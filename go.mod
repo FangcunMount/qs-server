@@ -36,9 +36,12 @@ require (
 )
 
 require (
+	github.com/buger/jsonparser v1.1.1
 	github.com/fatih/color v1.18.0
+	github.com/go-redis/redis/v7 v7.4.1
 	github.com/marmotedu/errors v1.0.2
 	github.com/marmotedu/log v0.0.1 // indirect
+	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6 // indirect
