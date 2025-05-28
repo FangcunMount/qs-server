@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/marmotedu/iam/pkg/shutdown"
+	"github.com/yshujie/questionnaire-scale/pkg/shutdown"
 )
 
 type startShutdownFunc func(sm shutdown.ShutdownManager)
