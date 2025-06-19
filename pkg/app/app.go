@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
 )
 
 // App 应用
@@ -77,6 +79,9 @@ func (a *App) buildCommand() {
 
 	// 设置排序
 	cmd.Flags().SortFlags = true
+
+	// 初始化命令行参数
+	cliflag.InitFlags(cmd.Flags())
 
 	a.cmd = cmd
 }
