@@ -21,6 +21,7 @@ type App struct {
 	basename  string
 	name      string
 	noVersion bool
+	noConfig  bool
 	options   CliOptions
 	cmd       *cobra.Command
 	args      cobra.PositionalArgs
@@ -139,6 +140,11 @@ func (a *App) buildCommand() {
 	// 如果版本标志不为空，则添加版本标志
 	if !a.noVersion {
 		verflag.AddFlags(namedFlagSets.FlagSet("global"))
+	}
+
+	// 如果配置标志不为空，则添加配置标志
+	if !a.noConfig {
+		addConfigFlag(a.basename, namedFlagSets.FlagSet("global"))
 	}
 
 	// 设置命令

@@ -1,0 +1,70 @@
+package app
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/gosuri/uitable"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"github.com/yshujie/questionnaire-scale/pkg/util/homedir"
+)
+
+// configFlagName 配置标志名称
+const configFlagName = "config"
+
+// cfgFile 配置文件
+var cfgFile string
+
+// init 初始化配置标志
+func init() {
+	pflag.StringVarP(&cfgFile, "config", "c", cfgFile, "Read configuration from specified `FILE`, "+
+		"support JSON, TOML, YAML, HCL, or Java properties formats.")
+}
+
+// addConfigFlag 添加配置标志
+func addConfigFlag(basename string, fs *pflag.FlagSet) {
+	fs.AddFlag(pflag.Lookup(configFlagName))
+
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix(strings.Replace(strings.ToUpper(basename), "-", "_", -1))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+
+	cobra.OnInitialize(func() {
+		if cfgFile != "" {
+			viper.SetConfigFile(cfgFile)
+		} else {
+			viper.AddConfigPath(".")
+
+			if names := strings.Split(basename, "-"); len(names) > 1 {
+				viper.AddConfigPath(filepath.Join(homedir.HomeDir(), "."+names[0]))
+				viper.AddConfigPath(filepath.Join("/etc", names[0]))
+			}
+
+			viper.SetConfigName(basename)
+		}
+
+		if err := viper.ReadInConfig(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: failed to read configuration file(%s): %v\n", cfgFile, err)
+			os.Exit(1)
+		}
+	})
+}
+
+// printConfig 打印配置
+func printConfig() {
+	if keys := viper.AllKeys(); len(keys) > 0 {
+		fmt.Printf("%v Configuration items:\n", progressMessage)
+		table := uitable.New()
+		table.Separator = " "
+		table.MaxColWidth = 80
+		table.RightAlign(0)
+		for _, k := range keys {
+			table.AddRow(fmt.Sprintf("%s:", k), viper.Get(k))
+		}
+		fmt.Printf("%v", table)
+	}
+}
