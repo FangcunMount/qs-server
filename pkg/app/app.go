@@ -13,12 +13,21 @@ import (
 type App struct {
 	basename string
 	name     string
+	options  CliOptions
 	cmd      *cobra.Command
 	args     cobra.PositionalArgs
+	commands []*Command
 }
 
 // Option 应用选项
 type Option func(*App)
+
+// WithOptions 打开应用程序的函数，从命令行或配置文件中读取参数
+func WithOptions(opt CliOptions) Option {
+	return func(a *App) {
+		a.options = opt
+	}
+}
 
 // WithValidArgs 设置 args
 func WithValidArgs(args cobra.PositionalArgs) Option {
@@ -82,6 +91,16 @@ func (a *App) buildCommand() {
 
 	// 初始化命令行参数
 	cliflag.InitFlags(cmd.Flags())
+
+	// 如果命令不为空，则添加命令
+	if len(a.commands) > 0 {
+		// 添加命令
+		for _, command := range a.commands {
+			cmd.AddCommand(command.cobraCommand())
+		}
+		// 设置帮助命令
+		cmd.SetHelpCommand(helpCommand(FormatBaseName(a.basename)))
+	}
 
 	a.cmd = cmd
 }
