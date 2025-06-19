@@ -5,10 +5,14 @@ import (
 	"os"
 
 	"github.com/fatih/color"
+	"github.com/marmotedu/component-base/pkg/term"
+	"github.com/marmotedu/errors"
 	"github.com/marmotedu/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
+	"github.com/yshujie/questionnaire-scale/pkg/version"
 	"github.com/yshujie/questionnaire-scale/pkg/version/verflag"
 )
 
@@ -18,15 +22,17 @@ var (
 
 // App 应用
 type App struct {
-	basename  string
-	name      string
-	noVersion bool
-	noConfig  bool
-	options   CliOptions
-	cmd       *cobra.Command
-	args      cobra.PositionalArgs
-	commands  []*Command
-	runFunc   RunFunc
+	basename    string
+	name        string
+	description string
+	noVersion   bool
+	noConfig    bool
+	silence     bool
+	options     CliOptions
+	cmd         *cobra.Command
+	args        cobra.PositionalArgs
+	commands    []*Command
+	runFunc     RunFunc
 }
 
 // Option 应用选项
@@ -34,6 +40,13 @@ type Option func(*App)
 
 // RunFunc 定义应用程序的启动回调函数
 type RunFunc func(basename string) error
+
+// WithDescription 设置应用程序的描述
+func WithDescription(description string) Option {
+	return func(a *App) {
+		a.description = description
+	}
+}
 
 // WithOptions 打开应用程序的函数，从命令行或配置文件中读取参数
 func WithOptions(opt CliOptions) Option {
@@ -96,7 +109,7 @@ func (a *App) buildCommand() {
 	cmd := &cobra.Command{
 		Use:           FormatBaseName(a.basename),
 		Short:         a.name,
-		Long:          a.name,
+		Long:          a.description,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          a.args,
@@ -147,8 +160,22 @@ func (a *App) buildCommand() {
 		addConfigFlag(a.basename, namedFlagSets.FlagSet("global"))
 	}
 
+	// 添加全局标志到命令标志集
+	cmd.Flags().AddFlagSet(namedFlagSets.FlagSet("global"))
+
+	// 添加命令模板
+	addCmdTemplate(cmd, namedFlagSets)
+
 	// 设置命令
 	a.cmd = cmd
+}
+
+// Run 运行应用程序
+func (a *App) Run() {
+	if err := a.cmd.Execute(); err != nil {
+		fmt.Printf("%v %v\n", color.RedString("Error:"), err)
+		os.Exit(1)
+	}
 }
 
 // runCommand 运行命令
@@ -158,9 +185,64 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 	// 打印命令行参数
 	cliflag.PrintFlags(cmd.Flags())
 
+	// 打印版本信息
+	if !a.noVersion {
+		verflag.PrintAndExitIfRequested()
+	}
+
+	// 如果配置标志不为空，则绑定命令行标志
+	if !a.noConfig {
+		// 绑定命令行标志
+		if err := viper.BindPFlags(cmd.Flags()); err != nil {
+			return err
+		}
+
+		// 如果选项不为空，则反序列化选项
+		if err := viper.Unmarshal(a.options); err != nil {
+			return err
+		}
+	}
+
+	// 如果静默标志不为空，则打印日志
+	if !a.silence {
+		log.Infof("%v Starting %s ...", progressMessage, a.name)
+		if !a.noVersion {
+			log.Infof("%v Version: `%s`", progressMessage, version.Get().ToJSON())
+		}
+		if !a.noConfig {
+			log.Infof("%v Config file used: `%s`", progressMessage, viper.ConfigFileUsed())
+		}
+	}
+
+	// 如果选项不为空，则应用选项规则
+	if a.options != nil {
+		if err := a.applyOptionRules(); err != nil {
+			return err
+		}
+	}
+
 	// 运行应用程序
 	if a.runFunc != nil {
 		return a.runFunc(a.basename)
+	}
+
+	return nil
+}
+
+// applyOptionRules 应用选项规则
+func (a *App) applyOptionRules() error {
+	if completeableOptions, ok := a.options.(CompleteableOptions); ok {
+		if err := completeableOptions.Complete(); err != nil {
+			return err
+		}
+	}
+
+	if errs := a.options.Validate(); len(errs) != 0 {
+		return errors.NewAggregate(errs)
+	}
+
+	if printableOptions, ok := a.options.(PrintableOptions); ok && !a.silence {
+		log.Infof("%v Config: `%s`", progressMessage, printableOptions.String())
 	}
 
 	return nil
@@ -170,4 +252,20 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 func printWorkingDir() {
 	wd, _ := os.Getwd()
 	log.Infof("%v WorkingDir: %s", progressMessage, wd)
+}
+
+// addCmdTemplate 添加命令模板
+func addCmdTemplate(cmd *cobra.Command, namedFlagSets cliflag.NamedFlagSets) {
+	usageFmt := "Usage:\n  %s\n"
+	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
+	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
+		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
+
+		return nil
+	})
+	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
+		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
+	})
 }
