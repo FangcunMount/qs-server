@@ -4,9 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
+	"github.com/marmotedu/log"
 	"github.com/spf13/cobra"
 
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
+)
+
+var (
+	progressMessage = color.GreenString("==>")
 )
 
 // App 应用
@@ -17,15 +23,26 @@ type App struct {
 	cmd      *cobra.Command
 	args     cobra.PositionalArgs
 	commands []*Command
+	runFunc  RunFunc
 }
 
 // Option 应用选项
 type Option func(*App)
 
+// RunFunc 定义应用程序的启动回调函数
+type RunFunc func(basename string) error
+
 // WithOptions 打开应用程序的函数，从命令行或配置文件中读取参数
 func WithOptions(opt CliOptions) Option {
 	return func(a *App) {
 		a.options = opt
+	}
+}
+
+// WithRunFunc 设置应用程序的启动回调函数选项
+func WithRunFunc(run RunFunc) Option {
+	return func(a *App) {
+		a.runFunc = run
 	}
 }
 
@@ -102,5 +119,31 @@ func (a *App) buildCommand() {
 		cmd.SetHelpCommand(helpCommand(FormatBaseName(a.basename)))
 	}
 
+	// 如果启动回调函数不为空，则设置启动回调函数
+	if a.runFunc != nil {
+		cmd.RunE = a.runCommand
+	}
+
 	a.cmd = cmd
+}
+
+// runCommand 运行命令
+func (a *App) runCommand(cmd *cobra.Command, args []string) error {
+	// 打印工作目录
+	printWorkingDir()
+	// 打印命令行参数
+	cliflag.PrintFlags(cmd.Flags())
+
+	// 运行应用程序
+	if a.runFunc != nil {
+		return a.runFunc(a.basename)
+	}
+
+	return nil
+}
+
+// printWorkingDir 打印工作目录
+func printWorkingDir() {
+	wd, _ := os.Getwd()
+	log.Infof("%v WorkingDir: %s", progressMessage, wd)
 }
