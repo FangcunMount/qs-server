@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
+	"github.com/yshujie/questionnaire-scale/pkg/version/verflag"
 )
 
 var (
@@ -17,13 +18,14 @@ var (
 
 // App 应用
 type App struct {
-	basename string
-	name     string
-	options  CliOptions
-	cmd      *cobra.Command
-	args     cobra.PositionalArgs
-	commands []*Command
-	runFunc  RunFunc
+	basename  string
+	name      string
+	noVersion bool
+	options   CliOptions
+	cmd       *cobra.Command
+	args      cobra.PositionalArgs
+	commands  []*Command
+	runFunc   RunFunc
 }
 
 // Option 应用选项
@@ -134,6 +136,12 @@ func (a *App) buildCommand() {
 		}
 	}
 
+	// 如果版本标志不为空，则添加版本标志
+	if !a.noVersion {
+		verflag.AddFlags(namedFlagSets.FlagSet("global"))
+	}
+
+	// 设置命令
 	a.cmd = cmd
 }
 
