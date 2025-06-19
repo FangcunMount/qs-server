@@ -27,26 +27,38 @@ func init() {
 
 // addConfigFlag 添加配置标志
 func addConfigFlag(basename string, fs *pflag.FlagSet) {
+	// 添加配置标志
 	fs.AddFlag(pflag.Lookup(configFlagName))
 
+	// 自动设置环境变量
 	viper.AutomaticEnv()
+	// 设置环境变量前缀
 	viper.SetEnvPrefix(strings.Replace(strings.ToUpper(basename), "-", "_", -1))
+	// 设置环境变量键替换
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
+	// 初始化配置
 	cobra.OnInitialize(func() {
+		// 如果配置文件不为空，则设置配置文件
 		if cfgFile != "" {
 			viper.SetConfigFile(cfgFile)
 		} else {
+			// 添加配置路径
 			viper.AddConfigPath(".")
 
+			// 如果basename包含多个单词，则添加配置路径
 			if names := strings.Split(basename, "-"); len(names) > 1 {
+				// 添加配置路径
 				viper.AddConfigPath(filepath.Join(homedir.HomeDir(), "."+names[0]))
+				// 添加配置路径
 				viper.AddConfigPath(filepath.Join("/etc", names[0]))
 			}
 
+			// 设置配置文件名
 			viper.SetConfigName(basename)
 		}
 
+		// 读取配置文件
 		if err := viper.ReadInConfig(); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Error: failed to read configuration file(%s): %v\n", cfgFile, err)
 			os.Exit(1)
