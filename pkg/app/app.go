@@ -124,6 +124,16 @@ func (a *App) buildCommand() {
 		cmd.RunE = a.runCommand
 	}
 
+	// 如果选项不为空，则添加选项
+	var namedFlagSets cliflag.NamedFlagSets
+	if a.options != nil {
+		namedFlagSets = a.options.Flags()
+		fs := cmd.Flags()
+		for _, f := range namedFlagSets.FlagSets {
+			fs.AddFlagSet(f)
+		}
+	}
+
 	a.cmd = cmd
 }
 
