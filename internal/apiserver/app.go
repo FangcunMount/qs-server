@@ -25,10 +25,18 @@ func NewApp(basename string) *app.App {
 
 func run() app.RunFunc {
 	return func(basename string) error {
-		log.Init(log.NewOptions())
+		// 获取配置选项
+		options := NewOptions()
+
+		// 初始化日志
+		log.Init(options.Log)
 		defer log.Flush()
 
 		log.Info("Starting questionnaire-scale ...")
+
+		// 打印配置信息
+		log.Infof("Server mode: %s", options.Server.Mode)
+		log.Infof("Health check enabled: %v", options.Server.Healthz)
 
 		return nil
 	}
