@@ -7,6 +7,7 @@
 ### 快速开始
 
 1. **安装 Air**（如果还没有安装）：
+
    ```bash
    make install-air
    # 或者
@@ -14,6 +15,7 @@
    ```
 
 2. **启动开发环境**：
+
    ```bash
    make dev
    # 或者
@@ -66,7 +68,7 @@ make deps
 
 ### 文件结构
 
-```
+```text
 .
 ├── .air.toml              # Air 配置文件
 ├── Makefile               # 构建脚本
@@ -88,18 +90,21 @@ make deps
 ### 故障排除
 
 #### 问题：Air 未找到
+
 ```bash
 # 解决方案：重新安装 Air
 go install github.com/air-verse/air@latest
 ```
 
 #### 问题：配置文件未找到
+
 ```bash
 # 解决方案：检查配置文件路径
 ls -la configs/qs-apiserver.yaml
 ```
 
 #### 问题：构建失败
+
 ```bash
 # 解决方案：检查 Go 模块
 go mod tidy
@@ -107,6 +112,7 @@ go mod download
 ```
 
 #### 问题：权限被拒绝
+
 ```bash
 # 解决方案：添加执行权限
 chmod +x script/dev.sh
@@ -119,4 +125,4 @@ chmod +x script/dev.sh
 - **修改监听文件类型**：调整 `include_ext` 数组
 - **修改排除目录**：调整 `exclude_dir` 数组
 - **修改构建命令**：调整 `cmd` 字段
-- **修改启动参数**：调整 `args_bin` 数组 
+- **修改启动参数**：调整 `args_bin` 数组
