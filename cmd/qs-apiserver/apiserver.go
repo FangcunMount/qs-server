@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver"
+)
 
 func main() {
-	fmt.Println("qs-apiserver will start")
+	apiserver.NewApp("qs-apiserver").Run()
 }
