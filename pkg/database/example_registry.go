@@ -151,7 +151,7 @@ func (c *ComponentExample) DoMySQLWork() error {
 func (c *ComponentExample) DoRedisWork() error {
 	client, err := c.registry.GetClient(dbs.Redis)
 	if err != nil {
-		return fmt.Errorf("Redis not available: %w", err)
+		return fmt.Errorf("redis not available: %w", err)
 	}
 
 	if _, ok := client.(redis.UniversalClient); ok {
@@ -168,7 +168,7 @@ func (c *ComponentExample) DoRedisWork() error {
 func (c *ComponentExample) DoMongoWork() error {
 	client, err := c.registry.GetClient(dbs.MongoDB)
 	if err != nil {
-		return fmt.Errorf("MongoDB not available: %w", err)
+		return fmt.Errorf("mongodb not available: %w", err)
 	}
 
 	if _, ok := client.(*mgo.Session); ok {
