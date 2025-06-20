@@ -39,18 +39,18 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 
 	// 初始化配置
 	cobra.OnInitialize(func() {
-		// 如果配置文件不为空，则设置配置文件
+		// 若指定了配置文件地址，则直接使用
 		if cfgFile != "" {
 			viper.SetConfigFile(cfgFile)
 		} else {
-			// 添加配置路径
+			// 没有指定配置文件地址，则使用当前目录
 			viper.AddConfigPath(".")
 
 			// 如果basename包含多个单词，则添加配置路径
 			if names := strings.Split(basename, "-"); len(names) > 1 {
-				// 添加配置路径
+				// 添加用户家目录下的配置路径
 				viper.AddConfigPath(filepath.Join(homedir.HomeDir(), "."+names[0]))
-				// 添加配置路径
+				// 添加系统配置路径
 				viper.AddConfigPath(filepath.Join("/etc", names[0]))
 			}
 
