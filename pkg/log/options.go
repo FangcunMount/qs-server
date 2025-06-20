@@ -54,6 +54,12 @@ type Options struct {
 	EnableColor       bool     `json:"enable-color"       mapstructure:"enable-color"`
 	Development       bool     `json:"development"        mapstructure:"development"`
 	Name              string   `json:"name"               mapstructure:"name"`
+
+	// 日志轮转配置
+	MaxSize    int  `json:"max-size"    mapstructure:"max-size"`    // 单个日志文件最大大小（MB）
+	MaxAge     int  `json:"max-age"     mapstructure:"max-age"`     // 保留旧日志文件的最大天数
+	MaxBackups int  `json:"max-backups" mapstructure:"max-backups"` // 保留旧日志文件的最大个数
+	Compress   bool `json:"compress"    mapstructure:"compress"`    // 是否压缩旧日志文件
 }
 
 // NewOptions creates an Options object with default parameters.
@@ -67,6 +73,10 @@ func NewOptions() *Options {
 		Development:       false,
 		OutputPaths:       []string{"stdout"},
 		ErrorOutputPaths:  []string{"stderr"},
+		MaxSize:           100,  // 100MB
+		MaxAge:            30,   // 30天
+		MaxBackups:        10,   // 保留10个备份文件
+		Compress:          true, // 压缩旧文件
 	}
 }
 
@@ -82,6 +92,19 @@ func (o *Options) Validate() []error {
 	format := strings.ToLower(o.Format)
 	if format != consoleFormat && format != jsonFormat {
 		errs = append(errs, fmt.Errorf("not a valid log format: %q", o.Format))
+	}
+
+	// 验证日志轮转配置
+	if o.MaxSize <= 0 {
+		errs = append(errs, fmt.Errorf("max-size must be greater than 0"))
+	}
+
+	if o.MaxAge < 0 {
+		errs = append(errs, fmt.Errorf("max-age cannot be negative"))
+	}
+
+	if o.MaxBackups < 0 {
+		errs = append(errs, fmt.Errorf("max-backups cannot be negative"))
 	}
 
 	return errs
@@ -105,6 +128,12 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"the behavior of DPanicLevel and takes stacktraces more liberally.",
 	)
 	fs.StringVar(&o.Name, flagName, o.Name, "The name of the logger.")
+
+	// 添加日志轮转相关的命令行参数
+	fs.IntVar(&o.MaxSize, "log.max-size", o.MaxSize, "Maximum size in megabytes of the log file before it gets rotated.")
+	fs.IntVar(&o.MaxAge, "log.max-age", o.MaxAge, "Maximum number of days to retain old log files.")
+	fs.IntVar(&o.MaxBackups, "log.max-backups", o.MaxBackups, "Maximum number of old log files to retain.")
+	fs.BoolVar(&o.Compress, "log.compress", o.Compress, "Compress rotated log files.")
 }
 
 func (o *Options) String() string {
@@ -115,6 +144,30 @@ func (o *Options) String() string {
 
 // Build constructs a global zap logger from the Config and Options.
 func (o *Options) Build() error {
+	// 检查是否有文件输出路径，如果有则使用轮转功能
+	hasFileOutput := false
+	for _, path := range o.OutputPaths {
+		if path != "stdout" && path != "stderr" {
+			hasFileOutput = true
+			break
+		}
+	}
+	for _, path := range o.ErrorOutputPaths {
+		if path != "stdout" && path != "stderr" {
+			hasFileOutput = true
+			break
+		}
+	}
+
+	// 如果有文件输出，使用轮转功能
+	if hasFileOutput {
+		logger := NewWithRotation(o)
+		zap.RedirectStdLog(logger.Named(o.Name))
+		zap.ReplaceGlobals(logger)
+		return nil
+	}
+
+	// 原有的逻辑（无文件输出时）
 	var zapLevel zapcore.Level
 	if err := zapLevel.UnmarshalText([]byte(o.Level)); err != nil {
 		zapLevel = zapcore.InfoLevel

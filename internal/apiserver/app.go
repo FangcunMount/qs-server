@@ -12,31 +12,29 @@ others. The API Server services REST operations to do the api objects management
 
 // NewApp 创建 App
 func NewApp(basename string) *app.App {
+	opts := NewOptions()
 	application := app.NewApp("Questionnaire Scale API Server",
 		basename,
 		app.WithDescription(commandDesc),
 		app.WithDefaultValidArgs(),
-		app.WithOptions(NewOptions()),
-		app.WithRunFunc(run()),
+		app.WithOptions(opts),
+		app.WithRunFunc(run(opts)),
 	)
 
 	return application
 }
 
-func run() app.RunFunc {
+func run(opts *Options) app.RunFunc {
 	return func(basename string) error {
-		// 获取配置选项
-		options := NewOptions()
-
-		// 初始化日志
-		log.Init(options.Log)
+		// 初始化日志（使用从配置文件加载的配置）
+		log.Init(opts.Log)
 		defer log.Flush()
 
 		log.Info("Starting questionnaire-scale ...")
 
 		// 打印配置信息
-		log.Infof("Server mode: %s", options.Server.Mode)
-		log.Infof("Health check enabled: %v", options.Server.Healthz)
+		log.Infof("Server mode: %s", opts.Server.Mode)
+		log.Infof("Health check enabled: %v", opts.Server.Healthz)
 
 		return nil
 	}

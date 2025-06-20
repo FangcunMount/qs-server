@@ -27,6 +27,7 @@ bin/
 # Log files
 *.log
 build-errors.log
+logs/
 
 # IDE files
 .vscode/
