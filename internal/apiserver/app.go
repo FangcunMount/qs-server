@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/options"
 	"github.com/yshujie/questionnaire-scale/pkg/app"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
@@ -12,7 +13,7 @@ others. The API Server services REST operations to do the api objects management
 
 // NewApp 创建 App
 func NewApp(basename string) *app.App {
-	opts := NewOptions()
+	opts := options.NewOptions()
 	application := app.NewApp("Questionnaire Scale API Server",
 		basename,
 		app.WithDescription(commandDesc),
@@ -24,7 +25,7 @@ func NewApp(basename string) *app.App {
 	return application
 }
 
-func run(opts *Options) app.RunFunc {
+func run(opts *options.Options) app.RunFunc {
 	return func(basename string) error {
 		// 初始化日志（使用从配置文件加载的配置）
 		log.Init(opts.Log)
