@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/marmotedu/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/yshujie/questionnaire-scale/pkg/errors"
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/term"
