@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"github.com/marmotedu/component-base/pkg/core"
-	"github.com/marmotedu/component-base/pkg/version"
+	"github.com/yshujie/questionnaire-scale/pkg/core"
+	"github.com/yshujie/questionnaire-scale/pkg/version"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 	"golang.org/x/sync/errgroup"
 
