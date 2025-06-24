@@ -1,8 +1,7 @@
-package apiserver
+package options
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/pflag"
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
@@ -49,25 +48,6 @@ func (o *Options) addServerFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Server.Healthz, "server.healthz", o.Server.Healthz, "Enable health check endpoint")
 	fs.StringVar(&o.Server.Middlewares, "server.middlewares", o.Server.Middlewares, "Comma-separated list of middlewares")
 	fs.IntVar(&o.Server.MaxPingCount, "server.max-ping-count", o.Server.MaxPingCount, "Max ping count for health check")
-}
-
-// Validate 验证命令行参数
-func (o *Options) Validate() []error {
-	var errs []error
-
-	// 验证日志配置
-	errs = append(errs, o.Log.Validate()...)
-
-	// 验证服务器配置
-	if o.Server.Mode != "release" && o.Server.Mode != "debug" && o.Server.Mode != "test" {
-		errs = append(errs, fmt.Errorf("invalid server mode: %s", o.Server.Mode))
-	}
-
-	if o.Server.MaxPingCount <= 0 {
-		errs = append(errs, fmt.Errorf("max-ping-count must be greater than 0"))
-	}
-
-	return errs
 }
 
 // Complete 完成配置选项
