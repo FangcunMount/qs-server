@@ -4,8 +4,8 @@ import (
 	goflag "flag"
 	"strings"
 
-	"github.com/marmotedu/log"
 	"github.com/spf13/pflag"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // InitFlags 初始化

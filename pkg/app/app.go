@@ -5,13 +5,13 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/marmotedu/component-base/pkg/term"
 	"github.com/marmotedu/errors"
-	"github.com/marmotedu/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/yshujie/questionnaire-scale/pkg/term"
 	"github.com/yshujie/questionnaire-scale/pkg/version"
 	"github.com/yshujie/questionnaire-scale/pkg/version/verflag"
 )
