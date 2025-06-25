@@ -3,56 +3,45 @@ package options
 import (
 	"encoding/json"
 
-	"github.com/spf13/pflag"
+	genericoptions "github.com/yshujie/questionnaire-scale/internal/pkg/options"
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // Options 包含所有配置项
 type Options struct {
-	Log    *log.Options   `json:"log"    mapstructure:"log"`
-	Server *ServerOptions `json:"server" mapstructure:"server"`
-}
-
-// ServerOptions 服务器配置选项
-type ServerOptions struct {
-	Mode         string `json:"mode"          mapstructure:"mode"`
-	Healthz      bool   `json:"healthz"       mapstructure:"healthz"`
-	Middlewares  string `json:"middlewares"   mapstructure:"middlewares"`
-	MaxPingCount int    `json:"max-ping-count" mapstructure:"max-ping-count"`
+	Log                     *log.Options                           `json:"log"    mapstructure:"log"`
+	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server" mapstructure:"server"`
+	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
+	SecureServing           *genericoptions.SecureServingOptions   `json:"secure" mapstructure:"secure"`
+	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"    mapstructure:"mysql"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{
-		Log: log.NewOptions(),
-		Server: &ServerOptions{
-			Mode:         "release",
-			Healthz:      true,
-			Middlewares:  "recovery,logger,secure,nocache,cors,dump",
-			MaxPingCount: 3,
-		},
+		Log:                     log.NewOptions(),
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		InsecureServing:         genericoptions.NewInsecureServingOptions(),
+		SecureServing:           genericoptions.NewSecureServingOptions(),
+		MySQLOptions:            genericoptions.NewMySQLOptions(),
 	}
 }
 
 // Flags 返回一个 NamedFlagSets 对象，包含所有命令行参数
 func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Log.AddFlags(fss.FlagSet("log"))
-	o.addServerFlags(fss.FlagSet("server"))
-	return fss
-}
+	o.GenericServerRunOptions.AddFlags(fss.FlagSet("server"))
+	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
+	o.SecureServing.AddFlags(fss.FlagSet("secure"))
+	o.MySQLOptions.AddFlags(fss.FlagSet("mysql"))
 
-// addServerFlags 添加服务器相关的命令行参数
-func (o *Options) addServerFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.Server.Mode, "server.mode", o.Server.Mode, "Server mode: release, debug, test")
-	fs.BoolVar(&o.Server.Healthz, "server.healthz", o.Server.Healthz, "Enable health check endpoint")
-	fs.StringVar(&o.Server.Middlewares, "server.middlewares", o.Server.Middlewares, "Comma-separated list of middlewares")
-	fs.IntVar(&o.Server.MaxPingCount, "server.max-ping-count", o.Server.MaxPingCount, "Max ping count for health check")
+	return fss
 }
 
 // Complete 完成配置选项
 func (o *Options) Complete() error {
-	return nil
+	return o.SecureServing.Complete()
 }
 
 // String 返回配置的字符串表示
