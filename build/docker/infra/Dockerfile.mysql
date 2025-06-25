@@ -20,7 +20,7 @@ ENV TZ=${TZ}
 COPY ../../../configs/mysql/my.cnf /etc/mysql/conf.d/my.cnf
 
 # 复制初始化SQL脚本
-COPY ../../../configs/mysql/questionnaire-scale.sql /docker-entrypoint-initdb.d/
+COPY ../../../configs/mysql/questionnaire.sql /docker-entrypoint-initdb.d/
 
 # 创建日志目录并设置权限
 RUN mkdir -p /var/log/mysql && \

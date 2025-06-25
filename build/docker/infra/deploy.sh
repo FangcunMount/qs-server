@@ -102,8 +102,8 @@ check_config_files() {
         exit 1
     fi
     
-    if [ ! -f "configs/mysql/questionnaire-scale.sql" ]; then
-        error "MySQL初始化脚本不存在: configs/mysql/questionnaire-scale.sql"
+    if [ ! -f "configs/mysql/questionnaire.sql" ]; then
+        error "MySQL初始化脚本不存在: configs/mysql/questionnaire.sql"
         exit 1
     fi
     
