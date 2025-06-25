@@ -7,6 +7,17 @@ server:
     middlewares: recovery,logger,secure,nocache,cors,dump # 加载的 gin 中间件列表，多个中间件，逗号(,)隔开
     max-ping-count: 3 # http 服务启动后，自检尝试次数，默认 3
 
+# MySQL 数据库配置
+mysql:
+  host: "127.0.0.1:3306" # MySQL 服务器地址
+  username: "root" # 数据库用户名
+  password: "" # 数据库密码
+  database: "questionnaire_scale" # 数据库名称
+  max-idle-connections: 10 # 最大空闲连接数
+  max-open-connections: 100 # 最大打开连接数
+  max-connection-life-time: "1h" # 连接最大生存时间
+  log-level: 1 # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
+
 # 日志配置
 log:
   level: "info" # 日志级别：debug, info, warn, error, fatal, panic
