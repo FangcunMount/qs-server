@@ -2,6 +2,8 @@ package apiserver
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/store"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/store/mysql"
 	genericapiserver "github.com/yshujie/questionnaire-scale/internal/pkg/server"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/shutdown"
@@ -61,11 +63,28 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// 创建存储工厂（依赖注入）
+	mysqlDB, err := s.dbManager.GetMySQLDB()
+	if err != nil {
+		log.Fatalf("Failed to get MySQL connection: %v", err)
+	}
+	storeFactory := mysql.NewMySQLStore(mysqlDB)
+
+	// 设置全局存储客户端
+	store.SetClient(storeFactory)
+
 	// 初始化路由
 	initRouter(s.genericAPIServer.Engine, s.dbManager)
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
+		// 关闭存储连接
+		if client := store.Client(); client != nil {
+			if err := client.Close(); err != nil {
+				log.Errorf("Failed to close store connections: %v", err)
+			}
+		}
+
 		// 关闭数据库连接
 		if s.dbManager != nil {
 			if err := s.dbManager.Close(); err != nil {
