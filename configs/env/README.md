@@ -24,17 +24,20 @@ cd build/docker/infra
 
 ### 生产环境
 
-1. 复制生产环境模板：
+1.复制生产环境模板：
+
 ```bash
 cp configs/env/config.prod.env configs/env/config.env
 ```
 
-2. 修改配置文件中的敏感信息：
+2.修改配置文件中的敏感信息：
+
 ```bash
 nano configs/env/config.env
 ```
 
-3. 部署服务：
+3.部署服务：
+
 ```bash
 cd build/docker/infra
 ./deploy.sh deploy
@@ -68,31 +71,35 @@ cd build/docker/infra
 
 ## 安全建议
 
-### 开发环境
+### 开发环境建议
 
 - 使用简单密码便于开发调试
 - 可以提交到版本控制系统
 
-### 生产环境
+### 生产环境建议
 
 1. **强密码**: 使用复杂密码
+
    ```bash
    # 生成32位随机密码
    openssl rand -base64 32
    ```
 
 2. **文件权限**: 限制配置文件访问权限
+
    ```bash
    chmod 600 configs/env/config.env
    ```
 
 3. **版本控制**: 不要提交生产配置到代码仓库
+
    ```bash
    # 添加到 .gitignore
    echo "configs/env/config.env" >> .gitignore
    ```
 
 4. **环境分离**: 为不同环境使用不同的配置文件
+
    ```bash
    # 开发环境
    configs/env/config.dev.env
@@ -166,4 +173,4 @@ mkdir -p /data/logs/qs/mysql
 3. **权限控制**: 严格控制配置文件的访问权限
 4. **版本控制**: 只提交模板文件，不提交实际使用的配置
 5. **定期更新**: 定期更换生产环境密码
-6. **备份配置**: 安全备份生产环境配置文件 
+6. **备份配置**: 安全备份生产环境配置文件

@@ -6,7 +6,7 @@
 
 ## 目录结构
 
-```
+```text
 build/docker/infra/
 ├── Dockerfile.mysql          # MySQL自定义镜像构建文件
 ├── Dockerfile.redis          # Redis自定义镜像构建文件  
@@ -23,22 +23,26 @@ configs/env/
 ## 架构特点
 
 ### 统一配置管理
+
 - **环境变量配置**: 使用 `config.env` 统一管理所有数据库配置
 - **多环境支持**: 提供开发环境和生产环境配置示例
 - **配置继承**: 支持环境变量覆盖和默认值
 
 ### 自定义镜像
+
 - **配置文件内嵌**: 所有配置文件都构建到镜像中，无需外部挂载
 - **初始化脚本集成**: 数据库初始化脚本已集成到镜像
 - **生产就绪**: 所有服务都使用生产级配置
 
 ### 数据持久化
+
 - **灵活路径配置**: 通过环境变量自定义数据和日志路径
 - **数据文件**: 默认挂载到 `/data/{service}/qs/data` 目录
 - **日志文件**: 默认挂载到 `/data/logs/qs/{service}` 目录
 - **配置隔离**: 配置文件在镜像内部，不依赖外部文件
 
 ### 无管理界面
+
 - 专注于数据库服务本身
 - 减少资源消耗
 - 提高安全性
@@ -73,7 +77,7 @@ cp ../../../configs/env/config.prod.env ../../../configs/env/config.env
 | MySQL | MYSQL_USER, MYSQL_PASSWORD | 应用用户密码 |
 | Redis | REDIS_PASSWORD | Redis访问密码 |
 | MongoDB | MONGODB_ROOT_PASSWORD | MongoDB管理员密码 |
-| 路径 | *_DATA_PATH, *_LOGS_PATH | 数据和日志存储路径 |
+| 路径 | *_DATA_PATH,*_LOGS_PATH | 数据和日志存储路径 |
 
 ## 快速开始
 
@@ -103,6 +107,7 @@ cd build/docker/infra
 ## 服务配置
 
 ### MySQL 服务
+
 - **镜像**: questionnaire-mysql:latest
 - **端口**: 3306
 - **数据库**: questionnaire_scale
@@ -110,6 +115,7 @@ cd build/docker/infra
 - **管理员**: root / questionnaire_root_2024
 
 ### Redis 服务
+
 - **镜像**: questionnaire-redis:latest
 - **端口**: 6379
 - **密码**: questionnaire_redis_2024
@@ -117,6 +123,7 @@ cd build/docker/infra
 - **内存限制**: 512MB
 
 ### MongoDB 服务
+
 - **镜像**: questionnaire-mongodb:latest
 - **端口**: 27017
 - **数据库**: questionnaire_scale
@@ -150,7 +157,7 @@ cd build/docker/infra
 ./deploy.sh connect redis  # 连接Redis
 ```
 
-## 数据持久化
+## 数据持久化配置
 
 ### 目录映射
 
@@ -219,11 +226,13 @@ mongo mongodb://admin:questionnaire_admin_2024@localhost:27017/admin
 ### 常见问题
 
 1. **容器启动失败**
+
    ```bash
    ./deploy.sh logs <service>  # 查看详细日志
    ```
 
 2. **端口冲突**
+
    ```bash
    lsof -i :3306   # 检查MySQL端口
    lsof -i :6379   # 检查Redis端口
@@ -231,6 +240,7 @@ mongo mongodb://admin:questionnaire_admin_2024@localhost:27017/admin
    ```
 
 3. **权限问题**
+
    ```bash
    sudo chown -R $USER:$USER ../../../data/
    sudo chown -R $USER:$USER ../../../logs/
@@ -262,11 +272,13 @@ docker system prune
 ## 资源要求
 
 ### 最小配置
+
 - CPU: 4核
 - 内存: 6GB
 - 磁盘: 20GB
 
 ### 推荐配置
+
 - CPU: 8核
 - 内存: 12GB  
 - 磁盘: 100GB SSD
@@ -276,4 +288,4 @@ docker system prune
 - MySQL: 8.0
 - Redis: 7.2
 - MongoDB: 7.0
-- Docker Compose: 3.8 
+- Docker Compose: 3.8
