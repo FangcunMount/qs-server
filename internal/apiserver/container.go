@@ -10,7 +10,8 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/api/http/handlers"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/storage/composite"
 	mongoAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/storage/mongodb"
-	mysqlAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/storage/mysql"
+	mysqlQuestionnaireAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/storage/mysql/questionnaire"
+	mysqlUserAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/storage/mysql/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/services"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/ports/storage"
 )
@@ -236,7 +237,7 @@ func (c *Container) Cleanup() {
 func (c *Container) registerQuestionnaireComponents() {
 	// 注册 MySQL 问卷仓储
 	c.RegisterComponent("mysqlQuestionnaireRepo", RepositoryType, func(container *Container) (interface{}, error) {
-		return mysqlAdapter.NewQuestionnaireRepository(container.mysqlDB, nil, ""), nil
+		return mysqlQuestionnaireAdapter.NewRepository(container.mysqlDB, nil, ""), nil
 	})
 
 	// 注册 MongoDB 文档仓储（如果可用）
@@ -290,7 +291,7 @@ func (c *Container) registerQuestionnaireComponents() {
 func (c *Container) registerUserComponents() {
 	// 注册用户仓储
 	c.RegisterComponent("userRepo", RepositoryType, func(container *Container) (interface{}, error) {
-		return mysqlAdapter.NewUserRepository(container.mysqlDB), nil
+		return mysqlUserAdapter.NewRepository(container.mysqlDB), nil
 	})
 
 	// 注册用户服务

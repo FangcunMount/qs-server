@@ -1,4 +1,4 @@
-package mysql
+package questionnaire
 
 import (
 	"context"
@@ -8,43 +8,28 @@ import (
 	"github.com/vinllen/mgo"
 	"gorm.io/gorm"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/storage/mysql"
+	questionnaireDomain "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/ports/storage"
 )
 
-// questionnaireRepository 问卷仓储适配器
+// Repository 问卷仓储适配器
 // 使用 MySQL 存储基础信息，MongoDB 存储文档结构
-type questionnaireRepository struct {
-	*BaseRepository
-	mongo    *mgo.Session
-	database string
+type Repository struct {
+	*mysql.BaseRepository
+	mongo     *mgo.Session
+	database  string
+	converter *Converter
 }
 
-// NewQuestionnaireRepository 创建问卷仓储适配器
-func NewQuestionnaireRepository(mysql *gorm.DB, mongo *mgo.Session, mongoDatabase string) storage.QuestionnaireRepository {
-	return &questionnaireRepository{
-		BaseRepository: NewBaseRepository(mysql),
+// NewRepository 创建问卷仓储适配器
+func NewRepository(mysqlDB *gorm.DB, mongo *mgo.Session, mongoDatabase string) storage.QuestionnaireRepository {
+	return &Repository{
+		BaseRepository: mysql.NewBaseRepository(mysqlDB),
 		mongo:          mongo,
 		database:       mongoDatabase,
+		converter:      NewConverter(),
 	}
-}
-
-// questionnaireModel MySQL 表模型
-type questionnaireModel struct {
-	ID          string    `gorm:"primaryKey" json:"id"`
-	Code        string    `gorm:"uniqueIndex" json:"code"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Status      int       `json:"status"`
-	CreatedBy   string    `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Version     int       `json:"version"`
-}
-
-// TableName 表名
-func (questionnaireModel) TableName() string {
-	return "questionnaires"
 }
 
 // questionnaireDocument MongoDB 文档模型
@@ -74,19 +59,9 @@ type optionDocument struct {
 }
 
 // Save 保存问卷
-func (r *questionnaireRepository) Save(ctx context.Context, q *questionnaire.Questionnaire) error {
+func (r *Repository) Save(ctx context.Context, q *questionnaireDomain.Questionnaire) error {
 	// 1. 保存基础信息到 MySQL
-	model := &questionnaireModel{
-		ID:          q.ID().Value(),
-		Code:        q.Code(),
-		Title:       q.Title(),
-		Description: q.Description(),
-		Status:      int(q.Status()),
-		CreatedBy:   q.CreatedBy(),
-		CreatedAt:   q.CreatedAt(),
-		UpdatedAt:   q.UpdatedAt(),
-		Version:     q.Version(),
-	}
+	model := r.converter.DomainToModel(q)
 
 	if err := r.Create(ctx, model); err != nil {
 		return fmt.Errorf("failed to save questionnaire to MySQL: %w", err)
@@ -117,60 +92,47 @@ func (r *questionnaireRepository) Save(ctx context.Context, q *questionnaire.Que
 }
 
 // FindByID 根据ID查找问卷
-func (r *questionnaireRepository) FindByID(ctx context.Context, id questionnaire.QuestionnaireID) (*questionnaire.Questionnaire, error) {
+func (r *Repository) FindByID(ctx context.Context, id questionnaireDomain.QuestionnaireID) (*questionnaireDomain.Questionnaire, error) {
 	// 1. 从 MySQL 获取基础信息
-	var model questionnaireModel
+	var model Model
 	if err := r.BaseRepository.FindByID(ctx, &model, id.Value()); err != nil {
 		return nil, fmt.Errorf("failed to find questionnaire in MySQL: %w", err)
 	}
 
 	// 如果记录不存在，model 的字段会为零值
 	if model.ID == "" {
-		return nil, questionnaire.ErrQuestionnaireNotFound
+		return nil, questionnaireDomain.ErrQuestionnaireNotFound
 	}
 
 	// 2. 暂时返回一个基础的问卷对象
 	// TODO: 从 MongoDB 加载完整信息
-	q := questionnaire.NewQuestionnaire(model.Code, model.Title, model.Description, model.CreatedBy)
-	return q, nil
+	return r.converter.ModelToDomain(&model), nil
 }
 
 // FindByCode 根据代码查找问卷
-func (r *questionnaireRepository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
-	var model questionnaireModel
+func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnaireDomain.Questionnaire, error) {
+	var model Model
 	if err := r.FindByField(ctx, &model, "code", code); err != nil {
 		return nil, fmt.Errorf("failed to find questionnaire by code: %w", err)
 	}
 
 	// 如果记录不存在，model 的字段会为零值
 	if model.ID == "" {
-		return nil, questionnaire.ErrQuestionnaireNotFound
+		return nil, questionnaireDomain.ErrQuestionnaireNotFound
 	}
 
 	// TODO: 从 MongoDB 加载完整信息
-	q := questionnaire.NewQuestionnaire(model.Code, model.Title, model.Description, model.CreatedBy)
-	return q, nil
+	return r.converter.ModelToDomain(&model), nil
 }
 
 // Update 更新问卷
-func (r *questionnaireRepository) Update(ctx context.Context, q *questionnaire.Questionnaire) error {
-	model := &questionnaireModel{
-		ID:          q.ID().Value(),
-		Code:        q.Code(),
-		Title:       q.Title(),
-		Description: q.Description(),
-		Status:      int(q.Status()),
-		CreatedBy:   q.CreatedBy(),
-		CreatedAt:   q.CreatedAt(),
-		UpdatedAt:   q.UpdatedAt(),
-		Version:     q.Version(),
-	}
-
+func (r *Repository) Update(ctx context.Context, q *questionnaireDomain.Questionnaire) error {
+	model := r.converter.DomainToModel(q)
 	return r.BaseRepository.Update(ctx, model)
 }
 
 // Remove 删除问卷
-func (r *questionnaireRepository) Remove(ctx context.Context, id questionnaire.QuestionnaireID) error {
+func (r *Repository) Remove(ctx context.Context, id questionnaireDomain.QuestionnaireID) error {
 	// 1. 删除 MongoDB 文档（如果可用）
 	if r.mongo != nil {
 		session := r.mongo.Copy()
@@ -181,17 +143,17 @@ func (r *questionnaireRepository) Remove(ctx context.Context, id questionnaire.Q
 	}
 
 	// 2. 删除 MySQL 记录
-	return r.DeleteByID(ctx, &questionnaireModel{}, id.Value())
+	return r.DeleteByID(ctx, &Model{}, id.Value())
 }
 
 // FindPublishedQuestionnaires 查找已发布的问卷
-func (r *questionnaireRepository) FindPublishedQuestionnaires(ctx context.Context) ([]*questionnaire.Questionnaire, error) {
-	return r.FindQuestionnairesByStatus(ctx, questionnaire.StatusPublished)
+func (r *Repository) FindPublishedQuestionnaires(ctx context.Context) ([]*questionnaireDomain.Questionnaire, error) {
+	return r.FindQuestionnairesByStatus(ctx, questionnaireDomain.StatusPublished)
 }
 
 // FindQuestionnairesByCreator 根据创建者查找问卷
-func (r *questionnaireRepository) FindQuestionnairesByCreator(ctx context.Context, creatorID string) ([]*questionnaire.Questionnaire, error) {
-	var models []questionnaireModel
+func (r *Repository) FindQuestionnairesByCreator(ctx context.Context, creatorID string) ([]*questionnaireDomain.Questionnaire, error) {
+	var models []Model
 	conditions := map[string]interface{}{
 		"created_by": creatorID,
 	}
@@ -200,16 +162,16 @@ func (r *questionnaireRepository) FindQuestionnairesByCreator(ctx context.Contex
 		return nil, err
 	}
 
-	result := make([]*questionnaire.Questionnaire, len(models))
+	result := make([]*questionnaireDomain.Questionnaire, len(models))
 	for i, model := range models {
-		result[i] = questionnaire.NewQuestionnaire(model.Code, model.Title, model.Description, model.CreatedBy)
+		result[i] = r.converter.ModelToDomain(&model)
 	}
 	return result, nil
 }
 
 // FindQuestionnairesByStatus 根据状态查找问卷
-func (r *questionnaireRepository) FindQuestionnairesByStatus(ctx context.Context, status questionnaire.Status) ([]*questionnaire.Questionnaire, error) {
-	var models []questionnaireModel
+func (r *Repository) FindQuestionnairesByStatus(ctx context.Context, status questionnaireDomain.Status) ([]*questionnaireDomain.Questionnaire, error) {
+	var models []Model
 	conditions := map[string]interface{}{
 		"status": int(status),
 	}
@@ -218,16 +180,16 @@ func (r *questionnaireRepository) FindQuestionnairesByStatus(ctx context.Context
 		return nil, err
 	}
 
-	result := make([]*questionnaire.Questionnaire, len(models))
+	result := make([]*questionnaireDomain.Questionnaire, len(models))
 	for i, model := range models {
-		result[i] = questionnaire.NewQuestionnaire(model.Code, model.Title, model.Description, model.CreatedBy)
+		result[i] = r.converter.ModelToDomain(&model)
 	}
 	return result, nil
 }
 
 // FindQuestionnaires 分页查询问卷
-func (r *questionnaireRepository) FindQuestionnaires(ctx context.Context, query storage.QueryOptions) (*storage.QuestionnaireQueryResult, error) {
-	paginatedQuery := r.NewPaginatedQuery(ctx, &questionnaireModel{}).
+func (r *Repository) FindQuestionnaires(ctx context.Context, query storage.QueryOptions) (*storage.QuestionnaireQueryResult, error) {
+	paginatedQuery := r.NewPaginatedQuery(ctx, &Model{}).
 		Offset(query.Offset).
 		Limit(query.Limit)
 
@@ -251,16 +213,16 @@ func (r *questionnaireRepository) FindQuestionnaires(ctx context.Context, query 
 		paginatedQuery = paginatedQuery.OrderBy(order)
 	}
 
-	var models []questionnaireModel
+	var models []Model
 	result, err := paginatedQuery.Execute(&models)
 	if err != nil {
 		return nil, err
 	}
 
 	// 转换为领域对象
-	questionnaires := make([]*questionnaire.Questionnaire, len(models))
+	questionnaires := make([]*questionnaireDomain.Questionnaire, len(models))
 	for i, model := range models {
-		questionnaires[i] = questionnaire.NewQuestionnaire(model.Code, model.Title, model.Description, model.CreatedBy)
+		questionnaires[i] = r.converter.ModelToDomain(&model)
 	}
 
 	return &storage.QuestionnaireQueryResult{
@@ -271,17 +233,17 @@ func (r *questionnaireRepository) FindQuestionnaires(ctx context.Context, query 
 }
 
 // ExistsByCode 检查代码是否存在
-func (r *questionnaireRepository) ExistsByCode(ctx context.Context, code string) (bool, error) {
-	return r.ExistsByField(ctx, &questionnaireModel{}, "code", code)
+func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error) {
+	return r.ExistsByField(ctx, &Model{}, "code", code)
 }
 
 // ExistsByID 检查ID是否存在
-func (r *questionnaireRepository) ExistsByID(ctx context.Context, id questionnaire.QuestionnaireID) (bool, error) {
-	return r.ExistsByField(ctx, &questionnaireModel{}, "id", id.Value())
+func (r *Repository) ExistsByID(ctx context.Context, id questionnaireDomain.QuestionnaireID) (bool, error) {
+	return r.ExistsByField(ctx, &Model{}, "id", id.Value())
 }
 
-// 辅助方法
-func (r *questionnaireRepository) questionsToMongo(questions []questionnaire.Question) []map[string]interface{} {
+// 辅助方法 - MongoDB 转换
+func (r *Repository) questionsToMongo(questions []questionnaireDomain.Question) []map[string]interface{} {
 	result := make([]map[string]interface{}, len(questions))
 	for i, q := range questions {
 		result[i] = map[string]interface{}{
@@ -296,7 +258,7 @@ func (r *questionnaireRepository) questionsToMongo(questions []questionnaire.Que
 	return result
 }
 
-func (r *questionnaireRepository) optionsToMongo(options []questionnaire.Option) []map[string]interface{} {
+func (r *Repository) optionsToMongo(options []questionnaireDomain.Option) []map[string]interface{} {
 	result := make([]map[string]interface{}, len(options))
 	for i, opt := range options {
 		result[i] = map[string]interface{}{
@@ -308,7 +270,7 @@ func (r *questionnaireRepository) optionsToMongo(options []questionnaire.Option)
 	return result
 }
 
-func (r *questionnaireRepository) settingsToMongo(settings questionnaire.Settings) map[string]interface{} {
+func (r *Repository) settingsToMongo(settings questionnaireDomain.Settings) map[string]interface{} {
 	result := map[string]interface{}{
 		"allowAnonymous": settings.AllowAnonymous(),
 		"showProgress":   settings.ShowProgress(),
