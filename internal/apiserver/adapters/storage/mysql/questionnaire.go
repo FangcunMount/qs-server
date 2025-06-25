@@ -15,7 +15,7 @@ import (
 // questionnaireRepository 问卷仓储适配器
 // 使用 MySQL 存储基础信息，MongoDB 存储文档结构
 type questionnaireRepository struct {
-	mysql    *gorm.DB
+	*BaseRepository
 	mongo    *mgo.Session
 	database string
 }
@@ -23,9 +23,9 @@ type questionnaireRepository struct {
 // NewQuestionnaireRepository 创建问卷仓储适配器
 func NewQuestionnaireRepository(mysql *gorm.DB, mongo *mgo.Session, mongoDatabase string) storage.QuestionnaireRepository {
 	return &questionnaireRepository{
-		mysql:    mysql,
-		mongo:    mongo,
-		database: mongoDatabase,
+		BaseRepository: NewBaseRepository(mysql),
+		mongo:          mongo,
+		database:       mongoDatabase,
 	}
 }
 
@@ -88,7 +88,7 @@ func (r *questionnaireRepository) Save(ctx context.Context, q *questionnaire.Que
 		Version:     q.Version(),
 	}
 
-	if err := r.mysql.WithContext(ctx).Create(model).Error; err != nil {
+	if err := r.Create(ctx, model); err != nil {
 		return fmt.Errorf("failed to save questionnaire to MySQL: %w", err)
 	}
 
@@ -108,7 +108,7 @@ func (r *questionnaireRepository) Save(ctx context.Context, q *questionnaire.Que
 		collection := session.DB(r.database).C("questionnaire_docs")
 		if err := collection.Insert(doc); err != nil {
 			// 如果 MongoDB 失败，回滚 MySQL
-			_ = r.mysql.WithContext(ctx).Delete(model).Error
+			_ = r.Delete(ctx, model)
 			return fmt.Errorf("failed to save questionnaire to MongoDB: %w", err)
 		}
 	}
@@ -120,11 +120,13 @@ func (r *questionnaireRepository) Save(ctx context.Context, q *questionnaire.Que
 func (r *questionnaireRepository) FindByID(ctx context.Context, id questionnaire.QuestionnaireID) (*questionnaire.Questionnaire, error) {
 	// 1. 从 MySQL 获取基础信息
 	var model questionnaireModel
-	if err := r.mysql.WithContext(ctx).Where("id = ?", id.Value()).First(&model).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, questionnaire.ErrQuestionnaireNotFound
-		}
+	if err := r.BaseRepository.FindByID(ctx, &model, id.Value()); err != nil {
 		return nil, fmt.Errorf("failed to find questionnaire in MySQL: %w", err)
+	}
+
+	// 如果记录不存在，model 的字段会为零值
+	if model.ID == "" {
+		return nil, questionnaire.ErrQuestionnaireNotFound
 	}
 
 	// 2. 暂时返回一个基础的问卷对象
@@ -136,11 +138,13 @@ func (r *questionnaireRepository) FindByID(ctx context.Context, id questionnaire
 // FindByCode 根据代码查找问卷
 func (r *questionnaireRepository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
 	var model questionnaireModel
-	if err := r.mysql.WithContext(ctx).Where("code = ?", code).First(&model).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, questionnaire.ErrQuestionnaireNotFound
-		}
+	if err := r.FindByField(ctx, &model, "code", code); err != nil {
 		return nil, fmt.Errorf("failed to find questionnaire by code: %w", err)
+	}
+
+	// 如果记录不存在，model 的字段会为零值
+	if model.ID == "" {
+		return nil, questionnaire.ErrQuestionnaireNotFound
 	}
 
 	// TODO: 从 MongoDB 加载完整信息
@@ -162,7 +166,7 @@ func (r *questionnaireRepository) Update(ctx context.Context, q *questionnaire.Q
 		Version:     q.Version(),
 	}
 
-	return r.mysql.WithContext(ctx).Save(model).Error
+	return r.BaseRepository.Update(ctx, model)
 }
 
 // Remove 删除问卷
@@ -177,7 +181,7 @@ func (r *questionnaireRepository) Remove(ctx context.Context, id questionnaire.Q
 	}
 
 	// 2. 删除 MySQL 记录
-	return r.mysql.WithContext(ctx).Where("id = ?", id.Value()).Delete(&questionnaireModel{}).Error
+	return r.DeleteByID(ctx, &questionnaireModel{}, id.Value())
 }
 
 // FindPublishedQuestionnaires 查找已发布的问卷
@@ -188,7 +192,11 @@ func (r *questionnaireRepository) FindPublishedQuestionnaires(ctx context.Contex
 // FindQuestionnairesByCreator 根据创建者查找问卷
 func (r *questionnaireRepository) FindQuestionnairesByCreator(ctx context.Context, creatorID string) ([]*questionnaire.Questionnaire, error) {
 	var models []questionnaireModel
-	if err := r.mysql.WithContext(ctx).Where("created_by = ?", creatorID).Find(&models).Error; err != nil {
+	conditions := map[string]interface{}{
+		"created_by": creatorID,
+	}
+
+	if err := r.FindWithConditions(ctx, &models, conditions); err != nil {
 		return nil, err
 	}
 
@@ -202,7 +210,11 @@ func (r *questionnaireRepository) FindQuestionnairesByCreator(ctx context.Contex
 // FindQuestionnairesByStatus 根据状态查找问卷
 func (r *questionnaireRepository) FindQuestionnairesByStatus(ctx context.Context, status questionnaire.Status) ([]*questionnaire.Questionnaire, error) {
 	var models []questionnaireModel
-	if err := r.mysql.WithContext(ctx).Where("status = ?", int(status)).Find(&models).Error; err != nil {
+	conditions := map[string]interface{}{
+		"status": int(status),
+	}
+
+	if err := r.FindWithConditions(ctx, &models, conditions); err != nil {
 		return nil, err
 	}
 
@@ -215,38 +227,33 @@ func (r *questionnaireRepository) FindQuestionnairesByStatus(ctx context.Context
 
 // FindQuestionnaires 分页查询问卷
 func (r *questionnaireRepository) FindQuestionnaires(ctx context.Context, query storage.QueryOptions) (*storage.QuestionnaireQueryResult, error) {
-	db := r.mysql.WithContext(ctx).Model(&questionnaireModel{})
+	paginatedQuery := r.NewPaginatedQuery(ctx, &questionnaireModel{}).
+		Offset(query.Offset).
+		Limit(query.Limit)
 
 	// 应用过滤条件
 	if query.CreatorID != nil {
-		db = db.Where("created_by = ?", *query.CreatorID)
+		paginatedQuery = paginatedQuery.Where("created_by = ?", *query.CreatorID)
 	}
 	if query.Status != nil {
-		db = db.Where("status = ?", int(*query.Status))
+		paginatedQuery = paginatedQuery.Where("status = ?", int(*query.Status))
 	}
 	if query.Keyword != nil {
-		db = db.Where("title LIKE ? OR description LIKE ?", "%"+*query.Keyword+"%", "%"+*query.Keyword+"%")
+		paginatedQuery = paginatedQuery.Search(*query.Keyword, "title", "description")
 	}
 
-	// 获取总数
-	var totalCount int64
-	if err := db.Count(&totalCount).Error; err != nil {
-		return nil, err
-	}
-
-	// 应用排序和分页
+	// 应用排序
 	if query.SortBy != "" {
 		order := query.SortBy
 		if query.SortOrder == "desc" {
 			order += " DESC"
 		}
-		db = db.Order(order)
-	} else {
-		db = db.Order("created_at DESC")
+		paginatedQuery = paginatedQuery.OrderBy(order)
 	}
 
 	var models []questionnaireModel
-	if err := db.Offset(query.Offset).Limit(query.Limit).Find(&models).Error; err != nil {
+	result, err := paginatedQuery.Execute(&models)
+	if err != nil {
 		return nil, err
 	}
 
@@ -258,27 +265,19 @@ func (r *questionnaireRepository) FindQuestionnaires(ctx context.Context, query 
 
 	return &storage.QuestionnaireQueryResult{
 		Items:      questionnaires,
-		TotalCount: totalCount,
-		HasMore:    int64(query.Offset+len(models)) < totalCount,
+		TotalCount: result.TotalCount,
+		HasMore:    result.HasMore,
 	}, nil
 }
 
 // ExistsByCode 检查代码是否存在
 func (r *questionnaireRepository) ExistsByCode(ctx context.Context, code string) (bool, error) {
-	var count int64
-	if err := r.mysql.WithContext(ctx).Model(&questionnaireModel{}).Where("code = ?", code).Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return r.ExistsByField(ctx, &questionnaireModel{}, "code", code)
 }
 
 // ExistsByID 检查ID是否存在
 func (r *questionnaireRepository) ExistsByID(ctx context.Context, id questionnaire.QuestionnaireID) (bool, error) {
-	var count int64
-	if err := r.mysql.WithContext(ctx).Model(&questionnaireModel{}).Where("id = ?", id.Value()).Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return r.ExistsByField(ctx, &questionnaireModel{}, "id", id.Value())
 }
 
 // 辅助方法

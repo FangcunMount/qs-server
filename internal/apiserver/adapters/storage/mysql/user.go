@@ -12,12 +12,14 @@ import (
 
 // userRepository 用户仓储适配器
 type userRepository struct {
-	db *gorm.DB
+	*BaseRepository
 }
 
 // NewUserRepository 创建用户仓储适配器
 func NewUserRepository(db *gorm.DB) storage.UserRepository {
-	return &userRepository{db: db}
+	return &userRepository{
+		BaseRepository: NewBaseRepository(db),
+	}
 }
 
 // userModel MySQL 表模型
@@ -48,17 +50,19 @@ func (r *userRepository) Save(ctx context.Context, u *user.User) error {
 		UpdatedAt: u.UpdatedAt(),
 	}
 
-	return r.db.WithContext(ctx).Create(model).Error
+	return r.Create(ctx, model)
 }
 
 // FindByID 根据ID查找用户
 func (r *userRepository) FindByID(ctx context.Context, id user.UserID) (*user.User, error) {
 	var model userModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id.Value()).First(&model).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil // 用户不存在
-		}
+	if err := r.BaseRepository.FindByID(ctx, &model, id.Value()); err != nil {
 		return nil, err
+	}
+
+	// 如果记录不存在，model 的字段会为零值
+	if model.ID == "" {
+		return nil, nil // 用户不存在
 	}
 
 	return r.modelToDomain(&model), nil
@@ -67,11 +71,13 @@ func (r *userRepository) FindByID(ctx context.Context, id user.UserID) (*user.Us
 // FindByUsername 根据用户名查找用户
 func (r *userRepository) FindByUsername(ctx context.Context, username string) (*user.User, error) {
 	var model userModel
-	if err := r.db.WithContext(ctx).Where("username = ?", username).First(&model).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
+	if err := r.FindByField(ctx, &model, "username", username); err != nil {
 		return nil, err
+	}
+
+	// 如果记录不存在，model 的字段会为零值
+	if model.ID == "" {
+		return nil, nil
 	}
 
 	return r.modelToDomain(&model), nil
@@ -80,11 +86,13 @@ func (r *userRepository) FindByUsername(ctx context.Context, username string) (*
 // FindByEmail 根据邮箱查找用户
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*user.User, error) {
 	var model userModel
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&model).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
+	if err := r.FindByField(ctx, &model, "email", email); err != nil {
 		return nil, err
+	}
+
+	// 如果记录不存在，model 的字段会为零值
+	if model.ID == "" {
+		return nil, nil
 	}
 
 	return r.modelToDomain(&model), nil
@@ -102,18 +110,22 @@ func (r *userRepository) Update(ctx context.Context, u *user.User) error {
 		UpdatedAt: u.UpdatedAt(),
 	}
 
-	return r.db.WithContext(ctx).Save(model).Error
+	return r.BaseRepository.Update(ctx, model)
 }
 
 // Remove 删除用户
 func (r *userRepository) Remove(ctx context.Context, id user.UserID) error {
-	return r.db.WithContext(ctx).Where("id = ?", id.Value()).Delete(&userModel{}).Error
+	return r.DeleteByID(ctx, &userModel{}, id.Value())
 }
 
 // FindActiveUsers 查找活跃用户
 func (r *userRepository) FindActiveUsers(ctx context.Context) ([]*user.User, error) {
 	var models []userModel
-	if err := r.db.WithContext(ctx).Where("status = ?", int(user.StatusActive)).Find(&models).Error; err != nil {
+	conditions := map[string]interface{}{
+		"status": int(user.StatusActive),
+	}
+
+	if err := r.FindWithConditions(ctx, &models, conditions); err != nil {
 		return nil, err
 	}
 
@@ -126,35 +138,30 @@ func (r *userRepository) FindActiveUsers(ctx context.Context) ([]*user.User, err
 
 // FindUsers 分页查询用户
 func (r *userRepository) FindUsers(ctx context.Context, query storage.UserQueryOptions) (*storage.UserQueryResult, error) {
-	db := r.db.WithContext(ctx).Model(&userModel{})
+	paginatedQuery := r.NewPaginatedQuery(ctx, &userModel{}).
+		Offset(query.Offset).
+		Limit(query.Limit)
 
 	// 应用过滤条件
 	if query.Status != nil {
-		db = db.Where("status = ?", int(*query.Status))
+		paginatedQuery = paginatedQuery.Where("status = ?", int(*query.Status))
 	}
 	if query.Keyword != nil {
-		db = db.Where("username LIKE ? OR email LIKE ?", "%"+*query.Keyword+"%", "%"+*query.Keyword+"%")
+		paginatedQuery = paginatedQuery.Search(*query.Keyword, "username", "email")
 	}
 
-	// 获取总数
-	var totalCount int64
-	if err := db.Count(&totalCount).Error; err != nil {
-		return nil, err
-	}
-
-	// 应用排序和分页
+	// 应用排序
 	if query.SortBy != "" {
 		order := query.SortBy
 		if query.SortOrder == "desc" {
 			order += " DESC"
 		}
-		db = db.Order(order)
-	} else {
-		db = db.Order("created_at DESC")
+		paginatedQuery = paginatedQuery.OrderBy(order)
 	}
 
 	var models []userModel
-	if err := db.Offset(query.Offset).Limit(query.Limit).Find(&models).Error; err != nil {
+	result, err := paginatedQuery.Execute(&models)
+	if err != nil {
 		return nil, err
 	}
 
@@ -166,27 +173,19 @@ func (r *userRepository) FindUsers(ctx context.Context, query storage.UserQueryO
 
 	return &storage.UserQueryResult{
 		Items:      users,
-		TotalCount: totalCount,
-		HasMore:    int64(query.Offset+len(models)) < totalCount,
+		TotalCount: result.TotalCount,
+		HasMore:    result.HasMore,
 	}, nil
 }
 
 // ExistsByUsername 检查用户名是否存在
 func (r *userRepository) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	var count int64
-	if err := r.db.WithContext(ctx).Model(&userModel{}).Where("username = ?", username).Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return r.ExistsByField(ctx, &userModel{}, "username", username)
 }
 
 // ExistsByEmail 检查邮箱是否存在
 func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	var count int64
-	if err := r.db.WithContext(ctx).Model(&userModel{}).Where("email = ?", email).Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return r.ExistsByField(ctx, &userModel{}, "email", email)
 }
 
 // 辅助方法
