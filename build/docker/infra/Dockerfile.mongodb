@@ -1,0 +1,49 @@
+# MongoDB Dockerfile for Questionnaire Scale System
+# 基于官方MongoDB镜像
+FROM mongo:7.0
+
+# 设置标签信息
+LABEL maintainer="questionnaire-scale-team"
+LABEL version="1.0"
+LABEL description="MongoDB for Questionnaire Scale System"
+
+# 接收构建参数（不设置默认值）
+ARG MONGO_INITDB_ROOT_USERNAME
+ARG MONGO_INITDB_ROOT_PASSWORD
+ARG MONGO_INITDB_DATABASE
+ARG MONGODB_PORT
+ARG TZ
+
+# 设置时区
+ENV TZ=${TZ}
+
+# 设置MongoDB环境变量
+ENV MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+ENV MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+ENV MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+
+# 复制MongoDB配置文件到镜像中
+COPY ../../../configs/mongodb/mongod.conf /etc/mongod.conf
+
+# 复制初始化脚本到镜像中
+COPY ../../../scripts/mongodb/init-mongo.js /docker-entrypoint-initdb.d/
+COPY ../../../scripts/mongodb/create-indexes.js /docker-entrypoint-initdb.d/
+
+# 创建日志目录并设置权限
+RUN mkdir -p /var/log/mongodb && \
+    chown -R mongodb:mongodb /var/log/mongodb && \
+    chmod 755 /var/log/mongodb
+
+# 设置数据目录权限
+RUN chown -R mongodb:mongodb /data/db && \
+    chown -R mongodb:mongodb /data/configdb
+
+# 暴露端口（使用配置文件中的端口）
+EXPOSE ${MONGODB_PORT}
+
+# 设置健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD mongo --eval "db.adminCommand('ping')" || exit 1
+
+# 使用自定义配置启动MongoDB
+CMD ["mongod", "--config", "/etc/mongod.conf"] 

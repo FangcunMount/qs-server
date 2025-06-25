@@ -1,0 +1,142 @@
+# 环境变量文件配置
+x-env-file: &env-file
+  env_file:
+    - ../../../configs/env/config.env
+
+services:
+  # MySQL服务
+  mysql:
+    <<: *env-file
+    build:
+      context: ../../../
+      dockerfile: build/docker/infra/Dockerfile.mysql
+      args:
+        MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+        MYSQL_DATABASE: ${MYSQL_DATABASE}
+        MYSQL_USER: ${MYSQL_USER}
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+        MYSQL_PORT: ${MYSQL_PORT}
+        TZ: ${TZ}
+    image: ${MYSQL_IMAGE_NAME:-questionnaire-mysql:latest}
+    container_name: ${MYSQL_CONTAINER_NAME:-questionnaire-mysql}
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:${MYSQL_PORT:-3306}"
+    environment:
+      TZ: ${TZ}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # 数据持久化到宿主机
+      - ${MYSQL_DATA_PATH:-/data/mysql/qs/data}:/var/lib/mysql
+      # 日志文件挂载到宿主机
+      - ${MYSQL_LOGS_PATH:-/data/logs/qs/mysql}:/var/log/mysql
+    networks:
+      - questionnaire-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Redis服务
+  redis:
+    <<: *env-file
+    build:
+      context: ../../../
+      dockerfile: build/docker/infra/Dockerfile.redis
+      args:
+        REDIS_PORT: ${REDIS_PORT}
+        TZ: ${TZ}
+    image: ${REDIS_IMAGE_NAME:-questionnaire-redis:latest}
+    container_name: ${REDIS_CONTAINER_NAME:-questionnaire-redis}
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:${REDIS_PORT:-6379}"
+    environment:
+      TZ: ${TZ}
+    volumes:
+      # 数据持久化到宿主机
+      - ${REDIS_DATA_PATH:-/data/redis/qs/data}:/data
+      # 日志文件挂载到宿主机
+      - ${REDIS_LOGS_PATH:-/data/logs/qs/redis}:/var/log/redis
+    networks:
+      - questionnaire-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  # MongoDB服务
+  mongodb:
+    <<: *env-file
+    build:
+      context: ../../../
+      dockerfile: build/docker/infra/Dockerfile.mongodb
+      args:
+        MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME}
+        MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+        MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+        MONGODB_PORT: ${MONGODB_PORT}
+        TZ: ${TZ}
+    image: ${MONGODB_IMAGE_NAME:-questionnaire-mongodb:latest}
+    container_name: ${MONGODB_CONTAINER_NAME:-questionnaire-mongodb}
+    restart: unless-stopped
+    ports:
+      - "${MONGODB_PORT:-27017}:${MONGODB_PORT:-27017}"
+    environment:
+      TZ: ${TZ}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+    volumes:
+      # 数据持久化到宿主机
+      - ${MONGODB_DATA_PATH:-/data/mongodb/qs/data}:/data/db
+      - ${MONGODB_CONFIG_PATH:-/data/mongodb/qs/config}:/data/configdb
+      # 日志文件挂载到宿主机
+      - ${MONGODB_LOGS_PATH:-/data/logs/qs/mongodb}:/var/log/mongodb
+    networks:
+      - questionnaire-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# 网络定义
+networks:
+  questionnaire-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${DOCKER_NETWORK_SUBNET:-172.20.0.0/16} 

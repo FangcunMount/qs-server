@@ -1,0 +1,30 @@
+FROM redis:7.2-alpine
+
+# 设置标签信息
+LABEL maintainer="questionnaire-scale-team"
+LABEL version="1.0"
+LABEL description="Redis for Questionnaire Scale System"
+
+# 接收构建参数（不设置默认值）
+ARG REDIS_PORT
+ARG TZ
+
+# 设置时区
+ENV TZ=${TZ}
+
+# 复制Redis配置文件到镜像中
+COPY ../../../configs/redis/redis.conf /usr/local/etc/redis/redis.conf
+
+# 创建日志目录并设置权限
+RUN mkdir -p /var/log/redis && \
+    chown -R redis:redis /var/log/redis && \
+    chmod 755 /var/log/redis
+
+# 修复配置文件中的日志路径权限
+RUN chown redis:redis /usr/local/etc/redis/redis.conf
+
+# 暴露端口（使用配置文件中的端口）
+EXPOSE ${REDIS_PORT}
+
+# 使用自定义配置启动Redis
+CMD ["redis-server", "/usr/local/etc/redis/redis.conf"]
