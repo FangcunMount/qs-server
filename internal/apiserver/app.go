@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/options"
 	"github.com/yshujie/questionnaire-scale/pkg/app"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
@@ -34,9 +35,16 @@ func run(opts *options.Options) app.RunFunc {
 		log.Info("Starting questionnaire-scale ...")
 
 		// 打印配置信息
-		log.Infof("Server mode: %s", opts.Server.Mode)
-		log.Infof("Health check enabled: %v", opts.Server.Healthz)
+		log.Infof("Server mode: %s", opts.GenericServerRunOptions.Mode)
+		log.Infof("Health check enabled: %v", opts.GenericServerRunOptions.Healthz)
 
-		return nil
+		// 根据 options 创建 app 配置
+		cfg, err := config.CreateConfigFromOptions(opts)
+		if err != nil {
+			return err
+		}
+
+		// 运行 app
+		return Run(cfg)
 	}
 }
