@@ -14,6 +14,8 @@ type apiServer struct {
 	gs *shutdown.GracefulShutdown
 	// 通用 API 服务器
 	genericAPIServer *genericapiserver.GenericAPIServer
+	// 数据库管理器
+	dbManager *DatabaseManager
 }
 
 // preparedAPIServer 定义了准备运行的 API 服务器
@@ -43,6 +45,7 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 	server := &apiServer{
 		gs:               gs,
 		genericAPIServer: genericServer,
+		dbManager:        NewDatabaseManager(cfg),
 	}
 
 	return server, nil
@@ -50,11 +53,22 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 
 // PrepareRun 准备运行 API 服务器
 func (s *apiServer) PrepareRun() preparedAPIServer {
+	// 初始化数据库连接
+	if err := s.dbManager.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
 	// 初始化路由
-	initRouter(s.genericAPIServer.Engine)
+	initRouter(s.genericAPIServer.Engine, s.dbManager)
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
+		// 关闭数据库连接
+		if s.dbManager != nil {
+			if err := s.dbManager.Close(); err != nil {
+				log.Errorf("Failed to close database connections: %v", err)
+			}
+		}
 
 		// 关闭 HTTP 服务器
 		s.genericAPIServer.Close()

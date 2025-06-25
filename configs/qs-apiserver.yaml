@@ -34,6 +34,28 @@ mysql:
   max-connection-life-time: "1h" # 连接最大生存时间
   log-level: 1 # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
 
+# Redis 数据库配置
+redis:
+  host: "127.0.0.1" # Redis 服务器地址
+  port: 6379 # Redis 端口
+  password: "" # Redis 密码
+  database: 0 # Redis 数据库编号
+  max-idle: 50 # 最大空闲连接数
+  max-active: 100 # 最大活跃连接数
+  timeout: 5 # 连接超时时间（秒）
+  enable-cluster: false # 是否启用集群模式
+  use-ssl: false # 是否使用SSL
+  ssl-insecure-skip-verify: false # 是否跳过SSL证书验证
+
+# MongoDB 数据库配置
+mongodb:
+  url: "mongodb://127.0.0.1:27017/questionnaire_scale" # MongoDB 连接URL
+  use-ssl: false # 是否使用SSL
+  ssl-insecure-skip-verify: false # 是否跳过SSL证书验证
+  ssl-allow-invalid-hostnames: false # 是否允许无效的主机名
+  ssl-ca-file: "" # SSL CA 证书文件路径
+  ssl-pem-keyfile: "" # SSL PEM 密钥文件路径
+
 # 日志配置
 log:
   level: "info" # 日志级别：debug, info, warn, error, fatal, panic

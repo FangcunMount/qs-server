@@ -15,6 +15,8 @@ type Options struct {
 	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure" mapstructure:"secure"`
 	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"    mapstructure:"mysql"`
+	RedisOptions            *genericoptions.RedisOptions           `json:"redis"    mapstructure:"redis"`
+	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"  mapstructure:"mongodb"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -25,6 +27,8 @@ func NewOptions() *Options {
 		InsecureServing:         genericoptions.NewInsecureServingOptions(),
 		SecureServing:           genericoptions.NewSecureServingOptions(),
 		MySQLOptions:            genericoptions.NewMySQLOptions(),
+		RedisOptions:            genericoptions.NewRedisOptions(),
+		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
 	}
 }
 
@@ -35,6 +39,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.MySQLOptions.AddFlags(fss.FlagSet("mysql"))
+	o.RedisOptions.AddFlags(fss.FlagSet("redis"))
+	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
 
 	return fss
 }
