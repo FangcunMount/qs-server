@@ -16,6 +16,8 @@ type apiServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
 	// 数据库管理器
 	dbManager *DatabaseManager
+	// 存储管理器 (MySQL, Redis, MongoDB)
+	storageManager *StorageManager
 }
 
 // preparedAPIServer 定义了准备运行的 API 服务器
@@ -41,11 +43,15 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		return nil, err
 	}
 
+	// 创建数据库管理器
+	dbManager := NewDatabaseManager(cfg)
+
 	// 创建 API 服务器实例
 	server := &apiServer{
 		gs:               gs,
 		genericAPIServer: genericServer,
-		dbManager:        NewDatabaseManager(cfg),
+		dbManager:        dbManager,
+		storageManager:   NewStorageManager(cfg),
 	}
 
 	return server, nil
@@ -58,8 +64,13 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// 初始化存储管理器
+	if err := s.storageManager.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize storage manager: %v", err)
+	}
+
 	// 初始化路由
-	initRouter(s.genericAPIServer.Engine, s.dbManager)
+	initRouter(s.genericAPIServer.Engine, s.dbManager, s.storageManager)
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
@@ -67,6 +78,13 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		if s.dbManager != nil {
 			if err := s.dbManager.Close(); err != nil {
 				log.Errorf("Failed to close database connections: %v", err)
+			}
+		}
+
+		// 关闭存储管理器
+		if s.storageManager != nil {
+			if err := s.storageManager.Close(); err != nil {
+				log.Errorf("Failed to close storage manager: %v", err)
 			}
 		}
 

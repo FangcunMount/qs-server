@@ -6,7 +6,7 @@ import (
 	"time"
 
 	redis "github.com/go-redis/redis/v7"
-	"github.com/vinllen/mgo"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
@@ -154,19 +154,19 @@ func (dm *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
 	return redisClient, nil
 }
 
-// GetMongoSession 获取MongoDB会话
-func (dm *DatabaseManager) GetMongoSession() (*mgo.Session, error) {
+// GetMongoClient 获取MongoDB客户端
+func (dm *DatabaseManager) GetMongoClient() (*mongo.Client, error) {
 	client, err := dm.registry.GetClient(databases.MongoDB)
 	if err != nil {
 		return nil, err
 	}
 
-	session, ok := client.(*mgo.Session)
+	mongoClient, ok := client.(*mongo.Client)
 	if !ok {
-		return nil, fmt.Errorf("failed to cast client to *mgo.Session")
+		return nil, fmt.Errorf("failed to cast client to *mongo.Client")
 	}
 
-	return session, nil
+	return mongoClient, nil
 }
 
 // HealthCheck 数据库健康检查
@@ -183,7 +183,7 @@ func (dm *DatabaseManager) Close() error {
 	return dm.registry.Close()
 }
 
-// GetRegistry 获取数据库注册器
+// GetRegistry 获取数据库注册器（用于测试和调试）
 func (dm *DatabaseManager) GetRegistry() *database.Registry {
 	return dm.registry
 }

@@ -6,7 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/vinllen/mgo"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 // MongoConfig MongoDB 数据库配置
@@ -22,7 +24,7 @@ type MongoConfig struct {
 // MongoDBConnection MongoDB 连接实现
 type MongoDBConnection struct {
 	config *MongoConfig
-	client *mgo.Session
+	client *mongo.Client
 }
 
 // NewMongoDBConnection 创建 MongoDB 连接
@@ -39,24 +41,29 @@ func (m *MongoDBConnection) Type() DatabaseType {
 
 // Connect 连接 MongoDB 数据库
 func (m *MongoDBConnection) Connect() error {
-	dialInfo, err := mgo.ParseURL(m.config.URL)
-	if err != nil {
-		return fmt.Errorf("failed to parse MongoDB URL: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	dialInfo.Timeout = 5 * time.Second
+	// 创建连接选项
+	clientOptions := options.Client().ApplyURI(m.config.URL)
 
-	session, err := mgo.DialWithInfo(dialInfo)
+	// 设置连接超时
+	clientOptions.SetConnectTimeout(5 * time.Second)
+	clientOptions.SetServerSelectionTimeout(5 * time.Second)
+
+	// 连接到MongoDB
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
 	// 测试连接
-	if err := session.Ping(); err != nil {
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 
-	m.client = session
+	m.client = client
 	log.Printf("MongoDB connected successfully")
 	return nil
 }
@@ -64,7 +71,9 @@ func (m *MongoDBConnection) Connect() error {
 // Close 关闭 MongoDB 连接
 func (m *MongoDBConnection) Close() error {
 	if m.client != nil {
-		m.client.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return m.client.Disconnect(ctx)
 	}
 	return nil
 }
@@ -75,7 +84,7 @@ func (m *MongoDBConnection) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("MongoDB client is nil")
 	}
 
-	return m.client.Ping()
+	return m.client.Ping(ctx, readpref.Primary())
 }
 
 // GetClient 获取 MongoDB 客户端

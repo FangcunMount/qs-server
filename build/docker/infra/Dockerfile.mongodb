@@ -43,7 +43,7 @@ EXPOSE ${MONGODB_PORT}
 
 # 设置健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD mongo --eval "db.adminCommand('ping')" || exit 1
+  CMD mongosh --eval "db.adminCommand('ping')" || exit 1
 
 # 使用自定义配置启动MongoDB
 CMD ["mongod", "--config", "/etc/mongod.conf"] 

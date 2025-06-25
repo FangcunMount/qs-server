@@ -28,7 +28,7 @@ mysql:
   host: "127.0.0.1:3306" # MySQL 服务器地址
   username: "qs_app_user" # 数据库用户名
   password: "qs_app_password_2024" # 数据库密码
-  database: "questionnaire" # 数据库名称
+  database: "questionnaire_scale" # 数据库名称
   max-idle-connections: 10 # 最大空闲连接数
   max-open-connections: 100 # 最大打开连接数
   max-connection-life-time: "1h" # 连接最大生存时间
@@ -49,7 +49,7 @@ redis:
 
 # MongoDB 数据库配置
 mongodb:
-  url: "mongodb://127.0.0.1:27017/questionnaire" # MongoDB 连接URL
+  url: "mongodb://qs_app_user:qs_app_password_2024@127.0.0.1:27017/questionnaire_scale" # MongoDB 连接URL
   use-ssl: false # 是否使用SSL
   ssl-insecure-skip-verify: false # 是否跳过SSL证书验证
   ssl-allow-invalid-hostnames: false # 是否允许无效的主机名
