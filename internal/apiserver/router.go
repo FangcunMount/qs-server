@@ -1,7 +1,6 @@
 package apiserver
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -10,18 +9,18 @@ import (
 )
 
 // initRouter 初始化路由
-func initRouter(g *gin.Engine, dbManager *DatabaseManager, storageManager *StorageManager) {
+func initRouter(g *gin.Engine, dbManager *DatabaseManager) {
 	installMiddleware(g)
-	installController(g, dbManager, storageManager)
+	installController(g, dbManager)
 }
 
 func installMiddleware(g *gin.Engine) {
 	// 安装中间件
 }
 
-func installController(g *gin.Engine, dbManager *DatabaseManager, storageManager *StorageManager) {
+func installController(g *gin.Engine, dbManager *DatabaseManager) {
 	// 自定义健康检查路由（避免与系统路由冲突）
-	g.GET("/health/db", healthCheck(dbManager, storageManager))
+	g.GET("/health/db", healthCheck(dbManager))
 
 	// API 版本组
 	v1 := g.Group("/v1")
@@ -51,23 +50,14 @@ func installController(g *gin.Engine, dbManager *DatabaseManager, storageManager
 }
 
 // healthCheck 健康检查处理函数
-func healthCheck(dbManager *DatabaseManager, storageManager *StorageManager) gin.HandlerFunc {
+func healthCheck(dbManager *DatabaseManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		message := "OK"
 
 		// 检查数据库连接状态
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
 		if err := dbManager.HealthCheck(); err != nil {
 			log.Warnf("Database health check failed: %v", err)
 			message = "Database unhealthy"
-		}
-
-		// 检查存储管理器状态
-		if err := storageManager.HealthCheck(ctx); err != nil {
-			log.Warnf("Storage manager health check failed: %v", err)
-			message = "Storage unhealthy"
 		}
 
 		c.JSON(http.StatusOK, gin.H{
