@@ -89,7 +89,7 @@ func NewConfig() *Config {
 		EnableProfiling: true,
 		EnableMetrics:   true,
 		Jwt: &JwtInfo{
-			Realm:      "iam jwt",
+			Realm:      "qs jwt",
 			Timeout:    1 * time.Hour,
 			MaxRefresh: 1 * time.Hour,
 		},
@@ -127,24 +127,24 @@ func (c CompletedConfig) New() (*GenericAPIServer, error) {
 	return s, nil
 }
 
-// LoadConfig reads in config file and ENV variables if set.
+// LoadConfig 读取配置文件和环境变量
 func LoadConfig(cfg string, defaultName string) {
 	if cfg != "" {
 		viper.SetConfigFile(cfg)
 	} else {
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(filepath.Join(homedir.HomeDir(), RecommendedHomeDir))
-		viper.AddConfigPath("/etc/iam")
+		viper.AddConfigPath("/etc/qs")
 		viper.SetConfigName(defaultName)
 	}
 
-	// Use config file from the flag.
-	viper.SetConfigType("yaml")              // set the type of the configuration to yaml.
-	viper.AutomaticEnv()                     // read in environment variables that match.
-	viper.SetEnvPrefix(RecommendedEnvPrefix) // set ENVIRONMENT variables prefix to IAM.
+	// 设置配置文件类型为yaml
+	viper.SetConfigType("yaml")              // 设置配置文件类型
+	viper.AutomaticEnv()                     // 读取环境变量
+	viper.SetEnvPrefix(RecommendedEnvPrefix) // 设置环境变量的前缀
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
-	// If a config file is found, read it in.
+	// 如果配置文件存在，则读取配置文件
 	if err := viper.ReadInConfig(); err != nil {
 		log.Warnf("WARNING: viper failed to discover and load the configuration file: %s", err.Error())
 	}

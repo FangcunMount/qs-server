@@ -1,7 +1,3 @@
-// Copyright 2020 Lingfei Kong <colin404@foxmail.com>. All rights reserved.
-// Use of this source code is governed by a MIT style
-// license that can be found in the LICENSE file.
-
 package apiserver
 
 import (
@@ -52,6 +48,7 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 	return server, nil
 }
 
+// PrepareRun 准备运行 API 服务器
 func (s *apiServer) PrepareRun() preparedAPIServer {
 	// 初始化路由
 	initRouter(s.genericAPIServer.Engine)
@@ -84,5 +81,19 @@ func (s preparedAPIServer) Run() error {
 func buildGenericConfig(cfg *config.Config) (genericConfig *genericapiserver.Config, lastErr error) {
 	genericConfig = genericapiserver.NewConfig()
 
+	// 应用通用配置
+	if lastErr = cfg.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
+		return
+	}
+
+	// 应用安全配置
+	if lastErr = cfg.SecureServing.ApplyTo(genericConfig); lastErr != nil {
+		return
+	}
+
+	// 应用不安全配置
+	if lastErr = cfg.InsecureServing.ApplyTo(genericConfig); lastErr != nil {
+		return
+	}
 	return
 }

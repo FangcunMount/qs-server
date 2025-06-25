@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/yshujie/questionnaire-scale/pkg/core"
 	"github.com/yshujie/questionnaire-scale/pkg/version"
@@ -44,23 +43,23 @@ func initGenericAPIServer(s *GenericAPIServer) {
 
 // InstallAPIs 安装通用 API
 func (s *GenericAPIServer) InstallAPIs() {
-	// install healthz handler
+	// 安装健康检查路由
 	if s.healthz {
 		s.GET("/healthz", func(c *gin.Context) {
 			core.WriteResponse(c, nil, map[string]string{"status": "ok"})
 		})
 	}
 
-	// install metric handler
+	// 安装指标路由
 	if s.enableMetrics {
 		prometheus := ginprometheus.NewPrometheus("gin")
 		prometheus.Use(s.Engine)
 	}
 
-	// install pprof handler
-	if s.enableProfiling {
-		pprof.Register(s.Engine)
-	}
+	// // 安装pprof路由
+	// if s.enableProfiling {
+	// 	pprof.Register(s.Engine)
+	// }
 
 	s.GET("/version", func(c *gin.Context) {
 		core.WriteResponse(c, nil, version.Get())
@@ -130,6 +129,7 @@ func (s *GenericAPIServer) Run() error {
 	// 启动 HTTPS 服务器
 	eg.Go(func() error {
 		key, cert := s.SecureServingInfo.CertKey.KeyFile, s.SecureServingInfo.CertKey.CertFile
+		log.Infof("cert: %s, key: %s, bindPort: %d", cert, key, s.SecureServingInfo.BindPort)
 		if cert == "" || key == "" || s.SecureServingInfo.BindPort == 0 {
 			return nil
 		}
