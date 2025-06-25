@@ -34,7 +34,7 @@ install-air: ## 安装 Air 热更新工具
 deps: ## 安装依赖
 	@echo "📦 安装依赖..."
 	@go mod download
-	@go mod tidy
+	@go mod tidy 
 
 # 数据库相关命令
 db-deploy: ## 部署所有数据库服务

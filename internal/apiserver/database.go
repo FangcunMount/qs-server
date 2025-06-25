@@ -169,6 +169,20 @@ func (dm *DatabaseManager) GetMongoClient() (*mongo.Client, error) {
 	return mongoClient, nil
 }
 
+// GetMongoSession 获取 MongoDB 会话 (兼容 mgo 接口)
+// TODO: 这是一个临时的兼容方法，实际项目中应该统一使用现代的 MongoDB 驱动
+func (dm *DatabaseManager) GetMongoSession() (interface{}, error) {
+	// 这里返回一个模拟的 session，实际使用时需要实现 mgo 兼容层
+	// 或者重构适配器使用现代的 MongoDB 驱动
+	return nil, fmt.Errorf("mgo session compatibility not implemented - please use GetMongoClient() instead")
+}
+
+// GetMongoDatabase 获取 MongoDB 数据库名称
+func (dm *DatabaseManager) GetMongoDatabase() string {
+	// 使用默认数据库名，后续可以从配置中读取
+	return "questionnaire_db"
+}
+
 // HealthCheck 数据库健康检查
 func (dm *DatabaseManager) HealthCheck() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
