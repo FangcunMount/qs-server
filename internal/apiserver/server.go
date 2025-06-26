@@ -16,8 +16,8 @@ type apiServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
 	// 数据库管理器
 	dbManager *DatabaseManager
-	// 六边形架构容器
-	container *Container
+	// 六边形架构容器（自动发现版本）
+	container *AutoDiscoveryContainer
 }
 
 // preparedAPIServer 定义了准备运行的 API 服务器
@@ -78,8 +78,8 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		mongoClient = nil
 	}
 
-	// 创建六边形架构容器
-	s.container = NewContainer(mysqlDB, mongoClient, mongoDatabase)
+	// 创建六边形架构容器（自动发现版本）
+	s.container = NewAutoDiscoveryContainer(mysqlDB, mongoClient, mongoDatabase)
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {

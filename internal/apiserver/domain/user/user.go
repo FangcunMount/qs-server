@@ -1,7 +1,16 @@
 package user
 
 import (
+	"errors"
 	"time"
+)
+
+// 领域错误
+var (
+	ErrUserNotFound      = errors.New("user not found")
+	ErrDuplicateUsername = errors.New("username already exists")
+	ErrDuplicateEmail    = errors.New("email already exists")
+	ErrInvalidPassword   = errors.New("invalid password")
 )
 
 // User 用户聚合根
