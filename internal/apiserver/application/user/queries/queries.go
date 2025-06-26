@@ -3,11 +3,11 @@ package queries
 import (
 	"context"
 
-	appErrors "github.com/yshujie/questionnaire-scale/internal/apiserver/application/shared/errors"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/shared/interfaces"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/ports/storage"
+	internalErrors "github.com/yshujie/questionnaire-scale/internal/pkg/errors"
 )
 
 // GetUserQuery 获取用户查询
@@ -18,10 +18,43 @@ type GetUserQuery struct {
 }
 
 // Validate 验证查询
-func (q *GetUserQuery) Validate() error {
+func (q GetUserQuery) Validate() error {
 	if q.ID == nil && q.Username == nil && q.Email == nil {
-		return appErrors.NewValidationError("identifier", "ID, Username, or Email must be provided")
+		return internalErrors.NewWithCode(internalErrors.ErrUserValidationFailed, "必须提供用户ID、用户名或邮箱中的一个")
 	}
+	return nil
+}
+
+// ListUsersQuery 获取用户列表查询
+type ListUsersQuery struct {
+	interfaces.PaginationRequest
+	dto.UserFilterDTO
+}
+
+// Validate 验证查询
+func (q ListUsersQuery) Validate() error {
+	q.PaginationRequest.SetDefaults()
+	return nil
+}
+
+// SearchUsersQuery 搜索用户查询
+type SearchUsersQuery struct {
+	interfaces.PaginationRequest
+	interfaces.FilterRequest
+	interfaces.SortingRequest
+}
+
+// Validate 验证查询
+func (q SearchUsersQuery) Validate() error {
+	q.PaginationRequest.SetDefaults()
+	return nil
+}
+
+// GetActiveUsersQuery 获取活跃用户查询
+type GetActiveUsersQuery struct{}
+
+// Validate 验证查询
+func (q GetActiveUsersQuery) Validate() error {
 	return nil
 }
 
@@ -42,53 +75,32 @@ func (h *GetUserHandler) Handle(ctx context.Context, query GetUserQuery) (*dto.U
 		return nil, err
 	}
 
-	var u *user.User
+	var foundUser *user.User
 	var err error
 
-	// 2. 执行查询
+	// 2. 根据不同条件查找用户
 	if query.ID != nil {
-		u, err = h.userRepo.FindByID(ctx, user.NewUserID(*query.ID))
+		foundUser, err = h.userRepo.FindByID(ctx, user.NewUserID(*query.ID))
 	} else if query.Username != nil {
-		u, err = h.userRepo.FindByUsername(ctx, *query.Username)
+		foundUser, err = h.userRepo.FindByUsername(ctx, *query.Username)
 	} else if query.Email != nil {
-		u, err = h.userRepo.FindByEmail(ctx, *query.Email)
+		foundUser, err = h.userRepo.FindByEmail(ctx, *query.Email)
 	}
 
 	if err != nil {
 		if err == user.ErrUserNotFound {
-			identifier := ""
-			if query.ID != nil {
-				identifier = *query.ID
-			} else if query.Username != nil {
-				identifier = *query.Username
-			} else {
-				identifier = *query.Email
-			}
-			return nil, appErrors.NewNotFoundError("user", identifier)
+			return nil, internalErrors.NewWithCode(internalErrors.ErrUserNotFound, "用户不存在")
 		}
-		return nil, appErrors.NewSystemError("Failed to find user", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户失败")
 	}
 
-	// 3. 转换为DTO返回
+	// 3. 转换为DTO
 	result := &dto.UserDTO{}
-	result.FromDomain(u)
+	result.FromDomain(foundUser)
 	return result, nil
 }
 
-// ListUsersQuery 用户列表查询
-type ListUsersQuery struct {
-	interfaces.PaginationRequest
-	dto.UserFilterDTO
-}
-
-// Validate 验证查询
-func (q *ListUsersQuery) Validate() error {
-	q.PaginationRequest.SetDefaults()
-	q.UserFilterDTO.SetDefaults()
-	return nil
-}
-
-// ListUsersHandler 用户列表查询处理器
+// ListUsersHandler 获取用户列表查询处理器
 type ListUsersHandler struct {
 	userRepo storage.UserRepository
 }
@@ -98,15 +110,15 @@ func NewListUsersHandler(userRepo storage.UserRepository) *ListUsersHandler {
 	return &ListUsersHandler{userRepo: userRepo}
 }
 
-// Handle 处理用户列表查询
+// Handle 处理获取用户列表查询
 func (h *ListUsersHandler) Handle(ctx context.Context, query ListUsersQuery) (*dto.UserListDTO, error) {
 	// 1. 验证查询
 	if err := query.Validate(); err != nil {
 		return nil, err
 	}
 
-	// 2. 构建存储查询
-	storageQuery := storage.UserQueryOptions{
+	// 2. 构建查询选项
+	queryOptions := storage.UserQueryOptions{
 		Offset:    query.GetOffset(),
 		Limit:     query.PageSize,
 		Status:    query.Status,
@@ -115,14 +127,14 @@ func (h *ListUsersHandler) Handle(ctx context.Context, query ListUsersQuery) (*d
 		SortOrder: query.SortOrder,
 	}
 
-	// 3. 执行查询
-	result, err := h.userRepo.FindUsers(ctx, storageQuery)
+	// 3. 查询用户列表
+	result, err := h.userRepo.FindUsers(ctx, queryOptions)
 	if err != nil {
-		return nil, appErrors.NewSystemError("Failed to find users", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户列表失败")
 	}
 
 	// 4. 转换为DTO
-	userDTOs := dto.FromDomainList(result.Items)
+	items := dto.FromDomainList(result.Items)
 	pagination := &dto.PaginationResponse{
 		Page:       query.Page,
 		PageSize:   query.PageSize,
@@ -131,29 +143,12 @@ func (h *ListUsersHandler) Handle(ctx context.Context, query ListUsersQuery) (*d
 	}
 
 	return &dto.UserListDTO{
-		Items:      userDTOs,
+		Items:      items,
 		Pagination: pagination,
 	}, nil
 }
 
-// SearchUsersQuery 用户搜索查询
-type SearchUsersQuery struct {
-	interfaces.PaginationRequest
-	interfaces.FilterRequest
-	interfaces.SortingRequest
-
-	AdvancedFilters dto.UserFilterDTO `json:"filters"`
-}
-
-// Validate 验证查询
-func (q *SearchUsersQuery) Validate() error {
-	q.PaginationRequest.SetDefaults()
-	q.SortingRequest.SetDefaults("created_at")
-	q.AdvancedFilters.SetDefaults()
-	return nil
-}
-
-// SearchUsersHandler 用户搜索查询处理器
+// SearchUsersHandler 搜索用户查询处理器
 type SearchUsersHandler struct {
 	userRepo storage.UserRepository
 }
@@ -163,44 +158,30 @@ func NewSearchUsersHandler(userRepo storage.UserRepository) *SearchUsersHandler 
 	return &SearchUsersHandler{userRepo: userRepo}
 }
 
-// Handle 处理用户搜索查询
+// Handle 处理搜索用户查询
 func (h *SearchUsersHandler) Handle(ctx context.Context, query SearchUsersQuery) (*dto.UserListDTO, error) {
 	// 1. 验证查询
 	if err := query.Validate(); err != nil {
 		return nil, err
 	}
 
-	// 2. 构建复杂查询
-	storageQuery := storage.UserQueryOptions{
+	// 2. 构建搜索查询选项
+	queryOptions := storage.UserQueryOptions{
 		Offset:    query.GetOffset(),
 		Limit:     query.PageSize,
+		Keyword:   query.Keyword,
 		SortBy:    query.SortBy,
 		SortOrder: query.SortOrder,
 	}
 
-	// 应用高级过滤器
-	if query.AdvancedFilters.HasStatusFilter() {
-		status := query.AdvancedFilters.GetStatus()
-		storageQuery.Status = &status
-	}
-	if query.AdvancedFilters.HasKeyword() {
-		keyword := query.AdvancedFilters.GetKeyword()
-		storageQuery.Keyword = &keyword
-	}
-
-	// 应用基础过滤器
-	if query.FilterRequest.Keyword != nil {
-		storageQuery.Keyword = query.FilterRequest.Keyword
-	}
-
-	// 3. 执行查询
-	result, err := h.userRepo.FindUsers(ctx, storageQuery)
+	// 3. 执行搜索
+	result, err := h.userRepo.FindUsers(ctx, queryOptions)
 	if err != nil {
-		return nil, appErrors.NewSystemError("Failed to search users", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "搜索用户失败")
 	}
 
 	// 4. 转换为DTO
-	userDTOs := dto.FromDomainList(result.Items)
+	items := dto.FromDomainList(result.Items)
 	pagination := &dto.PaginationResponse{
 		Page:       query.Page,
 		PageSize:   query.PageSize,
@@ -209,17 +190,9 @@ func (h *SearchUsersHandler) Handle(ctx context.Context, query SearchUsersQuery)
 	}
 
 	return &dto.UserListDTO{
-		Items:      userDTOs,
+		Items:      items,
 		Pagination: pagination,
 	}, nil
-}
-
-// GetActiveUsersQuery 获取活跃用户查询
-type GetActiveUsersQuery struct{}
-
-// Validate 验证查询
-func (q *GetActiveUsersQuery) Validate() error {
-	return nil
 }
 
 // GetActiveUsersHandler 获取活跃用户查询处理器
@@ -239,13 +212,13 @@ func (h *GetActiveUsersHandler) Handle(ctx context.Context, query GetActiveUsers
 		return nil, err
 	}
 
-	// 2. 执行查询
+	// 2. 查询活跃用户
 	users, err := h.userRepo.FindActiveUsers(ctx)
 	if err != nil {
-		return nil, appErrors.NewSystemError("Failed to find active users", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询活跃用户失败")
 	}
 
-	// 3. 转换为DTO返回
+	// 3. 转换为DTO
 	return dto.FromDomainList(users), nil
 }
 

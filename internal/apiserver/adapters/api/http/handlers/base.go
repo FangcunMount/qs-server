@@ -97,27 +97,27 @@ func (h *BaseHandler) ErrorResponseWithCode(c *gin.Context, code int, format str
 // BadRequestResponse 400错误响应
 func (h *BaseHandler) BadRequestResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrBind, message))
+		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrBind, "%s", message))
 	} else {
-		h.ErrorResponseWithCode(c, internalErrors.ErrBind, message)
+		h.ErrorResponseWithCode(c, internalErrors.ErrBind, "%s", message)
 	}
 }
 
 // NotFoundResponse 404错误响应
 func (h *BaseHandler) NotFoundResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrPageNotFound, message))
+		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrPageNotFound, "%s", message))
 	} else {
-		h.ErrorResponseWithCode(c, internalErrors.ErrPageNotFound, message)
+		h.ErrorResponseWithCode(c, internalErrors.ErrPageNotFound, "%s", message)
 	}
 }
 
 // InternalErrorResponse 500错误响应
 func (h *BaseHandler) InternalErrorResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrInternalServerError, message))
+		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrInternalServerError, "%s", message))
 	} else {
-		h.ErrorResponseWithCode(c, internalErrors.ErrInternalServerError, message)
+		h.ErrorResponseWithCode(c, internalErrors.ErrInternalServerError, "%s", message)
 	}
 }
 
@@ -128,20 +128,20 @@ func (h *BaseHandler) ValidationErrorResponse(c *gin.Context, field, message str
 
 // UnauthorizedResponse 401错误响应
 func (h *BaseHandler) UnauthorizedResponse(c *gin.Context, message string) {
-	h.ErrorResponseWithCode(c, internalErrors.ErrTokenInvalid, message)
+	h.ErrorResponseWithCode(c, internalErrors.ErrTokenInvalid, "%s", message)
 }
 
 // ForbiddenResponse 403错误响应
 func (h *BaseHandler) ForbiddenResponse(c *gin.Context, message string) {
-	h.ErrorResponseWithCode(c, internalErrors.ErrUserPermissionDenied, message)
+	h.ErrorResponseWithCode(c, internalErrors.ErrUserPermissionDenied, "%s", message)
 }
 
 // ConflictResponse 409错误响应
 func (h *BaseHandler) ConflictResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrDatabaseDuplicateKey, message))
+		h.ErrorResponse(c, internalErrors.WrapWithCode(err, internalErrors.ErrDatabaseDuplicateKey, "%s", message))
 	} else {
-		h.ErrorResponseWithCode(c, internalErrors.ErrDatabaseDuplicateKey, message)
+		h.ErrorResponseWithCode(c, internalErrors.ErrDatabaseDuplicateKey, "%s", message)
 	}
 }
 
