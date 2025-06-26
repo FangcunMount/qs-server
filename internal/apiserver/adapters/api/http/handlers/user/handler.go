@@ -6,6 +6,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/api/http/handlers"
 	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/commands"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/queries"
 )
 
@@ -49,7 +50,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 
 	user, err := h.userService.CreateUser(c.Request.Context(), cmd)
 	if err != nil {
-		h.InternalErrorResponse(c, "创建用户失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -76,7 +77,7 @@ func (h *Handler) GetUser(c *gin.Context) {
 
 	user, err := h.userService.GetUser(c.Request.Context(), query)
 	if err != nil {
-		h.NotFoundResponse(c, "用户不存在", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -107,7 +108,7 @@ func (h *Handler) ListUsers(c *gin.Context) {
 
 	result, err := h.userService.ListUsers(c.Request.Context(), query)
 	if err != nil {
-		h.InternalErrorResponse(c, "获取列表失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -149,7 +150,7 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 
 	user, err := h.userService.UpdateUser(c.Request.Context(), cmd)
 	if err != nil {
-		h.InternalErrorResponse(c, "更新用户失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -175,7 +176,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 
 	err := h.userService.DeleteUser(c.Request.Context(), cmd)
 	if err != nil {
-		h.InternalErrorResponse(c, "删除用户失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -201,7 +202,7 @@ func (h *Handler) ActivateUser(c *gin.Context) {
 
 	err := h.userService.ActivateUser(c.Request.Context(), cmd)
 	if err != nil {
-		h.InternalErrorResponse(c, "激活用户失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -227,7 +228,7 @@ func (h *Handler) BlockUser(c *gin.Context) {
 
 	err := h.userService.BlockUser(c.Request.Context(), cmd)
 	if err != nil {
-		h.InternalErrorResponse(c, "封禁用户失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -258,7 +259,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 
 	err := h.userService.ChangePassword(c.Request.Context(), cmd)
 	if err != nil {
-		h.InternalErrorResponse(c, "修改密码失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -279,7 +280,7 @@ func (h *Handler) GetActiveUsers(c *gin.Context) {
 
 	users, err := h.userService.GetActiveUsers(c.Request.Context(), query)
 	if err != nil {
-		h.InternalErrorResponse(c, "获取活跃用户失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -292,12 +293,14 @@ func (h *Handler) GetActiveUsers(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "获取成功", gin.H{"items": items})
 }
 
-// 辅助方法：将DTO转换为响应格式
-func (h *Handler) userToResponse(u interface{}) map[string]interface{} {
-	// TODO: 实现具体的转换逻辑
-	// 这里需要将DTO转换为适合HTTP响应的格式
+// userToResponse 将DTO转换为响应格式
+func (h *Handler) userToResponse(userDTO *dto.UserDTO) map[string]interface{} {
 	return map[string]interface{}{
-		"message": "user response conversion not implemented yet",
-		"data":    u,
+		"id":         userDTO.ID,
+		"username":   userDTO.Username,
+		"email":      userDTO.Email,
+		"status":     userDTO.Status,
+		"created_at": userDTO.CreatedAt,
+		"updated_at": userDTO.UpdatedAt,
 	}
 }

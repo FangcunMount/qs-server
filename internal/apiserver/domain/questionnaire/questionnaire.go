@@ -232,6 +232,33 @@ func (q *Questionnaire) Version() int {
 	return q.version
 }
 
+// IsPublished 检查是否已发布
+func (q *Questionnaire) IsPublished() bool {
+	return q.status == StatusPublished
+}
+
+// IsDraft 检查是否为草稿状态
+func (q *Questionnaire) IsDraft() bool {
+	return q.status == StatusDraft
+}
+
+// IsArchived 检查是否已归档
+func (q *Questionnaire) IsArchived() bool {
+	return q.status == StatusArchived
+}
+
+// ChangeTitle 修改标题
+func (q *Questionnaire) ChangeTitle(newTitle string) {
+	q.title = newTitle
+	q.updatedAt = time.Now()
+}
+
+// ChangeDescription 修改描述
+func (q *Questionnaire) ChangeDescription(newDescription string) {
+	q.description = newDescription
+	q.updatedAt = time.Now()
+}
+
 // UpdateBasicInfo 更新基础信息（业务操作）
 func (q *Questionnaire) UpdateBasicInfo(title, description string) error {
 	if title == "" {

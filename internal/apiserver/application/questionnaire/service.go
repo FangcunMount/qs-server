@@ -276,7 +276,7 @@ func (s *Service) CloneQuestionnaire(ctx context.Context, sourceID string, newCo
 			Code:        newCode,
 			Title:       newTitle,
 			Description: sourceQuestionnaire.Description,
-			CreatedBy:   createdBy,
+			CreatorID:   createdBy,
 		}
 
 		result, err = s.CreateQuestionnaire(ctx, createCmd)

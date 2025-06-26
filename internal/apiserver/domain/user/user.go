@@ -97,10 +97,43 @@ func (u *User) UpdatedAt() time.Time {
 	return u.updatedAt
 }
 
+// ChangeUsername 修改用户名
+func (u *User) ChangeUsername(newUsername string) {
+	u.username = newUsername
+	u.updatedAt = time.Now()
+}
+
+// ChangeEmail 修改邮箱
+func (u *User) ChangeEmail(newEmail string) {
+	u.email = newEmail
+	u.updatedAt = time.Now()
+}
+
 // ChangePassword 修改密码
 func (u *User) ChangePassword(newPassword string) {
 	u.password = newPassword
 	u.updatedAt = time.Now()
+}
+
+// ValidatePassword 验证密码
+func (u *User) ValidatePassword(password string) bool {
+	// TODO: 实现真正的密码验证逻辑（应该使用加密后的密码比较）
+	return u.password == password
+}
+
+// IsActive 检查用户是否活跃
+func (u *User) IsActive() bool {
+	return u.status == StatusActive
+}
+
+// IsBlocked 检查用户是否被封禁
+func (u *User) IsBlocked() bool {
+	return u.status == StatusBlocked
+}
+
+// IsInactive 检查用户是否非活跃
+func (u *User) IsInactive() bool {
+	return u.status == StatusInactive
 }
 
 // Block 封禁用户
@@ -112,6 +145,12 @@ func (u *User) Block() {
 // Activate 激活用户
 func (u *User) Activate() {
 	u.status = StatusActive
+	u.updatedAt = time.Now()
+}
+
+// Deactivate 停用用户
+func (u *User) Deactivate() {
+	u.status = StatusInactive
 	u.updatedAt = time.Now()
 }
 

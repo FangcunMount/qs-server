@@ -2,45 +2,55 @@ package commands
 
 import (
 	"context"
+	"strings"
 
-	appErrors "github.com/yshujie/questionnaire-scale/internal/apiserver/application/shared/errors"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/ports/storage"
+	internalErrors "github.com/yshujie/questionnaire-scale/internal/pkg/errors"
 )
 
 // CreateUserCommand 创建用户命令
 type CreateUserCommand struct {
-	Username string `json:"username" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Username string `json:"username" binding:"required,min=3,max=50" validate:"required,min=3,max=50"`
+	Email    string `json:"email" binding:"required,email" validate:"required,email"`
+	Password string `json:"password" binding:"required,min=6" validate:"required,min=6"`
 }
 
 // Validate 验证命令
-func (cmd *CreateUserCommand) Validate() error {
-	if cmd.Username == "" {
-		return appErrors.NewValidationError("username", "Username is required")
+func (cmd CreateUserCommand) Validate() error {
+	if strings.TrimSpace(cmd.Username) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidUsername, "用户名不能为空")
 	}
-	if cmd.Email == "" {
-		return appErrors.NewValidationError("email", "Email is required")
+	if len(cmd.Username) < 3 || len(cmd.Username) > 50 {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidUsername, "用户名长度必须在3-50个字符之间")
 	}
-	if cmd.Password == "" || len(cmd.Password) < 6 {
-		return appErrors.NewValidationError("password", "Password must be at least 6 characters")
+	if strings.TrimSpace(cmd.Email) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidEmail, "邮箱不能为空")
+	}
+	if strings.TrimSpace(cmd.Password) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidPassword, "密码不能为空")
+	}
+	if len(cmd.Password) < 6 {
+		return internalErrors.NewWithCode(internalErrors.ErrUserPasswordTooWeak, "密码长度至少6个字符")
 	}
 	return nil
 }
 
 // UpdateUserCommand 更新用户命令
 type UpdateUserCommand struct {
-	ID       string `json:"id" binding:"required"`
-	Username string `json:"username"`
-	Email    string `json:"email,omitempty,email"`
+	ID       string  `json:"id" binding:"required"`
+	Username *string `json:"username,omitempty" binding:"omitempty,min=3,max=50"`
+	Email    *string `json:"email,omitempty" binding:"omitempty,email"`
 }
 
 // Validate 验证命令
-func (cmd *UpdateUserCommand) Validate() error {
-	if cmd.ID == "" {
-		return appErrors.NewValidationError("id", "User ID is required")
+func (cmd UpdateUserCommand) Validate() error {
+	if strings.TrimSpace(cmd.ID) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidID, "用户ID不能为空")
+	}
+	if cmd.Username != nil && (len(*cmd.Username) < 3 || len(*cmd.Username) > 50) {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidUsername, "用户名长度必须在3-50个字符之间")
 	}
 	return nil
 }
@@ -53,25 +63,32 @@ type ChangePasswordCommand struct {
 }
 
 // Validate 验证命令
-func (cmd *ChangePasswordCommand) Validate() error {
-	if cmd.ID == "" {
-		return appErrors.NewValidationError("id", "User ID is required")
+func (cmd ChangePasswordCommand) Validate() error {
+	if strings.TrimSpace(cmd.ID) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidID, "用户ID不能为空")
 	}
-	if cmd.NewPassword == "" || len(cmd.NewPassword) < 6 {
-		return appErrors.NewValidationError("new_password", "New password must be at least 6 characters")
+	if strings.TrimSpace(cmd.OldPassword) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidPassword, "旧密码不能为空")
+	}
+	if strings.TrimSpace(cmd.NewPassword) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidPassword, "新密码不能为空")
+	}
+	if len(cmd.NewPassword) < 6 {
+		return internalErrors.NewWithCode(internalErrors.ErrUserPasswordTooWeak, "新密码长度至少6个字符")
 	}
 	return nil
 }
 
 // BlockUserCommand 封禁用户命令
 type BlockUserCommand struct {
-	ID string `json:"id" binding:"required"`
+	ID     string `json:"id" binding:"required"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // Validate 验证命令
-func (cmd *BlockUserCommand) Validate() error {
-	if cmd.ID == "" {
-		return appErrors.NewValidationError("id", "User ID is required")
+func (cmd BlockUserCommand) Validate() error {
+	if strings.TrimSpace(cmd.ID) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidID, "用户ID不能为空")
 	}
 	return nil
 }
@@ -82,9 +99,9 @@ type ActivateUserCommand struct {
 }
 
 // Validate 验证命令
-func (cmd *ActivateUserCommand) Validate() error {
-	if cmd.ID == "" {
-		return appErrors.NewValidationError("id", "User ID is required")
+func (cmd ActivateUserCommand) Validate() error {
+	if strings.TrimSpace(cmd.ID) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidID, "用户ID不能为空")
 	}
 	return nil
 }
@@ -95,9 +112,9 @@ type DeleteUserCommand struct {
 }
 
 // Validate 验证命令
-func (cmd *DeleteUserCommand) Validate() error {
-	if cmd.ID == "" {
-		return appErrors.NewValidationError("id", "User ID is required")
+func (cmd DeleteUserCommand) Validate() error {
+	if strings.TrimSpace(cmd.ID) == "" {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidID, "用户ID不能为空")
 	}
 	return nil
 }
@@ -122,18 +139,18 @@ func (h *CreateUserHandler) Handle(ctx context.Context, cmd CreateUserCommand) (
 	// 2. 验证业务规则
 	exists, err := h.userRepo.ExistsByUsername(ctx, cmd.Username)
 	if err != nil {
-		return nil, appErrors.NewSystemError("Failed to check username existence", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "检查用户名是否存在失败")
 	}
 	if exists {
-		return nil, appErrors.NewValidationError("username", "Username already exists")
+		return nil, internalErrors.NewWithCode(internalErrors.ErrUsernameAlreadyExists, "用户名已存在")
 	}
 
 	exists, err = h.userRepo.ExistsByEmail(ctx, cmd.Email)
 	if err != nil {
-		return nil, appErrors.NewSystemError("Failed to check email existence", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "检查邮箱是否存在失败")
 	}
 	if exists {
-		return nil, appErrors.NewValidationError("email", "Email already exists")
+		return nil, internalErrors.NewWithCode(internalErrors.ErrEmailAlreadyExists, "邮箱已存在")
 	}
 
 	// 3. 创建领域对象
@@ -142,7 +159,7 @@ func (h *CreateUserHandler) Handle(ctx context.Context, cmd CreateUserCommand) (
 
 	// 4. 持久化
 	if err := h.userRepo.Save(ctx, u); err != nil {
-		return nil, appErrors.NewSystemError("Failed to save user", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserCreateFailed, "保存用户失败")
 	}
 
 	// 5. 转换为DTO返回
@@ -168,26 +185,53 @@ func (h *UpdateUserHandler) Handle(ctx context.Context, cmd UpdateUserCommand) (
 		return nil, err
 	}
 
-	// 2. 获取领域对象
-	u, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
+	// 2. 获取现有用户
+	existingUser, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
 	if err != nil {
 		if err == user.ErrUserNotFound {
-			return nil, appErrors.NewNotFoundError("user", cmd.ID)
+			return nil, internalErrors.NewWithCode(internalErrors.ErrUserNotFound, "用户不存在")
 		}
-		return nil, appErrors.NewSystemError("Failed to find user", err)
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户失败")
 	}
 
-	// 3. 执行业务操作
-	// TODO: 实现用户更新逻辑，例如更新用户名、邮箱等
-
-	// 4. 持久化
-	if err := h.userRepo.Update(ctx, u); err != nil {
-		return nil, appErrors.NewSystemError("Failed to update user", err)
+	// 3. 检查用户名是否被其他用户使用
+	if cmd.Username != nil && *cmd.Username != existingUser.Username() {
+		exists, err := h.userRepo.ExistsByUsername(ctx, *cmd.Username)
+		if err != nil {
+			return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "检查用户名是否存在失败")
+		}
+		if exists {
+			return nil, internalErrors.NewWithCode(internalErrors.ErrUsernameAlreadyExists, "用户名已存在")
+		}
 	}
 
-	// 5. 转换为DTO返回
+	// 4. 检查邮箱是否被其他用户使用
+	if cmd.Email != nil && *cmd.Email != existingUser.Email() {
+		exists, err := h.userRepo.ExistsByEmail(ctx, *cmd.Email)
+		if err != nil {
+			return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "检查邮箱是否存在失败")
+		}
+		if exists {
+			return nil, internalErrors.NewWithCode(internalErrors.ErrEmailAlreadyExists, "邮箱已存在")
+		}
+	}
+
+	// 5. 更新用户信息
+	if cmd.Username != nil {
+		existingUser.ChangeUsername(*cmd.Username)
+	}
+	if cmd.Email != nil {
+		existingUser.ChangeEmail(*cmd.Email)
+	}
+
+	// 6. 持久化
+	if err := h.userRepo.Update(ctx, existingUser); err != nil {
+		return nil, internalErrors.WrapWithCode(err, internalErrors.ErrUserUpdateFailed, "更新用户失败")
+	}
+
+	// 7. 转换为DTO返回
 	result := &dto.UserDTO{}
-	result.FromDomain(u)
+	result.FromDomain(existingUser)
 	return result, nil
 }
 
@@ -208,27 +252,27 @@ func (h *ChangePasswordHandler) Handle(ctx context.Context, cmd ChangePasswordCo
 		return err
 	}
 
-	// 2. 获取领域对象
-	u, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
+	// 2. 获取现有用户
+	existingUser, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
 	if err != nil {
 		if err == user.ErrUserNotFound {
-			return appErrors.NewNotFoundError("user", cmd.ID)
+			return internalErrors.NewWithCode(internalErrors.ErrUserNotFound, "用户不存在")
 		}
-		return appErrors.NewSystemError("Failed to find user", err)
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户失败")
 	}
 
 	// 3. 验证旧密码
 	// TODO: 实现密码验证逻辑
-	if u.Password() != cmd.OldPassword {
-		return appErrors.NewValidationError("old_password", "Invalid old password")
+	if !existingUser.ValidatePassword(cmd.OldPassword) {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidPassword, "旧密码不正确")
 	}
 
-	// 4. 执行业务操作
-	u.ChangePassword(cmd.NewPassword)
+	// 4. 修改密码
+	existingUser.ChangePassword(cmd.NewPassword)
 
 	// 5. 持久化
-	if err := h.userRepo.Update(ctx, u); err != nil {
-		return appErrors.NewSystemError("Failed to update user password", err)
+	if err := h.userRepo.Update(ctx, existingUser); err != nil {
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserPasswordChangeFailed, "修改密码失败")
 	}
 
 	return nil
@@ -251,21 +295,26 @@ func (h *BlockUserHandler) Handle(ctx context.Context, cmd BlockUserCommand) err
 		return err
 	}
 
-	// 2. 获取领域对象
-	u, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
+	// 2. 获取现有用户
+	existingUser, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
 	if err != nil {
 		if err == user.ErrUserNotFound {
-			return appErrors.NewNotFoundError("user", cmd.ID)
+			return internalErrors.NewWithCode(internalErrors.ErrUserNotFound, "用户不存在")
 		}
-		return appErrors.NewSystemError("Failed to find user", err)
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户失败")
 	}
 
-	// 3. 执行业务操作
-	u.Block()
+	// 3. 检查用户状态
+	if existingUser.IsBlocked() {
+		return internalErrors.NewWithCode(internalErrors.ErrUserBlocked, "用户已被封禁")
+	}
 
-	// 4. 持久化
-	if err := h.userRepo.Update(ctx, u); err != nil {
-		return appErrors.NewSystemError("Failed to block user", err)
+	// 4. 封禁用户
+	existingUser.Block()
+
+	// 5. 持久化
+	if err := h.userRepo.Update(ctx, existingUser); err != nil {
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserBlockingFailed, "封禁用户失败")
 	}
 
 	return nil
@@ -288,21 +337,26 @@ func (h *ActivateUserHandler) Handle(ctx context.Context, cmd ActivateUserComman
 		return err
 	}
 
-	// 2. 获取领域对象
-	u, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
+	// 2. 获取现有用户
+	existingUser, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
 	if err != nil {
 		if err == user.ErrUserNotFound {
-			return appErrors.NewNotFoundError("user", cmd.ID)
+			return internalErrors.NewWithCode(internalErrors.ErrUserNotFound, "用户不存在")
 		}
-		return appErrors.NewSystemError("Failed to find user", err)
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户失败")
 	}
 
-	// 3. 执行业务操作
-	u.Activate()
+	// 3. 检查用户状态
+	if existingUser.IsActive() {
+		return internalErrors.NewWithCode(internalErrors.ErrUserInvalidStatus, "用户已激活")
+	}
 
-	// 4. 持久化
-	if err := h.userRepo.Update(ctx, u); err != nil {
-		return appErrors.NewSystemError("Failed to activate user", err)
+	// 4. 激活用户
+	existingUser.Activate()
+
+	// 5. 持久化
+	if err := h.userRepo.Update(ctx, existingUser); err != nil {
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserActivationFailed, "激活用户失败")
 	}
 
 	return nil
@@ -329,14 +383,14 @@ func (h *DeleteUserHandler) Handle(ctx context.Context, cmd DeleteUserCommand) e
 	_, err := h.userRepo.FindByID(ctx, user.NewUserID(cmd.ID))
 	if err != nil {
 		if err == user.ErrUserNotFound {
-			return appErrors.NewNotFoundError("user", cmd.ID)
+			return internalErrors.NewWithCode(internalErrors.ErrUserNotFound, "用户不存在")
 		}
-		return appErrors.NewSystemError("Failed to check user existence", err)
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserQueryFailed, "查询用户失败")
 	}
 
 	// 3. 删除
 	if err := h.userRepo.Remove(ctx, user.NewUserID(cmd.ID)); err != nil {
-		return appErrors.NewSystemError("Failed to delete user", err)
+		return internalErrors.WrapWithCode(err, internalErrors.ErrUserDeleteFailed, "删除用户失败")
 	}
 
 	return nil
