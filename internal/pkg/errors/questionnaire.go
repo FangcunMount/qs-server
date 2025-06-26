@@ -97,6 +97,18 @@ const (
 	ErrAnswerUpdateFailed
 	// ErrAnswerDeleteFailed - 答案删除失败
 	ErrAnswerDeleteFailed
+
+	// 额外的问卷相关错误码
+	// ErrQuestionnairePublished - 问卷已发布，不能修改
+	ErrQuestionnairePublished
+	// ErrQuestionnaireInvalidQuestion - 问题无效
+	ErrQuestionnaireInvalidQuestion
+	// ErrQuestionnaireInvalidContent - 问卷内容无效
+	ErrQuestionnaireInvalidContent
+	// ErrQuestionnaireUnpublishFailed - 取消发布问卷失败
+	ErrQuestionnaireUnpublishFailed
+	// ErrQuestionnaireArchiveFailed - 归档问卷失败
+	ErrQuestionnaireArchiveFailed
 )
 
 // 问卷错误码注册
@@ -149,4 +161,11 @@ func init() {
 	register(ErrAnswerSubmitFailed, http.StatusInternalServerError, "答案提交失败", "")
 	register(ErrAnswerUpdateFailed, http.StatusInternalServerError, "答案更新失败", "")
 	register(ErrAnswerDeleteFailed, http.StatusInternalServerError, "答案删除失败", "")
+
+	// 额外的问卷相关错误码
+	register(ErrQuestionnairePublished, http.StatusBadRequest, "问卷已发布，不能修改", "")
+	register(ErrQuestionnaireInvalidQuestion, http.StatusBadRequest, "问题无效", "")
+	register(ErrQuestionnaireInvalidContent, http.StatusBadRequest, "问卷内容无效", "")
+	register(ErrQuestionnaireUnpublishFailed, http.StatusInternalServerError, "取消发布问卷失败", "")
+	register(ErrQuestionnaireArchiveFailed, http.StatusInternalServerError, "归档问卷失败", "")
 }

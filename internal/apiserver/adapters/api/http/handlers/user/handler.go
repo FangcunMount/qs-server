@@ -4,23 +4,22 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/api/http/handlers"
-	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/commands"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user/queries"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
 )
 
 // Handler 用户HTTP处理器
 type Handler struct {
 	*handlers.BaseHandler
-	userService *userApp.Service
+	userEditor *user.UserEditor
+	userQuery  *user.UserQuery
 }
 
 // NewHandler 创建用户处理器
-func NewHandler(userService *userApp.Service) handlers.Handler {
+func NewHandler(userEditor *user.UserEditor, userQuery *user.UserQuery) handlers.Handler {
 	return &Handler{
 		BaseHandler: handlers.NewBaseHandler(),
-		userService: userService,
+		userEditor:  userEditor,
+		userQuery:   userQuery,
 	}
 }
 
@@ -29,7 +28,12 @@ func (h *Handler) GetName() string {
 	return "user"
 }
 
-// 路由注册已移至 internal/apiserver/routers.go 进行集中管理
+// CreateUserRequest 创建用户请求
+type CreateUserRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=50"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
 
 // CreateUser 创建用户
 // @Summary 创建用户
@@ -37,18 +41,18 @@ func (h *Handler) GetName() string {
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param user body commands.CreateUserCommand true "用户信息"
+// @Param user body CreateUserRequest true "用户信息"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users [post]
 func (h *Handler) CreateUser(c *gin.Context) {
-	var cmd commands.CreateUserCommand
-	if err := h.BindJSON(c, &cmd); err != nil {
+	var req CreateUserRequest
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
-	user, err := h.userService.CreateUser(c.Request.Context(), cmd)
+	user, err := h.userEditor.RegisterUser(c.Request.Context(), req.Username, req.Email, req.Password)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -71,17 +75,24 @@ func (h *Handler) CreateUser(c *gin.Context) {
 // @Router /api/v1/users/{id} [get]
 func (h *Handler) GetUser(c *gin.Context) {
 	id := h.GetPathParam(c, "id")
-	query := queries.GetUserQuery{
-		ID: &id,
-	}
 
-	user, err := h.userService.GetUser(c.Request.Context(), query)
+	user, err := h.userQuery.GetUserByID(c.Request.Context(), id)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponseWithMessage(c, "获取成功", h.userToResponse(user))
+}
+
+// ListUsersRequest 列表查询请求
+type ListUsersRequest struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"page_size,default=20"`
+	Status   string `form:"status,default=all"`
+	Keyword  string `form:"keyword"`
+	SortBy   string `form:"sort_by,default=created_at"`
+	SortDir  string `form:"sort_dir,default=desc"`
 }
 
 // ListUsers 获取用户列表
@@ -92,38 +103,58 @@ func (h *Handler) GetUser(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Param status query int false "状态"
-// @Param keyword query string false "关键字"
+// @Param status query string false "状态筛选"
+// @Param keyword query string false "搜索关键字"
 // @Param sort_by query string false "排序字段"
-// @Param sort_order query string false "排序方式" Enums(asc, desc)
+// @Param sort_dir query string false "排序方向" Enums(asc, desc)
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users [get]
 func (h *Handler) ListUsers(c *gin.Context) {
-	var query queries.ListUsersQuery
-	if err := h.BindQuery(c, &query); err != nil {
+	var req ListUsersRequest
+	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
 
-	result, err := h.userService.ListUsers(c.Request.Context(), query)
+	query := user.UserListQuery{
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Status:   req.Status,
+		Keyword:  req.Keyword,
+		SortBy:   req.SortBy,
+		SortDir:  req.SortDir,
+	}
+
+	result, err := h.userQuery.GetUserList(c.Request.Context(), query)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为响应格式
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, user := range result.Items {
-		items[i] = h.userToResponse(user)
+	items := make([]map[string]interface{}, len(result.Users))
+	for i, userDTO := range result.Users {
+		items[i] = h.userToResponse(userDTO)
 	}
 
 	data := gin.H{
-		"items":      items,
-		"pagination": result.Pagination,
+		"items": items,
+		"pagination": gin.H{
+			"total":       result.Total,
+			"page":        result.Page,
+			"page_size":   result.PageSize,
+			"total_pages": result.TotalPages,
+		},
 	}
 
 	h.SuccessResponseWithMessage(c, "获取成功", data)
+}
+
+// UpdateUserRequest 更新用户请求
+type UpdateUserRequest struct {
+	Username *string `json:"username,omitempty" binding:"omitempty,min=3,max=50"`
+	Email    *string `json:"email,omitempty" binding:"omitempty,email"`
 }
 
 // UpdateUser 更新用户
@@ -133,22 +164,21 @@ func (h *Handler) ListUsers(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "用户ID"
-// @Param user body commands.UpdateUserCommand true "用户更新信息"
+// @Param user body UpdateUserRequest true "用户更新信息"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users/{id} [put]
 func (h *Handler) UpdateUser(c *gin.Context) {
-	var cmd commands.UpdateUserCommand
-	if err := h.BindJSON(c, &cmd); err != nil {
+	var req UpdateUserRequest
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
-	// 从路径参数获取ID
-	cmd.ID = h.GetPathParam(c, "id")
+	id := h.GetPathParam(c, "id")
 
-	user, err := h.userService.UpdateUser(c.Request.Context(), cmd)
+	user, err := h.userEditor.UpdateUserProfile(c.Request.Context(), id, req.Username, req.Email)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -170,11 +200,9 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users/{id} [delete]
 func (h *Handler) DeleteUser(c *gin.Context) {
-	cmd := commands.DeleteUserCommand{
-		ID: h.GetPathParam(c, "id"),
-	}
+	id := h.GetPathParam(c, "id")
 
-	err := h.userService.DeleteUser(c.Request.Context(), cmd)
+	err := h.userEditor.DeleteUser(c.Request.Context(), id)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -196,17 +224,20 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users/{id}/activate [post]
 func (h *Handler) ActivateUser(c *gin.Context) {
-	cmd := commands.ActivateUserCommand{
-		ID: h.GetPathParam(c, "id"),
-	}
+	id := h.GetPathParam(c, "id")
 
-	err := h.userService.ActivateUser(c.Request.Context(), cmd)
+	err := h.userEditor.ActivateUser(c.Request.Context(), id)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponseWithMessage(c, "激活成功", nil)
+}
+
+// BlockUserRequest 封禁用户请求
+type BlockUserRequest struct {
+	Reason string `json:"reason"`
 }
 
 // BlockUser 封禁用户
@@ -216,23 +247,31 @@ func (h *Handler) ActivateUser(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "用户ID"
+// @Param request body BlockUserRequest false "封禁原因"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users/{id}/block [post]
 func (h *Handler) BlockUser(c *gin.Context) {
-	cmd := commands.BlockUserCommand{
-		ID: h.GetPathParam(c, "id"),
-	}
+	var req BlockUserRequest
+	_ = h.BindJSON(c, &req) // 忽略错误，因为封禁原因是可选的
 
-	err := h.userService.BlockUser(c.Request.Context(), cmd)
+	id := h.GetPathParam(c, "id")
+
+	err := h.userEditor.BlockUser(c.Request.Context(), id, req.Reason)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponseWithMessage(c, "封禁成功", nil)
+}
+
+// ChangePasswordRequest 修改密码请求
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
 // ChangePassword 修改密码
@@ -242,22 +281,21 @@ func (h *Handler) BlockUser(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "用户ID"
-// @Param password body commands.ChangePasswordCommand true "密码信息"
+// @Param password body ChangePasswordRequest true "密码信息"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/users/{id}/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
-	var cmd commands.ChangePasswordCommand
-	if err := h.BindJSON(c, &cmd); err != nil {
+	var req ChangePasswordRequest
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
-	// 从路径参数获取ID
-	cmd.ID = h.GetPathParam(c, "id")
+	id := h.GetPathParam(c, "id")
 
-	err := h.userService.ChangePassword(c.Request.Context(), cmd)
+	err := h.userEditor.ChangeUserPassword(c.Request.Context(), id, req.OldPassword, req.NewPassword)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -266,35 +304,127 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "密码修改成功", nil)
 }
 
-// GetActiveUsers 获取活跃用户
-// @Summary 获取活跃用户列表
-// @Description 获取所有活跃状态的用户
+// GetUserStats 获取用户统计信息
+// @Summary 获取用户统计信息
+// @Description 获取用户的统计数据
 // @Tags users
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/users/active [get]
-func (h *Handler) GetActiveUsers(c *gin.Context) {
-	query := queries.GetActiveUsersQuery{}
-
-	users, err := h.userService.GetActiveUsers(c.Request.Context(), query)
+// @Router /api/v1/users/stats [get]
+func (h *Handler) GetUserStats(c *gin.Context) {
+	stats, err := h.userQuery.GetUserStats(c.Request.Context())
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为响应格式
-	items := make([]map[string]interface{}, len(users))
-	for i, user := range users {
-		items[i] = h.userToResponse(user)
+	h.SuccessResponseWithMessage(c, "获取成功", stats)
+}
+
+// ValidateCredentialsRequest 验证凭证请求
+type ValidateCredentialsRequest struct {
+	UsernameOrEmail string `json:"username_or_email" binding:"required"`
+	Password        string `json:"password" binding:"required"`
+}
+
+// ValidateCredentials 验证用户凭证
+// @Summary 验证用户凭证
+// @Description 验证用户登录凭证
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param credentials body ValidateCredentialsRequest true "登录凭证"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Router /api/v1/users/validate [post]
+func (h *Handler) ValidateCredentials(c *gin.Context) {
+	var req ValidateCredentialsRequest
+	if err := h.BindJSON(c, &req); err != nil {
+		return
 	}
 
-	h.SuccessResponseWithMessage(c, "获取成功", gin.H{"items": items})
+	user, err := h.userQuery.ValidateUserCredentials(c.Request.Context(), req.UsernameOrEmail, req.Password)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "验证成功", h.userToResponse(user))
+}
+
+// CheckUsernameRequest 检查用户名请求
+type CheckUsernameRequest struct {
+	Username string `form:"username" binding:"required"`
+}
+
+// CheckUsername 检查用户名是否存在
+// @Summary 检查用户名是否存在
+// @Description 检查用户名的可用性
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param username query string true "用户名"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/v1/users/check-username [get]
+func (h *Handler) CheckUsername(c *gin.Context) {
+	var req CheckUsernameRequest
+	if err := h.BindQuery(c, &req); err != nil {
+		return
+	}
+
+	exists, err := h.userQuery.CheckUsernameExists(c.Request.Context(), req.Username)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "检查完成", gin.H{
+		"username":  req.Username,
+		"exists":    exists,
+		"available": !exists,
+	})
+}
+
+// CheckEmailRequest 检查邮箱请求
+type CheckEmailRequest struct {
+	Email string `form:"email" binding:"required,email"`
+}
+
+// CheckEmail 检查邮箱是否存在
+// @Summary 检查邮箱是否存在
+// @Description 检查邮箱的可用性
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param email query string true "邮箱"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Router /api/v1/users/check-email [get]
+func (h *Handler) CheckEmail(c *gin.Context) {
+	var req CheckEmailRequest
+	if err := h.BindQuery(c, &req); err != nil {
+		return
+	}
+
+	exists, err := h.userQuery.CheckEmailExists(c.Request.Context(), req.Email)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "检查完成", gin.H{
+		"email":     req.Email,
+		"exists":    exists,
+		"available": !exists,
+	})
 }
 
 // userToResponse 将DTO转换为响应格式
-func (h *Handler) userToResponse(userDTO *dto.UserDTO) map[string]interface{} {
+func (h *Handler) userToResponse(userDTO *user.UserDTO) map[string]interface{} {
 	return map[string]interface{}{
 		"id":         userDTO.ID,
 		"username":   userDTO.Username,

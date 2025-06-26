@@ -61,6 +61,16 @@ const (
 	ErrUserEmailNotVerified
 	// ErrUserPhoneNotVerified - 用户手机号未验证
 	ErrUserPhoneNotVerified
+	// ErrUserListQueryFailed - 用户列表查询失败
+	ErrUserListQueryFailed
+	// ErrUserStatsQueryFailed - 用户统计查询失败
+	ErrUserStatsQueryFailed
+	// ErrUserInvalidCredentials - 用户凭证无效
+	ErrUserInvalidCredentials
+	// ErrUserInvalidSortField - 无效的排序字段
+	ErrUserInvalidSortField
+	// ErrUserInvalidSortDirection - 无效的排序方向
+	ErrUserInvalidSortDirection
 )
 
 // 用户错误码注册
@@ -93,4 +103,9 @@ func init() {
 	register(ErrUserAccountLocked, http.StatusForbidden, "账户已被锁定", "")
 	register(ErrUserEmailNotVerified, http.StatusForbidden, "邮箱未验证", "")
 	register(ErrUserPhoneNotVerified, http.StatusForbidden, "手机号未验证", "")
+	register(ErrUserListQueryFailed, http.StatusInternalServerError, "用户列表查询失败", "")
+	register(ErrUserStatsQueryFailed, http.StatusInternalServerError, "用户统计查询失败", "")
+	register(ErrUserInvalidCredentials, http.StatusUnauthorized, "用户凭证无效", "")
+	register(ErrUserInvalidSortField, http.StatusBadRequest, "无效的排序字段", "")
+	register(ErrUserInvalidSortDirection, http.StatusBadRequest, "无效的排序方向", "")
 }

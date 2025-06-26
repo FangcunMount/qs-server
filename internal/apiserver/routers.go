@@ -91,7 +91,10 @@ func (r *Router) registerUserRoutes(apiV1 *gin.RouterGroup) {
 
 		// 新增路由
 		users.PUT("/:id/password", r.userHandler.ChangePassword)
-		users.GET("/active", r.userHandler.GetActiveUsers)
+		users.GET("/stats", r.userHandler.GetUserStats)
+		users.POST("/validate", r.userHandler.ValidateCredentials)
+		users.GET("/check-username", r.userHandler.CheckUsername)
+		users.GET("/check-email", r.userHandler.CheckEmail)
 	}
 }
 
@@ -104,15 +107,23 @@ func (r *Router) registerQuestionnaireRoutes(apiV1 *gin.RouterGroup) {
 	questionnaires := apiV1.Group("/questionnaires")
 	{
 		questionnaires.POST("", r.questionnaireHandler.CreateQuestionnaire)
-		questionnaires.GET("", r.questionnaireHandler.GetQuestionnaire)
-		questionnaires.GET("/list", r.questionnaireHandler.ListQuestionnaires)
+		questionnaires.GET("/:id", r.questionnaireHandler.GetQuestionnaire)
+		questionnaires.GET("/code/:code", r.questionnaireHandler.GetQuestionnaireByCode)
+		questionnaires.GET("", r.questionnaireHandler.ListQuestionnaires)
 		questionnaires.PUT("/:id", r.questionnaireHandler.UpdateQuestionnaire)
 		questionnaires.POST("/:id/publish", r.questionnaireHandler.PublishQuestionnaire)
+		questionnaires.POST("/:id/unpublish", r.questionnaireHandler.UnpublishQuestionnaire)
+		questionnaires.POST("/:id/archive", r.questionnaireHandler.ArchiveQuestionnaire)
 		questionnaires.DELETE("/:id", r.questionnaireHandler.DeleteQuestionnaire)
 
-		// 数据一致性相关路由
-		questionnaires.GET("/:id/consistency", r.questionnaireHandler.CheckDataConsistency)
-		questionnaires.POST("/:id/repair", r.questionnaireHandler.RepairData)
+		// 问题管理路由
+		questionnaires.POST("/:id/questions", r.questionnaireHandler.AddQuestion)
+		questionnaires.DELETE("/:id/questions/:questionId", r.questionnaireHandler.RemoveQuestion)
+
+		// 统计和专用查询路由
+		questionnaires.GET("/stats", r.questionnaireHandler.GetQuestionnaireStats)
+		questionnaires.GET("/my", r.questionnaireHandler.GetMyQuestionnaires)
+		questionnaires.GET("/published", r.questionnaireHandler.GetPublishedQuestionnaires)
 	}
 }
 

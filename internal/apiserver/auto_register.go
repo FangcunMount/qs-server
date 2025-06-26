@@ -31,17 +31,31 @@ func registerUserComponents() {
 		reflect.TypeOf((*storage.UserRepository)(nil)).Elem(),
 	)
 
-	// 注册用户服务（使用新的DDD架构）
+	// 注册用户编辑器
 	RegisterService(
-		"user",
+		"user-editor",
 		func(container *AutoDiscoveryContainer) (interface{}, error) {
 			repo, exists := container.GetRepository("user")
 			if !exists {
 				return nil, fmt.Errorf("user repository not found")
 			}
-			return userApp.NewService(repo.(storage.UserRepository)), nil
+			return userApp.NewUserEditor(repo.(storage.UserRepository)), nil
 		},
-		reflect.TypeOf((*userApp.Service)(nil)).Elem(),
+		reflect.TypeOf((*userApp.UserEditor)(nil)).Elem(),
+		"user", // 依赖用户存储库
+	)
+
+	// 注册用户查询器
+	RegisterService(
+		"user-query",
+		func(container *AutoDiscoveryContainer) (interface{}, error) {
+			repo, exists := container.GetRepository("user")
+			if !exists {
+				return nil, fmt.Errorf("user repository not found")
+			}
+			return userApp.NewUserQuery(repo.(storage.UserRepository)), nil
+		},
+		reflect.TypeOf((*userApp.UserQuery)(nil)).Elem(),
 		"user", // 依赖用户存储库
 	)
 
@@ -49,13 +63,20 @@ func registerUserComponents() {
 	RegisterHandler(
 		"user",
 		func(container *AutoDiscoveryContainer) (interface{}, error) {
-			service, exists := container.GetService("user")
-			if !exists {
-				return nil, fmt.Errorf("user service not found")
+			editor, editorExists := container.GetService("user-editor")
+			if !editorExists {
+				return nil, fmt.Errorf("user editor service not found")
 			}
-			return user.NewHandler(service.(*userApp.Service)), nil
+			query, queryExists := container.GetService("user-query")
+			if !queryExists {
+				return nil, fmt.Errorf("user query service not found")
+			}
+			return user.NewHandler(
+				editor.(*userApp.UserEditor),
+				query.(*userApp.UserQuery),
+			), nil
 		},
-		"user", // 依赖用户服务
+		"user-editor", "user-query", // 依赖用户编辑器和查询器
 	)
 }
 
@@ -85,29 +106,35 @@ func registerQuestionnaireComponents() {
 		reflect.TypeOf((*storage.QuestionnaireDocumentRepository)(nil)).Elem(),
 	)
 
-	// 注册问卷服务（使用DataCoordinator）
+	// 注册问卷编辑器
 	RegisterService(
-		"questionnaire",
+		"questionnaire-editor",
 		func(container *AutoDiscoveryContainer) (interface{}, error) {
 			mysqlRepo, exists := container.GetRepository("questionnaire-mysql")
 			if !exists {
 				return nil, fmt.Errorf("questionnaire MySQL repository not found")
 			}
-
-			// 如果MongoDB可用，使用多数据源模式
-			if mongoRepo, exists := container.GetRepository("questionnaire-mongo"); exists {
-				return questionnaireApp.NewService(
-					mysqlRepo.(storage.QuestionnaireRepository),
-					mongoRepo.(storage.QuestionnaireDocumentRepository),
-				), nil
-			}
-
-			// 否则使用单数据源模式
-			return questionnaireApp.NewServiceWithSingleRepo(
+			return questionnaireApp.NewQuestionnaireEditor(
 				mysqlRepo.(storage.QuestionnaireRepository),
 			), nil
 		},
-		reflect.TypeOf((*questionnaireApp.Service)(nil)).Elem(),
+		reflect.TypeOf((*questionnaireApp.QuestionnaireEditor)(nil)).Elem(),
+		"questionnaire-mysql", // 依赖MySQL存储库
+	)
+
+	// 注册问卷查询器
+	RegisterService(
+		"questionnaire-query",
+		func(container *AutoDiscoveryContainer) (interface{}, error) {
+			mysqlRepo, exists := container.GetRepository("questionnaire-mysql")
+			if !exists {
+				return nil, fmt.Errorf("questionnaire MySQL repository not found")
+			}
+			return questionnaireApp.NewQuestionnaireQuery(
+				mysqlRepo.(storage.QuestionnaireRepository),
+			), nil
+		},
+		reflect.TypeOf((*questionnaireApp.QuestionnaireQuery)(nil)).Elem(),
 		"questionnaire-mysql", // 依赖MySQL存储库
 	)
 
@@ -115,12 +142,19 @@ func registerQuestionnaireComponents() {
 	RegisterHandler(
 		"questionnaire",
 		func(container *AutoDiscoveryContainer) (interface{}, error) {
-			service, exists := container.GetService("questionnaire")
-			if !exists {
-				return nil, fmt.Errorf("questionnaire service not found")
+			editor, editorExists := container.GetService("questionnaire-editor")
+			if !editorExists {
+				return nil, fmt.Errorf("questionnaire editor service not found")
 			}
-			return questionnaire.NewHandler(service.(*questionnaireApp.Service)), nil
+			query, queryExists := container.GetService("questionnaire-query")
+			if !queryExists {
+				return nil, fmt.Errorf("questionnaire query service not found")
+			}
+			return questionnaire.NewHandler(
+				editor.(*questionnaireApp.QuestionnaireEditor),
+				query.(*questionnaireApp.QuestionnaireQuery),
+			), nil
 		},
-		"questionnaire", // 依赖问卷服务
+		"questionnaire-editor", "questionnaire-query", // 依赖问卷编辑器和查询器
 	)
 }

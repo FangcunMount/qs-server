@@ -4,22 +4,22 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/api/http/handlers"
-	questionnaireApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire/commands"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire/queries"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire"
 )
 
 // Handler 问卷HTTP处理器
 type Handler struct {
 	*handlers.BaseHandler
-	questionnaireService *questionnaireApp.Service
+	questionnaireEditor *questionnaire.QuestionnaireEditor
+	questionnaireQuery  *questionnaire.QuestionnaireQuery
 }
 
 // NewHandler 创建问卷处理器
-func NewHandler(questionnaireService *questionnaireApp.Service) handlers.Handler {
+func NewHandler(questionnaireEditor *questionnaire.QuestionnaireEditor, questionnaireQuery *questionnaire.QuestionnaireQuery) handlers.Handler {
 	return &Handler{
-		BaseHandler:          handlers.NewBaseHandler(),
-		questionnaireService: questionnaireService,
+		BaseHandler:         handlers.NewBaseHandler(),
+		questionnaireEditor: questionnaireEditor,
+		questionnaireQuery:  questionnaireQuery,
 	}
 }
 
@@ -28,7 +28,11 @@ func (h *Handler) GetName() string {
 	return "questionnaire"
 }
 
-// 路由注册已移至 internal/apiserver/routers.go 进行集中管理
+// CreateQuestionnaireRequest 创建问卷请求
+type CreateQuestionnaireRequest struct {
+	Title       string `json:"title" binding:"required,min=2,max=200"`
+	Description string `json:"description"`
+}
 
 // CreateQuestionnaire 创建问卷
 // @Summary 创建问卷
@@ -36,52 +40,86 @@ func (h *Handler) GetName() string {
 // @Tags questionnaires
 // @Accept json
 // @Produce json
-// @Param questionnaire body commands.CreateQuestionnaireCommand true "问卷信息"
+// @Param questionnaire body CreateQuestionnaireRequest true "问卷信息"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/questionnaires [post]
 func (h *Handler) CreateQuestionnaire(c *gin.Context) {
-	var cmd commands.CreateQuestionnaireCommand
-	if err := h.BindJSON(c, &cmd); err != nil {
-		return // 错误响应已在BindJSON中处理
+	var req CreateQuestionnaireRequest
+	if err := h.BindJSON(c, &req); err != nil {
+		return
 	}
 
-	questionnaire, err := h.questionnaireService.CreateQuestionnaire(c.Request.Context(), cmd)
+	// TODO: 从认证上下文获取用户ID
+	creatorID := "user-123" // 暂时硬编码
+
+	questionnaire, err := h.questionnaireEditor.CreateQuestionnaire(c.Request.Context(), req.Title, req.Description, creatorID)
 	if err != nil {
-		h.InternalErrorResponse(c, "创建问卷失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponseWithMessage(c, "创建成功", h.questionnaireToResponse(questionnaire))
 }
 
-// GetQuestionnaire 获取问卷
+// GetQuestionnaire 获取问卷详情
 // @Summary 获取问卷详情
-// @Description 根据ID或代码获取问卷详情
+// @Description 根据ID获取问卷详情
 // @Tags questionnaires
 // @Accept json
 // @Produce json
-// @Param id query string false "问卷ID"
-// @Param code query string false "问卷代码"
+// @Param id path string true "问卷ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/questionnaires [get]
+// @Router /api/v1/questionnaires/{id} [get]
 func (h *Handler) GetQuestionnaire(c *gin.Context) {
-	var query queries.GetQuestionnaireQuery
-	if err := h.BindQuery(c, &query); err != nil {
-		return
-	}
+	id := h.GetPathParam(c, "id")
 
-	questionnaire, err := h.questionnaireService.GetQuestionnaire(c.Request.Context(), query)
+	questionnaire, err := h.questionnaireQuery.GetQuestionnaireByID(c.Request.Context(), id)
 	if err != nil {
-		h.NotFoundResponse(c, "问卷不存在", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponseWithMessage(c, "获取成功", h.questionnaireToResponse(questionnaire))
+}
+
+// GetQuestionnaireByCode 根据代码获取问卷
+// @Summary 根据代码获取问卷
+// @Description 根据问卷代码获取问卷详情
+// @Tags questionnaires
+// @Accept json
+// @Produce json
+// @Param code path string true "问卷代码"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/questionnaires/code/{code} [get]
+func (h *Handler) GetQuestionnaireByCode(c *gin.Context) {
+	code := h.GetPathParam(c, "code")
+
+	questionnaire, err := h.questionnaireQuery.GetQuestionnaireByCode(c.Request.Context(), code)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "获取成功", h.questionnaireToResponse(questionnaire))
+}
+
+// ListQuestionnairesRequest 列表查询请求
+type ListQuestionnairesRequest struct {
+	Page      int    `form:"page,default=1"`
+	PageSize  int    `form:"page_size,default=20"`
+	Status    string `form:"status,default=all"`
+	CreatorID string `form:"creator_id"`
+	Keyword   string `form:"keyword"`
+	SortBy    string `form:"sort_by,default=updated_at"`
+	SortDir   string `form:"sort_dir,default=desc"`
 }
 
 // ListQuestionnaires 获取问卷列表
@@ -92,39 +130,60 @@ func (h *Handler) GetQuestionnaire(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
+// @Param status query string false "状态筛选"
 // @Param creator_id query string false "创建者ID"
-// @Param status query int false "状态"
-// @Param keyword query string false "关键字"
+// @Param keyword query string false "搜索关键字"
 // @Param sort_by query string false "排序字段"
-// @Param sort_order query string false "排序方式" Enums(asc, desc)
+// @Param sort_dir query string false "排序方向" Enums(asc, desc)
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/questionnaires/list [get]
+// @Router /api/v1/questionnaires [get]
 func (h *Handler) ListQuestionnaires(c *gin.Context) {
-	var query queries.ListQuestionnairesQuery
-	if err := h.BindQuery(c, &query); err != nil {
+	var req ListQuestionnairesRequest
+	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
 
-	result, err := h.questionnaireService.ListQuestionnaires(c.Request.Context(), query)
+	query := questionnaire.QuestionnaireListQuery{
+		Page:      req.Page,
+		PageSize:  req.PageSize,
+		Status:    req.Status,
+		CreatorID: req.CreatorID,
+		Keyword:   req.Keyword,
+		SortBy:    req.SortBy,
+		SortDir:   req.SortDir,
+	}
+
+	result, err := h.questionnaireQuery.GetQuestionnaireList(c.Request.Context(), query)
 	if err != nil {
-		h.InternalErrorResponse(c, "获取列表失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为响应格式
-	items := make([]map[string]interface{}, len(result.Items))
-	for i, questionnaire := range result.Items {
-		items[i] = h.questionnaireToResponse(questionnaire)
+	items := make([]map[string]interface{}, len(result.Questionnaires))
+	for i, q := range result.Questionnaires {
+		items[i] = h.questionnaireToResponse(q)
 	}
 
 	data := gin.H{
-		"items":      items,
-		"pagination": result.Pagination,
+		"items": items,
+		"pagination": gin.H{
+			"total":       result.Total,
+			"page":        result.Page,
+			"page_size":   result.PageSize,
+			"total_pages": result.TotalPages,
+		},
 	}
 
 	h.SuccessResponseWithMessage(c, "获取成功", data)
+}
+
+// UpdateQuestionnaireRequest 更新问卷请求
+type UpdateQuestionnaireRequest struct {
+	Title       string `json:"title" binding:"required,min=2,max=200"`
+	Description string `json:"description"`
 }
 
 // UpdateQuestionnaire 更新问卷
@@ -134,24 +193,23 @@ func (h *Handler) ListQuestionnaires(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "问卷ID"
-// @Param questionnaire body commands.UpdateQuestionnaireCommand true "问卷更新信息"
+// @Param questionnaire body UpdateQuestionnaireRequest true "问卷更新信息"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/questionnaires/{id} [put]
 func (h *Handler) UpdateQuestionnaire(c *gin.Context) {
-	var cmd commands.UpdateQuestionnaireCommand
-	if err := h.BindJSON(c, &cmd); err != nil {
+	var req UpdateQuestionnaireRequest
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
-	// 从路径参数获取ID
-	cmd.ID = h.GetPathParam(c, "id")
+	id := h.GetPathParam(c, "id")
 
-	questionnaire, err := h.questionnaireService.UpdateQuestionnaire(c.Request.Context(), cmd)
+	questionnaire, err := h.questionnaireEditor.UpdateQuestionnaireInfo(c.Request.Context(), id, req.Title, req.Description)
 	if err != nil {
-		h.InternalErrorResponse(c, "更新问卷失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
@@ -171,17 +229,63 @@ func (h *Handler) UpdateQuestionnaire(c *gin.Context) {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/questionnaires/{id}/publish [post]
 func (h *Handler) PublishQuestionnaire(c *gin.Context) {
-	cmd := commands.PublishQuestionnaireCommand{
-		ID: h.GetPathParam(c, "id"),
-	}
+	id := h.GetPathParam(c, "id")
 
-	err := h.questionnaireService.PublishQuestionnaire(c.Request.Context(), cmd)
+	questionnaire, err := h.questionnaireEditor.PublishQuestionnaire(c.Request.Context(), id)
 	if err != nil {
-		h.InternalErrorResponse(c, "发布问卷失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
-	h.SuccessResponseWithMessage(c, "发布成功", nil)
+	h.SuccessResponseWithMessage(c, "发布成功", h.questionnaireToResponse(questionnaire))
+}
+
+// UnpublishQuestionnaire 取消发布问卷
+// @Summary 取消发布问卷
+// @Description 将已发布的问卷撤回到草稿状态
+// @Tags questionnaires
+// @Accept json
+// @Produce json
+// @Param id path string true "问卷ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/questionnaires/{id}/unpublish [post]
+func (h *Handler) UnpublishQuestionnaire(c *gin.Context) {
+	id := h.GetPathParam(c, "id")
+
+	questionnaire, err := h.questionnaireEditor.UnpublishQuestionnaire(c.Request.Context(), id)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "取消发布成功", h.questionnaireToResponse(questionnaire))
+}
+
+// ArchiveQuestionnaire 归档问卷
+// @Summary 归档问卷
+// @Description 将问卷归档，不再使用
+// @Tags questionnaires
+// @Accept json
+// @Produce json
+// @Param id path string true "问卷ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/questionnaires/{id}/archive [post]
+func (h *Handler) ArchiveQuestionnaire(c *gin.Context) {
+	id := h.GetPathParam(c, "id")
+
+	err := h.questionnaireEditor.ArchiveQuestionnaire(c.Request.Context(), id)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "归档成功", nil)
 }
 
 // DeleteQuestionnaire 删除问卷
@@ -197,71 +301,222 @@ func (h *Handler) PublishQuestionnaire(c *gin.Context) {
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/questionnaires/{id} [delete]
 func (h *Handler) DeleteQuestionnaire(c *gin.Context) {
-	cmd := commands.DeleteQuestionnaireCommand{
-		ID: h.GetPathParam(c, "id"),
-	}
+	id := h.GetPathParam(c, "id")
 
-	err := h.questionnaireService.DeleteQuestionnaire(c.Request.Context(), cmd)
+	err := h.questionnaireEditor.DeleteQuestionnaire(c.Request.Context(), id)
 	if err != nil {
-		h.InternalErrorResponse(c, "删除问卷失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponseWithMessage(c, "删除成功", nil)
 }
 
-// CheckDataConsistency 检查数据一致性
-// @Summary 检查问卷数据一致性
-// @Description 检查MySQL和MongoDB中问卷数据的一致性
+// AddQuestionRequest 添加问题请求
+type AddQuestionRequest struct {
+	QuestionText string   `json:"question_text" binding:"required"`
+	QuestionType string   `json:"question_type" binding:"required"`
+	Options      []string `json:"options"`
+}
+
+// AddQuestion 添加问题到问卷
+// @Summary 添加问题到问卷
+// @Description 向问卷添加新问题
 // @Tags questionnaires
 // @Accept json
 // @Produce json
 // @Param id path string true "问卷ID"
+// @Param question body AddQuestionRequest true "问题信息"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/questionnaires/{id}/consistency [get]
-func (h *Handler) CheckDataConsistency(c *gin.Context) {
-	id := h.GetPathParam(c, "id")
-
-	result, err := h.questionnaireService.CheckQuestionnaireDataConsistency(c.Request.Context(), id)
-	if err != nil {
-		h.InternalErrorResponse(c, "数据一致性检查失败", err)
+// @Router /api/v1/questionnaires/{id}/questions [post]
+func (h *Handler) AddQuestion(c *gin.Context) {
+	var req AddQuestionRequest
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
-	h.SuccessResponseWithMessage(c, "检查完成", result)
+	id := h.GetPathParam(c, "id")
+
+	questionnaire, err := h.questionnaireEditor.AddQuestion(c.Request.Context(), id, req.QuestionText, req.QuestionType, req.Options)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "添加问题成功", h.questionnaireToResponse(questionnaire))
 }
 
-// RepairData 修复数据不一致
-// @Summary 修复问卷数据不一致
-// @Description 修复MySQL和MongoDB中问卷数据的不一致
+// RemoveQuestion 从问卷移除问题
+// @Summary 从问卷移除问题
+// @Description 从问卷中删除指定问题
 // @Tags questionnaires
 // @Accept json
 // @Produce json
 // @Param id path string true "问卷ID"
+// @Param questionId path string true "问题ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/questionnaires/{id}/repair [post]
-func (h *Handler) RepairData(c *gin.Context) {
+// @Router /api/v1/questionnaires/{id}/questions/{questionId} [delete]
+func (h *Handler) RemoveQuestion(c *gin.Context) {
 	id := h.GetPathParam(c, "id")
+	questionID := h.GetPathParam(c, "questionId")
 
-	err := h.questionnaireService.RepairQuestionnaireData(c.Request.Context(), id)
+	questionnaire, err := h.questionnaireEditor.RemoveQuestion(c.Request.Context(), id, questionID)
 	if err != nil {
-		h.InternalErrorResponse(c, "数据修复失败", err)
+		h.ErrorResponse(c, err)
 		return
 	}
 
-	h.SuccessResponseWithMessage(c, "数据修复成功", nil)
+	h.SuccessResponseWithMessage(c, "移除问题成功", h.questionnaireToResponse(questionnaire))
 }
 
-// 辅助方法：将DTO转换为响应格式
-func (h *Handler) questionnaireToResponse(q interface{}) map[string]interface{} {
-	// TODO: 实现具体的转换逻辑
-	// 这里需要将DTO转换为适合HTTP响应的格式
+// GetQuestionnaireStats 获取问卷统计信息
+// @Summary 获取问卷统计信息
+// @Description 获取问卷的统计数据
+// @Tags questionnaires
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/questionnaires/stats [get]
+func (h *Handler) GetQuestionnaireStats(c *gin.Context) {
+	stats, err := h.questionnaireQuery.GetQuestionnaireStats(c.Request.Context())
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "获取成功", stats)
+}
+
+// GetMyQuestionnaires 获取我的问卷列表
+// @Summary 获取我的问卷列表
+// @Description 获取当前用户创建的问卷列表
+// @Tags questionnaires
+// @Accept json
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(20)
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/questionnaires/my [get]
+func (h *Handler) GetMyQuestionnaires(c *gin.Context) {
+	page := 1
+	pageSize := 20
+
+	if p := c.Query("page"); p != "" {
+		if parsed, err := c.GetQuery("page"); err {
+			page = 1
+		} else {
+			page = int(parsed[0] - '0') // 简单转换
+		}
+	}
+
+	if ps := c.Query("page_size"); ps != "" {
+		if parsed, err := c.GetQuery("page_size"); err {
+			pageSize = 20
+		} else {
+			pageSize = int(parsed[0] - '0') // 简单转换
+		}
+	}
+
+	// TODO: 从认证上下文获取用户ID
+	userID := "user-123" // 暂时硬编码
+
+	result, err := h.questionnaireQuery.GetUserQuestionnaires(c.Request.Context(), userID, page, pageSize)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	// 转换为响应格式
+	items := make([]map[string]interface{}, len(result.Questionnaires))
+	for i, q := range result.Questionnaires {
+		items[i] = h.questionnaireToResponse(q)
+	}
+
+	data := gin.H{
+		"items": items,
+		"pagination": gin.H{
+			"total":       result.Total,
+			"page":        result.Page,
+			"page_size":   result.PageSize,
+			"total_pages": result.TotalPages,
+		},
+	}
+
+	h.SuccessResponseWithMessage(c, "获取成功", data)
+}
+
+// GetPublishedQuestionnaires 获取已发布的问卷列表
+// @Summary 获取已发布的问卷列表
+// @Description 获取公开发布的问卷列表
+// @Tags questionnaires
+// @Accept json
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(20)
+// @Param keyword query string false "搜索关键字"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/questionnaires/published [get]
+func (h *Handler) GetPublishedQuestionnaires(c *gin.Context) {
+	page := 1
+	pageSize := 20
+	keyword := c.Query("keyword")
+
+	if p := c.Query("page"); p != "" {
+		// 简单解析，实际应用中需要更严格的验证
+		page = 1
+	}
+
+	if ps := c.Query("page_size"); ps != "" {
+		pageSize = 20
+	}
+
+	result, err := h.questionnaireQuery.GetPublishedQuestionnaires(c.Request.Context(), page, pageSize, keyword)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	// 转换为响应格式
+	items := make([]map[string]interface{}, len(result.Questionnaires))
+	for i, q := range result.Questionnaires {
+		items[i] = h.questionnaireToResponse(q)
+	}
+
+	data := gin.H{
+		"items": items,
+		"pagination": gin.H{
+			"total":       result.Total,
+			"page":        result.Page,
+			"page_size":   result.PageSize,
+			"total_pages": result.TotalPages,
+		},
+	}
+
+	h.SuccessResponseWithMessage(c, "获取成功", data)
+}
+
+// questionnaireToResponse 将DTO转换为响应格式
+func (h *Handler) questionnaireToResponse(q *questionnaire.QuestionnaireDTO) map[string]interface{} {
 	return map[string]interface{}{
-		"message": "questionnaire response conversion not implemented yet",
-		"data":    q,
+		"id":          q.ID,
+		"code":        q.Code,
+		"title":       q.Title,
+		"description": q.Description,
+		"status":      q.Status,
+		"creator_id":  q.CreatedBy,
+		"created_at":  q.CreatedAt,
+		"updated_at":  q.UpdatedAt,
+		"questions":   q.Questions,
 	}
 }

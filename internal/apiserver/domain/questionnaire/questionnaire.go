@@ -128,6 +128,30 @@ func (o Option) Value() string {
 	return o.value
 }
 
+// NewQuestion 创建新问题（工厂方法）
+func NewQuestion(title, questionType string, options []string) Question {
+	questionID := generateID()
+	questionOptions := make([]Option, 0, len(options))
+
+	for _, optionText := range options {
+		option := Option{
+			id:    generateID(),
+			text:  optionText,
+			value: optionText,
+		}
+		questionOptions = append(questionOptions, option)
+	}
+
+	return Question{
+		id:       questionID,
+		type_:    QuestionType(questionType),
+		title:    title,
+		required: false,
+		options:  questionOptions,
+		settings: make(map[string]interface{}),
+	}
+}
+
 // Settings 问卷设置值对象
 type Settings struct {
 	allowAnonymous bool
@@ -285,6 +309,25 @@ func (q *Questionnaire) AddQuestion(question Question) error {
 	return nil
 }
 
+// RemoveQuestion 移除问题（业务操作）
+func (q *Questionnaire) RemoveQuestion(questionID string) error {
+	if q.status == StatusPublished {
+		return ErrCannotModifyPublishedQuestionnaire
+	}
+
+	for i, question := range q.questions {
+		if question.ID() == questionID {
+			// 移除问题
+			q.questions = append(q.questions[:i], q.questions[i+1:]...)
+			q.updatedAt = time.Now()
+			q.version++
+			return nil
+		}
+	}
+
+	return ErrQuestionNotFound
+}
+
 // Publish 发布问卷（业务操作）
 func (q *Questionnaire) Publish() error {
 	if len(q.questions) == 0 {
@@ -296,6 +339,23 @@ func (q *Questionnaire) Publish() error {
 	}
 
 	q.status = StatusPublished
+	q.updatedAt = time.Now()
+
+	return nil
+}
+
+// CanPublish 检查是否可以发布
+func (q *Questionnaire) CanPublish() bool {
+	return len(q.questions) > 0 && q.status == StatusDraft
+}
+
+// Unpublish 取消发布问卷（业务操作）
+func (q *Questionnaire) Unpublish() error {
+	if q.status != StatusPublished {
+		return ErrAlreadyPublished
+	}
+
+	q.status = StatusDraft
 	q.updatedAt = time.Now()
 
 	return nil

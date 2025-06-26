@@ -11,4 +11,5 @@ var (
 	ErrAlreadyArchived                    = errors.New("questionnaire is already archived")
 	ErrQuestionnaireNotFound              = errors.New("questionnaire not found")
 	ErrDuplicateCode                      = errors.New("questionnaire code already exists")
+	ErrQuestionNotFound                   = errors.New("question not found")
 )
