@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
 	genericapiserver "github.com/yshujie/questionnaire-scale/internal/pkg/server"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/shutdown"
@@ -16,8 +17,8 @@ type apiServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
 	// 数据库管理器
 	dbManager *DatabaseManager
-	// 六边形架构容器（自动发现版本）
-	container *AutoDiscoveryContainer
+	// Container 主容器
+	container *container.Container
 }
 
 // preparedAPIServer 定义了准备运行的 API 服务器
@@ -79,12 +80,15 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}
 
 	// 创建六边形架构容器（自动发现版本）
-	s.container = NewAutoDiscoveryContainer(mysqlDB, mongoClient, mongoDatabase)
+	s.container = container.NewContainer(mysqlDB, mongoClient, mongoDatabase)
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize hexagonal architecture container: %v", err)
 	}
+
+	// 创建并初始化路由器
+	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
 
 	log.Info("🏗️  Hexagonal Architecture initialized successfully!")
 	log.Info("   📦 Domain: questionnaire, user")
@@ -97,9 +101,6 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	} else {
 		log.Info("   🗄️  Storage Mode: MySQL Only")
 	}
-
-	// 使用容器中的路由器替换通用服务器的引擎
-	s.genericAPIServer.Engine = s.container.GetRouter()
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {

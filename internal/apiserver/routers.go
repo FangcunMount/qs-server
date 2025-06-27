@@ -4,39 +4,19 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/api/http/handlers/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/api/http/handlers/user"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
 )
 
 // Router 集中的路由管理器
 type Router struct {
-	// handlers
-	userHandler          *user.Handler
-	questionnaireHandler *questionnaire.Handler
-
-	// container reference for health check
-	container *AutoDiscoveryContainer
+	container *container.Container
 }
 
 // NewRouter 创建路由管理器
-func NewRouter() *Router {
-	return &Router{}
-}
-
-// SetContainer 设置容器引用（用于健康检查）
-func (r *Router) SetContainer(container *AutoDiscoveryContainer) {
-	r.container = container
-}
-
-// SetUserHandler 设置用户处理器
-func (r *Router) SetUserHandler(handler *user.Handler) {
-	r.userHandler = handler
-}
-
-// SetQuestionnaireHandler 设置问卷处理器
-func (r *Router) SetQuestionnaireHandler(handler *questionnaire.Handler) {
-	r.questionnaireHandler = handler
+func NewRouter(c *container.Container) *Router {
+	return &Router{
+		container: c,
+	}
 }
 
 // RegisterRoutes 注册所有路由
@@ -52,7 +32,7 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 
 	// 注册业务路由
 	r.registerUserRoutes(apiV1)
-	r.registerQuestionnaireRoutes(apiV1)
+	// r.registerQuestionnaireRoutes(apiV1)
 
 	fmt.Printf("🔗 Registered routes for: user, questionnaire\n")
 }
@@ -75,56 +55,24 @@ func (r *Router) registerHealthRoutes(engine *gin.Engine) {
 
 // registerUserRoutes 注册用户相关路由
 func (r *Router) registerUserRoutes(apiV1 *gin.RouterGroup) {
-	if r.userHandler == nil {
+	userHandler := r.container.GetUserModule().GetHandler()
+	if userHandler == nil {
 		return
 	}
 
 	users := apiV1.Group("/users")
 	{
-		users.POST("", r.userHandler.CreateUser)
-		users.GET("/:id", r.userHandler.GetUser)
-		users.GET("", r.userHandler.ListUsers)
-		users.PUT("/:id", r.userHandler.UpdateUser)
-		users.DELETE("/:id", r.userHandler.DeleteUser)
-		users.POST("/:id/activate", r.userHandler.ActivateUser)
-		users.POST("/:id/block", r.userHandler.BlockUser)
-
-		// 新增路由
-		users.PUT("/:id/password", r.userHandler.ChangePassword)
-		users.GET("/stats", r.userHandler.GetUserStats)
-		users.POST("/validate", r.userHandler.ValidateCredentials)
-		users.GET("/check-username", r.userHandler.CheckUsername)
-		users.GET("/check-email", r.userHandler.CheckEmail)
+		users.POST("", userHandler.CreateUser)
+		users.GET("/:id", userHandler.GetUser)
+		users.PUT("/:id", userHandler.UpdateUser)
+		users.DELETE("/:id", userHandler.DeleteUser)
+		// users.PUT("/:id/password", userHandler.ChangePassword)
 	}
 }
 
 // registerQuestionnaireRoutes 注册问卷相关路由
 func (r *Router) registerQuestionnaireRoutes(apiV1 *gin.RouterGroup) {
-	if r.questionnaireHandler == nil {
-		return
-	}
-
-	questionnaires := apiV1.Group("/questionnaires")
-	{
-		questionnaires.POST("", r.questionnaireHandler.CreateQuestionnaire)
-		questionnaires.GET("/:id", r.questionnaireHandler.GetQuestionnaire)
-		questionnaires.GET("/code/:code", r.questionnaireHandler.GetQuestionnaireByCode)
-		questionnaires.GET("", r.questionnaireHandler.ListQuestionnaires)
-		questionnaires.PUT("/:id", r.questionnaireHandler.UpdateQuestionnaire)
-		questionnaires.POST("/:id/publish", r.questionnaireHandler.PublishQuestionnaire)
-		questionnaires.POST("/:id/unpublish", r.questionnaireHandler.UnpublishQuestionnaire)
-		questionnaires.POST("/:id/archive", r.questionnaireHandler.ArchiveQuestionnaire)
-		questionnaires.DELETE("/:id", r.questionnaireHandler.DeleteQuestionnaire)
-
-		// 问题管理路由
-		questionnaires.POST("/:id/questions", r.questionnaireHandler.AddQuestion)
-		questionnaires.DELETE("/:id/questions/:questionId", r.questionnaireHandler.RemoveQuestion)
-
-		// 统计和专用查询路由
-		questionnaires.GET("/stats", r.questionnaireHandler.GetQuestionnaireStats)
-		questionnaires.GET("/my", r.questionnaireHandler.GetMyQuestionnaires)
-		questionnaires.GET("/published", r.questionnaireHandler.GetPublishedQuestionnaires)
-	}
+	// TODO: 待实现
 }
 
 // healthCheck 健康检查处理函数
@@ -145,9 +93,9 @@ func (r *Router) healthCheck(c *gin.Context) {
 
 	// 如果有容器引用，添加更详细的信息
 	if r.container != nil {
-		response["repositories"] = r.container.getRegisteredRepositories()
-		response["services"] = r.container.getRegisteredServices()
-		response["handlers"] = r.container.getRegisteredHandlers()
+		response["repositories"] = r.container.GetUserRepository()
+		response["services"] = r.container.GetUserService()
+		response["handlers"] = r.container.GetUserHandler()
 	}
 
 	c.JSON(200, response)
