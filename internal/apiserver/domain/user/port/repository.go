@@ -17,13 +17,15 @@ type UserRepository interface {
 
 	// 查询操作
 	FindByUsername(ctx context.Context, username string) (*user.User, error)
+	FindByPhone(ctx context.Context, phone string) (*user.User, error)
 	FindByEmail(ctx context.Context, email string) (*user.User, error)
 	FindAll(ctx context.Context, limit, offset int) ([]*user.User, error)
 
 	// 存在性检查
-	ExistsByID(ctx context.Context, id user.UserID) (bool, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	ExistsByID(ctx context.Context, id user.UserID) bool
+	ExistsByUsername(ctx context.Context, username string) bool
+	ExistsByEmail(ctx context.Context, email string) bool
+	ExistsByPhone(ctx context.Context, phone string) bool
 
 	// 统计操作
 	Count(ctx context.Context) (int64, error)

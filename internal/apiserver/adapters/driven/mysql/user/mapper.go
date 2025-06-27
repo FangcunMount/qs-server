@@ -91,13 +91,13 @@ func (m *UserMapper) reconstructUser(
 
 // 这里提供一个临时的重建方法，实际应该在user包中实现
 func ReconstructUser(
-	id, username, email, password string,
+	id, username, email, password, phone string,
 	status user.Status,
 	createdAt, updatedAt time.Time,
 ) *user.User {
 	// 由于User结构体的字段是私有的，我们需要在user包中提供重建方法
 	// 这里暂时使用NewUser创建，然后修改字段（这不是最佳实践）
-	domainUser := user.NewUser(username, email, password)
+	domainUser := user.NewUser(username, email, password, phone)
 
 	// 理想情况下，应该在user包中提供ReconstructUser方法
 	return domainUser

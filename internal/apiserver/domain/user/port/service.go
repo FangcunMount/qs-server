@@ -7,8 +7,9 @@ import (
 // UserCreateRequest 创建用户请求
 type UserCreateRequest struct {
 	Username string `json:"username" valid:"required"`
+	Nickname string `json:"nickname" valid:"required"`
 	Email    string `json:"email" valid:"required,email"`
-	Password string `json:"password" valid:"required"`
+	Phone    string `json:"phone" valid:"required"`
 }
 
 // UserQueryRequest 查询用户请求
@@ -17,10 +18,19 @@ type UserIDRequest struct {
 }
 
 // UserUpdateRequest 更新用户请求
-type UserUpdateRequest struct {
-	ID       string `json:"id" valid:"required"`
-	Username string `json:"username" valid:"optional"`
-	Email    string `json:"email" valid:"optional"`
+type UserBasicInfoRequest struct {
+	ID           string `json:"id" valid:"required"`
+	Username     string `json:"username" valid:"optional"`
+	Nickname     string `json:"nickname" valid:"optional"`
+	Email        string `json:"email" valid:"optional"`
+	Phone        string `json:"phone" valid:"optional"`
+	Avatar       string `json:"avatar" valid:"optional"`
+	Introduction string `json:"introduction" valid:"optional"`
+}
+
+type UserAvatarRequest struct {
+	ID     string `json:"id" valid:"required"`
+	Avatar string `json:"avatar" valid:"required"`
 }
 
 // UserPasswordChangeRequest 修改密码请求
@@ -32,12 +42,16 @@ type UserPasswordChangeRequest struct {
 
 // UserResponse 用户响应
 type UserResponse struct {
-	ID        string `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID           string `json:"id"`
+	Username     string `json:"username"`
+	Nickname     string `json:"nickname"`
+	Phone        string `json:"phone"`
+	Avatar       string `json:"avatar"`
+	Introduction string `json:"introduction"`
+	Email        string `json:"email"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 // UserListResponse 用户列表响应
@@ -48,24 +62,31 @@ type UserListResponse struct {
 	PageSize   int             `json:"page_size"`
 }
 
-// UserService 用户服务接口（入站端口）
-// 定义了所有用户相关的业务用例
-type UserService interface {
-	// 用户管理
+// UserCreator 用户创建接口
+type UserCreator interface {
 	CreateUser(ctx context.Context, req UserCreateRequest) (*UserResponse, error)
+}
+
+type UserQueryer interface {
 	GetUser(ctx context.Context, req UserIDRequest) (*UserResponse, error)
-	UpdateUser(ctx context.Context, req UserUpdateRequest) (*UserResponse, error)
-	DeleteUser(ctx context.Context, req UserIDRequest) error
-
-	// 用户列表和查询
 	ListUsers(ctx context.Context, page, pageSize int) (*UserListResponse, error)
+}
 
-	// 用户状态管理
+// UserEditor 用户编辑接口
+type UserEditor interface {
+	UpdateBasicInfo(ctx context.Context, req UserBasicInfoRequest) (*UserResponse, error)
+	UpdateAvatar(ctx context.Context, req UserAvatarRequest) error
+}
+
+// PasswordChanger 密码管理接口
+type PasswordChanger interface {
+	ChangePassword(ctx context.Context, req UserPasswordChangeRequest) error
+	ValidatePassword(ctx context.Context, username, password string) (*UserResponse, error)
+}
+
+// UserActivator 用户状态管理接口
+type UserActivator interface {
 	ActivateUser(ctx context.Context, req UserIDRequest) error
 	BlockUser(ctx context.Context, req UserIDRequest) error
 	DeactivateUser(ctx context.Context, req UserIDRequest) error
-
-	// 密码管理
-	ChangePassword(ctx context.Context, req UserPasswordChangeRequest) error
-	ValidatePassword(ctx context.Context, username, password string) (*UserResponse, error)
 }

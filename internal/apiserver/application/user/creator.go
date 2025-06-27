@@ -1,0 +1,61 @@
+package user
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/errors"
+)
+
+type UserCreator struct {
+	userRepo port.UserRepository
+}
+
+func NewUserCreator(userRepo port.UserRepository) port.UserCreator {
+	return &UserCreator{userRepo: userRepo}
+}
+
+// CreateUser 创建用户
+func (c *UserCreator) CreateUser(ctx context.Context, req port.UserCreateRequest) (*port.UserResponse, error) {
+	// 唯一性检查
+	if c.usernameUnique(ctx, req.Username) {
+		return nil, errors.NewWithCode(errors.ErrUserAlreadyExists, "username already exists")
+	}
+	if c.emailUnique(ctx, req.Email) {
+		return nil, errors.NewWithCode(errors.ErrUserAlreadyExists, "email already exists")
+	}
+	if c.phoneUnique(ctx, req.Phone) {
+		return nil, errors.NewWithCode(errors.ErrUserAlreadyExists, "phone already exists")
+	}
+
+	// 创建用户领域对象
+	user := user.NewUser(req.Username, req.Nickname, req.Email, req.Phone)
+
+	// 保存用户
+	if err := c.userRepo.Save(ctx, user); err != nil {
+		return nil, fmt.Errorf("failed to save user: %w", err)
+	}
+
+	// 返回响应
+	return &port.UserResponse{
+		ID:       user.ID().Value(),
+		Username: user.Username(),
+		Nickname: user.Nickname(),
+		Email:    user.Email(),
+		Phone:    user.Phone(),
+	}, nil
+}
+
+func (c *UserCreator) usernameUnique(ctx context.Context, username string) bool {
+	return c.userRepo.ExistsByUsername(ctx, username)
+}
+
+func (c *UserCreator) emailUnique(ctx context.Context, email string) bool {
+	return c.userRepo.ExistsByEmail(ctx, email)
+}
+
+func (c *UserCreator) phoneUnique(ctx context.Context, phone string) bool {
+	return c.userRepo.ExistsByPhone(ctx, phone)
+}

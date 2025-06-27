@@ -83,7 +83,7 @@ func (c *Container) GetUserService() interface{} {
 	if c.userModule == nil {
 		return nil
 	}
-	return c.userModule.GetService()
+	return c.userModule.GetServices()
 }
 
 // GetUserRepository 获取用户仓库（便捷方法）
@@ -131,8 +131,8 @@ func (c *Container) checkModulesHealth(ctx context.Context) error {
 		if c.userModule.GetRepository() == nil {
 			return fmt.Errorf("user repository is nil")
 		}
-		if c.userModule.GetService() == nil {
-			return fmt.Errorf("user service is nil")
+		if c.userModule.GetServices() == nil {
+			return fmt.Errorf("user services is nil")
 		}
 		if c.userModule.GetHandler() == nil {
 			return fmt.Errorf("user handler is nil")

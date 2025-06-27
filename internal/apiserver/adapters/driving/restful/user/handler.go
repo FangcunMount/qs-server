@@ -11,13 +11,21 @@ import (
 // Handler 用户HTTP处理器
 type Handler struct {
 	restful.BaseHandler
-	userService port.UserService
+	userCreator         port.UserCreator
+	userQueryer         port.UserQueryer
+	userEditor          port.UserEditor
+	userActivator       port.UserActivator
+	userPasswordChanger port.PasswordChanger
 }
 
 // NewHandler 创建用户处理器
-func NewHandler(userService port.UserService) *Handler {
+func NewHandler(userCreator port.UserCreator, userQueryer port.UserQueryer, userEditor port.UserEditor, userActivator port.UserActivator, userPasswordChanger port.PasswordChanger) *Handler {
 	return &Handler{
-		userService: userService,
+		userCreator:         userCreator,
+		userQueryer:         userQueryer,
+		userEditor:          userEditor,
+		userActivator:       userActivator,
+		userPasswordChanger: userPasswordChanger,
 	}
 }
 
@@ -35,7 +43,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 
 	// 创建用户
-	userResponse, err := h.userService.CreateUser(c.Request.Context(), req)
+	userResponse, err := h.userCreator.CreateUser(c.Request.Context(), req)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -57,7 +65,7 @@ func (h *Handler) GetUser(c *gin.Context) {
 		return
 	}
 
-	userResponse, err := h.userService.GetUser(c.Request.Context(), req)
+	userResponse, err := h.userQueryer.GetUser(c.Request.Context(), req)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -69,7 +77,7 @@ func (h *Handler) GetUser(c *gin.Context) {
 // UpdateUser 更新用户
 // PUT /api/v1/users/:id
 func (h *Handler) UpdateUser(c *gin.Context) {
-	var req port.UserUpdateRequest
+	var req port.UserBasicInfoRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -79,28 +87,11 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	userResponse, err := h.userService.UpdateUser(c.Request.Context(), req)
+	userResponse, err := h.userEditor.UpdateBasicInfo(c.Request.Context(), req)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	h.SuccessResponse(c, userResponse)
-}
-
-// DeleteUser 删除用户
-// DELETE /api/v1/users/:id
-func (h *Handler) DeleteUser(c *gin.Context) {
-	var req port.UserIDRequest
-	if err := h.BindQuery(c, &req); err != nil {
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	if err := h.userService.DeleteUser(c.Request.Context(), req); err != nil {
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	h.SuccessResponse(c, nil)
 }

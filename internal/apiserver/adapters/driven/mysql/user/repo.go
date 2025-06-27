@@ -8,6 +8,7 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/errors"
 )
 
 // Repository 用户存储库实现
@@ -43,7 +44,7 @@ func (r *Repository) FindByID(ctx context.Context, id user.UserID) (*user.User, 
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			return nil, user.ErrUserNotFound
+			return nil, errors.NewWithCode(errors.ErrUserNotFound, "user not found")
 		}
 		return nil, fmt.Errorf("failed to find user by ID: %w", result.Error)
 	}
@@ -64,7 +65,7 @@ func (r *Repository) Update(ctx context.Context, userDomain *user.User) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return user.ErrUserNotFound
+		return errors.NewWithCode(errors.ErrUserNotFound, "user not found")
 	}
 
 	return nil
@@ -79,7 +80,7 @@ func (r *Repository) Remove(ctx context.Context, id user.UserID) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return user.ErrUserNotFound
+		return errors.NewWithCode(errors.ErrUserNotFound, "user not found")
 	}
 
 	return nil
@@ -92,9 +93,23 @@ func (r *Repository) FindByUsername(ctx context.Context, username string) (*user
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			return nil, user.ErrUserNotFound
+			return nil, errors.NewWithCode(errors.ErrUserNotFound, "user not found")
 		}
 		return nil, fmt.Errorf("failed to find user by username: %w", result.Error)
+	}
+
+	return r.mapper.ToDomain(&entity), nil
+}
+
+func (r *Repository) FindByPhone(ctx context.Context, phone string) (*user.User, error) {
+	var entity UserEntity
+	result := r.db.WithContext(ctx).Where("phone = ?", phone).First(&entity)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, errors.NewWithCode(errors.ErrUserNotFound, "user not found")
+		}
+		return nil, fmt.Errorf("failed to find user by phone: %w", result.Error)
 	}
 
 	return r.mapper.ToDomain(&entity), nil
@@ -107,7 +122,7 @@ func (r *Repository) FindByEmail(ctx context.Context, email string) (*user.User,
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			return nil, user.ErrUserNotFound
+			return nil, errors.NewWithCode(errors.ErrUserNotFound, "user not found")
 		}
 		return nil, fmt.Errorf("failed to find user by email: %w", result.Error)
 	}
@@ -143,45 +158,59 @@ func (r *Repository) FindAll(ctx context.Context, limit, offset int) ([]*user.Us
 }
 
 // ExistsByID 检查用户ID是否存在
-func (r *Repository) ExistsByID(ctx context.Context, id user.UserID) (bool, error) {
+func (r *Repository) ExistsByID(ctx context.Context, id user.UserID) bool {
 	var count int64
 	result := r.db.WithContext(ctx).Model(&UserEntity{}).
 		Where("id = ?", id.Value()).
 		Count(&count)
 
 	if result.Error != nil {
-		return false, fmt.Errorf("failed to check user existence by ID: %w", result.Error)
+		return false
 	}
 
-	return count > 0, nil
+	return count > 0
 }
 
 // ExistsByUsername 检查用户名是否存在
-func (r *Repository) ExistsByUsername(ctx context.Context, username string) (bool, error) {
+func (r *Repository) ExistsByUsername(ctx context.Context, username string) bool {
 	var count int64
 	result := r.db.WithContext(ctx).Model(&UserEntity{}).
 		Where("username = ?", username).
 		Count(&count)
 
 	if result.Error != nil {
-		return false, fmt.Errorf("failed to check user existence by username: %w", result.Error)
+		return false
 	}
 
-	return count > 0, nil
+	return count > 0
 }
 
 // ExistsByEmail 检查邮箱是否存在
-func (r *Repository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+func (r *Repository) ExistsByEmail(ctx context.Context, email string) bool {
 	var count int64
 	result := r.db.WithContext(ctx).Model(&UserEntity{}).
 		Where("email = ?", email).
 		Count(&count)
 
 	if result.Error != nil {
-		return false, fmt.Errorf("failed to check user existence by email: %w", result.Error)
+		return false
 	}
 
-	return count > 0, nil
+	return count > 0
+}
+
+// ExistsByPhone 检查手机号是否存在
+func (r *Repository) ExistsByPhone(ctx context.Context, phone string) bool {
+	var count int64
+	result := r.db.WithContext(ctx).Model(&UserEntity{}).
+		Where("phone = ?", phone).
+		Count(&count)
+
+	if result.Error != nil {
+		return false
+	}
+
+	return count > 0
 }
 
 // Count 统计用户总数

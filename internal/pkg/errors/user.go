@@ -17,6 +17,8 @@ const (
 	ErrUserInvalidPassword
 	// ErrUserPasswordTooWeak - 密码强度不够
 	ErrUserPasswordTooWeak
+	// ErrUserInvalidAvatar - 头像无效
+	ErrUserInvalidAvatar
 	// ErrUserBlocked - 用户被封禁
 	ErrUserBlocked
 	// ErrUserInactive - 用户未激活
@@ -49,6 +51,8 @@ const (
 	ErrUserInvalidUsername
 	// ErrUserInvalidEmail - 邮箱无效
 	ErrUserInvalidEmail
+	// ErrUserInvalidPhone - 手机号无效
+	ErrUserInvalidPhone
 	// ErrUserLoginFailed - 用户登录失败
 	ErrUserLoginFailed
 	// ErrUserLogoutFailed - 用户登出失败

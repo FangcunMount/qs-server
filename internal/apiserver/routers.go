@@ -65,8 +65,6 @@ func (r *Router) registerUserRoutes(apiV1 *gin.RouterGroup) {
 		users.POST("", userHandler.CreateUser)
 		users.GET("/:id", userHandler.GetUser)
 		users.PUT("/:id", userHandler.UpdateUser)
-		users.DELETE("/:id", userHandler.DeleteUser)
-		// users.PUT("/:id/password", userHandler.ChangePassword)
 	}
 }
 
@@ -89,13 +87,6 @@ func (r *Router) healthCheck(c *gin.Context) {
 			"adapters":    "mysql, mongodb, http",
 			"application": "questionnaire_service, user_service",
 		},
-	}
-
-	// 如果有容器引用，添加更详细的信息
-	if r.container != nil {
-		response["repositories"] = r.container.GetUserRepository()
-		response["services"] = r.container.GetUserService()
-		response["handlers"] = r.container.GetUserHandler()
 	}
 
 	c.JSON(200, response)

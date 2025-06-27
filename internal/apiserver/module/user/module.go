@@ -16,7 +16,11 @@ type Module struct {
 	userRepository port.UserRepository
 
 	// 应用层
-	userService port.UserService
+	userCreator         port.UserCreator
+	userQueryer         port.UserQueryer
+	userEditor          port.UserEditor
+	userActivator       port.UserActivator
+	userPasswordChanger port.PasswordChanger
 
 	// 适配器层
 	userHandler *userAdapter.Handler
@@ -28,15 +32,23 @@ func NewModule(db *gorm.DB) *Module {
 	userRepository := userInfra.NewRepository(db)
 
 	// 构造应用层 - Service
-	userService := userApp.NewService(userRepository)
+	userCreator := userApp.NewUserCreator(userRepository)
+	userQueryer := userApp.NewUserQueryer(userRepository)
+	userEditor := userApp.NewUserEditor(userRepository)
+	userActivator := userApp.NewUserActivator(userRepository)
+	userPasswordChanger := userApp.NewPasswordChanger(userRepository)
 
 	// 构造适配器层 - Handler
-	userHandler := userAdapter.NewHandler(userService)
+	userHandler := userAdapter.NewHandler(userCreator, userQueryer, userEditor, userActivator, userPasswordChanger)
 
 	return &Module{
-		userRepository: userRepository,
-		userService:    userService,
-		userHandler:    userHandler,
+		userRepository:      userRepository,
+		userCreator:         userCreator,
+		userQueryer:         userQueryer,
+		userEditor:          userEditor,
+		userActivator:       userActivator,
+		userPasswordChanger: userPasswordChanger,
+		userHandler:         userHandler,
 	}
 }
 
@@ -45,9 +57,15 @@ func (m *Module) GetRepository() port.UserRepository {
 	return m.userRepository
 }
 
-// GetService 获取用户服务
-func (m *Module) GetService() port.UserService {
-	return m.userService
+// GetServices 获取用户服务
+func (m *Module) GetServices() []interface{} {
+	return []interface{}{
+		m.userCreator,
+		m.userQueryer,
+		m.userEditor,
+		m.userActivator,
+		m.userPasswordChanger,
+	}
 }
 
 // GetHandler 获取用户处理器
