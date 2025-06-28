@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
@@ -40,11 +41,16 @@ func (c *UserCreator) CreateUser(ctx context.Context, req port.UserCreateRequest
 
 	// 返回响应
 	return &port.UserResponse{
-		ID:       user.ID().Value(),
-		Username: user.Username(),
-		Nickname: user.Nickname(),
-		Email:    user.Email(),
-		Phone:    user.Phone(),
+		ID:           user.ID().Value(),
+		Username:     user.Username(),
+		Nickname:     user.Nickname(),
+		Avatar:       user.Avatar(),
+		Introduction: user.Introduction(),
+		Email:        user.Email(),
+		Phone:        user.Phone(),
+		Status:       user.Status().String(),
+		CreatedAt:    user.CreatedAt().Format(time.DateTime),
+		UpdatedAt:    user.UpdatedAt().Format(time.DateTime),
 	}, nil
 }
 

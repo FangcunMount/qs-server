@@ -21,62 +21,25 @@ type User struct {
 	updatedAt    time.Time
 }
 
-// UserID 用户唯一标识
-type UserID struct {
-	value string
-}
-
-// NewUserID 创建用户ID
-func NewUserID(value string) UserID {
-	return UserID{value: value}
-}
-
-// Value 获取ID值
-func (id UserID) Value() string {
-	return id.value
-}
-
-// Status 用户状态
-type Status int
-
-const (
-	StatusActive   Status = 1 // 活跃
-	StatusInactive Status = 2 // 非活跃
-	StatusBlocked  Status = 3 // 被封禁
-)
-
-// String 获取状态字符串
-func (s Status) String() string {
-	switch s {
-	case StatusActive:
-		return "active"
-	case StatusInactive:
-		return "inactive"
-	case StatusBlocked:
-		return "blocked"
-	default:
-		return "unknown"
-	}
-}
-
 // NewUser 创建新用户
 func NewUser(username, nickname, email, phone string) *User {
-	now := time.Now()
 	return &User{
-		id:        NewUserID(generateUserID()),
-		username:  username,
-		nickname:  nickname,
-		email:     email,
-		phone:     phone,
-		status:    StatusActive,
-		createdAt: now,
-		updatedAt: now,
+		username: username,
+		nickname: nickname,
+		email:    email,
+		phone:    phone,
+		status:   StatusActive,
 	}
 }
 
 // ID 获取用户ID
 func (u *User) ID() UserID {
 	return u.id
+}
+
+// SetID 设置用户ID
+func (u *User) SetID(id UserID) {
+	u.id = id
 }
 
 // Username 获取用户名
@@ -124,9 +87,19 @@ func (u *User) CreatedAt() time.Time {
 	return u.createdAt
 }
 
+// SetCreatedAt 设置创建时间
+func (u *User) SetCreatedAt(createdAt time.Time) {
+	u.createdAt = createdAt
+}
+
 // UpdatedAt 获取更新时间
 func (u *User) UpdatedAt() time.Time {
 	return u.updatedAt
+}
+
+// SetUpdatedAt 设置更新时间
+func (u *User) SetUpdatedAt(updatedAt time.Time) {
+	u.updatedAt = updatedAt
 }
 
 // ChangeUsername 修改用户名
@@ -238,9 +211,4 @@ func (u *User) Deactivate() error {
 	u.status = StatusInactive
 	u.updatedAt = time.Now()
 	return nil
-}
-
-// 辅助函数
-func generateUserID() string {
-	return time.Now().Format("20060102150405")
 }

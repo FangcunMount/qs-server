@@ -21,15 +21,24 @@ func (m *UserMapper) ToEntity(domainUser *user.User) *UserEntity {
 		return nil
 	}
 
-	return &UserEntity{
-		ID:        domainUser.ID().Value(),
-		Username:  domainUser.Username(),
-		Email:     domainUser.Email(),
-		Password:  domainUser.Password(),
-		Status:    int(domainUser.Status()),
-		CreatedAt: domainUser.CreatedAt(),
-		UpdatedAt: domainUser.UpdatedAt(),
+	// 先创建实体（不包含嵌入字段的成员）
+	entity := &UserEntity{
+		Username:     domainUser.Username(),
+		Nickname:     domainUser.Nickname(),
+		Avatar:       domainUser.Avatar(),
+		Phone:        domainUser.Phone(),
+		Introduction: domainUser.Introduction(),
+		Email:        domainUser.Email(),
+		Password:     domainUser.Password(),
+		Status:       domainUser.Status().Value(),
 	}
+
+	// 然后设置嵌入字段的成员
+	entity.ID = domainUser.ID().Value()
+	entity.CreatedAt = domainUser.CreatedAt()
+	entity.UpdatedAt = domainUser.UpdatedAt()
+
+	return entity
 }
 
 // ToDomain 将数据库实体转换为领域模型
@@ -74,7 +83,7 @@ func (m *UserMapper) ToDomainList(entities []*UserEntity) []*user.User {
 // reconstructUser 重建用户领域对象
 // 用于从数据库加载时重建对象状态
 func (m *UserMapper) reconstructUser(
-	id, username, email, password string,
+	id uint64, username, email, password string,
 	status user.Status,
 	createdAt, updatedAt time.Time,
 ) *user.User {

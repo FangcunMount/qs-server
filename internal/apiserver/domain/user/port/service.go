@@ -14,12 +14,12 @@ type UserCreateRequest struct {
 
 // UserQueryRequest 查询用户请求
 type UserIDRequest struct {
-	ID string `json:"id" valid:"required"`
+	ID uint64 `json:"id" valid:"required"`
 }
 
 // UserUpdateRequest 更新用户请求
 type UserBasicInfoRequest struct {
-	ID           string `json:"id" valid:"required"`
+	ID           uint64 `json:"id" valid:"required"`
 	Username     string `json:"username" valid:"optional"`
 	Nickname     string `json:"nickname" valid:"optional"`
 	Email        string `json:"email" valid:"optional"`
@@ -29,20 +29,20 @@ type UserBasicInfoRequest struct {
 }
 
 type UserAvatarRequest struct {
-	ID     string `json:"id" valid:"required"`
+	ID     uint64 `json:"id" valid:"required"`
 	Avatar string `json:"avatar" valid:"required"`
 }
 
 // UserPasswordChangeRequest 修改密码请求
 type UserPasswordChangeRequest struct {
-	ID          string `json:"id" valid:"required"`
+	ID          uint64 `json:"id" valid:"required"`
 	OldPassword string `json:"old_password" valid:"required"`
 	NewPassword string `json:"new_password" valid:"required"`
 }
 
 // UserResponse 用户响应
 type UserResponse struct {
-	ID           string `json:"id"`
+	ID           uint64 `json:"id"`
 	Username     string `json:"username"`
 	Nickname     string `json:"nickname"`
 	Phone        string `json:"phone"`
