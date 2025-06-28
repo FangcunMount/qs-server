@@ -3,8 +3,8 @@ package user
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/pkg/auth"
 	"github.com/yshujie/questionnaire-scale/pkg/util/idutil"
+	"gorm.io/gorm"
 
 	base "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql"
 )
@@ -29,26 +29,18 @@ func (UserEntity) TableName() string {
 }
 
 // BeforeCreate 在创建前设置信息
-func (u *UserEntity) BeforeCreate() (err error) {
-	// 设置ID
+func (u *UserEntity) BeforeCreate(tx *gorm.DB) error {
 	u.ID = idutil.GetIntID()
-	// 加密密码
-	u.Password, err = auth.Encrypt(u.Password)
-	if err != nil {
-		return err
-	}
-
-	// 设置创建和更新时间
 	u.CreatedAt = time.Now()
 	u.UpdatedAt = time.Now()
 
-	return
+	return nil
 }
 
 // BeforeUpdate 在更新前设置信息
-func (u *UserEntity) BeforeUpdate() (err error) {
+func (u *UserEntity) BeforeUpdate(tx *gorm.DB) error {
 	u.UpdatedAt = time.Now()
-	return
+	return nil
 }
 
 // 实现 Syncable 接口

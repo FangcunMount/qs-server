@@ -6,10 +6,11 @@ import (
 
 // UserCreateRequest 创建用户请求
 type UserCreateRequest struct {
-	Username string `json:"username" valid:"required"`
-	Nickname string `json:"nickname" valid:"required"`
-	Email    string `json:"email" valid:"required,email"`
-	Phone    string `json:"phone" valid:"required"`
+	Username     string `json:"username" valid:"required"`
+	Nickname     string `json:"nickname" valid:"required"`
+	Email        string `json:"email" valid:"required,email"`
+	Phone        string `json:"phone" valid:"required"`
+	Introduction string `json:"introduction" valid:"optional"`
 }
 
 // UserQueryRequest 查询用户请求

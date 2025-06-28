@@ -21,25 +21,9 @@ type User struct {
 	updatedAt    time.Time
 }
 
-// NewUser 创建新用户
-func NewUser(username, nickname, email, phone string) *User {
-	return &User{
-		username: username,
-		nickname: nickname,
-		email:    email,
-		phone:    phone,
-		status:   StatusActive,
-	}
-}
-
 // ID 获取用户ID
 func (u *User) ID() UserID {
 	return u.id
-}
-
-// SetID 设置用户ID
-func (u *User) SetID(id UserID) {
-	u.id = id
 }
 
 // Username 获取用户名
@@ -87,14 +71,19 @@ func (u *User) CreatedAt() time.Time {
 	return u.createdAt
 }
 
-// SetCreatedAt 设置创建时间
-func (u *User) SetCreatedAt(createdAt time.Time) {
-	u.createdAt = createdAt
-}
-
 // UpdatedAt 获取更新时间
 func (u *User) UpdatedAt() time.Time {
 	return u.updatedAt
+}
+
+// SetID 设置用户ID
+func (u *User) SetID(id UserID) {
+	u.id = id
+}
+
+// SetCreatedAt 设置创建时间
+func (u *User) SetCreatedAt(createdAt time.Time) {
+	u.createdAt = createdAt
 }
 
 // SetUpdatedAt 设置更新时间
@@ -108,7 +97,6 @@ func (u *User) ChangeUsername(newUsername string) error {
 		return errors.NewWithCode(errors.ErrUserInvalidUsername, "username cannot be empty")
 	}
 	u.username = newUsername
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -118,7 +106,6 @@ func (u *User) ChangeNickname(newNickname string) error {
 		return errors.NewWithCode(errors.ErrUserInvalidUsername, "nickname cannot be empty")
 	}
 	u.nickname = newNickname
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -128,7 +115,6 @@ func (u *User) ChangeEmail(newEmail string) error {
 		return errors.NewWithCode(errors.ErrUserInvalidEmail, "email cannot be empty")
 	}
 	u.email = newEmail
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -138,7 +124,6 @@ func (u *User) ChangePhone(newPhone string) error {
 		return errors.NewWithCode(errors.ErrUserInvalidPhone, "phone cannot be empty")
 	}
 	u.phone = newPhone
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -148,7 +133,6 @@ func (u *User) ChangePassword(newPassword string) error {
 		return errors.NewWithCode(errors.ErrUserInvalidPassword, "password must be at least 6 characters")
 	}
 	u.password = newPassword
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -189,7 +173,6 @@ func (u *User) Block() error {
 		return errors.NewWithCode(errors.ErrUserBlocked, "user is already blocked")
 	}
 	u.status = StatusBlocked
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -199,7 +182,6 @@ func (u *User) Activate() error {
 		return errors.NewWithCode(errors.ErrUserInvalidStatus, "user is already active")
 	}
 	u.status = StatusActive
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -209,6 +191,5 @@ func (u *User) Deactivate() error {
 		return errors.NewWithCode(errors.ErrUserInvalidStatus, "user is already inactive")
 	}
 	u.status = StatusInactive
-	u.updatedAt = time.Now()
 	return nil
 }

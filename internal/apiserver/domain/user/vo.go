@@ -19,6 +19,7 @@ func (id UserID) Value() uint64 {
 type Status uint8
 
 const (
+	StatusInit     Status = 0 // 初始状态
 	StatusActive   Status = 1 // 活跃
 	StatusInactive Status = 2 // 非活跃
 	StatusBlocked  Status = 3 // 被封禁
@@ -32,6 +33,8 @@ func (s Status) Value() uint8 {
 // String 获取状态字符串
 func (s Status) String() string {
 	switch s {
+	case StatusInit:
+		return "init"
 	case StatusActive:
 		return "active"
 	case StatusInactive:

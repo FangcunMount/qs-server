@@ -10,10 +10,12 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/pkg/errors"
 )
 
+// UserCreator 用户创建器
 type UserCreator struct {
 	userRepo port.UserRepository
 }
 
+// NewUserCreator 创建用户创建器
 func NewUserCreator(userRepo port.UserRepository) port.UserCreator {
 	return &UserCreator{userRepo: userRepo}
 }
@@ -32,7 +34,14 @@ func (c *UserCreator) CreateUser(ctx context.Context, req port.UserCreateRequest
 	}
 
 	// 创建用户领域对象
-	user := user.NewUser(req.Username, req.Nickname, req.Email, req.Phone)
+	user := user.NewUserBuilder().
+		WithUsername(req.Username).
+		WithNickname(req.Nickname).
+		WithEmail(req.Email).
+		WithPhone(req.Phone).
+		WithStatus(user.StatusInit).
+		WithIntroduction(req.Introduction).
+		Build()
 
 	// 保存用户
 	if err := c.userRepo.Save(ctx, user); err != nil {
