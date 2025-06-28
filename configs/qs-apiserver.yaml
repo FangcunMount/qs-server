@@ -32,7 +32,7 @@ mysql:
   max-idle-connections: 10 # 最大空闲连接数
   max-open-connections: 100 # 最大打开连接数
   max-connection-life-time: "1h" # 连接最大生存时间
-  log-level: 1 # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
+  log-level: 4 # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
 
 # Redis 数据库配置
 redis:

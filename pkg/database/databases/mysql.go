@@ -21,6 +21,7 @@ type MySQLConfig struct {
 	MaxOpenConnections    int           `json:"max-open-connections" mapstructure:"max-open-connections"`
 	MaxConnectionLifeTime time.Duration `json:"max-connection-life-time" mapstructure:"max-connection-life-time"`
 	LogLevel              int           `json:"log-level" mapstructure:"log-level"`
+	Logger                logger.Interface
 }
 
 // MySQLConnection MySQL 连接实现
@@ -52,7 +53,7 @@ func (m *MySQLConnection) Connect() error {
 		"Local")
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.LogLevel(m.config.LogLevel)),
+		Logger: m.config.Logger,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect to MySQL: %w", err)

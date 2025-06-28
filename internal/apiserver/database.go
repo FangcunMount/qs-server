@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/logger"
 	"github.com/yshujie/questionnaire-scale/pkg/database"
 	"github.com/yshujie/questionnaire-scale/pkg/database/databases"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
@@ -68,6 +69,7 @@ func (dm *DatabaseManager) initMySQL() error {
 		MaxOpenConnections:    dm.config.MySQLOptions.MaxOpenConnections,
 		MaxConnectionLifeTime: dm.config.MySQLOptions.MaxConnectionLifeTime,
 		LogLevel:              dm.config.MySQLOptions.LogLevel,
+		Logger:                logger.New(dm.config.MySQLOptions.LogLevel),
 	}
 
 	if mysqlConfig.Host == "" {
