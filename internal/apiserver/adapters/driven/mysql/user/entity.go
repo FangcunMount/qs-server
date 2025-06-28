@@ -20,7 +20,7 @@ type UserEntity struct {
 	Introduction string `gorm:"column:introduction;type:varchar(255)" json:"introduction"`
 	Email        string `gorm:"uniqueIndex;column:email;type:varchar(100)" json:"email"`
 	Password     string `gorm:"column:password;type:varchar(255)" json:"-"`
-	Status       uint8  `gorm:"column:status;type:tinyint;default:1" json:"status"`
+	Status       uint8  `gorm:"column:status;type:tinyint;default:0" json:"status"`
 }
 
 // TableName 指定表名
