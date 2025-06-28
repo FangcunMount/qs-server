@@ -7,7 +7,8 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 // UserCreator 用户创建器
@@ -24,13 +25,13 @@ func NewUserCreator(userRepo port.UserRepository) port.UserCreator {
 func (c *UserCreator) CreateUser(ctx context.Context, req port.UserCreateRequest) (*port.UserResponse, error) {
 	// 唯一性检查
 	if c.usernameUnique(ctx, req.Username) {
-		return nil, errors.NewWithCode(errors.ErrUserAlreadyExists, "username already exists")
+		return nil, errors.WithCode(code.ErrUserAlreadyExists, "username already exists")
 	}
 	if c.emailUnique(ctx, req.Email) {
-		return nil, errors.NewWithCode(errors.ErrUserAlreadyExists, "email already exists")
+		return nil, errors.WithCode(code.ErrUserAlreadyExists, "email already exists")
 	}
 	if c.phoneUnique(ctx, req.Phone) {
-		return nil, errors.NewWithCode(errors.ErrUserAlreadyExists, "phone already exists")
+		return nil, errors.WithCode(code.ErrUserAlreadyExists, "phone already exists")
 	}
 
 	// 创建用户领域对象

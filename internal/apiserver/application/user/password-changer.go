@@ -5,7 +5,8 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 type PasswordChanger struct {
@@ -40,7 +41,7 @@ func (p *PasswordChanger) ValidatePassword(ctx context.Context, username, passwo
 	}
 
 	if !user.ValidatePassword(password) {
-		return nil, errors.NewWithCode(errors.ErrUserInvalidPassword, "password is incorrect")
+		return nil, errors.WithCode(code.ErrPasswordIncorrect, "password is incorrect")
 	}
 
 	return nil, nil
