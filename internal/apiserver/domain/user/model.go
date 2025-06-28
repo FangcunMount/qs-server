@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/pkg/auth"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
@@ -133,7 +134,15 @@ func (u *User) ChangePassword(newPassword string) error {
 	if len(newPassword) < 6 {
 		return errors.WithCode(code.ErrUserBasicInfoInvalid, "password must be at least 6 characters")
 	}
-	u.password = newPassword
+
+	// 使用 bcrypt 加密密码
+	hashedPassword, err := auth.Encrypt(newPassword)
+	if err != nil {
+		return errors.WithCode(code.ErrEncrypt, "failed to encrypt password")
+	}
+
+	u.password = hashedPassword
+	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -149,8 +158,9 @@ func (u *User) ChangeAvatar(newAvatar string) error {
 
 // ValidatePassword 验证密码
 func (u *User) ValidatePassword(password string) bool {
-	// TODO: 实现真正的密码验证逻辑（应该使用加密后的密码比较）
-	return u.password == password
+	// 使用 bcrypt 验证密码
+	err := auth.Compare(u.password, password)
+	return err == nil
 }
 
 // IsActive 检查用户是否活跃

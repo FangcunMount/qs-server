@@ -21,8 +21,13 @@ func Compare(hashedPassword, password string) error {
 
 // Sign issue a jwt token based on secretID, secretKey, iss and aud.
 func Sign(secretID string, secretKey string, iss, aud string) string {
+	return SignWithExpiry(secretID, secretKey, iss, aud, 24*time.Hour) // 默认24小时
+}
+
+// SignWithExpiry issue a jwt token with custom expiry duration
+func SignWithExpiry(secretID string, secretKey string, iss, aud string, expiry time.Duration) string {
 	claims := jwt.MapClaims{
-		"exp": time.Now().Add(time.Minute).Unix(),
+		"exp": time.Now().Add(expiry).Unix(),
 		"iat": time.Now().Unix(),
 		"nbf": time.Now().Add(0).Unix(),
 		"aud": aud,

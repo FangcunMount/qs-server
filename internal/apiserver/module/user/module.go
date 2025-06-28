@@ -21,6 +21,7 @@ type Module struct {
 	userEditor          port.UserEditor
 	userActivator       port.UserActivator
 	userPasswordChanger port.PasswordChanger
+	userAuthService     *userApp.AuthService
 
 	// 适配器层
 	userHandler *userAdapter.Handler
@@ -37,6 +38,7 @@ func NewModule(db *gorm.DB) *Module {
 	userEditor := userApp.NewUserEditor(userRepository)
 	userActivator := userApp.NewUserActivator(userRepository)
 	userPasswordChanger := userApp.NewPasswordChanger(userRepository)
+	userAuthService := userApp.NewAuthService(userRepository, userPasswordChanger, userQueryer, userActivator)
 
 	// 构造适配器层 - Handler
 	userHandler := userAdapter.NewHandler(userCreator, userQueryer, userEditor, userActivator, userPasswordChanger)
@@ -48,6 +50,7 @@ func NewModule(db *gorm.DB) *Module {
 		userEditor:          userEditor,
 		userActivator:       userActivator,
 		userPasswordChanger: userPasswordChanger,
+		userAuthService:     userAuthService,
 		userHandler:         userHandler,
 	}
 }
@@ -71,6 +74,11 @@ func (m *Module) GetServices() []interface{} {
 // GetHandler 获取用户处理器
 func (m *Module) GetHandler() *userAdapter.Handler {
 	return m.userHandler
+}
+
+// GetAuthService 获取认证服务
+func (m *Module) GetAuthService() *userApp.AuthService {
+	return m.userAuthService
 }
 
 // RegisterRoutes 注册用户路由

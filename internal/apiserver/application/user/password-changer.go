@@ -44,5 +44,17 @@ func (p *PasswordChanger) ValidatePassword(ctx context.Context, username, passwo
 		return nil, errors.WithCode(code.ErrPasswordIncorrect, "password is incorrect")
 	}
 
-	return nil, nil
+	// 返回用户信息
+	return &port.UserResponse{
+		ID:           user.ID().Value(),
+		Username:     user.Username(),
+		Nickname:     user.Nickname(),
+		Email:        user.Email(),
+		Phone:        user.Phone(),
+		Avatar:       user.Avatar(),
+		Introduction: user.Introduction(),
+		Status:       user.Status().String(),
+		CreatedAt:    user.CreatedAt().Format("2006-01-02 15:04:05"),
+		UpdatedAt:    user.UpdatedAt().Format("2006-01-02 15:04:05"),
+	}, nil
 }

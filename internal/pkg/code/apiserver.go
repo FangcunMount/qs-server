@@ -16,4 +16,10 @@ const (
 
 	// ErrUserInvalid - 400: User is invalid.
 	ErrUserInvalid
+
+	// ErrUserBlocked - 403: User is blocked.
+	ErrUserBlocked
+
+	// ErrUserInactive - 403: User is inactive.
+	ErrUserInactive
 )

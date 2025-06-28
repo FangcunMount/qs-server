@@ -1,6 +1,10 @@
 package user
 
-import "time"
+import (
+	"time"
+
+	"github.com/yshujie/questionnaire-scale/pkg/auth"
+)
 
 type UserBuilder struct {
 	u *User
@@ -50,6 +54,21 @@ func (b *UserBuilder) WithUpdatedAt(t time.Time) *UserBuilder {
 	b.u.updatedAt = t
 	return b
 }
+
+// WithPassword 设置密码（自动加密）
+func (b *UserBuilder) WithPassword(password string) *UserBuilder {
+	// 使用 bcrypt 加密密码
+	hashedPassword, err := auth.Encrypt(password)
+	if err != nil {
+		// 在builder中处理错误的方式，可以存储错误状态
+		// 这里简化处理，实际项目中可能需要更复杂的错误处理
+		b.u.password = "" // 设置为空表示错误
+		return b
+	}
+	b.u.password = hashedPassword
+	return b
+}
+
 func (b *UserBuilder) Build() *User {
 	return b.u
 }

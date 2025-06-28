@@ -37,6 +37,7 @@ func (c *UserCreator) CreateUser(ctx context.Context, req port.UserCreateRequest
 	// 创建用户领域对象
 	user := user.NewUserBuilder().
 		WithUsername(req.Username).
+		WithPassword(req.Password).
 		WithNickname(req.Nickname).
 		WithEmail(req.Email).
 		WithPhone(req.Phone).
