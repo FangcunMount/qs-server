@@ -93,6 +93,11 @@ func (u *User) SetUpdatedAt(updatedAt time.Time) {
 	u.updatedAt = updatedAt
 }
 
+// SetPassword 设置已加密的密码（用于从数据库读取）
+func (u *User) SetPassword(hashedPassword string) {
+	u.password = hashedPassword
+}
+
 // ChangeUsername 修改用户名
 func (u *User) ChangeUsername(newUsername string) error {
 	if newUsername == "" {

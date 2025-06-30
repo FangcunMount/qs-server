@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"errors"
 
 	"gorm.io/gorm"
 )
@@ -60,10 +59,7 @@ func (r *BaseRepository[T]) FindByID(ctx context.Context, id uint64) (T, error) 
 // FindByField 根据字段查找记录
 func (r *BaseRepository[T]) FindByField(ctx context.Context, model interface{}, field string, value interface{}) error {
 	err := r.db.WithContext(ctx).Where(field+" = ?", value).First(model).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	return err
+	return err // 直接返回错误，包括 gorm.ErrRecordNotFound
 }
 
 // DeleteByID 根据 ID 删除实体

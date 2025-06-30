@@ -7,7 +7,7 @@ import (
 // UserCreateRequest 创建用户请求
 type UserCreateRequest struct {
 	Username     string `json:"username" valid:"required"`
-	Password     string `json:"password" valid:"required,min=6"`
+	Password     string `json:"password" valid:"required,stringlength(6|50)"`
 	Nickname     string `json:"nickname" valid:"required"`
 	Email        string `json:"email" valid:"required,email"`
 	Phone        string `json:"phone" valid:"required"`

@@ -138,6 +138,10 @@ func (cfg *AuthConfig) createAuthenticator() func(c *gin.Context) (interface{}, 
 		}
 
 		log.Infof("Authentication successful for user: %s", authResp.User.Username)
+
+		// 将用户信息设置到context中，供LoginResponse使用
+		c.Set("user", authResp.User)
+
 		return authResp.User, nil
 	}
 }

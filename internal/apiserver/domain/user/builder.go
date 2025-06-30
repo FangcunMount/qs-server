@@ -57,6 +57,12 @@ func (b *UserBuilder) WithUpdatedAt(t time.Time) *UserBuilder {
 
 // WithPassword 设置密码（自动加密）
 func (b *UserBuilder) WithPassword(password string) *UserBuilder {
+	// 如果密码为空，直接设置空密码（用于从数据库读取的场景）
+	if password == "" {
+		b.u.password = ""
+		return b
+	}
+
 	// 使用 bcrypt 加密密码
 	hashedPassword, err := auth.Encrypt(password)
 	if err != nil {

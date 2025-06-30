@@ -70,3 +70,10 @@ log:
   max-age: 30 # 保留旧日志文件的最大天数
   max-backups: 10 # 保留旧日志文件的最大个数
   compress: true # 是否压缩旧日志文件
+
+# JWT 配置
+jwt:
+  realm: "qs jwt" # JWT 领域名称
+  key: "questionnaire-scale-jwt-secret-key-2024" # JWT 签名密钥（生产环境请使用更强的密钥）
+  timeout: "24h" # Token 有效期（24小时）
+  max-refresh: "168h" # 最大刷新时间（7天）

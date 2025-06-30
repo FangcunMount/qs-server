@@ -45,7 +45,7 @@ func (m *UserMapper) ToDomain(entity *UserEntity) *user.User {
 		return nil
 	}
 
-	return user.NewUserBuilder().
+	userObj := user.NewUserBuilder().
 		WithID(user.NewUserID(entity.ID)).
 		WithUsername(entity.Username).
 		WithNickname(entity.Nickname).
@@ -57,6 +57,11 @@ func (m *UserMapper) ToDomain(entity *UserEntity) *user.User {
 		WithCreatedAt(entity.CreatedAt).
 		WithUpdatedAt(entity.UpdatedAt).
 		Build()
+
+	// 直接设置已加密的密码，不需要重新加密
+	userObj.SetPassword(entity.Password)
+
+	return userObj
 }
 
 // ToEntityList 将领域模型列表转换为实体列表

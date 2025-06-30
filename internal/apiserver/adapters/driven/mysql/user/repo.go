@@ -2,12 +2,15 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"gorm.io/gorm"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	pkgerrors "github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 // Repository 用户存储库实现
@@ -65,6 +68,9 @@ func (r *Repository) FindByUsername(ctx context.Context, username string) (*user
 	var entity UserEntity
 	err := r.BaseRepository.FindByField(ctx, &entity, "username", username)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.WithCode(code.ErrUserNotFound, "user not found: %s", username)
+		}
 		return nil, err
 	}
 	return r.mapper.ToDomain(&entity), nil
@@ -75,6 +81,9 @@ func (r *Repository) FindByPhone(ctx context.Context, phone string) (*user.User,
 	var entity UserEntity
 	err := r.BaseRepository.FindByField(ctx, &entity, "phone", phone)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.WithCode(code.ErrUserNotFound, "user not found with phone: %s", phone)
+		}
 		return nil, err
 	}
 	return r.mapper.ToDomain(&entity), nil
@@ -85,6 +94,9 @@ func (r *Repository) FindByEmail(ctx context.Context, email string) (*user.User,
 	var entity UserEntity
 	err := r.BaseRepository.FindByField(ctx, &entity, "email", email)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, pkgerrors.WithCode(code.ErrUserNotFound, "user not found with email: %s", email)
+		}
 		return nil, err
 	}
 	return r.mapper.ToDomain(&entity), nil

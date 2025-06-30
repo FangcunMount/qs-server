@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
+	authpkg "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
 )
 
 // Router 集中的路由管理器
@@ -43,17 +45,10 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	// 认证相关的公开路由
 	auth := engine.Group("/auth")
 	{
-		// JWT登录端点
-		jwtMiddleware := r.authConfig.NewJWTAuth().AuthFunc()
-		auth.POST("/login", jwtMiddleware)
-		auth.POST("/refresh", jwtMiddleware)
-		auth.POST("/logout", jwtMiddleware)
-
-		// 用户注册（公开）
-		userHandler := r.container.GetUserModule().GetHandler()
-		if userHandler != nil {
-			auth.POST("/register", userHandler.CreateUser)
-		}
+		jwtStrategy, _ := r.authConfig.NewJWTAuth().(authpkg.JWTStrategy)
+		auth.POST("/login", jwtStrategy.LoginHandler)
+		auth.POST("/logout", jwtStrategy.LogoutHandler)
+		auth.POST("/refresh", jwtStrategy.RefreshHandler)
 	}
 
 	// 公开的API路由
@@ -200,7 +195,7 @@ func (r *Router) updateCurrentUserProfile(c *gin.Context) {
 func (r *Router) changePassword(c *gin.Context) {
 	type ChangePasswordRequest struct {
 		OldPassword string `json:"old_password" binding:"required"`
-		NewPassword string `json:"new_password" binding:"required,min=6"`
+		NewPassword string `json:"new_password" binding:"required,min=6,max=50"`
 	}
 
 	username, exists := c.Get(middleware.UsernameKey)
@@ -263,6 +258,12 @@ func (r *Router) healthCheck(c *gin.Context) {
 			"ports":       "storage",
 			"adapters":    "mysql, mongodb, http",
 			"application": "questionnaire_service, user_service",
+		},
+		"jwt_config": gin.H{
+			"realm":       viper.GetString("jwt.realm"),
+			"timeout":     viper.GetDuration("jwt.timeout").String(),
+			"max_refresh": viper.GetDuration("jwt.max-refresh").String(),
+			"key_loaded":  viper.GetString("jwt.key") != "", // 不显示实际密钥，只显示是否加载
 		},
 	}
 
