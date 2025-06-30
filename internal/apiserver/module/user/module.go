@@ -7,88 +7,60 @@ import (
 	userAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful/user"
 	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 // Module 用户模块
 // 负责组装用户相关的所有组件
 type Module struct {
-	// 基础设施层
-	userRepository port.UserRepository
+	// repository 层
+	UserRepo port.UserRepository
 
-	// 应用层
-	userCreator         port.UserCreator
-	userQueryer         port.UserQueryer
-	userEditor          port.UserEditor
-	userActivator       port.UserActivator
-	userPasswordChanger port.PasswordChanger
-	userAuthService     *userApp.AuthService
+	// handler 层
+	UserHandler *userAdapter.Handler
 
-	// 适配器层
-	userHandler *userAdapter.Handler
+	// service 层
+	UserCreator         port.UserCreator
+	UserQueryer         port.UserQueryer
+	UserEditor          port.UserEditor
+	UserActivator       port.UserActivator
+	UserPasswordChanger port.PasswordChanger
 }
 
 // NewModule 创建用户模块
-func NewModule(db *gorm.DB) *Module {
-	// 构造基础设施层 - Repository
-	userRepository := userInfra.NewRepository(db)
+func NewModule() *Module {
+	return &Module{}
+}
 
-	// 构造应用层 - Service
-	userCreator := userApp.NewUserCreator(userRepository)
-	userQueryer := userApp.NewUserQueryer(userRepository)
-	userEditor := userApp.NewUserEditor(userRepository)
-	userActivator := userApp.NewUserActivator(userRepository)
-	userPasswordChanger := userApp.NewPasswordChanger(userRepository)
-	userAuthService := userApp.NewAuthService(userRepository, userPasswordChanger, userQueryer, userActivator)
-
-	// 构造适配器层 - Handler
-	userHandler := userAdapter.NewHandler(userCreator, userQueryer, userEditor, userActivator, userPasswordChanger)
-
-	return &Module{
-		userRepository:      userRepository,
-		userCreator:         userCreator,
-		userQueryer:         userQueryer,
-		userEditor:          userEditor,
-		userActivator:       userActivator,
-		userPasswordChanger: userPasswordChanger,
-		userAuthService:     userAuthService,
-		userHandler:         userHandler,
+// Initialize 初始化模块
+func (m *Module) Initialize(params ...interface{}) error {
+	db := params[0].(*gorm.DB)
+	if db == nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
-}
 
-// GetRepository 获取用户存储库
-func (m *Module) GetRepository() port.UserRepository {
-	return m.userRepository
-}
+	// 初始化 repository 层
+	m.UserRepo = userInfra.NewRepository(db)
 
-// GetServices 获取用户服务
-func (m *Module) GetServices() []interface{} {
-	return []interface{}{
-		m.userCreator,
-		m.userQueryer,
-		m.userEditor,
-		m.userActivator,
-		m.userPasswordChanger,
-	}
-}
+	// 初始化 service 层
+	m.UserCreator = userApp.NewUserCreator(m.UserRepo)
+	m.UserQueryer = userApp.NewUserQueryer(m.UserRepo)
+	m.UserEditor = userApp.NewUserEditor(m.UserRepo)
+	m.UserActivator = userApp.NewUserActivator(m.UserRepo)
+	m.UserPasswordChanger = userApp.NewPasswordChanger(m.UserRepo)
 
-// GetHandler 获取用户处理器
-func (m *Module) GetHandler() *userAdapter.Handler {
-	return m.userHandler
-}
+	// 初始化 handler 层
+	m.UserHandler = userAdapter.NewHandler(
+		m.UserCreator,
+		m.UserQueryer,
+		m.UserEditor,
+		m.UserActivator,
+		m.UserPasswordChanger,
+	)
 
-// GetAuthService 获取认证服务
-func (m *Module) GetAuthService() *userApp.AuthService {
-	return m.userAuthService
-}
-
-// RegisterRoutes 注册用户路由
-// 这个方法可以被路由器调用来注册用户相关的路由
-func (m *Module) RegisterRoutes(group interface{}) {
-	// 这里可以根据不同的路由器实现来注册路由
-	// 由于我们现在使用gin，所以期望传入*gin.RouterGroup
-	// 但为了保持模块的独立性，这里使用interface{}
-
-	// 实际的路由注册可能在外部进行，这里只是提供一个示例接口
+	return nil
 }
 
 // Cleanup 清理模块资源
@@ -98,16 +70,16 @@ func (m *Module) Cleanup() error {
 	return nil
 }
 
+// CheckHealth 检查模块健康状态
+func (m *Module) CheckHealth() error {
+	return nil
+}
+
 // ModuleInfo 返回模块信息
-func (m *Module) ModuleInfo() map[string]interface{} {
-	return map[string]interface{}{
-		"name":        "user",
-		"version":     "1.0.0",
-		"description": "用户管理模块",
-		"components": map[string]string{
-			"repository": "user.Repository",
-			"service":    "user.Service",
-			"handler":    "user.Handler",
-		},
+func (m *Module) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		Name:        "user",
+		Version:     "1.0.0",
+		Description: "用户管理模块",
 	}
 }

@@ -7,8 +7,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
+	authModule "github.com/yshujie/questionnaire-scale/internal/apiserver/module/auth"
 	userModule "github.com/yshujie/questionnaire-scale/internal/apiserver/module/user"
 )
+
+// modulePool 模块池
+var modulePool = make(map[string]module.Module)
 
 // Container 主容器
 // 组合所有业务模块和基础设施组件
@@ -19,8 +24,8 @@ type Container struct {
 	mongoDB     string
 
 	// 业务模块
-	userModule *userModule.Module
-	// questionnaireModule *questionnaireModule.Module  // 待实现
+	AuthModule *authModule.Module
+	UserModule *userModule.Module
 
 	// 容器状态
 	initialized bool
@@ -47,10 +52,10 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize user module: %w", err)
 	}
 
-	// 初始化其他模块...
-	// if err := c.initQuestionnaireModule(); err != nil {
-	//     return fmt.Errorf("failed to initialize questionnaire module: %w", err)
-	// }
+	// 初始化认证模块
+	if err := c.initAuthModule(); err != nil {
+		return fmt.Errorf("failed to initialize auth module: %w", err)
+	}
 
 	c.initialized = true
 	fmt.Printf("🏗️  Container initialized with modules: user\n")
@@ -60,38 +65,30 @@ func (c *Container) Initialize() error {
 
 // initUserModule 初始化用户模块
 func (c *Container) initUserModule() error {
-	c.userModule = userModule.NewModule(c.mysqlDB)
+	userModule := userModule.NewModule()
+	if err := userModule.Initialize(c.mysqlDB); err != nil {
+		return fmt.Errorf("failed to initialize user module: %w", err)
+	}
+
+	c.UserModule = userModule
+	modulePool["user"] = userModule
+
 	fmt.Printf("📦 User module initialized\n")
 	return nil
 }
 
-// GetUserModule 获取用户模块
-func (c *Container) GetUserModule() *userModule.Module {
-	return c.userModule
-}
-
-// GetUserHandler 获取用户处理器（便捷方法）
-func (c *Container) GetUserHandler() interface{} {
-	if c.userModule == nil {
-		return nil
+// initAuthModule 初始化认证模块
+func (c *Container) initAuthModule() error {
+	authModule := authModule.NewModule()
+	if err := authModule.Initialize(c.mysqlDB); err != nil {
+		return fmt.Errorf("failed to initialize auth module: %w", err)
 	}
-	return c.userModule.GetHandler()
-}
 
-// GetUserService 获取用户服务（便捷方法）
-func (c *Container) GetUserService() interface{} {
-	if c.userModule == nil {
-		return nil
-	}
-	return c.userModule.GetServices()
-}
+	c.AuthModule = authModule
+	modulePool["auth"] = authModule
 
-// GetUserRepository 获取用户仓库（便捷方法）
-func (c *Container) GetUserRepository() interface{} {
-	if c.userModule == nil {
-		return nil
-	}
-	return c.userModule.GetRepository()
+	fmt.Printf("📦 Auth module initialized\n")
+	return nil
 }
 
 // HealthCheck 健康检查
@@ -124,21 +121,11 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 
 // checkModulesHealth 检查模块健康状态
 func (c *Container) checkModulesHealth(ctx context.Context) error {
-	// 检查用户模块健康状态
-	if c.userModule != nil {
-		// 这里可以添加模块特定的健康检查
-		// 例如：检查模块依赖是否正常工作
-		if c.userModule.GetRepository() == nil {
-			return fmt.Errorf("user repository is nil")
-		}
-		if c.userModule.GetServices() == nil {
-			return fmt.Errorf("user services is nil")
-		}
-		if c.userModule.GetHandler() == nil {
-			return fmt.Errorf("user handler is nil")
+	for _, module := range modulePool {
+		if err := module.CheckHealth(); err != nil {
+			return fmt.Errorf("module health check failed: %w", err)
 		}
 	}
-
 	return nil
 }
 
@@ -146,21 +133,12 @@ func (c *Container) checkModulesHealth(ctx context.Context) error {
 func (c *Container) Cleanup() error {
 	fmt.Printf("🧹 Cleaning up container resources...\n")
 
-	// 清理用户模块
-	if c.userModule != nil {
-		if err := c.userModule.Cleanup(); err != nil {
-			return fmt.Errorf("failed to cleanup user module: %w", err)
+	for _, module := range modulePool {
+		if err := module.Cleanup(); err != nil {
+			return fmt.Errorf("failed to cleanup module: %w", err)
 		}
-		fmt.Printf("   ✅ User module cleaned up\n")
+		fmt.Printf("   ✅ %s module cleaned up\n", module.ModuleInfo().Name)
 	}
-
-	// 清理其他模块...
-	// if c.questionnaireModule != nil {
-	//     if err := c.questionnaireModule.Cleanup(); err != nil {
-	//         return fmt.Errorf("failed to cleanup questionnaire module: %w", err)
-	//     }
-	//     fmt.Printf("   ✅ Questionnaire module cleaned up\n")
-	// }
 
 	c.initialized = false
 	fmt.Printf("🏁 Container cleanup completed\n")
@@ -171,9 +149,8 @@ func (c *Container) Cleanup() error {
 // GetContainerInfo 获取容器信息
 func (c *Container) GetContainerInfo() map[string]interface{} {
 	modules := make(map[string]interface{})
-
-	if c.userModule != nil {
-		modules["user"] = c.userModule.ModuleInfo()
+	for _, module := range modulePool {
+		modules[module.ModuleInfo().Name] = module.ModuleInfo()
 	}
 
 	return map[string]interface{}{
@@ -198,14 +175,9 @@ func (c *Container) IsInitialized() bool {
 func (c *Container) GetLoadedModules() []string {
 	modules := make([]string, 0)
 
-	if c.userModule != nil {
-		modules = append(modules, "user")
+	for _, module := range modulePool {
+		modules = append(modules, module.ModuleInfo().Name)
 	}
-
-	// 如果有其他模块，继续添加
-	// if c.questionnaireModule != nil {
-	//     modules = append(modules, "questionnaire")
-	// }
 
 	return modules
 }

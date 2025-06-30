@@ -6,36 +6,41 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
 	"github.com/yshujie/questionnaire-scale/pkg/core"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
+// authHeaderCount 认证头数量
 const authHeaderCount = 2
 
-// AutoStrategy defines authentication strategy which can automatically choose between Basic and Bearer
-// according `Authorization` header.
+// AutoStrategy 自动认证策略器
 type AutoStrategy struct {
-	basic middleware.AuthStrategy
-	jwt   middleware.AuthStrategy
+	// 基础策略认证器
+	basic AuthStrategy
+	// JWT策略认证器
+	jwt AuthStrategy
 }
 
-var _ middleware.AuthStrategy = &AutoStrategy{}
+// 实现AuthStrategy接口
+var _ AuthStrategy = &AutoStrategy{}
 
-// NewAutoStrategy create auto strategy with basic strategy and jwt strategy.
-func NewAutoStrategy(basic, jwt middleware.AuthStrategy) AutoStrategy {
+// NewAutoStrategy 创建自动认证策略器
+func NewAutoStrategy(basic, jwt AuthStrategy) AutoStrategy {
 	return AutoStrategy{
 		basic: basic,
 		jwt:   jwt,
 	}
 }
 
-// AuthFunc defines auto strategy as the gin authentication middleware.
+// AuthFunc 定义自动认证策略器为gin认证中间件
 func (a AutoStrategy) AuthFunc() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		operator := middleware.AuthOperator{}
+		// 创建认证操作器
+		operator := AuthOperator{}
+		// 获取Authorization头
 		authHeader := strings.SplitN(c.Request.Header.Get("Authorization"), " ", 2)
 
+		// 如果Authorization头格式不正确，返回错误
 		if len(authHeader) != authHeaderCount {
 			core.WriteResponse(
 				c,
@@ -47,12 +52,14 @@ func (a AutoStrategy) AuthFunc() gin.HandlerFunc {
 			return
 		}
 
+		// 根据Authorization头类型设置认证策略
 		switch authHeader[0] {
 		case "Basic":
+			// 使用 Basic 认证器
 			operator.SetStrategy(a.basic)
 		case "Bearer":
+			// 使用 JWT 认证器
 			operator.SetStrategy(a.jwt)
-			// a.JWT.MiddlewareFunc()(c)
 		default:
 			core.WriteResponse(c, errors.WithCode(code.ErrSignatureInvalid, "unrecognized Authorization header."), nil)
 			c.Abort()
@@ -60,6 +67,7 @@ func (a AutoStrategy) AuthFunc() gin.HandlerFunc {
 			return
 		}
 
+		// 执行认证
 		operator.AuthFunc()(c)
 
 		c.Next()

@@ -7,21 +7,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
-	authpkg "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
 )
 
 // Router 集中的路由管理器
 type Router struct {
-	container  *container.Container
-	authConfig *AuthConfig
+	container *container.Container
+	auth      *Auth
 }
 
 // NewRouter 创建路由管理器
 func NewRouter(c *container.Container) *Router {
 	return &Router{
-		container:  c,
-		authConfig: NewAuthConfig(c), // 初始化认证配置
+		container: c,
+		auth:      NewAuth(c), // 初始化认证配置
 	}
 }
 
@@ -45,7 +43,7 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	// 认证相关的公开路由
 	auth := engine.Group("/auth")
 	{
-		jwtStrategy, _ := r.authConfig.NewJWTAuth().(authpkg.JWTStrategy)
+		jwtStrategy := r.auth.NewJWTAuth()
 		auth.POST("/login", jwtStrategy.LoginHandler)
 		auth.POST("/logout", jwtStrategy.LogoutHandler)
 		auth.POST("/refresh", jwtStrategy.RefreshHandler)
@@ -54,7 +52,6 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	// 公开的API路由
 	publicAPI := engine.Group("/api/v1/public")
 	{
-		// 示例：添加一些公开的API端点
 		publicAPI.GET("/info", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"service":     "questionnaire-scale",
@@ -62,9 +59,6 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 				"description": "问卷量表管理系统",
 			})
 		})
-		// 可以添加更多公开的API，比如：
-		// publicAPI.GET("/announcements", getAnnouncements)
-		// publicAPI.GET("/help", getHelp)
 	}
 }
 
@@ -74,7 +68,7 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	apiV1 := engine.Group("/api/v1")
 
 	// 应用认证中间件
-	authMiddleware := r.authConfig.CreateAuthMiddleware("auto") // 自动选择Basic或JWT
+	authMiddleware := r.auth.CreateAuthMiddleware("auto") // 自动选择Basic或JWT
 	apiV1.Use(authMiddleware)
 
 	// 注册用户相关的受保护路由
@@ -89,22 +83,16 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 
 // registerUserProtectedRoutes 注册用户相关的受保护路由
 func (r *Router) registerUserProtectedRoutes(apiV1 *gin.RouterGroup) {
-	userHandler := r.container.GetUserModule().GetHandler()
+	userHandler := r.container.UserModule.UserHandler
+
 	if userHandler == nil {
 		return
 	}
 
 	users := apiV1.Group("/users")
 	{
-		// 用户资料相关
-		users.GET("/profile", r.getCurrentUserProfile)    // 获取当前用户资料
-		users.PUT("/profile", r.updateCurrentUserProfile) // 更新当前用户资料
-		users.POST("/change-password", r.changePassword)  // 修改密码
-
-		// 用户管理（可能需要管理员权限）
-		users.GET("/:id", userHandler.GetUser)    // 获取指定用户
-		users.PUT("/:id", userHandler.UpdateUser) // 更新指定用户
-		// users.DELETE("/:id", userHandler.DeleteUser) // 删除用户（管理员）
+		// 获取当前用户资料相关
+		users.GET("/profile", userHandler.GetUserProfile)
 	}
 }
 
@@ -141,97 +129,6 @@ func (r *Router) registerAdminRoutes(apiV1 *gin.RouterGroup) {
 		admin.GET("/statistics", r.placeholder) // 系统统计信息
 		admin.GET("/logs", r.placeholder)       // 系统日志
 	}
-}
-
-// getCurrentUserProfile 获取当前用户资料
-func (r *Router) getCurrentUserProfile(c *gin.Context) {
-	// 从认证中间件设置的上下文中获取用户名
-	username, exists := c.Get(middleware.UsernameKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户未认证"})
-		return
-	}
-
-	// 使用认证服务获取用户信息
-	authService := r.container.GetUserModule().GetAuthService()
-	if authService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "认证服务不可用"})
-		return
-	}
-
-	userInfo, err := authService.GetUserByUsername(c.Request.Context(), username.(string))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取用户信息失败"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"data":    userInfo,
-		"message": "获取用户资料成功",
-	})
-}
-
-// updateCurrentUserProfile 更新当前用户资料
-func (r *Router) updateCurrentUserProfile(c *gin.Context) {
-	username, exists := c.Get(middleware.UsernameKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户未认证"})
-		return
-	}
-
-	// 这里可以调用用户编辑服务
-	// userEditor := r.container.GetUserModule().GetServices()[2].(port.UserEditor)
-	// 实现用户资料更新逻辑...
-
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "用户资料更新成功",
-		"user":    username,
-	})
-}
-
-// changePassword 修改密码
-func (r *Router) changePassword(c *gin.Context) {
-	type ChangePasswordRequest struct {
-		OldPassword string `json:"old_password" binding:"required"`
-		NewPassword string `json:"new_password" binding:"required,min=6,max=50"`
-	}
-
-	username, exists := c.Get(middleware.UsernameKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户未认证"})
-		return
-	}
-
-	var req ChangePasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
-		return
-	}
-
-	// 使用认证服务修改密码
-	authService := r.container.GetUserModule().GetAuthService()
-	if authService == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "认证服务不可用"})
-		return
-	}
-
-	err := authService.ChangePasswordWithAuth(
-		c.Request.Context(),
-		username.(string),
-		req.OldPassword,
-		req.NewPassword,
-	)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "密码修改失败: " + err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "密码修改成功",
-	})
 }
 
 // placeholder 占位符处理器（用于未实现的功能）
@@ -279,38 +176,3 @@ func (r *Router) ping(c *gin.Context) {
 		"auth":    "enabled",
 	})
 }
-
-// RegisterCustomRoutes 注册自定义路由（扩展点）
-func (r *Router) RegisterCustomRoutes(apiV1 *gin.RouterGroup, routerFunc func(*gin.RouterGroup)) {
-	if routerFunc != nil {
-		routerFunc(apiV1)
-	}
-}
-
-// GetAuthConfig 获取认证配置（用于外部访问）
-func (r *Router) GetAuthConfig() *AuthConfig {
-	return r.authConfig
-}
-
-// requireAdminRole 管理员权限检查中间件（示例）
-// func (r *Router) requireAdminRole() gin.HandlerFunc {
-//     return func(c *gin.Context) {
-//         username, exists := c.Get(middleware.UsernameKey)
-//         if !exists {
-//             c.JSON(http.StatusUnauthorized, gin.H{"error": "用户未认证"})
-//             c.Abort()
-//             return
-//         }
-//
-//         // 检查用户是否有管理员权限
-//         authService := r.container.GetUserModule().GetAuthService()
-//         // isAdmin := authService.CheckUserRole(username.(string), "admin")
-//         // if !isAdmin {
-//         //     c.JSON(http.StatusForbidden, gin.H{"error": "需要管理员权限"})
-//         //     c.Abort()
-//         //     return
-//         // }
-//
-//         c.Next()
-//     }
-// }

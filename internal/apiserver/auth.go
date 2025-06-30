@@ -11,11 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
+	auth "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
+	authStrategys "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth/strategys"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
@@ -27,45 +27,40 @@ type LoginInfo struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
-// AuthConfig 认证配置
-type AuthConfig struct {
-	container   *container.Container
-	authService *user.AuthService
+// Auth 认证
+type Auth struct {
+	container     *container.Container
+	authenticator port.Authenticator
 }
 
-// NewAuthConfig 创建认证配置
-func NewAuthConfig(container *container.Container) *AuthConfig {
-	authService := container.GetUserModule().GetAuthService()
-	return &AuthConfig{
-		container:   container,
-		authService: authService,
+// NewAuth 创建认证
+func NewAuth(container *container.Container) *Auth {
+	authenticator := container.AuthModule.Authenticator
+	return &Auth{
+		container:     container,
+		authenticator: authenticator,
 	}
 }
 
 // NewBasicAuth 创建Basic认证策略
-func (cfg *AuthConfig) NewBasicAuth() middleware.AuthStrategy {
-	return auth.NewBasicStrategy(func(username string, password string) bool {
-		ctx := context.Background()
-		userResponse, err := cfg.authService.ValidatePasswordOnly(ctx, username, password)
+func (cfg *Auth) NewBasicAuth() authStrategys.BasicStrategy {
+	return authStrategys.NewBasicStrategy(func(username string, password string) bool {
+		// 使用Authenticator进行认证
+		authResp, err := cfg.authenticator.Authenticate(context.Background(), port.AuthenticateRequest{
+			Username: username,
+			Password: password,
+		})
 		if err != nil {
 			log.Warnf("Basic auth failed for user %s: %v", username, err)
 			return false
 		}
-
-		// 检查用户状态
-		isActive, err := cfg.authService.IsUserActive(ctx, username)
-		if err != nil || !isActive {
-			log.Warnf("User %s is not active", username)
-			return false
-		}
-
-		log.Infof("Basic auth successful for user: %s", userResponse.Username)
+		log.Infof("Basic auth successful for user: %s", authResp.User.Username)
 		return true
 	})
 }
 
 // NewJWTAuth 创建JWT认证策略
-func (cfg *AuthConfig) NewJWTAuth() middleware.AuthStrategy {
+func (cfg *Auth) NewJWTAuth() authStrategys.JWTStrategy {
 	ginjwt, _ := jwt.New(&jwt.GinJWTMiddleware{
 		Realm:            viper.GetString("jwt.realm"),
 		SigningAlgorithm: "HS256",
@@ -97,19 +92,19 @@ func (cfg *AuthConfig) NewJWTAuth() middleware.AuthStrategy {
 		TimeFunc:      time.Now,
 	})
 
-	return auth.NewJWTStrategy(*ginjwt)
+	return authStrategys.NewJWTStrategy(*ginjwt)
 }
 
 // NewAutoAuth 创建自动认证策略
-func (cfg *AuthConfig) NewAutoAuth() middleware.AuthStrategy {
+func (cfg *Auth) NewAutoAuth() auth.AutoStrategy {
 	return auth.NewAutoStrategy(
-		cfg.NewBasicAuth().(auth.BasicStrategy),
-		cfg.NewJWTAuth().(auth.JWTStrategy),
+		cfg.NewBasicAuth(),
+		cfg.NewJWTAuth(),
 	)
 }
 
 // createAuthenticator 创建认证器
-func (cfg *AuthConfig) createAuthenticator() func(c *gin.Context) (interface{}, error) {
+func (cfg *Auth) createAuthenticator() func(c *gin.Context) (interface{}, error) {
 	return func(c *gin.Context) (interface{}, error) {
 		var login LoginInfo
 		var err error
@@ -126,12 +121,12 @@ func (cfg *AuthConfig) createAuthenticator() func(c *gin.Context) (interface{}, 
 
 		// 使用AuthService进行认证
 		ctx := c.Request.Context()
-		authReq := user.AuthenticateRequest{
+		authReq := port.AuthenticateRequest{
 			Username: login.Username,
 			Password: login.Password,
 		}
 
-		authResp, err := cfg.authService.Authenticate(ctx, authReq)
+		authResp, err := cfg.authenticator.Authenticate(ctx, authReq)
 		if err != nil {
 			log.Errorf("Authentication failed for user %s: %v", login.Username, err)
 			return "", jwt.ErrFailedAuthentication
@@ -147,7 +142,7 @@ func (cfg *AuthConfig) createAuthenticator() func(c *gin.Context) (interface{}, 
 }
 
 // parseWithHeader 解析请求头中的Authorization字段
-func (cfg *AuthConfig) parseWithHeader(c *gin.Context) (LoginInfo, error) {
+func (cfg *Auth) parseWithHeader(c *gin.Context) (LoginInfo, error) {
 	authHeader := strings.SplitN(c.Request.Header.Get("Authorization"), " ", 2)
 	if len(authHeader) != 2 || authHeader[0] != "Basic" {
 		log.Errorf("Invalid Authorization header format")
@@ -173,7 +168,7 @@ func (cfg *AuthConfig) parseWithHeader(c *gin.Context) (LoginInfo, error) {
 }
 
 // parseWithBody 解析请求体中的登录信息
-func (cfg *AuthConfig) parseWithBody(c *gin.Context) (LoginInfo, error) {
+func (cfg *Auth) parseWithBody(c *gin.Context) (LoginInfo, error) {
 	var login LoginInfo
 	if err := c.ShouldBindJSON(&login); err != nil {
 		log.Errorf("Failed to parse login parameters: %v", err)
@@ -184,7 +179,7 @@ func (cfg *AuthConfig) parseWithBody(c *gin.Context) (LoginInfo, error) {
 }
 
 // createLoginResponse 创建登录响应
-func (cfg *AuthConfig) createLoginResponse() func(c *gin.Context, code int, token string, expire time.Time) {
+func (cfg *Auth) createLoginResponse() func(c *gin.Context, code int, token string, expire time.Time) {
 	return func(c *gin.Context, code int, token string, expire time.Time) {
 		// 从context中获取用户信息
 		userInterface, exists := c.Get("user")
@@ -204,7 +199,7 @@ func (cfg *AuthConfig) createLoginResponse() func(c *gin.Context, code int, toke
 }
 
 // createRefreshResponse 创建刷新响应
-func (cfg *AuthConfig) createRefreshResponse() func(c *gin.Context, code int, token string, expire time.Time) {
+func (cfg *Auth) createRefreshResponse() func(c *gin.Context, code int, token string, expire time.Time) {
 	return func(c *gin.Context, code int, token string, expire time.Time) {
 		c.JSON(http.StatusOK, gin.H{
 			"code":   code,
@@ -215,7 +210,7 @@ func (cfg *AuthConfig) createRefreshResponse() func(c *gin.Context, code int, to
 }
 
 // createPayloadFunc 创建负载函数
-func (cfg *AuthConfig) createPayloadFunc() func(data interface{}) jwt.MapClaims {
+func (cfg *Auth) createPayloadFunc() func(data interface{}) jwt.MapClaims {
 	return func(data interface{}) jwt.MapClaims {
 		APIServerIssuer := "questionnaire-scale-apiserver"
 		APIServerAudience := "questionnaire-scale.com"
@@ -236,7 +231,7 @@ func (cfg *AuthConfig) createPayloadFunc() func(data interface{}) jwt.MapClaims 
 }
 
 // createAuthorizator 创建授权器
-func (cfg *AuthConfig) createAuthorizator() func(data interface{}, c *gin.Context) bool {
+func (cfg *Auth) createAuthorizator() func(data interface{}, c *gin.Context) bool {
 	return func(data interface{}, c *gin.Context) bool {
 		if username, ok := data.(string); ok {
 			log.L(c).Infof("User `%s` is authorized.", username)
@@ -256,7 +251,7 @@ func (cfg *AuthConfig) createAuthorizator() func(data interface{}, c *gin.Contex
 
 // CreateAuthMiddleware 创建认证中间件
 // 这是一个便捷方法，用于在路由中设置认证中间件
-func (cfg *AuthConfig) CreateAuthMiddleware(authType string) gin.HandlerFunc {
+func (cfg *Auth) CreateAuthMiddleware(authType string) gin.HandlerFunc {
 	switch strings.ToLower(authType) {
 	case "basic":
 		return cfg.NewBasicAuth().AuthFunc()

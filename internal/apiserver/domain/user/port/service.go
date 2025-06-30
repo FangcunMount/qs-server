@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"time"
 )
 
 // UserCreateRequest 创建用户请求
@@ -64,6 +65,19 @@ type UserListResponse struct {
 	PageSize   int             `json:"page_size"`
 }
 
+// AuthenticateRequest 认证请求
+type AuthenticateRequest struct {
+	Username string `json:"username" valid:"required"`
+	Password string `json:"password" valid:"required"`
+}
+
+// AuthenticateResponse 认证响应
+type AuthenticateResponse struct {
+	User      *UserResponse `json:"user"`
+	Token     string        `json:"token,omitempty"`
+	ExpiresAt *time.Time    `json:"expires_at,omitempty"`
+}
+
 // UserCreator 用户创建接口
 type UserCreator interface {
 	CreateUser(ctx context.Context, req UserCreateRequest) (*UserResponse, error)
@@ -71,6 +85,7 @@ type UserCreator interface {
 
 type UserQueryer interface {
 	GetUser(ctx context.Context, req UserIDRequest) (*UserResponse, error)
+	GetUserByUsername(ctx context.Context, username string) (*UserResponse, error)
 	ListUsers(ctx context.Context, page, pageSize int) (*UserListResponse, error)
 }
 
@@ -83,7 +98,6 @@ type UserEditor interface {
 // PasswordChanger 密码管理接口
 type PasswordChanger interface {
 	ChangePassword(ctx context.Context, req UserPasswordChangeRequest) error
-	ValidatePassword(ctx context.Context, username, password string) (*UserResponse, error)
 }
 
 // UserActivator 用户状态管理接口
@@ -91,4 +105,8 @@ type UserActivator interface {
 	ActivateUser(ctx context.Context, req UserIDRequest) error
 	BlockUser(ctx context.Context, req UserIDRequest) error
 	DeactivateUser(ctx context.Context, req UserIDRequest) error
+}
+
+type Authenticator interface {
+	Authenticate(ctx context.Context, req AuthenticateRequest) (*AuthenticateResponse, error)
 }

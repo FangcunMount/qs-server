@@ -38,6 +38,28 @@ func (q *UserQueryer) GetUser(ctx context.Context, req port.UserIDRequest) (*por
 	return userResponse, nil
 }
 
+// GetUserByUsername 根据用户名获取用户信息
+func (q *UserQueryer) GetUserByUsername(ctx context.Context, username string) (*port.UserResponse, error) {
+	user, err := q.userRepo.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	userResponse := &port.UserResponse{
+		ID:        user.ID().Value(),
+		Username:  user.Username(),
+		Nickname:  user.Nickname(),
+		Email:     user.Email(),
+		Phone:     user.Phone(),
+		Avatar:    user.Avatar(),
+		Status:    user.Status().String(),
+		CreatedAt: user.CreatedAt().Format(time.RFC3339),
+		UpdatedAt: user.UpdatedAt().Format(time.RFC3339),
+	}
+
+	return userResponse, nil
+}
+
 // ListUsers 获取用户列表
 func (q *UserQueryer) ListUsers(ctx context.Context, page, pageSize int) (*port.UserListResponse, error) {
 	users, err := q.userRepo.FindAll(ctx, page, pageSize)

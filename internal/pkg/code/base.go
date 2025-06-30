@@ -78,3 +78,12 @@ const (
 	// ErrDecodingYaml - 500: Yaml data could not be decoded.
 	ErrDecodingYaml
 )
+
+// common: module errors.
+const (
+	// ErrModuleInitializationFailed - 500: Module initialization failed.
+	ErrModuleInitializationFailed int = iota + 100401
+
+	// ErrModuleNotFound - 404: Module not found.
+	ErrModuleNotFound
+)
