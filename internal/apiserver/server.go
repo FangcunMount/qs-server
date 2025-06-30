@@ -70,7 +70,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to get MySQL connection: %v", err)
 	}
 
-	// 获取 MongoDB 客户端（如果可用）
+	// 获取 MongoDB 数据库链接
 	mongoDB, err := s.dbManager.GetMongoDB()
 	if err != nil {
 		log.Fatalf("Failed to get MongoDB connection: %v", err)

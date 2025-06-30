@@ -50,6 +50,7 @@ redis:
 # MongoDB 数据库配置
 mongodb:
   url: "mongodb://qs_app_user:qs_app_password_2024@127.0.0.1:27017/questionnaire_scale" # MongoDB 连接URL
+  database: "questionnaire_scale" # 数据库名称
   use-ssl: false # 是否使用SSL
   ssl-insecure-skip-verify: false # 是否跳过SSL证书验证
   ssl-allow-invalid-hostnames: false # 是否允许无效的主机名
