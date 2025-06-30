@@ -57,7 +57,7 @@ type QuestionnaireQueryer interface {
 }
 
 type QuestionnaireEditor interface {
-	EditQuestionnaire(ctx context.Context, req QuestionnaireEditRequest) (*QuestionnaireResponse, error)
+	EditBasicInfo(ctx context.Context, req QuestionnaireEditRequest) (*QuestionnaireResponse, error)
 }
 
 type QuestionnairePublisher interface {
