@@ -6,6 +6,7 @@ import (
 	"time"
 
 	redis "github.com/go-redis/redis/v7"
+	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
@@ -179,10 +180,20 @@ func (dm *DatabaseManager) GetMongoSession() (interface{}, error) {
 	return nil, fmt.Errorf("mgo session compatibility not implemented - please use GetMongoClient() instead")
 }
 
-// GetMongoDatabase 获取 MongoDB 数据库名称
-func (dm *DatabaseManager) GetMongoDatabase() string {
+// GetMongoDB 获取 MongoDB 数据库
+func (dm *DatabaseManager) GetMongoDB() (*mongo.Database, error) {
 	// 使用默认数据库名，后续可以从配置中读取
-	return "questionnaire_db"
+	client, err := dm.registry.GetClient(databases.MongoDB)
+	if err != nil {
+		return nil, err
+	}
+
+	mongoClient, ok := client.(*mongo.Client)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast client to *mongo.Client")
+	}
+
+	return mongoClient.Database(viper.GetString("mongodb.database")), nil
 }
 
 // HealthCheck 数据库健康检查
