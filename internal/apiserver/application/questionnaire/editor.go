@@ -8,12 +8,16 @@ import (
 
 // Editor 问卷编辑器
 type Editor struct {
-	questionnaireRepo port.QuestionnaireRepository
+	quesRepo port.QuestionnaireRepository
+	quesDoc  port.QuestionnaireDocument
 }
 
 // NewEditor 创建问卷编辑器
-func NewEditor(quesRepo port.QuestionnaireRepository) *Editor {
-	return &Editor{questionnaireRepo: quesRepo}
+func NewEditor(
+	quesRepo port.QuestionnaireRepository,
+	quesDoc port.QuestionnaireDocument,
+) *Editor {
+	return &Editor{quesRepo: quesRepo, quesDoc: quesDoc}
 }
 
 // EditBasicInfo 编辑问卷基本信息
