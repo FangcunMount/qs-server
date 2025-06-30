@@ -19,12 +19,13 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 // ToDocument 将领域模型转换为MongoDB文档
 func (m *QuestionnaireMapper) ToDocument(domainQuestionnaire *questionnaire.Questionnaire) *QuestionnaireDocument {
 	doc := &QuestionnaireDocument{
-		DomainID: domainQuestionnaire.ID.Value(),
-		Code:     domainQuestionnaire.Code,
-		Title:    domainQuestionnaire.Title,
-		ImgUrl:   domainQuestionnaire.ImgUrl,
-		Version:  domainQuestionnaire.Version,
-		Status:   domainQuestionnaire.Status,
+		DomainID:    domainQuestionnaire.ID.Value(),
+		Code:        domainQuestionnaire.Code,
+		Title:       domainQuestionnaire.Title,
+		Description: domainQuestionnaire.Description,
+		ImgUrl:      domainQuestionnaire.ImgUrl,
+		Version:     domainQuestionnaire.Version,
+		Status:      domainQuestionnaire.Status,
 	}
 
 	// 处理MongoDB ObjectID
@@ -56,12 +57,13 @@ func (m *QuestionnaireMapper) ToDocument(domainQuestionnaire *questionnaire.Ques
 func (m *QuestionnaireMapper) ToDomain(doc *QuestionnaireDocument) *questionnaire.Questionnaire {
 	// 直接使用存储的 DomainID
 	domain := &questionnaire.Questionnaire{
-		ID:      questionnaire.NewQuestionnaireID(doc.DomainID),
-		Code:    doc.Code,
-		Title:   doc.Title,
-		ImgUrl:  doc.ImgUrl,
-		Version: doc.Version,
-		Status:  doc.Status,
+		ID:          questionnaire.NewQuestionnaireID(doc.DomainID),
+		Code:        doc.Code,
+		Title:       doc.Title,
+		Description: doc.Description,
+		ImgUrl:      doc.ImgUrl,
+		Version:     doc.Version,
+		Status:      doc.Status,
 	}
 
 	// 设置审计字段

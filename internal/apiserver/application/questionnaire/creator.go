@@ -47,13 +47,14 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, req port.Questionnair
 
 	// 4. 返回问卷响应
 	return &port.QuestionnaireResponse{
-		ID:        quesDomain.ID.Value(),
-		Code:      quesDomain.Code,
-		Title:     quesDomain.Title,
-		ImgUrl:    quesDomain.ImgUrl,
-		Version:   quesDomain.Version,
-		Status:    quesDomain.Status,
-		CreatedAt: quesDomain.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: quesDomain.UpdatedAt.Format(time.RFC3339),
+		ID:          quesDomain.ID.Value(),
+		Code:        quesDomain.Code,
+		Title:       quesDomain.Title,
+		Description: quesDomain.Description,
+		ImgUrl:      quesDomain.ImgUrl,
+		Version:     quesDomain.Version,
+		Status:      quesDomain.Status,
+		CreatedAt:   quesDomain.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   quesDomain.UpdatedAt.Format(time.RFC3339),
 	}, nil
 }

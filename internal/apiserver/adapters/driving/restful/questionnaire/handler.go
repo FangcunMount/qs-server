@@ -1,6 +1,7 @@
 package questionnaire
 
 import (
+	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
@@ -31,7 +32,11 @@ func NewHandler(
 // CreateQuestionnaire 创建问卷
 func (h *Handler) CreateQuestionnaire(c *gin.Context) {
 	var req port.QuestionnaireCreateRequest
-	if err := h.BindQuery(c, &req); err != nil {
+	if err := h.BindJSON(c, &req); err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+	if ok, err := govalidator.ValidateStruct(req); !ok {
 		h.ErrorResponse(c, err)
 		return
 	}
