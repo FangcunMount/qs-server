@@ -14,8 +14,18 @@ type Handler struct {
 	questionnaireQueryer   port.QuestionnaireQueryer
 }
 
-func NewHandler(questionnaireCreator port.QuestionnaireCreator) *Handler {
-	return &Handler{questionnaireCreator: questionnaireCreator}
+func NewHandler(
+	questionnaireCreator port.QuestionnaireCreator,
+	questionnaireEditor port.QuestionnaireEditor,
+	questionnairePublisher port.QuestionnairePublisher,
+	questionnaireQueryer port.QuestionnaireQueryer,
+) *Handler {
+	return &Handler{
+		questionnaireCreator:   questionnaireCreator,
+		questionnaireEditor:    questionnaireEditor,
+		questionnairePublisher: questionnairePublisher,
+		questionnaireQueryer:   questionnaireQueryer,
+	}
 }
 
 // CreateQuestionnaire 创建问卷
@@ -102,5 +112,3 @@ func (h *Handler) GetQuestionnaire(c *gin.Context) {
 
 	h.SuccessResponse(c, questionnaire)
 }
-
-// GetQuestionnaireByCode 根据编码获取问卷
