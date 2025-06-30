@@ -1,7 +1,3 @@
-// Copyright 2020 Lingfei Kong <colin404@foxmail.com>. All rights reserved.
-// Use of this source code is governed by a MIT style
-// license that can be found in the LICENSE file.
-
 package idutil
 
 import (
@@ -14,14 +10,16 @@ import (
 	"github.com/yshujie/questionnaire-scale/pkg/util/stringutil"
 )
 
-// Defiens alphabet.
+// 62进制字母表
 const (
 	Alphabet62 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 	Alphabet36 = "abcdefghijklmnopqrstuvwxyz1234567890"
 )
 
+// 雪花算法实例
 var sf *sonyflake.Sonyflake
 
+// 初始化雪花算法
 func init() {
 	var st sonyflake.Settings
 	st.MachineID = func() (uint16, error) {
@@ -33,7 +31,7 @@ func init() {
 	sf = sonyflake.NewSonyflake(st)
 }
 
-// GetIntID returns uint64 uniq id.
+// GetIntID 获取雪花算法生成的唯一ID
 func GetIntID() uint64 {
 	id, err := sf.NextID()
 	if err != nil {
@@ -43,7 +41,7 @@ func GetIntID() uint64 {
 	return id
 }
 
-// GetInstanceID returns id format like: secret-2v69o5
+// GetInstanceID 获取实例ID
 func GetInstanceID(uid uint64, prefix string) string {
 	hd := hashids.NewData()
 	hd.Alphabet = Alphabet36
@@ -63,7 +61,7 @@ func GetInstanceID(uid uint64, prefix string) string {
 	return prefix + stringutil.Reverse(i)
 }
 
-// GetUUID36 returns id format like: 300m50zn91nwz5.
+// GetUUID36 获取36进制ID
 func GetUUID36(prefix string) string {
 	id := GetIntID()
 	hd := hashids.NewData()
@@ -82,6 +80,7 @@ func GetUUID36(prefix string) string {
 	return prefix + stringutil.Reverse(i)
 }
 
+// randString 随机字符串
 func randString(letters string, n int) string {
 	output := make([]byte, n)
 
@@ -110,12 +109,12 @@ func randString(letters string, n int) string {
 	return string(output)
 }
 
-// NewSecretID returns a secretID.
+// 生成36位随机字符串
 func NewSecretID() string {
 	return randString(Alphabet62, 36)
 }
 
-// NewSecretKey returns a secretKey or password.
+// 生成32位随机字符串
 func NewSecretKey() string {
 	return randString(Alphabet62, 32)
 }
