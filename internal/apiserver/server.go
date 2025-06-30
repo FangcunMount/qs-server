@@ -71,16 +71,13 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}
 
 	// 获取 MongoDB 客户端（如果可用）
-	mongoDatabase := s.dbManager.GetMongoDatabase()
-
-	mongoClient, err := s.dbManager.GetMongoClient()
+	mongoDB, err := s.dbManager.GetMongoDB()
 	if err != nil {
-		log.Warnf("MongoDB not available, using MySQL-only mode: %v", err)
-		mongoClient = nil
+		log.Fatalf("Failed to get MongoDB connection: %v", err)
 	}
 
 	// 创建六边形架构容器（自动发现版本）
-	s.container = container.NewContainer(mysqlDB, mongoClient, mongoDatabase)
+	s.container = container.NewContainer(mysqlDB, mongoDB)
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
@@ -96,7 +93,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	log.Info("   🔧 Adapters: mysql, mongodb, http")
 	log.Info("   📋 Application Services: questionnaire_service, user_service")
 
-	if mongoClient != nil {
+	if mongoDB != nil {
 		log.Info("   🗄️  Storage Mode: MySQL + MongoDB (Hybrid)")
 	} else {
 		log.Info("   🗄️  Storage Mode: MySQL Only")

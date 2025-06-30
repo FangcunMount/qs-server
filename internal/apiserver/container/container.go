@@ -20,9 +20,8 @@ var modulePool = make(map[string]module.Module)
 // 组合所有业务模块和基础设施组件
 type Container struct {
 	// 基础设施
-	mysqlDB     *gorm.DB
-	mongoClient *mongo.Client
-	mongoDB     string
+	mysqlDB *gorm.DB
+	mongoDB *mongo.Database
 
 	// 业务模块
 	AuthModule          *authModule.Module
@@ -34,10 +33,9 @@ type Container struct {
 }
 
 // NewContainer 创建容器
-func NewContainer(mysqlDB *gorm.DB, mongoClient *mongo.Client, mongoDB string) *Container {
+func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database) *Container {
 	return &Container{
 		mysqlDB:     mysqlDB,
-		mongoClient: mongoClient,
 		mongoDB:     mongoDB,
 		initialized: false,
 	}
@@ -126,8 +124,8 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 	}
 
 	// 检查MongoDB连接（如果有）
-	if c.mongoClient != nil {
-		if err := c.mongoClient.Ping(ctx, nil); err != nil {
+	if c.mongoDB != nil {
+		if err := c.mongoDB.Client().Ping(ctx, nil); err != nil {
 			return fmt.Errorf("mongodb ping failed: %w", err)
 		}
 	}
@@ -182,7 +180,7 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"modules":      modules,
 		"infrastructure": map[string]bool{
 			"mysql":   c.mysqlDB != nil,
-			"mongodb": c.mongoClient != nil,
+			"mongodb": c.mongoDB != nil,
 		},
 	}
 }
