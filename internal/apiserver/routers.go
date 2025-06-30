@@ -98,20 +98,19 @@ func (r *Router) registerUserProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由
 func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
-	// TODO: 实现问卷处理器后取消注释
-	// questionnaireHandler := r.container.GetQuestionnaireModule().GetHandler()
-	// if questionnaireHandler == nil {
-	//     return
-	// }
+	quesHandler := r.container.QuestionnaireModule.QuesHandler
+	if quesHandler == nil {
+		return
+	}
 
 	questionnaires := apiV1.Group("/questionnaires")
 	{
 		// 问卷CRUD操作
-		questionnaires.POST("", r.placeholder)       // 创建问卷
-		questionnaires.GET("", r.placeholder)        // 获取问卷列表
-		questionnaires.GET("/:id", r.placeholder)    // 获取指定问卷
-		questionnaires.PUT("/:id", r.placeholder)    // 更新问卷
-		questionnaires.DELETE("/:id", r.placeholder) // 删除问卷
+		questionnaires.POST("", quesHandler.CreateQuestionnaire) // 创建问卷
+		questionnaires.GET("", r.placeholder)                    // 获取问卷列表
+		questionnaires.GET("/:id", r.placeholder)                // 获取指定问卷
+		questionnaires.PUT("/:id", r.placeholder)                // 更新问卷
+		questionnaires.DELETE("/:id", r.placeholder)             // 删除问卷
 
 		// 问卷状态管理
 		questionnaires.POST("/:id/publish", r.placeholder)   // 发布问卷

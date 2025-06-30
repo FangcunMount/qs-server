@@ -6,6 +6,7 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
+	"github.com/yshujie/questionnaire-scale/pkg/util/idutil"
 )
 
 // Creator 问卷创建器
@@ -26,10 +27,12 @@ func NewCreator(
 func (c *Creator) CreateQuestionnaire(ctx context.Context, req port.QuestionnaireCreateRequest) (*port.QuestionnaireResponse, error) {
 	// 1. 创建问卷领域模型
 	quesDomain := &questionnaire.Questionnaire{
-		Code:    req.Code,
-		Title:   req.Title,
-		ImgUrl:  req.ImgUrl,
-		Version: req.Version,
+		Code:        idutil.GetUUID36("ques")[:8],
+		Title:       req.Title,
+		Description: req.Description,
+		ImgUrl:      req.ImgUrl,
+		Version:     1,
+		Status:      questionnaire.STATUS_DRAFT.Value(),
 	}
 
 	// 2. 保存到 mysql

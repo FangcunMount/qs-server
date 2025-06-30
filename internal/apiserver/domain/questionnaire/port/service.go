@@ -3,10 +3,9 @@ package port
 import "context"
 
 type QuestionnaireCreateRequest struct {
-	Code    string `json:"code" valid:"required"`
-	Title   string `json:"title" valid:"required"`
-	ImgUrl  string `json:"img_url" valid:"required"`
-	Version uint8  `json:"version" valid:"required"`
+	Title       string `json:"title" valid:"required"`
+	Description string `json:"description" valid:"required"`
+	ImgUrl      string `json:"img_url"`
 }
 
 type QuestionnaireIDRequest struct {
@@ -14,14 +13,15 @@ type QuestionnaireIDRequest struct {
 }
 
 type QuestionnaireResponse struct {
-	ID        uint64 `json:"id"`
-	Code      string `json:"code"`
-	Title     string `json:"title"`
-	ImgUrl    string `json:"img_url"`
-	Version   uint8  `json:"version"`
-	Status    uint8  `json:"status"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID          uint64 `json:"id"`
+	Code        string `json:"code"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ImgUrl      string `json:"img_url"`
+	Version     uint8  `json:"version"`
+	Status      uint8  `json:"status"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 type QuestionnaireListResponse struct {

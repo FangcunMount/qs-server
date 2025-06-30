@@ -32,9 +32,9 @@ func (c Code) Value() string {
 type Status uint8
 
 const (
-	StatusInit     Status = 0 // 草稿
-	StatusActive   Status = 1 // 已发布
-	StatusInactive Status = 2 // 已下架
+	STATUS_DRAFT     Status = 0 // 草稿
+	STATUS_PUBLISHED Status = 1 // 已发布
+	STATUS_ARCHIVED  Status = 2 // 已归档
 )
 
 // Value 获取状态值
@@ -45,11 +45,11 @@ func (s Status) Value() uint8 {
 // String 获取状态字符串
 func (s Status) String() string {
 	switch s {
-	case StatusInit:
+	case STATUS_DRAFT:
 		return "draft"
-	case StatusActive:
+	case STATUS_PUBLISHED:
 		return "published"
-	case StatusInactive:
+	case STATUS_ARCHIVED:
 		return "unpublished"
 	default:
 		return "unknown"

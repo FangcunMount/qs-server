@@ -3,18 +3,19 @@ package questionnaire
 import "time"
 
 type Questionnaire struct {
-	ID        QuestionnaireID
-	Code      string
-	Title     string
-	ImgUrl    string
-	Version   uint8
-	Status    uint8
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt time.Time
-	CreatedBy uint64
-	UpdatedBy uint64
-	DeletedBy uint64
+	ID          QuestionnaireID
+	Code        string
+	Title       string
+	Description string
+	ImgUrl      string
+	Version     uint8
+	Status      uint8
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   time.Time
+	CreatedBy   uint64
+	UpdatedBy   uint64
+	DeletedBy   uint64
 }
 
 func NewQuestionnaire(id QuestionnaireID, code string, title string, imgUrl string, version uint8, status uint8) *Questionnaire {
@@ -38,6 +39,10 @@ func (q *Questionnaire) SetCode(code string) {
 
 func (q *Questionnaire) SetTitle(title string) {
 	q.Title = title
+}
+
+func (q *Questionnaire) SetDescription(description string) {
+	q.Description = description
 }
 
 func (q *Questionnaire) SetImgUrl(imgUrl string) {
