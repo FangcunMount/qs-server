@@ -9,6 +9,7 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	authModule "github.com/yshujie/questionnaire-scale/internal/apiserver/module/auth"
+	quesModule "github.com/yshujie/questionnaire-scale/internal/apiserver/module/questionnaire"
 	userModule "github.com/yshujie/questionnaire-scale/internal/apiserver/module/user"
 )
 
@@ -24,8 +25,9 @@ type Container struct {
 	mongoDB     string
 
 	// 业务模块
-	AuthModule *authModule.Module
-	UserModule *userModule.Module
+	AuthModule          *authModule.Module
+	UserModule          *userModule.Module
+	QuestionnaireModule *quesModule.Module
 
 	// 容器状态
 	initialized bool
@@ -55,6 +57,11 @@ func (c *Container) Initialize() error {
 	// 初始化认证模块
 	if err := c.initAuthModule(); err != nil {
 		return fmt.Errorf("failed to initialize auth module: %w", err)
+	}
+
+	// 初始化问卷模块
+	if err := c.initQuestionnaireModule(); err != nil {
+		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
 	}
 
 	c.initialized = true
@@ -88,6 +95,20 @@ func (c *Container) initAuthModule() error {
 	modulePool["auth"] = authModule
 
 	fmt.Printf("📦 Auth module initialized\n")
+	return nil
+}
+
+// initQuestionnaireModule 初始化问卷模块
+func (c *Container) initQuestionnaireModule() error {
+	quesModule := quesModule.NewModule()
+	if err := quesModule.Initialize(c.mysqlDB); err != nil {
+		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
+	}
+
+	c.QuestionnaireModule = quesModule
+	modulePool["questionnaire"] = quesModule
+
+	fmt.Printf("📦 Questionnaire module initialized\n")
 	return nil
 }
 
