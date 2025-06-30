@@ -33,6 +33,9 @@ func (u *UserEntity) BeforeCreate(tx *gorm.DB) error {
 	u.ID = idutil.GetIntID()
 	u.CreatedAt = time.Now()
 	u.UpdatedAt = time.Now()
+	u.CreatedBy = 0
+	u.UpdatedBy = 0
+	u.DeletedBy = 0
 
 	return nil
 }
@@ -40,13 +43,7 @@ func (u *UserEntity) BeforeCreate(tx *gorm.DB) error {
 // BeforeUpdate 在更新前设置信息
 func (u *UserEntity) BeforeUpdate(tx *gorm.DB) error {
 	u.UpdatedAt = time.Now()
+	u.UpdatedBy = 0
+
 	return nil
 }
-
-// 实现 Syncable 接口
-func (u *UserEntity) GetID() uint64            { return u.ID }
-func (u *UserEntity) GetCreatedAt() time.Time  { return u.CreatedAt }
-func (u *UserEntity) GetUpdatedAt() time.Time  { return u.UpdatedAt }
-func (u *UserEntity) SetID(id uint64)          { u.ID = id }
-func (u *UserEntity) SetCreatedAt(t time.Time) { u.CreatedAt = t }
-func (u *UserEntity) SetUpdatedAt(t time.Time) { u.UpdatedAt = t }
