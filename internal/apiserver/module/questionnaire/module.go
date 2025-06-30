@@ -1,8 +1,10 @@
 package user
 
 import (
+	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	quesDocInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mongo/questionnaire"
 	quesInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql/questionnaire"
 	quesAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful/questionnaire"
 	quesApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire"
@@ -15,16 +17,17 @@ import (
 // Module 问卷模块
 type Module struct {
 	// repository 层
-	QuestionnaireRepo port.QuestionnaireRepository
+	QuesRepo port.QuestionnaireRepository
+	QuesDoc  port.QuestionnaireDocument
 
 	// handler 层
-	QuestionnaireHandler *quesAdapter.Handler
+	QuesHandler *quesAdapter.Handler
 
 	// service 层
-	QuestionnaireCreator   port.QuestionnaireCreator
-	QuestionnaireEditor    port.QuestionnaireEditor
-	QuestionnairePublisher port.QuestionnairePublisher
-	QuestionnaireQueryer   port.QuestionnaireQueryer
+	QuesCreator   port.QuestionnaireCreator
+	QuesEditor    port.QuestionnaireEditor
+	QuesPublisher port.QuestionnairePublisher
+	QuesQueryer   port.QuestionnaireQueryer
 }
 
 // NewModule 创建用户模块
@@ -34,26 +37,28 @@ func NewModule() *Module {
 
 // Initialize 初始化模块
 func (m *Module) Initialize(params ...interface{}) error {
-	db := params[0].(*gorm.DB)
-	if db == nil {
+	mysqlDB := params[0].(*gorm.DB)
+	mongoDB := params[1].(*mongo.Database)
+	if mysqlDB == nil || mongoDB == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
 	// 初始化 repository 层
-	m.QuestionnaireRepo = quesInfra.NewRepository(db)
+	m.QuesRepo = quesInfra.NewRepository(mysqlDB)
+	m.QuesDoc = quesDocInfra.NewRepository(mongoDB).(port.QuestionnaireDocument)
 
 	// 初始化 service 层
-	m.QuestionnaireCreator = quesApp.NewCreator(m.QuestionnaireRepo)
-	m.QuestionnaireEditor = quesApp.NewEditor(m.QuestionnaireRepo)
-	m.QuestionnairePublisher = quesApp.NewPublisher(m.QuestionnaireRepo)
-	m.QuestionnaireQueryer = quesApp.NewQueryer(m.QuestionnaireRepo)
+	m.QuesCreator = quesApp.NewCreator(m.QuesRepo, m.QuesDoc)
+	m.QuesEditor = quesApp.NewEditor(m.QuesRepo, m.QuesDoc)
+	m.QuesPublisher = quesApp.NewPublisher(m.QuesRepo, m.QuesDoc)
+	m.QuesQueryer = quesApp.NewQueryer(m.QuesRepo, m.QuesDoc)
 
 	// 初始化 handler 层
-	m.QuestionnaireHandler = quesAdapter.NewHandler(
-		m.QuestionnaireCreator,
-		m.QuestionnaireEditor,
-		m.QuestionnairePublisher,
-		m.QuestionnaireQueryer,
+	m.QuesHandler = quesAdapter.NewHandler(
+		m.QuesCreator,
+		m.QuesEditor,
+		m.QuesPublisher,
+		m.QuesQueryer,
 	)
 
 	return nil

@@ -101,7 +101,7 @@ func (c *Container) initAuthModule() error {
 // initQuestionnaireModule 初始化问卷模块
 func (c *Container) initQuestionnaireModule() error {
 	quesModule := quesModule.NewModule()
-	if err := quesModule.Initialize(c.mysqlDB); err != nil {
+	if err := quesModule.Initialize(c.mysqlDB, c.mongoDB); err != nil {
 		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
 	}
 
