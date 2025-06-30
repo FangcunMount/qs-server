@@ -23,17 +23,40 @@ func (e *UserEditor) UpdateBasicInfo(ctx context.Context, req port.UserBasicInfo
 	}
 
 	// 修改用户基本信息
-	user.ChangeUsername(req.Username)
-	user.ChangeNickname(req.Nickname)
-	user.ChangeEmail(req.Email)
-	user.ChangePhone(req.Phone)
+	if req.Username != "" {
+		user.ChangeUsername(req.Username)
+	}
+	if req.Nickname != "" {
+		user.ChangeNickname(req.Nickname)
+	}
+	if req.Email != "" {
+		user.ChangeEmail(req.Email)
+	}
+	if req.Phone != "" {
+		user.ChangePhone(req.Phone)
+	}
+	if req.Introduction != "" {
+		user.ChangeIntroduction(req.Introduction)
+	}
 
 	// 更新用户信息
 	if err := e.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	// 返回更新后的用户信息
+	return &port.UserResponse{
+		ID:           user.ID().Value(),
+		Username:     user.Username(),
+		Nickname:     user.Nickname(),
+		Phone:        user.Phone(),
+		Avatar:       user.Avatar(),
+		Introduction: user.Introduction(),
+		Email:        user.Email(),
+		Status:       user.Status().String(),
+		CreatedAt:    user.CreatedAt().Format("2006-01-02 15:04:05"),
+		UpdatedAt:    user.UpdatedAt().Format("2006-01-02 15:04:05"),
+	}, nil
 }
 
 // UpdateAvatar 更新用户头像

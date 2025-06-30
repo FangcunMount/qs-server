@@ -147,7 +147,6 @@ func (u *User) ChangePassword(newPassword string) error {
 	}
 
 	u.password = hashedPassword
-	u.updatedAt = time.Now()
 	return nil
 }
 
@@ -157,7 +156,15 @@ func (u *User) ChangeAvatar(newAvatar string) error {
 		return errors.WithCode(code.ErrUserBasicInfoInvalid, "avatar cannot be empty")
 	}
 	u.avatar = newAvatar
-	u.updatedAt = time.Now()
+	return nil
+}
+
+// ChangeIntroduction 修改简介
+func (u *User) ChangeIntroduction(newIntroduction string) error {
+	if newIntroduction == "" {
+		return errors.WithCode(code.ErrUserBasicInfoInvalid, "introduction cannot be empty")
+	}
+	u.introduction = newIntroduction
 	return nil
 }
 
@@ -185,27 +192,23 @@ func (u *User) IsInactive() bool {
 
 // Block 封禁用户
 func (u *User) Block() error {
-	if u.status == StatusBlocked {
-		return errors.WithCode(code.ErrUserStatusInvalid, "user is already blocked")
-	}
-	u.status = StatusBlocked
-	return nil
+	return u.updateStatus(StatusBlocked)
 }
 
 // Activate 激活用户
 func (u *User) Activate() error {
-	if u.status == StatusActive {
-		return errors.WithCode(code.ErrUserStatusInvalid, "user is already active")
-	}
-	u.status = StatusActive
-	return nil
+	return u.updateStatus(StatusActive)
 }
 
 // Deactivate 停用用户
 func (u *User) Deactivate() error {
-	if u.status == StatusInactive {
-		return errors.WithCode(code.ErrUserStatusInvalid, "user is already inactive")
+	return u.updateStatus(StatusInactive)
+}
+
+func (u *User) updateStatus(status Status) error {
+	if u.status == status {
+		return errors.WithCode(code.ErrUserStatusInvalid, "user is already in this status")
 	}
-	u.status = StatusInactive
+	u.status = status
 	return nil
 }
