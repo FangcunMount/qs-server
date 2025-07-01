@@ -36,7 +36,7 @@ func (m *AuthModule) Initialize(params ...interface{}) error {
 	m.UserRepo = userInfra.NewRepository(db)
 
 	// 初始化 service 层
-	m.Authenticator = authApp.NewAuthenticator(m.UserRepo, "your-secret-key")
+	m.Authenticator = authApp.NewAuthenticator(m.UserRepo)
 
 	return nil
 }

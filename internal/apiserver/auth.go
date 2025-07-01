@@ -15,7 +15,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
-	auth "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
+	authMiddleware "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
 	authStrategys "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth/strategys"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
@@ -46,12 +46,14 @@ func NewAuth(container *container.Container) *Auth {
 // NewBasicAuth 创建Basic认证策略
 func (cfg *Auth) NewBasicAuth() authStrategys.BasicStrategy {
 	return authStrategys.NewBasicStrategy(func(username string, password string) bool {
-		// 使用Authenticator进行认证
-		_, _, err := cfg.authenticator.Authenticate(context.Background(), username, password)
+		ctx := context.Background()
+		// 调用身份认证起验证身份
+		_, err := cfg.authenticator.Authenticate(ctx, username, password)
 		if err != nil {
-			log.Warnf("Basic auth failed for user %s: %v", username, err)
+			log.Errorf("Basic auth failed for user %s: %v", username, err)
 			return false
 		}
+
 		log.Infof("Basic auth successful for user: %s", username)
 		return true
 	})
@@ -94,8 +96,8 @@ func (cfg *Auth) NewJWTAuth() authStrategys.JWTStrategy {
 }
 
 // NewAutoAuth 创建自动认证策略
-func (cfg *Auth) NewAutoAuth() auth.AutoStrategy {
-	return auth.NewAutoStrategy(
+func (cfg *Auth) NewAutoAuth() authMiddleware.AutoStrategy {
+	return authMiddleware.NewAutoStrategy(
 		cfg.NewBasicAuth(),
 		cfg.NewJWTAuth(),
 	)
@@ -117,9 +119,9 @@ func (cfg *Auth) createAuthenticator() func(c *gin.Context) (interface{}, error)
 			return "", jwt.ErrFailedAuthentication
 		}
 
-		// 使用AuthService进行认证
+		// 使用AuthService进行认证 - 只验证用户名密码，不生成token
 		ctx := c.Request.Context()
-		userObj, token, err := cfg.authenticator.Authenticate(ctx, login.Username, login.Password)
+		userObj, err := cfg.authenticator.Authenticate(ctx, login.Username, login.Password)
 		if err != nil {
 			log.Errorf("Authentication failed for user %s: %v", login.Username, err)
 			return "", jwt.ErrFailedAuthentication
@@ -129,7 +131,6 @@ func (cfg *Auth) createAuthenticator() func(c *gin.Context) (interface{}, error)
 
 		// 将用户信息设置到context中，供LoginResponse使用
 		c.Set("user", userObj)
-		c.Set("token", token)
 
 		return userObj, nil
 	}

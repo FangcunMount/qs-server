@@ -35,6 +35,7 @@ type UserActivator interface {
 	DeactivateUser(ctx context.Context, id uint64) error
 }
 
+// Authenticator 认证接口
 type Authenticator interface {
-	Authenticate(ctx context.Context, username, password string) (*user.User, string, error) // 返回用户、token、错误
+	Authenticate(ctx context.Context, username, password string) (*user.User, error)
 }
