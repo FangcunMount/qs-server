@@ -17,6 +17,12 @@ type PasswordChangeScript struct {
 	query           port.UserQueryer
 }
 
+// PasswordResetData 密码重置数据
+type PasswordResetData struct {
+	Username    string
+	NewPassword string
+}
+
 // NewPasswordChangeScript 创建密码修改脚本
 func NewPasswordChangeScript() *PasswordChangeScript {
 	return &PasswordChangeScript{}
@@ -50,21 +56,18 @@ func (s *PasswordChangeScript) Execute() error {
 	ctx := context.Background()
 
 	// 预设要重置密码的用户数据
-	passwordResets := []struct {
-		Username    string
-		NewPassword string
-	}{
+	passwordResets := []PasswordResetData{
 		{
 			Username:    "admin",
-			NewPassword: "NewAdmin@2024",
+			NewPassword: "1q2w3e4r5T@",
 		},
 		{
 			Username:    "testuser",
-			NewPassword: "TestUser@2024",
+			NewPassword: "test@1q2w3e4r5T",
 		},
 		{
 			Username:    "demo",
-			NewPassword: "DemoUser@2024",
+			NewPassword: "demo@1q2w3e4r5T",
 		},
 	}
 
@@ -86,14 +89,12 @@ func (s *PasswordChangeScript) Execute() error {
 			continue
 		}
 
-		// 重置密码（管理员级别重置，不需要验证旧密码）
-		changeReq := port.UserPasswordChangeRequest{
-			ID:          existingUser.ID,
-			OldPassword: "", // 管理员重置，忽略旧密码
-			NewPassword: resetData.NewPassword,
-		}
-
-		if err := s.passwordChanger.ChangePassword(ctx, changeReq); err != nil {
+		// 重置密码（管理员级别重置，不需要验证旧密码）- 使用原始参数
+		err = s.passwordChanger.ChangePassword(ctx,
+			existingUser.ID().Value(),
+			"", // oldPassword 管理员重置，传空字符串
+			resetData.NewPassword)
+		if err != nil {
 			log.Errorf("重置密码失败: %v", err)
 			continue
 		}

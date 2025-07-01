@@ -16,17 +16,18 @@ func NewPasswordChanger(userRepo port.UserRepository) port.PasswordChanger {
 }
 
 // ChangePassword 修改密码
-func (p *PasswordChanger) ChangePassword(ctx context.Context, req port.UserPasswordChangeRequest) error {
-	user, err := p.userRepo.FindByID(ctx, user.NewUserID(req.ID))
+func (p *PasswordChanger) ChangePassword(ctx context.Context, id uint64, oldPassword, newPassword string) error {
+	userObj, err := p.userRepo.FindByID(ctx, user.NewUserID(id))
 	if err != nil {
 		return err
 	}
 
-	user.ChangePassword(req.NewPassword)
+	// TODO: 验证旧密码
+	// if !userObj.CheckPassword(oldPassword) {
+	//     return errors.New("old password is incorrect")
+	// }
 
-	if err := p.userRepo.Update(ctx, user); err != nil {
-		return err
-	}
+	userObj.ChangePassword(newPassword)
 
-	return nil
+	return p.userRepo.Update(ctx, userObj)
 }

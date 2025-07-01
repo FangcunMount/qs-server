@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
 	auth "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
@@ -46,15 +47,12 @@ func NewAuth(container *container.Container) *Auth {
 func (cfg *Auth) NewBasicAuth() authStrategys.BasicStrategy {
 	return authStrategys.NewBasicStrategy(func(username string, password string) bool {
 		// 使用Authenticator进行认证
-		authResp, err := cfg.authenticator.Authenticate(context.Background(), port.AuthenticateRequest{
-			Username: username,
-			Password: password,
-		})
+		_, _, err := cfg.authenticator.Authenticate(context.Background(), username, password)
 		if err != nil {
 			log.Warnf("Basic auth failed for user %s: %v", username, err)
 			return false
 		}
-		log.Infof("Basic auth successful for user: %s", authResp.User.Username)
+		log.Infof("Basic auth successful for user: %s", username)
 		return true
 	})
 }
@@ -121,23 +119,19 @@ func (cfg *Auth) createAuthenticator() func(c *gin.Context) (interface{}, error)
 
 		// 使用AuthService进行认证
 		ctx := c.Request.Context()
-		authReq := port.AuthenticateRequest{
-			Username: login.Username,
-			Password: login.Password,
-		}
-
-		authResp, err := cfg.authenticator.Authenticate(ctx, authReq)
+		userObj, token, err := cfg.authenticator.Authenticate(ctx, login.Username, login.Password)
 		if err != nil {
 			log.Errorf("Authentication failed for user %s: %v", login.Username, err)
 			return "", jwt.ErrFailedAuthentication
 		}
 
-		log.Infof("Authentication successful for user: %s", authResp.User.Username)
+		log.Infof("Authentication successful for user: %s", userObj.Username())
 
 		// 将用户信息设置到context中，供LoginResponse使用
-		c.Set("user", authResp.User)
+		c.Set("user", userObj)
+		c.Set("token", token)
 
-		return authResp.User, nil
+		return userObj, nil
 	}
 }
 
@@ -185,7 +179,21 @@ func (cfg *Auth) createLoginResponse() func(c *gin.Context, code int, token stri
 		userInterface, exists := c.Get("user")
 		var userData interface{}
 		if exists {
-			userData = userInterface
+			if userObj, ok := userInterface.(*user.User); ok {
+				// 转换领域对象为响应格式
+				userData = gin.H{
+					"id":           userObj.ID().Value(),
+					"username":     userObj.Username(),
+					"nickname":     userObj.Nickname(),
+					"email":        userObj.Email(),
+					"phone":        userObj.Phone(),
+					"avatar":       userObj.Avatar(),
+					"introduction": userObj.Introduction(),
+					"status":       userObj.Status().String(),
+					"created_at":   userObj.CreatedAt().Format(time.RFC3339),
+					"updated_at":   userObj.UpdatedAt().Format(time.RFC3339),
+				}
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -219,11 +227,11 @@ func (cfg *Auth) createPayloadFunc() func(data interface{}) jwt.MapClaims {
 			"aud": APIServerAudience,
 		}
 
-		if user, ok := data.(*port.UserResponse); ok {
-			claims[jwt.IdentityKey] = user.Username
-			claims["sub"] = user.Username
-			claims["user_id"] = user.ID
-			claims["nickname"] = user.Nickname
+		if userObj, ok := data.(*user.User); ok {
+			claims[jwt.IdentityKey] = userObj.Username()
+			claims["sub"] = userObj.Username()
+			claims["user_id"] = userObj.ID().Value()
+			claims["nickname"] = userObj.Nickname()
 		}
 
 		return claims

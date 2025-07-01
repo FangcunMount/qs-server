@@ -2,111 +2,39 @@ package port
 
 import (
 	"context"
-	"time"
+
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 )
-
-// UserCreateRequest 创建用户请求
-type UserCreateRequest struct {
-	Username     string `json:"username" valid:"required"`
-	Password     string `json:"password" valid:"required,stringlength(6|50)"`
-	Nickname     string `json:"nickname" valid:"required"`
-	Email        string `json:"email" valid:"required,email"`
-	Phone        string `json:"phone" valid:"required"`
-	Introduction string `json:"introduction" valid:"optional"`
-}
-
-// UserQueryRequest 查询用户请求
-type UserIDRequest struct {
-	ID uint64 `json:"id" valid:"required"`
-}
-
-// UserUpdateRequest 更新用户请求
-type UserBasicInfoRequest struct {
-	ID           uint64 `json:"id" valid:"required"`
-	Username     string `json:"username" valid:"optional"`
-	Nickname     string `json:"nickname" valid:"optional"`
-	Email        string `json:"email" valid:"optional"`
-	Phone        string `json:"phone" valid:"optional"`
-	Avatar       string `json:"avatar" valid:"optional"`
-	Introduction string `json:"introduction" valid:"optional"`
-}
-
-type UserAvatarRequest struct {
-	ID     uint64 `json:"id" valid:"required"`
-	Avatar string `json:"avatar" valid:"required"`
-}
-
-// UserPasswordChangeRequest 修改密码请求
-type UserPasswordChangeRequest struct {
-	ID          uint64 `json:"id" valid:"required"`
-	OldPassword string `json:"old_password" valid:"required"`
-	NewPassword string `json:"new_password" valid:"required"`
-}
-
-// UserResponse 用户响应
-type UserResponse struct {
-	ID           uint64 `json:"id"`
-	Username     string `json:"username"`
-	Nickname     string `json:"nickname"`
-	Phone        string `json:"phone"`
-	Avatar       string `json:"avatar"`
-	Introduction string `json:"introduction"`
-	Email        string `json:"email"`
-	Status       string `json:"status"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
-}
-
-// UserListResponse 用户列表响应
-type UserListResponse struct {
-	Users      []*UserResponse `json:"users"`
-	TotalCount int64           `json:"total_count"`
-	Page       int             `json:"page"`
-	PageSize   int             `json:"page_size"`
-}
-
-// AuthenticateRequest 认证请求
-type AuthenticateRequest struct {
-	Username string `json:"username" valid:"required"`
-	Password string `json:"password" valid:"required"`
-}
-
-// AuthenticateResponse 认证响应
-type AuthenticateResponse struct {
-	User      *UserResponse `json:"user"`
-	Token     string        `json:"token,omitempty"`
-	ExpiresAt *time.Time    `json:"expires_at,omitempty"`
-}
 
 // UserCreator 用户创建接口
 type UserCreator interface {
-	CreateUser(ctx context.Context, req UserCreateRequest) (*UserResponse, error)
+	CreateUser(ctx context.Context, username, password, nickname, email, phone, introduction string) (*user.User, error)
 }
 
 type UserQueryer interface {
-	GetUser(ctx context.Context, req UserIDRequest) (*UserResponse, error)
-	GetUserByUsername(ctx context.Context, username string) (*UserResponse, error)
-	ListUsers(ctx context.Context, page, pageSize int) (*UserListResponse, error)
+	GetUser(ctx context.Context, id uint64) (*user.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*user.User, error)
+	ListUsers(ctx context.Context, page, pageSize int) ([]*user.User, int64, error)
 }
 
 // UserEditor 用户编辑接口
 type UserEditor interface {
-	UpdateBasicInfo(ctx context.Context, req UserBasicInfoRequest) (*UserResponse, error)
-	UpdateAvatar(ctx context.Context, req UserAvatarRequest) error
+	UpdateBasicInfo(ctx context.Context, id uint64, username, nickname, email, phone, avatar, introduction string) (*user.User, error)
+	UpdateAvatar(ctx context.Context, id uint64, avatar string) error
 }
 
 // PasswordChanger 密码管理接口
 type PasswordChanger interface {
-	ChangePassword(ctx context.Context, req UserPasswordChangeRequest) error
+	ChangePassword(ctx context.Context, id uint64, oldPassword, newPassword string) error
 }
 
 // UserActivator 用户状态管理接口
 type UserActivator interface {
-	ActivateUser(ctx context.Context, req UserIDRequest) error
-	BlockUser(ctx context.Context, req UserIDRequest) error
-	DeactivateUser(ctx context.Context, req UserIDRequest) error
+	ActivateUser(ctx context.Context, id uint64) error
+	BlockUser(ctx context.Context, id uint64) error
+	DeactivateUser(ctx context.Context, id uint64) error
 }
 
 type Authenticator interface {
-	Authenticate(ctx context.Context, req AuthenticateRequest) (*AuthenticateResponse, error)
+	Authenticate(ctx context.Context, username, password string) (*user.User, string, error) // 返回用户、token、错误
 }

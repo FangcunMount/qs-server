@@ -18,55 +18,43 @@ func NewUserActivator(userRepo port.UserRepository) port.UserActivator {
 }
 
 // ActivateUser 激活用户
-func (a *UserActivator) ActivateUser(ctx context.Context, req port.UserIDRequest) error {
-	user, err := a.userRepo.FindByID(ctx, user.NewUserID(req.ID))
+func (a *UserActivator) ActivateUser(ctx context.Context, id uint64) error {
+	userObj, err := a.userRepo.FindByID(ctx, user.NewUserID(id))
 	if err != nil {
 		return err
 	}
 
-	if err := user.Activate(); err != nil {
+	if err := userObj.Activate(); err != nil {
 		return err
 	}
 
-	if err := a.userRepo.Update(ctx, user); err != nil {
-		return err
-	}
-
-	return nil
+	return a.userRepo.Update(ctx, userObj)
 }
 
 // BlockUser 封禁用户
-func (a *UserActivator) BlockUser(ctx context.Context, req port.UserIDRequest) error {
-	user, err := a.userRepo.FindByID(ctx, user.NewUserID(req.ID))
+func (a *UserActivator) BlockUser(ctx context.Context, id uint64) error {
+	userObj, err := a.userRepo.FindByID(ctx, user.NewUserID(id))
 	if err != nil {
 		return err
 	}
 
-	if err := user.Block(); err != nil {
+	if err := userObj.Block(); err != nil {
 		return err
 	}
 
-	if err := a.userRepo.Update(ctx, user); err != nil {
-		return err
-	}
-
-	return nil
+	return a.userRepo.Update(ctx, userObj)
 }
 
 // DeactivateUser 禁用用户
-func (a *UserActivator) DeactivateUser(ctx context.Context, req port.UserIDRequest) error {
-	user, err := a.userRepo.FindByID(ctx, user.NewUserID(req.ID))
+func (a *UserActivator) DeactivateUser(ctx context.Context, id uint64) error {
+	userObj, err := a.userRepo.FindByID(ctx, user.NewUserID(id))
 	if err != nil {
 		return err
 	}
 
-	if err := user.Deactivate(); err != nil {
+	if err := userObj.Deactivate(); err != nil {
 		return err
 	}
 
-	if err := a.userRepo.Update(ctx, user); err != nil {
-		return err
-	}
-
-	return nil
+	return a.userRepo.Update(ctx, userObj)
 }

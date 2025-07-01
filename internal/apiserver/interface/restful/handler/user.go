@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
 )
 
@@ -32,7 +35,7 @@ func NewUserHandler(userCreator port.UserCreator, userQueryer port.UserQueryer, 
 // GetUser 获取用户
 // GET /api/v1/users/:id
 func (h *UserHandler) GetUser(c *gin.Context) {
-	var req port.UserIDRequest
+	var req dto.UserIDRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -42,24 +45,55 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 		return
 	}
 
-	userResponse, err := h.userQueryer.GetUser(c.Request.Context(), req)
+	// 调用领域服务
+	user, err := h.userQueryer.GetUser(c.Request.Context(), req.ID)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, userResponse)
+	// 转换为DTO响应
+	response := &dto.UserResponse{
+		ID:           user.ID().Value(),
+		Username:     user.Username(),
+		Nickname:     user.Nickname(),
+		Phone:        user.Phone(),
+		Avatar:       user.Avatar(),
+		Introduction: user.Introduction(),
+		Email:        user.Email(),
+		Status:       user.Status().String(),
+		CreatedAt:    user.CreatedAt().Format(time.RFC3339),
+		UpdatedAt:    user.UpdatedAt().Format(time.RFC3339),
+	}
+
+	h.SuccessResponse(c, response)
 }
 
 // GetUserProfile 获取用户资料
 // GET /api/v1/users/profile
 func (h *UserHandler) GetUserProfile(c *gin.Context) {
 	username := c.GetString(middleware.UsernameKey)
-	userResponse, err := h.userQueryer.GetUserByUsername(c.Request.Context(), username)
+
+	// 调用领域服务
+	user, err := h.userQueryer.GetUserByUsername(c.Request.Context(), username)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, userResponse)
+	// 转换为DTO响应
+	response := &dto.UserResponse{
+		ID:           user.ID().Value(),
+		Username:     user.Username(),
+		Nickname:     user.Nickname(),
+		Phone:        user.Phone(),
+		Avatar:       user.Avatar(),
+		Introduction: user.Introduction(),
+		Email:        user.Email(),
+		Status:       user.Status().String(),
+		CreatedAt:    user.CreatedAt().Format(time.RFC3339),
+		UpdatedAt:    user.UpdatedAt().Format(time.RFC3339),
+	}
+
+	h.SuccessResponse(c, response)
 }

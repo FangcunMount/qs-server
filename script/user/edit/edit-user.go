@@ -17,6 +17,15 @@ type UserEditScript struct {
 	query  port.UserQueryer
 }
 
+// UserEditData 用户编辑数据
+type UserEditData struct {
+	Username        string
+	NewNickname     string
+	NewEmail        string
+	NewPhone        string
+	NewIntroduction string
+}
+
 // NewUserEditScript 创建用户编辑脚本
 func NewUserEditScript() *UserEditScript {
 	return &UserEditScript{}
@@ -50,13 +59,7 @@ func (s *UserEditScript) Execute() error {
 	ctx := context.Background()
 
 	// 预设要编辑的用户数据
-	usersToEdit := []struct {
-		Username        string
-		NewNickname     string
-		NewEmail        string
-		NewPhone        string
-		NewIntroduction string
-	}{
+	usersToEdit := []UserEditData{
 		{
 			Username:        "admin",
 			NewNickname:     "超级管理员",
@@ -99,19 +102,18 @@ func (s *UserEditScript) Execute() error {
 		}
 
 		log.Infof("原信息 - 昵称: %s, 邮箱: %s, 电话: %s",
-			existingUser.Nickname, existingUser.Email, existingUser.Phone)
+			existingUser.Nickname(), existingUser.Email(), existingUser.Phone())
 
-		// 更新用户信息
-		updateReq := port.UserBasicInfoRequest{
-			ID:           existingUser.ID,
-			Nickname:     editData.NewNickname,
-			Email:        editData.NewEmail,
-			Phone:        editData.NewPhone,
-			Introduction: editData.NewIntroduction,
-		}
-
-		// 保存更新
-		if _, err := s.editor.UpdateBasicInfo(ctx, updateReq); err != nil {
+		// 更新用户信息 - 使用原始参数
+		updatedUser, err := s.editor.UpdateBasicInfo(ctx,
+			existingUser.ID().Value(),
+			"", // username 保持不变，传空字符串
+			editData.NewNickname,
+			editData.NewEmail,
+			editData.NewPhone,
+			"", // avatar 保持不变，传空字符串
+			editData.NewIntroduction)
+		if err != nil {
 			log.Errorf("更新用户失败: %v", err)
 			continue
 		}
@@ -119,7 +121,7 @@ func (s *UserEditScript) Execute() error {
 		successCount++
 		log.Infof("✅ 用户 '%s' 信息更新成功", editData.Username)
 		log.Infof("新信息 - 昵称: %s, 邮箱: %s, 电话: %s",
-			editData.NewNickname, editData.NewEmail, editData.NewPhone)
+			updatedUser.Nickname(), updatedUser.Email(), updatedUser.Phone())
 	}
 
 	log.Infof("批量编辑完成！成功: %d/%d", successCount, len(usersToEdit))

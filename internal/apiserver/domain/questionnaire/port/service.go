@@ -1,66 +1,26 @@
 package port
 
-import "context"
+import (
+	"context"
 
-type QuestionnaireCreateRequest struct {
-	Title       string `json:"title" valid:"required"`
-	Description string `json:"description" valid:"required"`
-	ImgUrl      string `json:"img_url"`
-}
-
-type QuestionnaireIDRequest struct {
-	ID uint64 `json:"id" valid:"required"`
-}
-
-type QuestionnaireResponse struct {
-	ID          uint64 `json:"id"`
-	Code        string `json:"code"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	ImgUrl      string `json:"img_url"`
-	Version     uint8  `json:"version"`
-	Status      uint8  `json:"status"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-}
-
-type QuestionnaireListResponse struct {
-	Questionnaires []*QuestionnaireResponse `json:"questionnaires"`
-	TotalCount     int64                    `json:"total_count"`
-	Page           int                      `json:"page"`
-	PageSize       int                      `json:"page_size"`
-}
-
-type QuestionnaireEditRequest struct {
-	ID      uint64 `json:"id" valid:"required"`
-	Title   string `json:"title" valid:"required"`
-	ImgUrl  string `json:"img_url" valid:"required"`
-	Version uint8  `json:"version" valid:"required"`
-}
-
-type QuestionnairePublishRequest struct {
-	ID uint64 `json:"id" valid:"required"`
-}
-
-type QuestionnaireUnpublishRequest struct {
-	ID uint64 `json:"id" valid:"required"`
-}
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
+)
 
 type QuestionnaireCreator interface {
-	CreateQuestionnaire(ctx context.Context, req QuestionnaireCreateRequest) (*QuestionnaireResponse, error)
+	CreateQuestionnaire(ctx context.Context, title, description, imgUrl string) (*questionnaire.Questionnaire, error)
 }
 
 type QuestionnaireQueryer interface {
-	GetQuestionnaire(ctx context.Context, req QuestionnaireIDRequest) (*QuestionnaireResponse, error)
-	GetQuestionnaireByCode(ctx context.Context, code string) (*QuestionnaireResponse, error)
-	ListQuestionnaires(ctx context.Context, page, pageSize int) (*QuestionnaireListResponse, error)
+	GetQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
+	GetQuestionnaireByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error)
+	ListQuestionnaires(ctx context.Context, page, pageSize int) ([]*questionnaire.Questionnaire, int64, error)
 }
 
 type QuestionnaireEditor interface {
-	EditBasicInfo(ctx context.Context, req QuestionnaireEditRequest) (*QuestionnaireResponse, error)
+	EditBasicInfo(ctx context.Context, id uint64, title, imgUrl string, version uint8) (*questionnaire.Questionnaire, error)
 }
 
 type QuestionnairePublisher interface {
-	PublishQuestionnaire(ctx context.Context, req QuestionnairePublishRequest) (*QuestionnaireResponse, error)
-	UnpublishQuestionnaire(ctx context.Context, req QuestionnaireUnpublishRequest) (*QuestionnaireResponse, error)
+	PublishQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
+	UnpublishQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
 }

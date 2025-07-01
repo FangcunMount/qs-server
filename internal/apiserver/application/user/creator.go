@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
@@ -22,47 +21,36 @@ func NewUserCreator(userRepo port.UserRepository) port.UserCreator {
 }
 
 // CreateUser 创建用户
-func (c *UserCreator) CreateUser(ctx context.Context, req port.UserCreateRequest) (*port.UserResponse, error) {
+func (c *UserCreator) CreateUser(ctx context.Context, username, password, nickname, email, phone, introduction string) (*user.User, error) {
 	// 唯一性检查
-	if c.usernameUnique(ctx, req.Username) {
+	if c.usernameUnique(ctx, username) {
 		return nil, errors.WithCode(code.ErrUserAlreadyExists, "username already exists")
 	}
-	if c.emailUnique(ctx, req.Email) {
+	if c.emailUnique(ctx, email) {
 		return nil, errors.WithCode(code.ErrUserAlreadyExists, "email already exists")
 	}
-	if c.phoneUnique(ctx, req.Phone) {
+	if c.phoneUnique(ctx, phone) {
 		return nil, errors.WithCode(code.ErrUserAlreadyExists, "phone already exists")
 	}
 
 	// 创建用户领域对象
-	user := user.NewUserBuilder().
-		WithUsername(req.Username).
-		WithPassword(req.Password).
-		WithNickname(req.Nickname).
-		WithEmail(req.Email).
-		WithPhone(req.Phone).
+	userObj := user.NewUserBuilder().
+		WithUsername(username).
+		WithPassword(password).
+		WithNickname(nickname).
+		WithEmail(email).
+		WithPhone(phone).
 		WithStatus(user.StatusInit).
-		WithIntroduction(req.Introduction).
+		WithIntroduction(introduction).
 		Build()
 
 	// 保存用户
-	if err := c.userRepo.Save(ctx, user); err != nil {
+	if err := c.userRepo.Save(ctx, userObj); err != nil {
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
 
-	// 返回响应
-	return &port.UserResponse{
-		ID:           user.ID().Value(),
-		Username:     user.Username(),
-		Nickname:     user.Nickname(),
-		Avatar:       user.Avatar(),
-		Introduction: user.Introduction(),
-		Email:        user.Email(),
-		Phone:        user.Phone(),
-		Status:       user.Status().String(),
-		CreatedAt:    user.CreatedAt().Format(time.DateTime),
-		UpdatedAt:    user.UpdatedAt().Format(time.DateTime),
-	}, nil
+	// 返回用户领域对象
+	return userObj, nil
 }
 
 func (c *UserCreator) usernameUnique(ctx context.Context, username string) bool {

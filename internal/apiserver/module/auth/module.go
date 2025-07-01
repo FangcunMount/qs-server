@@ -17,8 +17,8 @@ type Module struct {
 	// repository 层
 	UserRepo port.UserRepository
 
-	// service 层
-	Authenticator *authApp.Authenticator
+	// service 层 - 使用接口类型而非具体类型
+	Authenticator port.Authenticator
 }
 
 // NewModule 创建认证模块
@@ -37,7 +37,7 @@ func (m *Module) Initialize(params ...interface{}) error {
 	m.UserRepo = userInfra.NewRepository(db)
 
 	// 初始化 service 层
-	m.Authenticator = authApp.NewAuthenticator(m.UserRepo)
+	m.Authenticator = authApp.NewAuthenticator(m.UserRepo, "your-secret-key")
 
 	return nil
 }

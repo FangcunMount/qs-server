@@ -2,7 +2,6 @@ package questionnaire
 
 import (
 	"context"
-	"time"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
@@ -24,13 +23,13 @@ func NewCreator(
 }
 
 // CreateQuestionnaire 创建问卷
-func (c *Creator) CreateQuestionnaire(ctx context.Context, req port.QuestionnaireCreateRequest) (*port.QuestionnaireResponse, error) {
+func (c *Creator) CreateQuestionnaire(ctx context.Context, title, description, imgUrl string) (*questionnaire.Questionnaire, error) {
 	// 1. 创建问卷领域模型
 	quesDomain := &questionnaire.Questionnaire{
 		Code:        idutil.GetUUID36("ques")[:8],
-		Title:       req.Title,
-		Description: req.Description,
-		ImgUrl:      req.ImgUrl,
+		Title:       title,
+		Description: description,
+		ImgUrl:      imgUrl,
 		Version:     1,
 		Status:      questionnaire.STATUS_DRAFT.Value(),
 	}
@@ -45,16 +44,6 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, req port.Questionnair
 		return nil, err
 	}
 
-	// 4. 返回问卷响应
-	return &port.QuestionnaireResponse{
-		ID:          quesDomain.ID.Value(),
-		Code:        quesDomain.Code,
-		Title:       quesDomain.Title,
-		Description: quesDomain.Description,
-		ImgUrl:      quesDomain.ImgUrl,
-		Version:     quesDomain.Version,
-		Status:      quesDomain.Status,
-		CreatedAt:   quesDomain.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   quesDomain.UpdatedAt.Format(time.RFC3339),
-	}, nil
+	// 4. 返回问卷领域对象
+	return quesDomain, nil
 }

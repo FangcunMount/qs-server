@@ -16,6 +16,16 @@ type UserCreateScript struct {
 	creator port.UserCreator
 }
 
+// UserCreateData 用户创建数据
+type UserCreateData struct {
+	Username     string
+	Password     string
+	Nickname     string
+	Email        string
+	Phone        string
+	Introduction string
+}
+
 // NewUserCreateScript 创建用户创建脚本
 func NewUserCreateScript() *UserCreateScript {
 	return &UserCreateScript{}
@@ -48,7 +58,7 @@ func (s *UserCreateScript) Execute() error {
 	ctx := context.Background()
 
 	// 预设用户数据
-	usersToCreate := []port.UserCreateRequest{
+	usersToCreate := []UserCreateData{
 		{
 			Username:     "admin",
 			Password:     "admin123",
@@ -81,15 +91,21 @@ func (s *UserCreateScript) Execute() error {
 	for i, userData := range usersToCreate {
 		log.Infof("正在创建用户 [%d/%d]: %s", i+1, len(usersToCreate), userData.Username)
 
-		// 创建用户
-		userResp, err := s.creator.CreateUser(ctx, userData)
+		// 创建用户 - 使用原始参数
+		user, err := s.creator.CreateUser(ctx,
+			userData.Username,
+			userData.Password,
+			userData.Nickname,
+			userData.Email,
+			userData.Phone,
+			userData.Introduction)
 		if err != nil {
 			log.Errorf("创建用户失败: %v", err)
 			continue
 		}
 
 		successCount++
-		log.Infof("✅ 用户 '%s' 创建成功 (ID: %d)", userData.Username, userResp.ID)
+		log.Infof("✅ 用户 '%s' 创建成功 (ID: %d)", userData.Username, user.ID().Value())
 	}
 
 	log.Infof("批量创建完成！成功: %d/%d", successCount, len(usersToCreate))
