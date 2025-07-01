@@ -1,4 +1,4 @@
-package user
+package module
 
 import (
 	"gorm.io/gorm"
@@ -7,14 +7,13 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
 	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 // Module 用户模块
 // 负责组装用户相关的所有组件
-type Module struct {
+type UserModule struct {
 	// repository 层
 	UserRepo port.UserRepository
 
@@ -30,12 +29,12 @@ type Module struct {
 }
 
 // NewModule 创建用户模块
-func NewModule() *Module {
-	return &Module{}
+func NewUserModule() *UserModule {
+	return &UserModule{}
 }
 
 // Initialize 初始化模块
-func (m *Module) Initialize(params ...interface{}) error {
+func (m *UserModule) Initialize(params ...interface{}) error {
 	db := params[0].(*gorm.DB)
 	if db == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
@@ -64,20 +63,20 @@ func (m *Module) Initialize(params ...interface{}) error {
 }
 
 // Cleanup 清理模块资源
-func (m *Module) Cleanup() error {
+func (m *UserModule) Cleanup() error {
 	// 如果有需要清理的资源，在这里进行清理
 	// 比如关闭数据库连接、释放缓存等
 	return nil
 }
 
 // CheckHealth 检查模块健康状态
-func (m *Module) CheckHealth() error {
+func (m *UserModule) CheckHealth() error {
 	return nil
 }
 
 // ModuleInfo 返回模块信息
-func (m *Module) ModuleInfo() module.ModuleInfo {
-	return module.ModuleInfo{
+func (m *UserModule) ModuleInfo() ModuleInfo {
+	return ModuleInfo{
 		Name:        "user",
 		Version:     "1.0.0",
 		Description: "用户管理模块",
