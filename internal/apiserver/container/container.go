@@ -7,11 +7,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/container/module"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/container/assembler"
 )
 
 // modulePool 模块池
-var modulePool = make(map[string]module.Module)
+var modulePool = make(map[string]assembler.Module)
 
 // Container 主容器
 // 组合所有业务模块和基础设施组件
@@ -21,9 +21,9 @@ type Container struct {
 	mongoDB *mongo.Database
 
 	// 业务模块
-	AuthModule          *module.AuthModule
-	UserModule          *module.UserModule
-	QuestionnaireModule *module.QuestionnaireModule
+	AuthModule          *assembler.AuthModule
+	UserModule          *assembler.UserModule
+	QuestionnaireModule *assembler.QuestionnaireModule
 
 	// 容器状态
 	initialized bool
@@ -67,7 +67,7 @@ func (c *Container) Initialize() error {
 
 // initUserModule 初始化用户模块
 func (c *Container) initUserModule() error {
-	userModule := module.NewUserModule()
+	userModule := assembler.NewUserModule()
 	if err := userModule.Initialize(c.mysqlDB); err != nil {
 		return fmt.Errorf("failed to initialize user module: %w", err)
 	}
@@ -81,7 +81,7 @@ func (c *Container) initUserModule() error {
 
 // initAuthModule 初始化认证模块
 func (c *Container) initAuthModule() error {
-	authModule := module.NewAuthModule()
+	authModule := assembler.NewAuthModule()
 	if err := authModule.Initialize(c.mysqlDB); err != nil {
 		return fmt.Errorf("failed to initialize auth module: %w", err)
 	}
@@ -95,7 +95,7 @@ func (c *Container) initAuthModule() error {
 
 // initQuestionnaireModule 初始化问卷模块
 func (c *Container) initQuestionnaireModule() error {
-	quesModule := module.NewQuestionnaireModule()
+	quesModule := assembler.NewQuestionnaireModule()
 	if err := quesModule.Initialize(c.mysqlDB, c.mongoDB); err != nil {
 		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
 	}

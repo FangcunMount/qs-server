@@ -1,4 +1,4 @@
-package module
+package assembler
 
 import (
 	"go.mongodb.org/mongo-driver/mongo"
