@@ -4,11 +4,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	quesAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful/questionnaire"
 	quesApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	quesDocInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/questionnaire"
 	quesInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/questionnaire"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
@@ -21,7 +21,7 @@ type Module struct {
 	QuesDoc  port.QuestionnaireDocument
 
 	// handler 层
-	QuesHandler *quesAdapter.Handler
+	QuesHandler *handler.QuestionnaireHandler
 
 	// service 层
 	QuesCreator   port.QuestionnaireCreator
@@ -54,7 +54,7 @@ func (m *Module) Initialize(params ...interface{}) error {
 	m.QuesQueryer = quesApp.NewQueryer(m.QuesRepo, m.QuesDoc)
 
 	// 初始化 handler 层
-	m.QuesHandler = quesAdapter.NewHandler(
+	m.QuesHandler = handler.NewQuestionnaireHandler(
 		m.QuesCreator,
 		m.QuesEditor,
 		m.QuesPublisher,

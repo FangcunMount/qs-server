@@ -3,10 +3,10 @@ package user
 import (
 	"gorm.io/gorm"
 
-	userAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful/user"
 	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
 	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
@@ -19,7 +19,7 @@ type Module struct {
 	UserRepo port.UserRepository
 
 	// handler 层
-	UserHandler *userAdapter.Handler
+	UserHandler *handler.UserHandler
 
 	// service 层
 	UserCreator         port.UserCreator
@@ -52,7 +52,7 @@ func (m *Module) Initialize(params ...interface{}) error {
 	m.UserPasswordChanger = userApp.NewPasswordChanger(m.UserRepo)
 
 	// 初始化 handler 层
-	m.UserHandler = userAdapter.NewHandler(
+	m.UserHandler = handler.NewUserHandler(
 		m.UserCreator,
 		m.UserQueryer,
 		m.UserEditor,
