@@ -21,19 +21,19 @@ type Repository struct {
 
 // NewRepository 创建问卷MongoDB存储库
 func NewRepository(db *mongo.Database) port.QuestionnaireRepository {
-	doc := &QuestionnaireDocument{}
+	po := &QuestionnairePO{}
 	return &Repository{
-		BaseRepository: mongoBase.NewBaseRepository(db, doc.CollectionName()),
+		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),
 		mapper:         NewQuestionnaireMapper(),
 	}
 }
 
 // Save 保存问卷
 func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
-	doc := r.mapper.ToDocument(qDomain)
-	doc.BeforeInsert()
+	po := r.mapper.ToPO(qDomain)
+	po.BeforeInsert()
 
-	result, err := r.InsertOne(ctx, doc)
+	result, err := r.InsertOne(ctx, po)
 	if err != nil {
 		return err
 	}
@@ -44,10 +44,10 @@ func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionna
 		qDomain.SetID(questionnaire.NewQuestionnaireID(domainID))
 	}
 
-	qDomain.SetCreatedAt(doc.CreatedAt)
-	qDomain.SetUpdatedAt(doc.UpdatedAt)
-	qDomain.SetCreatedBy(doc.CreatedBy)
-	qDomain.SetUpdatedBy(doc.UpdatedBy)
+	qDomain.SetCreatedAt(po.CreatedAt)
+	qDomain.SetUpdatedAt(po.UpdatedAt)
+	qDomain.SetCreatedBy(po.CreatedBy)
+	qDomain.SetUpdatedBy(po.UpdatedBy)
 
 	return nil
 }
@@ -57,8 +57,8 @@ func (r *Repository) FindByID(ctx context.Context, id uint64) (*questionnaire.Qu
 	// 方法1: 根据自定义字段查询（如果你在文档中存储了uint64 ID）
 	filter := bson.M{"domain_id": id} // 假设你在文档中添加了domain_id字段
 
-	var doc QuestionnaireDocument
-	err := r.FindOne(ctx, filter, &doc)
+	var po QuestionnairePO
+	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil // 或者返回自定义的NotFound错误
@@ -66,7 +66,7 @@ func (r *Repository) FindByID(ctx context.Context, id uint64) (*questionnaire.Qu
 		return nil, err
 	}
 
-	return r.mapper.ToDomain(&doc), nil
+	return r.mapper.ToBO(&po), nil
 }
 
 // FindByCode 根据编码查询问卷
@@ -76,8 +76,8 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnair
 		"deleted_at": bson.M{"$exists": false}, // 排除已删除的文档
 	}
 
-	var doc QuestionnaireDocument
-	err := r.FindOne(ctx, filter, &doc)
+	var po QuestionnairePO
+	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil // 或者返回自定义的NotFound错误
@@ -85,26 +85,26 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnair
 		return nil, err
 	}
 
-	return r.mapper.ToDomain(&doc), nil
+	return r.mapper.ToBO(&po), nil
 }
 
 // Update 更新问卷
 func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
-	doc := r.mapper.ToDocument(qDomain)
-	doc.BeforeUpdate()
+	po := r.mapper.ToPO(qDomain)
+	po.BeforeUpdate()
 
 	// 根据领域ID查找文档
 	filter := bson.M{"domain_id": qDomain.ID.Value()}
 
 	update := bson.M{
 		"$set": bson.M{
-			"code":       doc.Code,
-			"title":      doc.Title,
-			"img_url":    doc.ImgUrl,
-			"version":    doc.Version,
-			"status":     doc.Status,
-			"updated_at": doc.UpdatedAt,
-			"updated_by": doc.UpdatedBy,
+			"code":       po.Code,
+			"title":      po.Title,
+			"img_url":    po.ImgUrl,
+			"version":    po.Version,
+			"status":     po.Status,
+			"updated_at": po.UpdatedAt,
+			"updated_by": po.UpdatedBy,
 		},
 	}
 
@@ -118,8 +118,8 @@ func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Question
 	}
 
 	// 同步更新时间回领域对象
-	qDomain.SetUpdatedAt(doc.UpdatedAt)
-	qDomain.SetUpdatedBy(doc.UpdatedBy)
+	qDomain.SetUpdatedAt(po.UpdatedAt)
+	qDomain.SetUpdatedBy(po.UpdatedBy)
 
 	return nil
 }
@@ -190,11 +190,11 @@ func (r *Repository) FindActiveQuestionnaires(ctx context.Context) ([]*questionn
 
 	var questionnaires []*questionnaire.Questionnaire
 	for cursor.Next(ctx) {
-		var doc QuestionnaireDocument
-		if err := cursor.Decode(&doc); err != nil {
+		var po QuestionnairePO
+		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		questionnaires = append(questionnaires, r.mapper.ToDomain(&doc))
+		questionnaires = append(questionnaires, r.mapper.ToBO(&po))
 	}
 
 	if err := cursor.Err(); err != nil {

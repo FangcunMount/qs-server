@@ -10,9 +10,9 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 	return &QuestionnaireMapper{}
 }
 
-// ToEntity 将领域模型转换为实体
-func (m *QuestionnaireMapper) ToEntity(domainQuestionnaire *questionnaire.Questionnaire) *QuestionnaireEntity {
-	return &QuestionnaireEntity{
+// ToPO 将领域模型转换为持久化对象
+func (m *QuestionnaireMapper) ToPO(domainQuestionnaire *questionnaire.Questionnaire) *QuestionnairePO {
+	return &QuestionnairePO{
 		Code:        domainQuestionnaire.Code,
 		Title:       domainQuestionnaire.Title,
 		Description: domainQuestionnaire.Description,
@@ -22,14 +22,14 @@ func (m *QuestionnaireMapper) ToEntity(domainQuestionnaire *questionnaire.Questi
 	}
 }
 
-// ToDomain 将实体转换为领域模型
-func (m *QuestionnaireMapper) ToDomain(entity *QuestionnaireEntity) *questionnaire.Questionnaire {
+// ToBO 将持久化对象转换为业务对象
+func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	return &questionnaire.Questionnaire{
-		Code:        entity.Code,
-		Title:       entity.Title,
-		Description: entity.Description,
-		ImgUrl:      entity.ImgUrl,
-		Version:     entity.Version,
-		Status:      entity.Status,
+		Code:        po.Code,
+		Title:       po.Title,
+		Description: po.Description,
+		ImgUrl:      po.ImgUrl,
+		Version:     po.Version,
+		Status:      po.Status,
 	}
 }

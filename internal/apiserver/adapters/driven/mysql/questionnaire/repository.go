@@ -10,44 +10,44 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 )
 
-// Repository 存储库现
+// Repository 存储库实现
 type Repository struct {
-	mysql.BaseRepository[*QuestionnaireEntity]
+	mysql.BaseRepository[*QuestionnairePO]
 	mapper *QuestionnaireMapper
 }
 
 // NewRepository 创建问卷存储库
 func NewRepository(db *gorm.DB) port.QuestionnaireRepository {
 	return &Repository{
-		BaseRepository: mysql.NewBaseRepository[*QuestionnaireEntity](db),
+		BaseRepository: mysql.NewBaseRepository[*QuestionnairePO](db),
 		mapper:         NewQuestionnaireMapper(),
 	}
 }
 
 // Save 保存问卷
 func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
-	entity := r.mapper.ToEntity(qDomain)
-	return r.UpdateAndSync(ctx, entity, func(qEntity *QuestionnaireEntity) {
-		qDomain.SetID(questionnaire.NewQuestionnaireID(qEntity.ID))
-		qDomain.SetCreatedAt(qEntity.CreatedAt)
-		qDomain.SetUpdatedAt(qEntity.UpdatedAt)
-		qDomain.SetCreatedBy(qEntity.CreatedBy)
-		qDomain.SetUpdatedBy(qEntity.UpdatedBy)
-		qDomain.SetDeletedBy(qEntity.DeletedBy)
-		qDomain.SetDeletedAt(qEntity.DeletedAt)
+	po := r.mapper.ToPO(qDomain)
+	return r.UpdateAndSync(ctx, po, func(qPO *QuestionnairePO) {
+		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
+		qDomain.SetCreatedAt(qPO.CreatedAt)
+		qDomain.SetUpdatedAt(qPO.UpdatedAt)
+		qDomain.SetCreatedBy(qPO.CreatedBy)
+		qDomain.SetUpdatedBy(qPO.UpdatedBy)
+		qDomain.SetDeletedBy(qPO.DeletedBy)
+		qDomain.SetDeletedAt(qPO.DeletedAt)
 	})
 }
 
 // Update 更新问卷
 func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
-	return r.BaseRepository.UpdateAndSync(ctx, r.mapper.ToEntity(qDomain), func(qEntity *QuestionnaireEntity) {
-		qDomain.SetID(questionnaire.NewQuestionnaireID(qEntity.ID))
-		qDomain.SetCreatedAt(qEntity.CreatedAt)
-		qDomain.SetUpdatedAt(qEntity.UpdatedAt)
-		qDomain.SetCreatedBy(qEntity.CreatedBy)
-		qDomain.SetUpdatedBy(qEntity.UpdatedBy)
-		qDomain.SetDeletedBy(qEntity.DeletedBy)
-		qDomain.SetDeletedAt(qEntity.DeletedAt)
+	return r.BaseRepository.UpdateAndSync(ctx, r.mapper.ToPO(qDomain), func(qPO *QuestionnairePO) {
+		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
+		qDomain.SetCreatedAt(qPO.CreatedAt)
+		qDomain.SetUpdatedAt(qPO.UpdatedAt)
+		qDomain.SetCreatedBy(qPO.CreatedBy)
+		qDomain.SetUpdatedBy(qPO.UpdatedBy)
+		qDomain.SetDeletedBy(qPO.DeletedBy)
+		qDomain.SetDeletedAt(qPO.DeletedAt)
 	})
 }
 
@@ -58,20 +58,20 @@ func (r *Repository) Remove(ctx context.Context, id uint64) error {
 
 // FindByID 根据ID查询问卷
 func (r *Repository) FindByID(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error) {
-	var entity QuestionnaireEntity
-	err := r.BaseRepository.FindByField(ctx, &entity, "id", id)
+	var po QuestionnairePO
+	err := r.BaseRepository.FindByField(ctx, &po, "id", id)
 	if err != nil {
 		return nil, err
 	}
-	return r.mapper.ToDomain(&entity), nil
+	return r.mapper.ToBO(&po), nil
 }
 
 // FindByCode 根据编码查询问卷
 func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
-	var entity QuestionnaireEntity
-	err := r.BaseRepository.FindByField(ctx, &entity, "code", code)
+	var po QuestionnairePO
+	err := r.BaseRepository.FindByField(ctx, &po, "code", code)
 	if err != nil {
 		return nil, err
 	}
-	return r.mapper.ToDomain(&entity), nil
+	return r.mapper.ToBO(&po), nil
 }

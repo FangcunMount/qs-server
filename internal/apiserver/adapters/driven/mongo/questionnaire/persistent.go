@@ -8,9 +8,9 @@ import (
 	base "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mongo"
 )
 
-// QuestionnaireDocument 问卷MongoDB文档
+// QuestionnairePO 问卷MongoDB持久化对象
 // 对应MongoDB集合结构
-type QuestionnaireDocument struct {
+type QuestionnairePO struct {
 	base.BaseDocument `bson:",inline"`
 	DomainID          uint64 `bson:"domain_id" json:"domain_id"` // 领域模型ID
 	Code              string `bson:"code" json:"code"`
@@ -22,28 +22,28 @@ type QuestionnaireDocument struct {
 }
 
 // CollectionName 集合名称
-func (QuestionnaireDocument) CollectionName() string {
+func (QuestionnairePO) CollectionName() string {
 	return "questionnaires"
 }
 
 // BeforeInsert 插入前设置字段
-func (d *QuestionnaireDocument) BeforeInsert() {
-	if d.ID.IsZero() {
-		d.ID = primitive.NewObjectID()
+func (p *QuestionnairePO) BeforeInsert() {
+	if p.ID.IsZero() {
+		p.ID = primitive.NewObjectID()
 	}
 	now := time.Now()
-	d.CreatedAt = now
-	d.UpdatedAt = now
+	p.CreatedAt = now
+	p.UpdatedAt = now
 
 	// 设置默认值
-	if d.CreatedBy == 0 {
-		d.CreatedBy = 0 // 可以从上下文中获取当前用户ID
+	if p.CreatedBy == 0 {
+		p.CreatedBy = 0 // 可以从上下文中获取当前用户ID
 	}
-	d.UpdatedBy = d.CreatedBy
+	p.UpdatedBy = p.CreatedBy
 }
 
 // BeforeUpdate 更新前设置字段
-func (d *QuestionnaireDocument) BeforeUpdate() {
-	d.UpdatedAt = time.Now()
+func (p *QuestionnairePO) BeforeUpdate() {
+	p.UpdatedAt = time.Now()
 	// UpdatedBy 应该从上下文中获取当前用户ID
 }

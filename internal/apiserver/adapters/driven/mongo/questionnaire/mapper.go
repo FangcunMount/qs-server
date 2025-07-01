@@ -16,9 +16,9 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 	return &QuestionnaireMapper{}
 }
 
-// ToDocument 将领域模型转换为MongoDB文档
-func (m *QuestionnaireMapper) ToDocument(domainQuestionnaire *questionnaire.Questionnaire) *QuestionnaireDocument {
-	doc := &QuestionnaireDocument{
+// ToPO 将领域模型转换为MongoDB持久化对象
+func (m *QuestionnaireMapper) ToPO(domainQuestionnaire *questionnaire.Questionnaire) *QuestionnairePO {
+	po := &QuestionnairePO{
 		DomainID:    domainQuestionnaire.ID.Value(),
 		Code:        domainQuestionnaire.Code,
 		Title:       domainQuestionnaire.Title,
@@ -30,52 +30,52 @@ func (m *QuestionnaireMapper) ToDocument(domainQuestionnaire *questionnaire.Ques
 
 	// 处理MongoDB ObjectID
 	if domainQuestionnaire.ID.Value() != 0 {
-		doc.ID = m.ObjectIDFromUint64(domainQuestionnaire.ID.Value())
+		po.ID = m.ObjectIDFromUint64(domainQuestionnaire.ID.Value())
 	}
 
 	// 设置审计字段
 	if !domainQuestionnaire.CreatedAt.IsZero() {
-		doc.CreatedAt = domainQuestionnaire.CreatedAt
+		po.CreatedAt = domainQuestionnaire.CreatedAt
 	}
 	if !domainQuestionnaire.UpdatedAt.IsZero() {
-		doc.UpdatedAt = domainQuestionnaire.UpdatedAt
+		po.UpdatedAt = domainQuestionnaire.UpdatedAt
 	}
 	if !domainQuestionnaire.DeletedAt.IsZero() {
-		doc.DeletedAt = &domainQuestionnaire.DeletedAt
+		po.DeletedAt = &domainQuestionnaire.DeletedAt
 	}
 
-	doc.CreatedBy = domainQuestionnaire.CreatedBy
-	doc.UpdatedBy = domainQuestionnaire.UpdatedBy
+	po.CreatedBy = domainQuestionnaire.CreatedBy
+	po.UpdatedBy = domainQuestionnaire.UpdatedBy
 	if domainQuestionnaire.DeletedBy != 0 {
-		doc.DeletedBy = domainQuestionnaire.DeletedBy
+		po.DeletedBy = domainQuestionnaire.DeletedBy
 	}
 
-	return doc
+	return po
 }
 
-// ToDomain 将MongoDB文档转换为领域模型
-func (m *QuestionnaireMapper) ToDomain(doc *QuestionnaireDocument) *questionnaire.Questionnaire {
+// ToBO 将MongoDB持久化对象转换为业务对象
+func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	// 直接使用存储的 DomainID
 	domain := &questionnaire.Questionnaire{
-		ID:          questionnaire.NewQuestionnaireID(doc.DomainID),
-		Code:        doc.Code,
-		Title:       doc.Title,
-		Description: doc.Description,
-		ImgUrl:      doc.ImgUrl,
-		Version:     doc.Version,
-		Status:      doc.Status,
+		ID:          questionnaire.NewQuestionnaireID(po.DomainID),
+		Code:        po.Code,
+		Title:       po.Title,
+		Description: po.Description,
+		ImgUrl:      po.ImgUrl,
+		Version:     po.Version,
+		Status:      po.Status,
 	}
 
 	// 设置审计字段
-	domain.CreatedAt = doc.CreatedAt
-	domain.UpdatedAt = doc.UpdatedAt
-	if doc.DeletedAt != nil {
-		domain.DeletedAt = *doc.DeletedAt
+	domain.CreatedAt = po.CreatedAt
+	domain.UpdatedAt = po.UpdatedAt
+	if po.DeletedAt != nil {
+		domain.DeletedAt = *po.DeletedAt
 	}
 
-	domain.CreatedBy = doc.CreatedBy
-	domain.UpdatedBy = doc.UpdatedBy
-	domain.DeletedBy = doc.DeletedBy
+	domain.CreatedBy = po.CreatedBy
+	domain.UpdatedBy = po.UpdatedBy
+	domain.DeletedBy = po.DeletedBy
 
 	return domain
 }

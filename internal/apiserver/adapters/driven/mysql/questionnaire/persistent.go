@@ -9,9 +9,9 @@ import (
 	base "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql"
 )
 
-// UserEntity 用户数据库实体
+// QuestionnairePO 问卷持久化对象
 // 对应数据库表结构
-type QuestionnaireEntity struct {
+type QuestionnairePO struct {
 	base.AuditFields
 	Code        string `gorm:"column:code;type:varchar(255)" json:"code"`
 	Title       string `gorm:"column:title;type:varchar(255)" json:"title"`
@@ -22,27 +22,27 @@ type QuestionnaireEntity struct {
 }
 
 // TableName 指定表名
-func (QuestionnaireEntity) TableName() string {
+func (QuestionnairePO) TableName() string {
 	return "questionnaires"
 }
 
 // BeforeCreate 在创建前设置信息
-func (e *QuestionnaireEntity) BeforeCreate(tx *gorm.DB) error {
-	e.ID = idutil.GetIntID()
-	e.CreatedAt = time.Now()
-	e.UpdatedAt = time.Now()
+func (p *QuestionnairePO) BeforeCreate(tx *gorm.DB) error {
+	p.ID = idutil.GetIntID()
+	p.CreatedAt = time.Now()
+	p.UpdatedAt = time.Now()
 
-	e.CreatedBy = 0
-	e.UpdatedBy = 0
-	e.DeletedBy = 0
+	p.CreatedBy = 0
+	p.UpdatedBy = 0
+	p.DeletedBy = 0
 
 	return nil
 }
 
 // BeforeUpdate 在更新前设置信息
-func (e *QuestionnaireEntity) BeforeUpdate(tx *gorm.DB) error {
-	e.UpdatedAt = time.Now()
-	e.UpdatedBy = 0
+func (p *QuestionnairePO) BeforeUpdate(tx *gorm.DB) error {
+	p.UpdatedAt = time.Now()
+	p.UpdatedBy = 0
 
 	return nil
 }
