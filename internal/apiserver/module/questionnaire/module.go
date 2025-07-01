@@ -4,11 +4,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	quesDocInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mongo/questionnaire"
-	quesInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql/questionnaire"
 	quesAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful/questionnaire"
 	quesApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
+	quesDocInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/questionnaire"
+	quesInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"

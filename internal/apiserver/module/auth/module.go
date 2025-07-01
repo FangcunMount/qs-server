@@ -3,22 +3,25 @@ package auth
 import (
 	"gorm.io/gorm"
 
-	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql/user"
 	authApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/auth"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
-// Module 用户模块
+// Module 认证模块
 // 负责组装用户相关的所有组件
 type Module struct {
-	// 应用层
-	Authenticator port.Authenticator
+	// repository 层
+	UserRepo port.UserRepository
+
+	// service 层
+	Authenticator *authApp.Authenticator
 }
 
-// NewModule 创建模块
+// NewModule 创建认证模块
 func NewModule() *Module {
 	return &Module{}
 }
@@ -30,10 +33,11 @@ func (m *Module) Initialize(params ...interface{}) error {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
-	// 构造应用层 - Service
-	m.Authenticator = authApp.NewAuthenticator(
-		userInfra.NewRepository(db),
-	)
+	// 初始化 repository 层
+	m.UserRepo = userInfra.NewRepository(db)
+
+	// 初始化 service 层
+	m.Authenticator = authApp.NewAuthenticator(m.UserRepo)
 
 	return nil
 }

@@ -3,10 +3,10 @@ package user
 import (
 	"gorm.io/gorm"
 
-	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driven/mysql/user"
 	userAdapter "github.com/yshujie/questionnaire-scale/internal/apiserver/adapters/driving/restful/user"
 	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/module"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
