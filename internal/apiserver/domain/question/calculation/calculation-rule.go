@@ -1,4 +1,4 @@
-package vo
+package calculation
 
 // FormulaType 公式类型
 type FormulaType string
@@ -11,24 +11,16 @@ const (
 	FormulaTypeMin   FormulaType = "min"   // 最小值
 )
 
-// CalculationAbility 计算能力
-type CalculationAbility struct {
-	calculationRule *CalculationRule
-}
-
-// GetCalculationRule 获取计算规则
-func (c *CalculationAbility) GetCalculationRule() *CalculationRule {
-	return c.calculationRule
-}
-
-// SetCalculationRule 设置计算规则
-func (c *CalculationAbility) SetCalculationRule(calculationRule *CalculationRule) {
-	c.calculationRule = calculationRule
-}
-
 // CalculationRule 计算规则
 type CalculationRule struct {
 	formula FormulaType
+}
+
+// NewCalculationRule 创建计算规则
+func NewCalculationRule(formula FormulaType) *CalculationRule {
+	return &CalculationRule{
+		formula: formula,
+	}
 }
 
 // GetFormulaType 获取公式类型

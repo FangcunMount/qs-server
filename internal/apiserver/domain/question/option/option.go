@@ -1,10 +1,19 @@
-package vo
+package option
 
 // Option 选项
 type Option struct {
 	code    string
 	content string
 	score   int
+}
+
+// NewOption 创建选项
+func NewOption(code, content string, score int) Option {
+	return Option{
+		code:    code,
+		content: content,
+		score:   score,
+	}
 }
 
 // GetCode 获取选项编码

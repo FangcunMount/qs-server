@@ -1,7 +1,9 @@
 package questionnaire
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/vo"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 )
 
@@ -50,7 +52,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 }
 
 // mapOptions 转换选项
-func (m *QuestionnaireMapper) mapOptions(options []vo.Option) []OptionPO {
+func (m *QuestionnaireMapper) mapOptions(options []option.Option) []OptionPO {
 	if options == nil {
 		return []OptionPO{} // 返回空切片而不是nil
 	}
@@ -67,7 +69,7 @@ func (m *QuestionnaireMapper) mapOptions(options []vo.Option) []OptionPO {
 }
 
 // mapValidationRules 转换校验规则
-func (m *QuestionnaireMapper) mapValidationRules(rules []vo.ValidationRule) []ValidationRulePO {
+func (m *QuestionnaireMapper) mapValidationRules(rules []validation.ValidationRule) []ValidationRulePO {
 	if rules == nil {
 		return []ValidationRulePO{} // 返回空切片而不是nil
 	}
@@ -83,7 +85,7 @@ func (m *QuestionnaireMapper) mapValidationRules(rules []vo.ValidationRule) []Va
 }
 
 // mapCalculationRule 转换计算规则
-func (m *QuestionnaireMapper) mapCalculationRule(rule *vo.CalculationRule) CalculationRulePO {
+func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRule) CalculationRulePO {
 	if rule == nil {
 		return CalculationRulePO{}
 	}

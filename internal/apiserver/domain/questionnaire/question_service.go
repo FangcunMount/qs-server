@@ -2,7 +2,6 @@ package questionnaire
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
-	questionVo "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/vo"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
@@ -36,7 +35,7 @@ func (QuestionService) UpdateQuestion(q *Questionnaire, updated question.Questio
 }
 
 // DeleteQuestion 删除问题
-func (QuestionService) DeleteQuestion(q *Questionnaire, questionCode questionVo.QuestionCode) error {
+func (QuestionService) DeleteQuestion(q *Questionnaire, questionCode question.QuestionCode) error {
 	for i := range q.questions {
 		if q.questions[i].GetCode().Equals(questionCode) {
 			q.questions = append(q.questions[:i], q.questions[i+1:]...)
