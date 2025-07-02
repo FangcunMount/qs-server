@@ -1,6 +1,7 @@
-package question
+package types
 
 import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
@@ -9,13 +10,14 @@ import (
 // BuilderOption 构建器选项函数类型
 type BuilderOption func(*QuestionBuilder)
 
-// QuestionBuilder 问题构建器 - 配置容器
+// QuestionBuilder 问题构建器 - 纯配置容器
+// 职责：收集和管理问题创建所需的所有配置参数
 type QuestionBuilder struct {
 	// 基础信息
-	code         QuestionCode
+	code         question.QuestionCode
 	title        string
 	tips         string
-	questionType QuestionType
+	questionType question.QuestionType
 
 	// 特定属性
 	placeholder string
@@ -24,11 +26,6 @@ type QuestionBuilder struct {
 	// 能力配置
 	validationRules []validation.ValidationRule
 	calculationRule *calculation.CalculationRule
-}
-
-// QuestionFactory 问题工厂接口
-type QuestionFactory interface {
-	CreateFromBuilder(builder *QuestionBuilder) Question
 }
 
 // NewQuestionBuilder 创建新的问题构建器
@@ -44,7 +41,7 @@ func NewQuestionBuilder() *QuestionBuilder {
 // ================================
 
 // WithCode 设置问题编码
-func WithCode(code QuestionCode) BuilderOption {
+func WithCode(code question.QuestionCode) BuilderOption {
 	return func(b *QuestionBuilder) {
 		b.code = code
 	}
@@ -65,7 +62,7 @@ func WithTips(tips string) BuilderOption {
 }
 
 // WithQuestionType 设置问题类型
-func WithQuestionType(questionType QuestionType) BuilderOption {
+func WithQuestionType(questionType question.QuestionType) BuilderOption {
 	return func(b *QuestionBuilder) {
 		b.questionType = questionType
 	}
@@ -148,7 +145,7 @@ func WithMaxValue(value int) BuilderOption {
 // 链式调用方法
 // ================================
 
-func (b *QuestionBuilder) SetCode(code QuestionCode) *QuestionBuilder {
+func (b *QuestionBuilder) SetCode(code question.QuestionCode) *QuestionBuilder {
 	b.code = code
 	return b
 }
@@ -163,7 +160,7 @@ func (b *QuestionBuilder) SetTips(tips string) *QuestionBuilder {
 	return b
 }
 
-func (b *QuestionBuilder) SetQuestionType(questionType QuestionType) *QuestionBuilder {
+func (b *QuestionBuilder) SetQuestionType(questionType question.QuestionType) *QuestionBuilder {
 	b.questionType = questionType
 	return b
 }
@@ -191,10 +188,10 @@ func (b *QuestionBuilder) SetCalculationRule(formula calculation.FormulaType) *Q
 }
 
 // ================================
-// 获取构建的配置信息
+// 配置信息访问方法（只读）
 // ================================
 
-func (b *QuestionBuilder) GetCode() QuestionCode {
+func (b *QuestionBuilder) GetCode() question.QuestionCode {
 	return b.code
 }
 
@@ -206,7 +203,7 @@ func (b *QuestionBuilder) GetTips() string {
 	return b.tips
 }
 
-func (b *QuestionBuilder) GetQuestionType() QuestionType {
+func (b *QuestionBuilder) GetQuestionType() question.QuestionType {
 	return b.questionType
 }
 
@@ -227,11 +224,37 @@ func (b *QuestionBuilder) GetCalculationRule() *calculation.CalculationRule {
 }
 
 // ================================
-// 便捷构建函数
+// 配置验证方法
 // ================================
 
-// BuildQuestionWithOptions 使用函数式选项创建问题构建器
-func BuildQuestionWithOptions(opts ...BuilderOption) *QuestionBuilder {
+// IsValid 验证配置是否有效
+func (b *QuestionBuilder) IsValid() bool {
+	return b.code.Value() != "" && b.title != "" && b.questionType != ""
+}
+
+// GetValidationErrors 获取配置验证错误
+func (b *QuestionBuilder) GetValidationErrors() []string {
+	var errors []string
+
+	if b.code.Value() == "" {
+		errors = append(errors, "问题编码不能为空")
+	}
+	if b.title == "" {
+		errors = append(errors, "问题标题不能为空")
+	}
+	if b.questionType == "" {
+		errors = append(errors, "问题类型不能为空")
+	}
+
+	return errors
+}
+
+// ================================
+// 便捷构建函数（仅创建Builder）
+// ================================
+
+// BuildQuestionConfig 使用函数式选项创建问题构建器
+func BuildQuestionConfig(opts ...BuilderOption) *QuestionBuilder {
 	builder := NewQuestionBuilder()
 	for _, opt := range opts {
 		opt(builder)
@@ -239,47 +262,42 @@ func BuildQuestionWithOptions(opts ...BuilderOption) *QuestionBuilder {
 	return builder
 }
 
-// QuickBuildTextQuestion 快速创建文本问题构建器
-func QuickBuildTextQuestion(code QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
+// QuickConfigTextQuestion 快速配置文本问题
+func QuickConfigTextQuestion(code question.QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
 	allOpts := append([]BuilderOption{
 		WithCode(code),
 		WithTitle(title),
-		WithQuestionType(QuestionTypeText),
+		WithQuestionType(question.QuestionTypeText),
 	}, opts...)
-	return BuildQuestionWithOptions(allOpts...)
+	return BuildQuestionConfig(allOpts...)
 }
 
-// QuickBuildRadioQuestion 快速创建单选问题构建器
-func QuickBuildRadioQuestion(code QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
+// QuickConfigRadioQuestion 快速配置单选问题
+func QuickConfigRadioQuestion(code question.QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
 	allOpts := append([]BuilderOption{
 		WithCode(code),
 		WithTitle(title),
-		WithQuestionType(QuestionTypeRadio),
+		WithQuestionType(question.QuestionTypeRadio),
 	}, opts...)
-	return BuildQuestionWithOptions(allOpts...)
+	return BuildQuestionConfig(allOpts...)
 }
 
-// QuickBuildNumberQuestion 快速创建数字问题构建器
-func QuickBuildNumberQuestion(code QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
+// QuickConfigNumberQuestion 快速配置数字问题
+func QuickConfigNumberQuestion(code question.QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
 	allOpts := append([]BuilderOption{
 		WithCode(code),
 		WithTitle(title),
-		WithQuestionType(QuestionTypeNumber),
+		WithQuestionType(question.QuestionTypeNumber),
 	}, opts...)
-	return BuildQuestionWithOptions(allOpts...)
+	return BuildQuestionConfig(allOpts...)
 }
 
-// QuickBuildCheckboxQuestion 快速创建多选问题构建器
-func QuickBuildCheckboxQuestion(code QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
+// QuickConfigCheckboxQuestion 快速配置多选问题
+func QuickConfigCheckboxQuestion(code question.QuestionCode, title string, opts ...BuilderOption) *QuestionBuilder {
 	allOpts := append([]BuilderOption{
 		WithCode(code),
 		WithTitle(title),
-		WithQuestionType(QuestionTypeCheckbox),
+		WithQuestionType(question.QuestionTypeCheckbox),
 	}, opts...)
-	return BuildQuestionWithOptions(allOpts...)
-}
-
-// Build 通过工厂构建问题对象
-func (b *QuestionBuilder) Build(factory QuestionFactory) Question {
-	return factory.CreateFromBuilder(b)
+	return BuildQuestionConfig(allOpts...)
 }
