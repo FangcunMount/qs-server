@@ -5,6 +5,8 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
+	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 // Editor 问卷编辑器
@@ -33,8 +35,25 @@ func (e *Editor) EditBasicInfo(
 		return nil, err
 	}
 
-	// 2. 更新基本信息
-	qBo.ChangeBasicInfo(title, description, imgUrl)
+	// 2. 判断问卷状态
+	if qBo.IsArchived() {
+		return nil, errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能编辑")
+	}
+
+	// 已发布的问卷，Copy 一份新的，旧版本归档
+	if qBo.IsPublished() {
+		// 归档旧版本
+		questionnaire.VersionService{}.Archive(qBo)
+
+		// 创建新版本
+		qBo = questionnaire.VersionService{}.Clone(qBo)
+	}
+
+	// 3. 更新基本信息
+	service := questionnaire.BaseInfoService{}
+	service.UpdateTitle(qBo, title)
+	service.UpdateDescription(qBo, description)
+	// service.UpdateCoverImage(qBo, imgUrl)
 
 	// 3. 保存到数据库
 	if err := e.qRepoMySQL.Save(ctx, qBo); err != nil {

@@ -49,4 +49,10 @@ const (
 
 	// ErrQuestionnaireQuestionBasicInfoInvalid - 400: Questionnaire question basic info is invalid.
 	ErrQuestionnaireQuestionBasicInfoInvalid
+
+	// ErrQuestionnairePublished - 400: Questionnaire is published, can't edit.
+	ErrQuestionnairePublished
+
+	// ErrQuestionnaireArchived - 400: Questionnaire is archived, can't edit.
+	ErrQuestionnaireArchived
 )

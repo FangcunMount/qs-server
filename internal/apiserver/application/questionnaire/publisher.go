@@ -33,7 +33,7 @@ func (p *Publisher) Publish(
 	}
 
 	// 2. 更新状态为已发布
-	qBo.Publish()
+	questionnaire.VersionService{}.Publish(qBo)
 
 	// 3. 保存到数据库
 	if err := p.qRepoMySQL.Save(ctx, qBo); err != nil {
@@ -60,7 +60,7 @@ func (p *Publisher) Unpublish(
 	}
 
 	// 2. 更新状态为草稿
-	qBo.Unpublish()
+	questionnaire.VersionService{}.Archive(qBo)
 
 	// 3. 保存到数据库
 	if err := p.qRepoMySQL.Save(ctx, qBo); err != nil {

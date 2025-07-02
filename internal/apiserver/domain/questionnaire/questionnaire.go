@@ -1,8 +1,6 @@
 package questionnaire
 
 import (
-	"slices"
-
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 )
 
@@ -117,35 +115,12 @@ func (q *Questionnaire) GetQuestions() []question.Question {
 	return q.questions
 }
 
-// ChangeBasicInfo 修改问卷基本信息
-func (q *Questionnaire) ChangeBasicInfo(title, description, imgUrl string) {
-	q.title = title
-	q.description = description
-	q.imgUrl = imgUrl
+// IsPublished 判断问卷是否已发布
+func (q *Questionnaire) IsPublished() bool {
+	return q.status == STATUS_PUBLISHED
 }
 
-// Publish 发布问卷
-func (q *Questionnaire) Publish() {
-	q.status = STATUS_PUBLISHED
-	q.version = q.version.Increment()
-}
-
-// Unpublish 下架问卷
-func (q *Questionnaire) Unpublish() {
-	q.status = STATUS_DRAFT
-}
-
-// AddQuestion 添加问题
-func (q *Questionnaire) AddQuestion(question question.Question) {
-	q.questions = append(q.questions, question)
-}
-
-// RemoveQuestion 删除问题
-func (q *Questionnaire) RemoveQuestion(question question.Question) {
-	for i, theQuestion := range q.questions {
-		if theQuestion.GetCode() == question.GetCode() {
-			q.questions = slices.Delete(q.questions, i, i+1)
-			break
-		}
-	}
+// IsArchived 判断问卷是否已归档
+func (q *Questionnaire) IsArchived() bool {
+	return q.status == STATUS_ARCHIVED
 }
