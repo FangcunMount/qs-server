@@ -26,6 +26,11 @@ func (q *TextQuestion) GetPlaceholder() string {
 	return q.placeholder
 }
 
+// GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
+func (q *TextQuestion) GetValidationRules() []vo.ValidationRule {
+	return q.ValidationAbility.GetValidationRules()
+}
+
 func (q *TextQuestion) SetPlaceholder(placeholder string) {
 	q.placeholder = placeholder
 }

@@ -9,40 +9,42 @@ import (
 
 // Editor 问卷编辑器
 type Editor struct {
-	quesRepo port.QuestionnaireRepository
-	quesDoc  port.QuestionnaireDocument
+	qRepoMySQL port.QuestionnaireRepositoryMySQL
+	qRepoMongo port.QuestionnaireRepositoryMongo
 }
 
 // NewEditor 创建问卷编辑器
 func NewEditor(
-	quesRepo port.QuestionnaireRepository,
-	quesDoc port.QuestionnaireDocument,
+	qRepoMySQL port.QuestionnaireRepositoryMySQL,
+	qRepoMongo port.QuestionnaireRepositoryMongo,
 ) *Editor {
-	return &Editor{quesRepo: quesRepo, quesDoc: quesDoc}
+	return &Editor{qRepoMySQL: qRepoMySQL, qRepoMongo: qRepoMongo}
 }
 
 // EditBasicInfo 编辑问卷基本信息
-func (e *Editor) EditBasicInfo(ctx context.Context, id uint64, title, imgUrl string, version uint8) (*questionnaire.Questionnaire, error) {
+func (e *Editor) EditBasicInfo(
+	ctx context.Context,
+	code questionnaire.QuestionnaireCode,
+	title, description, imgUrl string,
+) (*questionnaire.Questionnaire, error) {
 	// 1. 获取现有问卷
-	ques, err := e.quesRepo.FindByID(ctx, id)
+	qBo, err := e.qRepoMySQL.FindByCode(ctx, code.Value())
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. 更新基本信息
-	ques.Title = title
-	ques.ImgUrl = imgUrl
-	ques.Version = version
+	qBo.ChangeBasicInfo(title, description, imgUrl)
 
 	// 3. 保存到数据库
-	if err := e.quesRepo.Save(ctx, ques); err != nil {
+	if err := e.qRepoMySQL.Save(ctx, qBo); err != nil {
 		return nil, err
 	}
 
 	// 4. 同步到文档数据库
-	if err := e.quesDoc.Save(ctx, ques); err != nil {
+	if err := e.qRepoMongo.Save(ctx, qBo); err != nil {
 		return nil, err
 	}
 
-	return ques, nil
+	return qBo, nil
 }

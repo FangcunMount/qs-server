@@ -1,14 +1,14 @@
 package handler
 
 import (
-	"time"
-
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
 )
 
+// QuestionnaireHandler 问卷处理器
 type QuestionnaireHandler struct {
 	BaseHandler
 	questionnaireCreator   port.QuestionnaireCreator
@@ -17,6 +17,7 @@ type QuestionnaireHandler struct {
 	questionnaireQueryer   port.QuestionnaireQueryer
 }
 
+// NewQuestionnaireHandler 创建问卷处理器
 func NewQuestionnaireHandler(
 	questionnaireCreator port.QuestionnaireCreator,
 	questionnaireEditor port.QuestionnaireEditor,
@@ -33,7 +34,7 @@ func NewQuestionnaireHandler(
 
 // CreateQuestionnaire 创建问卷
 func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
-	var req dto.QuestionnaireCreateRequest
+	var req dto.CreateQuestionnaireRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -44,54 +45,54 @@ func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
 	}
 
 	// 调用领域服务
-	questionnaire, err := h.questionnaireCreator.CreateQuestionnaire(c, req.Title, req.Description, req.ImgUrl)
+	q, err := h.questionnaireCreator.CreateQuestionnaire(c, req.Title, req.Description, req.ImgUrl)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireResponse{
-		ID:          questionnaire.ID.Value(),
-		Code:        questionnaire.Code,
-		Title:       questionnaire.Title,
-		Description: questionnaire.Description,
-		ImgUrl:      questionnaire.ImgUrl,
-		Version:     questionnaire.Version,
-		Status:      questionnaire.Status,
-		CreatedAt:   questionnaire.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   questionnaire.UpdatedAt.Format(time.RFC3339),
+	response := &dto.QuestionnaireBasicInfoResponse{
+		Code:        q.GetCode().Value(),
+		Title:       q.GetTitle(),
+		Description: q.GetDescription(),
+		ImgUrl:      q.GetImgUrl(),
+		Version:     q.GetVersion().Value(),
+		Status:      q.GetStatus().Value(),
 	}
 
 	h.SuccessResponse(c, response)
 }
 
 // EditQuestionnaire 编辑问卷
-func (h *QuestionnaireHandler) EditQuestionnaire(c *gin.Context) {
-	var req dto.QuestionnaireEditRequest
+func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
+	var req dto.EditQuestionnaireBasicInfoRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 调用领域服务
-	questionnaire, err := h.questionnaireEditor.EditBasicInfo(c, req.ID, req.Title, req.ImgUrl, req.Version)
+	q, err := h.questionnaireEditor.EditBasicInfo(
+		c,
+		questionnaire.NewQuestionnaireCode(req.Code),
+		req.Title,
+		req.Description,
+		req.ImgUrl,
+	)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireResponse{
-		ID:          questionnaire.ID.Value(),
-		Code:        questionnaire.Code,
-		Title:       questionnaire.Title,
-		Description: questionnaire.Description,
-		ImgUrl:      questionnaire.ImgUrl,
-		Version:     questionnaire.Version,
-		Status:      questionnaire.Status,
-		CreatedAt:   questionnaire.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   questionnaire.UpdatedAt.Format(time.RFC3339),
+	response := &dto.QuestionnaireBasicInfoResponse{
+		Code:        q.GetCode().Value(),
+		Title:       q.GetTitle(),
+		Description: q.GetDescription(),
+		ImgUrl:      q.GetImgUrl(),
+		Version:     q.GetVersion().Value(),
+		Status:      q.GetStatus().Value(),
 	}
 
 	h.SuccessResponse(c, response)
@@ -99,30 +100,27 @@ func (h *QuestionnaireHandler) EditQuestionnaire(c *gin.Context) {
 
 // PublishQuestionnaire 发布问卷
 func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
-	var req dto.QuestionnairePublishRequest
+	var req dto.PublishQuestionnaireRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 调用领域服务
-	questionnaire, err := h.questionnairePublisher.PublishQuestionnaire(c, req.ID)
+	q, err := h.questionnairePublisher.Publish(c, questionnaire.NewQuestionnaireCode(req.Code))
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireResponse{
-		ID:          questionnaire.ID.Value(),
-		Code:        questionnaire.Code,
-		Title:       questionnaire.Title,
-		Description: questionnaire.Description,
-		ImgUrl:      questionnaire.ImgUrl,
-		Version:     questionnaire.Version,
-		Status:      questionnaire.Status,
-		CreatedAt:   questionnaire.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   questionnaire.UpdatedAt.Format(time.RFC3339),
+	response := &dto.QuestionnaireBasicInfoResponse{
+		Code:        q.GetCode().Value(),
+		Title:       q.GetTitle(),
+		Description: q.GetDescription(),
+		ImgUrl:      q.GetImgUrl(),
+		Version:     q.GetVersion().Value(),
+		Status:      q.GetStatus().Value(),
 	}
 
 	h.SuccessResponse(c, response)
@@ -130,62 +128,64 @@ func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
 
 // UnpublishQuestionnaire 下架问卷
 func (h *QuestionnaireHandler) UnpublishQuestionnaire(c *gin.Context) {
-	var req dto.QuestionnaireUnpublishRequest
+	var req dto.UnpublishQuestionnaireRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 调用领域服务
-	questionnaire, err := h.questionnairePublisher.UnpublishQuestionnaire(c, req.ID)
+	q, err := h.questionnairePublisher.Unpublish(c, questionnaire.NewQuestionnaireCode(req.Code))
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireResponse{
-		ID:          questionnaire.ID.Value(),
-		Code:        questionnaire.Code,
-		Title:       questionnaire.Title,
-		Description: questionnaire.Description,
-		ImgUrl:      questionnaire.ImgUrl,
-		Version:     questionnaire.Version,
-		Status:      questionnaire.Status,
-		CreatedAt:   questionnaire.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   questionnaire.UpdatedAt.Format(time.RFC3339),
+	response := &dto.QuestionnaireBasicInfoResponse{
+		Code:        q.GetCode().Value(),
+		Title:       q.GetTitle(),
+		Description: q.GetDescription(),
+		ImgUrl:      q.GetImgUrl(),
+		Version:     q.GetVersion().Value(),
+		Status:      q.GetStatus().Value(),
 	}
 
 	h.SuccessResponse(c, response)
 }
 
 // GetQuestionnaire 获取问卷
-func (h *QuestionnaireHandler) GetQuestionnaire(c *gin.Context) {
-	var req dto.QuestionnaireIDRequest
+func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
+	var req dto.QueryQuestionnaireRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 调用领域服务
-	questionnaire, err := h.questionnaireQueryer.GetQuestionnaire(c, req.ID)
+	q, err := h.questionnaireQueryer.GetQuestionnaireByCode(c, req.Code)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireResponse{
-		ID:          questionnaire.ID.Value(),
-		Code:        questionnaire.Code,
-		Title:       questionnaire.Title,
-		Description: questionnaire.Description,
-		ImgUrl:      questionnaire.ImgUrl,
-		Version:     questionnaire.Version,
-		Status:      questionnaire.Status,
-		CreatedAt:   questionnaire.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   questionnaire.UpdatedAt.Format(time.RFC3339),
+	response := &dto.QuestionnaireBasicInfoResponse{
+		Code:        q.GetCode().Value(),
+		Title:       q.GetTitle(),
+		Description: q.GetDescription(),
+		ImgUrl:      q.GetImgUrl(),
+		Version:     q.GetVersion().Value(),
+		Status:      q.GetStatus().Value(),
 	}
 
 	h.SuccessResponse(c, response)
+}
+
+func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
+	var req dto.QueryQuestionnaireListRequest
+	if err := h.BindQuery(c, &req); err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
 }

@@ -27,6 +27,16 @@ func (q *RadioQuestion) GetOptions() []vo.Option {
 	return q.options
 }
 
+// GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
+func (q *RadioQuestion) GetValidationRules() []vo.ValidationRule {
+	return q.ValidationAbility.GetValidationRules()
+}
+
+// GetCalculationRule 获取计算规则 - 重写BaseQuestion的默认实现
+func (q *RadioQuestion) GetCalculationRule() *vo.CalculationRule {
+	return q.CalculationAbility.GetCalculationRule()
+}
+
 // SetOptions 设置选项
 func (q *RadioQuestion) SetOptions(options []vo.Option) {
 	q.options = options

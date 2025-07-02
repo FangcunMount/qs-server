@@ -17,8 +17,8 @@ type QuestionnairePO struct {
 	Title       string `gorm:"column:title;type:varchar(255)" json:"title"`
 	Description string `gorm:"column:description;type:varchar(255)" json:"description"`
 	ImgUrl      string `gorm:"column:img_url;type:varchar(255)" json:"img_url"`
-	Version     uint8  `gorm:"column:version;type:tinyint;default:0" json:"version"`
-	Status      uint8  `gorm:"column:status;type:tinyint;default:0" json:"status"`
+	Version     string `gorm:"column:version;type:varchar(255);" json:"version"`
+	Status      uint8  `gorm:"column:status;type:tinyint;" json:"status"`
 }
 
 // TableName 指定表名

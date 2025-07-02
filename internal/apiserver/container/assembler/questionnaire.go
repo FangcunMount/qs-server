@@ -16,8 +16,8 @@ import (
 // Module 问卷模块
 type QuestionnaireModule struct {
 	// repository 层
-	QuesRepo port.QuestionnaireRepository
-	QuesDoc  port.QuestionnaireDocument
+	QuesRepo port.QuestionnaireRepositoryMySQL
+	QuesDoc  port.QuestionnaireRepositoryMongo
 
 	// handler 层
 	QuesHandler *handler.QuestionnaireHandler
@@ -47,11 +47,7 @@ func (m *QuestionnaireModule) Initialize(params ...interface{}) error {
 
 	// 安全的类型断言
 	mongoRepo := quesDocInfra.NewRepository(mongoDB)
-	if docRepo, ok := mongoRepo.(port.QuestionnaireDocument); ok {
-		m.QuesDoc = docRepo
-	} else {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB repository does not implement QuestionnaireDocument interface")
-	}
+	m.QuesDoc = mongoRepo
 
 	// 初始化 service 层
 	m.QuesCreator = quesApp.NewCreator(m.QuesRepo, m.QuesDoc)

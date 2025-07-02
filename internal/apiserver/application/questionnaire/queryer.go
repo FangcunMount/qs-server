@@ -9,26 +9,26 @@ import (
 
 // Queryer 问卷查询器
 type Queryer struct {
-	quesRepo port.QuestionnaireRepository
-	quesDoc  port.QuestionnaireDocument
+	qRepoMySQL port.QuestionnaireRepositoryMySQL
+	qRepoMongo port.QuestionnaireRepositoryMongo
 }
 
 // NewQueryer 创建问卷查询器
 func NewQueryer(
-	quesRepo port.QuestionnaireRepository,
-	quesDoc port.QuestionnaireDocument,
+	qRepoMySQL port.QuestionnaireRepositoryMySQL,
+	qRepoMongo port.QuestionnaireRepositoryMongo,
 ) *Queryer {
-	return &Queryer{quesRepo: quesRepo, quesDoc: quesDoc}
+	return &Queryer{qRepoMySQL: qRepoMySQL, qRepoMongo: qRepoMongo}
 }
 
 // GetQuestionnaire 根据ID获取问卷
 func (q *Queryer) GetQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error) {
-	return q.quesRepo.FindByID(ctx, id)
+	return q.qRepoMySQL.FindByID(ctx, id)
 }
 
 // GetQuestionnaireByCode 根据编码获取问卷
 func (q *Queryer) GetQuestionnaireByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
-	return q.quesRepo.FindByCode(ctx, code)
+	return q.qRepoMySQL.FindByCode(ctx, code)
 }
 
 // ListQuestionnaires 获取问卷列表

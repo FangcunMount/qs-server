@@ -115,6 +115,8 @@ github.com/marmotedu/component-base v1.6.2 h1:UtQkG0ZmAbVHVUdky5Sw68QLJno5ARSqsl
 github.com/marmotedu/component-base v1.6.2/go.mod h1:rvpc1f0WN4iEUMN4pzU/nBOEEym0Yj2hQFA+mQxTRt4=
 github.com/marmotedu/errors v1.0.2 h1:qx9GtOljmAL+wLuemahe3WSWdXyEpJvLBlpXK8y2rdI=
 github.com/marmotedu/errors v1.0.2/go.mod h1:xNqbJJRD50/RGSjbfqF01CTLegWK+gtRgeJ6ExVzQQ8=
+github.com/mattheath/base62 v0.0.0-20150408093626-b80cdc656a7a h1:rnrxZue85aKdMU4nJ50GgKA31lCaVbft+7Xl8OXj55U=
+github.com/mattheath/base62 v0.0.0-20150408093626-b80cdc656a7a/go.mod h1:hJJYoBMTZIONmUEpX3+9v2057zuRM0n3n77U4Ob4wE4=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-colorable v0.1.13/go.mod h1:7S9/ev0klgBDR4GtXTXX8a3vIGJpMovkB8vQcUbaXHg=
 github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=

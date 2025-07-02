@@ -44,18 +44,12 @@ func (v *ValidationAbility) ClearValidationRules() {
 // ValidationRule 校验规则接口
 type ValidationRule struct {
 	ruleType    RuleType
-	ruleName    string
 	targetValue string
 }
 
 // GetRuleType 获取规则类型
 func (r *ValidationRule) GetRuleType() RuleType {
 	return r.ruleType
-}
-
-// GetRuleName 获取规则名称
-func (r *ValidationRule) GetRuleName() string {
-	return r.ruleName
 }
 
 // GetTargetValue 获取目标值

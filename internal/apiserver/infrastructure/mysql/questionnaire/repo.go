@@ -17,7 +17,7 @@ type Repository struct {
 }
 
 // NewRepository 创建问卷存储库
-func NewRepository(db *gorm.DB) port.QuestionnaireRepository {
+func NewRepository(db *gorm.DB) port.QuestionnaireRepositoryMySQL {
 	return &Repository{
 		BaseRepository: mysql.NewBaseRepository[*QuestionnairePO](db),
 		mapper:         NewQuestionnaireMapper(),
@@ -29,12 +29,6 @@ func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionna
 	po := r.mapper.ToPO(qDomain)
 	return r.UpdateAndSync(ctx, po, func(qPO *QuestionnairePO) {
 		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
-		qDomain.SetCreatedAt(qPO.CreatedAt)
-		qDomain.SetUpdatedAt(qPO.UpdatedAt)
-		qDomain.SetCreatedBy(qPO.CreatedBy)
-		qDomain.SetUpdatedBy(qPO.UpdatedBy)
-		qDomain.SetDeletedBy(qPO.DeletedBy)
-		qDomain.SetDeletedAt(qPO.DeletedAt)
 	})
 }
 
@@ -42,12 +36,6 @@ func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionna
 func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	return r.BaseRepository.UpdateAndSync(ctx, r.mapper.ToPO(qDomain), func(qPO *QuestionnairePO) {
 		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
-		qDomain.SetCreatedAt(qPO.CreatedAt)
-		qDomain.SetUpdatedAt(qPO.UpdatedAt)
-		qDomain.SetCreatedBy(qPO.CreatedBy)
-		qDomain.SetUpdatedBy(qPO.UpdatedBy)
-		qDomain.SetDeletedBy(qPO.DeletedBy)
-		qDomain.SetDeletedAt(qPO.DeletedAt)
 	})
 }
 

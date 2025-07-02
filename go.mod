@@ -85,6 +85,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/marmotedu/component-base v1.6.2
 	github.com/marmotedu/errors v1.0.2
+	github.com/mattheath/base62 v0.0.0-20150408093626-b80cdc656a7a
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/sony/sonyflake v1.2.1

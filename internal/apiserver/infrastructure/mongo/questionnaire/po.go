@@ -12,13 +12,13 @@ import (
 // 对应MongoDB集合结构
 type QuestionnairePO struct {
 	base.BaseDocument `bson:",inline"`
-	DomainID          uint64 `bson:"domain_id" json:"domain_id"` // 领域模型ID
-	Code              string `bson:"code" json:"code"`
-	Title             string `bson:"title" json:"title"`
-	Description       string `bson:"description,omitempty" json:"description,omitempty"`
-	ImgUrl            string `bson:"img_url,omitempty" json:"img_url,omitempty"`
-	Version           uint8  `bson:"version" json:"version"`
-	Status            uint8  `bson:"status" json:"status"`
+	Code              string       `bson:"code" json:"code"`
+	Title             string       `bson:"title" json:"title"`
+	Description       string       `bson:"description,omitempty" json:"description,omitempty"`
+	ImgUrl            string       `bson:"img_url,omitempty" json:"img_url,omitempty"`
+	Version           string       `bson:"version" json:"version"`
+	Status            uint8        `bson:"status" json:"status"`
+	Questions         []QuestionPO `bson:"questions" json:"questions"`
 }
 
 // CollectionName 集合名称
@@ -46,4 +46,34 @@ func (p *QuestionnairePO) BeforeInsert() {
 func (p *QuestionnairePO) BeforeUpdate() {
 	p.UpdatedAt = time.Now()
 	// UpdatedBy 应该从上下文中获取当前用户ID
+}
+
+// QuestionPO 问题
+type QuestionPO struct {
+	Code            string             `bson:"code" json:"code"`
+	Title           string             `bson:"title" json:"title"`
+	QuestionType    string             `bson:"question_type" json:"question_type"`
+	Tip             string             `bson:"tip" json:"tip"`
+	Placeholder     string             `bson:"placeholder" json:"placeholder"`
+	Options         []OptionPO         `bson:"options" json:"options"`
+	ValidationRules []ValidationRulePO `bson:"validation_rules" json:"validation_rules"`
+	CalculationRule CalculationRulePO  `bson:"calculation_rule" json:"calculation_rule"`
+}
+
+// OptionPO 选项
+type OptionPO struct {
+	Code    string `bson:"code" json:"code"`
+	Content string `bson:"content" json:"content"`
+	Score   int    `bson:"score" json:"score"`
+}
+
+// ValidationRulePO 校验规则
+type ValidationRulePO struct {
+	RuleType    string `bson:"rule_type" json:"rule_type"`
+	TargetValue string `bson:"target_value" json:"target_value"`
+}
+
+// CalculationRulePO 计算规则
+type CalculationRulePO struct {
+	Formula string `bson:"formula" json:"formula"`
 }

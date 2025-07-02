@@ -17,10 +17,10 @@ type QuestionnaireQueryer interface {
 }
 
 type QuestionnaireEditor interface {
-	EditBasicInfo(ctx context.Context, id uint64, title, imgUrl string, version uint8) (*questionnaire.Questionnaire, error)
+	EditBasicInfo(ctx context.Context, code questionnaire.QuestionnaireCode, title, description, imgUrl string) (*questionnaire.Questionnaire, error)
 }
 
 type QuestionnairePublisher interface {
-	PublishQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
-	UnpublishQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
+	Publish(ctx context.Context, code questionnaire.QuestionnaireCode) (*questionnaire.Questionnaire, error)
+	Unpublish(ctx context.Context, code questionnaire.QuestionnaireCode) (*questionnaire.Questionnaire, error)
 }

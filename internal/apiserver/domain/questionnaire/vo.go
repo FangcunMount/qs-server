@@ -1,5 +1,7 @@
 package questionnaire
 
+import "strconv"
+
 // QuestionnaireID 问卷唯一标识
 type QuestionnaireID struct {
 	value uint64
@@ -16,34 +18,34 @@ func (id QuestionnaireID) Value() uint64 {
 }
 
 // Code 问卷编码
-type Code string
+type QuestionnaireCode string
 
 // NewCode 创建问卷编码
-func NewCode(value string) Code {
-	return Code(value)
+func NewQuestionnaireCode(value string) QuestionnaireCode {
+	return QuestionnaireCode(value)
 }
 
 // Value 获取编码值
-func (c Code) Value() string {
+func (c QuestionnaireCode) Value() string {
 	return string(c)
 }
 
 // Status 问卷状态
-type Status uint8
+type QuestionnaireStatus uint8
 
 const (
-	STATUS_DRAFT     Status = 0 // 草稿
-	STATUS_PUBLISHED Status = 1 // 已发布
-	STATUS_ARCHIVED  Status = 2 // 已归档
+	STATUS_DRAFT     QuestionnaireStatus = 0 // 草稿
+	STATUS_PUBLISHED QuestionnaireStatus = 1 // 已发布
+	STATUS_ARCHIVED  QuestionnaireStatus = 2 // 已归档
 )
 
 // Value 获取状态值
-func (s Status) Value() uint8 {
+func (s QuestionnaireStatus) Value() uint8 {
 	return uint8(s)
 }
 
 // String 获取状态字符串
-func (s Status) String() string {
+func (s QuestionnaireStatus) String() string {
 	switch s {
 	case STATUS_DRAFT:
 		return "draft"
@@ -54,4 +56,26 @@ func (s Status) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+// QuestionnaireVersion 问卷版本
+type QuestionnaireVersion string
+
+// NewQuestionnaireVersion 创建问卷版本
+func NewQuestionnaireVersion(value string) QuestionnaireVersion {
+	return QuestionnaireVersion(value)
+}
+
+// Value 获取版本值
+func (v QuestionnaireVersion) Value() string {
+	return string(v)
+}
+
+// Increment 增加版本号
+func (v QuestionnaireVersion) Increment() QuestionnaireVersion {
+	version, err := strconv.Atoi(v.Value())
+	if err != nil {
+		return v
+	}
+	return QuestionnaireVersion(strconv.Itoa(version + 1))
 }

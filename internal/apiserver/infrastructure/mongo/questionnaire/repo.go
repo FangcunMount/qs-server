@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
@@ -20,7 +19,7 @@ type Repository struct {
 }
 
 // NewRepository 创建问卷MongoDB存储库
-func NewRepository(db *mongo.Database) port.QuestionnaireRepository {
+func NewRepository(db *mongo.Database) port.QuestionnaireRepositoryMongo {
 	po := &QuestionnairePO{}
 	return &Repository{
 		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),
@@ -33,40 +32,12 @@ func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionna
 	po := r.mapper.ToPO(qDomain)
 	po.BeforeInsert()
 
-	result, err := r.InsertOne(ctx, po)
+	_, err := r.InsertOne(ctx, po)
 	if err != nil {
 		return err
 	}
 
-	// 同步生成的ID和时间戳回领域对象
-	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		domainID := r.mapper.Uint64FromObjectID(oid)
-		qDomain.SetID(questionnaire.NewQuestionnaireID(domainID))
-	}
-
-	qDomain.SetCreatedAt(po.CreatedAt)
-	qDomain.SetUpdatedAt(po.UpdatedAt)
-	qDomain.SetCreatedBy(po.CreatedBy)
-	qDomain.SetUpdatedBy(po.UpdatedBy)
-
 	return nil
-}
-
-// FindByID 根据ID查询问卷
-func (r *Repository) FindByID(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error) {
-	// 方法1: 根据自定义字段查询（如果你在文档中存储了uint64 ID）
-	filter := bson.M{"domain_id": id} // 假设你在文档中添加了domain_id字段
-
-	var po QuestionnairePO
-	err := r.FindOne(ctx, filter, &po)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, nil // 或者返回自定义的NotFound错误
-		}
-		return nil, err
-	}
-
-	return r.mapper.ToBO(&po), nil
 }
 
 // FindByCode 根据编码查询问卷
@@ -94,7 +65,7 @@ func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Question
 	po.BeforeUpdate()
 
 	// 根据领域ID查找文档
-	filter := bson.M{"domain_id": qDomain.ID.Value()}
+	filter := bson.M{"code": qDomain.GetCode().Value()}
 
 	update := bson.M{
 		"$set": bson.M{
@@ -117,16 +88,12 @@ func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Question
 		return mongo.ErrNoDocuments // 或者返回自定义的NotFound错误
 	}
 
-	// 同步更新时间回领域对象
-	qDomain.SetUpdatedAt(po.UpdatedAt)
-	qDomain.SetUpdatedBy(po.UpdatedBy)
-
 	return nil
 }
 
 // Remove 删除问卷（软删除）
-func (r *Repository) Remove(ctx context.Context, id uint64) error {
-	filter := bson.M{"domain_id": id}
+func (r *Repository) Remove(ctx context.Context, code string) error {
+	filter := bson.M{"code": code}
 
 	now := time.Now()
 	update := bson.M{
@@ -150,8 +117,8 @@ func (r *Repository) Remove(ctx context.Context, id uint64) error {
 }
 
 // HardDelete 物理删除问卷
-func (r *Repository) HardDelete(ctx context.Context, id uint64) error {
-	filter := bson.M{"domain_id": id}
+func (r *Repository) HardDelete(ctx context.Context, code string) error {
+	filter := bson.M{"code": code}
 
 	result, err := r.DeleteOne(ctx, filter)
 	if err != nil {
