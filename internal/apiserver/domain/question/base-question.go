@@ -5,7 +5,7 @@ import "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questio
 // Question 问题接口 - 统一所有题型的方法签名
 type Question interface {
 	// 基础方法
-	GetCode() string
+	GetCode() vo.QuestionCode
 	GetTitle() string
 	GetType() QuestionType
 	GetTips() string
@@ -22,14 +22,14 @@ type Question interface {
 
 // BaseQuestion 基础问题
 type BaseQuestion struct {
-	code         string
+	code         vo.QuestionCode
 	title        string
 	questionType QuestionType
 	tips         string
 }
 
 // GetCode 获取问题编码
-func (q *BaseQuestion) GetCode() string {
+func (q *BaseQuestion) GetCode() vo.QuestionCode {
 	return q.code
 }
 
@@ -63,10 +63,6 @@ func (q *BaseQuestion) GetValidationRules() []vo.ValidationRule {
 
 func (q *BaseQuestion) GetCalculationRule() *vo.CalculationRule {
 	return nil
-}
-
-func (q *BaseQuestion) SetCode(code string) {
-	q.code = code
 }
 
 // SetTitle 设置问题标题

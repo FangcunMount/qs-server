@@ -11,7 +11,7 @@ type NumberQuestion struct {
 }
 
 // NewNumberQuestion 创建数字问题
-func NewNumberQuestion(code, title string) *NumberQuestion {
+func NewNumberQuestion(code vo.QuestionCode, title string) *NumberQuestion {
 	return &NumberQuestion{
 		BaseQuestion: BaseQuestion{
 			code:         code,

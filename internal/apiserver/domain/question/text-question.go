@@ -11,7 +11,7 @@ type TextQuestion struct {
 }
 
 // NewTextQuestion 创建文本问题
-func NewTextQuestion(code, title string) *TextQuestion {
+func NewTextQuestion(code vo.QuestionCode, title string) *TextQuestion {
 	return &TextQuestion{
 		BaseQuestion: BaseQuestion{
 			code:         code,

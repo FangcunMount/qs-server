@@ -12,7 +12,7 @@ type RadioQuestion struct {
 }
 
 // NewRadioQuestion 创建单选问题
-func NewRadioQuestion(code, title string) *RadioQuestion {
+func NewRadioQuestion(code vo.QuestionCode, title string) *RadioQuestion {
 	return &RadioQuestion{
 		BaseQuestion: BaseQuestion{
 			code:         code,

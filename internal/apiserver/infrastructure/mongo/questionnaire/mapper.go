@@ -26,7 +26,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 
 	for _, questionBO := range bo.GetQuestions() {
 		questionPO := QuestionPO{
-			Code:            questionBO.GetCode(),
+			Code:            questionBO.GetCode().Value(),
 			Title:           questionBO.GetTitle(),
 			QuestionType:    string(questionBO.GetType()),
 			Tip:             questionBO.GetTips(),
