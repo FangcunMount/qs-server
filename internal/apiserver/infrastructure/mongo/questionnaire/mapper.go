@@ -99,18 +99,15 @@ func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRu
 // ToBO 将MongoDB持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	// 创建问卷对象
-	q := questionnaire.NewQuestionnaire(questionnaire.NewQuestionnaireCode(po.Code), po.Title)
-
-	// 设置基础信息
-	q.SetTitle(po.Title)
-	q.SetDescription(po.Description)
-	q.SetImgUrl(po.ImgUrl)
-	q.SetVersion(questionnaire.NewQuestionnaireVersion(po.Version))
-	q.SetStatus(questionnaire.QuestionnaireStatus(po.Status))
-
-	// 添加问题
-	questions := m.mapQuestions(po.Questions)
-	q.SetQuestions(questions)
+	q := questionnaire.NewQuestionnaire(
+		questionnaire.NewQuestionnaireCode(po.Code),
+		po.Title,
+		questionnaire.WithDescription(po.Description),
+		questionnaire.WithImgUrl(po.ImgUrl),
+		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),
+		questionnaire.WithStatus(questionnaire.QuestionnaireStatus(po.Status)),
+		questionnaire.WithQuestions(m.mapQuestions(po.Questions)),
+	)
 
 	return q
 }

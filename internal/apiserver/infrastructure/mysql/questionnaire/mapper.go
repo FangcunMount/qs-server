@@ -27,12 +27,15 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 
 // ToBO 将持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
-	qBO := questionnaire.NewQuestionnaire(questionnaire.NewQuestionnaireCode(po.Code), po.Title)
-	qBO.SetID(questionnaire.NewQuestionnaireID(po.ID))
-	qBO.SetDescription(po.Description)
-	qBO.SetImgUrl(po.ImgUrl)
-	qBO.SetVersion(questionnaire.NewQuestionnaireVersion(po.Version))
-	qBO.SetStatus(questionnaire.QuestionnaireStatus(po.Status))
+	qBO := questionnaire.NewQuestionnaire(
+		questionnaire.NewQuestionnaireCode(po.Code),
+		po.Title,
+		questionnaire.WithDescription(po.Description),
+		questionnaire.WithImgUrl(po.ImgUrl),
+		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),
+		questionnaire.WithStatus(questionnaire.QuestionnaireStatus(po.Status)),
+	)
+
 	return qBO
 }
 

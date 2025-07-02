@@ -5,7 +5,6 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/service"
 	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
@@ -41,21 +40,10 @@ func (e *Editor) EditBasicInfo(
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能编辑")
 	}
 
-	// 已发布的问卷，Copy 一份新的，旧版本归档
-	if qBo.IsPublished() {
-		// 归档旧版本
-		service := service.VersionService{}
-		service.Archive(qBo)
-
-		// 创建新版本
-
-	}
-
 	// 3. 更新基本信息
-	service := service.BaseInfoService{}
-	service.UpdateTitle(qBo, title)
-	service.UpdateDescription(qBo, description)
-	// service.UpdateCoverImage(qBo, imgUrl)
+	questionnaire.BaseInfoService{}.UpdateTitle(qBo, title)
+	questionnaire.BaseInfoService{}.UpdateDescription(qBo, description)
+	questionnaire.BaseInfoService{}.UpdateCoverImage(qBo, imgUrl)
 
 	// 3. 保存到数据库
 	if err := e.qRepoMySQL.Update(ctx, qBo); err != nil {
