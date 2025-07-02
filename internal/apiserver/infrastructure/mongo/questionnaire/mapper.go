@@ -1,8 +1,10 @@
 package questionnaire
 
 import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/types"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 )
@@ -96,17 +98,97 @@ func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRu
 
 // ToBO 将MongoDB持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
-	// 使用构造函数和选项模式创建问卷
-	domain := questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(po.Code),
-		questionnaire.WithDescription(po.Description),
-		questionnaire.WithImgUrl(po.ImgUrl),
-		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),
-		questionnaire.WithStatus(questionnaire.QuestionnaireStatus(po.Status)),
-	)
+	// 创建问卷对象
+	q := questionnaire.NewQuestionnaire(questionnaire.NewQuestionnaireCode(po.Code), po.Title)
 
-	// 添加问题（这里简化处理，实际项目中需要根据具体需求转换问题）
-	// TODO: 需要实现从QuestionPO到具体Question类型的转换
+	// 设置基础信息
+	q.SetTitle(po.Title)
+	q.SetDescription(po.Description)
+	q.SetImgUrl(po.ImgUrl)
+	q.SetVersion(questionnaire.NewQuestionnaireVersion(po.Version))
+	q.SetStatus(questionnaire.QuestionnaireStatus(po.Status))
 
-	return domain
+	// 添加问题
+	questions := m.mapQuestions(po.Questions)
+	q.SetQuestions(questions)
+
+	return q
+}
+
+// mapQuestions 将问题PO转换为问题BO - 使用重构后的Builder和Factory
+func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.Question {
+	if questionsPO == nil {
+		return []question.Question{}
+	}
+
+	var questions []question.Question
+	factory := types.NewQuestionFactory()
+
+	for _, questionPO := range questionsPO {
+		// 构建配置选项列表
+		opts := []types.BuilderOption{
+			types.WithCode(question.NewQuestionCode(questionPO.Code)),
+			types.WithTitle(questionPO.Title),
+			types.WithTips(questionPO.Tip),
+			types.WithQuestionType(question.QuestionType(questionPO.QuestionType)),
+			types.WithPlaceholder(questionPO.Placeholder),
+			types.WithOptions(m.mapOptionsPOToBO(questionPO.Options)),
+			types.WithValidationRules(m.mapValidationRulesPOToBO(questionPO.ValidationRules)),
+		}
+
+		// 添加计算规则（如果有的话）
+		if questionPO.CalculationRule.Formula != "" {
+			opts = append(opts, types.WithCalculationRule(calculation.FormulaType(questionPO.CalculationRule.Formula)))
+		}
+
+		// 1. 创建配置
+		builder := types.BuildQuestionConfig(opts...)
+
+		// 2. 创建对象
+		questionBO := factory.CreateFromBuilder(builder)
+		if questionBO != nil {
+			questions = append(questions, questionBO)
+		}
+	}
+
+	return questions
+}
+
+// mapOptionsPOToBO 将选项PO转换为选项BO
+func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []option.Option {
+	if optionsPO == nil {
+		return []option.Option{}
+	}
+
+	var options []option.Option
+	for _, optionPO := range optionsPO {
+		optionBO := option.NewOption(optionPO.Code, optionPO.Content, optionPO.Score)
+		options = append(options, optionBO)
+	}
+	return options
+}
+
+// mapValidationRulesPOToBO 将校验规则PO转换为校验规则BO
+func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRulePO) []validation.ValidationRule {
+	if rulesPO == nil {
+		return []validation.ValidationRule{}
+	}
+
+	var rules []validation.ValidationRule
+	for _, rulePO := range rulesPO {
+		ruleType := validation.RuleType(rulePO.RuleType)
+		rule := validation.NewValidationRule(ruleType, rulePO.TargetValue)
+		rules = append(rules, rule)
+	}
+	return rules
+}
+
+// mapCalculationRulePOToBO 将计算规则PO转换为计算规则BO
+func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO) *calculation.CalculationRule {
+	if rulePO.Formula == "" {
+		return nil
+	}
+
+	formulaType := calculation.FormulaType(rulePO.Formula)
+	return calculation.NewCalculationRule(formulaType)
 }

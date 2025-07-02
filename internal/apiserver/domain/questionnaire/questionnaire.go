@@ -16,63 +16,10 @@ type Questionnaire struct {
 	questions   []question.Question
 }
 
-// Option 问卷选项
-type Option func(*Questionnaire)
-
 // NewQuestionnaire 创建问卷
-func NewQuestionnaire(code QuestionnaireCode, opts ...Option) *Questionnaire {
-	q := &Questionnaire{code: code}
-	for _, opt := range opts {
-		opt(q)
-	}
+func NewQuestionnaire(code QuestionnaireCode, title string) *Questionnaire {
+	q := &Questionnaire{code: code, title: title}
 	return q
-}
-
-// WithID 设置问卷ID
-func WithID(id QuestionnaireID) Option {
-	return func(q *Questionnaire) {
-		q.id = id
-	}
-}
-
-// WithTitle 设置问卷标题
-func WithTitle(title string) Option {
-	return func(q *Questionnaire) {
-		q.title = title
-	}
-}
-
-// WithDescription 设置问卷描述
-func WithDescription(description string) Option {
-	return func(q *Questionnaire) {
-		q.description = description
-	}
-}
-
-// WithImgUrl 设置问卷图片
-func WithImgUrl(imgUrl string) Option {
-	return func(q *Questionnaire) {
-		q.imgUrl = imgUrl
-	}
-}
-
-// WithVersion 设置问卷版本
-func WithVersion(version QuestionnaireVersion) Option {
-	return func(q *Questionnaire) {
-		q.version = version
-	}
-}
-
-// WithStatus 设置问卷状态
-func WithStatus(status QuestionnaireStatus) Option {
-	return func(q *Questionnaire) {
-		q.status = status
-	}
-}
-
-// SetID 设置问卷ID
-func (q *Questionnaire) SetID(id QuestionnaireID) {
-	q.id = id
 }
 
 // GetID 获取问卷ID
@@ -113,6 +60,41 @@ func (q *Questionnaire) GetStatus() QuestionnaireStatus {
 // GetQuestions 获取问卷问题
 func (q *Questionnaire) GetQuestions() []question.Question {
 	return q.questions
+}
+
+// SetID 设置问卷ID
+func (q *Questionnaire) SetID(id QuestionnaireID) {
+	q.id = id
+}
+
+// SetTitle 设置问卷标题
+func (q *Questionnaire) SetTitle(title string) {
+	q.title = title
+}
+
+// SetDescription 设置问卷描述
+func (q *Questionnaire) SetDescription(description string) {
+	q.description = description
+}
+
+// SetImgUrl 设置问卷图片
+func (q *Questionnaire) SetImgUrl(imgUrl string) {
+	q.imgUrl = imgUrl
+}
+
+// SetVersion 设置问卷版本
+func (q *Questionnaire) SetVersion(version QuestionnaireVersion) {
+	q.version = version
+}
+
+// SetStatus 设置问卷状态
+func (q *Questionnaire) SetStatus(status QuestionnaireStatus) {
+	q.status = status
+}
+
+// SetQuestions 设置问卷问题
+func (q *Questionnaire) SetQuestions(questions []question.Question) {
+	q.questions = questions
 }
 
 // IsPublished 判断问卷是否已发布

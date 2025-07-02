@@ -31,14 +31,11 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, title, description, i
 	}
 
 	// 2. 创建问卷领域模型
-	qBo := questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(code),
-		questionnaire.WithTitle(title),
-		questionnaire.WithDescription(description),
-		questionnaire.WithImgUrl(imgUrl),
-		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion("1")),
-		questionnaire.WithStatus(questionnaire.STATUS_DRAFT),
-	)
+	qBo := questionnaire.NewQuestionnaire(questionnaire.NewQuestionnaireCode(code), title)
+	qBo.SetDescription(description)
+	qBo.SetImgUrl(imgUrl)
+	qBo.SetVersion(questionnaire.NewQuestionnaireVersion("1.0"))
+	qBo.SetStatus(questionnaire.STATUS_DRAFT)
 
 	// 3. 保存到 mysql
 	if err := c.qRepoMySQL.Save(ctx, qBo); err != nil {

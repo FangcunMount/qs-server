@@ -5,6 +5,7 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/service"
 )
 
 // Publisher 问卷发布器
@@ -33,7 +34,8 @@ func (p *Publisher) Publish(
 	}
 
 	// 2. 更新状态为已发布
-	questionnaire.VersionService{}.Publish(qBo)
+	service := service.VersionService{}
+	service.Publish(qBo)
 
 	// 3. 更新到数据库
 	if err := p.qRepoMySQL.Update(ctx, qBo); err != nil {
@@ -60,7 +62,8 @@ func (p *Publisher) Unpublish(
 	}
 
 	// 2. 更新状态为草稿
-	questionnaire.VersionService{}.Archive(qBo)
+	service := service.VersionService{}
+	service.Archive(qBo)
 
 	// 3. 更新到数据库
 	if err := p.qRepoMySQL.Update(ctx, qBo); err != nil {

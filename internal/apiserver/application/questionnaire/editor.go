@@ -5,6 +5,7 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/service"
 	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
@@ -43,14 +44,15 @@ func (e *Editor) EditBasicInfo(
 	// 已发布的问卷，Copy 一份新的，旧版本归档
 	if qBo.IsPublished() {
 		// 归档旧版本
-		questionnaire.VersionService{}.Archive(qBo)
+		service := service.VersionService{}
+		service.Archive(qBo)
 
 		// 创建新版本
-		qBo = questionnaire.VersionService{}.Clone(qBo)
+
 	}
 
 	// 3. 更新基本信息
-	service := questionnaire.BaseInfoService{}
+	service := service.BaseInfoService{}
 	service.UpdateTitle(qBo, title)
 	service.UpdateDescription(qBo, description)
 	// service.UpdateCoverImage(qBo, imgUrl)
