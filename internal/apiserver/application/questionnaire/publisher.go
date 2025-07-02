@@ -35,13 +35,13 @@ func (p *Publisher) Publish(
 	// 2. 更新状态为已发布
 	questionnaire.VersionService{}.Publish(qBo)
 
-	// 3. 保存到数据库
-	if err := p.qRepoMySQL.Save(ctx, qBo); err != nil {
+	// 3. 更新到数据库
+	if err := p.qRepoMySQL.Update(ctx, qBo); err != nil {
 		return nil, err
 	}
 
 	// 4. 同步到文档数据库
-	if err := p.qRepoMongo.Save(ctx, qBo); err != nil {
+	if err := p.qRepoMongo.Update(ctx, qBo); err != nil {
 		return nil, err
 	}
 
@@ -62,13 +62,13 @@ func (p *Publisher) Unpublish(
 	// 2. 更新状态为草稿
 	questionnaire.VersionService{}.Archive(qBo)
 
-	// 3. 保存到数据库
-	if err := p.qRepoMySQL.Save(ctx, qBo); err != nil {
+	// 3. 更新到数据库
+	if err := p.qRepoMySQL.Update(ctx, qBo); err != nil {
 		return nil, err
 	}
 
 	// 4. 同步到文档数据库
-	if err := p.qRepoMongo.Save(ctx, qBo); err != nil {
+	if err := p.qRepoMongo.Update(ctx, qBo); err != nil {
 		return nil, err
 	}
 

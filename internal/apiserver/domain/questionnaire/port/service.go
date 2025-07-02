@@ -13,7 +13,7 @@ type QuestionnaireCreator interface {
 type QuestionnaireQueryer interface {
 	GetQuestionnaire(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
 	GetQuestionnaireByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error)
-	ListQuestionnaires(ctx context.Context, page, pageSize int) ([]*questionnaire.Questionnaire, int64, error)
+	ListQuestionnaires(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, int64, error)
 }
 
 type QuestionnaireEditor interface {

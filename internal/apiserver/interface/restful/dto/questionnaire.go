@@ -14,13 +14,13 @@ type QueryQuestionnaireRequest struct {
 
 // QueryQuestionnaireListRequest 问卷列表请求
 type QueryQuestionnaireListRequest struct {
-	Page     int `json:"page" valid:"required"`
-	PageSize int `json:"page_size" valid:"required"`
+	Page       int               `json:"page" valid:"required"`
+	PageSize   int               `json:"page_size" valid:"required"`
+	Conditions map[string]string `json:"conditions"`
 }
 
 // EditQuestionnaireBasicInfoRequest 编辑问卷请求
 type EditQuestionnaireBasicInfoRequest struct {
-	Code        string `json:"code" valid:"required"`
 	Title       string `json:"title" valid:"required"`
 	Description string `json:"description" valid:"required"`
 	ImgUrl      string `json:"img_url" valid:"required"`

@@ -37,7 +37,7 @@ func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync fu
 
 // UpdateAndSync 更新实体并同步时间戳等字段
 func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync func(T)) error {
-	result := r.db.WithContext(ctx).Save(entity)
+	result := r.db.WithContext(ctx).Updates(entity)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -102,8 +102,30 @@ func (r *BaseRepository[T]) FindWithConditions(ctx context.Context, models inter
 	return entities, nil
 }
 
+// FindList 查询列表
+func (r *BaseRepository[T]) FindList(ctx context.Context, models interface{}, conditions map[string]string, page, pageSize int) ([]T, error) {
+	db := r.db.WithContext(ctx)
+	for field, value := range conditions {
+		db = db.Where(field+" = ?", value)
+	}
+	if page > 0 {
+		db = db.Offset((page - 1) * pageSize)
+	}
+	if pageSize > 0 {
+		db = db.Limit(pageSize)
+	}
+	if err := db.Find(models).Error; err != nil {
+		return nil, err
+	}
+	entities := make([]T, 0)
+	if err := db.Find(&entities).Error; err != nil {
+		return nil, err
+	}
+	return entities, nil
+}
+
 // CountWithConditions 根据条件统计记录数
-func (r *BaseRepository[T]) CountWithConditions(ctx context.Context, model interface{}, conditions map[string]interface{}) (int64, error) {
+func (r *BaseRepository[T]) CountWithConditions(ctx context.Context, model interface{}, conditions map[string]string) (int64, error) {
 	var count int64
 	db := r.db.WithContext(ctx).Model(model)
 	for field, value := range conditions {

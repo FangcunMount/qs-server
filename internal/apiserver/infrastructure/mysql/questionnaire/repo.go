@@ -63,3 +63,17 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnair
 	}
 	return r.mapper.ToBO(&po), nil
 }
+
+// FindList 查询问卷列表
+func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, error) {
+	pos, err := r.BaseRepository.FindList(ctx, &QuestionnairePO{}, conditions, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToBOList(pos), nil
+}
+
+// CountWithConditions 根据条件统计记录数
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
+	return r.BaseRepository.CountWithConditions(ctx, &QuestionnairePO{}, conditions)
+}

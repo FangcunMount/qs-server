@@ -107,15 +107,13 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 	{
 		// 问卷CRUD操作
 		questionnaires.POST("", quesHandler.CreateQuestionnaire) // 创建问卷
-		questionnaires.GET("", r.placeholder)                    // 获取问卷列表
-		questionnaires.GET("/:id", r.placeholder)                // 获取指定问卷
-		questionnaires.PUT("/:id", r.placeholder)                // 更新问卷
-		questionnaires.DELETE("/:id", r.placeholder)             // 删除问卷
+		questionnaires.GET("", quesHandler.QueryList)            // 获取问卷列表
+		questionnaires.GET("/:code", quesHandler.QueryOne)       // 获取指定问卷
+		questionnaires.PUT("/:code", quesHandler.EditBasicInfo)  // 更新问卷
 
 		// 问卷状态管理
-		questionnaires.POST("/:id/publish", r.placeholder)   // 发布问卷
-		questionnaires.POST("/:id/archive", r.placeholder)   // 归档问卷
-		questionnaires.POST("/:id/responses", r.placeholder) // 提交问卷响应
+		questionnaires.POST("/:code/publish", quesHandler.PublishQuestionnaire)   // 发布问卷
+		questionnaires.POST("/:code/archive", quesHandler.UnpublishQuestionnaire) // 归档问卷
 	}
 }
 

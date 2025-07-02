@@ -13,6 +13,8 @@ type QuestionnaireRepositoryMySQL interface {
 	Save(ctx context.Context, questionnaire *questionnaire.Questionnaire) error
 	FindByID(ctx context.Context, id uint64) (*questionnaire.Questionnaire, error)
 	FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error)
+	FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, error)
+	CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error)
 	Update(ctx context.Context, questionnaire *questionnaire.Questionnaire) error
 	Remove(ctx context.Context, id uint64) error
 }

@@ -13,6 +13,7 @@ import (
 // 对应数据库表结构
 type QuestionnairePO struct {
 	base.AuditFields
+	ID          uint64 `gorm:"column:id;type:bigint(20) unsigned;primary_key;auto_increment" json:"id"`
 	Code        string `gorm:"column:code;type:varchar(255)" json:"code"`
 	Title       string `gorm:"column:title;type:varchar(255)" json:"title"`
 	Description string `gorm:"column:description;type:varchar(255)" json:"description"`

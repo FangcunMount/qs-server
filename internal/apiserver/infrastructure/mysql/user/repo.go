@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"gorm.io/gorm"
 
@@ -138,12 +139,12 @@ func (r *Repository) ExistsByPhone(ctx context.Context, phone string) bool {
 
 // Count
 func (r *Repository) Count(ctx context.Context) (int64, error) {
-	return r.CountWithConditions(ctx, &UserPO{}, map[string]interface{}{})
+	return r.CountWithConditions(ctx, &UserPO{}, map[string]string{})
 }
 
 // CountByStatus 根据状态统计用户数量
 func (r *Repository) CountByStatus(ctx context.Context, status user.Status) (int64, error) {
-	return r.CountWithConditions(ctx, &UserPO{}, map[string]interface{}{"status": status})
+	return r.CountWithConditions(ctx, &UserPO{}, map[string]string{"status": strconv.Itoa(int(status))})
 }
 
 // FindByIDs 根据用户 ID 查找用户列表

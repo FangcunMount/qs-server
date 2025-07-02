@@ -32,7 +32,6 @@ func (VersionService) Archive(q *Questionnaire) error {
 // Clone 克隆问卷
 func (VersionService) Clone(q *Questionnaire) *Questionnaire {
 	copy := *q
-	copy.id = QuestionnaireID{} // 让 repo 生成新 ID
 	copy.status = STATUS_DRAFT
 	copy.version = copy.version.Increment()
 	return &copy

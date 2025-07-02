@@ -32,8 +32,15 @@ func (q *Queryer) GetQuestionnaireByCode(ctx context.Context, code string) (*que
 }
 
 // ListQuestionnaires 获取问卷列表
-func (q *Queryer) ListQuestionnaires(ctx context.Context, page, pageSize int) ([]*questionnaire.Questionnaire, int64, error) {
-	// TODO: 实现分页查询逻辑
-	// 这里需要根据实际的仓储接口方法来实现
-	return nil, 0, nil
+func (q *Queryer) ListQuestionnaires(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, int64, error) {
+	questionnaires, err := q.qRepoMySQL.FindList(ctx, page, pageSize, conditions)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := q.qRepoMySQL.CountWithConditions(ctx, conditions)
+	if err != nil {
+		return nil, 0, err
+	}
+	return questionnaires, total, nil
 }

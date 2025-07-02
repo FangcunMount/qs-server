@@ -6,6 +6,8 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
 // QuestionnaireHandler 问卷处理器
@@ -66,8 +68,15 @@ func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
 
 // EditQuestionnaire 编辑问卷
 func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
+	// 从路径参数获取code
+	qCode := c.Param("code")
+	if qCode == "" {
+		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		return
+	}
+
 	var req dto.EditQuestionnaireBasicInfoRequest
-	if err := h.BindQuery(c, &req); err != nil {
+	if err := h.BindJSON(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -75,7 +84,7 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 	// 调用领域服务
 	q, err := h.questionnaireEditor.EditBasicInfo(
 		c,
-		questionnaire.NewQuestionnaireCode(req.Code),
+		questionnaire.NewQuestionnaireCode(qCode),
 		req.Title,
 		req.Description,
 		req.ImgUrl,
@@ -100,14 +109,15 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 
 // PublishQuestionnaire 发布问卷
 func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
-	var req dto.PublishQuestionnaireRequest
-	if err := h.BindQuery(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+	// 从路径参数获取code
+	qCode := c.Param("code")
+	if qCode == "" {
+		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
 		return
 	}
 
 	// 调用领域服务
-	q, err := h.questionnairePublisher.Publish(c, questionnaire.NewQuestionnaireCode(req.Code))
+	q, err := h.questionnairePublisher.Publish(c, questionnaire.NewQuestionnaireCode(qCode))
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -128,14 +138,15 @@ func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
 
 // UnpublishQuestionnaire 下架问卷
 func (h *QuestionnaireHandler) UnpublishQuestionnaire(c *gin.Context) {
-	var req dto.UnpublishQuestionnaireRequest
-	if err := h.BindQuery(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+	// 从路径参数获取code
+	qCode := c.Param("code")
+	if qCode == "" {
+		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
 		return
 	}
 
 	// 调用领域服务
-	q, err := h.questionnairePublisher.Unpublish(c, questionnaire.NewQuestionnaireCode(req.Code))
+	q, err := h.questionnairePublisher.Unpublish(c, questionnaire.NewQuestionnaireCode(qCode))
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -156,14 +167,15 @@ func (h *QuestionnaireHandler) UnpublishQuestionnaire(c *gin.Context) {
 
 // GetQuestionnaire 获取问卷
 func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
-	var req dto.QueryQuestionnaireRequest
-	if err := h.BindQuery(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+	// 从路径参数获取code
+	qCode := c.Param("code")
+	if qCode == "" {
+		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
 		return
 	}
 
 	// 调用领域服务
-	q, err := h.questionnaireQueryer.GetQuestionnaireByCode(c, req.Code)
+	q, err := h.questionnaireQueryer.GetQuestionnaireByCode(c, qCode)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -188,4 +200,32 @@ func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
 		h.ErrorResponse(c, err)
 		return
 	}
+
+	// 调用领域服务
+	questionnaires, total, err := h.questionnaireQueryer.ListQuestionnaires(c, req.Page, req.PageSize, req.Conditions)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	// 转换为DTO响应
+	questionnaireDTOs := make([]*dto.QuestionnaireBasicInfoResponse, len(questionnaires))
+	for i, q := range questionnaires {
+		questionnaireDTOs[i] = &dto.QuestionnaireBasicInfoResponse{
+			Code:        q.GetCode().Value(),
+			Title:       q.GetTitle(),
+			Description: q.GetDescription(),
+			ImgUrl:      q.GetImgUrl(),
+			Version:     q.GetVersion().Value(),
+			Status:      q.GetStatus().Value(),
+		}
+	}
+	response := &dto.QuestionnaireListResponse{
+		Questionnaires: questionnaireDTOs,
+		TotalCount:     total,
+		Page:           req.Page,
+		PageSize:       req.PageSize,
+	}
+
+	h.SuccessResponse(c, response)
 }

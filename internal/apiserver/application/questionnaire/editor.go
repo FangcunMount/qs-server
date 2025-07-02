@@ -56,7 +56,7 @@ func (e *Editor) EditBasicInfo(
 	// service.UpdateCoverImage(qBo, imgUrl)
 
 	// 3. 保存到数据库
-	if err := e.qRepoMySQL.Save(ctx, qBo); err != nil {
+	if err := e.qRepoMySQL.Update(ctx, qBo); err != nil {
 		return nil, err
 	}
 
