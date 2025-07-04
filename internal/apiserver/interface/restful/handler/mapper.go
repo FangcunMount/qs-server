@@ -4,7 +4,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/types"
+	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/question-types"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
@@ -34,29 +34,29 @@ func (m *QuestionMapper) mapQuestionToBO(q dto.Question) question.Question {
 	log.Infow("---- mapQuestionToBO input:", "code", q.Code, "type", q.Type, "title", q.Title)
 
 	// 构建配置选项列表
-	opts := []types.BuilderOption{
-		types.WithCode(question.NewQuestionCode(q.Code)),
-		types.WithTitle(q.Title),
-		types.WithTips(q.Tips),
-		types.WithQuestionType(question.QuestionType(q.Type)),
+	opts := []question_types.BuilderOption{
+		question_types.WithCode(question.NewQuestionCode(q.Code)),
+		question_types.WithTitle(q.Title),
+		question_types.WithTips(q.Tips),
+		question_types.WithQuestionType(question.QuestionType(q.Type)),
 	}
 
 	// 添加特定属性
 	if q.Placeholder != "" {
-		opts = append(opts, types.WithPlaceholder(q.Placeholder))
+		opts = append(opts, question_types.WithPlaceholder(q.Placeholder))
 	}
 	if len(q.Options) > 0 {
-		opts = append(opts, types.WithOptions(m.mapOptionsToBO(q.Options)))
+		opts = append(opts, question_types.WithOptions(m.mapOptionsToBO(q.Options)))
 	}
 	if len(q.ValidationRules) > 0 {
-		opts = append(opts, types.WithValidationRules(m.mapValidationRulesToBO(q.ValidationRules)))
+		opts = append(opts, question_types.WithValidationRules(m.mapValidationRulesToBO(q.ValidationRules)))
 	}
 	if q.CalculationRule != nil {
-		opts = append(opts, types.WithCalculationRule(calculation.FormulaType(q.CalculationRule.FormulaType)))
+		opts = append(opts, question_types.WithCalculationRule(calculation.FormulaType(q.CalculationRule.FormulaType)))
 	}
 
 	// 1. 创建配置
-	builder := types.BuildQuestionConfig(opts...)
+	builder := question_types.BuildQuestionConfig(opts...)
 
 	// 验证 builder 有效性
 	if !builder.IsValid() {
@@ -65,7 +65,7 @@ func (m *QuestionMapper) mapQuestionToBO(q dto.Question) question.Question {
 	}
 
 	// 2. 创建对象
-	result := types.NewQuestionFactory().CreateFromBuilder(builder)
+	result := question_types.NewQuestionFactory().CreateFromBuilder(builder)
 	if result == nil {
 		log.Errorw("---- CreateFromBuilder returned nil for question:", "code", q.Code, "type", q.Type)
 	} else {

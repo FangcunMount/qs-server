@@ -1,4 +1,4 @@
-package types
+package question_types
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
@@ -7,8 +7,8 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
 )
 
-// CheckboxQuestion 多选问题
-type CheckboxQuestion struct {
+// RadioQuestion 单选问题
+type RadioQuestion struct {
 	BaseQuestion
 	validation.ValidationAbility
 	calculation.CalculationAbility
@@ -16,35 +16,35 @@ type CheckboxQuestion struct {
 	options []option.Option
 }
 
-// NewCheckboxQuestion 创建多选问题
-func NewCheckboxQuestion(code question.QuestionCode, title string) *CheckboxQuestion {
-	return &CheckboxQuestion{
-		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeCheckbox),
+// NewRadioQuestion 创建单选问题
+func NewRadioQuestion(code question.QuestionCode, title string) *RadioQuestion {
+	return &RadioQuestion{
+		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeRadio),
 	}
 }
 
 // GetOptions 获取选项
-func (q *CheckboxQuestion) GetOptions() []option.Option {
+func (q *RadioQuestion) GetOptions() []option.Option {
 	return q.options
 }
 
 // GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
-func (q *CheckboxQuestion) GetValidationRules() []validation.ValidationRule {
+func (q *RadioQuestion) GetValidationRules() []validation.ValidationRule {
 	return q.ValidationAbility.GetValidationRules()
 }
 
 // GetCalculationRule 获取计算规则 - 重写BaseQuestion的默认实现
-func (q *CheckboxQuestion) GetCalculationRule() *calculation.CalculationRule {
+func (q *RadioQuestion) GetCalculationRule() *calculation.CalculationRule {
 	return q.CalculationAbility.GetCalculationRule()
 }
 
 // SetOptions 设置选项
-func (q *CheckboxQuestion) SetOptions(options []option.Option) {
+func (q *RadioQuestion) SetOptions(options []option.Option) {
 	q.options = options
 }
 
 // AddOption 添加选项
-func (q *CheckboxQuestion) AddOption(option option.Option) {
+func (q *RadioQuestion) AddOption(option option.Option) {
 	// 如果选项已存在，则不添加
 	for _, o := range q.options {
 		if o.GetCode() == option.GetCode() {
@@ -57,16 +57,16 @@ func (q *CheckboxQuestion) AddOption(option option.Option) {
 }
 
 // ClearOptions 清空选项
-func (q *CheckboxQuestion) ClearOptions() {
+func (q *RadioQuestion) ClearOptions() {
 	q.options = []option.Option{}
 }
 
 // AddValidationRule 添加校验规则
-func (q *CheckboxQuestion) AddValidationRule(rule validation.ValidationRule) {
+func (q *RadioQuestion) AddValidationRule(rule validation.ValidationRule) {
 	q.ValidationAbility.AddValidationRule(rule)
 }
 
 // SetCalculationRule 设置计算规则
-func (q *CheckboxQuestion) SetCalculationRule(rule *calculation.CalculationRule) {
+func (q *RadioQuestion) SetCalculationRule(rule *calculation.CalculationRule) {
 	q.CalculationAbility.SetCalculationRule(rule)
 }

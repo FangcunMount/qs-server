@@ -1,4 +1,4 @@
-package types
+package question_types
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
