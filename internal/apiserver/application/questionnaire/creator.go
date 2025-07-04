@@ -41,12 +41,12 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, title, description, i
 	)
 
 	// 3. 保存到 mysql
-	if err := c.qRepoMySQL.Save(ctx, qBo); err != nil {
+	if err := c.qRepoMySQL.Create(ctx, qBo); err != nil {
 		return nil, err
 	}
 
 	// 4. 保存到 mongodb
-	if err := c.qRepoMongo.Save(ctx, qBo); err != nil {
+	if err := c.qRepoMongo.Create(ctx, qBo); err != nil {
 		return nil, err
 	}
 

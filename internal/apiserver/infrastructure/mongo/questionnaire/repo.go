@@ -27,8 +27,8 @@ func NewRepository(db *mongo.Database) port.QuestionnaireRepositoryMongo {
 	}
 }
 
-// Save 保存问卷
-func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
+// Create 创建问卷
+func (r *Repository) Create(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	po := r.mapper.ToPO(qDomain)
 	po.BeforeInsert()
 

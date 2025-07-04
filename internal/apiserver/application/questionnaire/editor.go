@@ -51,7 +51,7 @@ func (e *Editor) EditBasicInfo(
 	}
 
 	// 4. 同步到文档数据库
-	if err := e.qRepoMongo.Save(ctx, qBo); err != nil {
+	if err := e.qRepoMongo.Update(ctx, qBo); err != nil {
 		return nil, err
 	}
 
