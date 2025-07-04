@@ -4,6 +4,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // QuestionService 问题服务
@@ -11,6 +12,14 @@ type QuestionService struct{}
 
 // AddQuestion 添加问题
 func (QuestionService) AddQuestion(q *Questionnaire, newQuestion question.Question) error {
+	log.Infow("---- in QuestionService AddQuestion: ")
+
+	// 检查问题对象是否为 nil
+	if newQuestion == nil {
+		log.Errorw("---- newQuestion is nil, skipping")
+		return errors.WithCode(code.ErrQuestionnaireQuestionBasicInfoInvalid, "问题对象不能为空")
+	}
+
 	if newQuestion.GetCode().Value() == "" {
 		return errors.WithCode(code.ErrQuestionnaireQuestionBasicInfoInvalid, "问题必须有 code")
 	}
@@ -20,6 +29,7 @@ func (QuestionService) AddQuestion(q *Questionnaire, newQuestion question.Questi
 		}
 	}
 	q.questions = append(q.questions, newQuestion)
+	log.Infow("---- q.questions: ", "q.questions", q.questions)
 	return nil
 }
 

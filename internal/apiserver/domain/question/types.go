@@ -22,10 +22,10 @@ func (c QuestionCode) Equals(other QuestionCode) bool {
 type QuestionType string
 
 const (
-	QuestionTypeSection  QuestionType = "section"  // 段落
-	QuestionTypeRadio    QuestionType = "radio"    // 单选
-	QuestionTypeCheckbox QuestionType = "checkbox" // 多选
-	QuestionTypeText     QuestionType = "text"     // 文本
-	QuestionTypeTextarea QuestionType = "textarea" // 文本域
-	QuestionTypeNumber   QuestionType = "number"   // 数字
+	QuestionTypeSection  QuestionType = "Section"  // 段落
+	QuestionTypeRadio    QuestionType = "Radio"    // 单选
+	QuestionTypeCheckbox QuestionType = "Checkbox" // 多选
+	QuestionTypeText     QuestionType = "Text"     // 文本
+	QuestionTypeTextarea QuestionType = "Textarea" // 文本域
+	QuestionTypeNumber   QuestionType = "Number"   // 数字
 )

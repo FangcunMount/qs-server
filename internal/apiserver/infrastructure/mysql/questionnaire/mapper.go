@@ -13,7 +13,6 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 // ToPO 将领域模型转换为持久化对象
 func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *QuestionnairePO {
 	po := &QuestionnairePO{
-		ID:          bo.GetID().Value(),
 		Code:        bo.GetCode().Value(),
 		Title:       bo.GetTitle(),
 		Description: bo.GetDescription(),
@@ -21,6 +20,9 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		Version:     bo.GetVersion().Value(),
 		Status:      bo.GetStatus().Value(),
 	}
+
+	// 设置 AuditFields 中的 ID
+	po.AuditFields.ID = bo.GetID().Value()
 
 	return po
 }
@@ -30,6 +32,7 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 	qBO := questionnaire.NewQuestionnaire(
 		questionnaire.NewQuestionnaireCode(po.Code),
 		po.Title,
+		questionnaire.WithID(questionnaire.NewQuestionnaireID(po.AuditFields.ID)),
 		questionnaire.WithDescription(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),

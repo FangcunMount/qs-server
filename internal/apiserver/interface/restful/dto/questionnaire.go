@@ -26,6 +26,11 @@ type EditQuestionnaireBasicInfoRequest struct {
 	ImgUrl      string `json:"img_url" valid:"required"`
 }
 
+// EditQuestionnaireQuestionsRequest 编辑问卷问题请求
+type EditQuestionnaireQuestionsRequest struct {
+	Questions []Question `json:"questions" valid:"required"`
+}
+
 // QuestionnairePublishRequest 发布问卷请求
 type PublishQuestionnaireRequest struct {
 	Code string `json:"code" valid:"required"`
@@ -48,8 +53,14 @@ type QuestionnaireBasicInfoResponse struct {
 
 // QuestionnaireListResponse 问卷列表响应
 type QuestionnaireListResponse struct {
-	Questionnaires []*QuestionnaireBasicInfoResponse `json:"questionnaires"`
-	TotalCount     int64                             `json:"total_count"`
-	Page           int                               `json:"page"`
-	PageSize       int                               `json:"page_size"`
+	Questionnaires []QuestionnaireBasicInfoResponse `json:"questionnaires"`
+	TotalCount     int64                            `json:"total_count"`
+	Page           int                              `json:"page"`
+	PageSize       int                              `json:"page_size"`
+}
+
+// QuestionnaireQuestionsResponse 问卷问题响应
+type QuestionnaireQuestionsResponse struct {
+	Code      string     `json:"code"`
+	Questions []Question `json:"questions"`
 }

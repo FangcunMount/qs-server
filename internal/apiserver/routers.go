@@ -114,6 +114,9 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 		// 问卷状态管理
 		questionnaires.POST("/:code/publish", quesHandler.PublishQuestionnaire)   // 发布问卷
 		questionnaires.POST("/:code/archive", quesHandler.UnpublishQuestionnaire) // 归档问卷
+
+		// 问卷问题管理
+		questionnaires.PUT("/:code/questions", quesHandler.UpdateQuestions) // 更新问卷问题
 	}
 }
 

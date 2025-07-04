@@ -21,6 +21,7 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *QuestionnairePO {
 	po := &QuestionnairePO{
 		Code:        bo.GetCode().Value(),
+		DomainID:    bo.GetID().Value(),
 		Title:       bo.GetTitle(),
 		Description: bo.GetDescription(),
 		ImgUrl:      bo.GetImgUrl(),
@@ -33,7 +34,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 			Code:            questionBO.GetCode().Value(),
 			Title:           questionBO.GetTitle(),
 			QuestionType:    string(questionBO.GetType()),
-			Tip:             questionBO.GetTips(),
+			Tips:            questionBO.GetTips(),
 			Placeholder:     questionBO.GetPlaceholder(),
 			Options:         m.mapOptions(questionBO.GetOptions()),
 			ValidationRules: m.mapValidationRules(questionBO.GetValidationRules()),
@@ -102,6 +103,7 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 	q := questionnaire.NewQuestionnaire(
 		questionnaire.NewQuestionnaireCode(po.Code),
 		po.Title,
+		questionnaire.WithID(questionnaire.NewQuestionnaireID(po.DomainID)),
 		questionnaire.WithDescription(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),
@@ -126,7 +128,7 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 		opts := []types.BuilderOption{
 			types.WithCode(question.NewQuestionCode(questionPO.Code)),
 			types.WithTitle(questionPO.Title),
-			types.WithTips(questionPO.Tip),
+			types.WithTips(questionPO.Tips),
 			types.WithQuestionType(question.QuestionType(questionPO.QuestionType)),
 			types.WithPlaceholder(questionPO.Placeholder),
 			types.WithOptions(m.mapOptionsPOToBO(questionPO.Options)),

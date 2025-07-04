@@ -13,7 +13,6 @@ import (
 // 对应数据库表结构
 type QuestionnairePO struct {
 	base.AuditFields
-	ID          uint64 `gorm:"column:id;type:bigint(20) unsigned;primary_key;auto_increment" json:"id"`
 	Code        string `gorm:"column:code;type:varchar(255)" json:"code"`
 	Title       string `gorm:"column:title;type:varchar(255)" json:"title"`
 	Description string `gorm:"column:description;type:varchar(255)" json:"description"`
@@ -29,7 +28,7 @@ func (QuestionnairePO) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (p *QuestionnairePO) BeforeCreate(tx *gorm.DB) error {
-	p.ID = idutil.GetIntID()
+	p.AuditFields.ID = idutil.GetIntID()
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 

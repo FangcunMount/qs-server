@@ -32,7 +32,12 @@ func (r *Repository) Create(ctx context.Context, qDomain *questionnaire.Question
 	po := r.mapper.ToPO(qDomain)
 	po.BeforeInsert()
 
-	_, err := r.InsertOne(ctx, po)
+	insertData, err := po.ToBsonM()
+	if err != nil {
+		return err
+	}
+
+	_, err = r.InsertOne(ctx, insertData)
 	if err != nil {
 		return err
 	}
@@ -67,25 +72,18 @@ func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Question
 	// 根据领域ID查找文档
 	filter := bson.M{"code": qDomain.GetCode().Value()}
 
-	update := bson.M{
-		"$set": bson.M{
-			"code":       po.Code,
-			"title":      po.Title,
-			"img_url":    po.ImgUrl,
-			"version":    po.Version,
-			"status":     po.Status,
-			"updated_at": po.UpdatedAt,
-			"updated_by": po.UpdatedBy,
-		},
-	}
-
-	result, err := r.UpdateOne(ctx, filter, update)
+	// 将领域模型转换为BSON M
+	updateData, err := po.ToBsonM()
 	if err != nil {
 		return err
 	}
 
-	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments // 或者返回自定义的NotFound错误
+	// 使用 $set 操作符包装更新数据，避免覆盖其他字段
+	update := bson.M{"$set": updateData}
+
+	_, err = r.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
 	}
 
 	return nil

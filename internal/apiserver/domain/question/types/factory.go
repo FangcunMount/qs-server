@@ -152,46 +152,6 @@ func CreateQuestion(opts ...BuilderOption) question.Question {
 	return factory.CreateFromBuilder(builder)
 }
 
-// CreateTextQuestion 创建文本问题
-func CreateTextQuestion(code question.QuestionCode, title string, opts ...BuilderOption) question.Question {
-	allOpts := append([]BuilderOption{
-		WithCode(code),
-		WithTitle(title),
-		WithQuestionType(question.QuestionTypeText),
-	}, opts...)
-	return CreateQuestion(allOpts...)
-}
-
-// CreateRadioQuestion 创建单选问题
-func CreateRadioQuestion(code question.QuestionCode, title string, opts ...BuilderOption) question.Question {
-	allOpts := append([]BuilderOption{
-		WithCode(code),
-		WithTitle(title),
-		WithQuestionType(question.QuestionTypeRadio),
-	}, opts...)
-	return CreateQuestion(allOpts...)
-}
-
-// CreateNumberQuestion 创建数字问题
-func CreateNumberQuestion(code question.QuestionCode, title string, opts ...BuilderOption) question.Question {
-	allOpts := append([]BuilderOption{
-		WithCode(code),
-		WithTitle(title),
-		WithQuestionType(question.QuestionTypeNumber),
-	}, opts...)
-	return CreateQuestion(allOpts...)
-}
-
-// CreateCheckboxQuestion 创建多选问题
-func CreateCheckboxQuestion(code question.QuestionCode, title string, opts ...BuilderOption) question.Question {
-	allOpts := append([]BuilderOption{
-		WithCode(code),
-		WithTitle(title),
-		WithQuestionType(question.QuestionTypeCheckbox),
-	}, opts...)
-	return CreateQuestion(allOpts...)
-}
-
 // ================================
 // 批量创建功能
 // ================================

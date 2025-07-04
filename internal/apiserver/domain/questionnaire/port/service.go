@@ -3,6 +3,7 @@ package port
 import (
 	"context"
 
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 )
 
@@ -18,6 +19,7 @@ type QuestionnaireQueryer interface {
 
 type QuestionnaireEditor interface {
 	EditBasicInfo(ctx context.Context, code questionnaire.QuestionnaireCode, title, description, imgUrl string) (*questionnaire.Questionnaire, error)
+	UpdateQuestions(ctx context.Context, code questionnaire.QuestionnaireCode, questions []question.Question) (*questionnaire.Questionnaire, error)
 }
 
 type QuestionnairePublisher interface {

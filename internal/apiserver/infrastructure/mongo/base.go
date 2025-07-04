@@ -96,10 +96,10 @@ type BaseDocument struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
-	DeletedAt *time.Time         `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+	DeletedAt *time.Time         `bson:"deleted_at" json:"deleted_at"`
 	CreatedBy uint64             `bson:"created_by" json:"created_by"`
 	UpdatedBy uint64             `bson:"updated_by" json:"updated_by"`
-	DeletedBy uint64             `bson:"deleted_by,omitempty" json:"deleted_by,omitempty"`
+	DeletedBy uint64             `bson:"deleted_by" json:"deleted_by"`
 }
 
 // SetCreatedAt 设置创建时间

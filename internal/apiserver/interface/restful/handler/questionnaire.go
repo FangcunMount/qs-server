@@ -8,6 +8,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // QuestionnaireHandler 问卷处理器
@@ -102,6 +103,43 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 		ImgUrl:      q.GetImgUrl(),
 		Version:     q.GetVersion().Value(),
 		Status:      q.GetStatus().Value(),
+	}
+
+	h.SuccessResponse(c, response)
+}
+
+// UpdateQuestions 更新问卷的问题列表
+func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
+	log.Infow("---- in UpdateQuestions: ")
+
+	// 从路径参数获取code
+	qCode := c.Param("code")
+	if qCode == "" {
+		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		return
+	}
+
+	var req dto.EditQuestionnaireQuestionsRequest
+	if err := h.BindJSON(c, &req); err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	// 调用领域服务
+	q, err := h.questionnaireEditor.UpdateQuestions(
+		c,
+		questionnaire.NewQuestionnaireCode(qCode),
+		NewQuestionMapper().mapQuestionsToBOs(req.Questions),
+	)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	// 转换为DTO响应
+	response := &dto.QuestionnaireQuestionsResponse{
+		Code:      q.GetCode().Value(),
+		Questions: NewQuestionMapper().mapQuestionsToDTOs(q.GetQuestions()),
 	}
 
 	h.SuccessResponse(c, response)
@@ -209,9 +247,9 @@ func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	questionnaireDTOs := make([]*dto.QuestionnaireBasicInfoResponse, len(questionnaires))
+	questionnaireDTOs := make([]dto.QuestionnaireBasicInfoResponse, len(questionnaires))
 	for i, q := range questionnaires {
-		questionnaireDTOs[i] = &dto.QuestionnaireBasicInfoResponse{
+		questionnaireDTOs[i] = dto.QuestionnaireBasicInfoResponse{
 			Code:        q.GetCode().Value(),
 			Title:       q.GetTitle(),
 			Description: q.GetDescription(),
