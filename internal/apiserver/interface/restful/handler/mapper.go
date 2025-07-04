@@ -65,7 +65,7 @@ func (m *QuestionMapper) mapQuestionToBO(q dto.Question) question.Question {
 	}
 
 	// 2. 创建对象
-	result := question_types.NewQuestionFactory().CreateFromBuilder(builder)
+	result := question_types.CreateQuestionFromBuilder(builder)
 	if result == nil {
 		log.Errorw("---- CreateFromBuilder returned nil for question:", "code", q.Code, "type", q.Type)
 	} else {

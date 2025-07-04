@@ -121,7 +121,6 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 	}
 
 	var questions []question.Question
-	factory := question_types.NewQuestionFactory()
 
 	for _, questionPO := range questionsPO {
 		// 构建配置选项列表
@@ -144,7 +143,7 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 		builder := question_types.BuildQuestionConfig(opts...)
 
 		// 2. 创建对象
-		questionBO := factory.CreateFromBuilder(builder)
+		questionBO := question_types.CreateQuestionFromBuilder(builder)
 		if questionBO != nil {
 			questions = append(questions, questionBO)
 		}

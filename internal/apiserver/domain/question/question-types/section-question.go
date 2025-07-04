@@ -9,8 +9,15 @@ type SectionQuestion struct {
 	BaseQuestion
 }
 
-// NewSectionQuestion 创建段落问题
-func NewSectionQuestion(code question.QuestionCode, title string) *SectionQuestion {
+// 注册段落问题
+func init() {
+	RegisterQuestionFactory(question.QuestionTypeSection, func(builder *QuestionBuilder) question.Question {
+		return newSectionQuestion(builder.GetCode(), builder.GetTitle())
+	})
+}
+
+// newSectionQuestion 创建段落问题
+func newSectionQuestion(code question.QuestionCode, title string) *SectionQuestion {
 	return &SectionQuestion{
 		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeSection),
 	}

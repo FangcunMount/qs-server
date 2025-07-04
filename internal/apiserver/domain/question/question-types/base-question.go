@@ -15,7 +15,7 @@ type BaseQuestion struct {
 	tips         string
 }
 
-// NewBaseQuestion creates a new BaseQuestion with the given parameters
+// NewBaseQuestion
 func NewBaseQuestion(code question.QuestionCode, title string, questionType question.QuestionType) BaseQuestion {
 	return BaseQuestion{
 		code:         code,
@@ -49,14 +49,17 @@ func (q *BaseQuestion) GetPlaceholder() string {
 	return ""
 }
 
+// GetOptions 获取选项
 func (q *BaseQuestion) GetOptions() []option.Option {
 	return nil
 }
 
+// GetValidationRules 获取校验规则
 func (q *BaseQuestion) GetValidationRules() []validation.ValidationRule {
 	return nil
 }
 
+// GetCalculationRule 获取计算规则
 func (q *BaseQuestion) GetCalculationRule() *calculation.CalculationRule {
 	return nil
 }
