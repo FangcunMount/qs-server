@@ -28,7 +28,38 @@ func (q *Queryer) GetQuestionnaire(ctx context.Context, id uint64) (*questionnai
 
 // GetQuestionnaireByCode 根据编码获取问卷
 func (q *Queryer) GetQuestionnaireByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
-	return q.qRepoMySQL.FindByCode(ctx, code)
+	qBOFromMySQL, err := q.qRepoMySQL.FindByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	qBOFromMongo, err := q.qRepoMongo.FindByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建选项列表
+	opts := []questionnaire.QuestionnaireOption{
+		questionnaire.WithID(qBOFromMySQL.GetID()),
+		questionnaire.WithDescription(qBOFromMySQL.GetDescription()),
+		questionnaire.WithImgUrl(qBOFromMySQL.GetImgUrl()),
+		questionnaire.WithVersion(qBOFromMySQL.GetVersion()),
+		questionnaire.WithStatus(qBOFromMySQL.GetStatus()),
+	}
+
+	// 如果 MongoDB 中有问卷数据且有问题列表，则添加问题
+	if qBOFromMongo != nil && qBOFromMongo.GetQuestions() != nil {
+		opts = append(opts, questionnaire.WithQuestions(qBOFromMongo.GetQuestions()))
+	}
+
+	// 创建问卷对象
+	qBo := questionnaire.NewQuestionnaire(
+		questionnaire.NewQuestionnaireCode(code),
+		qBOFromMySQL.GetTitle(),
+		opts...,
+	)
+
+	return qBo, nil
 }
 
 // ListQuestionnaires 获取问卷列表

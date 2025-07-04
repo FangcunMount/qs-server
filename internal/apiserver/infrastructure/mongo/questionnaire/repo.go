@@ -48,8 +48,7 @@ func (r *Repository) Create(ctx context.Context, qDomain *questionnaire.Question
 // FindByCode 根据编码查询问卷
 func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
 	filter := bson.M{
-		"code":       code,
-		"deleted_at": bson.M{"$exists": false}, // 排除已删除的文档
+		"code": code,
 	}
 
 	var po QuestionnairePO

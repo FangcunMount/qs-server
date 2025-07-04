@@ -8,7 +8,6 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // QuestionnaireHandler 问卷处理器
@@ -110,8 +109,6 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 
 // UpdateQuestions 更新问卷的问题列表
 func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
-	log.Infow("---- in UpdateQuestions: ")
-
 	// 从路径参数获取code
 	qCode := c.Param("code")
 	if qCode == "" {
@@ -220,13 +217,16 @@ func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireBasicInfoResponse{
-		Code:        q.GetCode().Value(),
-		Title:       q.GetTitle(),
-		Description: q.GetDescription(),
-		ImgUrl:      q.GetImgUrl(),
-		Version:     q.GetVersion().Value(),
-		Status:      q.GetStatus().Value(),
+	response := &dto.QuestionnaireResponse{
+		Questionnaire: dto.QuestionnaireBasicInfoResponse{
+			Code:        q.GetCode().Value(),
+			Title:       q.GetTitle(),
+			Description: q.GetDescription(),
+			ImgUrl:      q.GetImgUrl(),
+			Version:     q.GetVersion().Value(),
+			Status:      q.GetStatus().Value(),
+		},
+		Questions: NewQuestionMapper().mapQuestionsToDTOs(q.GetQuestions()),
 	}
 
 	h.SuccessResponse(c, response)

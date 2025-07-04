@@ -51,6 +51,11 @@ type QuestionnaireBasicInfoResponse struct {
 	Status      uint8  `json:"status"`
 }
 
+type QuestionnaireResponse struct {
+	Questionnaire QuestionnaireBasicInfoResponse `json:"questionnaire"`
+	Questions     []Question                     `json:"questions"`
+}
+
 // QuestionnaireListResponse 问卷列表响应
 type QuestionnaireListResponse struct {
 	Questionnaires []QuestionnaireBasicInfoResponse `json:"questionnaires"`
