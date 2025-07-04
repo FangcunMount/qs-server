@@ -27,7 +27,7 @@ func NewRepository(db *gorm.DB) port.QuestionnaireRepositoryMySQL {
 // Save 保存问卷
 func (r *Repository) Save(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	po := r.mapper.ToPO(qDomain)
-	return r.UpdateAndSync(ctx, po, func(qPO *QuestionnairePO) {
+	return r.BaseRepository.CreateAndSync(ctx, po, func(qPO *QuestionnairePO) {
 		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
 	})
 }
