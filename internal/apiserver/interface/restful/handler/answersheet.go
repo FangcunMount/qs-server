@@ -42,7 +42,7 @@ func NewAnswerSheetHandler(saver port.AnswerSheetSaver, queryer port.AnswerSheet
 func (h *AnswerSheetHandler) Save(c *gin.Context) {
 	var req viewmodel.SaveAnswerSheetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.ErrorResponse(c, errors.WithCode(code.ErrBind, err.Error()))
+		h.ErrorResponse(c, errors.WrapC(err, code.ErrBind, "参数绑定失败"))
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *AnswerSheetHandler) Save(c *gin.Context) {
 func (h *AnswerSheetHandler) List(c *gin.Context) {
 	var req viewmodel.ListAnswerSheetsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		h.ErrorResponse(c, errors.WithCode(code.ErrBind, err.Error()))
+		h.ErrorResponse(c, errors.WrapC(err, code.ErrBind, "参数绑定失败"))
 		return
 	}
 
