@@ -24,6 +24,7 @@ type Container struct {
 	AuthModule          *assembler.AuthModule
 	UserModule          *assembler.UserModule
 	QuestionnaireModule *assembler.QuestionnaireModule
+	AnswersheetModule   *assembler.AnswersheetModule
 
 	// 容器状态
 	initialized bool
@@ -57,6 +58,11 @@ func (c *Container) Initialize() error {
 	// 初始化问卷模块
 	if err := c.initQuestionnaireModule(); err != nil {
 		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
+	}
+
+	// 初始化答卷模块
+	if err := c.initAnswersheetModule(); err != nil {
+		return fmt.Errorf("failed to initialize answersheet module: %w", err)
 	}
 
 	c.initialized = true
@@ -104,6 +110,20 @@ func (c *Container) initQuestionnaireModule() error {
 	modulePool["questionnaire"] = quesModule
 
 	fmt.Printf("📦 Questionnaire module initialized\n")
+	return nil
+}
+
+// initAnswersheetModule 初始化答卷模块
+func (c *Container) initAnswersheetModule() error {
+	answersheetModule := assembler.NewAnswersheetModule()
+	if err := answersheetModule.Initialize(c.mongoDB); err != nil {
+		return fmt.Errorf("failed to initialize answersheet module: %w", err)
+	}
+
+	c.AnswersheetModule = answersheetModule
+	modulePool["answersheet"] = answersheetModule
+
+	fmt.Printf("📦 Answersheet module initialized\n")
 	return nil
 }
 
