@@ -132,8 +132,8 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	answersheets := apiV1.Group("/answersheets")
 	{
-		answersheets.POST("", answersheetHandler.SaveAnswerSheet)   // 保存答卷
-		answersheets.GET("/:id", answersheetHandler.GetAnswerSheet) // 获取答卷
+		answersheets.POST("", answersheetHandler.Save)   // 保存答卷
+		answersheets.GET("/:id", answersheetHandler.Get) // 获取答卷
 	}
 }
 

@@ -19,7 +19,7 @@ type AnswersheetModule struct {
 	AnswersheetRepo port.AnswerSheetRepositoryMongo
 
 	// handler 层
-	AnswersheetHandler *asHandler.AnswersheetHandler
+	AnswersheetHandler *asHandler.AnswerSheetHandler
 
 	// service 层
 	AnswersheetSaver   port.AnswerSheetSaver
@@ -46,7 +46,7 @@ func (m *AnswersheetModule) Initialize(params ...interface{}) error {
 	m.AnswersheetQueryer = asApp.NewQueryer(m.AnswersheetRepo, qnMongoInfra.NewRepository(mongoDB))
 
 	// 初始化 handler 层
-	m.AnswersheetHandler = asHandler.NewAnswersheetHandler(m.AnswersheetSaver, m.AnswersheetQueryer)
+	m.AnswersheetHandler = asHandler.NewAnswerSheetHandler(m.AnswersheetSaver, m.AnswersheetQueryer)
 
 	return nil
 }

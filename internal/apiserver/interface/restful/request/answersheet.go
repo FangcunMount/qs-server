@@ -11,3 +11,13 @@ type SaveAnswerSheetRequest struct {
 	TesteeID             uint64                `json:"testee_id" valid:"required"`
 	Answers              []viewmodel.AnswerDTO `json:"answers" valid:"required"`
 }
+
+// ListAnswerSheetsRequest 获取答卷列表请求
+type ListAnswerSheetsRequest struct {
+	QuestionnaireCode    string `form:"questionnaire_code"`
+	QuestionnaireVersion string `form:"questionnaire_version"`
+	WriterID             uint64 `form:"writer_id"`
+	TesteeID             uint64 `form:"testee_id"`
+	Page                 int    `form:"page" binding:"required,min=1"`
+	PageSize             int    `form:"page_size" binding:"required,min=1,max=100"`
+}

@@ -4,78 +4,123 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
-	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
-// AnswersheetHandler 答卷处理器
-type AnswersheetHandler struct {
-	BaseHandler
-	AnswersheetSaver   port.AnswerSheetSaver
-	AnswersheetQueryer port.AnswerSheetQueryer
+// AnswerSheetHandler 答卷处理器
+type AnswerSheetHandler struct {
+	*BaseHandler
+	saver   port.AnswerSheetSaver
+	queryer port.AnswerSheetQueryer
+	mapper  *mapper.AnswerSheetMapper
 }
 
-// NewAnswersheetHandler 创建答卷处理器
-func NewAnswersheetHandler(
-	answersheetSaver port.AnswerSheetSaver,
-	answersheetQueryer port.AnswerSheetQueryer,
-) *AnswersheetHandler {
-	return &AnswersheetHandler{
-		AnswersheetSaver:   answersheetSaver,
-		AnswersheetQueryer: answersheetQueryer,
+// NewAnswerSheetHandler 创建答卷处理器
+func NewAnswerSheetHandler(saver port.AnswerSheetSaver, queryer port.AnswerSheetQueryer) *AnswerSheetHandler {
+	return &AnswerSheetHandler{
+		BaseHandler: &BaseHandler{},
+		saver:       saver,
+		queryer:     queryer,
+		mapper:      mapper.NewAnswerSheetMapper(),
 	}
 }
 
-// SaveAnswerSheet 保存答卷
-func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
-	var req request.SaveAnswerSheetRequest
+// Save 保存答卷
+// @Summary 保存答卷
+// @Description 保存答卷
+// @Tags answersheet
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body viewmodel.SaveAnswerSheetRequest true "保存答卷请求"
+// @Success 200 {object} response.Response
+// @Router /v1/answersheets [post]
+func (h *AnswerSheetHandler) Save(c *gin.Context) {
+	var req viewmodel.SaveAnswerSheetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.WithCode(errCode.ErrInvalidJSON, "invalid request body")
+		h.ErrorResponse(c, errors.WithCode(code.ErrBind, err.Error()))
 		return
 	}
 
-	// 保存原始答卷
-	asBO := answersheet.NewAnswerSheet(req.QuestionnaireCode, req.QuestionnaireVersion,
-		answersheet.WithTitle(req.Title),
-		answersheet.WithWriter(user.NewWriter(user.NewUserID(req.WriterID), "")),
-		answersheet.WithTestee(user.NewTestee(user.NewUserID(req.TesteeID), "")),
-		answersheet.WithAnswers(mapper.NewAnswerMapper().MapAnswersToBOs(req.Answers)),
-	)
-	answersheet, err := h.AnswersheetSaver.SaveOriginalAnswerSheet(c, asBO)
+	dto := h.mapper.ToAnswerSheetDTO(req)
+	savedDTO, err := h.saver.SaveOriginalAnswerSheet(c.Request.Context(), dto)
 	if err != nil {
-		errors.WithCode(errCode.ErrInternalServerError, "failed to save original answer sheet")
+		h.ErrorResponse(c, err)
 		return
 	}
 
-	response := response.SaveAnswerSheetResponse{
-		ID: answersheet.GetID(),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, gin.H{
+		"id": savedDTO.ID,
+	})
 }
 
-// GetAnswerSheet 获取答卷
-func (h *AnswersheetHandler) GetAnswerSheet(c *gin.Context) {
-	answersheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		errors.WithCode(errCode.ErrInvalidJSON, "invalid request body")
-		return
-	}
-	answersheet, err := h.AnswersheetQueryer.GetAnswerSheetByID(c, answersheetID)
-	if err != nil {
-		errors.WithCode(errCode.ErrInternalServerError, "failed to get answer sheet")
+// List 获取答卷列表
+// @Summary 获取答卷列表
+// @Description 获取答卷列表
+// @Tags answersheet
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param questionnaire_code query string false "问卷编码"
+// @Param questionnaire_version query string false "问卷版本"
+// @Param writer_id query integer false "填写人ID"
+// @Param testee_id query integer false "被试ID"
+// @Param page query integer true "页码"
+// @Param page_size query integer true "每页数量"
+// @Success 200 {object} response.Response{data=response.ListAnswerSheetsResponse}
+// @Router /v1/answersheets [get]
+func (h *AnswerSheetHandler) List(c *gin.Context) {
+	var req viewmodel.ListAnswerSheetsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		h.ErrorResponse(c, errors.WithCode(code.ErrBind, err.Error()))
 		return
 	}
 
-	response := response.GetAnswerSheetResponse{
-		ID: answersheet.GetID(),
+	filter := h.mapper.ToAnswerSheetFilterDTO(req)
+	sheets, total, err := h.queryer.GetAnswerSheetList(c.Request.Context(), filter, req.Page, req.PageSize)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
 	}
 
-	h.SuccessResponse(c, response)
+	var vms []viewmodel.AnswerSheetViewModel
+	for _, sheet := range sheets {
+		vms = append(vms, h.mapper.ToAnswerSheetViewModel(sheet))
+	}
+
+	h.SuccessResponse(c, gin.H{
+		"total": total,
+		"items": vms,
+	})
+}
+
+// Get 获取答卷详情
+// @Summary 获取答卷详情
+// @Description 获取答卷详情
+// @Tags answersheet
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path integer true "答卷ID"
+// @Success 200 {object} response.Response{data=response.GetAnswerSheetResponse}
+// @Router /v1/answersheets/{id} [get]
+func (h *AnswerSheetHandler) Get(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "无效的答卷ID"))
+		return
+	}
+
+	detail, err := h.queryer.GetAnswerSheetByID(c.Request.Context(), id)
+	if err != nil {
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	vm := h.mapper.ToAnswerSheetDetailViewModel(*detail)
+	h.SuccessResponse(c, vm)
 }

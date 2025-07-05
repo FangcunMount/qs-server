@@ -3,18 +3,25 @@ package port
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 )
 
 // AnswerSheetSaver 答卷保存器
+// 专注于答卷的保存操作
 type AnswerSheetSaver interface {
-	SaveOriginalAnswerSheet(ctx context.Context, aDomain *answersheet.AnswerSheet) (*answersheet.AnswerSheet, error)
-	SaveAnswerSheetScores(ctx context.Context, aDomain *answersheet.AnswerSheet) (*answersheet.AnswerSheet, error)
+	// SaveAnswerSheet 保存答卷（包括新建和更新）
+	SaveOriginalAnswerSheet(ctx context.Context, answerSheet dto.AnswerSheetDTO) (*dto.AnswerSheetDTO, error)
+
+	// SaveAnswerSheetScores 保存答卷分数
+	SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore uint16, answers []dto.AnswerDTO) (*dto.AnswerSheetDTO, error)
 }
 
 // AnswerSheetQueryer 答卷查询器
+// 专注于答卷的查询操作
 type AnswerSheetQueryer interface {
-	GetAnswerSheetByID(ctx context.Context, id uint64) (*answersheet.AnswerSheet, error)
-	GetAnswerSheetListByWriter(ctx context.Context, writerID uint64, page, pageSize int) ([]*answersheet.AnswerSheet, error)
-	GetAnswerSheetListByTestee(ctx context.Context, testeeID uint64, page, pageSize int) ([]*answersheet.AnswerSheet, error)
+	// GetAnswerSheetByID 根据ID获取答卷详情
+	GetAnswerSheetByID(ctx context.Context, id uint64) (*dto.AnswerSheetDetailDTO, error)
+
+	// GetAnswerSheetList 获取答卷列表
+	GetAnswerSheetList(ctx context.Context, filter dto.AnswerSheetDTO, page, pageSize int) ([]dto.AnswerSheetDTO, int64, error)
 }
