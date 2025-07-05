@@ -39,12 +39,12 @@ func (m *AnswersheetModule) Initialize(params ...interface{}) error {
 	// 初始化 repository 层
 	m.AnswersheetRepo = infra.NewRepository(mongoDB)
 
-	// 初始化 handler 层
-	m.AnswersheetHandler = handler.NewAnswersheetHandler(m.AnswersheetSaver, m.AnswersheetQueryer)
-
 	// 初始化 service 层
 	m.AnswersheetSaver = answersheetApp.NewSaver(m.AnswersheetRepo)
 	m.AnswersheetQueryer = answersheetApp.NewQueryer(m.AnswersheetRepo)
+
+	// 初始化 handler 层
+	m.AnswersheetHandler = handler.NewAnswersheetHandler(m.AnswersheetSaver, m.AnswersheetQueryer)
 
 	return nil
 }

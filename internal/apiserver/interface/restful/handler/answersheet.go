@@ -45,7 +45,7 @@ func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
 	)
 	answersheet, err := h.AnswersheetSaver.SaveOriginalAnswerSheet(c, asBO)
 	if err != nil {
-		errors.WithCode(errCode.ErrInternalServerError, err.Error())
+		errors.WithCode(errCode.ErrInternalServerError, "failed to save original answer sheet")
 		return
 	}
 

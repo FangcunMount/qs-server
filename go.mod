@@ -7,11 +7,17 @@ require (
 	github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.39.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gorm.io/gorm v1.30.0
 	k8s.io/klog v1.0.0
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 )
 
 require (
@@ -79,7 +85,7 @@ require (
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-redis/redis/v7 v7.4.1
-	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/gosuri/uitable v0.0.4
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12
@@ -92,7 +98,6 @@ require (
 	github.com/speps/go-hashids v2.0.0+incompatible
 	github.com/spf13/pflag v1.0.6
 	github.com/tpkeeper/gin-dump v1.0.1
-	github.com/vinllen/mgo v0.0.0-20220329061231-e5ecea62f194
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/sync v0.15.0
 	golang.org/x/time v0.12.0
