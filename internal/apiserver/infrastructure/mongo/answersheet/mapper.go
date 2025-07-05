@@ -65,7 +65,7 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	// 转换答案
 	answers := make([]answer.Answer, 0, len(po.Answers))
 	for _, answerPO := range po.Answers {
-		answers = append(answers, *m.mapAnswerToBO(&answerPO))
+		answers = append(answers, m.mapAnswerToBO(answerPO))
 	}
 
 	// 转换答卷者 - 只使用 userID 创建 Writer
@@ -114,11 +114,7 @@ func (m *AnswerSheetMapper) mapAnswerToPO(answerBO *answer.Answer) *AnswerPO {
 }
 
 // mapAnswerToBO 将 AnswerPO 转换为答案领域对象
-func (m *AnswerSheetMapper) mapAnswerToBO(answerPO *AnswerPO) *answer.Answer {
-	if answerPO == nil {
-		return nil
-	}
-
+func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) answer.Answer {
 	// 使用工厂函数创建 AnswerValue
 	questionType := question.QuestionType(answerPO.QuestionType)
 	answerValue := answer_values.NewAnswerValue(questionType, answerPO.Value.Value)

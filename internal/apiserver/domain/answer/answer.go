@@ -15,8 +15,8 @@ type Answer struct {
 }
 
 // NewAnswer 创建基础答案
-func NewAnswer(questionCode string, questionType string, score uint16, value AnswerValue) *Answer {
-	return &Answer{
+func NewAnswer(questionCode string, questionType string, score uint16, value AnswerValue) Answer {
+	return Answer{
 		questionCode: questionCode,
 		questionType: questionType,
 		score:        score,
