@@ -1,34 +1,37 @@
 package code
 
-// questionnaire errors.
+// apiserver: questionnaire errors.
 const (
 	// ErrQuestionnaireNotFound - 404: Questionnaire not found.
-	ErrQuestionnaireNotFound int = iota + 110001
+	ErrQuestionnaireNotFound int = iota + 120001
 
-	// ErrQuestionnaireAlreadyExists- 400: Questionnaire already exist.
+	// ErrQuestionnaireAlreadyExists - 400: Questionnaire already exists.
 	ErrQuestionnaireAlreadyExists
 
-	// ErrQuestionnaireBasicInfoInvalid - 400: Questionnaire basic info is invalid.
-	ErrQuestionnaireBasicInfoInvalid
+	// ErrQuestionnaireArchived - 400: Questionnaire is archived.
+	ErrQuestionnaireArchived
 
-	// ErrQuestionnaireStatusInvalid - 400: Questionnaire status is invalid.
-	ErrQuestionnaireStatusInvalid
+	// ErrQuestionnaireInvalidInput - 400: Invalid input for questionnaire.
+	ErrQuestionnaireInvalidInput
 
-	// ErrQuestionnaireQuestionInvalid - 400: Questionnaire question is invalid.
-	ErrQuestionnaireQuestionInvalid
+	// ErrQuestionnaireInvalidStatus - 400: Invalid questionnaire status.
+	ErrQuestionnaireInvalidStatus
 
-	// ErrQuestionnaireQuestionNotFound - 404: Questionnaire question not found.
+	// ErrQuestionnaireInvalidQuestion - 400: Invalid question in questionnaire.
+	ErrQuestionnaireInvalidQuestion
+
+	// ErrQuestionnaireQuestionNotFound - 404: Question not found in questionnaire.
 	ErrQuestionnaireQuestionNotFound
 
-	// ErrQuestionnaireQuestionAlreadyExists - 400: Questionnaire question already exist.
+	// ErrQuestionnaireQuestionAlreadyExists - 400: Question already exists in questionnaire.
 	ErrQuestionnaireQuestionAlreadyExists
 
-	// ErrQuestionnaireQuestionBasicInfoInvalid - 400: Questionnaire question basic info is invalid.
+	// ErrQuestionnaireQuestionBasicInfoInvalid - 400: Question basic info is invalid.
 	ErrQuestionnaireQuestionBasicInfoInvalid
 
-	// ErrQuestionnairePublished - 400: Questionnaire is published, can't edit.
-	ErrQuestionnairePublished
+	// ErrQuestionnaireQuestionInvalid - 400: Question is invalid.
+	ErrQuestionnaireQuestionInvalid
 
-	// ErrQuestionnaireArchived - 400: Questionnaire is archived, can't edit.
-	ErrQuestionnaireArchived
+	// ErrQuestionnaireStatusInvalid - 400: Invalid status transition.
+	ErrQuestionnaireStatusInvalid
 )

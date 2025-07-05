@@ -20,6 +20,15 @@ func (VersionService) Publish(q *Questionnaire) error {
 	return nil
 }
 
+// Unpublish 下架问卷
+func (VersionService) Unpublish(q *Questionnaire) error {
+	if q.GetStatus() != STATUS_PUBLISHED {
+		return errors.WithCode(code.ErrQuestionnaireStatusInvalid, "只有发布状态才能下架")
+	}
+	q.status = STATUS_DRAFT
+	return nil
+}
+
 // Archive 归档问卷
 func (VersionService) Archive(q *Questionnaire) error {
 	if q.GetStatus() != STATUS_PUBLISHED {

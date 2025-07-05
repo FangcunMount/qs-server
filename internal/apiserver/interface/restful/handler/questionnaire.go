@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"strconv"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/mapper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
@@ -48,32 +50,29 @@ func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
 		return
 	}
 
+	// 转换为 DTO
+	questionnaireDTO := &dto.QuestionnaireDTO{
+		Title:       req.Title,
+		Description: req.Description,
+		ImgUrl:      req.ImgUrl,
+	}
+
 	// 调用领域服务
-	q, err := h.questionnaireCreator.CreateQuestionnaire(c, req.Title, req.Description, req.ImgUrl)
+	result, err := h.questionnaireCreator.CreateQuestionnaire(c, questionnaireDTO)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	response := &response.QuestionnaireBasicInfoResponse{
-		Code:        q.GetCode().Value(),
-		Title:       q.GetTitle(),
-		Description: q.GetDescription(),
-		ImgUrl:      q.GetImgUrl(),
-		Version:     q.GetVersion().Value(),
-		Status:      q.GetStatus().Value(),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
 }
 
-// EditQuestionnaire 编辑问卷
+// EditBasicInfo 编辑问卷基本信息
 func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 	// 从路径参数获取code
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷代码不能为空"))
 		return
 	}
 
@@ -83,30 +82,22 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 		return
 	}
 
+	// 转换为 DTO
+	questionnaireDTO := &dto.QuestionnaireDTO{
+		Code:        qCode,
+		Title:       req.Title,
+		Description: req.Description,
+		ImgUrl:      req.ImgUrl,
+	}
+
 	// 调用领域服务
-	q, err := h.questionnaireEditor.EditBasicInfo(
-		c,
-		questionnaire.NewQuestionnaireCode(qCode),
-		req.Title,
-		req.Description,
-		req.ImgUrl,
-	)
+	result, err := h.questionnaireEditor.EditBasicInfo(c, questionnaireDTO)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	response := &response.QuestionnaireBasicInfoResponse{
-		Code:        q.GetCode().Value(),
-		Title:       q.GetTitle(),
-		Description: q.GetDescription(),
-		ImgUrl:      q.GetImgUrl(),
-		Version:     q.GetVersion().Value(),
-		Status:      q.GetStatus().Value(),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
 }
 
 // UpdateQuestions 更新问卷的问题列表
@@ -114,7 +105,7 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 	// 从路径参数获取code
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷代码不能为空"))
 		return
 	}
 
@@ -124,24 +115,17 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 		return
 	}
 
+	// 转换为 DTO
+	questions := mapper.NewQuestionMapper().ToDTOs(req.Questions)
+
 	// 调用领域服务
-	q, err := h.questionnaireEditor.UpdateQuestions(
-		c,
-		questionnaire.NewQuestionnaireCode(qCode),
-		mapper.NewQuestionMapper().MapQuestionsToBOs(req.Questions),
-	)
+	result, err := h.questionnaireEditor.UpdateQuestions(c, qCode, questions)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	response := &response.QuestionnaireQuestionsResponse{
-		Code:      q.GetCode().Value(),
-		Questions: mapper.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
 }
 
 // PublishQuestionnaire 发布问卷
@@ -149,28 +133,18 @@ func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
 	// 从路径参数获取code
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷代码不能为空"))
 		return
 	}
 
 	// 调用领域服务
-	q, err := h.questionnairePublisher.Publish(c, questionnaire.NewQuestionnaireCode(qCode))
+	result, err := h.questionnairePublisher.Publish(c, qCode)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	response := &response.QuestionnaireBasicInfoResponse{
-		Code:        q.GetCode().Value(),
-		Title:       q.GetTitle(),
-		Description: q.GetDescription(),
-		ImgUrl:      q.GetImgUrl(),
-		Version:     q.GetVersion().Value(),
-		Status:      q.GetStatus().Value(),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
 }
 
 // UnpublishQuestionnaire 下架问卷
@@ -178,94 +152,69 @@ func (h *QuestionnaireHandler) UnpublishQuestionnaire(c *gin.Context) {
 	// 从路径参数获取code
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷代码不能为空"))
 		return
 	}
 
 	// 调用领域服务
-	q, err := h.questionnairePublisher.Unpublish(c, questionnaire.NewQuestionnaireCode(qCode))
+	result, err := h.questionnairePublisher.Unpublish(c, qCode)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	response := &response.QuestionnaireBasicInfoResponse{
-		Code:        q.GetCode().Value(),
-		Title:       q.GetTitle(),
-		Description: q.GetDescription(),
-		ImgUrl:      q.GetImgUrl(),
-		Version:     q.GetVersion().Value(),
-		Status:      q.GetStatus().Value(),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
 }
 
-// GetQuestionnaire 获取问卷
+// QueryOne 查询单个问卷
 func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
 	// 从路径参数获取code
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrValidation, "问卷代码不能为空"))
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷代码不能为空"))
 		return
 	}
 
 	// 调用领域服务
-	q, err := h.questionnaireQueryer.GetQuestionnaireByCode(c, qCode)
+	result, err := h.questionnaireQueryer.GetQuestionnaireByCode(c, qCode)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	response := &response.QuestionnaireResponse{
-		Questionnaire: response.QuestionnaireBasicInfoResponse{
-			Code:        q.GetCode().Value(),
-			Title:       q.GetTitle(),
-			Description: q.GetDescription(),
-			ImgUrl:      q.GetImgUrl(),
-			Version:     q.GetVersion().Value(),
-			Status:      q.GetStatus().Value(),
-		},
-		Questions: mapper.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
 }
 
+// QueryList 查询问卷列表
 func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
-	var req request.QueryQuestionnaireListRequest
-	if err := h.BindQuery(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+	// 获取分页参数
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page <= 0 {
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "页码必须为正整数"))
 		return
 	}
 
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if err != nil || pageSize <= 0 || pageSize > 100 {
+		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "每页数量必须为1-100的整数"))
+		return
+	}
+
+	// 获取查询条件
+	conditions := make(map[string]string)
+	if status := c.Query("status"); status != "" {
+		conditions["status"] = status
+	}
+	if title := c.Query("title"); title != "" {
+		conditions["title"] = title
+	}
+
 	// 调用领域服务
-	questionnaires, total, err := h.questionnaireQueryer.ListQuestionnaires(c, req.Page, req.PageSize, req.Conditions)
+	questionnaires, total, err := h.questionnaireQueryer.ListQuestionnaires(c, page, pageSize, conditions)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
 	}
 
-	// 转换为DTO响应
-	questionnaireDTOs := make([]response.QuestionnaireBasicInfoResponse, len(questionnaires))
-	for i, q := range questionnaires {
-		questionnaireDTOs[i] = response.QuestionnaireBasicInfoResponse{
-			Code:        q.GetCode().Value(),
-			Title:       q.GetTitle(),
-			Description: q.GetDescription(),
-			ImgUrl:      q.GetImgUrl(),
-			Version:     q.GetVersion().Value(),
-			Status:      q.GetStatus().Value(),
-		}
-	}
-	response := &response.QuestionnaireListResponse{
-		Questionnaires: questionnaireDTOs,
-		TotalCount:     total,
-		Page:           req.Page,
-		PageSize:       req.PageSize,
-	}
-
-	h.SuccessResponse(c, response)
+	h.SuccessResponse(c, response.NewQuestionnaireListResponse(questionnaires, total, page, pageSize))
 }

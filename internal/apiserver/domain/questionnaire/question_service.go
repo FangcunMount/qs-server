@@ -55,3 +55,8 @@ func (QuestionService) DeleteQuestion(q *Questionnaire, questionCode question.Qu
 
 	return errors.WithCode(code.ErrQuestionnaireQuestionNotFound, "找不到该题目")
 }
+
+// RemoveAllQuestions 清除所有问题
+func (QuestionService) RemoveAllQuestions(q *Questionnaire) {
+	q.questions = make([]question.Question, 0)
+}

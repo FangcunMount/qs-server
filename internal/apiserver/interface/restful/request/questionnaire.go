@@ -1,24 +1,26 @@
 package request
 
-import "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
+import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
+)
 
-// QuestionnaireCreateRequest 创建问卷请求
+// CreateQuestionnaireRequest 创建问卷请求
 type CreateQuestionnaireRequest struct {
-	Title       string `json:"title" valid:"required"`
-	Description string `json:"description" valid:"required"`
+	Title       string `json:"title" valid:"required~标题不能为空"`
+	Description string `json:"description"`
 	ImgUrl      string `json:"img_url"`
 }
 
-// EditQuestionnaireBasicInfoRequest 编辑问卷请求
+// EditQuestionnaireBasicInfoRequest 编辑问卷基本信息请求
 type EditQuestionnaireBasicInfoRequest struct {
-	Title       string `json:"title" valid:"required"`
-	Description string `json:"description" valid:"required"`
-	ImgUrl      string `json:"img_url" valid:"required"`
+	Title       string `json:"title" valid:"required~标题不能为空"`
+	Description string `json:"description"`
+	ImgUrl      string `json:"img_url"`
 }
 
 // EditQuestionnaireQuestionsRequest 编辑问卷问题请求
 type EditQuestionnaireQuestionsRequest struct {
-	Questions []viewmodel.QuestionDTO `json:"questions" valid:"required"`
+	Questions []viewmodel.QuestionDTO `json:"questions" valid:"required~问题列表不能为空"`
 }
 
 // QueryQuestionnaireRequest 问卷ID请求

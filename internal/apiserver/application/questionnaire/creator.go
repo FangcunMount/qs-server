@@ -3,6 +3,7 @@ package questionnaire
 import (
 	"context"
 
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	"github.com/yshujie/questionnaire-scale/pkg/util/codeutil"
@@ -12,6 +13,7 @@ import (
 type Creator struct {
 	qRepoMySQL port.QuestionnaireRepositoryMySQL
 	qRepoMongo port.QuestionnaireRepositoryMongo
+	mapper     *QuestionnaireMapper
 }
 
 // NewCreator 创建问卷创建器
@@ -19,11 +21,15 @@ func NewCreator(
 	qRepoMySQL port.QuestionnaireRepositoryMySQL,
 	qRepoMongo port.QuestionnaireRepositoryMongo,
 ) *Creator {
-	return &Creator{qRepoMySQL: qRepoMySQL, qRepoMongo: qRepoMongo}
+	return &Creator{
+		qRepoMySQL: qRepoMySQL,
+		qRepoMongo: qRepoMongo,
+		mapper:     NewQuestionnaireMapper(),
+	}
 }
 
 // CreateQuestionnaire 创建问卷
-func (c *Creator) CreateQuestionnaire(ctx context.Context, title, description, imgUrl string) (*questionnaire.Questionnaire, error) {
+func (c *Creator) CreateQuestionnaire(ctx context.Context, questionnaireDTO *dto.QuestionnaireDTO) (*dto.QuestionnaireDTO, error) {
 	// 1. 生成问卷编码
 	code, err := codeutil.GenerateCode()
 	if err != nil {
@@ -33,9 +39,9 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, title, description, i
 	// 2. 创建问卷领域模型
 	qBo := questionnaire.NewQuestionnaire(
 		questionnaire.NewQuestionnaireCode(code),
-		title,
-		questionnaire.WithDescription(description),
-		questionnaire.WithImgUrl(imgUrl),
+		questionnaireDTO.Title,
+		questionnaire.WithDescription(questionnaireDTO.Description),
+		questionnaire.WithImgUrl(questionnaireDTO.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion("1.0")),
 		questionnaire.WithStatus(questionnaire.STATUS_DRAFT),
 	)
@@ -50,6 +56,6 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, title, description, i
 		return nil, err
 	}
 
-	// 5. 返回问卷领域对象
-	return qBo, nil
+	// 5. 转换为 DTO 并返回
+	return c.mapper.ToDTO(qBo), nil
 }

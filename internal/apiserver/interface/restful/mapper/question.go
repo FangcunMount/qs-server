@@ -1,13 +1,8 @@
 package mapper
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
-	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/question-types"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // QuestionMapper 问题映射器
@@ -18,146 +13,114 @@ func NewQuestionMapper() *QuestionMapper {
 	return &QuestionMapper{}
 }
 
-// mapQuestionsToBOs 将问题 DTO 列表转为领域对象列表
-func (m *QuestionMapper) MapQuestionsToBOs(questions []viewmodel.QuestionDTO) []question.Question {
-	boQuestions := make([]question.Question, 0, len(questions))
-	for _, q := range questions {
-		if bo := m.mapQuestionToBO(q); bo != nil {
-			boQuestions = append(boQuestions, bo)
-		}
-	}
-	return boQuestions
-}
-
-// mapQuestionToBO 将问题 DTO 转为领域对象
-func (m *QuestionMapper) mapQuestionToBO(q viewmodel.QuestionDTO) question.Question {
-	log.Infow("---- mapQuestionToBO input:", "code", q.Code, "type", q.Type, "title", q.Title)
-
-	// 构建配置选项列表
-	opts := []question_types.BuilderOption{
-		question_types.WithCode(question.NewQuestionCode(q.Code)),
-		question_types.WithTitle(q.Title),
-		question_types.WithTips(q.Tips),
-		question_types.WithQuestionType(question.QuestionType(q.Type)),
-	}
-
-	// 添加特定属性
-	if q.Placeholder != "" {
-		opts = append(opts, question_types.WithPlaceholder(q.Placeholder))
-	}
-	if len(q.Options) > 0 {
-		opts = append(opts, question_types.WithOptions(m.mapOptionsToBO(q.Options)))
-	}
-	if len(q.ValidationRules) > 0 {
-		opts = append(opts, question_types.WithValidationRules(m.mapValidationRulesToBO(q.ValidationRules)))
-	}
-	if q.CalculationRule != nil {
-		opts = append(opts, question_types.WithCalculationRule(calculation.FormulaType(q.CalculationRule.FormulaType)))
-	}
-
-	// 1. 创建配置
-	builder := question_types.BuildQuestionConfig(opts...)
-
-	// 验证 builder 有效性
-	if !builder.IsValid() {
-		log.Errorw("---- QuestionBuilder validation failed:", "errors", builder.GetValidationErrors())
+// ToDTO 将 viewmodel 转换为 DTO
+func (m *QuestionMapper) ToDTO(vm *viewmodel.QuestionDTO) *dto.QuestionDTO {
+	if vm == nil {
 		return nil
 	}
 
-	// 2. 创建对象
-	result := question_types.CreateQuestionFromBuilder(builder)
-	if result == nil {
-		log.Errorw("---- CreateFromBuilder returned nil for question:", "code", q.Code, "type", q.Type)
-	} else {
-		log.Infow("---- Successfully created question:", "code", result.GetCode().Value(), "type", result.GetType())
+	questionDTO := &dto.QuestionDTO{
+		Code:  vm.Code,
+		Type:  vm.Type,
+		Title: vm.Title,
+		Tips:  vm.Tips,
 	}
 
-	return result
-}
-
-// mapOptionsToBO 将选项DTO转换为领域模型
-func (m *QuestionMapper) mapOptionsToBO(options []viewmodel.OptionDTO) []option.Option {
-	opts := make([]option.Option, len(options))
-	for i, o := range options {
-		opts[i] = option.NewOption(o.Code, o.Content, o.Score)
-	}
-	return opts
-}
-
-// mapValidationRulesToBO 将校验规则DTO转换为领域模型
-func (m *QuestionMapper) mapValidationRulesToBO(rules []viewmodel.ValidationRuleDTO) []validation.ValidationRule {
-	opts := make([]validation.ValidationRule, len(rules))
-	for i, r := range rules {
-		opts[i] = validation.NewValidationRule(validation.RuleType(r.RuleType), r.TargetValue)
-	}
-	return opts
-}
-
-// MapQuestionsToDTOs 将 Questions 转为 question DTO 列表
-func (m *QuestionMapper) MapQuestionsToDTOs(questions []question.Question) []viewmodel.QuestionDTO {
-	dtos := make([]viewmodel.QuestionDTO, len(questions))
-	for i, q := range questions {
-		dtos[i] = m.mapQuestionToDTO(q)
-	}
-	return dtos
-}
-
-// mapQuestionToDTO 将 question 转为 question DTO
-func (m *QuestionMapper) mapQuestionToDTO(q question.Question) viewmodel.QuestionDTO {
-	qDto := viewmodel.QuestionDTO{
-		Code:  q.GetCode().Value(),
-		Type:  string(q.GetType()),
-		Title: q.GetTitle(),
-		Tips:  q.GetTips(),
-	}
-
-	// 添加特定属性
-	if q.GetPlaceholder() != "" {
-		qDto.Placeholder = q.GetPlaceholder()
-	}
-	if q.GetOptions() != nil {
-		qDto.Options = m.mapOptionsToDTO(q.GetOptions())
-	}
-	if q.GetValidationRules() != nil {
-		qDto.ValidationRules = m.mapValidationRulesToDTO(q.GetValidationRules())
-	}
-	if q.GetCalculationRule() != nil {
-		qDto.CalculationRule = m.mapCalculationRuleToDTO(q.GetCalculationRule())
-	}
-	return qDto
-}
-
-// mapOptionsToDTO 将 options 转为 option DTO 列表
-func (m *QuestionMapper) mapOptionsToDTO(options []option.Option) []viewmodel.OptionDTO {
-	dtos := make([]viewmodel.OptionDTO, len(options))
-	for i, o := range options {
-		dtos[i] = viewmodel.OptionDTO{
-			Code:    o.GetCode(),
-			Content: o.GetContent(),
-			Score:   o.GetScore(),
+	if vm.Options != nil {
+		questionDTO.Options = make([]dto.OptionDTO, len(vm.Options))
+		for i, opt := range vm.Options {
+			questionDTO.Options[i] = dto.OptionDTO{
+				Code:    opt.Code,
+				Content: opt.Content,
+				Score:   opt.Score,
+			}
 		}
 	}
-	return dtos
-}
 
-// mapValidationRulesToDTO 将 validationRules 转为 validationRule DTO 列表
-func (m *QuestionMapper) mapValidationRulesToDTO(rules []validation.ValidationRule) []viewmodel.ValidationRuleDTO {
-	dtos := make([]viewmodel.ValidationRuleDTO, len(rules))
-	for i, r := range rules {
-		dtos[i] = viewmodel.ValidationRuleDTO{
-			RuleType:    string(r.GetRuleType()),
-			TargetValue: r.GetTargetValue(),
+	if vm.ValidationRules != nil {
+		questionDTO.ValidationRules = make([]dto.ValidationRuleDTO, len(vm.ValidationRules))
+		for i, rule := range vm.ValidationRules {
+			questionDTO.ValidationRules[i] = dto.ValidationRuleDTO{
+				RuleType:    rule.RuleType,
+				TargetValue: rule.TargetValue,
+			}
 		}
 	}
-	return dtos
+
+	if vm.CalculationRule != nil {
+		questionDTO.CalculationRule = &dto.CalculationRuleDTO{
+			FormulaType: vm.CalculationRule.FormulaType,
+		}
+	}
+
+	return questionDTO
 }
 
-// mapCalculationRuleToDTO 将 calculationRule 转为 calculationRule DTO
-func (m *QuestionMapper) mapCalculationRuleToDTO(rule *calculation.CalculationRule) *viewmodel.CalculationRuleDTO {
-	if rule == nil {
+// ToViewModel 将 DTO 转换为 viewmodel
+func (m *QuestionMapper) ToViewModel(dto *dto.QuestionDTO) *viewmodel.QuestionDTO {
+	if dto == nil {
 		return nil
 	}
-	return &viewmodel.CalculationRuleDTO{
-		FormulaType: string(rule.GetFormulaType()),
+
+	vm := &viewmodel.QuestionDTO{
+		Code:  dto.Code,
+		Type:  dto.Type,
+		Title: dto.Title,
+		Tips:  dto.Tips,
 	}
+
+	if dto.Options != nil {
+		vm.Options = make([]viewmodel.OptionDTO, len(dto.Options))
+		for i, opt := range dto.Options {
+			vm.Options[i] = viewmodel.OptionDTO{
+				Code:    opt.Code,
+				Content: opt.Content,
+				Score:   opt.Score,
+			}
+		}
+	}
+
+	if dto.ValidationRules != nil {
+		vm.ValidationRules = make([]viewmodel.ValidationRuleDTO, len(dto.ValidationRules))
+		for i, rule := range dto.ValidationRules {
+			vm.ValidationRules[i] = viewmodel.ValidationRuleDTO{
+				RuleType:    rule.RuleType,
+				TargetValue: rule.TargetValue,
+			}
+		}
+	}
+
+	if dto.CalculationRule != nil {
+		vm.CalculationRule = &viewmodel.CalculationRuleDTO{
+			FormulaType: dto.CalculationRule.FormulaType,
+		}
+	}
+
+	return vm
+}
+
+// ToDTOs 将多个 viewmodel 转换为 DTOs
+func (m *QuestionMapper) ToDTOs(vms []viewmodel.QuestionDTO) []dto.QuestionDTO {
+	if vms == nil {
+		return nil
+	}
+
+	dtos := make([]dto.QuestionDTO, len(vms))
+	for i, vm := range vms {
+		dtos[i] = *m.ToDTO(&vm)
+	}
+	return dtos
+}
+
+// ToViewModels 将多个 DTO 转换为 viewmodels
+func (m *QuestionMapper) ToViewModels(dtos []dto.QuestionDTO) []viewmodel.QuestionDTO {
+	if dtos == nil {
+		return nil
+	}
+
+	vms := make([]viewmodel.QuestionDTO, len(dtos))
+	for i, dto := range dtos {
+		vms[i] = *m.ToViewModel(&dto)
+	}
+	return vms
 }
