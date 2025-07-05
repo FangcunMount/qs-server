@@ -77,6 +77,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册问卷相关的受保护路由
 	r.registerQuestionnaireProtectedRoutes(apiV1)
 
+	// 注册答卷相关的受保护路由
+	r.registerAnswersheetProtectedRoutes(apiV1)
+
 	// 管理员路由（需要额外的权限检查）
 	r.registerAdminRoutes(apiV1)
 }
@@ -117,6 +120,20 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 		// 问卷问题管理
 		questionnaires.PUT("/:code/questions", quesHandler.UpdateQuestions) // 更新问卷问题
+	}
+}
+
+// registerAnswersheetProtectedRoutes 注册答卷相关的受保护路由
+func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
+	answersheetHandler := r.container.AnswersheetModule.AnswersheetHandler
+	if answersheetHandler == nil {
+		return
+	}
+
+	answersheets := apiV1.Group("/answersheets")
+	{
+		answersheets.POST("", answersheetHandler.SaveAnswerSheet)   // 保存答卷
+		answersheets.GET("/:id", answersheetHandler.GetAnswerSheet) // 获取答卷
 	}
 }
 
