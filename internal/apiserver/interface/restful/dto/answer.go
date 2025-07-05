@@ -11,6 +11,7 @@ type Answer struct {
 	QuestionCode string `json:"question_code" valid:"required"`
 	QuestionType string `json:"question_type" valid:"required"`
 	Value        any    `json:"value"`
+	Score        uint16 `json:"score"`
 }
 
 // AnswerMapper 答案映射

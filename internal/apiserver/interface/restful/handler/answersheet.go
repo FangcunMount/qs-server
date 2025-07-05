@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
@@ -50,7 +52,7 @@ func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
 	}
 
 	response := dto.SaveAnswerSheetResponse{
-		ID: answersheet.ID,
+		ID: answersheet.GetID(),
 	}
 
 	h.SuccessResponse(c, response)
@@ -58,5 +60,20 @@ func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
 
 // GetAnswerSheet 获取答卷
 func (h *AnswersheetHandler) GetAnswerSheet(c *gin.Context) {
+	answersheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		errors.WithCode(errCode.ErrInvalidJSON, "invalid request body")
+		return
+	}
+	answersheet, err := h.AnswersheetQueryer.GetAnswerSheetByID(c, answersheetID)
+	if err != nil {
+		errors.WithCode(errCode.ErrInternalServerError, "failed to get answer sheet")
+		return
+	}
 
+	response := dto.GetAnswerSheetResponse{
+		ID: answersheet.GetID(),
+	}
+
+	h.SuccessResponse(c, response)
 }

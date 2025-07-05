@@ -4,22 +4,29 @@ import (
 	"context"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
+	asPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
+	qnPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 )
 
 // Queryer 答卷查询器
 type Queryer struct {
-	aRepoMongo port.AnswerSheetRepositoryMongo
+	aRepoMongo asPort.AnswerSheetRepositoryMongo
+
+	qRepoMongo qnPort.QuestionnaireRepositoryMongo
 }
 
 // NewQueryer 创建答卷查询器
-func NewQueryer(aRepoMongo port.AnswerSheetRepositoryMongo) *Queryer {
-	return &Queryer{aRepoMongo: aRepoMongo}
+func NewQueryer(aRepoMongo asPort.AnswerSheetRepositoryMongo, qRepoMongo qnPort.QuestionnaireRepositoryMongo) *Queryer {
+	return &Queryer{aRepoMongo: aRepoMongo, qRepoMongo: qRepoMongo}
 }
 
 // GetAnswerSheetByID 根据ID获取答卷
 func (q *Queryer) GetAnswerSheetByID(ctx context.Context, id uint64) (*answersheet.AnswerSheet, error) {
-	return q.aRepoMongo.FindByID(ctx, id)
+	asBO, err := q.aRepoMongo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return asBO, nil
 }
 
 // GetAnswerSheetListByWriter 根据答卷者获取答卷列表

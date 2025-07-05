@@ -24,6 +24,7 @@ type QuestionnaireRepositoryMySQL interface {
 type QuestionnaireRepositoryMongo interface {
 	Create(ctx context.Context, qDomain *questionnaire.Questionnaire) error
 	FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error)
+	FindByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error)
 	Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error
 	Remove(ctx context.Context, code string) error
 	HardDelete(ctx context.Context, code string) error

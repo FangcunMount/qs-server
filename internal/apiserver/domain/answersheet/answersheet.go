@@ -11,23 +11,23 @@ import (
 
 // AnswerSheet 答卷
 type AnswerSheet struct {
-	ID                   uint64
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-	Title                string
-	Score                uint16
-	Answers              []answer.Answer
-	Writer               *user.Writer
-	Testee               *user.Testee
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	id                   uint64
+	questionnaireCode    string
+	questionnaireVersion string
+	title                string
+	score                uint16
+	answers              []answer.Answer
+	writer               *user.Writer
+	testee               *user.Testee
+	createdAt            time.Time
+	updatedAt            time.Time
 }
 
 // NewAnswerSheet 创建答卷
 func NewAnswerSheet(questionnaireCode string, questionnaireVersion string, opts ...AnswerSheetOption) *AnswerSheet {
 	a := &AnswerSheet{
-		QuestionnaireCode:    questionnaireCode,
-		QuestionnaireVersion: questionnaireVersion,
+		questionnaireCode:    questionnaireCode,
+		questionnaireVersion: questionnaireVersion,
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -39,106 +39,106 @@ type AnswerSheetOption func(*AnswerSheet)
 
 func WithID(id uint64) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.ID = id
+		a.id = id
 	}
 }
 
 func WithQuestionnaireCode(questionnaireCode string) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.QuestionnaireCode = questionnaireCode
+		a.questionnaireCode = questionnaireCode
 	}
 }
 
 func WithQuestionnaireVersion(questionnaireVersion string) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.QuestionnaireVersion = questionnaireVersion
+		a.questionnaireVersion = questionnaireVersion
 	}
 }
 
 func WithTitle(title string) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.Title = title
+		a.title = title
 	}
 }
 
 func WithScore(score uint16) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.Score = score
+		a.score = score
 	}
 }
 
 func WithAnswers(answers []answer.Answer) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.Answers = answers
+		a.answers = answers
 	}
 }
 
 func WithWriter(writer *user.Writer) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.Writer = writer
+		a.writer = writer
 	}
 }
 
 func WithTestee(testee *user.Testee) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.Testee = testee
+		a.testee = testee
 	}
 }
 
 func WithCreatedAt(createdAt time.Time) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.CreatedAt = createdAt
+		a.createdAt = createdAt
 	}
 }
 
 func WithUpdatedAt(updatedAt time.Time) AnswerSheetOption {
 	return func(a *AnswerSheet) {
-		a.UpdatedAt = updatedAt
+		a.updatedAt = updatedAt
 	}
 }
 
 func (a *AnswerSheet) GetID() uint64 {
-	return a.ID
+	return a.id
 }
 
 func (a *AnswerSheet) GetQuestionnaireCode() string {
-	return a.QuestionnaireCode
+	return a.questionnaireCode
 }
 
 func (a *AnswerSheet) GetQuestionnaireVersion() string {
-	return a.QuestionnaireVersion
+	return a.questionnaireVersion
 }
 
 func (a *AnswerSheet) GetTitle() string {
-	return a.Title
+	return a.title
 }
 
 func (a *AnswerSheet) GetScore() uint16 {
-	return a.Score
+	return a.score
 }
 
 func (a *AnswerSheet) GetWriter() *user.Writer {
-	return a.Writer
+	return a.writer
 }
 
 func (a *AnswerSheet) GetTestee() *user.Testee {
-	return a.Testee
+	return a.testee
 }
 
 func (a *AnswerSheet) GetCreatedAt() time.Time {
-	return a.CreatedAt
+	return a.createdAt
 }
 
 func (a *AnswerSheet) GetUpdatedAt() time.Time {
-	return a.UpdatedAt
+	return a.updatedAt
 }
 
 func (a *AnswerSheet) GetAnswers() []answer.Answer {
-	return a.Answers
+	return a.answers
 }
 
 func (a *AnswerSheet) GetAnswer(questionCode string) (answer.Answer, error) {
-	for _, answer := range a.Answers {
+	for _, answer := range a.answers {
 		if answer.GetQuestionCode() == questionCode {
 			return answer, nil
 		}

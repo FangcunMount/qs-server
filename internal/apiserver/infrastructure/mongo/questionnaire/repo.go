@@ -63,6 +63,25 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnair
 	return r.mapper.ToBO(&po), nil
 }
 
+// FindByCodeVersion 根据编码和版本查询问卷
+func (r *Repository) FindByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
+	filter := bson.M{
+		"code":    code,
+		"version": version,
+	}
+
+	var po QuestionnairePO
+	err := r.FindOne(ctx, filter, &po)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil // 或者返回自定义的NotFound错误
+		}
+		return nil, err
+	}
+
+	return r.mapper.ToBO(&po), nil
+}
+
 // Update 更新问卷
 func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	po := r.mapper.ToPO(qDomain)

@@ -6,9 +6,11 @@ import (
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	answersheetApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/answersheet"
-	infra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/answersheet"
-	handler "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
+	qnMongoInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/questionnaire"
+
+	asApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/answersheet"
+	asMongoInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/answersheet"
+	asHandler "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
 )
 
 // AnswersheetModule 答卷模块
@@ -17,7 +19,7 @@ type AnswersheetModule struct {
 	AnswersheetRepo port.AnswerSheetRepositoryMongo
 
 	// handler 层
-	AnswersheetHandler *handler.AnswersheetHandler
+	AnswersheetHandler *asHandler.AnswersheetHandler
 
 	// service 层
 	AnswersheetSaver   port.AnswerSheetSaver
@@ -37,14 +39,14 @@ func (m *AnswersheetModule) Initialize(params ...interface{}) error {
 	}
 
 	// 初始化 repository 层
-	m.AnswersheetRepo = infra.NewRepository(mongoDB)
+	m.AnswersheetRepo = asMongoInfra.NewRepository(mongoDB)
 
 	// 初始化 service 层
-	m.AnswersheetSaver = answersheetApp.NewSaver(m.AnswersheetRepo)
-	m.AnswersheetQueryer = answersheetApp.NewQueryer(m.AnswersheetRepo)
+	m.AnswersheetSaver = asApp.NewSaver(m.AnswersheetRepo)
+	m.AnswersheetQueryer = asApp.NewQueryer(m.AnswersheetRepo, qnMongoInfra.NewRepository(mongoDB))
 
 	// 初始化 handler 层
-	m.AnswersheetHandler = handler.NewAnswersheetHandler(m.AnswersheetSaver, m.AnswersheetQueryer)
+	m.AnswersheetHandler = asHandler.NewAnswersheetHandler(m.AnswersheetSaver, m.AnswersheetQueryer)
 
 	return nil
 }
