@@ -7,7 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
 )
 
@@ -35,7 +36,7 @@ func NewUserHandler(userCreator port.UserCreator, userQueryer port.UserQueryer, 
 // GetUser 获取用户
 // GET /api/v1/users/:id
 func (h *UserHandler) GetUser(c *gin.Context) {
-	var req dto.UserIDRequest
+	var req request.UserIDRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -53,7 +54,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.UserResponse{
+	response := response.UserResponse{
 		ID:           user.ID().Value(),
 		Username:     user.Username(),
 		Nickname:     user.Nickname(),
@@ -82,7 +83,7 @@ func (h *UserHandler) GetUserProfile(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.UserResponse{
+	response := response.UserResponse{
 		ID:           user.ID().Value(),
 		Username:     user.Username(),
 		Nickname:     user.Nickname(),

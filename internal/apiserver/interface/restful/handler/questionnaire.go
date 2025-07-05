@@ -5,7 +5,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/mapper"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
@@ -36,7 +38,7 @@ func NewQuestionnaireHandler(
 
 // CreateQuestionnaire 创建问卷
 func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
-	var req dto.CreateQuestionnaireRequest
+	var req request.CreateQuestionnaireRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -54,7 +56,7 @@ func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireBasicInfoResponse{
+	response := &response.QuestionnaireBasicInfoResponse{
 		Code:        q.GetCode().Value(),
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
@@ -75,7 +77,7 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 		return
 	}
 
-	var req dto.EditQuestionnaireBasicInfoRequest
+	var req request.EditQuestionnaireBasicInfoRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -95,7 +97,7 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireBasicInfoResponse{
+	response := &response.QuestionnaireBasicInfoResponse{
 		Code:        q.GetCode().Value(),
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
@@ -116,7 +118,7 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 		return
 	}
 
-	var req dto.EditQuestionnaireQuestionsRequest
+	var req request.EditQuestionnaireQuestionsRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -126,7 +128,7 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 	q, err := h.questionnaireEditor.UpdateQuestions(
 		c,
 		questionnaire.NewQuestionnaireCode(qCode),
-		dto.NewQuestionMapper().MapQuestionsToBOs(req.Questions),
+		mapper.NewQuestionMapper().MapQuestionsToBOs(req.Questions),
 	)
 	if err != nil {
 		h.ErrorResponse(c, err)
@@ -134,9 +136,9 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireQuestionsResponse{
+	response := &response.QuestionnaireQuestionsResponse{
 		Code:      q.GetCode().Value(),
-		Questions: dto.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
+		Questions: mapper.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
 	}
 
 	h.SuccessResponse(c, response)
@@ -159,7 +161,7 @@ func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireBasicInfoResponse{
+	response := &response.QuestionnaireBasicInfoResponse{
 		Code:        q.GetCode().Value(),
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
@@ -188,7 +190,7 @@ func (h *QuestionnaireHandler) UnpublishQuestionnaire(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireBasicInfoResponse{
+	response := &response.QuestionnaireBasicInfoResponse{
 		Code:        q.GetCode().Value(),
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
@@ -217,8 +219,8 @@ func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	response := &dto.QuestionnaireResponse{
-		Questionnaire: dto.QuestionnaireBasicInfoResponse{
+	response := &response.QuestionnaireResponse{
+		Questionnaire: response.QuestionnaireBasicInfoResponse{
 			Code:        q.GetCode().Value(),
 			Title:       q.GetTitle(),
 			Description: q.GetDescription(),
@@ -226,14 +228,14 @@ func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
 			Version:     q.GetVersion().Value(),
 			Status:      q.GetStatus().Value(),
 		},
-		Questions: dto.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
+		Questions: mapper.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
 	}
 
 	h.SuccessResponse(c, response)
 }
 
 func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
-	var req dto.QueryQuestionnaireListRequest
+	var req request.QueryQuestionnaireListRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -247,9 +249,9 @@ func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
 	}
 
 	// 转换为DTO响应
-	questionnaireDTOs := make([]dto.QuestionnaireBasicInfoResponse, len(questionnaires))
+	questionnaireDTOs := make([]response.QuestionnaireBasicInfoResponse, len(questionnaires))
 	for i, q := range questionnaires {
-		questionnaireDTOs[i] = dto.QuestionnaireBasicInfoResponse{
+		questionnaireDTOs[i] = response.QuestionnaireBasicInfoResponse{
 			Code:        q.GetCode().Value(),
 			Title:       q.GetTitle(),
 			Description: q.GetDescription(),
@@ -258,7 +260,7 @@ func (h *QuestionnaireHandler) QueryList(c *gin.Context) {
 			Status:      q.GetStatus().Value(),
 		}
 	}
-	response := &dto.QuestionnaireListResponse{
+	response := &response.QuestionnaireListResponse{
 		Questionnaires: questionnaireDTOs,
 		TotalCount:     total,
 		Page:           req.Page,

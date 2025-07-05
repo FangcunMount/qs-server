@@ -7,7 +7,9 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/mapper"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
@@ -32,7 +34,7 @@ func NewAnswersheetHandler(
 
 // SaveAnswerSheet 保存答卷
 func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
-	var req dto.SaveAnswerSheetRequest
+	var req request.SaveAnswerSheetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errors.WithCode(errCode.ErrInvalidJSON, "invalid request body")
 		return
@@ -43,7 +45,7 @@ func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
 		answersheet.WithTitle(req.Title),
 		answersheet.WithWriter(user.NewWriter(user.NewUserID(req.WriterID), "")),
 		answersheet.WithTestee(user.NewTestee(user.NewUserID(req.TesteeID), "")),
-		answersheet.WithAnswers(dto.NewAnswerMapper().MapAnswersToBOs(req.Answers)),
+		answersheet.WithAnswers(mapper.NewAnswerMapper().MapAnswersToBOs(req.Answers)),
 	)
 	answersheet, err := h.AnswersheetSaver.SaveOriginalAnswerSheet(c, asBO)
 	if err != nil {
@@ -51,7 +53,7 @@ func (h *AnswersheetHandler) SaveAnswerSheet(c *gin.Context) {
 		return
 	}
 
-	response := dto.SaveAnswerSheetResponse{
+	response := response.SaveAnswerSheetResponse{
 		ID: answersheet.GetID(),
 	}
 
@@ -71,7 +73,7 @@ func (h *AnswersheetHandler) GetAnswerSheet(c *gin.Context) {
 		return
 	}
 
-	response := dto.GetAnswerSheetResponse{
+	response := response.GetAnswerSheetResponse{
 		ID: answersheet.GetID(),
 	}
 

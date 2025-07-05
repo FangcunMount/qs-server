@@ -1,4 +1,4 @@
-package dto
+package mapper
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
@@ -6,42 +6,9 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
 	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/question-types"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
-
-// Question 问题
-type Question struct {
-	Code  string `json:"code"`          // 问题ID，仅更新/编辑时提供
-	Type  string `json:"question_type"` // 问题题型：single_choice, multi_choice, text 等
-	Title string `json:"title"`         // 问题主标题
-	Tips  string `json:"tips"`          // 问题提示
-
-	// 特定属性
-	Placeholder string   `json:"placeholder"`       // 问题占位符
-	Options     []Option `json:"options,omitempty"` // 问题选项（可选项，结构化题型）
-
-	// 能力属性
-	ValidationRules []ValidationRule `json:"validation_rules,omitempty"` // 校验规则（可选项）
-	CalculationRule *CalculationRule `json:"calculation_rule,omitempty"` // 问题算分规则（可选项，结构化题型）
-}
-
-// Option 选项
-type Option struct {
-	Code    string `json:"code"`    // 选项ID，仅更新/编辑时提供
-	Content string `json:"content"` // 选项内容
-	Score   int    `json:"score"`   // 选项分数
-}
-
-// ValidationRule 校验规则
-type ValidationRule struct {
-	RuleType    string `json:"rule_type"`    // 规则类型
-	TargetValue string `json:"target_value"` // 目标值
-}
-
-// CalculationRule 算分规则
-type CalculationRule struct {
-	FormulaType string `json:"formula_type"` // 公式类型
-}
 
 // QuestionMapper 问题映射器
 type QuestionMapper struct{}
@@ -52,7 +19,7 @@ func NewQuestionMapper() *QuestionMapper {
 }
 
 // mapQuestionsToBOs 将问题 DTO 列表转为领域对象列表
-func (m *QuestionMapper) MapQuestionsToBOs(questions []Question) []question.Question {
+func (m *QuestionMapper) MapQuestionsToBOs(questions []viewmodel.QuestionDTO) []question.Question {
 	boQuestions := make([]question.Question, 0, len(questions))
 	for _, q := range questions {
 		if bo := m.mapQuestionToBO(q); bo != nil {
@@ -63,7 +30,7 @@ func (m *QuestionMapper) MapQuestionsToBOs(questions []Question) []question.Ques
 }
 
 // mapQuestionToBO 将问题 DTO 转为领域对象
-func (m *QuestionMapper) mapQuestionToBO(q Question) question.Question {
+func (m *QuestionMapper) mapQuestionToBO(q viewmodel.QuestionDTO) question.Question {
 	log.Infow("---- mapQuestionToBO input:", "code", q.Code, "type", q.Type, "title", q.Title)
 
 	// 构建配置选项列表
@@ -109,7 +76,7 @@ func (m *QuestionMapper) mapQuestionToBO(q Question) question.Question {
 }
 
 // mapOptionsToBO 将选项DTO转换为领域模型
-func (m *QuestionMapper) mapOptionsToBO(options []Option) []option.Option {
+func (m *QuestionMapper) mapOptionsToBO(options []viewmodel.OptionDTO) []option.Option {
 	opts := make([]option.Option, len(options))
 	for i, o := range options {
 		opts[i] = option.NewOption(o.Code, o.Content, o.Score)
@@ -118,7 +85,7 @@ func (m *QuestionMapper) mapOptionsToBO(options []Option) []option.Option {
 }
 
 // mapValidationRulesToBO 将校验规则DTO转换为领域模型
-func (m *QuestionMapper) mapValidationRulesToBO(rules []ValidationRule) []validation.ValidationRule {
+func (m *QuestionMapper) mapValidationRulesToBO(rules []viewmodel.ValidationRuleDTO) []validation.ValidationRule {
 	opts := make([]validation.ValidationRule, len(rules))
 	for i, r := range rules {
 		opts[i] = validation.NewValidationRule(validation.RuleType(r.RuleType), r.TargetValue)
@@ -127,8 +94,8 @@ func (m *QuestionMapper) mapValidationRulesToBO(rules []ValidationRule) []valida
 }
 
 // MapQuestionsToDTOs 将 Questions 转为 question DTO 列表
-func (m *QuestionMapper) MapQuestionsToDTOs(questions []question.Question) []Question {
-	dtos := make([]Question, len(questions))
+func (m *QuestionMapper) MapQuestionsToDTOs(questions []question.Question) []viewmodel.QuestionDTO {
+	dtos := make([]viewmodel.QuestionDTO, len(questions))
 	for i, q := range questions {
 		dtos[i] = m.mapQuestionToDTO(q)
 	}
@@ -136,8 +103,8 @@ func (m *QuestionMapper) MapQuestionsToDTOs(questions []question.Question) []Que
 }
 
 // mapQuestionToDTO 将 question 转为 question DTO
-func (m *QuestionMapper) mapQuestionToDTO(q question.Question) Question {
-	qDto := Question{
+func (m *QuestionMapper) mapQuestionToDTO(q question.Question) viewmodel.QuestionDTO {
+	qDto := viewmodel.QuestionDTO{
 		Code:  q.GetCode().Value(),
 		Type:  string(q.GetType()),
 		Title: q.GetTitle(),
@@ -161,10 +128,10 @@ func (m *QuestionMapper) mapQuestionToDTO(q question.Question) Question {
 }
 
 // mapOptionsToDTO 将 options 转为 option DTO 列表
-func (m *QuestionMapper) mapOptionsToDTO(options []option.Option) []Option {
-	dtos := make([]Option, len(options))
+func (m *QuestionMapper) mapOptionsToDTO(options []option.Option) []viewmodel.OptionDTO {
+	dtos := make([]viewmodel.OptionDTO, len(options))
 	for i, o := range options {
-		dtos[i] = Option{
+		dtos[i] = viewmodel.OptionDTO{
 			Code:    o.GetCode(),
 			Content: o.GetContent(),
 			Score:   o.GetScore(),
@@ -174,10 +141,10 @@ func (m *QuestionMapper) mapOptionsToDTO(options []option.Option) []Option {
 }
 
 // mapValidationRulesToDTO 将 validationRules 转为 validationRule DTO 列表
-func (m *QuestionMapper) mapValidationRulesToDTO(rules []validation.ValidationRule) []ValidationRule {
-	dtos := make([]ValidationRule, len(rules))
+func (m *QuestionMapper) mapValidationRulesToDTO(rules []validation.ValidationRule) []viewmodel.ValidationRuleDTO {
+	dtos := make([]viewmodel.ValidationRuleDTO, len(rules))
 	for i, r := range rules {
-		dtos[i] = ValidationRule{
+		dtos[i] = viewmodel.ValidationRuleDTO{
 			RuleType:    string(r.GetRuleType()),
 			TargetValue: r.GetTargetValue(),
 		}
@@ -186,11 +153,11 @@ func (m *QuestionMapper) mapValidationRulesToDTO(rules []validation.ValidationRu
 }
 
 // mapCalculationRuleToDTO 将 calculationRule 转为 calculationRule DTO
-func (m *QuestionMapper) mapCalculationRuleToDTO(rule *calculation.CalculationRule) *CalculationRule {
+func (m *QuestionMapper) mapCalculationRuleToDTO(rule *calculation.CalculationRule) *viewmodel.CalculationRuleDTO {
 	if rule == nil {
 		return nil
 	}
-	return &CalculationRule{
+	return &viewmodel.CalculationRuleDTO{
 		FormulaType: string(rule.GetFormulaType()),
 	}
 }
