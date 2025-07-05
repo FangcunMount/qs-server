@@ -126,7 +126,7 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 	q, err := h.questionnaireEditor.UpdateQuestions(
 		c,
 		questionnaire.NewQuestionnaireCode(qCode),
-		NewQuestionMapper().mapQuestionsToBOs(req.Questions),
+		dto.NewQuestionMapper().MapQuestionsToBOs(req.Questions),
 	)
 	if err != nil {
 		h.ErrorResponse(c, err)
@@ -136,7 +136,7 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 	// 转换为DTO响应
 	response := &dto.QuestionnaireQuestionsResponse{
 		Code:      q.GetCode().Value(),
-		Questions: NewQuestionMapper().mapQuestionsToDTOs(q.GetQuestions()),
+		Questions: dto.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
 	}
 
 	h.SuccessResponse(c, response)
@@ -226,7 +226,7 @@ func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
 			Version:     q.GetVersion().Value(),
 			Status:      q.GetStatus().Value(),
 		},
-		Questions: NewQuestionMapper().mapQuestionsToDTOs(q.GetQuestions()),
+		Questions: dto.NewQuestionMapper().MapQuestionsToDTOs(q.GetQuestions()),
 	}
 
 	h.SuccessResponse(c, response)
