@@ -8,7 +8,8 @@ import (
 
 // AnswerSheetSaver 答卷保存器
 type AnswerSheetSaver interface {
-	SaveAnswerSheet(ctx context.Context, aDomain *answersheet.AnswerSheet) (*answersheet.AnswerSheet, error)
+	SaveOriginalAnswerSheet(ctx context.Context, aDomain *answersheet.AnswerSheet) (*answersheet.AnswerSheet, error)
+	SaveAnswerSheetScores(ctx context.Context, aDomain *answersheet.AnswerSheet) (*answersheet.AnswerSheet, error)
 }
 
 // AnswerSheetQueryer 答卷查询器
