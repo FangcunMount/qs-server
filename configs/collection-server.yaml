@@ -48,7 +48,7 @@ grpc_client:
 redis:
   host: 127.0.0.1              # Redis 服务器主机
   port: 6379                   # Redis 服务器端口
-  password: ""                 # Redis 密码
+  password: questionnaire_redis_2024  # Redis 密码
   database: 0                  # Redis 数据库编号
   max-idle: 50                 # 最大空闲连接数
   max-active: 100              # 最大活跃连接数

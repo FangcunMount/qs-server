@@ -51,4 +51,4 @@ message_queue:
   topic: answersheet.saved      # 订阅的主题
   group: evaluation_group       # 消费者组
   username: ""                  # 用户名
-  password: ""                  # 密码 
+  password: questionnaire_redis_2024  # Redis 密码 
