@@ -92,16 +92,35 @@ func (s preparedEvaluationServer) Run() error {
 		log.Fatalf("start shutdown manager failed: %s", err.Error())
 	}
 
-	// 启动消息队列订阅者
-	if err := s.container.StartMessageSubscriber(); err != nil {
-		log.Fatalf("start message subscriber failed: %s", err.Error())
-	}
-
 	log.Info("🚀 Starting Evaluation Server...")
-	log.Info("   📨 Message queue subscriber started")
-	log.Info("   🌐 HTTP health check server started")
+	log.Info("   📨 Message queue subscriber starting...")
+	log.Info("   🌐 HTTP health check server starting...")
 
-	return s.genericAPIServer.Run()
+	// 创建一个 channel 用于接收错误
+	errChan := make(chan error, 2)
+
+	// 启动消息队列订阅者（在 goroutine 中运行）
+	go func() {
+		if err := s.container.StartMessageSubscriber(); err != nil {
+			log.Errorf("Message subscriber failed: %v", err)
+			errChan <- err
+		}
+	}()
+
+	// 启动 HTTP 健康检查服务器（在 goroutine 中运行）
+	go func() {
+		if err := s.genericAPIServer.Run(); err != nil {
+			log.Errorf("HTTP server failed: %v", err)
+			errChan <- err
+		}
+	}()
+
+	log.Info("✅ Evaluation Server started successfully")
+	log.Info("   📨 Message queue subscriber is running")
+	log.Info("   🌐 HTTP health check server is running")
+
+	// 等待任一服务出错
+	return <-errChan
 }
 
 // buildGenericServer 构建通用服务器

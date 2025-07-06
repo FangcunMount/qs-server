@@ -3,11 +3,13 @@ package options
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 	genericoptions "github.com/yshujie/questionnaire-scale/internal/pkg/options"
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
 
 // Options 包含所有配置项
@@ -40,6 +42,19 @@ type MessageQueueOptions struct {
 	Password string `json:"password" mapstructure:"password"` // 密码
 }
 
+// ToRedisConfig 将消息队列配置转换为Redis配置
+func (m *MessageQueueOptions) ToRedisConfig() *pubsub.RedisConfig {
+	if m.Type != "redis" {
+		return nil
+	}
+
+	return &pubsub.RedisConfig{
+		Addr:     m.Endpoint,
+		Password: m.Password,
+		DB:       0, // 默认使用0号数据库
+	}
+}
+
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{
@@ -56,7 +71,7 @@ func NewOptions() *Options {
 		MessageQueue: &MessageQueueOptions{
 			Type:     "redis",
 			Endpoint: "localhost:6379",
-			Topic:    "answersheet_saved",
+			Topic:    "answersheet.saved",
 			Group:    "evaluation_group",
 			Username: "",
 			Password: "",
@@ -132,6 +147,13 @@ func (o *Options) Validate() []error {
 	}
 	if o.MessageQueue.Group == "" {
 		errs = append(errs, fmt.Errorf("message-queue.group cannot be empty"))
+	}
+
+	// 验证 Redis 特定配置
+	if strings.ToLower(o.MessageQueue.Type) == "redis" {
+		if !strings.Contains(o.MessageQueue.Endpoint, ":") {
+			errs = append(errs, fmt.Errorf("redis endpoint must include port (e.g., localhost:6379)"))
+		}
 	}
 
 	return errs

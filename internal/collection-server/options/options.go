@@ -2,11 +2,13 @@ package options
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/spf13/pflag"
 	genericoptions "github.com/yshujie/questionnaire-scale/internal/pkg/options"
 	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
 
 // Options 包含所有配置项
@@ -17,6 +19,8 @@ type Options struct {
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"   mapstructure:"secure"`
 	// GRPC 客户端配置，用于连接 apiserver
 	GRPCClient *GRPCClientOptions `json:"grpc_client" mapstructure:"grpc_client"`
+	// Redis 配置，用于消息队列
+	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -38,6 +42,7 @@ func NewOptions() *Options {
 			Timeout:  30,
 			Insecure: true,
 		},
+		Redis: genericoptions.NewRedisOptions(),
 	}
 }
 
@@ -48,6 +53,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc-client"))
+	o.Redis.AddFlags(fss.FlagSet("redis"))
 
 	return fss
 }
@@ -62,6 +68,16 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 		"Whether to use insecure gRPC connection.")
 }
 
+// ToRedisConfig 将RedisOptions转换为pubsub.RedisConfig
+func (o *Options) ToRedisConfig() *pubsub.RedisConfig {
+	addr := fmt.Sprintf("%s:%d", o.Redis.Host, o.Redis.Port)
+	return &pubsub.RedisConfig{
+		Addr:     addr,
+		Password: o.Redis.Password,
+		DB:       o.Redis.Database,
+	}
+}
+
 // Complete 完成配置选项
 func (o *Options) Complete() error {
 	return o.SecureServing.Complete()
@@ -71,4 +87,30 @@ func (o *Options) Complete() error {
 func (o *Options) String() string {
 	data, _ := json.Marshal(o)
 	return string(data)
+}
+
+// Validate 验证配置选项
+func (o *Options) Validate() []error {
+	var errs []error
+
+	errs = append(errs, o.GenericServerRunOptions.Validate()...)
+	errs = append(errs, o.Log.Validate()...)
+
+	// 验证 GRPC 客户端配置
+	if o.GRPCClient.Endpoint == "" {
+		errs = append(errs, fmt.Errorf("grpc-client.endpoint cannot be empty"))
+	}
+	if o.GRPCClient.Timeout <= 0 {
+		errs = append(errs, fmt.Errorf("grpc-client.timeout must be greater than 0"))
+	}
+
+	// 验证 Redis 配置
+	if o.Redis.Host == "" {
+		errs = append(errs, fmt.Errorf("redis.host cannot be empty"))
+	}
+	if o.Redis.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.port must be greater than 0"))
+	}
+
+	return errs
 }

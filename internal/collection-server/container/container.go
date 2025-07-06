@@ -9,6 +9,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/handler"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
 
 // Container 主容器，负责管理所有组件
@@ -16,6 +17,7 @@ type Container struct {
 	// 基础设施层
 	QuestionnaireClient grpc.QuestionnaireClient
 	AnswersheetClient   grpc.AnswersheetClient
+	Publisher           *pubsub.RedisPublisher
 
 	// 应用层
 	ValidationService validation.Service
@@ -26,13 +28,15 @@ type Container struct {
 
 	// 配置
 	grpcClientConfig *options.GRPCClientOptions
+	redisConfig      *pubsub.RedisConfig
 	initialized      bool
 }
 
 // NewContainer 创建新的容器
-func NewContainer(grpcClientConfig *options.GRPCClientOptions) *Container {
+func NewContainer(grpcClientConfig *options.GRPCClientOptions, redisConfig *pubsub.RedisConfig) *Container {
 	return &Container{
 		grpcClientConfig: grpcClientConfig,
+		redisConfig:      redisConfig,
 		initialized:      false,
 	}
 }
@@ -45,7 +49,7 @@ func (c *Container) Initialize() error {
 
 	log.Info("🔧 Initializing Collection Server Container...")
 
-	// 1. 初始化基础设施层（GRPC 客户端）
+	// 1. 初始化基础设施层（GRPC 客户端和Redis发布者）
 	if err := c.initializeInfrastructure(); err != nil {
 		return fmt.Errorf("failed to initialize infrastructure: %w", err)
 	}
@@ -84,6 +88,18 @@ func (c *Container) initializeInfrastructure() error {
 	c.AnswersheetClient = answersheetClient
 
 	log.Info("   ✅ GRPC clients initialized")
+
+	// 创建 Redis 发布者
+	log.Info("   📡 Initializing Redis publisher...")
+	c.Publisher = pubsub.NewRedisPublisher(c.redisConfig)
+
+	// 连接 Redis
+	ctx := context.Background()
+	if err := c.Publisher.Connect(ctx); err != nil {
+		return fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+
+	log.Info("   ✅ Redis publisher initialized")
 	return nil
 }
 
@@ -111,6 +127,7 @@ func (c *Container) initializeInterface() error {
 	c.AnswersheetHandler = handler.NewAnswersheetHandler(
 		c.AnswersheetClient,
 		c.ValidationService,
+		c.Publisher, // 传递发布者给答卷处理器
 	)
 
 	log.Info("   ✅ Interface handlers initialized")
@@ -130,6 +147,14 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 
 	if err := c.AnswersheetClient.HealthCheck(ctx); err != nil {
 		return fmt.Errorf("answersheet client health check failed: %w", err)
+	}
+
+	// 检查 Redis 连接
+	if c.Publisher != nil {
+		err := c.Publisher.Connect(ctx)
+		if err != nil {
+			return fmt.Errorf("redis publisher health check failed: %w", err)
+		}
 	}
 
 	return nil
@@ -152,6 +177,13 @@ func (c *Container) Cleanup() error {
 		}
 	}
 
+	// 关闭 Redis 发布者
+	if c.Publisher != nil {
+		if err := c.Publisher.Close(); err != nil {
+			log.Errorf("Failed to close redis publisher: %v", err)
+		}
+	}
+
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")
 
@@ -167,6 +199,7 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"components": map[string]bool{
 			"questionnaire_client":  c.QuestionnaireClient != nil,
 			"answersheet_client":    c.AnswersheetClient != nil,
+			"redis_publisher":       c.Publisher != nil,
 			"validation_service":    c.ValidationService != nil,
 			"questionnaire_handler": c.QuestionnaireHandler != nil,
 			"answersheet_handler":   c.AnswersheetHandler != nil,
@@ -177,4 +210,9 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 // IsInitialized 检查容器是否已初始化
 func (c *Container) IsInitialized() bool {
 	return c.initialized
+}
+
+// GetPublisher 获取Redis发布者
+func (c *Container) GetPublisher() *pubsub.RedisPublisher {
+	return c.Publisher
 }

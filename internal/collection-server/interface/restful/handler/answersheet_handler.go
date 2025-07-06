@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/validation"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
 
 // AnswersheetHandler 答卷处理器接口
@@ -27,13 +29,15 @@ type AnswersheetHandler interface {
 type answersheetHandler struct {
 	client            grpc.AnswersheetClient
 	validationService validation.Service
+	publisher         *pubsub.RedisPublisher
 }
 
 // NewAnswersheetHandler 创建新的答卷处理器
-func NewAnswersheetHandler(client grpc.AnswersheetClient, validationService validation.Service) AnswersheetHandler {
+func NewAnswersheetHandler(client grpc.AnswersheetClient, validationService validation.Service, publisher *pubsub.RedisPublisher) AnswersheetHandler {
 	return &answersheetHandler{
 		client:            client,
 		validationService: validationService,
+		publisher:         publisher,
 	}
 }
 
@@ -118,6 +122,23 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 			"error":   err.Error(),
 		})
 		return
+	}
+
+	// 发布答卷已保存消息
+	if h.publisher != nil {
+		message := &pubsub.ResponseSavedMessage{
+			ResponseID:      strconv.FormatUint(resp.Id, 10),
+			QuestionnaireID: req.QuestionnaireCode,
+			UserID:          strconv.FormatUint(req.TesteeID, 10),
+			SubmittedAt:     time.Now().Unix(),
+		}
+
+		if err := h.publisher.Publish(c.Request.Context(), "answersheet.saved", message); err != nil {
+			log.L(c).Errorf("Failed to publish answersheet saved message: %v", err)
+			// 不影响主流程，只记录错误
+		} else {
+			log.L(c).Infof("Published answersheet saved message for response ID: %s", resp.Id)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
