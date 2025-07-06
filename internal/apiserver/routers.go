@@ -80,6 +80,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册答卷相关的受保护路由
 	r.registerAnswersheetProtectedRoutes(apiV1)
 
+	// 注册医学量表相关的受保护路由
+	r.registerMedicalScaleProtectedRoutes(apiV1)
+
 	// 管理员路由（需要额外的权限检查）
 	r.registerAdminRoutes(apiV1)
 }
@@ -134,6 +137,22 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 	{
 		answersheets.POST("", answersheetHandler.Save)   // 保存答卷
 		answersheets.GET("/:id", answersheetHandler.Get) // 获取答卷
+	}
+}
+
+// registerMedicalScaleProtectedRoutes 注册医学量表相关的受保护路由
+func (r *Router) registerMedicalScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
+	medicalScaleHandler := r.container.MedicalScaleModule.MSHandler
+	if medicalScaleHandler == nil {
+		return
+	}
+
+	medicalScales := apiV1.Group("/medical-scales")
+	{
+		medicalScales.POST("", medicalScaleHandler.Create)
+		medicalScales.GET("/:code", medicalScaleHandler.Get)
+		medicalScales.PUT("/:code", medicalScaleHandler.UpdateBaseInfo)
+		medicalScales.PUT("/:code/factors", medicalScaleHandler.UpdateFactor)
 	}
 }
 
