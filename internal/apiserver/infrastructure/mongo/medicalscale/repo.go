@@ -6,11 +6,11 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/port"
 	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
 // Repository 医学量表MongoDB存储库
@@ -20,7 +20,7 @@ type Repository struct {
 }
 
 // NewRepository 创建医学量表MongoDB存储库
-func NewRepository(db *mongo.Database) port.Repository {
+func NewRepository(db *mongo.Database) port.MedicalScaleRepositoryMongo {
 	po := &MedicalScalePO{}
 	return &Repository{
 		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),
@@ -28,8 +28,8 @@ func NewRepository(db *mongo.Database) port.Repository {
 	}
 }
 
-// Save 保存医学量表
-func (r *Repository) Save(ctx context.Context, scale *medicalscale.MedicalScale) error {
+// Create 创建医学量表
+func (r *Repository) Create(ctx context.Context, scale *medicalscale.MedicalScale) error {
 	po := r.mapper.ToPO(scale)
 	po.BeforeInsert()
 
@@ -47,7 +47,7 @@ func (r *Repository) Save(ctx context.Context, scale *medicalscale.MedicalScale)
 }
 
 // FindByID 根据ID查找医学量表
-func (r *Repository) FindByID(ctx context.Context, id medicalscale.MedicalScaleID) (*medicalscale.MedicalScale, error) {
+func (r *Repository) FindByID(ctx context.Context, id v1.ID) (*medicalscale.MedicalScale, error) {
 	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
 	if err != nil {
 		return nil, err
@@ -118,50 +118,6 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 	return scales, nil
 }
 
-// FindAll 查找所有医学量表（支持分页）
-func (r *Repository) FindAll(ctx context.Context, offset, limit int) ([]*medicalscale.MedicalScale, int64, error) {
-	filter := bson.M{
-		"deleted_at": bson.M{"$exists": false},
-	}
-
-	// 计算总数
-	total, err := r.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// 查询数据
-	opts := options.Find()
-	if offset > 0 {
-		opts.SetSkip(int64(offset))
-	}
-	if limit > 0 {
-		opts.SetLimit(int64(limit))
-	}
-	opts.SetSort(bson.D{{"created_at", -1}}) // 按创建时间降序
-
-	cursor, err := r.Find(ctx, filter, opts)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer cursor.Close(ctx)
-
-	var scales []*medicalscale.MedicalScale
-	for cursor.Next(ctx) {
-		var po MedicalScalePO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, 0, err
-		}
-		scales = append(scales, r.mapper.ToBO(&po))
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, 0, err
-	}
-
-	return scales, total, nil
-}
-
 // Update 更新医学量表
 func (r *Repository) Update(ctx context.Context, scale *medicalscale.MedicalScale) error {
 	po := r.mapper.ToPO(scale)
@@ -169,7 +125,7 @@ func (r *Repository) Update(ctx context.Context, scale *medicalscale.MedicalScal
 
 	// 根据代码查找文档
 	filter := bson.M{
-		"code":       scale.Code(),
+		"code":       scale.GetCode(),
 		"deleted_at": bson.M{"$exists": false},
 	}
 
@@ -200,7 +156,7 @@ func (r *Repository) Update(ctx context.Context, scale *medicalscale.MedicalScal
 }
 
 // Delete 删除医学量表（软删除）
-func (r *Repository) Delete(ctx context.Context, id medicalscale.MedicalScaleID) error {
+func (r *Repository) Delete(ctx context.Context, id v1.ID) error {
 	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
 	if err != nil {
 		return err
@@ -239,44 +195,18 @@ func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error
 		"deleted_at": bson.M{"$exists": false},
 	}
 
-	return r.ExistsByFilter(ctx, filter)
+	count, err := r.CountDocuments(ctx, filter)
+	return count > 0, err
 }
 
-// ExistsByQuestionnaireBinding 检查问卷绑定是否已存在
-func (r *Repository) ExistsByQuestionnaireBinding(ctx context.Context, questionnaireCode, questionnaireVersion string) (bool, error) {
-	filter := bson.M{
-		"questionnaire_code":    questionnaireCode,
-		"questionnaire_version": questionnaireVersion,
-		"deleted_at":            bson.M{"$exists": false},
-	}
-
-	return r.ExistsByFilter(ctx, filter)
-}
-
-// HardDelete 物理删除医学量表（用于测试或特殊情况）
-func (r *Repository) HardDelete(ctx context.Context, id medicalscale.MedicalScaleID) error {
+// HardDelete 硬删除医学量表
+func (r *Repository) HardDelete(ctx context.Context, id v1.ID) error {
 	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
 	if err != nil {
 		return err
 	}
 
 	filter := bson.M{"_id": objectID}
-
-	result, err := r.DeleteOne(ctx, filter)
-	if err != nil {
-		return err
-	}
-
-	if result.DeletedCount == 0 {
-		return mongo.ErrNoDocuments
-	}
-
-	return nil
-}
-
-// HardDeleteByCode 根据代码物理删除医学量表（用于测试或特殊情况）
-func (r *Repository) HardDeleteByCode(ctx context.Context, code string) error {
-	filter := bson.M{"code": code}
 
 	result, err := r.DeleteOne(ctx, filter)
 	if err != nil {

@@ -250,3 +250,23 @@ type TableOptions struct {
 	// and may be removed as a field in a future release.
 	NoHeaders bool `json:"-"`
 }
+
+// ID 标识符类型
+type ID struct {
+	value uint64
+}
+
+// NewID 创建新的标识符
+func NewID(value uint64) ID {
+	return ID{value: value}
+}
+
+// Value 获取标识符值
+func (id ID) Value() uint64 {
+	return id.value
+}
+
+// String 获取标识符字符串表示
+func (id ID) String() string {
+	return string(id.value)
+}

@@ -3,35 +3,29 @@ package port
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 )
 
-// CalculationService 计算服务接口
-type CalculationService interface {
-	// CalculateFactorScore 计算因子分数
-	CalculateFactorScore(ctx context.Context, factor medicalscale.Factor, answerValues map[string]interface{}) (float64, error)
-
-	// CalculateScaleScores 计算量表所有因子分数
-	CalculateScaleScores(ctx context.Context, scale *medicalscale.MedicalScale, answerValues map[string]interface{}) (map[string]float64, error)
+// MedicalScaleCreator 医学量表创建接口
+type MedicalScaleCreator interface {
+	// CreateMedicalScale 创建医学量表
+	CreateMedicalScale(ctx context.Context, medicalScaleDTO *dto.MedicalScaleDTO) (*dto.MedicalScaleDTO, error)
 }
 
-// InterpretationService 解读服务接口
-type InterpretationService interface {
-	// GetFactorInterpretation 获取因子解读
-	GetFactorInterpretation(ctx context.Context, factor medicalscale.Factor, score float64) (string, error)
-
-	// GetScaleInterpretation 获取量表解读
-	GetScaleInterpretation(ctx context.Context, scale *medicalscale.MedicalScale, scores map[string]float64) (map[string]string, error)
+// MedicalScaleQueryer 医学量表查询接口
+type MedicalScaleQueryer interface {
+	// GetMedicalScaleByCode 根据医学量表代码获取医学量表
+	GetMedicalScaleByCode(ctx context.Context, code string) (*dto.MedicalScaleDTO, error)
+	// GetMedicalScaleByQuestionnaireCode 根据问卷代码获取医学量表列表
+	GetMedicalScaleByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*dto.MedicalScaleDTO, error)
+	// ListMedicalScales 列出医学量表列表
+	ListMedicalScales(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*dto.MedicalScaleDTO, int64, error)
 }
 
-// ValidationService 验证服务接口
-type ValidationService interface {
-	// ValidateScale 验证量表完整性
-	ValidateScale(ctx context.Context, scale *medicalscale.MedicalScale) error
-
-	// ValidateFactor 验证因子完整性
-	ValidateFactor(ctx context.Context, factor medicalscale.Factor) error
-
-	// ValidateQuestionnaireBinding 验证问卷绑定
-	ValidateQuestionnaireBinding(ctx context.Context, questionnaireCode, questionnaireVersion string) error
+// MedicalScaleEditor 医学量表编辑接口
+type MedicalScaleEditor interface {
+	// EditBasicInfo 编辑医学量表基本信息
+	EditBasicInfo(ctx context.Context, medicalScaleDTO *dto.MedicalScaleDTO) (*dto.MedicalScaleDTO, error)
+	// UpdateFactors 更新医学量表因子
+	UpdateFactors(ctx context.Context, code string, factors []dto.FactorDTO) (*dto.MedicalScaleDTO, error)
 }
