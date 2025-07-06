@@ -1,7 +1,7 @@
 package medicalscale
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )

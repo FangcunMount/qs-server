@@ -2,8 +2,8 @@ package mapper
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor"
+	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/interpretation"
 )
@@ -16,7 +16,7 @@ func NewMedicalScaleMapper() MedicalScaleMapper {
 	return MedicalScaleMapper{}
 }
 
-func (m *MedicalScaleMapper) ToDTO(bo *medicalscale.MedicalScale) *dto.MedicalScaleDTO {
+func (m *MedicalScaleMapper) ToDTO(bo *medicalScale.MedicalScale) *dto.MedicalScaleDTO {
 	return &dto.MedicalScaleDTO{
 		ID:                bo.GetID().Value(),
 		Code:              bo.GetCode(),

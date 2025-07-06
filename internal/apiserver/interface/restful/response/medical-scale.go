@@ -1,8 +1,8 @@
 package response
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor"
+	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
 )
 
@@ -12,7 +12,7 @@ type MedicalScaleResponse struct {
 }
 
 // NewMedicalScaleResponse 创建医学量表响应
-func NewMedicalScaleResponse(scale *medicalscale.MedicalScale) *MedicalScaleResponse {
+func NewMedicalScaleResponse(scale *medicalScale.MedicalScale) *MedicalScaleResponse {
 	if scale == nil {
 		return &MedicalScaleResponse{
 			Data: nil,

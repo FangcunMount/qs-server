@@ -7,8 +7,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/port"
+	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	medicalscale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
 	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
@@ -29,7 +30,7 @@ func NewRepository(db *mongo.Database) port.MedicalScaleRepositoryMongo {
 }
 
 // Create 创建医学量表
-func (r *Repository) Create(ctx context.Context, scale *medicalscale.MedicalScale) error {
+func (r *Repository) Create(ctx context.Context, scale *medicalScale.MedicalScale) error {
 	po := r.mapper.ToPO(scale)
 	po.BeforeInsert()
 
@@ -47,7 +48,7 @@ func (r *Repository) Create(ctx context.Context, scale *medicalscale.MedicalScal
 }
 
 // FindByID 根据ID查找医学量表
-func (r *Repository) FindByID(ctx context.Context, id v1.ID) (*medicalscale.MedicalScale, error) {
+func (r *Repository) FindByID(ctx context.Context, id v1.ID) (*medicalScale.MedicalScale, error) {
 	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
 	if err != nil {
 		return nil, err
@@ -71,7 +72,7 @@ func (r *Repository) FindByID(ctx context.Context, id v1.ID) (*medicalscale.Medi
 }
 
 // FindByCode 根据代码查找医学量表
-func (r *Repository) FindByCode(ctx context.Context, code string) (*medicalscale.MedicalScale, error) {
+func (r *Repository) FindByCode(ctx context.Context, code string) (*medicalScale.MedicalScale, error) {
 	filter := bson.M{
 		"code":       code,
 		"deleted_at": bson.M{"$exists": false},
@@ -102,7 +103,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 	}
 	defer cursor.Close(ctx)
 
-	var scales []*medicalscale.MedicalScale
+	var scales []*medicalScale.MedicalScale
 	for cursor.Next(ctx) {
 		var po MedicalScalePO
 		if err := cursor.Decode(&po); err != nil {

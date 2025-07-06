@@ -5,8 +5,8 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/port"
+	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
 	"github.com/yshujie/questionnaire-scale/pkg/util/codeutil"
 )
 
@@ -33,11 +33,11 @@ func (c *Creator) Create(ctx context.Context, dto *dto.MedicalScaleDTO) (*dto.Me
 	}
 
 	// 2. 创建医学量表领域模型
-	msBO := medicalscale.NewMedicalScale(
+	msBO := medicalScale.NewMedicalScale(
 		code,
 		dto.Title,
-		medicalscale.WithDescription(dto.Description),
-		medicalscale.WithQuestionnaireCode(dto.QuestionnaireCode),
+		medicalScale.WithDescription(dto.Description),
+		medicalScale.WithQuestionnaireCode(dto.QuestionnaireCode),
 	)
 
 	// 4. 保存到 mongodb

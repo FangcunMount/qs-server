@@ -1,9 +1,9 @@
 package medicalscale
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor/ability"
+	medicalscale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor/ability"
 	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/interpretation"

@@ -5,10 +5,10 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/factor/ability"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/port"
+	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor/ability"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/interpretation"
@@ -60,7 +60,7 @@ func (e *Editor) EditBasicInfo(
 	}
 
 	// 3. 更新基本信息
-	baseInfoService := medicalscale.BaseInfoService{}
+	baseInfoService := medicalScale.BaseInfoService{}
 	baseInfoService.UpdateTitle(msBO, medicalScaleDTO.Title)
 	baseInfoService.UpdateDescription(msBO, medicalScaleDTO.Description)
 
@@ -158,7 +158,7 @@ func (e *Editor) UpdateFactors(
 	}
 
 	// 5. 更新因子
-	factorService := medicalscale.FactorService{}
+	factorService := medicalScale.FactorService{}
 	// 5.1 清除现有因子
 	factorService.RemoveAllFactors(msBO)
 	// 5.2 按顺序添加新因子

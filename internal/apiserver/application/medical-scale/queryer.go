@@ -5,7 +5,7 @@ import (
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medicalscale/port"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
 	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )

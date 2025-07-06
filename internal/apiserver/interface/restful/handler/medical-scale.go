@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/medicalscale"
+	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/application/medical-scale"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
@@ -17,16 +17,16 @@ import (
 // MedicalScaleHandler 医学量表处理器
 type MedicalScaleHandler struct {
 	BaseHandler
-	creator medicalscale.Creator
-	queryer medicalscale.Queryer
-	editor  medicalscale.Editor
+	creator medicalScale.Creator
+	queryer medicalScale.Queryer
+	editor  medicalScale.Editor
 }
 
 // NewMedicalScaleHandler 创建医学量表处理器
 func NewMedicalScaleHandler(
-	creator medicalscale.Creator,
-	queryer medicalscale.Queryer,
-	editor medicalscale.Editor,
+	creator medicalScale.Creator,
+	queryer medicalScale.Queryer,
+	editor medicalScale.Editor,
 ) *MedicalScaleHandler {
 	return &MedicalScaleHandler{
 		creator: creator,
