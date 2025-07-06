@@ -3,6 +3,7 @@ package apiserver
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/grpcserver"
 	genericapiserver "github.com/yshujie/questionnaire-scale/internal/pkg/server"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/shutdown"
@@ -15,6 +16,8 @@ type apiServer struct {
 	gs *shutdown.GracefulShutdown
 	// 通用 API 服务器
 	genericAPIServer *genericapiserver.GenericAPIServer
+	// GRPC 服务器
+	grpcServer *grpcserver.Server
 	// 数据库管理器
 	dbManager *DatabaseManager
 	// Container 主容器
@@ -32,15 +35,17 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 	gs := shutdown.New()
 	gs.AddShutdownManager(posixsignal.NewPosixSignalManager())
 
-	// 构建通用配置
-	genericConfig, err := buildGenericConfig(cfg)
+	// 创建  服务器
+	genericServer, err := buildGenericServer(cfg)
 	if err != nil {
+		log.Fatalf("Failed to build generic server: %v", err)
 		return nil, err
 	}
 
-	// 完成通用配置并创建实例
-	genericServer, err := genericConfig.Complete().New()
+	// 创建 GRPC 服务器
+	grpcServer, err := buildGRPCServer(cfg)
 	if err != nil {
+		log.Fatalf("Failed to build GRPC server: %v", err)
 		return nil, err
 	}
 
@@ -52,6 +57,7 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		gs:               gs,
 		genericAPIServer: genericServer,
 		dbManager:        dbManager,
+		grpcServer:       grpcServer,
 	}
 
 	return server, nil
@@ -87,10 +93,15 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	// 创建并初始化路由器
 	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
 
+	// 注册 GRPC 服务
+	if err := NewGRPCRegistry(s.grpcServer, s.container).RegisterServices(); err != nil {
+		log.Fatalf("Failed to register GRPC services: %v", err)
+	}
+
 	log.Info("🏗️  Hexagonal Architecture initialized successfully!")
 	log.Info("   📦 Domain: questionnaire, user")
 	log.Info("   🔌 Ports: storage, document")
-	log.Info("   🔧 Adapters: mysql, mongodb, http")
+	log.Info("   🔧 Adapters: mysql, mongodb, http, grpc")
 	log.Info("   📋 Application Services: questionnaire_service, user_service")
 
 	if mongoDB != nil {
@@ -116,6 +127,9 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		// 关闭 HTTP 服务器
 		s.genericAPIServer.Close()
 
+		// 关闭 GRPC 服务器
+		s.grpcServer.Close()
+
 		log.Info("🏗️  Hexagonal Architecture server shutdown complete")
 		return nil
 	}))
@@ -130,8 +144,37 @@ func (s preparedAPIServer) Run() error {
 		log.Fatalf("start shutdown manager failed: %s", err.Error())
 	}
 
+	if err := s.genericAPIServer.Run(); err != nil {
+		log.Errorf("Failed to run HTTP server: %v", err)
+		return err
+	}
 	log.Info("🚀 Starting Hexagonal Architecture HTTP REST API server...")
-	return s.genericAPIServer.Run()
+
+	// 启动 GRPC 服务器
+	if err := s.grpcServer.Run(); err != nil {
+		log.Errorf("Failed to run GRPC server: %v", err)
+		return err
+	}
+	log.Info("🚀 Starting Hexagonal Architecture GRPC server...")
+
+	return nil
+}
+
+// buildGenericServer 构建通用服务器
+func buildGenericServer(cfg *config.Config) (*genericapiserver.GenericAPIServer, error) {
+	// 构建通用配置
+	genericConfig, err := buildGenericConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// 完成通用配置并创建实例
+	genericServer, err := genericConfig.Complete().New()
+	if err != nil {
+		return nil, err
+	}
+
+	return genericServer, nil
 }
 
 // buildGenericConfig 构建通用配置
@@ -153,4 +196,33 @@ func buildGenericConfig(cfg *config.Config) (genericConfig *genericapiserver.Con
 		return
 	}
 	return
+}
+
+// buildGRPCServer 构建 GRPC 服务器
+func buildGRPCServer(cfg *config.Config) (*grpcserver.Server, error) {
+	// 创建 GRPC 配置
+	grpcConfig := grpcserver.NewConfig()
+
+	// 应用配置选项
+	if err := applyGRPCOptions(cfg, grpcConfig); err != nil {
+		return nil, err
+	}
+
+	// 完成配置并创建服务器
+	return grpcConfig.Complete().New()
+}
+
+// applyGRPCOptions 应用 GRPC 选项到配置
+func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcserver.Config) error {
+	// 应用基本配置
+	grpcConfig.BindAddress = cfg.GRPCOptions.BindAddress
+	grpcConfig.BindPort = cfg.GRPCOptions.BindPort
+
+	// 应用 TLS 配置
+	if cfg.SecureServing != nil {
+		grpcConfig.TLSCertFile = cfg.SecureServing.ServerCert.CertKey.CertFile
+		grpcConfig.TLSKeyFile = cfg.SecureServing.ServerCert.CertKey.KeyFile
+	}
+
+	return nil
 }

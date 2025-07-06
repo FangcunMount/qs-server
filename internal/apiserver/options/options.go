@@ -12,6 +12,7 @@ import (
 type Options struct {
 	Log                     *log.Options                           `json:"log"    mapstructure:"log"`
 	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server" mapstructure:"server"`
+	GRPCOptions             *genericoptions.GRPCOptions            `json:"grpc"     mapstructure:"grpc"`
 	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure" mapstructure:"secure"`
 	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"    mapstructure:"mysql"`
@@ -24,6 +25,7 @@ func NewOptions() *Options {
 	return &Options{
 		Log:                     log.NewOptions(),
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		GRPCOptions:             genericoptions.NewGRPCOptions(),
 		InsecureServing:         genericoptions.NewInsecureServingOptions(),
 		SecureServing:           genericoptions.NewSecureServingOptions(),
 		MySQLOptions:            genericoptions.NewMySQLOptions(),
@@ -36,6 +38,7 @@ func NewOptions() *Options {
 func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Log.AddFlags(fss.FlagSet("log"))
 	o.GenericServerRunOptions.AddFlags(fss.FlagSet("server"))
+	o.GRPCOptions.AddFlags(fss.FlagSet("grpc"))
 	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.MySQLOptions.AddFlags(fss.FlagSet("mysql"))
