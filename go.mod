@@ -18,6 +18,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 )
 
 require (
@@ -101,5 +102,6 @@ require (
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/sync v0.15.0
 	golang.org/x/time v0.12.0
+	google.golang.org/grpc v1.73.0
 	gorm.io/driver/mysql v1.6.0
 )
