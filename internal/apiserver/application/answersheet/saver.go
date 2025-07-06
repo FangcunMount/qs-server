@@ -37,7 +37,7 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 	testee := user.NewTestee(user.NewUserID(answerSheetDTO.TesteeID), "")
 	answers := s.mapper.ToBOs(answerSheetDTO.Answers)
 
-	aDomain := answersheet.NewAnswerSheet(
+	asBO := answersheet.NewAnswerSheet(
 		answerSheetDTO.QuestionnaireCode,
 		answerSheetDTO.QuestionnaireVersion,
 		answersheet.WithTitle(answerSheetDTO.Title),
@@ -47,20 +47,20 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 	)
 
 	// 3. 保存到 MongoDB
-	if err := s.aRepoMongo.Create(ctx, aDomain); err != nil {
+	if err := s.aRepoMongo.Create(ctx, asBO); err != nil {
 		return nil, errors.WrapC(err, errCode.ErrDatabase, "保存答卷失败")
 	}
 
 	// 4. 转换为 DTO 并返回
 	return &dto.AnswerSheetDTO{
-		ID:                   aDomain.GetID(),
-		QuestionnaireCode:    aDomain.GetQuestionnaireCode(),
-		QuestionnaireVersion: aDomain.GetQuestionnaireVersion(),
-		Title:                aDomain.GetTitle(),
-		Score:                aDomain.GetScore(),
-		WriterID:             aDomain.GetWriter().GetUserID().Value(),
-		TesteeID:             aDomain.GetTestee().GetUserID().Value(),
-		Answers:              s.mapper.ToDTOs(aDomain.GetAnswers()),
+		ID:                   asBO.GetID(),
+		QuestionnaireCode:    asBO.GetQuestionnaireCode(),
+		QuestionnaireVersion: asBO.GetQuestionnaireVersion(),
+		Title:                asBO.GetTitle(),
+		Score:                asBO.GetScore(),
+		WriterID:             asBO.GetWriter().GetUserID().Value(),
+		TesteeID:             asBO.GetTestee().GetUserID().Value(),
+		Answers:              s.mapper.ToDTOs(asBO.GetAnswers()),
 	}, nil
 }
 
