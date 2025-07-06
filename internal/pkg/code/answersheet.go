@@ -7,4 +7,7 @@ const (
 
 	// ErrAnswerNotFound - 404: Answer not found.
 	ErrAnswerNotFound
+
+	// ErrAnswerSheetInvalid - 400: Answer sheet is invalid.
+	ErrAnswerSheetInvalid
 )

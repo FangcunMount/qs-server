@@ -21,11 +21,12 @@ type Container struct {
 	mongoDB *mongo.Database
 
 	// 业务模块
-	AuthModule          *assembler.AuthModule
-	UserModule          *assembler.UserModule
-	QuestionnaireModule *assembler.QuestionnaireModule
-	AnswersheetModule   *assembler.AnswersheetModule
-	MedicalScaleModule  *assembler.MedicalScaleModule
+	AuthModule            *assembler.AuthModule
+	UserModule            *assembler.UserModule
+	QuestionnaireModule   *assembler.QuestionnaireModule
+	AnswersheetModule     *assembler.AnswersheetModule
+	MedicalScaleModule    *assembler.MedicalScaleModule
+	InterpretReportModule *assembler.InterpretReportModule
 
 	// 容器状态
 	initialized bool
@@ -69,6 +70,11 @@ func (c *Container) Initialize() error {
 	// 初始化医学量表模块
 	if err := c.initMedicalScaleModule(); err != nil {
 		return fmt.Errorf("failed to initialize medical scale module: %w", err)
+	}
+
+	// 初始化解读报告模块
+	if err := c.initInterpretReportModule(); err != nil {
+		return fmt.Errorf("failed to initialize interpret report module: %w", err)
 	}
 
 	c.initialized = true
@@ -144,6 +150,17 @@ func (c *Container) initMedicalScaleModule() error {
 	modulePool["medicalscale"] = medicalScaleModule
 
 	fmt.Printf("📦 Medical scale module initialized\n")
+	return nil
+}
+
+// initInterpretReportModule 初始化解读报告模块
+func (c *Container) initInterpretReportModule() error {
+	interpretReportModule := assembler.NewInterpretReportModule(c.mongoDB)
+
+	c.InterpretReportModule = interpretReportModule
+	modulePool["interpretreport"] = interpretReportModule
+
+	fmt.Printf("📦 Interpret report module initialized\n")
 	return nil
 }
 

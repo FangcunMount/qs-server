@@ -10,4 +10,6 @@ const (
 	ErrMedicalScaleAlreadyExists
 	// ErrMedicalScaleFactorNotFound 因子不存在
 	ErrMedicalScaleFactorNotFound
+	// ErrMedicalScaleInvalid 医学量表无效
+	ErrMedicalScaleInvalid
 )
