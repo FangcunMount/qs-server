@@ -21,365 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// SaveAnswerSheetRequest 保存答卷请求
-type SaveAnswerSheetRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
-	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	Title                string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	WriterId             uint64                 `protobuf:"varint,4,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
-	TesteeId             uint64                 `protobuf:"varint,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	Answers              []*Answer              `protobuf:"bytes,6,rep,name=answers,proto3" json:"answers,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *SaveAnswerSheetRequest) Reset() {
-	*x = SaveAnswerSheetRequest{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SaveAnswerSheetRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SaveAnswerSheetRequest) ProtoMessage() {}
-
-func (x *SaveAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SaveAnswerSheetRequest.ProtoReflect.Descriptor instead.
-func (*SaveAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *SaveAnswerSheetRequest) GetQuestionnaireCode() string {
-	if x != nil {
-		return x.QuestionnaireCode
-	}
-	return ""
-}
-
-func (x *SaveAnswerSheetRequest) GetQuestionnaireVersion() string {
-	if x != nil {
-		return x.QuestionnaireVersion
-	}
-	return ""
-}
-
-func (x *SaveAnswerSheetRequest) GetTitle() string {
-	if x != nil {
-		return x.Title
-	}
-	return ""
-}
-
-func (x *SaveAnswerSheetRequest) GetWriterId() uint64 {
-	if x != nil {
-		return x.WriterId
-	}
-	return 0
-}
-
-func (x *SaveAnswerSheetRequest) GetTesteeId() uint64 {
-	if x != nil {
-		return x.TesteeId
-	}
-	return 0
-}
-
-func (x *SaveAnswerSheetRequest) GetAnswers() []*Answer {
-	if x != nil {
-		return x.Answers
-	}
-	return nil
-}
-
-// SaveAnswerSheetResponse 保存答卷响应
-type SaveAnswerSheetResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SaveAnswerSheetResponse) Reset() {
-	*x = SaveAnswerSheetResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SaveAnswerSheetResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SaveAnswerSheetResponse) ProtoMessage() {}
-
-func (x *SaveAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SaveAnswerSheetResponse.ProtoReflect.Descriptor instead.
-func (*SaveAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *SaveAnswerSheetResponse) GetId() uint64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-// GetAnswerSheetRequest 获取答卷请求
-type GetAnswerSheetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetAnswerSheetRequest) Reset() {
-	*x = GetAnswerSheetRequest{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetAnswerSheetRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetAnswerSheetRequest) ProtoMessage() {}
-
-func (x *GetAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetAnswerSheetRequest.ProtoReflect.Descriptor instead.
-func (*GetAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GetAnswerSheetRequest) GetId() uint64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-// GetAnswerSheetResponse 获取答卷响应
-type GetAnswerSheetResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AnswerSheet   *AnswerSheet           `protobuf:"bytes,1,opt,name=answer_sheet,json=answerSheet,proto3" json:"answer_sheet,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetAnswerSheetResponse) Reset() {
-	*x = GetAnswerSheetResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetAnswerSheetResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetAnswerSheetResponse) ProtoMessage() {}
-
-func (x *GetAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetAnswerSheetResponse.ProtoReflect.Descriptor instead.
-func (*GetAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *GetAnswerSheetResponse) GetAnswerSheet() *AnswerSheet {
-	if x != nil {
-		return x.AnswerSheet
-	}
-	return nil
-}
-
-// ListAnswerSheetsRequest 获取答卷列表请求
-type ListAnswerSheetsRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
-	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	WriterId             uint64                 `protobuf:"varint,3,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
-	TesteeId             uint64                 `protobuf:"varint,4,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	Page                 uint32                 `protobuf:"varint,5,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize             uint32                 `protobuf:"varint,6,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *ListAnswerSheetsRequest) Reset() {
-	*x = ListAnswerSheetsRequest{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListAnswerSheetsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListAnswerSheetsRequest) ProtoMessage() {}
-
-func (x *ListAnswerSheetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListAnswerSheetsRequest.ProtoReflect.Descriptor instead.
-func (*ListAnswerSheetsRequest) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ListAnswerSheetsRequest) GetQuestionnaireCode() string {
-	if x != nil {
-		return x.QuestionnaireCode
-	}
-	return ""
-}
-
-func (x *ListAnswerSheetsRequest) GetQuestionnaireVersion() string {
-	if x != nil {
-		return x.QuestionnaireVersion
-	}
-	return ""
-}
-
-func (x *ListAnswerSheetsRequest) GetWriterId() uint64 {
-	if x != nil {
-		return x.WriterId
-	}
-	return 0
-}
-
-func (x *ListAnswerSheetsRequest) GetTesteeId() uint64 {
-	if x != nil {
-		return x.TesteeId
-	}
-	return 0
-}
-
-func (x *ListAnswerSheetsRequest) GetPage() uint32 {
-	if x != nil {
-		return x.Page
-	}
-	return 0
-}
-
-func (x *ListAnswerSheetsRequest) GetPageSize() uint32 {
-	if x != nil {
-		return x.PageSize
-	}
-	return 0
-}
-
-// ListAnswerSheetsResponse 获取答卷列表响应
-type ListAnswerSheetsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Total         int64                  `protobuf:"varint,1,opt,name=total,proto3" json:"total,omitempty"`
-	Items         []*AnswerSheet         `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListAnswerSheetsResponse) Reset() {
-	*x = ListAnswerSheetsResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListAnswerSheetsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListAnswerSheetsResponse) ProtoMessage() {}
-
-func (x *ListAnswerSheetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListAnswerSheetsResponse.ProtoReflect.Descriptor instead.
-func (*ListAnswerSheetsResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ListAnswerSheetsResponse) GetTotal() int64 {
-	if x != nil {
-		return x.Total
-	}
-	return 0
-}
-
-func (x *ListAnswerSheetsResponse) GetItems() []*AnswerSheet {
-	if x != nil {
-		return x.Items
-	}
-	return nil
-}
-
-// AnswerSheet 答卷
+// 答卷信息
 type AnswerSheet struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -400,7 +42,7 @@ type AnswerSheet struct {
 
 func (x *AnswerSheet) Reset() {
 	*x = AnswerSheet{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[6]
+	mi := &file_answersheet_answersheet_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -412,7 +54,7 @@ func (x *AnswerSheet) String() string {
 func (*AnswerSheet) ProtoMessage() {}
 
 func (x *AnswerSheet) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[6]
+	mi := &file_answersheet_answersheet_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,7 +67,7 @@ func (x *AnswerSheet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerSheet.ProtoReflect.Descriptor instead.
 func (*AnswerSheet) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{6}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *AnswerSheet) GetId() uint64 {
@@ -512,20 +154,20 @@ func (x *AnswerSheet) GetUpdatedAt() string {
 	return ""
 }
 
-// Answer 答案
+// 答案信息
 type Answer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	QuestionCode  string                 `protobuf:"bytes,1,opt,name=question_code,json=questionCode,proto3" json:"question_code,omitempty"`
 	QuestionType  string                 `protobuf:"bytes,2,opt,name=question_type,json=questionType,proto3" json:"question_type,omitempty"`
 	Score         uint32                 `protobuf:"varint,3,opt,name=score,proto3" json:"score,omitempty"`
-	Value         string                 `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	Value         string                 `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"` // JSON 字符串，可以表示各种类型的答案值
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Answer) Reset() {
 	*x = Answer{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[7]
+	mi := &file_answersheet_answersheet_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +179,7 @@ func (x *Answer) String() string {
 func (*Answer) ProtoMessage() {}
 
 func (x *Answer) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[7]
+	mi := &file_answersheet_answersheet_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +192,7 @@ func (x *Answer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Answer.ProtoReflect.Descriptor instead.
 func (*Answer) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{7}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Answer) GetQuestionCode() string {
@@ -581,34 +223,377 @@ func (x *Answer) GetValue() string {
 	return ""
 }
 
+// 保存答卷请求
+type SaveAnswerSheetRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
+	Title                string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	WriterId             uint64                 `protobuf:"varint,4,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
+	TesteeId             uint64                 `protobuf:"varint,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Answers              []*Answer              `protobuf:"bytes,6,rep,name=answers,proto3" json:"answers,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *SaveAnswerSheetRequest) Reset() {
+	*x = SaveAnswerSheetRequest{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveAnswerSheetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveAnswerSheetRequest) ProtoMessage() {}
+
+func (x *SaveAnswerSheetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveAnswerSheetRequest.ProtoReflect.Descriptor instead.
+func (*SaveAnswerSheetRequest) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SaveAnswerSheetRequest) GetQuestionnaireCode() string {
+	if x != nil {
+		return x.QuestionnaireCode
+	}
+	return ""
+}
+
+func (x *SaveAnswerSheetRequest) GetQuestionnaireVersion() string {
+	if x != nil {
+		return x.QuestionnaireVersion
+	}
+	return ""
+}
+
+func (x *SaveAnswerSheetRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *SaveAnswerSheetRequest) GetWriterId() uint64 {
+	if x != nil {
+		return x.WriterId
+	}
+	return 0
+}
+
+func (x *SaveAnswerSheetRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *SaveAnswerSheetRequest) GetAnswers() []*Answer {
+	if x != nil {
+		return x.Answers
+	}
+	return nil
+}
+
+// 保存答卷响应
+type SaveAnswerSheetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveAnswerSheetResponse) Reset() {
+	*x = SaveAnswerSheetResponse{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveAnswerSheetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveAnswerSheetResponse) ProtoMessage() {}
+
+func (x *SaveAnswerSheetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveAnswerSheetResponse.ProtoReflect.Descriptor instead.
+func (*SaveAnswerSheetResponse) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SaveAnswerSheetResponse) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *SaveAnswerSheetResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// 获取答卷请求
+type GetAnswerSheetRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAnswerSheetRequest) Reset() {
+	*x = GetAnswerSheetRequest{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAnswerSheetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAnswerSheetRequest) ProtoMessage() {}
+
+func (x *GetAnswerSheetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAnswerSheetRequest.ProtoReflect.Descriptor instead.
+func (*GetAnswerSheetRequest) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetAnswerSheetRequest) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+// 获取答卷响应
+type GetAnswerSheetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnswerSheet   *AnswerSheet           `protobuf:"bytes,1,opt,name=answer_sheet,json=answerSheet,proto3" json:"answer_sheet,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAnswerSheetResponse) Reset() {
+	*x = GetAnswerSheetResponse{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAnswerSheetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAnswerSheetResponse) ProtoMessage() {}
+
+func (x *GetAnswerSheetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAnswerSheetResponse.ProtoReflect.Descriptor instead.
+func (*GetAnswerSheetResponse) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetAnswerSheetResponse) GetAnswerSheet() *AnswerSheet {
+	if x != nil {
+		return x.AnswerSheet
+	}
+	return nil
+}
+
+// 获取答卷列表请求
+type ListAnswerSheetsRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
+	WriterId             uint64                 `protobuf:"varint,3,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
+	TesteeId             uint64                 `protobuf:"varint,4,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Page                 int32                  `protobuf:"varint,5,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize             int32                  `protobuf:"varint,6,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ListAnswerSheetsRequest) Reset() {
+	*x = ListAnswerSheetsRequest{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAnswerSheetsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAnswerSheetsRequest) ProtoMessage() {}
+
+func (x *ListAnswerSheetsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAnswerSheetsRequest.ProtoReflect.Descriptor instead.
+func (*ListAnswerSheetsRequest) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListAnswerSheetsRequest) GetQuestionnaireCode() string {
+	if x != nil {
+		return x.QuestionnaireCode
+	}
+	return ""
+}
+
+func (x *ListAnswerSheetsRequest) GetQuestionnaireVersion() string {
+	if x != nil {
+		return x.QuestionnaireVersion
+	}
+	return ""
+}
+
+func (x *ListAnswerSheetsRequest) GetWriterId() uint64 {
+	if x != nil {
+		return x.WriterId
+	}
+	return 0
+}
+
+func (x *ListAnswerSheetsRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *ListAnswerSheetsRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListAnswerSheetsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+// 获取答卷列表响应
+type ListAnswerSheetsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnswerSheets  []*AnswerSheet         `protobuf:"bytes,1,rep,name=answer_sheets,json=answerSheets,proto3" json:"answer_sheets,omitempty"`
+	Total         int64                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAnswerSheetsResponse) Reset() {
+	*x = ListAnswerSheetsResponse{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAnswerSheetsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAnswerSheetsResponse) ProtoMessage() {}
+
+func (x *ListAnswerSheetsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAnswerSheetsResponse.ProtoReflect.Descriptor instead.
+func (*ListAnswerSheetsResponse) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListAnswerSheetsResponse) GetAnswerSheets() []*AnswerSheet {
+	if x != nil {
+		return x.AnswerSheets
+	}
+	return nil
+}
+
+func (x *ListAnswerSheetsResponse) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
 var File_answersheet_answersheet_proto protoreflect.FileDescriptor
 
 const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\n" +
-	"\x1danswersheet/answersheet.proto\x12\vanswersheet\"\xfb\x01\n" +
-	"\x16SaveAnswerSheetRequest\x12-\n" +
-	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1b\n" +
-	"\twriter_id\x18\x04 \x01(\x04R\bwriterId\x12\x1b\n" +
-	"\ttestee_id\x18\x05 \x01(\x04R\btesteeId\x12-\n" +
-	"\aanswers\x18\x06 \x03(\v2\x13.answersheet.AnswerR\aanswers\")\n" +
-	"\x17SaveAnswerSheetResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x04R\x02id\"'\n" +
-	"\x15GetAnswerSheetRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x04R\x02id\"U\n" +
-	"\x16GetAnswerSheetResponse\x12;\n" +
-	"\fanswer_sheet\x18\x01 \x01(\v2\x18.answersheet.AnswerSheetR\vanswerSheet\"\xe8\x01\n" +
-	"\x17ListAnswerSheetsRequest\x12-\n" +
-	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x1b\n" +
-	"\twriter_id\x18\x03 \x01(\x04R\bwriterId\x12\x1b\n" +
-	"\ttestee_id\x18\x04 \x01(\x04R\btesteeId\x12\x12\n" +
-	"\x04page\x18\x05 \x01(\rR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x06 \x01(\rR\bpageSize\"`\n" +
-	"\x18ListAnswerSheetsResponse\x12\x14\n" +
-	"\x05total\x18\x01 \x01(\x03R\x05total\x12.\n" +
-	"\x05items\x18\x02 \x03(\v2\x18.answersheet.AnswerSheetR\x05items\"\x96\x03\n" +
+	"\x1danswersheet/answersheet.proto\x12\vanswersheet\"\x96\x03\n" +
 	"\vAnswerSheet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
@@ -631,11 +616,35 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value2\xb4\x02\n" +
-	"\x12AnswerSheetService\x12^\n" +
-	"\x0fSaveAnswerSheet\x12#.answersheet.SaveAnswerSheetRequest\x1a$.answersheet.SaveAnswerSheetResponse\"\x00\x12[\n" +
-	"\x0eGetAnswerSheet\x12\".answersheet.GetAnswerSheetRequest\x1a#.answersheet.GetAnswerSheetResponse\"\x00\x12a\n" +
-	"\x10ListAnswerSheets\x12$.answersheet.ListAnswerSheetsRequest\x1a%.answersheet.ListAnswerSheetsResponse\"\x00B\\ZZgithub.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheetb\x06proto3"
+	"\x05value\x18\x04 \x01(\tR\x05value\"\xfb\x01\n" +
+	"\x16SaveAnswerSheetRequest\x12-\n" +
+	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
+	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1b\n" +
+	"\twriter_id\x18\x04 \x01(\x04R\bwriterId\x12\x1b\n" +
+	"\ttestee_id\x18\x05 \x01(\x04R\btesteeId\x12-\n" +
+	"\aanswers\x18\x06 \x03(\v2\x13.answersheet.AnswerR\aanswers\"C\n" +
+	"\x17SaveAnswerSheetResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
+	"\x15GetAnswerSheetRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\"U\n" +
+	"\x16GetAnswerSheetResponse\x12;\n" +
+	"\fanswer_sheet\x18\x01 \x01(\v2\x18.answersheet.AnswerSheetR\vanswerSheet\"\xe8\x01\n" +
+	"\x17ListAnswerSheetsRequest\x12-\n" +
+	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
+	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x1b\n" +
+	"\twriter_id\x18\x03 \x01(\x04R\bwriterId\x12\x1b\n" +
+	"\ttestee_id\x18\x04 \x01(\x04R\btesteeId\x12\x12\n" +
+	"\x04page\x18\x05 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x06 \x01(\x05R\bpageSize\"o\n" +
+	"\x18ListAnswerSheetsResponse\x12=\n" +
+	"\ranswer_sheets\x18\x01 \x03(\v2\x18.answersheet.AnswerSheetR\fanswerSheets\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total2\xae\x02\n" +
+	"\x12AnswerSheetService\x12\\\n" +
+	"\x0fSaveAnswerSheet\x12#.answersheet.SaveAnswerSheetRequest\x1a$.answersheet.SaveAnswerSheetResponse\x12Y\n" +
+	"\x0eGetAnswerSheet\x12\".answersheet.GetAnswerSheetRequest\x1a#.answersheet.GetAnswerSheetResponse\x12_\n" +
+	"\x10ListAnswerSheets\x12$.answersheet.ListAnswerSheetsRequest\x1a%.answersheet.ListAnswerSheetsResponseB\\ZZgithub.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheetb\x06proto3"
 
 var (
 	file_answersheet_answersheet_proto_rawDescOnce sync.Once
@@ -651,26 +660,26 @@ func file_answersheet_answersheet_proto_rawDescGZIP() []byte {
 
 var file_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_answersheet_answersheet_proto_goTypes = []any{
-	(*SaveAnswerSheetRequest)(nil),   // 0: answersheet.SaveAnswerSheetRequest
-	(*SaveAnswerSheetResponse)(nil),  // 1: answersheet.SaveAnswerSheetResponse
-	(*GetAnswerSheetRequest)(nil),    // 2: answersheet.GetAnswerSheetRequest
-	(*GetAnswerSheetResponse)(nil),   // 3: answersheet.GetAnswerSheetResponse
-	(*ListAnswerSheetsRequest)(nil),  // 4: answersheet.ListAnswerSheetsRequest
-	(*ListAnswerSheetsResponse)(nil), // 5: answersheet.ListAnswerSheetsResponse
-	(*AnswerSheet)(nil),              // 6: answersheet.AnswerSheet
-	(*Answer)(nil),                   // 7: answersheet.Answer
+	(*AnswerSheet)(nil),              // 0: answersheet.AnswerSheet
+	(*Answer)(nil),                   // 1: answersheet.Answer
+	(*SaveAnswerSheetRequest)(nil),   // 2: answersheet.SaveAnswerSheetRequest
+	(*SaveAnswerSheetResponse)(nil),  // 3: answersheet.SaveAnswerSheetResponse
+	(*GetAnswerSheetRequest)(nil),    // 4: answersheet.GetAnswerSheetRequest
+	(*GetAnswerSheetResponse)(nil),   // 5: answersheet.GetAnswerSheetResponse
+	(*ListAnswerSheetsRequest)(nil),  // 6: answersheet.ListAnswerSheetsRequest
+	(*ListAnswerSheetsResponse)(nil), // 7: answersheet.ListAnswerSheetsResponse
 }
 var file_answersheet_answersheet_proto_depIdxs = []int32{
-	7, // 0: answersheet.SaveAnswerSheetRequest.answers:type_name -> answersheet.Answer
-	6, // 1: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
-	6, // 2: answersheet.ListAnswerSheetsResponse.items:type_name -> answersheet.AnswerSheet
-	7, // 3: answersheet.AnswerSheet.answers:type_name -> answersheet.Answer
-	0, // 4: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
-	2, // 5: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
-	4, // 6: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
-	1, // 7: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
-	3, // 8: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
-	5, // 9: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
+	1, // 0: answersheet.AnswerSheet.answers:type_name -> answersheet.Answer
+	1, // 1: answersheet.SaveAnswerSheetRequest.answers:type_name -> answersheet.Answer
+	0, // 2: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
+	0, // 3: answersheet.ListAnswerSheetsResponse.answer_sheets:type_name -> answersheet.AnswerSheet
+	2, // 4: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
+	4, // 5: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
+	6, // 6: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
+	3, // 7: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
+	5, // 8: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
+	7, // 9: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
 	7, // [7:10] is the sub-list for method output_type
 	4, // [4:7] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name

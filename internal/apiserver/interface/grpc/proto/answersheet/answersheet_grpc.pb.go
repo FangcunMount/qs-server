@@ -28,13 +28,13 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AnswerSheetService 答卷服务
+// 答卷服务 - 对外提供答卷管理功能
 type AnswerSheetServiceClient interface {
-	// SaveAnswerSheet 保存答卷
+	// 保存答卷
 	SaveAnswerSheet(ctx context.Context, in *SaveAnswerSheetRequest, opts ...grpc.CallOption) (*SaveAnswerSheetResponse, error)
-	// GetAnswerSheet 获取答卷
+	// 获取答卷详情
 	GetAnswerSheet(ctx context.Context, in *GetAnswerSheetRequest, opts ...grpc.CallOption) (*GetAnswerSheetResponse, error)
-	// ListAnswerSheets 获取答卷列表
+	// 获取答卷列表
 	ListAnswerSheets(ctx context.Context, in *ListAnswerSheetsRequest, opts ...grpc.CallOption) (*ListAnswerSheetsResponse, error)
 }
 
@@ -80,13 +80,13 @@ func (c *answerSheetServiceClient) ListAnswerSheets(ctx context.Context, in *Lis
 // All implementations must embed UnimplementedAnswerSheetServiceServer
 // for forward compatibility.
 //
-// AnswerSheetService 答卷服务
+// 答卷服务 - 对外提供答卷管理功能
 type AnswerSheetServiceServer interface {
-	// SaveAnswerSheet 保存答卷
+	// 保存答卷
 	SaveAnswerSheet(context.Context, *SaveAnswerSheetRequest) (*SaveAnswerSheetResponse, error)
-	// GetAnswerSheet 获取答卷
+	// 获取答卷详情
 	GetAnswerSheet(context.Context, *GetAnswerSheetRequest) (*GetAnswerSheetResponse, error)
-	// ListAnswerSheets 获取答卷列表
+	// 获取答卷列表
 	ListAnswerSheets(context.Context, *ListAnswerSheetsRequest) (*ListAnswerSheetsResponse, error)
 	mustEmbedUnimplementedAnswerSheetServiceServer()
 }
