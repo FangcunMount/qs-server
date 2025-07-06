@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
@@ -14,14 +15,14 @@ import (
 // Saver 答卷保存器
 type Saver struct {
 	aRepoMongo port.AnswerSheetRepositoryMongo
-	mapper     *AnswerMapper
+	mapper     mapper.AnswerMapper
 }
 
 // NewSaver 创建答卷保存器
 func NewSaver(aRepoMongo port.AnswerSheetRepositoryMongo) *Saver {
 	return &Saver{
 		aRepoMongo: aRepoMongo,
-		mapper:     NewAnswerMapper(),
+		mapper:     mapper.NewAnswerMapper(),
 	}
 }
 

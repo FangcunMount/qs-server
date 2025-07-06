@@ -1,4 +1,4 @@
-package answersheet
+package mapper
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
@@ -11,8 +11,8 @@ import (
 type AnswerMapper struct{}
 
 // NewAnswerMapper 创建答案映射器
-func NewAnswerMapper() *AnswerMapper {
-	return &AnswerMapper{}
+func NewAnswerMapper() AnswerMapper {
+	return AnswerMapper{}
 }
 
 // ToDTO 将领域对象转换为 DTO

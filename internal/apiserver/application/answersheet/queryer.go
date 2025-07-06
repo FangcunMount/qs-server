@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
 	qnPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
@@ -15,7 +16,7 @@ import (
 type Queryer struct {
 	aRepoMongo port.AnswerSheetRepositoryMongo
 	qRepoMongo qnPort.QuestionnaireRepositoryMongo
-	mapper     *AnswerMapper
+	mapper     mapper.AnswerMapper
 }
 
 // NewQueryer 创建答卷查询器
@@ -26,7 +27,7 @@ func NewQueryer(
 	return &Queryer{
 		aRepoMongo: aRepoMongo,
 		qRepoMongo: qRepoMongo,
-		mapper:     NewAnswerMapper(),
+		mapper:     mapper.NewAnswerMapper(),
 	}
 }
 
