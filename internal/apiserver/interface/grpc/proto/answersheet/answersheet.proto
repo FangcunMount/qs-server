@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package answersheet;
+
+option go_package = "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet";
+
+// AnswerSheetService 答卷服务
+service AnswerSheetService {
+  // SaveAnswerSheet 保存答卷
+  rpc SaveAnswerSheet(SaveAnswerSheetRequest) returns (SaveAnswerSheetResponse) {}
+  // GetAnswerSheet 获取答卷
+  rpc GetAnswerSheet(GetAnswerSheetRequest) returns (GetAnswerSheetResponse) {}
+  // ListAnswerSheets 获取答卷列表
+  rpc ListAnswerSheets(ListAnswerSheetsRequest) returns (ListAnswerSheetsResponse) {}
+}
+
+// SaveAnswerSheetRequest 保存答卷请求
+message SaveAnswerSheetRequest {
+  string questionnaire_code = 1;
+  string questionnaire_version = 2;
+  string title = 3;
+  uint64 writer_id = 4;
+  uint64 testee_id = 5;
+  repeated Answer answers = 6;
+}
+
+// SaveAnswerSheetResponse 保存答卷响应
+message SaveAnswerSheetResponse {
+  uint64 id = 1;
+}
+
+// GetAnswerSheetRequest 获取答卷请求
+message GetAnswerSheetRequest {
+  uint64 id = 1;
+}
+
+// GetAnswerSheetResponse 获取答卷响应
+message GetAnswerSheetResponse {
+  AnswerSheet answer_sheet = 1;
+}
+
+// ListAnswerSheetsRequest 获取答卷列表请求
+message ListAnswerSheetsRequest {
+  string questionnaire_code = 1;
+  string questionnaire_version = 2;
+  uint64 writer_id = 3;
+  uint64 testee_id = 4;
+  uint32 page = 5;
+  uint32 page_size = 6;
+}
+
+// ListAnswerSheetsResponse 获取答卷列表响应
+message ListAnswerSheetsResponse {
+  int64 total = 1;
+  repeated AnswerSheet items = 2;
+}
+
+// AnswerSheet 答卷
+message AnswerSheet {
+  uint64 id = 1;
+  string questionnaire_code = 2;
+  string questionnaire_version = 3;
+  string title = 4;
+  uint32 score = 5;
+  uint64 writer_id = 6;
+  string writer_name = 7;
+  uint64 testee_id = 8;
+  string testee_name = 9;
+  repeated Answer answers = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+// Answer 答案
+message Answer {
+  string question_code = 1;
+  string question_type = 2;
+  uint32 score = 3;
+  string value = 4;
+} 
