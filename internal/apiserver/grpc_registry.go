@@ -73,16 +73,15 @@ func (r *GRPCRegistry) registerQuestionnaireService() error {
 		return nil
 	}
 
-	// TODO: 实现问卷 GRPC 服务
-	// questionnaireService := service.NewQuestionnaireService(
-	//     r.container.QuestionnaireModule.QuesCreator,
-	//     r.container.QuestionnaireModule.QuesQueryer,
-	//     r.container.QuestionnaireModule.QuesEditor,
-	//     r.container.QuestionnaireModule.QuesPublisher,
-	// )
-	// r.server.RegisterService(questionnaireService)
+	questionnaireService := service.NewQuestionnaireService(
+		r.container.QuestionnaireModule.QuesCreator,
+		r.container.QuestionnaireModule.QuesEditor,
+		r.container.QuestionnaireModule.QuesPublisher,
+		r.container.QuestionnaireModule.QuesQueryer,
+	)
 
-	log.Info("   📝 Questionnaire service registration skipped (not implemented)")
+	r.server.RegisterService(questionnaireService)
+	log.Info("   📝 Questionnaire service registered")
 	return nil
 }
 
@@ -132,10 +131,11 @@ func (r *GRPCRegistry) GetRegisteredServices() []string {
 		services = append(services, "AnswerSheetService")
 	}
 
+	if r.container.QuestionnaireModule != nil {
+		services = append(services, "QuestionnaireService")
+	}
+
 	// TODO: 添加其他服务
-	// if r.container.QuestionnaireModule != nil {
-	//     services = append(services, "QuestionnaireService")
-	// }
 	// if r.container.UserModule != nil {
 	//     services = append(services, "UserService")
 	// }

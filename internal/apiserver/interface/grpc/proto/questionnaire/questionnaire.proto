@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package questionnaire;
+
+option go_package = "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire";
+
+// 问卷服务
+service QuestionnaireService {
+  // 创建问卷
+  rpc CreateQuestionnaire(CreateQuestionnaireRequest) returns (CreateQuestionnaireResponse);
+  
+  // 获取问卷
+  rpc GetQuestionnaire(GetQuestionnaireRequest) returns (GetQuestionnaireResponse);
+  
+  // 获取问卷列表
+  rpc ListQuestionnaires(ListQuestionnairesRequest) returns (ListQuestionnairesResponse);
+  
+  // 编辑问卷基本信息
+  rpc EditBasicInfo(EditBasicInfoRequest) returns (EditBasicInfoResponse);
+  
+  // 更新问卷问题
+  rpc UpdateQuestions(UpdateQuestionsRequest) returns (UpdateQuestionsResponse);
+  
+  // 发布问卷
+  rpc PublishQuestionnaire(PublishQuestionnaireRequest) returns (PublishQuestionnaireResponse);
+  
+  // 下架问卷
+  rpc UnpublishQuestionnaire(UnpublishQuestionnaireRequest) returns (UnpublishQuestionnaireResponse);
+}
+
+// 问卷信息
+message Questionnaire {
+  string code = 1;
+  string title = 2;
+  string description = 3;
+  string img_url = 4;
+  string status = 5;
+  string version = 6;
+  repeated Question questions = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// 问题信息
+message Question {
+  string id = 1;
+  string type = 2;
+  string title = 3;
+  string description = 4;
+  bool required = 5;
+  repeated Option options = 6;
+  ValidationRule validation = 7;
+  CalculationRule calculation = 8;
+}
+
+// 选项信息
+message Option {
+  string id = 1;
+  string text = 2;
+  int32 score = 3;
+}
+
+// 验证规则
+message ValidationRule {
+  string type = 1;
+  string message = 2;
+  map<string, string> params = 3;
+}
+
+// 计算规则
+message CalculationRule {
+  string type = 1;
+  map<string, string> params = 2;
+}
+
+// 创建问卷请求
+message CreateQuestionnaireRequest {
+  string title = 1;
+  string description = 2;
+  string img_url = 3;
+}
+
+// 创建问卷响应
+message CreateQuestionnaireResponse {
+  Questionnaire questionnaire = 1;
+}
+
+// 获取问卷请求
+message GetQuestionnaireRequest {
+  string code = 1;
+}
+
+// 获取问卷响应
+message GetQuestionnaireResponse {
+  Questionnaire questionnaire = 1;
+}
+
+// 获取问卷列表请求
+message ListQuestionnairesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string status = 3;
+  string title = 4;
+}
+
+// 获取问卷列表响应
+message ListQuestionnairesResponse {
+  repeated Questionnaire questionnaires = 1;
+  int64 total = 2;
+}
+
+// 编辑基本信息请求
+message EditBasicInfoRequest {
+  string code = 1;
+  string title = 2;
+  string description = 3;
+  string img_url = 4;
+}
+
+// 编辑基本信息响应
+message EditBasicInfoResponse {
+  Questionnaire questionnaire = 1;
+}
+
+// 更新问题请求
+message UpdateQuestionsRequest {
+  string code = 1;
+  repeated Question questions = 2;
+}
+
+// 更新问题响应
+message UpdateQuestionsResponse {
+  Questionnaire questionnaire = 1;
+}
+
+// 发布问卷请求
+message PublishQuestionnaireRequest {
+  string code = 1;
+}
+
+// 发布问卷响应
+message PublishQuestionnaireResponse {
+  Questionnaire questionnaire = 1;
+}
+
+// 下架问卷请求
+message UnpublishQuestionnaireRequest {
+  string code = 1;
+}
+
+// 下架问卷响应
+message UnpublishQuestionnaireResponse {
+  Questionnaire questionnaire = 1;
+} 
