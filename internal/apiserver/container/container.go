@@ -25,6 +25,7 @@ type Container struct {
 	UserModule          *assembler.UserModule
 	QuestionnaireModule *assembler.QuestionnaireModule
 	AnswersheetModule   *assembler.AnswersheetModule
+	MedicalScaleModule  *assembler.MedicalScaleModule
 
 	// 容器状态
 	initialized bool
@@ -63,6 +64,11 @@ func (c *Container) Initialize() error {
 	// 初始化答卷模块
 	if err := c.initAnswersheetModule(); err != nil {
 		return fmt.Errorf("failed to initialize answersheet module: %w", err)
+	}
+
+	// 初始化医学量表模块
+	if err := c.initMedicalScaleModule(); err != nil {
+		return fmt.Errorf("failed to initialize medical scale module: %w", err)
 	}
 
 	c.initialized = true
@@ -124,6 +130,20 @@ func (c *Container) initAnswersheetModule() error {
 	modulePool["answersheet"] = answersheetModule
 
 	fmt.Printf("📦 Answersheet module initialized\n")
+	return nil
+}
+
+// initMedicalScaleModule 初始化医学量表模块
+func (c *Container) initMedicalScaleModule() error {
+	medicalScaleModule := assembler.NewMedicalScaleModule()
+	if err := medicalScaleModule.Initialize(c.mongoDB); err != nil {
+		return fmt.Errorf("failed to initialize medical scale module: %w", err)
+	}
+
+	c.MedicalScaleModule = medicalScaleModule
+	modulePool["medicalscale"] = medicalScaleModule
+
+	fmt.Printf("📦 Medical scale module initialized\n")
 	return nil
 }
 

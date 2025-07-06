@@ -10,19 +10,22 @@ import (
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 )
 
-// Queryer 医学量表查询器
+// Queryer 医学量表查询器，实现 MedicalScaleQueryer 接口
 type Queryer struct {
-	repo   port.MedicalScaleQueryer
+	repo   port.MedicalScaleRepositoryMongo
 	mapper mapper.MedicalScaleMapper
 }
 
 // NewQueryer 创建医学量表查询器
-func NewQueryer(repo port.MedicalScaleQueryer) *Queryer {
+func NewQueryer(repo port.MedicalScaleRepositoryMongo) *Queryer {
 	return &Queryer{
 		repo:   repo,
 		mapper: mapper.NewMedicalScaleMapper(),
 	}
 }
+
+// 确保 Queryer 实现了 MedicalScaleQueryer 接口
+var _ port.MedicalScaleQueryer = (*Queryer)(nil)
 
 // validateCode 验证医学量表编码
 func (q *Queryer) validateCode(code string) error {
@@ -57,7 +60,13 @@ func (q *Queryer) GetMedicalScaleByCode(
 	}
 
 	// 2. 从仓储获取医学量表
-	return q.repo.GetMedicalScaleByCode(ctx, code)
+	medicalScale, err := q.repo.FindByCode(ctx, code)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取医学量表失败")
+	}
+
+	// 3. 转换为 DTO 并返回
+	return q.mapper.ToDTO(medicalScale), nil
 }
 
 // GetMedicalScaleByQuestionnaireCode 根据问卷代码获取医学量表
@@ -71,7 +80,13 @@ func (q *Queryer) GetMedicalScaleByQuestionnaireCode(
 	}
 
 	// 2. 从仓储获取医学量表
-	return q.repo.GetMedicalScaleByQuestionnaireCode(ctx, questionnaireCode)
+	medicalScale, err := q.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取医学量表失败")
+	}
+
+	// 3. 转换为 DTO 并返回
+	return q.mapper.ToDTO(medicalScale), nil
 }
 
 // ListMedicalScales 获取医学量表列表
@@ -86,5 +101,22 @@ func (q *Queryer) ListMedicalScales(
 	}
 
 	// 2. 获取医学量表列表
-	return q.repo.ListMedicalScales(ctx, page, pageSize, conditions)
+	medicalScales, err := q.repo.FindList(ctx, page, pageSize, conditions)
+	if err != nil {
+		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "获取医学量表列表失败")
+	}
+
+	// 3. 获取总数
+	total, err := q.repo.CountWithConditions(ctx, conditions)
+	if err != nil {
+		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "获取医学量表总数失败")
+	}
+
+	// 4. 转换为 DTO 列表
+	dtos := make([]*dto.MedicalScaleDTO, 0, len(medicalScales))
+	for _, medicalScale := range medicalScales {
+		dtos = append(dtos, q.mapper.ToDTO(medicalScale))
+	}
+
+	return dtos, total, nil
 }

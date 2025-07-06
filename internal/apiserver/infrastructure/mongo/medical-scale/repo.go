@@ -6,6 +6,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
 	medicalscale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
@@ -91,7 +92,7 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*medicalScale
 }
 
 // FindByQuestionnaireCode 根据问卷代码查找医学量表列表
-func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) ([]*medicalscale.MedicalScale, error) {
+func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*medicalscale.MedicalScale, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
 		"deleted_at":         bson.M{"$exists": false},
@@ -116,7 +117,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 		return nil, err
 	}
 
-	return scales, nil
+	return scales[0], nil
 }
 
 // Update 更新医学量表
@@ -219,4 +220,81 @@ func (r *Repository) HardDelete(ctx context.Context, id v1.ID) error {
 	}
 
 	return nil
+}
+
+// FindList 根据条件查找医学量表列表
+func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*medicalScale.MedicalScale, error) {
+	// 构建查询条件
+	filter := bson.M{
+		"deleted_at": bson.M{"$exists": false},
+	}
+
+	// 添加条件过滤
+	for key, value := range conditions {
+		if value != "" {
+			switch key {
+			case "title":
+				filter["title"] = bson.M{"$regex": value, "$options": "i"}
+			case "questionnaire_code":
+				filter["questionnaire_code"] = value
+			case "code":
+				filter["code"] = value
+			}
+		}
+	}
+
+	// 计算跳过的文档数
+	skip := (page - 1) * pageSize
+
+	// 设置分页选项
+	opts := options.Find().
+		SetSkip(int64(skip)).
+		SetLimit(int64(pageSize)).
+		SetSort(bson.M{"created_at": -1}) // 按创建时间倒序
+
+	// 执行查询
+	cursor, err := r.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var scales []*medicalScale.MedicalScale
+	for cursor.Next(ctx) {
+		var po MedicalScalePO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		scales = append(scales, r.mapper.ToBO(&po))
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return scales, nil
+}
+
+// CountWithConditions 根据条件计算医学量表数量
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
+	// 构建查询条件
+	filter := bson.M{
+		"deleted_at": bson.M{"$exists": false},
+	}
+
+	// 添加条件过滤
+	for key, value := range conditions {
+		if value != "" {
+			switch key {
+			case "title":
+				filter["title"] = bson.M{"$regex": value, "$options": "i"}
+			case "questionnaire_code":
+				filter["questionnaire_code"] = value
+			case "code":
+				filter["code"] = value
+			}
+		}
+	}
+
+	return r.CountDocuments(ctx, filter)
 }

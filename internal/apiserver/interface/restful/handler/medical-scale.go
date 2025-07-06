@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/application/medical-scale"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
@@ -17,16 +17,16 @@ import (
 // MedicalScaleHandler 医学量表处理器
 type MedicalScaleHandler struct {
 	BaseHandler
-	creator medicalScale.Creator
-	queryer medicalScale.Queryer
-	editor  medicalScale.Editor
+	creator port.MedicalScaleCreator
+	queryer port.MedicalScaleQueryer
+	editor  port.MedicalScaleEditor
 }
 
 // NewMedicalScaleHandler 创建医学量表处理器
 func NewMedicalScaleHandler(
-	creator medicalScale.Creator,
-	queryer medicalScale.Queryer,
-	editor medicalScale.Editor,
+	creator port.MedicalScaleCreator,
+	queryer port.MedicalScaleQueryer,
+	editor port.MedicalScaleEditor,
 ) *MedicalScaleHandler {
 	return &MedicalScaleHandler{
 		creator: creator,
@@ -59,7 +59,7 @@ func (h *MedicalScaleHandler) Create(c *gin.Context) {
 	}
 
 	// 创建医学量表
-	scale, err := h.creator.Create(c.Request.Context(), medicalScaleDTO)
+	scale, err := h.creator.CreateMedicalScale(c.Request.Context(), medicalScaleDTO)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return

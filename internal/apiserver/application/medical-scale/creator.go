@@ -24,6 +24,14 @@ func NewCreator(mRepoMongo port.MedicalScaleRepositoryMongo) *Creator {
 	}
 }
 
+// 确保 Creator 实现了 MedicalScaleCreator 接口
+var _ port.MedicalScaleCreator = (*Creator)(nil)
+
+// CreateMedicalScale 创建医学量表（实现接口方法）
+func (c *Creator) CreateMedicalScale(ctx context.Context, dto *dto.MedicalScaleDTO) (*dto.MedicalScaleDTO, error) {
+	return c.Create(ctx, dto)
+}
+
 // Create 创建医学量表
 func (c *Creator) Create(ctx context.Context, dto *dto.MedicalScaleDTO) (*dto.MedicalScaleDTO, error) {
 	// 1. 生成医学量表编码

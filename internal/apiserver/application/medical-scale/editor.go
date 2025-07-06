@@ -29,6 +29,9 @@ func NewEditor(repo port.MedicalScaleRepositoryMongo) *Editor {
 	}
 }
 
+// 确保 Editor 实现了 MedicalScaleEditor 接口
+var _ port.MedicalScaleEditor = (*Editor)(nil)
+
 // validateMedicalScaleDTO 验证医学量表 DTO
 func (e *Editor) validateMedicalScaleDTO(dto *dto.MedicalScaleDTO) error {
 	if dto == nil {
