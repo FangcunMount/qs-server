@@ -46,8 +46,3 @@ type ValidationRuleDTO struct {
 	RuleType    string // 规则类型
 	TargetValue string // 目标值
 }
-
-// CalculationRuleDTO 计算规则 DTO
-type CalculationRuleDTO struct {
-	FormulaType string // 公式类型
-}

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	"github.com/yshujie/questionnaire-scale/pkg/util/codeutil"
@@ -13,7 +14,7 @@ import (
 type Creator struct {
 	qRepoMySQL port.QuestionnaireRepositoryMySQL
 	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     *QuestionnaireMapper
+	mapper     mapper.QuestionnaireMapper
 }
 
 // NewCreator 创建问卷创建器
@@ -24,7 +25,7 @@ func NewCreator(
 	return &Creator{
 		qRepoMySQL: qRepoMySQL,
 		qRepoMongo: qRepoMongo,
-		mapper:     NewQuestionnaireMapper(),
+		mapper:     mapper.NewQuestionnaireMapper(),
 	}
 }
 

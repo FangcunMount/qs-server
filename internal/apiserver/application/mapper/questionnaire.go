@@ -1,4 +1,4 @@
-package questionnaire
+package mapper
 
 import (
 	"errors"
@@ -16,8 +16,8 @@ import (
 type QuestionnaireMapper struct{}
 
 // NewQuestionnaireMapper 创建问卷映射器
-func NewQuestionnaireMapper() *QuestionnaireMapper {
-	return &QuestionnaireMapper{}
+func NewQuestionnaireMapper() QuestionnaireMapper {
+	return QuestionnaireMapper{}
 }
 
 // ToDTO 将领域对象转换为 DTO

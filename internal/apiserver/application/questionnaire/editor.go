@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
@@ -15,7 +16,7 @@ import (
 type Editor struct {
 	qRepoMySQL port.QuestionnaireRepositoryMySQL
 	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     *QuestionnaireMapper
+	mapper     mapper.QuestionnaireMapper
 }
 
 // NewEditor 创建问卷编辑器
@@ -26,7 +27,7 @@ func NewEditor(
 	return &Editor{
 		qRepoMySQL: qRepoMySQL,
 		qRepoMongo: qRepoMongo,
-		mapper:     NewQuestionnaireMapper(),
+		mapper:     mapper.NewQuestionnaireMapper(),
 	}
 }
 

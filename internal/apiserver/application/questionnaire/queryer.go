@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
@@ -14,7 +15,7 @@ import (
 type Queryer struct {
 	qRepoMySQL port.QuestionnaireRepositoryMySQL
 	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     *QuestionnaireMapper
+	mapper     mapper.QuestionnaireMapper
 }
 
 // NewQueryer 创建问卷查询器
@@ -25,7 +26,7 @@ func NewQueryer(
 	return &Queryer{
 		qRepoMySQL: qRepoMySQL,
 		qRepoMongo: qRepoMongo,
-		mapper:     NewQuestionnaireMapper(),
+		mapper:     mapper.NewQuestionnaireMapper(),
 	}
 }
 
