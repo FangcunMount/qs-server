@@ -19,35 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	QuestionnaireService_CreateQuestionnaire_FullMethodName    = "/questionnaire.QuestionnaireService/CreateQuestionnaire"
-	QuestionnaireService_GetQuestionnaire_FullMethodName       = "/questionnaire.QuestionnaireService/GetQuestionnaire"
-	QuestionnaireService_ListQuestionnaires_FullMethodName     = "/questionnaire.QuestionnaireService/ListQuestionnaires"
-	QuestionnaireService_EditBasicInfo_FullMethodName          = "/questionnaire.QuestionnaireService/EditBasicInfo"
-	QuestionnaireService_UpdateQuestions_FullMethodName        = "/questionnaire.QuestionnaireService/UpdateQuestions"
-	QuestionnaireService_PublishQuestionnaire_FullMethodName   = "/questionnaire.QuestionnaireService/PublishQuestionnaire"
-	QuestionnaireService_UnpublishQuestionnaire_FullMethodName = "/questionnaire.QuestionnaireService/UnpublishQuestionnaire"
+	QuestionnaireService_GetQuestionnaire_FullMethodName   = "/questionnaire.QuestionnaireService/GetQuestionnaire"
+	QuestionnaireService_ListQuestionnaires_FullMethodName = "/questionnaire.QuestionnaireService/ListQuestionnaires"
 )
 
 // QuestionnaireServiceClient is the client API for QuestionnaireService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// 问卷服务
+// 问卷服务 - 对外提供查询功能
 type QuestionnaireServiceClient interface {
-	// 创建问卷
-	CreateQuestionnaire(ctx context.Context, in *CreateQuestionnaireRequest, opts ...grpc.CallOption) (*CreateQuestionnaireResponse, error)
-	// 获取问卷
+	// 获取问卷详情
 	GetQuestionnaire(ctx context.Context, in *GetQuestionnaireRequest, opts ...grpc.CallOption) (*GetQuestionnaireResponse, error)
 	// 获取问卷列表
 	ListQuestionnaires(ctx context.Context, in *ListQuestionnairesRequest, opts ...grpc.CallOption) (*ListQuestionnairesResponse, error)
-	// 编辑问卷基本信息
-	EditBasicInfo(ctx context.Context, in *EditBasicInfoRequest, opts ...grpc.CallOption) (*EditBasicInfoResponse, error)
-	// 更新问卷问题
-	UpdateQuestions(ctx context.Context, in *UpdateQuestionsRequest, opts ...grpc.CallOption) (*UpdateQuestionsResponse, error)
-	// 发布问卷
-	PublishQuestionnaire(ctx context.Context, in *PublishQuestionnaireRequest, opts ...grpc.CallOption) (*PublishQuestionnaireResponse, error)
-	// 下架问卷
-	UnpublishQuestionnaire(ctx context.Context, in *UnpublishQuestionnaireRequest, opts ...grpc.CallOption) (*UnpublishQuestionnaireResponse, error)
 }
 
 type questionnaireServiceClient struct {
@@ -56,16 +41,6 @@ type questionnaireServiceClient struct {
 
 func NewQuestionnaireServiceClient(cc grpc.ClientConnInterface) QuestionnaireServiceClient {
 	return &questionnaireServiceClient{cc}
-}
-
-func (c *questionnaireServiceClient) CreateQuestionnaire(ctx context.Context, in *CreateQuestionnaireRequest, opts ...grpc.CallOption) (*CreateQuestionnaireResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateQuestionnaireResponse)
-	err := c.cc.Invoke(ctx, QuestionnaireService_CreateQuestionnaire_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *questionnaireServiceClient) GetQuestionnaire(ctx context.Context, in *GetQuestionnaireRequest, opts ...grpc.CallOption) (*GetQuestionnaireResponse, error) {
@@ -88,66 +63,16 @@ func (c *questionnaireServiceClient) ListQuestionnaires(ctx context.Context, in 
 	return out, nil
 }
 
-func (c *questionnaireServiceClient) EditBasicInfo(ctx context.Context, in *EditBasicInfoRequest, opts ...grpc.CallOption) (*EditBasicInfoResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EditBasicInfoResponse)
-	err := c.cc.Invoke(ctx, QuestionnaireService_EditBasicInfo_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *questionnaireServiceClient) UpdateQuestions(ctx context.Context, in *UpdateQuestionsRequest, opts ...grpc.CallOption) (*UpdateQuestionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateQuestionsResponse)
-	err := c.cc.Invoke(ctx, QuestionnaireService_UpdateQuestions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *questionnaireServiceClient) PublishQuestionnaire(ctx context.Context, in *PublishQuestionnaireRequest, opts ...grpc.CallOption) (*PublishQuestionnaireResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PublishQuestionnaireResponse)
-	err := c.cc.Invoke(ctx, QuestionnaireService_PublishQuestionnaire_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *questionnaireServiceClient) UnpublishQuestionnaire(ctx context.Context, in *UnpublishQuestionnaireRequest, opts ...grpc.CallOption) (*UnpublishQuestionnaireResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UnpublishQuestionnaireResponse)
-	err := c.cc.Invoke(ctx, QuestionnaireService_UnpublishQuestionnaire_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // QuestionnaireServiceServer is the server API for QuestionnaireService service.
 // All implementations must embed UnimplementedQuestionnaireServiceServer
 // for forward compatibility.
 //
-// 问卷服务
+// 问卷服务 - 对外提供查询功能
 type QuestionnaireServiceServer interface {
-	// 创建问卷
-	CreateQuestionnaire(context.Context, *CreateQuestionnaireRequest) (*CreateQuestionnaireResponse, error)
-	// 获取问卷
+	// 获取问卷详情
 	GetQuestionnaire(context.Context, *GetQuestionnaireRequest) (*GetQuestionnaireResponse, error)
 	// 获取问卷列表
 	ListQuestionnaires(context.Context, *ListQuestionnairesRequest) (*ListQuestionnairesResponse, error)
-	// 编辑问卷基本信息
-	EditBasicInfo(context.Context, *EditBasicInfoRequest) (*EditBasicInfoResponse, error)
-	// 更新问卷问题
-	UpdateQuestions(context.Context, *UpdateQuestionsRequest) (*UpdateQuestionsResponse, error)
-	// 发布问卷
-	PublishQuestionnaire(context.Context, *PublishQuestionnaireRequest) (*PublishQuestionnaireResponse, error)
-	// 下架问卷
-	UnpublishQuestionnaire(context.Context, *UnpublishQuestionnaireRequest) (*UnpublishQuestionnaireResponse, error)
 	mustEmbedUnimplementedQuestionnaireServiceServer()
 }
 
@@ -158,26 +83,11 @@ type QuestionnaireServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedQuestionnaireServiceServer struct{}
 
-func (UnimplementedQuestionnaireServiceServer) CreateQuestionnaire(context.Context, *CreateQuestionnaireRequest) (*CreateQuestionnaireResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateQuestionnaire not implemented")
-}
 func (UnimplementedQuestionnaireServiceServer) GetQuestionnaire(context.Context, *GetQuestionnaireRequest) (*GetQuestionnaireResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetQuestionnaire not implemented")
 }
 func (UnimplementedQuestionnaireServiceServer) ListQuestionnaires(context.Context, *ListQuestionnairesRequest) (*ListQuestionnairesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListQuestionnaires not implemented")
-}
-func (UnimplementedQuestionnaireServiceServer) EditBasicInfo(context.Context, *EditBasicInfoRequest) (*EditBasicInfoResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method EditBasicInfo not implemented")
-}
-func (UnimplementedQuestionnaireServiceServer) UpdateQuestions(context.Context, *UpdateQuestionsRequest) (*UpdateQuestionsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateQuestions not implemented")
-}
-func (UnimplementedQuestionnaireServiceServer) PublishQuestionnaire(context.Context, *PublishQuestionnaireRequest) (*PublishQuestionnaireResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PublishQuestionnaire not implemented")
-}
-func (UnimplementedQuestionnaireServiceServer) UnpublishQuestionnaire(context.Context, *UnpublishQuestionnaireRequest) (*UnpublishQuestionnaireResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UnpublishQuestionnaire not implemented")
 }
 func (UnimplementedQuestionnaireServiceServer) mustEmbedUnimplementedQuestionnaireServiceServer() {}
 func (UnimplementedQuestionnaireServiceServer) testEmbeddedByValue()                              {}
@@ -198,24 +108,6 @@ func RegisterQuestionnaireServiceServer(s grpc.ServiceRegistrar, srv Questionnai
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&QuestionnaireService_ServiceDesc, srv)
-}
-
-func _QuestionnaireService_CreateQuestionnaire_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateQuestionnaireRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QuestionnaireServiceServer).CreateQuestionnaire(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: QuestionnaireService_CreateQuestionnaire_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QuestionnaireServiceServer).CreateQuestionnaire(ctx, req.(*CreateQuestionnaireRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _QuestionnaireService_GetQuestionnaire_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -254,78 +146,6 @@ func _QuestionnaireService_ListQuestionnaires_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _QuestionnaireService_EditBasicInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EditBasicInfoRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QuestionnaireServiceServer).EditBasicInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: QuestionnaireService_EditBasicInfo_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QuestionnaireServiceServer).EditBasicInfo(ctx, req.(*EditBasicInfoRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _QuestionnaireService_UpdateQuestions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateQuestionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QuestionnaireServiceServer).UpdateQuestions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: QuestionnaireService_UpdateQuestions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QuestionnaireServiceServer).UpdateQuestions(ctx, req.(*UpdateQuestionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _QuestionnaireService_PublishQuestionnaire_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishQuestionnaireRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QuestionnaireServiceServer).PublishQuestionnaire(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: QuestionnaireService_PublishQuestionnaire_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QuestionnaireServiceServer).PublishQuestionnaire(ctx, req.(*PublishQuestionnaireRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _QuestionnaireService_UnpublishQuestionnaire_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UnpublishQuestionnaireRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QuestionnaireServiceServer).UnpublishQuestionnaire(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: QuestionnaireService_UnpublishQuestionnaire_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QuestionnaireServiceServer).UnpublishQuestionnaire(ctx, req.(*UnpublishQuestionnaireRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // QuestionnaireService_ServiceDesc is the grpc.ServiceDesc for QuestionnaireService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -334,32 +154,12 @@ var QuestionnaireService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*QuestionnaireServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateQuestionnaire",
-			Handler:    _QuestionnaireService_CreateQuestionnaire_Handler,
-		},
-		{
 			MethodName: "GetQuestionnaire",
 			Handler:    _QuestionnaireService_GetQuestionnaire_Handler,
 		},
 		{
 			MethodName: "ListQuestionnaires",
 			Handler:    _QuestionnaireService_ListQuestionnaires_Handler,
-		},
-		{
-			MethodName: "EditBasicInfo",
-			Handler:    _QuestionnaireService_EditBasicInfo_Handler,
-		},
-		{
-			MethodName: "UpdateQuestions",
-			Handler:    _QuestionnaireService_UpdateQuestions_Handler,
-		},
-		{
-			MethodName: "PublishQuestionnaire",
-			Handler:    _QuestionnaireService_PublishQuestionnaire_Handler,
-		},
-		{
-			MethodName: "UnpublishQuestionnaire",
-			Handler:    _QuestionnaireService_UnpublishQuestionnaire_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

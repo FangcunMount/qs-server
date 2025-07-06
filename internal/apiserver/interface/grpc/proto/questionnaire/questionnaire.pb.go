@@ -132,17 +132,17 @@ func (x *Questionnaire) GetUpdatedAt() string {
 
 // 问题信息
 type Question struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	Required      bool                   `protobuf:"varint,5,opt,name=required,proto3" json:"required,omitempty"`
-	Options       []*Option              `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`
-	Validation    *ValidationRule        `protobuf:"bytes,7,opt,name=validation,proto3" json:"validation,omitempty"`
-	Calculation   *CalculationRule       `protobuf:"bytes,8,opt,name=calculation,proto3" json:"calculation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Code            string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Type            string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Title           string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Tips            string                 `protobuf:"bytes,4,opt,name=tips,proto3" json:"tips,omitempty"`
+	Placeholder     string                 `protobuf:"bytes,5,opt,name=placeholder,proto3" json:"placeholder,omitempty"`
+	Options         []*Option              `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`
+	ValidationRules []*ValidationRule      `protobuf:"bytes,7,rep,name=validation_rules,json=validationRules,proto3" json:"validation_rules,omitempty"`
+	CalculationRule *CalculationRule       `protobuf:"bytes,8,opt,name=calculation_rule,json=calculationRule,proto3" json:"calculation_rule,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Question) Reset() {
@@ -175,9 +175,9 @@ func (*Question) Descriptor() ([]byte, []int) {
 	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Question) GetId() string {
+func (x *Question) GetCode() string {
 	if x != nil {
-		return x.Id
+		return x.Code
 	}
 	return ""
 }
@@ -196,18 +196,18 @@ func (x *Question) GetTitle() string {
 	return ""
 }
 
-func (x *Question) GetDescription() string {
+func (x *Question) GetTips() string {
 	if x != nil {
-		return x.Description
+		return x.Tips
 	}
 	return ""
 }
 
-func (x *Question) GetRequired() bool {
+func (x *Question) GetPlaceholder() string {
 	if x != nil {
-		return x.Required
+		return x.Placeholder
 	}
-	return false
+	return ""
 }
 
 func (x *Question) GetOptions() []*Option {
@@ -217,16 +217,16 @@ func (x *Question) GetOptions() []*Option {
 	return nil
 }
 
-func (x *Question) GetValidation() *ValidationRule {
+func (x *Question) GetValidationRules() []*ValidationRule {
 	if x != nil {
-		return x.Validation
+		return x.ValidationRules
 	}
 	return nil
 }
 
-func (x *Question) GetCalculation() *CalculationRule {
+func (x *Question) GetCalculationRule() *CalculationRule {
 	if x != nil {
-		return x.Calculation
+		return x.CalculationRule
 	}
 	return nil
 }
@@ -234,8 +234,8 @@ func (x *Question) GetCalculation() *CalculationRule {
 // 选项信息
 type Option struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
 	Score         int32                  `protobuf:"varint,3,opt,name=score,proto3" json:"score,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -271,16 +271,16 @@ func (*Option) Descriptor() ([]byte, []int) {
 	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Option) GetId() string {
+func (x *Option) GetCode() string {
 	if x != nil {
-		return x.Id
+		return x.Code
 	}
 	return ""
 }
 
-func (x *Option) GetText() string {
+func (x *Option) GetContent() string {
 	if x != nil {
-		return x.Text
+		return x.Content
 	}
 	return ""
 }
@@ -295,9 +295,8 @@ func (x *Option) GetScore() int32 {
 // 验证规则
 type ValidationRule struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Params        map[string]string      `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	RuleType      string                 `protobuf:"bytes,1,opt,name=rule_type,json=ruleType,proto3" json:"rule_type,omitempty"`
+	TargetValue   string                 `protobuf:"bytes,2,opt,name=target_value,json=targetValue,proto3" json:"target_value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -332,32 +331,24 @@ func (*ValidationRule) Descriptor() ([]byte, []int) {
 	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ValidationRule) GetType() string {
+func (x *ValidationRule) GetRuleType() string {
 	if x != nil {
-		return x.Type
+		return x.RuleType
 	}
 	return ""
 }
 
-func (x *ValidationRule) GetMessage() string {
+func (x *ValidationRule) GetTargetValue() string {
 	if x != nil {
-		return x.Message
+		return x.TargetValue
 	}
 	return ""
-}
-
-func (x *ValidationRule) GetParams() map[string]string {
-	if x != nil {
-		return x.Params
-	}
-	return nil
 }
 
 // 计算规则
 type CalculationRule struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Params        map[string]string      `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	FormulaType   string                 `protobuf:"bytes,1,opt,name=formula_type,json=formulaType,proto3" json:"formula_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -392,124 +383,11 @@ func (*CalculationRule) Descriptor() ([]byte, []int) {
 	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CalculationRule) GetType() string {
+func (x *CalculationRule) GetFormulaType() string {
 	if x != nil {
-		return x.Type
+		return x.FormulaType
 	}
 	return ""
-}
-
-func (x *CalculationRule) GetParams() map[string]string {
-	if x != nil {
-		return x.Params
-	}
-	return nil
-}
-
-// 创建问卷请求
-type CreateQuestionnaireRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	ImgUrl        string                 `protobuf:"bytes,3,opt,name=img_url,json=imgUrl,proto3" json:"img_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreateQuestionnaireRequest) Reset() {
-	*x = CreateQuestionnaireRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateQuestionnaireRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateQuestionnaireRequest) ProtoMessage() {}
-
-func (x *CreateQuestionnaireRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateQuestionnaireRequest.ProtoReflect.Descriptor instead.
-func (*CreateQuestionnaireRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *CreateQuestionnaireRequest) GetTitle() string {
-	if x != nil {
-		return x.Title
-	}
-	return ""
-}
-
-func (x *CreateQuestionnaireRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *CreateQuestionnaireRequest) GetImgUrl() string {
-	if x != nil {
-		return x.ImgUrl
-	}
-	return ""
-}
-
-// 创建问卷响应
-type CreateQuestionnaireResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Questionnaire *Questionnaire         `protobuf:"bytes,1,opt,name=questionnaire,proto3" json:"questionnaire,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreateQuestionnaireResponse) Reset() {
-	*x = CreateQuestionnaireResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateQuestionnaireResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateQuestionnaireResponse) ProtoMessage() {}
-
-func (x *CreateQuestionnaireResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateQuestionnaireResponse.ProtoReflect.Descriptor instead.
-func (*CreateQuestionnaireResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *CreateQuestionnaireResponse) GetQuestionnaire() *Questionnaire {
-	if x != nil {
-		return x.Questionnaire
-	}
-	return nil
 }
 
 // 获取问卷请求
@@ -522,7 +400,7 @@ type GetQuestionnaireRequest struct {
 
 func (x *GetQuestionnaireRequest) Reset() {
 	*x = GetQuestionnaireRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[7]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -534,7 +412,7 @@ func (x *GetQuestionnaireRequest) String() string {
 func (*GetQuestionnaireRequest) ProtoMessage() {}
 
 func (x *GetQuestionnaireRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[7]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -547,7 +425,7 @@ func (x *GetQuestionnaireRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetQuestionnaireRequest.ProtoReflect.Descriptor instead.
 func (*GetQuestionnaireRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{7}
+	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetQuestionnaireRequest) GetCode() string {
@@ -567,7 +445,7 @@ type GetQuestionnaireResponse struct {
 
 func (x *GetQuestionnaireResponse) Reset() {
 	*x = GetQuestionnaireResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[8]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -579,7 +457,7 @@ func (x *GetQuestionnaireResponse) String() string {
 func (*GetQuestionnaireResponse) ProtoMessage() {}
 
 func (x *GetQuestionnaireResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[8]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -592,7 +470,7 @@ func (x *GetQuestionnaireResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetQuestionnaireResponse.ProtoReflect.Descriptor instead.
 func (*GetQuestionnaireResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{8}
+	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetQuestionnaireResponse) GetQuestionnaire() *Questionnaire {
@@ -615,7 +493,7 @@ type ListQuestionnairesRequest struct {
 
 func (x *ListQuestionnairesRequest) Reset() {
 	*x = ListQuestionnairesRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[9]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +505,7 @@ func (x *ListQuestionnairesRequest) String() string {
 func (*ListQuestionnairesRequest) ProtoMessage() {}
 
 func (x *ListQuestionnairesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[9]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +518,7 @@ func (x *ListQuestionnairesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListQuestionnairesRequest.ProtoReflect.Descriptor instead.
 func (*ListQuestionnairesRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{9}
+	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListQuestionnairesRequest) GetPage() int32 {
@@ -682,7 +560,7 @@ type ListQuestionnairesResponse struct {
 
 func (x *ListQuestionnairesResponse) Reset() {
 	*x = ListQuestionnairesResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[10]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -694,7 +572,7 @@ func (x *ListQuestionnairesResponse) String() string {
 func (*ListQuestionnairesResponse) ProtoMessage() {}
 
 func (x *ListQuestionnairesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[10]
+	mi := &file_questionnaire_questionnaire_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -707,7 +585,7 @@ func (x *ListQuestionnairesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListQuestionnairesResponse.ProtoReflect.Descriptor instead.
 func (*ListQuestionnairesResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{10}
+	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListQuestionnairesResponse) GetQuestionnaires() []*Questionnaire {
@@ -722,398 +600,6 @@ func (x *ListQuestionnairesResponse) GetTotal() int64 {
 		return x.Total
 	}
 	return 0
-}
-
-// 编辑基本信息请求
-type EditBasicInfoRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	ImgUrl        string                 `protobuf:"bytes,4,opt,name=img_url,json=imgUrl,proto3" json:"img_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *EditBasicInfoRequest) Reset() {
-	*x = EditBasicInfoRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EditBasicInfoRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EditBasicInfoRequest) ProtoMessage() {}
-
-func (x *EditBasicInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EditBasicInfoRequest.ProtoReflect.Descriptor instead.
-func (*EditBasicInfoRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *EditBasicInfoRequest) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-func (x *EditBasicInfoRequest) GetTitle() string {
-	if x != nil {
-		return x.Title
-	}
-	return ""
-}
-
-func (x *EditBasicInfoRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *EditBasicInfoRequest) GetImgUrl() string {
-	if x != nil {
-		return x.ImgUrl
-	}
-	return ""
-}
-
-// 编辑基本信息响应
-type EditBasicInfoResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Questionnaire *Questionnaire         `protobuf:"bytes,1,opt,name=questionnaire,proto3" json:"questionnaire,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *EditBasicInfoResponse) Reset() {
-	*x = EditBasicInfoResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EditBasicInfoResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EditBasicInfoResponse) ProtoMessage() {}
-
-func (x *EditBasicInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EditBasicInfoResponse.ProtoReflect.Descriptor instead.
-func (*EditBasicInfoResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *EditBasicInfoResponse) GetQuestionnaire() *Questionnaire {
-	if x != nil {
-		return x.Questionnaire
-	}
-	return nil
-}
-
-// 更新问题请求
-type UpdateQuestionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Questions     []*Question            `protobuf:"bytes,2,rep,name=questions,proto3" json:"questions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateQuestionsRequest) Reset() {
-	*x = UpdateQuestionsRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateQuestionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateQuestionsRequest) ProtoMessage() {}
-
-func (x *UpdateQuestionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateQuestionsRequest.ProtoReflect.Descriptor instead.
-func (*UpdateQuestionsRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *UpdateQuestionsRequest) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-func (x *UpdateQuestionsRequest) GetQuestions() []*Question {
-	if x != nil {
-		return x.Questions
-	}
-	return nil
-}
-
-// 更新问题响应
-type UpdateQuestionsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Questionnaire *Questionnaire         `protobuf:"bytes,1,opt,name=questionnaire,proto3" json:"questionnaire,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdateQuestionsResponse) Reset() {
-	*x = UpdateQuestionsResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdateQuestionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdateQuestionsResponse) ProtoMessage() {}
-
-func (x *UpdateQuestionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdateQuestionsResponse.ProtoReflect.Descriptor instead.
-func (*UpdateQuestionsResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *UpdateQuestionsResponse) GetQuestionnaire() *Questionnaire {
-	if x != nil {
-		return x.Questionnaire
-	}
-	return nil
-}
-
-// 发布问卷请求
-type PublishQuestionnaireRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PublishQuestionnaireRequest) Reset() {
-	*x = PublishQuestionnaireRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PublishQuestionnaireRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PublishQuestionnaireRequest) ProtoMessage() {}
-
-func (x *PublishQuestionnaireRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PublishQuestionnaireRequest.ProtoReflect.Descriptor instead.
-func (*PublishQuestionnaireRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *PublishQuestionnaireRequest) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-// 发布问卷响应
-type PublishQuestionnaireResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Questionnaire *Questionnaire         `protobuf:"bytes,1,opt,name=questionnaire,proto3" json:"questionnaire,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PublishQuestionnaireResponse) Reset() {
-	*x = PublishQuestionnaireResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PublishQuestionnaireResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PublishQuestionnaireResponse) ProtoMessage() {}
-
-func (x *PublishQuestionnaireResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PublishQuestionnaireResponse.ProtoReflect.Descriptor instead.
-func (*PublishQuestionnaireResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *PublishQuestionnaireResponse) GetQuestionnaire() *Questionnaire {
-	if x != nil {
-		return x.Questionnaire
-	}
-	return nil
-}
-
-// 下架问卷请求
-type UnpublishQuestionnaireRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UnpublishQuestionnaireRequest) Reset() {
-	*x = UnpublishQuestionnaireRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UnpublishQuestionnaireRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UnpublishQuestionnaireRequest) ProtoMessage() {}
-
-func (x *UnpublishQuestionnaireRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UnpublishQuestionnaireRequest.ProtoReflect.Descriptor instead.
-func (*UnpublishQuestionnaireRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *UnpublishQuestionnaireRequest) GetCode() string {
-	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-// 下架问卷响应
-type UnpublishQuestionnaireResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Questionnaire *Questionnaire         `protobuf:"bytes,1,opt,name=questionnaire,proto3" json:"questionnaire,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UnpublishQuestionnaireResponse) Reset() {
-	*x = UnpublishQuestionnaireResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UnpublishQuestionnaireResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UnpublishQuestionnaireResponse) ProtoMessage() {}
-
-func (x *UnpublishQuestionnaireResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UnpublishQuestionnaireResponse.ProtoReflect.Descriptor instead.
-func (*UnpublishQuestionnaireResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *UnpublishQuestionnaireResponse) GetQuestionnaire() *Questionnaire {
-	if x != nil {
-		return x.Questionnaire
-	}
-	return nil
 }
 
 var File_questionnaire_questionnaire_proto protoreflect.FileDescriptor
@@ -1132,41 +618,25 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\tR\tupdatedAt\"\xb4\x02\n" +
-	"\bQuestion\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\"\xc4\x02\n" +
+	"\bQuestion\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1a\n" +
-	"\brequired\x18\x05 \x01(\bR\brequired\x12/\n" +
-	"\aoptions\x18\x06 \x03(\v2\x15.questionnaire.OptionR\aoptions\x12=\n" +
-	"\n" +
-	"validation\x18\a \x01(\v2\x1d.questionnaire.ValidationRuleR\n" +
-	"validation\x12@\n" +
-	"\vcalculation\x18\b \x01(\v2\x1e.questionnaire.CalculationRuleR\vcalculation\"B\n" +
-	"\x06Option\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\x12\x14\n" +
-	"\x05score\x18\x03 \x01(\x05R\x05score\"\xbc\x01\n" +
-	"\x0eValidationRule\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12A\n" +
-	"\x06params\x18\x03 \x03(\v2).questionnaire.ValidationRule.ParamsEntryR\x06params\x1a9\n" +
-	"\vParamsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa4\x01\n" +
-	"\x0fCalculationRule\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12B\n" +
-	"\x06params\x18\x02 \x03(\v2*.questionnaire.CalculationRule.ParamsEntryR\x06params\x1a9\n" +
-	"\vParamsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"m\n" +
-	"\x1aCreateQuestionnaireRequest\x12\x14\n" +
-	"\x05title\x18\x01 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x17\n" +
-	"\aimg_url\x18\x03 \x01(\tR\x06imgUrl\"a\n" +
-	"\x1bCreateQuestionnaireResponse\x12B\n" +
-	"\rquestionnaire\x18\x01 \x01(\v2\x1c.questionnaire.QuestionnaireR\rquestionnaire\"-\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
+	"\x04tips\x18\x04 \x01(\tR\x04tips\x12 \n" +
+	"\vplaceholder\x18\x05 \x01(\tR\vplaceholder\x12/\n" +
+	"\aoptions\x18\x06 \x03(\v2\x15.questionnaire.OptionR\aoptions\x12H\n" +
+	"\x10validation_rules\x18\a \x03(\v2\x1d.questionnaire.ValidationRuleR\x0fvalidationRules\x12I\n" +
+	"\x10calculation_rule\x18\b \x01(\v2\x1e.questionnaire.CalculationRuleR\x0fcalculationRule\"L\n" +
+	"\x06Option\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x12\x14\n" +
+	"\x05score\x18\x03 \x01(\x05R\x05score\"P\n" +
+	"\x0eValidationRule\x12\x1b\n" +
+	"\trule_type\x18\x01 \x01(\tR\bruleType\x12!\n" +
+	"\ftarget_value\x18\x02 \x01(\tR\vtargetValue\"4\n" +
+	"\x0fCalculationRule\x12!\n" +
+	"\fformula_type\x18\x01 \x01(\tR\vformulaType\"-\n" +
 	"\x17GetQuestionnaireRequest\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\"^\n" +
 	"\x18GetQuestionnaireResponse\x12B\n" +
@@ -1178,35 +648,10 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\x05title\x18\x04 \x01(\tR\x05title\"x\n" +
 	"\x1aListQuestionnairesResponse\x12D\n" +
 	"\x0equestionnaires\x18\x01 \x03(\v2\x1c.questionnaire.QuestionnaireR\x0equestionnaires\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total\"{\n" +
-	"\x14EditBasicInfoRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
-	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x17\n" +
-	"\aimg_url\x18\x04 \x01(\tR\x06imgUrl\"[\n" +
-	"\x15EditBasicInfoResponse\x12B\n" +
-	"\rquestionnaire\x18\x01 \x01(\v2\x1c.questionnaire.QuestionnaireR\rquestionnaire\"c\n" +
-	"\x16UpdateQuestionsRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\x125\n" +
-	"\tquestions\x18\x02 \x03(\v2\x17.questionnaire.QuestionR\tquestions\"]\n" +
-	"\x17UpdateQuestionsResponse\x12B\n" +
-	"\rquestionnaire\x18\x01 \x01(\v2\x1c.questionnaire.QuestionnaireR\rquestionnaire\"1\n" +
-	"\x1bPublishQuestionnaireRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\"b\n" +
-	"\x1cPublishQuestionnaireResponse\x12B\n" +
-	"\rquestionnaire\x18\x01 \x01(\v2\x1c.questionnaire.QuestionnaireR\rquestionnaire\"3\n" +
-	"\x1dUnpublishQuestionnaireRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\"d\n" +
-	"\x1eUnpublishQuestionnaireResponse\x12B\n" +
-	"\rquestionnaire\x18\x01 \x01(\v2\x1c.questionnaire.QuestionnaireR\rquestionnaire2\xfa\x05\n" +
-	"\x14QuestionnaireService\x12l\n" +
-	"\x13CreateQuestionnaire\x12).questionnaire.CreateQuestionnaireRequest\x1a*.questionnaire.CreateQuestionnaireResponse\x12c\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total2\xe6\x01\n" +
+	"\x14QuestionnaireService\x12c\n" +
 	"\x10GetQuestionnaire\x12&.questionnaire.GetQuestionnaireRequest\x1a'.questionnaire.GetQuestionnaireResponse\x12i\n" +
-	"\x12ListQuestionnaires\x12(.questionnaire.ListQuestionnairesRequest\x1a).questionnaire.ListQuestionnairesResponse\x12Z\n" +
-	"\rEditBasicInfo\x12#.questionnaire.EditBasicInfoRequest\x1a$.questionnaire.EditBasicInfoResponse\x12`\n" +
-	"\x0fUpdateQuestions\x12%.questionnaire.UpdateQuestionsRequest\x1a&.questionnaire.UpdateQuestionsResponse\x12o\n" +
-	"\x14PublishQuestionnaire\x12*.questionnaire.PublishQuestionnaireRequest\x1a+.questionnaire.PublishQuestionnaireResponse\x12u\n" +
-	"\x16UnpublishQuestionnaire\x12,.questionnaire.UnpublishQuestionnaireRequest\x1a-.questionnaire.UnpublishQuestionnaireResponseB^Z\\github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaireb\x06proto3"
+	"\x12ListQuestionnaires\x12(.questionnaire.ListQuestionnairesRequest\x1a).questionnaire.ListQuestionnairesResponseB^Z\\github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaireb\x06proto3"
 
 var (
 	file_questionnaire_questionnaire_proto_rawDescOnce sync.Once
@@ -1220,64 +665,34 @@ func file_questionnaire_questionnaire_proto_rawDescGZIP() []byte {
 	return file_questionnaire_questionnaire_proto_rawDescData
 }
 
-var file_questionnaire_questionnaire_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_questionnaire_questionnaire_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_questionnaire_questionnaire_proto_goTypes = []any{
-	(*Questionnaire)(nil),                  // 0: questionnaire.Questionnaire
-	(*Question)(nil),                       // 1: questionnaire.Question
-	(*Option)(nil),                         // 2: questionnaire.Option
-	(*ValidationRule)(nil),                 // 3: questionnaire.ValidationRule
-	(*CalculationRule)(nil),                // 4: questionnaire.CalculationRule
-	(*CreateQuestionnaireRequest)(nil),     // 5: questionnaire.CreateQuestionnaireRequest
-	(*CreateQuestionnaireResponse)(nil),    // 6: questionnaire.CreateQuestionnaireResponse
-	(*GetQuestionnaireRequest)(nil),        // 7: questionnaire.GetQuestionnaireRequest
-	(*GetQuestionnaireResponse)(nil),       // 8: questionnaire.GetQuestionnaireResponse
-	(*ListQuestionnairesRequest)(nil),      // 9: questionnaire.ListQuestionnairesRequest
-	(*ListQuestionnairesResponse)(nil),     // 10: questionnaire.ListQuestionnairesResponse
-	(*EditBasicInfoRequest)(nil),           // 11: questionnaire.EditBasicInfoRequest
-	(*EditBasicInfoResponse)(nil),          // 12: questionnaire.EditBasicInfoResponse
-	(*UpdateQuestionsRequest)(nil),         // 13: questionnaire.UpdateQuestionsRequest
-	(*UpdateQuestionsResponse)(nil),        // 14: questionnaire.UpdateQuestionsResponse
-	(*PublishQuestionnaireRequest)(nil),    // 15: questionnaire.PublishQuestionnaireRequest
-	(*PublishQuestionnaireResponse)(nil),   // 16: questionnaire.PublishQuestionnaireResponse
-	(*UnpublishQuestionnaireRequest)(nil),  // 17: questionnaire.UnpublishQuestionnaireRequest
-	(*UnpublishQuestionnaireResponse)(nil), // 18: questionnaire.UnpublishQuestionnaireResponse
-	nil,                                    // 19: questionnaire.ValidationRule.ParamsEntry
-	nil,                                    // 20: questionnaire.CalculationRule.ParamsEntry
+	(*Questionnaire)(nil),              // 0: questionnaire.Questionnaire
+	(*Question)(nil),                   // 1: questionnaire.Question
+	(*Option)(nil),                     // 2: questionnaire.Option
+	(*ValidationRule)(nil),             // 3: questionnaire.ValidationRule
+	(*CalculationRule)(nil),            // 4: questionnaire.CalculationRule
+	(*GetQuestionnaireRequest)(nil),    // 5: questionnaire.GetQuestionnaireRequest
+	(*GetQuestionnaireResponse)(nil),   // 6: questionnaire.GetQuestionnaireResponse
+	(*ListQuestionnairesRequest)(nil),  // 7: questionnaire.ListQuestionnairesRequest
+	(*ListQuestionnairesResponse)(nil), // 8: questionnaire.ListQuestionnairesResponse
 }
 var file_questionnaire_questionnaire_proto_depIdxs = []int32{
-	1,  // 0: questionnaire.Questionnaire.questions:type_name -> questionnaire.Question
-	2,  // 1: questionnaire.Question.options:type_name -> questionnaire.Option
-	3,  // 2: questionnaire.Question.validation:type_name -> questionnaire.ValidationRule
-	4,  // 3: questionnaire.Question.calculation:type_name -> questionnaire.CalculationRule
-	19, // 4: questionnaire.ValidationRule.params:type_name -> questionnaire.ValidationRule.ParamsEntry
-	20, // 5: questionnaire.CalculationRule.params:type_name -> questionnaire.CalculationRule.ParamsEntry
-	0,  // 6: questionnaire.CreateQuestionnaireResponse.questionnaire:type_name -> questionnaire.Questionnaire
-	0,  // 7: questionnaire.GetQuestionnaireResponse.questionnaire:type_name -> questionnaire.Questionnaire
-	0,  // 8: questionnaire.ListQuestionnairesResponse.questionnaires:type_name -> questionnaire.Questionnaire
-	0,  // 9: questionnaire.EditBasicInfoResponse.questionnaire:type_name -> questionnaire.Questionnaire
-	1,  // 10: questionnaire.UpdateQuestionsRequest.questions:type_name -> questionnaire.Question
-	0,  // 11: questionnaire.UpdateQuestionsResponse.questionnaire:type_name -> questionnaire.Questionnaire
-	0,  // 12: questionnaire.PublishQuestionnaireResponse.questionnaire:type_name -> questionnaire.Questionnaire
-	0,  // 13: questionnaire.UnpublishQuestionnaireResponse.questionnaire:type_name -> questionnaire.Questionnaire
-	5,  // 14: questionnaire.QuestionnaireService.CreateQuestionnaire:input_type -> questionnaire.CreateQuestionnaireRequest
-	7,  // 15: questionnaire.QuestionnaireService.GetQuestionnaire:input_type -> questionnaire.GetQuestionnaireRequest
-	9,  // 16: questionnaire.QuestionnaireService.ListQuestionnaires:input_type -> questionnaire.ListQuestionnairesRequest
-	11, // 17: questionnaire.QuestionnaireService.EditBasicInfo:input_type -> questionnaire.EditBasicInfoRequest
-	13, // 18: questionnaire.QuestionnaireService.UpdateQuestions:input_type -> questionnaire.UpdateQuestionsRequest
-	15, // 19: questionnaire.QuestionnaireService.PublishQuestionnaire:input_type -> questionnaire.PublishQuestionnaireRequest
-	17, // 20: questionnaire.QuestionnaireService.UnpublishQuestionnaire:input_type -> questionnaire.UnpublishQuestionnaireRequest
-	6,  // 21: questionnaire.QuestionnaireService.CreateQuestionnaire:output_type -> questionnaire.CreateQuestionnaireResponse
-	8,  // 22: questionnaire.QuestionnaireService.GetQuestionnaire:output_type -> questionnaire.GetQuestionnaireResponse
-	10, // 23: questionnaire.QuestionnaireService.ListQuestionnaires:output_type -> questionnaire.ListQuestionnairesResponse
-	12, // 24: questionnaire.QuestionnaireService.EditBasicInfo:output_type -> questionnaire.EditBasicInfoResponse
-	14, // 25: questionnaire.QuestionnaireService.UpdateQuestions:output_type -> questionnaire.UpdateQuestionsResponse
-	16, // 26: questionnaire.QuestionnaireService.PublishQuestionnaire:output_type -> questionnaire.PublishQuestionnaireResponse
-	18, // 27: questionnaire.QuestionnaireService.UnpublishQuestionnaire:output_type -> questionnaire.UnpublishQuestionnaireResponse
-	21, // [21:28] is the sub-list for method output_type
-	14, // [14:21] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	1, // 0: questionnaire.Questionnaire.questions:type_name -> questionnaire.Question
+	2, // 1: questionnaire.Question.options:type_name -> questionnaire.Option
+	3, // 2: questionnaire.Question.validation_rules:type_name -> questionnaire.ValidationRule
+	4, // 3: questionnaire.Question.calculation_rule:type_name -> questionnaire.CalculationRule
+	0, // 4: questionnaire.GetQuestionnaireResponse.questionnaire:type_name -> questionnaire.Questionnaire
+	0, // 5: questionnaire.ListQuestionnairesResponse.questionnaires:type_name -> questionnaire.Questionnaire
+	5, // 6: questionnaire.QuestionnaireService.GetQuestionnaire:input_type -> questionnaire.GetQuestionnaireRequest
+	7, // 7: questionnaire.QuestionnaireService.ListQuestionnaires:input_type -> questionnaire.ListQuestionnairesRequest
+	6, // 8: questionnaire.QuestionnaireService.GetQuestionnaire:output_type -> questionnaire.GetQuestionnaireResponse
+	8, // 9: questionnaire.QuestionnaireService.ListQuestionnaires:output_type -> questionnaire.ListQuestionnairesResponse
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_questionnaire_questionnaire_proto_init() }
@@ -1291,7 +706,7 @@ func file_questionnaire_questionnaire_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_questionnaire_questionnaire_proto_rawDesc), len(file_questionnaire_questionnaire_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
