@@ -50,9 +50,9 @@ func NewServer(config *Config) (*Server, error) {
 		}))
 	}
 
-	// 如果配置了 TLS，添加 TLS 选项
+	// 如果配置了 TLS 且不是不安全模式，添加 TLS 选项
 	secure := false
-	if config.TLSCertFile != "" && config.TLSKeyFile != "" {
+	if !config.Insecure && config.TLSCertFile != "" && config.TLSKeyFile != "" {
 		creds, err := credentials.NewServerTLSFromFile(config.TLSCertFile, config.TLSKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load TLS credentials: %v", err)

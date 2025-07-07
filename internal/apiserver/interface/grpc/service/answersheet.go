@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -11,6 +13,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
 	pb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // AnswerSheetService 答卷 GRPC 服务 - 对外提供答卷管理功能
@@ -139,14 +142,62 @@ func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO
 func (s *AnswerSheetService) toProtoAnswers(answers []dto.AnswerDTO) []*pb.Answer {
 	protoAnswers := make([]*pb.Answer, len(answers))
 	for i, answer := range answers {
-		// 将答案值转换为 JSON 字符串
-		valueJSON, _ := json.Marshal(answer.Value)
+		// 根据问题类型处理答案值
+		var valueStr string
+
+		switch answer.QuestionType {
+		case "single_choice":
+			// 单选题答案应该是字符串
+			if str, ok := answer.Value.(string); ok {
+				valueStr = str
+			} else {
+				log.Errorf("Invalid single choice answer type: %T", answer.Value)
+				valueStr = fmt.Sprintf("%v", answer.Value)
+			}
+		case "multiple_choice":
+			// 多选题答案应该是字符串数组
+			if valueBytes, err := json.Marshal(answer.Value); err == nil {
+				valueStr = string(valueBytes)
+			} else {
+				log.Errorf("Failed to marshal multiple choice answer: %v", err)
+				valueStr = fmt.Sprintf("%v", answer.Value)
+			}
+		case "text", "textarea":
+			// 文本类答案直接转换为字符串
+			if str, ok := answer.Value.(string); ok {
+				valueStr = str
+			} else {
+				log.Errorf("Invalid text answer type: %T", answer.Value)
+				valueStr = fmt.Sprintf("%v", answer.Value)
+			}
+		case "number", "rating":
+			// 数值类答案需要转换为字符串
+			switch v := answer.Value.(type) {
+			case float64:
+				valueStr = fmt.Sprintf("%f", v)
+			case int:
+				valueStr = fmt.Sprintf("%d", v)
+			case string:
+				valueStr = v
+			default:
+				log.Errorf("Invalid number answer type: %T", answer.Value)
+				valueStr = fmt.Sprintf("%v", answer.Value)
+			}
+		default:
+			// 其他类型答案统一转换为JSON
+			if valueBytes, err := json.Marshal(answer.Value); err == nil {
+				valueStr = string(valueBytes)
+			} else {
+				log.Errorf("Failed to marshal answer value: %v", err)
+				valueStr = fmt.Sprintf("%v", answer.Value)
+			}
+		}
 
 		protoAnswers[i] = &pb.Answer{
 			QuestionCode: answer.QuestionCode,
 			QuestionType: answer.QuestionType,
 			Score:        uint32(answer.Score),
-			Value:        string(valueJSON),
+			Value:        valueStr,
 		}
 	}
 	return protoAnswers
@@ -156,11 +207,40 @@ func (s *AnswerSheetService) toProtoAnswers(answers []dto.AnswerDTO) []*pb.Answe
 func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.AnswerDTO {
 	answers := make([]dto.AnswerDTO, len(protoAnswers))
 	for i, protoAnswer := range protoAnswers {
-		// 从 JSON 字符串解析答案值
+		// 根据问题类型处理答案值
 		var value interface{}
-		if err := json.Unmarshal([]byte(protoAnswer.Value), &value); err != nil {
-			// 如果解析失败，直接使用字符串值
+		var err error
+
+		switch protoAnswer.QuestionType {
+		case "single_choice":
+			// 单选题答案应该是字符串
 			value = protoAnswer.Value
+		case "multiple_choice":
+			// 多选题答案应该是字符串数组
+			var options []string
+			if err = json.Unmarshal([]byte(protoAnswer.Value), &options); err != nil {
+				log.Errorf("Failed to unmarshal multiple choice answer: %v", err)
+				value = protoAnswer.Value // 保持原始值
+			} else {
+				value = options
+			}
+		case "text", "textarea":
+			// 文本类答案直接使用字符串
+			value = protoAnswer.Value
+		case "number", "rating":
+			// 数值类答案需要转换为数值
+			if num, err := strconv.ParseFloat(protoAnswer.Value, 64); err == nil {
+				value = num
+			} else {
+				log.Errorf("Failed to parse number answer: %v", err)
+				value = protoAnswer.Value // 保持原始值
+			}
+		default:
+			// 其他类型答案尝试解析JSON
+			if err = json.Unmarshal([]byte(protoAnswer.Value), &value); err != nil {
+				log.Errorf("Failed to unmarshal answer value: %v", err)
+				value = protoAnswer.Value // 保持原始值
+			}
 		}
 
 		answers[i] = dto.AnswerDTO{

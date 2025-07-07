@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
@@ -37,8 +38,18 @@ type answersheetClient struct {
 // NewAnswersheetClient 创建新的答卷客户端
 func NewAnswersheetClient(config *options.GRPCClientOptions) (AnswersheetClient, error) {
 	// 设置连接选项
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second, // 每10秒发送一次ping
+		Timeout:             3 * time.Second,  // ping超时时间
+		PermitWithoutStream: true,             // 允许在没有RPC的情况下发送ping
+	}
+
 	opts := []grpc.DialOption{
-		grpc.WithTimeout(time.Duration(config.Timeout) * time.Second),
+		grpc.WithKeepaliveParams(kacp),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(20*1024*1024), // 20MB
+			grpc.MaxCallSendMsgSize(20*1024*1024), // 20MB
+		),
 	}
 
 	// 根据配置决定是否使用TLS
@@ -47,7 +58,10 @@ func NewAnswersheetClient(config *options.GRPCClientOptions) (AnswersheetClient,
 	}
 
 	// 建立连接
-	conn, err := grpc.Dial(config.Endpoint, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, config.Endpoint, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to answersheet service: %w", err)
 	}
@@ -66,6 +80,10 @@ func NewAnswersheetClient(config *options.GRPCClientOptions) (AnswersheetClient,
 
 // SaveAnswersheet 保存答卷
 func (c *answersheetClient) SaveAnswersheet(ctx context.Context, req *answersheet.SaveAnswerSheetRequest) (*answersheet.SaveAnswerSheetResponse, error) {
+	// 添加超时控制
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	resp, err := c.client.SaveAnswerSheet(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save answersheet: %w", err)

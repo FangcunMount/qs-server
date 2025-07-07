@@ -17,6 +17,7 @@ type Config struct {
 	TLSKeyFile            string
 	EnableReflection      bool
 	EnableHealthCheck     bool
+	Insecure              bool // 是否使用不安全连接
 }
 
 // NewConfig 创建默认的 GRPC 服务器配置
@@ -31,6 +32,7 @@ func NewConfig() *Config {
 		WriteTimeout:          5 * time.Second,  // 写入超时时间
 		EnableReflection:      true,             // 启用反射
 		EnableHealthCheck:     true,             // 启用健康检查
+		Insecure:              true,             // 默认使用不安全连接
 	}
 }
 

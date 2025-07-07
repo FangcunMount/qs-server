@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -85,12 +86,38 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 	// 转换答案格式
 	answers := make([]*answersheet.Answer, 0, len(req.Answers))
 	for _, answer := range req.Answers {
-		// 将答案值转换为 JSON 字符串
-		valueBytes, err := json.Marshal(answer.Value)
+		// 根据问题类型处理答案值
+		var valueStr string
+		var err error
+
+		switch answer.QuestionType {
+		case "single_choice", "multiple_choice":
+			// 选择题答案应该是字符串或字符串数组
+			valueStr, err = h.convertChoiceAnswer(answer.Value)
+		case "text", "textarea":
+			// 文本类答案直接转换为字符串
+			if str, ok := answer.Value.(string); ok {
+				valueStr = str
+			} else {
+				err = fmt.Errorf("invalid text answer type: %T", answer.Value)
+			}
+		case "number", "rating":
+			// 数值类答案需要特殊处理
+			valueStr, err = h.convertNumberAnswer(answer.Value)
+		default:
+			// 其他类型答案统一转换为JSON
+			valueBytes, e := json.Marshal(answer.Value)
+			if e != nil {
+				err = fmt.Errorf("failed to marshal answer value: %v", e)
+			} else {
+				valueStr = string(valueBytes)
+			}
+		}
+
 		if err != nil {
-			log.L(c).Errorf("Failed to marshal answer value: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    500,
+			log.L(c).Errorf("Failed to convert answer value: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"code":    400,
 				"message": "答案格式转换失败",
 				"error":   err.Error(),
 			})
@@ -99,17 +126,19 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 
 		answers = append(answers, &answersheet.Answer{
 			QuestionCode: answer.QuestionID,
-			Value:        string(valueBytes),
+			QuestionType: answer.QuestionType,
+			Value:        valueStr,
 		})
 	}
 
 	// 构建 GRPC 请求
 	grpcReq := &answersheet.SaveAnswerSheetRequest{
-		QuestionnaireCode: req.QuestionnaireCode,
-		Title:             req.Title,
-		WriterId:          req.WriterID,
-		TesteeId:          req.TesteeID,
-		Answers:           answers,
+		QuestionnaireCode:    req.QuestionnaireCode,
+		QuestionnaireVersion: "1.0", // 添加问卷版本
+		Title:                req.Title,
+		WriterId:             req.WriterID,
+		TesteeId:             req.TesteeID,
+		Answers:              answers,
 	}
 
 	// 调用 GRPC 服务
@@ -141,13 +170,13 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 		}
 	}
 
+	// 返回响应
 	c.JSON(http.StatusOK, gin.H{
-		"code": 200,
+		"code":    200,
+		"message": "答卷保存成功",
 		"data": gin.H{
-			"id":      resp.Id,
-			"message": resp.Message,
+			"id": resp.Id,
 		},
-		"message": "答卷提交成功",
 	})
 }
 
@@ -292,5 +321,40 @@ func (h *answersheetHandler) convertAnswersheetSummary(as *answersheet.AnswerShe
 		"testee_name":           as.TesteeName,
 		"created_at":            as.CreatedAt,
 		"updated_at":            as.UpdatedAt,
+	}
+}
+
+// convertChoiceAnswer 转换选择题答案
+func (h *answersheetHandler) convertChoiceAnswer(value interface{}) (string, error) {
+	switch v := value.(type) {
+	case string:
+		return v, nil
+	case []interface{}:
+		// 将选项数组转换为JSON字符串
+		bytes, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal choice options: %v", err)
+		}
+		return string(bytes), nil
+	default:
+		return "", fmt.Errorf("invalid choice answer type: %T", value)
+	}
+}
+
+// convertNumberAnswer 转换数值类答案
+func (h *answersheetHandler) convertNumberAnswer(value interface{}) (string, error) {
+	switch v := value.(type) {
+	case float64:
+		return fmt.Sprintf("%f", v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	case string:
+		// 尝试解析字符串为数值
+		if _, err := strconv.ParseFloat(v, 64); err == nil {
+			return v, nil
+		}
+		return "", fmt.Errorf("invalid number string: %s", v)
+	default:
+		return "", fmt.Errorf("invalid number answer type: %T", value)
 	}
 }

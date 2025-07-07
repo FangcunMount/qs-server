@@ -144,20 +144,29 @@ func (s preparedAPIServer) Run() error {
 		log.Fatalf("start shutdown manager failed: %s", err.Error())
 	}
 
-	if err := s.genericAPIServer.Run(); err != nil {
-		log.Errorf("Failed to run HTTP server: %v", err)
-		return err
-	}
+	// 创建一个 channel 用于接收错误
+	errChan := make(chan error, 2)
+
+	// 启动 HTTP 服务器
+	go func() {
+		if err := s.genericAPIServer.Run(); err != nil {
+			log.Errorf("Failed to run HTTP server: %v", err)
+			errChan <- err
+		}
+	}()
 	log.Info("🚀 Starting Hexagonal Architecture HTTP REST API server...")
 
 	// 启动 GRPC 服务器
-	if err := s.grpcServer.Run(); err != nil {
-		log.Errorf("Failed to run GRPC server: %v", err)
-		return err
-	}
+	go func() {
+		if err := s.grpcServer.Run(); err != nil {
+			log.Errorf("Failed to run GRPC server: %v", err)
+			errChan <- err
+		}
+	}()
 	log.Info("🚀 Starting Hexagonal Architecture GRPC server...")
 
-	return nil
+	// 等待任一服务出错
+	return <-errChan
 }
 
 // buildGenericServer 构建通用服务器

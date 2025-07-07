@@ -25,8 +25,10 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 
 	// 转换答案
 	answers := make([]AnswerPO, 0, len(bo.GetAnswers()))
-	for _, answerBO := range bo.GetAnswers() {
-		answers = append(answers, *m.mapAnswerToPO(&answerBO))
+	for _, answer := range bo.GetAnswers() {
+		if po := m.mapAnswerToPO(answer); po != nil {
+			answers = append(answers, *po)
+		}
 	}
 
 	// 转换答卷者 - 只存储 userID
@@ -98,11 +100,7 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 }
 
 // mapAnswerToPO 将答案领域对象转换为 AnswerPO
-func (m *AnswerSheetMapper) mapAnswerToPO(answerBO *answer.Answer) *AnswerPO {
-	if answerBO == nil {
-		return nil
-	}
-
+func (m *AnswerSheetMapper) mapAnswerToPO(answerBO answer.Answer) *AnswerPO {
 	return &AnswerPO{
 		QuestionCode: answerBO.GetQuestionCode(),
 		QuestionType: answerBO.GetQuestionType(),

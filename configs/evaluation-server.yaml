@@ -24,7 +24,7 @@ secure:
 
 # GRPC 客户端配置
 grpc_client:
-  endpoint: "localhost:8090"      # apiserver GRPC 服务地址
+  endpoint: "127.0.0.1:9090"      # apiserver GRPC 服务地址
   timeout: 30                   # 超时时间（秒）
   insecure: true               # 是否使用不安全连接
 
@@ -54,8 +54,8 @@ log:
   disable-caller: false # 是否禁用调用者
   disable-stacktrace: false # 是否禁用堆栈跟踪
   development: false # 是否为开发环境
-  output-paths: ["logs/evaluation-server.log", "stdout"] # 输出路径
-  error-output-paths: ["logs/evaluation-server-error.log", "stderr"] # 错误输出路径
+  output-paths: ["/data/logs/qs/evaluation-server.log", "stdout"] # 输出路径
+  error-output-paths: ["/data/logs/qs/evaluation-server-error.log", "stderr"] # 错误输出路径
   max-size: 100 # 单个日志文件最大大小（MB）
   max-age: 30 # 保留旧日志文件的最大天数
   max-backups: 10 # 保留旧日志文件的最大个数

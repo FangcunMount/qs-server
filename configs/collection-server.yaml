@@ -14,9 +14,10 @@ secure:
     private-key-file: "./configs/cert/collection-server.key"
 
 # GRPC 客户端配置
-grpc:
-  client:
-    address: "127.0.0.1:9090"
+grpc_client:
+  endpoint: "127.0.0.1:9090"
+  timeout: 30
+  insecure: true
 
 # 日志配置
 log:
@@ -27,8 +28,8 @@ log:
   disable-caller: false # 是否禁用调用者
   disable-stacktrace: false # 是否禁用堆栈跟踪
   development: false # 是否为开发环境
-  output-paths: ["logs/collection-server.log", "stdout"] # 输出路径
-  error-output-paths: ["logs/collection-server-error.log", "stderr"] # 错误输出路径
+  output-paths: ["/data/logs/qs/collection-server.log", "stdout"] # 输出路径
+  error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"] # 错误输出路径
   max-size: 100 # 单个日志文件最大大小（MB）
   max-age: 30 # 保留旧日志文件的最大天数
   max-backups: 10 # 保留旧日志文件的最大个数

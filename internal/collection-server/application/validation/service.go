@@ -34,8 +34,9 @@ type AnswersheetValidationRequest struct {
 
 // AnswerValidationItem 答案校验项
 type AnswerValidationItem struct {
-	QuestionID string      `json:"question_id"`
-	Value      interface{} `json:"value"`
+	QuestionID   string      `json:"question_id"`
+	QuestionType string      `json:"question_type"`
+	Value        interface{} `json:"value"`
 }
 
 // TesteeInfo 测试者信息
