@@ -9,7 +9,7 @@ APISERVER_BIN = qs-apiserver
 COLLECTION_BIN = collection-server
 EVALUATION_BIN = evaluation-server
 
-APISERVER_CONFIG = configs/qs-apiserver.yaml
+APISERVER_CONFIG = configs/apiserver.yaml
 COLLECTION_CONFIG = configs/collection-server.yaml
 EVALUATION_CONFIG = configs/evaluation-server.yaml
 
@@ -312,7 +312,57 @@ test-submit: ## 测试答卷提交
 dev: ## 启动开发环境（热更新）
 	@echo "🚀 启动开发环境..."
 	@mkdir -p tmp
-	@air
+	@echo "启动 apiserver..."
+	@air -c .air-apiserver.toml & echo $$! > tmp/pids/air-apiserver.pid
+	@sleep 2
+	@echo "启动 collection-server..."
+	@air -c .air-collection.toml & echo $$! > tmp/pids/air-collection.pid
+	@sleep 2
+	@echo "启动 evaluation-server..."
+	@air -c .air-evaluation.toml & echo $$! > tmp/pids/air-evaluation.pid
+	@echo "✅ 所有服务已启动（热更新模式）"
+	@echo "提示：使用 Ctrl+C 停止所有服务"
+	@echo "      或使用 make dev-stop 停止服务"
+
+dev-stop: ## 停止开发环境
+	@echo "⏹️  停止开发环境..."
+	@if [ -f tmp/pids/air-evaluation.pid ]; then \
+		kill $$(cat tmp/pids/air-evaluation.pid) 2>/dev/null || true; \
+		rm -f tmp/pids/air-evaluation.pid; \
+	fi
+	@if [ -f tmp/pids/air-collection.pid ]; then \
+		kill $$(cat tmp/pids/air-collection.pid) 2>/dev/null || true; \
+		rm -f tmp/pids/air-collection.pid; \
+	fi
+	@if [ -f tmp/pids/air-apiserver.pid ]; then \
+		kill $$(cat tmp/pids/air-apiserver.pid) 2>/dev/null || true; \
+		rm -f tmp/pids/air-apiserver.pid; \
+	fi
+	@echo "✅ 开发环境已停止"
+
+dev-status: ## 查看开发环境状态
+	@echo "📊 开发环境状态:"
+	@echo "=============="
+	@if [ -f tmp/pids/air-apiserver.pid ] && kill -0 $$(cat tmp/pids/air-apiserver.pid) 2>/dev/null; then \
+		echo "✅ apiserver      - 运行中 (PID: $$(cat tmp/pids/air-apiserver.pid))"; \
+	else \
+		echo "⚪ apiserver      - 未运行"; \
+	fi
+	@if [ -f tmp/pids/air-collection.pid ] && kill -0 $$(cat tmp/pids/air-collection.pid) 2>/dev/null; then \
+		echo "✅ collection     - 运行中 (PID: $$(cat tmp/pids/air-collection.pid))"; \
+	else \
+		echo "⚪ collection     - 未运行"; \
+	fi
+	@if [ -f tmp/pids/air-evaluation.pid ] && kill -0 $$(cat tmp/pids/air-evaluation.pid) 2>/dev/null; then \
+		echo "✅ evaluation     - 运行中 (PID: $$(cat tmp/pids/air-evaluation.pid))"; \
+	else \
+		echo "⚪ evaluation     - 未运行"; \
+	fi
+
+dev-logs: ## 查看开发环境日志
+	@echo "📋 开发环境日志:"
+	@echo "=============="
+	@tail -f tmp/build-errors-*.log
 
 test: ## 运行测试
 	@echo "🧪 运行测试..."
