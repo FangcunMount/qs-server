@@ -13,17 +13,17 @@ server:
 log:
   name: evaluation-server        # 日志名称
   development: true              # 开发模式
-  level: debug                   # 日志级别
-  format: console               # 日志格式: json, console
-  enable-color: true            # 启用颜色
-  disable-caller: false         # 禁用调用者信息
-  disable-stacktrace: false     # 禁用堆栈跟踪
-  output-paths:                 # 输出路径
-    - stdout
-    - logs/evaluation-server.log
-  error-output-paths:           # 错误输出路径
-    - stderr
-    - logs/evaluation-server-error.log
+  level: "debug" # 日志级别：debug, info, warn, error, fatal, panic
+  format: "console" # 日志格式：console, json
+  enable-color: true # 是否开启颜色
+  disable-caller: false # 是否禁用调用者
+  disable-stacktrace: false # 是否禁用堆栈跟踪
+  output-paths: ["/data/logs/qs/evaluation-server.log", "stdout"] # 输出路径
+  error-output-paths: ["/data/logs/qs/evaluation-server-error.log", "stderr"] # 错误输出路径
+  max-size: 100 # 单个日志文件最大大小（MB）
+  max-age: 30 # 保留旧日志文件的最大天数
+  max-backups: 10 # 保留旧日志文件的最大个数
+  compress: true # 是否压缩旧日志文件
 
 # 不安全服务配置
 insecure:

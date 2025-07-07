@@ -4,7 +4,7 @@
 server:
     mode: debug # server mode: release, debug, test，默认 release
     healthz: true # 是否开启健康检查，如果开启会安装 /healthz 路由，默认 true
-    middlewares: recovery,logger,enhanced_logger,secure,nocache,cors,dump # 加载的 gin 中间件列表，多个中间件，逗号(,)隔开
+    middlewares: recovery,enhanced_logger,secure,nocache,cors,dump # 加载的 gin 中间件列表，多个中间件，逗号(,)隔开
     max-ping-count: 3 # http 服务启动后，自检尝试次数，默认 3
 
 # HTTP 配置
@@ -59,7 +59,7 @@ mongodb:
 
 # 日志配置
 log:
-  level: "info" # 日志级别：debug, info, warn, error, fatal, panic
+  level: "debug" # 日志级别：debug, info, warn, error, fatal, panic
   format: "console" # 日志格式：console, json
   enable-color: true # 是否开启颜色
   disable-caller: false # 是否禁用调用者
