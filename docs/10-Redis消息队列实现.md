@@ -137,7 +137,7 @@ make build
 #### 方式二: 手动启动
 ```bash
 # 启动 apiserver
-./qs-apiserver --config=configs/qs-apiserver.yaml &
+./qs-apiserver --config=configs/apiserver.yaml &
 
 # 启动 evaluation-server (订阅者)
 ./evaluation-server --config=configs/evaluation-server.yaml &
