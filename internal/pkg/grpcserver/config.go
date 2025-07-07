@@ -23,7 +23,7 @@ type Config struct {
 func NewConfig() *Config {
 	return &Config{
 		BindAddress:           "0.0.0.0",
-		BindPort:              8090,
+		BindPort:              9090,
 		MaxMsgSize:            4 * 1024 * 1024,  // 4MB
 		MaxConnectionAge:      2 * time.Hour,    // 连接最大存活时间
 		MaxConnectionAgeGrace: 10 * time.Second, // 连接优雅终止等待时间

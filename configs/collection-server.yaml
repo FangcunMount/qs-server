@@ -1,49 +1,38 @@
 # Collection Server 配置文件
 
 # 服务器配置
-server:
-  mode: debug                    # 运行模式: debug, test, release
-  healthz: true                  # 启用健康检查
-  middlewares:                   # 中间件列表
-    - logger
-    - cors
-    - requestid
- 
+insecure:
+  bind-address: "127.0.0.1"
+  bind-port: 9081
+
+# 安全服务配置
+secure:
+  bind-address: "127.0.0.1
+  bind-port: 9444
+  tls:
+    cert-file: "configs/cert/collection-server.crt"
+    private-key-file: "configs/cert/collection-server.key"
+
+# GRPC 客户端配置
+grpc:
+  client:
+    address: "127.0.0.1:9090"
+
 # 日志配置
 log:
-  name: collection-server        # 日志名称
-  development: true              # 开发模式
+  name: "collection-server"
   level: "debug" # 日志级别：debug, info, warn, error, fatal, panic
   format: "console" # 日志格式：console, json
   enable-color: true # 是否开启颜色
   disable-caller: false # 是否禁用调用者
   disable-stacktrace: false # 是否禁用堆栈跟踪
+  development: false # 是否为开发环境
   output-paths: ["/data/logs/qs/collection-server.log", "stdout"] # 输出路径
   error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"] # 错误输出路径
   max-size: 100 # 单个日志文件最大大小（MB）
   max-age: 30 # 保留旧日志文件的最大天数
   max-backups: 10 # 保留旧日志文件的最大个数
   compress: true # 是否压缩旧日志文件
-   
-
-# 不安全服务配置
-insecure:
-  bind-address: 0.0.0.0         # 绑定地址
-  bind-port: 8081               # 绑定端口
-
-# 安全服务配置
-secure:
-  bind-address: 0.0.0.0         # 绑定地址
-  bind-port: 8444               # 绑定端口
-  tls:
-    cert-dir: configs/cert      # 证书目录
-    pair-name: collection-server # 证书对名称
-
-# GRPC 客户端配置
-grpc_client:
-  endpoint: localhost:8090      # apiserver GRPC 服务地址
-  timeout: 30                   # 超时时间（秒）
-  insecure: true               # 是否使用不安全连接
 
 # Redis 配置
 redis:

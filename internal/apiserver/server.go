@@ -220,8 +220,8 @@ func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcserver.Config) error {
 
 	// 应用 TLS 配置
 	if cfg.SecureServing != nil {
-		grpcConfig.TLSCertFile = cfg.SecureServing.ServerCert.CertKey.CertFile
-		grpcConfig.TLSKeyFile = cfg.SecureServing.ServerCert.CertKey.KeyFile
+		grpcConfig.TLSCertFile = cfg.SecureServing.CertFile
+		grpcConfig.TLSKeyFile = cfg.SecureServing.KeyFile
 	}
 
 	return nil

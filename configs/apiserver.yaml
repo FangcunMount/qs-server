@@ -8,20 +8,27 @@ server:
     max-ping-count: 3 # http 服务启动后，自检尝试次数，默认 3
 
 # HTTP 配置
-insecure:
-    bind-address: 0.0.0.0 # 绑定的不安全 IP 地址，设置为 0.0.0.0 表示使用全部网络接口，默认为 127.0.0.1
-    bind-port: 8080 # 提供非安全认证的监听端口，默认为 8080
+grpc:
+  BindAddress: "127.0.0.1
+  BindPort: 9090
+  HealthzPort: 9091
 
-# HTTPS 配置
+# 不安全服务配置
+insecure:
+  bind-address:  "127.0.0.1
+  bind-port: 9080
+
+# 安全服务配置
 secure:
-    bind-address: 0.0.0.0 # HTTPS 安全模式的 IP 地址，默认为 0.0.0.0
-    bind-port: 8443 # 使用 HTTPS 安全模式的端口号，设置为 0 表示不启用 HTTPS，默认为 8443
-    tls:
-        cert-dir: ./cert # TLS 证书所在的目录，默认值为 /var/run/iam
-        pair-name: qs # TLS 私钥对名称，默认 iam
-        cert-key:
-            cert-file: ./configs/cert/qs-apiserver.crt # 包含 x509 证书的文件路径，用 HTTPS 认证
-            private-key-file: ./configs/cert/qs-apiserver.key # TLS 私钥
+  bind-address: "127.0.0.1"
+  bind-port: 9443
+  Required: true
+  tls:
+    cert-key:
+      cert-file: "./configs/cert/qs-apiserver.crt"
+      private-key-file: "./configs/cert/qs-apiserver.key"
+    cert-dir: "./cert"
+    pair-name: "qs"
 
 # MySQL 数据库配置
 mysql:

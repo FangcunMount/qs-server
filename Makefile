@@ -13,9 +13,9 @@ APISERVER_CONFIG = configs/apiserver.yaml
 COLLECTION_CONFIG = configs/collection-server.yaml
 EVALUATION_CONFIG = configs/evaluation-server.yaml
 
-APISERVER_PORT = 8080
-COLLECTION_PORT = 8081
-EVALUATION_PORT = 8082
+APISERVER_PORT = 9080
+COLLECTION_PORT = 9081
+EVALUATION_PORT = 9082
 
 # PID 文件目录
 PID_DIR = tmp/pids

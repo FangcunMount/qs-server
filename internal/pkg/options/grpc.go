@@ -1,26 +1,26 @@
 package options
 
 import (
-	"crypto/tls"
 	"fmt"
+	"net"
 
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 // GRPCOptions GRPC 服务器配置选项
 type GRPCOptions struct {
-	BindAddress string      // 绑定地址
-	BindPort    int         // 绑定端口
-	HealthzPort int         // 健康检查端口
-	TLSConfig   *tls.Config // TLS 配置
+	BindAddress string // 绑定地址
+	BindPort    int    // 绑定端口
+	HealthzPort int    // 健康检查端口
 }
 
 // NewGRPCOptions 创建默认的 GRPC 配置选项
 func NewGRPCOptions() *GRPCOptions {
 	return &GRPCOptions{
-		BindAddress: "0.0.0.0",
-		BindPort:    8090,
-		HealthzPort: 8091,
+		BindAddress: viper.GetString("grpc.bind-address"),
+		BindPort:    viper.GetInt("grpc.bind-port"),
+		HealthzPort: viper.GetInt("grpc.healthz-port"),
 	}
 }
 
@@ -32,7 +32,7 @@ func (s *GRPCOptions) Validate() []error {
 		errors = append(
 			errors,
 			fmt.Errorf(
-				"--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port",
+				"--grpc.bind-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure (HTTP) port",
 				s.BindPort,
 			),
 		)
@@ -41,7 +41,7 @@ func (s *GRPCOptions) Validate() []error {
 	return errors
 }
 
-// AddFlags
+// AddFlags 添加命令行参数
 func (s *GRPCOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.BindAddress, "grpc.bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --grpc.bind-port(set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
@@ -51,4 +51,15 @@ func (s *GRPCOptions) AddFlags(fs *pflag.FlagSet) {
 		"that firewall rules are set up such that this port is not reachable from outside of "+
 		"the deployed machine and that port 443 on the iam public address is proxied to this "+
 		"port. This is performed by nginx in the default setup. Set to zero to disable.")
+
+	fs.IntVar(&s.HealthzPort, "grpc.healthz-port", s.HealthzPort, ""+
+		"The port on which to serve grpc health check.")
+}
+
+// ApplyTo 应用配置到服务器
+func (s *GRPCOptions) ApplyTo(c *GRPCConfig) error {
+	c.Addr = net.JoinHostPort(s.BindAddress, fmt.Sprintf("%d", s.BindPort))
+	c.HealthzAddr = net.JoinHostPort(s.BindAddress, fmt.Sprintf("%d", s.HealthzPort))
+
+	return nil
 }

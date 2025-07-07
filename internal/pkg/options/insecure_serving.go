@@ -3,37 +3,27 @@ package options
 import (
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/spf13/pflag"
-
+	"github.com/spf13/viper"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/server"
 )
 
-// InsecureServingOptions 创建一个未认证、未授权、不安全的端口
+// InsecureServingOptions 不安全的服务器配置选项
 type InsecureServingOptions struct {
-	BindAddress string `json:"bind-address" mapstructure:"bind-address"`
-	BindPort    int    `json:"bind-port"    mapstructure:"bind-port"`
+	BindAddress string // 绑定地址
+	BindPort    int    // 绑定端口
 }
 
-// NewInsecureServingOptions 创建一个未认证、未授权、不安全的端口
+// NewInsecureServingOptions 创建默认的不安全服务器配置选项
 func NewInsecureServingOptions() *InsecureServingOptions {
 	return &InsecureServingOptions{
-		BindAddress: "127.0.0.1",
-		BindPort:    8080,
+		BindAddress: viper.GetString("insecure.bind-address"),
+		BindPort:    viper.GetInt("insecure.bind-port"),
 	}
 }
 
-// ApplyTo 应用运行选项到方法接收者并返回自身
-func (s *InsecureServingOptions) ApplyTo(c *server.Config) error {
-	c.InsecureServing = &server.InsecureServingInfo{
-		Address: net.JoinHostPort(s.BindAddress, strconv.Itoa(s.BindPort)),
-	}
-
-	return nil
-}
-
-// Validate 验证命令行参数
+// Validate 验证InsecureServingOptions
 func (s *InsecureServingOptions) Validate() []error {
 	var errors []error
 
@@ -55,9 +45,18 @@ func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.BindAddress, "insecure.bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --insecure.bind-port "+
 		"(set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+
 	fs.IntVar(&s.BindPort, "insecure.bind-port", s.BindPort, ""+
 		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
 		"that firewall rules are set up such that this port is not reachable from outside of "+
 		"the deployed machine and that port 443 on the iam public address is proxied to this "+
 		"port. This is performed by nginx in the default setup. Set to zero to disable.")
+}
+
+// ApplyTo 应用配置到服务器
+func (s *InsecureServingOptions) ApplyTo(c *server.Config) error {
+	c.InsecureServing = &server.InsecureServingInfo{
+		Address: net.JoinHostPort(s.BindAddress, fmt.Sprintf("%d", s.BindPort)),
+	}
+	return nil
 }

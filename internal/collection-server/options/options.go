@@ -38,7 +38,7 @@ func NewOptions() *Options {
 		InsecureServing:         genericoptions.NewInsecureServingOptions(),
 		SecureServing:           genericoptions.NewSecureServingOptions(),
 		GRPCClient: &GRPCClientOptions{
-			Endpoint: "localhost:8090", // apiserver 的 GRPC 端口
+			Endpoint: "localhost:9090", // apiserver 的 GRPC 端口
 			Timeout:  30,
 			Insecure: true,
 		},
