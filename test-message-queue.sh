@@ -60,7 +60,7 @@ check_redis
 
 # 2. 启动 apiserver
 echo "🔧 启动 apiserver..."
-./qs-apiserver --config=configs/qs-apiserver.yaml > logs/apiserver.log 2>&1 &
+./qs-apiserver --config=configs/apiserver.yaml > logs/apiserver.log 2>&1 &
 APISERVER_PID=$!
 echo "apiserver PID: $APISERVER_PID"
 

@@ -98,14 +98,14 @@ func findConfigFile(configFile string) (string, error) {
 
 	// 向上查找项目根目录中的配置文件
 	for {
-		configPath := filepath.Join(wd, "configs", "qs-apiserver.yaml")
+		configPath := filepath.Join(wd, "configs", "apiserver.yaml")
 		if _, err := os.Stat(configPath); err == nil {
 			return configPath, nil
 		}
 
 		parent := filepath.Dir(wd)
 		if parent == wd {
-			return "", fmt.Errorf("无法找到配置文件 configs/qs-apiserver.yaml，请指定配置文件路径")
+			return "", fmt.Errorf("无法找到配置文件 configs/apiserver.yaml，请指定配置文件路径")
 		}
 		wd = parent
 	}

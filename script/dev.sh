@@ -11,9 +11,9 @@ if ! command -v air &> /dev/null; then
     go install github.com/air-verse/air@latest
 fi
 
-# 检查配置文件是否存在
-if [ ! -f "configs/qs-apiserver.yaml" ]; then
-    echo "❌ 配置文件 configs/qs-apiserver.yaml 不存在"
+# 检查必要的配置文件
+if [ ! -f "configs/apiserver.yaml" ]; then
+    echo "❌ 配置文件 configs/apiserver.yaml 不存在"
     exit 1
 fi
 
