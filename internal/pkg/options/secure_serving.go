@@ -22,7 +22,7 @@ type SecureServingOptions struct {
 func NewSecureServingOptions() *SecureServingOptions {
 	return &SecureServingOptions{
 		BindAddress: "127.0.0.1",
-		BindPort:    9443,
+		BindPort:    9444,
 	}
 }
 

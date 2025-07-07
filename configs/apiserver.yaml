@@ -21,7 +21,7 @@ insecure:
 # 安全服务配置
 secure:
   bind-address: "127.0.0.1"
-  bind-port: 9443
+  bind-port: 9444
   tls:
     cert-file: "./configs/cert/qs-apiserver.crt"
     private-key-file: "./configs/cert/qs-apiserver.key"

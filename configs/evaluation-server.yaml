@@ -17,7 +17,7 @@ insecure:
 # 安全服务配置
 secure:
   bind-address: "127.0.0.1"         # 绑定地址
-  bind-port: 9445               # 绑定端口
+  bind-port: 9446               # 绑定端口
   tls:
     cert-file: "./configs/cert/evaluation-server.crt"
     private-key-file: "./configs/cert/evaluation-server.key"
