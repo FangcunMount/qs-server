@@ -6,6 +6,7 @@ tmp_dir = "tmp"
   args_bin = ["--config=configs/apiserver.yaml"]
   bin = "./tmp/apiserver"
   cmd = "go build -o ./tmp/apiserver ./cmd/qs-apiserver"
+  working_dir = "."
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "docs", "script"]
   exclude_file = []

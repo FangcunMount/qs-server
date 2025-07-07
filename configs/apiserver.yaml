@@ -7,28 +7,24 @@ server:
     middlewares: recovery,enhanced_logger,secure,nocache,cors,dump # 加载的 gin 中间件列表，多个中间件，逗号(,)隔开
     max-ping-count: 3 # http 服务启动后，自检尝试次数，默认 3
 
-# HTTP 配置
+# GRPC 配置
 grpc:
-  BindAddress: "127.0.0.1
-  BindPort: 9090
-  HealthzPort: 9091
+  bind-address: "127.0.0.1"
+  bind-port: 9090
+  healthz-port: 9091
 
 # 不安全服务配置
 insecure:
-  bind-address:  "127.0.0.1
+  bind-address: "127.0.0.1"
   bind-port: 9080
 
 # 安全服务配置
 secure:
   bind-address: "127.0.0.1"
   bind-port: 9443
-  Required: true
   tls:
-    cert-key:
-      cert-file: "./configs/cert/qs-apiserver.crt"
-      private-key-file: "./configs/cert/qs-apiserver.key"
-    cert-dir: "./cert"
-    pair-name: "qs"
+    cert-file: "./configs/cert/qs-apiserver.crt"
+    private-key-file: "./configs/cert/qs-apiserver.key"
 
 # MySQL 数据库配置
 mysql:
@@ -72,8 +68,8 @@ log:
   disable-caller: false # 是否禁用调用者
   disable-stacktrace: false # 是否禁用堆栈跟踪
   development: false # 是否为开发环境
-  output-paths: ["/data/logs/qs/qs-apiserver.log", "stdout"] # 输出路径
-  error-output-paths: ["/data/logs/qs/qs-apiserver-error.log", "stderr"] # 错误输出路径
+  output-paths: ["logs/qs-apiserver.log", "stdout"] # 输出路径
+  error-output-paths: ["logs/qs-apiserver-error.log", "stderr"] # 错误输出路径
   max-size: 100 # 单个日志文件最大大小（MB）
   max-age: 30 # 保留旧日志文件的最大天数
   max-backups: 10 # 保留旧日志文件的最大个数

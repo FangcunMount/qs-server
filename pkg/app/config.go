@@ -45,6 +45,8 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 		} else {
 			// 没有指定配置文件地址，则使用当前目录
 			viper.AddConfigPath(".")
+			// 添加 configs 目录
+			viper.AddConfigPath("configs")
 
 			// 如果basename包含多个单词，则添加配置路径
 			if names := strings.Split(basename, "-"); len(names) > 1 {
@@ -63,6 +65,9 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 			_, _ = fmt.Fprintf(os.Stderr, "Error: failed to read configuration file(%s): %v\n", cfgFile, err)
 			os.Exit(1)
 		}
+
+		// 打印配置信息
+		fmt.Printf("Viper Config: %+v\n", viper.AllSettings())
 	})
 }
 

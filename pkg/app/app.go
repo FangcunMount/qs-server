@@ -197,10 +197,22 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
+		// 打印配置信息
+		fmt.Printf("Viper Config: %+v\n", viper.AllSettings())
+
 		// 如果选项不为空，则反序列化选项
 		if err := viper.Unmarshal(a.options); err != nil {
 			return err
 		}
+
+		// 打印选项信息
+		fmt.Printf("Options: %+v\n", a.options)
+
+		// 打印 secure 配置
+		fmt.Printf("Secure Config: %+v\n", viper.Get("secure"))
+		fmt.Printf("Secure TLS Config: %+v\n", viper.Get("secure.tls"))
+		fmt.Printf("Secure TLS Cert File: %+v\n", viper.Get("secure.tls.cert-file"))
+		fmt.Printf("Secure TLS Private Key File: %+v\n", viper.Get("secure.tls.private-key-file"))
 	}
 
 	// 如果静默标志不为空，则打印日志

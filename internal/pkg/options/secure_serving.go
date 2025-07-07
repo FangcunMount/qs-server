@@ -5,25 +5,24 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/server"
 )
 
 // SecureServingOptions 安全的服务器配置选项
 type SecureServingOptions struct {
-	BindAddress string // 绑定地址
-	BindPort    int    // 绑定端口
-	CertFile    string // 证书文件
-	KeyFile     string // 密钥文件
+	BindAddress string `json:"bind_address" mapstructure:"bind-address"` // 绑定地址
+	BindPort    int    `json:"bind_port"    mapstructure:"bind-port"`    // 绑定端口
+	TLS         struct {
+		CertFile string `json:"cert_file"    mapstructure:"cert-file"`        // 证书文件
+		KeyFile  string `json:"key_file"     mapstructure:"private-key-file"` // 密钥文件
+	} `json:"tls" mapstructure:"tls"`
 }
 
 // NewSecureServingOptions 创建默认的安全服务器配置选项
 func NewSecureServingOptions() *SecureServingOptions {
 	return &SecureServingOptions{
-		BindAddress: viper.GetString("secure.bind-address"),
-		BindPort:    viper.GetInt("secure.bind-port"),
-		CertFile:    viper.GetString("secure.tls.cert-file"),
-		KeyFile:     viper.GetString("secure.tls.private-key-file"),
+		BindAddress: "127.0.0.1",
+		BindPort:    9443,
 	}
 }
 
@@ -46,20 +45,21 @@ func (s *SecureServingOptions) Validate() []error {
 
 // Complete 完成配置选项
 func (s *SecureServingOptions) Complete() error {
+	fmt.Printf("SecureServingOptions: %+v\n", s)
 	if s.BindPort == 0 {
 		return nil
 	}
 
-	if len(s.CertFile) == 0 || len(s.KeyFile) == 0 {
+	if len(s.TLS.CertFile) == 0 || len(s.TLS.KeyFile) == 0 {
 		return fmt.Errorf("--secure.tls.cert-file and --secure.tls.private-key-file are required for serving via HTTPS")
 	}
 
 	// 检查证书文件是否存在
-	if _, err := os.Stat(s.CertFile); err != nil {
-		return fmt.Errorf("could not stat certificate file %s: %v", s.CertFile, err)
+	if _, err := os.Stat(s.TLS.CertFile); err != nil {
+		return fmt.Errorf("could not stat certificate file %s: %v", s.TLS.CertFile, err)
 	}
-	if _, err := os.Stat(s.KeyFile); err != nil {
-		return fmt.Errorf("could not stat private key file %s: %v", s.KeyFile, err)
+	if _, err := os.Stat(s.TLS.KeyFile); err != nil {
+		return fmt.Errorf("could not stat private key file %s: %v", s.TLS.KeyFile, err)
 	}
 
 	return nil
@@ -77,10 +77,10 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"the deployed machine and that port 443 on the iam public address is proxied to this "+
 		"port. This is performed by nginx in the default setup. Set to zero to disable.")
 
-	fs.StringVar(&s.CertFile, "secure.tls.cert-file", s.CertFile, ""+
+	fs.StringVar(&s.TLS.CertFile, "secure.tls.cert-file", s.TLS.CertFile, ""+
 		"File containing the default x509 Certificate for HTTPS.")
 
-	fs.StringVar(&s.KeyFile, "secure.tls.private-key-file", s.KeyFile, ""+
+	fs.StringVar(&s.TLS.KeyFile, "secure.tls.private-key-file", s.TLS.KeyFile, ""+
 		"File containing the default x509 private key matching --secure.tls.cert-file.")
 }
 
@@ -90,8 +90,8 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 		BindAddress: s.BindAddress,
 		BindPort:    s.BindPort,
 		CertKey: server.CertKey{
-			CertFile: s.CertFile,
-			KeyFile:  s.KeyFile,
+			CertFile: s.TLS.CertFile,
+			KeyFile:  s.TLS.KeyFile,
 		},
 	}
 	return nil

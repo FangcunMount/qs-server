@@ -5,21 +5,20 @@ import (
 	"net"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/server"
 )
 
 // InsecureServingOptions 不安全的服务器配置选项
 type InsecureServingOptions struct {
-	BindAddress string // 绑定地址
-	BindPort    int    // 绑定端口
+	BindAddress string `json:"bind_address" mapstructure:"bind-address"` // 绑定地址
+	BindPort    int    `json:"bind_port"    mapstructure:"bind-port"`    // 绑定端口
 }
 
 // NewInsecureServingOptions 创建默认的不安全服务器配置选项
 func NewInsecureServingOptions() *InsecureServingOptions {
 	return &InsecureServingOptions{
-		BindAddress: viper.GetString("insecure.bind-address"),
-		BindPort:    viper.GetInt("insecure.bind-port"),
+		BindAddress: "127.0.0.1",
+		BindPort:    9080,
 	}
 }
 
@@ -55,8 +54,13 @@ func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ApplyTo 应用配置到服务器
 func (s *InsecureServingOptions) ApplyTo(c *server.Config) error {
+	// 添加调试日志
+	fmt.Printf("DEBUG: InsecureServingOptions.ApplyTo called with BindAddress=%s, BindPort=%d\n", s.BindAddress, s.BindPort)
+
 	c.InsecureServing = &server.InsecureServingInfo{
 		Address: net.JoinHostPort(s.BindAddress, fmt.Sprintf("%d", s.BindPort)),
 	}
+
+	fmt.Printf("DEBUG: InsecureServingInfo.Address set to: %s\n", c.InsecureServing.Address)
 	return nil
 }

@@ -6,6 +6,7 @@ tmp_dir = "tmp"
   args_bin = ["--config=configs/collection-server.yaml"]
   bin = "./tmp/collection"
   cmd = "go build -o ./tmp/collection ./cmd/collection-server"
+  working_dir = "."
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "docs", "script"]
   exclude_file = []

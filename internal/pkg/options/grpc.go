@@ -5,22 +5,21 @@ import (
 	"net"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 // GRPCOptions GRPC 服务器配置选项
 type GRPCOptions struct {
-	BindAddress string // 绑定地址
-	BindPort    int    // 绑定端口
-	HealthzPort int    // 健康检查端口
+	BindAddress string `json:"bind_address" mapstructure:"bind-address"` // 绑定地址
+	BindPort    int    `json:"bind_port"    mapstructure:"bind-port"`    // 绑定端口
+	HealthzPort int    `json:"healthz_port" mapstructure:"healthz-port"` // 健康检查端口
 }
 
 // NewGRPCOptions 创建默认的 GRPC 配置选项
 func NewGRPCOptions() *GRPCOptions {
 	return &GRPCOptions{
-		BindAddress: viper.GetString("grpc.bind-address"),
-		BindPort:    viper.GetInt("grpc.bind-port"),
-		HealthzPort: viper.GetInt("grpc.healthz-port"),
+		BindAddress: "127.0.0.1",
+		BindPort:    9090,
+		HealthzPort: 9091,
 	}
 }
 

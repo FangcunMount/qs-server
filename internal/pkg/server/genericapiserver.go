@@ -131,7 +131,7 @@ func (s *GenericAPIServer) Run() error {
 		key, cert := s.SecureServingInfo.CertKey.KeyFile, s.SecureServingInfo.CertKey.CertFile
 		log.Infof("cert: %s, key: %s, bindPort: %d", cert, key, s.SecureServingInfo.BindPort)
 		if cert == "" || key == "" || s.SecureServingInfo.BindPort == 0 {
-			return nil
+			return fmt.Errorf("invalid HTTPS configuration: cert=%s, key=%s, bindPort=%d", cert, key, s.SecureServingInfo.BindPort)
 		}
 
 		log.Infof("Start to listening the incoming requests on https address: %s", s.SecureServingInfo.Address())

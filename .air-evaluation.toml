@@ -6,6 +6,7 @@ tmp_dir = "tmp"
   args_bin = ["--config=configs/evaluation-server.yaml"]
   bin = "./tmp/evaluation"
   cmd = "go build -o ./tmp/evaluation ./cmd/evaluation-server"
+  working_dir = "."
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "docs", "script"]
   exclude_file = []
