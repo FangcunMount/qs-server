@@ -31,7 +31,7 @@ func NewRepository(db *mongo.Database) port.MedicalScaleRepositoryMongo {
 }
 
 // Create 创建医学量表
-func (r *Repository) Create(ctx context.Context, scale *medicalScale.MedicalScale) error {
+func (r *Repository) Create(ctx context.Context, scale *medicalscale.MedicalScale) error {
 	po := r.mapper.ToPO(scale)
 	po.BeforeInsert()
 
@@ -44,6 +44,9 @@ func (r *Repository) Create(ctx context.Context, scale *medicalScale.MedicalScal
 	if err != nil {
 		return err
 	}
+
+	// 将生成的 ID 设置回领域对象
+	scale.SetID(v1.NewID(po.DomainID))
 
 	return nil
 }

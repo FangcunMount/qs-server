@@ -72,6 +72,11 @@ func WithFactors(factors []factor.Factor) MedicalScaleOption {
 	}
 }
 
+// SetID 设置ID
+func (s *MedicalScale) SetID(id v1.ID) {
+	s.id = id
+}
+
 // GetID 获取ID
 func (s *MedicalScale) GetID() v1.ID {
 	return s.id

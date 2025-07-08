@@ -4,10 +4,11 @@ import (
 	medicalscale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor/ability"
-	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/interpretation"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // MedicalScaleMapper 医学量表映射器
@@ -20,135 +21,131 @@ func NewMedicalScaleMapper() *MedicalScaleMapper {
 
 // ToPO 将领域模型转换为MongoDB持久化对象
 func (m *MedicalScaleMapper) ToPO(bo *medicalscale.MedicalScale) *MedicalScalePO {
-	po := &MedicalScalePO{
+	if bo == nil {
+		return nil
+	}
+
+	// 转换因子列表
+	factors := make([]FactorPO, 0, len(bo.GetFactors()))
+	for _, factor := range bo.GetFactors() {
+		if po := m.mapFactorToPO(&factor); po != nil {
+			factors = append(factors, *po)
+		}
+	}
+
+	return &MedicalScalePO{
+		BaseDocument: base.BaseDocument{
+			ID: primitive.NewObjectID(),
+		},
 		Code:              bo.GetCode(),
 		Title:             bo.GetTitle(),
 		QuestionnaireCode: bo.GetQuestionnaireCode(),
-		Factors:           m.mapFactorsToPO(bo.GetFactors()),
+		Factors:           factors,
 	}
-
-	if bo.GetID().Value() != 0 {
-		objectID, _ := mongoBase.Uint64ToObjectID(bo.GetID().Value())
-		po.BaseDocument.ID = objectID
-	}
-
-	return po
 }
 
-// mapFactorsToPO 将因子领域对象转换为持久化对象
-func (m *MedicalScaleMapper) mapFactorsToPO(factors []factor.Factor) []FactorPO {
-	if factors == nil {
-		return []FactorPO{}
-	}
-
-	var factorsPO []FactorPO
-	for _, f := range factors {
-		factorPO := FactorPO{
-			Code:       f.GetCode(),
-			Title:      f.GetTitle(),
-			FactorType: f.GetFactorType().String(),
-		}
-
-		// 处理计算能力
-		if calcAbility := f.GetCalculationAbility(); calcAbility != nil {
-			if calcRule := calcAbility.GetCalculationRule(); calcRule != nil {
-				factorPO.CalculationRule = CalculationRulePO{
-					FormulaType: calcRule.GetFormula().String(),
-					SourceCodes: calcRule.GetSourceCodes(),
-				}
-			}
-		}
-
-		// 处理解读能力
-		if interpretAbility := f.GetInterpretationAbility(); interpretAbility != nil {
-			if interpretRule := interpretAbility.GetInterpretationRule(); interpretRule != nil {
-				factorPO.InterpretRules = []InterpretRulePO{
-					{
-						ScoreRange: ScoreRangePO{
-							MinScore: interpretRule.GetScoreRange().MinScore(),
-							MaxScore: interpretRule.GetScoreRange().MaxScore(),
-						},
-						Content: interpretRule.GetContent(),
-					},
-				}
-			}
-		}
-
-		factorsPO = append(factorsPO, factorPO)
-	}
-
-	return factorsPO
-}
-
-// ToBO 将MongoDB持久化对象转换为业务对象
+// ToBO 将MongoDB持久化对象转换为领域对象
 func (m *MedicalScaleMapper) ToBO(po *MedicalScalePO) *medicalscale.MedicalScale {
-	// 转换因子
-	factors := m.mapFactorsToBO(po.Factors)
+	if po == nil {
+		return nil
+	}
 
-	// 创建医学量表选项
-	opts := []medicalscale.MedicalScaleOption{
-		medicalscale.WithCode(po.Code),
-		medicalscale.WithTitle(po.Title),
+	// 转换因子列表
+	factors := make([]factor.Factor, 0, len(po.Factors))
+	for _, factorPO := range po.Factors {
+		if bo := m.mapFactorToBO(&factorPO); bo != nil {
+			factors = append(factors, *bo)
+		}
+	}
+
+	return medicalscale.NewMedicalScale(
+		po.Code,
+		po.Title,
+		medicalscale.WithID(v1.NewID(po.DomainID)),
 		medicalscale.WithQuestionnaireCode(po.QuestionnaireCode),
 		medicalscale.WithFactors(factors),
-	}
-
-	// 如果有ID，添加ID选项
-	if !po.BaseDocument.ID.IsZero() {
-		domainID := mongoBase.ObjectIDToUint64(po.BaseDocument.ID)
-		opts = append(opts, medicalscale.WithID(v1.NewID(domainID)))
-	}
-
-	// 创建医学量表对象
-	ms := medicalscale.NewMedicalScale(po.Code, po.Title, opts...)
-
-	return ms
+	)
 }
 
-// mapFactorsToBO 将因子持久化对象转换为领域对象
-func (m *MedicalScaleMapper) mapFactorsToBO(factorsPO []FactorPO) []factor.Factor {
-	if factorsPO == nil {
-		return []factor.Factor{}
+// mapFactorToPO 将因子领域对象转换为持久化对象
+func (m *MedicalScaleMapper) mapFactorToPO(bo *factor.Factor) *FactorPO {
+	if bo == nil {
+		return nil
 	}
 
-	var factors []factor.Factor
-	for _, factorPO := range factorsPO {
-		var opts []factor.FactorOption
-
-		// 处理计算规则
-		if factorPO.CalculationRule.FormulaType != "" {
-			calculationRule := calculation.NewCalculationRule(
-				calculation.FormulaType(factorPO.CalculationRule.FormulaType),
-				factorPO.CalculationRule.SourceCodes,
-			)
-			calculationAbility := &ability.CalculationAbility{}
-			calculationAbility.SetCalculationRule(calculationRule)
-			opts = append(opts, factor.WithCalculation(calculationAbility))
+	// 转换计算规则
+	var calculationRule CalculationRulePO
+	if bo.GetCalculationAbility() != nil && bo.GetCalculationAbility().GetCalculationRule() != nil {
+		rule := bo.GetCalculationAbility().GetCalculationRule()
+		calculationRule = CalculationRulePO{
+			FormulaType: rule.GetFormula().String(),
+			SourceCodes: rule.GetSourceCodes(),
 		}
+	}
 
-		// 处理解读规则
-		if len(factorPO.InterpretRules) > 0 {
-			interpretRulePO := factorPO.InterpretRules[0]
-			interpretRule := interpretation.NewInterpretRule(
-				interpretation.NewScoreRange(
-					interpretRulePO.ScoreRange.MinScore,
-					interpretRulePO.ScoreRange.MaxScore,
-				),
-				interpretRulePO.Content,
-			)
-			interpretationAbility := &ability.InterpretationAbility{}
-			interpretationAbility.SetInterpretationRule(&interpretRule)
-			opts = append(opts, factor.WithInterpretation(interpretationAbility))
+	// 转换解读规则
+	var interpretRules []InterpretRulePO
+	if bo.GetInterpretationAbility() != nil && bo.GetInterpretationAbility().GetInterpretationRule() != nil {
+		rule := bo.GetInterpretationAbility().GetInterpretationRule()
+		interpretRules = []InterpretRulePO{
+			{
+				ScoreRange: ScoreRangePO{
+					MinScore: rule.GetScoreRange().MinScore(),
+					MaxScore: rule.GetScoreRange().MaxScore(),
+				},
+				Content: rule.GetContent(),
+			},
 		}
+	}
 
-		f := factor.NewFactor(
-			factorPO.Code,
-			factorPO.Title,
-			factor.FactorType(factorPO.FactorType),
-			opts...,
+	return &FactorPO{
+		Code:            bo.GetCode(),
+		Title:           bo.GetTitle(),
+		FactorType:      bo.GetFactorType().String(),
+		CalculationRule: calculationRule,
+		InterpretRules:  interpretRules,
+	}
+}
+
+// mapFactorToBO 将因子持久化对象转换为领域对象
+func (m *MedicalScaleMapper) mapFactorToBO(po *FactorPO) *factor.Factor {
+	if po == nil {
+		return nil
+	}
+
+	// 转换计算规则
+	var calculationAbility *ability.CalculationAbility
+	if po.CalculationRule.FormulaType != "" {
+		rule := calculation.NewCalculationRule(
+			calculation.FormulaType(po.CalculationRule.FormulaType),
+			po.CalculationRule.SourceCodes,
 		)
-		factors = append(factors, f)
+		calculationAbility = &ability.CalculationAbility{}
+		calculationAbility.SetCalculationRule(rule)
 	}
 
-	return factors
+	// 转换解读规则
+	var interpretationAbility *ability.InterpretationAbility
+	if len(po.InterpretRules) > 0 {
+		interpretRule := po.InterpretRules[0]
+		rule := interpretation.NewInterpretRule(
+			interpretation.NewScoreRange(
+				interpretRule.ScoreRange.MinScore,
+				interpretRule.ScoreRange.MaxScore,
+			),
+			interpretRule.Content,
+		)
+		interpretationAbility = &ability.InterpretationAbility{}
+		interpretationAbility.SetInterpretationRule(&rule)
+	}
+
+	result := factor.NewFactor(
+		po.Code,
+		po.Title,
+		factor.FactorType(po.FactorType),
+		factor.WithCalculation(calculationAbility),
+		factor.WithInterpretation(interpretationAbility),
+	)
+
+	return &result
 }
