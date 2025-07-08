@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
-	medicalscale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
 	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
@@ -31,7 +30,7 @@ func NewRepository(db *mongo.Database) port.MedicalScaleRepositoryMongo {
 }
 
 // Create 创建医学量表
-func (r *Repository) Create(ctx context.Context, scale *medicalscale.MedicalScale) error {
+func (r *Repository) Create(ctx context.Context, scale *medicalScale.MedicalScale) error {
 	po := r.mapper.ToPO(scale)
 	po.BeforeInsert()
 
@@ -95,7 +94,7 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*medicalScale
 }
 
 // FindByQuestionnaireCode 根据问卷代码查找医学量表列表
-func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*medicalscale.MedicalScale, error) {
+func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*medicalScale.MedicalScale, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
 		"deleted_at":         bson.M{"$exists": false},
@@ -124,7 +123,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 }
 
 // Update 更新医学量表
-func (r *Repository) Update(ctx context.Context, scale *medicalscale.MedicalScale) error {
+func (r *Repository) Update(ctx context.Context, scale *medicalScale.MedicalScale) error {
 	po := r.mapper.ToPO(scale)
 	po.BeforeUpdate()
 
