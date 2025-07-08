@@ -3,10 +3,10 @@ package answersheet
 import (
 	"time"
 
+	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	"github.com/yshujie/questionnaire-scale/pkg/util/idutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-
-	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
 )
 
 // AnswerSheetPO 答卷MongoDB持久化对象
@@ -32,9 +32,9 @@ func (p *AnswerSheetPO) BeforeInsert() {
 	if p.ID.IsZero() {
 		p.ID = primitive.NewObjectID()
 	}
-	now := time.Now()
-	p.CreatedAt = now
-	p.UpdatedAt = now
+	p.DomainID = idutil.GetIntID()
+	p.CreatedAt = time.Now()
+	p.UpdatedAt = time.Now()
 	p.DeletedAt = nil
 
 	// 设置默认值

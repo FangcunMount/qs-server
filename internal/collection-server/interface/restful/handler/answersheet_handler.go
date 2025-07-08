@@ -143,6 +143,7 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 
 	// 调用 GRPC 服务
 	resp, err := h.client.SaveAnswersheet(c.Request.Context(), grpcReq)
+	log.L(c).Infow("SaveAnswersheet", "resp", resp)
 	if err != nil {
 		log.L(c).Errorf("Failed to save answersheet: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -166,7 +167,7 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 			log.L(c).Errorf("Failed to publish answersheet saved message: %v", err)
 			// 不影响主流程，只记录错误
 		} else {
-			log.L(c).Infof("Published answersheet saved message for response ID: %s", resp.Id)
+			log.L(c).Infof("Published answersheet saved message for response ID: %s", message.ResponseID)
 		}
 	}
 

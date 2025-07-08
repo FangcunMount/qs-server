@@ -11,6 +11,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
 	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
 // Repository 答卷MongoDB存储库
@@ -47,19 +48,23 @@ func (r *Repository) Create(ctx context.Context, aDomain *answersheet.AnswerShee
 		return err
 	}
 
+	// 将生成的 ID 设置回领域对象
+	aDomain.SetID(v1.NewID(po.DomainID))
+
 	return nil
 }
 
 // FindByID 根据ID查找答卷
 func (r *Repository) FindByID(ctx context.Context, id uint64) (*answersheet.AnswerSheet, error) {
-	// 将 uint64 转换为 ObjectID
-	objectID, err := mongoBase.Uint64ToObjectID(id)
-	if err != nil {
-		return nil, err
+	filter := bson.M{
+		"domain_id": id,
+		"deleted_at": bson.M{
+			"$exists": false,
+		},
 	}
 
 	var po AnswerSheetPO
-	err = r.BaseRepository.FindByID(ctx, objectID, &po)
+	err := r.Collection().FindOne(ctx, filter).Decode(&po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil // 或者返回自定义的NotFound错误
@@ -248,12 +253,6 @@ func (r *Repository) Update(ctx context.Context, aDomain *answersheet.AnswerShee
 
 	po.BeforeUpdate()
 
-	// 将 uint64 转换为 ObjectID
-	objectID, err := mongoBase.Uint64ToObjectID(aDomain.GetID())
-	if err != nil {
-		return err
-	}
-
 	updateData, err := po.ToBsonM()
 	if err != nil {
 		return err
@@ -265,9 +264,20 @@ func (r *Repository) Update(ctx context.Context, aDomain *answersheet.AnswerShee
 	// 使用 $set 操作符包装更新数据，避免覆盖其他字段
 	update := bson.M{"$set": updateData}
 
-	_, err = r.UpdateByID(ctx, objectID, update)
+	filter := bson.M{
+		"domain_id": aDomain.GetID(),
+		"deleted_at": bson.M{
+			"$exists": false,
+		},
+	}
+
+	result, err := r.Collection().UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
 	}
 
 	return nil
@@ -275,12 +285,6 @@ func (r *Repository) Update(ctx context.Context, aDomain *answersheet.AnswerShee
 
 // Remove 删除答卷（软删除）
 func (r *Repository) Remove(ctx context.Context, id uint64) error {
-	// 将 uint64 转换为 ObjectID
-	objectID, err := mongoBase.Uint64ToObjectID(id)
-	if err != nil {
-		return err
-	}
-
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
@@ -290,7 +294,14 @@ func (r *Repository) Remove(ctx context.Context, id uint64) error {
 		},
 	}
 
-	result, err := r.UpdateByID(ctx, objectID, update)
+	filter := bson.M{
+		"domain_id": id,
+		"deleted_at": bson.M{
+			"$exists": false,
+		},
+	}
+
+	result, err := r.Collection().UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -304,13 +315,11 @@ func (r *Repository) Remove(ctx context.Context, id uint64) error {
 
 // HardDelete 物理删除答卷
 func (r *Repository) HardDelete(ctx context.Context, id uint64) error {
-	// 将 uint64 转换为 ObjectID
-	objectID, err := mongoBase.Uint64ToObjectID(id)
-	if err != nil {
-		return err
+	filter := bson.M{
+		"domain_id": id,
 	}
 
-	result, err := r.DeleteByID(ctx, objectID)
+	result, err := r.Collection().DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -324,14 +333,8 @@ func (r *Repository) HardDelete(ctx context.Context, id uint64) error {
 
 // ExistsByID 检查ID是否存在
 func (r *Repository) ExistsByID(ctx context.Context, id uint64) (bool, error) {
-	// 将 uint64 转换为 ObjectID
-	objectID, err := mongoBase.Uint64ToObjectID(id)
-	if err != nil {
-		return false, err
-	}
-
 	filter := bson.M{
-		"_id":        objectID,
+		"domain_id":  id,
 		"deleted_at": bson.M{"$exists": false},
 	}
 

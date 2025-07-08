@@ -7,11 +7,12 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
 // AnswerSheet 答卷
 type AnswerSheet struct {
-	id                   uint64
+	id                   v1.ID
 	questionnaireCode    string
 	questionnaireVersion string
 	title                string
@@ -37,7 +38,7 @@ func NewAnswerSheet(questionnaireCode string, questionnaireVersion string, opts 
 
 type AnswerSheetOption func(*AnswerSheet)
 
-func WithID(id uint64) AnswerSheetOption {
+func WithID(id v1.ID) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.id = id
 	}
@@ -97,7 +98,11 @@ func WithUpdatedAt(updatedAt time.Time) AnswerSheetOption {
 	}
 }
 
-func (a *AnswerSheet) GetID() uint64 {
+func (a *AnswerSheet) SetID(id v1.ID) {
+	a.id = id
+}
+
+func (a *AnswerSheet) GetID() v1.ID {
 	return a.id
 }
 

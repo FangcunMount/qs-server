@@ -1,6 +1,9 @@
 package viewmodel
 
-import "github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+)
 
 // SaveAnswerSheetRequest 保存答卷请求视图模型
 type SaveAnswerSheetRequest struct {
@@ -24,7 +27,7 @@ type ListAnswerSheetsRequest struct {
 
 // AnswerSheetViewModel 答卷视图模型
 type AnswerSheetViewModel struct {
-	ID                   uint64      `json:"id"`
+	ID                   v1.ID       `json:"id"`
 	QuestionnaireCode    string      `json:"questionnaire_code"`
 	QuestionnaireVersion string      `json:"questionnaire_version"`
 	Title                string      `json:"title"`

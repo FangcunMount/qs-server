@@ -1,9 +1,11 @@
 package dto
 
+import v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+
 // AnswerSheetDTO 表示答卷数据传输对象
 // 用于应用层和领域层之间的数据传输
 type AnswerSheetDTO struct {
-	ID                   uint64      // 答卷ID
+	ID                   v1.ID       // 答卷ID
 	QuestionnaireCode    string      // 问卷代码
 	QuestionnaireVersion string      // 问卷版本
 	Title                string      // 答卷标题

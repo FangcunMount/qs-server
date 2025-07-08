@@ -6,6 +6,13 @@ print('开始创建索引...');
 // 切换到questionnaire_scale数据库
 db = db.getSiblingDB('questionnaire_scale');
 
+// 为所有集合创建 domain_id 索引
+print('创建 domain_id 索引...');
+db.answersheets.createIndex({ "domain_id": 1 }, { unique: true, background: true });
+db.questionnaires.createIndex({ "domain_id": 1 }, { unique: true, background: true });
+db.medical_scales.createIndex({ "domain_id": 1 }, { unique: true, background: true });
+db.interpret_reports.createIndex({ "domain_id": 1 }, { unique: true, background: true });
+
 // 为activity_logs集合创建索引
 print('创建activity_logs索引...');
 db.activity_logs.createIndex({ "type": 1 });

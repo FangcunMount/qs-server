@@ -6,7 +6,8 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
 // AnswerSheetMapper 答卷映射器
@@ -48,6 +49,10 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 	}
 
 	return &AnswerSheetPO{
+		BaseDocument: base.BaseDocument{
+			CreatedAt: bo.GetCreatedAt(),
+			UpdatedAt: bo.GetUpdatedAt(),
+		},
 		QuestionnaireCode:    bo.GetQuestionnaireCode(),
 		QuestionnaireVersion: bo.GetQuestionnaireVersion(),
 		Title:                bo.GetTitle(),
@@ -82,13 +87,10 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 		testee = user.NewTestee(user.NewUserID(po.Testee.UserID), "") // 名称留空，需要时从用户服务获取
 	}
 
-	// 转换 ObjectID 为 uint64
-	id := mongo.ObjectIDToUint64(po.ID)
-
 	return answersheet.NewAnswerSheet(
 		po.QuestionnaireCode,
 		po.QuestionnaireVersion,
-		answersheet.WithID(id),
+		answersheet.WithID(v1.NewID(po.DomainID)),
 		answersheet.WithTitle(po.Title),
 		answersheet.WithScore(po.Score),
 		answersheet.WithAnswers(answers),
