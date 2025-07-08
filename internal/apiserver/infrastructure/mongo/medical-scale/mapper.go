@@ -85,16 +85,17 @@ func (m *MedicalScaleMapper) mapFactorToPO(bo *factor.Factor) *FactorPO {
 
 	// 转换解读规则
 	var interpretRules []InterpretRulePO
-	if bo.GetInterpretationAbility() != nil && bo.GetInterpretationAbility().GetInterpretationRule() != nil {
-		rule := bo.GetInterpretationAbility().GetInterpretationRule()
-		interpretRules = []InterpretRulePO{
-			{
+	if bo.GetInterpretationAbility() != nil {
+		rules := bo.GetInterpretationAbility().GetInterpretationRules()
+		interpretRules = make([]InterpretRulePO, len(rules))
+		for i, rule := range rules {
+			interpretRules[i] = InterpretRulePO{
 				ScoreRange: ScoreRangePO{
 					MinScore: rule.GetScoreRange().MinScore(),
 					MaxScore: rule.GetScoreRange().MaxScore(),
 				},
 				Content: rule.GetContent(),
-			},
+			}
 		}
 	}
 
@@ -127,16 +128,18 @@ func (m *MedicalScaleMapper) mapFactorToBO(po *FactorPO) *factor.Factor {
 	// 转换解读规则
 	var interpretationAbility *ability.InterpretationAbility
 	if len(po.InterpretRules) > 0 {
-		interpretRule := po.InterpretRules[0]
-		rule := interpretation.NewInterpretRule(
-			interpretation.NewScoreRange(
-				interpretRule.ScoreRange.MinScore,
-				interpretRule.ScoreRange.MaxScore,
-			),
-			interpretRule.Content,
-		)
+		rules := make([]interpretation.InterpretRule, len(po.InterpretRules))
+		for i, rulePO := range po.InterpretRules {
+			rules[i] = interpretation.NewInterpretRule(
+				interpretation.NewScoreRange(
+					rulePO.ScoreRange.MinScore,
+					rulePO.ScoreRange.MaxScore,
+				),
+				rulePO.Content,
+			)
+		}
 		interpretationAbility = &ability.InterpretationAbility{}
-		interpretationAbility.SetInterpretationRule(&rule)
+		interpretationAbility.SetInterpretationRules(rules)
 	}
 
 	result := factor.NewFactor(

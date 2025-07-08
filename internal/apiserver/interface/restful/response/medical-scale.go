@@ -56,15 +56,15 @@ func mapFactorsToVM(factors []factor.Factor) []viewmodel.FactorVM {
 
 		// 处理解读能力
 		if interpretAbility := f.GetInterpretationAbility(); interpretAbility != nil {
-			if interpretRule := interpretAbility.GetInterpretationRule(); interpretRule != nil {
-				factorVM.InterpretRules = []viewmodel.InterpretRuleVM{
-					{
-						ScoreRange: viewmodel.ScoreRangeVM{
-							MinScore: interpretRule.GetScoreRange().MinScore(),
-							MaxScore: interpretRule.GetScoreRange().MaxScore(),
-						},
-						Content: interpretRule.GetContent(),
+			rules := interpretAbility.GetInterpretationRules()
+			factorVM.InterpretRules = make([]viewmodel.InterpretRuleVM, len(rules))
+			for i, rule := range rules {
+				factorVM.InterpretRules[i] = viewmodel.InterpretRuleVM{
+					ScoreRange: viewmodel.ScoreRangeVM{
+						MinScore: rule.GetScoreRange().MinScore(),
+						MaxScore: rule.GetScoreRange().MaxScore(),
 					},
+					Content: rule.GetContent(),
 				}
 			}
 		}

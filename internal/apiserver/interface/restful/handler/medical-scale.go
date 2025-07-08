@@ -135,33 +135,44 @@ func (h *MedicalScaleHandler) UpdateFactor(c *gin.Context) {
 		return
 	}
 
-	// 转换为因子DTO
-	factorDTO := dto.FactorDTO{
-		Code:       req.Code,
-		Title:      req.Title,
-		FactorType: req.FactorType,
-	}
-
-	// 处理计算规则
-	factorDTO.CalculationRule = &dto.CalculationRuleDTO{
-		FormulaType: req.CalculationRule.FormulaType,
-		SourceCodes: req.CalculationRule.SourceCodes,
-	}
-
-	// 处理解读规则（取第一个解读规则）
-	if len(req.InterpretRules) > 0 {
-		interpretRule := req.InterpretRules[0]
-		factorDTO.InterpretRule = &dto.InterpretRuleDTO{
-			ScoreRange: dto.ScoreRangeDTO{
-				MinScore: interpretRule.ScoreRange.MinScore,
-				MaxScore: interpretRule.ScoreRange.MaxScore,
-			},
-			Content: interpretRule.Content,
+	// 转换为因子DTO列表
+	factorDTOs := make([]dto.FactorDTO, len(req.Factors))
+	for i, factor := range req.Factors {
+		factorDTO := dto.FactorDTO{
+			Code:       factor.Code,
+			Title:      factor.Title,
+			FactorType: factor.FactorType,
 		}
+
+		// 处理计算规则
+		factorDTO.CalculationRule = &dto.CalculationRuleDTO{
+			FormulaType: factor.CalculationRule.FormulaType,
+			SourceCodes: factor.CalculationRule.SourceCodes,
+		}
+
+		// 处理解读规则（支持多个解读规则）
+		// 如果是总分因子，可以没有解读规则
+		if !factor.IsTotalScore && (factor.InterpretRules == nil || len(factor.InterpretRules) == 0) {
+			h.ErrorResponse(c, errors.WithCode(errorCode.ErrValidation, "非总分因子必须包含解读规则"))
+			return
+		}
+
+		factorDTO.InterpretRules = make([]dto.InterpretRuleDTO, len(factor.InterpretRules))
+		for j, rule := range factor.InterpretRules {
+			factorDTO.InterpretRules[j] = dto.InterpretRuleDTO{
+				ScoreRange: dto.ScoreRangeDTO{
+					MinScore: rule.ScoreRange.MinScore,
+					MaxScore: rule.ScoreRange.MaxScore,
+				},
+				Content: rule.Content,
+			}
+		}
+
+		factorDTOs[i] = factorDTO
 	}
 
 	// 更新因子
-	scale, err := h.editor.UpdateFactors(c.Request.Context(), code, []dto.FactorDTO{factorDTO})
+	scale, err := h.editor.UpdateFactors(c.Request.Context(), code, factorDTOs)
 	if err != nil {
 		h.ErrorResponse(c, err)
 		return
@@ -234,16 +245,15 @@ func (h *MedicalScaleHandler) convertDTOToVM(dto *dto.MedicalScaleDTO) *viewmode
 			}
 		}
 
-		// 处理解读规则
-		if factor.InterpretRule != nil {
-			factorVM.InterpretRules = []viewmodel.InterpretRuleVM{
-				{
-					ScoreRange: viewmodel.ScoreRangeVM{
-						MinScore: factor.InterpretRule.ScoreRange.MinScore,
-						MaxScore: factor.InterpretRule.ScoreRange.MaxScore,
-					},
-					Content: factor.InterpretRule.Content,
+		// 处理解读规则（支持多个解读规则）
+		factorVM.InterpretRules = make([]viewmodel.InterpretRuleVM, len(factor.InterpretRules))
+		for i, rule := range factor.InterpretRules {
+			factorVM.InterpretRules[i] = viewmodel.InterpretRuleVM{
+				ScoreRange: viewmodel.ScoreRangeVM{
+					MinScore: rule.ScoreRange.MinScore,
+					MaxScore: rule.ScoreRange.MaxScore,
 				},
+				Content: rule.Content,
 			}
 		}
 

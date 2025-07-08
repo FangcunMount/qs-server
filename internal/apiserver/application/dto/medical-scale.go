@@ -15,8 +15,9 @@ type FactorDTO struct {
 	Code            string              `json:"code"`
 	Title           string              `json:"title"`
 	FactorType      string              `json:"factor_type"`
+	IsTotalScore    bool                `json:"is_total_score"`
 	CalculationRule *CalculationRuleDTO `json:"calculation_rule"`
-	InterpretRule   *InterpretRuleDTO   `json:"interpret_rule"`
+	InterpretRules  []InterpretRuleDTO  `json:"interpret_rules"`
 }
 
 // InterpretRuleDTO 解读规则数据传输对象

@@ -92,6 +92,26 @@ func (e *Editor) validateFactors(factors []dto.FactorDTO) error {
 		if f.FactorType == "" {
 			return errors.WithCode(errorCode.ErrMedicalScaleInvalidInput, "第 %d 个因子的类型不能为空", i+1)
 		}
+
+		// 验证解读规则的分数区间
+		if len(f.InterpretRules) > 0 {
+			// 收集所有分数区间
+			ranges := make([]interpretation.ScoreRange, len(f.InterpretRules))
+			for j, rule := range f.InterpretRules {
+				if rule.Content == "" {
+					return errors.WithCode(errorCode.ErrMedicalScaleInvalidInput, "第 %d 个因子的第 %d 个解读规则内容不能为空", i+1, j+1)
+				}
+				ranges[j] = interpretation.NewScoreRange(
+					rule.ScoreRange.MinScore,
+					rule.ScoreRange.MaxScore,
+				)
+			}
+
+			// 验证分数区间
+			if err := interpretation.ValidateRanges(ranges); err != nil {
+				return errors.WithCode(errorCode.ErrMedicalScaleInvalidInput, "第 %d 个因子的分数区间无效: %v", i+1, err)
+			}
+		}
 	}
 	return nil
 }
@@ -115,6 +135,9 @@ func (e *Editor) UpdateFactors(
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取医学量表失败")
 	}
+	if msBO == nil {
+		return nil, errors.WithCode(errorCode.ErrMedicalScaleNotFound, "医学量表不存在")
+	}
 
 	// 4. 转换 DTO 到领域对象
 	factors := make([]factor.Factor, 0, len(factorDTOs))
@@ -137,13 +160,28 @@ func (e *Editor) UpdateFactors(
 
 		// 创建解读能力
 		var interpretationAbility *ability.InterpretationAbility
-		if fDTO.InterpretRule != nil {
-			interpretRule := interpretation.NewInterpretRule(
-				interpretation.NewScoreRange(fDTO.InterpretRule.ScoreRange.MinScore, fDTO.InterpretRule.ScoreRange.MaxScore),
-				fDTO.InterpretRule.Content,
-			)
+		if len(fDTO.InterpretRules) > 0 {
+			// 创建解读规则列表
+			interpretRules := make([]interpretation.InterpretRule, len(fDTO.InterpretRules))
+			for i, rule := range fDTO.InterpretRules {
+				interpretRules[i] = interpretation.NewInterpretRule(
+					interpretation.NewScoreRange(rule.ScoreRange.MinScore, rule.ScoreRange.MaxScore),
+					rule.Content,
+				)
+			}
+
+			// 验证解读规则列表
+			ranges := make([]interpretation.ScoreRange, len(interpretRules))
+			for i, rule := range interpretRules {
+				ranges[i] = rule.GetScoreRange()
+			}
+			if err := interpretation.ValidateRanges(ranges); err != nil {
+				return nil, errors.WithCode(errorCode.ErrMedicalScaleInvalidInput, "因子 %s 的分数区间无效: %v", fDTO.Code, err)
+			}
+
+			// 设置解读规则
 			interpretationAbility = &ability.InterpretationAbility{}
-			interpretationAbility.SetInterpretationRule(&interpretRule)
+			interpretationAbility.SetInterpretationRules(interpretRules)
 		}
 
 		// 创建因子选项
@@ -154,20 +192,21 @@ func (e *Editor) UpdateFactors(
 		if interpretationAbility != nil {
 			opts = append(opts, factor.WithInterpretation(interpretationAbility))
 		}
+		opts = append(opts, factor.WithIsTotalScore(fDTO.IsTotalScore))
 
 		// 创建因子
-		f := factor.NewFactor(fDTO.Code, fDTO.Title, factor.FactorType(fDTO.FactorType), opts...)
+		f := factor.NewFactor(
+			fDTO.Code,
+			fDTO.Title,
+			factor.FactorType(fDTO.FactorType),
+			opts...,
+		)
+
 		factors = append(factors, f)
 	}
 
-	// 5. 更新因子
-	factorService := medicalScale.FactorService{}
-	// 5.1 清除现有因子
-	factorService.RemoveAllFactors(msBO)
-	// 5.2 按顺序添加新因子
-	for _, f := range factors {
-		factorService.AddFactor(msBO, f)
-	}
+	// 5. 更新医学量表的因子
+	msBO.SetFactors(factors)
 
 	// 6. 保存到数据库
 	if err := e.repo.Update(ctx, msBO); err != nil {

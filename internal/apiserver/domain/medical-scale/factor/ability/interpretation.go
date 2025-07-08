@@ -3,14 +3,15 @@ package ability
 import "github.com/yshujie/questionnaire-scale/internal/pkg/interpretation"
 
 type InterpretationAbility struct {
-	interpretationRule *interpretation.InterpretRule
+	interpretationRules []interpretation.InterpretRule
 }
 
-// GetInterpretationRule 获取解读规则
-func (i *InterpretationAbility) GetInterpretationRule() *interpretation.InterpretRule {
-	return i.interpretationRule
+// GetInterpretationRules 获取解读规则列表
+func (i *InterpretationAbility) GetInterpretationRules() []interpretation.InterpretRule {
+	return i.interpretationRules
 }
 
-func (i *InterpretationAbility) SetInterpretationRule(interpretationRule *interpretation.InterpretRule) {
-	i.interpretationRule = interpretationRule
+// SetInterpretationRules 设置解读规则列表
+func (i *InterpretationAbility) SetInterpretationRules(rules []interpretation.InterpretRule) {
+	i.interpretationRules = rules
 }

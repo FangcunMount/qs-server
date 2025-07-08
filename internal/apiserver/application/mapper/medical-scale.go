@@ -31,12 +31,23 @@ func (m *MedicalScaleMapper) ToDTO(bo *medicalScale.MedicalScale) *dto.MedicalSc
 func (m *MedicalScaleMapper) toFactorDTOs(factors []factor.Factor) []dto.FactorDTO {
 	dtos := make([]dto.FactorDTO, len(factors))
 	for i, factor := range factors {
+		var calculationRule *dto.CalculationRuleDTO
+		if factor.GetCalculationAbility() != nil {
+			calculationRule = m.toCalculationRuleDTO(factor.GetCalculationAbility().GetCalculationRule())
+		}
+
+		var interpretRules []dto.InterpretRuleDTO
+		if factor.GetInterpretationAbility() != nil {
+			interpretRules = m.toInterpretRuleDTOs(factor.GetInterpretationAbility().GetInterpretationRules())
+		}
+
 		dtos[i] = dto.FactorDTO{
 			Code:            factor.GetCode(),
 			Title:           factor.GetTitle(),
 			FactorType:      string(factor.GetFactorType()),
-			CalculationRule: m.toCalculationRuleDTO(factor.GetCalculationAbility().GetCalculationRule()),
-			InterpretRule:   m.toInterpretRuleDTO(factor.GetInterpretationAbility().GetInterpretationRule()),
+			IsTotalScore:    factor.IsTotalScore(),
+			CalculationRule: calculationRule,
+			InterpretRules:  interpretRules,
 		}
 	}
 	return dtos
@@ -44,19 +55,30 @@ func (m *MedicalScaleMapper) toFactorDTOs(factors []factor.Factor) []dto.FactorD
 
 // toCalculationRuleDTO 将计算规则领域对象转换为 DTO
 func (m *MedicalScaleMapper) toCalculationRuleDTO(rule *calculation.CalculationRule) *dto.CalculationRuleDTO {
+	if rule == nil {
+		return nil
+	}
 	return &dto.CalculationRuleDTO{
 		FormulaType: rule.GetFormula().String(),
 		SourceCodes: rule.GetSourceCodes(),
 	}
 }
 
-// toInterpretRuleDTO 将解读规则领域对象转换为 DTO
-func (m *MedicalScaleMapper) toInterpretRuleDTO(rule *interpretation.InterpretRule) *dto.InterpretRuleDTO {
-	return &dto.InterpretRuleDTO{
-		ScoreRange: dto.ScoreRangeDTO{
-			MinScore: rule.GetScoreRange().MinScore(),
-			MaxScore: rule.GetScoreRange().MaxScore(),
-		},
-		Content: rule.GetContent(),
+// toInterpretRuleDTOs 将解读规则领域对象转换为 DTO 数组
+func (m *MedicalScaleMapper) toInterpretRuleDTOs(rules []interpretation.InterpretRule) []dto.InterpretRuleDTO {
+	if len(rules) == 0 {
+		return nil
 	}
+
+	dtos := make([]dto.InterpretRuleDTO, len(rules))
+	for i, rule := range rules {
+		dtos[i] = dto.InterpretRuleDTO{
+			ScoreRange: dto.ScoreRangeDTO{
+				MinScore: rule.GetScoreRange().MinScore(),
+				MaxScore: rule.GetScoreRange().MaxScore(),
+			},
+			Content: rule.GetContent(),
+		}
+	}
+	return dtos
 }

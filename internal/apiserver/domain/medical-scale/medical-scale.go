@@ -106,3 +106,8 @@ func (s *MedicalScale) GetDescription() string {
 func (s *MedicalScale) GetFactors() []factor.Factor {
 	return s.factors
 }
+
+// SetFactors 设置因子列表
+func (s *MedicalScale) SetFactors(factors []factor.Factor) {
+	s.factors = factors
+}

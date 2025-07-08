@@ -77,8 +77,7 @@ func (r *Repository) FindByID(ctx context.Context, id v1.ID) (*medicalScale.Medi
 // FindByCode 根据代码查找医学量表
 func (r *Repository) FindByCode(ctx context.Context, code string) (*medicalScale.MedicalScale, error) {
 	filter := bson.M{
-		"code":       code,
-		"deleted_at": bson.M{"$exists": false},
+		"code": code,
 	}
 
 	var po MedicalScalePO
@@ -97,7 +96,6 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*medicalScale
 func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*medicalScale.MedicalScale, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
-		"deleted_at":         bson.M{"$exists": false},
 	}
 
 	cursor, err := r.Find(ctx, filter)
@@ -129,8 +127,7 @@ func (r *Repository) Update(ctx context.Context, scale *medicalScale.MedicalScal
 
 	// 根据代码查找文档
 	filter := bson.M{
-		"code":       scale.GetCode(),
-		"deleted_at": bson.M{"$exists": false},
+		"code": scale.GetCode(),
 	}
 
 	// 将领域模型转换为BSON M
@@ -167,8 +164,7 @@ func (r *Repository) Delete(ctx context.Context, id v1.ID) error {
 	}
 
 	filter := bson.M{
-		"_id":        objectID,
-		"deleted_at": bson.M{"$exists": false},
+		"_id": objectID,
 	}
 
 	now := time.Now()
@@ -195,8 +191,7 @@ func (r *Repository) Delete(ctx context.Context, id v1.ID) error {
 // ExistsByCode 检查代码是否已存在
 func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error) {
 	filter := bson.M{
-		"code":       code,
-		"deleted_at": bson.M{"$exists": false},
+		"code": code,
 	}
 
 	count, err := r.CountDocuments(ctx, filter)

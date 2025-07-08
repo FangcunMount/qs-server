@@ -17,12 +17,18 @@ type UpdateMedicalScaleRequest struct {
 
 // UpdateMedicalScaleFactorRequest 更新医学量表因子请求
 type UpdateMedicalScaleFactorRequest struct {
+	Code    string      `json:"code" binding:"required"`
+	Factors []FactorDTO `json:"factors" binding:"required,min=1"`
+}
+
+// FactorDTO 因子请求
+type FactorDTO struct {
 	Code            string                 `json:"code" binding:"required"`
 	Title           string                 `json:"title" binding:"required"`
 	IsTotalScore    bool                   `json:"is_total_score"`
 	FactorType      string                 `json:"factor_type" binding:"required"`
 	CalculationRule CalculationRuleRequest `json:"calculation_rule" binding:"required"`
-	InterpretRules  []InterpretRuleRequest `json:"interpret_rules" binding:"required,min=1"`
+	InterpretRules  []InterpretRuleRequest `json:"interpret_rules"`
 }
 
 // CalculationRuleRequest 计算规则请求
@@ -38,7 +44,10 @@ type InterpretRuleRequest struct {
 }
 
 // ScoreRangeRequest 分数范围请求
+// 分数区间采用左开右闭原则 (min, max]
+// 例如：区间 (0,6] 表示分数大于0且小于等于6
+// 相邻区间的边界允许相等，例如：(0,6],(6,9] 是合法的
 type ScoreRangeRequest struct {
 	MinScore float64 `json:"min_score" binding:"required"`
-	MaxScore float64 `json:"max_score" binding:"required,gtefield=MinScore"`
+	MaxScore float64 `json:"max_score" binding:"required"`
 }

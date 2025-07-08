@@ -6,9 +6,10 @@ import (
 
 // Factor 因子实体
 type Factor struct {
-	code       string
-	title      string
-	factorType FactorType
+	code         string
+	title        string
+	factorType   FactorType
+	isTotalScore bool
 
 	calculationAbility    *ability.CalculationAbility
 	interpretationAbility *ability.InterpretationAbility
@@ -50,6 +51,13 @@ func WithInterpretation(interpretationAbility *ability.InterpretationAbility) Fa
 	}
 }
 
+// WithIsTotalScore 设置是否为总分因子
+func WithIsTotalScore(isTotalScore bool) FactorOption {
+	return func(f *Factor) {
+		f.isTotalScore = isTotalScore
+	}
+}
+
 // GetCode 获取因子代码
 func (f Factor) GetCode() string {
 	return f.code
@@ -63,6 +71,11 @@ func (f Factor) GetTitle() string {
 // GetFactorType 获取因子类型
 func (f Factor) GetFactorType() FactorType {
 	return f.factorType
+}
+
+// IsTotalScore 是否为总分因子
+func (f Factor) IsTotalScore() bool {
+	return f.isTotalScore
 }
 
 // GetCalculationAbility 获取计算能力
