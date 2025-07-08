@@ -1,8 +1,6 @@
 package interpretationreport
 
 import (
-	"time"
-
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
@@ -16,8 +14,6 @@ type InterpretReport struct {
 	description      string
 	testee           user.Testee
 	interpretItems   []InterpretItem
-	createdAt        time.Time
-	updatedAt        time.Time
 }
 
 // InterpretReportOption 解读报告选项
@@ -29,8 +25,6 @@ func NewInterpretReport(answerSheetId uint64, medicalScaleCode string, title str
 		answerSheetId:    answerSheetId,
 		medicalScaleCode: medicalScaleCode,
 		title:            title,
-		createdAt:        time.Now(),
-		updatedAt:        time.Now(),
 	}
 
 	for _, opt := range opts {
@@ -65,20 +59,6 @@ func WithTestee(testee user.Testee) InterpretReportOption {
 func WithInterpretItems(items []InterpretItem) InterpretReportOption {
 	return func(r *InterpretReport) {
 		r.interpretItems = items
-	}
-}
-
-// WithCreatedAt 设置创建时间
-func WithCreatedAt(createdAt time.Time) InterpretReportOption {
-	return func(r *InterpretReport) {
-		r.createdAt = createdAt
-	}
-}
-
-// WithUpdatedAt 设置更新时间
-func WithUpdatedAt(updatedAt time.Time) InterpretReportOption {
-	return func(r *InterpretReport) {
-		r.updatedAt = updatedAt
 	}
 }
 
@@ -119,16 +99,6 @@ func (r *InterpretReport) GetInterpretItems() []InterpretItem {
 	return r.interpretItems
 }
 
-// GetCreatedAt 获取创建时间
-func (r *InterpretReport) GetCreatedAt() time.Time {
-	return r.createdAt
-}
-
-// GetUpdatedAt 获取更新时间
-func (r *InterpretReport) GetUpdatedAt() time.Time {
-	return r.updatedAt
-}
-
 // 业务方法
 
 // SetID 设置ID
@@ -139,19 +109,16 @@ func (r *InterpretReport) SetID(id v1.ID) {
 // UpdateTitle 更新标题
 func (r *InterpretReport) UpdateTitle(title string) {
 	r.title = title
-	r.updatedAt = time.Now()
 }
 
 // UpdateDescription 更新描述
 func (r *InterpretReport) UpdateDescription(description string) {
 	r.description = description
-	r.updatedAt = time.Now()
 }
 
 // AddInterpretItem 添加解读项
 func (r *InterpretReport) AddInterpretItem(item InterpretItem) {
 	r.interpretItems = append(r.interpretItems, item)
-	r.updatedAt = time.Now()
 }
 
 // RemoveInterpretItem 移除解读项
@@ -159,7 +126,6 @@ func (r *InterpretReport) RemoveInterpretItem(factorCode string) {
 	for i, item := range r.interpretItems {
 		if item.GetFactorCode() == factorCode {
 			r.interpretItems = append(r.interpretItems[:i], r.interpretItems[i+1:]...)
-			r.updatedAt = time.Now()
 			break
 		}
 	}
@@ -170,7 +136,6 @@ func (r *InterpretReport) UpdateInterpretItem(factorCode string, updatedItem Int
 	for i, item := range r.interpretItems {
 		if item.GetFactorCode() == factorCode {
 			r.interpretItems[i] = updatedItem
-			r.updatedAt = time.Now()
 			break
 		}
 	}
@@ -197,8 +162,8 @@ func (r *InterpretReport) IsEmpty() bool {
 }
 
 // GetTotalScore 获取总分（所有解读项分数之和）
-func (r *InterpretReport) GetTotalScore() int {
-	total := 0
+func (r *InterpretReport) GetTotalScore() float64 {
+	var total float64
 	for _, item := range r.interpretItems {
 		total += item.GetScore()
 	}
@@ -213,11 +178,9 @@ func (r *InterpretReport) HasFactorCode(factorCode string) bool {
 // ClearInterpretItems 清空所有解读项
 func (r *InterpretReport) ClearInterpretItems() {
 	r.interpretItems = []InterpretItem{}
-	r.updatedAt = time.Now()
 }
 
 // SetInterpretItems 设置解读项列表
 func (r *InterpretReport) SetInterpretItems(items []InterpretItem) {
 	r.interpretItems = items
-	r.updatedAt = time.Now()
 }

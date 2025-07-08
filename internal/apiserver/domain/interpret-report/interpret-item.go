@@ -1,29 +1,27 @@
 package interpretationreport
 
-import "time"
+import (
+	"math"
+)
 
 // InterpretItem 解读项
 type InterpretItem struct {
 	factorCode string
 	title      string
-	score      int
+	score      float64
 	content    string
-	createdAt  time.Time
-	updatedAt  time.Time
 }
 
 // InterpretItemOption 解读项选项
 type InterpretItemOption func(*InterpretItem)
 
 // NewInterpretItem 创建解读项
-func NewInterpretItem(factorCode, title string, score int, content string, opts ...InterpretItemOption) InterpretItem {
+func NewInterpretItem(factorCode, title string, score float64, content string, opts ...InterpretItemOption) InterpretItem {
 	item := InterpretItem{
 		factorCode: factorCode,
 		title:      title,
 		score:      score,
 		content:    content,
-		createdAt:  time.Now(),
-		updatedAt:  time.Now(),
 	}
 
 	for _, opt := range opts {
@@ -31,20 +29,6 @@ func NewInterpretItem(factorCode, title string, score int, content string, opts 
 	}
 
 	return item
-}
-
-// WithCreatedAt 设置创建时间
-func WithItemCreatedAt(createdAt time.Time) InterpretItemOption {
-	return func(i *InterpretItem) {
-		i.createdAt = createdAt
-	}
-}
-
-// WithUpdatedAt 设置更新时间
-func WithItemUpdatedAt(updatedAt time.Time) InterpretItemOption {
-	return func(i *InterpretItem) {
-		i.updatedAt = updatedAt
-	}
 }
 
 // Getter 方法
@@ -60,7 +44,7 @@ func (i *InterpretItem) GetTitle() string {
 }
 
 // GetScore 获取分数
-func (i *InterpretItem) GetScore() int {
+func (i *InterpretItem) GetScore() float64 {
 	return i.score
 }
 
@@ -69,39 +53,31 @@ func (i *InterpretItem) GetContent() string {
 	return i.content
 }
 
-// GetCreatedAt 获取创建时间
-func (i *InterpretItem) GetCreatedAt() time.Time {
-	return i.createdAt
-}
-
-// GetUpdatedAt 获取更新时间
-func (i *InterpretItem) GetUpdatedAt() time.Time {
-	return i.updatedAt
-}
-
 // 业务方法
+
+// SetID 设置ID
+func (i *InterpretItem) SetID(id string) {
+	i.factorCode = id
+}
 
 // UpdateTitle 更新标题
 func (i *InterpretItem) UpdateTitle(title string) {
 	i.title = title
-	i.updatedAt = time.Now()
 }
 
 // UpdateScore 更新分数
-func (i *InterpretItem) UpdateScore(score int) {
+func (i *InterpretItem) UpdateScore(score float64) {
 	i.score = score
-	i.updatedAt = time.Now()
 }
 
 // UpdateContent 更新内容
 func (i *InterpretItem) UpdateContent(content string) {
 	i.content = content
-	i.updatedAt = time.Now()
 }
 
 // IsValidScore 判断分数是否有效
 func (i *InterpretItem) IsValidScore() bool {
-	return i.score >= 0
+	return !math.IsNaN(i.score) && !math.IsInf(i.score, 0)
 }
 
 // HasContent 判断是否有内容
@@ -121,7 +97,5 @@ func (i *InterpretItem) Clone() InterpretItem {
 		title:      i.title,
 		score:      i.score,
 		content:    i.content,
-		createdAt:  i.createdAt,
-		updatedAt:  time.Now(),
 	}
 }

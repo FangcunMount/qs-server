@@ -28,8 +28,6 @@ func (m *InterpretReportMapper) ToDTO(report *interpretreport.InterpretReport) *
 		Title:            report.GetTitle(),
 		Description:      report.GetDescription(),
 		Testee:           &testee,
-		CreatedAt:        report.GetCreatedAt(),
-		UpdatedAt:        report.GetUpdatedAt(),
 	}
 
 	// 转换解读项
@@ -78,8 +76,6 @@ func (m *InterpretReportMapper) ToDomain(reportDTO *dto.InterpretReportDTO) *int
 		interpretreport.WithID(v1.NewID(reportDTO.ID)),
 		interpretreport.WithDescription(reportDTO.Description),
 		interpretreport.WithInterpretItems(items),
-		interpretreport.WithCreatedAt(reportDTO.CreatedAt),
-		interpretreport.WithUpdatedAt(reportDTO.UpdatedAt),
 	)
 
 	if reportDTO.Testee != nil {
@@ -91,8 +87,6 @@ func (m *InterpretReportMapper) ToDomain(reportDTO *dto.InterpretReportDTO) *int
 			interpretreport.WithDescription(reportDTO.Description),
 			interpretreport.WithTestee(*reportDTO.Testee),
 			interpretreport.WithInterpretItems(items),
-			interpretreport.WithCreatedAt(reportDTO.CreatedAt),
-			interpretreport.WithUpdatedAt(reportDTO.UpdatedAt),
 		)
 	}
 
@@ -106,8 +100,6 @@ func (m *InterpretReportMapper) InterpretItemToDTO(item interpretreport.Interpre
 		Title:      item.GetTitle(),
 		Score:      item.GetScore(),
 		Content:    item.GetContent(),
-		CreatedAt:  item.GetCreatedAt(),
-		UpdatedAt:  item.GetUpdatedAt(),
 	}
 }
 
@@ -118,8 +110,6 @@ func (m *InterpretReportMapper) InterpretItemToDomain(dto dto.InterpretItemDTO) 
 		dto.Title,
 		dto.Score,
 		dto.Content,
-		interpretreport.WithItemCreatedAt(dto.CreatedAt),
-		interpretreport.WithItemUpdatedAt(dto.UpdatedAt),
 	)
 }
 

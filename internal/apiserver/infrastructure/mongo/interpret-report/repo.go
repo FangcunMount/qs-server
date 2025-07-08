@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -45,22 +44,14 @@ func (r *Repository) Create(ctx context.Context, report *interpretreport.Interpr
 	// 设置创建时间等字段
 	po.BeforeInsert()
 
-	// 为解读项设置时间
-	for i := range po.InterpretItems {
-		po.InterpretItems[i].BeforeInsert()
-	}
-
 	// 插入数据库
-	result, err := r.InsertOne(ctx, po)
+	_, err = r.InsertOne(ctx, po)
 	if err != nil {
 		return fmt.Errorf("插入解读报告失败: %v", err)
 	}
 
 	// 更新领域对象的ID
-	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		id := base.ObjectIDToUint64(oid)
-		report.SetID(v1.NewID(id))
-	}
+	report.SetID(v1.NewID(po.DomainID))
 
 	return nil
 }
@@ -216,52 +207,36 @@ func (r *Repository) Update(ctx context.Context, report *interpretreport.Interpr
 	// 设置更新时间等字段
 	po.BeforeUpdate()
 
-	// 为解读项设置更新时间
-	for i := range po.InterpretItems {
-		po.InterpretItems[i].BeforeUpdate()
-	}
-
-	// 构建更新数据
-	updateData := bson.M{
-		"$set": bson.M{
-			"title":           po.Title,
-			"description":     po.Description,
-			"testee":          po.Testee,
-			"interpret_items": po.InterpretItems,
-			"updated_at":      po.UpdatedAt,
-		},
-	}
-
-	// 更新条件
+	// 构建更新条件
 	filter := bson.M{
-		"_id":        po.ID,
+		"domain_id":  report.GetID().Value(),
 		"deleted_at": bson.M{"$exists": false},
 	}
 
-	// 执行更新
-	result, err := r.UpdateOne(ctx, filter, updateData)
+	// 更新数据库
+	result, err := r.UpdateOne(ctx, filter, bson.M{"$set": po})
 	if err != nil {
 		return fmt.Errorf("更新解读报告失败: %v", err)
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("解读报告不存在或已被删除")
+		return fmt.Errorf("解读报告不存在")
 	}
 
 	return nil
 }
 
-// ExistsByAnswerSheetId 检查答卷ID对应的解读报告是否存在
+// ExistsByAnswerSheetId 检查指定答卷ID的解读报告是否存在
 func (r *Repository) ExistsByAnswerSheetId(ctx context.Context, answerSheetId uint64) (bool, error) {
 	filter := bson.M{
 		"answer_sheet_id": answerSheetId,
 		"deleted_at":      bson.M{"$exists": false},
 	}
 
-	exists, err := r.ExistsByFilter(ctx, filter)
+	count, err := r.CountDocuments(ctx, filter)
 	if err != nil {
 		return false, fmt.Errorf("检查解读报告是否存在失败: %v", err)
 	}
 
-	return exists, nil
+	return count > 0, nil
 }

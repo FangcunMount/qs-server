@@ -1,8 +1,6 @@
 package dto
 
 import (
-	"time"
-
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 )
 
@@ -15,18 +13,14 @@ type InterpretReportDTO struct {
 	Description      string             `json:"description"`
 	Testee           *user.Testee       `json:"testee,omitempty"`
 	InterpretItems   []InterpretItemDTO `json:"interpret_items"`
-	CreatedAt        time.Time          `json:"created_at"`
-	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
 // InterpretItemDTO 解读项DTO
 type InterpretItemDTO struct {
-	FactorCode string    `json:"factor_code"`
-	Title      string    `json:"title"`
-	Score      int       `json:"score"`
-	Content    string    `json:"content"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	FactorCode string  `json:"factor_code"`
+	Title      string  `json:"title"`
+	Score      float64 `json:"score"`
+	Content    string  `json:"content"`
 }
 
 // InterpretReportFilterDTO 解读报告过滤条件DTO
@@ -57,15 +51,15 @@ type InterpretReportUpdateDTO struct {
 
 // InterpretItemCreateDTO 创建解读项DTO
 type InterpretItemCreateDTO struct {
-	FactorCode string `json:"factor_code" binding:"required"`
-	Title      string `json:"title" binding:"required"`
-	Score      int    `json:"score" binding:"required"`
-	Content    string `json:"content" binding:"required"`
+	FactorCode string  `json:"factor_code" binding:"required"`
+	Title      string  `json:"title" binding:"required"`
+	Score      float64 `json:"score" binding:"required"`
+	Content    string  `json:"content" binding:"required"`
 }
 
 // InterpretItemUpdateDTO 更新解读项DTO
 type InterpretItemUpdateDTO struct {
-	Title   string `json:"title"`
-	Score   int    `json:"score"`
-	Content string `json:"content"`
+	Title   string  `json:"title"`
+	Score   float64 `json:"score"`
+	Content string  `json:"content"`
 }

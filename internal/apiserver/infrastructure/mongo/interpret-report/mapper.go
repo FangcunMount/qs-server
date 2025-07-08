@@ -1,8 +1,6 @@
 package interpretreport
 
 import (
-	"time"
-
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	interpretreport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report"
@@ -33,11 +31,9 @@ func (m *Mapper) ToEntity(po *InterpretReportPO) (*interpretreport.InterpretRepo
 
 	// 创建选项
 	var options []interpretreport.InterpretReportOption
-	options = append(options, interpretreport.WithID(v1.NewID(base.ObjectIDToUint64(po.ID))))
+	options = append(options, interpretreport.WithID(v1.NewID(po.DomainID)))
 	options = append(options, interpretreport.WithDescription(po.Description))
 	options = append(options, interpretreport.WithInterpretItems(items))
-	options = append(options, interpretreport.WithCreatedAt(po.CreatedAt))
-	options = append(options, interpretreport.WithUpdatedAt(po.UpdatedAt))
 
 	// 如果有被试者信息
 	if po.Testee != nil {
@@ -91,9 +87,8 @@ func (m *Mapper) ToPO(entity *interpretreport.InterpretReport) (*InterpretReport
 
 	po := &InterpretReportPO{
 		BaseDocument: base.BaseDocument{
-			ID:        objectID,
-			CreatedAt: entity.GetCreatedAt(),
-			UpdatedAt: entity.GetUpdatedAt(),
+			ID:       objectID,
+			DomainID: entity.GetID().Value(),
 		},
 		AnswerSheetId:    entity.GetAnswerSheetId(),
 		MedicalScaleCode: entity.GetMedicalScaleCode(),
@@ -113,31 +108,16 @@ func (m *Mapper) interpretItemPOToEntity(po InterpretItemPO) interpretreport.Int
 		po.Title,
 		po.Score,
 		po.Content,
-		interpretreport.WithItemCreatedAt(po.CreatedAt),
-		interpretreport.WithItemUpdatedAt(po.UpdatedAt),
 	)
 }
 
 // interpretItemEntityToPO 将解读项领域对象转换为持久化对象
 func (m *Mapper) interpretItemEntityToPO(entity interpretreport.InterpretItem) InterpretItemPO {
-	po := InterpretItemPO{
+	return InterpretItemPO{
 		FactorCode: entity.GetFactorCode(),
-		Title:      entity.GetTitle(),
 		Score:      entity.GetScore(),
 		Content:    entity.GetContent(),
-		CreatedAt:  entity.GetCreatedAt(),
-		UpdatedAt:  entity.GetUpdatedAt(),
 	}
-
-	// 如果时间为零值，设置当前时间
-	if po.CreatedAt.IsZero() {
-		po.CreatedAt = time.Now()
-	}
-	if po.UpdatedAt.IsZero() {
-		po.UpdatedAt = time.Now()
-	}
-
-	return po
 }
 
 // ToEntityList 将持久化对象列表转换为领域对象列表
