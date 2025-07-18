@@ -34,6 +34,13 @@ func NewServer(config *Config) (*Server, error) {
 	// 创建 GRPC 服务器选项
 	var serverOpts []grpc.ServerOption
 
+	// 添加拦截器链
+	serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(
+		RecoveryInterceptor(),  // 恢复拦截器，防止 panic
+		RequestIDInterceptor(), // 请求ID拦截器
+		LoggingInterceptor(),   // 日志拦截器
+	))
+
 	// 添加消息大小限制
 	if config.MaxMsgSize > 0 {
 		serverOpts = append(serverOpts,
