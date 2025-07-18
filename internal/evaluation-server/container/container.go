@@ -13,7 +13,7 @@ import (
 // Container 主容器，负责管理所有组件
 type Container struct {
 	// 基础设施层
-	Subscriber *pubsub.RedisSubscriber
+	Subscriber pubsub.Subscriber
 
 	// 应用层
 	MessageHandler message.Handler
@@ -21,14 +21,16 @@ type Container struct {
 	// 配置
 	grpcClientConfig   *options.GRPCClientOptions
 	messageQueueConfig *options.MessageQueueOptions
+	pubsubConfig       *pubsub.Config
 	initialized        bool
 }
 
 // NewContainer 创建新的容器
-func NewContainer(grpcClient *options.GRPCClientOptions, messageQueue *options.MessageQueueOptions) *Container {
+func NewContainer(grpcClient *options.GRPCClientOptions, messageQueue *options.MessageQueueOptions, pubsubConfig *pubsub.Config) *Container {
 	return &Container{
 		grpcClientConfig:   grpcClient,
 		messageQueueConfig: messageQueue,
+		pubsubConfig:       pubsubConfig,
 		initialized:        false,
 	}
 }
@@ -46,7 +48,7 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize application: %w", err)
 	}
 
-	// 2. 初始化基础设施层（Redis订阅者）
+	// 2. 初始化基础设施层（Watermill订阅者）
 	if err := c.initializeInfrastructure(); err != nil {
 		return fmt.Errorf("failed to initialize infrastructure: %w", err)
 	}
@@ -70,31 +72,21 @@ func (c *Container) initializeApplication() error {
 
 // initializeInfrastructure 初始化基础设施层
 func (c *Container) initializeInfrastructure() error {
-	log.Info("   📡 Initializing Redis subscriber...")
+	log.Info("   📡 Initializing Watermill subscriber...")
 
-	// 创建 Redis 订阅者
-	if c.messageQueueConfig.Type == "redis" {
-		redisConfig := c.messageQueueConfig.ToRedisConfig()
-		if redisConfig == nil {
-			return fmt.Errorf("failed to convert message queue config to redis config")
-		}
+	// 创建订阅者
+	subscriber, err := pubsub.NewSubscriber(c.pubsubConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create subscriber: %w", err)
+	}
+	c.Subscriber = subscriber
 
-		c.Subscriber = pubsub.NewRedisSubscriber(redisConfig)
-
-		// 连接 Redis
-		ctx := context.Background()
-		if err := c.Subscriber.Connect(ctx); err != nil {
-			return fmt.Errorf("failed to connect to Redis: %w", err)
-		}
-
-		// 注册消息处理器
-		c.Subscriber.RegisterHandler(c.messageQueueConfig.Topic, c.MessageHandler.GetMessageHandler())
-
-		log.Info("   ✅ Redis subscriber initialized")
-	} else {
-		log.Warnf("   ⚠️  Unsupported message queue type: %s", c.messageQueueConfig.Type)
+	// 订阅消息
+	if err := c.Subscriber.Subscribe(context.Background(), c.messageQueueConfig.Topic, c.MessageHandler.GetMessageHandler()); err != nil {
+		return fmt.Errorf("failed to subscribe to topic %s: %w", c.messageQueueConfig.Topic, err)
 	}
 
+	log.Info("   ✅ Subscriber initialized")
 	return nil
 }
 
@@ -110,8 +102,8 @@ func (c *Container) StartSubscription(ctx context.Context) error {
 
 	log.Infof("🚀 Starting message subscription for topic: %s", c.messageQueueConfig.Topic)
 
-	// 启动订阅（这是一个阻塞操作）
-	return c.Subscriber.Subscribe(ctx, c.messageQueueConfig.Topic, c.MessageHandler.GetMessageHandler())
+	// 启动订阅者（这是一个阻塞操作）
+	return c.Subscriber.Run(ctx)
 }
 
 // StartMessageSubscriber 启动消息队列订阅者（保持兼容性）
@@ -126,10 +118,10 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("container not initialized")
 	}
 
-	// 检查 Redis 连接
+	// 检查 Watermill 订阅者
 	if c.Subscriber != nil {
 		if err := c.Subscriber.HealthCheck(ctx); err != nil {
-			return fmt.Errorf("redis subscriber health check failed: %w", err)
+			return fmt.Errorf("watermill subscriber health check failed: %w", err)
 		}
 	}
 
@@ -140,10 +132,10 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 func (c *Container) Cleanup() error {
 	log.Info("🧹 Cleaning up container resources...")
 
-	// 关闭 Redis 订阅者
+	// 关闭 Watermill 订阅者
 	if c.Subscriber != nil {
 		if err := c.Subscriber.Close(); err != nil {
-			log.Errorf("Failed to close redis subscriber: %v", err)
+			log.Errorf("Failed to close watermill subscriber: %v", err)
 		}
 	}
 
@@ -160,8 +152,8 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"version":     "1.0.0",
 		"initialized": c.initialized,
 		"components": map[string]bool{
-			"redis_subscriber": c.Subscriber != nil,
-			"message_handler":  c.MessageHandler != nil,
+			"watermill_subscriber": c.Subscriber != nil,
+			"message_handler":      c.MessageHandler != nil,
 		},
 	}
 }

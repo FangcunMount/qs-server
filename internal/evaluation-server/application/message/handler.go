@@ -2,9 +2,9 @@ package message
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
@@ -19,26 +19,39 @@ type Handler interface {
 
 // handler 消息处理器实现
 type handler struct {
-	// 这里可以注入需要的服务，比如 gRPC 客户端
+	messageFactory *internalpubsub.MessageFactory
 }
 
-// NewHandler 创建新的消息处理器
+// NewHandler 创建消息处理器
 func NewHandler() Handler {
-	return &handler{}
+	return &handler{
+		messageFactory: internalpubsub.NewMessageFactory(),
+	}
 }
 
 // HandleAnswersheetSaved 处理答卷已保存消息
 func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) error {
 	log.Infof("Received answersheet saved message: %s", string(message))
 
-	// 解析消息
-	var savedMsg pubsub.ResponseSavedMessage
-	if err := json.Unmarshal(message, &savedMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal answersheet saved message: %w", err)
+	// 使用消息工厂解析消息
+	parsedMsg, err := h.messageFactory.ParseMessage(message)
+	if err != nil {
+		return fmt.Errorf("failed to parse message: %w", err)
+	}
+
+	// 检查消息类型
+	if parsedMsg.GetType() != internalpubsub.MessageTypeAnswersheetSaved {
+		return fmt.Errorf("unexpected message type: %s", parsedMsg.GetType())
+	}
+
+	// 提取答卷数据
+	answersheetData, err := internalpubsub.GetAnswersheetSavedData(parsedMsg)
+	if err != nil {
+		return fmt.Errorf("failed to extract answersheet data: %w", err)
 	}
 
 	log.Infof("Processing answersheet: ResponseID=%s, QuestionnaireID=%s, UserID=%s, SubmittedAt=%d",
-		savedMsg.ResponseID, savedMsg.QuestionnaireID, savedMsg.UserID, savedMsg.SubmittedAt)
+		answersheetData.ResponseID, answersheetData.QuestionnaireID, answersheetData.UserID, answersheetData.SubmittedAt)
 
 	// TODO: 实现具体的业务逻辑
 	// 1. 通过 gRPC 调用 apiserver 获取答卷详情
@@ -47,20 +60,21 @@ func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) er
 	// 4. 执行 evaluation 模块（报告生成）
 	// 5. 通过 gRPC 调用 apiserver 保存解读报告
 
-	log.Infof("Answersheet processing completed for ResponseID: %s", savedMsg.ResponseID)
+	log.Infof("Answersheet processing completed for ResponseID: %s", answersheetData.ResponseID)
 	return nil
 }
 
 // GetMessageHandler 获取消息处理器函数
 func (h *handler) GetMessageHandler() pubsub.MessageHandler {
-	return func(channel string, message []byte) error {
+	return func(topic string, data []byte) error {
 		ctx := context.Background()
 
-		switch channel {
+		// 根据主题分发消息
+		switch topic {
 		case "answersheet.saved":
-			return h.HandleAnswersheetSaved(ctx, message)
+			return h.HandleAnswersheetSaved(ctx, data)
 		default:
-			log.Warnf("Unknown message channel: %s", channel)
+			log.Warnf("Unknown topic: %s", topic)
 			return nil
 		}
 	}

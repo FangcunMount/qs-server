@@ -52,7 +52,8 @@ func createEvaluationServer(cfg *config.Config) (*evaluationServer, error) {
 // PrepareRun 准备运行 Evaluation 服务器
 func (s *evaluationServer) PrepareRun() preparedEvaluationServer {
 	// 创建容器
-	s.container = container.NewContainer(s.config.GRPCClient, s.config.MessageQueue)
+	pubsubConfig := s.config.MessageQueue.ToPubSubConfig()
+	s.container = container.NewContainer(s.config.GRPCClient, s.config.MessageQueue, pubsubConfig)
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {

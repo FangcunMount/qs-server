@@ -42,17 +42,15 @@ type MessageQueueOptions struct {
 	Password string `json:"password" mapstructure:"password"` // 密码
 }
 
-// ToRedisConfig 将消息队列配置转换为Redis配置
-func (m *MessageQueueOptions) ToRedisConfig() *pubsub.RedisConfig {
-	if m.Type != "redis" {
-		return nil
-	}
-
-	return &pubsub.RedisConfig{
-		Addr:     m.Endpoint,
-		Password: m.Password,
-		DB:       0, // 默认使用0号数据库
-	}
+// ToPubSubConfig 将消息队列配置转换为PubSub配置
+func (m *MessageQueueOptions) ToPubSubConfig() *pubsub.Config {
+	config := pubsub.DefaultConfig()
+	config.Addr = m.Endpoint
+	config.Password = m.Password
+	config.DB = 0 // 默认使用0号数据库
+	config.ConsumerGroup = m.Group
+	config.Consumer = "evaluation-server-consumer"
+	return config
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
