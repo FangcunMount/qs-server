@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package medical_scale;
+
+option go_package = "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scale";
+
+// MedicalScaleService 医学量表服务
+service MedicalScaleService {
+  
+    // GetMedicalScaleByCode 根据医学量表代码获取医学量表详情
+    rpc GetMedicalScaleByCode(GetMedicalScaleByCodeRequest) returns (GetMedicalScaleByCodeResponse);
+    
+    // GetMedicalScaleByQuestionnaireCode 根据问卷代码获取医学量表详情
+    rpc GetMedicalScaleByQuestionnaireCode(GetMedicalScaleByQuestionnaireCodeRequest) returns (GetMedicalScaleByQuestionnaireCodeResponse);
+}
+
+// 根据医学量表代码获取医学量表详情请求
+message GetMedicalScaleByCodeRequest {
+    string code = 1; // 医学量表代码
+}
+
+// 根据医学量表代码获取医学量表详情响应
+message GetMedicalScaleByCodeResponse {
+    MedicalScale medical_scale = 1; // 医学量表详情
+}
+
+// 根据问卷代码获取医学量表详情请求
+message GetMedicalScaleByQuestionnaireCodeRequest {
+    string questionnaire_code = 1; // 问卷代码
+}
+
+// 根据问卷代码获取医学量表详情响应
+message GetMedicalScaleByQuestionnaireCodeResponse {
+    MedicalScale medical_scale = 1; // 医学量表详情
+}
+
+// 解读报告
+message InterpretReport {
+    uint64 id = 1;                          // 解读报告ID
+    uint64 answer_sheet_id = 2;             // 答卷ID
+    string medical_scale_code = 3;          // 医学量表代码
+    string title = 4;                       // 标题
+    string description = 5;                 // 描述
+    repeated InterpretItem interpret_items = 6; // 解读项列表
+    string created_at = 7;                  // 创建时间
+    string updated_at = 8;                  // 更新时间
+}
+
+// 解读项
+message InterpretItem {
+    string factor_code = 1;  // 因子代码
+    string title = 2;        // 标题
+    double score = 3;        // 分数
+    string content = 4;      // 解读内容
+}
+
+// 医学量表
+message MedicalScale {
+    uint64 id = 1;                    // 医学量表ID
+    string code = 2;                  // 医学量表代码
+    string questionnaire_code = 3;    // 问卷代码
+    string title = 4;                 // 标题
+    string description = 5;           // 描述
+    repeated Factor factors = 6;      // 因子列表
+    string created_at = 7;           // 创建时间
+    string updated_at = 8;           // 更新时间
+}
+
+// 因子
+message Factor {
+    string code = 1;           // 因子代码
+    string title = 2;          // 因子标题
+    string factor_type = 3;    // 因子类型
+    bool is_total_score = 4;   // 是否为总分因子
+    CalculationRule calculation_rule = 5;    // 计算规则
+    repeated InterpretationRule interpretation_rules = 6; // 解读规则列表
+}
+
+// 计算规则
+message CalculationRule {
+    string formula_type = 1;       // 公式类型
+    repeated string source_codes = 2; // 源代码列表
+}
+
+// 解读规则
+message InterpretationRule {
+    ScoreRange score_range = 1;  // 分数范围
+    string content = 2;          // 解读内容
+}
+
+// 分数范围
+message ScoreRange {
+    double min_score = 1;  // 最小分数
+    double max_score = 2;  // 最大分数
+} 
