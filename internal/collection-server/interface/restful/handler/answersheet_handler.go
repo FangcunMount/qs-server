@@ -210,6 +210,8 @@ func (h *answersheetHandler) Get(c *gin.Context) {
 		return
 	}
 
+	log.L(c).Infof("GetAnswersheet: %d", id)
+
 	// 调用 GRPC 服务
 	resp, err := h.client.GetAnswersheet(c.Request.Context(), id)
 	if err != nil {
@@ -218,6 +220,15 @@ func (h *answersheetHandler) Get(c *gin.Context) {
 			"code":    500,
 			"message": "获取答卷详情失败",
 			"error":   err.Error(),
+		})
+		return
+	}
+
+	log.L(c).Infof("GetAnswersheet result: %v", resp.AnswerSheet)
+	if resp.AnswerSheet == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "答卷不存在",
 		})
 		return
 	}

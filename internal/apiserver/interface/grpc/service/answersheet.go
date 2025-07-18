@@ -63,15 +63,27 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 
 // GetAnswerSheet 获取答卷详情
 func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnswerSheetRequest) (*pb.GetAnswerSheetResponse, error) {
+	log.Infof("---- in grpc GetAnswerSheet: %d", req.Id)
+
 	// 调用领域服务
 	detail, err := s.queryer.GetAnswerSheetByID(ctx, req.Id)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// 检查答卷是否存在
+	if detail == nil {
+		return nil, status.Error(codes.NotFound, "答卷不存在")
+	}
+
 	// 转换响应
+	protoAnswerSheet := s.toProtoAnswerSheet(detail)
+	if protoAnswerSheet == nil {
+		return nil, status.Error(codes.Internal, "转换答卷数据失败")
+	}
+
 	return &pb.GetAnswerSheetResponse{
-		AnswerSheet: s.toProtoAnswerSheet(detail),
+		AnswerSheet: protoAnswerSheet,
 	}, nil
 }
 

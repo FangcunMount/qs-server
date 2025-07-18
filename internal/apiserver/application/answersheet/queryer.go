@@ -10,6 +10,7 @@ import (
 	qnPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // Queryer 答卷查询器
@@ -33,10 +34,16 @@ func NewQueryer(
 
 // GetAnswerSheetByID 根据ID获取答卷详情
 func (q *Queryer) GetAnswerSheetByID(ctx context.Context, id uint64) (*dto.AnswerSheetDetailDTO, error) {
+	log.Infof("---- in queryer GetAnswerSheetByID: %d", id)
 	// 1. 获取答卷领域对象
 	aDomain, err := q.aRepoMongo.FindByID(ctx, id)
 	if err != nil {
 		return nil, errors.WrapC(err, errCode.ErrAnswerSheetNotFound, "答卷不存在")
+	}
+
+	// 检查答卷是否存在
+	if aDomain == nil {
+		return nil, errors.WrapC(nil, errCode.ErrAnswerSheetNotFound, "答卷不存在")
 	}
 
 	// 2. 获取问卷信息
