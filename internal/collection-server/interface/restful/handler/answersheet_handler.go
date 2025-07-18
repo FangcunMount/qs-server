@@ -12,6 +12,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/validation"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
+	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
@@ -30,11 +31,11 @@ type AnswersheetHandler interface {
 type answersheetHandler struct {
 	client            grpc.AnswersheetClient
 	validationService validation.Service
-	publisher         *pubsub.RedisPublisher
+	publisher         pubsub.Publisher
 }
 
 // NewAnswersheetHandler 创建新的答卷处理器
-func NewAnswersheetHandler(client grpc.AnswersheetClient, validationService validation.Service, publisher *pubsub.RedisPublisher) AnswersheetHandler {
+func NewAnswersheetHandler(client grpc.AnswersheetClient, validationService validation.Service, publisher pubsub.Publisher) AnswersheetHandler {
 	return &answersheetHandler{
 		client:            client,
 		validationService: validationService,
@@ -156,18 +157,25 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 
 	// 发布答卷已保存消息
 	if h.publisher != nil {
-		message := &pubsub.ResponseSavedMessage{
+		// 创建答卷已保存数据
+		answersheetData := &internalpubsub.AnswersheetSavedData{
 			ResponseID:      strconv.FormatUint(resp.Id, 10),
 			QuestionnaireID: req.QuestionnaireCode,
 			UserID:          strconv.FormatUint(req.TesteeID, 10),
 			SubmittedAt:     time.Now().Unix(),
 		}
 
+		// 创建答卷已保存消息
+		message := internalpubsub.NewAnswersheetSavedMessage(
+			internalpubsub.SourceCollectionServer,
+			answersheetData,
+		)
+
 		if err := h.publisher.Publish(c.Request.Context(), "answersheet.saved", message); err != nil {
 			log.L(c).Errorf("Failed to publish answersheet saved message: %v", err)
 			// 不影响主流程，只记录错误
 		} else {
-			log.L(c).Infof("Published answersheet saved message for response ID: %s", message.ResponseID)
+			log.L(c).Infof("Published answersheet saved message for response ID: %s", answersheetData.ResponseID)
 		}
 	}
 

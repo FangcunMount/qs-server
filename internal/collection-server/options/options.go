@@ -68,14 +68,16 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 		"Whether to use insecure gRPC connection.")
 }
 
-// ToRedisConfig 将RedisOptions转换为pubsub.RedisConfig
-func (o *Options) ToRedisConfig() *pubsub.RedisConfig {
+// ToPubSubConfig 将RedisOptions转换为pubsub.Config
+func (o *Options) ToPubSubConfig() *pubsub.Config {
 	addr := fmt.Sprintf("%s:%d", o.Redis.Host, o.Redis.Port)
-	return &pubsub.RedisConfig{
-		Addr:     addr,
-		Password: o.Redis.Password,
-		DB:       o.Redis.Database,
-	}
+	config := pubsub.DefaultConfig()
+	config.Addr = addr
+	config.Password = o.Redis.Password
+	config.DB = o.Redis.Database
+	config.ConsumerGroup = "collection-server-group"
+	config.Consumer = "collection-server-consumer"
+	return config
 }
 
 // Complete 完成配置选项

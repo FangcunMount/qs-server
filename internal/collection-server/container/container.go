@@ -17,7 +17,7 @@ type Container struct {
 	// 基础设施层
 	QuestionnaireClient grpc.QuestionnaireClient
 	AnswersheetClient   grpc.AnswersheetClient
-	Publisher           *pubsub.RedisPublisher
+	Publisher           pubsub.Publisher
 
 	// 应用层
 	ValidationService validation.Service
@@ -28,15 +28,15 @@ type Container struct {
 
 	// 配置
 	grpcClientConfig *options.GRPCClientOptions
-	redisConfig      *pubsub.RedisConfig
+	pubsubConfig     *pubsub.Config
 	initialized      bool
 }
 
 // NewContainer 创建新的容器
-func NewContainer(grpcClientConfig *options.GRPCClientOptions, redisConfig *pubsub.RedisConfig) *Container {
+func NewContainer(grpcClientConfig *options.GRPCClientOptions, pubsubConfig *pubsub.Config) *Container {
 	return &Container{
 		grpcClientConfig: grpcClientConfig,
-		redisConfig:      redisConfig,
+		pubsubConfig:     pubsubConfig,
 		initialized:      false,
 	}
 }
@@ -49,7 +49,7 @@ func (c *Container) Initialize() error {
 
 	log.Info("🔧 Initializing Collection Server Container...")
 
-	// 1. 初始化基础设施层（GRPC 客户端和Redis发布者）
+	// 1. 初始化基础设施层（GRPC 客户端和Watermill发布者）
 	if err := c.initializeInfrastructure(); err != nil {
 		return fmt.Errorf("failed to initialize infrastructure: %w", err)
 	}
@@ -89,17 +89,15 @@ func (c *Container) initializeInfrastructure() error {
 
 	log.Info("   ✅ GRPC clients initialized")
 
-	// 创建 Redis 发布者
-	log.Info("   📡 Initializing Redis publisher...")
-	c.Publisher = pubsub.NewRedisPublisher(c.redisConfig)
-
-	// 连接 Redis
-	ctx := context.Background()
-	if err := c.Publisher.Connect(ctx); err != nil {
-		return fmt.Errorf("failed to connect to Redis: %w", err)
+	// 创建发布者
+	log.Info("   📡 Initializing publisher...")
+	publisher, err := pubsub.NewPublisher(c.pubsubConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
 	}
+	c.Publisher = publisher
 
-	log.Info("   ✅ Redis publisher initialized")
+	log.Info("   ✅ Publisher initialized")
 	return nil
 }
 
@@ -149,13 +147,8 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("answersheet client health check failed: %w", err)
 	}
 
-	// 检查 Redis 连接
-	if c.Publisher != nil {
-		err := c.Publisher.Connect(ctx)
-		if err != nil {
-			return fmt.Errorf("redis publisher health check failed: %w", err)
-		}
-	}
+	// Watermill 发布者不需要额外的健康检查
+	log.Info("   ✅ All components healthy")
 
 	return nil
 }
@@ -177,10 +170,10 @@ func (c *Container) Cleanup() error {
 		}
 	}
 
-	// 关闭 Redis 发布者
+	// 关闭 Watermill 发布者
 	if c.Publisher != nil {
 		if err := c.Publisher.Close(); err != nil {
-			log.Errorf("Failed to close redis publisher: %v", err)
+			log.Errorf("Failed to close watermill publisher: %v", err)
 		}
 	}
 
@@ -199,7 +192,7 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"components": map[string]bool{
 			"questionnaire_client":  c.QuestionnaireClient != nil,
 			"answersheet_client":    c.AnswersheetClient != nil,
-			"redis_publisher":       c.Publisher != nil,
+			"watermill_publisher":   c.Publisher != nil,
 			"validation_service":    c.ValidationService != nil,
 			"questionnaire_handler": c.QuestionnaireHandler != nil,
 			"answersheet_handler":   c.AnswersheetHandler != nil,
@@ -212,7 +205,7 @@ func (c *Container) IsInitialized() bool {
 	return c.initialized
 }
 
-// GetPublisher 获取Redis发布者
-func (c *Container) GetPublisher() *pubsub.RedisPublisher {
+// GetPublisher 获取发布者
+func (c *Container) GetPublisher() pubsub.Publisher {
 	return c.Publisher
 }
