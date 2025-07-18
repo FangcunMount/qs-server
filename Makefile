@@ -324,6 +324,21 @@ dev: ## 启动开发环境（热更新）
 	@echo "提示：使用 Ctrl+C 停止所有服务"
 	@echo "      或使用 make dev-stop 停止服务"
 
+dev-apiserver: ## 独立启动 API 服务器（热更新）
+	@echo "🚀 启动 apiserver 开发环境..."
+	@mkdir -p tmp
+	@air -c .air-apiserver.toml
+
+dev-collection: ## 独立启动收集服务器（热更新）
+	@echo "🚀 启动 collection-server 开发环境..."
+	@mkdir -p tmp
+	@air -c .air-collection.toml
+
+dev-evaluation: ## 独立启动评估服务器（热更新）
+	@echo "🚀 启动 evaluation-server 开发环境..."
+	@mkdir -p tmp
+	@air -c .air-evaluation.toml
+
 dev-stop: ## 停止开发环境
 	@echo "⏹️  停止开发环境..."
 	@if [ -f tmp/pids/air-evaluation.pid ]; then \
