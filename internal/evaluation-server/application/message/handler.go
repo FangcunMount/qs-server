@@ -50,9 +50,9 @@ func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) er
 		return fmt.Errorf("failed to extract answersheet data: %w", err)
 	}
 
-	log.Infof("Processing answersheet: ResponseID=%s, QuestionnaireID=%s, UserID=%s, SubmittedAt=%d",
-		answersheetData.ResponseID, answersheetData.QuestionnaireID, answersheetData.UserID, answersheetData.SubmittedAt)
-
+	log.Infof("Processing answersheet: ResponseID=%s, AnswerSheetID=%d, WriterID=%d, SubmittedAt=%d",
+		answersheetData.ResponseID, answersheetData.AnswerSheetID, answersheetData.WriterID, answersheetData.SubmittedAt)
+	log.Infof("answersheetData: %+v", answersheetData)
 	// TODO: 实现具体的业务逻辑
 	// 1. 通过 gRPC 调用 apiserver 获取答卷详情
 	// 2. 通过 gRPC 调用 apiserver 获取问卷和量表信息

@@ -23,10 +23,10 @@ const (
 
 // AnswersheetSavedData 答卷已保存数据
 type AnswersheetSavedData struct {
-	ResponseID      string `json:"response_id"`
-	QuestionnaireID string `json:"questionnaire_id"`
-	UserID          string `json:"user_id"`
-	SubmittedAt     int64  `json:"submitted_at"`
+	ResponseID    string `json:"response_id"`
+	AnswerSheetID uint64 `json:"answer_sheet_id"`
+	WriterID      uint64 `json:"writer_id"`
+	SubmittedAt   int64  `json:"submitted_at"`
 }
 
 // AnswersheetSavedMessage 答卷已保存消息
@@ -175,14 +175,14 @@ func GetAnswersheetSavedData(msg pubsub.Message) (*AnswersheetSavedData, error) 
 	}
 
 	responseID, _ := data["response_id"].(string)
-	questionnaireID, _ := data["questionnaire_id"].(string)
-	userID, _ := data["user_id"].(string)
+	answerSheetID, _ := data["answer_sheet_id"].(uint64)
+	writerID, _ := data["writer_id"].(uint64)
 	submittedAt, _ := data["submitted_at"].(float64)
 
 	return &AnswersheetSavedData{
-		ResponseID:      responseID,
-		QuestionnaireID: questionnaireID,
-		UserID:          userID,
-		SubmittedAt:     int64(submittedAt),
+		ResponseID:    responseID,
+		AnswerSheetID: answerSheetID,
+		WriterID:      writerID,
+		SubmittedAt:   int64(submittedAt),
 	}, nil
 }

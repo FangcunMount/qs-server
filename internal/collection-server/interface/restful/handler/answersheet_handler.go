@@ -159,10 +159,10 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 	if h.publisher != nil {
 		// 创建答卷已保存数据
 		answersheetData := &internalpubsub.AnswersheetSavedData{
-			ResponseID:      strconv.FormatUint(resp.Id, 10),
-			QuestionnaireID: req.QuestionnaireCode,
-			UserID:          strconv.FormatUint(req.TesteeID, 10),
-			SubmittedAt:     time.Now().Unix(),
+			ResponseID:    strconv.FormatUint(resp.Id, 10),
+			AnswerSheetID: resp.Id,
+			WriterID:      req.WriterID,
+			SubmittedAt:   time.Now().Unix(),
 		}
 
 		// 创建答卷已保存消息
