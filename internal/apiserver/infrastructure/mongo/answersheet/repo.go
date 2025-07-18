@@ -58,9 +58,6 @@ func (r *Repository) Create(ctx context.Context, aDomain *answersheet.AnswerShee
 func (r *Repository) FindByID(ctx context.Context, id uint64) (*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"domain_id": id,
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	var po AnswerSheetPO
@@ -79,9 +76,6 @@ func (r *Repository) FindByID(ctx context.Context, id uint64) (*answersheet.Answ
 func (r *Repository) FindListByWriter(ctx context.Context, writerID uint64, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"writer.id": writerID,
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	// 设置分页选项
@@ -118,9 +112,6 @@ func (r *Repository) FindListByWriter(ctx context.Context, writerID uint64, page
 func (r *Repository) FindListByTestee(ctx context.Context, testeeID uint64, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"testee.id": testeeID,
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	// 设置分页选项
@@ -169,9 +160,6 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	// 设置分页选项
@@ -209,9 +197,6 @@ func (r *Repository) FindByQuestionnaireCodeAndVersion(ctx context.Context, ques
 	filter := bson.M{
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": version,
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	// 设置分页选项
@@ -266,9 +251,6 @@ func (r *Repository) Update(ctx context.Context, aDomain *answersheet.AnswerShee
 
 	filter := bson.M{
 		"domain_id": aDomain.GetID(),
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	result, err := r.Collection().UpdateOne(ctx, filter, update)
@@ -296,9 +278,6 @@ func (r *Repository) Remove(ctx context.Context, id uint64) error {
 
 	filter := bson.M{
 		"domain_id": id,
-		"deleted_at": bson.M{
-			"$exists": false,
-		},
 	}
 
 	result, err := r.Collection().UpdateOne(ctx, filter, update)
@@ -334,8 +313,7 @@ func (r *Repository) HardDelete(ctx context.Context, id uint64) error {
 // ExistsByID 检查ID是否存在
 func (r *Repository) ExistsByID(ctx context.Context, id uint64) (bool, error) {
 	filter := bson.M{
-		"domain_id":  id,
-		"deleted_at": bson.M{"$exists": false},
+		"domain_id": id,
 	}
 
 	return r.ExistsByFilter(ctx, filter)
