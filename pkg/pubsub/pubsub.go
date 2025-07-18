@@ -2,119 +2,106 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-
-	redis "github.com/go-redis/redis/v7"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
-// PubSub 发布订阅接口
-type PubSub interface {
-	// 发布消息
-	Publish(ctx context.Context, channel string, message interface{}) error
-
-	// 订阅消息（阻塞式）
-	Subscribe(ctx context.Context, channel string, handler MessageHandler) error
-
-	// 批量订阅多个频道
-	SubscribeMultiple(ctx context.Context, channels []string, handler MessageHandler) error
-
-	// 关闭连接
+// Publisher 发布者接口
+type Publisher interface {
+	// Publish 发布消息到指定主题
+	Publish(ctx context.Context, topic string, message interface{}) error
+	// Close 关闭发布者
 	Close() error
 }
 
+// Subscriber 订阅者接口
+type Subscriber interface {
+	// Subscribe 订阅主题
+	Subscribe(ctx context.Context, topic string, handler MessageHandler) error
+	// SubscribeWithRetry 带重试机制的订阅
+	SubscribeWithRetry(ctx context.Context, topic string, handler MessageHandler) error
+	// Run 启动订阅者（阻塞运行）
+	Run(ctx context.Context) error
+	// Close 关闭订阅者
+	Close() error
+	// HealthCheck 健康检查
+	HealthCheck(ctx context.Context) error
+}
+
 // MessageHandler 消息处理函数类型
-type MessageHandler func(channel string, message []byte) error
+type MessageHandler func(topic string, data []byte) error
 
-// Message 标准消息结构
-type Message struct {
-	Type      string      `json:"type"`      // 消息类型
-	Source    string      `json:"source"`    // 来源服务
-	Data      interface{} `json:"data"`      // 消息数据
-	Timestamp int64       `json:"timestamp"` // 时间戳
+// PubSub 发布订阅组合接口
+type PubSub interface {
+	Publisher() Publisher
+	Subscriber() Subscriber
+	Close() error
 }
 
-// ResponseSavedMessage 答卷已保存消息
-type ResponseSavedMessage struct {
-	ResponseID      string `json:"response_id"`
-	QuestionnaireID string `json:"questionnaire_id"`
-	UserID          string `json:"user_id"`
-	SubmittedAt     int64  `json:"submitted_at"`
+// NewPublisher 创建发布者
+func NewPublisher(config *Config) (Publisher, error) {
+	return newWatermillPublisher(config)
 }
 
-// redisPubSub Redis 发布订阅实现
-type redisPubSub struct {
-	client redis.UniversalClient
+// NewSubscriber 创建订阅者
+func NewSubscriber(config *Config) (Subscriber, error) {
+	return newWatermillSubscriber(config)
 }
 
-// NewRedisPubSub 创建 Redis 发布订阅实例
-func NewRedisPubSub(client redis.UniversalClient) PubSub {
-	return &redisPubSub{
-		client: client,
-	}
+// NewPubSub 创建发布订阅实例
+func NewPubSub(config *Config) (PubSub, error) {
+	return newWatermillPubSub(config)
 }
 
-// Publish 发布消息
-func (r *redisPubSub) Publish(ctx context.Context, channel string, message interface{}) error {
-	// 将消息序列化为 JSON
-	data, err := json.Marshal(message)
+// watermillPubSub 组合发布者和订阅者
+type watermillPubSub struct {
+	publisher  Publisher
+	subscriber Subscriber
+}
+
+// newWatermillPubSub 创建发布订阅实例
+func newWatermillPubSub(config *Config) (*watermillPubSub, error) {
+	publisher, err := newWatermillPublisher(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message: %w", err)
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	// 发布到 Redis
-	result := r.client.Publish(channel, data)
-	if err := result.Err(); err != nil {
-		return fmt.Errorf("failed to publish message to channel %s: %w", channel, err)
+	subscriber, err := newWatermillSubscriber(config)
+	if err != nil {
+		publisher.Close()
+		return nil, fmt.Errorf("failed to create subscriber: %w", err)
 	}
 
-	log.Infof("Published message to channel %s, subscribers: %d", channel, result.Val())
-	return nil
+	return &watermillPubSub{
+		publisher:  publisher,
+		subscriber: subscriber,
+	}, nil
 }
 
-// Subscribe 订阅单个频道
-func (r *redisPubSub) Subscribe(ctx context.Context, channel string, handler MessageHandler) error {
-	return r.SubscribeMultiple(ctx, []string{channel}, handler)
+// Publisher 返回发布者
+func (ps *watermillPubSub) Publisher() Publisher {
+	return ps.publisher
 }
 
-// SubscribeMultiple 订阅多个频道
-func (r *redisPubSub) SubscribeMultiple(ctx context.Context, channels []string, handler MessageHandler) error {
-	// 创建订阅
-	pubsub := r.client.Subscribe(channels...)
-	defer pubsub.Close()
-
-	log.Infof("Subscribed to channels: %v", channels)
-
-	// 获取消息通道
-	msgChan := pubsub.Channel()
-
-	// 处理消息
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info("Subscription context cancelled")
-			return ctx.Err()
-
-		case msg := <-msgChan:
-			if msg == nil {
-				log.Warn("Received nil message, continuing...")
-				continue
-			}
-
-			// 处理消息
-			if err := handler(msg.Channel, []byte(msg.Payload)); err != nil {
-				log.Errorf("Error handling message from channel %s: %v", msg.Channel, err)
-				// 继续处理其他消息，不中断订阅
-			}
-		}
-	}
+// Subscriber 返回订阅者
+func (ps *watermillPubSub) Subscriber() Subscriber {
+	return ps.subscriber
 }
 
-// Close 关闭连接
-func (r *redisPubSub) Close() error {
-	if r.client != nil {
-		return r.client.Close()
+// Close 关闭发布订阅实例
+func (ps *watermillPubSub) Close() error {
+	var errs []error
+
+	if err := ps.publisher.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("failed to close publisher: %w", err))
 	}
+
+	if err := ps.subscriber.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("failed to close subscriber: %w", err))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors closing pubsub: %v", errs)
+	}
+
 	return nil
 }
