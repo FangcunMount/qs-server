@@ -37,5 +37,16 @@ func (a *Answer) GetScore() uint16 {
 }
 
 func (a *Answer) GetValue() AnswerValue {
+	// 如果 value 为 nil，返回一个简单的默认实现
+	if a.value == nil {
+		return &defaultAnswerValue{}
+	}
 	return a.value
+}
+
+// defaultAnswerValue 默认答案值实现
+type defaultAnswerValue struct{}
+
+func (d *defaultAnswerValue) Raw() any {
+	return ""
 }

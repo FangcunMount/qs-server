@@ -1,12 +1,15 @@
 package answersheet
 
 import (
+	"fmt"
+
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer"
 	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer/answer-values"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
@@ -118,6 +121,14 @@ func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) answer.Answer {
 	// 使用工厂函数创建 AnswerValue
 	questionType := question.QuestionType(answerPO.QuestionType)
 	answerValue := answer_values.NewAnswerValue(questionType, answerPO.Value.Value)
+
+	// 如果 AnswerValue 创建失败，记录警告并返回一个默认的答案
+	if answerValue == nil {
+		log.Warnf("Failed to create AnswerValue for question %s with type %s and value %v",
+			answerPO.QuestionCode, answerPO.QuestionType, answerPO.Value.Value)
+		// 返回一个默认的字符串答案，避免 nil pointer dereference
+		answerValue = answer_values.StringValue{V: fmt.Sprintf("%v", answerPO.Value.Value)}
+	}
 
 	return answer.NewAnswer(
 		answerPO.QuestionCode,

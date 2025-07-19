@@ -8,6 +8,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
 	qnPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
@@ -35,21 +36,36 @@ func NewQueryer(
 // GetAnswerSheetByID 根据ID获取答卷详情
 func (q *Queryer) GetAnswerSheetByID(ctx context.Context, id uint64) (*dto.AnswerSheetDetailDTO, error) {
 	log.Infof("---- in queryer GetAnswerSheetByID: %d", id)
+
+	// 检查参数
+	if id == 0 {
+		return nil, errors.WrapC(nil, errCode.ErrAnswerSheetNotFound, "答卷ID不能为空")
+	}
+
 	// 1. 获取答卷领域对象
 	aDomain, err := q.aRepoMongo.FindByID(ctx, id)
 	if err != nil {
+		log.Errorf("Failed to find answersheet by ID %d: %v", id, err)
 		return nil, errors.WrapC(err, errCode.ErrAnswerSheetNotFound, "答卷不存在")
 	}
 
 	// 检查答卷是否存在
 	if aDomain == nil {
+		log.Warnf("Answersheet with ID %d not found", id)
 		return nil, errors.WrapC(nil, errCode.ErrAnswerSheetNotFound, "答卷不存在")
 	}
 
 	// 2. 获取问卷信息
 	qDomain, err := q.qRepoMongo.FindByCode(ctx, aDomain.GetQuestionnaireCode())
 	if err != nil {
+		log.Errorf("Failed to find questionnaire by code %s: %v", aDomain.GetQuestionnaireCode(), err)
 		return nil, errors.WrapC(err, errCode.ErrQuestionnaireNotFound, "问卷不存在")
+	}
+
+	// 检查问卷是否存在
+	if qDomain == nil {
+		log.Warnf("Questionnaire with code %s not found", aDomain.GetQuestionnaireCode())
+		return nil, errors.WrapC(nil, errCode.ErrQuestionnaireNotFound, "问卷不存在")
 	}
 
 	// 3. 转换为 DTO
@@ -59,16 +75,16 @@ func (q *Queryer) GetAnswerSheetByID(ctx context.Context, id uint64) (*dto.Answe
 		QuestionnaireVersion: aDomain.GetQuestionnaireVersion(),
 		Title:                aDomain.GetTitle(),
 		Score:                aDomain.GetScore(),
-		WriterID:             aDomain.GetWriter().GetUserID().Value(),
-		TesteeID:             aDomain.GetTestee().GetUserID().Value(),
+		WriterID:             getWriterID(aDomain.GetWriter()),
+		TesteeID:             getTesteeID(aDomain.GetTestee()),
 		Answers:              q.mapper.ToDTOs(aDomain.GetAnswers()),
 	}
 
 	// 4. 构建详情 DTO
 	return &dto.AnswerSheetDetailDTO{
 		AnswerSheet: *answerSheetDTO,
-		WriterName:  aDomain.GetWriter().GetName(),
-		TesteeName:  aDomain.GetTestee().GetName(),
+		WriterName:  getWriterName(aDomain.GetWriter()),
+		TesteeName:  getTesteeName(aDomain.GetTestee()),
 		Questionnaire: dto.QuestionnaireDTO{
 			Code:        qDomain.GetCode().Value(),
 			Version:     qDomain.GetVersion().Value(),
@@ -148,4 +164,36 @@ func (q *Queryer) convertDomainsToAnswerSheetDTOs(domains []*answersheet.AnswerS
 		}
 	}
 	return dtos
+}
+
+// getWriterID 安全地获取答卷者ID
+func getWriterID(writer *user.Writer) uint64 {
+	if writer == nil {
+		return 0
+	}
+	return writer.GetUserID().Value()
+}
+
+// getTesteeID 安全地获取被试者ID
+func getTesteeID(testee *user.Testee) uint64 {
+	if testee == nil {
+		return 0
+	}
+	return testee.GetUserID().Value()
+}
+
+// getWriterName 安全地获取答卷者姓名
+func getWriterName(writer *user.Writer) string {
+	if writer == nil {
+		return ""
+	}
+	return writer.GetName()
+}
+
+// getTesteeName 安全地获取被试者姓名
+func getTesteeName(testee *user.Testee) string {
+	if testee == nil {
+		return ""
+	}
+	return testee.GetName()
 }

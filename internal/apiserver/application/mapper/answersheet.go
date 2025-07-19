@@ -31,9 +31,19 @@ func (m *AnswerMapper) ToDTO(bo *answer.Answer) *dto.AnswerDTO {
 
 // ToDTOs 将领域对象列表转换为 DTO 列表
 func (m *AnswerMapper) ToDTOs(bos []answer.Answer) []dto.AnswerDTO {
+	if bos == nil {
+		return []dto.AnswerDTO{} // 返回空切片而不是 nil
+	}
+
 	dtos := make([]dto.AnswerDTO, len(bos))
 	for i, bo := range bos {
-		dtos[i] = *m.ToDTO(&bo)
+		// 直接使用值类型，不需要取地址
+		dtos[i] = dto.AnswerDTO{
+			QuestionCode: bo.GetQuestionCode(),
+			QuestionType: bo.GetQuestionType(),
+			Score:        bo.GetScore(),
+			Value:        bo.GetValue().Raw(),
+		}
 	}
 	return dtos
 }

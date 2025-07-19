@@ -7,6 +7,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
@@ -123,10 +124,18 @@ func (a *AnswerSheet) GetScore() uint16 {
 }
 
 func (a *AnswerSheet) GetWriter() *user.Writer {
+	if a.writer == nil {
+		log.Warnf("Writer is nil for answersheet")
+		return nil
+	}
 	return a.writer
 }
 
 func (a *AnswerSheet) GetTestee() *user.Testee {
+	if a.testee == nil {
+		log.Warnf("Testee is nil for answersheet")
+		return nil
+	}
 	return a.testee
 }
 
@@ -139,6 +148,9 @@ func (a *AnswerSheet) GetUpdatedAt() time.Time {
 }
 
 func (a *AnswerSheet) GetAnswers() []answer.Answer {
+	if a.answers == nil {
+		return []answer.Answer{} // 返回空切片而不是 nil
+	}
 	return a.answers
 }
 

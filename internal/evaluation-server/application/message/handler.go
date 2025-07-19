@@ -20,15 +20,23 @@ type Handler interface {
 
 // handler 消息处理器实现
 type handler struct {
-	messageFactory    *internalpubsub.MessageFactory
-	answersheetClient *grpcclient.AnswerSheetClient
+	messageFactory      *internalpubsub.MessageFactory
+	answersheetClient   *grpcclient.AnswerSheetClient
+	questionnaireClient *grpcclient.QuestionnaireClient
+	medicalScaleClient  *grpcclient.MedicalScaleClient
 }
 
 // NewHandler 创建消息处理器
-func NewHandler(answersheetClient *grpcclient.AnswerSheetClient) Handler {
+func NewHandler(
+	answersheetClient *grpcclient.AnswerSheetClient,
+	questionnaireClient *grpcclient.QuestionnaireClient,
+	medicalScaleClient *grpcclient.MedicalScaleClient,
+) Handler {
 	return &handler{
-		messageFactory:    internalpubsub.NewMessageFactory(),
-		answersheetClient: answersheetClient,
+		messageFactory:      internalpubsub.NewMessageFactory(),
+		answersheetClient:   answersheetClient,
+		questionnaireClient: questionnaireClient,
+		medicalScaleClient:  medicalScaleClient,
 	}
 }
 
@@ -70,7 +78,19 @@ func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) er
 	}
 	log.Infof("answersheet: %+v", answersheet)
 	// 2. 通过 gRPC 调用 apiserver 获取问卷和量表信息
+	questionnaire, err := h.questionnaireClient.GetQuestionnaire(ctx, answersheet.QuestionnaireCode)
+	if err != nil {
+		return fmt.Errorf("failed to get questionnaire: %w", err)
+	}
+	log.Infof("questionnaire: %+v", questionnaire)
+	scale, err := h.medicalScaleClient.GetMedicalScaleByQuestionnaireCode(ctx, questionnaire.Code)
+	if err != nil {
+		return fmt.Errorf("failed to get scale: %w", err)
+	}
+	log.Infof("medical scale: %+v", scale)
+
 	// 3. 执行 scoring 模块（得分计算）
+
 	// 4. 执行 evaluation 模块（报告生成）
 	// 5. 通过 gRPC 调用 apiserver 保存解读报告
 

@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"google.golang.org/grpc"
@@ -68,7 +69,7 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Errorf("gRPC Request Panic Recovered - Method: %s, Panic: %v", info.FullMethod, r)
+				log.Errorf("gRPC Request Panic Recovered - Method: %s, Panic: %v, Stack: %s", info.FullMethod, r, debug.Stack())
 				err = status.Error(codes.Internal, fmt.Sprintf("内部服务器错误: %v", r))
 			}
 		}()

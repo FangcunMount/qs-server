@@ -131,7 +131,16 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 // toProtoAnswerSheet 转换为 protobuf 答卷（详细信息）
 func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO) *pb.AnswerSheet {
 	if detail == nil {
+		log.Warnf("AnswerSheetDetailDTO is nil")
 		return nil
+	}
+
+	// 安全地获取答案列表
+	var answers []*pb.Answer
+	if detail.AnswerSheet.Answers != nil {
+		answers = s.toProtoAnswers(detail.AnswerSheet.Answers)
+	} else {
+		answers = []*pb.Answer{} // 空切片而不是 nil
 	}
 
 	return &pb.AnswerSheet{
@@ -144,7 +153,7 @@ func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO
 		WriterName:           detail.WriterName,
 		TesteeId:             detail.AnswerSheet.TesteeID,
 		TesteeName:           detail.TesteeName,
-		Answers:              s.toProtoAnswers(detail.AnswerSheet.Answers),
+		Answers:              answers,
 		CreatedAt:            detail.CreatedAt,
 		UpdatedAt:            detail.UpdatedAt,
 	}
@@ -152,6 +161,10 @@ func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO
 
 // toProtoAnswers 转换为 protobuf 答案列表
 func (s *AnswerSheetService) toProtoAnswers(answers []dto.AnswerDTO) []*pb.Answer {
+	if answers == nil {
+		return []*pb.Answer{} // 返回空切片而不是 nil
+	}
+
 	protoAnswers := make([]*pb.Answer, len(answers))
 	for i, answer := range answers {
 		// 根据问题类型处理答案值

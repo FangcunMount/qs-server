@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
@@ -169,20 +170,79 @@ func (f *MessageFactory) ParseMessage(data []byte) (pubsub.Message, error) {
 
 // GetAnswersheetSavedData 从基础消息中提取答卷已保存数据
 func GetAnswersheetSavedData(msg pubsub.Message) (*AnswersheetSavedData, error) {
-	data, ok := msg.GetData().(map[string]interface{})
-	if !ok {
-		return nil, json.Unmarshal([]byte("{}"), &AnswersheetSavedData{})
+	// 尝试从 answersheet_data 字段获取数据
+	if answersheetMsg, ok := msg.(*AnswersheetSavedMessage); ok {
+		return answersheetMsg.AnswersheetData, nil
 	}
 
+	// 如果无法直接获取，尝试从原始数据中解析
+	data, ok := msg.GetData().(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid message data format")
+	}
+
+	// 尝试从 answersheet_data 字段获取
+	if answersheetDataRaw, exists := data["answersheet_data"]; exists {
+		if answersheetDataMap, ok := answersheetDataRaw.(map[string]interface{}); ok {
+			return extractAnswersheetDataFromMap(answersheetDataMap)
+		}
+	}
+
+	// 如果 answersheet_data 不存在，尝试从 data 字段获取
+	return extractAnswersheetDataFromMap(data)
+}
+
+// extractAnswersheetDataFromMap 从 map 中提取答卷数据
+func extractAnswersheetDataFromMap(data map[string]interface{}) (*AnswersheetSavedData, error) {
 	responseID, _ := data["response_id"].(string)
-	answerSheetID, _ := data["answer_sheet_id"].(uint64)
-	writerID, _ := data["writer_id"].(uint64)
-	submittedAt, _ := data["submitted_at"].(float64)
+
+	// 处理 answer_sheet_id，可能是 float64 或 int64
+	var answerSheetID uint64
+	if answerSheetIDRaw, exists := data["answer_sheet_id"]; exists {
+		switch v := answerSheetIDRaw.(type) {
+		case float64:
+			answerSheetID = uint64(v)
+		case int64:
+			answerSheetID = uint64(v)
+		case int:
+			answerSheetID = uint64(v)
+		case uint64:
+			answerSheetID = v
+		}
+	}
+
+	// 处理 writer_id，可能是 float64 或 int64
+	var writerID uint64
+	if writerIDRaw, exists := data["writer_id"]; exists {
+		switch v := writerIDRaw.(type) {
+		case float64:
+			writerID = uint64(v)
+		case int64:
+			writerID = uint64(v)
+		case int:
+			writerID = uint64(v)
+		case uint64:
+			writerID = v
+		}
+	}
+
+	// 处理 submitted_at，可能是 float64 或 int64
+	var submittedAt int64
+	if submittedAtRaw, exists := data["submitted_at"]; exists {
+		switch v := submittedAtRaw.(type) {
+		case float64:
+			submittedAt = int64(v)
+		case int64:
+			submittedAt = v
+		case int:
+			submittedAt = int64(v)
+		}
+	}
 
 	return &AnswersheetSavedData{
 		ResponseID:    responseID,
 		AnswerSheetID: answerSheetID,
 		WriterID:      writerID,
-		SubmittedAt:   int64(submittedAt),
+		SubmittedAt:   submittedAt,
 	}, nil
 }

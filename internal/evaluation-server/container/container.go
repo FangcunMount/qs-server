@@ -100,7 +100,11 @@ func (c *Container) initializeApplication() error {
 	log.Info("   📋 Initializing application services...")
 
 	// 创建消息处理器，传入 gRPC 客户端
-	c.MessageHandler = message.NewHandler(c.AnswerSheetClient)
+	c.MessageHandler = message.NewHandler(
+		c.AnswerSheetClient,
+		c.QuestionnaireClient,
+		c.MedicalScaleClient,
+	)
 
 	log.Info("   ✅ Application services initialized")
 	return nil
