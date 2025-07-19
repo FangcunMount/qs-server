@@ -5,13 +5,23 @@ import (
 	"fmt"
 
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/message"
+	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/options"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
 
-// Container 主容器，负责管理所有组件
+// Container 容器
 type Container struct {
+	// gRPC 客户端
+	QuestionnaireClient   *grpcclient.QuestionnaireClient
+	AnswerSheetClient     *grpcclient.AnswerSheetClient
+	MedicalScaleClient    *grpcclient.MedicalScaleClient
+	InterpretReportClient *grpcclient.InterpretReportClient
+
+	// gRPC 客户端工厂
+	grpcClientFactory *grpcclient.ClientFactory
+
 	// 基础设施层
 	Subscriber pubsub.Subscriber
 
@@ -43,12 +53,17 @@ func (c *Container) Initialize() error {
 
 	log.Info("🔧 Initializing Evaluation Server Container...")
 
-	// 1. 初始化应用层
+	// 1. 初始化 gRPC 客户端
+	if err := c.initializeGRPCClients(); err != nil {
+		return fmt.Errorf("failed to initialize gRPC clients: %w", err)
+	}
+
+	// 2. 初始化应用层
 	if err := c.initializeApplication(); err != nil {
 		return fmt.Errorf("failed to initialize application: %w", err)
 	}
 
-	// 2. 初始化基础设施层（Watermill订阅者）
+	// 3. 初始化基础设施层（Watermill订阅者）
 	if err := c.initializeInfrastructure(); err != nil {
 		return fmt.Errorf("failed to initialize infrastructure: %w", err)
 	}
@@ -59,12 +74,33 @@ func (c *Container) Initialize() error {
 	return nil
 }
 
+// initializeGRPCClients 初始化 gRPC 客户端
+func (c *Container) initializeGRPCClients() error {
+	log.Info("   🔌 Initializing gRPC clients...")
+
+	// 创建 gRPC 客户端工厂
+	factory, err := grpcclient.NewClientFactory(c.grpcClientConfig.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to create gRPC client factory: %w", err)
+	}
+	c.grpcClientFactory = factory
+
+	// 创建 gRPC 客户端
+	c.QuestionnaireClient = grpcclient.NewQuestionnaireClient(factory)
+	c.AnswerSheetClient = grpcclient.NewAnswerSheetClient(factory)
+	c.MedicalScaleClient = grpcclient.NewMedicalScaleClient(factory)
+	c.InterpretReportClient = grpcclient.NewInterpretReportClient(factory)
+
+	log.Info("   ✅ gRPC clients initialized")
+	return nil
+}
+
 // initializeApplication 初始化应用层
 func (c *Container) initializeApplication() error {
 	log.Info("   📋 Initializing application services...")
 
-	// 创建消息处理器
-	c.MessageHandler = message.NewHandler()
+	// 创建消息处理器，传入 gRPC 客户端
+	c.MessageHandler = message.NewHandler(c.AnswerSheetClient)
 
 	log.Info("   ✅ Application services initialized")
 	return nil
@@ -128,7 +164,7 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// Cleanup 清理资源
+// Cleanup 清理容器资源
 func (c *Container) Cleanup() error {
 	log.Info("🧹 Cleaning up container resources...")
 
@@ -136,6 +172,13 @@ func (c *Container) Cleanup() error {
 	if c.Subscriber != nil {
 		if err := c.Subscriber.Close(); err != nil {
 			log.Errorf("Failed to close watermill subscriber: %v", err)
+		}
+	}
+
+	// 关闭 gRPC 连接
+	if c.grpcClientFactory != nil {
+		if err := c.grpcClientFactory.Close(); err != nil {
+			return fmt.Errorf("关闭 gRPC 连接失败: %v", err)
 		}
 	}
 
@@ -154,6 +197,7 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"components": map[string]bool{
 			"watermill_subscriber": c.Subscriber != nil,
 			"message_handler":      c.MessageHandler != nil,
+			"grpc_clients":         c.grpcClientFactory != nil,
 		},
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
@@ -19,13 +20,15 @@ type Handler interface {
 
 // handler 消息处理器实现
 type handler struct {
-	messageFactory *internalpubsub.MessageFactory
+	messageFactory    *internalpubsub.MessageFactory
+	answersheetClient *grpcclient.AnswerSheetClient
 }
 
 // NewHandler 创建消息处理器
-func NewHandler() Handler {
+func NewHandler(answersheetClient *grpcclient.AnswerSheetClient) Handler {
 	return &handler{
-		messageFactory: internalpubsub.NewMessageFactory(),
+		messageFactory:    internalpubsub.NewMessageFactory(),
+		answersheetClient: answersheetClient,
 	}
 }
 
@@ -53,8 +56,19 @@ func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) er
 	log.Infof("Processing answersheet: ResponseID=%s, AnswerSheetID=%d, WriterID=%d, SubmittedAt=%d",
 		answersheetData.ResponseID, answersheetData.AnswerSheetID, answersheetData.WriterID, answersheetData.SubmittedAt)
 	log.Infof("answersheetData: %+v", answersheetData)
+
+	// 检查 gRPC 客户端是否可用
+	if h.answersheetClient == nil {
+		return fmt.Errorf("answersheet client is not initialized")
+	}
+
 	// TODO: 实现具体的业务逻辑
 	// 1. 通过 gRPC 调用 apiserver 获取答卷详情
+	answersheet, err := h.answersheetClient.GetAnswerSheet(ctx, answersheetData.AnswerSheetID)
+	if err != nil {
+		return fmt.Errorf("failed to get answersheet: %w", err)
+	}
+	log.Infof("answersheet: %+v", answersheet)
 	// 2. 通过 gRPC 调用 apiserver 获取问卷和量表信息
 	// 3. 执行 scoring 模块（得分计算）
 	// 4. 执行 evaluation 模块（报告生成）
