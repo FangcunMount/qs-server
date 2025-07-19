@@ -23,6 +23,9 @@ const (
 
 	// ErrInvalidArgument - 400: Invalid argument.
 	ErrInvalidArgument
+
+	// ErrInvalidMessage - 400: Invalid message.
+	ErrInvalidMessage
 )
 
 // common: database errors.

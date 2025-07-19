@@ -104,6 +104,7 @@ func (c *Container) initializeApplication() error {
 		c.AnswerSheetClient,
 		c.QuestionnaireClient,
 		c.MedicalScaleClient,
+		c.InterpretReportClient,
 	)
 
 	log.Info("   ✅ Application services initialized")

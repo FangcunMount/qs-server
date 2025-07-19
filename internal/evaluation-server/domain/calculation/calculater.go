@@ -10,6 +10,7 @@ type CalculaterType string
 
 const (
 	CalculaterTheOption   CalculaterType = "the_option" // 选项
+	CalculaterTypeScore   CalculaterType = "score"      // 分数（与the_option相同）
 	CalculaterTypeSum     CalculaterType = "sum"        // 求和
 	CalculaterTypeAverage CalculaterType = "average"    // 平均值
 	CalculaterTypeMax     CalculaterType = "max"        // 最大值

@@ -42,6 +42,25 @@ func TestStaticFactory(t *testing.T) {
 	}
 }
 
+func TestScoreCalculater(t *testing.T) {
+	// 测试score计算器（应该与the_option相同）
+	operands := []Operand{3.0}
+
+	calculater, err := GetCalculater(CalculaterTypeScore)
+	if err != nil {
+		t.Fatalf("获取score计算器失败: %v", err)
+	}
+
+	result, err := calculater.Calculate(operands)
+	if err != nil {
+		t.Fatalf("score计算失败: %v", err)
+	}
+
+	if result.Value() != 3.0 {
+		t.Errorf("期望结果 3.0, 实际结果 %f", result.Value())
+	}
+}
+
 func TestMustGetCalculater(t *testing.T) {
 	// 测试正常情况
 	calculater := MustGetCalculater(CalculaterTypeSum)

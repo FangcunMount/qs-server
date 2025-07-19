@@ -12,6 +12,7 @@ var calculaters = make(map[CalculaterType]Calculater)
 func init() {
 	// 初始化所有计算器实例
 	calculaters[CalculaterTheOption] = TheOptionCalculater{}
+	calculaters[CalculaterTypeScore] = TheOptionCalculater{} // score类型使用the_option计算器
 	calculaters[CalculaterTypeSum] = SumCalculater{}
 	calculaters[CalculaterTypeAverage] = AverageCalculater{}
 	calculaters[CalculaterTypeMax] = MaxCalculater{}
