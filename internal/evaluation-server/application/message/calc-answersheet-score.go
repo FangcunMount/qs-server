@@ -203,18 +203,16 @@ func (h *HandlerCalcAnswersheetScore) calculateAnswerSheetTotalScore(answersheet
 
 // saveAnswerSheetScores 保存答卷得分
 func (h *HandlerCalcAnswersheetScore) saveAnswerSheetScores(ctx context.Context, answerSheetID uint64, answersheet *answersheetpb.AnswerSheet) error {
-	// 暂时只记录计算结果，不实际保存到数据库
-	// TODO: 添加专门的GRPC方法来保存分数
+	log.Infof("保存答卷得分，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
 
-	log.Infof("答卷得分计算完成，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
+	// 调用GRPC服务保存分数
+	err := h.answersheetClient.SaveAnswerSheetScores(ctx, answerSheetID, answersheet.Score, answersheet.Answers)
+	if err != nil {
+		log.Errorf("保存答卷分数失败: %v", err)
+		return err
+	}
 
-	// 这里可以添加后续的保存逻辑
-	// 例如：调用专门的GRPC服务来更新答卷分数
-
-	// 记录日志
-	log.Infof("答卷得分计算完成，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
-	log.Debugf("answersheet: %s", answersheet.String())
-
+	log.Infof("答卷得分保存成功，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
 	return nil
 }
 

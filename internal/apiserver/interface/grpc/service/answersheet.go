@@ -128,6 +128,28 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 	}, nil
 }
 
+// SaveAnswerSheetScores 保存答卷答案和分数
+func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
+	log.Infof("保存答卷答案和分数，答卷ID: %d, 总分: %d", req.AnswerSheetId, req.TotalScore)
+
+	// 转换答案列表
+	answers := s.fromProtoAnswers(req.Answers)
+
+	// 调用领域服务保存分数
+	savedDTO, err := s.saver.SaveAnswerSheetScores(ctx, req.AnswerSheetId, uint16(req.TotalScore), answers)
+	if err != nil {
+		log.Errorf("保存答卷分数失败: %v", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// 转换响应
+	return &pb.SaveAnswerSheetScoresResponse{
+		AnswerSheetId: savedDTO.ID.Value(),
+		TotalScore:    uint32(savedDTO.Score),
+		Message:       "答卷分数保存成功",
+	}, nil
+}
+
 // toProtoAnswerSheet 转换为 protobuf 答卷（详细信息）
 func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO) *pb.AnswerSheet {
 	if detail == nil {
@@ -236,7 +258,13 @@ func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.A
 		var value interface{}
 		var err error
 
-		switch protoAnswer.QuestionType {
+		// 设置默认问题类型（如果为空）
+		questionType := protoAnswer.QuestionType
+		if questionType == "" {
+			questionType = "Radio" // 默认为单选题
+		}
+
+		switch questionType {
 		case "single_choice":
 			// 单选题答案应该是字符串
 			value = protoAnswer.Value
@@ -270,7 +298,7 @@ func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.A
 
 		answers[i] = dto.AnswerDTO{
 			QuestionCode: protoAnswer.QuestionCode,
-			QuestionType: protoAnswer.QuestionType,
+			QuestionType: questionType,
 			Score:        uint16(protoAnswer.Score),
 			Value:        value,
 		}

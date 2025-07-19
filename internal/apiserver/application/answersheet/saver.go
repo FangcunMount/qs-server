@@ -10,6 +10,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // Saver 答卷保存器
@@ -67,13 +68,27 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 
 // SaveAnswerSheetScores 保存答卷得分
 func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore uint16, answers []dto.AnswerDTO) (*dto.AnswerSheetDTO, error) {
+	log.Infof("开始保存答卷分数，答卷ID: %d, 总分: %d, 答案数量: %d", id, totalScore, len(answers))
+
 	// 1. 获取现有答卷
 	aDomain, err := s.aRepoMongo.FindByID(ctx, id)
 	if err != nil {
+		log.Errorf("查找答卷失败，ID: %d, 错误: %v", id, err)
 		return nil, errors.WrapC(err, errCode.ErrAnswerSheetNotFound, "答卷不存在")
 	}
 
-	// 2. 更新分数
+	if aDomain == nil {
+		log.Errorf("答卷不存在，ID: %d", id)
+		return nil, errors.WithCode(errCode.ErrAnswerSheetNotFound, "答卷不存在")
+	}
+
+	log.Infof("找到现有答卷，ID: %d, 当前分数: %d", id, aDomain.GetScore())
+
+	// 2. 转换答案
+	answerBOs := s.mapper.ToBOs(answers)
+	log.Infof("转换答案完成，答案数量: %d", len(answerBOs))
+
+	// 3. 更新分数
 	aDomain = answersheet.NewAnswerSheet(
 		aDomain.GetQuestionnaireCode(),
 		aDomain.GetQuestionnaireVersion(),
@@ -82,17 +97,22 @@ func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore
 		answersheet.WithScore(totalScore),
 		answersheet.WithWriter(aDomain.GetWriter()),
 		answersheet.WithTestee(aDomain.GetTestee()),
-		answersheet.WithAnswers(s.mapper.ToBOs(answers)),
+		answersheet.WithAnswers(answerBOs),
 		answersheet.WithCreatedAt(aDomain.GetCreatedAt()),
 	)
 
-	// 3. 保存到 MongoDB
+	log.Infof("创建新的答卷对象完成，新分数: %d", aDomain.GetScore())
+
+	// 4. 保存到 MongoDB
 	if err := s.aRepoMongo.Update(ctx, aDomain); err != nil {
+		log.Errorf("更新MongoDB失败，ID: %d, 错误: %v", id, err)
 		return nil, errors.WrapC(err, errCode.ErrDatabase, "更新答卷分数失败")
 	}
 
-	// 4. 转换为 DTO 并返回
-	return &dto.AnswerSheetDTO{
+	log.Infof("MongoDB更新成功，ID: %d", id)
+
+	// 5. 转换为 DTO 并返回
+	result := &dto.AnswerSheetDTO{
 		ID:                   aDomain.GetID(),
 		QuestionnaireCode:    aDomain.GetQuestionnaireCode(),
 		QuestionnaireVersion: aDomain.GetQuestionnaireVersion(),
@@ -101,7 +121,10 @@ func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore
 		WriterID:             aDomain.GetWriter().GetUserID().Value(),
 		TesteeID:             aDomain.GetTestee().GetUserID().Value(),
 		Answers:              s.mapper.ToDTOs(aDomain.GetAnswers()),
-	}, nil
+	}
+
+	log.Infof("保存答卷分数完成，ID: %d, 最终分数: %d", id, result.Score)
+	return result, nil
 }
 
 // validateAnswerSheet 验证答卷数据

@@ -14,6 +14,9 @@ service AnswerSheetService {
   
   // 获取答卷列表
   rpc ListAnswerSheets(ListAnswerSheetsRequest) returns (ListAnswerSheetsResponse);
+  
+  // 保存答卷答案和分数
+  rpc SaveAnswerSheetScores(SaveAnswerSheetScoresRequest) returns (SaveAnswerSheetScoresResponse);
 }
 
 // 答卷信息
@@ -80,4 +83,18 @@ message ListAnswerSheetsRequest {
 message ListAnswerSheetsResponse {
   repeated AnswerSheet answer_sheets = 1;
   int64 total = 2;
+}
+
+// 保存答卷答案和分数请求
+message SaveAnswerSheetScoresRequest {
+  uint64 answer_sheet_id = 1;  // 答卷ID
+  uint32 total_score = 2;      // 总分
+  repeated Answer answers = 3;  // 答案列表（包含分数）
+}
+
+// 保存答卷答案和分数响应
+message SaveAnswerSheetScoresResponse {
+  uint64 answer_sheet_id = 1;  // 答卷ID
+  uint32 total_score = 2;      // 总分
+  string message = 3;          // 响应消息
 } 

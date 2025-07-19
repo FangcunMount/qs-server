@@ -34,3 +34,21 @@ func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, id uint64) (*ans
 
 	return resp.AnswerSheet, nil
 }
+
+// SaveAnswerSheetScores 保存答卷答案和分数
+func (c *AnswerSheetClient) SaveAnswerSheetScores(ctx context.Context, answerSheetID uint64, totalScore uint32, answers []*answersheet.Answer) error {
+	log.Infof("保存答卷答案和分数，答卷ID: %d, 总分: %d", answerSheetID, totalScore)
+
+	// 调用 gRPC 服务
+	resp, err := c.client.SaveAnswerSheetScores(ctx, &answersheet.SaveAnswerSheetScoresRequest{
+		AnswerSheetId: answerSheetID,
+		TotalScore:    totalScore,
+		Answers:       answers,
+	})
+	if err != nil {
+		return fmt.Errorf("保存答卷分数失败: %v", err)
+	}
+
+	log.Infof("答卷分数保存成功，答卷ID: %d, 总分: %d", resp.AnswerSheetId, resp.TotalScore)
+	return nil
+}

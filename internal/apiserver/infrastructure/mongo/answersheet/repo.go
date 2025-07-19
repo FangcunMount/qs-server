@@ -250,7 +250,7 @@ func (r *Repository) Update(ctx context.Context, aDomain *answersheet.AnswerShee
 	update := bson.M{"$set": updateData}
 
 	filter := bson.M{
-		"domain_id": aDomain.GetID(),
+		"domain_id": aDomain.GetID().Value(),
 	}
 
 	result, err := r.Collection().UpdateOne(ctx, filter, update)
