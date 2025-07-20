@@ -61,11 +61,18 @@ func (e *Editor) EditBasicInfo(
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取医学量表失败")
 	}
+	if msBO == nil {
+		return nil, errors.WithCode(errorCode.ErrMedicalScaleNotFound, "医学量表不存在")
+	}
 
 	// 3. 更新基本信息
 	baseInfoService := medicalScale.BaseInfoService{}
-	baseInfoService.UpdateTitle(msBO, medicalScaleDTO.Title)
-	baseInfoService.UpdateDescription(msBO, medicalScaleDTO.Description)
+	if err := baseInfoService.UpdateTitle(msBO, medicalScaleDTO.Title); err != nil {
+		return nil, err
+	}
+	if err := baseInfoService.UpdateDescription(msBO, medicalScaleDTO.Description); err != nil {
+		return nil, err
+	}
 
 	// 4. 保存到数据库
 	if err := e.repo.Update(ctx, msBO); err != nil {

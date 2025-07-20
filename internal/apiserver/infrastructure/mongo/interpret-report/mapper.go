@@ -115,6 +115,7 @@ func (m *Mapper) interpretItemPOToEntity(po InterpretItemPO) interpretreport.Int
 func (m *Mapper) interpretItemEntityToPO(entity interpretreport.InterpretItem) InterpretItemPO {
 	return InterpretItemPO{
 		FactorCode: entity.GetFactorCode(),
+		Title:      entity.GetTitle(),
 		Score:      entity.GetScore(),
 		Content:    entity.GetContent(),
 	}
