@@ -3,9 +3,11 @@ package validation
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"strings"
+	"strconv"
 
+	questionnairepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation"
+	grpcclient "github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
@@ -18,11 +20,17 @@ type Service interface {
 }
 
 // service 校验服务实现
-type service struct{}
+type service struct {
+	questionnaireClient grpcclient.QuestionnaireClient
+	validator           *validation.Validator
+}
 
 // NewService 创建新的校验服务
-func NewService() Service {
-	return &service{}
+func NewService(questionnaireClient grpcclient.QuestionnaireClient) Service {
+	return &service{
+		questionnaireClient: questionnaireClient,
+		validator:           validation.NewValidator(),
+	}
 }
 
 // AnswersheetValidationRequest 答卷校验请求
@@ -57,13 +65,14 @@ func (s *service) ValidateAnswersheet(ctx context.Context, req *AnswersheetValid
 		return fmt.Errorf("invalid questionnaire code: %w", err)
 	}
 
-	// 2. 校验测试者信息
-	if err := s.validateTesteeInfo(ctx, req.TesteeInfo); err != nil {
-		return fmt.Errorf("invalid testee info: %w", err)
+	// 2. 获取问卷详情
+	questionnaire, err := s.questionnaireClient.GetQuestionnaire(ctx, req.QuestionnaireCode)
+	if err != nil {
+		return fmt.Errorf("failed to get questionnaire: %w", err)
 	}
 
-	// 3. 校验答案
-	if err := s.validateAnswers(ctx, req.Answers); err != nil {
+	// 3. 根据问卷配置校验答案
+	if err := s.validateAnswersWithQuestionnaire(ctx, req.Answers, questionnaire.Questionnaire); err != nil {
 		return fmt.Errorf("invalid answers: %w", err)
 	}
 
@@ -77,11 +86,6 @@ func (s *service) ValidateQuestionnaireCode(ctx context.Context, code string) er
 		return fmt.Errorf("questionnaire code cannot be empty")
 	}
 
-	// 校验代码格式：只允许字母、数字、下划线和连字符
-	if !isValidCode(code) {
-		return fmt.Errorf("invalid questionnaire code format: %s", code)
-	}
-
 	// 校验代码长度
 	if len(code) < 3 || len(code) > 50 {
 		return fmt.Errorf("questionnaire code length must be between 3 and 50 characters")
@@ -90,146 +94,103 @@ func (s *service) ValidateQuestionnaireCode(ctx context.Context, code string) er
 	return nil
 }
 
-// validateTesteeInfo 校验测试者信息
-func (s *service) validateTesteeInfo(ctx context.Context, info TesteeInfo) error {
-	// 校验姓名
-	if strings.TrimSpace(info.Name) == "" {
-		return fmt.Errorf("testee name cannot be empty")
-	}
-
-	if len(info.Name) > 100 {
-		return fmt.Errorf("testee name too long")
-	}
-
-	// 校验年龄
-	if info.Age < 0 || info.Age > 150 {
-		return fmt.Errorf("invalid age: %d", info.Age)
-	}
-
-	// 校验性别
-	if info.Gender != "" && !isValidGender(info.Gender) {
-		return fmt.Errorf("invalid gender: %s", info.Gender)
-	}
-
-	// 校验邮箱
-	if info.Email != "" && !isValidEmail(info.Email) {
-		return fmt.Errorf("invalid email format: %s", info.Email)
-	}
-
-	// 校验手机号
-	if info.Phone != "" && !isValidPhone(info.Phone) {
-		return fmt.Errorf("invalid phone format: %s", info.Phone)
-	}
-
-	return nil
-}
-
-// validateAnswers 校验答案
-func (s *service) validateAnswers(ctx context.Context, answers []AnswerValidationItem) error {
+// validateAnswersWithQuestionnaire 根据问卷配置校验答案
+func (s *service) validateAnswersWithQuestionnaire(ctx context.Context, answers []AnswerValidationItem, questionnaire *questionnairepb.Questionnaire) error {
 	if len(answers) == 0 {
 		return fmt.Errorf("answers cannot be empty")
 	}
 
+	// 创建问题映射，方便查找
+	questionMap := make(map[string]*questionnairepb.Question)
+	for _, q := range questionnaire.Questions {
+		questionMap[q.Code] = q
+	}
+
 	// 校验每个答案
 	for i, answer := range answers {
-		if err := s.validateAnswer(ctx, answer); err != nil {
-			return fmt.Errorf("invalid answer at index %d: %w", i, err)
+		// 查找对应的问题
+		question, exists := questionMap[answer.QuestionID]
+		if !exists {
+			return fmt.Errorf("question not found: %s", answer.QuestionID)
+		}
+
+		// 根据问题配置生成验证规则并校验
+		if err := s.validateAnswerWithQuestion(ctx, answer, question); err != nil {
+			return fmt.Errorf("invalid answer at index %d (question %s): %w", i, answer.QuestionID, err)
 		}
 	}
 
 	return nil
 }
 
-// validateAnswer 校验单个答案
-func (s *service) validateAnswer(ctx context.Context, answer AnswerValidationItem) error {
-	// 校验问题ID
-	if answer.QuestionID == "" {
-		return fmt.Errorf("question ID cannot be empty")
-	}
+// validateAnswerWithQuestion 根据问题配置校验单个答案
+func (s *service) validateAnswerWithQuestion(ctx context.Context, answer AnswerValidationItem, question *questionnairepb.Question) error {
+	// 生成验证规则
+	rules := s.generateValidationRules(question)
 
-	// 校验答案值
-	if answer.Value == nil {
-		return fmt.Errorf("answer value cannot be nil")
-	}
-
-	// 校验答案值类型
-	if err := s.validateAnswerValue(ctx, answer.Value); err != nil {
-		return fmt.Errorf("invalid answer value for question %s: %w", answer.QuestionID, err)
+	// 使用验证器校验答案
+	errors := s.validator.ValidateMultiple(answer.Value, rules)
+	if len(errors) > 0 {
+		// 返回第一个错误
+		return fmt.Errorf("validation failed: %s", errors[0].Error())
 	}
 
 	return nil
 }
 
-// validateAnswerValue 校验答案值
-func (s *service) validateAnswerValue(ctx context.Context, value interface{}) error {
-	if value == nil {
-		return fmt.Errorf("value cannot be nil")
+// generateValidationRules 根据问题配置生成验证规则
+func (s *service) generateValidationRules(question *questionnairepb.Question) []*validation.ValidationRule {
+	var rules []*validation.ValidationRule
+
+	// 处理问卷中配置的验证规则
+	for _, protoRule := range question.ValidationRules {
+		rule := s.convertProtoValidationRule(protoRule, question)
+		if rule != nil {
+			rules = append(rules, rule)
+		}
 	}
 
-	// 根据值类型进行不同的校验
-	switch v := value.(type) {
-	case string:
-		if len(v) > 10000 { // 限制文本长度
-			return fmt.Errorf("text answer too long")
+	return rules
+}
+
+// convertProtoValidationRule 转换 protobuf 验证规则为领域验证规则
+func (s *service) convertProtoValidationRule(protoRule *questionnairepb.ValidationRule, question *questionnairepb.Question) *validation.ValidationRule {
+	switch protoRule.RuleType {
+	case "required":
+		return validation.Required("此题为必答题")
+
+	case "min_length":
+		if length, err := strconv.Atoi(protoRule.TargetValue); err == nil {
+			return validation.MinLength(length, fmt.Sprintf("答案长度不能少于%d个字符", length))
 		}
-	case int, int32, int64, float32, float64:
-		// 数值类型校验
-		return nil
-	case []interface{}:
-		// 数组类型校验
-		if len(v) > 100 { // 限制数组长度
-			return fmt.Errorf("array answer too long")
+
+	case "max_length":
+		if length, err := strconv.Atoi(protoRule.TargetValue); err == nil {
+			return validation.MaxLength(length, fmt.Sprintf("答案长度不能超过%d个字符", length))
 		}
-	case map[string]interface{}:
-		// 对象类型校验
-		if len(v) > 50 { // 限制对象字段数
-			return fmt.Errorf("object answer too complex")
+
+	case "min_value":
+		if value, err := strconv.ParseFloat(protoRule.TargetValue, 64); err == nil {
+			return validation.MinValue(value, fmt.Sprintf("答案不能小于%v", value))
 		}
-	default:
-		// 其他类型校验
-		log.L(ctx).Warnf("Unknown answer value type: %v", reflect.TypeOf(value))
+
+	case "max_value":
+		if value, err := strconv.ParseFloat(protoRule.TargetValue, 64); err == nil {
+			return validation.MaxValue(value, fmt.Sprintf("答案不能大于%v", value))
+		}
+
+	case "min_selections":
+		if count, err := strconv.Atoi(protoRule.TargetValue); err == nil {
+			// 对于多选题，验证最少选择数量
+			return validation.MinValue(float64(count), fmt.Sprintf("至少需要选择%d个选项", count))
+		}
+
+	case "max_selections":
+		if count, err := strconv.Atoi(protoRule.TargetValue); err == nil {
+			// 对于多选题，验证最多选择数量
+			return validation.MaxValue(float64(count), fmt.Sprintf("最多只能选择%d个选项", count))
+		}
 	}
 
 	return nil
-}
-
-// isValidCode 检查代码格式是否有效
-func isValidCode(code string) bool {
-	for _, char := range code {
-		if !((char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '_' || char == '-') {
-			return false
-		}
-	}
-	return true
-}
-
-// isValidGender 检查性别是否有效
-func isValidGender(gender string) bool {
-	validGenders := []string{"male", "female", "other", "男", "女", "其他"}
-	for _, valid := range validGenders {
-		if strings.ToLower(gender) == strings.ToLower(valid) {
-			return true
-		}
-	}
-	return false
-}
-
-// isValidEmail 检查邮箱格式是否有效
-func isValidEmail(email string) bool {
-	// 简单的邮箱格式校验
-	return strings.Contains(email, "@") && strings.Contains(email, ".")
-}
-
-// isValidPhone 检查手机号格式是否有效
-func isValidPhone(phone string) bool {
-	// 简单的手机号格式校验：只允许数字、空格、连字符和加号
-	for _, char := range phone {
-		if !((char >= '0' && char <= '9') || char == ' ' || char == '-' || char == '+') {
-			return false
-		}
-	}
-	return len(phone) >= 10 && len(phone) <= 20
 }

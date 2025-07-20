@@ -106,7 +106,7 @@ func (c *Container) initializeApplication() error {
 	log.Info("   📋 Initializing application services...")
 
 	// 创建校验服务
-	c.ValidationService = validation.NewService()
+	c.ValidationService = validation.NewService(c.QuestionnaireClient)
 
 	log.Info("   ✅ Application services initialized")
 	return nil
