@@ -20,24 +20,27 @@ type Container struct {
 	Publisher           pubsub.Publisher
 
 	// 应用层
-	ValidationService validation.Service
+	ValidationService           validation.Service
+	ValidationServiceConcurrent validation.ServiceConcurrent
 
 	// 接口层
 	QuestionnaireHandler handler.QuestionnaireHandler
 	AnswersheetHandler   handler.AnswersheetHandler
 
 	// 配置
-	grpcClientConfig *options.GRPCClientOptions
-	pubsubConfig     *pubsub.Config
-	initialized      bool
+	grpcClientConfig  *options.GRPCClientOptions
+	pubsubConfig      *pubsub.Config
+	concurrencyConfig *options.ConcurrencyOptions
+	initialized       bool
 }
 
 // NewContainer 创建新的容器
-func NewContainer(grpcClientConfig *options.GRPCClientOptions, pubsubConfig *pubsub.Config) *Container {
+func NewContainer(grpcClientConfig *options.GRPCClientOptions, pubsubConfig *pubsub.Config, concurrencyConfig *options.ConcurrencyOptions) *Container {
 	return &Container{
-		grpcClientConfig: grpcClientConfig,
-		pubsubConfig:     pubsubConfig,
-		initialized:      false,
+		grpcClientConfig:  grpcClientConfig,
+		pubsubConfig:      pubsubConfig,
+		concurrencyConfig: concurrencyConfig,
+		initialized:       false,
 	}
 }
 
@@ -111,13 +114,19 @@ func (c *Container) initializeApplication() error {
 	// 创建验证规则工厂
 	ruleFactory := validation.NewDefaultValidationRuleFactory()
 
-	// 创建答案验证器
-	answerValidator := validation.NewAnswerValidator(ruleFactory)
+	// 创建答案验证器（并发版本）
+	answerValidatorConcurrent := validation.NewAnswerValidatorConcurrent(ruleFactory, c.concurrencyConfig.MaxConcurrency)
 
-	// 创建校验服务（作为协调器）
-	c.ValidationService = validation.NewService(questionnaireValidator, answerValidator)
+	// 创建并发校验服务
+	concurrentService := validation.NewServiceConcurrent(questionnaireValidator, answerValidatorConcurrent)
 
-	log.Info("   ✅ Application services initialized")
+	// 使用适配器让并发服务实现原有Service接口
+	c.ValidationService = validation.NewServiceAdapter(concurrentService)
+
+	// 保存并发服务引用（用于直接访问并发功能）
+	c.ValidationServiceConcurrent = concurrentService
+
+	log.Infof("   ✅ Application services initialized (using concurrent validation, max concurrency: %d)", c.concurrencyConfig.MaxConcurrency)
 	return nil
 }
 
@@ -125,19 +134,19 @@ func (c *Container) initializeApplication() error {
 func (c *Container) initializeInterface() error {
 	log.Info("   🌐 Initializing interface handlers...")
 
-	// 创建处理器
+	// 创建处理器（使用适配器包装的并发验证服务）
 	c.QuestionnaireHandler = handler.NewQuestionnaireHandler(
 		c.QuestionnaireClient,
-		c.ValidationService,
+		c.ValidationService, // 通过适配器使用并发版本
 	)
 
 	c.AnswersheetHandler = handler.NewAnswersheetHandler(
 		c.AnswersheetClient,
-		c.ValidationService,
-		c.Publisher, // 传递发布者给答卷处理器
+		c.ValidationService, // 通过适配器使用并发版本
+		c.Publisher,         // 传递发布者给答卷处理器
 	)
 
-	log.Info("   ✅ Interface handlers initialized")
+	log.Info("   ✅ Interface handlers initialized (using concurrent validation via adapter)")
 	return nil
 }
 

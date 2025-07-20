@@ -53,7 +53,7 @@ func createCollectionServer(cfg *config.Config) (*collectionServer, error) {
 func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	// 创建容器
 	pubsubConfig := s.config.ToPubSubConfig()
-	s.container = container.NewContainer(s.config.GRPCClient, pubsubConfig)
+	s.container = container.NewContainer(s.config.GRPCClient, pubsubConfig, s.config.Concurrency)
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {

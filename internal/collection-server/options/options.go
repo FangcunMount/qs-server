@@ -21,6 +21,8 @@ type Options struct {
 	GRPCClient *GRPCClientOptions `json:"grpc_client" mapstructure:"grpc_client"`
 	// Redis 配置，用于消息队列
 	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
+	// 并发处理配置
+	Concurrency *ConcurrencyOptions `json:"concurrency" mapstructure:"concurrency"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -28,6 +30,11 @@ type GRPCClientOptions struct {
 	Endpoint string `json:"endpoint" mapstructure:"endpoint"`
 	Timeout  int    `json:"timeout"  mapstructure:"timeout"`  // 超时时间（秒）
 	Insecure bool   `json:"insecure" mapstructure:"insecure"` // 是否使用不安全连接
+}
+
+// ConcurrencyOptions 并发处理配置
+type ConcurrencyOptions struct {
+	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -43,6 +50,9 @@ func NewOptions() *Options {
 			Insecure: true,
 		},
 		Redis: genericoptions.NewRedisOptions(),
+		Concurrency: &ConcurrencyOptions{
+			MaxConcurrency: 10, // 默认最大并发数
+		},
 	}
 }
 
@@ -54,6 +64,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc-client"))
 	o.Redis.AddFlags(fss.FlagSet("redis"))
+	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 
 	return fss
 }
@@ -66,6 +77,12 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 		"The timeout for gRPC client requests in seconds.")
 	fs.BoolVar(&g.Insecure, "grpc-client.insecure", g.Insecure,
 		"Whether to use insecure gRPC connection.")
+}
+
+// AddFlags 添加并发处理相关的命令行参数
+func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
+		"The maximum number of concurrent goroutines for validation.")
 }
 
 // ToPubSubConfig 将RedisOptions转换为pubsub.Config
@@ -112,6 +129,14 @@ func (o *Options) Validate() []error {
 	}
 	if o.Redis.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0"))
+	}
+
+	// 验证并发配置
+	if o.Concurrency.MaxConcurrency <= 0 {
+		errs = append(errs, fmt.Errorf("concurrency.max-concurrency must be greater than 0"))
+	}
+	if o.Concurrency.MaxConcurrency > 100 {
+		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
 	}
 
 	return errs
