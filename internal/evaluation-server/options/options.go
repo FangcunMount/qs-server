@@ -23,6 +23,8 @@ type Options struct {
 	GRPCClient *GRPCClientOptions `json:"grpc_client" mapstructure:"grpc_client"`
 	// 消息队列配置
 	MessageQueue *MessageQueueOptions `json:"message_queue" mapstructure:"message_queue"`
+	// 并发处理配置
+	Concurrency *ConcurrencyOptions `json:"concurrency" mapstructure:"concurrency"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -53,6 +55,11 @@ func (m *MessageQueueOptions) ToPubSubConfig() *pubsub.Config {
 	return config
 }
 
+// ConcurrencyOptions 并发处理配置
+type ConcurrencyOptions struct {
+	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
+}
+
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{
@@ -74,6 +81,9 @@ func NewOptions() *Options {
 			Username: "",
 			Password: "",
 		},
+		Concurrency: &ConcurrencyOptions{
+			MaxConcurrency: 10, // 默认最大并发数
+		},
 	}
 }
 
@@ -86,6 +96,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc-client"))
 	o.MessageQueue.AddFlags(fss.FlagSet("message-queue"))
+	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 
 	return fss
 }
@@ -114,6 +125,12 @@ func (m *MessageQueueOptions) AddFlags(fs *pflag.FlagSet) {
 		"The username for message queue authentication.")
 	fs.StringVar(&m.Password, "message-queue.password", m.Password,
 		"The password for message queue authentication.")
+}
+
+// AddFlags 添加并发处理相关的命令行参数
+func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
+		"The maximum number of concurrent goroutines for processing.")
 }
 
 // Complete 完成配置选项
@@ -145,6 +162,14 @@ func (o *Options) Validate() []error {
 	}
 	if o.MessageQueue.Group == "" {
 		errs = append(errs, fmt.Errorf("message-queue.group cannot be empty"))
+	}
+
+	// 验证并发配置
+	if o.Concurrency.MaxConcurrency <= 0 {
+		errs = append(errs, fmt.Errorf("concurrency.max-concurrency must be greater than 0"))
+	}
+	if o.Concurrency.MaxConcurrency > 100 {
+		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
 	}
 
 	// 验证 Redis 特定配置

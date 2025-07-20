@@ -42,11 +42,12 @@ func NewHandler(
 		answersheetClient,
 	))
 
-	// 添加生成解读报告处理器
-	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerAdapter(
+	// 添加生成解读报告处理器（使用并发版本）
+	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerConcurrentAdapter(
 		answersheetClient,
 		medicalScaleClient,
 		interpretReportClient,
+		10, // 设置最大并发数为10
 	))
 
 	// 创建答卷保存消息处理器
@@ -90,6 +91,45 @@ func NewHandlerWithRepositories(
 	// 注意：这里为了演示依赖抽象的概念，实际使用中需要创建适配器
 	// handlerChain.AddHandler(NewScoreCalculationHandler(questionnaireRepo, answerSheetRepo))
 	// handlerChain.AddHandler(NewReportGenerationHandler(answerSheetRepo, medicalScaleRepo, interpretReportRepo))
+
+	// 创建答卷保存消息处理器
+	answersheetProcessor := NewAnswersheetSavedProcessor(handlerChain)
+
+	// 注册处理器到分发器
+	dispatcher.RegisterProcessor(answersheetProcessor)
+
+	return &handler{
+		dispatcher: dispatcher,
+	}
+}
+
+// NewHandlerWithConcurrency 创建消息处理器（支持配置并发数）
+func NewHandlerWithConcurrency(
+	answersheetClient *grpcclient.AnswerSheetClient,
+	questionnaireClient *grpcclient.QuestionnaireClient,
+	medicalScaleClient *grpcclient.MedicalScaleClient,
+	interpretReportClient *grpcclient.InterpretReportClient,
+	maxConcurrency int,
+) Handler {
+	// 创建消息分发器
+	dispatcher := NewMessageDispatcher()
+
+	// 创建答卷保存处理器链
+	handlerChain := &AnswersheetSavedHandlerChain{}
+
+	// 添加计算答卷分数处理器
+	handlerChain.AddHandler(answersheet_saved.NewCalcAnswersheetScoreHandlerAdapter(
+		questionnaireClient,
+		answersheetClient,
+	))
+
+	// 添加生成解读报告处理器（使用并发版本，可配置并发数）
+	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerConcurrentAdapter(
+		answersheetClient,
+		medicalScaleClient,
+		interpretReportClient,
+		maxConcurrency,
+	))
 
 	// 创建答卷保存消息处理器
 	answersheetProcessor := NewAnswersheetSavedProcessor(handlerChain)

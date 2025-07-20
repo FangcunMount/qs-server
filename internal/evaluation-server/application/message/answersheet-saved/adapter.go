@@ -68,3 +68,30 @@ func NewGenerateInterpretReportHandlerAdapter(
 func (a *GenerateInterpretReportHandlerAdapter) Handle(ctx context.Context, data internalpubsub.AnswersheetSavedData) error {
 	return a.GenerateInterpretReportHandler.Handle(ctx, data)
 }
+
+// GenerateInterpretReportHandlerConcurrentAdapter 并发版本生成解读报告处理器适配器
+type GenerateInterpretReportHandlerConcurrentAdapter struct {
+	*GenerateInterpretReportHandlerConcurrent
+}
+
+// NewGenerateInterpretReportHandlerConcurrentAdapter 创建并发版本生成解读报告处理器适配器
+func NewGenerateInterpretReportHandlerConcurrentAdapter(
+	answersheetClient *grpcclient.AnswerSheetClient,
+	medicalScaleClient *grpcclient.MedicalScaleClient,
+	interpretReportClient *grpcclient.InterpretReportClient,
+	maxConcurrency int,
+) *GenerateInterpretReportHandlerConcurrentAdapter {
+	return &GenerateInterpretReportHandlerConcurrentAdapter{
+		GenerateInterpretReportHandlerConcurrent: NewGenerateInterpretReportHandlerConcurrent(
+			answersheetClient,
+			medicalScaleClient,
+			interpretReportClient,
+			maxConcurrency,
+		),
+	}
+}
+
+// Handle 实现新的AnswersheetSavedHandler接口
+func (a *GenerateInterpretReportHandlerConcurrentAdapter) Handle(ctx context.Context, data internalpubsub.AnswersheetSavedData) error {
+	return a.GenerateInterpretReportHandlerConcurrent.Handle(ctx, data)
+}

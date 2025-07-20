@@ -31,15 +31,17 @@ type Container struct {
 	// 配置
 	grpcClientConfig   *options.GRPCClientOptions
 	messageQueueConfig *options.MessageQueueOptions
+	concurrencyConfig  *options.ConcurrencyOptions
 	pubsubConfig       *pubsub.Config
 	initialized        bool
 }
 
 // NewContainer 创建新的容器
-func NewContainer(grpcClient *options.GRPCClientOptions, messageQueue *options.MessageQueueOptions, pubsubConfig *pubsub.Config) *Container {
+func NewContainer(grpcClient *options.GRPCClientOptions, messageQueue *options.MessageQueueOptions, concurrency *options.ConcurrencyOptions, pubsubConfig *pubsub.Config) *Container {
 	return &Container{
 		grpcClientConfig:   grpcClient,
 		messageQueueConfig: messageQueue,
+		concurrencyConfig:  concurrency,
 		pubsubConfig:       pubsubConfig,
 		initialized:        false,
 	}
@@ -99,15 +101,16 @@ func (c *Container) initializeGRPCClients() error {
 func (c *Container) initializeApplication() error {
 	log.Info("   📋 Initializing application services...")
 
-	// 创建消息处理器，传入 gRPC 客户端
-	c.MessageHandler = message.NewHandler(
+	// 创建消息处理器，使用并发版本（从配置获取最大并发数）
+	c.MessageHandler = message.NewHandlerWithConcurrency(
 		c.AnswerSheetClient,
 		c.QuestionnaireClient,
 		c.MedicalScaleClient,
 		c.InterpretReportClient,
+		c.concurrencyConfig.MaxConcurrency, // 从配置获取最大并发数
 	)
 
-	log.Info("   ✅ Application services initialized")
+	log.Infof("   ✅ Application services initialized (with concurrent processing, max concurrency: %d)", c.concurrencyConfig.MaxConcurrency)
 	return nil
 }
 
