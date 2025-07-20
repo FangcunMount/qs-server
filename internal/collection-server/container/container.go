@@ -105,8 +105,17 @@ func (c *Container) initializeInfrastructure() error {
 func (c *Container) initializeApplication() error {
 	log.Info("   📋 Initializing application services...")
 
-	// 创建校验服务
-	c.ValidationService = validation.NewService(c.QuestionnaireClient)
+	// 创建问卷验证器（直接使用 gRPC client）
+	questionnaireValidator := validation.NewQuestionnaireValidator(c.QuestionnaireClient)
+
+	// 创建验证规则工厂
+	ruleFactory := validation.NewDefaultValidationRuleFactory()
+
+	// 创建答案验证器
+	answerValidator := validation.NewAnswerValidator(ruleFactory)
+
+	// 创建校验服务（作为协调器）
+	c.ValidationService = validation.NewService(questionnaireValidator, answerValidator)
 
 	log.Info("   ✅ Application services initialized")
 	return nil
