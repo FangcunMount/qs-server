@@ -4,6 +4,7 @@ import (
 	"time"
 
 	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 	"github.com/yshujie/questionnaire-scale/pkg/util/idutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -32,7 +33,14 @@ func (p *AnswerSheetPO) BeforeInsert() {
 	if p.ID.IsZero() {
 		p.ID = primitive.NewObjectID()
 	}
-	p.DomainID = idutil.GetIntID()
+
+	// 生成DomainID
+	domainID := idutil.GetIntID()
+	p.DomainID = domainID
+
+	// 添加调试日志
+	log.Infof("生成答卷DomainID: %d", domainID)
+
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 	p.DeletedAt = nil

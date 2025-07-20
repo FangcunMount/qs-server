@@ -95,6 +95,7 @@ func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) er
 
 	// 添加计算解读报告分数处理器
 	answersheetSavedHandlerChain.AddHandler(&HandlerCalcInterpretReportScore{
+		answersheetClient:     h.answersheetClient,
 		medicalScaleClient:    h.medicalScaleClient,
 		interpretReportClient: h.interpretReportClient,
 	})

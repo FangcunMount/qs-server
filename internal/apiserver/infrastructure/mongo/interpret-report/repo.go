@@ -13,6 +13,7 @@ import (
 	interpretreport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report"
 	interpretport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report/port"
 	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
 
@@ -35,23 +36,35 @@ var _ interpretport.InterpretReportRepositoryMongo = (*Repository)(nil)
 
 // Create 创建解读报告
 func (r *Repository) Create(ctx context.Context, report *interpretreport.InterpretReport) error {
+	log.Infof("开始创建解读报告，领域对象ID: %d", report.GetID().Value())
+
 	// 转换为持久化对象
 	po, err := r.mapper.ToPO(report)
 	if err != nil {
+		log.Errorf("转换领域对象为持久化对象失败: %v", err)
 		return fmt.Errorf("转换领域对象为持久化对象失败: %v", err)
 	}
+
+	log.Infof("持久化对象转换成功，DomainID: %d", po.DomainID)
 
 	// 设置创建时间等字段
 	po.BeforeInsert()
 
+	log.Infof("BeforeInsert完成，DomainID: %d", po.DomainID)
+
 	// 插入数据库
-	_, err = r.InsertOne(ctx, po)
+	result, err := r.InsertOne(ctx, po)
 	if err != nil {
+		log.Errorf("插入解读报告到MongoDB失败: %v", err)
 		return fmt.Errorf("插入解读报告失败: %v", err)
 	}
 
+	log.Infof("MongoDB插入成功，ObjectID: %v", result.InsertedID)
+
 	// 更新领域对象的ID
 	report.SetID(v1.NewID(po.DomainID))
+
+	log.Infof("领域对象ID更新完成，新ID: %d", report.GetID().Value())
 
 	return nil
 }

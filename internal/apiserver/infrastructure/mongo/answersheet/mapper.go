@@ -8,7 +8,6 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
 )
@@ -51,11 +50,8 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		}
 	}
 
-	return &AnswerSheetPO{
-		BaseDocument: base.BaseDocument{
-			CreatedAt: bo.GetCreatedAt(),
-			UpdatedAt: bo.GetUpdatedAt(),
-		},
+	// 创建PO对象，但不设置DomainID，让BeforeInsert方法来设置
+	po := &AnswerSheetPO{
 		QuestionnaireCode:    bo.GetQuestionnaireCode(),
 		QuestionnaireVersion: bo.GetQuestionnaireVersion(),
 		Title:                bo.GetTitle(),
@@ -64,6 +60,17 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		Writer:               writer,
 		Testee:               testee,
 	}
+
+	// 设置时间字段
+	po.CreatedAt = bo.GetCreatedAt()
+	po.UpdatedAt = bo.GetUpdatedAt()
+
+	// 如果领域对象有ID，则设置DomainID
+	if bo.GetID().Value() != 0 {
+		po.DomainID = bo.GetID().Value()
+	}
+
+	return po
 }
 
 // ToBO 将MongoDB持久化对象转换为业务对象

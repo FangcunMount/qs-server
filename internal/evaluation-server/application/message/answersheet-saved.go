@@ -32,17 +32,6 @@ func (chain *AnswersheetSavedHandlerChain) Handle(ctx context.Context, data pubs
 	return nil
 }
 
-// HandlerCalcInterpretReportScore 计算解读报告分数处理器
-type HandlerCalcInterpretReportScore struct {
-	medicalScaleClient    *grpcclient.MedicalScaleClient
-	interpretReportClient *grpcclient.InterpretReportClient
-}
-
-// Handle 计算解读报告中的因子分，并保存解读报告
-func (h *HandlerCalcInterpretReportScore) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
-	return nil
-}
-
 // HandlerGenerateInterpretReportContent 生成解读报告内容处理器
 type HandlerGenerateInterpretReportContent struct {
 	medicalScaleClient    *grpcclient.MedicalScaleClient
