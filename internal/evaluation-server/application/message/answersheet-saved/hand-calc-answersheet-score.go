@@ -1,4 +1,4 @@
-package message
+package answersheet_saved
 
 import (
 	"context"
@@ -14,32 +14,40 @@ import (
 )
 
 // HandlerCalcAnswersheetScore 计算答卷分数处理器
-type HandlerCalcAnswersheetScore struct {
+type CalcAnswersheetScoreHandler struct {
 	questionnaireClient *grpcclient.QuestionnaireClient
 	answersheetClient   *grpcclient.AnswerSheetClient
 }
 
-var (
-	questionnaire *questionnairepb.Questionnaire
-	answersheet   *answersheetpb.AnswerSheet
-)
+// NewCalcAnswersheetScoreHandler 创建计算答卷分数处理器
+func NewCalcAnswersheetScoreHandler(
+	questionnaireClient *grpcclient.QuestionnaireClient,
+	answersheetClient *grpcclient.AnswerSheetClient,
+) *CalcAnswersheetScoreHandler {
+	return &CalcAnswersheetScoreHandler{
+		questionnaireClient: questionnaireClient,
+		answersheetClient:   answersheetClient,
+	}
+}
 
 // Handle 计算答卷得分，并保存分数
-func (h *HandlerCalcAnswersheetScore) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
+func (h *CalcAnswersheetScoreHandler) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
 	log.Debugf("in HandlerCalcAnswersheetScore: %s", data)
 
 	// 先加载答卷
-	if err := h.loadAnswersheet(ctx, data.AnswerSheetID); err != nil {
+	answersheet, err := h.loadAnswersheet(ctx, data.AnswerSheetID)
+	if err != nil {
 		return err
 	}
 
 	// 从答卷中获取问卷代码，然后加载问卷
-	if err := h.loadQuestionnaire(ctx, answersheet.QuestionnaireCode, answersheet.QuestionnaireVersion); err != nil {
+	questionnaire, err := h.loadQuestionnaire(ctx, data.QuestionnaireCode, data.QuestionnaireVersion)
+	if err != nil {
 		return err
 	}
 
 	// 计算答卷中每一个答案的得分
-	if err := h.calculateAnswerScores(answersheet); err != nil {
+	if err := h.calculateAnswerScores(answersheet, questionnaire); err != nil {
 		log.Errorf("计算答案得分失败: %v", err)
 		return err
 	}
@@ -61,40 +69,38 @@ func (h *HandlerCalcAnswersheetScore) Handle(ctx context.Context, data pubsub.An
 }
 
 // loadQuestionnaire 加载问卷
-func (h *HandlerCalcAnswersheetScore) loadQuestionnaire(ctx context.Context, questionnaireCode string, questionnaireVersion string) error {
+func (h *CalcAnswersheetScoreHandler) loadQuestionnaire(ctx context.Context, questionnaireCode string, questionnaireVersion string) (*questionnairepb.Questionnaire, error) {
 	loadedQuestionnaire, err := h.questionnaireClient.GetQuestionnaire(ctx, questionnaireCode)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	questionnaire = loadedQuestionnaire
-	log.Debugf("loaded questionnaire: %s", questionnaire.String())
-	return nil
+	log.Debugf("loaded questionnaire: %s", loadedQuestionnaire.String())
+	return loadedQuestionnaire, nil
 }
 
 // loadAnswersheet 加载答卷
-func (h *HandlerCalcAnswersheetScore) loadAnswersheet(ctx context.Context, answerSheetID uint64) error {
+func (h *CalcAnswersheetScoreHandler) loadAnswersheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
 	loadedAnswersheet, err := h.answersheetClient.GetAnswerSheet(ctx, answerSheetID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	answersheet = loadedAnswersheet
-	log.Debugf("loaded answersheet: %s", answersheet.String())
-	return nil
+	log.Debugf("loaded answersheet: %s", loadedAnswersheet.String())
+	return loadedAnswersheet, nil
 }
 
 // calculateAnswerScores 计算答案得分
-func (h *HandlerCalcAnswersheetScore) calculateAnswerScores(answersheet *answersheetpb.AnswerSheet) error {
+func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(answersheet *answersheetpb.AnswerSheet, questionnaire *questionnairepb.Questionnaire) error {
 	// 遍历答卷中的每个答案
 	for _, answer := range answersheet.Answers {
 		// 是否可以计算得分
-		if !h.canCalculateScore(answer.QuestionCode) {
+		if !h.canCalculateScore(answer.QuestionCode, questionnaire) {
 			continue
 		}
 
 		// 获取计算公式
-		FormulaType := h.getCalculationFormulaType(answer.QuestionCode)
+		FormulaType := h.getCalculationFormulaType(answer.QuestionCode, questionnaire)
 
 		// 根据计算规则，创建计算器
 		calculater, err := calculation.GetCalculater(calculation.CalculaterType(FormulaType))
@@ -104,7 +110,7 @@ func (h *HandlerCalcAnswersheetScore) calculateAnswerScores(answersheet *answers
 		}
 
 		// 获取计算操作数（根据问题的 option 和 答案选中值）
-		operands := h.loadCalculationOperands(answer.QuestionCode, answer.Value)
+		operands := h.loadCalculationOperands(answer.QuestionCode, answer.Value, questionnaire)
 
 		// 执行计算
 		score, err := calculater.Calculate(operands)
@@ -122,8 +128,8 @@ func (h *HandlerCalcAnswersheetScore) calculateAnswerScores(answersheet *answers
 
 // canCalculateScore 是否可以计算得分
 // 判断 question 是否拥有 CalculationRule、CalculationRule.FormulaType 不为空
-func (h *HandlerCalcAnswersheetScore) canCalculateScore(questionCode string) bool {
-	question := findQuestionByCode(questionCode)
+func (h *CalcAnswersheetScoreHandler) canCalculateScore(questionCode string, questionnaire *questionnairepb.Questionnaire) bool {
+	question := findQuestionByCode(questionCode, questionnaire)
 	if question == nil {
 		log.Debugf("question not found: %s", questionCode)
 		return false
@@ -143,9 +149,9 @@ func (h *HandlerCalcAnswersheetScore) canCalculateScore(questionCode string) boo
 }
 
 // getCalculationFormulaType 获取计算公式类型
-func (h *HandlerCalcAnswersheetScore) getCalculationFormulaType(questionCode string) string {
+func (h *CalcAnswersheetScoreHandler) getCalculationFormulaType(questionCode string, questionnaire *questionnairepb.Questionnaire) string {
 	// 获取问题
-	question := findQuestionByCode(questionCode)
+	question := findQuestionByCode(questionCode, questionnaire)
 	if question == nil {
 		log.Errorf("question not found: %s", questionCode)
 		return ""
@@ -156,9 +162,9 @@ func (h *HandlerCalcAnswersheetScore) getCalculationFormulaType(questionCode str
 }
 
 // loadCalculationOperands 获取计算操作数
-func (h *HandlerCalcAnswersheetScore) loadCalculationOperands(questionCode string, answerValue string) (operands []calculation.Operand) {
+func (h *CalcAnswersheetScoreHandler) loadCalculationOperands(questionCode string, answerValue string, questionnaire *questionnairepb.Questionnaire) (operands []calculation.Operand) {
 	// 获取问题
-	question := findQuestionByCode(questionCode)
+	question := findQuestionByCode(questionCode, questionnaire)
 	if question == nil {
 		log.Errorf("question not found: %s", questionCode)
 		return operands
@@ -190,7 +196,7 @@ func (h *HandlerCalcAnswersheetScore) loadCalculationOperands(questionCode strin
 }
 
 // calculateAnswerSheetTotalScore 计算答卷总分
-func (h *HandlerCalcAnswersheetScore) calculateAnswerSheetTotalScore(answersheet *answersheetpb.AnswerSheet) error {
+func (h *CalcAnswersheetScoreHandler) calculateAnswerSheetTotalScore(answersheet *answersheetpb.AnswerSheet) error {
 	var totalScore float64
 	// 遍历答卷中的每个答案
 	for _, answer := range answersheet.Answers {
@@ -202,7 +208,7 @@ func (h *HandlerCalcAnswersheetScore) calculateAnswerSheetTotalScore(answersheet
 }
 
 // saveAnswerSheetScores 保存答卷得分
-func (h *HandlerCalcAnswersheetScore) saveAnswerSheetScores(ctx context.Context, answerSheetID uint64, answersheet *answersheetpb.AnswerSheet) error {
+func (h *CalcAnswersheetScoreHandler) saveAnswerSheetScores(ctx context.Context, answerSheetID uint64, answersheet *answersheetpb.AnswerSheet) error {
 	log.Infof("保存答卷得分，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
 
 	// 调用GRPC服务保存分数
@@ -217,7 +223,7 @@ func (h *HandlerCalcAnswersheetScore) saveAnswerSheetScores(ctx context.Context,
 }
 
 // findQuestionByCode 根据问题代码查找问题
-func findQuestionByCode(questionCode string) *questionnairepb.Question {
+func findQuestionByCode(questionCode string, questionnaire *questionnairepb.Questionnaire) *questionnairepb.Question {
 	if questionnaire == nil {
 		log.Errorf("questionnaire is nil, cannot find question: %s", questionCode)
 		return nil

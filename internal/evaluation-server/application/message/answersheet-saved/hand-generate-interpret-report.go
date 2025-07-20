@@ -1,4 +1,4 @@
-package message
+package answersheet_saved
 
 import (
 	"context"
@@ -8,20 +8,34 @@ import (
 	interpretreportpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-report"
 	medicalscalepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scale"
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/interpretion"
 	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
-// HandlerCalcInterpretReportScore 计算解读报告分数处理器
-type HandlerCalcInterpretReportScore struct {
+// HandlerGenerateInterpretReport 生成解读报告处理器
+type GenerateInterpretReportHandler struct {
 	answersheetClient     *grpcclient.AnswerSheetClient
 	medicalScaleClient    *grpcclient.MedicalScaleClient
 	interpretReportClient *grpcclient.InterpretReportClient
 }
 
+// NewGenerateInterpretReportHandler 创建生成解读报告处理器
+func NewGenerateInterpretReportHandler(
+	answersheetClient *grpcclient.AnswerSheetClient,
+	medicalScaleClient *grpcclient.MedicalScaleClient,
+	interpretReportClient *grpcclient.InterpretReportClient,
+) *GenerateInterpretReportHandler {
+	return &GenerateInterpretReportHandler{
+		answersheetClient:     answersheetClient,
+		medicalScaleClient:    medicalScaleClient,
+		interpretReportClient: interpretReportClient,
+	}
+}
+
 // Handle 计算解读报告中的因子分，并保存解读报告
-func (h *HandlerCalcInterpretReportScore) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
+func (h *GenerateInterpretReportHandler) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
 	log.Infof("开始计算解读报告分数，答卷ID: %d, 问卷代码: %s", data.AnswerSheetID, data.QuestionnaireCode)
 
 	// 加载答卷
@@ -54,6 +68,13 @@ func (h *HandlerCalcInterpretReportScore) Handle(ctx context.Context, data pubsu
 		return fmt.Errorf("计算解读报告分数失败: %w", err)
 	}
 
+	// 生成解读内容
+	contentGenerator := interpretion.NewInterpretReportContentGenerator()
+	if err := contentGenerator.GenerateInterpretContent(interpretReport, medicalScale); err != nil {
+		log.Errorf("生成解读内容失败，错误: %v", err)
+		return fmt.Errorf("生成解读内容失败: %w", err)
+	}
+
 	// 保存解读报告
 	if err := h.saveInterpretReport(ctx, interpretReport); err != nil {
 		log.Errorf("保存解读报告失败，错误: %v", err)
@@ -65,7 +86,7 @@ func (h *HandlerCalcInterpretReportScore) Handle(ctx context.Context, data pubsu
 }
 
 // loadAnswerSheet 加载答卷
-func (h *HandlerCalcInterpretReportScore) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
+func (h *GenerateInterpretReportHandler) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
 	answerSheet, err := h.answersheetClient.GetAnswerSheet(ctx, answerSheetID)
 	if err != nil {
 		return nil, err
@@ -77,7 +98,7 @@ func (h *HandlerCalcInterpretReportScore) loadAnswerSheet(ctx context.Context, a
 }
 
 // loadMedicalScale 加载医学量表
-func (h *HandlerCalcInterpretReportScore) loadMedicalScale(ctx context.Context, medicalScaleCode string) (*medicalscalepb.MedicalScale, error) {
+func (h *GenerateInterpretReportHandler) loadMedicalScale(ctx context.Context, medicalScaleCode string) (*medicalscalepb.MedicalScale, error) {
 	medicalScale, err := h.medicalScaleClient.GetMedicalScaleByQuestionnaireCode(ctx, medicalScaleCode)
 	if err != nil {
 		return nil, err
@@ -89,7 +110,7 @@ func (h *HandlerCalcInterpretReportScore) loadMedicalScale(ctx context.Context, 
 }
 
 // buildInterpretItems 构建解读项
-func (h *HandlerCalcInterpretReportScore) buildInterpretItems(medicalScale *medicalscalepb.MedicalScale) []*interpretreportpb.InterpretItem {
+func (h *GenerateInterpretReportHandler) buildInterpretItems(medicalScale *medicalscalepb.MedicalScale) []*interpretreportpb.InterpretItem {
 	interpretItems := make([]*interpretreportpb.InterpretItem, 0, len(medicalScale.Factors))
 	for _, factor := range medicalScale.Factors {
 		// 为解读项设置默认内容
@@ -105,7 +126,7 @@ func (h *HandlerCalcInterpretReportScore) buildInterpretItems(medicalScale *medi
 }
 
 // calculateInterpretReportScore 计算解读报告中的因子分
-func (h *HandlerCalcInterpretReportScore) calculateInterpretReportScore(interpretReport *interpretreportpb.InterpretReport, answerSheet *answersheetpb.AnswerSheet, medicalScale *medicalscalepb.MedicalScale) error {
+func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(interpretReport *interpretreportpb.InterpretReport, answerSheet *answersheetpb.AnswerSheet, medicalScale *medicalscalepb.MedicalScale) error {
 	log.Infof("开始计算因子分，因子数量: %d", len(interpretReport.InterpretItems))
 
 	// 创建答案映射，便于快速查找
@@ -166,7 +187,7 @@ func (h *HandlerCalcInterpretReportScore) calculateInterpretReportScore(interpre
 }
 
 // calculatePrimaryFactorScore 计算一级因子分数
-func (h *HandlerCalcInterpretReportScore) calculatePrimaryFactorScore(factor *medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer) (float64, error) {
+func (h *GenerateInterpretReportHandler) calculatePrimaryFactorScore(factor *medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer) (float64, error) {
 	if factor.CalculationRule == nil {
 		return 0, fmt.Errorf("因子 %s 没有计算规则", factor.Code)
 	}
@@ -209,7 +230,7 @@ func (h *HandlerCalcInterpretReportScore) calculatePrimaryFactorScore(factor *me
 }
 
 // calculateMultilevelFactorScore 计算多级因子分数
-func (h *HandlerCalcInterpretReportScore) calculateMultilevelFactorScore(factor *medicalscalepb.Factor, primaryFactorScores map[string]float64) (float64, error) {
+func (h *GenerateInterpretReportHandler) calculateMultilevelFactorScore(factor *medicalscalepb.Factor, primaryFactorScores map[string]float64) (float64, error) {
 	if factor.CalculationRule == nil {
 		return 0, fmt.Errorf("因子 %s 没有计算规则", factor.Code)
 	}
@@ -252,7 +273,7 @@ func (h *HandlerCalcInterpretReportScore) calculateMultilevelFactorScore(factor 
 }
 
 // saveInterpretReport 保存解读报告
-func (h *HandlerCalcInterpretReportScore) saveInterpretReport(ctx context.Context, interpretReport *interpretreportpb.InterpretReport) error {
+func (h *GenerateInterpretReportHandler) saveInterpretReport(ctx context.Context, interpretReport *interpretreportpb.InterpretReport) error {
 	_, err := h.interpretReportClient.SaveInterpretReport(
 		ctx,
 		interpretReport.AnswerSheetId,

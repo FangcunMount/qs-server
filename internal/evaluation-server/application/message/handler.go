@@ -3,6 +3,7 @@ package message
 import (
 	"context"
 
+	answersheet_saved "github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/message/answersheet-saved"
 	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
@@ -85,26 +86,20 @@ func (h *handler) HandleAnswersheetSaved(ctx context.Context, message []byte) er
 	}
 
 	// 创建答卷已保存消息处理器链
-	answersheetSavedHandlerChain := AnswersheetSavedHandlerChain{}
+	answersheetSavedHandlerChain := answersheet_saved.HandlerChain{}
 
 	// 添加计算答卷分数处理器
-	answersheetSavedHandlerChain.AddHandler(&HandlerCalcAnswersheetScore{
-		questionnaireClient: h.questionnaireClient,
-		answersheetClient:   h.answersheetClient,
-	})
+	answersheetSavedHandlerChain.AddHandler(answersheet_saved.NewCalcAnswersheetScoreHandler(
+		h.questionnaireClient,
+		h.answersheetClient,
+	))
 
-	// 添加计算解读报告分数处理器
-	answersheetSavedHandlerChain.AddHandler(&HandlerCalcInterpretReportScore{
-		answersheetClient:     h.answersheetClient,
-		medicalScaleClient:    h.medicalScaleClient,
-		interpretReportClient: h.interpretReportClient,
-	})
-
-	// 添加生成解读报告内容处理器
-	answersheetSavedHandlerChain.AddHandler(&HandlerGenerateInterpretReportContent{
-		medicalScaleClient:    h.medicalScaleClient,
-		interpretReportClient: h.interpretReportClient,
-	})
+	// 添加创建生成解读报告处理器
+	answersheetSavedHandlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandler(
+		h.answersheetClient,
+		h.medicalScaleClient,
+		h.interpretReportClient,
+	))
 
 	return answersheetSavedHandlerChain.Handle(ctx, *answersheetSavedData)
 }
