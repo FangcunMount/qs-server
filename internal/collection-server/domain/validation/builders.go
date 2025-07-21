@@ -1,18 +1,22 @@
 package validation
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
+)
 
 // ValidationRuleBuilder 验证规则构建器
 type ValidationRuleBuilder struct {
-	rule *ValidationRule
+	rule *rules.BaseRule
 }
 
 // NewRule 创建新的验证规则构建器
-func NewRule(strategy string) *ValidationRuleBuilder {
+func NewRule(name string) *ValidationRuleBuilder {
 	return &ValidationRuleBuilder{
-		rule: &ValidationRule{
-			Strategy: strategy,
-			Params:   make(map[string]interface{}),
+		rule: &rules.BaseRule{
+			Name:   name,
+			Params: make(map[string]interface{}),
 		},
 	}
 }
@@ -36,14 +40,14 @@ func (b *ValidationRuleBuilder) WithParam(key string, value interface{}) *Valida
 }
 
 // Build 构建验证规则
-func (b *ValidationRuleBuilder) Build() *ValidationRule {
+func (b *ValidationRuleBuilder) Build() *rules.BaseRule {
 	return b.rule
 }
 
 // 便捷的验证规则创建函数
 
 // Required 创建必填验证规则
-func Required(message string) *ValidationRule {
+func Required(message string) *rules.BaseRule {
 	if message == "" {
 		message = "此字段为必填项"
 	}
@@ -51,7 +55,7 @@ func Required(message string) *ValidationRule {
 }
 
 // MaxValue 创建最大值验证规则
-func MaxValue(maxValue float64, message string) *ValidationRule {
+func MaxValue(maxValue float64, message string) *rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("值不能大于 %v", maxValue)
 	}
@@ -59,7 +63,7 @@ func MaxValue(maxValue float64, message string) *ValidationRule {
 }
 
 // MinValue 创建最小值验证规则
-func MinValue(minValue float64, message string) *ValidationRule {
+func MinValue(minValue float64, message string) *rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("值不能小于 %v", minValue)
 	}
@@ -67,7 +71,7 @@ func MinValue(minValue float64, message string) *ValidationRule {
 }
 
 // MaxLength 创建最大长度验证规则
-func MaxLength(maxLength int, message string) *ValidationRule {
+func MaxLength(maxLength int, message string) *rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("长度不能超过 %d 个字符", maxLength)
 	}
@@ -75,7 +79,7 @@ func MaxLength(maxLength int, message string) *ValidationRule {
 }
 
 // MinLength 创建最小长度验证规则
-func MinLength(minLength int, message string) *ValidationRule {
+func MinLength(minLength int, message string) *rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("长度不能少于 %d 个字符", minLength)
 	}
@@ -83,7 +87,7 @@ func MinLength(minLength int, message string) *ValidationRule {
 }
 
 // Pattern 创建正则表达式验证规则
-func Pattern(pattern, message string) *ValidationRule {
+func Pattern(pattern, message string) *rules.BaseRule {
 	if message == "" {
 		message = "格式不正确"
 	}
@@ -91,7 +95,7 @@ func Pattern(pattern, message string) *ValidationRule {
 }
 
 // Email 创建邮箱验证规则
-func Email(message string) *ValidationRule {
+func Email(message string) *rules.BaseRule {
 	if message == "" {
 		message = "邮箱格式不正确"
 	}
@@ -99,7 +103,7 @@ func Email(message string) *ValidationRule {
 }
 
 // Phone 创建手机号验证规则
-func Phone(message string) *ValidationRule {
+func Phone(message string) *rules.BaseRule {
 	if message == "" {
 		message = "手机号格式不正确"
 	}
@@ -107,7 +111,7 @@ func Phone(message string) *ValidationRule {
 }
 
 // OptionCode 创建选项代码验证规则
-func OptionCode(allowedCodes []string, message string) *ValidationRule {
+func OptionCode(allowedCodes []string, message string) *rules.BaseRule {
 	if message == "" {
 		message = "选择的选项不在允许范围内"
 	}
@@ -115,7 +119,7 @@ func OptionCode(allowedCodes []string, message string) *ValidationRule {
 }
 
 // Range 创建数值范围验证规则
-func Range(minValue, maxValue float64, message string) *ValidationRule {
+func Range(minValue, maxValue float64, message string) *rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("答案必须在 %v 到 %v 之间", minValue, maxValue)
 	}
@@ -127,22 +131,22 @@ func Range(minValue, maxValue float64, message string) *ValidationRule {
 }
 
 // RangeRules 创建数值范围验证规则（返回多个规则）
-func RangeRules(minValue, maxValue float64, message string) []*ValidationRule {
+func RangeRules(minValue, maxValue float64, message string) []*rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("答案必须在 %v 到 %v 之间", minValue, maxValue)
 	}
-	return []*ValidationRule{
+	return []*rules.BaseRule{
 		MinValue(minValue, ""),
 		MaxValue(maxValue, message),
 	}
 }
 
 // Length 创建长度范围验证规则
-func Length(minLength, maxLength int, message string) []*ValidationRule {
+func Length(minLength, maxLength int, message string) []*rules.BaseRule {
 	if message == "" {
 		message = fmt.Sprintf("长度必须在 %d 到 %d 个字符之间", minLength, maxLength)
 	}
-	return []*ValidationRule{
+	return []*rules.BaseRule{
 		MinLength(minLength, ""),
 		MaxLength(maxLength, message),
 	}
@@ -193,8 +197,8 @@ func (r *StringRules) SetEmail(email bool) *StringRules {
 }
 
 // Build 构建验证规则列表
-func (r *StringRules) Build() []*ValidationRule {
-	var rules []*ValidationRule
+func (r *StringRules) Build() []*rules.BaseRule {
+	var rules []*rules.BaseRule
 
 	if r.Required {
 		rules = append(rules, Required(""))
@@ -257,8 +261,8 @@ func (r *NumberRules) SetRange(minValue, maxValue float64) *NumberRules {
 }
 
 // Build 构建验证规则列表
-func (r *NumberRules) Build() []*ValidationRule {
-	var rules []*ValidationRule
+func (r *NumberRules) Build() []*rules.BaseRule {
+	var rules []*rules.BaseRule
 
 	if r.Required {
 		rules = append(rules, Required(""))

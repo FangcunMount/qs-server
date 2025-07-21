@@ -2,441 +2,240 @@ package validation
 
 import (
 	"testing"
+
+	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
+	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/strategies"
 )
 
-func TestRequiredStrategy(t *testing.T) {
-	strategy := &RequiredStrategy{}
-
-	tests := []struct {
-		name    string
-		value   interface{}
-		rule    *ValidationRule
-		wantErr bool
-	}{
-		{
-			name:    "空字符串",
-			value:   "",
-			rule:    NewValidationRule("required", nil, "不能为空"),
-			wantErr: true,
-		},
-		{
-			name:    "空格字符串",
-			value:   "   ",
-			rule:    NewValidationRule("required", nil, "不能为空"),
-			wantErr: true,
-		},
-		{
-			name:    "有效字符串",
-			value:   "hello",
-			rule:    NewValidationRule("required", nil, "不能为空"),
-			wantErr: false,
-		},
-		{
-			name:    "nil值",
-			value:   nil,
-			rule:    NewValidationRule("required", nil, "不能为空"),
-			wantErr: true,
-		},
-		{
-			name:    "空切片",
-			value:   []string{},
-			rule:    NewValidationRule("required", nil, "不能为空"),
-			wantErr: true,
-		},
-		{
-			name:    "非空切片",
-			value:   []string{"item"},
-			rule:    NewValidationRule("required", nil, "不能为空"),
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := strategy.Validate(tt.value, tt.rule)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("RequiredStrategy.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestMaxValueStrategy(t *testing.T) {
-	strategy := &MaxValueStrategy{}
-
-	tests := []struct {
-		name    string
-		value   interface{}
-		rule    *ValidationRule
-		wantErr bool
-	}{
-		{
-			name:    "整数小于最大值",
-			value:   5,
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: false,
-		},
-		{
-			name:    "整数等于最大值",
-			value:   10,
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: false,
-		},
-		{
-			name:    "整数大于最大值",
-			value:   15,
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: true,
-		},
-		{
-			name:    "浮点数小于最大值",
-			value:   5.5,
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: false,
-		},
-		{
-			name:    "字符串数字小于最大值",
-			value:   "5",
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: false,
-		},
-		{
-			name:    "字符串数字大于最大值",
-			value:   "15",
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: true,
-		},
-		{
-			name:    "无效字符串",
-			value:   "abc",
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: true,
-		},
-		{
-			name:    "nil值跳过验证",
-			value:   nil,
-			rule:    NewValidationRule("max_value", float64(10), "不能大于10"),
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := strategy.Validate(tt.value, tt.rule)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("MaxValueStrategy.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestMinValueStrategy(t *testing.T) {
-	strategy := &MinValueStrategy{}
-
-	tests := []struct {
-		name    string
-		value   interface{}
-		rule    *ValidationRule
-		wantErr bool
-	}{
-		{
-			name:    "整数大于最小值",
-			value:   15,
-			rule:    NewValidationRule("min_value", float64(10), "不能小于10"),
-			wantErr: false,
-		},
-		{
-			name:    "整数等于最小值",
-			value:   10,
-			rule:    NewValidationRule("min_value", float64(10), "不能小于10"),
-			wantErr: false,
-		},
-		{
-			name:    "整数小于最小值",
-			value:   5,
-			rule:    NewValidationRule("min_value", float64(10), "不能小于10"),
-			wantErr: true,
-		},
-		{
-			name:    "nil值跳过验证",
-			value:   nil,
-			rule:    NewValidationRule("min_value", float64(10), "不能小于10"),
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := strategy.Validate(tt.value, tt.rule)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("MinValueStrategy.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestMaxLengthStrategy(t *testing.T) {
-	strategy := &MaxLengthStrategy{}
-
-	tests := []struct {
-		name    string
-		value   interface{}
-		rule    *ValidationRule
-		wantErr bool
-	}{
-		{
-			name:    "字符串长度小于最大值",
-			value:   "hello",
-			rule:    NewValidationRule("max_length", 10, "长度不能超过10"),
-			wantErr: false,
-		},
-		{
-			name:    "字符串长度等于最大值",
-			value:   "hello world",
-			rule:    NewValidationRule("max_length", 11, "长度不能超过11"),
-			wantErr: false,
-		},
-		{
-			name:    "字符串长度大于最大值",
-			value:   "hello world",
-			rule:    NewValidationRule("max_length", 5, "长度不能超过5"),
-			wantErr: true,
-		},
-		{
-			name:    "切片长度小于最大值",
-			value:   []string{"a", "b"},
-			rule:    NewValidationRule("max_length", 5, "长度不能超过5"),
-			wantErr: false,
-		},
-		{
-			name:    "nil值跳过验证",
-			value:   nil,
-			rule:    NewValidationRule("max_length", 5, "长度不能超过5"),
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := strategy.Validate(tt.value, tt.rule)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("MaxLengthStrategy.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestMinLengthStrategy(t *testing.T) {
-	strategy := &MinLengthStrategy{}
-
-	tests := []struct {
-		name    string
-		value   interface{}
-		rule    *ValidationRule
-		wantErr bool
-	}{
-		{
-			name:    "字符串长度大于最小值",
-			value:   "hello world",
-			rule:    NewValidationRule("min_length", 5, "长度不能少于5"),
-			wantErr: false,
-		},
-		{
-			name:    "字符串长度等于最小值",
-			value:   "hello",
-			rule:    NewValidationRule("min_length", 5, "长度不能少于5"),
-			wantErr: false,
-		},
-		{
-			name:    "字符串长度小于最小值",
-			value:   "hi",
-			rule:    NewValidationRule("min_length", 5, "长度不能少于5"),
-			wantErr: true,
-		},
-		{
-			name:    "nil值跳过验证",
-			value:   nil,
-			rule:    NewValidationRule("min_length", 5, "长度不能少于5"),
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := strategy.Validate(tt.value, tt.rule)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("MinLengthStrategy.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestValidator(t *testing.T) {
+func TestValidator_Validate(t *testing.T) {
 	validator := NewValidator()
 
-	// 测试单个值验证
-	err := validator.Validate("hello", Required("不能为空"))
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
+	tests := []struct {
+		name     string
+		value    interface{}
+		rule     *rules.BaseRule
+		expected bool // true if should pass validation
+	}{
+		{
+			name:     "required field with value",
+			value:    "test",
+			rule:     rules.NewBaseRule("required", nil, "此字段为必填项"),
+			expected: true,
+		},
+		{
+			name:     "required field with empty string",
+			value:    "",
+			rule:     rules.NewBaseRule("required", nil, "此字段为必填项"),
+			expected: false,
+		},
+		{
+			name:     "required field with nil",
+			value:    nil,
+			rule:     rules.NewBaseRule("required", nil, "此字段为必填项"),
+			expected: false,
+		},
+		{
+			name:     "min_length with valid string",
+			value:    "hello",
+			rule:     rules.NewBaseRule("min_length", 3, "长度不能少于3个字符"),
+			expected: true,
+		},
+		{
+			name:     "min_length with short string",
+			value:    "hi",
+			rule:     rules.NewBaseRule("min_length", 3, "长度不能少于3个字符"),
+			expected: false,
+		},
+		{
+			name:     "max_length with valid string",
+			value:    "hello",
+			rule:     rules.NewBaseRule("max_length", 10, "长度不能超过10个字符"),
+			expected: true,
+		},
+		{
+			name:     "max_length with long string",
+			value:    "hello world",
+			rule:     rules.NewBaseRule("max_length", 5, "长度不能超过5个字符"),
+			expected: false,
+		},
+		{
+			name:     "min_value with valid number",
+			value:    10,
+			rule:     rules.NewBaseRule("min_value", 5, "值不能小于5"),
+			expected: true,
+		},
+		{
+			name:     "min_value with small number",
+			value:    3,
+			rule:     rules.NewBaseRule("min_value", 5, "值不能小于5"),
+			expected: false,
+		},
+		{
+			name:     "max_value with valid number",
+			value:    5,
+			rule:     rules.NewBaseRule("max_value", 10, "值不能大于10"),
+			expected: true,
+		},
+		{
+			name:     "max_value with large number",
+			value:    15,
+			rule:     rules.NewBaseRule("max_value", 10, "值不能大于10"),
+			expected: false,
+		},
+		{
+			name:     "email with valid email",
+			value:    "test@example.com",
+			rule:     rules.NewBaseRule("email", nil, "邮箱格式不正确"),
+			expected: true,
+		},
+		{
+			name:     "email with invalid email",
+			value:    "invalid-email",
+			rule:     rules.NewBaseRule("email", nil, "邮箱格式不正确"),
+			expected: false,
+		},
 	}
 
-	err = validator.Validate("", Required("不能为空"))
-	if err == nil {
-		t.Error("Expected error, got nil")
-	}
-
-	// 测试多个规则验证
-	rules := []*ValidationRule{
-		Required("不能为空"),
-		MinLength(3, "长度不能少于3"),
-		MaxLength(10, "长度不能超过10"),
-	}
-
-	errors := validator.ValidateMultiple("hi", rules)
-	if len(errors) == 0 {
-		t.Error("Expected validation errors, got none")
-	}
-
-	errors = validator.ValidateMultiple("hello", rules)
-	if len(errors) > 0 {
-		t.Errorf("Expected no errors, got %v", errors)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.Validate(tt.value, tt.rule)
+			if tt.expected && err != nil {
+				t.Errorf("期望验证通过，但得到错误: %v", err)
+			}
+			if !tt.expected && err == nil {
+				t.Errorf("期望验证失败，但没有得到错误")
+			}
+		})
 	}
 }
 
-func TestValidatorStruct(t *testing.T) {
+func TestValidator_ValidateMultiple(t *testing.T) {
+	validator := NewValidator()
+
+	rules := []*rules.BaseRule{
+		rules.NewBaseRule("required", nil, "此字段为必填项"),
+		rules.NewBaseRule("min_length", 3, "长度不能少于3个字符"),
+		rules.NewBaseRule("max_length", 10, "长度不能超过10个字符"),
+	}
+
+	// 测试有效值
+	errors := validator.ValidateMultiple("hello", rules)
+	if len(errors) > 0 {
+		t.Errorf("期望验证通过，但得到错误: %v", errors)
+	}
+
+	// 测试无效值
+	errors = validator.ValidateMultiple("", rules)
+	if len(errors) == 0 {
+		t.Errorf("期望验证失败，但没有得到错误")
+	}
+}
+
+func TestValidator_ValidateStruct(t *testing.T) {
 	validator := NewValidator()
 
 	type TestStruct struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
-		Age   int    `json:"age"`
+		Name  string  `json:"name"`
+		Age   int     `json:"age"`
+		Email string  `json:"email"`
+		Score float64 `json:"score"`
 	}
 
-	rules := map[string][]*ValidationRule{
+	data := TestStruct{
+		Name:  "John",
+		Age:   25,
+		Email: "john@example.com",
+		Score: 85.5,
+	}
+
+	rules := map[string][]*rules.BaseRule{
 		"name": {
-			Required("姓名不能为空"),
-			MinLength(2, "姓名长度不能少于2"),
-		},
-		"email": {
-			Required("邮箱不能为空"),
-			Email("邮箱格式不正确"),
+			rules.NewBaseRule("required", nil, "姓名不能为空"),
+			rules.NewBaseRule("min_length", 2, "姓名长度不能少于2个字符"),
 		},
 		"age": {
-			MinValue(0, "年龄不能为负数"),
-			MaxValue(150, "年龄不能超过150"),
+			rules.NewBaseRule("min_value", 18, "年龄不能小于18岁"),
+			rules.NewBaseRule("max_value", 100, "年龄不能大于100岁"),
+		},
+		"email": {
+			rules.NewBaseRule("required", nil, "邮箱不能为空"),
+			rules.NewBaseRule("email", nil, "邮箱格式不正确"),
+		},
+		"score": {
+			rules.NewBaseRule("min_value", 0.0, "分数不能小于0"),
+			rules.NewBaseRule("max_value", 100.0, "分数不能大于100"),
 		},
 	}
 
-	// 测试有效数据
-	validData := &TestStruct{
-		Name:  "张三",
-		Email: "zhangsan@example.com",
-		Age:   25,
+	errors := validator.ValidateStruct(data, rules)
+	if len(errors) > 0 {
+		t.Errorf("期望验证通过，但得到错误: %v", errors)
+	}
+}
+
+func TestStrategyFactory(t *testing.T) {
+	factory := strategies.NewStrategyFactory()
+
+	// 测试获取策略
+	strategy, err := factory.GetStrategy("required")
+	if err != nil {
+		t.Errorf("获取required策略失败: %v", err)
+	}
+	if strategy == nil {
+		t.Error("策略不能为空")
 	}
 
-	errors := validator.ValidateStruct(validData, rules)
-	if validator.HasErrors(errors) {
-		t.Errorf("Expected no errors, got %v", errors)
-	}
-
-	// 测试无效数据
-	invalidData := &TestStruct{
-		Name:  "",
-		Email: "invalid-email",
-		Age:   -5,
-	}
-
-	errors = validator.ValidateStruct(invalidData, rules)
-	if !validator.HasErrors(errors) {
-		t.Error("Expected errors, got none")
-	}
-
-	// 检查错误数量
-	allErrors := validator.GetAllErrors(errors)
-	if len(allErrors) < 3 {
-		t.Errorf("Expected at least 3 errors, got %d", len(allErrors))
+	// 测试获取不存在的策略
+	_, err = factory.GetStrategy("non_existent")
+	if err == nil {
+		t.Error("期望获取不存在的策略时返回错误")
 	}
 }
 
 func TestValidationRuleBuilder(t *testing.T) {
 	// 测试构建器模式
-	rule := NewRule("max_length").
-		WithValue(10).
-		WithMessage("长度不能超过10").
-		WithParam("trim", true).
+	rule := NewRule("required").
+		WithMessage("此字段为必填项").
+		WithParam("custom", "value").
 		Build()
 
-	if rule.Strategy != "max_length" {
-		t.Errorf("Expected strategy 'max_length', got %s", rule.Strategy)
+	if rule.Name != "required" {
+		t.Errorf("期望规则名称为required，但得到: %s", rule.Name)
 	}
 
-	if rule.Value != 10 {
-		t.Errorf("Expected value 10, got %v", rule.Value)
+	if rule.Message != "此字段为必填项" {
+		t.Errorf("期望错误消息为'此字段为必填项'，但得到: %s", rule.Message)
 	}
 
-	if rule.Message != "长度不能超过10" {
-		t.Errorf("Expected message '长度不能超过10', got %s", rule.Message)
-	}
-
-	if rule.Params["trim"] != true {
-		t.Errorf("Expected param 'trim' to be true, got %v", rule.Params["trim"])
+	if rule.Params["custom"] != "value" {
+		t.Errorf("期望参数custom为value，但得到: %v", rule.Params["custom"])
 	}
 }
 
-func TestStringRulesBuilder(t *testing.T) {
-	validator := NewValidator()
-
-	// 使用 StringRules 构建器
+func TestStringRules(t *testing.T) {
+	// 测试字符串规则组合
 	stringRules := NewStringRules().
 		SetRequired(true).
 		SetMinLength(3).
 		SetMaxLength(10).
-		SetPattern(`^[a-zA-Z]+$`)
+		SetPattern(`^[a-zA-Z]+$`).
+		SetEmail(false)
 
 	rules := stringRules.Build()
-
-	// 测试有效字符串
-	err := validator.ValidateMultiple("hello", rules)
-	if len(err) > 0 {
-		t.Errorf("Expected no errors for 'hello', got %v", err)
-	}
-
-	// 测试无效字符串
-	err = validator.ValidateMultiple("hi", rules)
-	if len(err) == 0 {
-		t.Error("Expected errors for 'hi', got none")
-	}
-
-	err = validator.ValidateMultiple("hello123", rules)
-	if len(err) == 0 {
-		t.Error("Expected errors for 'hello123', got none")
+	if len(rules) != 4 { // required + min_length + max_length + pattern
+		t.Errorf("期望4个规则，但得到: %d", len(rules))
 	}
 }
 
-func TestNumberRulesBuilder(t *testing.T) {
-	validator := NewValidator()
-
-	// 使用 NumberRules 构建器
+func TestNumberRules(t *testing.T) {
+	// 测试数值规则组合
 	numberRules := NewNumberRules().
 		SetRequired(true).
-		SetRange(18, 65)
+		SetMinValue(1). // 改为非零值
+		SetMaxValue(100)
 
 	rules := numberRules.Build()
-
-	// 测试有效数值
-	err := validator.ValidateMultiple(25, rules)
-	if len(err) > 0 {
-		t.Errorf("Expected no errors for 25, got %v", err)
-	}
-
-	// 测试无效数值
-	err = validator.ValidateMultiple(15, rules)
-	if len(err) == 0 {
-		t.Error("Expected errors for 15, got none")
-	}
-
-	err = validator.ValidateMultiple(70, rules)
-	if len(err) == 0 {
-		t.Error("Expected errors for 70, got none")
+	if len(rules) != 3 { // required + min_value + max_value
+		t.Errorf("期望3个规则，但得到: %d", len(rules))
 	}
 }

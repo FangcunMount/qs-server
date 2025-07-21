@@ -1,80 +1,60 @@
 package validation
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-)
-
-// Service 校验服务接口
+// Service 验证服务统一接口
 type Service interface {
-	// ValidateAnswersheet 校验答卷
-	ValidateAnswersheet(ctx context.Context, answersheet *AnswersheetValidationRequest) error
-	// ValidateQuestionnaireCode 校验问卷代码
+	// ValidateAnswersheet 验证答卷
+	ValidateAnswersheet(ctx context.Context, req *ValidationRequest) error
+
+	// ValidateQuestionnaireCode 验证问卷代码
 	ValidateQuestionnaireCode(ctx context.Context, code string) error
 }
 
-// service 校验服务实现 - 作为协调器
-type service struct {
-	questionnaireValidator *QuestionnaireValidator
-	answerValidator        *AnswerValidator
-}
-
-// NewService 创建新的校验服务
-func NewService(
-	questionnaireValidator *QuestionnaireValidator,
-	answerValidator *AnswerValidator,
-) Service {
-	return &service{
-		questionnaireValidator: questionnaireValidator,
-		answerValidator:        answerValidator,
-	}
-}
-
-// AnswersheetValidationRequest 答卷校验请求
-type AnswersheetValidationRequest struct {
-	QuestionnaireCode string                 `json:"questionnaire_code"`
-	Answers           []AnswerValidationItem `json:"answers"`
-	TesteeInfo        TesteeInfo             `json:"testee_info"`
-}
-
-// AnswerValidationItem 答案校验项
-type AnswerValidationItem struct {
-	QuestionID   string      `json:"question_id"`
-	QuestionType string      `json:"question_type"`
-	Value        interface{} `json:"value"`
+// ValidationRequest 验证请求
+type ValidationRequest struct {
+	QuestionnaireCode string                  `json:"questionnaire_code" validate:"required"`
+	Title             string                  `json:"title" validate:"required"`
+	TesteeInfo        *TesteeInfo             `json:"testee_info" validate:"required"`
+	Answers           []*AnswerValidationItem `json:"answers" validate:"required"`
 }
 
 // TesteeInfo 测试者信息
 type TesteeInfo struct {
-	Name   string `json:"name"`
-	Age    int    `json:"age"`
-	Gender string `json:"gender"`
-	Email  string `json:"email"`
-	Phone  string `json:"phone"`
+	Name  string `json:"name" validate:"required"`
+	Email string `json:"email,omitempty"`
+	Phone string `json:"phone,omitempty"`
 }
 
-// ValidateAnswersheet 校验答卷
-func (s *service) ValidateAnswersheet(ctx context.Context, req *AnswersheetValidationRequest) error {
-	log.L(ctx).Infof("Validating answersheet for questionnaire: %s", req.QuestionnaireCode)
-
-	// 1. 获取问卷详情（包含问卷代码验证）
-	questionnaire, err := s.questionnaireValidator.GetQuestionnaire(ctx, req.QuestionnaireCode)
-	if err != nil {
-		return fmt.Errorf("questionnaire validation failed: %w", err)
-	}
-
-	// 2. 验证答案
-	if err := s.answerValidator.ValidateAnswers(ctx, req.Answers, questionnaire); err != nil {
-		return fmt.Errorf("answer validation failed: %w", err)
-	}
-
-	log.L(ctx).Info("Answersheet validation passed")
-	return nil
+// AnswerValidationItem 答案验证项
+type AnswerValidationItem struct {
+	QuestionCode string      `json:"question_code" validate:"required"`
+	QuestionType string      `json:"question_type" validate:"required"`
+	Value        interface{} `json:"value" validate:"required"`
 }
 
-// ValidateQuestionnaireCode 校验问卷代码
-func (s *service) ValidateQuestionnaireCode(ctx context.Context, code string) error {
-	return s.questionnaireValidator.ValidateQuestionnaireCode(ctx, code)
+// ValidationStrategy 验证策略
+type ValidationStrategy string
+
+const (
+	SequentialStrategy ValidationStrategy = "sequential"
+	ConcurrentStrategy ValidationStrategy = "concurrent"
+)
+
+// ValidationConfig 验证配置
+type ValidationConfig struct {
+	Strategy           ValidationStrategy `json:"strategy"`
+	MaxConcurrency     int                `json:"max_concurrency"`
+	ValidationTimeout  int                `json:"validation_timeout"`
+	EnableDetailedLogs bool               `json:"enable_detailed_logs"`
+}
+
+// DefaultValidationConfig 默认验证配置
+func DefaultValidationConfig() *ValidationConfig {
+	return &ValidationConfig{
+		Strategy:           SequentialStrategy,
+		MaxConcurrency:     10,
+		ValidationTimeout:  30,
+		EnableDetailedLogs: false,
+	}
 }
