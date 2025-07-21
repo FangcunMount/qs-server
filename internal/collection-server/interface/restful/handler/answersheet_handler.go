@@ -66,11 +66,18 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 		return
 	}
 
+	// 转换Answers为指针切片
+	answerPtrs := make([]*validation.AnswerValidationItem, len(req.Answers))
+	for i := range req.Answers {
+		answerPtrs[i] = &req.Answers[i]
+	}
+
 	// 构建校验请求
-	validationReq := &validation.AnswersheetValidationRequest{
+	validationReq := &validation.ValidationRequest{
 		QuestionnaireCode: req.QuestionnaireCode,
-		Answers:           req.Answers,
-		TesteeInfo:        req.TesteeInfo,
+		Title:             req.Title,
+		Answers:           answerPtrs,
+		TesteeInfo:        &req.TesteeInfo,
 	}
 
 	// 校验答卷
@@ -126,7 +133,7 @@ func (h *answersheetHandler) Submit(c *gin.Context) {
 		}
 
 		answers = append(answers, &answersheet.Answer{
-			QuestionCode: answer.QuestionID,
+			QuestionCode: answer.QuestionCode,
 			QuestionType: answer.QuestionType,
 			Value:        valueStr,
 		})
