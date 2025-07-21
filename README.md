@@ -19,75 +19,6 @@ questionnaire and scale system, 支持问卷收集、量表测评、数据分析
 5|旁路组件|qs-operating-system|问卷&量表后台|问卷、量表、答卷、解读报告的后台编辑
 6|旁路组件|qs-sdk-php|PHP版SDK|问卷、量表、答卷、解读报告的SDK
 
-### 核心组件关系图
-
-```mermaid
-graph TB
-    %% 客户端层
-    subgraph "客户端层"
-        A1[qs-collection-system<br/>问卷小程序]
-        A2[qs-operating-system<br/>问卷&量表后台]
-        A3[qs-sdk-php<br/>PHP版SDK]
-    end
-    
-    %% 核心服务层
-    subgraph "核心服务层"
-        B1[api-server<br/>核心领域服务]
-        B2[collection-server<br/>问卷收集服务]
-        B3[evaluation-server<br/>测评解读服务]
-    end
-    
-    %% 数据层
-    subgraph "数据层"
-        C1[(MySQL<br/>主数据)]
-        C2[(MongoDB<br/>答卷数据)]
-        C3[(Redis<br/>缓存)]
-    end
-    
-    %% 消息队列
-    subgraph "消息队列"
-        D1[Pub/Sub<br/>事件总线]
-    end
-    
-    %% 客户端到核心服务
-    A1 --> B1
-    A1 --> B2
-    A2 --> B1
-    A3 --> B1
-    
-    %% 核心服务间通信
-    B1 --> B2
-    B1 --> B3
-    B2 --> B3
-    
-    %% 服务到数据层
-    B1 --> C1
-    B1 --> C3
-    B2 --> C2
-    B2 --> C3
-    B3 --> C1
-    B3 --> C2
-    B3 --> C3
-    
-    %% 消息通信
-    B1 --> D1
-    B2 --> D1
-    B3 --> D1
-    D1 --> B2
-    D1 --> B3
-    
-    %% 样式定义
-    classDef client fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef service fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef data fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef message fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
-    class A1,A2,A3 client
-    class B1,B2,B3 service
-    class C1,C2,C3 data
-    class D1 message
-```
-
 ### 分层架构
 
 ![分层架构图](./docs/images/layered-architecture.png)
@@ -241,103 +172,6 @@ make dev-collection-server
 # Evaluation Server 热重载
 make dev-evaluation-server
 ```
-
-## API 文档
-
-### 核心接口
-
-#### 问卷管理
-
-```http
-# 创建问卷
-POST /api/v1/questionnaires
-Content-Type: application/json
-
-{
-  "code": "TEST_001",
-  "title": "测试问卷",
-  "description": "这是一个测试问卷",
-  "questions": [
-    {
-      "code": "Q1",
-      "title": "您的性别是？",
-      "type": "Radio",
-      "options": [
-        {"code": "A", "content": "男", "score": 1},
-        {"code": "B", "content": "女", "score": 2}
-      ]
-    }
-  ]
-}
-
-# 获取问卷列表
-GET /api/v1/questionnaires?page=1&pageSize=10
-
-# 获取问卷详情
-GET /api/v1/questionnaires/{code}
-
-# 发布问卷
-PUT /api/v1/questionnaires/{code}/publish
-```
-
-#### 答卷管理
-
-```http
-# 提交答卷
-POST /api/v1/answersheets
-Content-Type: application/json
-
-{
-  "questionnaireCode": "TEST_001",
-  "questionnaireVersion": "1.0",
-  "title": "测试答卷",
-  "answers": [
-    {
-      "questionCode": "Q1",
-      "value": "A"
-    }
-  ]
-}
-
-# 获取答卷列表
-GET /api/v1/answersheets?page=1&pageSize=10
-
-# 获取答卷详情
-GET /api/v1/answersheets/{id}
-```
-
-#### 解读报告
-
-```http
-# 生成解读报告
-POST /api/v1/interpret-reports
-Content-Type: application/json
-
-{
-  "answersheetId": 123,
-  "medicalScaleCode": "SCALE_001"
-}
-
-# 获取解读报告
-GET /api/v1/interpret-reports/{id}
-```
-
-### 错误码说明
-
-错误码 | 说明 | HTTP 状态码
---|--|--
-10001 | 参数错误 | 400
-10002 | 未授权访问 | 401
-10003 | 禁止访问 | 403
-10004 | 资源不存在 | 404
-10005 | 服务器内部错误 | 500
-20001 | 问卷不存在 | 404
-20002 | 问卷已发布 | 400
-20003 | 问题编码重复 | 400
-30001 | 答卷不存在 | 404
-30002 | 答卷数据无效 | 400
-40001 | 解读报告不存在 | 404
-40002 | 解读报告生成失败 | 500
 
 ## 开发指南
 
@@ -525,9 +359,6 @@ mongodump --db questionnaire --out backup/
 - 更新相关文档
 - 提供清晰的提交信息
 
-## 许可证
-
-本项目采用 MIT 许可证，详见 [LICENSE](LICENSE) 文件。
 
 ## 联系方式
 
@@ -537,7 +368,7 @@ mongodump --db questionnaire --out backup/
 
 ## 更新日志
 
-### v1.0.0 (2024-01-01)
+### v1.0.0 (2025-07-21)
 
 - 🎉 初始版本发布
 - ✨ 支持问卷创建和管理
