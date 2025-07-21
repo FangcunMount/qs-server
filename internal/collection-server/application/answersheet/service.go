@@ -2,11 +2,17 @@ package answersheet
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
+	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
+	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
 )
 
 // Service 答卷应用服务接口
@@ -22,13 +28,15 @@ type Service interface {
 type service struct {
 	answersheetClient grpc.AnswersheetClient
 	validator         *answersheet.Validator
+	publisher         pubsub.Publisher
 }
 
 // NewService 创建答卷应用服务
-func NewService(answersheetClient grpc.AnswersheetClient) Service {
+func NewService(answersheetClient grpc.AnswersheetClient, publisher pubsub.Publisher) Service {
 	return &service{
 		answersheetClient: answersheetClient,
 		validator:         answersheet.NewValidator(),
+		publisher:         publisher,
 	}
 }
 
@@ -51,14 +59,39 @@ func (s *service) SubmitAnswersheet(ctx context.Context, req *SubmitRequest) (*S
 		return nil, fmt.Errorf("answersheet validation failed: %w", err)
 	}
 
-	// TODO: 实现 gRPC 调用逻辑
-	// 暂时返回模拟响应
-	return &SubmitResponse{
-		ID:        "mock-id-123",
+	// 转换为gRPC请求
+	grpcReq, err := s.convertToSaveRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert request: %w", err)
+	}
+
+	// 调用gRPC客户端保存答卷
+	log.L(ctx).Infof("Submitting answersheet for questionnaire: %s", req.QuestionnaireCode)
+	grpcResp, err := s.answersheetClient.SaveAnswersheet(ctx, grpcReq)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to save answersheet: %v", err)
+		return nil, fmt.Errorf("failed to save answersheet: %w", err)
+	}
+
+	log.L(ctx).Infof("Successfully saved answersheet with ID: %d", grpcResp.Id)
+
+	// 发布答卷已保存消息
+	if s.publisher != nil {
+		if err := s.publishAnswersheetSavedMessage(ctx, req, grpcResp.Id); err != nil {
+			log.L(ctx).Errorf("Failed to publish answersheet saved message: %v", err)
+			// 不影响主流程，只记录错误
+		}
+	}
+
+	// 转换响应
+	response := &SubmitResponse{
+		ID:        strconv.FormatUint(grpcResp.Id, 10),
 		Status:    "success",
-		Message:   "Answersheet submitted successfully",
+		Message:   grpcResp.Message,
 		CreatedAt: time.Now(),
-	}, nil
+	}
+
+	return response, nil
 }
 
 // ValidateAnswersheet 验证答卷
@@ -86,6 +119,39 @@ func (s *service) ValidateAnswersheet(ctx context.Context, req *ValidationReques
 	}
 
 	return nil
+}
+
+// convertToSaveRequest 将DTO转换为gRPC保存请求
+func (s *service) convertToSaveRequest(req *SubmitRequest) (*answersheetpb.SaveAnswerSheetRequest, error) {
+	// 转换答案列表
+	grpcAnswers := make([]*answersheetpb.Answer, len(req.Answers))
+	for i, answer := range req.Answers {
+		// 将答案值转换为JSON字符串
+		valueJSON, err := json.Marshal(answer.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal answer value: %w", err)
+		}
+
+		grpcAnswers[i] = &answersheetpb.Answer{
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
+			Score:        0, // 分数在后续计算中设置
+			Value:        string(valueJSON),
+		}
+	}
+
+	// TODO: 这里需要获取实际的用户ID，暂时使用默认值
+	writerID := uint64(1) // 答卷填写者ID
+	testeeID := uint64(1) // 被测试者ID
+
+	return &answersheetpb.SaveAnswerSheetRequest{
+		QuestionnaireCode:    req.QuestionnaireCode,
+		QuestionnaireVersion: "1.0", // 暂时使用默认版本
+		Title:                req.Title,
+		WriterId:             writerID,
+		TesteeId:             testeeID,
+		Answers:              grpcAnswers,
+	}, nil
 }
 
 // validateSubmitRequest 验证提交请求
@@ -167,4 +233,31 @@ func (s *service) convertToAnswersheet(req *SubmitRequest) *answersheet.SubmitRe
 		},
 		Answers: answers,
 	}
+}
+
+// publishAnswersheetSavedMessage 发布答卷已保存消息
+func (s *service) publishAnswersheetSavedMessage(ctx context.Context, req *SubmitRequest, answersheetID uint64) error {
+	// 创建答卷已保存数据
+	answersheetData := &internalpubsub.AnswersheetSavedData{
+		ResponseID:           strconv.FormatUint(answersheetID, 10),
+		QuestionnaireCode:    req.QuestionnaireCode,
+		QuestionnaireVersion: "1.0",
+		AnswerSheetID:        answersheetID,
+		WriterID:             1, // TODO: 从上下文获取实际用户ID
+		SubmittedAt:          time.Now().Unix(),
+	}
+
+	// 创建答卷已保存消息
+	message := internalpubsub.NewAnswersheetSavedMessage(
+		internalpubsub.SourceCollectionServer,
+		answersheetData,
+	)
+
+	// 发布消息
+	if err := s.publisher.Publish(ctx, "answersheet.saved", message); err != nil {
+		return fmt.Errorf("failed to publish message: %w", err)
+	}
+
+	log.L(ctx).Infof("Published answersheet saved message for response ID: %s", answersheetData.ResponseID)
+	return nil
 }
