@@ -37,13 +37,13 @@ func NewHandler(
 	handlerChain := &AnswersheetSavedHandlerChain{}
 
 	// 添加计算答卷分数处理器
-	handlerChain.AddHandler(answersheet_saved.NewCalcAnswersheetScoreHandlerAdapter(
+	handlerChain.AddHandler(answersheet_saved.NewCalcAnswersheetScoreHandler(
 		questionnaireClient,
 		answersheetClient,
 	))
 
 	// 添加生成解读报告处理器（使用并发版本）
-	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerConcurrentAdapter(
+	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerConcurrent(
 		answersheetClient,
 		medicalScaleClient,
 		interpretReportClient,
@@ -118,13 +118,13 @@ func NewHandlerWithConcurrency(
 	handlerChain := &AnswersheetSavedHandlerChain{}
 
 	// 添加计算答卷分数处理器
-	handlerChain.AddHandler(answersheet_saved.NewCalcAnswersheetScoreHandlerAdapter(
+	handlerChain.AddHandler(answersheet_saved.NewCalcAnswersheetScoreHandler(
 		questionnaireClient,
 		answersheetClient,
 	))
 
 	// 添加生成解读报告处理器（使用并发版本，可配置并发数）
-	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerConcurrentAdapter(
+	handlerChain.AddHandler(answersheet_saved.NewGenerateInterpretReportHandlerConcurrent(
 		answersheetClient,
 		medicalScaleClient,
 		interpretReportClient,

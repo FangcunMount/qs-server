@@ -7,39 +7,57 @@ import (
 	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
 	interpretreportpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-report"
 	medicalscalepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scale"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/rules"
+	calculationapp "github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/calculation"
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/interpretion"
 	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
-// HandlerGenerateInterpretReport 生成解读报告处理器
-type GenerateInterpretReportHandler struct {
+// GenerateInterpretReportHandlerConcurrent 并发版本的解读报告生成处理器
+type GenerateInterpretReportHandlerConcurrent struct {
 	answersheetClient     *grpcclient.AnswerSheetClient
 	medicalScaleClient    *grpcclient.MedicalScaleClient
 	interpretReportClient *grpcclient.InterpretReportClient
-	calculationEngine     *calculation.CalculationEngine
+	calculationPort       calculationapp.CalculationPort
 }
 
-// NewGenerateInterpretReportHandler 创建生成解读报告处理器
-func NewGenerateInterpretReportHandler(
+// NewGenerateInterpretReportHandlerConcurrent 创建并发版本的解读报告生成处理器
+func NewGenerateInterpretReportHandlerConcurrent(
 	answersheetClient *grpcclient.AnswerSheetClient,
 	medicalScaleClient *grpcclient.MedicalScaleClient,
 	interpretReportClient *grpcclient.InterpretReportClient,
-) *GenerateInterpretReportHandler {
-	return &GenerateInterpretReportHandler{
+	maxConcurrency int,
+) *GenerateInterpretReportHandlerConcurrent {
+	if maxConcurrency <= 0 {
+		maxConcurrency = 10
+	}
+	return &GenerateInterpretReportHandlerConcurrent{
 		answersheetClient:     answersheetClient,
 		medicalScaleClient:    medicalScaleClient,
 		interpretReportClient: interpretReportClient,
-		calculationEngine:     calculation.GetGlobalCalculationEngine(),
+		calculationPort:       calculationapp.GetConcurrentCalculationPort(maxConcurrency),
 	}
 }
 
-// Handle 计算解读报告中的因子分，并保存解读报告
-func (h *GenerateInterpretReportHandler) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
-	log.Infof("开始计算解读报告分数，答卷ID: %d, 问卷代码: %s", data.AnswerSheetID, data.QuestionnaireCode)
+// NewGenerateInterpretReportHandlerConcurrentWithAdapter 创建并发版本的解读报告生成处理器（自定义适配器）
+func NewGenerateInterpretReportHandlerConcurrentWithAdapter(
+	answersheetClient *grpcclient.AnswerSheetClient,
+	medicalScaleClient *grpcclient.MedicalScaleClient,
+	interpretReportClient *grpcclient.InterpretReportClient,
+	calculationPort calculationapp.CalculationPort,
+) *GenerateInterpretReportHandlerConcurrent {
+	return &GenerateInterpretReportHandlerConcurrent{
+		answersheetClient:     answersheetClient,
+		medicalScaleClient:    medicalScaleClient,
+		interpretReportClient: interpretReportClient,
+		calculationPort:       calculationPort,
+	}
+}
+
+// Handle 并发处理解读报告生成
+func (h *GenerateInterpretReportHandlerConcurrent) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
+	log.Infof("开始并发计算解读报告分数，答卷ID: %d, 问卷代码: %s", data.AnswerSheetID, data.QuestionnaireCode)
 
 	// 加载答卷
 	answerSheet, err := h.loadAnswerSheet(ctx, data.AnswerSheetID)
@@ -65,8 +83,8 @@ func (h *GenerateInterpretReportHandler) Handle(ctx context.Context, data pubsub
 		InterpretItems:   h.buildInterpretItems(medicalScale),
 	}
 
-	// 计算解读报告中的因子分
-	if err := h.calculateInterpretReportScore(ctx, interpretReport, answerSheet, medicalScale); err != nil {
+	// 并发计算解读报告中的因子分
+	if err := h.calculateInterpretReportScoreConcurrent(ctx, interpretReport, answerSheet, medicalScale); err != nil {
 		log.Errorf("计算解读报告分数失败，错误: %v", err)
 		return fmt.Errorf("计算解读报告分数失败: %w", err)
 	}
@@ -84,12 +102,12 @@ func (h *GenerateInterpretReportHandler) Handle(ctx context.Context, data pubsub
 		return fmt.Errorf("保存解读报告失败: %w", err)
 	}
 
-	log.Infof("解读报告分数计算完成，答卷ID: %d", data.AnswerSheetID)
+	log.Infof("并发解读报告分数计算完成，答卷ID: %d", data.AnswerSheetID)
 	return nil
 }
 
 // loadAnswerSheet 加载答卷
-func (h *GenerateInterpretReportHandler) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
+func (h *GenerateInterpretReportHandlerConcurrent) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
 	answerSheet, err := h.answersheetClient.GetAnswerSheet(ctx, answerSheetID)
 	if err != nil {
 		return nil, fmt.Errorf("获取答卷失败，ID: %d, 错误: %v", answerSheetID, err)
@@ -98,7 +116,7 @@ func (h *GenerateInterpretReportHandler) loadAnswerSheet(ctx context.Context, an
 }
 
 // loadMedicalScale 加载医学量表
-func (h *GenerateInterpretReportHandler) loadMedicalScale(ctx context.Context, questionnaireCode string) (*medicalscalepb.MedicalScale, error) {
+func (h *GenerateInterpretReportHandlerConcurrent) loadMedicalScale(ctx context.Context, questionnaireCode string) (*medicalscalepb.MedicalScale, error) {
 	medicalScale, err := h.medicalScaleClient.GetMedicalScaleByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
 		return nil, fmt.Errorf("获取医学量表失败，代码: %s, 错误: %v", questionnaireCode, err)
@@ -107,15 +125,15 @@ func (h *GenerateInterpretReportHandler) loadMedicalScale(ctx context.Context, q
 }
 
 // buildInterpretItems 构建解读项目
-func (h *GenerateInterpretReportHandler) buildInterpretItems(medicalScale *medicalscalepb.MedicalScale) []*interpretreportpb.InterpretItem {
+func (h *GenerateInterpretReportHandlerConcurrent) buildInterpretItems(medicalScale *medicalscalepb.MedicalScale) []*interpretreportpb.InterpretItem {
 	var interpretItems []*interpretreportpb.InterpretItem
 
 	for _, factor := range medicalScale.Factors {
 		interpretItem := &interpretreportpb.InterpretItem{
 			FactorCode: factor.Code,
 			Title:      factor.Title,
-			Score:      0,  // 初始分数为0，后续会计算
-			Content:    "", // 初始内容为空，后续会生成
+			Score:      0,
+			Content:    "",
 		}
 		interpretItems = append(interpretItems, interpretItem)
 	}
@@ -123,176 +141,146 @@ func (h *GenerateInterpretReportHandler) buildInterpretItems(medicalScale *medic
 	return interpretItems
 }
 
-// calculateInterpretReportScore 计算解读报告分数
-func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(ctx context.Context, interpretReport *interpretreportpb.InterpretReport, answerSheet *answersheetpb.AnswerSheet, medicalScale *medicalscalepb.MedicalScale) error {
-	log.Infof("开始计算因子分，因子数量: %d", len(interpretReport.InterpretItems))
+// calculateInterpretReportScoreConcurrent 并发计算解读报告分数（业务逻辑层）
+func (h *GenerateInterpretReportHandlerConcurrent) calculateInterpretReportScoreConcurrent(ctx context.Context, interpretReport *interpretreportpb.InterpretReport, answerSheet *answersheetpb.AnswerSheet, medicalScale *medicalscalepb.MedicalScale) error {
+	log.Infof("开始并发计算因子分，因子数量: %d", len(interpretReport.InterpretItems))
 
-	// 创建答案映射，便于快速查找
+	// 创建答案映射
 	answerMap := make(map[string]*answersheetpb.Answer)
 	for _, answer := range answerSheet.Answers {
 		answerMap[answer.QuestionCode] = answer
 	}
 
-	// 创建因子映射，便于快速查找
-	factorMap := make(map[string]*medicalscalepb.Factor)
+	// 分离一级和多级因子
+	primaryFactors := []*medicalscalepb.Factor{}
+	multilevelFactors := []*medicalscalepb.Factor{}
+
 	for _, factor := range medicalScale.Factors {
-		factorMap[factor.Code] = factor
-	}
-
-	// 第一轮：计算一级因子分数
-	primaryFactorScores := make(map[string]float64)
-	for _, interpretItem := range interpretReport.InterpretItems {
-		factor := factorMap[interpretItem.FactorCode]
-		if factor == nil {
-			log.Warnf("未找到因子，代码: %s", interpretItem.FactorCode)
-			continue
-		}
-
-		// 判断因子类型
 		if factor.FactorType == "primary" || factor.FactorType == "first_grade" {
-			// 一级因子：根据计算公式和问题答案计算
-			score, err := h.calculatePrimaryFactorScore(ctx, factor, answerMap)
-			if err != nil {
-				log.Errorf("计算一级因子分数失败，因子: %s, 错误: %v", factor.Code, err)
-				continue
-			}
-			primaryFactorScores[factor.Code] = score
-			interpretItem.Score = score
-			log.Infof("一级因子 %s 分数: %f", factor.Code, score)
+			primaryFactors = append(primaryFactors, factor)
+		} else if factor.FactorType == "multilevel" || factor.FactorType == "second_grade" {
+			multilevelFactors = append(multilevelFactors, factor)
 		}
 	}
 
-	// 第二轮：计算多级因子分数
-	for _, interpretItem := range interpretReport.InterpretItems {
-		factor := factorMap[interpretItem.FactorCode]
-		if factor == nil {
-			continue
-		}
-
-		// 判断因子类型
-		if factor.FactorType == "multilevel" || factor.FactorType == "second_grade" {
-			// 多级因子：根据一级因子分数计算
-			score, err := h.calculateMultilevelFactorScore(ctx, factor, primaryFactorScores)
-			if err != nil {
-				log.Errorf("计算多级因子分数失败，因子: %s, 错误: %v", factor.Code, err)
-				continue
-			}
-			interpretItem.Score = score
-			log.Infof("多级因子 %s 分数: %f", factor.Code, score)
-		}
+	// 第一轮：并发计算一级因子分数
+	primaryFactorScores, err := h.calculatePrimaryFactorsConcurrent(ctx, primaryFactors, answerMap)
+	if err != nil {
+		return fmt.Errorf("并发计算一级因子分数失败: %w", err)
 	}
 
-	log.Infof("因子分计算完成")
+	// 应用一级因子分数到解读项
+	h.applyFactorScoresToInterpretItems(interpretReport.InterpretItems, primaryFactorScores, "并发primary")
+
+	// 第二轮：并发计算多级因子分数
+	multilevelFactorScores, err := h.calculateMultilevelFactorsConcurrent(ctx, multilevelFactors, primaryFactorScores)
+	if err != nil {
+		return fmt.Errorf("并发计算多级因子分数失败: %w", err)
+	}
+
+	// 应用多级因子分数到解读项
+	h.applyFactorScoresToInterpretItems(interpretReport.InterpretItems, multilevelFactorScores, "并发multilevel")
+
+	log.Infof("并发因子分计算完成")
 	return nil
 }
 
-// calculatePrimaryFactorScore 计算一级因子分数
-func (h *GenerateInterpretReportHandler) calculatePrimaryFactorScore(ctx context.Context, factor *medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer) (float64, error) {
-	if factor.CalculationRule == nil {
-		return 0, fmt.Errorf("因子 %s 没有计算规则", factor.Code)
+// calculatePrimaryFactorsConcurrent 并发计算一级因子分数
+func (h *GenerateInterpretReportHandlerConcurrent) calculatePrimaryFactorsConcurrent(ctx context.Context, factors []*medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer) (map[string]float64, error) {
+	log.Infof("开始并发计算一级因子，因子数量: %d", len(factors))
+
+	// 转换为计算请求
+	requests, err := h.convertFactorBatchCalculation(factors, answerMap, nil)
+	if err != nil {
+		return nil, fmt.Errorf("转换计算请求失败: %w", err)
 	}
 
-	// 获取计算公式类型
-	formulaType := factor.CalculationRule.FormulaType
-	if formulaType == "" {
-		return 0, fmt.Errorf("因子 %s 的计算公式类型为空", factor.Code)
+	if len(requests) == 0 {
+		return make(map[string]float64), nil
 	}
 
-	// 获取计算操作数（根据因子的源代码列表和对应的答案得分）
-	var operands []float64
-	for _, sourceCode := range factor.CalculationRule.SourceCodes {
-		if answer, exists := answerMap[sourceCode]; exists {
-			operands = append(operands, float64(answer.Score))
-			log.Debugf("因子 %s 问题 %s 得分: %d", factor.Code, sourceCode, answer.Score)
-		} else {
-			log.Warnf("未找到问题的答案，因子: %s, 问题代码: %s", factor.Code, sourceCode)
+	// 使用计算端口进行并发批量计算
+	results, err := h.calculationPort.CalculateBatch(ctx, requests)
+	if err != nil {
+		return nil, fmt.Errorf("并发计算失败: %w", err)
+	}
+
+	return h.extractFactorScoresFromResults(results), nil
+}
+
+// calculateMultilevelFactorsConcurrent 并发计算多级因子分数
+func (h *GenerateInterpretReportHandlerConcurrent) calculateMultilevelFactorsConcurrent(ctx context.Context, factors []*medicalscalepb.Factor, primaryFactorScores map[string]float64) (map[string]float64, error) {
+	log.Infof("开始并发计算多级因子，因子数量: %d", len(factors))
+
+	// 转换为计算请求
+	requests, err := h.convertFactorBatchCalculation(factors, nil, primaryFactorScores)
+	if err != nil {
+		return nil, fmt.Errorf("转换计算请求失败: %w", err)
+	}
+
+	if len(requests) == 0 {
+		return make(map[string]float64), nil
+	}
+
+	// 使用计算端口进行并发批量计算
+	results, err := h.calculationPort.CalculateBatch(ctx, requests)
+	if err != nil {
+		return nil, fmt.Errorf("并发计算失败: %w", err)
+	}
+
+	return h.extractFactorScoresFromResults(results), nil
+}
+
+// extractFactorScoresFromResults 从结果中提取因子分数
+func (h *GenerateInterpretReportHandlerConcurrent) extractFactorScoresFromResults(results []*calculationapp.CalculationResult) map[string]float64 {
+	factorScores := make(map[string]float64)
+
+	for _, result := range results {
+		if result.Error != "" {
+			log.Errorf("计算失败，任务: %s, 错误: %s", result.Name, result.Error)
+			continue
+		}
+
+		if factorCode := extractFactorCodeFromResultIDConcurrent(result.ID); factorCode != "" {
+			factorScores[factorCode] = result.Value
+			log.Debugf("因子 %s 分数: %f", factorCode, result.Value)
 		}
 	}
 
-	if len(operands) == 0 {
-		log.Warnf("因子 %s 没有找到任何有效的操作数", factor.Code)
-		return 0, nil
-	}
-
-	// 创建计算规则
-	rule := h.createCalculationRule(formulaType)
-
-	// 执行计算
-	result, err := h.calculationEngine.Calculate(ctx, operands, rule)
-	if err != nil {
-		return 0, fmt.Errorf("计算因子分数失败，因子: %s, 错误: %v", factor.Code, err)
-	}
-
-	return result.Value, nil
+	return factorScores
 }
 
-// calculateMultilevelFactorScore 计算多级因子分数
-func (h *GenerateInterpretReportHandler) calculateMultilevelFactorScore(ctx context.Context, factor *medicalscalepb.Factor, primaryFactorScores map[string]float64) (float64, error) {
-	if factor.CalculationRule == nil {
-		return 0, fmt.Errorf("因子 %s 没有计算规则", factor.Code)
+// extractFactorCodeFromResultIDConcurrent 从结果ID提取因子代码（并发版本）
+func extractFactorCodeFromResultIDConcurrent(resultID string) string {
+	const prefix = "factor_"
+	if len(resultID) > len(prefix) && resultID[:len(prefix)] == prefix {
+		return resultID[len(prefix):]
+	}
+	return ""
+}
+
+// applyFactorScoresToInterpretItems 应用因子分数到解读项
+func (h *GenerateInterpretReportHandlerConcurrent) applyFactorScoresToInterpretItems(interpretItems []*interpretreportpb.InterpretItem, factorScores map[string]float64, factorType string) {
+	// 创建解读项映射
+	itemMap := make(map[string]*interpretreportpb.InterpretItem)
+	for _, item := range interpretItems {
+		itemMap[item.FactorCode] = item
 	}
 
-	// 获取计算公式类型
-	formulaType := factor.CalculationRule.FormulaType
-	if formulaType == "" {
-		return 0, fmt.Errorf("因子 %s 的计算公式类型为空", factor.Code)
-	}
-
-	// 获取计算操作数（根据因子的源代码列表和对应的一级因子得分）
-	var operands []float64
-	for _, sourceCode := range factor.CalculationRule.SourceCodes {
-		if score, exists := primaryFactorScores[sourceCode]; exists {
-			operands = append(operands, score)
-			log.Debugf("多级因子 %s 一级因子 %s 得分: %f", factor.Code, sourceCode, score)
-		} else {
-			log.Warnf("未找到一级因子得分，多级因子: %s, 一级因子代码: %s", factor.Code, sourceCode)
+	successCount := 0
+	for factorCode, score := range factorScores {
+		if item, exists := itemMap[factorCode]; exists {
+			item.Score = score
+			successCount++
+			log.Infof("%s因子 %s 分数: %f", factorType, factorCode, score)
 		}
 	}
 
-	if len(operands) == 0 {
-		log.Warnf("多级因子 %s 没有找到任何有效的操作数", factor.Code)
-		return 0, nil
-	}
-
-	// 创建计算规则
-	rule := h.createCalculationRule(formulaType)
-
-	// 执行计算
-	result, err := h.calculationEngine.Calculate(ctx, operands, rule)
-	if err != nil {
-		return 0, fmt.Errorf("计算多级因子分数失败，因子: %s, 错误: %v", factor.Code, err)
-	}
-
-	return result.Value, nil
-}
-
-// createCalculationRule 创建计算规则
-func (h *GenerateInterpretReportHandler) createCalculationRule(formulaType string) *rules.CalculationRule {
-	// 将旧的公式类型映射到新的策略名称
-	strategyName := h.mapFormulaTypeToStrategy(formulaType)
-	return rules.NewCalculationRule(strategyName)
-}
-
-// mapFormulaTypeToStrategy 映射公式类型到策略名称
-func (h *GenerateInterpretReportHandler) mapFormulaTypeToStrategy(formulaType string) string {
-	switch formulaType {
-	case "the_option", "score":
-		return "option"
-	case "sum":
-		return "sum"
-	case "average":
-		return "average"
-	case "max":
-		return "max"
-	case "min":
-		return "min"
-	default:
-		return "option" // 默认使用选项策略
-	}
+	log.Infof("%s因子计算完成，成功 %d 个", factorType, successCount)
 }
 
 // saveInterpretReport 保存解读报告
-func (h *GenerateInterpretReportHandler) saveInterpretReport(ctx context.Context, interpretReport *interpretreportpb.InterpretReport) error {
+func (h *GenerateInterpretReportHandlerConcurrent) saveInterpretReport(ctx context.Context, interpretReport *interpretreportpb.InterpretReport) error {
 	_, err := h.interpretReportClient.SaveInterpretReport(
 		ctx,
 		interpretReport.AnswerSheetId,
@@ -302,4 +290,95 @@ func (h *GenerateInterpretReportHandler) saveInterpretReport(ctx context.Context
 		interpretReport.InterpretItems,
 	)
 	return err
+}
+
+// SetCalculationPort 设置计算端口（运行时切换适配器）
+func (h *GenerateInterpretReportHandlerConcurrent) SetCalculationPort(port calculationapp.CalculationPort) {
+	h.calculationPort = port
+}
+
+// convertFactorBatchCalculation 批量转换因子计算请求（私有方法）
+func (h *GenerateInterpretReportHandlerConcurrent) convertFactorBatchCalculation(factors []*medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer, factorScores map[string]float64) ([]*calculationapp.CalculationRequest, error) {
+	if len(factors) == 0 {
+		return []*calculationapp.CalculationRequest{}, nil
+	}
+
+	var requests []*calculationapp.CalculationRequest
+
+	for _, factor := range factors {
+		if factor.CalculationRule == nil || factor.CalculationRule.FormulaType == "" {
+			log.Debugf("因子 %s 无需计算", factor.Code)
+			continue
+		}
+
+		// 根据因子类型选择操作数源
+		operandData := make(map[string]float64)
+
+		if factor.FactorType == "primary" || factor.FactorType == "first_grade" {
+			// 一级因子：使用答案得分
+			for _, sourceCode := range factor.CalculationRule.SourceCodes {
+				if answer, exists := answerMap[sourceCode]; exists {
+					operandData[sourceCode] = float64(answer.Score)
+				}
+			}
+		} else if factor.FactorType == "multilevel" || factor.FactorType == "second_grade" {
+			// 多级因子：使用其他因子得分
+			for _, sourceCode := range factor.CalculationRule.SourceCodes {
+				if score, exists := factorScores[sourceCode]; exists {
+					operandData[sourceCode] = score
+				}
+			}
+		}
+
+		request, err := h.convertFactorCalculation(factor, operandData)
+		if err != nil {
+			log.Errorf("转换因子计算请求失败，因子: %s, 错误: %v", factor.Code, err)
+			continue
+		}
+
+		requests = append(requests, request)
+	}
+
+	log.Infof("批量转换因子计算请求完成，共生成 %d 个计算任务", len(requests))
+	return requests, nil
+}
+
+// convertFactorCalculation 转换因子计算请求（私有方法）
+func (h *GenerateInterpretReportHandlerConcurrent) convertFactorCalculation(factor *medicalscalepb.Factor, operandData map[string]float64) (*calculationapp.CalculationRequest, error) {
+	if factor == nil {
+		return nil, fmt.Errorf("因子不能为空")
+	}
+
+	if factor.CalculationRule == nil || factor.CalculationRule.FormulaType == "" {
+		return nil, fmt.Errorf("因子 %s 没有有效的计算规则", factor.Code)
+	}
+
+	// 根据源代码列表提取操作数
+	var operands []float64
+	for _, sourceCode := range factor.CalculationRule.SourceCodes {
+		if value, exists := operandData[sourceCode]; exists {
+			operands = append(operands, value)
+		} else {
+			log.Warnf("未找到源代码对应的操作数: %s", sourceCode)
+		}
+	}
+
+	if len(operands) == 0 {
+		return nil, fmt.Errorf("因子 %s 没有有效的操作数", factor.Code)
+	}
+
+	return &calculationapp.CalculationRequest{
+		ID:          fmt.Sprintf("factor_%s", factor.Code),
+		Name:        fmt.Sprintf("因子 %s 计算", factor.Title),
+		FormulaType: factor.CalculationRule.FormulaType,
+		Operands:    operands,
+		Parameters: map[string]interface{}{
+			"factor_code":  factor.Code,
+			"factor_type":  factor.FactorType,
+			"source_codes": factor.CalculationRule.SourceCodes,
+			"total_score":  factor.IsTotalScore,
+		},
+		Precision:    2,
+		RoundingMode: "round",
+	}, nil
 }

@@ -3,27 +3,25 @@ package answersheet_saved
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
-
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/rules"
-	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
 
 	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
 	questionnairepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
+	calculationapp "github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/calculation"
+	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
+	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
-// HandlerCalcAnswersheetScore 计算答卷分数处理器
+// CalcAnswersheetScoreHandler 计算答卷分数处理器
 type CalcAnswersheetScoreHandler struct {
 	questionnaireClient *grpcclient.QuestionnaireClient
 	answersheetClient   *grpcclient.AnswerSheetClient
-	calculationEngine   *calculation.CalculationEngine
-	maxConcurrency      int // 最大并发数
+	calculationPort     calculationapp.CalculationPort
 }
 
-// NewCalcAnswersheetScoreHandler 创建计算答卷分数处理器
+// NewCalcAnswersheetScoreHandler 创建计算答卷分数处理器（默认并发）
 func NewCalcAnswersheetScoreHandler(
 	questionnaireClient *grpcclient.QuestionnaireClient,
 	answersheetClient *grpcclient.AnswerSheetClient,
@@ -31,32 +29,27 @@ func NewCalcAnswersheetScoreHandler(
 	return &CalcAnswersheetScoreHandler{
 		questionnaireClient: questionnaireClient,
 		answersheetClient:   answersheetClient,
-		calculationEngine:   calculation.GetGlobalCalculationEngine(),
-		maxConcurrency:      50, // 默认最大并发数为50
+		calculationPort:     calculationapp.GetConcurrentCalculationPort(50), // 默认并发50
 	}
 }
 
-// NewCalcAnswersheetScoreHandlerWithConcurrency 创建计算答卷分数处理器（带并发控制）
-func NewCalcAnswersheetScoreHandlerWithConcurrency(
+// NewCalcAnswersheetScoreHandlerWithAdapter 创建计算答卷分数处理器（自定义适配器）
+func NewCalcAnswersheetScoreHandlerWithAdapter(
 	questionnaireClient *grpcclient.QuestionnaireClient,
 	answersheetClient *grpcclient.AnswerSheetClient,
-	maxConcurrency int,
+	calculationPort calculationapp.CalculationPort,
 ) *CalcAnswersheetScoreHandler {
-	if maxConcurrency <= 0 {
-		maxConcurrency = 50 // 默认值
-	}
 	return &CalcAnswersheetScoreHandler{
 		questionnaireClient: questionnaireClient,
 		answersheetClient:   answersheetClient,
-		calculationEngine:   calculation.GetGlobalCalculationEngine(),
-		maxConcurrency:      maxConcurrency,
+		calculationPort:     calculationPort,
 	}
 }
 
 // Handle 计算答卷得分，并保存分数
 func (h *CalcAnswersheetScoreHandler) Handle(ctx context.Context, data pubsub.AnswersheetSavedData) error {
 	startTime := time.Now()
-	log.Debugf("in HandlerCalcAnswersheetScore: %s", data)
+	log.Debugf("开始计算答卷分数: %s", data)
 
 	// 先加载答卷
 	answersheet, err := h.loadAnswersheet(ctx, data.AnswerSheetID)
@@ -70,7 +63,7 @@ func (h *CalcAnswersheetScoreHandler) Handle(ctx context.Context, data pubsub.An
 		return err
 	}
 
-	// 计算答卷中每一个答案的得分
+	// 计算答案分数
 	scoreStartTime := time.Now()
 	if err := h.calculateAnswerScores(ctx, answersheet, questionnaire); err != nil {
 		log.Errorf("计算答案得分失败: %v", err)
@@ -100,6 +93,71 @@ func (h *CalcAnswersheetScoreHandler) Handle(ctx context.Context, data pubsub.An
 	return nil
 }
 
+// calculateAnswerScores 计算答案分数（业务逻辑层）
+func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(ctx context.Context, answersheet *answersheetpb.AnswerSheet, questionnaire *questionnairepb.Questionnaire) error {
+	log.Infof("开始计算答案分数，答案数量: %d", len(answersheet.Answers))
+
+	// 转换为计算请求
+	requests, err := h.convertAnswerBatchCalculation(answersheet, questionnaire)
+	if err != nil {
+		return err
+	}
+
+	if len(requests) == 0 {
+		log.Infof("没有需要计算的答案")
+		return nil
+	}
+
+	// 使用计算端口进行批量计算
+	results, err := h.calculationPort.CalculateBatch(ctx, requests)
+	if err != nil {
+		return err
+	}
+
+	// 应用计算结果到答案
+	return h.applyAnswerCalculationResults(answersheet, results)
+}
+
+// applyAnswerCalculationResults 应用答案计算结果
+func (h *CalcAnswersheetScoreHandler) applyAnswerCalculationResults(answersheet *answersheetpb.AnswerSheet, results []*calculationapp.CalculationResult) error {
+	answerMap := make(map[string]*answersheetpb.Answer)
+	for _, answer := range answersheet.Answers {
+		answerMap[answer.QuestionCode] = answer
+	}
+
+	successCount := 0
+	errorCount := 0
+
+	for _, result := range results {
+		if result.Error != "" {
+			errorCount++
+			log.Errorf("计算失败，任务: %s, 错误: %s", result.Name, result.Error)
+			continue
+		}
+
+		// 从结果ID提取问题代码
+		if questionCode := extractQuestionCodeFromResultID(result.ID); questionCode != "" {
+			if answer, exists := answerMap[questionCode]; exists {
+				answer.Score = uint32(result.Value)
+				successCount++
+				log.Debugf("问题 %s 得分更新: %d", questionCode, answer.Score)
+			}
+		}
+	}
+
+	log.Infof("答案得分计算完成，成功 %d 个，失败 %d 个", successCount, errorCount)
+	return nil
+}
+
+// extractQuestionCodeFromResultID 从结果ID提取问题代码
+func extractQuestionCodeFromResultID(resultID string) string {
+	const prefix = "answer_"
+	if len(resultID) > len(prefix) && resultID[:len(prefix)] == prefix {
+		return resultID[len(prefix):]
+	}
+	return ""
+}
+
 // loadQuestionnaire 加载问卷
 func (h *CalcAnswersheetScoreHandler) loadQuestionnaire(ctx context.Context, questionnaireCode string, questionnaireVersion string) (*questionnairepb.Questionnaire, error) {
 	loadedQuestionnaire, err := h.questionnaireClient.GetQuestionnaire(ctx, questionnaireCode)
@@ -122,212 +180,14 @@ func (h *CalcAnswersheetScoreHandler) loadAnswersheet(ctx context.Context, answe
 	return loadedAnswersheet, nil
 }
 
-// calculateAnswerScores 计算答案得分
-func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(ctx context.Context, answersheet *answersheetpb.AnswerSheet, questionnaire *questionnairepb.Questionnaire) error {
-	// 使用 worker pool 模式并发计算每个答案的得分
-	type answerResult struct {
-		answer *answersheetpb.Answer
-		score  uint32
-		err    error
-	}
-
-	// 创建任务通道和结果通道
-	taskChan := make(chan *answersheetpb.Answer, len(answersheet.Answers))
-	resultChan := make(chan answerResult, len(answersheet.Answers))
-
-	// 启动 worker goroutines
-	for i := 0; i < h.maxConcurrency; i++ {
-		go func(workerID int) {
-			for answer := range taskChan {
-				result := answerResult{answer: answer}
-
-				// 是否可以计算得分
-				if !h.canCalculateScore(answer.QuestionCode, questionnaire) {
-					resultChan <- result
-					continue
-				}
-
-				// 获取计算公式
-				formulaType := h.getCalculationFormulaType(answer.QuestionCode, questionnaire)
-
-				// 获取计算操作数（根据问题的 option 和 答案选中值）
-				operands := h.loadCalculationOperands(answer.QuestionCode, answer.Value, questionnaire)
-				if len(operands) == 0 {
-					resultChan <- result
-					continue
-				}
-
-				// 创建计算规则
-				rule := h.createCalculationRule(formulaType)
-
-				// 执行计算
-				calcResult, err := h.calculationEngine.Calculate(ctx, operands, rule)
-				if err != nil {
-					result.err = err
-					resultChan <- result
-					continue
-				}
-
-				// 保存计算结果
-				result.score = uint32(calcResult.Value)
-				resultChan <- result
-
-				log.Debugf("Worker %d: 问题 %s 得分计算完成: %d", workerID, answer.QuestionCode, result.score)
-			}
-		}(i)
-	}
-
-	// 发送任务到任务通道
-	for _, answer := range answersheet.Answers {
-		taskChan <- answer
-	}
-	close(taskChan) // 关闭任务通道，通知 workers 没有更多任务
-
-	// 收集所有计算结果
-	completedCount := 0
-	errorCount := 0
-	successCount := 0
-
-	for completedCount < len(answersheet.Answers) {
-		result := <-resultChan
-		completedCount++
-
-		if result.err != nil {
-			errorCount++
-			log.Errorf("计算答案得分失败，问题代码: %s, 错误: %v", result.answer.QuestionCode, result.err)
-			continue
-		}
-
-		// 更新答案的得分
-		result.answer.Score = result.score
-		successCount++
-	}
-
-	log.Infof("所有答案得分计算完成，共处理 %d 个答案，成功 %d 个，失败 %d 个，使用 %d 个 worker",
-		len(answersheet.Answers), successCount, errorCount, h.maxConcurrency)
-	return nil
-}
-
-// canCalculateScore 是否可以计算得分
-// 判断 question 是否拥有 CalculationRule、CalculationRule.FormulaType 不为空
-func (h *CalcAnswersheetScoreHandler) canCalculateScore(questionCode string, questionnaire *questionnairepb.Questionnaire) bool {
-	question := findQuestionByCode(questionCode, questionnaire)
-	if question == nil {
-		log.Debugf("question not found: %s", questionCode)
-		return false
-	}
-
-	if question.CalculationRule == nil {
-		log.Debugf("question calculation rule not found: %s", question.Title)
-		return false
-	}
-
-	if question.CalculationRule.FormulaType == "" {
-		log.Debugf("question calculation rule formula type is empty: %s", question.Title)
-		return false
-	}
-
-	return true
-}
-
-// getCalculationFormulaType 获取计算公式类型
-func (h *CalcAnswersheetScoreHandler) getCalculationFormulaType(questionCode string, questionnaire *questionnairepb.Questionnaire) string {
-	// 获取问题
-	question := findQuestionByCode(questionCode, questionnaire)
-	if question == nil {
-		log.Errorf("question not found: %s", questionCode)
-		return ""
-	}
-
-	// 获取计算公式类型
-	return question.CalculationRule.FormulaType
-}
-
-// createCalculationRule 创建计算规则
-func (h *CalcAnswersheetScoreHandler) createCalculationRule(formulaType string) *rules.CalculationRule {
-	// 将旧的公式类型映射到新的策略名称
-	strategyName := h.mapFormulaTypeToStrategy(formulaType)
-	return rules.NewCalculationRule(strategyName)
-}
-
-// mapFormulaTypeToStrategy 映射公式类型到策略名称
-func (h *CalcAnswersheetScoreHandler) mapFormulaTypeToStrategy(formulaType string) string {
-	switch formulaType {
-	case "the_option", "score":
-		return "option"
-	case "sum":
-		return "sum"
-	case "average":
-		return "average"
-	case "max":
-		return "max"
-	case "min":
-		return "min"
-	default:
-		return "option" // 默认使用选项策略
-	}
-}
-
-// loadCalculationOperands 获取计算操作数
-func (h *CalcAnswersheetScoreHandler) loadCalculationOperands(questionCode string, answerValue string, questionnaire *questionnairepb.Questionnaire) []float64 {
-	// 获取问题
-	question := findQuestionByCode(questionCode, questionnaire)
-	if question == nil {
-		log.Errorf("question not found: %s", questionCode)
-		return nil
-	}
-
-	// 解析答案值（可能是JSON字符串）
-	var actualValue string
-	if err := json.Unmarshal([]byte(answerValue), &actualValue); err != nil {
-		// 如果不是JSON格式，直接使用原值
-		actualValue = answerValue
-	}
-
-	log.Debugf("解析答案值: 原始值=%s, 解析后=%s", answerValue, actualValue)
-
-	// 遍历问题选项
-	for _, option := range question.Options {
-		if option.Code == actualValue {
-			operands := []float64{float64(option.Score)}
-			log.Debugf("找到匹配选项: %s, 得分: %d", option.Code, option.Score)
-			return operands
-		}
-	}
-
-	log.Warnf("未找到匹配的选项: 问题=%s, 答案值=%s", questionCode, actualValue)
-	return nil
-}
-
 // calculateAnswerSheetTotalScore 计算答卷总分
 func (h *CalcAnswersheetScoreHandler) calculateAnswerSheetTotalScore(answersheet *answersheetpb.AnswerSheet) error {
-	// 使用 goroutine 并发计算总分
-	type totalResult struct {
-		totalScore float64
-		err        error
+	var totalScore float64
+	for _, answer := range answersheet.Answers {
+		totalScore += float64(answer.Score)
 	}
 
-	// 创建结果通道
-	resultChan := make(chan totalResult, 1)
-
-	// 启动 goroutine 计算总分
-	go func() {
-		var totalScore float64
-		// 遍历答卷中的每个答案
-		for _, answer := range answersheet.Answers {
-			totalScore += float64(answer.Score)
-		}
-
-		resultChan <- totalResult{totalScore: totalScore}
-	}()
-
-	// 等待计算结果
-	result := <-resultChan
-	if result.err != nil {
-		return result.err
-	}
-
-	answersheet.Score = uint32(result.totalScore)
+	answersheet.Score = uint32(totalScore)
 	log.Debugf("答卷总分计算完成: %d", answersheet.Score)
 	return nil
 }
@@ -344,17 +204,101 @@ func (h *CalcAnswersheetScoreHandler) saveAnswerSheetScores(ctx context.Context,
 	return nil
 }
 
-// findQuestionByCode 根据问题代码查找问题
-func findQuestionByCode(questionCode string, questionnaire *questionnairepb.Questionnaire) *questionnairepb.Question {
-	if questionnaire == nil {
-		log.Errorf("questionnaire is nil, cannot find question: %s", questionCode)
-		return nil
+// SetCalculationPort 设置计算端口（运行时切换适配器）
+func (h *CalcAnswersheetScoreHandler) SetCalculationPort(port calculationapp.CalculationPort) {
+	h.calculationPort = port
+}
+
+// convertAnswerBatchCalculation 批量转换答案计算请求（私有方法）
+func (h *CalcAnswersheetScoreHandler) convertAnswerBatchCalculation(answersheet *answersheetpb.AnswerSheet, questionnaire *questionnairepb.Questionnaire) ([]*calculationapp.CalculationRequest, error) {
+	if answersheet == nil || questionnaire == nil {
+		return nil, fmt.Errorf("答卷或问卷不能为空")
 	}
 
+	// 创建问题映射
+	questionMap := make(map[string]*questionnairepb.Question)
 	for _, question := range questionnaire.Questions {
-		if question.Code == questionCode {
-			return question
+		questionMap[question.Code] = question
+	}
+
+	var requests []*calculationapp.CalculationRequest
+
+	for _, answer := range answersheet.Answers {
+		question, exists := questionMap[answer.QuestionCode]
+		if !exists {
+			log.Warnf("未找到答案对应的问题: %s", answer.QuestionCode)
+			continue
+		}
+
+		// 检查是否需要计算
+		if question.CalculationRule == nil || question.CalculationRule.FormulaType == "" {
+			log.Debugf("问题 %s 无需计算", answer.QuestionCode)
+			continue
+		}
+
+		request, err := h.convertAnswerCalculation(answer, question)
+		if err != nil {
+			log.Errorf("转换答案计算请求失败，问题: %s, 错误: %v", answer.QuestionCode, err)
+			continue
+		}
+
+		requests = append(requests, request)
+	}
+
+	log.Infof("批量转换答案计算请求完成，共生成 %d 个计算任务", len(requests))
+	return requests, nil
+}
+
+// convertAnswerCalculation 转换答案计算请求（私有方法）
+func (h *CalcAnswersheetScoreHandler) convertAnswerCalculation(answer *answersheetpb.Answer, question *questionnairepb.Question) (*calculationapp.CalculationRequest, error) {
+	if answer == nil || question == nil {
+		return nil, fmt.Errorf("答案或问题不能为空")
+	}
+
+	if question.CalculationRule == nil || question.CalculationRule.FormulaType == "" {
+		return nil, fmt.Errorf("问题 %s 没有有效的计算规则", question.Code)
+	}
+
+	// 解析答案值获取操作数
+	operands, err := h.extractOperandsFromAnswer(answer, question)
+	if err != nil {
+		return nil, fmt.Errorf("解析答案操作数失败: %w", err)
+	}
+
+	return &calculationapp.CalculationRequest{
+		ID:          fmt.Sprintf("answer_%s", answer.QuestionCode),
+		Name:        fmt.Sprintf("问题 %s 答案计算", question.Title),
+		FormulaType: question.CalculationRule.FormulaType,
+		Operands:    operands,
+		Parameters: map[string]interface{}{
+			"question_code": answer.QuestionCode,
+			"question_type": answer.QuestionType,
+			"answer_value":  answer.Value,
+		},
+		Precision:    2,
+		RoundingMode: "round",
+	}, nil
+}
+
+// extractOperandsFromAnswer 从答案中提取操作数（私有方法）
+func (h *CalcAnswersheetScoreHandler) extractOperandsFromAnswer(answer *answersheetpb.Answer, question *questionnairepb.Question) ([]float64, error) {
+	// 解析答案值
+	var actualValue string
+	if err := json.Unmarshal([]byte(answer.Value), &actualValue); err != nil {
+		// 如果不是JSON格式，直接使用原值
+		actualValue = answer.Value
+	}
+
+	log.Debugf("解析答案值: 原始值=%s, 解析后=%s", answer.Value, actualValue)
+
+	// 遍历问题选项寻找匹配的得分
+	for _, option := range question.Options {
+		if option.Code == actualValue {
+			operands := []float64{float64(option.Score)}
+			log.Debugf("找到匹配选项: %s, 得分: %d", option.Code, option.Score)
+			return operands, nil
 		}
 	}
-	return nil
+
+	return nil, fmt.Errorf("未找到匹配的选项: 问题=%s, 答案值=%s", question.Code, actualValue)
 }
