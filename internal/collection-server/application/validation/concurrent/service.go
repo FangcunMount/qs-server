@@ -3,7 +3,6 @@ package concurrent
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/answersheet"
@@ -83,8 +82,9 @@ func (s *service) ValidateAnswersheet(ctx context.Context, req *ValidationReques
 	// 3. 转换为领域实体
 	answersheetEntity := s.convertToAnswersheet(req)
 
-	// 4. 并发验证答案
-	if err := s.validateAnswersConcurrently(ctx, answersheetEntity, questionnaireInfo); err != nil {
+	// 4. 使用专门的并发验证器
+	validator := NewValidator(s.maxConcurrency)
+	if err := validator.ValidateAnswersWithValidation(ctx, answersheetEntity, questionnaireInfo); err != nil {
 		return fmt.Errorf("concurrent answersheet validation failed: %w", err)
 	}
 
@@ -97,63 +97,25 @@ func (s *service) ValidateQuestionnaireCode(ctx context.Context, code string) er
 	return s.questionnaireService.ValidateQuestionnaireCode(ctx, code)
 }
 
-// validateAnswersConcurrently 并发验证答案
-func (s *service) validateAnswersConcurrently(ctx context.Context, answersheetEntity *answersheet.SubmitRequest, questionnaireInfo answersheet.QuestionnaireInfo) error {
-	// 创建问题映射
-	questionMap := make(map[string]answersheet.QuestionInfo)
-	for _, q := range questionnaireInfo.GetQuestions() {
-		questionMap[q.GetCode()] = q
+// GetMaxConcurrency 获取最大并发数
+func (s *service) GetMaxConcurrency() int {
+	return s.maxConcurrency
+}
+
+// SetMaxConcurrency 设置最大并发数
+func (s *service) SetMaxConcurrency(maxConcurrency int) {
+	if maxConcurrency > 0 {
+		s.maxConcurrency = maxConcurrency
 	}
+}
 
-	// 创建错误通道
-	errorChan := make(chan error, len(answersheetEntity.Answers))
-
-	// 创建信号量控制并发数
-	semaphore := make(chan struct{}, s.maxConcurrency)
-
-	var wg sync.WaitGroup
-
-	// 并发验证每个答案
-	for _, answer := range answersheetEntity.Answers {
-		wg.Add(1)
-		go func(answer *answersheet.Answer) {
-			defer wg.Done()
-
-			// 获取信号量
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			// 查找对应的问题
-			question, exists := questionMap[answer.QuestionCode]
-			if !exists {
-				errorChan <- fmt.Errorf("question not found: %s", answer.QuestionCode)
-				return
-			}
-
-			// 验证答案
-			if err := s.answersheetValidator.ValidateAnswer(ctx, answer, question); err != nil {
-				errorChan <- fmt.Errorf("invalid answer for question %s: %w", answer.QuestionCode, err)
-				return
-			}
-		}(answer)
+// GetServiceInfo 获取服务信息
+func (s *service) GetServiceInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"service_type":    "concurrent",
+		"max_concurrency": s.maxConcurrency,
+		"domain_layer":    "answersheet",
 	}
-
-	// 等待所有验证完成
-	wg.Wait()
-	close(errorChan)
-
-	// 收集错误
-	var errors []error
-	for err := range errorChan {
-		errors = append(errors, err)
-	}
-
-	// 如果有错误，返回第一个错误
-	if len(errors) > 0 {
-		return errors[0]
-	}
-
-	return nil
 }
 
 // convertToAnswersheet 将请求转换为答卷实体

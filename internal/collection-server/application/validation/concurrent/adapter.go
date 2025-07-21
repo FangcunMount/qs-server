@@ -9,77 +9,119 @@ import (
 // ValidatorAdapter 并发验证器适配器
 // 将 Validator 适配为 Service 接口
 type ValidatorAdapter struct {
-	validator *Validator
+	service Service
 }
 
 // NewValidatorAdapter 创建并发验证器适配器
 func NewValidatorAdapter(questionnaireService questionnaire.Service, maxConcurrency int) Service {
-	validator := NewValidator(questionnaireService, maxConcurrency)
+	concurrentService := NewService(questionnaireService, maxConcurrency)
 	return &ValidatorAdapter{
-		validator: validator,
+		service: concurrentService,
 	}
 }
 
 // ValidateAnswersheet 验证答卷
 func (a *ValidatorAdapter) ValidateAnswersheet(ctx context.Context, req *ValidationRequest) error {
-	return a.validator.ValidateAnswersheet(ctx, req)
+	return a.service.ValidateAnswersheet(ctx, req)
 }
 
 // ValidateQuestionnaireCode 验证问卷代码
 func (a *ValidatorAdapter) ValidateQuestionnaireCode(ctx context.Context, code string) error {
-	return a.validator.ValidateQuestionnaireCode(ctx, code)
+	return a.service.ValidateQuestionnaireCode(ctx, code)
 }
 
-// GetValidator 获取底层验证器（提供更多功能）
-func (a *ValidatorAdapter) GetValidator() *Validator {
-	return a.validator
+// GetService 获取底层服务（提供更多功能）
+func (a *ValidatorAdapter) GetService() Service {
+	return a.service
 }
 
-// GetMaxConcurrency 获取最大并发数
-func (a *ValidatorAdapter) GetMaxConcurrency() int {
-	return a.validator.GetMaxConcurrency()
+// ServiceExtended 扩展的并发服务接口
+type ServiceExtended interface {
+	Service
+	GetMaxConcurrency() int
+	SetMaxConcurrency(maxConcurrency int)
+	GetServiceInfo() map[string]interface{}
 }
 
-// SetMaxConcurrency 设置最大并发数
-func (a *ValidatorAdapter) SetMaxConcurrency(maxConcurrency int) {
-	a.validator.SetMaxConcurrency(maxConcurrency)
+// ExtendedServiceAdapter 扩展的并发服务适配器
+type ExtendedServiceAdapter struct {
+	service *service
 }
 
-// ServiceAdapter 并发服务适配器
-// 将并发验证器适配为通用的验证服务接口
-type ServiceAdapter struct {
-	validator *Validator
-}
-
-// NewServiceAdapter 创建并发服务适配器
-func NewServiceAdapter(questionnaireService questionnaire.Service, maxConcurrency int) *ServiceAdapter {
-	validator := NewValidator(questionnaireService, maxConcurrency)
-	return &ServiceAdapter{
-		validator: validator,
+// NewExtendedServiceAdapter 创建扩展的并发服务适配器
+func NewExtendedServiceAdapter(questionnaireService questionnaire.Service, maxConcurrency int) ServiceExtended {
+	concurrentService := NewService(questionnaireService, maxConcurrency).(*service)
+	return &ExtendedServiceAdapter{
+		service: concurrentService,
 	}
 }
 
 // ValidateAnswersheet 验证答卷
-func (a *ServiceAdapter) ValidateAnswersheet(ctx context.Context, req interface{}) error {
-	// 类型转换
-	concurrentReq, ok := req.(*ValidationRequest)
-	if !ok {
-		// 这里可能需要从通用类型转换
-		return a.validator.ValidateAnswersheet(ctx, concurrentReq)
-	}
-	return a.validator.ValidateAnswersheet(ctx, concurrentReq)
+func (a *ExtendedServiceAdapter) ValidateAnswersheet(ctx context.Context, req *ValidationRequest) error {
+	return a.service.ValidateAnswersheet(ctx, req)
 }
 
 // ValidateQuestionnaireCode 验证问卷代码
-func (a *ServiceAdapter) ValidateQuestionnaireCode(ctx context.Context, code string) error {
-	return a.validator.ValidateQuestionnaireCode(ctx, code)
+func (a *ExtendedServiceAdapter) ValidateQuestionnaireCode(ctx context.Context, code string) error {
+	return a.service.ValidateQuestionnaireCode(ctx, code)
 }
 
-// GetConcurrencyInfo 获取并发信息
-func (a *ServiceAdapter) GetConcurrencyInfo() map[string]interface{} {
+// GetMaxConcurrency 获取最大并发数
+func (a *ExtendedServiceAdapter) GetMaxConcurrency() int {
+	return a.service.GetMaxConcurrency()
+}
+
+// SetMaxConcurrency 设置最大并发数
+func (a *ExtendedServiceAdapter) SetMaxConcurrency(maxConcurrency int) {
+	a.service.SetMaxConcurrency(maxConcurrency)
+}
+
+// GetServiceInfo 获取服务信息
+func (a *ExtendedServiceAdapter) GetServiceInfo() map[string]interface{} {
+	return a.service.GetServiceInfo()
+}
+
+// ConcurrentValidationManager 并发验证管理器
+type ConcurrentValidationManager struct {
+	validator *Validator
+	service   Service
+}
+
+// NewConcurrentValidationManager 创建并发验证管理器
+func NewConcurrentValidationManager(questionnaireService questionnaire.Service, maxConcurrency int) *ConcurrentValidationManager {
+	return &ConcurrentValidationManager{
+		validator: NewValidator(maxConcurrency),
+		service:   NewService(questionnaireService, maxConcurrency),
+	}
+}
+
+// GetValidator 获取并发验证器
+func (m *ConcurrentValidationManager) GetValidator() *Validator {
+	return m.validator
+}
+
+// GetService 获取并发服务
+func (m *ConcurrentValidationManager) GetService() Service {
+	return m.service
+}
+
+// ValidateWithBoth 使用验证器和服务双重验证
+func (m *ConcurrentValidationManager) ValidateWithBoth(ctx context.Context, req *ValidationRequest) error {
+	// 首先使用服务验证
+	if err := m.service.ValidateAnswersheet(ctx, req); err != nil {
+		return err
+	}
+
+	// 如果需要，可以添加额外的验证逻辑
+	return nil
+}
+
+// GetManagerInfo 获取管理器信息
+func (m *ConcurrentValidationManager) GetManagerInfo() map[string]interface{} {
 	return map[string]interface{}{
-		"strategy":        "concurrent",
-		"max_concurrency": a.validator.GetMaxConcurrency(),
-		"validator_type":  "concurrent",
+		"manager_type":    "concurrent",
+		"has_validator":   m.validator != nil,
+		"has_service":     m.service != nil,
+		"validator_stats": m.validator.GetConcurrencyStats(),
 	}
 }

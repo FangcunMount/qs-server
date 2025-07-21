@@ -90,27 +90,15 @@ func (v *Validator) ValidateAnswersConcurrently(ctx context.Context, answers []*
 	return nil
 }
 
-// convertToAnswersheet 将请求转换为答卷实体
-func (v *Validator) convertToAnswersheet(req *ValidationRequest) *answersheet.SubmitRequest {
-	answers := make([]*answersheet.Answer, 0, len(req.Answers))
-	for _, answer := range req.Answers {
-		answers = append(answers, &answersheet.Answer{
-			QuestionCode: answer.QuestionCode,
-			QuestionType: answer.QuestionType,
-			Value:        answer.Value,
-		})
+// ValidateAnswersWithValidation 验证答案列表并使用额外的测试者信息验证
+func (v *Validator) ValidateAnswersWithValidation(ctx context.Context, req *answersheet.SubmitRequest, questionnaireInfo answersheet.QuestionnaireInfo) error {
+	// 首先验证测试者信息
+	if err := v.answersheetValidator.ValidateTesteeInfo(req.TesteeInfo); err != nil {
+		return fmt.Errorf("testee info validation failed: %w", err)
 	}
 
-	return &answersheet.SubmitRequest{
-		QuestionnaireCode: req.QuestionnaireCode,
-		Title:             req.Title,
-		TesteeInfo: &answersheet.TesteeInfo{
-			Name:  req.TesteeInfo.Name,
-			Email: req.TesteeInfo.Email,
-			Phone: req.TesteeInfo.Phone,
-		},
-		Answers: answers,
-	}
+	// 并发验证答案
+	return v.ValidateAnswersConcurrently(ctx, req.Answers, questionnaireInfo)
 }
 
 // GetMaxConcurrency 获取最大并发数
@@ -122,5 +110,14 @@ func (v *Validator) GetMaxConcurrency() int {
 func (v *Validator) SetMaxConcurrency(maxConcurrency int) {
 	if maxConcurrency > 0 {
 		v.maxConcurrency = maxConcurrency
+	}
+}
+
+// GetConcurrencyStats 获取并发统计信息
+func (v *Validator) GetConcurrencyStats() map[string]interface{} {
+	return map[string]interface{}{
+		"max_concurrency":  v.maxConcurrency,
+		"validator_type":   "concurrent",
+		"domain_validator": "answersheet",
 	}
 }
