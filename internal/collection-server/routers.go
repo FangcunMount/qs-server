@@ -61,9 +61,8 @@ func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
 
 // registerPublicRoutes 注册公开路由（不需要认证）
 func (r *Router) registerPublicRoutes(engine *gin.Engine) {
-	// 健康检查和基础路由
+	// 自定义健康检查路由（genericapiserver已经注册了/healthz和/version）
 	engine.GET("/health", r.healthCheck)
-	engine.GET("/healthz", r.healthCheck)
 	engine.GET("/ping", r.ping)
 	engine.GET("/ready", r.readiness)
 	engine.GET("/live", r.liveness)
