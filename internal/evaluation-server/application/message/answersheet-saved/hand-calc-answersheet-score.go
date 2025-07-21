@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/rules"
 	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
@@ -18,6 +19,7 @@ import (
 type CalcAnswersheetScoreHandler struct {
 	questionnaireClient *grpcclient.QuestionnaireClient
 	answersheetClient   *grpcclient.AnswerSheetClient
+	calculationEngine   *calculation.CalculationEngine
 	maxConcurrency      int // 最大并发数
 }
 
@@ -29,6 +31,7 @@ func NewCalcAnswersheetScoreHandler(
 	return &CalcAnswersheetScoreHandler{
 		questionnaireClient: questionnaireClient,
 		answersheetClient:   answersheetClient,
+		calculationEngine:   calculation.GetGlobalCalculationEngine(),
 		maxConcurrency:      50, // 默认最大并发数为50
 	}
 }
@@ -45,6 +48,7 @@ func NewCalcAnswersheetScoreHandlerWithConcurrency(
 	return &CalcAnswersheetScoreHandler{
 		questionnaireClient: questionnaireClient,
 		answersheetClient:   answersheetClient,
+		calculationEngine:   calculation.GetGlobalCalculationEngine(),
 		maxConcurrency:      maxConcurrency,
 	}
 }
@@ -68,7 +72,7 @@ func (h *CalcAnswersheetScoreHandler) Handle(ctx context.Context, data pubsub.An
 
 	// 计算答卷中每一个答案的得分
 	scoreStartTime := time.Now()
-	if err := h.calculateAnswerScores(answersheet, questionnaire); err != nil {
+	if err := h.calculateAnswerScores(ctx, answersheet, questionnaire); err != nil {
 		log.Errorf("计算答案得分失败: %v", err)
 		return err
 	}
@@ -119,7 +123,7 @@ func (h *CalcAnswersheetScoreHandler) loadAnswersheet(ctx context.Context, answe
 }
 
 // calculateAnswerScores 计算答案得分
-func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(answersheet *answersheetpb.AnswerSheet, questionnaire *questionnairepb.Questionnaire) error {
+func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(ctx context.Context, answersheet *answersheetpb.AnswerSheet, questionnaire *questionnairepb.Questionnaire) error {
 	// 使用 worker pool 模式并发计算每个答案的得分
 	type answerResult struct {
 		answer *answersheetpb.Answer
@@ -146,19 +150,18 @@ func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(answersheet *answers
 				// 获取计算公式
 				formulaType := h.getCalculationFormulaType(answer.QuestionCode, questionnaire)
 
-				// 根据计算规则，创建计算器
-				calculater, err := calculation.GetCalculater(calculation.CalculaterType(formulaType))
-				if err != nil {
-					result.err = err
+				// 获取计算操作数（根据问题的 option 和 答案选中值）
+				operands := h.loadCalculationOperands(answer.QuestionCode, answer.Value, questionnaire)
+				if len(operands) == 0 {
 					resultChan <- result
 					continue
 				}
 
-				// 获取计算操作数（根据问题的 option 和 答案选中值）
-				operands := h.loadCalculationOperands(answer.QuestionCode, answer.Value, questionnaire)
+				// 创建计算规则
+				rule := h.createCalculationRule(formulaType)
 
 				// 执行计算
-				score, err := calculater.Calculate(operands)
+				calcResult, err := h.calculationEngine.Calculate(ctx, operands, rule)
 				if err != nil {
 					result.err = err
 					resultChan <- result
@@ -166,7 +169,7 @@ func (h *CalcAnswersheetScoreHandler) calculateAnswerScores(answersheet *answers
 				}
 
 				// 保存计算结果
-				result.score = uint32(score)
+				result.score = uint32(calcResult.Value)
 				resultChan <- result
 
 				log.Debugf("Worker %d: 问题 %s 得分计算完成: %d", workerID, answer.QuestionCode, result.score)
@@ -240,13 +243,38 @@ func (h *CalcAnswersheetScoreHandler) getCalculationFormulaType(questionCode str
 	return question.CalculationRule.FormulaType
 }
 
+// createCalculationRule 创建计算规则
+func (h *CalcAnswersheetScoreHandler) createCalculationRule(formulaType string) *rules.CalculationRule {
+	// 将旧的公式类型映射到新的策略名称
+	strategyName := h.mapFormulaTypeToStrategy(formulaType)
+	return rules.NewCalculationRule(strategyName)
+}
+
+// mapFormulaTypeToStrategy 映射公式类型到策略名称
+func (h *CalcAnswersheetScoreHandler) mapFormulaTypeToStrategy(formulaType string) string {
+	switch formulaType {
+	case "the_option", "score":
+		return "option"
+	case "sum":
+		return "sum"
+	case "average":
+		return "average"
+	case "max":
+		return "max"
+	case "min":
+		return "min"
+	default:
+		return "option" // 默认使用选项策略
+	}
+}
+
 // loadCalculationOperands 获取计算操作数
-func (h *CalcAnswersheetScoreHandler) loadCalculationOperands(questionCode string, answerValue string, questionnaire *questionnairepb.Questionnaire) (operands []calculation.Operand) {
+func (h *CalcAnswersheetScoreHandler) loadCalculationOperands(questionCode string, answerValue string, questionnaire *questionnairepb.Questionnaire) []float64 {
 	// 获取问题
 	question := findQuestionByCode(questionCode, questionnaire)
 	if question == nil {
 		log.Errorf("question not found: %s", questionCode)
-		return operands
+		return nil
 	}
 
 	// 解析答案值（可能是JSON字符串）
@@ -261,17 +289,14 @@ func (h *CalcAnswersheetScoreHandler) loadCalculationOperands(questionCode strin
 	// 遍历问题选项
 	for _, option := range question.Options {
 		if option.Code == actualValue {
-			operands = append(operands, calculation.Operand(option.Score))
+			operands := []float64{float64(option.Score)}
 			log.Debugf("找到匹配选项: %s, 得分: %d", option.Code, option.Score)
-			break
+			return operands
 		}
 	}
 
-	if len(operands) == 0 {
-		log.Warnf("未找到匹配的选项: 问题=%s, 答案值=%s", questionCode, actualValue)
-	}
-
-	return
+	log.Warnf("未找到匹配的选项: 问题=%s, 答案值=%s", questionCode, actualValue)
+	return nil
 }
 
 // calculateAnswerSheetTotalScore 计算答卷总分
@@ -309,16 +334,13 @@ func (h *CalcAnswersheetScoreHandler) calculateAnswerSheetTotalScore(answersheet
 
 // saveAnswerSheetScores 保存答卷得分
 func (h *CalcAnswersheetScoreHandler) saveAnswerSheetScores(ctx context.Context, answerSheetID uint64, answersheet *answersheetpb.AnswerSheet) error {
-	log.Infof("保存答卷得分，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
-
-	// 调用GRPC服务保存分数
+	// 保存答卷得分
 	err := h.answersheetClient.SaveAnswerSheetScores(ctx, answerSheetID, answersheet.Score, answersheet.Answers)
 	if err != nil {
-		log.Errorf("保存答卷分数失败: %v", err)
 		return err
 	}
 
-	log.Infof("答卷得分保存成功，答卷ID: %d, 总分: %d", answerSheetID, answersheet.Score)
+	log.Debugf("answersheet score saved: %d", answersheet.Score)
 	return nil
 }
 

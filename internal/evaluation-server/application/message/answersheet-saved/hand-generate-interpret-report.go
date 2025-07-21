@@ -8,6 +8,7 @@ import (
 	interpretreportpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-report"
 	medicalscalepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scale"
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/rules"
 	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/interpretion"
 	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
@@ -19,6 +20,7 @@ type GenerateInterpretReportHandler struct {
 	answersheetClient     *grpcclient.AnswerSheetClient
 	medicalScaleClient    *grpcclient.MedicalScaleClient
 	interpretReportClient *grpcclient.InterpretReportClient
+	calculationEngine     *calculation.CalculationEngine
 }
 
 // NewGenerateInterpretReportHandler 创建生成解读报告处理器
@@ -31,6 +33,7 @@ func NewGenerateInterpretReportHandler(
 		answersheetClient:     answersheetClient,
 		medicalScaleClient:    medicalScaleClient,
 		interpretReportClient: interpretReportClient,
+		calculationEngine:     calculation.GetGlobalCalculationEngine(),
 	}
 }
 
@@ -63,7 +66,7 @@ func (h *GenerateInterpretReportHandler) Handle(ctx context.Context, data pubsub
 	}
 
 	// 计算解读报告中的因子分
-	if err := h.calculateInterpretReportScore(interpretReport, answerSheet, medicalScale); err != nil {
+	if err := h.calculateInterpretReportScore(ctx, interpretReport, answerSheet, medicalScale); err != nil {
 		log.Errorf("计算解读报告分数失败，错误: %v", err)
 		return fmt.Errorf("计算解读报告分数失败: %w", err)
 	}
@@ -89,44 +92,39 @@ func (h *GenerateInterpretReportHandler) Handle(ctx context.Context, data pubsub
 func (h *GenerateInterpretReportHandler) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
 	answerSheet, err := h.answersheetClient.GetAnswerSheet(ctx, answerSheetID)
 	if err != nil {
-		return nil, err
-	}
-	if answerSheet == nil {
-		return nil, fmt.Errorf("答卷不存在，ID: %d", answerSheetID)
+		return nil, fmt.Errorf("获取答卷失败，ID: %d, 错误: %v", answerSheetID, err)
 	}
 	return answerSheet, nil
 }
 
 // loadMedicalScale 加载医学量表
-func (h *GenerateInterpretReportHandler) loadMedicalScale(ctx context.Context, medicalScaleCode string) (*medicalscalepb.MedicalScale, error) {
-	medicalScale, err := h.medicalScaleClient.GetMedicalScaleByQuestionnaireCode(ctx, medicalScaleCode)
+func (h *GenerateInterpretReportHandler) loadMedicalScale(ctx context.Context, questionnaireCode string) (*medicalscalepb.MedicalScale, error) {
+	medicalScale, err := h.medicalScaleClient.GetMedicalScaleByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
-		return nil, err
-	}
-	if medicalScale == nil {
-		return nil, fmt.Errorf("医学量表不存在，代码: %s", medicalScaleCode)
+		return nil, fmt.Errorf("获取医学量表失败，代码: %s, 错误: %v", questionnaireCode, err)
 	}
 	return medicalScale, nil
 }
 
-// buildInterpretItems 构建解读项
+// buildInterpretItems 构建解读项目
 func (h *GenerateInterpretReportHandler) buildInterpretItems(medicalScale *medicalscalepb.MedicalScale) []*interpretreportpb.InterpretItem {
-	interpretItems := make([]*interpretreportpb.InterpretItem, 0, len(medicalScale.Factors))
+	var interpretItems []*interpretreportpb.InterpretItem
+
 	for _, factor := range medicalScale.Factors {
-		// 为解读项设置默认内容
-		content := fmt.Sprintf("因子 %s (%s) 的评估结果", factor.Title, factor.Code)
-		interpretItems = append(interpretItems, &interpretreportpb.InterpretItem{
+		interpretItem := &interpretreportpb.InterpretItem{
 			FactorCode: factor.Code,
 			Title:      factor.Title,
-			Score:      0,
-			Content:    content,
-		})
+			Score:      0,  // 初始分数为0，后续会计算
+			Content:    "", // 初始内容为空，后续会生成
+		}
+		interpretItems = append(interpretItems, interpretItem)
 	}
+
 	return interpretItems
 }
 
-// calculateInterpretReportScore 计算解读报告中的因子分
-func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(interpretReport *interpretreportpb.InterpretReport, answerSheet *answersheetpb.AnswerSheet, medicalScale *medicalscalepb.MedicalScale) error {
+// calculateInterpretReportScore 计算解读报告分数
+func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(ctx context.Context, interpretReport *interpretreportpb.InterpretReport, answerSheet *answersheetpb.AnswerSheet, medicalScale *medicalscalepb.MedicalScale) error {
 	log.Infof("开始计算因子分，因子数量: %d", len(interpretReport.InterpretItems))
 
 	// 创建答案映射，便于快速查找
@@ -153,7 +151,7 @@ func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(interpret
 		// 判断因子类型
 		if factor.FactorType == "primary" || factor.FactorType == "first_grade" {
 			// 一级因子：根据计算公式和问题答案计算
-			score, err := h.calculatePrimaryFactorScore(factor, answerMap)
+			score, err := h.calculatePrimaryFactorScore(ctx, factor, answerMap)
 			if err != nil {
 				log.Errorf("计算一级因子分数失败，因子: %s, 错误: %v", factor.Code, err)
 				continue
@@ -171,9 +169,10 @@ func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(interpret
 			continue
 		}
 
+		// 判断因子类型
 		if factor.FactorType == "multilevel" || factor.FactorType == "second_grade" {
-			// 多级因子：根据计算公式和一级因子得分计算
-			score, err := h.calculateMultilevelFactorScore(factor, primaryFactorScores)
+			// 多级因子：根据一级因子分数计算
+			score, err := h.calculateMultilevelFactorScore(ctx, factor, primaryFactorScores)
 			if err != nil {
 				log.Errorf("计算多级因子分数失败，因子: %s, 错误: %v", factor.Code, err)
 				continue
@@ -183,11 +182,12 @@ func (h *GenerateInterpretReportHandler) calculateInterpretReportScore(interpret
 		}
 	}
 
+	log.Infof("因子分计算完成")
 	return nil
 }
 
 // calculatePrimaryFactorScore 计算一级因子分数
-func (h *GenerateInterpretReportHandler) calculatePrimaryFactorScore(factor *medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer) (float64, error) {
+func (h *GenerateInterpretReportHandler) calculatePrimaryFactorScore(ctx context.Context, factor *medicalscalepb.Factor, answerMap map[string]*answersheetpb.Answer) (float64, error) {
 	if factor.CalculationRule == nil {
 		return 0, fmt.Errorf("因子 %s 没有计算规则", factor.Code)
 	}
@@ -198,17 +198,11 @@ func (h *GenerateInterpretReportHandler) calculatePrimaryFactorScore(factor *med
 		return 0, fmt.Errorf("因子 %s 的计算公式类型为空", factor.Code)
 	}
 
-	// 根据计算规则，创建计算器
-	calculater, err := calculation.GetCalculater(calculation.CalculaterType(formulaType))
-	if err != nil {
-		return 0, fmt.Errorf("获取计算器失败，公式类型: %s, 错误: %v", formulaType, err)
-	}
-
 	// 获取计算操作数（根据因子的源代码列表和对应的答案得分）
-	var operands []calculation.Operand
+	var operands []float64
 	for _, sourceCode := range factor.CalculationRule.SourceCodes {
 		if answer, exists := answerMap[sourceCode]; exists {
-			operands = append(operands, calculation.Operand(answer.Score))
+			operands = append(operands, float64(answer.Score))
 			log.Debugf("因子 %s 问题 %s 得分: %d", factor.Code, sourceCode, answer.Score)
 		} else {
 			log.Warnf("未找到问题的答案，因子: %s, 问题代码: %s", factor.Code, sourceCode)
@@ -220,17 +214,20 @@ func (h *GenerateInterpretReportHandler) calculatePrimaryFactorScore(factor *med
 		return 0, nil
 	}
 
+	// 创建计算规则
+	rule := h.createCalculationRule(formulaType)
+
 	// 执行计算
-	score, err := calculater.Calculate(operands)
+	result, err := h.calculationEngine.Calculate(ctx, operands, rule)
 	if err != nil {
 		return 0, fmt.Errorf("计算因子分数失败，因子: %s, 错误: %v", factor.Code, err)
 	}
 
-	return score.Value(), nil
+	return result.Value, nil
 }
 
 // calculateMultilevelFactorScore 计算多级因子分数
-func (h *GenerateInterpretReportHandler) calculateMultilevelFactorScore(factor *medicalscalepb.Factor, primaryFactorScores map[string]float64) (float64, error) {
+func (h *GenerateInterpretReportHandler) calculateMultilevelFactorScore(ctx context.Context, factor *medicalscalepb.Factor, primaryFactorScores map[string]float64) (float64, error) {
 	if factor.CalculationRule == nil {
 		return 0, fmt.Errorf("因子 %s 没有计算规则", factor.Code)
 	}
@@ -241,17 +238,11 @@ func (h *GenerateInterpretReportHandler) calculateMultilevelFactorScore(factor *
 		return 0, fmt.Errorf("因子 %s 的计算公式类型为空", factor.Code)
 	}
 
-	// 根据计算规则，创建计算器
-	calculater, err := calculation.GetCalculater(calculation.CalculaterType(formulaType))
-	if err != nil {
-		return 0, fmt.Errorf("获取计算器失败，公式类型: %s, 错误: %v", formulaType, err)
-	}
-
 	// 获取计算操作数（根据因子的源代码列表和对应的一级因子得分）
-	var operands []calculation.Operand
+	var operands []float64
 	for _, sourceCode := range factor.CalculationRule.SourceCodes {
 		if score, exists := primaryFactorScores[sourceCode]; exists {
-			operands = append(operands, calculation.Operand(score))
+			operands = append(operands, score)
 			log.Debugf("多级因子 %s 一级因子 %s 得分: %f", factor.Code, sourceCode, score)
 		} else {
 			log.Warnf("未找到一级因子得分，多级因子: %s, 一级因子代码: %s", factor.Code, sourceCode)
@@ -263,13 +254,41 @@ func (h *GenerateInterpretReportHandler) calculateMultilevelFactorScore(factor *
 		return 0, nil
 	}
 
+	// 创建计算规则
+	rule := h.createCalculationRule(formulaType)
+
 	// 执行计算
-	score, err := calculater.Calculate(operands)
+	result, err := h.calculationEngine.Calculate(ctx, operands, rule)
 	if err != nil {
 		return 0, fmt.Errorf("计算多级因子分数失败，因子: %s, 错误: %v", factor.Code, err)
 	}
 
-	return score.Value(), nil
+	return result.Value, nil
+}
+
+// createCalculationRule 创建计算规则
+func (h *GenerateInterpretReportHandler) createCalculationRule(formulaType string) *rules.CalculationRule {
+	// 将旧的公式类型映射到新的策略名称
+	strategyName := h.mapFormulaTypeToStrategy(formulaType)
+	return rules.NewCalculationRule(strategyName)
+}
+
+// mapFormulaTypeToStrategy 映射公式类型到策略名称
+func (h *GenerateInterpretReportHandler) mapFormulaTypeToStrategy(formulaType string) string {
+	switch formulaType {
+	case "the_option", "score":
+		return "option"
+	case "sum":
+		return "sum"
+	case "average":
+		return "average"
+	case "max":
+		return "max"
+	case "min":
+		return "min"
+	default:
+		return "option" // 默认使用选项策略
+	}
 }
 
 // saveInterpretReport 保存解读报告
@@ -282,8 +301,5 @@ func (h *GenerateInterpretReportHandler) saveInterpretReport(ctx context.Context
 		interpretReport.Description,
 		interpretReport.InterpretItems,
 	)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
