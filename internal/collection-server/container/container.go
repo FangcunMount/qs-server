@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/answersheet"
+	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/validation"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/handler"
@@ -24,6 +25,7 @@ type Container struct {
 	ValidationService           validation.Service
 	ValidationServiceConcurrent validation.ServiceConcurrent
 	AnswersheetService          answersheet.Service
+	QuestionnaireService        questionnaire.Service
 
 	// 接口层
 	QuestionnaireHandler handler.QuestionnaireHandler
@@ -131,6 +133,9 @@ func (c *Container) initializeApplication() error {
 	// 创建答卷应用服务
 	c.AnswersheetService = answersheet.NewService(c.AnswersheetClient, c.Publisher)
 
+	// 创建问卷应用服务
+	c.QuestionnaireService = questionnaire.NewService(c.QuestionnaireClient)
+
 	log.Infof("   ✅ Application services initialized (using concurrent validation, max concurrency: %d)", c.concurrencyConfig.MaxConcurrency)
 	return nil
 }
@@ -139,10 +144,10 @@ func (c *Container) initializeApplication() error {
 func (c *Container) initializeInterface() error {
 	log.Info("   🌐 Initializing interface handlers...")
 
-	// 创建处理器（使用适配器包装的并发验证服务）
+	// 创建处理器（使用应用服务）
 	c.QuestionnaireHandler = handler.NewQuestionnaireHandler(
-		c.QuestionnaireClient,
-		c.ValidationService, // 通过适配器使用并发版本
+		c.QuestionnaireService, // 使用问卷应用服务
+		c.QuestionnaireClient,  // 保留gRPC客户端用于List操作
 	)
 
 	c.AnswersheetHandler = handler.NewAnswersheetHandler(
