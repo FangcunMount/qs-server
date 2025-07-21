@@ -38,9 +38,11 @@ type ValidationRequest struct {
 
 // TesteeInfo 测试者信息
 type TesteeInfo struct {
-	Name  string `json:"name" validate:"required"`
-	Email string `json:"email,omitempty"`
-	Phone string `json:"phone,omitempty"`
+	Name   string `json:"name" validate:"required"`
+	Gender string `json:"gender,omitempty"`
+	Age    *int   `json:"age,omitempty"`
+	Email  string `json:"email,omitempty"`
+	Phone  string `json:"phone,omitempty"`
 }
 
 // AnswerValidationItem 答案验证项
@@ -89,9 +91,11 @@ func (req *ValidationRequest) ToSequentialRequest() *sequential.ValidationReques
 		QuestionnaireCode: req.QuestionnaireCode,
 		Title:             req.Title,
 		TesteeInfo: &sequential.TesteeInfo{
-			Name:  req.TesteeInfo.Name,
-			Email: req.TesteeInfo.Email,
-			Phone: req.TesteeInfo.Phone,
+			Name:   req.TesteeInfo.Name,
+			Gender: req.TesteeInfo.Gender,
+			Age:    req.TesteeInfo.Age,
+			Email:  req.TesteeInfo.Email,
+			Phone:  req.TesteeInfo.Phone,
 		},
 		Answers: sequentialAnswers,
 	}
@@ -112,9 +116,11 @@ func (req *ValidationRequest) ToConcurrentRequest() *concurrent.ValidationReques
 		QuestionnaireCode: req.QuestionnaireCode,
 		Title:             req.Title,
 		TesteeInfo: &concurrent.TesteeInfo{
-			Name:  req.TesteeInfo.Name,
-			Email: req.TesteeInfo.Email,
-			Phone: req.TesteeInfo.Phone,
+			Name:   req.TesteeInfo.Name,
+			Gender: req.TesteeInfo.Gender,
+			Age:    req.TesteeInfo.Age,
+			Email:  req.TesteeInfo.Email,
+			Phone:  req.TesteeInfo.Phone,
 		},
 		Answers: concurrentAnswers,
 	}

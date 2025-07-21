@@ -130,11 +130,11 @@ func (c *Container) initializeApplication() error {
 	// 保存并发服务引用（用于直接访问并发功能）
 	c.ValidationServiceConcurrent = concurrentService
 
-	// 创建答卷应用服务
-	c.AnswersheetService = answersheet.NewService(c.AnswersheetClient, c.Publisher)
-
-	// 创建问卷应用服务
+	// 先创建问卷应用服务（答卷服务依赖它）
 	c.QuestionnaireService = questionnaire.NewService(c.QuestionnaireClient)
+
+	// 再创建答卷应用服务
+	c.AnswersheetService = answersheet.NewService(c.AnswersheetClient, c.Publisher, c.QuestionnaireService)
 
 	log.Infof("   ✅ Application services initialized (using concurrent validation, max concurrency: %d)", c.concurrencyConfig.MaxConcurrency)
 	return nil

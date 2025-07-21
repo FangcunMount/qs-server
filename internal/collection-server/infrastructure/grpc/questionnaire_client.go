@@ -7,9 +7,11 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
@@ -35,8 +37,16 @@ type questionnaireClient struct {
 // NewQuestionnaireClient 创建新的问卷客户端
 func NewQuestionnaireClient(config *options.GRPCClientOptions) (QuestionnaireClient, error) {
 	// 设置连接选项
+	kacp := keepalive.ClientParameters{
+		Time:                30 * time.Second, // 每30秒发送一次ping
+		Timeout:             10 * time.Second, // ping超时时间
+		PermitWithoutStream: false,            // 只在有活跃RPC时发送ping
+	}
 	opts := []grpc.DialOption{
 		grpc.WithTimeout(time.Duration(config.Timeout) * time.Second),
+		grpc.WithKeepaliveParams(kacp),
+		grpc.WithUnaryInterceptor(middleware.UnaryClientLoggingInterceptor()),
+		grpc.WithStreamInterceptor(middleware.StreamClientLoggingInterceptor()),
 	}
 
 	// 根据配置决定是否使用TLS

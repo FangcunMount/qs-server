@@ -8,6 +8,7 @@ import (
 	"time"
 
 	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
 	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
@@ -26,60 +27,90 @@ type Service interface {
 
 // service 答卷应用服务实现
 type service struct {
-	answersheetClient grpc.AnswersheetClient
-	validator         *answersheet.Validator
-	publisher         pubsub.Publisher
+	answersheetClient    grpc.AnswersheetClient
+	questionnaireService questionnaire.Service
+	validator            *answersheet.Validator
+	publisher            pubsub.Publisher
 }
 
 // NewService 创建答卷应用服务
-func NewService(answersheetClient grpc.AnswersheetClient, publisher pubsub.Publisher) Service {
+func NewService(answersheetClient grpc.AnswersheetClient, publisher pubsub.Publisher, questionnaireService questionnaire.Service) Service {
 	return &service{
-		answersheetClient: answersheetClient,
-		validator:         answersheet.NewValidator(),
-		publisher:         publisher,
+		answersheetClient:    answersheetClient,
+		questionnaireService: questionnaireService,
+		validator:            answersheet.NewValidator(),
+		publisher:            publisher,
 	}
 }
 
 // SubmitAnswersheet 提交答卷
 func (s *service) SubmitAnswersheet(ctx context.Context, req *SubmitRequest) (*SubmitResponse, error) {
+	log.L(ctx).Info("=== Starting answersheet submission process ===")
+
 	if req == nil {
+		log.L(ctx).Error("Submit request is nil")
 		return nil, fmt.Errorf("submit request cannot be nil")
 	}
 
+	log.L(ctx).Infof("Validating submit request for questionnaire: %s", req.QuestionnaireCode)
 	// 验证请求
 	if err := s.validateSubmitRequest(req); err != nil {
+		log.L(ctx).Errorf("Request validation failed: %v", err)
 		return nil, fmt.Errorf("invalid submit request: %w", err)
 	}
+	log.L(ctx).Info("Request validation passed")
 
+	log.L(ctx).Infof("Getting questionnaire info for validation: %s", req.QuestionnaireCode)
+	// 获取问卷信息用于验证
+	questionnaireInfo, err := s.questionnaireService.GetQuestionnaireForValidation(ctx, req.QuestionnaireCode)
+	if err != nil {
+		log.L(ctx).Errorf("Failed to get questionnaire info: %v", err)
+		return nil, fmt.Errorf("failed to get questionnaire for validation: %w", err)
+	}
+	log.L(ctx).Infof("Successfully retrieved questionnaire info: %s", req.QuestionnaireCode)
+
+	log.L(ctx).Info("Converting to domain entity...")
 	// 转换为领域实体
 	answersheetEntity := s.convertToAnswersheet(req)
+	log.L(ctx).Infof("Domain entity created with %d answers", len(answersheetEntity.Answers))
 
-	// 验证答卷（这里需要问卷信息，暂时传 nil）
-	if err := s.validator.ValidateSubmitRequest(ctx, answersheetEntity, nil); err != nil {
+	log.L(ctx).Info("Starting domain validation...")
+	// 验证答卷
+	if err := s.validator.ValidateSubmitRequest(ctx, answersheetEntity, questionnaireInfo); err != nil {
+		log.L(ctx).Errorf("Domain validation failed: %v", err)
 		return nil, fmt.Errorf("answersheet validation failed: %w", err)
 	}
+	log.L(ctx).Info("Domain validation passed")
 
+	log.L(ctx).Info("Converting to gRPC request...")
 	// 转换为gRPC请求
 	grpcReq, err := s.convertToSaveRequest(req)
 	if err != nil {
+		log.L(ctx).Errorf("Failed to convert to gRPC request: %v", err)
 		return nil, fmt.Errorf("failed to convert request: %w", err)
 	}
+	log.L(ctx).Infof("gRPC request prepared: questionnaire_code=%s, answers_count=%d",
+		grpcReq.QuestionnaireCode, len(grpcReq.Answers))
 
 	// 调用gRPC客户端保存答卷
-	log.L(ctx).Infof("Submitting answersheet for questionnaire: %s", req.QuestionnaireCode)
+	log.L(ctx).Infof("Calling gRPC SaveAnswersheet: questionnaire_code=%s", req.QuestionnaireCode)
 	grpcResp, err := s.answersheetClient.SaveAnswersheet(ctx, grpcReq)
 	if err != nil {
-		log.L(ctx).Errorf("Failed to save answersheet: %v", err)
+		log.L(ctx).Errorf("gRPC SaveAnswersheet failed: %v", err)
 		return nil, fmt.Errorf("failed to save answersheet: %w", err)
 	}
 
-	log.L(ctx).Infof("Successfully saved answersheet with ID: %d", grpcResp.Id)
+	log.L(ctx).Infof("Successfully saved answersheet via gRPC: id=%d, message=%s",
+		grpcResp.Id, grpcResp.Message)
 
 	// 发布答卷已保存消息
 	if s.publisher != nil {
+		log.L(ctx).Info("Publishing answersheet saved message...")
 		if err := s.publishAnswersheetSavedMessage(ctx, req, grpcResp.Id); err != nil {
 			log.L(ctx).Errorf("Failed to publish answersheet saved message: %v", err)
 			// 不影响主流程，只记录错误
+		} else {
+			log.L(ctx).Info("Answersheet saved message published successfully")
 		}
 	}
 
@@ -91,6 +122,7 @@ func (s *service) SubmitAnswersheet(ctx context.Context, req *SubmitRequest) (*S
 		CreatedAt: time.Now(),
 	}
 
+	log.L(ctx).Infof("=== Answersheet submission completed successfully: id=%s ===", response.ID)
 	return response, nil
 }
 
@@ -113,8 +145,14 @@ func (s *service) ValidateAnswersheet(ctx context.Context, req *ValidationReques
 		Answers:           req.Answers,
 	})
 
-	// 验证答卷（这里需要问卷信息，暂时传 nil）
-	if err := s.validator.ValidateSubmitRequest(ctx, answersheetEntity, nil); err != nil {
+	// 获取问卷信息
+	questionnaireInfo, err := s.questionnaireService.GetQuestionnaireForValidation(ctx, req.QuestionnaireCode)
+	if err != nil {
+		return fmt.Errorf("failed to get questionnaire for validation: %w", err)
+	}
+
+	// 验证答卷
+	if err := s.validator.ValidateSubmitRequest(ctx, answersheetEntity, questionnaireInfo); err != nil {
 		return fmt.Errorf("answersheet validation failed: %w", err)
 	}
 
@@ -223,13 +261,21 @@ func (s *service) convertToAnswersheet(req *SubmitRequest) *answersheet.SubmitRe
 		})
 	}
 
+	// 处理Age字段，从指针转换为int
+	age := 0
+	if req.TesteeInfo.Age != nil {
+		age = *req.TesteeInfo.Age
+	}
+
 	return &answersheet.SubmitRequest{
 		QuestionnaireCode: req.QuestionnaireCode,
 		Title:             req.Title,
 		TesteeInfo: &answersheet.TesteeInfo{
-			Name:  req.TesteeInfo.Name,
-			Email: req.TesteeInfo.Email,
-			Phone: req.TesteeInfo.Phone,
+			Name:   req.TesteeInfo.Name,
+			Gender: req.TesteeInfo.Gender,
+			Age:    age,
+			Email:  req.TesteeInfo.Email,
+			Phone:  req.TesteeInfo.Phone,
 		},
 		Answers: answers,
 	}

@@ -37,6 +37,35 @@ type ConcurrencyOptions struct {
 	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
 }
 
+// LoggingOptions 日志配置选项
+type LoggingOptions struct {
+	// EnableAPILogging 是否启用详细API日志
+	EnableAPILogging bool `json:"enable_api_logging" mapstructure:"enable_api_logging"`
+
+	// EnableGRPCLogging 是否启用gRPC日志
+	EnableGRPCLogging bool `json:"enable_grpc_logging" mapstructure:"enable_grpc_logging"`
+
+	// LogLevel 日志级别 (0=INFO, 1=DEBUG)
+	LogLevel int `json:"log_level" mapstructure:"log_level"`
+
+	// MaxBodySize API日志最大记录体大小
+	MaxBodySize int64 `json:"max_body_size" mapstructure:"max_body_size"`
+
+	// MaxPayloadSize gRPC日志最大载荷大小
+	MaxPayloadSize int `json:"max_payload_size" mapstructure:"max_payload_size"`
+}
+
+// NewLoggingOptions 创建默认日志选项
+func NewLoggingOptions() *LoggingOptions {
+	return &LoggingOptions{
+		EnableAPILogging:  true,
+		EnableGRPCLogging: true,
+		LogLevel:          0,         // INFO level
+		MaxBodySize:       10 * 1024, // 10KB
+		MaxPayloadSize:    2048,      // 2KB
+	}
+}
+
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{

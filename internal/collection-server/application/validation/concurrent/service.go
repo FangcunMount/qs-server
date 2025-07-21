@@ -28,9 +28,11 @@ type ValidationRequest struct {
 
 // TesteeInfo 测试者信息
 type TesteeInfo struct {
-	Name  string `json:"name" validate:"required"`
-	Email string `json:"email,omitempty"`
-	Phone string `json:"phone,omitempty"`
+	Name   string `json:"name" validate:"required"`
+	Gender string `json:"gender,omitempty"`
+	Age    *int   `json:"age,omitempty"`
+	Email  string `json:"email,omitempty"`
+	Phone  string `json:"phone,omitempty"`
 }
 
 // AnswerValidationItem 答案验证项
@@ -129,13 +131,21 @@ func (s *service) convertToAnswersheet(req *ValidationRequest) *answersheet.Subm
 		})
 	}
 
+	// 处理Age字段，从指针转换为int
+	age := 0
+	if req.TesteeInfo.Age != nil {
+		age = *req.TesteeInfo.Age
+	}
+
 	return &answersheet.SubmitRequest{
 		QuestionnaireCode: req.QuestionnaireCode,
 		Title:             req.Title,
 		TesteeInfo: &answersheet.TesteeInfo{
-			Name:  req.TesteeInfo.Name,
-			Email: req.TesteeInfo.Email,
-			Phone: req.TesteeInfo.Phone,
+			Name:   req.TesteeInfo.Name,
+			Gender: req.TesteeInfo.Gender,
+			Age:    age,
+			Email:  req.TesteeInfo.Email,
+			Phone:  req.TesteeInfo.Phone,
 		},
 		Answers: answers,
 	}

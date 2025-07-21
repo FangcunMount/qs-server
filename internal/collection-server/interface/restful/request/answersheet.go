@@ -5,6 +5,7 @@ import "time"
 // AnswerValue 答案值
 type AnswerValue struct {
 	QuestionCode string      `json:"question_code" binding:"required"`
+	QuestionType string      `json:"question_type" binding:"required"`
 	Value        interface{} `json:"value" binding:"required"`
 }
 
@@ -20,9 +21,9 @@ type AnswersheetSubmitRequest struct {
 // TesteeInfo 受测者信息
 type TesteeInfo struct {
 	Name      string                 `json:"name" binding:"required,min=1,max=100"`
-	Gender    string                 `json:"gender" binding:"omitempty,oneof=male female other"`
+	Gender    string                 `json:"gender" binding:"omitempty,oneof=male female other unknown '' 男 女 未知"`
 	Age       *int                   `json:"age" binding:"omitempty,min=1,max=120"`
-	Phone     string                 `json:"phone" binding:"omitempty,len=11,numeric"`
+	Phone     string                 `json:"phone" binding:"omitempty"`
 	Email     string                 `json:"email" binding:"omitempty,email"`
 	ID        string                 `json:"id" binding:"omitempty"`
 	ExtraInfo map[string]interface{} `json:"extra_info,omitempty"`

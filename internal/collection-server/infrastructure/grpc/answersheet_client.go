@@ -9,19 +9,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
+	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
 	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )
 
 // AnswersheetClient 答卷客户端接口
 type AnswersheetClient interface {
 	// SaveAnswersheet 保存答卷
-	SaveAnswersheet(ctx context.Context, req *answersheet.SaveAnswerSheetRequest) (*answersheet.SaveAnswerSheetResponse, error)
+	SaveAnswersheet(ctx context.Context, req *answersheetpb.SaveAnswerSheetRequest) (*answersheetpb.SaveAnswerSheetResponse, error)
 	// GetAnswersheet 获取答卷详情
-	GetAnswersheet(ctx context.Context, id uint64) (*answersheet.GetAnswerSheetResponse, error)
+	GetAnswersheet(ctx context.Context, id uint64) (*answersheetpb.GetAnswerSheetResponse, error)
 	// ListAnswersheets 获取答卷列表
-	ListAnswersheets(ctx context.Context, req *answersheet.ListAnswerSheetsRequest) (*answersheet.ListAnswerSheetsResponse, error)
+	ListAnswersheets(ctx context.Context, req *answersheetpb.ListAnswerSheetsRequest) (*answersheetpb.ListAnswerSheetsResponse, error)
 	// HealthCheck 健康检查
 	HealthCheck(ctx context.Context) error
 	// Close 关闭连接
@@ -31,7 +32,7 @@ type AnswersheetClient interface {
 // answersheetClient 答卷客户端实现
 type answersheetClient struct {
 	conn   *grpc.ClientConn
-	client answersheet.AnswerSheetServiceClient
+	client answersheetpb.AnswerSheetServiceClient
 	config *options.GRPCClientOptions
 }
 
@@ -39,13 +40,16 @@ type answersheetClient struct {
 func NewAnswersheetClient(config *options.GRPCClientOptions) (AnswersheetClient, error) {
 	// 设置连接选项
 	kacp := keepalive.ClientParameters{
-		Time:                10 * time.Second, // 每10秒发送一次ping
-		Timeout:             3 * time.Second,  // ping超时时间
-		PermitWithoutStream: true,             // 允许在没有RPC的情况下发送ping
+		Time:                30 * time.Second, // 每30秒发送一次ping（从10秒增加到30秒）
+		Timeout:             10 * time.Second, // ping超时时间（从3秒增加到10秒）
+		PermitWithoutStream: false,            // 只在有活跃RPC时发送ping（从true改为false）
 	}
 
 	opts := []grpc.DialOption{
+		grpc.WithTimeout(time.Duration(config.Timeout) * time.Second),
 		grpc.WithKeepaliveParams(kacp),
+		grpc.WithUnaryInterceptor(middleware.UnaryClientLoggingInterceptor()),
+		grpc.WithStreamInterceptor(middleware.StreamClientLoggingInterceptor()),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(20*1024*1024), // 20MB
 			grpc.MaxCallSendMsgSize(20*1024*1024), // 20MB
@@ -67,7 +71,7 @@ func NewAnswersheetClient(config *options.GRPCClientOptions) (AnswersheetClient,
 	}
 
 	// 创建客户端
-	client := answersheet.NewAnswerSheetServiceClient(conn)
+	client := answersheetpb.NewAnswerSheetServiceClient(conn)
 
 	log.Infof("Connected to answersheet service at %s", config.Endpoint)
 
@@ -79,7 +83,7 @@ func NewAnswersheetClient(config *options.GRPCClientOptions) (AnswersheetClient,
 }
 
 // SaveAnswersheet 保存答卷
-func (c *answersheetClient) SaveAnswersheet(ctx context.Context, req *answersheet.SaveAnswerSheetRequest) (*answersheet.SaveAnswerSheetResponse, error) {
+func (c *answersheetClient) SaveAnswersheet(ctx context.Context, req *answersheetpb.SaveAnswerSheetRequest) (*answersheetpb.SaveAnswerSheetResponse, error) {
 	// 添加超时控制
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -93,8 +97,8 @@ func (c *answersheetClient) SaveAnswersheet(ctx context.Context, req *answershee
 }
 
 // GetAnswersheet 获取答卷详情
-func (c *answersheetClient) GetAnswersheet(ctx context.Context, id uint64) (*answersheet.GetAnswerSheetResponse, error) {
-	req := &answersheet.GetAnswerSheetRequest{
+func (c *answersheetClient) GetAnswersheet(ctx context.Context, id uint64) (*answersheetpb.GetAnswerSheetResponse, error) {
+	req := &answersheetpb.GetAnswerSheetRequest{
 		Id: id,
 	}
 
@@ -107,7 +111,7 @@ func (c *answersheetClient) GetAnswersheet(ctx context.Context, id uint64) (*ans
 }
 
 // ListAnswersheets 获取答卷列表
-func (c *answersheetClient) ListAnswersheets(ctx context.Context, req *answersheet.ListAnswerSheetsRequest) (*answersheet.ListAnswerSheetsResponse, error) {
+func (c *answersheetClient) ListAnswersheets(ctx context.Context, req *answersheetpb.ListAnswerSheetsRequest) (*answersheetpb.ListAnswerSheetsResponse, error) {
 	resp, err := c.client.ListAnswerSheets(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list answersheets: %w", err)
@@ -119,7 +123,7 @@ func (c *answersheetClient) ListAnswersheets(ctx context.Context, req *answershe
 // HealthCheck 健康检查
 func (c *answersheetClient) HealthCheck(ctx context.Context) error {
 	// 尝试获取一个空的答卷列表来检查连接
-	req := &answersheet.ListAnswerSheetsRequest{
+	req := &answersheetpb.ListAnswerSheetsRequest{
 		Page:     1,
 		PageSize: 1,
 	}

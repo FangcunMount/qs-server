@@ -2,6 +2,12 @@ package response
 
 import "time"
 
+// ErrorResponse 错误响应
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
+
 // Answer 答案信息
 type Answer struct {
 	QuestionCode  string      `json:"question_code"`
@@ -97,65 +103,4 @@ type AnswersheetItem struct {
 	SubmissionTime     time.Time `json:"submission_time"`
 	Status             string    `json:"status"`
 	ValidationStatus   string    `json:"validation_status"`
-	TotalScore         *float64  `json:"total_score,omitempty"`
-	AnswerCount        int       `json:"answer_count"`
-	CreatedAt          time.Time `json:"created_at"`
-}
-
-// AnswersheetValidateResponse 答卷验证响应
-type AnswersheetValidateResponse struct {
-	Valid            bool              `json:"valid"`
-	ValidationStatus string            `json:"validation_status"`
-	ValidationErrors []ValidationError `json:"validation_errors,omitempty"`
-	Message          string            `json:"message"`
-	Details          ValidationDetails `json:"details,omitempty"`
-}
-
-// ValidationDetails 验证详情
-type ValidationDetails struct {
-	TotalQuestions int            `json:"total_questions"`
-	ValidAnswers   int            `json:"valid_answers"`
-	InvalidAnswers int            `json:"invalid_answers"`
-	MissingAnswers int            `json:"missing_answers"`
-	CompletionRate float64        `json:"completion_rate"`
-	ErrorsByType   map[string]int `json:"errors_by_type"`
-}
-
-// AnswersheetStatsResponse 答卷统计响应
-type AnswersheetStatsResponse struct {
-	QuestionnaireCode     string       `json:"questionnaire_code"`
-	TotalSubmissions      int          `json:"total_submissions"`
-	ValidSubmissions      int          `json:"valid_submissions"`
-	InvalidSubmissions    int          `json:"invalid_submissions"`
-	AverageScore          *float64     `json:"average_score,omitempty"`
-	HighestScore          *float64     `json:"highest_score,omitempty"`
-	LowestScore           *float64     `json:"lowest_score,omitempty"`
-	AverageCompletionTime *float64     `json:"average_completion_time,omitempty"`
-	FirstSubmissionTime   *time.Time   `json:"first_submission_time,omitempty"`
-	LastSubmissionTime    *time.Time   `json:"last_submission_time,omitempty"`
-	SubmissionTrend       []TrendPoint `json:"submission_trend,omitempty"`
-}
-
-// 使用response包中的TrendPoint
-
-// AnswersheetOperationResponse 答卷操作响应
-type AnswersheetOperationResponse struct {
-	Success   bool      `json:"success"`
-	Operation string    `json:"operation"`
-	Count     int       `json:"count,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
-	Message   string    `json:"message"`
-}
-
-// AnswersheetExportResponse 答卷导出响应
-type AnswersheetExportResponse struct {
-	ExportID    string    `json:"export_id"`
-	Format      string    `json:"format"`
-	Status      string    `json:"status"`
-	RecordCount int       `json:"record_count"`
-	FileSize    int64     `json:"file_size,omitempty"`
-	DownloadURL string    `json:"download_url,omitempty"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
-	Message     string    `json:"message"`
 }

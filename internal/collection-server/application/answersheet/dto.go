@@ -30,9 +30,11 @@ type ValidationRequest struct {
 
 // TesteeInfo 测试者信息
 type TesteeInfo struct {
-	Name  string `json:"name" validate:"required"`
-	Email string `json:"email,omitempty"`
-	Phone string `json:"phone,omitempty"`
+	Name   string `json:"name" validate:"required"`
+	Gender string `json:"gender,omitempty"`
+	Age    *int   `json:"age,omitempty"`
+	Email  string `json:"email,omitempty"`
+	Phone  string `json:"phone,omitempty"`
 }
 
 // Answer 答案

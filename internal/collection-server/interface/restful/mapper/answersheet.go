@@ -21,23 +21,25 @@ func NewAnswersheetMapper() *AnswersheetMapper {
 
 // ToServiceRequest 将HTTP请求转换为应用服务请求
 func (m *AnswersheetMapper) ToServiceRequest(req *request.AnswersheetSubmitRequest) *answersheetapp.SubmitRequest {
-	// 转换答案
+	// 转换答案，直接使用请求中的问题类型
 	answers := make([]*answersheetapp.Answer, len(req.Answers))
 	for i, answer := range req.Answers {
 		answers[i] = &answersheetapp.Answer{
 			QuestionCode: answer.QuestionCode,
-			QuestionType: "unknown", // request中没有question_type，需要从问卷服务查询
+			QuestionType: answer.QuestionType, // 直接使用请求中的问题类型
 			Value:        answer.Value,
 		}
 	}
 
 	return &answersheetapp.SubmitRequest{
 		QuestionnaireCode: req.QuestionnaireCode,
-		Title:             "", // request中没有title字段，可能需要从问卷服务获取
+		Title:             req.QuestionnaireCode, // 使用问卷代码作为默认title
 		TesteeInfo: &answersheetapp.TesteeInfo{
-			Name:  req.TesteeInfo.Name,
-			Email: req.TesteeInfo.Email,
-			Phone: req.TesteeInfo.Phone,
+			Name:   req.TesteeInfo.Name,
+			Gender: req.TesteeInfo.Gender,
+			Age:    req.TesteeInfo.Age,
+			Email:  req.TesteeInfo.Email,
+			Phone:  req.TesteeInfo.Phone,
 		},
 		Answers: answers,
 	}
@@ -106,8 +108,6 @@ func (m *AnswersheetMapper) ToAnswersheetItem(as *answersheet.AnswerSheet) respo
 	createdAt, _ := time.Parse(time.RFC3339, as.CreatedAt)
 	submissionTime := createdAt
 
-	score := float64(as.Score)
-
 	return response.AnswersheetItem{
 		ID:                strconv.FormatUint(as.Id, 10),
 		QuestionnaireCode: as.QuestionnaireCode,
@@ -115,9 +115,6 @@ func (m *AnswersheetMapper) ToAnswersheetItem(as *answersheet.AnswerSheet) respo
 		SubmissionTime:    submissionTime,
 		Status:            "submitted",
 		ValidationStatus:  "valid",
-		TotalScore:        &score,
-		AnswerCount:       len(as.Answers),
-		CreatedAt:         createdAt,
 	}
 }
 

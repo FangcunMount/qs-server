@@ -43,19 +43,17 @@ func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
 	// RequestID 中间件
 	engine.Use(middleware.RequestID())
 
-	// 日志中间件
+	// 基础日志中间件
 	engine.Use(middleware.Logger())
+
+	// API详细日志中间件 (可以通过配置控制是否启用)
+	engine.Use(middleware.APILogger())
 
 	// CORS 中间件
 	engine.Use(middleware.Cors())
 
-	// 安全中间件
-	engine.Use(middleware.Secure)
-
-	// NoCache 中间件（对于API响应不缓存）
+	// 其他中间件
 	engine.Use(middleware.NoCache)
-
-	// Options 中间件（处理 OPTIONS 请求）
 	engine.Use(middleware.Options)
 }
 
