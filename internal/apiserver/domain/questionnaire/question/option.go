@@ -1,4 +1,4 @@
-package option
+package question
 
 // Option 选项
 type Option struct {

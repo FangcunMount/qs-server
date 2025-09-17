@@ -1,13 +1,13 @@
-package question_types
+package types
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 )
 
 // 注册文本问题
 func init() {
-	RegisterQuestionFactory(question.QuestionTypeText, func(builder *QuestionBuilder) question.Question {
+	question.RegisterQuestionFactory(question.QuestionTypeText, func(builder *question.QuestionBuilder) question.Question {
 		// 创建文本问题
 		q := newTextQuestion(builder.GetCode(), builder.GetTitle())
 
@@ -25,7 +25,7 @@ func init() {
 // TextQuestion 文本问题
 type TextQuestion struct {
 	BaseQuestion
-	validation.ValidationAbility
+	ability.ValidationAbility
 
 	placeholder string
 }
@@ -43,7 +43,7 @@ func (q *TextQuestion) setPlaceholder(placeholder string) {
 }
 
 // addValidationRule 添加校验规则
-func (q *TextQuestion) addValidationRule(rule validation.ValidationRule) {
+func (q *TextQuestion) addValidationRule(rule ability.ValidationRule) {
 	q.ValidationAbility.AddValidationRule(rule)
 }
 
@@ -53,6 +53,6 @@ func (q *TextQuestion) GetPlaceholder() string {
 }
 
 // GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
-func (q *TextQuestion) GetValidationRules() []validation.ValidationRule {
+func (q *TextQuestion) GetValidationRules() []ability.ValidationRule {
 	return q.ValidationAbility.GetValidationRules()
 }

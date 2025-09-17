@@ -1,21 +1,21 @@
-package question_types
+package types
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 )
 
 // NumberQuestion 数字问题
 type NumberQuestion struct {
 	BaseQuestion
-	validation.ValidationAbility
+	ability.ValidationAbility
 
 	placeholder string
 }
 
 // 注册数字问题
 func init() {
-	RegisterQuestionFactory(question.QuestionTypeNumber, func(builder *QuestionBuilder) question.Question {
+	question.RegisterQuestionFactory(question.QuestionTypeNumber, func(builder *question.QuestionBuilder) question.Question {
 		// 创建数字问题
 		q := newNumberQuestion(builder.GetCode(), builder.GetTitle())
 
@@ -43,7 +43,7 @@ func (q *NumberQuestion) setPlaceholder(placeholder string) {
 }
 
 // addValidationRule 添加校验规则
-func (q *NumberQuestion) addValidationRule(rule validation.ValidationRule) {
+func (q *NumberQuestion) addValidationRule(rule ability.ValidationRule) {
 	q.ValidationAbility.AddValidationRule(rule)
 }
 
@@ -53,6 +53,6 @@ func (q *NumberQuestion) GetPlaceholder() string {
 }
 
 // GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
-func (q *NumberQuestion) GetValidationRules() []validation.ValidationRule {
+func (q *NumberQuestion) GetValidationRules() []ability.ValidationRule {
 	return q.ValidationAbility.GetValidationRules()
 }

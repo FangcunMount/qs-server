@@ -1,4 +1,4 @@
-package calculation
+package ability
 
 // FormulaType 公式类型
 type FormulaType string

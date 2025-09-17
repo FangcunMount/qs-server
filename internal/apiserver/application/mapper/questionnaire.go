@@ -6,10 +6,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
-	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/question-types"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 )
 
 // QuestionnaireMapper DTO 与领域对象转换器
@@ -61,7 +58,7 @@ func (m *QuestionnaireMapper) toQuestionDTOs(questions []question.Question) []dt
 }
 
 // toOptionDTOs 将选项领域对象转换为 DTO
-func (m *QuestionnaireMapper) toOptionDTOs(options []option.Option) []dto.OptionDTO {
+func (m *QuestionnaireMapper) toOptionDTOs(options []question.Option) []dto.OptionDTO {
 	if len(options) == 0 {
 		return nil
 	}
@@ -78,7 +75,7 @@ func (m *QuestionnaireMapper) toOptionDTOs(options []option.Option) []dto.Option
 }
 
 // toValidationRuleDTOs 将验证规则领域对象转换为 DTO
-func (m *QuestionnaireMapper) toValidationRuleDTOs(rules []validation.ValidationRule) []dto.ValidationRuleDTO {
+func (m *QuestionnaireMapper) toValidationRuleDTOs(rules []ability.ValidationRule) []dto.ValidationRuleDTO {
 	if len(rules) == 0 {
 		return nil
 	}
@@ -94,7 +91,7 @@ func (m *QuestionnaireMapper) toValidationRuleDTOs(rules []validation.Validation
 }
 
 // toCalculationRuleDTO 将计算规则领域对象转换为 DTO
-func (m *QuestionnaireMapper) toCalculationRuleDTO(rule *calculation.CalculationRule) *dto.CalculationRuleDTO {
+func (m *QuestionnaireMapper) toCalculationRuleDTO(rule *ability.CalculationRule) *dto.CalculationRuleDTO {
 	if rule == nil {
 		return nil
 	}
@@ -111,7 +108,7 @@ func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Qu
 	}
 
 	// 创建问题构建器
-	builder := question_types.NewQuestionBuilder()
+	builder := question.NewQuestionBuilder()
 
 	// 设置基本属性
 	builder.SetCode(question.QuestionCode(dto.Code))
@@ -130,17 +127,17 @@ func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Qu
 	// 设置验证规则
 	if len(dto.ValidationRules) > 0 {
 		for _, ruleDTO := range dto.ValidationRules {
-			builder.AddValidationRule(validation.RuleType(ruleDTO.RuleType), ruleDTO.TargetValue)
+			builder.AddValidationRule(ability.RuleType(ruleDTO.RuleType), ruleDTO.TargetValue)
 		}
 	}
 
 	// 设置计算规则
 	if dto.CalculationRule != nil {
-		builder.SetCalculationRule(calculation.FormulaType(dto.CalculationRule.FormulaType))
+		builder.SetCalculationRule(ability.FormulaType(dto.CalculationRule.FormulaType))
 	}
 
 	// 使用工厂函数创建问题
-	q := question_types.CreateQuestionFromBuilder(builder)
+	q := question.CreateQuestionFromBuilder(builder)
 	if q == nil {
 		return nil, errors.New("创建问题失败")
 	}

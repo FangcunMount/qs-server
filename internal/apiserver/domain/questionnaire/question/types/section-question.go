@@ -1,4 +1,4 @@
-package question_types
+package types
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
@@ -11,7 +11,7 @@ type SectionQuestion struct {
 
 // 注册段落问题
 func init() {
-	RegisterQuestionFactory(question.QuestionTypeSection, func(builder *QuestionBuilder) question.Question {
+	question.RegisterQuestionFactory(question.QuestionTypeSection, func(builder *question.QuestionBuilder) question.Question {
 		return newSectionQuestion(builder.GetCode(), builder.GetTitle())
 	})
 }

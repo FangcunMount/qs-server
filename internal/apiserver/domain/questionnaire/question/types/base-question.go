@@ -1,10 +1,8 @@
-package question_types
+package types
 
 import (
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 )
 
 // BaseQuestion 基础问题
@@ -50,16 +48,16 @@ func (q *BaseQuestion) GetPlaceholder() string {
 }
 
 // GetOptions 获取选项
-func (q *BaseQuestion) GetOptions() []option.Option {
+func (q *BaseQuestion) GetOptions() []question.Option {
 	return nil
 }
 
 // GetValidationRules 获取校验规则
-func (q *BaseQuestion) GetValidationRules() []validation.ValidationRule {
+func (q *BaseQuestion) GetValidationRules() []ability.ValidationRule {
 	return nil
 }
 
 // GetCalculationRule 获取计算规则
-func (q *BaseQuestion) GetCalculationRule() *calculation.CalculationRule {
+func (q *BaseQuestion) GetCalculationRule() *ability.CalculationRule {
 	return nil
 }

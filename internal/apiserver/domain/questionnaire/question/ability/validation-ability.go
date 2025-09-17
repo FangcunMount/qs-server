@@ -1,4 +1,4 @@
-package validation
+package ability
 
 // ValidationAbility 校验能力
 type ValidationAbility struct {

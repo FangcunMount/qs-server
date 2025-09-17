@@ -1,24 +1,22 @@
-package question_types
+package types
 
 import (
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
-    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 )
 
 // CheckboxQuestion 多选问题
 type CheckboxQuestion struct {
 	BaseQuestion
-	validation.ValidationAbility
-	calculation.CalculationAbility
+	ability.ValidationAbility
+	ability.CalculationAbility
 
-	options []option.Option
+	options []question.Option
 }
 
 // 注册多选问题
 func init() {
-	RegisterQuestionFactory(question.QuestionTypeCheckbox, func(builder *QuestionBuilder) question.Question {
+	question.RegisterQuestionFactory(question.QuestionTypeCheckbox, func(builder *question.QuestionBuilder) question.Question {
 		// 创建多选问题
 		q := newCheckboxQuestion(builder.GetCode(), builder.GetTitle())
 
@@ -47,31 +45,31 @@ func newCheckboxQuestion(code question.QuestionCode, title string) *CheckboxQues
 }
 
 // setOptions 设置选项
-func (q *CheckboxQuestion) setOptions(options []option.Option) {
+func (q *CheckboxQuestion) setOptions(options []question.Option) {
 	q.options = options
 }
 
 // addValidationRule 添加校验规则
-func (q *CheckboxQuestion) addValidationRule(rule validation.ValidationRule) {
+func (q *CheckboxQuestion) addValidationRule(rule ability.ValidationRule) {
 	q.ValidationAbility.AddValidationRule(rule)
 }
 
 // setCalculationRule 设置计算规则
-func (q *CheckboxQuestion) setCalculationRule(rule *calculation.CalculationRule) {
+func (q *CheckboxQuestion) setCalculationRule(rule *ability.CalculationRule) {
 	q.CalculationAbility.SetCalculationRule(rule)
 }
 
 // GetOptions 获取选项
-func (q *CheckboxQuestion) GetOptions() []option.Option {
+func (q *CheckboxQuestion) GetOptions() []question.Option {
 	return q.options
 }
 
 // GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
-func (q *CheckboxQuestion) GetValidationRules() []validation.ValidationRule {
+func (q *CheckboxQuestion) GetValidationRules() []ability.ValidationRule {
 	return q.ValidationAbility.GetValidationRules()
 }
 
 // GetCalculationRule 获取计算规则 - 重写BaseQuestion的默认实现
-func (q *CheckboxQuestion) GetCalculationRule() *calculation.CalculationRule {
+func (q *CheckboxQuestion) GetCalculationRule() *ability.CalculationRule {
 	return q.CalculationAbility.GetCalculationRule()
 }

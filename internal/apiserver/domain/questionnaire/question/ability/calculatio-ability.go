@@ -1,4 +1,4 @@
-package calculation
+package ability
 
 // CalculationAbility 计算能力
 type CalculationAbility struct {

@@ -3,10 +3,7 @@ package questionnaire
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
-	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/question-types"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 )
 
 // QuestionnaireMapper 问卷映射器
@@ -55,7 +52,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 }
 
 // mapOptions 转换选项
-func (m *QuestionnaireMapper) mapOptions(options []option.Option) []OptionPO {
+func (m *QuestionnaireMapper) mapOptions(options []question.Option) []OptionPO {
 	if options == nil {
 		return []OptionPO{} // 返回空切片而不是nil
 	}
@@ -72,7 +69,7 @@ func (m *QuestionnaireMapper) mapOptions(options []option.Option) []OptionPO {
 }
 
 // mapValidationRules 转换校验规则
-func (m *QuestionnaireMapper) mapValidationRules(rules []validation.ValidationRule) []ValidationRulePO {
+func (m *QuestionnaireMapper) mapValidationRules(rules []ability.ValidationRule) []ValidationRulePO {
 	if rules == nil {
 		return []ValidationRulePO{} // 返回空切片而不是nil
 	}
@@ -88,7 +85,7 @@ func (m *QuestionnaireMapper) mapValidationRules(rules []validation.ValidationRu
 }
 
 // mapCalculationRule 转换计算规则
-func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRule) CalculationRulePO {
+func (m *QuestionnaireMapper) mapCalculationRule(rule *ability.CalculationRule) CalculationRulePO {
 	if rule == nil {
 		return CalculationRulePO{}
 	}
@@ -124,26 +121,26 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 
 	for _, questionPO := range questionsPO {
 		// 构建配置选项列表
-		opts := []question_types.BuilderOption{
-			question_types.WithCode(question.NewQuestionCode(questionPO.Code)),
-			question_types.WithTitle(questionPO.Title),
-			question_types.WithTips(questionPO.Tips),
-			question_types.WithQuestionType(question.QuestionType(questionPO.QuestionType)),
-			question_types.WithPlaceholder(questionPO.Placeholder),
-			question_types.WithOptions(m.mapOptionsPOToBO(questionPO.Options)),
-			question_types.WithValidationRules(m.mapValidationRulesPOToBO(questionPO.ValidationRules)),
+		opts := []question.BuilderOption{
+			question.WithCode(question.NewQuestionCode(questionPO.Code)),
+			question.WithTitle(questionPO.Title),
+			question.WithTips(questionPO.Tips),
+			question.WithQuestionType(question.QuestionType(questionPO.QuestionType)),
+			question.WithPlaceholder(questionPO.Placeholder),
+			question.WithOptions(m.mapOptionsPOToBO(questionPO.Options)),
+			question.WithValidationRules(m.mapValidationRulesPOToBO(questionPO.ValidationRules)),
 		}
 
 		// 添加计算规则（如果有的话）
 		if questionPO.CalculationRule.Formula != "" {
-			opts = append(opts, question_types.WithCalculationRule(calculation.FormulaType(questionPO.CalculationRule.Formula)))
+			opts = append(opts, question.WithCalculationRule(ability.FormulaType(questionPO.CalculationRule.Formula)))
 		}
 
 		// 1. 创建配置
-		builder := question_types.BuildQuestionConfig(opts...)
+		builder := question.BuildQuestionConfig(opts...)
 
 		// 2. 创建对象
-		questionBO := question_types.CreateQuestionFromBuilder(builder)
+		questionBO := question.CreateQuestionFromBuilder(builder)
 		if questionBO != nil {
 			questions = append(questions, questionBO)
 		}
@@ -153,40 +150,40 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 }
 
 // mapOptionsPOToBO 将选项PO转换为选项BO
-func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []option.Option {
+func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []question.Option {
 	if optionsPO == nil {
-		return []option.Option{}
+		return []question.Option{}
 	}
 
-	var options []option.Option
+	var options []question.Option
 	for _, optionPO := range optionsPO {
-		optionBO := option.NewOption(optionPO.Code, optionPO.Content, optionPO.Score)
+		optionBO := question.NewOption(optionPO.Code, optionPO.Content, optionPO.Score)
 		options = append(options, optionBO)
 	}
 	return options
 }
 
 // mapValidationRulesPOToBO 将校验规则PO转换为校验规则BO
-func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRulePO) []validation.ValidationRule {
+func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRulePO) []ability.ValidationRule {
 	if rulesPO == nil {
-		return []validation.ValidationRule{}
+		return []ability.ValidationRule{}
 	}
 
-	var rules []validation.ValidationRule
+	var rules []ability.ValidationRule
 	for _, rulePO := range rulesPO {
-		ruleType := validation.RuleType(rulePO.RuleType)
-		rule := validation.NewValidationRule(ruleType, rulePO.TargetValue)
+		ruleType := ability.RuleType(rulePO.RuleType)
+		rule := ability.NewValidationRule(ruleType, rulePO.TargetValue)
 		rules = append(rules, rule)
 	}
 	return rules
 }
 
 // mapCalculationRulePOToBO 将计算规则PO转换为计算规则BO
-func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO) *calculation.CalculationRule {
+func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO) *ability.CalculationRule {
 	if rulePO.Formula == "" {
 		return nil
 	}
 
-	formulaType := calculation.FormulaType(rulePO.Formula)
-	return calculation.NewCalculationRule(formulaType)
+	formulaType := ability.FormulaType(rulePO.Formula)
+	return ability.NewCalculationRule(formulaType)
 }
