@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 )
 
 // CheckboxQuestion 多选问题
@@ -55,7 +56,7 @@ func (q *CheckboxQuestion) addValidationRule(rule ability.ValidationRule) {
 }
 
 // setCalculationRule 设置计算规则
-func (q *CheckboxQuestion) setCalculationRule(rule *ability.CalculationRule) {
+func (q *CheckboxQuestion) setCalculationRule(rule *calculation.CalculationRule) {
 	q.CalculationAbility.SetCalculationRule(rule)
 }
 
@@ -70,6 +71,6 @@ func (q *CheckboxQuestion) GetValidationRules() []ability.ValidationRule {
 }
 
 // GetCalculationRule 获取计算规则 - 重写BaseQuestion的默认实现
-func (q *CheckboxQuestion) GetCalculationRule() *ability.CalculationRule {
+func (q *CheckboxQuestion) GetCalculationRule() *calculation.CalculationRule {
 	return q.CalculationAbility.GetCalculationRule()
 }

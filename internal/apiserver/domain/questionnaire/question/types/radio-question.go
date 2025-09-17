@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 )
 
 // RadioQuestion 单选问题
@@ -54,7 +55,7 @@ func (q *RadioQuestion) addValidationRule(rule ability.ValidationRule) {
 }
 
 // setCalculationRule 设置计算规则
-func (q *RadioQuestion) setCalculationRule(rule *ability.CalculationRule) {
+func (q *RadioQuestion) setCalculationRule(rule *calculation.CalculationRule) {
 	q.CalculationAbility.SetCalculationRule(rule)
 }
 
@@ -69,6 +70,6 @@ func (q *RadioQuestion) GetValidationRules() []ability.ValidationRule {
 }
 
 // GetCalculationRule 获取计算规则 - 重写BaseQuestion的默认实现
-func (q *RadioQuestion) GetCalculationRule() *ability.CalculationRule {
+func (q *RadioQuestion) GetCalculationRule() *calculation.CalculationRule {
 	return q.CalculationAbility.GetCalculationRule()
 }

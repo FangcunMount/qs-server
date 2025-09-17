@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 )
 
 // BaseQuestion 基础问题
@@ -58,6 +59,6 @@ func (q *BaseQuestion) GetValidationRules() []ability.ValidationRule {
 }
 
 // GetCalculationRule 获取计算规则
-func (q *BaseQuestion) GetCalculationRule() *ability.CalculationRule {
+func (q *BaseQuestion) GetCalculationRule() *calculation.CalculationRule {
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 )
 
 // QuestionnaireMapper DTO 与领域对象转换器
@@ -91,13 +92,13 @@ func (m *QuestionnaireMapper) toValidationRuleDTOs(rules []ability.ValidationRul
 }
 
 // toCalculationRuleDTO 将计算规则领域对象转换为 DTO
-func (m *QuestionnaireMapper) toCalculationRuleDTO(rule *ability.CalculationRule) *dto.CalculationRuleDTO {
+func (m *QuestionnaireMapper) toCalculationRuleDTO(rule *calculation.CalculationRule) *dto.CalculationRuleDTO {
 	if rule == nil {
 		return nil
 	}
 
 	return &dto.CalculationRuleDTO{
-		FormulaType: string(rule.GetFormulaType()),
+		FormulaType: string(rule.GetFormula()),
 	}
 }
 
@@ -133,7 +134,7 @@ func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Qu
 
 	// 设置计算规则
 	if dto.CalculationRule != nil {
-		builder.SetCalculationRule(ability.FormulaType(dto.CalculationRule.FormulaType))
+		builder.SetCalculationRule(calculation.FormulaType(dto.CalculationRule.FormulaType))
 	}
 
 	// 使用工厂函数创建问题

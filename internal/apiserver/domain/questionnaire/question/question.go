@@ -1,6 +1,9 @@
 package question
 
-import "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+)
 
 // Question 问题接口 - 统一所有题型的方法签名
 type Question interface {
@@ -17,7 +20,7 @@ type Question interface {
 	// 校验相关方法
 	GetValidationRules() []ability.ValidationRule
 	// 计算相关方法
-	GetCalculationRule() *ability.CalculationRule
+	GetCalculationRule() *calculation.CalculationRule
 }
 
 // QuestionCode 问题编码

@@ -4,6 +4,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
 )
 
 // QuestionnaireMapper 问卷映射器
@@ -41,7 +42,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		// 处理计算规则（可能为nil）
 		if rule := questionBO.GetCalculationRule(); rule != nil {
 			questionPO.CalculationRule = CalculationRulePO{
-				Formula: string(rule.GetFormulaType()),
+				Formula: string(rule.GetFormula()),
 			}
 		}
 
@@ -85,12 +86,12 @@ func (m *QuestionnaireMapper) mapValidationRules(rules []ability.ValidationRule)
 }
 
 // mapCalculationRule 转换计算规则
-func (m *QuestionnaireMapper) mapCalculationRule(rule *ability.CalculationRule) CalculationRulePO {
+func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRule) CalculationRulePO {
 	if rule == nil {
 		return CalculationRulePO{}
 	}
 	return CalculationRulePO{
-		Formula: string(rule.GetFormulaType()),
+		Formula: string(rule.GetFormula()),
 	}
 }
 
@@ -133,7 +134,7 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 
 		// 添加计算规则（如果有的话）
 		if questionPO.CalculationRule.Formula != "" {
-			opts = append(opts, question.WithCalculationRule(ability.FormulaType(questionPO.CalculationRule.Formula)))
+			opts = append(opts, question.WithCalculationRule(calculation.FormulaType(questionPO.CalculationRule.Formula)))
 		}
 
 		// 1. 创建配置
@@ -179,11 +180,11 @@ func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRuleP
 }
 
 // mapCalculationRulePOToBO 将计算规则PO转换为计算规则BO
-func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO) *ability.CalculationRule {
+func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO) *calculation.CalculationRule {
 	if rulePO.Formula == "" {
 		return nil
 	}
 
-	formulaType := ability.FormulaType(rulePO.Formula)
-	return ability.NewCalculationRule(formulaType)
+	formulaType := calculation.FormulaType(rulePO.Formula)
+	return calculation.NewCalculationRule(formulaType, []string{})
 }

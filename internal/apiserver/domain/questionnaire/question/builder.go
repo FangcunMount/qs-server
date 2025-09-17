@@ -1,6 +1,9 @@
 package question
 
-import "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+import (
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+)
 
 // BuilderOption 构建器选项函数类型
 type BuilderOption func(*QuestionBuilder)
@@ -20,7 +23,7 @@ type QuestionBuilder struct {
 
 	// 能力配置
 	validationRules []ability.ValidationRule
-	calculationRule *ability.CalculationRule
+	calculationRule *calculation.CalculationRule
 }
 
 // NewQuestionBuilder 创建新的问题构建器
@@ -101,9 +104,9 @@ func WithValidationRule(ruleType ability.RuleType, targetValue string) BuilderOp
 }
 
 // WithCalculationRule 设置计算规则
-func WithCalculationRule(formula ability.FormulaType) BuilderOption {
+func WithCalculationRule(formula calculation.FormulaType) BuilderOption {
 	return func(b *QuestionBuilder) {
-		b.calculationRule = ability.NewCalculationRule(formula)
+		b.calculationRule = calculation.NewCalculationRule(formula, []string{})
 	}
 }
 
@@ -177,8 +180,8 @@ func (b *QuestionBuilder) AddValidationRule(ruleType ability.RuleType, targetVal
 	return b
 }
 
-func (b *QuestionBuilder) SetCalculationRule(formula ability.FormulaType) *QuestionBuilder {
-	b.calculationRule = ability.NewCalculationRule(formula)
+func (b *QuestionBuilder) SetCalculationRule(formula calculation.FormulaType) *QuestionBuilder {
+	b.calculationRule = calculation.NewCalculationRule(formula, []string{})
 	return b
 }
 
@@ -214,7 +217,7 @@ func (b *QuestionBuilder) GetValidationRules() []ability.ValidationRule {
 	return b.validationRules
 }
 
-func (b *QuestionBuilder) GetCalculationRule() *ability.CalculationRule {
+func (b *QuestionBuilder) GetCalculationRule() *calculation.CalculationRule {
 	return b.calculationRule
 }
 
