@@ -6,7 +6,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer"
 	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer/answer-values"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"

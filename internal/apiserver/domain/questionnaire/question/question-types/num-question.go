@@ -1,8 +1,8 @@
 package question_types
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
 )
 
 // NumberQuestion 数字问题

@@ -4,7 +4,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer"
 	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer/answer-values"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 )
 
 // AnswerMapper DTO 与领域对象转换器

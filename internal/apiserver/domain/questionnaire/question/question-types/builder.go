@@ -1,10 +1,10 @@
 package question_types
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
+    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
+    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
+    "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
 )
 
 // BuilderOption 构建器选项函数类型

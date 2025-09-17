@@ -4,12 +4,12 @@ import (
 	"errors"
 
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
-	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/question-types"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
+	question_types "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/question-types"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
 )
 
 // QuestionnaireMapper DTO 与领域对象转换器

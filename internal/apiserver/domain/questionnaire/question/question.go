@@ -1,9 +1,9 @@
 package question
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/option"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/question/validation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/option"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/validation"
 )
 
 // Question 问题接口 - 统一所有题型的方法签名
