@@ -20,6 +20,7 @@ EVALUATION_PORT = 9082
 # PID 文件目录
 PID_DIR = tmp/pids
 LOG_DIR = logs
+BIN_DIR = bin
 
 # 默认目标
 help: ## 显示帮助信息
@@ -53,15 +54,18 @@ build-all: ## 构建所有服务
 
 build-apiserver: ## 构建 API 服务器
 	@echo "🔨 构建 apiserver..."
-	@go build -o $(APISERVER_BIN) ./cmd/qs-apiserver/
+	@$(MAKE) create-dirs
+	@go build -o $(BIN_DIR)/$(APISERVER_BIN) ./cmd/qs-apiserver/
 
 build-collection: ## 构建收集服务器
 	@echo "🔨 构建 collection-server..."
-	@go build -o $(COLLECTION_BIN) ./cmd/collection-server/
+	@$(MAKE) create-dirs
+	@go build -o $(BIN_DIR)/$(COLLECTION_BIN) ./cmd/collection-server/
 
 build-evaluation: ## 构建评估服务器
 	@echo "🔨 构建 evaluation-server..."
-	@go build -o $(EVALUATION_BIN) ./cmd/evaluation-server/
+	@$(MAKE) create-dirs
+	@go build -o $(BIN_DIR)/$(EVALUATION_BIN) ./cmd/evaluation-server/
 
 # =============================================================================
 # 服务运行管理
@@ -91,7 +95,7 @@ run-apiserver: ## 启动 API 服务器
 			exit 1; \
 		fi; \
 	fi
-	@nohup ./$(APISERVER_BIN) --config=$(APISERVER_CONFIG) > $(LOG_DIR)/apiserver.log 2>&1 & echo $$! > $(PID_DIR)/apiserver.pid
+	@nohup $(BIN_DIR)/$(APISERVER_BIN) --config=$(APISERVER_CONFIG) > $(LOG_DIR)/apiserver.log 2>&1 & echo $$! > $(PID_DIR)/apiserver.pid
 	@echo "✅ apiserver 已启动 (PID: $$(cat $(PID_DIR)/apiserver.pid))"
 
 run-collection: ## 启动收集服务器
@@ -107,7 +111,7 @@ run-collection: ## 启动收集服务器
 			exit 1; \
 		fi; \
 	fi
-	@nohup ./$(COLLECTION_BIN) --config=$(COLLECTION_CONFIG) > $(LOG_DIR)/collection-server.log 2>&1 & echo $$! > $(PID_DIR)/collection.pid
+	@nohup $(BIN_DIR)/$(COLLECTION_BIN) --config=$(COLLECTION_CONFIG) > $(LOG_DIR)/collection-server.log 2>&1 & echo $$! > $(PID_DIR)/collection.pid
 	@echo "✅ collection-server 已启动 (PID: $$(cat $(PID_DIR)/collection.pid))"
 
 run-evaluation: ## 启动评估服务器
@@ -123,7 +127,7 @@ run-evaluation: ## 启动评估服务器
 			exit 1; \
 		fi; \
 	fi
-	@nohup ./$(EVALUATION_BIN) --config=$(EVALUATION_CONFIG) > $(LOG_DIR)/evaluation-server.log 2>&1 & echo $$! > $(PID_DIR)/evaluation.pid
+	@nohup $(BIN_DIR)/$(EVALUATION_BIN) --config=$(EVALUATION_CONFIG) > $(LOG_DIR)/evaluation-server.log 2>&1 & echo $$! > $(PID_DIR)/evaluation.pid
 	@echo "✅ evaluation-server 已启动 (PID: $$(cat $(PID_DIR)/evaluation.pid))"
 
 # =============================================================================
@@ -387,12 +391,12 @@ clean: ## 清理构建文件和进程
 	@echo "🧹 清理构建文件和进程..."
 	@$(MAKE) stop-all
 	@rm -rf tmp bin $(LOG_DIR)/*.log
-	@rm -f $(APISERVER_BIN) $(COLLECTION_BIN) $(EVALUATION_BIN)
+	@rm -f $(BIN_DIR)/$(APISERVER_BIN) $(BIN_DIR)/$(COLLECTION_BIN) $(BIN_DIR)/$(EVALUATION_BIN)
 	@go clean
 	@echo "✅ 清理完成"
 
 create-dirs: ## 创建必要的目录
-	@mkdir -p $(PID_DIR) $(LOG_DIR)
+	@mkdir -p $(PID_DIR) $(LOG_DIR) $(BIN_DIR)
 
 install-air: ## 安装 Air 热更新工具
 	@echo "📦 安装 Air..."
