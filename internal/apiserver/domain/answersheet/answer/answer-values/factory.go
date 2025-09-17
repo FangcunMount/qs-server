@@ -3,7 +3,7 @@ package answer_values
 import (
 	"strconv"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/pkg/log"
 )

@@ -1,8 +1,8 @@
 package mapper
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer"
-	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer/answer-values"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
+	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer/answer-values"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
 )

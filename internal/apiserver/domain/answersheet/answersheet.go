@@ -3,7 +3,7 @@ package answersheet
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answer"
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
 	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
 	"github.com/yshujie/questionnaire-scale/pkg/errors"
