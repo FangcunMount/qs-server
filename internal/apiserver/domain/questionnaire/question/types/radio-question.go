@@ -4,6 +4,7 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
 )
 
 // RadioQuestion 单选问题
@@ -50,7 +51,7 @@ func (q *RadioQuestion) setOptions(options []question.Option) {
 }
 
 // AddValidationRule 添加校验规则
-func (q *RadioQuestion) addValidationRule(rule ability.ValidationRule) {
+func (q *RadioQuestion) addValidationRule(rule validation.ValidationRule) {
 	q.ValidationAbility.AddValidationRule(rule)
 }
 
@@ -65,7 +66,7 @@ func (q *RadioQuestion) GetOptions() []question.Option {
 }
 
 // GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
-func (q *RadioQuestion) GetValidationRules() []ability.ValidationRule {
+func (q *RadioQuestion) GetValidationRules() []validation.ValidationRule {
 	return q.ValidationAbility.GetValidationRules()
 }
 

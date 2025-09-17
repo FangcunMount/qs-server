@@ -1,8 +1,8 @@
 package question
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
 )
 
 // BuilderOption 构建器选项函数类型
@@ -22,7 +22,7 @@ type QuestionBuilder struct {
 	options     []Option
 
 	// 能力配置
-	validationRules []ability.ValidationRule
+	validationRules []validation.ValidationRule
 	calculationRule *calculation.CalculationRule
 }
 
@@ -30,7 +30,7 @@ type QuestionBuilder struct {
 func NewQuestionBuilder() *QuestionBuilder {
 	return &QuestionBuilder{
 		options:         make([]Option, 0),
-		validationRules: make([]ability.ValidationRule, 0),
+		validationRules: make([]validation.ValidationRule, 0),
 	}
 }
 
@@ -89,16 +89,16 @@ func WithOption(code, content string, score int) BuilderOption {
 }
 
 // WithValidationRules 设置校验规则列表
-func WithValidationRules(rules []ability.ValidationRule) BuilderOption {
+func WithValidationRules(rules []validation.ValidationRule) BuilderOption {
 	return func(b *QuestionBuilder) {
 		b.validationRules = rules
 	}
 }
 
 // WithValidationRule 添加单个校验规则
-func WithValidationRule(ruleType ability.RuleType, targetValue string) BuilderOption {
+func WithValidationRule(ruleType validation.RuleType, targetValue string) BuilderOption {
 	return func(b *QuestionBuilder) {
-		rule := ability.NewValidationRule(ruleType, targetValue)
+		rule := validation.NewValidationRule(ruleType, targetValue)
 		b.validationRules = append(b.validationRules, rule)
 	}
 }
@@ -116,27 +116,27 @@ func WithCalculationRule(formula calculation.FormulaType) BuilderOption {
 
 // WithRequired 设置必填
 func WithRequired() BuilderOption {
-	return WithValidationRule(ability.RuleTypeRequired, "true")
+	return WithValidationRule(validation.RuleTypeRequired, "true")
 }
 
 // WithMinLength 设置最小长度
 func WithMinLength(length int) BuilderOption {
-	return WithValidationRule(ability.RuleTypeMinLength, string(rune(length+'0')))
+	return WithValidationRule(validation.RuleTypeMinLength, string(rune(length+'0')))
 }
 
 // WithMaxLength 设置最大长度
 func WithMaxLength(length int) BuilderOption {
-	return WithValidationRule(ability.RuleTypeMaxLength, string(rune(length+'0')))
+	return WithValidationRule(validation.RuleTypeMaxLength, string(rune(length+'0')))
 }
 
 // WithMinValue 设置最小值
 func WithMinValue(value int) BuilderOption {
-	return WithValidationRule(ability.RuleTypeMinValue, string(rune(value+'0')))
+	return WithValidationRule(validation.RuleTypeMinValue, string(rune(value+'0')))
 }
 
 // WithMaxValue 设置最大值
 func WithMaxValue(value int) BuilderOption {
-	return WithValidationRule(ability.RuleTypeMaxValue, string(rune(value+'0')))
+	return WithValidationRule(validation.RuleTypeMaxValue, string(rune(value+'0')))
 }
 
 // ================================
@@ -174,8 +174,8 @@ func (b *QuestionBuilder) AddOption(code, content string, score int) *QuestionBu
 	return b
 }
 
-func (b *QuestionBuilder) AddValidationRule(ruleType ability.RuleType, targetValue string) *QuestionBuilder {
-	rule := ability.NewValidationRule(ruleType, targetValue)
+func (b *QuestionBuilder) AddValidationRule(ruleType validation.RuleType, targetValue string) *QuestionBuilder {
+	rule := validation.NewValidationRule(ruleType, targetValue)
 	b.validationRules = append(b.validationRules, rule)
 	return b
 }
@@ -213,7 +213,7 @@ func (b *QuestionBuilder) GetOptions() []Option {
 	return b.options
 }
 
-func (b *QuestionBuilder) GetValidationRules() []ability.ValidationRule {
+func (b *QuestionBuilder) GetValidationRules() []validation.ValidationRule {
 	return b.validationRules
 }
 

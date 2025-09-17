@@ -1,4 +1,4 @@
-package ability
+package validation
 
 type RuleType string
 

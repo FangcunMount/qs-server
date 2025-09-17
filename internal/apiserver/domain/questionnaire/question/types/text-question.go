@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
 )
 
 // 注册文本问题
@@ -43,7 +44,7 @@ func (q *TextQuestion) setPlaceholder(placeholder string) {
 }
 
 // addValidationRule 添加校验规则
-func (q *TextQuestion) addValidationRule(rule ability.ValidationRule) {
+func (q *TextQuestion) addValidationRule(rule validation.ValidationRule) {
 	q.ValidationAbility.AddValidationRule(rule)
 }
 
@@ -53,6 +54,6 @@ func (q *TextQuestion) GetPlaceholder() string {
 }
 
 // GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
-func (q *TextQuestion) GetValidationRules() []ability.ValidationRule {
+func (q *TextQuestion) GetValidationRules() []validation.ValidationRule {
 	return q.ValidationAbility.GetValidationRules()
 }

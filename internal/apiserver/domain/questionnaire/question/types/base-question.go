@@ -2,8 +2,8 @@ package types
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
 )
 
 // BaseQuestion 基础问题
@@ -54,7 +54,7 @@ func (q *BaseQuestion) GetOptions() []question.Option {
 }
 
 // GetValidationRules 获取校验规则
-func (q *BaseQuestion) GetValidationRules() []ability.ValidationRule {
+func (q *BaseQuestion) GetValidationRules() []validation.ValidationRule {
 	return nil
 }
 

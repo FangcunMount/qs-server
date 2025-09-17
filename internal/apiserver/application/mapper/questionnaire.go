@@ -6,8 +6,8 @@ import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
 )
 
 // QuestionnaireMapper DTO 与领域对象转换器
@@ -76,7 +76,7 @@ func (m *QuestionnaireMapper) toOptionDTOs(options []question.Option) []dto.Opti
 }
 
 // toValidationRuleDTOs 将验证规则领域对象转换为 DTO
-func (m *QuestionnaireMapper) toValidationRuleDTOs(rules []ability.ValidationRule) []dto.ValidationRuleDTO {
+func (m *QuestionnaireMapper) toValidationRuleDTOs(rules []validation.ValidationRule) []dto.ValidationRuleDTO {
 	if len(rules) == 0 {
 		return nil
 	}
@@ -128,7 +128,7 @@ func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Qu
 	// 设置验证规则
 	if len(dto.ValidationRules) > 0 {
 		for _, ruleDTO := range dto.ValidationRules {
-			builder.AddValidationRule(ability.RuleType(ruleDTO.RuleType), ruleDTO.TargetValue)
+			builder.AddValidationRule(validation.RuleType(ruleDTO.RuleType), ruleDTO.TargetValue)
 		}
 	}
 

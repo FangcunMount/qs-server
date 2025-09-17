@@ -3,8 +3,8 @@ package questionnaire
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
 )
 
 // QuestionnaireMapper 问卷映射器
@@ -70,7 +70,7 @@ func (m *QuestionnaireMapper) mapOptions(options []question.Option) []OptionPO {
 }
 
 // mapValidationRules 转换校验规则
-func (m *QuestionnaireMapper) mapValidationRules(rules []ability.ValidationRule) []ValidationRulePO {
+func (m *QuestionnaireMapper) mapValidationRules(rules []validation.ValidationRule) []ValidationRulePO {
 	if rules == nil {
 		return []ValidationRulePO{} // 返回空切片而不是nil
 	}
@@ -165,15 +165,15 @@ func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []question.
 }
 
 // mapValidationRulesPOToBO 将校验规则PO转换为校验规则BO
-func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRulePO) []ability.ValidationRule {
+func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRulePO) []validation.ValidationRule {
 	if rulesPO == nil {
-		return []ability.ValidationRule{}
+		return []validation.ValidationRule{}
 	}
 
-	var rules []ability.ValidationRule
+	var rules []validation.ValidationRule
 	for _, rulePO := range rulesPO {
-		ruleType := ability.RuleType(rulePO.RuleType)
-		rule := ability.NewValidationRule(ruleType, rulePO.TargetValue)
+		ruleType := validation.RuleType(rulePO.RuleType)
+		rule := validation.NewValidationRule(ruleType, rulePO.TargetValue)
 		rules = append(rules, rule)
 	}
 	return rules
