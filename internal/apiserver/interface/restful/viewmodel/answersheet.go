@@ -31,7 +31,7 @@ type AnswerSheetViewModel struct {
 	QuestionnaireCode    string      `json:"questionnaire_code"`
 	QuestionnaireVersion string      `json:"questionnaire_version"`
 	Title                string      `json:"title"`
-	Score                uint16      `json:"score"`
+	Score                float64     `json:"score"`
 	WriterID             uint64      `json:"writer_id"`
 	TesteeID             uint64      `json:"testee_id"`
 	Answers              []AnswerDTO `json:"answers"`

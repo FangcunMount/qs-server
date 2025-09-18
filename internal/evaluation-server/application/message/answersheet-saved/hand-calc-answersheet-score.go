@@ -187,7 +187,7 @@ func (h *CalcAnswersheetScoreHandler) calculateAnswerSheetTotalScore(answersheet
 		totalScore += float64(answer.Score)
 	}
 
-	answersheet.Score = uint32(totalScore)
+	answersheet.Score = float64(totalScore)
 	log.Debugf("答卷总分计算完成: %d", answersheet.Score)
 	return nil
 }

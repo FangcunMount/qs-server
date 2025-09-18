@@ -2,7 +2,6 @@ package mapper
 
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
-	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer/answer-values"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
 )
@@ -18,11 +17,11 @@ func NewAnswerMapper() *AnswerMapper {
 func (m *AnswerMapper) MapAnswersToBOs(answers []viewmodel.AnswerDTO) []answer.Answer {
 	domainAnswers := make([]answer.Answer, len(answers))
 	for i, a := range answers {
-		domainAnswers[i] = answer.NewAnswer(
-			a.QuestionCode,
-			a.QuestionType,
+		domainAnswers[i], _ = answer.NewAnswer(
+			question.QuestionCode(a.QuestionCode),
+			question.QuestionType(a.QuestionType),
 			0,
-			answer_values.NewAnswerValue(question.QuestionType(a.QuestionType), a.Value),
+			a.Value,
 		)
 	}
 

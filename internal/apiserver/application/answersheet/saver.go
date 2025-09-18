@@ -67,7 +67,7 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 }
 
 // SaveAnswerSheetScores 保存答卷得分
-func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore uint16, answers []dto.AnswerDTO) (*dto.AnswerSheetDTO, error) {
+func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore float64, answers []dto.AnswerDTO) (*dto.AnswerSheetDTO, error) {
 	log.Infof("开始保存答卷分数，答卷ID: %d, 总分: %d, 答案数量: %d", id, totalScore, len(answers))
 
 	// 1. 获取现有答卷

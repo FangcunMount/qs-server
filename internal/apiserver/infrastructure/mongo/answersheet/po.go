@@ -17,7 +17,7 @@ type AnswerSheetPO struct {
 	QuestionnaireCode    string     `bson:"questionnaire_code" json:"questionnaire_code"`
 	QuestionnaireVersion string     `bson:"questionnaire_version" json:"questionnaire_version"`
 	Title                string     `bson:"title" json:"title"`
-	Score                uint16     `bson:"score" json:"score"`
+	Score                float64    `bson:"score" json:"score"`
 	Answers              []AnswerPO `bson:"answers" json:"answers"`
 	Writer               *WriterPO  `bson:"writer" json:"writer"`
 	Testee               *TesteePO  `bson:"testee" json:"testee"`
@@ -98,7 +98,7 @@ func (p *AnswerSheetPO) FromBsonM(data bson.M) error {
 type AnswerPO struct {
 	QuestionCode string        `bson:"question_code" json:"question_code"`
 	QuestionType string        `bson:"question_type" json:"question_type"`
-	Score        uint16        `bson:"score" json:"score"`
+	Score        float64       `bson:"score" json:"score"`
 	Value        AnswerValuePO `bson:"value" json:"value"`
 }
 

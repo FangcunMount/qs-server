@@ -9,7 +9,7 @@ type AnswerSheetDTO struct {
 	QuestionnaireCode    string      // 问卷代码
 	QuestionnaireVersion string      // 问卷版本
 	Title                string      // 答卷标题
-	Score                uint16      // 总分
+	Score                float64     // 总分
 	WriterID             uint64      // 填写人ID
 	TesteeID             uint64      // 被测试者ID
 	Answers              []AnswerDTO // 答案列表
@@ -18,10 +18,10 @@ type AnswerSheetDTO struct {
 // AnswerDTO 表示答案数据传输对象
 // 用于在应用层和领域层之间传输单个答案数据
 type AnswerDTO struct {
-	QuestionCode string // 问题编码
-	QuestionType string // 问题类型
-	Score        uint16 // 得分
-	Value        any    // 答案值，可以是字符串、数字或选项数组等
+	QuestionCode string  // 问题编码
+	QuestionType string  // 问题类型
+	Score        float64 // 得分
+	Value        any     // 答案值，可以是字符串、数字或选项数组等
 }
 
 // AnswerSheetDetailDTO 用于返回答卷详细信息的数据传输对象

@@ -17,7 +17,7 @@ type AnswerSheet struct {
 	questionnaireCode    string
 	questionnaireVersion string
 	title                string
-	score                uint16
+	score                float64
 	answers              []answer.Answer
 	writer               *user.Writer
 	testee               *user.Testee
@@ -63,7 +63,7 @@ func WithTitle(title string) AnswerSheetOption {
 	}
 }
 
-func WithScore(score uint16) AnswerSheetOption {
+func WithScore(score float64) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.score = score
 	}
@@ -119,7 +119,7 @@ func (a *AnswerSheet) GetTitle() string {
 	return a.title
 }
 
-func (a *AnswerSheet) GetScore() uint16 {
+func (a *AnswerSheet) GetScore() float64 {
 	return a.score
 }
 

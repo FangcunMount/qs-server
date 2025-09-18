@@ -13,7 +13,7 @@ type AnswerSheetSaver interface {
 	SaveOriginalAnswerSheet(ctx context.Context, answerSheet dto.AnswerSheetDTO) (*dto.AnswerSheetDTO, error)
 
 	// SaveAnswerSheetScores 保存答卷分数
-	SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore uint16, answers []dto.AnswerDTO) (*dto.AnswerSheetDTO, error)
+	SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore float64, answers []dto.AnswerDTO) (*dto.AnswerSheetDTO, error)
 }
 
 // AnswerSheetQueryer 答卷查询器

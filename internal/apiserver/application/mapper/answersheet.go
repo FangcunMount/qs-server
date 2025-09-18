@@ -3,7 +3,6 @@ package mapper
 import (
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
-	answer_values "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer/answer-values"
 	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
 )
 
@@ -54,15 +53,14 @@ func (m *AnswerMapper) ToBO(dto *dto.AnswerDTO) answer.Answer {
 		return answer.Answer{}
 	}
 
-	questionType := question.QuestionType(dto.QuestionType)
-	answerValue := answer_values.NewAnswerValue(questionType, dto.Value)
-
-	return answer.NewAnswer(
-		dto.QuestionCode,
-		dto.QuestionType,
+	ans, _ := answer.NewAnswer(
+		question.QuestionCode(dto.QuestionCode),
+		question.QuestionType(dto.QuestionType),
 		dto.Score,
-		answerValue,
+		dto.Value,
 	)
+
+	return ans
 }
 
 // ToBOs 将 DTO 列表转换为领域对象列表

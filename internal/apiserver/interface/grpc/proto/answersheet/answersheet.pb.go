@@ -28,7 +28,7 @@ type AnswerSheet struct {
 	QuestionnaireCode    string                 `protobuf:"bytes,2,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Title                string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	Score                uint32                 `protobuf:"varint,5,opt,name=score,proto3" json:"score,omitempty"`
+	Score                float64                 `protobuf:"varint,5,opt,name=score,proto3" json:"score,omitempty"`
 	WriterId             uint64                 `protobuf:"varint,6,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
 	WriterName           string                 `protobuf:"bytes,7,opt,name=writer_name,json=writerName,proto3" json:"writer_name,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,8,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
@@ -98,7 +98,7 @@ func (x *AnswerSheet) GetTitle() string {
 	return ""
 }
 
-func (x *AnswerSheet) GetScore() uint32 {
+func (x *AnswerSheet) GetScore() float64 {
 	if x != nil {
 		return x.Score
 	}
@@ -593,7 +593,7 @@ func (x *ListAnswerSheetsResponse) GetTotal() int64 {
 type SaveAnswerSheetScoresRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AnswerSheetId uint64                 `protobuf:"varint,1,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"` // 答卷ID
-	TotalScore    uint32                 `protobuf:"varint,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`            // 总分
+	TotalScore    float64                `protobuf:"varint,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`            // 总分
 	Answers       []*Answer              `protobuf:"bytes,3,rep,name=answers,proto3" json:"answers,omitempty"`                                     // 答案列表（包含分数）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -636,7 +636,7 @@ func (x *SaveAnswerSheetScoresRequest) GetAnswerSheetId() uint64 {
 	return 0
 }
 
-func (x *SaveAnswerSheetScoresRequest) GetTotalScore() uint32 {
+func (x *SaveAnswerSheetScoresRequest) GetTotalScore() float64 {
 	if x != nil {
 		return x.TotalScore
 	}

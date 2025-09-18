@@ -44,6 +44,10 @@ func (c QuestionCode) Equals(other QuestionCode) bool {
 // QuestionType 题型
 type QuestionType string
 
+func (t QuestionType) Value() string {
+	return string(t)
+}
+
 const (
 	QuestionTypeSection  QuestionType = "Section"  // 段落
 	QuestionTypeRadio    QuestionType = "Radio"    // 单选

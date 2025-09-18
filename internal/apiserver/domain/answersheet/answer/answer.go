@@ -1,38 +1,58 @@
 package answer
 
-// AnswerValue 答案值
-type AnswerValue interface {
-	// Raw 原始值
-	Raw() any
-}
+import (
+	"errors"
+
+	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+)
 
 // Answer 基础答案
 type Answer struct {
-	questionCode string
-	questionType string
-	score        uint16
+	questionCode question.QuestionCode
+	questionType question.QuestionType
+	score        float64
 	value        AnswerValue
 }
 
 // NewAnswer 创建基础答案
-func NewAnswer(questionCode string, questionType string, score uint16, value AnswerValue) Answer {
+func NewAnswer(qCode question.QuestionCode, qType question.QuestionType, score float64, v any) (Answer, error) {
+	vType, err := transforAnswerValueType(qType)
+	if err != nil {
+		return Answer{}, err
+	}
+
 	return Answer{
-		questionCode: questionCode,
-		questionType: questionType,
+		questionCode: qCode,
+		questionType: qType,
 		score:        score,
-		value:        value,
+		value:        CreateAnswerValuer(vType, v),
+	}, nil
+}
+
+func transforAnswerValueType(qType question.QuestionType) (AnswerValueType, error) {
+	switch qType {
+	case question.QuestionTypeRadio:
+		return OptionValueType, nil
+	case question.QuestionTypeCheckbox:
+		return OptionsValueType, nil
+	case question.QuestionTypeText, question.QuestionTypeTextarea:
+		return StringValueType, nil
+	case question.QuestionTypeNumber:
+		return NumberValueType, nil
+	default:
+		return "", errors.New("no AnswerValueType")
 	}
 }
 
 func (a *Answer) GetQuestionCode() string {
-	return a.questionCode
+	return a.questionCode.Value()
 }
 
 func (a *Answer) GetQuestionType() string {
-	return a.questionType
+	return a.questionType.Value()
 }
 
-func (a *Answer) GetScore() uint16 {
+func (a *Answer) GetScore() float64 {
 	return a.score
 }
 

@@ -13,7 +13,7 @@ type GetAnswerSheetResponse struct {
 	QuestionnaireCode    string                `json:"questionnaire_code"`
 	QuestionnaireVersion string                `json:"questionnaire_version"`
 	Title                string                `json:"title"`
-	Score                uint16                `json:"score"`
+	Score                float64               `json:"score"`
 	WriterID             uint64                `json:"writer_id"`
 	WriterName           string                `json:"writer_name"`
 	TesteeID             uint64                `json:"testee_id"`
@@ -25,13 +25,13 @@ type GetAnswerSheetResponse struct {
 
 // AnswerSheetItem 答卷列表项
 type AnswerSheetItem struct {
-	ID                   uint64 `json:"id"`
-	QuestionnaireCode    string `json:"questionnaire_code"`
-	QuestionnaireVersion string `json:"questionnaire_version"`
-	Title                string `json:"title"`
-	Score                uint16 `json:"score"`
-	WriterID             uint64 `json:"writer_id"`
-	TesteeID             uint64 `json:"testee_id"`
+	ID                   uint64  `json:"id"`
+	QuestionnaireCode    string  `json:"questionnaire_code"`
+	QuestionnaireVersion string  `json:"questionnaire_version"`
+	Title                string  `json:"title"`
+	Score                float64 `json:"score"`
+	WriterID             uint64  `json:"writer_id"`
+	TesteeID             uint64  `json:"testee_id"`
 }
 
 // ListAnswerSheetsResponse 获取答卷列表响应

@@ -13,7 +13,7 @@ func TestAnswerSheetClient_SaveAnswerSheetScores(t *testing.T) {
 
 	// 创建测试数据
 	answerSheetID := uint64(12345)
-	totalScore := uint32(100)
+	totalScore := float64(100)
 	answers := []*answersheet.Answer{
 		{
 			QuestionCode: "Q1",

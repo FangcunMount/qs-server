@@ -112,7 +112,7 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 			QuestionnaireCode:    sheet.QuestionnaireCode,
 			QuestionnaireVersion: sheet.QuestionnaireVersion,
 			Title:                sheet.Title,
-			Score:                uint32(sheet.Score),
+			Score:                float64(sheet.Score),
 			WriterId:             sheet.WriterID,
 			TesteeId:             sheet.TesteeID,
 			// 列表中不返回具体答案，减少数据传输量
@@ -136,7 +136,7 @@ func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.
 	answers := s.fromProtoAnswers(req.Answers)
 
 	// 调用领域服务保存分数
-	savedDTO, err := s.saver.SaveAnswerSheetScores(ctx, req.AnswerSheetId, uint16(req.TotalScore), answers)
+	savedDTO, err := s.saver.SaveAnswerSheetScores(ctx, req.AnswerSheetId, req.TotalScore, answers)
 	if err != nil {
 		log.Errorf("保存答卷分数失败: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -170,7 +170,7 @@ func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO
 		QuestionnaireCode:    detail.AnswerSheet.QuestionnaireCode,
 		QuestionnaireVersion: detail.AnswerSheet.QuestionnaireVersion,
 		Title:                detail.AnswerSheet.Title,
-		Score:                uint32(detail.AnswerSheet.Score),
+		Score:                float64(detail.AnswerSheet.Score),
 		WriterId:             detail.AnswerSheet.WriterID,
 		WriterName:           detail.WriterName,
 		TesteeId:             detail.AnswerSheet.TesteeID,
@@ -299,7 +299,7 @@ func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.A
 		answers[i] = dto.AnswerDTO{
 			QuestionCode: protoAnswer.QuestionCode,
 			QuestionType: questionType,
-			Score:        uint16(protoAnswer.Score),
+			Score:        float64(protoAnswer.Score),
 			Value:        value,
 		}
 	}
