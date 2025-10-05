@@ -2,7 +2,6 @@ package wechat
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/redis/go-redis/v9"
@@ -27,7 +26,6 @@ type WxClientFactory struct {
 	rdb       *redis.Client
 	miniCache sync.Map // appID -> *miniprogram.MiniProgram
 	oaCache   sync.Map // appID -> *officialaccount.OfficialAccount
-	mu        sync.RWMutex
 }
 
 // NewWxClientFactory 创建微信客户端工厂
@@ -135,7 +133,7 @@ func (f *WxClientFactory) Code2Session(ctx context.Context, appID, jsCode string
 	}
 
 	if result.ErrCode != 0 {
-		return "", "", "", errors.WithCode(code.ErrUnknown, fmt.Sprintf("code2session failed: %s", result.ErrMsg))
+		return "", "", "", errors.WithCode(code.ErrUnknown, "code2session failed: %s", result.ErrMsg)
 	}
 
 	return result.OpenID, result.SessionKey, result.UnionID, nil
