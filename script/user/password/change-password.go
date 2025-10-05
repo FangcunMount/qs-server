@@ -5,7 +5,7 @@ import (
 
 	userApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
-	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql/user"
+	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql/user"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 	"github.com/fangcun-mount/qs-server/script/base"
 )

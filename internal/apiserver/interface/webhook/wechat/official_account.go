@@ -7,7 +7,7 @@ import (
 	"github.com/silenceper/wechat/v2/officialaccount/message"
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/application/wechat"
-	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/wechat"
+	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/wechat"
 	"github.com/fangcun-mount/qs-server/pkg/core"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 )

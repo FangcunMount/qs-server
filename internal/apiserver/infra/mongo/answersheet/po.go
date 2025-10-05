@@ -3,7 +3,7 @@ package answersheet
 import (
 	"time"
 
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
 	"go.mongodb.org/mongo-driver/bson"

@@ -6,8 +6,8 @@ import (
 
 	quesApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/questionnaire"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	quesDocInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/questionnaire"
-	quesInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql/questionnaire"
+	quesDocInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	quesInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql/questionnaire"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/errors"

@@ -5,7 +5,7 @@ import (
 
 	interpretreportapp "github.com/fangcun-mount/qs-server/internal/apiserver/application/interpret-report"
 	interpretreportport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report/port"
-	interpretreportmongo "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/interpret-report"
+	interpretreportmongo "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/interpret-report"
 )
 
 // InterpretReportModule 解读报告模块

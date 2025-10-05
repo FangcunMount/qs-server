@@ -6,10 +6,10 @@ import (
 	"github.com/fangcun-mount/qs-server/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	qnMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/questionnaire"
+	qnMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 
 	asApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/answersheet"
-	asMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/answersheet"
+	asMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	asHandler "github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
 )
 

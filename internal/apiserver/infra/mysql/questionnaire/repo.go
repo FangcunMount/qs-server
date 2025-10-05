@@ -7,7 +7,7 @@ import (
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql"
 )
 
 // Repository 存储库实现

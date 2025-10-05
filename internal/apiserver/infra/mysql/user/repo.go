@@ -9,7 +9,7 @@ import (
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql"
 	"github.com/fangcun-mount/qs-server/internal/pkg/code"
 	pkgerrors "github.com/fangcun-mount/qs-server/pkg/errors"
 )

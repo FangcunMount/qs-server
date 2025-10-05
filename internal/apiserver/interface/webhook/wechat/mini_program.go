@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/wechat"
+	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/wechat"
 	"github.com/fangcun-mount/qs-server/pkg/core"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 )

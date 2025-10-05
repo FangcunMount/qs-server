@@ -12,7 +12,7 @@ import (
 
 	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
 	interpretport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report/port"
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )

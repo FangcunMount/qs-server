@@ -5,7 +5,7 @@ import (
 
 	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
 	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 

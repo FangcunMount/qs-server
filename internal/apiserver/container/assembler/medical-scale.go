@@ -5,7 +5,7 @@ import (
 
 	msApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/medical-scale"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
-	msInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/medical-scale"
+	msInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/medical-scale"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/errors"

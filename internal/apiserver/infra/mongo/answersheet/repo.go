@@ -10,7 +10,7 @@ import (
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
-	mongoBase "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	mongoBase "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
 	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 

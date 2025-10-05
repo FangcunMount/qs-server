@@ -6,7 +6,7 @@ import (
 	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
 	"gorm.io/gorm"
 
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql"
 )
 
 // QuestionnairePO 问卷持久化对象

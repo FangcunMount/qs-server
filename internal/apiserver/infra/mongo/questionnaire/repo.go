@@ -9,7 +9,7 @@ import (
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	mongoBase "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	mongoBase "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
 )
 
 // Repository 问卷MongoDB存储库

@@ -7,7 +7,7 @@ import (
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql"
 	"github.com/fangcun-mount/qs-server/internal/pkg/code"
 	pkgerrors "github.com/fangcun-mount/qs-server/pkg/errors"
 )

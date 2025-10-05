@@ -5,7 +5,7 @@ import (
 
 	authApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/auth"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
-	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql/user"
+	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql/user"
 	"github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
