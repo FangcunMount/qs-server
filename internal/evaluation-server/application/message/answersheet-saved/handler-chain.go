@@ -3,7 +3,7 @@ package answersheet_saved
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/internal/pkg/pubsub"
 )
 
 // Handler 答卷已保存消息处理器

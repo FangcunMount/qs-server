@@ -3,7 +3,7 @@ package interpretationreport
 import (
 	"strconv"
 
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // InterpretReportID 解读报告唯一标识

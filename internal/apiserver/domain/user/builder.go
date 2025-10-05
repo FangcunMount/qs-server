@@ -3,7 +3,7 @@ package user
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/pkg/auth"
+	"github.com/fangcun-mount/qs-server/pkg/auth"
 )
 
 type UserBuilder struct {

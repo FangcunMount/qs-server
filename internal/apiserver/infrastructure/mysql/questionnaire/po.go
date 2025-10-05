@@ -3,10 +3,10 @@ package questionnaire
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/pkg/util/idutil"
+	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
 	"gorm.io/gorm"
 
-	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql"
 )
 
 // QuestionnairePO 问卷持久化对象

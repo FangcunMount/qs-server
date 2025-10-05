@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // InitFlags 初始化

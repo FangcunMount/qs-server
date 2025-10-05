@@ -3,7 +3,7 @@ package strategies
 import (
 	"sync"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
 )
 
 // GlobalStrategyFactory 全局策略工厂实例

@@ -10,11 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/logger"
-	"github.com/yshujie/questionnaire-scale/pkg/database"
-	"github.com/yshujie/questionnaire-scale/pkg/database/databases"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
+	"github.com/fangcun-mount/qs-server/internal/pkg/logger"
+	"github.com/fangcun-mount/qs-server/pkg/database"
+	"github.com/fangcun-mount/qs-server/pkg/database/databases"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // DatabaseManager 数据库管理器

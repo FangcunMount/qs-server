@@ -1,10 +1,10 @@
 package collection
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/config"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
-	"github.com/yshujie/questionnaire-scale/pkg/app"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/config"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/options"
+	"github.com/fangcun-mount/qs-server/pkg/app"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // commandDesc 命令描述

@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
-	questionnairepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
-	calculationapp "github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/calculation"
-	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	answersheetpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	questionnairepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	calculationapp "github.com/fangcun-mount/qs-server/internal/evaluation-server/application/calculation"
+	grpcclient "github.com/fangcun-mount/qs-server/internal/evaluation-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // CalcAnswersheetScoreHandler 计算答卷分数处理器

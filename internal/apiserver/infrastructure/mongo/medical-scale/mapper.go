@@ -1,13 +1,13 @@
 package medicalscale
 
 import (
-	medicalscale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/factor/ability"
-	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/interpretation"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	medicalscale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
+	"github.com/fangcun-mount/qs-server/internal/pkg/interpretation"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

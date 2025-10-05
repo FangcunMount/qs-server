@@ -1,7 +1,7 @@
 package questionnaire
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
 )
 
 // Questionnaire 问卷

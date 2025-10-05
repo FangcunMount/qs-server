@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // LoggingInterceptor 统一的 gRPC 日志拦截器

@@ -3,9 +3,9 @@ package account
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // WxPlatform 微信平台类型

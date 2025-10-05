@@ -14,8 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/util/homedir"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/util/homedir"
 )
 
 const (

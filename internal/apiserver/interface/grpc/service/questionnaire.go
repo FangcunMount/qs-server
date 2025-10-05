@@ -7,9 +7,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	pb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
+	pb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 )
 
 // QuestionnaireService 问卷 GRPC 服务 - 对外提供查询功能

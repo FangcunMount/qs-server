@@ -1,6 +1,6 @@
 package answer
 
-import "github.com/yshujie/questionnaire-scale/pkg/log"
+import "github.com/fangcun-mount/qs-server/pkg/log"
 
 // AnswerValue 答案值
 type AnswerValue interface {

@@ -3,15 +3,15 @@ package answersheet
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
-	qnPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
+	qnPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // Queryer 答卷查询器

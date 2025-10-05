@@ -1,8 +1,8 @@
 package question
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
+	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
+	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
 )
 
 // BuilderOption 构建器选项函数类型

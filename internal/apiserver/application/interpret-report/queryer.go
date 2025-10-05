@@ -3,11 +3,11 @@ package interpretreport
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	interpretport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report/port"
-	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
+	interpretport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report/port"
+	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Queryer 解读报告查询器

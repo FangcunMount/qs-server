@@ -1,12 +1,12 @@
 package collection
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/config"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/container"
-	genericapiserver "github.com/yshujie/questionnaire-scale/internal/pkg/server"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/shutdown"
-	"github.com/yshujie/questionnaire-scale/pkg/shutdown/shutdownmanagers/posixsignal"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/config"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/container"
+	genericapiserver "github.com/fangcun-mount/qs-server/internal/pkg/server"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/shutdown"
+	"github.com/fangcun-mount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
 )
 
 // collectionServer 定义了 Collection 服务器的基本结构

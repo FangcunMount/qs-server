@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
+	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
 )
 
 // Repository 医学量表仓储接口

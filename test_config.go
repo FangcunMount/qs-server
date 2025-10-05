@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/spf13/viper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/options"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/options"
 )
 
 func main() {

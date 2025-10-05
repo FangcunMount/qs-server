@@ -3,11 +3,11 @@ package message
 import (
 	"context"
 
-	answersheet_saved "github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/message/answersheet-saved"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/repository"
-	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	answersheet_saved "github.com/fangcun-mount/qs-server/internal/evaluation-server/application/message/answersheet-saved"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/application/repository"
+	grpcclient "github.com/fangcun-mount/qs-server/internal/evaluation-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // Handler 消息处理器接口（保持向后兼容）

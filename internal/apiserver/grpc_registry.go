@@ -1,10 +1,10 @@
 package apiserver
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/service"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/grpcserver"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/service"
+	"github.com/fangcun-mount/qs-server/internal/pkg/grpcserver"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // GRPCRegistry GRPC 服务注册器

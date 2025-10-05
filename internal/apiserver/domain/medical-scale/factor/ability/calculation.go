@@ -1,6 +1,6 @@
 package ability
 
-import "github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
+import "github.com/fangcun-mount/qs-server/internal/pkg/calculation"
 
 // CalculationRule 计算规则
 type CalculationAbility struct {

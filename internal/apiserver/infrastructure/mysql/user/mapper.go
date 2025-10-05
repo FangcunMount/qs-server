@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
 )
 
 // UserMapper 用户映射器

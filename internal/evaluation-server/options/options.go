@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	genericoptions "github.com/yshujie/questionnaire-scale/internal/pkg/options"
-	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	genericoptions "github.com/fangcun-mount/qs-server/internal/pkg/options"
+	cliflag "github.com/fangcun-mount/qs-server/pkg/flag"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // Options 包含所有配置项

@@ -1,8 +1,8 @@
 package mapper
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/viewmodel"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // QuestionMapper 问题映射器

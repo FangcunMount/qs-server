@@ -778,7 +778,7 @@ const file_medical_scale_proto_rawDesc = "" +
 	"\tmax_score\x18\x02 \x01(\x01R\bmaxScore2\xa5\x02\n" +
 	"\x13MedicalScaleService\x12r\n" +
 	"\x15GetMedicalScaleByCode\x12+.medical_scale.GetMedicalScaleByCodeRequest\x1a,.medical_scale.GetMedicalScaleByCodeResponse\x12\x99\x01\n" +
-	"\"GetMedicalScaleByQuestionnaireCode\x128.medical_scale.GetMedicalScaleByQuestionnaireCodeRequest\x1a9.medical_scale.GetMedicalScaleByQuestionnaireCodeResponseB^Z\\github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scaleb\x06proto3"
+	"\"GetMedicalScaleByQuestionnaireCode\x128.medical_scale.GetMedicalScaleByQuestionnaireCodeRequest\x1a9.medical_scale.GetMedicalScaleByQuestionnaireCodeResponseB^Z\\github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/medical-scaleb\x06proto3"
 
 var (
 	file_medical_scale_proto_rawDescOnce sync.Once

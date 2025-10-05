@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver"
+	"github.com/fangcun-mount/qs-server/internal/apiserver"
 )
 
 func main() {

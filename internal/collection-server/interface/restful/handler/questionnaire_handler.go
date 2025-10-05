@@ -5,11 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	questionnaireapp "github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	questionnaireapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/mapper"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/request"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // QuestionnaireHandler 问卷处理器接口

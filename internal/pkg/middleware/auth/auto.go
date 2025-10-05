@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/core"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/core"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // authHeaderCount 认证头数量

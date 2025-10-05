@@ -1,8 +1,8 @@
 package interpretationreport
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // InterpretReport 解读报告

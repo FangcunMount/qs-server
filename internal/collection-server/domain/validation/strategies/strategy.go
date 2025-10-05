@@ -3,7 +3,7 @@ package strategies
 import (
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
 )
 
 // ValidationStrategy 验证策略接口

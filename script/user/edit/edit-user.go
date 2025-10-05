@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 
-	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/script/base"
+	userApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
+	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql/user"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/script/base"
 )
 
 // UserEditScript 用户编辑脚本

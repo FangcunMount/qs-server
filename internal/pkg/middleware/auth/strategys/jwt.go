@@ -4,7 +4,7 @@ import (
 	ginjwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 
-	auth "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
+	auth "github.com/fangcun-mount/qs-server/internal/pkg/middleware/auth"
 )
 
 // JWTStrategy 定义jwt bearer认证策略

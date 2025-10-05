@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/strategies"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/strategies"
 )
 
 // Rule 验证规则类型别名

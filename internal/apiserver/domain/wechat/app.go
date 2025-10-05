@@ -3,8 +3,8 @@ package wechat
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Platform 微信平台类型

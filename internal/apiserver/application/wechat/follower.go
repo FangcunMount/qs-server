@@ -3,13 +3,13 @@ package wechat
 import (
 	"context"
 
-	accountDomain "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/account"
-	accountPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/account/port"
-	wechatDomain "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat"
-	wechatPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	accountDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account"
+	accountPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account/port"
+	wechatDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
+	wechatPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat/port"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // Follower 公众号关注/取关处理器

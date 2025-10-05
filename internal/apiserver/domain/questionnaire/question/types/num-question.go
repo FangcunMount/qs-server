@@ -1,9 +1,9 @@
 package types
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question/ability"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
 )
 
 // NumberQuestion 数字问题

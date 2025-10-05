@@ -1,16 +1,16 @@
 package assembler
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	qnMongoInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/questionnaire"
+	qnMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/questionnaire"
 
-	asApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/answersheet"
-	asMongoInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo/answersheet"
-	asHandler "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
+	asApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/answersheet"
+	asMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo/answersheet"
+	asHandler "github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
 )
 
 // AnswersheetModule 答卷模块

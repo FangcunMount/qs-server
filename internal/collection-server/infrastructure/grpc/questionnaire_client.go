@@ -9,10 +9,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/options"
+	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // QuestionnaireClient 问卷客户端接口

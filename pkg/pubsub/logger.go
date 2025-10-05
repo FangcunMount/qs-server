@@ -2,7 +2,7 @@ package pubsub
 
 import (
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // watermillLogger Watermill 日志适配器

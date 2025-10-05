@@ -1,8 +1,8 @@
 package question
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
+	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
+	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
 )
 
 // Question 问题接口 - 统一所有题型的方法签名

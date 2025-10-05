@@ -1,6 +1,6 @@
 package evaluation
 
-import "github.com/yshujie/questionnaire-scale/internal/evaluation-server/config"
+import "github.com/fangcun-mount/qs-server/internal/evaluation-server/config"
 
 // Run 运行指定的 Evaluation Server。此函数不应退出。
 func Run(cfg *config.Config) error {

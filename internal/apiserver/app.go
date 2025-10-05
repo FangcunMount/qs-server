@@ -1,10 +1,10 @@
 package apiserver
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/options"
-	"github.com/yshujie/questionnaire-scale/pkg/app"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/options"
+	"github.com/fangcun-mount/qs-server/pkg/app"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // commandDesc 命令描述

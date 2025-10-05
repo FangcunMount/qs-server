@@ -3,7 +3,7 @@ package sequential
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
 )
 
 // Service 串行验证服务接口

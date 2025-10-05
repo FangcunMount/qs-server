@@ -6,10 +6,10 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/request"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
 )
 
 // UserHandler 用户HTTP处理器

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // QuestionnaireClient 问卷客户端

@@ -1,7 +1,7 @@
 package app
 
 import (
-	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
+	cliflag "github.com/fangcun-mount/qs-server/pkg/flag"
 )
 
 // CliOptions 命令行选项

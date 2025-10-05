@@ -1,6 +1,6 @@
 package values
 
-import "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
+import "github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
 
 // 注册选项值工厂
 func init() {

@@ -11,13 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
-	authMiddleware "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth"
-	authStrategys "github.com/yshujie/questionnaire-scale/internal/pkg/middleware/auth/strategys"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
+	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
+	authMiddleware "github.com/fangcun-mount/qs-server/internal/pkg/middleware/auth"
+	authStrategys "github.com/fangcun-mount/qs-server/internal/pkg/middleware/auth/strategys"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // 使用已存在的常量 APIServerAudience 和 APIServerIssuer

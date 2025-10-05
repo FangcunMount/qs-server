@@ -1,9 +1,9 @@
 package types
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/validation"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
+	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
 )
 
 // BaseQuestion 基础问题

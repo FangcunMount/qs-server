@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/yshujie/questionnaire-scale/pkg/util/homedir"
+	"github.com/fangcun-mount/qs-server/pkg/util/homedir"
 )
 
 // configFlagName 配置标志名称

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // ConcurrentCalculationAdapter 并发计算适配器

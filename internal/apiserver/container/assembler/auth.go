@@ -3,11 +3,11 @@ package assembler
 import (
 	"gorm.io/gorm"
 
-	authApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/auth"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	authApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/auth"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
+	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql/user"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Module 认证模块

@@ -1,13 +1,13 @@
 package apiserver
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/config"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/grpcserver"
-	genericapiserver "github.com/yshujie/questionnaire-scale/internal/pkg/server"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/shutdown"
-	"github.com/yshujie/questionnaire-scale/pkg/shutdown/shutdownmanagers/posixsignal"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
+	"github.com/fangcun-mount/qs-server/internal/pkg/grpcserver"
+	genericapiserver "github.com/fangcun-mount/qs-server/internal/pkg/server"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/shutdown"
+	"github.com/fangcun-mount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
 )
 
 // apiServer 定义了 API 服务器的基本结构（六边形架构版本）

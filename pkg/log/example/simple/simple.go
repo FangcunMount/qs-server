@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/yshujie/questionnaire-scale/pkg/log"
+import "github.com/fangcun-mount/qs-server/pkg/log"
 
 func main() {
 	log.Infof("this is a test log, message: %s", "good")

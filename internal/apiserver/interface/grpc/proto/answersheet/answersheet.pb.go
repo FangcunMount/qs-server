@@ -777,7 +777,7 @@ const file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto
 	"\x0fSaveAnswerSheet\x12#.answersheet.SaveAnswerSheetRequest\x1a$.answersheet.SaveAnswerSheetResponse\x12Y\n" +
 	"\x0eGetAnswerSheet\x12\".answersheet.GetAnswerSheetRequest\x1a#.answersheet.GetAnswerSheetResponse\x12_\n" +
 	"\x10ListAnswerSheets\x12$.answersheet.ListAnswerSheetsRequest\x1a%.answersheet.ListAnswerSheetsResponse\x12n\n" +
-	"\x15SaveAnswerSheetScores\x12).answersheet.SaveAnswerSheetScoresRequest\x1a*.answersheet.SaveAnswerSheetScoresResponseB\\ZZgithub.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheetb\x06proto3"
+	"\x15SaveAnswerSheetScores\x12).answersheet.SaveAnswerSheetScoresRequest\x1a*.answersheet.SaveAnswerSheetScoresResponseB\\ZZgithub.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheetb\x06proto3"
 
 var (
 	file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescOnce sync.Once

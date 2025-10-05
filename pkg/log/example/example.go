@@ -8,7 +8,7 @@ import (
 	"context"
 	"flag"
 
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 var (

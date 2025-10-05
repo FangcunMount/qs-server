@@ -6,10 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/silenceper/wechat/v2/officialaccount/message"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/wechat"
-	wxInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/wechat"
-	"github.com/yshujie/questionnaire-scale/pkg/core"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/wechat"
+	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/wechat"
+	"github.com/fangcun-mount/qs-server/pkg/core"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // OfficialAccountWebhook 公众号事件回调处理器

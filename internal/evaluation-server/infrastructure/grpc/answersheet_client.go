@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // AnswerSheetClient 答卷客户端

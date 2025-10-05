@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/validation"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/handler"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/options"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/handler"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/options"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // Container 主容器，负责管理所有组件

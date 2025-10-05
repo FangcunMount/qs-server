@@ -1,11 +1,11 @@
 package answersheet
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // AnswerSheetMapper 答卷映射器

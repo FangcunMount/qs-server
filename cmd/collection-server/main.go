@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	collection "github.com/yshujie/questionnaire-scale/internal/collection-server"
+	collection "github.com/fangcun-mount/qs-server/internal/collection-server"
 )
 
 func main() {

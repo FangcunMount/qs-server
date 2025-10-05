@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/answersheet"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // Service 并发验证服务接口

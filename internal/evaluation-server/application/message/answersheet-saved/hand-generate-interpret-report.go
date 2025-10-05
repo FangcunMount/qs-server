@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
-	interpretreportpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-report"
-	medicalscalepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scale"
-	calculationapp "github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/calculation"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/interpretion"
-	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	answersheetpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	interpretreportpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	medicalscalepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
+	calculationapp "github.com/fangcun-mount/qs-server/internal/evaluation-server/application/calculation"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/interpretion"
+	grpcclient "github.com/fangcun-mount/qs-server/internal/evaluation-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // GenerateInterpretReportHandlerConcurrent 并发版本的解读报告生成处理器

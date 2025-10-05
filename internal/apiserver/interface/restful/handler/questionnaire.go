@@ -5,13 +5,13 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/response"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/mapper"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/request"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // QuestionnaireHandler 问卷处理器

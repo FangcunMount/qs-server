@@ -3,7 +3,7 @@ package strategies
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/rules"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/rules"
 )
 
 // CalculationStrategy 计算策略接口

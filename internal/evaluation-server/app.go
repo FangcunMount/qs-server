@@ -1,10 +1,10 @@
 package evaluation
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/config"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/options"
-	"github.com/yshujie/questionnaire-scale/pkg/app"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/config"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/options"
+	"github.com/fangcun-mount/qs-server/pkg/app"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // commandDesc 命令描述

@@ -3,7 +3,7 @@ package questionnaire
 import (
 	"time"
 
-	questionnairepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
+	questionnairepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 )
 
 // Questionnaire 问卷实体

@@ -7,9 +7,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
+	mongoBase "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
 )
 
 // Repository 问卷MongoDB存储库

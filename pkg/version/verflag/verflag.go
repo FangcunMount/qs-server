@@ -7,7 +7,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"github.com/yshujie/questionnaire-scale/pkg/version"
+	"github.com/fangcun-mount/qs-server/pkg/version"
 )
 
 // versionValue 版本值

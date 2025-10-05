@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
 )
 
 // QuestionnaireCreator 问卷创建接口

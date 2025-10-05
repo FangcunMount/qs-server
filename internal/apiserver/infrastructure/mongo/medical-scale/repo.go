@@ -8,10 +8,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
-	mongoBase "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
+	mongoBase "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // Repository 医学量表MongoDB存储库

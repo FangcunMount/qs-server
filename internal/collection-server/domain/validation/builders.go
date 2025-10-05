@@ -3,7 +3,7 @@ package validation
 import (
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
 )
 
 // ValidationRuleBuilder 验证规则构建器

@@ -3,11 +3,11 @@ package questionnaire
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/port"
-	"github.com/yshujie/questionnaire-scale/pkg/util/codeutil"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/fangcun-mount/qs-server/pkg/util/codeutil"
 )
 
 // Creator 问卷创建器

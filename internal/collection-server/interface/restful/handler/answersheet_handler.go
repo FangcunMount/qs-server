@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	answersheetapp "github.com/yshujie/questionnaire-scale/internal/collection-server/application/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/response"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	answersheetapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/mapper"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/request"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/response"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // AnswersheetHandler 答卷处理器接口

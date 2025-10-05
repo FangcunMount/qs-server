@@ -13,10 +13,10 @@ import (
 	"github.com/silenceper/wechat/v2/officialaccount"
 	oaConfig "github.com/silenceper/wechat/v2/officialaccount/config"
 
-	domainWechat "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat"
-	wechatPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	domainWechat "github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
+	wechatPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat/port"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // WxClientFactory 微信客户端工厂（按 app 产出 SDK 客户端）

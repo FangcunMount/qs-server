@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	questionnairepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/questionnaire"
+	questionnairepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/questionnaire"
 )
 
 // MockQuestionnaireClient 模拟问卷客户端

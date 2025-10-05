@@ -5,7 +5,7 @@
 package main
 
 import (
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 func main() {

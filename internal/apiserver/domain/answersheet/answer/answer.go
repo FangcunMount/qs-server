@@ -3,7 +3,7 @@ package answer
 import (
 	"errors"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire/question"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
 )
 
 // Answer 基础答案

@@ -8,12 +8,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
-	cliflag "github.com/yshujie/questionnaire-scale/pkg/flag"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/term"
-	"github.com/yshujie/questionnaire-scale/pkg/version"
-	"github.com/yshujie/questionnaire-scale/pkg/version/verflag"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
+	cliflag "github.com/fangcun-mount/qs-server/pkg/flag"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/term"
+	"github.com/fangcun-mount/qs-server/pkg/version"
+	"github.com/fangcun-mount/qs-server/pkg/version/verflag"
 )
 
 var (

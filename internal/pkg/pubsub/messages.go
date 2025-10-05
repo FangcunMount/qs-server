@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // 消息类型常量

@@ -5,11 +5,11 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat/port"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	pkgerrors "github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat/port"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	pkgerrors "github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Repository 微信应用存储库实现

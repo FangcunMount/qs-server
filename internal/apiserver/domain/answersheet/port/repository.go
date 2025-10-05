@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
 )
 
 // AnswerSheetRepositoryMongo 答卷存储库接口（出站端口）

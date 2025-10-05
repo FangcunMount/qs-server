@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/validation/rules"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
 )
 
 // RequiredStrategy 必填验证策略

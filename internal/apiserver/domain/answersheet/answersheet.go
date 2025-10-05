@@ -3,12 +3,12 @@ package answersheet
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/answersheet/answer"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // AnswerSheet 答卷

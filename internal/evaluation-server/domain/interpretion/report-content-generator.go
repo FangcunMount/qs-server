@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
-	interpretreportpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-report"
-	medicalscalepb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scale"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	interpretreportpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	medicalscalepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // InterpretReportContentGenerator 解读报告内容生成器

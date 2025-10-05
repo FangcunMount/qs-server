@@ -3,13 +3,13 @@ package interpretreport
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	interpretport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report/port"
-	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
+	interpretport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report/port"
+	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // Creator 解读报告创建器

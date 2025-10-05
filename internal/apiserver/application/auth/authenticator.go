@@ -3,11 +3,11 @@ package auth
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/auth"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/auth"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Authenticator 认证器

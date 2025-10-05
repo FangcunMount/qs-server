@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
-	answersheetapp "github.com/yshujie/questionnaire-scale/internal/collection-server/application/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/response"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	answersheetapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/request"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/response"
 )
 
 // AnswersheetMapper 答卷映射器，负责不同层级间的数据转换

@@ -3,10 +3,10 @@ package interpretreport
 import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	interpretreport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	base "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mongo"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	base "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mongo"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // Mapper 解读报告映射器

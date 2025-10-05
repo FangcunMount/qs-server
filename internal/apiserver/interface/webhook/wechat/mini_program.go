@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	wxInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/wechat"
-	"github.com/yshujie/questionnaire-scale/pkg/core"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/wechat"
+	"github.com/fangcun-mount/qs-server/pkg/core"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // MiniProgramWebhook 小程序回调处理器

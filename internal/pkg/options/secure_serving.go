@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/server"
+	"github.com/fangcun-mount/qs-server/internal/pkg/server"
 )
 
 // SecureServingOptions 安全的服务器配置选项

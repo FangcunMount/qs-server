@@ -3,10 +3,10 @@ package wechat
 import (
 	"context"
 
-	accountDomain "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/account"
-	accountPort "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/account/port"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	accountDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account"
+	accountPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account/port"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // SessionUpdater SessionKey更新器

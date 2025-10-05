@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"time"
 
-	answersheetpb "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
-	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	answersheetpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/answersheet"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	internalpubsub "github.com/fangcun-mount/qs-server/internal/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // Service 答卷应用服务接口

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/container"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/middleware"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/container"
+	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
 )
 
 // Router 集中的路由管理器

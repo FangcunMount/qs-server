@@ -3,12 +3,12 @@ package assembler
 import (
 	"gorm.io/gorm"
 
-	userApp "github.com/yshujie/questionnaire-scale/internal/apiserver/application/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
-	userInfra "github.com/yshujie/questionnaire-scale/internal/apiserver/infrastructure/mysql/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/restful/handler"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	userApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
+	userInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infrastructure/mysql/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Module 用户模块

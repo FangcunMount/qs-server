@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/domain/answersheet"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/answersheet"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // Validator 并发验证器 - 专注于并发验证逻辑

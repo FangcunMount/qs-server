@@ -448,7 +448,7 @@ const file_interpret_report_proto_rawDesc = "" +
 	"\acontent\x18\x04 \x01(\tR\acontent2\xab\x02\n" +
 	"\x16InterpretReportService\x12r\n" +
 	"\x13SaveInterpretReport\x12,.interpret_report.SaveInterpretReportRequest\x1a-.interpret_report.SaveInterpretReportResponse\x12\x9c\x01\n" +
-	"!GetInterpretReportByAnswerSheetID\x12:.interpret_report.GetInterpretReportByAnswerSheetIDRequest\x1a;.interpret_report.GetInterpretReportByAnswerSheetIDResponseBaZ_github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-reportb\x06proto3"
+	"!GetInterpretReportByAnswerSheetID\x12:.interpret_report.GetInterpretReportByAnswerSheetIDRequest\x1a;.interpret_report.GetInterpretReportByAnswerSheetIDResponseBaZ_github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-reportb\x06proto3"
 
 var (
 	file_interpret_report_proto_rawDescOnce sync.Once

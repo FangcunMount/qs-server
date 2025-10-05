@@ -3,11 +3,11 @@ package medicalscale
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
-	errorCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
+	errorCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // Queryer 医学量表查询器，实现 MedicalScaleQueryer 接口

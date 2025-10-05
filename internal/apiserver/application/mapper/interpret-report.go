@@ -1,9 +1,9 @@
 package mapper
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	interpretreport "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/interpret-report"
-	v1 "github.com/yshujie/questionnaire-scale/pkg/meta/v1"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
+	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
 // InterpretReportMapper 解读报告映射器

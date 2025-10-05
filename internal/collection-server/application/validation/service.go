@@ -3,9 +3,9 @@ package validation
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/validation/concurrent"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/application/validation/sequential"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation/concurrent"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation/sequential"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
 )
 
 // Service 验证服务统一接口

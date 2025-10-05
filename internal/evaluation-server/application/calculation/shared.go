@@ -1,9 +1,9 @@
 package calculation
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/rules"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/domain/calculation/strategies"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/rules"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/strategies"
+	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // CalculationRequest 计算请求

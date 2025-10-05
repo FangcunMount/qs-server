@@ -2,7 +2,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	"github.com/yshujie/questionnaire-scale/internal/pkg/server"
+	"github.com/fangcun-mount/qs-server/internal/pkg/server"
 )
 
 // ServerRunOptions 在运行的通用服务器选项

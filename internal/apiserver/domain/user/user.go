@@ -3,9 +3,9 @@ package user
 import (
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/auth"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	"github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/auth"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // User 用户聚合根

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	internalpubsub "github.com/yshujie/questionnaire-scale/internal/pkg/pubsub"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	internalpubsub "github.com/fangcun-mount/qs-server/internal/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 
-	errCode "github.com/yshujie/questionnaire-scale/internal/pkg/code"
-	"github.com/yshujie/questionnaire-scale/pkg/errors"
+	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
+	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // MessageProcessor 消息处理器接口

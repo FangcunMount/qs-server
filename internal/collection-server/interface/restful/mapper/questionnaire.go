@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire"
-	questionnaireapp "github.com/yshujie/questionnaire-scale/internal/collection-server/application/questionnaire"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/request"
-	"github.com/yshujie/questionnaire-scale/internal/collection-server/interface/restful/response"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	questionnaireapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/request"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/response"
 )
 
 // QuestionnaireMapper 问卷映射器，负责不同层级间的数据转换

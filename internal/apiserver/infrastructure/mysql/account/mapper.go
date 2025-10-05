@@ -1,8 +1,8 @@
 package account
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/account"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account"
 )
 
 // WechatAccountMapper 微信账户 DO <-> PO 映射器

@@ -3,8 +3,8 @@ package user
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/user/port"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/port"
 )
 
 // UserActivator 用户状态管理器

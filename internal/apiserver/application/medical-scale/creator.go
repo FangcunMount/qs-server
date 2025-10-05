@@ -3,11 +3,11 @@ package medicalscale
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/dto"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/application/mapper"
-	medicalScale "github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/medical-scale/port"
-	"github.com/yshujie/questionnaire-scale/pkg/util/codeutil"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
+	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
+	"github.com/fangcun-mount/qs-server/pkg/util/codeutil"
 )
 
 // Creator 医学量表创建器

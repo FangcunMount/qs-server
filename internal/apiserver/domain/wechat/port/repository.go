@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
 )
 
 // AppRepository 微信应用仓储接口（出站端口）

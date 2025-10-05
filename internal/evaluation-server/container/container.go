@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/application/message"
-	grpcclient "github.com/yshujie/questionnaire-scale/internal/evaluation-server/infrastructure/grpc"
-	"github.com/yshujie/questionnaire-scale/internal/evaluation-server/options"
-	"github.com/yshujie/questionnaire-scale/pkg/log"
-	"github.com/yshujie/questionnaire-scale/pkg/pubsub"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/application/message"
+	grpcclient "github.com/fangcun-mount/qs-server/internal/evaluation-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/evaluation-server/options"
+	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // Container 容器

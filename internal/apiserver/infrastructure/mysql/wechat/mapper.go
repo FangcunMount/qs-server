@@ -1,7 +1,7 @@
 package wechat
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/wechat"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
 )
 
 // AppMapper 微信应用 DO <-> PO 映射器

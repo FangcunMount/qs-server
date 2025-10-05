@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/container"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
 )
 
 // Router 集中的路由管理器

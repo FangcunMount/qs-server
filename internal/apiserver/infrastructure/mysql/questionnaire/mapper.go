@@ -1,7 +1,7 @@
 package questionnaire
 
 import (
-	"github.com/yshujie/questionnaire-scale/internal/apiserver/domain/questionnaire"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
 )
 
 type QuestionnaireMapper struct{}
