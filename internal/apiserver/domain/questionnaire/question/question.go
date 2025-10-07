@@ -3,6 +3,7 @@ package question
 import (
 	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
 	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
+	"github.com/fangcun-mount/qs-server/pkg/util/codeutil"
 )
 
 // Question 问题接口 - 统一所有题型的方法签名
@@ -24,21 +25,16 @@ type Question interface {
 }
 
 // QuestionCode 问题编码
-type QuestionCode string
+type QuestionCode = codeutil.Code
 
 // NewQuestionCode 创建问题编码
 func NewQuestionCode(value string) QuestionCode {
-	return QuestionCode(value)
+	return codeutil.NewCode(value)
 }
 
-// Value 获取问题编码
-func (c QuestionCode) Value() string {
-	return string(c)
-}
-
-// Equals 判断问题编码是否相等
-func (c QuestionCode) Equals(other QuestionCode) bool {
-	return c.Value() == other.Value()
+// GenerateQuestionCode 生成新的问题编码
+func GenerateQuestionCode() (QuestionCode, error) {
+	return codeutil.GenerateNewCode()
 }
 
 // QuestionType 题型

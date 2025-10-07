@@ -129,7 +129,7 @@ func (m *AnswerSheetMapper) mapAnswerToPO(answerBO answer.Answer) *AnswerPO {
 // mapAnswerToBO 将 AnswerPO 转换为答案领域对象
 func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) answer.Answer {
 	ans, _ := answer.NewAnswer(
-		question.QuestionCode(answerPO.QuestionCode),
+		question.NewQuestionCode(answerPO.QuestionCode),
 		question.QuestionType(answerPO.QuestionType),
 		answerPO.Score,
 		answerPO.Value.Value,

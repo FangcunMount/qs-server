@@ -61,7 +61,7 @@ func (m *QuestionnaireMapper) mapOptions(options []question.Option) []OptionPO {
 	var optionsPO []OptionPO
 	for _, opt := range options {
 		optionsPO = append(optionsPO, OptionPO{
-			Code:    opt.GetCode(),
+			Code:    opt.GetCode().Value(),
 			Content: opt.GetContent(),
 			Score:   opt.GetScore(),
 		})
@@ -158,7 +158,7 @@ func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []question.
 
 	var options []question.Option
 	for _, optionPO := range optionsPO {
-		optionBO := question.NewOption(optionPO.Code, optionPO.Content, optionPO.Score)
+		optionBO := question.NewOptionWithStringCode(optionPO.Code, optionPO.Content, optionPO.Score)
 		options = append(options, optionBO)
 	}
 	return options

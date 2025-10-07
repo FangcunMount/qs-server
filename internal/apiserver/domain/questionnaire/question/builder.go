@@ -83,7 +83,7 @@ func WithOptions(options []Option) BuilderOption {
 // WithOption 添加单个选项
 func WithOption(code, content string, score int) BuilderOption {
 	return func(b *QuestionBuilder) {
-		opt := NewOption(code, content, score)
+		opt := NewOptionWithStringCode(code, content, score)
 		b.options = append(b.options, opt)
 	}
 }
@@ -169,7 +169,7 @@ func (b *QuestionBuilder) SetPlaceholder(placeholder string) *QuestionBuilder {
 }
 
 func (b *QuestionBuilder) AddOption(code, content string, score int) *QuestionBuilder {
-	opt := NewOption(code, content, score)
+	opt := NewOptionWithStringCode(code, content, score)
 	b.options = append(b.options, opt)
 	return b
 }

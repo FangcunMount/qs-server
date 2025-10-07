@@ -3,6 +3,7 @@ package questionnaire
 import (
 	"strconv"
 
+	"github.com/fangcun-mount/qs-server/pkg/util/codeutil"
 	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
 )
 
@@ -14,17 +15,17 @@ func NewQuestionnaireID(value uint64) QuestionnaireID {
 	return idutil.NewID[uint64](value)
 }
 
-// Code 问卷编码
-type QuestionnaireCode string
+// QuestionnaireCode 问卷编码
+type QuestionnaireCode = codeutil.Code
 
-// NewCode 创建问卷编码
+// NewQuestionnaireCode 创建问卷编码
 func NewQuestionnaireCode(value string) QuestionnaireCode {
-	return QuestionnaireCode(value)
+	return codeutil.NewCode(value)
 }
 
-// Value 获取编码值
-func (c QuestionnaireCode) Value() string {
-	return string(c)
+// GenerateQuestionnaireCode 生成新的问卷编码
+func GenerateQuestionnaireCode() (QuestionnaireCode, error) {
+	return codeutil.GenerateNewCode()
 }
 
 // Status 问卷状态

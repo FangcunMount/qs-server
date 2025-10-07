@@ -45,7 +45,7 @@ func (m *QuestionnaireMapper) toQuestionDTOs(questions []question.Question) []dt
 	dtos := make([]dto.QuestionDTO, 0, len(questions))
 	for _, q := range questions {
 		dtos = append(dtos, dto.QuestionDTO{
-			Code:            string(q.GetCode()),
+			Code:            q.GetCode().Value(),
 			Title:           q.GetTitle(),
 			Type:            string(q.GetType()),
 			Tips:            q.GetTips(),
@@ -67,7 +67,7 @@ func (m *QuestionnaireMapper) toOptionDTOs(options []question.Option) []dto.Opti
 	dtos := make([]dto.OptionDTO, 0, len(options))
 	for _, o := range options {
 		dtos = append(dtos, dto.OptionDTO{
-			Code:    string(o.GetCode()),
+			Code:    o.GetCode().Value(),
 			Content: o.GetContent(),
 			Score:   o.GetScore(),
 		})
@@ -112,7 +112,7 @@ func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Qu
 	builder := question.NewQuestionBuilder()
 
 	// 设置基本属性
-	builder.SetCode(question.QuestionCode(dto.Code))
+	builder.SetCode(question.NewQuestionCode(dto.Code))
 	builder.SetTitle(dto.Title)
 	builder.SetTips(dto.Tips)
 	builder.SetQuestionType(question.QuestionType(dto.Type))

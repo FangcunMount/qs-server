@@ -54,7 +54,7 @@ func (m *AnswerMapper) ToBO(dto *dto.AnswerDTO) answer.Answer {
 	}
 
 	ans, _ := answer.NewAnswer(
-		question.QuestionCode(dto.QuestionCode),
+		question.NewQuestionCode(dto.QuestionCode),
 		question.QuestionType(dto.QuestionType),
 		dto.Score,
 		dto.Value,

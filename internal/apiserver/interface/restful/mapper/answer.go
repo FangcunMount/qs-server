@@ -18,7 +18,7 @@ func (m *AnswerMapper) MapAnswersToBOs(answers []viewmodel.AnswerDTO) []answer.A
 	domainAnswers := make([]answer.Answer, len(answers))
 	for i, a := range answers {
 		domainAnswers[i], _ = answer.NewAnswer(
-			question.QuestionCode(a.QuestionCode),
+			question.NewQuestionCode(a.QuestionCode),
 			question.QuestionType(a.QuestionType),
 			0,
 			a.Value,
