@@ -8,6 +8,7 @@ import (
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/errors"
 	"github.com/fangcun-mount/qs-server/pkg/log"
@@ -35,8 +36,8 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 	}
 
 	// 2. 转换为领域对象
-	writer := user.NewWriter(user.NewUserID(answerSheetDTO.WriterID), "")
-	testee := user.NewTestee(user.NewUserID(answerSheetDTO.TesteeID), "")
+	writer := role.NewWriter(user.NewUserID(answerSheetDTO.WriterID), "")
+	testee := role.NewTestee(user.NewUserID(answerSheetDTO.TesteeID), "")
 	answers := s.mapper.ToBOs(answerSheetDTO.Answers)
 
 	asBO := answersheet.NewAnswerSheet(

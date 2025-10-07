@@ -5,6 +5,7 @@ import (
 
 	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
 	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
@@ -37,7 +38,7 @@ func (m *Mapper) ToEntity(po *InterpretReportPO) (*interpretreport.InterpretRepo
 
 	// 如果有被试者信息
 	if po.Testee != nil {
-		testee := user.Testee{
+		testee := role.Testee{
 			UserID: user.NewUserID(po.Testee.UserID),
 		}
 		options = append(options, interpretreport.WithTestee(testee))

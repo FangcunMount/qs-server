@@ -163,6 +163,9 @@ func (p *WriterPO) ToBsonM() (bson.M, error) {
 // TesteePO 被试者持久化对象
 type TesteePO struct {
 	UserID uint64 `bson:"id" json:"id"`
+	Name   string `bson:"name" json:"name"`
+	Sex    uint8  `bson:"sex" json:"sex"`
+	Age    int    `bson:"age" json:"age"`
 }
 
 // ToBsonM 将 TesteePO 转换为 bson.M

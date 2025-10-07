@@ -8,7 +8,7 @@ import (
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
 	qnPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/errors"
 	"github.com/fangcun-mount/qs-server/pkg/log"
@@ -167,7 +167,7 @@ func (q *Queryer) convertDomainsToAnswerSheetDTOs(domains []*answersheet.AnswerS
 }
 
 // getWriterID 安全地获取答卷者ID
-func getWriterID(writer *user.Writer) uint64 {
+func getWriterID(writer *role.Writer) uint64 {
 	if writer == nil {
 		return 0
 	}
@@ -175,7 +175,7 @@ func getWriterID(writer *user.Writer) uint64 {
 }
 
 // getTesteeID 安全地获取被试者ID
-func getTesteeID(testee *user.Testee) uint64 {
+func getTesteeID(testee *role.Testee) uint64 {
 	if testee == nil {
 		return 0
 	}
@@ -183,7 +183,7 @@ func getTesteeID(testee *user.Testee) uint64 {
 }
 
 // getWriterName 安全地获取答卷者姓名
-func getWriterName(writer *user.Writer) string {
+func getWriterName(writer *role.Writer) string {
 	if writer == nil {
 		return ""
 	}
@@ -191,7 +191,7 @@ func getWriterName(writer *user.Writer) string {
 }
 
 // getTesteeName 安全地获取被试者姓名
-func getTesteeName(testee *user.Testee) string {
+func getTesteeName(testee *role.Testee) string {
 	if testee == nil {
 		return ""
 	}

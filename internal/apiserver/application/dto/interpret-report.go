@@ -1,8 +1,6 @@
 package dto
 
-import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
-)
+import "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 
 // InterpretReportDTO 解读报告DTO
 type InterpretReportDTO struct {
@@ -11,7 +9,7 @@ type InterpretReportDTO struct {
 	MedicalScaleCode string             `json:"medical_scale_code"`
 	Title            string             `json:"title"`
 	Description      string             `json:"description"`
-	Testee           *user.Testee       `json:"testee,omitempty"`
+	Testee           *role.Testee       `json:"testee,omitempty"`
 	InterpretItems   []InterpretItemDTO `json:"interpret_items"`
 }
 

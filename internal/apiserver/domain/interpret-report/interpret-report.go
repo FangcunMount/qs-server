@@ -1,7 +1,7 @@
 package interpretationreport
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
@@ -12,7 +12,7 @@ type InterpretReport struct {
 	medicalScaleCode string
 	title            string
 	description      string
-	testee           user.Testee
+	testee           role.Testee
 	interpretItems   []InterpretItem
 }
 
@@ -49,7 +49,7 @@ func WithDescription(description string) InterpretReportOption {
 }
 
 // WithTestee 设置被试者
-func WithTestee(testee user.Testee) InterpretReportOption {
+func WithTestee(testee role.Testee) InterpretReportOption {
 	return func(r *InterpretReport) {
 		r.testee = testee
 	}
@@ -90,7 +90,7 @@ func (r *InterpretReport) GetDescription() string {
 }
 
 // GetTestee 获取被试者
-func (r *InterpretReport) GetTestee() user.Testee {
+func (r *InterpretReport) GetTestee() role.Testee {
 	return r.testee
 }
 

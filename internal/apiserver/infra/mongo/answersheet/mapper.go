@@ -5,6 +5,7 @@ import (
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
 )
 
@@ -43,6 +44,9 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 	if bo.GetTestee() != nil {
 		testee = &TesteePO{
 			UserID: bo.GetTestee().GetUserID().Value(),
+			Name:   bo.GetTestee().GetName(),
+			Sex:    bo.GetTestee().GetSex(),
+			Age:    bo.GetTestee().GetAge(),
 		}
 	}
 
@@ -82,15 +86,18 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	}
 
 	// 转换答卷者 - 只使用 userID 创建 Writer
-	var writer *user.Writer
+	var writer *role.Writer
 	if po.Writer != nil {
-		writer = user.NewWriter(user.NewUserID(po.Writer.UserID), "") // 名称留空，需要时从用户服务获取
+		writer = role.NewWriter(user.NewUserID(po.Writer.UserID), "") // 名称留空，需要时从用户服务获取
 	}
 
 	// 转换被试者 - 只使用 userID 创建 Testee
-	var testee *user.Testee
+	var testee *role.Testee
 	if po.Testee != nil {
-		testee = user.NewTestee(user.NewUserID(po.Testee.UserID), "") // 名称留空，需要时从用户服务获取
+		testee = role.NewTestee(
+			user.NewUserID(po.Testee.UserID),
+			po.Testee.Name,
+		)
 	}
 
 	return answersheet.NewAnswerSheet(

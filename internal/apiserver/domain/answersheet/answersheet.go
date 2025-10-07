@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/errors"
 	"github.com/fangcun-mount/qs-server/pkg/log"
@@ -19,8 +19,8 @@ type AnswerSheet struct {
 	title                string
 	score                float64
 	answers              []answer.Answer
-	writer               *user.Writer
-	testee               *user.Testee
+	writer               *role.Writer
+	testee               *role.Testee
 	createdAt            time.Time
 	updatedAt            time.Time
 }
@@ -75,13 +75,13 @@ func WithAnswers(answers []answer.Answer) AnswerSheetOption {
 	}
 }
 
-func WithWriter(writer *user.Writer) AnswerSheetOption {
+func WithWriter(writer *role.Writer) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.writer = writer
 	}
 }
 
-func WithTestee(testee *user.Testee) AnswerSheetOption {
+func WithTestee(testee *role.Testee) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.testee = testee
 	}
@@ -123,7 +123,7 @@ func (a *AnswerSheet) GetScore() float64 {
 	return a.score
 }
 
-func (a *AnswerSheet) GetWriter() *user.Writer {
+func (a *AnswerSheet) GetWriter() *role.Writer {
 	if a.writer == nil {
 		log.Warnf("Writer is nil for answersheet")
 		return nil
@@ -131,7 +131,7 @@ func (a *AnswerSheet) GetWriter() *user.Writer {
 	return a.writer
 }
 
-func (a *AnswerSheet) GetTestee() *user.Testee {
+func (a *AnswerSheet) GetTestee() *role.Testee {
 	if a.testee == nil {
 		log.Warnf("Testee is nil for answersheet")
 		return nil
