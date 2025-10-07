@@ -30,7 +30,7 @@ type UserService struct {
 	userEditor  *userApp.UserEditor
 
 	// 微信账号服务
-	wxAccountCreator *wechatApp.WechatAccountCreator
+	wxAccountManager *wechatApp.AccountManager
 
 	// 角色服务
 	testeeCreator *roleApp.TesteeCreator
@@ -41,14 +41,14 @@ type UserService struct {
 func NewUserService(
 	userCreator *userApp.UserCreator,
 	userEditor *userApp.UserEditor,
-	wxAccountCreator *wechatApp.WechatAccountCreator,
+	wxAccountManager *wechatApp.AccountManager,
 	testeeCreator *roleApp.TesteeCreator,
 	writerCreator *roleApp.WriterCreator,
 ) *UserService {
 	return &UserService{
 		userCreator:      userCreator,
 		userEditor:       userEditor,
-		wxAccountCreator: wxAccountCreator,
+		wxAccountManager: wxAccountManager,
 		testeeCreator:    testeeCreator,
 		writerCreator:    writerCreator,
 	}
@@ -135,7 +135,7 @@ func (s *UserService) CreateOrUpdateMiniProgramAccount(ctx context.Context, req 
 		unionID = &req.UnionId
 	}
 
-	wxAccount, err := s.wxAccountCreator.CreateOrUpdateMiniProgramAccount(
+	wxAccount, err := s.wxAccountManager.CreateOrUpdateMiniProgramAccount(
 		ctx,
 		req.AppId,
 		req.OpenId,
@@ -161,7 +161,7 @@ func (s *UserService) CreateOrUpdateOfficialAccount(ctx context.Context, req *pb
 		unionID = &req.UnionId
 	}
 
-	wxAccount, err := s.wxAccountCreator.CreateOrUpdateOfficialAccount(
+	wxAccount, err := s.wxAccountManager.CreateOrUpdateOfficialAccount(
 		ctx,
 		req.AppId,
 		req.OpenId,
