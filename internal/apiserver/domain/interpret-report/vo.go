@@ -1,29 +1,13 @@
 package interpretationreport
 
-import (
-	"strconv"
-
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
-)
+import "github.com/fangcun-mount/qs-server/pkg/util/idutil"
 
 // InterpretReportID 解读报告唯一标识
-type InterpretReportID struct {
-	value v1.ID
-}
+type InterpretReportID = idutil.ID[uint64]
 
 // NewInterpretReportID 创建解读报告ID
 func NewInterpretReportID(value uint64) InterpretReportID {
-	return InterpretReportID{value: v1.NewID(value)}
-}
-
-// Value 获取ID值
-func (id InterpretReportID) Value() v1.ID {
-	return id.value
-}
-
-// String 获取ID字符串
-func (id InterpretReportID) String() string {
-	return strconv.FormatUint(id.value.Value(), 10)
+	return idutil.NewID[uint64](value)
 }
 
 // InterpretReportStatus 解读报告状态

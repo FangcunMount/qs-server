@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
 )
 
 // MergeReason 合并原因
@@ -69,16 +70,9 @@ func (l *MergeLog) SetCreatedAt(t time.Time) {
 }
 
 // MergeLogID 合并日志ID值对象
-type MergeLogID struct {
-	value uint64
-}
+type MergeLogID = idutil.ID[uint64]
 
 // NewMergeLogID 创建合并日志ID
 func NewMergeLogID(value uint64) MergeLogID {
-	return MergeLogID{value: value}
-}
-
-// Value 获取ID值
-func (id MergeLogID) Value() uint64 {
-	return id.value
+	return idutil.NewID[uint64](value)
 }

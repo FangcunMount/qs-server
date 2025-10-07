@@ -6,11 +6,12 @@ import (
 	"github.com/fangcun-mount/qs-server/internal/pkg/code"
 	"github.com/fangcun-mount/qs-server/pkg/auth"
 	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
 )
 
 // User 用户聚合根
 type User struct {
-	id           UserID
+	id           idutil.ID[uint64]
 	username     string
 	password     string
 	nickname     string
@@ -24,7 +25,7 @@ type User struct {
 }
 
 // ID 获取用户ID
-func (u *User) ID() UserID {
+func (u *User) ID() idutil.ID[uint64] {
 	return u.id
 }
 
@@ -79,7 +80,7 @@ func (u *User) UpdatedAt() time.Time {
 }
 
 // SetID 设置用户ID
-func (u *User) SetID(id UserID) {
+func (u *User) SetID(id idutil.ID[uint64]) {
 	u.id = id
 }
 

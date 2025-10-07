@@ -1,20 +1,17 @@
 package questionnaire
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
+)
 
 // QuestionnaireID 问卷唯一标识
-type QuestionnaireID struct {
-	value uint64
-}
+type QuestionnaireID = idutil.ID[uint64]
 
 // NewQuestionnaireID 创建问卷ID
 func NewQuestionnaireID(value uint64) QuestionnaireID {
-	return QuestionnaireID{value: value}
-}
-
-// Value 获取ID值
-func (id QuestionnaireID) Value() uint64 {
-	return id.value
+	return idutil.NewID[uint64](value)
 }
 
 // Code 问卷编码

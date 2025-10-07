@@ -1,18 +1,13 @@
 package user
 
+import "github.com/fangcun-mount/qs-server/pkg/util/idutil"
+
 // UserID 用户唯一标识
-type UserID struct {
-	value uint64
-}
+type UserID = idutil.ID[uint64]
 
 // NewUserID 创建用户ID
 func NewUserID(value uint64) UserID {
-	return UserID{value: value}
-}
-
-// Value 获取ID值
-func (id UserID) Value() uint64 {
-	return id.value
+	return idutil.NewID[uint64](value)
 }
 
 // Status 用户状态
