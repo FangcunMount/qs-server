@@ -145,7 +145,7 @@ func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.
 	// 转换响应
 	return &pb.SaveAnswerSheetScoresResponse{
 		AnswerSheetId: savedDTO.ID.Value(),
-		TotalScore:    uint32(savedDTO.Score),
+		TotalScore:    savedDTO.Score,
 		Message:       "答卷分数保存成功",
 	}, nil
 }

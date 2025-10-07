@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal/apiserver/interface/grpc/proto/answersheet/answersheet.proto
+// source: answersheet/answersheet.proto
 
 package answersheet
 
@@ -243,5 +243,5 @@ var AnswerSheetService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/apiserver/interface/grpc/proto/answersheet/answersheet.proto",
+	Metadata: "answersheet/answersheet.proto",
 }

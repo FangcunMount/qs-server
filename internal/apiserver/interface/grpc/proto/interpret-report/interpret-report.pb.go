@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: interpret-report.proto
+// source: interpret-report/interpret-report.proto
 
 package interpret_report
 
@@ -35,7 +35,7 @@ type SaveInterpretReportRequest struct {
 
 func (x *SaveInterpretReportRequest) Reset() {
 	*x = SaveInterpretReportRequest{}
-	mi := &file_interpret_report_proto_msgTypes[0]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +47,7 @@ func (x *SaveInterpretReportRequest) String() string {
 func (*SaveInterpretReportRequest) ProtoMessage() {}
 
 func (x *SaveInterpretReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpret_report_proto_msgTypes[0]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +60,7 @@ func (x *SaveInterpretReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveInterpretReportRequest.ProtoReflect.Descriptor instead.
 func (*SaveInterpretReportRequest) Descriptor() ([]byte, []int) {
-	return file_interpret_report_proto_rawDescGZIP(), []int{0}
+	return file_interpret_report_interpret_report_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SaveInterpretReportRequest) GetAnswerSheetId() uint64 {
@@ -109,7 +109,7 @@ type SaveInterpretReportResponse struct {
 
 func (x *SaveInterpretReportResponse) Reset() {
 	*x = SaveInterpretReportResponse{}
-	mi := &file_interpret_report_proto_msgTypes[1]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -121,7 +121,7 @@ func (x *SaveInterpretReportResponse) String() string {
 func (*SaveInterpretReportResponse) ProtoMessage() {}
 
 func (x *SaveInterpretReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpret_report_proto_msgTypes[1]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -134,7 +134,7 @@ func (x *SaveInterpretReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveInterpretReportResponse.ProtoReflect.Descriptor instead.
 func (*SaveInterpretReportResponse) Descriptor() ([]byte, []int) {
-	return file_interpret_report_proto_rawDescGZIP(), []int{1}
+	return file_interpret_report_interpret_report_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SaveInterpretReportResponse) GetId() uint64 {
@@ -161,7 +161,7 @@ type GetInterpretReportByAnswerSheetIDRequest struct {
 
 func (x *GetInterpretReportByAnswerSheetIDRequest) Reset() {
 	*x = GetInterpretReportByAnswerSheetIDRequest{}
-	mi := &file_interpret_report_proto_msgTypes[2]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -173,7 +173,7 @@ func (x *GetInterpretReportByAnswerSheetIDRequest) String() string {
 func (*GetInterpretReportByAnswerSheetIDRequest) ProtoMessage() {}
 
 func (x *GetInterpretReportByAnswerSheetIDRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_interpret_report_proto_msgTypes[2]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -186,7 +186,7 @@ func (x *GetInterpretReportByAnswerSheetIDRequest) ProtoReflect() protoreflect.M
 
 // Deprecated: Use GetInterpretReportByAnswerSheetIDRequest.ProtoReflect.Descriptor instead.
 func (*GetInterpretReportByAnswerSheetIDRequest) Descriptor() ([]byte, []int) {
-	return file_interpret_report_proto_rawDescGZIP(), []int{2}
+	return file_interpret_report_interpret_report_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetInterpretReportByAnswerSheetIDRequest) GetAnswerSheetId() uint64 {
@@ -206,7 +206,7 @@ type GetInterpretReportByAnswerSheetIDResponse struct {
 
 func (x *GetInterpretReportByAnswerSheetIDResponse) Reset() {
 	*x = GetInterpretReportByAnswerSheetIDResponse{}
-	mi := &file_interpret_report_proto_msgTypes[3]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -218,7 +218,7 @@ func (x *GetInterpretReportByAnswerSheetIDResponse) String() string {
 func (*GetInterpretReportByAnswerSheetIDResponse) ProtoMessage() {}
 
 func (x *GetInterpretReportByAnswerSheetIDResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpret_report_proto_msgTypes[3]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -231,7 +231,7 @@ func (x *GetInterpretReportByAnswerSheetIDResponse) ProtoReflect() protoreflect.
 
 // Deprecated: Use GetInterpretReportByAnswerSheetIDResponse.ProtoReflect.Descriptor instead.
 func (*GetInterpretReportByAnswerSheetIDResponse) Descriptor() ([]byte, []int) {
-	return file_interpret_report_proto_rawDescGZIP(), []int{3}
+	return file_interpret_report_interpret_report_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetInterpretReportByAnswerSheetIDResponse) GetInterpretReport() *InterpretReport {
@@ -258,7 +258,7 @@ type InterpretReport struct {
 
 func (x *InterpretReport) Reset() {
 	*x = InterpretReport{}
-	mi := &file_interpret_report_proto_msgTypes[4]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -270,7 +270,7 @@ func (x *InterpretReport) String() string {
 func (*InterpretReport) ProtoMessage() {}
 
 func (x *InterpretReport) ProtoReflect() protoreflect.Message {
-	mi := &file_interpret_report_proto_msgTypes[4]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +283,7 @@ func (x *InterpretReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterpretReport.ProtoReflect.Descriptor instead.
 func (*InterpretReport) Descriptor() ([]byte, []int) {
-	return file_interpret_report_proto_rawDescGZIP(), []int{4}
+	return file_interpret_report_interpret_report_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *InterpretReport) GetId() uint64 {
@@ -355,7 +355,7 @@ type InterpretItem struct {
 
 func (x *InterpretItem) Reset() {
 	*x = InterpretItem{}
-	mi := &file_interpret_report_proto_msgTypes[5]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +367,7 @@ func (x *InterpretItem) String() string {
 func (*InterpretItem) ProtoMessage() {}
 
 func (x *InterpretItem) ProtoReflect() protoreflect.Message {
-	mi := &file_interpret_report_proto_msgTypes[5]
+	mi := &file_interpret_report_interpret_report_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +380,7 @@ func (x *InterpretItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterpretItem.ProtoReflect.Descriptor instead.
 func (*InterpretItem) Descriptor() ([]byte, []int) {
-	return file_interpret_report_proto_rawDescGZIP(), []int{5}
+	return file_interpret_report_interpret_report_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *InterpretItem) GetFactorCode() string {
@@ -411,11 +411,11 @@ func (x *InterpretItem) GetContent() string {
 	return ""
 }
 
-var File_interpret_report_proto protoreflect.FileDescriptor
+var File_interpret_report_interpret_report_proto protoreflect.FileDescriptor
 
-const file_interpret_report_proto_rawDesc = "" +
+const file_interpret_report_interpret_report_proto_rawDesc = "" +
 	"\n" +
-	"\x16interpret-report.proto\x12\x10interpret_report\"\xf4\x01\n" +
+	"'interpret-report/interpret-report.proto\x12\x10interpret_report\"\xf4\x01\n" +
 	"\x1aSaveInterpretReportRequest\x12&\n" +
 	"\x0fanswer_sheet_id\x18\x01 \x01(\x04R\ranswerSheetId\x12,\n" +
 	"\x12medical_scale_code\x18\x02 \x01(\tR\x10medicalScaleCode\x12\x14\n" +
@@ -448,22 +448,22 @@ const file_interpret_report_proto_rawDesc = "" +
 	"\acontent\x18\x04 \x01(\tR\acontent2\xab\x02\n" +
 	"\x16InterpretReportService\x12r\n" +
 	"\x13SaveInterpretReport\x12,.interpret_report.SaveInterpretReportRequest\x1a-.interpret_report.SaveInterpretReportResponse\x12\x9c\x01\n" +
-	"!GetInterpretReportByAnswerSheetID\x12:.interpret_report.GetInterpretReportByAnswerSheetIDRequest\x1a;.interpret_report.GetInterpretReportByAnswerSheetIDResponseBaZ_github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-reportb\x06proto3"
+	"!GetInterpretReportByAnswerSheetID\x12:.interpret_report.GetInterpretReportByAnswerSheetIDRequest\x1a;.interpret_report.GetInterpretReportByAnswerSheetIDResponseBaZ_github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/interpret-reportb\x06proto3"
 
 var (
-	file_interpret_report_proto_rawDescOnce sync.Once
-	file_interpret_report_proto_rawDescData []byte
+	file_interpret_report_interpret_report_proto_rawDescOnce sync.Once
+	file_interpret_report_interpret_report_proto_rawDescData []byte
 )
 
-func file_interpret_report_proto_rawDescGZIP() []byte {
-	file_interpret_report_proto_rawDescOnce.Do(func() {
-		file_interpret_report_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_interpret_report_proto_rawDesc), len(file_interpret_report_proto_rawDesc)))
+func file_interpret_report_interpret_report_proto_rawDescGZIP() []byte {
+	file_interpret_report_interpret_report_proto_rawDescOnce.Do(func() {
+		file_interpret_report_interpret_report_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_interpret_report_interpret_report_proto_rawDesc), len(file_interpret_report_interpret_report_proto_rawDesc)))
 	})
-	return file_interpret_report_proto_rawDescData
+	return file_interpret_report_interpret_report_proto_rawDescData
 }
 
-var file_interpret_report_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_interpret_report_proto_goTypes = []any{
+var file_interpret_report_interpret_report_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_interpret_report_interpret_report_proto_goTypes = []any{
 	(*SaveInterpretReportRequest)(nil),                // 0: interpret_report.SaveInterpretReportRequest
 	(*SaveInterpretReportResponse)(nil),               // 1: interpret_report.SaveInterpretReportResponse
 	(*GetInterpretReportByAnswerSheetIDRequest)(nil),  // 2: interpret_report.GetInterpretReportByAnswerSheetIDRequest
@@ -471,7 +471,7 @@ var file_interpret_report_proto_goTypes = []any{
 	(*InterpretReport)(nil),                           // 4: interpret_report.InterpretReport
 	(*InterpretItem)(nil),                             // 5: interpret_report.InterpretItem
 }
-var file_interpret_report_proto_depIdxs = []int32{
+var file_interpret_report_interpret_report_proto_depIdxs = []int32{
 	5, // 0: interpret_report.SaveInterpretReportRequest.interpret_items:type_name -> interpret_report.InterpretItem
 	4, // 1: interpret_report.GetInterpretReportByAnswerSheetIDResponse.interpret_report:type_name -> interpret_report.InterpretReport
 	5, // 2: interpret_report.InterpretReport.interpret_items:type_name -> interpret_report.InterpretItem
@@ -486,26 +486,26 @@ var file_interpret_report_proto_depIdxs = []int32{
 	0, // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_interpret_report_proto_init() }
-func file_interpret_report_proto_init() {
-	if File_interpret_report_proto != nil {
+func init() { file_interpret_report_interpret_report_proto_init() }
+func file_interpret_report_interpret_report_proto_init() {
+	if File_interpret_report_interpret_report_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpret_report_proto_rawDesc), len(file_interpret_report_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpret_report_interpret_report_proto_rawDesc), len(file_interpret_report_interpret_report_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_interpret_report_proto_goTypes,
-		DependencyIndexes: file_interpret_report_proto_depIdxs,
-		MessageInfos:      file_interpret_report_proto_msgTypes,
+		GoTypes:           file_interpret_report_interpret_report_proto_goTypes,
+		DependencyIndexes: file_interpret_report_interpret_report_proto_depIdxs,
+		MessageInfos:      file_interpret_report_interpret_report_proto_msgTypes,
 	}.Build()
-	File_interpret_report_proto = out.File
-	file_interpret_report_proto_goTypes = nil
-	file_interpret_report_proto_depIdxs = nil
+	File_interpret_report_interpret_report_proto = out.File
+	file_interpret_report_interpret_report_proto_goTypes = nil
+	file_interpret_report_interpret_report_proto_depIdxs = nil
 }

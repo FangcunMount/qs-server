@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: interpret-report.proto
+// source: interpret-report/interpret-report.proto
 
 package interpret_report
 
@@ -164,5 +164,5 @@ var InterpretReportService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "interpret-report.proto",
+	Metadata: "interpret-report/interpret-report.proto",
 }

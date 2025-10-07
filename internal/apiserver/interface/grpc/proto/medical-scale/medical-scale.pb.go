@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: medical-scale.proto
+// source: medical-scale/medical-scale.proto
 
 package medical_scale
 
@@ -31,7 +31,7 @@ type GetMedicalScaleByCodeRequest struct {
 
 func (x *GetMedicalScaleByCodeRequest) Reset() {
 	*x = GetMedicalScaleByCodeRequest{}
-	mi := &file_medical_scale_proto_msgTypes[0]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *GetMedicalScaleByCodeRequest) String() string {
 func (*GetMedicalScaleByCodeRequest) ProtoMessage() {}
 
 func (x *GetMedicalScaleByCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[0]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *GetMedicalScaleByCodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMedicalScaleByCodeRequest.ProtoReflect.Descriptor instead.
 func (*GetMedicalScaleByCodeRequest) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{0}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetMedicalScaleByCodeRequest) GetCode() string {
@@ -76,7 +76,7 @@ type GetMedicalScaleByCodeResponse struct {
 
 func (x *GetMedicalScaleByCodeResponse) Reset() {
 	*x = GetMedicalScaleByCodeResponse{}
-	mi := &file_medical_scale_proto_msgTypes[1]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -88,7 +88,7 @@ func (x *GetMedicalScaleByCodeResponse) String() string {
 func (*GetMedicalScaleByCodeResponse) ProtoMessage() {}
 
 func (x *GetMedicalScaleByCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[1]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -101,7 +101,7 @@ func (x *GetMedicalScaleByCodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMedicalScaleByCodeResponse.ProtoReflect.Descriptor instead.
 func (*GetMedicalScaleByCodeResponse) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{1}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetMedicalScaleByCodeResponse) GetMedicalScale() *MedicalScale {
@@ -121,7 +121,7 @@ type GetMedicalScaleByQuestionnaireCodeRequest struct {
 
 func (x *GetMedicalScaleByQuestionnaireCodeRequest) Reset() {
 	*x = GetMedicalScaleByQuestionnaireCodeRequest{}
-	mi := &file_medical_scale_proto_msgTypes[2]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -133,7 +133,7 @@ func (x *GetMedicalScaleByQuestionnaireCodeRequest) String() string {
 func (*GetMedicalScaleByQuestionnaireCodeRequest) ProtoMessage() {}
 
 func (x *GetMedicalScaleByQuestionnaireCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[2]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -146,7 +146,7 @@ func (x *GetMedicalScaleByQuestionnaireCodeRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use GetMedicalScaleByQuestionnaireCodeRequest.ProtoReflect.Descriptor instead.
 func (*GetMedicalScaleByQuestionnaireCodeRequest) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{2}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetMedicalScaleByQuestionnaireCodeRequest) GetQuestionnaireCode() string {
@@ -166,7 +166,7 @@ type GetMedicalScaleByQuestionnaireCodeResponse struct {
 
 func (x *GetMedicalScaleByQuestionnaireCodeResponse) Reset() {
 	*x = GetMedicalScaleByQuestionnaireCodeResponse{}
-	mi := &file_medical_scale_proto_msgTypes[3]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -178,7 +178,7 @@ func (x *GetMedicalScaleByQuestionnaireCodeResponse) String() string {
 func (*GetMedicalScaleByQuestionnaireCodeResponse) ProtoMessage() {}
 
 func (x *GetMedicalScaleByQuestionnaireCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[3]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -191,7 +191,7 @@ func (x *GetMedicalScaleByQuestionnaireCodeResponse) ProtoReflect() protoreflect
 
 // Deprecated: Use GetMedicalScaleByQuestionnaireCodeResponse.ProtoReflect.Descriptor instead.
 func (*GetMedicalScaleByQuestionnaireCodeResponse) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{3}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetMedicalScaleByQuestionnaireCodeResponse) GetMedicalScale() *MedicalScale {
@@ -218,7 +218,7 @@ type InterpretReport struct {
 
 func (x *InterpretReport) Reset() {
 	*x = InterpretReport{}
-	mi := &file_medical_scale_proto_msgTypes[4]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -230,7 +230,7 @@ func (x *InterpretReport) String() string {
 func (*InterpretReport) ProtoMessage() {}
 
 func (x *InterpretReport) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[4]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -243,7 +243,7 @@ func (x *InterpretReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterpretReport.ProtoReflect.Descriptor instead.
 func (*InterpretReport) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{4}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *InterpretReport) GetId() uint64 {
@@ -315,7 +315,7 @@ type InterpretItem struct {
 
 func (x *InterpretItem) Reset() {
 	*x = InterpretItem{}
-	mi := &file_medical_scale_proto_msgTypes[5]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +327,7 @@ func (x *InterpretItem) String() string {
 func (*InterpretItem) ProtoMessage() {}
 
 func (x *InterpretItem) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[5]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +340,7 @@ func (x *InterpretItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterpretItem.ProtoReflect.Descriptor instead.
 func (*InterpretItem) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{5}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *InterpretItem) GetFactorCode() string {
@@ -388,7 +388,7 @@ type MedicalScale struct {
 
 func (x *MedicalScale) Reset() {
 	*x = MedicalScale{}
-	mi := &file_medical_scale_proto_msgTypes[6]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -400,7 +400,7 @@ func (x *MedicalScale) String() string {
 func (*MedicalScale) ProtoMessage() {}
 
 func (x *MedicalScale) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[6]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +413,7 @@ func (x *MedicalScale) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MedicalScale.ProtoReflect.Descriptor instead.
 func (*MedicalScale) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{6}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *MedicalScale) GetId() uint64 {
@@ -487,7 +487,7 @@ type Factor struct {
 
 func (x *Factor) Reset() {
 	*x = Factor{}
-	mi := &file_medical_scale_proto_msgTypes[7]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -499,7 +499,7 @@ func (x *Factor) String() string {
 func (*Factor) ProtoMessage() {}
 
 func (x *Factor) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[7]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -512,7 +512,7 @@ func (x *Factor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Factor.ProtoReflect.Descriptor instead.
 func (*Factor) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{7}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Factor) GetCode() string {
@@ -568,7 +568,7 @@ type CalculationRule struct {
 
 func (x *CalculationRule) Reset() {
 	*x = CalculationRule{}
-	mi := &file_medical_scale_proto_msgTypes[8]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +580,7 @@ func (x *CalculationRule) String() string {
 func (*CalculationRule) ProtoMessage() {}
 
 func (x *CalculationRule) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[8]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +593,7 @@ func (x *CalculationRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculationRule.ProtoReflect.Descriptor instead.
 func (*CalculationRule) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{8}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CalculationRule) GetFormulaType() string {
@@ -621,7 +621,7 @@ type InterpretationRule struct {
 
 func (x *InterpretationRule) Reset() {
 	*x = InterpretationRule{}
-	mi := &file_medical_scale_proto_msgTypes[9]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -633,7 +633,7 @@ func (x *InterpretationRule) String() string {
 func (*InterpretationRule) ProtoMessage() {}
 
 func (x *InterpretationRule) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[9]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -646,7 +646,7 @@ func (x *InterpretationRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterpretationRule.ProtoReflect.Descriptor instead.
 func (*InterpretationRule) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{9}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InterpretationRule) GetScoreRange() *ScoreRange {
@@ -674,7 +674,7 @@ type ScoreRange struct {
 
 func (x *ScoreRange) Reset() {
 	*x = ScoreRange{}
-	mi := &file_medical_scale_proto_msgTypes[10]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -686,7 +686,7 @@ func (x *ScoreRange) String() string {
 func (*ScoreRange) ProtoMessage() {}
 
 func (x *ScoreRange) ProtoReflect() protoreflect.Message {
-	mi := &file_medical_scale_proto_msgTypes[10]
+	mi := &file_medical_scale_medical_scale_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -699,7 +699,7 @@ func (x *ScoreRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScoreRange.ProtoReflect.Descriptor instead.
 func (*ScoreRange) Descriptor() ([]byte, []int) {
-	return file_medical_scale_proto_rawDescGZIP(), []int{10}
+	return file_medical_scale_medical_scale_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ScoreRange) GetMinScore() float64 {
@@ -716,11 +716,11 @@ func (x *ScoreRange) GetMaxScore() float64 {
 	return 0
 }
 
-var File_medical_scale_proto protoreflect.FileDescriptor
+var File_medical_scale_medical_scale_proto protoreflect.FileDescriptor
 
-const file_medical_scale_proto_rawDesc = "" +
+const file_medical_scale_medical_scale_proto_rawDesc = "" +
 	"\n" +
-	"\x13medical-scale.proto\x12\rmedical_scale\"2\n" +
+	"!medical-scale/medical-scale.proto\x12\rmedical_scale\"2\n" +
 	"\x1cGetMedicalScaleByCodeRequest\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\"a\n" +
 	"\x1dGetMedicalScaleByCodeResponse\x12@\n" +
@@ -778,22 +778,22 @@ const file_medical_scale_proto_rawDesc = "" +
 	"\tmax_score\x18\x02 \x01(\x01R\bmaxScore2\xa5\x02\n" +
 	"\x13MedicalScaleService\x12r\n" +
 	"\x15GetMedicalScaleByCode\x12+.medical_scale.GetMedicalScaleByCodeRequest\x1a,.medical_scale.GetMedicalScaleByCodeResponse\x12\x99\x01\n" +
-	"\"GetMedicalScaleByQuestionnaireCode\x128.medical_scale.GetMedicalScaleByQuestionnaireCodeRequest\x1a9.medical_scale.GetMedicalScaleByQuestionnaireCodeResponseB^Z\\github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/medical-scaleb\x06proto3"
+	"\"GetMedicalScaleByQuestionnaireCode\x128.medical_scale.GetMedicalScaleByQuestionnaireCodeRequest\x1a9.medical_scale.GetMedicalScaleByQuestionnaireCodeResponseB^Z\\github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/medical-scaleb\x06proto3"
 
 var (
-	file_medical_scale_proto_rawDescOnce sync.Once
-	file_medical_scale_proto_rawDescData []byte
+	file_medical_scale_medical_scale_proto_rawDescOnce sync.Once
+	file_medical_scale_medical_scale_proto_rawDescData []byte
 )
 
-func file_medical_scale_proto_rawDescGZIP() []byte {
-	file_medical_scale_proto_rawDescOnce.Do(func() {
-		file_medical_scale_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_medical_scale_proto_rawDesc), len(file_medical_scale_proto_rawDesc)))
+func file_medical_scale_medical_scale_proto_rawDescGZIP() []byte {
+	file_medical_scale_medical_scale_proto_rawDescOnce.Do(func() {
+		file_medical_scale_medical_scale_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_medical_scale_medical_scale_proto_rawDesc), len(file_medical_scale_medical_scale_proto_rawDesc)))
 	})
-	return file_medical_scale_proto_rawDescData
+	return file_medical_scale_medical_scale_proto_rawDescData
 }
 
-var file_medical_scale_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
-var file_medical_scale_proto_goTypes = []any{
+var file_medical_scale_medical_scale_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_medical_scale_medical_scale_proto_goTypes = []any{
 	(*GetMedicalScaleByCodeRequest)(nil),               // 0: medical_scale.GetMedicalScaleByCodeRequest
 	(*GetMedicalScaleByCodeResponse)(nil),              // 1: medical_scale.GetMedicalScaleByCodeResponse
 	(*GetMedicalScaleByQuestionnaireCodeRequest)(nil),  // 2: medical_scale.GetMedicalScaleByQuestionnaireCodeRequest
@@ -806,7 +806,7 @@ var file_medical_scale_proto_goTypes = []any{
 	(*InterpretationRule)(nil),                         // 9: medical_scale.InterpretationRule
 	(*ScoreRange)(nil),                                 // 10: medical_scale.ScoreRange
 }
-var file_medical_scale_proto_depIdxs = []int32{
+var file_medical_scale_medical_scale_proto_depIdxs = []int32{
 	6,  // 0: medical_scale.GetMedicalScaleByCodeResponse.medical_scale:type_name -> medical_scale.MedicalScale
 	6,  // 1: medical_scale.GetMedicalScaleByQuestionnaireCodeResponse.medical_scale:type_name -> medical_scale.MedicalScale
 	5,  // 2: medical_scale.InterpretReport.interpret_items:type_name -> medical_scale.InterpretItem
@@ -825,26 +825,26 @@ var file_medical_scale_proto_depIdxs = []int32{
 	0,  // [0:7] is the sub-list for field type_name
 }
 
-func init() { file_medical_scale_proto_init() }
-func file_medical_scale_proto_init() {
-	if File_medical_scale_proto != nil {
+func init() { file_medical_scale_medical_scale_proto_init() }
+func file_medical_scale_medical_scale_proto_init() {
+	if File_medical_scale_medical_scale_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_medical_scale_proto_rawDesc), len(file_medical_scale_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_medical_scale_medical_scale_proto_rawDesc), len(file_medical_scale_medical_scale_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_medical_scale_proto_goTypes,
-		DependencyIndexes: file_medical_scale_proto_depIdxs,
-		MessageInfos:      file_medical_scale_proto_msgTypes,
+		GoTypes:           file_medical_scale_medical_scale_proto_goTypes,
+		DependencyIndexes: file_medical_scale_medical_scale_proto_depIdxs,
+		MessageInfos:      file_medical_scale_medical_scale_proto_msgTypes,
 	}.Build()
-	File_medical_scale_proto = out.File
-	file_medical_scale_proto_goTypes = nil
-	file_medical_scale_proto_depIdxs = nil
+	File_medical_scale_medical_scale_proto = out.File
+	file_medical_scale_medical_scale_proto_goTypes = nil
+	file_medical_scale_medical_scale_proto_depIdxs = nil
 }

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: internal/apiserver/interface/grpc/proto/answersheet/answersheet.proto
+// source: answersheet/answersheet.proto
 
 package answersheet
 
@@ -28,7 +28,7 @@ type AnswerSheet struct {
 	QuestionnaireCode    string                 `protobuf:"bytes,2,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Title                string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	Score                float64                 `protobuf:"varint,5,opt,name=score,proto3" json:"score,omitempty"`
+	Score                float64                `protobuf:"fixed64,5,opt,name=score,proto3" json:"score,omitempty"` // 总分(使用 double 支持小数)
 	WriterId             uint64                 `protobuf:"varint,6,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
 	WriterName           string                 `protobuf:"bytes,7,opt,name=writer_name,json=writerName,proto3" json:"writer_name,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,8,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
@@ -42,7 +42,7 @@ type AnswerSheet struct {
 
 func (x *AnswerSheet) Reset() {
 	*x = AnswerSheet{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[0]
+	mi := &file_answersheet_answersheet_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -54,7 +54,7 @@ func (x *AnswerSheet) String() string {
 func (*AnswerSheet) ProtoMessage() {}
 
 func (x *AnswerSheet) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[0]
+	mi := &file_answersheet_answersheet_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -67,7 +67,7 @@ func (x *AnswerSheet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerSheet.ProtoReflect.Descriptor instead.
 func (*AnswerSheet) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{0}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *AnswerSheet) GetId() uint64 {
@@ -167,7 +167,7 @@ type Answer struct {
 
 func (x *Answer) Reset() {
 	*x = Answer{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[1]
+	mi := &file_answersheet_answersheet_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +179,7 @@ func (x *Answer) String() string {
 func (*Answer) ProtoMessage() {}
 
 func (x *Answer) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[1]
+	mi := &file_answersheet_answersheet_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,7 +192,7 @@ func (x *Answer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Answer.ProtoReflect.Descriptor instead.
 func (*Answer) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{1}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Answer) GetQuestionCode() string {
@@ -238,7 +238,7 @@ type SaveAnswerSheetRequest struct {
 
 func (x *SaveAnswerSheetRequest) Reset() {
 	*x = SaveAnswerSheetRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[2]
+	mi := &file_answersheet_answersheet_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +250,7 @@ func (x *SaveAnswerSheetRequest) String() string {
 func (*SaveAnswerSheetRequest) ProtoMessage() {}
 
 func (x *SaveAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[2]
+	mi := &file_answersheet_answersheet_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +263,7 @@ func (x *SaveAnswerSheetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetRequest.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{2}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SaveAnswerSheetRequest) GetQuestionnaireCode() string {
@@ -319,7 +319,7 @@ type SaveAnswerSheetResponse struct {
 
 func (x *SaveAnswerSheetResponse) Reset() {
 	*x = SaveAnswerSheetResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[3]
+	mi := &file_answersheet_answersheet_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -331,7 +331,7 @@ func (x *SaveAnswerSheetResponse) String() string {
 func (*SaveAnswerSheetResponse) ProtoMessage() {}
 
 func (x *SaveAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[3]
+	mi := &file_answersheet_answersheet_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -344,7 +344,7 @@ func (x *SaveAnswerSheetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetResponse.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{3}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SaveAnswerSheetResponse) GetId() uint64 {
@@ -371,7 +371,7 @@ type GetAnswerSheetRequest struct {
 
 func (x *GetAnswerSheetRequest) Reset() {
 	*x = GetAnswerSheetRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[4]
+	mi := &file_answersheet_answersheet_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -383,7 +383,7 @@ func (x *GetAnswerSheetRequest) String() string {
 func (*GetAnswerSheetRequest) ProtoMessage() {}
 
 func (x *GetAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[4]
+	mi := &file_answersheet_answersheet_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -396,7 +396,7 @@ func (x *GetAnswerSheetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAnswerSheetRequest.ProtoReflect.Descriptor instead.
 func (*GetAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{4}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetAnswerSheetRequest) GetId() uint64 {
@@ -416,7 +416,7 @@ type GetAnswerSheetResponse struct {
 
 func (x *GetAnswerSheetResponse) Reset() {
 	*x = GetAnswerSheetResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[5]
+	mi := &file_answersheet_answersheet_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -428,7 +428,7 @@ func (x *GetAnswerSheetResponse) String() string {
 func (*GetAnswerSheetResponse) ProtoMessage() {}
 
 func (x *GetAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[5]
+	mi := &file_answersheet_answersheet_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -441,7 +441,7 @@ func (x *GetAnswerSheetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAnswerSheetResponse.ProtoReflect.Descriptor instead.
 func (*GetAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{5}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetAnswerSheetResponse) GetAnswerSheet() *AnswerSheet {
@@ -466,7 +466,7 @@ type ListAnswerSheetsRequest struct {
 
 func (x *ListAnswerSheetsRequest) Reset() {
 	*x = ListAnswerSheetsRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[6]
+	mi := &file_answersheet_answersheet_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -478,7 +478,7 @@ func (x *ListAnswerSheetsRequest) String() string {
 func (*ListAnswerSheetsRequest) ProtoMessage() {}
 
 func (x *ListAnswerSheetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[6]
+	mi := &file_answersheet_answersheet_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -491,7 +491,7 @@ func (x *ListAnswerSheetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAnswerSheetsRequest.ProtoReflect.Descriptor instead.
 func (*ListAnswerSheetsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{6}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListAnswerSheetsRequest) GetQuestionnaireCode() string {
@@ -547,7 +547,7 @@ type ListAnswerSheetsResponse struct {
 
 func (x *ListAnswerSheetsResponse) Reset() {
 	*x = ListAnswerSheetsResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[7]
+	mi := &file_answersheet_answersheet_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +559,7 @@ func (x *ListAnswerSheetsResponse) String() string {
 func (*ListAnswerSheetsResponse) ProtoMessage() {}
 
 func (x *ListAnswerSheetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[7]
+	mi := &file_answersheet_answersheet_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +572,7 @@ func (x *ListAnswerSheetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAnswerSheetsResponse.ProtoReflect.Descriptor instead.
 func (*ListAnswerSheetsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{7}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListAnswerSheetsResponse) GetAnswerSheets() []*AnswerSheet {
@@ -593,7 +593,7 @@ func (x *ListAnswerSheetsResponse) GetTotal() int64 {
 type SaveAnswerSheetScoresRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AnswerSheetId uint64                 `protobuf:"varint,1,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"` // 答卷ID
-	TotalScore    float64                `protobuf:"varint,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`            // 总分
+	TotalScore    float64                `protobuf:"fixed64,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`           // 总分
 	Answers       []*Answer              `protobuf:"bytes,3,rep,name=answers,proto3" json:"answers,omitempty"`                                     // 答案列表（包含分数）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -601,7 +601,7 @@ type SaveAnswerSheetScoresRequest struct {
 
 func (x *SaveAnswerSheetScoresRequest) Reset() {
 	*x = SaveAnswerSheetScoresRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[8]
+	mi := &file_answersheet_answersheet_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -613,7 +613,7 @@ func (x *SaveAnswerSheetScoresRequest) String() string {
 func (*SaveAnswerSheetScoresRequest) ProtoMessage() {}
 
 func (x *SaveAnswerSheetScoresRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[8]
+	mi := &file_answersheet_answersheet_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -626,7 +626,7 @@ func (x *SaveAnswerSheetScoresRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetScoresRequest.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetScoresRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{8}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SaveAnswerSheetScoresRequest) GetAnswerSheetId() uint64 {
@@ -654,7 +654,7 @@ func (x *SaveAnswerSheetScoresRequest) GetAnswers() []*Answer {
 type SaveAnswerSheetScoresResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AnswerSheetId uint64                 `protobuf:"varint,1,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"` // 答卷ID
-	TotalScore    uint32                 `protobuf:"varint,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`            // 总分
+	TotalScore    float64                `protobuf:"fixed64,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`           // 总分
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                                     // 响应消息
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -662,7 +662,7 @@ type SaveAnswerSheetScoresResponse struct {
 
 func (x *SaveAnswerSheetScoresResponse) Reset() {
 	*x = SaveAnswerSheetScoresResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[9]
+	mi := &file_answersheet_answersheet_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -674,7 +674,7 @@ func (x *SaveAnswerSheetScoresResponse) String() string {
 func (*SaveAnswerSheetScoresResponse) ProtoMessage() {}
 
 func (x *SaveAnswerSheetScoresResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes[9]
+	mi := &file_answersheet_answersheet_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -687,7 +687,7 @@ func (x *SaveAnswerSheetScoresResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetScoresResponse.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetScoresResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP(), []int{9}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SaveAnswerSheetScoresResponse) GetAnswerSheetId() uint64 {
@@ -697,7 +697,7 @@ func (x *SaveAnswerSheetScoresResponse) GetAnswerSheetId() uint64 {
 	return 0
 }
 
-func (x *SaveAnswerSheetScoresResponse) GetTotalScore() uint32 {
+func (x *SaveAnswerSheetScoresResponse) GetTotalScore() float64 {
 	if x != nil {
 		return x.TotalScore
 	}
@@ -711,17 +711,17 @@ func (x *SaveAnswerSheetScoresResponse) GetMessage() string {
 	return ""
 }
 
-var File_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto protoreflect.FileDescriptor
+var File_answersheet_answersheet_proto protoreflect.FileDescriptor
 
-const file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDesc = "" +
+const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\n" +
-	"Einternal/apiserver/interface/grpc/proto/answersheet/answersheet.proto\x12\vanswersheet\"\x96\x03\n" +
+	"\x1danswersheet/answersheet.proto\x12\vanswersheet\"\x96\x03\n" +
 	"\vAnswerSheet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x03 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12\x14\n" +
-	"\x05score\x18\x05 \x01(\rR\x05score\x12\x1b\n" +
+	"\x05score\x18\x05 \x01(\x01R\x05score\x12\x1b\n" +
 	"\twriter_id\x18\x06 \x01(\x04R\bwriterId\x12\x1f\n" +
 	"\vwriter_name\x18\a \x01(\tR\n" +
 	"writerName\x12\x1b\n" +
@@ -765,34 +765,34 @@ const file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto
 	"\x05total\x18\x02 \x01(\x03R\x05total\"\x96\x01\n" +
 	"\x1cSaveAnswerSheetScoresRequest\x12&\n" +
 	"\x0fanswer_sheet_id\x18\x01 \x01(\x04R\ranswerSheetId\x12\x1f\n" +
-	"\vtotal_score\x18\x02 \x01(\rR\n" +
+	"\vtotal_score\x18\x02 \x01(\x01R\n" +
 	"totalScore\x12-\n" +
 	"\aanswers\x18\x03 \x03(\v2\x13.answersheet.AnswerR\aanswers\"\x82\x01\n" +
 	"\x1dSaveAnswerSheetScoresResponse\x12&\n" +
 	"\x0fanswer_sheet_id\x18\x01 \x01(\x04R\ranswerSheetId\x12\x1f\n" +
-	"\vtotal_score\x18\x02 \x01(\rR\n" +
+	"\vtotal_score\x18\x02 \x01(\x01R\n" +
 	"totalScore\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage2\x9e\x03\n" +
 	"\x12AnswerSheetService\x12\\\n" +
 	"\x0fSaveAnswerSheet\x12#.answersheet.SaveAnswerSheetRequest\x1a$.answersheet.SaveAnswerSheetResponse\x12Y\n" +
 	"\x0eGetAnswerSheet\x12\".answersheet.GetAnswerSheetRequest\x1a#.answersheet.GetAnswerSheetResponse\x12_\n" +
 	"\x10ListAnswerSheets\x12$.answersheet.ListAnswerSheetsRequest\x1a%.answersheet.ListAnswerSheetsResponse\x12n\n" +
-	"\x15SaveAnswerSheetScores\x12).answersheet.SaveAnswerSheetScoresRequest\x1a*.answersheet.SaveAnswerSheetScoresResponseB\\ZZgithub.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheetb\x06proto3"
+	"\x15SaveAnswerSheetScores\x12).answersheet.SaveAnswerSheetScoresRequest\x1a*.answersheet.SaveAnswerSheetScoresResponseB\\ZZgithub.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheetb\x06proto3"
 
 var (
-	file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescOnce sync.Once
-	file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescData []byte
+	file_answersheet_answersheet_proto_rawDescOnce sync.Once
+	file_answersheet_answersheet_proto_rawDescData []byte
 )
 
-func file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescGZIP() []byte {
-	file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescOnce.Do(func() {
-		file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDesc)))
+func file_answersheet_answersheet_proto_rawDescGZIP() []byte {
+	file_answersheet_answersheet_proto_rawDescOnce.Do(func() {
+		file_answersheet_answersheet_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_answersheet_answersheet_proto_rawDesc), len(file_answersheet_answersheet_proto_rawDesc)))
 	})
-	return file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDescData
+	return file_answersheet_answersheet_proto_rawDescData
 }
 
-var file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_goTypes = []any{
+var file_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_answersheet_answersheet_proto_goTypes = []any{
 	(*AnswerSheet)(nil),                   // 0: answersheet.AnswerSheet
 	(*Answer)(nil),                        // 1: answersheet.Answer
 	(*SaveAnswerSheetRequest)(nil),        // 2: answersheet.SaveAnswerSheetRequest
@@ -804,7 +804,7 @@ var file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_g
 	(*SaveAnswerSheetScoresRequest)(nil),  // 8: answersheet.SaveAnswerSheetScoresRequest
 	(*SaveAnswerSheetScoresResponse)(nil), // 9: answersheet.SaveAnswerSheetScoresResponse
 }
-var file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_depIdxs = []int32{
+var file_answersheet_answersheet_proto_depIdxs = []int32{
 	1, // 0: answersheet.AnswerSheet.answers:type_name -> answersheet.Answer
 	1, // 1: answersheet.SaveAnswerSheetRequest.answers:type_name -> answersheet.Answer
 	0, // 2: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
@@ -825,26 +825,26 @@ var file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_d
 	0, // [0:5] is the sub-list for field type_name
 }
 
-func init() { file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_init() }
-func file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_init() {
-	if File_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto != nil {
+func init() { file_answersheet_answersheet_proto_init() }
+func file_answersheet_answersheet_proto_init() {
+	if File_answersheet_answersheet_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_answersheet_answersheet_proto_rawDesc), len(file_answersheet_answersheet_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_goTypes,
-		DependencyIndexes: file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_depIdxs,
-		MessageInfos:      file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_msgTypes,
+		GoTypes:           file_answersheet_answersheet_proto_goTypes,
+		DependencyIndexes: file_answersheet_answersheet_proto_depIdxs,
+		MessageInfos:      file_answersheet_answersheet_proto_msgTypes,
 	}.Build()
-	File_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto = out.File
-	file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_goTypes = nil
-	file_internal_apiserver_interface_grpc_proto_answersheet_answersheet_proto_depIdxs = nil
+	File_answersheet_answersheet_proto = out.File
+	file_answersheet_answersheet_proto_goTypes = nil
+	file_answersheet_answersheet_proto_depIdxs = nil
 }

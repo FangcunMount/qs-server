@@ -651,7 +651,7 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\x05total\x18\x02 \x01(\x03R\x05total2\xe6\x01\n" +
 	"\x14QuestionnaireService\x12c\n" +
 	"\x10GetQuestionnaire\x12&.questionnaire.GetQuestionnaireRequest\x1a'.questionnaire.GetQuestionnaireResponse\x12i\n" +
-	"\x12ListQuestionnaires\x12(.questionnaire.ListQuestionnairesRequest\x1a).questionnaire.ListQuestionnairesResponseB^Z\\github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaireb\x06proto3"
+	"\x12ListQuestionnaires\x12(.questionnaire.ListQuestionnairesRequest\x1a).questionnaire.ListQuestionnairesResponseB^Z\\github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaireb\x06proto3"
 
 var (
 	file_questionnaire_questionnaire_proto_rawDescOnce sync.Once

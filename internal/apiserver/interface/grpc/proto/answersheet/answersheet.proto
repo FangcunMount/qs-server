@@ -25,7 +25,7 @@ message AnswerSheet {
   string questionnaire_code = 2;
   string questionnaire_version = 3;
   string title = 4;
-  uint32 score = 5;
+  double score = 5;  // 总分(使用 double 支持小数)
   uint64 writer_id = 6;
   string writer_name = 7;
   uint64 testee_id = 8;
@@ -88,13 +88,13 @@ message ListAnswerSheetsResponse {
 // 保存答卷答案和分数请求
 message SaveAnswerSheetScoresRequest {
   uint64 answer_sheet_id = 1;  // 答卷ID
-  uint32 total_score = 2;      // 总分
+  double total_score = 2;      // 总分
   repeated Answer answers = 3;  // 答案列表（包含分数）
 }
 
 // 保存答卷答案和分数响应
 message SaveAnswerSheetScoresResponse {
   uint64 answer_sheet_id = 1;  // 答卷ID
-  uint32 total_score = 2;      // 总分
+  double total_score = 2;      // 总分
   string message = 3;          // 响应消息
 } 
