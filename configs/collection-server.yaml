@@ -19,6 +19,16 @@ grpc_client:
   timeout: 30
   insecure: true
 
+# JWT 配置
+jwt:
+  secret_key: "qs-collection-server-jwt-secret-key-2024"
+  token_duration: 168  # 7 天 (24*7小时)
+
+# 微信小程序配置
+wechat:
+  app_id: "your_wechat_app_id"
+  app_secret: "your_wechat_app_secret"
+
 # 日志配置
 log:
   name: "collection-server"

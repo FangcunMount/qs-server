@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/pflag"
 	genericoptions "github.com/fangcun-mount/qs-server/internal/pkg/options"
 	cliflag "github.com/fangcun-mount/qs-server/pkg/flag"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 	"github.com/fangcun-mount/qs-server/pkg/pubsub"
+	"github.com/spf13/pflag"
 )
 
 // Options 包含所有配置项
@@ -23,6 +23,10 @@ type Options struct {
 	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
 	// 并发处理配置
 	Concurrency *ConcurrencyOptions `json:"concurrency" mapstructure:"concurrency"`
+	// JWT 配置
+	JWT *JWTOptions `json:"jwt" mapstructure:"jwt"`
+	// 微信小程序配置
+	Wechat *WechatOptions `json:"wechat" mapstructure:"wechat"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -35,6 +39,18 @@ type GRPCClientOptions struct {
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
 	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
+}
+
+// JWTOptions JWT 配置
+type JWTOptions struct {
+	SecretKey     string `json:"secret_key" mapstructure:"secret_key"`         // JWT 密钥
+	TokenDuration int    `json:"token_duration" mapstructure:"token_duration"` // Token 有效期（小时）
+}
+
+// WechatOptions 微信配置
+type WechatOptions struct {
+	AppID     string `json:"app_id" mapstructure:"app_id"`         // 微信小程序 AppID
+	AppSecret string `json:"app_secret" mapstructure:"app_secret"` // 微信小程序 AppSecret
 }
 
 // LoggingOptions 日志配置选项
@@ -82,6 +98,14 @@ func NewOptions() *Options {
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
+		JWT: &JWTOptions{
+			SecretKey:     "your-secret-key-change-in-production",
+			TokenDuration: 24 * 7, // 7 天
+		},
+		Wechat: &WechatOptions{
+			AppID:     "",
+			AppSecret: "",
+		},
 	}
 }
 
@@ -94,6 +118,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc-client"))
 	o.Redis.AddFlags(fss.FlagSet("redis"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
+	o.JWT.AddFlags(fss.FlagSet("jwt"))
+	o.Wechat.AddFlags(fss.FlagSet("wechat"))
 
 	return fss
 }
@@ -112,6 +138,22 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
 		"The maximum number of concurrent goroutines for validation.")
+}
+
+// AddFlags 添加 JWT 相关的命令行参数
+func (j *JWTOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&j.SecretKey, "jwt.secret-key", j.SecretKey,
+		"The secret key for JWT token signing.")
+	fs.IntVar(&j.TokenDuration, "jwt.token-duration", j.TokenDuration,
+		"The duration of JWT token in hours.")
+}
+
+// AddFlags 添加微信相关的命令行参数
+func (w *WechatOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&w.AppID, "wechat.app-id", w.AppID,
+		"The WeChat miniprogram app ID.")
+	fs.StringVar(&w.AppSecret, "wechat.app-secret", w.AppSecret,
+		"The WeChat miniprogram app secret.")
 }
 
 // ToPubSubConfig 将RedisOptions转换为pubsub.Config
@@ -166,6 +208,22 @@ func (o *Options) Validate() []error {
 	}
 	if o.Concurrency.MaxConcurrency > 100 {
 		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
+	}
+
+	// 验证 JWT 配置
+	if o.JWT.SecretKey == "" {
+		errs = append(errs, fmt.Errorf("jwt.secret-key cannot be empty"))
+	}
+	if o.JWT.TokenDuration <= 0 {
+		errs = append(errs, fmt.Errorf("jwt.token-duration must be greater than 0"))
+	}
+
+	// 验证微信配置
+	if o.Wechat.AppID == "" {
+		errs = append(errs, fmt.Errorf("wechat.app-id cannot be empty"))
+	}
+	if o.Wechat.AppSecret == "" {
+		errs = append(errs, fmt.Errorf("wechat.app-secret cannot be empty"))
 	}
 
 	return errs

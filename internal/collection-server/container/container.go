@@ -3,11 +3,16 @@ package container
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/fangcun-mount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	userapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/user"
 	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/auth"
 	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/wechat"
+	userhandler "github.com/fangcun-mount/qs-server/internal/collection-server/interface/http/handler"
 	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/handler"
 	"github.com/fangcun-mount/qs-server/internal/collection-server/options"
 	"github.com/fangcun-mount/qs-server/pkg/log"
@@ -19,31 +24,49 @@ type Container struct {
 	// 基础设施层
 	QuestionnaireClient grpc.QuestionnaireClient
 	AnswersheetClient   grpc.AnswersheetClient
+	UserServiceClient   *grpc.UserServiceClient
 	Publisher           pubsub.Publisher
+	JWTManager          *auth.JWTManager
+	MiniProgramClient   *wechat.MiniProgramClient
 
 	// 应用层
 	ValidationService           validation.Service
 	ValidationServiceConcurrent validation.ServiceConcurrent
 	AnswersheetService          answersheet.Service
 	QuestionnaireService        questionnaire.Service
+	MiniProgramRegistrar        *userapp.MiniProgramRegistrar
+	TesteeRegistrar             *userapp.TesteeRegistrar
+	UserQueryer                 *userapp.UserQueryer
 
 	// 接口层
 	QuestionnaireHandler handler.QuestionnaireHandler
 	AnswersheetHandler   handler.AnswersheetHandler
+	UserHandler          *userhandler.UserHandler
+	TesteeHandler        *userhandler.TesteeHandler
 
 	// 配置
 	grpcClientConfig  *options.GRPCClientOptions
 	pubsubConfig      *pubsub.Config
 	concurrencyConfig *options.ConcurrencyOptions
+	jwtConfig         *options.JWTOptions
+	wechatConfig      *options.WechatOptions
 	initialized       bool
 }
 
 // NewContainer 创建新的容器
-func NewContainer(grpcClientConfig *options.GRPCClientOptions, pubsubConfig *pubsub.Config, concurrencyConfig *options.ConcurrencyOptions) *Container {
+func NewContainer(
+	grpcClientConfig *options.GRPCClientOptions,
+	pubsubConfig *pubsub.Config,
+	concurrencyConfig *options.ConcurrencyOptions,
+	jwtConfig *options.JWTOptions,
+	wechatConfig *options.WechatOptions,
+) *Container {
 	return &Container{
 		grpcClientConfig:  grpcClientConfig,
 		pubsubConfig:      pubsubConfig,
 		concurrencyConfig: concurrencyConfig,
+		jwtConfig:         jwtConfig,
+		wechatConfig:      wechatConfig,
 		initialized:       false,
 	}
 }
@@ -94,7 +117,30 @@ func (c *Container) initializeInfrastructure() error {
 	}
 	c.AnswersheetClient = answersheetClient
 
+	// 创建用户服务 GRPC 客户端
+	userServiceClient, err := grpc.NewUserServiceClient(c.grpcClientConfig.Endpoint, c.grpcClientConfig.Timeout)
+	if err != nil {
+		return fmt.Errorf("failed to create user service client: %w", err)
+	}
+	c.UserServiceClient = userServiceClient
+
 	log.Info("   ✅ GRPC clients initialized")
+
+	// 创建 JWT 管理器
+	log.Info("   🔐 Initializing JWT manager...")
+	c.JWTManager = auth.NewJWTManager(
+		c.jwtConfig.SecretKey,
+		time.Duration(c.jwtConfig.TokenDuration)*time.Hour,
+	)
+	log.Info("   ✅ JWT manager initialized")
+
+	// 创建微信小程序客户端
+	log.Info("   📱 Initializing WeChat miniprogram client...")
+	c.MiniProgramClient = wechat.NewMiniProgramClient(
+		c.wechatConfig.AppID,
+		c.wechatConfig.AppSecret,
+	)
+	log.Info("   ✅ WeChat miniprogram client initialized")
 
 	// 创建发布者
 	log.Info("   📡 Initializing publisher...")
@@ -136,6 +182,16 @@ func (c *Container) initializeApplication() error {
 	// 再创建答卷应用服务
 	c.AnswersheetService = answersheet.NewService(c.AnswersheetClient, c.Publisher, c.QuestionnaireService)
 
+	// 创建用户应用服务
+	c.MiniProgramRegistrar = userapp.NewMiniProgramRegistrar(
+		c.UserServiceClient,
+		c.MiniProgramClient,
+		c.JWTManager,
+		c.wechatConfig.AppID,
+	)
+	c.TesteeRegistrar = userapp.NewTesteeRegistrar(c.UserServiceClient)
+	c.UserQueryer = userapp.NewUserQueryer(c.UserServiceClient)
+
 	log.Infof("   ✅ Application services initialized (using concurrent validation, max concurrency: %d)", c.concurrencyConfig.MaxConcurrency)
 	return nil
 }
@@ -153,6 +209,18 @@ func (c *Container) initializeInterface() error {
 	c.AnswersheetHandler = handler.NewAnswersheetHandler(
 		c.AnswersheetService, // 使用答卷应用服务
 		c.AnswersheetClient,  // 保留gRPC客户端用于查询操作
+	)
+
+	// 创建用户相关 Handler
+	c.UserHandler = userhandler.NewUserHandler(
+		c.MiniProgramRegistrar,
+		c.UserQueryer,
+		c.JWTManager,
+	)
+
+	c.TesteeHandler = userhandler.NewTesteeHandler(
+		c.TesteeRegistrar,
+		c.UserQueryer,
 	)
 
 	log.Info("   ✅ Interface handlers initialized (using concurrent validation via adapter)")
@@ -194,6 +262,12 @@ func (c *Container) Cleanup() error {
 	if c.AnswersheetClient != nil {
 		if err := c.AnswersheetClient.Close(); err != nil {
 			log.Errorf("Failed to close answersheet client: %v", err)
+		}
+	}
+
+	if c.UserServiceClient != nil {
+		if err := c.UserServiceClient.Close(); err != nil {
+			log.Errorf("Failed to close user service client: %v", err)
 		}
 	}
 

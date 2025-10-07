@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/fangcun-mount/qs-server/internal/collection-server/container"
-	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
+	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/http/middleware"
+	pkgmiddleware "github.com/fangcun-mount/qs-server/internal/pkg/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 // Router 集中的路由管理器
@@ -32,7 +33,10 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	// 注册API路由（collection-server不需要认证）
 	r.registerAPIRoutes(engine)
 
-	fmt.Printf("🔗 Registered routes for: public, questionnaire, answersheet\n")
+	// 注册用户相关路由
+	r.registerUserRoutes(engine)
+
+	fmt.Printf("🔗 Registered routes for: public, questionnaire, answersheet, user\n")
 }
 
 // setupGlobalMiddleware 设置全局中间件
@@ -41,20 +45,20 @@ func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
 	engine.Use(gin.Recovery())
 
 	// RequestID 中间件
-	engine.Use(middleware.RequestID())
+	engine.Use(pkgmiddleware.RequestID())
 
 	// 基础日志中间件
-	engine.Use(middleware.Logger())
+	engine.Use(pkgmiddleware.Logger())
 
 	// API详细日志中间件 (可以通过配置控制是否启用)
-	engine.Use(middleware.APILogger())
+	engine.Use(pkgmiddleware.APILogger())
 
 	// CORS 中间件
-	engine.Use(middleware.Cors())
+	engine.Use(pkgmiddleware.Cors())
 
 	// 其他中间件
-	engine.Use(middleware.NoCache)
-	engine.Use(middleware.Options)
+	engine.Use(pkgmiddleware.NoCache)
+	engine.Use(pkgmiddleware.Options)
 }
 
 // registerPublicRoutes 注册公开路由（不需要认证）
@@ -122,6 +126,42 @@ func (r *Router) registerAnswersheetRoutes(apiV1 *gin.RouterGroup) {
 
 		// 答卷验证（可选路由，根据需要启用）
 		// answersheets.POST("/validate", answersheetHandler.Validate)
+	}
+}
+
+// registerUserRoutes 注册用户相关路由
+func (r *Router) registerUserRoutes(engine *gin.Engine) {
+	userHandler := r.container.UserHandler
+	testeeHandler := r.container.TesteeHandler
+	if userHandler == nil || testeeHandler == nil {
+		return
+	}
+
+	apiV1 := engine.Group("/api/v1")
+
+	// 用户相关路由（不需要认证）
+	users := apiV1.Group("/users")
+	{
+		// 小程序注册/登录
+		users.POST("/miniprogram/register", userHandler.RegisterMiniProgram)
+	}
+
+	// 用户相关路由（需要认证）
+	usersAuth := apiV1.Group("/users")
+	usersAuth.Use(middleware.JWTAuth(r.container.JWTManager))
+	{
+		// 获取当前用户信息
+		usersAuth.GET("/me", userHandler.GetUser)
+	}
+
+	// 受试者相关路由（需要认证）
+	testees := apiV1.Group("/testees")
+	testees.Use(middleware.JWTAuth(r.container.JWTManager))
+	{
+		// 创建受试者
+		testees.POST("/register", testeeHandler.CreateTestee)
+		// 获取当前用户的受试者信息
+		testees.GET("/me", testeeHandler.GetTestee)
 	}
 }
 
