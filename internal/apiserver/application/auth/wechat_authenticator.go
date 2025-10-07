@@ -1,4 +1,4 @@
-package wechat
+package auth
 
 import (
 	"context"
@@ -32,23 +32,23 @@ type LoginResponse struct {
 	NeedBindInfo bool        // 是否需要补充信息
 }
 
-// Authenticator 微信登录认证器
+// WechatAuthenticator 微信登录认证器
 // 职责：处理微信小程序/公众号登录，创建或绑定用户账号
-type Authenticator struct {
+type WechatAuthenticator struct {
 	wxAccountRepo accountPort.WechatAccountRepository
 	mergeLogRepo  accountPort.MergeLogRepository
 	appRepo       wechatPort.AppRepository
 	userRepo      user.Repository
 }
 
-// NewAuthenticator 创建微信登录认证器
-func NewAuthenticator(
+// NewWechatAuthenticator 创建微信登录认证器
+func NewWechatAuthenticator(
 	wxAccountRepo accountPort.WechatAccountRepository,
 	mergeLogRepo accountPort.MergeLogRepository,
 	appRepo wechatPort.AppRepository,
 	userRepo user.Repository,
-) *Authenticator {
-	return &Authenticator{
+) *WechatAuthenticator {
+	return &WechatAuthenticator{
 		wxAccountRepo: wxAccountRepo,
 		mergeLogRepo:  mergeLogRepo,
 		appRepo:       appRepo,
@@ -57,7 +57,7 @@ func NewAuthenticator(
 }
 
 // LoginWithMiniProgram 小程序登录（创建/更新用户的唯一入口）
-func (a *Authenticator) LoginWithMiniProgram(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+func (a *WechatAuthenticator) LoginWithMiniProgram(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
 	// 1. 验证微信应用
 	app, err := a.appRepo.FindByPlatformAndAppID(ctx, wechatDomain.PlatformMini, req.AppID)
 	if err != nil {
@@ -145,7 +145,7 @@ func (a *Authenticator) LoginWithMiniProgram(ctx context.Context, req *LoginRequ
 }
 
 // findOrCreateUser 查找或创建用户（三段式合并逻辑）
-func (a *Authenticator) findOrCreateUser(
+func (a *WechatAuthenticator) findOrCreateUser(
 	ctx context.Context,
 	wxAcc *accountDomain.WechatAccount,
 	req *LoginRequest,

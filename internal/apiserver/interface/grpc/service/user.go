@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	roleApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/role"
 	userApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/wechat"
+	roleApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/role"
+	wechatApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/wechat"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
 	accountDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account"
 	roleDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
@@ -30,7 +30,7 @@ type UserService struct {
 	userEditor  *userApp.UserEditor
 
 	// 微信账号服务
-	wxAccountCreator *wechat.WechatAccountCreator
+	wxAccountCreator *wechatApp.WechatAccountCreator
 
 	// 角色服务
 	testeeCreator *roleApp.TesteeCreator
@@ -41,7 +41,7 @@ type UserService struct {
 func NewUserService(
 	userCreator *userApp.UserCreator,
 	userEditor *userApp.UserEditor,
-	wxAccountCreator *wechat.WechatAccountCreator,
+	wxAccountCreator *wechatApp.WechatAccountCreator,
 	testeeCreator *roleApp.TesteeCreator,
 	writerCreator *roleApp.WriterCreator,
 ) *UserService {

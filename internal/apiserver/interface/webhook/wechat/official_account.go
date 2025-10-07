@@ -6,7 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/silenceper/wechat/v2/officialaccount/message"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/wechat"
+	accountDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account"
+	accountPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account/port"
+	wechatDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat"
+	wechatPort "github.com/fangcun-mount/qs-server/internal/apiserver/domain/wechat/port"
 	wxInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/wechat"
 	"github.com/fangcun-mount/qs-server/pkg/core"
 	"github.com/fangcun-mount/qs-server/pkg/log"
@@ -14,18 +17,24 @@ import (
 
 // OfficialAccountWebhook 公众号事件回调处理器
 type OfficialAccountWebhook struct {
-	follower        *wechat.Follower
 	wxClientFactory *wxInfra.WxClientFactory
+	wxAccountRepo   accountPort.WechatAccountRepository
+	mergeLogRepo    accountPort.MergeLogRepository
+	appRepo         wechatPort.AppRepository
 }
 
 // NewOfficialAccountWebhook 创建公众号回调处理器
 func NewOfficialAccountWebhook(
-	follower *wechat.Follower,
 	wxClientFactory *wxInfra.WxClientFactory,
+	wxAccountRepo accountPort.WechatAccountRepository,
+	mergeLogRepo accountPort.MergeLogRepository,
+	appRepo wechatPort.AppRepository,
 ) *OfficialAccountWebhook {
 	return &OfficialAccountWebhook{
-		follower:        follower,
 		wxClientFactory: wxClientFactory,
+		wxAccountRepo:   wxAccountRepo,
+		mergeLogRepo:    mergeLogRepo,
+		appRepo:         appRepo,
 	}
 }
 
@@ -131,15 +140,84 @@ func (h *OfficialAccountWebhook) HandleSubscribe(ctx context.Context, appID stri
 		}
 	}
 
-	// 2. 处理关注逻辑（调用应用服务）
+	// 2. 处理关注逻辑
 	var unionIDPtr *string
 	if unionID != "" {
 		unionIDPtr = &unionID
 	}
 
-	err = h.follower.HandleSubscribe(ctx, appID, openID, unionIDPtr, nickname, avatar)
+	// 2.1 验证微信应用
+	app, err := h.appRepo.FindByPlatformAndAppID(ctx, wechatDomain.PlatformOA, appID)
 	if err != nil {
-		log.Errorw("failed to handle subscribe", "error", err, "openId", openID)
+		log.Errorw("failed to find wx app", "appID", appID, "error", err)
+		return &message.Reply{
+			MsgType: message.MsgTypeText,
+			MsgData: message.NewText("感谢关注！欢迎使用我们的服务。"),
+		}
+	}
+	if !app.IsEnabled() {
+		log.Warnw("wx app is disabled", "appID", appID)
+		return &message.Reply{
+			MsgType: message.MsgTypeText,
+			MsgData: message.NewText("感谢关注！欢迎使用我们的服务。"),
+		}
+	}
+
+	// 2.2 Upsert wx_accounts
+	wxAcc, err := h.wxAccountRepo.FindByOpenID(ctx, appID, accountDomain.WxPlatformOA, openID)
+	isNew := false
+
+	if err != nil {
+		// 新建账号
+		wxAcc, err = accountDomain.NewWechatAccount(int64(app.ID().Value()), appID, accountDomain.WxPlatformOA, openID, unionIDPtr)
+		if err != nil {
+			log.Errorw("failed to create wx account", "error", err)
+			return &message.Reply{
+				MsgType: message.MsgTypeText,
+				MsgData: message.NewText("感谢关注！欢迎使用我们的服务。"),
+			}
+		}
+		wxAcc.UpdateProfile(nickname, avatar)
+		isNew = true
+	} else {
+		// 更新
+		if unionIDPtr != nil && *unionIDPtr != "" {
+			wxAcc.UpdateUnionID(*unionIDPtr)
+		}
+		wxAcc.UpdateProfile(nickname, avatar)
+	}
+
+	// 2.3 标记关注
+	if err := wxAcc.Follow(); err != nil {
+		log.Errorw("failed to follow", "error", err)
+		return &message.Reply{
+			MsgType: message.MsgTypeText,
+			MsgData: message.NewText("感谢关注！欢迎使用我们的服务。"),
+		}
+	}
+
+	// 2.4 若有 unionid，尝试绑定到已有用户
+	if !wxAcc.IsBound() && wxAcc.UnionID() != nil && *wxAcc.UnionID() != "" {
+		boundAcc, err := h.wxAccountRepo.FindBoundAccountByUnionID(ctx, *wxAcc.UnionID())
+		if err == nil && boundAcc != nil {
+			wxAcc.BindUser(*boundAcc.GetUserID())
+
+			// 记录合并日志
+			mergeLog := accountDomain.NewMergeLog(*boundAcc.GetUserID(), wxAcc.GetID(), accountDomain.MergeReasonUnionID)
+			if err := h.mergeLogRepo.Save(ctx, mergeLog); err != nil {
+				log.Errorw("failed to save merge log", "error", err)
+			}
+		}
+	}
+
+	// 2.5 保存/更新
+	if isNew {
+		err = h.wxAccountRepo.Save(ctx, wxAcc)
+	} else {
+		err = h.wxAccountRepo.Update(ctx, wxAcc)
+	}
+	if err != nil {
+		log.Errorw("failed to save wx account", "error", err)
 	}
 
 	// 3. 返回欢迎消息
@@ -158,10 +236,23 @@ func (h *OfficialAccountWebhook) HandleUnsubscribe(ctx context.Context, appID st
 		"openId", openID,
 	)
 
-	// 处理取关逻辑
-	err := h.follower.HandleUnsubscribe(ctx, appID, openID)
+	// 1. 查找账号
+	wxAcc, err := h.wxAccountRepo.FindByOpenID(ctx, appID, accountDomain.WxPlatformOA, openID)
 	if err != nil {
-		log.Errorw("failed to handle unsubscribe", "error", err, "openId", openID)
+		log.Errorw("failed to find wx account", "error", err, "openId", openID)
+		return nil
+	}
+
+	// 2. 标记取关（不删账号、不解绑用户）
+	if err := wxAcc.Unfollow(); err != nil {
+		log.Errorw("failed to unfollow", "error", err, "openId", openID)
+		return nil
+	}
+
+	// 3. 更新
+	err = h.wxAccountRepo.Update(ctx, wxAcc)
+	if err != nil {
+		log.Errorw("failed to update wx account", "error", err, "openId", openID)
 	}
 
 	// 取关事件无需回复
