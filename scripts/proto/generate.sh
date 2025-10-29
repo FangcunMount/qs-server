@@ -47,14 +47,6 @@ protoc --proto_path=${PROTO_PATH} \
        --go-grpc_opt=paths=source_relative \
        ${PROTO_PATH}/user/user.proto
 
-# 生成 wechat-account 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/wechat/wechat-account.proto
-
 # 生成 role 服务代码
 protoc --proto_path=${PROTO_PATH} \
        --go_out=${GO_OUT_PATH} \

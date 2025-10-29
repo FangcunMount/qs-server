@@ -58,7 +58,6 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		pubsubConfig,
 		s.config.Concurrency,
 		s.config.JWT,
-		s.config.Wechat,
 	)
 
 	// 初始化容器中的所有组件

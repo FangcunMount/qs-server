@@ -11,16 +11,14 @@ import (
 
 	userApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user"
 	roleApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/role"
-	wechatApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/wechat"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
-	accountDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/account"
 	roleDomain "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
 	pb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/user"
 	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // UserService 用户模块 gRPC 服务 - 统一的用户体系服务
-// 负责对外提供用户、微信账号、受试者、填写人等所有用户相关功能
+// 负责对外提供用户、受试者、填写人等所有用户相关功能
 // 注意：Auditor（审核员）是内部员工角色，不对 collection-server 开放
 type UserService struct {
 	pb.UnimplementedUserServiceServer
@@ -28,9 +26,6 @@ type UserService struct {
 	// 基础用户服务
 	userCreator *userApp.UserCreator
 	userEditor  *userApp.UserEditor
-
-	// 微信账号服务
-	wxAccountManager *wechatApp.AccountManager
 
 	// 角色服务
 	testeeCreator *roleApp.TesteeCreator
@@ -41,16 +36,14 @@ type UserService struct {
 func NewUserService(
 	userCreator *userApp.UserCreator,
 	userEditor *userApp.UserEditor,
-	wxAccountManager *wechatApp.AccountManager,
 	testeeCreator *roleApp.TesteeCreator,
 	writerCreator *roleApp.WriterCreator,
 ) *UserService {
 	return &UserService{
-		userCreator:      userCreator,
-		userEditor:       userEditor,
-		wxAccountManager: wxAccountManager,
-		testeeCreator:    testeeCreator,
-		writerCreator:    writerCreator,
+		userCreator:   userCreator,
+		userEditor:    userEditor,
+		testeeCreator: testeeCreator,
+		writerCreator: writerCreator,
 	}
 }
 
@@ -122,67 +115,6 @@ func (s *UserService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 	// 注意：这里需要通过 repository 直接查询，或者添加 UserQueryer
 	// 暂时返回错误，需要实现查询服务
 	return nil, status.Error(codes.Unimplemented, "GetUser not implemented yet")
-}
-
-// ========== 微信账号服务 ==========
-
-// CreateOrUpdateMiniProgramAccount 创建或更新小程序账号
-func (s *UserService) CreateOrUpdateMiniProgramAccount(ctx context.Context, req *pb.CreateOrUpdateMiniProgramAccountRequest) (*pb.WechatAccountResponse, error) {
-	log.Infof("CreateOrUpdateMiniProgramAccount called: app_id=%s, open_id=%s", req.AppId, req.OpenId)
-
-	var unionID *string
-	if req.UnionId != "" {
-		unionID = &req.UnionId
-	}
-
-	wxAccount, err := s.wxAccountManager.CreateOrUpdateMiniProgramAccount(
-		ctx,
-		req.AppId,
-		req.OpenId,
-		unionID,
-		req.Nickname,
-		req.Avatar,
-		req.SessionKey,
-	)
-	if err != nil {
-		log.Errorf("Failed to create/update mini program account: %v", err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return s.toWechatAccountResponse(wxAccount), nil
-}
-
-// CreateOrUpdateOfficialAccount 创建或更新公众号账号
-func (s *UserService) CreateOrUpdateOfficialAccount(ctx context.Context, req *pb.CreateOrUpdateOfficialAccountRequest) (*pb.WechatAccountResponse, error) {
-	log.Infof("CreateOrUpdateOfficialAccount called: app_id=%s, open_id=%s", req.AppId, req.OpenId)
-
-	var unionID *string
-	if req.UnionId != "" {
-		unionID = &req.UnionId
-	}
-
-	wxAccount, err := s.wxAccountManager.CreateOrUpdateOfficialAccount(
-		ctx,
-		req.AppId,
-		req.OpenId,
-		unionID,
-		req.Nickname,
-		req.Avatar,
-	)
-	if err != nil {
-		log.Errorf("Failed to create/update official account: %v", err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return s.toWechatAccountResponse(wxAccount), nil
-}
-
-// GetWechatAccountByOpenID 获取微信账号
-func (s *UserService) GetWechatAccountByOpenID(ctx context.Context, req *pb.GetWechatAccountByOpenIDRequest) (*pb.WechatAccountResponse, error) {
-	log.Infof("GetWechatAccountByOpenID called: app_id=%s, open_id=%s", req.AppId, req.OpenId)
-
-	// 注意：需要添加查询服务获取账号
-	return nil, status.Error(codes.Unimplemented, "GetWechatAccountByOpenID not implemented yet")
 }
 
 // ========== 受试者服务 ==========
@@ -303,30 +235,6 @@ func (s *UserService) GetWriter(ctx context.Context, req *pb.GetWriterRequest) (
 }
 
 // ========== 辅助转换函数 ==========
-
-func (s *UserService) toWechatAccountResponse(wxAccount *accountDomain.WechatAccount) *pb.WechatAccountResponse {
-	var userId uint64
-	if wxAccount.GetUserID() != nil {
-		userId = wxAccount.GetUserID().Value()
-	}
-
-	return &pb.WechatAccountResponse{
-		UserId:    userId,
-		AccountId: wxAccount.GetID().Value(),
-		AppId:     wxAccount.WxAppID(),
-		Platform:  string(wxAccount.Platform()),
-		OpenId:    wxAccount.OpenID(),
-		UnionId: func() string {
-			if wxAccount.UnionID() != nil {
-				return *wxAccount.UnionID()
-			}
-			return ""
-		}(),
-		Nickname:     wxAccount.Nickname(),
-		Avatar:       wxAccount.AvatarURL(),
-		IsNewAccount: false, // TODO: 需要判断逻辑
-	}
-}
 
 func (s *UserService) toTesteeResponse(testee *roleDomain.Testee) *pb.TesteeResponse {
 	return &pb.TesteeResponse{

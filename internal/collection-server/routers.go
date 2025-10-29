@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/fangcun-mount/qs-server/internal/collection-server/container"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/http/middleware"
 	pkgmiddleware "github.com/fangcun-mount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -131,38 +130,8 @@ func (r *Router) registerAnswersheetRoutes(apiV1 *gin.RouterGroup) {
 
 // registerUserRoutes 注册用户相关路由
 func (r *Router) registerUserRoutes(engine *gin.Engine) {
-	userHandler := r.container.UserHandler
-	testeeHandler := r.container.TesteeHandler
-	if userHandler == nil || testeeHandler == nil {
-		return
-	}
-
-	apiV1 := engine.Group("/api/v1")
-
-	// 用户相关路由（不需要认证）
-	users := apiV1.Group("/users")
-	{
-		// 小程序注册/登录
-		users.POST("/miniprogram/register", userHandler.RegisterMiniProgram)
-	}
-
-	// 用户相关路由（需要认证）
-	usersAuth := apiV1.Group("/users")
-	usersAuth.Use(middleware.JWTAuth(r.container.JWTManager))
-	{
-		// 获取当前用户信息
-		usersAuth.GET("/me", userHandler.GetUser)
-	}
-
-	// 受试者相关路由（需要认证）
-	testees := apiV1.Group("/testees")
-	testees.Use(middleware.JWTAuth(r.container.JWTManager))
-	{
-		// 创建受试者
-		testees.POST("/register", testeeHandler.CreateTestee)
-		// 获取当前用户的受试者信息
-		testees.GET("/me", testeeHandler.GetTestee)
-	}
+	// 用户注册登录功能已迁移到 iam-contracts 项目
+	// 此方法保留以便未来添加其他用户相关路由
 }
 
 // 公共路由处理函数
