@@ -4,22 +4,19 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
+	"github.com/gin-gonic/gin"
 )
 
 // Router 集中的路由管理器
 type Router struct {
 	container *container.Container
-	auth      *Auth
 }
 
 // NewRouter 创建路由管理器
 func NewRouter(c *container.Container) *Router {
 	return &Router{
 		container: c,
-		auth:      NewAuth(c), // 初始化认证配置
 	}
 }
 
@@ -40,14 +37,7 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	engine.GET("/health", r.healthCheck)
 	engine.GET("/ping", r.ping)
 
-	// 认证相关的公开路由
-	auth := engine.Group("/auth")
-	{
-		jwtStrategy := r.auth.NewJWTAuth()
-		auth.POST("/login", jwtStrategy.LoginHandler)
-		auth.POST("/logout", jwtStrategy.LogoutHandler)
-		auth.POST("/refresh", jwtStrategy.RefreshHandler)
-	}
+	// 认证相关的公开路由 已迁移至 IAM / API 网关，不在此维护
 
 	// 公开的API路由
 	publicAPI := engine.Group("/api/v1/public")
@@ -67,9 +57,7 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 创建需要认证的API组
 	apiV1 := engine.Group("/api/v1")
 
-	// 应用认证中间件
-	authMiddleware := r.auth.CreateAuthMiddleware("auto") // 自动选择Basic或JWT
-	apiV1.Use(authMiddleware)
+	// 认证由上游网关或 IAM 负责，这里不再强制中间件
 
 	// 注册用户相关的受保护路由
 	r.registerUserProtectedRoutes(apiV1)
@@ -88,18 +76,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 }
 
 // registerUserProtectedRoutes 注册用户相关的受保护路由
+// 用户管理已迁移到 IAM 服务，此方法保留以便未来扩展
 func (r *Router) registerUserProtectedRoutes(apiV1 *gin.RouterGroup) {
-	userHandler := r.container.UserModule.UserHandler
-
-	if userHandler == nil {
-		return
-	}
-
-	users := apiV1.Group("/users")
-	{
-		// 获取当前用户资料相关
-		users.GET("/profile", userHandler.GetUserProfile)
-	}
+	// 用户相关功能已迁移到 iam-contracts 项目
 }
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由
@@ -185,19 +164,14 @@ func (r *Router) healthCheck(c *gin.Context) {
 		"discovery":    "auto",
 		"architecture": "hexagonal",
 		"router":       "centralized",
-		"auth":         "enabled", // 新增认证状态
+		"auth":         "delegated", // 认证由 IAM / API 网关代理
 		"components": gin.H{
-			"domain":      "questionnaire, user",
+			"domain":      "questionnaire",
 			"ports":       "storage",
 			"adapters":    "mysql, mongodb, http",
-			"application": "questionnaire_service, user_service",
+			"application": "questionnaire_service",
 		},
-		"jwt_config": gin.H{
-			"realm":       viper.GetString("jwt.realm"),
-			"timeout":     viper.GetDuration("jwt.timeout").String(),
-			"max_refresh": viper.GetDuration("jwt.max-refresh").String(),
-			"key_loaded":  viper.GetString("jwt.key") != "", // 不显示实际密钥，只显示是否加载
-		},
+		// JWT 配置移除（由 IAM 管理）
 	}
 
 	c.JSON(200, response)

@@ -21,8 +21,6 @@ type Container struct {
 	mongoDB *mongo.Database
 
 	// 业务模块
-	AuthModule            *assembler.AuthModule
-	UserModule            *assembler.UserModule
 	QuestionnaireModule   *assembler.QuestionnaireModule
 	AnswersheetModule     *assembler.AnswersheetModule
 	MedicalScaleModule    *assembler.MedicalScaleModule
@@ -47,16 +45,6 @@ func (c *Container) Initialize() error {
 		return nil
 	}
 
-	// 初始化用户模块
-	if err := c.initUserModule(); err != nil {
-		return fmt.Errorf("failed to initialize user module: %w", err)
-	}
-
-	// 初始化认证模块
-	if err := c.initAuthModule(); err != nil {
-		return fmt.Errorf("failed to initialize auth module: %w", err)
-	}
-
 	// 初始化问卷模块
 	if err := c.initQuestionnaireModule(); err != nil {
 		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
@@ -78,36 +66,8 @@ func (c *Container) Initialize() error {
 	}
 
 	c.initialized = true
-	fmt.Printf("🏗️  Container initialized with modules: user\n")
+	fmt.Printf("🏗️  Container initialized successfully\n")
 
-	return nil
-}
-
-// initUserModule 初始化用户模块
-func (c *Container) initUserModule() error {
-	userModule := assembler.NewUserModule()
-	if err := userModule.Initialize(c.mysqlDB); err != nil {
-		return fmt.Errorf("failed to initialize user module: %w", err)
-	}
-
-	c.UserModule = userModule
-	modulePool["user"] = userModule
-
-	fmt.Printf("📦 User module initialized\n")
-	return nil
-}
-
-// initAuthModule 初始化认证模块
-func (c *Container) initAuthModule() error {
-	authModule := assembler.NewAuthModule()
-	if err := authModule.Initialize(c.mysqlDB); err != nil {
-		return fmt.Errorf("failed to initialize auth module: %w", err)
-	}
-
-	c.AuthModule = authModule
-	modulePool["auth"] = authModule
-
-	fmt.Printf("📦 Auth module initialized\n")
 	return nil
 }
 
