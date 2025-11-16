@@ -12,20 +12,17 @@ import (
 
 // Creator 问卷创建器
 type Creator struct {
-	qRepoMySQL port.QuestionnaireRepositoryMySQL
-	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     mapper.QuestionnaireMapper
+	qRepo  port.QuestionnaireRepositoryMongo
+	mapper mapper.QuestionnaireMapper
 }
 
 // NewCreator 创建问卷创建器
 func NewCreator(
-	qRepoMySQL port.QuestionnaireRepositoryMySQL,
-	qRepoMongo port.QuestionnaireRepositoryMongo,
+	qRepo port.QuestionnaireRepositoryMongo,
 ) *Creator {
 	return &Creator{
-		qRepoMySQL: qRepoMySQL,
-		qRepoMongo: qRepoMongo,
-		mapper:     mapper.NewQuestionnaireMapper(),
+		qRepo:  qRepo,
+		mapper: mapper.NewQuestionnaireMapper(),
 	}
 }
 
@@ -47,16 +44,11 @@ func (c *Creator) CreateQuestionnaire(ctx context.Context, questionnaireDTO *dto
 		questionnaire.WithStatus(questionnaire.STATUS_DRAFT),
 	)
 
-	// 3. 保存到 mysql
-	if err := c.qRepoMySQL.Create(ctx, qBo); err != nil {
+	// 3. 保存到 MongoDB
+	if err := c.qRepo.Create(ctx, qBo); err != nil {
 		return nil, err
 	}
 
-	// 4. 保存到 mongodb
-	if err := c.qRepoMongo.Create(ctx, qBo); err != nil {
-		return nil, err
-	}
-
-	// 5. 转换为 DTO 并返回
+	// 4. 转换为 DTO 并返回
 	return c.mapper.ToDTO(qBo), nil
 }

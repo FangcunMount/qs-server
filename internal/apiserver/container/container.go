@@ -74,7 +74,7 @@ func (c *Container) Initialize() error {
 // initQuestionnaireModule 初始化问卷模块
 func (c *Container) initQuestionnaireModule() error {
 	quesModule := assembler.NewQuestionnaireModule()
-	if err := quesModule.Initialize(c.mysqlDB, c.mongoDB); err != nil {
+	if err := quesModule.Initialize(c.mongoDB); err != nil {
 		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
 	}
 

@@ -6,28 +6,23 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Queryer 问卷查询器
 type Queryer struct {
-	qRepoMySQL port.QuestionnaireRepositoryMySQL
-	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     mapper.QuestionnaireMapper
+	qRepo  port.QuestionnaireRepositoryMongo
+	mapper mapper.QuestionnaireMapper
 }
 
 // NewQueryer 创建问卷查询器
 func NewQueryer(
-	qRepoMySQL port.QuestionnaireRepositoryMySQL,
-	qRepoMongo port.QuestionnaireRepositoryMongo,
+	qRepo port.QuestionnaireRepositoryMongo,
 ) *Queryer {
 	return &Queryer{
-		qRepoMySQL: qRepoMySQL,
-		qRepoMongo: qRepoMongo,
-		mapper:     mapper.NewQuestionnaireMapper(),
+		qRepo:  qRepo,
+		mapper: mapper.NewQuestionnaireMapper(),
 	}
 }
 
@@ -63,22 +58,13 @@ func (q *Queryer) GetQuestionnaireByCode(
 		return nil, err
 	}
 
-	// 2. 从 MySQL 获取问卷
-	qBOFromMySQL, err := q.qRepoMySQL.FindByCode(ctx, code)
+	// 2. 从 MongoDB 获取问卷
+	qBo, err := q.qRepo.FindByCode(ctx, code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
 	}
 
-	// 3. 从 MongoDB 获取问题列表
-	qBOFromMongo, err := q.qRepoMongo.FindByCode(ctx, code)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问题列表失败")
-	}
-
-	// 4. 合并问卷数据
-	qBo := q.mergeQuestionnaireData(qBOFromMySQL, qBOFromMongo)
-
-	// 5. 转换为 DTO 并返回
+	// 3. 转换为 DTO 并返回
 	return q.mapper.ToDTO(qBo), nil
 }
 
@@ -94,13 +80,13 @@ func (q *Queryer) ListQuestionnaires(
 	}
 
 	// 2. 获取问卷列表
-	questionnaires, err := q.qRepoMySQL.FindList(ctx, page, pageSize, conditions)
+	questionnaires, err := q.qRepo.FindList(ctx, page, pageSize, conditions)
 	if err != nil {
 		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷列表失败")
 	}
 
 	// 3. 获取总数
-	total, err := q.qRepoMySQL.CountWithConditions(ctx, conditions)
+	total, err := q.qRepo.CountWithConditions(ctx, conditions)
 	if err != nil {
 		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
@@ -112,31 +98,4 @@ func (q *Queryer) ListQuestionnaires(
 	}
 
 	return dtos, total, nil
-}
-
-// mergeQuestionnaireData 合并问卷数据
-func (q *Queryer) mergeQuestionnaireData(
-	mysqlData *questionnaire.Questionnaire,
-	mongoData *questionnaire.Questionnaire,
-) *questionnaire.Questionnaire {
-	// 构建选项列表
-	opts := []questionnaire.QuestionnaireOption{
-		questionnaire.WithID(mysqlData.GetID()),
-		questionnaire.WithDescription(mysqlData.GetDescription()),
-		questionnaire.WithImgUrl(mysqlData.GetImgUrl()),
-		questionnaire.WithVersion(mysqlData.GetVersion()),
-		questionnaire.WithStatus(mysqlData.GetStatus()),
-	}
-
-	// 如果 MongoDB 中有问卷数据且有问题列表，则添加问题
-	if mongoData != nil && mongoData.GetQuestions() != nil {
-		opts = append(opts, questionnaire.WithQuestions(mongoData.GetQuestions()))
-	}
-
-	// 创建问卷对象
-	return questionnaire.NewQuestionnaire(
-		meta.NewCode(mysqlData.GetCode().Value()),
-		mysqlData.GetTitle(),
-		opts...,
-	)
 }

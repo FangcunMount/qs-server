@@ -14,20 +14,17 @@ import (
 
 // Editor 问卷编辑器
 type Editor struct {
-	qRepoMySQL port.QuestionnaireRepositoryMySQL
-	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     mapper.QuestionnaireMapper
+	qRepo  port.QuestionnaireRepositoryMongo
+	mapper mapper.QuestionnaireMapper
 }
 
 // NewEditor 创建问卷编辑器
 func NewEditor(
-	qRepoMySQL port.QuestionnaireRepositoryMySQL,
-	qRepoMongo port.QuestionnaireRepositoryMongo,
+	qRepo port.QuestionnaireRepositoryMongo,
 ) *Editor {
 	return &Editor{
-		qRepoMySQL: qRepoMySQL,
-		qRepoMongo: qRepoMongo,
-		mapper:     mapper.NewQuestionnaireMapper(),
+		qRepo:  qRepo,
+		mapper: mapper.NewQuestionnaireMapper(),
 	}
 }
 
@@ -56,7 +53,7 @@ func (e *Editor) EditBasicInfo(
 	}
 
 	// 2. 获取现有问卷
-	qBo, err := e.qRepoMySQL.FindByCode(ctx, questionnaireDTO.Code)
+	qBo, err := e.qRepo.FindByCode(ctx, questionnaireDTO.Code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
 	}
@@ -72,17 +69,12 @@ func (e *Editor) EditBasicInfo(
 	baseInfoService.UpdateDescription(qBo, questionnaireDTO.Description)
 	baseInfoService.UpdateCoverImage(qBo, questionnaireDTO.ImgUrl)
 
-	// 5. 保存到数据库
-	if err := e.qRepoMySQL.Update(ctx, qBo); err != nil {
+	// 5. 保存到 MongoDB
+	if err := e.qRepo.Update(ctx, qBo); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷基本信息失败")
 	}
 
-	// 6. 同步到文档数据库
-	if err := e.qRepoMongo.Update(ctx, qBo); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "同步问卷基本信息失败")
-	}
-
-	// 7. 转换为 DTO 并返回
+	// 6. 转换为 DTO 并返回
 	return e.mapper.ToDTO(qBo), nil
 }
 
@@ -121,7 +113,7 @@ func (e *Editor) UpdateQuestions(
 	}
 
 	// 2. 获取现有问卷
-	qBo, err := e.qRepoMySQL.FindByCode(ctx, code)
+	qBo, err := e.qRepo.FindByCode(ctx, code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
 	}
@@ -150,8 +142,8 @@ func (e *Editor) UpdateQuestions(
 		questionService.AddQuestion(qBo, q)
 	}
 
-	// 6. 保存到数据库
-	if err := e.qRepoMongo.Update(ctx, qBo); err != nil {
+	// 6. 保存到 MongoDB
+	if err := e.qRepo.Update(ctx, qBo); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷问题失败")
 	}
 

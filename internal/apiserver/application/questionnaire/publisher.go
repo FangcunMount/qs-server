@@ -13,20 +13,17 @@ import (
 
 // Publisher 问卷发布器
 type Publisher struct {
-	qRepoMySQL port.QuestionnaireRepositoryMySQL
-	qRepoMongo port.QuestionnaireRepositoryMongo
-	mapper     mapper.QuestionnaireMapper
+	qRepo  port.QuestionnaireRepositoryMongo
+	mapper mapper.QuestionnaireMapper
 }
 
 // NewPublisher 创建问卷发布器
 func NewPublisher(
-	qRepoMySQL port.QuestionnaireRepositoryMySQL,
-	qRepoMongo port.QuestionnaireRepositoryMongo,
+	qRepo port.QuestionnaireRepositoryMongo,
 ) *Publisher {
 	return &Publisher{
-		qRepoMySQL: qRepoMySQL,
-		qRepoMongo: qRepoMongo,
-		mapper:     mapper.NewQuestionnaireMapper(),
+		qRepo:  qRepo,
+		mapper: mapper.NewQuestionnaireMapper(),
 	}
 }
 
@@ -49,7 +46,7 @@ func (p *Publisher) Publish(
 	}
 
 	// 2. 获取问卷
-	qBo, err := p.qRepoMySQL.FindByCode(ctx, code)
+	qBo, err := p.qRepo.FindByCode(ctx, code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
 	}
@@ -71,17 +68,12 @@ func (p *Publisher) Publish(
 	versionService := questionnaire.VersionService{}
 	versionService.Publish(qBo)
 
-	// 6. 更新到数据库
-	if err := p.qRepoMySQL.Update(ctx, qBo); err != nil {
+	// 6. 更新到 MongoDB
+	if err := p.qRepo.Update(ctx, qBo); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
-	// 7. 同步到文档数据库
-	if err := p.qRepoMongo.Update(ctx, qBo); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "同步问卷状态失败")
-	}
-
-	// 8. 转换为 DTO 并返回
+	// 7. 转换为 DTO 并返回
 	return p.mapper.ToDTO(qBo), nil
 }
 
@@ -96,7 +88,7 @@ func (p *Publisher) Unpublish(
 	}
 
 	// 2. 获取问卷
-	qBo, err := p.qRepoMySQL.FindByCode(ctx, code)
+	qBo, err := p.qRepo.FindByCode(ctx, code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
 	}
@@ -113,16 +105,11 @@ func (p *Publisher) Unpublish(
 	versionService := questionnaire.VersionService{}
 	versionService.Unpublish(qBo)
 
-	// 5. 更新到数据库
-	if err := p.qRepoMySQL.Update(ctx, qBo); err != nil {
+	// 5. 更新到 MongoDB
+	if err := p.qRepo.Update(ctx, qBo); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
-	// 6. 同步到文档数据库
-	if err := p.qRepoMongo.Update(ctx, qBo); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "同步问卷状态失败")
-	}
-
-	// 7. 转换为 DTO 并返回
+	// 6. 转换为 DTO 并返回
 	return p.mapper.ToDTO(qBo), nil
 }

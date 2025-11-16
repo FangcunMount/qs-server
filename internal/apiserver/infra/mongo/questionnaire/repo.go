@@ -6,6 +6,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
@@ -185,4 +186,70 @@ func (r *Repository) FindActiveQuestionnaires(ctx context.Context) ([]*questionn
 	}
 
 	return questionnaires, nil
+}
+
+// FindList 根据条件查询问卷列表
+func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, error) {
+	filter := bson.M{
+		"deleted_at": bson.M{"$exists": false},
+	}
+
+	// 添加条件过滤
+	if code, ok := conditions["code"]; ok && code != "" {
+		filter["code"] = code
+	}
+	if title, ok := conditions["title"]; ok && title != "" {
+		filter["title"] = bson.M{"$regex": title, "$options": "i"} // 模糊查询，不区分大小写
+	}
+	if status, ok := conditions["status"]; ok && status != "" {
+		filter["status"] = status
+	}
+
+	// 计算分页
+	skip := int64((page - 1) * pageSize)
+	limit := int64(pageSize)
+
+	// 创建查询选项
+	opts := options.Find().SetSkip(skip).SetLimit(limit)
+
+	cursor, err := r.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var questionnaires []*questionnaire.Questionnaire
+	for cursor.Next(ctx) {
+		var po QuestionnairePO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		questionnaires = append(questionnaires, r.mapper.ToBO(&po))
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return questionnaires, nil
+}
+
+// CountWithConditions 根据条件统计问卷数量
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
+	filter := bson.M{
+		"deleted_at": bson.M{"$exists": false},
+	}
+
+	// 添加条件过滤
+	if code, ok := conditions["code"]; ok && code != "" {
+		filter["code"] = code
+	}
+	if title, ok := conditions["title"]; ok && title != "" {
+		filter["title"] = bson.M{"$regex": title, "$options": "i"}
+	}
+	if status, ok := conditions["status"]; ok && status != "" {
+		filter["status"] = status
+	}
+
+	return r.CountDocuments(ctx, filter)
 }

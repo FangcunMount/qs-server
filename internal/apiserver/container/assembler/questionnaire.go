@@ -2,13 +2,11 @@ package assembler
 
 import (
 	"go.mongodb.org/mongo-driver/mongo"
-	"gorm.io/gorm"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
 	quesDocInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	quesInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -16,8 +14,7 @@ import (
 // Module 问卷模块
 type QuestionnaireModule struct {
 	// repository 层
-	QuesRepo port.QuestionnaireRepositoryMySQL
-	QuesDoc  port.QuestionnaireRepositoryMongo
+	QuesRepo port.QuestionnaireRepositoryMongo
 
 	// handler 层
 	QuesHandler *handler.QuestionnaireHandler
@@ -36,24 +33,19 @@ func NewQuestionnaireModule() *QuestionnaireModule {
 
 // Initialize 初始化模块
 func (m *QuestionnaireModule) Initialize(params ...interface{}) error {
-	mysqlDB := params[0].(*gorm.DB)
-	mongoDB := params[1].(*mongo.Database)
-	if mysqlDB == nil || mongoDB == nil {
+	mongoDB := params[0].(*mongo.Database)
+	if mongoDB == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
 	// 初始化 repository 层
-	m.QuesRepo = quesInfra.NewRepository(mysqlDB)
-
-	// 安全的类型断言
-	mongoRepo := quesDocInfra.NewRepository(mongoDB)
-	m.QuesDoc = mongoRepo
+	m.QuesRepo = quesDocInfra.NewRepository(mongoDB)
 
 	// 初始化 service 层
-	m.QuesCreator = quesApp.NewCreator(m.QuesRepo, m.QuesDoc)
-	m.QuesEditor = quesApp.NewEditor(m.QuesRepo, m.QuesDoc)
-	m.QuesPublisher = quesApp.NewPublisher(m.QuesRepo, m.QuesDoc)
-	m.QuesQueryer = quesApp.NewQueryer(m.QuesRepo, m.QuesDoc)
+	m.QuesCreator = quesApp.NewCreator(m.QuesRepo)
+	m.QuesEditor = quesApp.NewEditor(m.QuesRepo)
+	m.QuesPublisher = quesApp.NewPublisher(m.QuesRepo)
+	m.QuesQueryer = quesApp.NewQueryer(m.QuesRepo)
 
 	// 初始化 handler 层
 	m.QuesHandler = handler.NewQuestionnaireHandler(
