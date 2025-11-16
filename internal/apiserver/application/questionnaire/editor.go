@@ -3,13 +3,13 @@ package questionnaire
 import (
 	"context"
 
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Editor 问卷编辑器

@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 

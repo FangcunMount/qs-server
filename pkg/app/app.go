@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/pkg/errors"
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/FangcunMount/qs-server/pkg/term"
 	"github.com/FangcunMount/qs-server/pkg/version"

@@ -8,8 +8,8 @@ import (
 	internalpubsub "github.com/FangcunMount/qs-server/internal/pkg/pubsub"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // MessageProcessor 消息处理器接口

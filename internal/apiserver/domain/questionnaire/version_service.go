@@ -1,8 +1,8 @@
 package questionnaire
 
 import (
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // VersionService 版本服务

@@ -1,9 +1,9 @@
 package assembler
 
 import (
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	qnMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"

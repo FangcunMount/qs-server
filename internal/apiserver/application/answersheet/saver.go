@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
@@ -11,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Saver 答卷保存器

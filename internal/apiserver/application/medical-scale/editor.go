@@ -3,6 +3,7 @@ package medicalscale
 import (
 	"context"
 
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
@@ -12,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/interpretation"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Editor 医学量表编辑器

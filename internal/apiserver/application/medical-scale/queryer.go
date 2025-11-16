@@ -3,11 +3,11 @@ package medicalscale
 import (
 	"context"
 
+	"github.com/FangcunMount/compose-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Queryer 医学量表查询器，实现 MedicalScaleQueryer 接口
