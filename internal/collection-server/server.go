@@ -1,12 +1,12 @@
 package collection
 
 import (
+	"github.com/FangcunMount/component-base/pkg/shutdown"
+	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
-	"github.com/FangcunMount/qs-server/pkg/shutdown"
-	"github.com/FangcunMount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
 )
 
 // collectionServer 定义了 Collection 服务器的基本结构

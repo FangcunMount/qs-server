@@ -1,12 +1,12 @@
 package evaluation
 
 import (
+	"github.com/FangcunMount/component-base/pkg/shutdown"
+	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/config"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/container"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
-	"github.com/FangcunMount/qs-server/pkg/shutdown"
-	"github.com/FangcunMount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
 )
 
 // evaluationServer 定义了 Evaluation 服务器的基本结构
