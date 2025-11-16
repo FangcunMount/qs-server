@@ -10,11 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/logger"
-	"github.com/FangcunMount/qs-server/pkg/database"
-	"github.com/FangcunMount/qs-server/pkg/database/databases"
 )
 
 // DatabaseManager 数据库管理器
@@ -61,7 +60,7 @@ func (dm *DatabaseManager) Initialize() error {
 
 // initMySQL 初始化MySQL连接
 func (dm *DatabaseManager) initMySQL() error {
-	mysqlConfig := &databases.MySQLConfig{
+	mysqlConfig := &database.MySQLConfig{
 		Host:                  dm.config.MySQLOptions.Host,
 		Username:              dm.config.MySQLOptions.Username,
 		Password:              dm.config.MySQLOptions.Password,
@@ -78,13 +77,13 @@ func (dm *DatabaseManager) initMySQL() error {
 		return nil
 	}
 
-	mysqlConn := databases.NewMySQLConnection(mysqlConfig)
-	return dm.registry.Register(databases.MySQL, mysqlConfig, mysqlConn)
+	mysqlConn := database.NewMySQLConnection(mysqlConfig)
+	return dm.registry.Register(database.MySQL, mysqlConfig, mysqlConn)
 }
 
 // initRedis 初始化Redis连接
 func (dm *DatabaseManager) initRedis() error {
-	redisConfig := &databases.RedisConfig{
+	redisConfig := &database.RedisConfig{
 		Host:                  dm.config.RedisOptions.Host,
 		Port:                  dm.config.RedisOptions.Port,
 		Addrs:                 dm.config.RedisOptions.Addrs,
@@ -103,13 +102,13 @@ func (dm *DatabaseManager) initRedis() error {
 		return nil
 	}
 
-	redisConn := databases.NewRedisConnection(redisConfig)
-	return dm.registry.Register(databases.Redis, redisConfig, redisConn)
+	redisConn := database.NewRedisConnection(redisConfig)
+	return dm.registry.Register(database.Redis, redisConfig, redisConn)
 }
 
 // initMongoDB 初始化MongoDB连接
 func (dm *DatabaseManager) initMongoDB() error {
-	mongoConfig := &databases.MongoConfig{
+	mongoConfig := &database.MongoConfig{
 		URL:                      dm.config.MongoDBOptions.URL,
 		UseSSL:                   dm.config.MongoDBOptions.UseSSL,
 		SSLInsecureSkipVerify:    dm.config.MongoDBOptions.SSLInsecureSkipVerify,
@@ -123,13 +122,13 @@ func (dm *DatabaseManager) initMongoDB() error {
 		return nil
 	}
 
-	mongoConn := databases.NewMongoDBConnection(mongoConfig)
-	return dm.registry.Register(databases.MongoDB, mongoConfig, mongoConn)
+	mongoConn := database.NewMongoDBConnection(mongoConfig)
+	return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)
 }
 
 // GetMySQLDB 获取MySQL数据库连接
 func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
-	client, err := dm.registry.GetClient(databases.MySQL)
+	client, err := dm.registry.GetClient(database.MySQL)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +143,7 @@ func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
 
 // GetRedisClient 获取Redis客户端
 func (dm *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
-	client, err := dm.registry.GetClient(databases.Redis)
+	client, err := dm.registry.GetClient(database.Redis)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +158,7 @@ func (dm *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
 
 // GetMongoClient 获取MongoDB客户端
 func (dm *DatabaseManager) GetMongoClient() (*mongo.Client, error) {
-	client, err := dm.registry.GetClient(databases.MongoDB)
+	client, err := dm.registry.GetClient(database.MongoDB)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +182,7 @@ func (dm *DatabaseManager) GetMongoSession() (interface{}, error) {
 // GetMongoDB 获取 MongoDB 数据库
 func (dm *DatabaseManager) GetMongoDB() (*mongo.Database, error) {
 	// 使用默认数据库名，后续可以从配置中读取
-	client, err := dm.registry.GetClient(databases.MongoDB)
+	client, err := dm.registry.GetClient(database.MongoDB)
 	if err != nil {
 		return nil, err
 	}

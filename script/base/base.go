@@ -8,10 +8,9 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 
+	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/pkg/database"
-	"github.com/FangcunMount/qs-server/pkg/database/databases"
 )
 
 // ScriptEnv 脚本环境
@@ -72,7 +71,7 @@ func NewScriptEnv(opts *InitOptions) (*ScriptEnv, error) {
 	env.Config = config
 
 	// 4. 初始化数据库连接
-	if err := env.initDatabases(opts); err != nil {
+	if err := env.initdatabase(opts); err != nil {
 		return nil, fmt.Errorf("初始化数据库失败: %w", err)
 	}
 
@@ -147,8 +146,8 @@ func loadConfig(configFile string) (*options.Options, error) {
 	return opts, nil
 }
 
-// initDatabases 初始化数据库连接
-func (env *ScriptEnv) initDatabases(opts *InitOptions) error {
+// initdatabase 初始化数据库连接
+func (env *ScriptEnv) initdatabase(opts *InitOptions) error {
 	// 初始化 MySQL
 	if opts.EnableMySQL {
 		if err := env.initMySQL(); err != nil {
@@ -180,7 +179,7 @@ func (env *ScriptEnv) initDatabases(opts *InitOptions) error {
 
 // initMySQL 初始化 MySQL 连接
 func (env *ScriptEnv) initMySQL() error {
-	mysqlConfig := &databases.MySQLConfig{
+	mysqlConfig := &database.MySQLConfig{
 		Host:                  env.Config.MySQLOptions.Host,
 		Username:              env.Config.MySQLOptions.Username,
 		Password:              env.Config.MySQLOptions.Password,
@@ -196,8 +195,8 @@ func (env *ScriptEnv) initMySQL() error {
 		return nil
 	}
 
-	mysqlConn := databases.NewMySQLConnection(mysqlConfig)
-	if err := env.Database.Register(databases.MySQL, mysqlConfig, mysqlConn); err != nil {
+	mysqlConn := database.NewMySQLConnection(mysqlConfig)
+	if err := env.Database.Register(database.MySQL, mysqlConfig, mysqlConn); err != nil {
 		return err
 	}
 
@@ -207,7 +206,7 @@ func (env *ScriptEnv) initMySQL() error {
 
 // initRedis 初始化 Redis 连接
 func (env *ScriptEnv) initRedis() error {
-	redisConfig := &databases.RedisConfig{
+	redisConfig := &database.RedisConfig{
 		Host:                  env.Config.RedisOptions.Host,
 		Port:                  env.Config.RedisOptions.Port,
 		Addrs:                 env.Config.RedisOptions.Addrs,
@@ -226,8 +225,8 @@ func (env *ScriptEnv) initRedis() error {
 		return nil
 	}
 
-	redisConn := databases.NewRedisConnection(redisConfig)
-	if err := env.Database.Register(databases.Redis, redisConfig, redisConn); err != nil {
+	redisConn := database.NewRedisConnection(redisConfig)
+	if err := env.Database.Register(database.Redis, redisConfig, redisConn); err != nil {
 		return err
 	}
 
@@ -237,7 +236,7 @@ func (env *ScriptEnv) initRedis() error {
 
 // initMongoDB 初始化 MongoDB 连接
 func (env *ScriptEnv) initMongoDB() error {
-	mongoConfig := &databases.MongoConfig{
+	mongoConfig := &database.MongoConfig{
 		URL:                      env.Config.MongoDBOptions.URL,
 		UseSSL:                   env.Config.MongoDBOptions.UseSSL,
 		SSLInsecureSkipVerify:    env.Config.MongoDBOptions.SSLInsecureSkipVerify,
@@ -251,8 +250,8 @@ func (env *ScriptEnv) initMongoDB() error {
 		return nil
 	}
 
-	mongoConn := databases.NewMongoDBConnection(mongoConfig)
-	if err := env.Database.Register(databases.MongoDB, mongoConfig, mongoConn); err != nil {
+	mongoConn := database.NewMongoDBConnection(mongoConfig)
+	if err := env.Database.Register(database.MongoDB, mongoConfig, mongoConn); err != nil {
 		return err
 	}
 
@@ -266,7 +265,7 @@ func (env *ScriptEnv) GetMySQLDB() (*gorm.DB, error) {
 		return env.MySQL, nil
 	}
 
-	client, err := env.Database.GetClient(databases.MySQL)
+	client, err := env.Database.GetClient(database.MySQL)
 	if err != nil {
 		return nil, fmt.Errorf("获取 MySQL 客户端失败: %w", err)
 	}
@@ -299,14 +298,6 @@ func (env *ScriptEnv) PrintSummary() {
 		log.Infof("  MySQL: %s", env.Config.MySQLOptions.Host)
 		log.Infof("  Redis: %s:%d", env.Config.RedisOptions.Host, env.Config.RedisOptions.Port)
 		log.Infof("  MongoDB: %s", env.Config.MongoDBOptions.URL)
-	}
-
-	// 打印已注册的数据库类型
-	registeredDbs := env.Database.ListRegistered()
-	if len(registeredDbs) > 0 {
-		log.Infof("  已注册数据库: %v", registeredDbs)
-	} else {
-		log.Warn("  未注册任何数据库连接")
 	}
 }
 
