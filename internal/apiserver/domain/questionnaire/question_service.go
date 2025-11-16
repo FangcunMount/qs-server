@@ -1,10 +1,10 @@
 package questionnaire
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // QuestionService 问题服务

@@ -3,7 +3,7 @@ package user
 import (
 	"time"
 
-	"github.com/fangcun-mount/qs-server/pkg/auth"
+	"github.com/FangcunMount/qs-server/pkg/auth"
 )
 
 type UserBuilder struct {

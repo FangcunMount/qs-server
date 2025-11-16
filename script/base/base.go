@@ -8,10 +8,10 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/options"
-	"github.com/fangcun-mount/qs-server/pkg/database"
-	"github.com/fangcun-mount/qs-server/pkg/database/databases"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/pkg/database"
+	"github.com/FangcunMount/qs-server/pkg/database/databases"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // ScriptEnv 脚本环境

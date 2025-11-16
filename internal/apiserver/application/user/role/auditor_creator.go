@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 )
 
 // AuditorRepository 审核员仓储接口

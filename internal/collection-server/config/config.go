@@ -1,6 +1,6 @@
 package config
 
-import "github.com/fangcun-mount/qs-server/internal/collection-server/options"
+import "github.com/FangcunMount/qs-server/internal/collection-server/options"
 
 // Config 运行配置结构体
 type Config struct {

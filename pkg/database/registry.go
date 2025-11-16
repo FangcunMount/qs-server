@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	dbs "github.com/fangcun-mount/qs-server/pkg/database/databases"
+	dbs "github.com/FangcunMount/qs-server/pkg/database/databases"
 )
 
 // Registry 数据库注册器

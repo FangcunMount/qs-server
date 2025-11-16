@@ -3,9 +3,9 @@ package answersheet
 import (
 	"time"
 
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/util/idutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )

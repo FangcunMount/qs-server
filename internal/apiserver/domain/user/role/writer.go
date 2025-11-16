@@ -1,6 +1,6 @@
 package role
 
-import "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 
 type Writer struct {
 	UserID user.UserID

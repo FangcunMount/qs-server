@@ -3,7 +3,7 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // UsernameKey 定义了在 gin 上下文中表示密钥所有者的键

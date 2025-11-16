@@ -1,9 +1,9 @@
 package mapper
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 )
 
 // AnswerMapper DTO 与领域对象转换器

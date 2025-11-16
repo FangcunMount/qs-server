@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 
-	answersheetpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
-	interpretreportpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
-	medicalscalepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
-	questionnairepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	answersheetpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	interpretreportpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	medicalscalepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
+	questionnairepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 )
 
 // QuestionnaireRepository 问卷仓储接口

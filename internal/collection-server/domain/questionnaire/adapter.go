@@ -1,6 +1,6 @@
 package questionnaire
 
-import "github.com/fangcun-mount/qs-server/internal/collection-server/domain/answersheet"
+import "github.com/FangcunMount/qs-server/internal/collection-server/domain/answersheet"
 
 // QuestionnaireAdapter 问卷适配器，实现 answersheet.QuestionnaireInfo 接口
 type QuestionnaireAdapter struct {

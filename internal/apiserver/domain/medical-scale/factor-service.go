@@ -1,9 +1,9 @@
 package medicalscale
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // FactorService 因子服务

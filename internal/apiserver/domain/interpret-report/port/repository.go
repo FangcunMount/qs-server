@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
+	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
 )
 
 // InterpretReportRepositoryMongo 解读报告MongoDB仓储接口

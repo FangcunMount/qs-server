@@ -3,7 +3,7 @@ package role
 import (
 	"time"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 )
 
 // Auditor 审核员/员工（用户体系中的角色）

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/application/answersheet"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
-	userapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/user"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/auth"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/handler"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/options"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	"github.com/fangcun-mount/qs-server/pkg/pubsub"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	userapp "github.com/FangcunMount/qs-server/internal/collection-server/application/user"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/validation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/auth"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/pubsub"
 )
 
 // Container 主容器，负责管理所有组件

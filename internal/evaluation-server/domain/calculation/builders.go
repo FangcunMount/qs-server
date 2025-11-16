@@ -1,7 +1,7 @@
 package calculation
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/rules"
+	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/calculation/rules"
 )
 
 // CalculationRuleBuilder 计算规则构建器

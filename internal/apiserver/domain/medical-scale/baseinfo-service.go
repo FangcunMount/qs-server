@@ -3,8 +3,8 @@ package medicalscale
 import (
 	"strings"
 
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // BaseInfoService 用于更新医学量表的基础信息（仅限领域内部访问字段）

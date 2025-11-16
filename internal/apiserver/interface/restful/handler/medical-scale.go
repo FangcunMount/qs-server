@@ -5,13 +5,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/request"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/response"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
-	errorCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // MedicalScaleHandler 医学量表处理器

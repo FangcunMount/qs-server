@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/rules"
+	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/calculation/rules"
 )
 
 // SumStrategy 求和计算策略

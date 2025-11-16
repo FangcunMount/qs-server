@@ -96,7 +96,7 @@ func NewTesteeCreator(
 ### 创建受试者
 
 ```go
-import "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/role"
+import "github.com/FangcunMount/qs-server/internal/apiserver/application/user/role"
 
 testeeCreator := role.NewTesteeCreator(testeeRepo, userRepo)
 
@@ -148,7 +148,7 @@ canAudit, err := auditorCreator.CanAudit(ctx, user.NewUserID(456))
 
 ```go
 import (
-    roleApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/role"
+    roleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/user/role"
 )
 
 type UserService struct {

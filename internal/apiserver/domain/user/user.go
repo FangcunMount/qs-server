@@ -3,10 +3,10 @@ package user
 import (
 	"time"
 
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/auth"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
-	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/auth"
+	"github.com/FangcunMount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/pkg/util/idutil"
 )
 
 // User 用户聚合根

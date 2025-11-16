@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/rules"
-	"github.com/fangcun-mount/qs-server/internal/evaluation-server/domain/calculation/strategies"
+	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/calculation/rules"
+	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/calculation/strategies"
 )
 
 // CalculationEngine 主计算引擎

@@ -1,7 +1,7 @@
 package factor
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
 )
 
 // Factor 因子实体

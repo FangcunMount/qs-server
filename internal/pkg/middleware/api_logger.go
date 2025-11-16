@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/gin-gonic/gin"
-	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // APILoggerConfig API日志配置

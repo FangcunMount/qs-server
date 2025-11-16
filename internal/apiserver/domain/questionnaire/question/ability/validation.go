@@ -1,6 +1,6 @@
 package ability
 
-import "github.com/fangcun-mount/qs-server/internal/pkg/validation"
+import "github.com/FangcunMount/qs-server/internal/pkg/validation"
 
 // ValidationAbility 校验能力
 type ValidationAbility struct {

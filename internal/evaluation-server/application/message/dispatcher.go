@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	internalpubsub "github.com/fangcun-mount/qs-server/internal/pkg/pubsub"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	"github.com/fangcun-mount/qs-server/pkg/pubsub"
+	internalpubsub "github.com/FangcunMount/qs-server/internal/pkg/pubsub"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/pubsub"
 
-	errCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // MessageProcessor 消息处理器接口

@@ -28,7 +28,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/fangcun-mount/qs-server/pkg/log/klog"
+	"github.com/FangcunMount/qs-server/pkg/log/klog"
 )
 
 // InfoLogger represents the ability to log non-error messages, at a particular verbosity.

@@ -1,6 +1,6 @@
 package interpretationreport
 
-import "github.com/fangcun-mount/qs-server/pkg/util/idutil"
+import "github.com/FangcunMount/qs-server/pkg/util/idutil"
 
 // InterpretReportID 解读报告唯一标识
 type InterpretReportID = idutil.ID[uint64]

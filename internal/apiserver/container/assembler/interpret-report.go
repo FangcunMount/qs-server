@@ -3,9 +3,9 @@ package assembler
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
-	interpretreportapp "github.com/fangcun-mount/qs-server/internal/apiserver/application/interpret-report"
-	interpretreportport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report/port"
-	interpretreportmongo "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/interpret-report"
+	interpretreportapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpret-report"
+	interpretreportport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
+	interpretreportmongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpret-report"
 )
 
 // InterpretReportModule 解读报告模块

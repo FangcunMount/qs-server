@@ -1,8 +1,8 @@
 package interpretationreport
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 
 // InterpretReport 解读报告

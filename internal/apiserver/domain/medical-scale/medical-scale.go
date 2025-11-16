@@ -1,8 +1,8 @@
 package medicalscale
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 
 // MedicalScale 医学量表聚合根

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/validation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/validation/rules"
 )
 
 // QuestionInfo 问题信息接口（避免循环导入）

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/answersheet"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 )
 
 // Service 问卷应用服务接口

@@ -3,11 +3,11 @@ package grpc
 import (
 	"fmt"
 
-	answersheet "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
-	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
-	medicalscale "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
-	questionnaire "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	answersheet "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	medicalscale "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
+	questionnaire "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/FangcunMount/qs-server/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

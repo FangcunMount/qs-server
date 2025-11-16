@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	questionnairepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/questionnaire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	questionnairepb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/questionnaire"
 )
 
 // MockQuestionnaireClient 模拟问卷客户端

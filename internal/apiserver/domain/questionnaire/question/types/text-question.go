@@ -1,9 +1,9 @@
 package types
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
-	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // 注册文本问题

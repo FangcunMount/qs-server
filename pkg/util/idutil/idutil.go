@@ -6,8 +6,8 @@ import (
 	"github.com/sony/sonyflake"
 	hashids "github.com/speps/go-hashids"
 
-	"github.com/fangcun-mount/qs-server/pkg/util/iputil"
-	"github.com/fangcun-mount/qs-server/pkg/util/stringutil"
+	"github.com/FangcunMount/qs-server/pkg/util/iputil"
+	"github.com/FangcunMount/qs-server/pkg/util/stringutil"
 )
 
 // 62进制字母表

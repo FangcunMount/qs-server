@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 )
 
 // QuestionnaireRepositoryMySQL 问卷存储库接口（出站端口）

@@ -1,7 +1,7 @@
 package values
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
 )
 
 // 注册选项值工厂

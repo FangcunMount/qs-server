@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/fangcun-mount/qs-server/pkg/log"
+import "github.com/FangcunMount/qs-server/pkg/log"
 
 func main() {
 	log.Infof("this is a test log, message: %s", "good")

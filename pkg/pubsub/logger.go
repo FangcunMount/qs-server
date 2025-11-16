@@ -1,8 +1,8 @@
 package pubsub
 
 import (
+	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // watermillLogger Watermill 日志适配器

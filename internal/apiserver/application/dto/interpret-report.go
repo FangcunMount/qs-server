@@ -1,6 +1,6 @@
 package dto
 
-import "github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 
 // InterpretReportDTO 解读报告DTO
 type InterpretReportDTO struct {

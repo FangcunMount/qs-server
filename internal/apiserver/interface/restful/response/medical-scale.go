@@ -1,9 +1,9 @@
 package response
 
 import (
-	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // MedicalScaleResponse 医学量表响应

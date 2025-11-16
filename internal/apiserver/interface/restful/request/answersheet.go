@@ -1,6 +1,6 @@
 package request
 
-import "github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
+import "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 
 // SaveAnswerSheetRequest 保存答卷请求
 type SaveAnswerSheetRequest struct {

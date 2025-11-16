@@ -3,9 +3,9 @@ package validation
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation/concurrent"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/application/validation/sequential"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/validation/concurrent"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/validation/sequential"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 )
 
 // Service 验证服务统一接口

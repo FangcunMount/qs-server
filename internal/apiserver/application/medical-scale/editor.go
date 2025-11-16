@@ -3,16 +3,16 @@ package medicalscale
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
-	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
-	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
-	errorCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/internal/pkg/interpretation"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
+	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
+	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/interpretation"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Editor 医学量表编辑器

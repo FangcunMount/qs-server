@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	interpret_report "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	interpret_report "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // InterpretReportClient 解读报告客户端

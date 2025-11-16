@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/fangcun-mount/qs-server/internal/evaluation-server/container"
-	"github.com/fangcun-mount/qs-server/pkg/core"
+	"github.com/FangcunMount/qs-server/internal/evaluation-server/container"
+	"github.com/FangcunMount/qs-server/pkg/core"
 )
 
 // Router 路由器

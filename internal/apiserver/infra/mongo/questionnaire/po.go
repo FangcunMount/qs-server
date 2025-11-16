@@ -6,7 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
 
 // QuestionnairePO 问卷MongoDB持久化对象

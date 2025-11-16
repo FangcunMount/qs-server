@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/FangcunMount/qs-server/pkg/util/homedir"
 	"github.com/gosuri/uitable"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/fangcun-mount/qs-server/pkg/util/homedir"
 )
 
 // configFlagName 配置标志名称

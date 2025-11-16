@@ -5,7 +5,7 @@
 package main
 
 import (
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 func main() {

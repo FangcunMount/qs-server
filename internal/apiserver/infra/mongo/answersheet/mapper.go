@@ -1,12 +1,12 @@
 package answersheet
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 
 // AnswerSheetMapper 答卷映射器

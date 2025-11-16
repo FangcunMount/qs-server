@@ -3,11 +3,11 @@ package medicalscale
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
-	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
-	"github.com/fangcun-mount/qs-server/pkg/util/codeutil"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
+	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
+	"github.com/FangcunMount/qs-server/pkg/util/codeutil"
 )
 
 // Creator 医学量表创建器

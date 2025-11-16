@@ -3,7 +3,7 @@ package questionnaire
 import (
 	"time"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/questionnaire"
 )
 
 // GetQuestionnaireRequest 获取问卷请求

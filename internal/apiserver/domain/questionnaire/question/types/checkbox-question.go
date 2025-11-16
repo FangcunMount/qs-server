@@ -1,10 +1,10 @@
 package types
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
-	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
-	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // CheckboxQuestion 多选问题

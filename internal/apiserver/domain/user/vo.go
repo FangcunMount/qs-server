@@ -1,6 +1,6 @@
 package user
 
-import "github.com/fangcun-mount/qs-server/pkg/util/idutil"
+import "github.com/FangcunMount/qs-server/pkg/util/idutil"
 
 // UserID 用户唯一标识
 type UserID = idutil.ID[uint64]

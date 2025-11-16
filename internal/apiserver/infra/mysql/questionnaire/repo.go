@@ -5,9 +5,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql"
 )
 
 // Repository 存储库实现

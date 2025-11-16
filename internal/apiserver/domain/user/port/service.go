@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 )
 
 // UserCreator 用户创建接口

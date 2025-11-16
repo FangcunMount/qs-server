@@ -1,9 +1,9 @@
 package response
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/mapper"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/mapper"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // QuestionnaireResponse 问卷响应

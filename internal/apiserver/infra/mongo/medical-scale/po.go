@@ -6,8 +6,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/pkg/util/idutil"
 )
 
 // MedicalScalePO 医学量表MongoDB持久化对象

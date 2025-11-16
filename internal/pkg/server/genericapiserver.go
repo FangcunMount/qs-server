@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/qs-server/pkg/core"
+	"github.com/FangcunMount/qs-server/pkg/version"
 	"github.com/gin-gonic/gin"
-	"github.com/fangcun-mount/qs-server/pkg/core"
-	"github.com/fangcun-mount/qs-server/pkg/version"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // GenericAPIServer 定义通用 API 服务器

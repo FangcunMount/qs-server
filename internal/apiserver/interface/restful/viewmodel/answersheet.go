@@ -1,8 +1,8 @@
 package viewmodel
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 
 // SaveAnswerSheetRequest 保存答卷请求视图模型

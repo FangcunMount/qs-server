@@ -8,12 +8,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/fangcun-mount/qs-server/pkg/errors"
-	cliflag "github.com/fangcun-mount/qs-server/pkg/flag"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	"github.com/fangcun-mount/qs-server/pkg/term"
-	"github.com/fangcun-mount/qs-server/pkg/version"
-	"github.com/fangcun-mount/qs-server/pkg/version/verflag"
+	"github.com/FangcunMount/qs-server/pkg/errors"
+	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/term"
+	"github.com/FangcunMount/qs-server/pkg/version"
+	"github.com/FangcunMount/qs-server/pkg/version/verflag"
 )
 
 var (

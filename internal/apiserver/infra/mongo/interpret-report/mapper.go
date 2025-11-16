@@ -3,11 +3,11 @@ package interpretreport
 import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user/role"
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 
 // Mapper 解读报告映射器

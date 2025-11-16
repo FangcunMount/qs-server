@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/config"
+	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/spf13/viper"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/options"
 )
 
 func main() {
 	// 设置配置文件
 	viper.SetConfigFile("configs/apiserver.yaml")
 	viper.SetConfigType("yaml")
-	
+
 	// 读取配置文件
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file: %v", err)
@@ -45,7 +45,7 @@ func main() {
 
 	// 测试 ApplyTo 方法
 	fmt.Printf("\nTesting ApplyTo method:\n")
-	
+
 	// 创建服务器配置
 	serverConfig := &struct {
 		InsecureServing *struct {
@@ -55,7 +55,7 @@ func main() {
 			Address string
 		}
 	}{}
-	
+
 	// 模拟 ApplyTo 方法
 	if cfg.InsecureServing != nil {
 		serverConfig.InsecureServing = &struct {
@@ -64,7 +64,7 @@ func main() {
 			Address: fmt.Sprintf("%s:%d", cfg.InsecureServing.BindAddress, cfg.InsecureServing.BindPort),
 		}
 	}
-	
+
 	if cfg.SecureServing != nil {
 		serverConfig.SecureServing = &struct {
 			Address string
@@ -72,7 +72,7 @@ func main() {
 			Address: fmt.Sprintf("%s:%d", cfg.SecureServing.BindAddress, cfg.SecureServing.BindPort),
 		}
 	}
-	
+
 	fmt.Printf("  InsecureServing.Address: %s\n", serverConfig.InsecureServing.Address)
 	fmt.Printf("  SecureServing.Address: %s\n", serverConfig.SecureServing.Address)
 }

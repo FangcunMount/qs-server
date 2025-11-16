@@ -46,7 +46,7 @@ syntax = "proto3";
 
 package user;
 
-option go_package = "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/user";
+option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/user";
 
 service UserService {
   // ========== 用户服务 ==========

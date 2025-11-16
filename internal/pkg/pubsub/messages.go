@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/fangcun-mount/qs-server/pkg/pubsub"
+	"github.com/FangcunMount/qs-server/pkg/pubsub"
 )
 
 // 消息类型常量

@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/container/assembler"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 )
 
 // modulePool 模块池

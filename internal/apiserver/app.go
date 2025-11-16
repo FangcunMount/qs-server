@@ -1,10 +1,10 @@
 package apiserver
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/options"
-	"github.com/fangcun-mount/qs-server/pkg/app"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/apiserver/config"
+	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/pkg/app"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // commandDesc 命令描述

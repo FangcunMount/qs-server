@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/container"
-	pkgmiddleware "github.com/fangcun-mount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/collection-server/container"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 

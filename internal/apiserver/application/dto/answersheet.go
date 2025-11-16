@@ -1,6 +1,6 @@
 package dto
 
-import v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+import v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 
 // AnswerSheetDTO 表示答卷数据传输对象
 // 用于应用层和领域层之间的数据传输

@@ -1,6 +1,6 @@
 package ability
 
-import "github.com/fangcun-mount/qs-server/internal/pkg/calculation"
+import "github.com/FangcunMount/qs-server/internal/pkg/calculation"
 
 // CalculationAbility 计算能力
 type CalculationAbility struct {

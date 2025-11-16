@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/redis/go-redis/v9"
-	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // watermillPublisher Watermill 发布者实现

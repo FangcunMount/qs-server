@@ -1,10 +1,10 @@
 package apiserver
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/service"
-	"github.com/fangcun-mount/qs-server/internal/pkg/grpcserver"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/service"
+	"github.com/FangcunMount/qs-server/internal/pkg/grpcserver"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // GRPCRegistry GRPC 服务注册器

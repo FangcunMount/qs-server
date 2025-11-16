@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/user"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 )
 
 func TestNewAuditor(t *testing.T) {
@@ -68,10 +68,10 @@ func TestAuditorWithStatus(t *testing.T) {
 	auditor := NewAuditor(user.NewUserID(1001), "张三", "EMP001")
 
 	tests := []struct {
-		name      string
-		status    Status
-		isActive  bool
-		canAudit  bool
+		name     string
+		status   Status
+		isActive bool
+		canAudit bool
 	}{
 		{"在职状态", StatusOnDuty, true, true},
 		{"休假状态", StatusOnLeave, false, true},

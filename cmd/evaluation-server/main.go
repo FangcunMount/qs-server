@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	evaluation "github.com/fangcun-mount/qs-server/internal/evaluation-server"
+	evaluation "github.com/FangcunMount/qs-server/internal/evaluation-server"
 )
 
 func main() {

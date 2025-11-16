@@ -3,7 +3,7 @@ package concurrent
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 )
 
 // ValidatorAdapter 并发验证器适配器

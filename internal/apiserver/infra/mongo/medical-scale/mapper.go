@@ -1,13 +1,13 @@
 package medicalscale
 
 import (
-	medicalscale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
-	"github.com/fangcun-mount/qs-server/internal/pkg/interpretation"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	medicalscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor/ability"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/interpretation"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

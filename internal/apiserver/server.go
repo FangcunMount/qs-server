@@ -1,13 +1,13 @@
 package apiserver
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/config"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
-	"github.com/fangcun-mount/qs-server/internal/pkg/grpcserver"
-	genericapiserver "github.com/fangcun-mount/qs-server/internal/pkg/server"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	"github.com/fangcun-mount/qs-server/pkg/shutdown"
-	"github.com/fangcun-mount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
+	"github.com/FangcunMount/qs-server/internal/apiserver/config"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	"github.com/FangcunMount/qs-server/internal/pkg/grpcserver"
+	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/shutdown"
+	"github.com/FangcunMount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
 )
 
 // apiServer 定义了 API 服务器的基本结构（六边形架构版本）

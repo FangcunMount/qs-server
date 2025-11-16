@@ -3,12 +3,12 @@ package assembler
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
-	msApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/port"
-	msInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	msApp "github.com/FangcunMount/qs-server/internal/apiserver/application/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
+	msInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // MedicalScaleModule 医学量表模块

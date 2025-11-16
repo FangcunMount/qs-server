@@ -4,13 +4,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	quesApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	quesDocInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	quesInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mysql/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	quesDocInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	quesInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Module 问卷模块

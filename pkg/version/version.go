@@ -6,7 +6,7 @@ import (
 
 	"github.com/gosuri/uitable"
 
-	"github.com/fangcun-mount/qs-server/pkg/json"
+	"github.com/FangcunMount/qs-server/pkg/json"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/container"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/gin-gonic/gin"
 )
 

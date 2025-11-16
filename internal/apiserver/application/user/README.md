@@ -174,9 +174,9 @@ loginResp, err := authenticator.LoginWithMiniProgram(ctx, loginRequest)
 ```go
 // interface/grpc/service/user.go
 import (
-    userApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user"
-    roleApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/role"
-    wechatApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/user/wechat"
+    userApp "github.com/FangcunMount/qs-server/internal/apiserver/application/user"
+    roleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/user/role"
+    wechatApp "github.com/FangcunMount/qs-server/internal/apiserver/application/user/wechat"
 )
 
 type UserService struct {

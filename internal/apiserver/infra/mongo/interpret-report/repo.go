@@ -10,11 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	interpretreport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report"
-	interpretport "github.com/fangcun-mount/qs-server/internal/apiserver/domain/interpret-report/port"
-	base "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	v1 "github.com/fangcun-mount/qs-server/pkg/meta/v1"
+	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
+	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 
 // Repository 解读报告MongoDB仓储

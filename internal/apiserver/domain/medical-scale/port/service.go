@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 )
 
 // MedicalScaleCreator 医学量表创建接口

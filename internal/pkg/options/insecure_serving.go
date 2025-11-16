@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/server"
 	"github.com/spf13/pflag"
-	"github.com/fangcun-mount/qs-server/internal/pkg/server"
 )
 
 // InsecureServingOptions 不安全的服务器配置选项

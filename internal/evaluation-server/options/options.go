@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
+	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/pubsub"
 	"github.com/spf13/pflag"
-	genericoptions "github.com/fangcun-mount/qs-server/internal/pkg/options"
-	cliflag "github.com/fangcun-mount/qs-server/pkg/flag"
-	"github.com/fangcun-mount/qs-server/pkg/log"
-	"github.com/fangcun-mount/qs-server/pkg/pubsub"
 )
 
 // Options 包含所有配置项

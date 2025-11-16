@@ -9,10 +9,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
-	answersheetpb "github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/options"
-	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	answersheetpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // AnswersheetClient 答卷客户端接口

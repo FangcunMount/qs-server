@@ -1,8 +1,8 @@
 package mapper
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // QuestionMapper 问题映射器

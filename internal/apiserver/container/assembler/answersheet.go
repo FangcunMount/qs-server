@@ -1,16 +1,16 @@
 package assembler
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	qnMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	qnMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 
-	asApp "github.com/fangcun-mount/qs-server/internal/apiserver/application/answersheet"
-	asMongoInfra "github.com/fangcun-mount/qs-server/internal/apiserver/infra/mongo/answersheet"
-	asHandler "github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/handler"
+	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/answersheet"
+	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
+	asHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 )
 
 // AnswersheetModule 答卷模块

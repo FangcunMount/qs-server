@@ -3,8 +3,8 @@ package questionnaire
 import (
 	"strconv"
 
-	"github.com/fangcun-mount/qs-server/pkg/util/codeutil"
-	"github.com/fangcun-mount/qs-server/pkg/util/idutil"
+	"github.com/FangcunMount/qs-server/pkg/util/codeutil"
+	"github.com/FangcunMount/qs-server/pkg/util/idutil"
 )
 
 // QuestionnaireID 问卷唯一标识

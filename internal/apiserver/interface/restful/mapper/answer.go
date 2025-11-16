@@ -1,9 +1,9 @@
 package mapper
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // AnswerMapper 答案映射

@@ -4,8 +4,8 @@ import (
 	goflag "flag"
 	"strings"
 
+	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/spf13/pflag"
-	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // InitFlags 初始化

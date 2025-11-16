@@ -1,11 +1,11 @@
 package mapper
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	medicalScale "github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
-	"github.com/fangcun-mount/qs-server/internal/pkg/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
+	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/interpretation"
 )
 
 // MedicalScaleMapper 医学量表映射器

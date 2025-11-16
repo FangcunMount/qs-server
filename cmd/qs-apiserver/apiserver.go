@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver"
+	"github.com/FangcunMount/qs-server/internal/apiserver"
 )
 
 func main() {

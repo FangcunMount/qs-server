@@ -1476,7 +1476,7 @@ const file_user_user_proto_rawDesc = "" +
 	"\fTesteeExists\x12\x19.user.TesteeExistsRequest\x1a\x1a.user.TesteeExistsResponse\x12?\n" +
 	"\fCreateWriter\x12\x19.user.CreateWriterRequest\x1a\x14.user.WriterResponse\x12?\n" +
 	"\fUpdateWriter\x12\x19.user.UpdateWriterRequest\x1a\x14.user.WriterResponse\x129\n" +
-	"\tGetWriter\x12\x16.user.GetWriterRequest\x1a\x14.user.WriterResponseBQZOgithub.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/userb\x06proto3"
+	"\tGetWriter\x12\x16.user.GetWriterRequest\x1a\x14.user.WriterResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/userb\x06proto3"
 
 var (
 	file_user_user_proto_rawDescOnce sync.Once

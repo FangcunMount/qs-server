@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/internal/pkg/middleware"
-	"github.com/fangcun-mount/qs-server/internal/pkg/middleware/auth"
-	"github.com/fangcun-mount/qs-server/pkg/core"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware/auth"
+	"github.com/FangcunMount/qs-server/pkg/core"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // BasicStrategy 基础策略认证器

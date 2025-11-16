@@ -1,6 +1,6 @@
 package apiserver
 
-import "github.com/fangcun-mount/qs-server/internal/apiserver/config"
+import "github.com/FangcunMount/qs-server/internal/apiserver/config"
 
 // Run 运行指定的 APIServer。此函数不应退出。
 func Run(cfg *config.Config) error {

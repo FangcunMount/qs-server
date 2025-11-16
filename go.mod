@@ -1,4 +1,4 @@
-module github.com/fangcun-mount/qs-server
+module github.com/FangcunMount/qs-server
 
 go 1.24.0
 

@@ -3,11 +3,11 @@ package mapper
 import (
 	"errors"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/fangcun-mount/qs-server/internal/pkg/calculation"
-	"github.com/fangcun-mount/qs-server/internal/pkg/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // QuestionnaireMapper DTO 与领域对象转换器

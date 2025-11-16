@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 )
 
 // SectionQuestion 段落问题

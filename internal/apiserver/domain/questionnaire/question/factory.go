@@ -1,7 +1,7 @@
 package question
 
 import (
-	"github.com/fangcun-mount/qs-server/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // 注册函数签名

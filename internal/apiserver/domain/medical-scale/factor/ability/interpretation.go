@@ -1,6 +1,6 @@
 package ability
 
-import "github.com/fangcun-mount/qs-server/internal/pkg/interpretation"
+import "github.com/FangcunMount/qs-server/internal/pkg/interpretation"
 
 type InterpretationAbility struct {
 	interpretationRules []interpretation.InterpretRule

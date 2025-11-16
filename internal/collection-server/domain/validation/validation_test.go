@@ -3,8 +3,8 @@ package validation
 import (
 	"testing"
 
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/rules"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/domain/validation/strategies"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/validation/rules"
+	"github.com/FangcunMount/qs-server/internal/collection-server/domain/validation/strategies"
 )
 
 func TestValidator_Validate(t *testing.T) {

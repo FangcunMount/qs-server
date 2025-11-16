@@ -1,8 +1,8 @@
 package mapper
 
 import (
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // AnswerSheetMapper ViewModel 和 DTO 转换器

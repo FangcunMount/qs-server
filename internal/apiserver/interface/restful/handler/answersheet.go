@@ -3,12 +3,12 @@ package handler
 import (
 	"strconv"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/mapper"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 	"github.com/gin-gonic/gin"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/port"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/mapper"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/restful/viewmodel"
-	"github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
 )
 
 // AnswerSheetHandler 答卷处理器

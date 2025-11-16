@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
+	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/mapper"
+	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/request"
+	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/response"
+	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/gin-gonic/gin"
-	answersheetapp "github.com/fangcun-mount/qs-server/internal/collection-server/application/answersheet"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/infrastructure/grpc"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/mapper"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/request"
-	"github.com/fangcun-mount/qs-server/internal/collection-server/interface/restful/response"
-	"github.com/fangcun-mount/qs-server/pkg/log"
 )
 
 // AnswersheetHandler 答卷处理器接口

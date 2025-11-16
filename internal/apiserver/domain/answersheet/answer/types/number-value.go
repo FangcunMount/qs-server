@@ -3,7 +3,7 @@ package values
 import (
 	"strconv"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/answersheet/answer"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
 )
 
 // NumberValue 数值

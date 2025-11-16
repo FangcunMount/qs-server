@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 )
 
 func TestAnswerSheetClient_SaveAnswerSheetScores(t *testing.T) {

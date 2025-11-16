@@ -3,12 +3,12 @@ package questionnaire
 import (
 	"context"
 
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/dto"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/application/mapper"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire"
-	"github.com/fangcun-mount/qs-server/internal/apiserver/domain/questionnaire/port"
-	errorCode "github.com/fangcun-mount/qs-server/internal/pkg/code"
-	"github.com/fangcun-mount/qs-server/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/errors"
 )
 
 // Publisher 问卷发布器
