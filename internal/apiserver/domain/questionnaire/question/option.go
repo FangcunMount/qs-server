@@ -1,29 +1,16 @@
 package question
 
-import "github.com/FangcunMount/component-base/pkg/util/codeutil"
-
-// OptionCode 选项编码
-type OptionCode = codeutil.Code
-
-// NewOptionCode 创建选项编码
-func NewOptionCode(value string) OptionCode {
-	return codeutil.NewCode(value)
-}
-
-// GenerateOptionCode 生成新的选项编码
-func GenerateOptionCode() (OptionCode, error) {
-	return codeutil.GenerateNewCode()
-}
+import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 
 // Option 选项
 type Option struct {
-	code    OptionCode
+	code    meta.Code
 	content string
 	score   int
 }
 
 // NewOption 创建选项
-func NewOption(code OptionCode, content string, score int) Option {
+func NewOption(code meta.Code, content string, score int) Option {
 	return Option{
 		code:    code,
 		content: content,
@@ -34,14 +21,14 @@ func NewOption(code OptionCode, content string, score int) Option {
 // NewOptionWithStringCode 使用字符串编码创建选项
 func NewOptionWithStringCode(code string, content string, score int) Option {
 	return Option{
-		code:    NewOptionCode(code),
+		code:    meta.NewCode(code),
 		content: content,
 		score:   score,
 	}
 }
 
 // GetCode 获取选项编码
-func (o *Option) GetCode() OptionCode {
+func (o *Option) GetCode() meta.Code {
 	return o.code
 }
 

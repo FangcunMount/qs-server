@@ -2,12 +2,13 @@ package questionnaire
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Questionnaire 问卷
 type Questionnaire struct {
-	id          QuestionnaireID
-	code        QuestionnaireCode
+	id          meta.ID
+	code        meta.Code
 	title       string
 	description string
 	imgUrl      string
@@ -19,7 +20,7 @@ type Questionnaire struct {
 type QuestionnaireOption func(*Questionnaire)
 
 // NewQuestionnaire 创建问卷
-func NewQuestionnaire(code QuestionnaireCode, title string, opts ...QuestionnaireOption) *Questionnaire {
+func NewQuestionnaire(code meta.Code, title string, opts ...QuestionnaireOption) *Questionnaire {
 	q := &Questionnaire{code: code, title: title}
 	for _, opt := range opts {
 		opt(q)
@@ -28,7 +29,7 @@ func NewQuestionnaire(code QuestionnaireCode, title string, opts ...Questionnair
 }
 
 // WithID 设置问卷ID
-func WithID(id QuestionnaireID) QuestionnaireOption {
+func WithID(id meta.ID) QuestionnaireOption {
 	return func(q *Questionnaire) {
 		q.id = id
 	}
@@ -77,17 +78,17 @@ func WithQuestions(questions []question.Question) QuestionnaireOption {
 }
 
 // SetID 设置问卷ID
-func (q *Questionnaire) SetID(id QuestionnaireID) {
+func (q *Questionnaire) SetID(id meta.ID) {
 	q.id = id
 }
 
 // GetID 获取问卷ID
-func (q *Questionnaire) GetID() QuestionnaireID {
+func (q *Questionnaire) GetID() meta.ID {
 	return q.id
 }
 
 // GetCode 获取问卷编码
-func (q *Questionnaire) GetCode() QuestionnaireCode {
+func (q *Questionnaire) GetCode() meta.Code {
 	return q.code
 }
 

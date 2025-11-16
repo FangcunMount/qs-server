@@ -1,8 +1,10 @@
 package viewmodel
 
+import "github.com/FangcunMount/qs-server/internal/pkg/meta"
+
 // MedicalScaleVM 医学量表视图模型
 type MedicalScaleVM struct {
-	ID                   uint64     `json:"id"`
+	ID                   meta.ID    `json:"id"`
 	Code                 string     `json:"code"`
 	Title                string     `json:"title"`
 	Description          string     `json:"description"`

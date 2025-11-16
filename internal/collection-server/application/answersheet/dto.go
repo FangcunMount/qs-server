@@ -2,6 +2,8 @@ package answersheet
 
 import (
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // SubmitRequest 提交答卷请求
@@ -14,7 +16,7 @@ type SubmitRequest struct {
 
 // SubmitResponse 提交答卷响应
 type SubmitResponse struct {
-	ID        string    `json:"id"`
+	ID        meta.ID   `json:"id"`
 	Status    string    `json:"status"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
@@ -46,12 +48,12 @@ type Answer struct {
 
 // GetAnswersheetRequest 获取答卷请求
 type GetAnswersheetRequest struct {
-	ID string `json:"id" validate:"required"`
+	ID meta.ID `json:"id" validate:"required"`
 }
 
 // GetAnswersheetResponse 获取答卷响应
 type GetAnswersheetResponse struct {
-	ID                string      `json:"id"`
+	ID                meta.ID     `json:"id"`
 	QuestionnaireCode string      `json:"questionnaire_code"`
 	Title             string      `json:"title"`
 	TesteeInfo        *TesteeInfo `json:"testee_info"`

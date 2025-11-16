@@ -1,19 +1,23 @@
 package response
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // UserResponse 用户响应
 type UserResponse struct {
-	ID           uint64 `json:"id"`
-	Username     string `json:"username"`
-	Nickname     string `json:"nickname"`
-	Phone        string `json:"phone"`
-	Avatar       string `json:"avatar"`
-	Introduction string `json:"introduction"`
-	Email        string `json:"email"`
-	Status       string `json:"status"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	ID           meta.ID `json:"id"`
+	Username     string  `json:"username"`
+	Nickname     string  `json:"nickname"`
+	Phone        string  `json:"phone"`
+	Avatar       string  `json:"avatar"`
+	Introduction string  `json:"introduction"`
+	Email        string  `json:"email"`
+	Status       string  `json:"status"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
 }
 
 // UserListResponse 用户列表响应

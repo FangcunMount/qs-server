@@ -11,7 +11,7 @@ import (
 	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Repository 医学量表MongoDB存储库
@@ -45,14 +45,14 @@ func (r *Repository) Create(ctx context.Context, scale *medicalScale.MedicalScal
 	}
 
 	// 将生成的 ID 设置回领域对象
-	scale.SetID(v1.NewID(po.DomainID))
+	scale.SetID(meta.ID(po.DomainID))
 
 	return nil
 }
 
 // FindByID 根据ID查找医学量表
-func (r *Repository) FindByID(ctx context.Context, id v1.ID) (*medicalScale.MedicalScale, error) {
-	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
+func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*medicalScale.MedicalScale, error) {
+	objectID, err := mongoBase.Uint64ToObjectID(id.Uint64())
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +157,8 @@ func (r *Repository) Update(ctx context.Context, scale *medicalScale.MedicalScal
 }
 
 // Delete 删除医学量表（软删除）
-func (r *Repository) Delete(ctx context.Context, id v1.ID) error {
-	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
+func (r *Repository) Delete(ctx context.Context, id meta.ID) error {
+	objectID, err := mongoBase.Uint64ToObjectID(id.Uint64())
 	if err != nil {
 		return err
 	}
@@ -199,8 +199,8 @@ func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error
 }
 
 // HardDelete 硬删除医学量表
-func (r *Repository) HardDelete(ctx context.Context, id v1.ID) error {
-	objectID, err := mongoBase.Uint64ToObjectID(id.Value())
+func (r *Repository) HardDelete(ctx context.Context, id meta.ID) error {
+	objectID, err := mongoBase.Uint64ToObjectID(id.Uint64())
 	if err != nil {
 		return err
 	}

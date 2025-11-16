@@ -98,7 +98,7 @@ func convertMedicalScaleToProto(medicalScale *dto.MedicalScaleDTO) *pb.MedicalSc
 	}
 
 	return &pb.MedicalScale{
-		Id:                medicalScale.ID,
+		Id:                medicalScale.ID.Uint64(),
 		Code:              medicalScale.Code,
 		QuestionnaireCode: medicalScale.QuestionnaireCode,
 		Title:             medicalScale.Title,

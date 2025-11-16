@@ -21,7 +21,7 @@ func NewMedicalScaleResponse(scale *medicalScale.MedicalScale) *MedicalScaleResp
 
 	return &MedicalScaleResponse{
 		Data: &viewmodel.MedicalScaleVM{
-			ID:                scale.GetID().Value(),
+			ID:                scale.GetID(),
 			Code:              scale.GetCode(),
 			Title:             scale.GetTitle(),
 			QuestionnaireCode: scale.GetQuestionnaireCode(),

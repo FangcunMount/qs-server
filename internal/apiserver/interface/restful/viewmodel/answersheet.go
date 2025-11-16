@@ -2,7 +2,7 @@ package viewmodel
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // SaveAnswerSheetRequest 保存答卷请求视图模型
@@ -27,7 +27,7 @@ type ListAnswerSheetsRequest struct {
 
 // AnswerSheetViewModel 答卷视图模型
 type AnswerSheetViewModel struct {
-	ID                   v1.ID       `json:"id"`
+	ID                   meta.ID     `json:"id"`
 	QuestionnaireCode    string      `json:"questionnaire_code"`
 	QuestionnaireVersion string      `json:"questionnaire_version"`
 	Title                string      `json:"title"`

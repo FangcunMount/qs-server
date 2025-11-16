@@ -3,11 +3,11 @@ package questionnaire
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/util/codeutil"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Creator 问卷创建器
@@ -32,14 +32,14 @@ func NewCreator(
 // CreateQuestionnaire 创建问卷
 func (c *Creator) CreateQuestionnaire(ctx context.Context, questionnaireDTO *dto.QuestionnaireDTO) (*dto.QuestionnaireDTO, error) {
 	// 1. 生成问卷编码
-	code, err := codeutil.GenerateCode()
+	code, err := meta.GenerateCode()
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. 创建问卷领域模型
 	qBo := questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(code),
+		meta.NewCode(code.String()),
 		questionnaireDTO.Title,
 		questionnaire.WithDescription(questionnaireDTO.Description),
 		questionnaire.WithImgUrl(questionnaireDTO.ImgUrl),

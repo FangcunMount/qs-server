@@ -1,8 +1,10 @@
 package dto
 
+import "github.com/FangcunMount/qs-server/internal/pkg/meta"
+
 // QuestionnaireDTO 问卷数据传输对象
 type QuestionnaireDTO struct {
-	ID          uint64        `json:"id"`
+	ID          meta.ID       `json:"id"`
 	Code        string        `json:"code"`
 	Title       string        `json:"title"`
 	Description string        `json:"description"`

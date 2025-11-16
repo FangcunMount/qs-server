@@ -2,6 +2,7 @@ package question
 
 import (
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -12,7 +13,7 @@ type BuilderOption func(*QuestionBuilder)
 // 职责：收集和管理问题创建所需的所有配置参数
 type QuestionBuilder struct {
 	// 基础信息
-	code         QuestionCode
+	code         meta.Code
 	title        string
 	tips         string
 	questionType QuestionType
@@ -39,7 +40,7 @@ func NewQuestionBuilder() *QuestionBuilder {
 // ================================
 
 // WithCode 设置问题编码
-func WithCode(code QuestionCode) BuilderOption {
+func WithCode(code meta.Code) BuilderOption {
 	return func(b *QuestionBuilder) {
 		b.code = code
 	}
@@ -143,7 +144,7 @@ func WithMaxValue(value int) BuilderOption {
 // 链式调用方法
 // ================================
 
-func (b *QuestionBuilder) SetCode(code QuestionCode) *QuestionBuilder {
+func (b *QuestionBuilder) SetCode(code meta.Code) *QuestionBuilder {
 	b.code = code
 	return b
 }
@@ -189,7 +190,7 @@ func (b *QuestionBuilder) SetCalculationRule(formula calculation.FormulaType) *Q
 // 配置信息访问方法（只读）
 // ================================
 
-func (b *QuestionBuilder) GetCode() QuestionCode {
+func (b *QuestionBuilder) GetCode() meta.Code {
 	return b.code
 }
 

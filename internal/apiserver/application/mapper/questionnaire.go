@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -25,7 +26,7 @@ func (m *QuestionnaireMapper) ToDTO(bo *questionnaire.Questionnaire) *dto.Questi
 	}
 
 	return &dto.QuestionnaireDTO{
-		ID:          bo.GetID().Value(),
+		ID:          bo.GetID(),
 		Code:        bo.GetCode().Value(),
 		Version:     bo.GetVersion().Value(),
 		Title:       bo.GetTitle(),
@@ -112,7 +113,7 @@ func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Qu
 	builder := question.NewQuestionBuilder()
 
 	// 设置基本属性
-	builder.SetCode(question.NewQuestionCode(dto.Code))
+	builder.SetCode(meta.NewCode(dto.Code))
 	builder.SetTitle(dto.Title)
 	builder.SetTips(dto.Tips)
 	builder.SetQuestionType(question.QuestionType(dto.Type))
@@ -154,7 +155,7 @@ func (m *QuestionnaireMapper) FromDTO(dto *dto.QuestionnaireDTO) (*questionnaire
 
 	// 构建选项列表
 	opts := []questionnaire.QuestionnaireOption{
-		questionnaire.WithID(questionnaire.NewQuestionnaireID(dto.ID)),
+		questionnaire.WithID(dto.ID),
 		questionnaire.WithDescription(dto.Description),
 		questionnaire.WithImgUrl(dto.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(dto.Version)),
@@ -187,7 +188,7 @@ func (m *QuestionnaireMapper) FromDTO(dto *dto.QuestionnaireDTO) (*questionnaire
 
 	// 创建问卷对象
 	return questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(dto.Code),
+		meta.NewCode(dto.Code),
 		dto.Title,
 		opts...,
 	), nil

@@ -14,7 +14,7 @@ import (
 	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
 	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Repository 解读报告MongoDB仓储
@@ -36,7 +36,7 @@ var _ interpretport.InterpretReportRepositoryMongo = (*Repository)(nil)
 
 // Create 创建解读报告
 func (r *Repository) Create(ctx context.Context, report *interpretreport.InterpretReport) error {
-	log.Infof("开始创建解读报告，领域对象ID: %d", report.GetID().Value())
+	log.Infof("开始创建解读报告，领域对象ID: %d", report.GetID().Uint64())
 
 	// 转换为持久化对象
 	po, err := r.mapper.ToPO(report)
@@ -62,17 +62,17 @@ func (r *Repository) Create(ctx context.Context, report *interpretreport.Interpr
 	log.Infof("MongoDB插入成功，ObjectID: %v", result.InsertedID)
 
 	// 更新领域对象的ID
-	report.SetID(v1.NewID(po.DomainID))
+	report.SetID(meta.ID(po.DomainID))
 
-	log.Infof("领域对象ID更新完成，新ID: %d", report.GetID().Value())
+	log.Infof("领域对象ID更新完成，新ID: %d", report.GetID().Uint64())
 
 	return nil
 }
 
 // FindByAnswerSheetId 根据答卷ID查找解读报告
-func (r *Repository) FindByAnswerSheetId(ctx context.Context, answerSheetId uint64) (*interpretreport.InterpretReport, error) {
+func (r *Repository) FindByAnswerSheetId(ctx context.Context, answerSheetId meta.ID) (*interpretreport.InterpretReport, error) {
 	filter := bson.M{
-		"answer_sheet_id": answerSheetId,
+		"answer_sheet_id": answerSheetId.Uint64(),
 		"deleted_at":      bson.M{"$exists": false},
 	}
 
@@ -222,7 +222,7 @@ func (r *Repository) Update(ctx context.Context, report *interpretreport.Interpr
 
 	// 构建更新条件
 	filter := bson.M{
-		"domain_id":  report.GetID().Value(),
+		"domain_id":  report.GetID().Uint64(),
 		"deleted_at": bson.M{"$exists": false},
 	}
 
@@ -240,9 +240,9 @@ func (r *Repository) Update(ctx context.Context, report *interpretreport.Interpr
 }
 
 // ExistsByAnswerSheetId 检查指定答卷ID的解读报告是否存在
-func (r *Repository) ExistsByAnswerSheetId(ctx context.Context, answerSheetId uint64) (bool, error) {
+func (r *Repository) ExistsByAnswerSheetId(ctx context.Context, answerSheetId meta.ID) (bool, error) {
 	filter := bson.M{
-		"answer_sheet_id": answerSheetId,
+		"answer_sheet_id": answerSheetId.Uint64(),
 		"deleted_at":      bson.M{"$exists": false},
 	}
 

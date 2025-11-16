@@ -1,6 +1,10 @@
 package request
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // AnswerValue 答案值
 type AnswerValue struct {
@@ -25,7 +29,7 @@ type TesteeInfo struct {
 	Age       *int                   `json:"age" binding:"omitempty,min=1,max=120"`
 	Phone     string                 `json:"phone" binding:"omitempty"`
 	Email     string                 `json:"email" binding:"omitempty,email"`
-	ID        string                 `json:"id" binding:"omitempty"`
+	ID        meta.ID                `json:"id" binding:"omitempty"`
 	ExtraInfo map[string]interface{} `json:"extra_info,omitempty"`
 }
 
@@ -40,17 +44,17 @@ type DeviceInfo struct {
 
 // AnswersheetGetRequest 获取答卷请求
 type AnswersheetGetRequest struct {
-	ID string `uri:"id" binding:"required" json:"id"`
+	ID meta.ID `uri:"id" binding:"required" json:"id"`
 }
 
 // AnswersheetListRequest 获取答卷列表请求
 type AnswersheetListRequest struct {
-	Page              int    `form:"page,default=1" json:"page"`
-	PageSize          int    `form:"page_size,default=10" json:"page_size"`
-	QuestionnaireCode string `form:"questionnaire_code" json:"questionnaire_code"`
-	TesteeID          string `form:"testee_id" json:"testee_id"`
-	DateFrom          string `form:"date_from" json:"date_from"`
-	DateTo            string `form:"date_to" json:"date_to"`
+	Page              int     `form:"page,default=1" json:"page"`
+	PageSize          int     `form:"page_size,default=10" json:"page_size"`
+	QuestionnaireCode string  `form:"questionnaire_code" json:"questionnaire_code"`
+	TesteeID          meta.ID `form:"testee_id" json:"testee_id"`
+	DateFrom          string  `form:"date_from" json:"date_from"`
+	DateTo            string  `form:"date_to" json:"date_to"`
 }
 
 // AnswersheetValidateRequest 验证答卷请求
@@ -61,12 +65,12 @@ type AnswersheetValidateRequest struct {
 
 // AnswersheetDeleteRequest 删除答卷请求
 type AnswersheetDeleteRequest struct {
-	ID string `uri:"id" binding:"required" json:"id"`
+	ID meta.ID `uri:"id" binding:"required" json:"id"`
 }
 
 // AnswersheetBatchDeleteRequest 批量删除答卷请求
 type AnswersheetBatchDeleteRequest struct {
-	IDs []string `json:"ids" binding:"required,min=1"`
+	IDs []meta.ID `json:"ids" binding:"required,min=1"`
 }
 
 // AnswersheetExportRequest 导出答卷请求

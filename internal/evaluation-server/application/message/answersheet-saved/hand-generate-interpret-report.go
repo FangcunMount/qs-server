@@ -11,6 +11,7 @@ import (
 	calculationapp "github.com/FangcunMount/qs-server/internal/evaluation-server/application/calculation"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/interpretion"
 	grpcclient "github.com/FangcunMount/qs-server/internal/evaluation-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/pubsub"
 )
 
@@ -108,7 +109,7 @@ func (h *GenerateInterpretReportHandlerConcurrent) Handle(ctx context.Context, d
 
 // loadAnswerSheet 加载答卷
 func (h *GenerateInterpretReportHandlerConcurrent) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
-	answerSheet, err := h.answersheetClient.GetAnswerSheet(ctx, answerSheetID)
+	answerSheet, err := h.answersheetClient.GetAnswerSheet(ctx, meta.ID(answerSheetID))
 	if err != nil {
 		return nil, fmt.Errorf("获取答卷失败，ID: %d, 错误: %v", answerSheetID, err)
 	}
@@ -283,7 +284,7 @@ func (h *GenerateInterpretReportHandlerConcurrent) applyFactorScoresToInterpretI
 func (h *GenerateInterpretReportHandlerConcurrent) saveInterpretReport(ctx context.Context, interpretReport *interpretreportpb.InterpretReport) error {
 	_, err := h.interpretReportClient.SaveInterpretReport(
 		ctx,
-		interpretReport.AnswerSheetId,
+		meta.ID(interpretReport.AnswerSheetId),
 		interpretReport.MedicalScaleCode,
 		interpretReport.Title,
 		interpretReport.Description,

@@ -11,6 +11,7 @@ import (
 	questionnairepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 	calculationapp "github.com/FangcunMount/qs-server/internal/evaluation-server/application/calculation"
 	grpcclient "github.com/FangcunMount/qs-server/internal/evaluation-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/pubsub"
 )
 
@@ -171,7 +172,7 @@ func (h *CalcAnswersheetScoreHandler) loadQuestionnaire(ctx context.Context, que
 
 // loadAnswersheet 加载答卷
 func (h *CalcAnswersheetScoreHandler) loadAnswersheet(ctx context.Context, answerSheetID uint64) (*answersheetpb.AnswerSheet, error) {
-	loadedAnswersheet, err := h.answersheetClient.GetAnswerSheet(ctx, answerSheetID)
+	loadedAnswersheet, err := h.answersheetClient.GetAnswerSheet(ctx, meta.ID(answerSheetID))
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +196,7 @@ func (h *CalcAnswersheetScoreHandler) calculateAnswerSheetTotalScore(answersheet
 // saveAnswerSheetScores 保存答卷得分
 func (h *CalcAnswersheetScoreHandler) saveAnswerSheetScores(ctx context.Context, answerSheetID uint64, answersheet *answersheetpb.AnswerSheet) error {
 	// 保存答卷得分
-	err := h.answersheetClient.SaveAnswerSheetScores(ctx, answerSheetID, answersheet.Score, answersheet.Answers)
+	err := h.answersheetClient.SaveAnswerSheetScores(ctx, meta.ID(answerSheetID), answersheet.Score, answersheet.Answers)
 	if err != nil {
 		return err
 	}

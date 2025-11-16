@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AnswerMapper 答案映射
@@ -18,7 +19,7 @@ func (m *AnswerMapper) MapAnswersToBOs(answers []viewmodel.AnswerDTO) []answer.A
 	domainAnswers := make([]answer.Answer, len(answers))
 	for i, a := range answers {
 		domainAnswers[i], _ = answer.NewAnswer(
-			question.NewQuestionCode(a.QuestionCode),
+			meta.NewCode(a.QuestionCode),
 			question.QuestionType(a.QuestionType),
 			0,
 			a.Value,

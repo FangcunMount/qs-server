@@ -56,7 +56,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 
 	// 转换响应
 	return &pb.SaveAnswerSheetResponse{
-		Id:      savedDTO.ID.Value(),
+		Id:      savedDTO.ID.Uint64(),
 		Message: "答卷保存成功",
 	}, nil
 }
@@ -108,7 +108,7 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 	for i, sheet := range sheets {
 		// 简化的答卷信息，不包含详细答案
 		protoSheets[i] = &pb.AnswerSheet{
-			Id:                   sheet.ID.Value(),
+			Id:                   sheet.ID.Uint64(),
 			QuestionnaireCode:    sheet.QuestionnaireCode,
 			QuestionnaireVersion: sheet.QuestionnaireVersion,
 			Title:                sheet.Title,
@@ -144,7 +144,7 @@ func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.
 
 	// 转换响应
 	return &pb.SaveAnswerSheetScoresResponse{
-		AnswerSheetId: savedDTO.ID.Value(),
+		AnswerSheetId: savedDTO.ID.Uint64(),
 		TotalScore:    savedDTO.Score,
 		Message:       "答卷分数保存成功",
 	}, nil
@@ -166,7 +166,7 @@ func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO
 	}
 
 	return &pb.AnswerSheet{
-		Id:                   detail.AnswerSheet.ID.Value(),
+		Id:                   detail.AnswerSheet.ID.Uint64(),
 		QuestionnaireCode:    detail.AnswerSheet.QuestionnaireCode,
 		QuestionnaireVersion: detail.AnswerSheet.QuestionnaireVersion,
 		Title:                detail.AnswerSheet.Title,

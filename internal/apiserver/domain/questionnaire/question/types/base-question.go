@@ -3,19 +3,20 @@ package types
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // BaseQuestion 基础问题
 type BaseQuestion struct {
-	code         question.QuestionCode
+	code         meta.Code
 	questionType question.QuestionType
 	title        string
 	tips         string
 }
 
 // NewBaseQuestion
-func NewBaseQuestion(code question.QuestionCode, title string, questionType question.QuestionType) BaseQuestion {
+func NewBaseQuestion(code meta.Code, title string, questionType question.QuestionType) BaseQuestion {
 	return BaseQuestion{
 		code:         code,
 		title:        title,
@@ -24,7 +25,7 @@ func NewBaseQuestion(code question.QuestionCode, title string, questionType ques
 }
 
 // GetCode 获取问题编码
-func (q *BaseQuestion) GetCode() question.QuestionCode {
+func (q *BaseQuestion) GetCode() meta.Code {
 	return q.code
 }
 

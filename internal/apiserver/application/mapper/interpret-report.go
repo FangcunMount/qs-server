@@ -3,7 +3,7 @@ package mapper
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // InterpretReportMapper 解读报告映射器
@@ -22,7 +22,7 @@ func (m *InterpretReportMapper) ToDTO(report *interpretreport.InterpretReport) *
 
 	testee := report.GetTestee()
 	reportDTO := &dto.InterpretReportDTO{
-		ID:               report.GetID().Value(),
+		ID:               report.GetID(),
 		AnswerSheetId:    report.GetAnswerSheetId(),
 		MedicalScaleCode: report.GetMedicalScaleCode(),
 		Title:            report.GetTitle(),
@@ -73,7 +73,7 @@ func (m *InterpretReportMapper) ToDomain(reportDTO *dto.InterpretReportDTO) *int
 		reportDTO.AnswerSheetId,
 		reportDTO.MedicalScaleCode,
 		reportDTO.Title,
-		interpretreport.WithID(v1.NewID(reportDTO.ID)),
+		interpretreport.WithID(meta.ID(reportDTO.ID)),
 		interpretreport.WithDescription(reportDTO.Description),
 		interpretreport.WithInterpretItems(items),
 	)
@@ -83,7 +83,7 @@ func (m *InterpretReportMapper) ToDomain(reportDTO *dto.InterpretReportDTO) *int
 			reportDTO.AnswerSheetId,
 			reportDTO.MedicalScaleCode,
 			reportDTO.Title,
-			interpretreport.WithID(v1.NewID(reportDTO.ID)),
+			interpretreport.WithID(meta.ID(reportDTO.ID)),
 			interpretreport.WithDescription(reportDTO.Description),
 			interpretreport.WithTestee(*reportDTO.Testee),
 			interpretreport.WithInterpretItems(items),

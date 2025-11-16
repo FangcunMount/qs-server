@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/iam-contracts/pkg/log"
@@ -12,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/domain/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	internalpubsub "github.com/FangcunMount/qs-server/internal/pkg/pubsub"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 )
@@ -116,7 +116,7 @@ func (s *service) SubmitAnswersheet(ctx context.Context, req *SubmitRequest) (*S
 
 	// 转换响应
 	response := &SubmitResponse{
-		ID:        strconv.FormatUint(grpcResp.Id, 10),
+		ID:        meta.ID(grpcResp.Id),
 		Status:    "success",
 		Message:   grpcResp.Message,
 		CreatedAt: time.Now(),
@@ -285,7 +285,7 @@ func (s *service) convertToAnswersheet(req *SubmitRequest) *answersheet.SubmitRe
 func (s *service) publishAnswersheetSavedMessage(ctx context.Context, req *SubmitRequest, answersheetID uint64) error {
 	// 创建答卷已保存数据
 	answersheetData := &internalpubsub.AnswersheetSavedData{
-		ResponseID:           strconv.FormatUint(answersheetID, 10),
+		ResponseID:           meta.ID(answersheetID).String(),
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: "1.0",
 		AnswerSheetID:        answersheetID,

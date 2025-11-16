@@ -1,8 +1,10 @@
 package dto
 
+import "github.com/FangcunMount/qs-server/internal/pkg/meta"
+
 // MedicalScaleDTO 医学量表数据传输对象
 type MedicalScaleDTO struct {
-	ID                uint64      `json:"id"`
+	ID                meta.ID     `json:"id"`
 	Code              string      `json:"code"`
 	QuestionnaireCode string      `json:"questionnaire_code"`
 	Title             string      `json:"title"`

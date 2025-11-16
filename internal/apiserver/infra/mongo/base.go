@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -95,7 +96,7 @@ func (r *BaseRepository) ExistsByFilter(ctx context.Context, filter bson.M) (boo
 // BaseDocument MongoDB基础文档结构
 type BaseDocument struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	DomainID  uint64             `bson:"domain_id" json:"domain_id"`
+	DomainID  meta.ID            `bson:"domain_id" json:"domain_id"`
 	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
 	DeletedAt *time.Time         `bson:"deleted_at" json:"deleted_at"`
@@ -105,8 +106,8 @@ type BaseDocument struct {
 }
 
 // SetDomainID 设置领域ID
-func (d *BaseDocument) SetDomainID(domainID uint64) {
-	d.DomainID = domainID
+func (d *BaseDocument) SetDomainID(id meta.ID) {
+	d.DomainID = id
 }
 
 // SetCreatedAt 设置创建时间

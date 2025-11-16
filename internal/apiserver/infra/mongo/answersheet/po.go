@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -35,7 +36,7 @@ func (p *AnswerSheetPO) BeforeInsert() {
 	}
 
 	// 生成DomainID
-	domainID := idutil.GetIntID()
+	domainID := meta.ID(idutil.GetIntID())
 	p.DomainID = domainID
 
 	// 添加调试日志

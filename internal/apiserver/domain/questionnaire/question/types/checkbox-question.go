@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -40,7 +41,7 @@ func init() {
 }
 
 // NewCheckboxQuestion 创建多选问题
-func newCheckboxQuestion(code question.QuestionCode, title string) *CheckboxQuestion {
+func newCheckboxQuestion(code meta.Code, title string) *CheckboxQuestion {
 	return &CheckboxQuestion{
 		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeCheckbox),
 	}

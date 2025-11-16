@@ -1,22 +1,25 @@
 package response
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // SaveAnswerSheetResponse 保存答卷响应
 type SaveAnswerSheetResponse struct {
-	ID uint64 `json:"id"`
+	ID meta.ID `json:"id"`
 }
 
 // GetAnswerSheetResponse 获取答卷响应
 type GetAnswerSheetResponse struct {
-	ID                   uint64                `json:"id"`
+	ID                   meta.ID               `json:"id"`
 	QuestionnaireCode    string                `json:"questionnaire_code"`
 	QuestionnaireVersion string                `json:"questionnaire_version"`
 	Title                string                `json:"title"`
 	Score                float64               `json:"score"`
-	WriterID             uint64                `json:"writer_id"`
+	WriterID             meta.ID               `json:"writer_id"`
 	WriterName           string                `json:"writer_name"`
-	TesteeID             uint64                `json:"testee_id"`
+	TesteeID             meta.ID               `json:"testee_id"`
 	TesteeName           string                `json:"testee_name"`
 	Answers              []viewmodel.AnswerDTO `json:"answers"`
 	CreatedAt            string                `json:"created_at"`
@@ -25,13 +28,13 @@ type GetAnswerSheetResponse struct {
 
 // AnswerSheetItem 答卷列表项
 type AnswerSheetItem struct {
-	ID                   uint64  `json:"id"`
+	ID                   meta.ID `json:"id"`
 	QuestionnaireCode    string  `json:"questionnaire_code"`
 	QuestionnaireVersion string  `json:"questionnaire_version"`
 	Title                string  `json:"title"`
 	Score                float64 `json:"score"`
-	WriterID             uint64  `json:"writer_id"`
-	TesteeID             uint64  `json:"testee_id"`
+	WriterID             meta.ID `json:"writer_id"`
+	TesteeID             meta.ID `json:"testee_id"`
 }
 
 // ListAnswerSheetsResponse 获取答卷列表响应

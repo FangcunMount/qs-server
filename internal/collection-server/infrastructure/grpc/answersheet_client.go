@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	answersheetpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 )
 
@@ -20,7 +21,7 @@ type AnswersheetClient interface {
 	// SaveAnswersheet 保存答卷
 	SaveAnswersheet(ctx context.Context, req *answersheetpb.SaveAnswerSheetRequest) (*answersheetpb.SaveAnswerSheetResponse, error)
 	// GetAnswersheet 获取答卷详情
-	GetAnswersheet(ctx context.Context, id uint64) (*answersheetpb.GetAnswerSheetResponse, error)
+	GetAnswersheet(ctx context.Context, id meta.ID) (*answersheetpb.GetAnswerSheetResponse, error)
 	// ListAnswersheets 获取答卷列表
 	ListAnswersheets(ctx context.Context, req *answersheetpb.ListAnswerSheetsRequest) (*answersheetpb.ListAnswerSheetsResponse, error)
 	// HealthCheck 健康检查
@@ -97,9 +98,9 @@ func (c *answersheetClient) SaveAnswersheet(ctx context.Context, req *answershee
 }
 
 // GetAnswersheet 获取答卷详情
-func (c *answersheetClient) GetAnswersheet(ctx context.Context, id uint64) (*answersheetpb.GetAnswerSheetResponse, error) {
+func (c *answersheetClient) GetAnswersheet(ctx context.Context, id meta.ID) (*answersheetpb.GetAnswerSheetResponse, error) {
 	req := &answersheetpb.GetAnswerSheetRequest{
-		Id: id,
+		Id: uint64(id),
 	}
 
 	resp, err := c.client.GetAnswerSheet(ctx, req)

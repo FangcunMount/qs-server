@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -19,7 +20,7 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *QuestionnairePO {
 	po := &QuestionnairePO{
 		Code:        bo.GetCode().Value(),
-		DomainID:    bo.GetID().Value(),
+		DomainID:    uint64(bo.GetID()),
 		Title:       bo.GetTitle(),
 		Description: bo.GetDescription(),
 		ImgUrl:      bo.GetImgUrl(),
@@ -99,9 +100,9 @@ func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRu
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	// 创建问卷对象
 	q := questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(po.Code),
+		meta.NewCode(po.Code),
 		po.Title,
-		questionnaire.WithID(questionnaire.NewQuestionnaireID(po.DomainID)),
+		questionnaire.WithID(meta.ID(po.DomainID)),
 		questionnaire.WithDescription(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),
@@ -123,7 +124,7 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.
 	for _, questionPO := range questionsPO {
 		// 构建配置选项列表
 		opts := []question.BuilderOption{
-			question.WithCode(question.NewQuestionCode(questionPO.Code)),
+			question.WithCode(meta.NewCode(questionPO.Code)),
 			question.WithTitle(questionPO.Title),
 			question.WithTips(questionPO.Tips),
 			question.WithQuestionType(question.QuestionType(questionPO.QuestionType)),

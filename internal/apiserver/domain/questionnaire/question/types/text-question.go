@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -32,7 +33,7 @@ type TextQuestion struct {
 }
 
 // NewTextQuestion 创建文本问题
-func newTextQuestion(code question.QuestionCode, title string) *TextQuestion {
+func newTextQuestion(code meta.Code, title string) *TextQuestion {
 	return &TextQuestion{
 		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeText),
 	}

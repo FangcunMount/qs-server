@@ -1,6 +1,10 @@
 package response
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // ErrorResponse 错误响应
 type ErrorResponse struct {
@@ -25,7 +29,7 @@ type TesteeResponseInfo struct {
 	Age       *int                   `json:"age,omitempty"`
 	Phone     string                 `json:"phone,omitempty"`
 	Email     string                 `json:"email,omitempty"`
-	ID        string                 `json:"id,omitempty"`
+	ID        meta.ID                `json:"id,omitempty"`
 	ExtraInfo map[string]interface{} `json:"extra_info,omitempty"`
 }
 
@@ -40,7 +44,7 @@ type DeviceResponseInfo struct {
 
 // AnswersheetResponse 答卷响应
 type AnswersheetResponse struct {
-	ID                 string              `json:"id"`
+	ID                 meta.ID             `json:"id"`
 	QuestionnaireCode  string              `json:"questionnaire_code"`
 	QuestionnaireTitle string              `json:"questionnaire_title,omitempty"`
 	TesteeInfo         TesteeResponseInfo  `json:"testee_info"`
@@ -66,7 +70,7 @@ type ValidationError struct {
 
 // AnswersheetSubmitResponse 提交答卷响应
 type AnswersheetSubmitResponse struct {
-	ID                string            `json:"id"`
+	ID                meta.ID           `json:"id"`
 	QuestionnaireCode string            `json:"questionnaire_code"`
 	Status            string            `json:"status"`
 	SubmissionTime    time.Time         `json:"submission_time"`
@@ -96,7 +100,7 @@ type AnswersheetListResponse struct {
 
 // AnswersheetItem 答卷列表项
 type AnswersheetItem struct {
-	ID                 string    `json:"id"`
+	ID                 meta.ID   `json:"id"`
 	QuestionnaireCode  string    `json:"questionnaire_code"`
 	QuestionnaireTitle string    `json:"questionnaire_title,omitempty"`
 	TesteeName         string    `json:"testee_name"`

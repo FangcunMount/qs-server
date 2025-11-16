@@ -2,13 +2,13 @@ package interpretationreport
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // InterpretReport 解读报告
 type InterpretReport struct {
-	id               v1.ID
-	answerSheetId    uint64
+	id               meta.ID
+	answerSheetId    meta.ID
 	medicalScaleCode string
 	title            string
 	description      string
@@ -20,7 +20,7 @@ type InterpretReport struct {
 type InterpretReportOption func(*InterpretReport)
 
 // NewInterpretReport 创建解读报告
-func NewInterpretReport(answerSheetId uint64, medicalScaleCode string, title string, opts ...InterpretReportOption) *InterpretReport {
+func NewInterpretReport(answerSheetId meta.ID, medicalScaleCode string, title string, opts ...InterpretReportOption) *InterpretReport {
 	report := &InterpretReport{
 		answerSheetId:    answerSheetId,
 		medicalScaleCode: medicalScaleCode,
@@ -35,7 +35,7 @@ func NewInterpretReport(answerSheetId uint64, medicalScaleCode string, title str
 }
 
 // WithID 设置ID
-func WithID(id v1.ID) InterpretReportOption {
+func WithID(id meta.ID) InterpretReportOption {
 	return func(r *InterpretReport) {
 		r.id = id
 	}
@@ -65,12 +65,12 @@ func WithInterpretItems(items []InterpretItem) InterpretReportOption {
 // Getter 方法
 
 // GetID 获取ID
-func (r *InterpretReport) GetID() v1.ID {
+func (r *InterpretReport) GetID() meta.ID {
 	return r.id
 }
 
 // GetAnswerSheetId 获取答卷ID
-func (r *InterpretReport) GetAnswerSheetId() uint64 {
+func (r *InterpretReport) GetAnswerSheetId() meta.ID {
 	return r.answerSheetId
 }
 
@@ -102,7 +102,7 @@ func (r *InterpretReport) GetInterpretItems() []InterpretItem {
 // 业务方法
 
 // SetID 设置ID
-func (r *InterpretReport) SetID(id v1.ID) {
+func (r *InterpretReport) SetID(id meta.ID) {
 	r.id = id
 }
 

@@ -1,11 +1,14 @@
 package dto
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // InterpretReportDTO 解读报告DTO
 type InterpretReportDTO struct {
-	ID               uint64             `json:"id"`
-	AnswerSheetId    uint64             `json:"answer_sheet_id"`
+	ID               meta.ID            `json:"id"`
+	AnswerSheetId    meta.ID            `json:"answer_sheet_id"`
 	MedicalScaleCode string             `json:"medical_scale_code"`
 	Title            string             `json:"title"`
 	Description      string             `json:"description"`
@@ -23,17 +26,17 @@ type InterpretItemDTO struct {
 
 // InterpretReportFilterDTO 解读报告过滤条件DTO
 type InterpretReportFilterDTO struct {
-	AnswerSheetId    uint64 `json:"answer_sheet_id,omitempty"`
-	MedicalScaleCode string `json:"medical_scale_code,omitempty"`
-	Title            string `json:"title,omitempty"`
-	TesteeId         uint64 `json:"testee_id,omitempty"`
-	CreatedAfter     string `json:"created_after,omitempty"`  // 格式: "2006-01-02"
-	CreatedBefore    string `json:"created_before,omitempty"` // 格式: "2006-01-02"
+	AnswerSheetId    meta.ID `json:"answer_sheet_id,omitempty"`
+	MedicalScaleCode string  `json:"medical_scale_code,omitempty"`
+	Title            string  `json:"title,omitempty"`
+	TesteeId         uint64  `json:"testee_id,omitempty"`
+	CreatedAfter     string  `json:"created_after,omitempty"`  // 格式: "2006-01-02"
+	CreatedBefore    string  `json:"created_before,omitempty"` // 格式: "2006-01-02"
 }
 
 // InterpretReportCreateDTO 创建解读报告DTO
 type InterpretReportCreateDTO struct {
-	AnswerSheetId    uint64             `json:"answer_sheet_id" binding:"required"`
+	AnswerSheetId    meta.ID            `json:"answer_sheet_id" binding:"required"`
 	MedicalScaleCode string             `json:"medical_scale_code" binding:"required"`
 	Title            string             `json:"title" binding:"required"`
 	Description      string             `json:"description"`

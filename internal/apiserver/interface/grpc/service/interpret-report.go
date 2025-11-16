@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -52,7 +53,7 @@ func (s *InterpretReportService) SaveInterpretReport(ctx context.Context, req *p
 
 	// 转换请求为 DTO
 	interpretReportDTO := &dto.InterpretReportDTO{
-		AnswerSheetId:    req.AnswerSheetId,
+		AnswerSheetId:    meta.ID(req.AnswerSheetId),
 		MedicalScaleCode: req.MedicalScaleCode,
 		Title:            req.Title,
 		Description:      req.Description,
@@ -77,7 +78,7 @@ func (s *InterpretReportService) SaveInterpretReport(ctx context.Context, req *p
 	}
 
 	return &pb.SaveInterpretReportResponse{
-		Id:      savedReport.ID,
+		Id:      savedReport.ID.Uint64(),
 		Message: "解读报告保存成功",
 	}, nil
 }
@@ -91,7 +92,7 @@ func (s *InterpretReportService) GetInterpretReportByAnswerSheetID(ctx context.C
 	log.Infof("获取解读报告，答卷ID: %d", req.AnswerSheetId)
 
 	// 查询解读报告
-	report, err := s.interpretReportQueryer.GetInterpretReportByAnswerSheetId(ctx, req.AnswerSheetId)
+	report, err := s.interpretReportQueryer.GetInterpretReportByAnswerSheetId(ctx, meta.ID(req.AnswerSheetId))
 	if err != nil {
 		log.Errorf("获取解读报告失败: %v", err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("获取解读报告失败: %v", err))
@@ -127,8 +128,8 @@ func convertInterpretReportToProto(report *dto.InterpretReportDTO) *pb.Interpret
 	}
 
 	return &pb.InterpretReport{
-		Id:               report.ID,
-		AnswerSheetId:    report.AnswerSheetId,
+		Id:               report.ID.Uint64(),
+		AnswerSheetId:    report.AnswerSheetId.Uint64(),
 		MedicalScaleCode: report.MedicalScaleCode,
 		Title:            report.Title,
 		Description:      report.Description,

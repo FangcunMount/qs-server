@@ -7,7 +7,6 @@ import (
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/interpretation"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -61,7 +60,7 @@ func (m *MedicalScaleMapper) ToBO(po *MedicalScalePO) *medicalscale.MedicalScale
 	return medicalscale.NewMedicalScale(
 		po.Code,
 		po.Title,
-		medicalscale.WithID(v1.NewID(po.DomainID)),
+		medicalscale.WithID(po.DomainID),
 		medicalscale.WithQuestionnaireCode(po.QuestionnaireCode),
 		medicalscale.WithFactors(factors),
 	)

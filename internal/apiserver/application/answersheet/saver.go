@@ -61,8 +61,8 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 		QuestionnaireVersion: asBO.GetQuestionnaireVersion(),
 		Title:                asBO.GetTitle(),
 		Score:                asBO.GetScore(),
-		WriterID:             asBO.GetWriter().GetUserID().Value(),
-		TesteeID:             asBO.GetTestee().GetUserID().Value(),
+		WriterID:             asBO.GetWriter().GetUserID().Uint64(),
+		TesteeID:             asBO.GetTestee().GetUserID().Uint64(),
 		Answers:              s.mapper.ToDTOs(asBO.GetAnswers()),
 	}, nil
 }
@@ -119,8 +119,8 @@ func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore
 		QuestionnaireVersion: aDomain.GetQuestionnaireVersion(),
 		Title:                aDomain.GetTitle(),
 		Score:                aDomain.GetScore(),
-		WriterID:             aDomain.GetWriter().GetUserID().Value(),
-		TesteeID:             aDomain.GetTestee().GetUserID().Value(),
+		WriterID:             aDomain.GetWriter().GetUserID().Uint64(),
+		TesteeID:             aDomain.GetTestee().GetUserID().Uint64(),
 		Answers:              s.mapper.ToDTOs(aDomain.GetAnswers()),
 	}
 

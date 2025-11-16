@@ -2,6 +2,7 @@ package questionnaire
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type QuestionnaireMapper struct{}
@@ -22,7 +23,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 	}
 
 	// 设置 AuditFields 中的 ID
-	po.AuditFields.ID = bo.GetID().Value()
+	po.AuditFields.ID = bo.GetID()
 
 	return po
 }
@@ -30,9 +31,9 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 // ToBO 将持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	qBO := questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(po.Code),
+		meta.NewCode(po.Code),
 		po.Title,
-		questionnaire.WithID(questionnaire.NewQuestionnaireID(po.AuditFields.ID)),
+		questionnaire.WithID(po.AuditFields.ID),
 		questionnaire.WithDescription(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),

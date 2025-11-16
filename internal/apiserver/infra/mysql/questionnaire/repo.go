@@ -28,14 +28,14 @@ func NewRepository(db *gorm.DB) port.QuestionnaireRepositoryMySQL {
 func (r *Repository) Create(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	po := r.mapper.ToPO(qDomain)
 	return r.BaseRepository.CreateAndSync(ctx, po, func(qPO *QuestionnairePO) {
-		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
+		qDomain.SetID(qPO.ID)
 	})
 }
 
 // Update 更新问卷
 func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	return r.BaseRepository.UpdateAndSync(ctx, r.mapper.ToPO(qDomain), func(qPO *QuestionnairePO) {
-		qDomain.SetID(questionnaire.NewQuestionnaireID(qPO.ID))
+		qDomain.SetID(qPO.ID)
 	})
 }
 

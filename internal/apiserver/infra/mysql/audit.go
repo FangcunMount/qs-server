@@ -1,37 +1,41 @@
 package mysql
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // Syncable 定义所有支持自动回填的实体结构
 type Syncable interface {
-	GetID() uint64
+	GetID() meta.ID
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetDeletedAt() time.Time
-	GetCreatedBy() uint64
-	GetUpdatedBy() uint64
-	GetDeletedBy() uint64
-	SetID(uint64)
+	GetCreatedBy() meta.ID
+	GetUpdatedBy() meta.ID
+	GetDeletedBy() meta.ID
+	SetID(meta.ID)
 	SetCreatedAt(time.Time)
 	SetUpdatedAt(time.Time)
 	SetDeletedAt(time.Time)
-	SetCreatedBy(uint64)
-	SetUpdatedBy(uint64)
-	SetDeletedBy(uint64)
+	SetCreatedBy(meta.ID)
+	SetUpdatedBy(meta.ID)
+	SetDeletedBy(meta.ID)
 }
 
 // AuditFields 用于统一管理 ID、创建时间和更新时间
 type AuditFields struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement"`
+	ID        meta.ID   `gorm:"primaryKey;autoIncrement"`
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt time.Time `gorm:"column:deleted_at;index"`
-	CreatedBy uint64    `gorm:"column:created_by;type:varchar(50)" json:"created_by"`
-	UpdatedBy uint64    `gorm:"column:updated_by;type:varchar(50)" json:"updated_by"`
-	DeletedBy uint64    `gorm:"column:deleted_by;type:varchar(50)" json:"deleted_by"`
+	CreatedBy meta.ID   `gorm:"column:created_by;type:varchar(50)" json:"created_by"`
+	UpdatedBy meta.ID   `gorm:"column:updated_by;type:varchar(50)" json:"updated_by"`
+	DeletedBy meta.ID   `gorm:"column:deleted_by;type:varchar(50)" json:"deleted_by"`
 }
 
-func (a *AuditFields) GetID() uint64 {
+func (a *AuditFields) GetID() meta.ID {
 	return a.ID
 }
 
@@ -47,19 +51,19 @@ func (a *AuditFields) GetDeletedAt() time.Time {
 	return a.DeletedAt
 }
 
-func (a *AuditFields) GetCreatedBy() uint64 {
+func (a *AuditFields) GetCreatedBy() meta.ID {
 	return a.CreatedBy
 }
 
-func (a *AuditFields) GetUpdatedBy() uint64 {
+func (a *AuditFields) GetUpdatedBy() meta.ID {
 	return a.UpdatedBy
 }
 
-func (a *AuditFields) GetDeletedBy() uint64 {
+func (a *AuditFields) GetDeletedBy() meta.ID {
 	return a.DeletedBy
 }
 
-func (a *AuditFields) SetID(id uint64) {
+func (a *AuditFields) SetID(id meta.ID) {
 	a.ID = id
 }
 
@@ -75,14 +79,14 @@ func (a *AuditFields) SetDeletedAt(t time.Time) {
 	a.DeletedAt = t
 }
 
-func (a *AuditFields) SetCreatedBy(id uint64) {
+func (a *AuditFields) SetCreatedBy(id meta.ID) {
 	a.CreatedBy = id
 }
 
-func (a *AuditFields) SetUpdatedBy(id uint64) {
+func (a *AuditFields) SetUpdatedBy(id meta.ID) {
 	a.UpdatedBy = id
 }
 
-func (a *AuditFields) SetDeletedBy(id uint64) {
+func (a *AuditFields) SetDeletedBy(id meta.ID) {
 	a.DeletedBy = id
 }

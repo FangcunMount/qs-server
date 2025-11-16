@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // SectionQuestion 段落问题
@@ -17,7 +18,7 @@ func init() {
 }
 
 // newSectionQuestion 创建段落问题
-func newSectionQuestion(code question.QuestionCode, title string) *SectionQuestion {
+func newSectionQuestion(code meta.Code, title string) *SectionQuestion {
 	return &SectionQuestion{
 		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeSection),
 	}

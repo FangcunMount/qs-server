@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/util/idutil"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"gorm.io/gorm"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql"
@@ -28,7 +29,7 @@ func (QuestionnairePO) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (p *QuestionnairePO) BeforeCreate(tx *gorm.DB) error {
-	p.AuditFields.ID = idutil.GetIntID()
+	p.AuditFields.ID = meta.ID(idutil.GetIntID())
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()
 

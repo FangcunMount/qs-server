@@ -9,6 +9,7 @@ import (
 	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AnswersheetMapper 答卷映射器，负责不同层级间的数据转换
@@ -87,7 +88,7 @@ func (m *AnswersheetMapper) ToAnswersheetResponse(as *answersheet.AnswerSheet) *
 	score := float64(as.Score)
 
 	return &response.AnswersheetResponse{
-		ID:                strconv.FormatUint(as.Id, 10),
+		ID:                meta.ID(as.Id),
 		QuestionnaireCode: as.QuestionnaireCode,
 		TesteeInfo: response.TesteeResponseInfo{
 			Name: as.TesteeName,
@@ -109,7 +110,7 @@ func (m *AnswersheetMapper) ToAnswersheetItem(as *answersheet.AnswerSheet) respo
 	submissionTime := createdAt
 
 	return response.AnswersheetItem{
-		ID:                strconv.FormatUint(as.Id, 10),
+		ID:                meta.ID(as.Id),
 		QuestionnaireCode: as.QuestionnaireCode,
 		TesteeName:        as.TesteeName,
 		SubmissionTime:    submissionTime,
@@ -150,8 +151,8 @@ func (m *AnswersheetMapper) ToGRPCListRequest(req *request.AnswersheetListReques
 	}
 
 	// 解析testee_id
-	if req.TesteeID != "" {
-		if testeeID, err := strconv.ParseUint(req.TesteeID, 10, 64); err == nil {
+	if !req.TesteeID.IsZero() {
+		if testeeID, err := strconv.ParseUint(req.TesteeID.String(), 10, 64); err == nil {
 			grpcReq.TesteeId = testeeID
 		}
 	}

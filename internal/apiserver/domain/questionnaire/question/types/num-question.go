@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -32,7 +33,7 @@ func init() {
 }
 
 // newNumberQuestion 创建数字问题
-func newNumberQuestion(code question.QuestionCode, title string) *NumberQuestion {
+func newNumberQuestion(code meta.Code, title string) *NumberQuestion {
 	return &NumberQuestion{
 		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeNumber),
 	}

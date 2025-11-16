@@ -1,15 +1,5 @@
 package interpretationreport
 
-import "github.com/FangcunMount/component-base/pkg/util/idutil"
-
-// InterpretReportID 解读报告唯一标识
-type InterpretReportID = idutil.ID[uint64]
-
-// NewInterpretReportID 创建解读报告ID
-func NewInterpretReportID(value uint64) InterpretReportID {
-	return idutil.NewID[uint64](value)
-}
-
 // InterpretReportStatus 解读报告状态
 type InterpretReportStatus uint8
 

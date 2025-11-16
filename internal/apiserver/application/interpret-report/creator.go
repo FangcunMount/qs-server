@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Creator 解读报告创建器
@@ -59,12 +59,12 @@ func (c *Creator) CreateInterpretReport(ctx context.Context, reportDTO *dto.Inte
 		return nil, errors.WithCode(errCode.ErrInterpretReportInvalid, "无法创建解读报告领域对象")
 	}
 
-	log.Infof("领域对象创建成功，ID: %d", report.GetID().Value())
+	log.Infof("领域对象创建成功，ID: %d", report.GetID().Uint64())
 
 	// 设置ID（如果没有的话）
-	if report.GetID().Value() == 0 {
-		report.SetID(v1.NewID(0)) // 让数据库自动生成ID
-		log.Infof("设置自动生成的ID: %d", report.GetID().Value())
+	if report.GetID().IsZero() {
+		report.SetID(meta.ID(0)) // 让数据库自动生成ID
+		log.Infof("设置自动生成的ID: %d", report.GetID().Uint64())
 	}
 
 	log.Infof("开始保存到数据库")

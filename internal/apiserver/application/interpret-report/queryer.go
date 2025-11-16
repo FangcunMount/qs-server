@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Queryer 解读报告查询器
@@ -28,7 +29,7 @@ func NewQueryer(repo interpretport.InterpretReportRepositoryMongo) *Queryer {
 var _ interpretport.InterpretReportQueryer = (*Queryer)(nil)
 
 // GetInterpretReportByAnswerSheetId 根据答卷ID获取解读报告
-func (q *Queryer) GetInterpretReportByAnswerSheetId(ctx context.Context, answerSheetId uint64) (*dto.InterpretReportDTO, error) {
+func (q *Queryer) GetInterpretReportByAnswerSheetId(ctx context.Context, answerSheetId meta.ID) (*dto.InterpretReportDTO, error) {
 	// 验证参数
 	if err := q.validateAnswerSheetId(answerSheetId); err != nil {
 		return nil, err
@@ -45,7 +46,7 @@ func (q *Queryer) GetInterpretReportByAnswerSheetId(ctx context.Context, answerS
 }
 
 // validateAnswerSheetId 验证答卷ID
-func (q *Queryer) validateAnswerSheetId(answerSheetId uint64) error {
+func (q *Queryer) validateAnswerSheetId(answerSheetId meta.ID) error {
 	if answerSheetId == 0 {
 		return errors.WithCode(errCode.ErrInvalidArgument, "答卷ID不能为空")
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Mapper 解读报告映射器
@@ -32,7 +32,7 @@ func (m *Mapper) ToEntity(po *InterpretReportPO) (*interpretreport.InterpretRepo
 
 	// 创建选项
 	var options []interpretreport.InterpretReportOption
-	options = append(options, interpretreport.WithID(v1.NewID(po.DomainID)))
+	options = append(options, interpretreport.WithID(meta.ID(po.DomainID)))
 	options = append(options, interpretreport.WithDescription(po.Description))
 	options = append(options, interpretreport.WithInterpretItems(items))
 
@@ -63,9 +63,9 @@ func (m *Mapper) ToPO(entity *interpretreport.InterpretReport) (*InterpretReport
 
 	// 转换ID
 	var objectID primitive.ObjectID
-	if entity.GetID().Value() != 0 {
+	if !entity.GetID().IsZero() {
 		var err error
-		objectID, err = base.Uint64ToObjectID(entity.GetID().Value())
+		objectID, err = base.Uint64ToObjectID(entity.GetID().Uint64())
 		if err != nil {
 			return nil, err
 		}
@@ -80,16 +80,16 @@ func (m *Mapper) ToPO(entity *interpretreport.InterpretReport) (*InterpretReport
 	// 转换被试者
 	var testeePO *TesteePO
 	testee := entity.GetTestee()
-	if testee.GetUserID().Value() != 0 {
+	if !testee.GetUserID().IsZero() {
 		testeePO = &TesteePO{
-			UserID: testee.GetUserID().Value(),
+			UserID: testee.GetUserID().Uint64(),
 		}
 	}
 
 	po := &InterpretReportPO{
 		BaseDocument: base.BaseDocument{
 			ID:       objectID,
-			DomainID: entity.GetID().Value(),
+			DomainID: entity.GetID(),
 		},
 		AnswerSheetId:    entity.GetAnswerSheetId(),
 		MedicalScaleCode: entity.GetMedicalScaleCode(),

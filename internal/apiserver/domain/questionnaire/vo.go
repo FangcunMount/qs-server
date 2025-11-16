@@ -2,31 +2,7 @@ package questionnaire
 
 import (
 	"strconv"
-
-	"github.com/FangcunMount/component-base/pkg/util/codeutil"
-	"github.com/FangcunMount/component-base/pkg/util/idutil"
 )
-
-// QuestionnaireID 问卷唯一标识
-type QuestionnaireID = idutil.ID[uint64]
-
-// NewQuestionnaireID 创建问卷ID
-func NewQuestionnaireID(value uint64) QuestionnaireID {
-	return idutil.NewID[uint64](value)
-}
-
-// QuestionnaireCode 问卷编码
-type QuestionnaireCode = codeutil.Code
-
-// NewQuestionnaireCode 创建问卷编码
-func NewQuestionnaireCode(value string) QuestionnaireCode {
-	return codeutil.NewCode(value)
-}
-
-// GenerateQuestionnaireCode 生成新的问卷编码
-func GenerateQuestionnaireCode() (QuestionnaireCode, error) {
-	return codeutil.GenerateNewCode()
-}
 
 // Status 问卷状态
 type QuestionnaireStatus uint8

@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // MedicalScalePO 医学量表MongoDB持久化对象
@@ -30,7 +31,7 @@ func (p *MedicalScalePO) BeforeInsert() {
 	if p.ID.IsZero() {
 		p.ID = primitive.NewObjectID()
 	}
-	p.DomainID = idutil.GetIntID()
+	p.DomainID = meta.ID(idutil.GetIntID())
 	now := time.Now()
 	p.CreatedAt = now
 	p.UpdatedAt = now

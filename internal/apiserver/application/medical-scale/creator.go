@@ -3,11 +3,11 @@ package medicalscale
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/util/codeutil"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	medicalScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Creator 医学量表创建器
@@ -35,14 +35,14 @@ func (c *Creator) CreateMedicalScale(ctx context.Context, dto *dto.MedicalScaleD
 // Create 创建医学量表
 func (c *Creator) Create(ctx context.Context, dto *dto.MedicalScaleDTO) (*dto.MedicalScaleDTO, error) {
 	// 1. 生成医学量表编码
-	code, err := codeutil.GenerateCode()
+	code, err := meta.GenerateCode()
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. 创建医学量表领域模型
 	msBO := medicalScale.NewMedicalScale(
-		code,
+		code.String(),
 		dto.Title,
 		medicalScale.WithDescription(dto.Description),
 		medicalScale.WithQuestionnaireCode(dto.QuestionnaireCode),

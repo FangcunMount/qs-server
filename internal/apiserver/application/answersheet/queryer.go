@@ -158,8 +158,8 @@ func (q *Queryer) convertDomainsToAnswerSheetDTOs(domains []*answersheet.AnswerS
 			QuestionnaireVersion: domain.GetQuestionnaireVersion(),
 			Title:                domain.GetTitle(),
 			Score:                domain.GetScore(),
-			WriterID:             domain.GetWriter().GetUserID().Value(),
-			TesteeID:             domain.GetTestee().GetUserID().Value(),
+			WriterID:             domain.GetWriter().GetUserID().Uint64(),
+			TesteeID:             domain.GetTestee().GetUserID().Uint64(),
 			Answers:              q.mapper.ToDTOs(domain.GetAnswers()),
 		}
 	}
@@ -171,7 +171,7 @@ func getWriterID(writer *role.Writer) uint64 {
 	if writer == nil {
 		return 0
 	}
-	return writer.GetUserID().Value()
+	return writer.GetUserID().Uint64()
 }
 
 // getTesteeID 安全地获取被试者ID
@@ -179,7 +179,7 @@ func getTesteeID(testee *role.Testee) uint64 {
 	if testee == nil {
 		return 0
 	}
-	return testee.GetUserID().Value()
+	return testee.GetUserID().Uint64()
 }
 
 // getWriterName 安全地获取答卷者姓名

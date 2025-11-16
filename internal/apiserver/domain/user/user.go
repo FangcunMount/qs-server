@@ -4,14 +4,13 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/auth"
 )
 
 // User 用户聚合根
 type User struct {
-	id           idutil.ID[uint64]
+	id           UserID
 	username     string
 	password     string
 	nickname     string
@@ -25,7 +24,7 @@ type User struct {
 }
 
 // ID 获取用户ID
-func (u *User) ID() idutil.ID[uint64] {
+func (u *User) ID() UserID {
 	return u.id
 }
 
@@ -80,7 +79,7 @@ func (u *User) UpdatedAt() time.Time {
 }
 
 // SetID 设置用户ID
-func (u *User) SetID(id idutil.ID[uint64]) {
+func (u *User) SetID(id UserID) {
 	u.id = id
 }
 

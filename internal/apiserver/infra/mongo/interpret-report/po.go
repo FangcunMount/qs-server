@@ -8,12 +8,13 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // InterpretReportPO 解读报告MongoDB持久化对象
 type InterpretReportPO struct {
 	base.BaseDocument `bson:",inline"`
-	AnswerSheetId     uint64            `bson:"answer_sheet_id" json:"answer_sheet_id"`
+	AnswerSheetId     meta.ID           `bson:"answer_sheet_id" json:"answer_sheet_id"`
 	MedicalScaleCode  string            `bson:"medical_scale_code" json:"medical_scale_code"`
 	Title             string            `bson:"title" json:"title"`
 	Description       string            `bson:"description" json:"description"`
@@ -44,7 +45,7 @@ func (p *InterpretReportPO) BeforeInsert() {
 	if p.ID.IsZero() {
 		p.ID = primitive.NewObjectID()
 	}
-	p.DomainID = idutil.GetIntID()
+	p.DomainID = meta.ID(idutil.GetIntID())
 	now := time.Now()
 	p.CreatedAt = now
 	p.UpdatedAt = now

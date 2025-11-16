@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // InterpretReportCreator
@@ -21,5 +22,5 @@ type InterpretReportEditor interface {
 // InterpretReportQueryer 解读报告查询器接口
 type InterpretReportQueryer interface {
 	// GetInterpretReportByAnswerSheetId 根据答卷ID获取解读报告
-	GetInterpretReportByAnswerSheetId(ctx context.Context, answerSheetId uint64) (*dto.InterpretReportDTO, error)
+	GetInterpretReportByAnswerSheetId(ctx context.Context, answerSheetId meta.ID) (*dto.InterpretReportDTO, error)
 }

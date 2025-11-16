@@ -4,18 +4,19 @@ import (
 	"errors"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Answer 基础答案
 type Answer struct {
-	questionCode question.QuestionCode
+	questionCode meta.Code
 	questionType question.QuestionType
 	score        float64
 	value        AnswerValue
 }
 
 // NewAnswer 创建基础答案
-func NewAnswer(qCode question.QuestionCode, qType question.QuestionType, score float64, v any) (Answer, error) {
+func NewAnswer(qCode meta.Code, qType question.QuestionType, score float64, v any) (Answer, error) {
 	vType, err := transforAnswerValueType(qType)
 	if err != nil {
 		return Answer{}, err

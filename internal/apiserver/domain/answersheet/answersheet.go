@@ -8,12 +8,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AnswerSheet 答卷
 type AnswerSheet struct {
-	id                   v1.ID
+	id                   meta.ID
 	questionnaireCode    string
 	questionnaireVersion string
 	title                string
@@ -39,7 +39,7 @@ func NewAnswerSheet(questionnaireCode string, questionnaireVersion string, opts 
 
 type AnswerSheetOption func(*AnswerSheet)
 
-func WithID(id v1.ID) AnswerSheetOption {
+func WithID(id meta.ID) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.id = id
 	}
@@ -99,11 +99,11 @@ func WithUpdatedAt(updatedAt time.Time) AnswerSheetOption {
 	}
 }
 
-func (a *AnswerSheet) SetID(id v1.ID) {
+func (a *AnswerSheet) SetID(id meta.ID) {
 	a.id = id
 }
 
-func (a *AnswerSheet) GetID() v1.ID {
+func (a *AnswerSheet) GetID() meta.ID {
 	return a.id
 }
 

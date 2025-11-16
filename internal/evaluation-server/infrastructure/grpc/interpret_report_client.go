@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	interpret_report "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // InterpretReportClient 解读报告客户端
@@ -21,12 +22,12 @@ func NewInterpretReportClient(factory *ClientFactory) *InterpretReportClient {
 }
 
 // SaveInterpretReport 保存解读报告
-func (c *InterpretReportClient) SaveInterpretReport(ctx context.Context, answerSheetId uint64, medicalScaleCode, title, description string, interpretItems []*interpret_report.InterpretItem) (uint64, error) {
+func (c *InterpretReportClient) SaveInterpretReport(ctx context.Context, answerSheetId meta.ID, medicalScaleCode, title, description string, interpretItems []*interpret_report.InterpretItem) (meta.ID, error) {
 	log.Infof("保存解读报告，答卷ID: %d", answerSheetId)
 
 	// 调用 gRPC 服务
 	resp, err := c.client.SaveInterpretReport(ctx, &interpret_report.SaveInterpretReportRequest{
-		AnswerSheetId:    answerSheetId,
+		AnswerSheetId:    uint64(answerSheetId),
 		MedicalScaleCode: medicalScaleCode,
 		Title:            title,
 		Description:      description,
@@ -36,16 +37,16 @@ func (c *InterpretReportClient) SaveInterpretReport(ctx context.Context, answerS
 		return 0, fmt.Errorf("保存解读报告失败: %v", err)
 	}
 
-	return resp.Id, nil
+	return meta.ID(resp.Id), nil
 }
 
 // GetInterpretReportByAnswerSheetID 根据答卷ID获取解读报告
-func (c *InterpretReportClient) GetInterpretReportByAnswerSheetID(ctx context.Context, answerSheetId uint64) (*interpret_report.InterpretReport, error) {
+func (c *InterpretReportClient) GetInterpretReportByAnswerSheetID(ctx context.Context, answerSheetId meta.ID) (*interpret_report.InterpretReport, error) {
 	log.Infof("获取解读报告，答卷ID: %d", answerSheetId)
 
 	// 调用 gRPC 服务
 	resp, err := c.client.GetInterpretReportByAnswerSheetID(ctx, &interpret_report.GetInterpretReportByAnswerSheetIDRequest{
-		AnswerSheetId: answerSheetId,
+		AnswerSheetId: answerSheetId.Uint64(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("获取解读报告失败: %v", err)

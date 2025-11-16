@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Queryer 问卷查询器
@@ -134,7 +135,7 @@ func (q *Queryer) mergeQuestionnaireData(
 
 	// 创建问卷对象
 	return questionnaire.NewQuestionnaire(
-		questionnaire.NewQuestionnaireCode(mysqlData.GetCode().Value()),
+		meta.NewCode(mysqlData.GetCode().Value()),
 		mysqlData.GetTitle(),
 		opts...,
 	)

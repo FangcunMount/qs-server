@@ -5,6 +5,7 @@ import (
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // QuestionService 问题服务
@@ -45,7 +46,7 @@ func (QuestionService) UpdateQuestion(q *Questionnaire, updated question.Questio
 }
 
 // DeleteQuestion 删除问题
-func (QuestionService) DeleteQuestion(q *Questionnaire, questionCode question.QuestionCode) error {
+func (QuestionService) DeleteQuestion(q *Questionnaire, questionCode meta.Code) error {
 	for i := range q.GetQuestions() {
 		if q.GetQuestions()[i].GetCode().Equals(questionCode) {
 			q.questions = append(q.questions[:i], q.questions[i+1:]...)

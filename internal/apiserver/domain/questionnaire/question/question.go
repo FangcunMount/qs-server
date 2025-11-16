@@ -1,15 +1,15 @@
 package question
 
 import (
-	"github.com/FangcunMount/component-base/pkg/util/codeutil"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // Question 问题接口 - 统一所有题型的方法签名
 type Question interface {
 	// 基础方法
-	GetCode() QuestionCode
+	GetCode() meta.Code
 	GetTitle() string
 	GetType() QuestionType
 	GetTips() string
@@ -22,19 +22,6 @@ type Question interface {
 	GetValidationRules() []validation.ValidationRule
 	// 计算相关方法
 	GetCalculationRule() *calculation.CalculationRule
-}
-
-// QuestionCode 问题编码
-type QuestionCode = codeutil.Code
-
-// NewQuestionCode 创建问题编码
-func NewQuestionCode(value string) QuestionCode {
-	return codeutil.NewCode(value)
-}
-
-// GenerateQuestionCode 生成新的问题编码
-func GenerateQuestionCode() (QuestionCode, error) {
-	return codeutil.GenerateNewCode()
 }
 
 // QuestionType 题型

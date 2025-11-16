@@ -2,12 +2,12 @@ package medicalscale
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // MedicalScale 医学量表聚合根
 type MedicalScale struct {
-	id                v1.ID
+	id                meta.ID
 	code              string
 	questionnaireCode string
 	title             string
@@ -31,7 +31,7 @@ func NewMedicalScale(code string, title string, opts ...MedicalScaleOption) *Med
 type MedicalScaleOption func(*MedicalScale)
 
 // WithID 设置ID
-func WithID(id v1.ID) MedicalScaleOption {
+func WithID(id meta.ID) MedicalScaleOption {
 	return func(s *MedicalScale) {
 		s.id = id
 	}
@@ -73,12 +73,12 @@ func WithFactors(factors []factor.Factor) MedicalScaleOption {
 }
 
 // SetID 设置ID
-func (s *MedicalScale) SetID(id v1.ID) {
+func (s *MedicalScale) SetID(id meta.ID) {
 	s.id = id
 }
 
 // GetID 获取ID
-func (s *MedicalScale) GetID() v1.ID {
+func (s *MedicalScale) GetID() meta.ID {
 	return s.id
 }
 

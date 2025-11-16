@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AnswerMapper DTO 与领域对象转换器
@@ -54,7 +55,7 @@ func (m *AnswerMapper) ToBO(dto *dto.AnswerDTO) answer.Answer {
 	}
 
 	ans, _ := answer.NewAnswer(
-		question.NewQuestionCode(dto.QuestionCode),
+		meta.NewCode(dto.QuestionCode),
 		question.QuestionType(dto.QuestionType),
 		dto.Score,
 		dto.Value,

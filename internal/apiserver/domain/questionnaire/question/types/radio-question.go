@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question/ability"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
@@ -39,7 +40,7 @@ func init() {
 }
 
 // NewRadioQuestion 创建单选问题
-func newRadioQuestion(code question.QuestionCode, title string) *RadioQuestion {
+func newRadioQuestion(code meta.Code, title string) *RadioQuestion {
 	return &RadioQuestion{
 		BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeRadio),
 	}

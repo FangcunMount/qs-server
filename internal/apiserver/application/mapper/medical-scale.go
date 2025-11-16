@@ -18,7 +18,7 @@ func NewMedicalScaleMapper() MedicalScaleMapper {
 
 func (m *MedicalScaleMapper) ToDTO(bo *medicalScale.MedicalScale) *dto.MedicalScaleDTO {
 	return &dto.MedicalScaleDTO{
-		ID:                bo.GetID().Value(),
+		ID:                bo.GetID(),
 		Code:              bo.GetCode(),
 		QuestionnaireCode: bo.GetQuestionnaireCode(),
 		Title:             bo.GetTitle(),

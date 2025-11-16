@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Repository 答卷MongoDB存储库
@@ -49,7 +49,7 @@ func (r *Repository) Create(ctx context.Context, aDomain *answersheet.AnswerShee
 	}
 
 	// 将生成的 ID 设置回领域对象
-	aDomain.SetID(v1.NewID(po.DomainID))
+	aDomain.SetID(meta.ID(po.DomainID))
 
 	return nil
 }
@@ -250,7 +250,7 @@ func (r *Repository) Update(ctx context.Context, aDomain *answersheet.AnswerShee
 	update := bson.M{"$set": updateData}
 
 	filter := bson.M{
-		"domain_id": aDomain.GetID().Value(),
+		"domain_id": aDomain.GetID().Uint64(),
 	}
 
 	result, err := r.Collection().UpdateOne(ctx, filter, update)

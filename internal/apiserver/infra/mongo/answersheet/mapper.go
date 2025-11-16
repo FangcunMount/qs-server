@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
-	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AnswerSheetMapper 答卷映射器
@@ -35,7 +35,7 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 	var writer *WriterPO
 	if bo.GetWriter() != nil {
 		writer = &WriterPO{
-			UserID: bo.GetWriter().GetUserID().Value(),
+			UserID: bo.GetWriter().GetUserID().Uint64(),
 		}
 	}
 
@@ -43,7 +43,7 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 	var testee *TesteePO
 	if bo.GetTestee() != nil {
 		testee = &TesteePO{
-			UserID: bo.GetTestee().GetUserID().Value(),
+			UserID: bo.GetTestee().GetUserID().Uint64(),
 			Name:   bo.GetTestee().GetName(),
 			Sex:    bo.GetTestee().GetSex(),
 			Age:    bo.GetTestee().GetAge(),
@@ -66,8 +66,8 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 	po.UpdatedAt = bo.GetUpdatedAt()
 
 	// 如果领域对象有ID，则设置DomainID
-	if bo.GetID().Value() != 0 {
-		po.DomainID = bo.GetID().Value()
+	if !bo.GetID().IsZero() {
+		po.DomainID = bo.GetID()
 	}
 
 	return po
@@ -103,7 +103,7 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	return answersheet.NewAnswerSheet(
 		po.QuestionnaireCode,
 		po.QuestionnaireVersion,
-		answersheet.WithID(v1.NewID(po.DomainID)),
+		answersheet.WithID(meta.ID(po.DomainID)),
 		answersheet.WithTitle(po.Title),
 		answersheet.WithScore(po.Score),
 		answersheet.WithAnswers(answers),
@@ -129,7 +129,7 @@ func (m *AnswerSheetMapper) mapAnswerToPO(answerBO answer.Answer) *AnswerPO {
 // mapAnswerToBO 将 AnswerPO 转换为答案领域对象
 func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) answer.Answer {
 	ans, _ := answer.NewAnswer(
-		question.NewQuestionCode(answerPO.QuestionCode),
+		meta.NewCode(answerPO.QuestionCode),
 		question.QuestionType(answerPO.QuestionType),
 		answerPO.Score,
 		answerPO.Value.Value,
