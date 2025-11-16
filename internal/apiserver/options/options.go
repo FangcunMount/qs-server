@@ -3,7 +3,7 @@ package options
 import (
 	"encoding/json"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 )

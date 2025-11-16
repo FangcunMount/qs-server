@@ -3,7 +3,7 @@ package handler
 import (
 	"strconv"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/mapper"

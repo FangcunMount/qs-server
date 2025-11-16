@@ -4,15 +4,17 @@ go 1.24.0
 
 require (
 	github.com/FangcunMount/component-base v0.3.1
+	github.com/FangcunMount/iam-contracts v0.0.0-20251027062840-64032f817e9e
 	github.com/ThreeDotsLabs/watermill v1.4.7
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.3
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
-	github.com/redis/go-redis/v9 v9.11.0
+	github.com/redis/go-redis/v9 v9.14.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.39.0
+	google.golang.org/appengine v1.6.8
 	gorm.io/gorm v1.30.0
 )
 
@@ -24,14 +26,11 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/onsi/gomega v1.18.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	k8s.io/klog v1.0.0 // indirect
@@ -104,9 +103,8 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/gosuri/uitable v0.0.4
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/json-iterator/go v1.1.12
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/marmotedu/component-base v1.6.2
-	github.com/marmotedu/errors v1.0.2
 	github.com/mattheath/base62 v0.0.0-20150408093626-b80cdc656a7a
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.3 // indirect

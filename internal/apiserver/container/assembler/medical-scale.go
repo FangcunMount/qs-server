@@ -3,7 +3,7 @@ package assembler
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	msApp "github.com/FangcunMount/qs-server/internal/apiserver/application/medical-scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/port"
 	msInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/medical-scale"

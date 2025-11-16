@@ -2,19 +2,19 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/FangcunMount/qs-server/pkg/version"
 	"github.com/gin-gonic/gin"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 )
 

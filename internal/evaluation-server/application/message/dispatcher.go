@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
 	internalpubsub "github.com/FangcunMount/qs-server/internal/pkg/pubsub"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 

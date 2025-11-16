@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	userapp "github.com/FangcunMount/qs-server/internal/collection-server/application/user"

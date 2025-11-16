@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
-	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 // GRPCLoggerConfig gRPC日志配置

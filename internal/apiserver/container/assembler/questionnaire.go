@@ -4,7 +4,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
 	quesDocInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"

@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"

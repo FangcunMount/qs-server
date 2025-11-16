@@ -1,7 +1,7 @@
 package evaluation
 
 import (
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/config"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/options"
 	"github.com/FangcunMount/qs-server/pkg/app"

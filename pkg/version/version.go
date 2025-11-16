@@ -6,7 +6,7 @@ import (
 
 	"github.com/gosuri/uitable"
 
-	"github.com/FangcunMount/compose-base/pkg/json"
+	"github.com/FangcunMount/component-base/pkg/json"
 )
 
 var (

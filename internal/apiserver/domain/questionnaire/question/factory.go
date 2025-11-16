@@ -1,8 +1,6 @@
 package question
 
-import (
-	"github.com/FangcunMount/component-base/pkg/log"
-)
+import "github.com/FangcunMount/component-base/pkg/log"
 
 // 注册函数签名
 type QuestionFactory func(builder *QuestionBuilder) Question

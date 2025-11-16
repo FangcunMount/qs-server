@@ -1,9 +1,8 @@
 package middleware
 
 import (
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/gin-gonic/gin"
-
-	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 // UsernameKey 定义了在 gin 上下文中表示密钥所有者的键

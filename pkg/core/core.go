@@ -3,9 +3,8 @@ package core
 import (
 	"net/http"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/gin-gonic/gin"
-	"github.com/marmotedu/errors"
 )
 
 // ErrResponse 定义了当发生错误时返回的消息
@@ -29,7 +28,6 @@ type ErrResponse struct {
 // 如果 err 为 nil，则将响应数据写入响应体
 func WriteResponse(c *gin.Context, err error, data interface{}) {
 	if err != nil {
-		log.Errorf("%#+v", err)
 		coder := errors.ParseCoder(err)
 		c.JSON(coder.HTTPStatus(), ErrResponse{
 			Code:      coder.Code(),

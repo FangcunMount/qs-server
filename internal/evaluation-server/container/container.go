@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/application/message"
 	grpcclient "github.com/FangcunMount/qs-server/internal/evaluation-server/infrastructure/grpc"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/options"

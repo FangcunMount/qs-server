@@ -3,7 +3,7 @@ package user
 import (
 	"time"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/auth"
 	"github.com/FangcunMount/qs-server/pkg/util/idutil"

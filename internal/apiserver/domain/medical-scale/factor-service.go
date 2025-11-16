@@ -1,7 +1,7 @@
 package medicalscale
 
 import (
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/medical-scale/factor"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )

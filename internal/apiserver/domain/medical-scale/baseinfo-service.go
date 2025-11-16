@@ -3,7 +3,7 @@ package medicalscale
 import (
 	"strings"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 

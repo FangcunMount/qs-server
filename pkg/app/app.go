@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/compose-base/pkg/errors"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/FangcunMount/qs-server/pkg/term"
 	"github.com/FangcunMount/qs-server/pkg/version"
@@ -217,12 +217,11 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 
 	// 如果静默标志不为空，则打印日志
 	if !a.silence {
-		log.Infof("%v Starting %s ...", progressMessage, a.name)
 		if !a.noVersion {
-			log.Infof("%v Version: `%s`", progressMessage, version.Get().ToJSON())
+			log.Infof("%v Version: %s", progressMessage, version.Get().String())
 		}
 		if !a.noConfig {
-			log.Infof("%v Config file used: `%s`", progressMessage, viper.ConfigFileUsed())
+			log.Infof("%v Config: %+v", progressMessage, viper.AllSettings())
 		}
 	}
 

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
 	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 )
 
@@ -45,8 +44,6 @@ type TesteeInfo struct {
 
 // GetUser 获取用户信息
 func (q *UserQueryer) GetUser(ctx context.Context, userIDStr string) (*UserInfo, error) {
-	log.Debugf("Getting user info for: %s", userIDStr)
-
 	// 转换 userID
 	userID, err := strconv.ParseUint(userIDStr, 10, 64)
 	if err != nil {
@@ -55,7 +52,6 @@ func (q *UserQueryer) GetUser(ctx context.Context, userIDStr string) (*UserInfo,
 
 	user, err := q.userServiceClient.GetUser(ctx, userID)
 	if err != nil {
-		log.Errorf("Failed to get user %s: %v", userIDStr, err)
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
@@ -73,8 +69,6 @@ func (q *UserQueryer) GetUser(ctx context.Context, userIDStr string) (*UserInfo,
 
 // GetTestee 获取受试者信息
 func (q *UserQueryer) GetTestee(ctx context.Context, userIDStr string) (*TesteeInfo, error) {
-	log.Debugf("Getting testee info for user: %s", userIDStr)
-
 	// 转换 userID
 	userID, err := strconv.ParseUint(userIDStr, 10, 64)
 	if err != nil {
@@ -83,7 +77,6 @@ func (q *UserQueryer) GetTestee(ctx context.Context, userIDStr string) (*TesteeI
 
 	testee, err := q.userServiceClient.GetTestee(ctx, userID)
 	if err != nil {
-		log.Errorf("Failed to get testee for user %s: %v", userIDStr, err)
 		return nil, fmt.Errorf("failed to get testee: %w", err)
 	}
 

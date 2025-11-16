@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/gin-gonic/gin"
 
-	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 

@@ -6,14 +6,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
-
-	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 // Server GRPC 服务器结构体

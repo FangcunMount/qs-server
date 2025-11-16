@@ -3,7 +3,7 @@ package interpretreport
 import (
 	"context"
 
-	"github.com/FangcunMount/compose-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
 	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 )
 
@@ -40,8 +39,6 @@ type CreateTesteeResponse struct {
 
 // CreateTestee 创建受试者
 func (r *TesteeRegistrar) CreateTestee(ctx context.Context, userIDStr string, req *CreateTesteeRequest) (*CreateTesteeResponse, error) {
-	log.Infof("Creating testee for user: %s", userIDStr)
-
 	// 转换 userID 为 uint64
 	userID, err := strconv.ParseUint(userIDStr, 10, 64)
 	if err != nil {
@@ -63,11 +60,8 @@ func (r *TesteeRegistrar) CreateTestee(ctx context.Context, userIDStr string, re
 		birthday.Unix(),
 	)
 	if err != nil {
-		log.Errorf("Failed to create testee for user %s: %v", userIDStr, err)
 		return nil, fmt.Errorf("failed to create testee: %w", err)
 	}
-
-	log.Infof("Successfully created testee for user %d", testee.UserId)
 
 	return &CreateTesteeResponse{
 		UserID:   strconv.FormatUint(testee.UserId, 10),
