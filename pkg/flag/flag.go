@@ -4,7 +4,7 @@ import (
 	goflag "flag"
 	"strings"
 
-	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/spf13/pflag"
 )
 

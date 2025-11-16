@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mattn/go-isatty"
 
-	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 // defaultLogFormatter 是 Logger 中间件使用的默认日志格式函数

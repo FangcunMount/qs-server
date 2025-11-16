@@ -1,10 +1,10 @@
 package collection
 
 import (
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/pkg/app"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // commandDesc 命令描述

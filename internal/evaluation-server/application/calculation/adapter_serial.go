@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/calculation"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // SerialCalculationAdapter 串行计算适配器

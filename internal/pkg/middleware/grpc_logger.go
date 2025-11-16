@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 // GRPCLoggerConfig gRPC日志配置

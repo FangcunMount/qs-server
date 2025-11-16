@@ -1,7 +1,7 @@
 package pubsub
 
 import (
-	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/ThreeDotsLabs/watermill"
 )
 

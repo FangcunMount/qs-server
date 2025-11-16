@@ -3,7 +3,7 @@ package core
 import (
 	"net/http"
 
-	"github.com/FangcunMount/qs-server/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/gin-gonic/gin"
 	"github.com/marmotedu/errors"
 )

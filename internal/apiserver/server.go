@@ -1,11 +1,11 @@
 package apiserver
 
 import (
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/pkg/grpcserver"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/shutdown"
 	"github.com/FangcunMount/qs-server/pkg/shutdown/shutdownmanagers/posixsignal"
 )

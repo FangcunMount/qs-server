@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	interpretreportpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
 	medicalscalepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // InterpretReportContentGenerator 解读报告内容生成器

@@ -1,6 +1,6 @@
 package answer
 
-import "github.com/FangcunMount/qs-server/pkg/log"
+import "github.com/FangcunMount/component-base/pkg/log"
 
 // AnswerValue 答案值
 type AnswerValue interface {

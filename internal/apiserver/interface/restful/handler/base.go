@@ -6,9 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/errors"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // BaseHandler 基础Handler结构

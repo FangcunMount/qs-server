@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	userapp "github.com/FangcunMount/qs-server/internal/collection-server/application/user"
@@ -13,7 +14,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 )
 

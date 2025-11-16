@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	answersheetpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 	interpretreportpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
 	medicalscalepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
@@ -11,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/evaluation-server/domain/interpretion"
 	grpcclient "github.com/FangcunMount/qs-server/internal/evaluation-server/infrastructure/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/pubsub"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // GenerateInterpretReportHandlerConcurrent 并发版本的解读报告生成处理器

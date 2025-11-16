@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/interpret-report"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // QuestionnaireClient 问卷客户端

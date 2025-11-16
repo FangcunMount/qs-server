@@ -3,9 +3,9 @@ package options
 import (
 	"encoding/json"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // Options 包含所有配置项

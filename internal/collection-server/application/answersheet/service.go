@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	answersheetpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/domain/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 	internalpubsub "github.com/FangcunMount/qs-server/internal/pkg/pubsub"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 )
 

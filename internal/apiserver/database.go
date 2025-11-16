@@ -10,11 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/logger"
 	"github.com/FangcunMount/qs-server/pkg/database"
 	"github.com/FangcunMount/qs-server/pkg/database/databases"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // DatabaseManager 数据库管理器

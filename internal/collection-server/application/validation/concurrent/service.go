@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/domain/answersheet"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // Service 并发验证服务接口

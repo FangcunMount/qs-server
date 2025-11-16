@@ -10,10 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
 	interpretport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report/port"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	v1 "github.com/FangcunMount/qs-server/pkg/meta/v1"
 )
 

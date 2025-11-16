@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	medical_scale "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/medical-scale"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // MedicalScaleClient 医学量表客户端

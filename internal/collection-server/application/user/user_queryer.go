@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // UserQueryer 用户查询服务

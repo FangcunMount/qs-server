@@ -3,6 +3,7 @@ package answersheet
 import (
 	"context"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
@@ -11,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/errors"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // Queryer 答卷查询器

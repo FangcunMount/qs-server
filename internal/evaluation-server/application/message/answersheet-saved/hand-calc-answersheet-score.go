@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	answersheetpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 	questionnairepb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 	calculationapp "github.com/FangcunMount/qs-server/internal/evaluation-server/application/calculation"
 	grpcclient "github.com/FangcunMount/qs-server/internal/evaluation-server/infrastructure/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/pubsub"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // CalcAnswersheetScoreHandler 计算答卷分数处理器

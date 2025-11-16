@@ -3,6 +3,7 @@ module github.com/FangcunMount/qs-server
 go 1.24.0
 
 require (
+	github.com/FangcunMount/component-base v0.3.1
 	github.com/ThreeDotsLabs/watermill v1.4.7
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.3
 	github.com/mattn/go-isatty v0.0.20
@@ -10,12 +11,9 @@ require (
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	github.com/stretchr/testify v1.10.0
-	go.uber.org/zap v1.16.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.39.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gorm.io/gorm v1.30.0
-	k8s.io/klog v1.0.0
 )
 
 require (
@@ -32,8 +30,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
+	go.uber.org/zap v1.27.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	k8s.io/klog v1.0.0 // indirect
 )
 
 require (
@@ -83,8 +84,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.mongodb.org/mongo-driver v1.17.4
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/arch v0.18.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
@@ -109,10 +109,10 @@ require (
 	github.com/marmotedu/errors v1.0.2
 	github.com/mattheath/base62 v0.0.0-20150408093626-b80cdc656a7a
 	github.com/satori/go.uuid v1.2.0
-	github.com/sirupsen/logrus v1.9.3
-	github.com/sony/sonyflake v1.2.1
+	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/sony/sonyflake v1.3.0
 	github.com/speps/go-hashids v2.0.0+incompatible
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.10
 	github.com/tpkeeper/gin-dump v1.0.1
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/sync v0.15.0

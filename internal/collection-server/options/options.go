@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 	"github.com/spf13/pflag"
 )

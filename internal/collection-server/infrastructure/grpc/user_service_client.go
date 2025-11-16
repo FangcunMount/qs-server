@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/user"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"

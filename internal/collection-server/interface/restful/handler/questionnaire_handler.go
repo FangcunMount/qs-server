@@ -5,11 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/mapper"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/request"
-	"github.com/FangcunMount/qs-server/pkg/log"
 )
 
 // QuestionnaireHandler 问卷处理器接口

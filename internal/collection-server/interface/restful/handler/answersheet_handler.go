@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/mapper"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/response"
-	"github.com/FangcunMount/qs-server/pkg/log"
 	"github.com/gin-gonic/gin"
 )
 
