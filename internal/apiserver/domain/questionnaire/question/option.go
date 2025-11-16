@@ -1,6 +1,6 @@
 package question
 
-import "github.com/FangcunMount/qs-server/pkg/util/codeutil"
+import "github.com/FangcunMount/component-base/pkg/util/codeutil"
 
 // OptionCode 选项编码
 type OptionCode = codeutil.Code

@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/auth"
-	"github.com/FangcunMount/qs-server/pkg/util/idutil"
 )
 
 // User 用户聚合根

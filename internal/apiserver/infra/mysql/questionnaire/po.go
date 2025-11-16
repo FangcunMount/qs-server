@@ -3,7 +3,7 @@ package questionnaire
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/pkg/util/idutil"
+	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	"gorm.io/gorm"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql"

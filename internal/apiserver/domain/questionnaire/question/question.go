@@ -1,9 +1,9 @@
 package question
 
 import (
+	"github.com/FangcunMount/component-base/pkg/util/codeutil"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/validation"
-	"github.com/FangcunMount/qs-server/pkg/util/codeutil"
 )
 
 // Question 问题接口 - 统一所有题型的方法签名

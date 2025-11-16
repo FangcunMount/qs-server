@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/pkg/util/homedir"
+	"github.com/FangcunMount/component-base/pkg/util/homedir"
 )
 
 const (

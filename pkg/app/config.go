@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/FangcunMount/qs-server/pkg/util/homedir"
+	"github.com/FangcunMount/component-base/pkg/util/homedir"
 	"github.com/gosuri/uitable"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
