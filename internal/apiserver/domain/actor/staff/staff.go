@@ -168,3 +168,20 @@ func (s *Staff) CanManageScreeningProject() bool {
 func (s *Staff) CanAuditReport() bool {
 	return s.HasRole(RoleReportAuditor)
 }
+
+// === 仓储层重建方法（用于从数据库加载）===
+
+// RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
+// 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
+func (s *Staff) RestoreFromRepository(
+	roles []Role,
+	email string,
+	phone string,
+	isActive bool,
+) {
+	s.roles = make([]Role, len(roles))
+	copy(s.roles, roles)
+	s.email = email
+	s.phone = phone
+	s.isActive = isActive
+}

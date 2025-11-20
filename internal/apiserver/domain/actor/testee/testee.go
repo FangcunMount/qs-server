@@ -250,3 +250,19 @@ func (t *Testee) SetTags(tags []string) {
 		t.tags = tags
 	}
 }
+
+// RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
+// 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
+func (t *Testee) RestoreFromRepository(
+	iamUserID *int64,
+	iamChildID *int64,
+	tags []string,
+	isKeyFocus bool,
+	assessmentStats *AssessmentStats,
+) {
+	t.iamUserID = iamUserID
+	t.iamChildID = iamChildID
+	t.SetTags(tags)
+	t.SetKeyFocus(isKeyFocus)
+	t.assessmentStats = assessmentStats
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 )
 
 // DatabaseManager 数据库管理器
@@ -52,6 +53,11 @@ func (dm *DatabaseManager) Initialize() error {
 	// 初始化数据库连接
 	if err := dm.registry.Init(); err != nil {
 		return fmt.Errorf("failed to initialize database connections: %w", err)
+	}
+
+	// 执行数据库迁移
+	if err := dm.runMigrations(); err != nil {
+		return fmt.Errorf("failed to run database migrations: %w", err)
 	}
 
 	log.Info("All database connections initialized successfully")
@@ -212,4 +218,51 @@ func (dm *DatabaseManager) Close() error {
 // GetRegistry 获取数据库注册器（用于测试和调试）
 func (dm *DatabaseManager) GetRegistry() *database.Registry {
 	return dm.registry
+}
+
+// runMigrations 执行数据库迁移
+func (dm *DatabaseManager) runMigrations() error {
+	// 检查是否启用迁移
+	if !dm.config.MySQLOptions.EnableMigration {
+		log.Info("Database migration is disabled, skipping...")
+		return nil
+	}
+
+	// 获取 MySQL 连接
+	gormDB, err := dm.GetMySQLDB()
+	if err != nil {
+		log.Warn("MySQL not configured, skipping migration")
+		return nil
+	}
+
+	// 获取底层的 *sql.DB
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get sql.DB: %w", err)
+	}
+
+	// 创建迁移配置
+	migrationConfig := &migration.Config{
+		Enabled:  dm.config.MySQLOptions.EnableMigration,
+		AutoSeed: dm.config.MySQLOptions.AutoSeed,
+		Database: dm.config.MySQLOptions.Database,
+	}
+
+	// 创建迁移器
+	migrator := migration.NewMigrator(sqlDB, migrationConfig)
+
+	// 执行迁移
+	log.Info("Starting database migration...")
+	version, migrated, err := migrator.Run()
+	if err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	if migrated {
+		log.Infof("✅ Database migration completed successfully! Current version: %d", version)
+	} else {
+		log.Infof("✅ Database is already up to date! Current version: %d", version)
+	}
+
+	return nil
 }

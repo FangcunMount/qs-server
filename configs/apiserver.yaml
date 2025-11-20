@@ -36,6 +36,8 @@ mysql:
   max-open-connections: 100 # 最大打开连接数
   max-connection-life-time: "1h" # 连接最大生存时间
   log-level: 4 # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
+  enable-migration: true # 是否启用自动数据库迁移（默认：true）
+  auto-seed: false # 是否自动加载种子数据（默认：false，生产环境建议关闭）
 
 # Redis 数据库配置
 redis:
