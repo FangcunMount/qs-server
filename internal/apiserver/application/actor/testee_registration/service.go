@@ -65,7 +65,7 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			if err == nil {
 				return errors.WithCode(code.ErrUserAlreadyExists, "testee with this iam_child_id already exists")
 			}
-			if !errors.IsCode(err, code.ErrUserNotFound) && err != nil {
+			if !errors.IsCode(err, code.ErrUserNotFound) {
 				return err
 			}
 		}
@@ -74,7 +74,7 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			if err == nil {
 				return errors.WithCode(code.ErrUserAlreadyExists, "testee with this iam_user_id already exists")
 			}
-			if !errors.IsCode(err, code.ErrUserNotFound) && err != nil {
+			if !errors.IsCode(err, code.ErrUserNotFound) {
 				return err
 			}
 		}

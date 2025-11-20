@@ -152,7 +152,7 @@ func (h *MedicalScaleHandler) UpdateFactor(c *gin.Context) {
 
 		// 处理解读规则（支持多个解读规则）
 		// 如果是总分因子，可以没有解读规则
-		if !factor.IsTotalScore && (factor.InterpretRules == nil || len(factor.InterpretRules) == 0) {
+		if !factor.IsTotalScore && len(factor.InterpretRules) == 0 {
 			h.ErrorResponse(c, errors.WithCode(errorCode.ErrValidation, "非总分因子必须包含解读规则"))
 			return
 		}

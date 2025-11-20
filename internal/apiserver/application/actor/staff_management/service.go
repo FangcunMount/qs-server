@@ -57,7 +57,7 @@ func (s *staffService) Register(ctx context.Context, dto RegisterStaffDTO) (*Sta
 		if err == nil {
 			return errors.WithCode(code.ErrUserAlreadyExists, "staff with this iam_user_id already exists")
 		}
-		if !errors.IsCode(err, code.ErrUserNotFound) && err != nil {
+		if !errors.IsCode(err, code.ErrUserNotFound) {
 			return err
 		}
 

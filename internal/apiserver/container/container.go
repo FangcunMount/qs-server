@@ -25,6 +25,7 @@ type Container struct {
 	AnswersheetModule     *assembler.AnswersheetModule
 	MedicalScaleModule    *assembler.MedicalScaleModule
 	InterpretReportModule *assembler.InterpretReportModule
+	ActorModule           *assembler.ActorModule
 
 	// 容器状态
 	initialized bool
@@ -63,6 +64,11 @@ func (c *Container) Initialize() error {
 	// 初始化解读报告模块
 	if err := c.initInterpretReportModule(); err != nil {
 		return fmt.Errorf("failed to initialize interpret report module: %w", err)
+	}
+
+	// 初始化 Actor 模块
+	if err := c.initActorModule(); err != nil {
+		return fmt.Errorf("failed to initialize actor module: %w", err)
 	}
 
 	c.initialized = true
@@ -121,6 +127,20 @@ func (c *Container) initInterpretReportModule() error {
 	modulePool["interpretreport"] = interpretReportModule
 
 	fmt.Printf("📦 Interpret report module initialized\n")
+	return nil
+}
+
+// initActorModule 初始化 Actor 模块
+func (c *Container) initActorModule() error {
+	actorModule := assembler.NewActorModule()
+	if err := actorModule.Initialize(c.mysqlDB); err != nil {
+		return fmt.Errorf("failed to initialize actor module: %w", err)
+	}
+
+	c.ActorModule = actorModule
+	modulePool["actor"] = actorModule
+
+	fmt.Printf("📦 Actor module initialized\n")
 	return nil
 }
 

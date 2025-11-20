@@ -71,6 +71,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册医学量表相关的受保护路由
 	r.registerMedicalScaleProtectedRoutes(apiV1)
 
+	// 注册 Actor 模块相关的受保护路由
+	r.registerActorProtectedRoutes(apiV1)
+
 	// 管理员路由（需要额外的权限检查）
 	r.registerAdminRoutes(apiV1)
 }
@@ -132,6 +135,33 @@ func (r *Router) registerMedicalScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		medicalScales.GET("/:code", medicalScaleHandler.Get)
 		medicalScales.PUT("/:code", medicalScaleHandler.UpdateBaseInfo)
 		medicalScales.PUT("/:code/factors", medicalScaleHandler.UpdateFactor)
+	}
+}
+
+// registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由
+func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
+	actorHandler := r.container.ActorModule.ActorHandler
+	if actorHandler == nil {
+		return
+	}
+
+	// 受试者路由
+	testees := apiV1.Group("/testees")
+	{
+		testees.POST("", actorHandler.CreateTestee)       // 创建受试者
+		testees.GET("", actorHandler.ListTestees)         // 查询受试者列表
+		testees.GET("/:id", actorHandler.GetTestee)       // 获取受试者详情
+		testees.PUT("/:id", actorHandler.UpdateTestee)    // 更新受试者
+		testees.DELETE("/:id", actorHandler.DeleteTestee) // 删除受试者
+	}
+
+	// 员工路由
+	staff := apiV1.Group("/staff")
+	{
+		staff.POST("", actorHandler.CreateStaff)       // 创建员工
+		staff.GET("", actorHandler.ListStaff)          // 查询员工列表
+		staff.GET("/:id", actorHandler.GetStaff)       // 获取员工详情
+		staff.DELETE("/:id", actorHandler.DeleteStaff) // 删除员工
 	}
 }
 

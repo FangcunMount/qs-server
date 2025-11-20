@@ -64,7 +64,9 @@ func (h *QuestionnaireHandler) CreateQuestionnaire(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
+	// 映射 Questions
+	questions := mapper.NewQuestionMapper().ToViewModels(result.Questions)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result, questions))
 }
 
 // EditBasicInfo 编辑问卷基本信息
@@ -97,7 +99,9 @@ func (h *QuestionnaireHandler) EditBasicInfo(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
+	// 映射 Questions
+	questions := mapper.NewQuestionMapper().ToViewModels(result.Questions)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result, questions))
 }
 
 // UpdateQuestions 更新问卷的问题列表
@@ -125,7 +129,9 @@ func (h *QuestionnaireHandler) UpdateQuestions(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
+	// 映射 Questions
+	responseQuestions := mapper.NewQuestionMapper().ToViewModels(result.Questions)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result, responseQuestions))
 }
 
 // PublishQuestionnaire 发布问卷
@@ -144,7 +150,9 @@ func (h *QuestionnaireHandler) PublishQuestionnaire(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
+	// 映射 Questions
+	responseQuestions := mapper.NewQuestionMapper().ToViewModels(result.Questions)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result, responseQuestions))
 }
 
 // UnpublishQuestionnaire 下架问卷
@@ -163,7 +171,9 @@ func (h *QuestionnaireHandler) UnpublishQuestionnaire(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
+	// 映射 Questions
+	responseQuestions := mapper.NewQuestionMapper().ToViewModels(result.Questions)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result, responseQuestions))
 }
 
 // QueryOne 查询单个问卷
@@ -182,7 +192,9 @@ func (h *QuestionnaireHandler) QueryOne(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponse(result))
+	// 映射 Questions
+	responseQuestions := mapper.NewQuestionMapper().ToViewModels(result.Questions)
+	h.SuccessResponse(c, response.NewQuestionnaireResponse(result, responseQuestions))
 }
 
 // QueryList 查询问卷列表
