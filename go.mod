@@ -107,6 +107,7 @@ require (
 	github.com/gosuri/uitable v0.0.4
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/lib/pq v1.10.9
 	github.com/marmotedu/component-base v1.6.2 // indirect
 	github.com/nyaruka/phonenumbers v1.6.7
 	github.com/satori/go.uuid v1.2.0
