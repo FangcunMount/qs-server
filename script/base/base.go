@@ -204,23 +204,25 @@ func (env *ScriptEnv) initMySQL() error {
 	return nil
 }
 
-// initRedis 初始化 Redis 连接
+// initRedis 初始化 Redis 连接（使用 Cache Redis）
 func (env *ScriptEnv) initRedis() error {
+	// 使用 Cache Redis 作为主 Redis 实例
+	cacheOpts := env.Config.RedisDualOptions.Cache
 	redisConfig := &database.RedisConfig{
-		Host:                  env.Config.RedisOptions.Host,
-		Port:                  env.Config.RedisOptions.Port,
-		Addrs:                 env.Config.RedisOptions.Addrs,
-		Password:              env.Config.RedisOptions.Password,
-		Database:              env.Config.RedisOptions.Database,
-		MaxIdle:               env.Config.RedisOptions.MaxIdle,
-		MaxActive:             env.Config.RedisOptions.MaxActive,
-		Timeout:               env.Config.RedisOptions.Timeout,
-		EnableCluster:         env.Config.RedisOptions.EnableCluster,
-		UseSSL:                env.Config.RedisOptions.UseSSL,
-		SSLInsecureSkipVerify: env.Config.RedisOptions.SSLInsecureSkipVerify,
+		Host:                  cacheOpts.Host,
+		Port:                  cacheOpts.Port,
+		Addrs:                 []string{},
+		Password:              cacheOpts.Password,
+		Database:              cacheOpts.Database,
+		MaxIdle:               cacheOpts.MaxIdle,
+		MaxActive:             cacheOpts.MaxActive,
+		Timeout:               cacheOpts.Timeout,
+		EnableCluster:         cacheOpts.EnableCluster,
+		UseSSL:                cacheOpts.UseSSL,
+		SSLInsecureSkipVerify: false,
 	}
 
-	if redisConfig.Host == "" && len(redisConfig.Addrs) == 0 {
+	if redisConfig.Host == "" {
 		log.Warn("Redis 配置为空，跳过 Redis 初始化")
 		return nil
 	}
@@ -296,7 +298,8 @@ func (env *ScriptEnv) PrintSummary() {
 	log.Info("📋 环境信息摘要:")
 	if env.Config != nil {
 		log.Infof("  MySQL: %s", env.Config.MySQLOptions.Host)
-		log.Infof("  Redis: %s:%d", env.Config.RedisOptions.Host, env.Config.RedisOptions.Port)
+		log.Infof("  Redis (Cache): %s:%d", env.Config.RedisDualOptions.Cache.Host, env.Config.RedisDualOptions.Cache.Port)
+		log.Infof("  Redis (Store): %s:%d", env.Config.RedisDualOptions.Store.Host, env.Config.RedisDualOptions.Store.Port)
 		log.Infof("  MongoDB: %s", env.Config.MongoDBOptions.URL)
 	}
 }

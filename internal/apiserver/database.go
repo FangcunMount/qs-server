@@ -87,29 +87,61 @@ func (dm *DatabaseManager) initMySQL() error {
 	return dm.registry.Register(database.MySQL, mysqlConfig, mysqlConn)
 }
 
-// initRedis 初始化Redis连接
+// initRedis 初始化Redis连接（双实例架构）
 func (dm *DatabaseManager) initRedis() error {
-	redisConfig := &database.RedisConfig{
-		Host:                  dm.config.RedisOptions.Host,
-		Port:                  dm.config.RedisOptions.Port,
-		Addrs:                 dm.config.RedisOptions.Addrs,
-		Password:              dm.config.RedisOptions.Password,
-		Database:              dm.config.RedisOptions.Database,
-		MaxIdle:               dm.config.RedisOptions.MaxIdle,
-		MaxActive:             dm.config.RedisOptions.MaxActive,
-		Timeout:               dm.config.RedisOptions.Timeout,
-		EnableCluster:         dm.config.RedisOptions.EnableCluster,
-		UseSSL:                dm.config.RedisOptions.UseSSL,
-		SSLInsecureSkipVerify: dm.config.RedisOptions.SSLInsecureSkipVerify,
+	// 初始化 Cache Redis
+	cacheConfig := &database.RedisConfig{
+		Host:                  dm.config.RedisDualOptions.Cache.Host,
+		Port:                  dm.config.RedisDualOptions.Cache.Port,
+		Addrs:                 []string{}, // 双实例模式暂不支持集群
+		Password:              dm.config.RedisDualOptions.Cache.Password,
+		Database:              dm.config.RedisDualOptions.Cache.Database,
+		MaxIdle:               dm.config.RedisDualOptions.Cache.MaxIdle,
+		MaxActive:             dm.config.RedisDualOptions.Cache.MaxActive,
+		Timeout:               dm.config.RedisDualOptions.Cache.Timeout,
+		EnableCluster:         dm.config.RedisDualOptions.Cache.EnableCluster,
+		UseSSL:                dm.config.RedisDualOptions.Cache.UseSSL,
+		SSLInsecureSkipVerify: false,
 	}
 
-	if redisConfig.Host == "" && len(redisConfig.Addrs) == 0 {
-		log.Info("Redis host not configured, skipping Redis initialization")
-		return nil
+	if cacheConfig.Host == "" {
+		log.Info("Cache Redis host not configured, skipping Cache Redis initialization")
+	} else {
+		cacheConn := database.NewRedisConnection(cacheConfig)
+		// 注册为主 Redis 实例（保持向后兼容）
+		if err := dm.registry.Register(database.Redis, cacheConfig, cacheConn); err != nil {
+			return fmt.Errorf("failed to register cache redis: %w", err)
+		}
+		log.Info("Cache Redis initialized successfully")
 	}
 
-	redisConn := database.NewRedisConnection(redisConfig)
-	return dm.registry.Register(database.Redis, redisConfig, redisConn)
+	// 初始化 Store Redis
+	storeConfig := &database.RedisConfig{
+		Host:                  dm.config.RedisDualOptions.Store.Host,
+		Port:                  dm.config.RedisDualOptions.Store.Port,
+		Addrs:                 []string{},
+		Password:              dm.config.RedisDualOptions.Store.Password,
+		Database:              dm.config.RedisDualOptions.Store.Database,
+		MaxIdle:               dm.config.RedisDualOptions.Store.MaxIdle,
+		MaxActive:             dm.config.RedisDualOptions.Store.MaxActive,
+		Timeout:               dm.config.RedisDualOptions.Store.Timeout,
+		EnableCluster:         dm.config.RedisDualOptions.Store.EnableCluster,
+		UseSSL:                dm.config.RedisDualOptions.Store.UseSSL,
+		SSLInsecureSkipVerify: false,
+	}
+
+	if storeConfig.Host == "" {
+		log.Info("Store Redis host not configured, skipping Store Redis initialization")
+	} else {
+		storeConn := database.NewRedisConnection(storeConfig)
+		// 注册为 RedisStore 实例（如果需要单独访问）
+		// 这里可以扩展 database.Type 来支持多个 Redis 实例
+		// 暂时只注册一个主实例，Store 实例需要业务代码直接创建连接
+		log.Info("Store Redis initialized successfully (not registered in registry)")
+		_ = storeConn // 暂时不使用，未来可以扩展注册机制
+	}
+
+	return nil
 }
 
 // initMongoDB 初始化MongoDB连接
@@ -223,7 +255,7 @@ func (dm *DatabaseManager) GetRegistry() *database.Registry {
 // runMigrations 执行数据库迁移
 func (dm *DatabaseManager) runMigrations() error {
 	// 检查是否启用迁移
-	if !dm.config.MySQLOptions.EnableMigration {
+	if !dm.config.MigrationOptions.Enabled {
 		log.Info("Database migration is disabled, skipping...")
 		return nil
 	}
@@ -241,11 +273,17 @@ func (dm *DatabaseManager) runMigrations() error {
 		return fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
+	// 使用配置中的数据库名，如果未配置则使用 MySQL 配置中的数据库名
+	database := dm.config.MigrationOptions.Database
+	if database == "" {
+		database = dm.config.MySQLOptions.Database
+	}
+
 	// 创建迁移配置
 	migrationConfig := &migration.Config{
-		Enabled:  dm.config.MySQLOptions.EnableMigration,
-		AutoSeed: dm.config.MySQLOptions.AutoSeed,
-		Database: dm.config.MySQLOptions.Database,
+		Enabled:  dm.config.MigrationOptions.Enabled,
+		AutoSeed: dm.config.MigrationOptions.AutoSeed,
+		Database: database,
 	}
 
 	// 创建迁移器

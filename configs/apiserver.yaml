@@ -1,5 +1,11 @@
 # qs-apiserver 全配置
 
+# 应用配置
+app:
+  name: "qs-apiserver"
+  version: "1.0.0"
+  mode: "production"  # development, production
+
 # RESTful 服务配置
 server:
     mode: debug # server mode: release, debug, test，默认 release
@@ -36,21 +42,42 @@ mysql:
   max-open-connections: 100 # 最大打开连接数
   max-connection-life-time: "1h" # 连接最大生存时间
   log-level: 4 # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
-  enable-migration: true # 是否启用自动数据库迁移（默认：true）
-  auto-seed: false # 是否自动加载种子数据（默认：false，生产环境建议关闭）
 
-# Redis 数据库配置
+# 数据库迁移配置
+migration:
+  enabled: true  # 是否启用自动迁移（生产环境建议启用）
+  autoseed: false  # 是否自动加载种子数据（仅开发/测试环境）
+  database: "questionnaire_scale"  # 数据库名称
+
+# Redis 配置（双实例架构）
 redis:
-  host: "127.0.0.1" # Redis 服务器地址
-  port: 6379 # Redis 端口
-  password: "questionnaire_redis_2024" # Redis 密码
-  database: 0 # Redis 数据库编号
-  max-idle: 50 # 最大空闲连接数
-  max-active: 100 # 最大活跃连接数
-  timeout: 5 # 连接超时时间（秒）
-  enable-cluster: false # 是否启用集群模式
-  use-ssl: false # 是否使用SSL
-  ssl-insecure-skip-verify: false # 是否跳过SSL证书验证
+  # Cache Redis - 用于缓存、会话、限流等临时数据
+  cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""  # Redis 6.0+ ACL 用户名，留空表示使用 default 用户
+    password: "questionnaire_redis_2024"
+    database: 0  # 缓存使用 DB 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）
+  
+  # Store Redis - 用于持久化存储、队列、发布订阅等
+  store:
+    host: "127.0.0.1"
+    port: 6379  # 可以使用同一实例但不同 DB，或使用不同端口的实例
+    username: ""  # Redis 6.0+ ACL 用户名，留空表示使用 default 用户
+    password: "questionnaire_redis_2024"
+    database: 1  # 存储使用 DB 1
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）
 
 # MongoDB 数据库配置
 mongodb:
@@ -62,20 +89,39 @@ mongodb:
   ssl-ca-file: "" # SSL CA 证书文件路径
   ssl-pem-keyfile: "" # SSL PEM 密钥文件路径
 
-# 日志配置
+# 日志配置（生产环境 - 使用 component-base v0.2.9 duplicate 模式）
 log:
-  level: "debug" # 日志级别：debug, info, warn, error, fatal, panic
-  format: "console" # 日志格式：console, json
-  enable-color: true # 是否开启颜色
-  disable-caller: false # 是否禁用调用者
-  disable-stacktrace: false # 是否禁用堆栈跟踪
-  development: false # 是否为开发环境
-  output-paths: ["/data/logs/qs/qs-apiserver.log", "stdout"] # 输出路径
-  error-output-paths: ["/data/logs/qs/qs-apiserver-error.log", "stderr"] # 错误输出路径
-  max-size: 100 # 单个日志文件最大大小（MB）
-  max-age: 30 # 保留旧日志文件的最大天数
-  max-backups: 10 # 保留旧日志文件的最大个数
-  compress: true # 是否压缩旧日志文件
+  # 基础配置
+  disable-caller: true          # 生产环境禁用调用者信息（性能优化）
+  disable-stacktrace: true      # 仅在 panic 时记录堆栈
+  level: debug                   # 日志基本级别： debug, info, warn, error, fatal, panic
+  format: console                # 日志格式（json 适合生产环境，console 适合开发环境）
+  enable-color: false           # 文件输出禁用颜色
+  development: false            # 生产模式
+  name: "qs-apiserver"         # 日志名称
+  
+  # 📊 日志轮转配置
+  max-size: 100                 # 单个日志文件最大 100MB
+  max-age: 30                   # 保留 30 天
+  max-backups: 10               # 保留 10 个备份文件
+  compress: true                # 压缩旧文件节省空间
+  
+  # ⏰ 按时间轮转（推荐生产环境使用）
+  enable-time-rotation: true    # 启用按天轮转
+  time-rotation-format: "2006-01-02"  # 按天轮转
+  
+  # 🎯 分级输出（v0.2.9 duplicate 模式 - 生产环境推荐）
+  enable-level-output: true       # 启用分级输出
+  level-output-mode: "duplicate"  # 重复输出模式（推荐）
+  level-output-paths:
+    all:
+      - stdout                              # 容器/进程标准输出保留完整日志
+      - /data/logs/qs/qs-apiserver.log      # 完整日志（所有级别）
+    warn:
+      - /data/logs/qs/qs-apiserver-warn.log # 额外记录 WARN（发现潜在问题，可选）
+    error:
+      - stderr                              # ERROR 级别写入标准错误，便于监控采集
+      - /data/logs/qs/qs-apiserver-error.log # 额外记录 ERROR（快速定位故障）
 
 # JWT 配置
 jwt:

@@ -20,9 +20,6 @@ type MySQLOptions struct {
 	MaxOpenConnections    int           `json:"max-open-connections,omitempty"     mapstructure:"max-open-connections"`
 	MaxConnectionLifeTime time.Duration `json:"max-connection-life-time,omitempty" mapstructure:"max-connection-life-time"`
 	LogLevel              int           `json:"log-level"                          mapstructure:"log-level"`
-	// Migration options
-	EnableMigration bool `json:"enable-migration"              mapstructure:"enable-migration"`
-	AutoSeed        bool `json:"auto-seed"                     mapstructure:"auto-seed"`
 }
 
 // NewMySQLOptions create a `zero` value instance.
@@ -36,8 +33,6 @@ func NewMySQLOptions() *MySQLOptions {
 		MaxOpenConnections:    100,
 		MaxConnectionLifeTime: time.Duration(10) * time.Second,
 		LogLevel:              1, // Silent
-		EnableMigration:       true,
-		AutoSeed:              false,
 	}
 }
 
@@ -73,10 +68,4 @@ func (o *MySQLOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&o.LogLevel, "mysql.log-mode", o.LogLevel, ""+
 		"Specify gorm log level.")
-
-	fs.BoolVar(&o.EnableMigration, "mysql.enable-migration", o.EnableMigration, ""+
-		"Enable automatic database migration on startup.")
-
-	fs.BoolVar(&o.AutoSeed, "mysql.auto-seed", o.AutoSeed, ""+
-		"Enable automatic seed data loading on startup (requires enable-migration).")
 }

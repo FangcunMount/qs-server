@@ -10,14 +10,15 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                     *log.Options                           `json:"log"    mapstructure:"log"`
-	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server" mapstructure:"server"`
-	GRPCOptions             *genericoptions.GRPCOptions            `json:"grpc"     mapstructure:"grpc"`
-	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
-	SecureServing           *genericoptions.SecureServingOptions   `json:"secure" mapstructure:"secure"`
-	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"    mapstructure:"mysql"`
-	RedisOptions            *genericoptions.RedisOptions           `json:"redis"    mapstructure:"redis"`
-	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"  mapstructure:"mongodb"`
+	Log                     *log.Options                           `json:"log"       mapstructure:"log"`
+	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server"    mapstructure:"server"`
+	GRPCOptions             *genericoptions.GRPCOptions            `json:"grpc"      mapstructure:"grpc"`
+	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure"  mapstructure:"insecure"`
+	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"    mapstructure:"secure"`
+	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"     mapstructure:"mysql"`
+	MigrationOptions        *genericoptions.MigrationOptions       `json:"migration" mapstructure:"migration"`
+	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
+	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"   mapstructure:"mongodb"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -29,7 +30,8 @@ func NewOptions() *Options {
 		InsecureServing:         genericoptions.NewInsecureServingOptions(),
 		SecureServing:           genericoptions.NewSecureServingOptions(),
 		MySQLOptions:            genericoptions.NewMySQLOptions(),
-		RedisOptions:            genericoptions.NewRedisOptions(),
+		MigrationOptions:        genericoptions.NewMigrationOptions(),
+		RedisDualOptions:        genericoptions.NewRedisDualOptions(),
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
 	}
 }
@@ -42,7 +44,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.MySQLOptions.AddFlags(fss.FlagSet("mysql"))
-	o.RedisOptions.AddFlags(fss.FlagSet("redis"))
+	o.MigrationOptions.AddFlags(fss.FlagSet("migration"))
+	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
 
 	return fss
