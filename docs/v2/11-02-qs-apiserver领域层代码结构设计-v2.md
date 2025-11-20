@@ -1,41 +1,230 @@
 # 11-02 qs-apiserver 领域层代码结构设计（V2）
 
 > 版本：V2.0
-> 目标：将问卷&量表 BC 的领域模型，映射为 `qs-apiserver` / `qs-worker` 可复用的 Go 领域层代码结构。
+> 目标：将问卷&量表 BC 领域模型映射为 `qs-apiserver` / `qs-worker` 可复用的 Go 领域层代码结构。
 
-本篇文档站在 **实现视角**，在《11-01-问卷&量表 BC 领域模型总览（V2）》基础上，给出：
+本文档站在 **实现视角**，在《11-01-问卷&量表 BC 领域模型总览（V2）》基础上，给出：
 
-* `internal/domain` 目录结构；
-* 各包内核心聚合/实体/VO 的结构草图；
-* 仓储接口划分（MySQL / Mongo）；
-* qs-apiserver 与 qs-worker 如何共用这套领域模型。
+* `internal/domain` 目录结构
+* 各包核心聚合/实体/VO 的结构草图
+* 仓储接口划分（MySQL / Mongo）
+* qs-apiserver 与 qs-worker 共用领域模型的方式
 
 ---
 
 ## 1. 目录结构总览
 
+### 1.1 整体结构
+
 ```text
 internal/domain/
-  common/
-  survey/
-  scale/
-  assessment/
-  user/
-  plan/
-  screening/
+├── common/                          # 通用组件
+│   ├── types.go                     # 通用 ID 类型、时间等基础类型
+│   ├── errors.go                    # 领域错误定义
+│   └── events.go                    # 领域事件基础接口
+│
+├── survey/                          # 问卷子域
+│   ├── questionnaire.go             # 问卷聚合根
+│   ├── question.go                  # 题目实体
+│   ├── option.go                    # 选项值对象
+│   ├── answer_sheet.go              # 答卷聚合根
+│   ├── answer_item.go               # 答题项值对象
+│   ├── validation_rule.go           # 校验规则配置
+│   ├── scoring_config.go            # 计分配置（元数据）
+│   ├── validator.go                 # 答卷校验器接口
+│   ├── rule_factory.go              # 校验规则工厂
+│   ├── repository.go                # 仓储接口定义
+│   └── events.go                    # survey 子域事件
+│
+├── scale/                           # 量表子域
+│   ├── medical_scale.go             # 量表聚合根
+│   ├── factor.go                    # 因子实体
+│   ├── interpretation_rule.go       # 解读规则值对象
+│   ├── norm.go                      # 常模值对象
+│   ├── evaluation_result.go         # 评估结果值对象
+│   ├── evaluator.go                 # 评估器接口（职责链）
+│   ├── scoring_strategy.go          # 题目计分策略接口
+│   ├── factor_strategy.go           # 因子聚合策略接口
+│   ├── scoring_factory.go           # 计分策略工厂
+│   ├── eval_context.go              # 评估上下文
+│   ├── eval_step.go                 # 评估步骤接口
+│   ├── repository.go                # 仓储接口定义
+│   └── events.go                    # scale 子域事件
+│
+├── assessment/                      # 测评案例子域
+│   ├── assessment.go                # 测评案例聚合根
+│   ├── assessment_score.go          # 因子得分实体
+│   ├── interpret_report.go          # 解读报告聚合根
+│   ├── dimension_report.go          # 维度报告值对象
+│   ├── origin.go                    # 来源枚举（adhoc/plan/screening）
+│   ├── status.go                    # 测评状态枚举
+│   ├── report_factory.go            # 报告工厂接口
+│   ├── repository.go                # 仓储接口定义
+│   └── events.go                    # assessment 子域事件
+│
+├── user/                            # 用户子域（BC 内视图）
+│   ├── testee.go                    # 受试者聚合根
+│   ├── testee_profile.go            # 受试者档案值对象
+│   ├── staff.go                     # 后台人员聚合根
+│   ├── staff_role.go                # 人员角色枚举
+│   ├── testee_factory.go            # 受试者工厂接口
+│   ├── repository.go                # 仓储接口定义
+│   └── events.go                    # user 子域事件
+│
+├── plan/                            # 测评计划子域
+│   ├── assessment_plan.go           # 测评计划聚合根
+│   ├── assessment_task.go           # 测评任务实体
+│   ├── frequency_spec.go            # 频率规格值对象
+│   ├── task_status.go               # 任务状态枚举
+│   ├── repository.go                # 仓储接口定义
+│   └── events.go                    # plan 子域事件
+│
+└── screening/                       # 入校筛查子域
+    ├── screening_project.go         # 筛查项目聚合根
+    ├── school_info.go               # 学校信息值对象
+    ├── project_status.go            # 项目状态枚举
+    ├── repository.go                # 仓储接口定义
+    └── events.go                    # screening 子域事件
 ```
 
-说明：
+### 1.2 子域职责说明
 
-* `common/`：通用 VO、ID 类型、枚举等；
-* `survey/`：问卷模板、答卷聚合 + 校验规则接口；
-* `scale/`：量表定义、计分与解读 Evaluator；
-* `assessment/`：测评案例、维度分数、解读报告；
-* `user/`：Testee / Staff 模型；
-* `plan/`：测评计划/任务模型；
-* `screening/`：入校筛查项目模型。
+#### survey（问卷子域）
 
-`qs-worker` 服务不单独拷贝领域模型，而是直接依赖同一个 `internal/domain` 包（通过 go module / go work 管理）。
+* **核心职责**：管理问卷结构、答卷内容、校验规则
+* **关注点**："怎么问""怎么填""答案是否合法"
+* **不关心**：分数的业务含义、量表解读
+* **主要聚合**：
+  * `Questionnaire`：问卷模板，管理题目列表和版本
+  * `AnswerSheet`：答卷实例，记录用户填写的答案
+* **领域服务**：
+  * `AnswerSheetValidator`：答卷校验器（策略模式）
+  * `RuleFactory`：校验规则工厂
+
+#### scale（量表子域）
+
+* **核心职责**：管理量表定义、计分规则、解读规则
+* **关注点**："量表语义""因子结构""如何算分和解读"
+* **不关心**：问卷如何展示、用户如何填写
+* **主要聚合**：
+  * `MedicalScale`：量表定义，包含因子、常模、解读规则
+* **领域服务**：
+  * `Evaluator`：评估器（职责链模式）
+  * `ScoringStrategy`：题目计分策略（策略模式）
+  * `FactorStrategy`：因子聚合策略（策略模式）
+
+#### assessment（测评案例子域）
+
+* **核心职责**：管理一次具体测评行为的全生命周期
+* **关注点**："谁在什么时候做了什么测评""状态流转""结果记录"
+* **桥接角色**：连接 survey、scale、user、plan/screening
+* **主要聚合**：
+  * `Assessment`：测评案例，记录测评过程和状态
+  * `InterpretReport`：解读报告，面向用户展示
+* **领域服务**：
+  * `ReportFactory`：报告工厂，组装解读报告
+
+#### user（用户子域）
+
+* **核心职责**：管理本 BC 内的用户视图
+* **关注点**：受试者档案、后台人员角色
+* **与 IAM 关系**：通过 ID 映射，不直接持有 IAM 聚合
+* **主要聚合**：
+  * `Testee`：受试者，测评的主体
+  * `Staff`：后台人员，量表管理者
+* **领域服务**：
+  * `TesteeFactory`：受试者工厂，处理创建逻辑
+
+#### plan（测评计划子域）
+
+* **核心职责**：管理周期性测评计划
+* **关注点**："按时间维度的测评安排"
+* **主要聚合**：
+  * `AssessmentPlan`：测评计划，面向单个 Testee
+  * `AssessmentTask`：测评任务，某一次具体执行
+
+#### screening（入校筛查子域）
+
+* **核心职责**：管理批量筛查项目
+* **关注点**："按项目/学校维度的批量测评"
+* **主要聚合**：
+  * `ScreeningProject`：筛查项目，面向班级/学校
+
+### 1.3 依赖关系约束
+
+为避免循环依赖，严格遵循以下依赖方向：
+
+```text
+┌────────────────────────────────────────┐
+│           common（基础设施层）            │
+└────────────────┬───────────────────────┘
+                 │
+        ┌────────┴────────┬───────────────────┬────────────┐
+        │                 │                   │            │
+    ┌───▼───┐      ┌─────▼─────┐      ┌─────▼─────┐  ┌──▼───┐
+    │ user  │      │   plan    │      │ screening │  │survey│
+    └───┬───┘      └─────┬─────┘      └─────┬─────┘  └──┬───┘
+        │                │                   │           │
+        └────────────────┴───────────────────┴──────────►│
+                                                      ┌───▼───┐
+                                                      │ scale │
+                                                      └───┬───┘
+                                                          │
+                                              ┌───────────▼──────────┐
+                                              │    assessment        │
+                                              │   (桥接所有子域)      │
+                                              └──────────────────────┘
+```
+
+**依赖规则**：
+
+1. `common` 不依赖任何子域
+2. `survey` 只依赖 `common`
+3. `scale` 依赖 `survey`（只读访问 Question/AnswerSheet）
+4. `user`、`plan`、`screening` 只依赖 `common`
+5. `assessment` 依赖所有其他子域，作为桥接聚合
+6. **禁止**：任何子域向 `assessment` 的反向依赖
+
+### 1.4 跨服务共享
+
+`qs-apiserver` 和 `qs-worker` 通过以下方式共享领域模型：
+
+```text
+qs-server (repository root)
+├── internal/
+│   └── domain/           # 共享领域层
+│       ├── survey/
+│       ├── scale/
+│       ├── assessment/
+│       └── ...
+├── cmd/
+│   ├── qs-apiserver/     # API 服务
+│   │   └── main.go
+│   └── qs-worker/        # 评估工作者
+│       └── main.go
+└── go.mod                # 统一的 module
+```
+
+或使用 `go.work`（多 module 场景）：
+
+```text
+qs-server/
+├── shared/
+│   └── domain/           # 共享领域层 (独立 module)
+│       └── go.mod
+├── qs-apiserver/
+│   ├── go.mod
+│   └── go.mod 引用 ../shared/domain
+└── qs-worker/
+    ├── go.mod
+    └── go.mod 引用 ../shared/domain
+```
+
+**关键原则**：
+
+* 领域层代码只有一份，避免重复
+* 两个服务通过相同的领域对象进行通信
+* 保证业务逻辑和不变量的一致性
 
 ---
 
@@ -52,7 +241,7 @@ type ID string
 type Time = time.Time
 ```
 
-也可以在各子域中定义 `type AssessmentID string` 之类，common 只提供工具函数。
+各子域也可定义自己的 ID 类型（如 `type AssessmentID string`），common 包仅提供工具函数。
 
 ---
 
@@ -402,9 +591,9 @@ type AssessmentScoreRepository interface {
 
 ## 8. 实施建议
 
-1. 按本文件结构先搭起目录与 type stub，再逐步充实现。
-2. 领域层不直接依赖 GORM/Mongo Driver，只通过仓储接口做 IO。
-3. 严格控制依赖方向，禁止子域间的环状引用。
-4. 优先抽象“行为”而不是一次性预埋所有字段，保持聚合内不变量清晰。
+1. 按本文档结构先搭起目录和 type stub，再逐步完善实现
+2. 领域层不直接依赖 GORM/Mongo Driver，仅通过仓储接口进行 IO 操作
+3. 严格控制依赖方向，禁止子域间的循环依赖
+4. 优先抽象"行为"而非一次性预埋所有字段，保持聚合内不变量清晰
 
-本结构是 V2 代码层面的“蓝本”，后续代码实现必须与之保持同步，如有重大调整需更新本文件。
+本结构是 V2 代码层面的蓝图，后续代码实现必须与之保持同步，重大调整时需同步更新本文档。
