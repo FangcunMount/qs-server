@@ -1,7 +1,6 @@
 package dto
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -12,7 +11,7 @@ type InterpretReportDTO struct {
 	MedicalScaleCode string             `json:"medical_scale_code"`
 	Title            string             `json:"title"`
 	Description      string             `json:"description"`
-	Testee           *role.Testee       `json:"testee,omitempty"`
+	Testee           interface{}        `json:"testee,omitempty"` // TODO: 重构为 actor.TesteeRef
 	InterpretItems   []InterpretItemDTO `json:"interpret_items"`
 }
 

@@ -4,8 +4,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	interpretreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpret-report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+	// TODO: 重构 - 使用 actor.TesteeRef
+	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
+	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -36,13 +37,14 @@ func (m *Mapper) ToEntity(po *InterpretReportPO) (*interpretreport.InterpretRepo
 	options = append(options, interpretreport.WithDescription(po.Description))
 	options = append(options, interpretreport.WithInterpretItems(items))
 
-	// 如果有被试者信息
-	if po.Testee != nil {
-		testee := role.Testee{
-			UserID: user.NewUserID(po.Testee.UserID),
-		}
-		options = append(options, interpretreport.WithTestee(testee))
-	}
+	// TODO: 重构 - 使用 actor.TesteeRef
+	// 临时注释掉
+	// if po.Testee != nil {
+	// 	testee := role.Testee{
+	// 		UserID: user.NewUserID(po.Testee.UserID),
+	// 	}
+	// 	options = append(options, interpretreport.WithTestee(testee))
+	// }
 
 	// 创建解读报告
 	report := interpretreport.NewInterpretReport(
@@ -77,14 +79,15 @@ func (m *Mapper) ToPO(entity *interpretreport.InterpretReport) (*InterpretReport
 		items[i] = m.interpretItemEntityToPO(item)
 	}
 
-	// 转换被试者
+	// TODO: 重构 - 使用 actor.TesteeRef
+	// 临时注释掉
 	var testeePO *TesteePO
-	testee := entity.GetTestee()
-	if !testee.GetUserID().IsZero() {
-		testeePO = &TesteePO{
-			UserID: testee.GetUserID().Uint64(),
-		}
-	}
+	// testee := entity.GetTestee()
+	// if !testee.GetUserID().IsZero() {
+	// 	testeePO = &TesteePO{
+	// 		UserID: testee.GetUserID().Uint64(),
+	// 	}
+	// }
 
 	po := &InterpretReportPO{
 		BaseDocument: base.BaseDocument{

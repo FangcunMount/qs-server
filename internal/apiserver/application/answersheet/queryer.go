@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
 	qnPort "github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -158,42 +157,35 @@ func (q *Queryer) convertDomainsToAnswerSheetDTOs(domains []*answersheet.AnswerS
 			QuestionnaireVersion: domain.GetQuestionnaireVersion(),
 			Title:                domain.GetTitle(),
 			Score:                domain.GetScore(),
-			WriterID:             domain.GetWriter().GetUserID().Uint64(),
-			TesteeID:             domain.GetTestee().GetUserID().Uint64(),
-			Answers:              q.mapper.ToDTOs(domain.GetAnswers()),
+			// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
+			WriterID: 0, // 临时返回 0
+			TesteeID: 0, // 临时返回 0
+			Answers:  q.mapper.ToDTOs(domain.GetAnswers()),
 		}
 	}
 	return dtos
 }
 
 // getWriterID 安全地获取答卷者ID
-func getWriterID(writer *role.Writer) uint64 {
-	if writer == nil {
-		return 0
-	}
-	return writer.GetUserID().Uint64()
+// TODO: 重构为使用 actor.FillerRef
+func getWriterID(writer interface{}) uint64 {
+	return 0 // 临时返回 0，待重构
 }
 
 // getTesteeID 安全地获取被试者ID
-func getTesteeID(testee *role.Testee) uint64 {
-	if testee == nil {
-		return 0
-	}
-	return testee.GetUserID().Uint64()
+// TODO: 重构为使用 actor.TesteeRef
+func getTesteeID(testee interface{}) uint64 {
+	return 0 // 临时返回 0，待重构
 }
 
 // getWriterName 安全地获取答卷者姓名
-func getWriterName(writer *role.Writer) string {
-	if writer == nil {
-		return ""
-	}
-	return writer.GetName()
+// TODO: 重构为使用 actor.FillerRef
+func getWriterName(writer interface{}) string {
+	return "" // 临时返回空，待重构
 }
 
 // getTesteeName 安全地获取被试者姓名
-func getTesteeName(testee *role.Testee) string {
-	if testee == nil {
-		return ""
-	}
-	return testee.GetName()
+// TODO: 重构为使用 actor.TesteeRef
+func getTesteeName(testee interface{}) string {
+	return "" // 临时返回空，待重构
 }

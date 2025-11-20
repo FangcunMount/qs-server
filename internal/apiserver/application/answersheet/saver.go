@@ -9,8 +9,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -36,8 +34,9 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 	}
 
 	// 2. 转换为领域对象
-	writer := role.NewWriter(user.NewUserID(answerSheetDTO.WriterID), "")
-	testee := role.NewTestee(user.NewUserID(answerSheetDTO.TesteeID), "")
+	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
+	var writer interface{} = nil
+	var testee interface{} = nil
 	answers := s.mapper.ToBOs(answerSheetDTO.Answers)
 
 	asBO := answersheet.NewAnswerSheet(
@@ -61,9 +60,10 @@ func (s *Saver) SaveOriginalAnswerSheet(ctx context.Context, answerSheetDTO dto.
 		QuestionnaireVersion: asBO.GetQuestionnaireVersion(),
 		Title:                asBO.GetTitle(),
 		Score:                asBO.GetScore(),
-		WriterID:             asBO.GetWriter().GetUserID().Uint64(),
-		TesteeID:             asBO.GetTestee().GetUserID().Uint64(),
-		Answers:              s.mapper.ToDTOs(asBO.GetAnswers()),
+		// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
+		WriterID: 0, // 临时返回 0
+		TesteeID: 0, // 临时返回 0
+		Answers:  s.mapper.ToDTOs(asBO.GetAnswers()),
 	}, nil
 }
 
@@ -119,9 +119,10 @@ func (s *Saver) SaveAnswerSheetScores(ctx context.Context, id uint64, totalScore
 		QuestionnaireVersion: aDomain.GetQuestionnaireVersion(),
 		Title:                aDomain.GetTitle(),
 		Score:                aDomain.GetScore(),
-		WriterID:             aDomain.GetWriter().GetUserID().Uint64(),
-		TesteeID:             aDomain.GetTestee().GetUserID().Uint64(),
-		Answers:              s.mapper.ToDTOs(aDomain.GetAnswers()),
+		// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
+		WriterID: 0, // 临时返回 0
+		TesteeID: 0, // 临时返回 0
+		Answers:  s.mapper.ToDTOs(aDomain.GetAnswers()),
 	}
 
 	log.Infof("保存答卷分数完成，ID: %d, 最终分数: %d", id, result.Score)

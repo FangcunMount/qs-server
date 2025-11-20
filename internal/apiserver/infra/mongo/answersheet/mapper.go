@@ -4,8 +4,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+
+	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
+	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
+	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -31,24 +33,26 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		}
 	}
 
-	// 转换答卷者 - 只存储 userID
+	// TODO: 重构 - 使用 actor.FillerRef
+	// 临时注释掉
 	var writer *WriterPO
-	if bo.GetWriter() != nil {
-		writer = &WriterPO{
-			UserID: bo.GetWriter().GetUserID().Uint64(),
-		}
-	}
+	// if bo.GetWriter() != nil {
+	// 	writer = &WriterPO{
+	// 		UserID: bo.GetWriter().GetUserID().Uint64(),
+	// 	}
+	// }
 
-	// 转换被试者 - 只存储 userID
+	// TODO: 重构 - 使用 actor.TesteeRef
+	// 临时注释掉
 	var testee *TesteePO
-	if bo.GetTestee() != nil {
-		testee = &TesteePO{
-			UserID: bo.GetTestee().GetUserID().Uint64(),
-			Name:   bo.GetTestee().GetName(),
-			Sex:    bo.GetTestee().GetSex(),
-			Age:    bo.GetTestee().GetAge(),
-		}
-	}
+	// if bo.GetTestee() != nil {
+	// 	testee = &TesteePO{
+	// 		UserID: bo.GetTestee().GetUserID().Uint64(),
+	// 		Name:   bo.GetTestee().GetName(),
+	// 		Sex:    bo.GetTestee().GetSex(),
+	// 		Age:    bo.GetTestee().GetAge(),
+	// 	}
+	// }
 
 	// 创建PO对象，但不设置DomainID，让BeforeInsert方法来设置
 	po := &AnswerSheetPO{
@@ -85,20 +89,10 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 		answers = append(answers, m.mapAnswerToBO(answerPO))
 	}
 
-	// 转换答卷者 - 只使用 userID 创建 Writer
-	var writer *role.Writer
-	if po.Writer != nil {
-		writer = role.NewWriter(user.NewUserID(po.Writer.UserID), "") // 名称留空，需要时从用户服务获取
-	}
-
-	// 转换被试者 - 只使用 userID 创建 Testee
-	var testee *role.Testee
-	if po.Testee != nil {
-		testee = role.NewTestee(
-			user.NewUserID(po.Testee.UserID),
-			po.Testee.Name,
-		)
-	}
+	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
+	// 临时注释掉，直接传 nil
+	var writer interface{}
+	var testee interface{}
 
 	return answersheet.NewAnswerSheet(
 		po.QuestionnaireCode,

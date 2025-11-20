@@ -1,7 +1,8 @@
 package interpretationreport
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
+	// TODO: 重构为使用 actor.TesteeRef
+	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -12,7 +13,7 @@ type InterpretReport struct {
 	medicalScaleCode string
 	title            string
 	description      string
-	testee           role.Testee
+	testee           interface{} // TODO: 重构为 actor.TesteeRef
 	interpretItems   []InterpretItem
 }
 
@@ -49,7 +50,8 @@ func WithDescription(description string) InterpretReportOption {
 }
 
 // WithTestee 设置被试者
-func WithTestee(testee role.Testee) InterpretReportOption {
+// TODO: 待重构为使用 actor.TesteeRef
+func WithTestee(testee interface{}) InterpretReportOption {
 	return func(r *InterpretReport) {
 		r.testee = testee
 	}
@@ -90,7 +92,8 @@ func (r *InterpretReport) GetDescription() string {
 }
 
 // GetTestee 获取被试者
-func (r *InterpretReport) GetTestee() role.Testee {
+// TODO: 待重构为返回 actor.TesteeRef
+func (r *InterpretReport) GetTestee() interface{} {
 	return r.testee
 }
 

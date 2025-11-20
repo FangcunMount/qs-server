@@ -78,6 +78,8 @@ func (m *InterpretReportMapper) ToDomain(reportDTO *dto.InterpretReportDTO) *int
 		interpretreport.WithInterpretItems(items),
 	)
 
+	// TODO: 重构 - 使用 actor.TesteeRef
+	// 临时跳过 testee 处理
 	if reportDTO.Testee != nil {
 		report = interpretreport.NewInterpretReport(
 			reportDTO.AnswerSheetId,
@@ -85,7 +87,7 @@ func (m *InterpretReportMapper) ToDomain(reportDTO *dto.InterpretReportDTO) *int
 			reportDTO.Title,
 			interpretreport.WithID(meta.ID(reportDTO.ID)),
 			interpretreport.WithDescription(reportDTO.Description),
-			interpretreport.WithTestee(*reportDTO.Testee),
+			// interpretreport.WithTestee(reportDTO.Testee), // 暂时不设置
 			interpretreport.WithInterpretItems(items),
 		)
 	}

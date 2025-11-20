@@ -6,9 +6,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	errCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	// TODO: 重构为使用 actor.TesteeRef 和 actor.FillerRef
+	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 )
 
 // AnswerSheet 答卷
@@ -19,8 +20,8 @@ type AnswerSheet struct {
 	title                string
 	score                float64
 	answers              []answer.Answer
-	writer               *role.Writer
-	testee               *role.Testee
+	writer               interface{} // TODO: 重构为 actor.FillerRef
+	testee               interface{} // TODO: 重构为 actor.TesteeRef
 	createdAt            time.Time
 	updatedAt            time.Time
 }
@@ -75,13 +76,15 @@ func WithAnswers(answers []answer.Answer) AnswerSheetOption {
 	}
 }
 
-func WithWriter(writer *role.Writer) AnswerSheetOption {
+// TODO: 待重构为使用 actor.FillerRef
+func WithWriter(writer interface{}) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.writer = writer
 	}
 }
 
-func WithTestee(testee *role.Testee) AnswerSheetOption {
+// TODO: 待重构为使用 actor.TesteeRef
+func WithTestee(testee interface{}) AnswerSheetOption {
 	return func(a *AnswerSheet) {
 		a.testee = testee
 	}
@@ -123,7 +126,7 @@ func (a *AnswerSheet) GetScore() float64 {
 	return a.score
 }
 
-func (a *AnswerSheet) GetWriter() *role.Writer {
+func (a *AnswerSheet) GetWriter() interface{} {
 	if a.writer == nil {
 		log.Warnf("Writer is nil for answersheet")
 		return nil
@@ -131,7 +134,7 @@ func (a *AnswerSheet) GetWriter() *role.Writer {
 	return a.writer
 }
 
-func (a *AnswerSheet) GetTestee() *role.Testee {
+func (a *AnswerSheet) GetTestee() interface{} {
 	if a.testee == nil {
 		log.Warnf("Testee is nil for answersheet")
 		return nil
