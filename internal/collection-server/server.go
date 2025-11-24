@@ -52,13 +52,7 @@ func createCollectionServer(cfg *config.Config) (*collectionServer, error) {
 // PrepareRun 准备运行 Collection 服务器
 func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	// 创建容器
-	pubsubConfig := s.config.ToPubSubConfig()
-	s.container = container.NewContainer(
-		s.config.GRPCClient,
-		pubsubConfig,
-		s.config.Concurrency,
-		s.config.JWT,
-	)
+	s.container = container.NewContainer()
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
@@ -69,10 +63,6 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
 
 	log.Info("🏗️  Collection Server initialized successfully!")
-	log.Info("   📦 Domain: validation, user")
-	log.Info("   🔌 Ports: grpc-client, redis-publisher")
-	log.Info("   🔧 Adapters: http, grpc-client, redis-publisher, jwt, wechat")
-	log.Info("   📋 Application Services: validation_service, questionnaire_client, answersheet_client, user_services")
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
