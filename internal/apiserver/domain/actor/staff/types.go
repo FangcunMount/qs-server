@@ -23,3 +23,7 @@ const (
 	// RoleReportAuditor 报告审核员
 	RoleReportAuditor Role = "report_auditor"
 )
+
+func (r Role) String() string {
+	return string(r)
+}

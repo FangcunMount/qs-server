@@ -1,6 +1,9 @@
 package staff
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -72,11 +75,15 @@ func (pv *permissionValidator) ValidateAll(staff *Staff, requiredRoles ...Role) 
 	}
 
 	// 3. 检查是否拥有所有角色
+	missRoles := make([]string, 0)
 	for _, role := range requiredRoles {
 		if !staff.HasRole(role) {
-			msg := "staff missing required role: " + string(role)
-			return errors.WithCode(code.ErrPermissionDenied, msg)
+			missRoles = append(missRoles, role.String())
 		}
+	}
+	if len(missRoles) > 0 {
+		msg := fmt.Sprintf("staff missing required roles: %s", strings.Join(missRoles, ", "))
+		return errors.WithCode(code.ErrPermissionDenied, msg)
 	}
 
 	return nil
