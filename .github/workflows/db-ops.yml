@@ -1,0 +1,227 @@
+name: Database Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Database operation'
+        required: true
+        type: choice
+        options:
+          - backup
+          - restore
+          - status
+      backup_name:
+        description: 'Backup name (for restore operation)'
+        required: false
+        type: string
+      database:
+        description: 'Database to operate on'
+        required: true
+        type: choice
+        options:
+          - mongodb
+          - all
+  
+  schedule:
+    - cron: '0 17 * * *'  # 每天 17:00 UTC (北京时间凌晨 01:00) 自动备份
+
+jobs:
+  mongodb-backup:
+    name: MongoDB Backup
+    if: |
+      (github.event_name == 'schedule') || 
+      (github.event.inputs.operation == 'backup' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Backup MongoDB
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          script: |
+            BACKUP_DIR="/opt/backups/qs-server/mongodb"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}"
+            
+            sudo mkdir -p $BACKUP_DIR
+            
+            echo "Starting MongoDB backup..."
+            echo "Database: $MONGODB_DBNAME"
+            echo "Timestamp: $TIMESTAMP"
+            
+            # MongoDB backup using mongodump
+            mongodump --host="$MONGODB_HOST" \
+                      --port="${MONGODB_PORT:-27017}" \
+                      --username="$MONGODB_USERNAME" \
+                      --password="$MONGODB_PASSWORD" \
+                      --db="$MONGODB_DBNAME" \
+                      --out="$BACKUP_DIR/$BACKUP_FILE" \
+                      --authenticationDatabase=admin 2>&1
+            
+            if [ $? -eq 0 ]; then
+              cd "$BACKUP_DIR"
+              tar -czf "${BACKUP_FILE}.tar.gz" "$BACKUP_FILE"
+              rm -rf "$BACKUP_FILE"
+              BACKUP_SIZE=$(du -h "${BACKUP_FILE}.tar.gz" | cut -f1)
+              echo "✅ Backup completed: ${BACKUP_FILE}.tar.gz"
+              echo "Size: $BACKUP_SIZE"
+              
+              # Keep only last 5 backups
+              echo "Cleaning old backups (keeping last 5)..."
+              ls -t qs_mongodb_backup_*.tar.gz | tail -n +6 | xargs -r rm -f
+              
+              echo ""
+              echo "Current backups:"
+              ls -lht qs_mongodb_backup_*.tar.gz 2>/dev/null | head -6
+            else
+              echo "❌ Backup failed"
+              exit 1
+            fi
+
+  mongodb-restore:
+    name: MongoDB Restore
+    if: github.event.inputs.operation == 'restore' && github.event.inputs.database == 'mongodb'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Restore MongoDB
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          BACKUP_FILE_INPUT: ${{ github.event.inputs.backup_name }}
+          script: |
+            BACKUP_DIR="/opt/backups/qs-server/mongodb"
+            BACKUP_FILE="$BACKUP_FILE_INPUT"
+            
+            if [ -z "$BACKUP_FILE" ]; then
+              echo "❌ Backup name is required"
+              echo ""
+              echo "Available backups:"
+              ls -lht "$BACKUP_DIR" | head -11
+              exit 1
+            fi
+            
+            if [ ! -f "$BACKUP_DIR/$BACKUP_FILE" ]; then
+              echo "❌ Backup file not found: $BACKUP_FILE"
+              echo ""
+              echo "Available backups:"
+              ls -lht "$BACKUP_DIR" | head -11
+              exit 1
+            fi
+            
+            echo "⚠️ WARNING: This will overwrite the current database!"
+            echo "Backup file: $BACKUP_FILE"
+            echo "Target database: $MONGODB_DBNAME"
+            echo "Restoring in 5 seconds..."
+            sleep 5
+            
+            echo "Restoring database..."
+            cd "$BACKUP_DIR"
+            tar -xzf "$BACKUP_FILE"
+            EXTRACT_DIR=$(basename "$BACKUP_FILE" .tar.gz)
+            
+            mongorestore --host="$MONGODB_HOST" \
+                        --port="${MONGODB_PORT:-27017}" \
+                        --username="$MONGODB_USERNAME" \
+                        --password="$MONGODB_PASSWORD" \
+                        --db="$MONGODB_DBNAME" \
+                        --authenticationDatabase=admin \
+                        --drop \
+                        "$EXTRACT_DIR/$MONGODB_DBNAME" 2>&1
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Database restored successfully from $BACKUP_FILE"
+              rm -rf "$EXTRACT_DIR"
+            else
+              echo "❌ Database restore failed"
+              rm -rf "$EXTRACT_DIR"
+              exit 1
+            fi
+
+  mongodb-status:
+    name: MongoDB Status
+    if: github.event.inputs.operation == 'status' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Check MongoDB Status
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          script: |
+            echo "=== MongoDB Status ==="
+            
+            # Check MongoDB connection
+            if mongosh --host "$MONGODB_HOST" \
+                  --port "${MONGODB_PORT:-27017}" \
+                  --username "$MONGODB_USERNAME" \
+                  --password "$MONGODB_PASSWORD" \
+                  --authenticationDatabase admin \
+                  --eval "db.version()" 2>/dev/null; then
+              echo "✅ MongoDB connection OK"
+            else
+              echo "❌ MongoDB connection failed"
+              exit 1
+            fi
+            
+            # Show database stats
+            echo ""
+            echo "Database statistics:"
+            mongosh --host "$MONGODB_HOST" \
+                  --port "${MONGODB_PORT:-27017}" \
+                  --username "$MONGODB_USERNAME" \
+                  --password "$MONGODB_PASSWORD" \
+                  --authenticationDatabase admin \
+                  --eval "use $MONGODB_DBNAME; db.stats()" 2>/dev/null
+            
+            # Show collections
+            echo ""
+            echo "Collections:"
+            mongosh --host "$MONGODB_HOST" \
+                  --port "${MONGODB_PORT:-27017}" \
+                  --username "$MONGODB_USERNAME" \
+                  --password "$MONGODB_PASSWORD" \
+                  --authenticationDatabase admin \
+                  --eval "use $MONGODB_DBNAME; db.getCollectionNames()" 2>/dev/null
+            
+            # List backups
+            echo ""
+            echo "Available backups:"
+            ls -lht /opt/backups/qs-server/mongodb/ 2>/dev/null | head -11 || echo "No backups found"

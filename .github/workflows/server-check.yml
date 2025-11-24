@@ -1,0 +1,217 @@
+name: Server Health Check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'  # 每30分钟执行一次
+
+jobs:
+  health-check:
+    name: Production Server Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: System Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "QS-Server - Health Check"
+            echo "=========================================="
+            
+            echo "Server: $(hostname)"
+            echo "Uptime: $(uptime)"
+            echo "Date: $(date)"
+            echo ""
+            
+            echo "CPU Usage:"
+            top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'
+            echo ""
+            
+            echo "Memory Usage:"
+            free -h | awk 'NR==2{printf "Used: %s / Total: %s (%.2f%%)\n", $3, $2, $3*100/$2}'
+            echo ""
+            
+            echo "Disk Usage:"
+            df -h | grep -E "^/dev/" | awk '{print $1 ": " $5 " used (" $3 "/" $2 ")"}'
+            echo ""
+            
+            echo "Load Average:"
+            uptime | awk -F'load average:' '{print $2}'
+            echo ""
+            
+            echo "Top 5 CPU processes:"
+            ps aux --sort=-%cpu | head -6
+            
+            echo "=========================================="
+
+      - name: Docker Service Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "Docker Service Status"
+            echo "=========================================="
+            
+            if ! sudo docker info >/dev/null 2>&1; then
+              echo "❌ Docker is not running"
+              exit 1
+            fi
+            echo "✅ Docker daemon is running"
+            echo ""
+            
+            echo "QS-Server Containers:"
+            
+            # Check API Server
+            if sudo docker ps --filter "name=qs-apiserver" --format "{{.Names}}" | grep -q "qs-apiserver"; then
+              CONTAINER_STATUS=$(sudo docker ps --filter "name=qs-apiserver" --format "{{.Status}}")
+              CONTAINER_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' qs-apiserver 2>/dev/null || echo "no healthcheck")
+              
+              echo "✅ API Server is RUNNING"
+              echo "   Status: $CONTAINER_STATUS"
+              echo "   Health: $CONTAINER_HEALTH"
+              
+              if [ "$CONTAINER_HEALTH" = "unhealthy" ]; then
+                echo "⚠️ Container is unhealthy, checking logs..."
+                sudo docker logs --tail 50 qs-apiserver
+                echo "Attempting restart..."
+                sudo docker restart qs-apiserver
+                sleep 10
+              fi
+            else
+              echo "❌ API Server is NOT running"
+            fi
+            echo ""
+            
+            # Check Collection Server
+            if sudo docker ps --filter "name=qs-collection-server" --format "{{.Names}}" | grep -q "qs-collection-server"; then
+              CONTAINER_STATUS=$(sudo docker ps --filter "name=qs-collection-server" --format "{{.Status}}")
+              CONTAINER_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' qs-collection-server 2>/dev/null || echo "no healthcheck")
+              
+              echo "✅ Collection Server is RUNNING"
+              echo "   Status: $CONTAINER_STATUS"
+              echo "   Health: $CONTAINER_HEALTH"
+              
+              if [ "$CONTAINER_HEALTH" = "unhealthy" ]; then
+                echo "⚠️ Container is unhealthy, checking logs..."
+                sudo docker logs --tail 50 qs-collection-server
+                echo "Attempting restart..."
+                sudo docker restart qs-collection-server
+                sleep 10
+              fi
+            else
+              echo "❌ Collection Server is NOT running"
+            fi
+            
+            echo "=========================================="
+
+      - name: API Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "API Health Check"
+            echo "=========================================="
+            
+            # API Server HTTP
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/healthz 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ API Server HTTP (8081): OK"
+            else
+              echo "❌ API Server HTTP (8081): Failed ($HTTP_CODE)"
+            fi
+            
+            # API Server HTTPS
+            HTTPS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:9445/healthz 2>/dev/null || echo "000")
+            if [ "$HTTPS_CODE" = "200" ]; then
+              echo "✅ API Server HTTPS (9445): OK"
+            else
+              echo "⚠️ API Server HTTPS (9445): $HTTPS_CODE"
+            fi
+            
+            # Collection Server HTTP
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/health 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Collection Server HTTP (8082): OK"
+            else
+              echo "❌ Collection Server HTTP (8082): Failed ($HTTP_CODE)"
+            fi
+            
+            # Collection Server HTTPS
+            HTTPS_CODE=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:9446/health 2>/dev/null || echo "000")
+            if [ "$HTTPS_CODE" = "200" ]; then
+              echo "✅ Collection Server HTTPS (9446): OK"
+            else
+              echo "⚠️ Collection Server HTTPS (9446): $HTTPS_CODE"
+            fi
+            
+            echo "=========================================="
+
+      - name: Database & Redis Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "Database & Cache Health Check"
+            echo "=========================================="
+            
+            # Check MongoDB from logs
+            echo "MongoDB Connection Status:"
+            if sudo docker logs --tail 100 qs-apiserver 2>&1 | grep -i "mongodb.*connect" | tail -3; then
+              echo "✅ MongoDB connection logs found"
+            else
+              echo "ℹ️ No recent MongoDB logs"
+            fi
+            echo ""
+            
+            # Check Redis from logs
+            echo "Redis Connection Status:"
+            if sudo docker logs --tail 100 qs-apiserver 2>&1 | grep -i "redis.*connect" | tail -3; then
+              echo "✅ Redis connection logs found"
+            else
+              echo "ℹ️ No recent Redis logs"
+            fi
+            
+            echo "=========================================="
+
+  report:
+    name: Health Check Report
+    needs: [health-check]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Generate Report
+        run: |
+          echo "=========================================="
+          echo "Health Check Report"
+          echo "=========================================="
+          echo "Status: ${{ needs.health-check.result }}"
+          echo "Time: $(date)"
+          echo ""
+          
+          if [ "${{ needs.health-check.result }}" == "success" ]; then
+            echo "✅ All health checks passed"
+          else
+            echo "❌ Health check failed"
+            exit 1
+          fi

@@ -1,0 +1,99 @@
+name: Test SSH Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    name: Test SSH Connection to SVRA
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Show GitHub Runner Info
+        run: |
+          echo "=========================================="
+          echo "GitHub Runner Information"
+          echo "=========================================="
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner Name: ${{ runner.name }}"
+          echo "Runner Arch: ${{ runner.arch }}"
+          echo "UTC Time: $(TZ=UTC date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "=========================================="
+      
+      - name: Test SSH Connection
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "SSH Connection Test - Success!"
+            echo "=========================================="
+            echo "Server: $(hostname)"
+            echo "User: $(whoami)"
+            echo "Working Directory: $(pwd)"
+            echo ""
+            
+            echo "Time Information:"
+            echo "  Local Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+            echo "  UTC Time: $(TZ=UTC date '+%Y-%m-%d %H:%M:%S %Z')"
+            
+            if command -v timedatectl >/dev/null 2>&1; then
+              echo ""
+              echo "Timezone Configuration:"
+              timedatectl | grep -E "Time zone|Local time|Universal time"
+            fi
+            
+            echo ""
+            echo "System Information:"
+            echo "  OS: $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2 || uname -s)"
+            echo "  Kernel: $(uname -r)"
+            echo "  Uptime: $(uptime -p 2>/dev/null || uptime)"
+            
+            echo ""
+            echo "Docker Status:"
+            if command -v docker >/dev/null 2>&1; then
+              if sudo docker info >/dev/null 2>&1; then
+                echo "  ✅ Docker is running"
+                echo "  Version: $(sudo docker version --format '{{.Server.Version}}' 2>/dev/null)"
+                echo "  Containers: $(sudo docker ps -q | wc -l) running"
+              else
+                echo "  ⚠️ Docker daemon not accessible"
+              fi
+            else
+              echo "  ❌ Docker not installed"
+            fi
+            
+            echo ""
+            echo "QS-Server Services:"
+            echo "  API Server:"
+            if sudo docker ps --filter "name=qs-apiserver" --format "{{.Names}}" | grep -q "qs-apiserver"; then
+              echo "    ✅ Running"
+              CONTAINER_STATUS=$(sudo docker ps --filter "name=qs-apiserver" --format "{{.Status}}")
+              echo "    Status: $CONTAINER_STATUS"
+            else
+              echo "    ⚠️ Not running"
+            fi
+            
+            echo "  Collection Server:"
+            if sudo docker ps --filter "name=qs-collection-server" --format "{{.Names}}" | grep -q "qs-collection-server"; then
+              echo "    ✅ Running"
+              CONTAINER_STATUS=$(sudo docker ps --filter "name=qs-collection-server" --format "{{.Status}}")
+              echo "    Status: $CONTAINER_STATUS"
+            else
+              echo "    ⚠️ Not running"
+            fi
+            
+            echo ""
+            echo "Disk Space:"
+            df -h / | tail -1 | awk '{printf "  Root: %s used / %s total (%s)\n", $3, $2, $5}'
+            
+            echo ""
+            echo "Memory Usage:"
+            free -h | awk 'NR==2{printf "  Used: %s / Total: %s (%.1f%%)\n", $3, $2, $3*100/$2}'
+            
+            echo "=========================================="
+            echo "✅ All checks completed"
+            echo "=========================================="

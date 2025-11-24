@@ -1,0 +1,161 @@
+name: Ping Runner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'  # 每6小时执行一次
+
+jobs:
+  ping-production:
+    name: Production Server Quick Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: System Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "QS-Server - Quick Check"
+            echo "=========================================="
+            echo "Hostname: $(hostname)"
+            echo "Uptime: $(uptime)"
+            echo "Date: $(date)"
+            echo ""
+            
+            echo "Memory:"
+            free -h | grep -E "Mem|Swap"
+            echo ""
+            
+            echo "Disk:"
+            df -h | grep -E "^/dev/" | head -3
+            echo ""
+            
+            echo "CPU:"
+            top -bn1 | grep "Cpu(s)"
+            echo ""
+            
+            echo "Load Average:"
+            uptime | awk -F'load average:' '{print $2}'
+            echo "=========================================="
+            
+      - name: Docker Service Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "Docker Service Status"
+            echo "=========================================="
+            
+            if ! sudo docker info >/dev/null 2>&1; then
+              echo "❌ Docker is not running"
+              exit 1
+            fi
+            echo "✅ Docker daemon is running"
+            echo ""
+            
+            echo "QS-Server containers:"
+            sudo docker ps --filter "name=qs-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo ""
+            
+            # API Server
+            if sudo docker ps --filter "name=qs-apiserver" --format "{{.Names}}" | grep -q "qs-apiserver"; then
+              echo "✅ API Server is running"
+            else
+              echo "❌ API Server is NOT running"
+            fi
+            
+            # Collection Server
+            if sudo docker ps --filter "name=qs-collection-server" --format "{{.Names}}" | grep -q "qs-collection-server"; then
+              echo "✅ Collection Server is running"
+            else
+              echo "❌ Collection Server is NOT running"
+            fi
+            
+            echo "=========================================="
+            
+      - name: API Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "=========================================="
+            echo "API Health Check"
+            echo "=========================================="
+            
+            # API Server
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/healthz 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ API Server HTTP (8081): OK"
+            else
+              echo "❌ API Server HTTP (8081): Failed ($HTTP_CODE)"
+            fi
+            
+            # Collection Server
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/health 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Collection Server HTTP (8082): OK"
+            else
+              echo "❌ Collection Server HTTP (8082): Failed ($HTTP_CODE)"
+            fi
+            
+            echo "=========================================="
+
+  ping-github:
+    name: GitHub Runner Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner Info
+        run: |
+          echo "=========================================="
+          echo "GitHub Runner Info"
+          echo "=========================================="
+          echo "OS: ${{ runner.os }}"
+          echo "Name: ${{ runner.name }}"
+          echo "Arch: ${{ runner.arch }}"
+          echo "✅ GitHub Runner OK"
+          echo "=========================================="
+
+  report:
+    name: Status Report
+    needs: [ping-production, ping-github]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Generate Report
+        run: |
+          echo "=========================================="
+          echo "Ping Runner - Status Report"
+          echo "=========================================="
+          echo "Production Server: ${{ needs.ping-production.result }}"
+          echo "GitHub Runner: ${{ needs.ping-github.result }}"
+          echo "Time: $(date)"
+          echo ""
+          
+          if [ "${{ needs.ping-production.result }}" != "success" ]; then
+            echo "❌ Production check failed!"
+            exit 1
+          fi
+          
+          if [ "${{ needs.ping-github.result }}" != "success" ]; then
+            echo "❌ GitHub runner check failed!"
+            exit 1
+          fi
+          
+          echo "✅ All checks passed"
+          echo "=========================================="

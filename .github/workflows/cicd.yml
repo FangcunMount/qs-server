@@ -1,0 +1,750 @@
+name: CI/CD Pipeline
+
+# ============================================================================
+# 必需的 Secrets 配置
+# ============================================================================
+# Organization Secrets (组织级别，共享配置):
+#   SVRA_HOST, SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
+#   SVRA_SUDO_PASSWORD (可选，如果 sudo 需要密码)
+#   MONGODB_HOST, MONGODB_PORT
+#   REDIS_HOST, REDIS_PORT
+#   NSQ_NSQD_HOST, NSQ_NSQD_PORT
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+#
+# Repository Secrets (仓库级别，敏感信息):
+#   MONGODB_USERNAME, MONGODB_PASSWORD, MONGODB_DBNAME
+#   REDIS_PASSWORD
+#   JWT_SECRET
+#   WWW_UID, WWW_GID (可选，默认 1000/1000)
+# ============================================================================
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: '要部署的服务'
+        required: true
+        type: choice
+        options:
+          - all
+          - apiserver
+          - collection
+
+env:
+  GO_VERSION: '1.24'
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_REPOSITORY: fangcunmount
+
+jobs:
+  validate-secrets:
+    name: Validate Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Required Secrets
+        env:
+          SVRA_HOST: ${{ secrets.SVRA_HOST }}
+          SVRA_USERNAME: ${{ secrets.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "🔍 Validating GitHub Action secrets..."
+          VALIDATION_FAILED=0
+          ENFORCE_REQUIRED=0
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            ENFORCE_REQUIRED=1
+            echo "📋 Checking required secrets for main branch deployment..."
+          else
+            echo "ℹ️ Not on main branch – required secrets reported for awareness only."
+          fi
+
+          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD REDIS_HOST JWT_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
+          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT REDIS_PORT REDIS_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID)
+
+          for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
+            VALUE=${!SECRET_NAME}
+            if [ -n "$VALUE" ]; then
+              echo "✅ $SECRET_NAME is set"
+            else
+              if [ $ENFORCE_REQUIRED -eq 1 ]; then
+                echo "❌ $SECRET_NAME is not set"
+                VALIDATION_FAILED=1
+              else
+                echo "⚠️ $SECRET_NAME is not set (required when deploying main)"
+              fi
+            fi
+          done
+
+          echo ""
+          echo "📎 Checking optional secrets (warnings only)..."
+          for SECRET_NAME in "${OPTIONAL_SECRETS[@]}"; do
+            VALUE=${!SECRET_NAME}
+            if [ -n "$VALUE" ]; then
+              echo "✅ $SECRET_NAME is set"
+            else
+              case "$SECRET_NAME" in
+                SVRA_SUDO_PASSWORD)
+                  echo "⚠️ $SECRET_NAME is not set (needed only if sudo prompts for a password)"
+                  ;;
+                WWW_UID|WWW_GID)
+                  echo "⚠️ $SECRET_NAME is not set (defaults to 1000/1000)"
+                  ;;
+                MONGODB_PORT)
+                  echo "⚠️ $SECRET_NAME is not set (defaults to 27017)"
+                  ;;
+                REDIS_PORT)
+                  echo "⚠️ $SECRET_NAME is not set (defaults to 6379)"
+                  ;;
+                REDIS_PASSWORD)
+                  echo "⚠️ $SECRET_NAME is not set (Redis auth disabled)"
+                  ;;
+                NSQ_NSQD_HOST|NSQ_NSQD_PORT)
+                  echo "⚠️ $SECRET_NAME is not set (NSQ may be optional)"
+                  ;;
+                *)
+                  echo "⚠️ $SECRET_NAME is not set (optional)"
+                  ;;
+              esac
+            fi
+          done
+
+          echo ""
+          if [ $ENFORCE_REQUIRED -eq 1 ] && [ $VALIDATION_FAILED -eq 1 ]; then
+            echo "⚠️ Secrets validation failed! Please configure the missing required secrets."
+            echo "ℹ️ Continuing anyway for non-deployment jobs..."
+          else
+            echo "✅ Required secrets look good!"
+          fi
+
+  test:
+    name: Run Tests
+    needs: [validate-secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Get dependencies
+        run: |
+          go mod download
+          go mod verify
+      
+      - name: Run tests
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      
+      - name: Generate coverage report
+        run: |
+          go tool cover -func=coverage.out
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+  lint:
+    name: Lint Code
+    needs: [validate-secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install dependencies
+        run: |
+          go mod download
+      
+      - name: Run make lint
+        run: |
+          make lint
+
+  build:
+    name: Build Applications
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [apiserver, collection]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Build ${{ matrix.service }}
+        run: |
+          make build-${{ matrix.service }}
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qs-${{ matrix.service }}
+          path: bin/*
+          retention-days: 7
+
+  docker:
+    name: Build Docker Images
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [apiserver, collection]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Set image metadata
+        id: meta
+        run: |
+          if [ "${{ matrix.service }}" = "apiserver" ]; then
+            echo "image_name=qs-apiserver" >> $GITHUB_OUTPUT
+            echo "dockerfile=build/docker/Dockerfile.qs-apiserver" >> $GITHUB_OUTPUT
+          else
+            echo "image_name=qs-collection-server" >> $GITHUB_OUTPUT
+            echo "dockerfile=build/docker/Dockerfile.collection-server" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ steps.meta.outputs.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}/${{ steps.meta.outputs.image_name }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}/${{ steps.meta.outputs.image_name }}:${{ github.sha }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Tag and push to Docker Hub
+        run: |
+          IMAGE_NAME=${{ steps.meta.outputs.image_name }}
+          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}/${IMAGE_NAME}:latest
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}/${IMAGE_NAME}:latest \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}/${IMAGE_NAME}:latest \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}
+          echo "✅ 镜像已推送到 Docker Hub:"
+          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest"
+          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}"
+
+  deploy-apiserver:
+    name: Deploy API Server
+    needs: [docker]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' &&
+      (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver')
+    environment:
+      name: production-apiserver
+      url: https://qs-api.yangshujie.com
+    env:
+      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
+      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      SERVICE_NAME: qs-apiserver
+      IMAGE_NAME: qs-apiserver
+      CONTAINER_NAME: qs-apiserver
+      HTTP_PORT: 8081
+      HTTPS_PORT: 9445
+      INTERNAL_HTTP_PORT: 9080
+      INTERNAL_HTTPS_PORT: 9444
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare deployment files
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
+          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
+        run: |
+          mkdir -p deploy-package/configs/env
+          cp -r configs deploy-package/
+
+          cat > deploy-package/configs/env/config.prod.env <<EOF
+          # Auto-generated production environment configuration for QS API Server
+          QS_APISERVER_MONGODB_HOST=${MONGODB_HOST}:${MONGODB_PORT}
+          QS_APISERVER_MONGODB_USERNAME=${MONGODB_USERNAME}
+          QS_APISERVER_MONGODB_PASSWORD=${MONGODB_PASSWORD}
+          QS_APISERVER_MONGODB_DATABASE=${MONGODB_DBNAME}
+          
+          QS_APISERVER_REDIS_HOST=${REDIS_HOST}
+          QS_APISERVER_REDIS_PORT=${REDIS_PORT}
+          QS_APISERVER_REDIS_PASSWORD=${REDIS_PASSWORD}
+          
+          QS_APISERVER_JWT_SECRET=${JWT_SECRET}
+          
+          QS_APISERVER_NSQ_NSQD_HOST=${NSQ_NSQD_HOST}
+          QS_APISERVER_NSQ_NSQD_PORT=${NSQ_NSQD_PORT}
+          EOF
+
+          echo "=========================================="
+          echo "📋 Generated config.prod.env for API Server"
+          echo "=========================================="
+          cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g' | sed 's/SECRET=.*/SECRET=***REDACTED***/g'
+          echo "=========================================="
+
+          tar -czf deploy-package.tar.gz -C deploy-package .
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-package.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          HTTP_PORT: ${{ env.HTTP_PORT }}
+          HTTPS_PORT: ${{ env.HTTPS_PORT }}
+          INTERNAL_HTTP_PORT: ${{ env.INTERNAL_HTTP_PORT }}
+          INTERNAL_HTTPS_PORT: ${{ env.INTERNAL_HTTPS_PORT }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ env.WWW_UID }}
+          WWW_GID: ${{ env.WWW_GID }}
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GHCR_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          script: |
+            set -Eeuo pipefail
+
+            APP_UID="${WWW_UID:-1000}"
+            APP_GID="${WWW_GID:-1000}"
+
+            # SUDO 助手
+            if sudo -n true 2>/dev/null; then
+              SUDO="sudo"
+              echo "ℹ️ Using passwordless sudo."
+            else
+              if [ -z "${SUDO_PASSWORD:-}" ]; then
+                echo "❌ sudo needs password. Provide SVRA_SUDO_PASSWORD or configure NOPASSWD." >&2
+                exit 1
+              fi
+              sudo_pw() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
+              export -f sudo_pw
+              SUDO="sudo_pw"
+              $SUDO -v || true
+              echo "ℹ️ Using sudo with password."
+            fi
+
+            echo "=========================================="
+            echo "Deploying ${CONTAINER_NAME} to Production Server"
+            echo "=========================================="
+
+            # 目录准备
+            $SUDO mkdir -p /opt/qs-server/${CONTAINER_NAME}/configs/env
+            $SUDO mkdir -p /data/logs/qs-server/${CONTAINER_NAME}
+            $SUDO mkdir -p /opt/backups/qs-server/${CONTAINER_NAME}
+
+            # 备份
+            BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            if [ -d "/opt/qs-server/${CONTAINER_NAME}/configs" ] && [ "$(ls -A /opt/qs-server/${CONTAINER_NAME}/configs 2>/dev/null)" != "" ]; then
+              $SUDO tar -czf "$BACKUP_DIR/backup_${TIMESTAMP}.tar.gz" \
+                /opt/qs-server/${CONTAINER_NAME}/configs \
+                2>/dev/null || echo "No previous version to backup"
+            fi
+
+            # 解包
+            DEPLOY_TMP="/tmp/qs-deploy-$$"
+            mkdir -p "$DEPLOY_TMP"
+            tar -xzf /tmp/deploy-package.tar.gz -C "$DEPLOY_TMP"
+
+            $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
+            $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
+            $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
+
+            rm -rf "$DEPLOY_TMP"
+            rm -f /tmp/deploy-package.tar.gz
+
+            # 网络
+            if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
+              echo "Creating Docker network qs-network..."
+              $SUDO docker network create qs-network
+            fi
+
+            # 证书路径
+            CERT_HOST_PATH="/data/ssl/certs/yangshujie.com.crt"
+            KEY_HOST_PATH="/data/ssl/private/yangshujie.com.key"
+
+            if ! $SUDO test -r "$CERT_HOST_PATH"; then
+              echo "❌ CERT not readable: $CERT_HOST_PATH"
+              exit 1
+            fi
+            if ! $SUDO test -r "$KEY_HOST_PATH"; then
+              echo "❌ KEY not readable: $KEY_HOST_PATH"
+              exit 1
+            fi
+
+            TLS_MOUNTS="-v $CERT_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.crt:ro \
+                        -v $KEY_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.key:ro"
+
+            # GHCR 登录
+            if [ -n "${GHCR_TOKEN:-}" ]; then
+              echo "Logging into GitHub Container Registry..."
+              echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
+            fi
+
+            # 拉取镜像
+            echo "Pulling latest Docker image..."
+            if ! $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"; then
+              echo "⚠️ Pull with auth failed, trying anonymous..."
+              $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
+            fi
+
+            # 停旧容器
+            if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
+              echo "Stopping existing container..."
+              $SUDO docker stop ${CONTAINER_NAME} || true
+              $SUDO docker rm ${CONTAINER_NAME} || true
+            fi
+
+            # 启动容器
+            DOCKER_OPTIONS="--name ${CONTAINER_NAME} \
+              --restart unless-stopped \
+              --network qs-network \
+              --user ${APP_UID}:${APP_GID} \
+              -p ${HTTP_PORT}:${INTERNAL_HTTP_PORT} \
+              -p ${HTTPS_PORT}:${INTERNAL_HTTPS_PORT} \
+              -v /opt/qs-server/${CONTAINER_NAME}/configs:/app/configs \
+              -v /data/logs/qs-server/${CONTAINER_NAME}:/var/log/qs-server \
+              --env-file /opt/qs-server/${CONTAINER_NAME}/configs/env/config.prod.env \
+              $TLS_MOUNTS"
+
+            echo "Starting ${CONTAINER_NAME}..."
+            $SUDO docker run -d $DOCKER_OPTIONS \
+              "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
+              --config=/app/configs/apiserver.prod.yaml
+
+            # 健康检查
+            echo "Waiting for service to be ready..."
+            ATTEMPTS=0
+            MAX_ATTEMPTS=30
+            while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+              if curl -sf http://localhost:${HTTP_PORT}/healthz > /dev/null 2>&1; then
+                echo "✅ Health check passed (attempt $ATTEMPTS)"
+                $SUDO docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}"
+                break
+              fi
+              ATTEMPTS=$((ATTEMPTS + 1))
+              if [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; then
+                echo "⏳ Health check attempt $ATTEMPTS/$MAX_ATTEMPTS, retrying..."
+                sleep 5
+              fi
+            done
+
+            if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+              echo "❌ Service failed to start after $MAX_ATTEMPTS attempts"
+              $SUDO docker logs --tail 100 ${CONTAINER_NAME} || true
+              exit 1
+            fi
+
+            # 清理旧备份
+            $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true'
+
+            echo "=========================================="
+            echo "✅ ${CONTAINER_NAME} deployment completed"
+            echo "=========================================="
+
+  deploy-collection:
+    name: Deploy Collection Server
+    needs: [docker]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' &&
+      (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'collection')
+    environment:
+      name: production-collection
+      url: https://qs-collection.yangshujie.com
+    env:
+      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
+      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      SERVICE_NAME: collection-server
+      IMAGE_NAME: qs-collection-server
+      CONTAINER_NAME: qs-collection-server
+      HTTP_PORT: 8082
+      HTTPS_PORT: 9446
+      INTERNAL_HTTP_PORT: 9080
+      INTERNAL_HTTPS_PORT: 9444
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare deployment files
+        env:
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          mkdir -p deploy-package/configs/env
+          cp -r configs deploy-package/
+
+          cat > deploy-package/configs/env/config.prod.env <<EOF
+          # Auto-generated production environment configuration for Collection Server
+          COLLECTION_SERVER_REDIS_HOST=${REDIS_HOST}
+          COLLECTION_SERVER_REDIS_PORT=${REDIS_PORT}
+          COLLECTION_SERVER_REDIS_PASSWORD=${REDIS_PASSWORD}
+          
+          COLLECTION_SERVER_JWT_SECRET=${JWT_SECRET}
+          EOF
+
+          echo "=========================================="
+          echo "📋 Generated config.prod.env for Collection Server"
+          echo "=========================================="
+          cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g' | sed 's/SECRET=.*/SECRET=***REDACTED***/g'
+          echo "=========================================="
+
+          tar -czf deploy-package.tar.gz -C deploy-package .
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-package.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          HTTP_PORT: ${{ env.HTTP_PORT }}
+          HTTPS_PORT: ${{ env.HTTPS_PORT }}
+          INTERNAL_HTTP_PORT: ${{ env.INTERNAL_HTTP_PORT }}
+          INTERNAL_HTTPS_PORT: ${{ env.INTERNAL_HTTPS_PORT }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ env.WWW_UID }}
+          WWW_GID: ${{ env.WWW_GID }}
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GHCR_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          script: |
+            set -Eeuo pipefail
+
+            APP_UID="${WWW_UID:-1000}"
+            APP_GID="${WWW_GID:-1000}"
+
+            # SUDO 助手
+            if sudo -n true 2>/dev/null; then
+              SUDO="sudo"
+            else
+              if [ -z "${SUDO_PASSWORD:-}" ]; then
+                echo "❌ sudo needs password." >&2
+                exit 1
+              fi
+              sudo_pw() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
+              export -f sudo_pw
+              SUDO="sudo_pw"
+              $SUDO -v || true
+            fi
+
+            echo "=========================================="
+            echo "Deploying ${CONTAINER_NAME}"
+            echo "=========================================="
+
+            # 目录准备
+            $SUDO mkdir -p /opt/qs-server/${CONTAINER_NAME}/configs/env
+            $SUDO mkdir -p /data/logs/qs-server/${CONTAINER_NAME}
+            $SUDO mkdir -p /opt/backups/qs-server/${CONTAINER_NAME}
+
+            # 备份
+            BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            if [ -d "/opt/qs-server/${CONTAINER_NAME}/configs" ] && [ "$(ls -A /opt/qs-server/${CONTAINER_NAME}/configs 2>/dev/null)" != "" ]; then
+              $SUDO tar -czf "$BACKUP_DIR/backup_${TIMESTAMP}.tar.gz" \
+                /opt/qs-server/${CONTAINER_NAME}/configs \
+                2>/dev/null || echo "No previous backup"
+            fi
+
+            # 解包
+            DEPLOY_TMP="/tmp/qs-deploy-$$"
+            mkdir -p "$DEPLOY_TMP"
+            tar -xzf /tmp/deploy-package.tar.gz -C "$DEPLOY_TMP"
+
+            $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
+            $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
+            $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
+
+            rm -rf "$DEPLOY_TMP"
+            rm -f /tmp/deploy-package.tar.gz
+
+            # 网络
+            if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
+              $SUDO docker network create qs-network
+            fi
+
+            # 证书
+            CERT_HOST_PATH="/data/ssl/certs/yangshujie.com.crt"
+            KEY_HOST_PATH="/data/ssl/private/yangshujie.com.key"
+
+            if ! $SUDO test -r "$CERT_HOST_PATH" || ! $SUDO test -r "$KEY_HOST_PATH"; then
+              echo "❌ TLS certificates not found"
+              exit 1
+            fi
+
+            TLS_MOUNTS="-v $CERT_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.crt:ro \
+                        -v $KEY_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.key:ro"
+
+            # 登录 GHCR
+            if [ -n "${GHCR_TOKEN:-}" ]; then
+              echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
+            fi
+
+            # 拉取镜像
+            $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
+
+            # 停旧容器
+            if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
+              $SUDO docker stop ${CONTAINER_NAME} || true
+              $SUDO docker rm ${CONTAINER_NAME} || true
+            fi
+
+            # 启动
+            DOCKER_OPTIONS="--name ${CONTAINER_NAME} \
+              --restart unless-stopped \
+              --network qs-network \
+              --user ${APP_UID}:${APP_GID} \
+              -p ${HTTP_PORT}:${INTERNAL_HTTP_PORT} \
+              -p ${HTTPS_PORT}:${INTERNAL_HTTPS_PORT} \
+              -v /opt/qs-server/${CONTAINER_NAME}/configs:/app/configs \
+              -v /data/logs/qs-server/${CONTAINER_NAME}:/var/log/qs-server \
+              --env-file /opt/qs-server/${CONTAINER_NAME}/configs/env/config.prod.env \
+              $TLS_MOUNTS"
+
+            $SUDO docker run -d $DOCKER_OPTIONS \
+              "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
+              --config=/app/configs/collection-server.prod.yaml
+
+            # 健康检查
+            ATTEMPTS=0
+            MAX_ATTEMPTS=30
+            while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+              if curl -sf http://localhost:${HTTP_PORT}/healthz > /dev/null 2>&1; then
+                echo "✅ Health check passed"
+                break
+              fi
+              ATTEMPTS=$((ATTEMPTS + 1))
+              if [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; then
+                sleep 5
+              fi
+            done
+
+            if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+              echo "❌ Service failed to start"
+              $SUDO docker logs --tail 100 ${CONTAINER_NAME} || true
+              exit 1
+            fi
+
+            # 清理旧备份
+            $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
+
+            echo "✅ ${CONTAINER_NAME} deployed"
+
+  notify:
+    name: Send Notification
+    needs: [deploy-apiserver, deploy-collection]
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Log deployment status
+        run: |
+          echo "=========================================="
+          echo "Deployment Summary"
+          echo "=========================================="
+          echo "API Server: ${{ needs.deploy-apiserver.result }}"
+          echo "Collection Server: ${{ needs.deploy-collection.result }}"
+          
+          if [ "${{ needs.deploy-apiserver.result }}" == "success" ] && [ "${{ needs.deploy-collection.result }}" == "success" ]; then
+            echo "✅ All deployments succeeded"
+          else
+            echo "❌ Some deployments failed"
+            exit 1
+          fi
