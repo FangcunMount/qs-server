@@ -14,9 +14,8 @@ import (
 // 用于在其他聚合根（如 AnswerSheet、Assessment）中引用受试者
 // 避免跨聚合根直接依赖实体，保持松耦合
 type TesteeRef struct {
-	testeeID   testee.ID // 受试者ID
-	iamUserID  *int64    // 可选：IAM用户ID
-	iamChildID *int64    // 可选：IAM儿童ID
+	testeeID  testee.ID // 受试者ID
+	profileID *uint64   // 可选：用户档案ID（当前对应 IAM.Child.ID）
 }
 
 // NewTesteeRef 创建受试者引用
@@ -26,19 +25,11 @@ func NewTesteeRef(testeeID testee.ID) *TesteeRef {
 	}
 }
 
-// NewTesteeRefWithIAMUser 创建带IAM用户ID的受试者引用
-func NewTesteeRefWithIAMUser(testeeID testee.ID, iamUserID int64) *TesteeRef {
+// NewTesteeRefWithProfile 创建带用户档案ID的受试者引用
+func NewTesteeRefWithProfile(testeeID testee.ID, profileID uint64) *TesteeRef {
 	return &TesteeRef{
 		testeeID:  testeeID,
-		iamUserID: &iamUserID,
-	}
-}
-
-// NewTesteeRefWithIAMChild 创建带IAM儿童ID的受试者引用
-func NewTesteeRefWithIAMChild(testeeID testee.ID, iamChildID int64) *TesteeRef {
-	return &TesteeRef{
-		testeeID:   testeeID,
-		iamChildID: &iamChildID,
+		profileID: &profileID,
 	}
 }
 
@@ -47,14 +38,9 @@ func (r *TesteeRef) TesteeID() testee.ID {
 	return r.testeeID
 }
 
-// IAMUserID 获取IAM用户ID
-func (r *TesteeRef) IAMUserID() *int64 {
-	return r.iamUserID
-}
-
-// IAMChildID 获取IAM儿童ID
-func (r *TesteeRef) IAMChildID() *int64 {
-	return r.iamChildID
+// ProfileID 获取用户档案ID
+func (r *TesteeRef) ProfileID() *uint64 {
+	return r.profileID
 }
 
 // StaffRef 员工引用（值对象）
