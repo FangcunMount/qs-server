@@ -7,7 +7,6 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"gorm.io/gorm"
 )
 
 // registrationService 受试者注册服务实现
@@ -41,9 +40,7 @@ func NewRegistrationService(
 func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDTO) (*TesteeResult, error) {
 	var result *domain.Testee
 
-	err := s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 验证参数
 		if err := s.validator.ValidateName(dto.Name, true); err != nil {
 			return err
@@ -92,12 +89,11 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 	return toTesteeResult(result), nil
 }
 
-// EnsureByProfile 确保受试者存在（幂等）
+// EnsureByProfile 确保受试者存在（幂等操作）
 func (s *registrationService) EnsureByProfile(ctx context.Context, dto EnsureTesteeDTO) (*TesteeResult, error) {
 	var result *domain.Testee
 
-	err := s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 
 		// 如果没有 ProfileID，无法使用幂等创建
 		if dto.ProfileID == nil || *dto.ProfileID == 0 {

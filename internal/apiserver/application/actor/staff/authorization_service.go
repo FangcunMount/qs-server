@@ -6,7 +6,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"gorm.io/gorm"
 )
 
 // authorizationService 员工权限管理服务实现
@@ -38,9 +37,7 @@ func NewAuthorizationService(
 
 // AssignRole 分配角色
 func (s *authorizationService) AssignRole(ctx context.Context, staffID uint64, roleName string) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找员工
 		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
 		if err != nil {
@@ -69,9 +66,7 @@ func (s *authorizationService) AssignRole(ctx context.Context, staffID uint64, r
 
 // RemoveRole 移除角色
 func (s *authorizationService) RemoveRole(ctx context.Context, staffID uint64, roleName string) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找员工
 		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
 		if err != nil {
@@ -95,9 +90,7 @@ func (s *authorizationService) RemoveRole(ctx context.Context, staffID uint64, r
 
 // Activate 激活员工
 func (s *authorizationService) Activate(ctx context.Context, staffID uint64) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找员工
 		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
 		if err != nil {
@@ -120,9 +113,7 @@ func (s *authorizationService) Activate(ctx context.Context, staffID uint64) err
 
 // Deactivate 停用员工
 func (s *authorizationService) Deactivate(ctx context.Context, staffID uint64) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找员工
 		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
 		if err != nil {

@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"gorm.io/gorm"
 )
 
 // lifecycleService 员工生命周期服务实现
@@ -47,9 +46,7 @@ func NewLifecycleService(
 func (s *lifecycleService) Register(ctx context.Context, dto RegisterStaffDTO) (*StaffResult, error) {
 	var result *staff.Staff
 
-	err := s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 验证参数
 		if err := s.validator.ValidateOrgID(dto.OrgID); err != nil {
 			return err
@@ -100,8 +97,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterStaffDTO) (
 func (s *lifecycleService) EnsureByUser(ctx context.Context, orgID int64, userID int64, name string) (*StaffResult, error) {
 	var result *staff.Staff
 
-	err := s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 使用工厂的幂等创建方法
 		var err error
 		result, err = s.factory.GetOrCreateByUser(txCtx, orgID, userID, name)
@@ -117,8 +113,8 @@ func (s *lifecycleService) EnsureByUser(ctx context.Context, orgID int64, userID
 
 // Delete 删除员工
 func (s *lifecycleService) Delete(ctx context.Context, staffID uint64) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+
 		if err := s.repo.Delete(txCtx, staff.ID(staffID)); err != nil {
 			return errors.Wrap(err, "failed to delete staff")
 		}
@@ -128,8 +124,7 @@ func (s *lifecycleService) Delete(ctx context.Context, staffID uint64) error {
 
 // UpdateContactInfo 更新联系方式
 func (s *lifecycleService) UpdateContactInfo(ctx context.Context, dto UpdateStaffContactDTO) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 
 		// 1. 查找员工
 		st, err := s.repo.FindByID(txCtx, staff.ID(dto.StaffID))
@@ -155,8 +150,7 @@ func (s *lifecycleService) UpdateContactInfo(ctx context.Context, dto UpdateStaf
 
 // UpdateFromExternalSource 从外部源更新员工信息
 func (s *lifecycleService) UpdateFromExternalSource(ctx context.Context, staffID uint64, name, email, phone string) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 
 		// 1. 查找员工
 		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))

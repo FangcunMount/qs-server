@@ -6,7 +6,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"gorm.io/gorm"
 )
 
 // managementService 受试者档案管理服务实现
@@ -38,9 +37,7 @@ func NewManagementService(
 
 // UpdateBasicInfo 更新基本信息
 func (s *managementService) UpdateBasicInfo(ctx context.Context, dto UpdateTesteeProfileDTO) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
 		testee, err := s.repo.FindByID(txCtx, domain.ID(dto.TesteeID))
 		if err != nil {
@@ -64,9 +61,7 @@ func (s *managementService) UpdateBasicInfo(ctx context.Context, dto UpdateTeste
 
 // BindProfile 绑定用户档案
 func (s *managementService) BindProfile(ctx context.Context, testeeID uint64, profileID uint64) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
 		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
 		if err != nil {
@@ -87,9 +82,7 @@ func (s *managementService) BindProfile(ctx context.Context, testeeID uint64, pr
 
 // AddTag 添加业务标签
 func (s *managementService) AddTag(ctx context.Context, testeeID uint64, tag string) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
 		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
 		if err != nil {
@@ -110,9 +103,7 @@ func (s *managementService) AddTag(ctx context.Context, testeeID uint64, tag str
 
 // RemoveTag 移除业务标签
 func (s *managementService) RemoveTag(ctx context.Context, testeeID uint64, tag string) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
 		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
 		if err != nil {
@@ -133,9 +124,7 @@ func (s *managementService) RemoveTag(ctx context.Context, testeeID uint64, tag 
 
 // MarkAsKeyFocus 标记为重点关注
 func (s *managementService) MarkAsKeyFocus(ctx context.Context, testeeID uint64) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
 		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
 		if err != nil {
@@ -156,9 +145,7 @@ func (s *managementService) MarkAsKeyFocus(ctx context.Context, testeeID uint64)
 
 // UnmarkKeyFocus 取消重点关注
 func (s *managementService) UnmarkKeyFocus(ctx context.Context, testeeID uint64) error {
-	return s.uow.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, "tx", tx)
-
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
 		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
 		if err != nil {

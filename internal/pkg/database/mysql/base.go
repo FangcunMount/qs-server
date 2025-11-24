@@ -6,6 +6,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// txKey 是用于在 context 中存储事务的自定义键类型
+type txKey struct{}
+
 // BaseRepository provides common CRUD helpers for GORM repositories.
 type BaseRepository[T Syncable] struct {
 	db *gorm.DB
@@ -32,7 +35,13 @@ func (r *BaseRepository[T]) DB() *gorm.DB {
 }
 
 // WithContext attaches a context to the DB handle.
+// If the context contains a transaction (set by UnitOfWork), it will use that transaction.
+// Otherwise, it uses the default DB connection.
 func (r *BaseRepository[T]) WithContext(ctx context.Context) *gorm.DB {
+	// 尝试从 context 中提取事务
+	if tx, ok := ctx.Value(txKey{}).(*gorm.DB); ok && tx != nil {
+		return tx.WithContext(ctx)
+	}
 	return r.db.WithContext(ctx)
 }
 
