@@ -39,34 +39,31 @@ type TesteeProfileQueryApplicationService interface {
 
 // RegisterTesteeDTO 注册受试者 DTO
 type RegisterTesteeDTO struct {
-	OrgID      int64      // 机构ID
-	IAMUserID  *int64     // IAM用户ID（成人患者自己注册）
-	IAMChildID *int64     // IAM儿童ID（家长为孩子注册）
-	Name       string     // 姓名
-	Gender     int8       // 性别（0-未知,1-男,2-女）
-	Birthday   *time.Time // 出生日期
-	Source     string     // 数据来源："online_form" / "wechat_miniprogram"
+	OrgID     int64      // 机构ID
+	ProfileID *uint64    // 用户档案ID（当前对应 IAM.Child.ID）
+	Name      string     // 姓名
+	Gender    int8       // 性别（0-未知,1-男,2-女）
+	Birthday  *time.Time // 出生日期
+	Source    string     // 数据来源："online_form" / "wechat_miniprogram"
 }
 
 // EnsureTesteeDTO 确保受试者存在 DTO（幂等）
 type EnsureTesteeDTO struct {
-	OrgID      int64      // 机构ID
-	IAMUserID  *int64     // IAM用户ID
-	IAMChildID *int64     // IAM儿童ID
-	Name       string     // 姓名
-	Gender     int8       // 性别
-	Birthday   *time.Time // 出生日期
+	OrgID     int64      // 机构ID
+	ProfileID *uint64    // 用户档案ID
+	Name      string     // 姓名
+	Gender    int8       // 性别
+	Birthday  *time.Time // 出生日期
 }
 
 // TesteeResult 受试者结果 DTO
 type TesteeResult struct {
-	ID         uint64     // 受试者ID
-	OrgID      int64      // 机构ID
-	IAMUserID  *int64     // IAM用户ID
-	IAMChildID *int64     // IAM儿童ID
-	Name       string     // 姓名
-	Gender     int8       // 性别
-	Birthday   *time.Time // 出生日期
-	Age        int        // 年龄
-	Source     string     // 数据来源
+	ID        uint64     // 受试者ID
+	OrgID     int64      // 机构ID
+	ProfileID *uint64    // 用户档案ID
+	Name      string     // 姓名
+	Gender    int8       // 性别
+	Birthday  *time.Time // 出生日期
+	Age       int        // 年龄
+	Source    string     // 数据来源
 }

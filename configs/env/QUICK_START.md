@@ -59,18 +59,20 @@ export
 
 # 使用配置
 run-apiserver:
-	@echo "MySQL Host: $(MYSQL_HOST)"
-	@./tmp/apiserver
+ @echo "MySQL Host: $(MYSQL_HOST)"
+ @./tmp/apiserver
 ```
 
 ### 方式三：代码加载
 
 **安装依赖：**
+
 ```bash
 go get github.com/joho/godotenv
 ```
 
 **Go 代码：**
+
 ```go
 import (
     "log"
@@ -97,6 +99,7 @@ func main() {
 ### 方式四：Docker 部署
 
 **docker-compose.yml:**
+
 ```yaml
 services:
   qs-apiserver:

@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package actor;
+
+option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor";
+
+import "google/protobuf/timestamp.proto";
+
+// ActorService Actor 服务 - 管理受试者和员工
+service ActorService {
+  // ========== Testee 受试者相关 ==========
+  
+  // CreateTestee 创建受试者
+  // 用于外部场景（collection-server）和内部场景（周期性测评创建受试者）
+  rpc CreateTestee(CreateTesteeRequest) returns (TesteeResponse);
+  
+  // GetTestee 获取受试者详情
+  rpc GetTestee(GetTesteeRequest) returns (TesteeResponse);
+  
+  // UpdateTestee 更新受试者信息
+  rpc UpdateTestee(UpdateTesteeRequest) returns (TesteeResponse);
+  
+  // TesteeExists 检查受试者是否存在
+  rpc TesteeExists(TesteeExistsRequest) returns (TesteeExistsResponse);
+  
+  // ListTesteesByOrg 根据机构查询受试者列表
+  rpc ListTesteesByOrg(ListTesteesByOrgRequest) returns (TesteeListResponse);
+}
+
+// ========== Testee 消息定义 ==========
+
+// CreateTesteeRequest 创建受试者请求
+message CreateTesteeRequest {
+  uint64 org_id = 1;                    // 机构ID
+  uint64 iam_user_id = 2;               // IAM用户ID（成人）
+  uint64 iam_child_id = 3;              // IAM儿童ID
+  string name = 4;                      // 姓名
+  int32 gender = 5;                     // 性别：1-男，2-女，3-其他
+  google.protobuf.Timestamp birthday = 6; // 出生日期
+  repeated string tags = 7;             // 标签列表
+  string source = 8;                    // 来源：online_form/plan/screening/imported
+  bool is_key_focus = 9;                // 是否重点关注
+}
+
+// GetTesteeRequest 获取受试者请求
+message GetTesteeRequest {
+  uint64 id = 1;                        // 受试者ID
+}
+
+// UpdateTesteeRequest 更新受试者请求
+message UpdateTesteeRequest {
+  uint64 id = 1;                        // 受试者ID
+  string name = 2;                      // 姓名（可选）
+  int32 gender = 3;                     // 性别（可选）
+  google.protobuf.Timestamp birthday = 4; // 出生日期（可选）
+  repeated string tags = 5;             // 标签列表（可选）
+  bool is_key_focus = 6;                // 是否重点关注（可选）
+}
+
+// TesteeExistsRequest 检查受试者是否存在请求
+message TesteeExistsRequest {
+  uint64 org_id = 1;                    // 机构ID
+  uint64 iam_child_id = 2;              // IAM儿童ID
+}
+
+// TesteeExistsResponse 检查受试者是否存在响应
+message TesteeExistsResponse {
+  bool exists = 1;                      // 是否存在
+  uint64 testee_id = 2;                 // 受试者ID（如果存在）
+}
+
+// ListTesteesByOrgRequest 根据机构查询受试者列表请求
+message ListTesteesByOrgRequest {
+  uint64 org_id = 1;                    // 机构ID
+  int32 offset = 2;                     // 偏移量
+  int32 limit = 3;                      // 限制数量
+}
+
+// TesteeResponse 受试者响应
+message TesteeResponse {
+  uint64 id = 1;                        // 受试者ID
+  uint64 org_id = 2;                    // 机构ID
+  uint64 iam_user_id = 3;               // IAM用户ID
+  uint64 iam_child_id = 4;              // IAM儿童ID
+  string name = 5;                      // 姓名
+  int32 gender = 6;                     // 性别
+  google.protobuf.Timestamp birthday = 7; // 出生日期
+  repeated string tags = 8;             // 标签列表
+  string source = 9;                    // 来源
+  bool is_key_focus = 10;               // 是否重点关注
+  
+  // 测评统计信息
+  AssessmentStats assessment_stats = 11;
+  
+  google.protobuf.Timestamp created_at = 12; // 创建时间
+  google.protobuf.Timestamp updated_at = 13; // 更新时间
+}
+
+// AssessmentStats 测评统计信息
+message AssessmentStats {
+  int32 total_count = 1;                // 总测评次数
+  google.protobuf.Timestamp last_assessment_at = 2; // 最后测评时间
+  string last_risk_level = 3;           // 最后风险等级
+}
+
+// TesteeListResponse 受试者列表响应
+message TesteeListResponse {
+  repeated TesteeResponse items = 1;    // 受试者列表
+  int64 total = 2;                      // 总数
+}

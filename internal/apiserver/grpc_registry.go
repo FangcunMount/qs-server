@@ -45,6 +45,11 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
+	// 注册 Actor 服务
+	if err := r.registerActorService(); err != nil {
+		return err
+	}
+
 	log.Info("✅ All GRPC services registered successfully")
 	return nil
 }
@@ -114,6 +119,20 @@ func (r *GRPCRegistry) registerInterpretReportService() error {
 	return nil
 }
 
+// registerActorService 注册 Actor 服务
+func (r *GRPCRegistry) registerActorService() error {
+	if r.container.ActorModule == nil {
+		log.Warn("ActorModule is not initialized, skipping actor service registration")
+		return nil
+	}
+
+	// 创建并注册 Actor 服务
+	actorService := service.NewActorService(r.container.ActorModule.TesteeService)
+	r.server.RegisterService(actorService)
+	log.Info("   👤 Actor service registered")
+	return nil
+}
+
 // GetRegisteredServices 获取已注册的服务列表
 func (r *GRPCRegistry) GetRegisteredServices() []string {
 	services := make([]string, 0)
@@ -134,13 +153,9 @@ func (r *GRPCRegistry) GetRegisteredServices() []string {
 		services = append(services, "InterpretReportService")
 	}
 
-	// TODO: 添加其他服务
-	// if r.container.UserModule != nil {
-	//     services = append(services, "UserService")
-	// }
-	// if r.container.AuthModule != nil {
-	//     services = append(services, "AuthService")
-	// }
+	if r.container.ActorModule != nil {
+		services = append(services, "ActorService")
+	}
 
 	return services
 }

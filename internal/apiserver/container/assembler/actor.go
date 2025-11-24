@@ -29,6 +29,7 @@ type ActorModule struct {
 	TesteeProfileService      testeeApp.TesteeProfileApplicationService
 	TesteeTagService          testeeApp.TesteeTagApplicationService
 	TesteeQueryService        testeeApp.TesteeQueryApplicationService
+	TesteeService             testeeApp.Service // 聚合服务，用于 gRPC
 
 	// staff service 层
 	StaffService        staffApp.StaffApplicationService
@@ -121,6 +122,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.TesteeTagService,
 		m.TesteeQueryService,
 	)
+	m.TesteeService = testeeCompositeService // 保存聚合服务供 gRPC 使用
 
 	staffCompositeService := staffApp.NewCompositeService(
 		m.StaffService,

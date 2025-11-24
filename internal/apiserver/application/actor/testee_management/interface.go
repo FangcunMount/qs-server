@@ -14,12 +14,10 @@ type TesteeProfileApplicationService interface {
 	// UpdateBasicInfo 更新基本信息（姓名、性别、生日）
 	UpdateBasicInfo(ctx context.Context, dto UpdateTesteeProfileDTO) error
 
-	// BindIAMUser 绑定IAM用户
-	// 场景：临时受试者补绑正式账号
-	BindIAMUser(ctx context.Context, testeeID uint64, iamUserID int64) error
-
-	// BindIAMChild 绑定IAM儿童
-	BindIAMChild(ctx context.Context, testeeID uint64, iamChildID int64) error
+	// BindProfile 绑定用户档案
+	// 场景：临时受试者补绑正式档案
+	// 注意：当前 profileID 对应 IAM.Child.ID
+	BindProfile(ctx context.Context, testeeID uint64, profileID uint64) error
 }
 
 // TesteeTagApplicationService 受试者标签应用服务
@@ -45,6 +43,10 @@ type TesteeTagApplicationService interface {
 type TesteeQueryApplicationService interface {
 	// GetByID 根据ID查询受试者
 	GetByID(ctx context.Context, testeeID uint64) (*TesteeManagementResult, error)
+
+	// FindByProfile 根据用户档案 ID 查询受试者
+	// 注意：当前 profileID 对应 IAM.Child.ID
+	FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*TesteeManagementResult, error)
 
 	// ListTestees 列出受试者
 	ListTestees(ctx context.Context, dto ListTesteeDTO) (*TesteeListResult, error)
@@ -77,8 +79,7 @@ type ListTesteeDTO struct {
 type TesteeManagementResult struct {
 	ID         uint64     // 受试者ID
 	OrgID      int64      // 机构ID
-	IAMUserID  *int64     // IAM用户ID
-	IAMChildID *int64     // IAM儿童ID
+	ProfileID  *uint64    // 用户档案ID（当前对应 IAM.Child.ID）
 	Name       string     // 姓名
 	Gender     int8       // 性别
 	Birthday   *time.Time // 出生日期

@@ -16,11 +16,8 @@ type Repository interface {
 	// FindByID 根据ID查找受试者
 	FindByID(ctx context.Context, id ID) (*Testee, error)
 
-	// FindByIAMUser 根据IAM用户ID查找受试者
-	FindByIAMUser(ctx context.Context, orgID int64, iamUserID int64) (*Testee, error)
-
-	// FindByIAMChild 根据IAM儿童ID查找受试者
-	FindByIAMChild(ctx context.Context, orgID int64, iamChildID int64) (*Testee, error)
+	// FindByProfile 根据用户档案ID查找受试者
+	FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*Testee, error)
 
 	// FindByOrgAndName 根据机构和姓名查找受试者列表（用于模糊匹配）
 	FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*Testee, error)
@@ -43,27 +40,18 @@ type Repository interface {
 
 // Factory 受试者工厂领域服务
 type Factory interface {
-	// GetOrCreateByIAMChild 根据IAM儿童ID获取或创建受试者
-	GetOrCreateByIAMChild(
+	// GetOrCreateByProfile 根据用户档案ID获取或创建受试者
+	// 注意：当前 profileID 对应 IAM.Child.ID，未来可重构为更通用的档案系统
+	GetOrCreateByProfile(
 		ctx context.Context,
 		orgID int64,
-		iamChildID int64,
+		profileID uint64,
 		name string,
 		gender int8,
 		birthday *time.Time,
 	) (*Testee, error)
 
-	// GetOrCreateByIAMUser 根据IAM用户ID获取或创建受试者
-	GetOrCreateByIAMUser(
-		ctx context.Context,
-		orgID int64,
-		iamUserID int64,
-		name string,
-		gender int8,
-		birthday *time.Time,
-	) (*Testee, error)
-
-	// CreateTemporary 创建临时受试者（不绑定IAM）
+	// CreateTemporary 创建临时受试者（不绑定档案）
 	CreateTemporary(
 		ctx context.Context,
 		orgID int64,

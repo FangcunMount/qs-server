@@ -34,13 +34,15 @@ type Service interface {
 
 	// CountByOrg 统计机构下的受试者数量（从 Query 服务）
 	CountByOrg(ctx context.Context, orgID int64) (int64, error)
+
+	// FindByProfileID 根据用户档案 ID 查找受试者（从 Query 服务）
+	FindByProfileID(ctx context.Context, orgID int64, profileID uint64) (*TesteeResult, error)
 }
 
 // CreateTesteeDTO 创建受试者 DTO
 type CreateTesteeDTO struct {
 	OrgID      int64      // 机构ID
-	IAMUserID  *int64     // IAM用户ID（可选）
-	IAMChildID *int64     // IAM儿童ID（可选）
+	ProfileID  *uint64    // 用户档案ID（可选，当前对应 IAM.Child.ID）
 	Name       string     // 姓名
 	Gender     int8       // 性别
 	Birthday   *time.Time // 出生日期
@@ -62,8 +64,7 @@ type UpdateTesteeDTO struct {
 type TesteeResult struct {
 	ID         uint64     // 受试者ID
 	OrgID      int64      // 机构ID
-	IAMUserID  *int64     // IAM用户ID
-	IAMChildID *int64     // IAM儿童ID
+	ProfileID  *uint64    // 用户档案ID（当前对应 IAM.Child.ID）
 	Name       string     // 姓名
 	Gender     int8       // 性别
 	Birthday   *time.Time // 出生日期

@@ -30,6 +30,16 @@ func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeMan
 	return toManagementResult(t), nil
 }
 
+// FindByIAMChild 根据 IAM Child ID 查询受试者
+func (s *queryService) FindByIAMChild(ctx context.Context, orgID int64, iamChildID int64) (*TesteeManagementResult, error) {
+	t, err := s.repo.FindByIAMChild(ctx, orgID, iamChildID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find testee by iam child id")
+	}
+
+	return toManagementResult(t), nil
+}
+
 // ListTestees 列出受试者
 func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*TesteeListResult, error) {
 	// 根据条件选择查询方法

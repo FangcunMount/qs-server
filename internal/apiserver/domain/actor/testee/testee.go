@@ -13,9 +13,9 @@ type Testee struct {
 	id    ID
 	orgID int64 // 所属机构（医院、训练中心、学校等）
 
-	// === 与 IAM 的映射 ===
-	iamUserID  *int64 // 可选：绑定 IAM.User（成人患者）
-	iamChildID *int64 // 可选：绑定 IAM.Child（儿童档案）
+	// === 用户档案关联 ===
+	// 注意：当前实现绑定的是 IAM.Child，未来可重构为更通用的 Profile
+	profileID *uint64 // 可选：关联的用户档案ID（当前对应 IAM.Child.ID）
 
 	// === 基本属性 ===
 	name     string     // 姓名（可脱敏）
@@ -61,31 +61,21 @@ func (t *Testee) OrgID() int64 {
 	return t.orgID
 }
 
-// === 身份绑定方法（包内可见，通过 Binder 服务使用）===
+// === 档案绑定方法（包内可见，通过 Binder 服务使用）===
 
-// bindIAMUser 绑定IAM用户（包内方法，应通过 Binder 调用）
-func (t *Testee) bindIAMUser(userID int64) {
-	t.iamUserID = &userID
+// bindProfile 绑定用户档案（包内方法，应通过 Binder 调用）
+func (t *Testee) bindProfile(profileID uint64) {
+	t.profileID = &profileID
 }
 
-// bindIAMChild 绑定IAM儿童（包内方法，应通过 Binder 调用）
-func (t *Testee) bindIAMChild(childID int64) {
-	t.iamChildID = &childID
+// ProfileID 获取绑定的用户档案ID
+func (t *Testee) ProfileID() *uint64 {
+	return t.profileID
 }
 
-// IAMUserID 获取绑定的IAM用户ID（用于验证身份）
-func (t *Testee) IAMUserID() *int64 {
-	return t.iamUserID
-}
-
-// IAMChildID 获取绑定的IAM儿童ID（用于验证身份）
-func (t *Testee) IAMChildID() *int64 {
-	return t.iamChildID
-}
-
-// IsBoundToIAM 是否已绑定IAM账号
-func (t *Testee) IsBoundToIAM() bool {
-	return t.iamUserID != nil || t.iamChildID != nil
+// IsBoundToProfile 是否已绑定用户档案
+func (t *Testee) IsBoundToProfile() bool {
+	return t.profileID != nil
 }
 
 // === 基本信息方法 ===
@@ -254,14 +244,12 @@ func (t *Testee) SetTags(tags []string) {
 // RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
 // 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
 func (t *Testee) RestoreFromRepository(
-	iamUserID *int64,
-	iamChildID *int64,
+	profileID *uint64,
 	tags []string,
 	isKeyFocus bool,
 	assessmentStats *AssessmentStats,
 ) {
-	t.iamUserID = iamUserID
-	t.iamChildID = iamChildID
+	t.profileID = profileID
 	t.SetTags(tags)
 	t.SetKeyFocus(isKeyFocus)
 	t.assessmentStats = assessmentStats

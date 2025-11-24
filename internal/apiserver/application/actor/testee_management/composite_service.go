@@ -36,13 +36,12 @@ func NewCompositeService(
 func (s *compositeService) Create(ctx context.Context, dto CreateTesteeDTO) (*TesteeResult, error) {
 	// 转换为注册服务的 DTO
 	regDTO := testee_registration.RegisterTesteeDTO{
-		OrgID:      dto.OrgID,
-		IAMUserID:  dto.IAMUserID,
-		IAMChildID: dto.IAMChildID,
-		Name:       dto.Name,
-		Gender:     dto.Gender,
-		Birthday:   dto.Birthday,
-		Source:     dto.Source,
+		OrgID:     dto.OrgID,
+		ProfileID: dto.ProfileID,
+		Name:      dto.Name,
+		Gender:    dto.Gender,
+		Birthday:  dto.Birthday,
+		Source:    dto.Source,
 	}
 
 	result, err := s.registrationService.Register(ctx, regDTO)
@@ -226,13 +225,22 @@ func (s *compositeService) CountByOrg(ctx context.Context, orgID int64) (int64, 
 	return listResult.TotalCount, nil
 }
 
+// FindByProfileID 根据用户档案 ID 查找受试者
+func (s *compositeService) FindByProfileID(ctx context.Context, orgID int64, profileID uint64) (*TesteeResult, error) {
+	result, err := s.queryService.FindByProfile(ctx, orgID, profileID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toTesteeResult(result), nil
+}
+
 // toTesteeResult 转换为 TesteeResult
 func toTesteeResult(src *TesteeManagementResult) *TesteeResult {
-	result := &TesteeResult{
+	return &TesteeResult{
 		ID:         src.ID,
 		OrgID:      src.OrgID,
-		IAMUserID:  src.IAMUserID,
-		IAMChildID: src.IAMChildID,
+		ProfileID:  src.ProfileID,
 		Name:       src.Name,
 		Gender:     src.Gender,
 		Birthday:   src.Birthday,
