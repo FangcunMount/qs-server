@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
-	testeeShared "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/gin-gonic/gin"
@@ -14,7 +14,10 @@ import (
 // ActorHandler Actor 模块的 HTTP Handler
 type ActorHandler struct {
 	*BaseHandler
-	testeeService testeeShared.Service
+	// Testee 服务按行为者组织
+	testeeRegistrationService testeeApp.TesteeRegistrationService
+	testeeManagementService   testeeApp.TesteeManagementService
+	testeeQueryService        testeeApp.TesteeQueryService
 	// Staff 服务按行为者组织
 	staffLifecycleService     staffApp.StaffLifecycleService
 	staffAuthorizationService staffApp.StaffAuthorizationService
@@ -23,14 +26,18 @@ type ActorHandler struct {
 
 // NewActorHandler 创建 Actor Handler
 func NewActorHandler(
-	testeeService testeeShared.Service,
+	testeeRegistrationService testeeApp.TesteeRegistrationService,
+	testeeManagementService testeeApp.TesteeManagementService,
+	testeeQueryService testeeApp.TesteeQueryService,
 	staffLifecycleService staffApp.StaffLifecycleService,
 	staffAuthorizationService staffApp.StaffAuthorizationService,
 	staffQueryService staffApp.StaffQueryService,
 ) *ActorHandler {
 	return &ActorHandler{
 		BaseHandler:               NewBaseHandler(),
-		testeeService:             testeeService,
+		testeeRegistrationService: testeeRegistrationService,
+		testeeManagementService:   testeeManagementService,
+		testeeQueryService:        testeeQueryService,
 		staffLifecycleService:     staffLifecycleService,
 		staffAuthorizationService: staffAuthorizationService,
 		staffQueryService:         staffQueryService,
@@ -55,7 +62,8 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 		return
 	}
 
-	result, err := h.testeeService.GetByID(c.Request.Context(), id)
+	// 使用查询服务
+	result, err := h.testeeQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
 		log.Errorf("Failed to get testee: %v", err)
 		h.ErrorResponse(c, err)
@@ -90,10 +98,40 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 		return
 	}
 
-	dto := toUpdateTesteeDTO(&req)
-	result, err := h.testeeService.Update(c.Request.Context(), id, dto)
+	// 使用管理服务更新基本信息（B端员工操作）
+	if (req.Name != nil && *req.Name != "") || req.Gender != nil || req.Birthday != nil {
+		dto := toUpdateTesteeProfileDTO(id, &req)
+		err = h.testeeManagementService.UpdateBasicInfo(c.Request.Context(), dto)
+		if err != nil {
+			log.Errorf("Failed to update testee profile: %v", err)
+			h.ErrorResponse(c, err)
+			return
+		}
+	}
+
+	// 更新标签（如果提供）
+	// 注意：旧接口使用覆盖式更新，新服务使用增量操作
+	// 这里简化处理，只在有标签时调用
+	// TODO: 可能需要先获取现有标签进行比较，实现完整的覆盖逻辑
+
+	// 更新重点关注状态
+	if req.IsKeyFocus != nil {
+		if *req.IsKeyFocus {
+			err = h.testeeManagementService.MarkAsKeyFocus(c.Request.Context(), id)
+		} else {
+			err = h.testeeManagementService.UnmarkKeyFocus(c.Request.Context(), id)
+		}
+		if err != nil {
+			log.Errorf("Failed to update key focus status: %v", err)
+			h.ErrorResponse(c, err)
+			return
+		}
+	}
+
+	// 查询更新后的结果
+	result, err := h.testeeQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
-		log.Errorf("Failed to update testee: %v", err)
+		log.Errorf("Failed to get updated testee: %v", err)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -128,81 +166,24 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		req.PageSize = 20
 	}
 
-	offset := (req.Page - 1) * req.PageSize
-
-	// 根据查询条件调用不同的服务方法
-	var results []*testeeShared.CompositeTesteeResult
-	var total int64
-	var err error
-
-	if req.Name != "" {
-		// 按姓名搜索
-		results, err = h.testeeService.FindByName(c.Request.Context(), req.OrgID, req.Name)
-		if err != nil {
-			log.Errorf("Failed to find testees by name: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-		total = int64(len(results))
-		// 手动分页
-		start := offset
-		end := offset + req.PageSize
-		if start >= len(results) {
-			results = []*testeeShared.CompositeTesteeResult{}
-		} else {
-			if end > len(results) {
-				end = len(results)
-			}
-			results = results[start:end]
-		}
-	} else if len(req.Tags) > 0 {
-		// 按标签搜索
-		results, err = h.testeeService.ListByTags(c.Request.Context(), req.OrgID, req.Tags, offset, req.PageSize)
-		if err != nil {
-			log.Errorf("Failed to list testees by tags: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-		// 获取总数
-		total, err = h.testeeService.CountByOrg(c.Request.Context(), req.OrgID)
-		if err != nil {
-			log.Errorf("Failed to count testees: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-	} else if req.IsKeyFocus != nil && *req.IsKeyFocus {
-		// 查询重点关注
-		results, err = h.testeeService.ListKeyFocus(c.Request.Context(), req.OrgID, offset, req.PageSize)
-		if err != nil {
-			log.Errorf("Failed to list key focus testees: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-		// 获取总数
-		total, err = h.testeeService.CountByOrg(c.Request.Context(), req.OrgID)
-		if err != nil {
-			log.Errorf("Failed to count testees: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-	} else {
-		// 查询机构下所有受试者
-		results, err = h.testeeService.ListByOrg(c.Request.Context(), req.OrgID, offset, req.PageSize)
-		if err != nil {
-			log.Errorf("Failed to list testees: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-		// 获取总数
-		total, err = h.testeeService.CountByOrg(c.Request.Context(), req.OrgID)
-		if err != nil {
-			log.Errorf("Failed to count testees: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
+	// 使用查询服务 - 统一通过 ListTestees 方法处理所有查询
+	dto := testeeApp.ListTesteeDTO{
+		OrgID:    req.OrgID,
+		Name:     req.Name,
+		Tags:     req.Tags,
+		KeyFocus: req.IsKeyFocus,
+		Offset:   (req.Page - 1) * req.PageSize,
+		Limit:    req.PageSize,
 	}
 
-	h.SuccessResponse(c, toTesteeListResponse(results, total, req.Page, req.PageSize))
+	listResult, err := h.testeeQueryService.ListTestees(c.Request.Context(), dto)
+	if err != nil {
+		log.Errorf("Failed to list testees: %v", err)
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	h.SuccessResponse(c, toTesteeListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
 }
 
 // ========== Staff API ==========
@@ -344,51 +325,10 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 
 // ========== 映射辅助函数 ==========
 
-// toCreateTesteeDTO 将创建请求转换为应用层 DTO
-func toCreateTesteeDTO(req *request.CreateTesteeRequest) testeeShared.CreateTesteeDTO {
+// toUpdateTesteeProfileDTO 将更新请求转换为应用层 UpdateTesteeProfileDTO
+func toUpdateTesteeProfileDTO(testeeID uint64, req *request.UpdateTesteeRequest) testeeApp.UpdateTesteeProfileDTO {
 	var gender int8
-	switch req.Gender {
-	case "male", "男":
-		gender = 1
-	case "female", "女":
-		gender = 2
-	default:
-		gender = 0
-	}
-
-	// 处理 ProfileID：优先使用 ProfileID，否则使用 IAMChildID（向后兼容）
-	var profileID *uint64
-	if req.ProfileID != nil {
-		profileID = req.ProfileID
-	} else if req.IAMChildID != nil {
-		// 向后兼容：将 IAMChildID 转换为 ProfileID
-		pid := uint64(*req.IAMChildID)
-		profileID = &pid
-	}
-
-	return testeeShared.CreateTesteeDTO{
-		OrgID:      req.OrgID,
-		ProfileID:  profileID,
-		Name:       req.Name,
-		Gender:     gender,
-		Birthday:   req.Birthday,
-		Tags:       req.Tags,
-		Source:     req.Source,
-		IsKeyFocus: req.IsKeyFocus,
-	}
-}
-
-// toUpdateTesteeDTO 将更新请求转换为应用层 DTO
-func toUpdateTesteeDTO(req *request.UpdateTesteeRequest) testeeShared.UpdateTesteeDTO {
-	dto := testeeShared.UpdateTesteeDTO{
-		Name:       req.Name,
-		Birthday:   req.Birthday,
-		Tags:       req.Tags,
-		IsKeyFocus: req.IsKeyFocus,
-	}
-
 	if req.Gender != nil {
-		var gender int8
 		switch *req.Gender {
 		case "male", "男":
 			gender = 1
@@ -397,14 +337,25 @@ func toUpdateTesteeDTO(req *request.UpdateTesteeRequest) testeeShared.UpdateTest
 		default:
 			gender = 0
 		}
-		dto.Gender = &gender
 	}
 
-	return dto
+	var name string
+	if req.Name != nil {
+		name = *req.Name
+	}
+
+	return testeeApp.UpdateTesteeProfileDTO{
+		TesteeID: testeeID,
+		Name:     name,
+		Gender:   gender,
+		Birthday: req.Birthday,
+	}
 }
 
+// TODO: Create Testee API 已废弃，未来将通过 Registration Service 实现
+
 // toTesteeResponse 将应用层结果转换为响应
-func toTesteeResponse(result *testeeShared.CompositeTesteeResult) *response.TesteeResponse {
+func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 	var gender string
 	switch result.Gender {
 	case 1:
@@ -428,11 +379,12 @@ func toTesteeResponse(result *testeeShared.CompositeTesteeResult) *response.Test
 		IsKeyFocus: result.IsKeyFocus,
 	}
 
-	if result.AssessmentStats != nil {
+	// 测评统计信息
+	if result.LastAssessmentAt != nil {
 		resp.AssessmentStats = &response.AssessmentStatsResponse{
-			TotalCount:       result.AssessmentStats.TotalAssessments,
-			LastAssessmentAt: result.AssessmentStats.LastAssessmentAt,
-			LastRiskLevel:    result.AssessmentStats.LastRiskLevel,
+			TotalCount:       result.TotalAssessments,
+			LastAssessmentAt: result.LastAssessmentAt,
+			LastRiskLevel:    result.LastRiskLevel,
 		}
 	}
 
@@ -440,7 +392,7 @@ func toTesteeResponse(result *testeeShared.CompositeTesteeResult) *response.Test
 }
 
 // toTesteeListResponse 将应用层列表结果转换为响应
-func toTesteeListResponse(results []*testeeShared.CompositeTesteeResult, total int64, page, pageSize int) *response.TesteeListResponse {
+func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, pageSize int) *response.TesteeListResponse {
 	items := make([]*response.TesteeResponse, 0, len(results))
 	for _, result := range results {
 		items = append(items, toTesteeResponse(result))

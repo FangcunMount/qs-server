@@ -1,15 +1,5 @@
 package service
 
-import (
-	"context"
-	"fmt"
-	"time"
-
-	"github.com/FangcunMount/iam-contracts/pkg/log"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
-)
-
 // TODO: ActorService gRPC 实现需要重构以适配新的按行为者组织的服务接口
 // 暂时禁用此文件，直到完成 gRPC 层的重构
 
