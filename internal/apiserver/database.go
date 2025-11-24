@@ -94,6 +94,7 @@ func (dm *DatabaseManager) initRedis() error {
 		Host:                  dm.config.RedisDualOptions.Cache.Host,
 		Port:                  dm.config.RedisDualOptions.Cache.Port,
 		Addrs:                 []string{}, // 双实例模式暂不支持集群
+		Username:              dm.config.RedisDualOptions.Cache.Username,
 		Password:              dm.config.RedisDualOptions.Cache.Password,
 		Database:              dm.config.RedisDualOptions.Cache.Database,
 		MaxIdle:               dm.config.RedisDualOptions.Cache.MaxIdle,
@@ -120,6 +121,7 @@ func (dm *DatabaseManager) initRedis() error {
 		Host:                  dm.config.RedisDualOptions.Store.Host,
 		Port:                  dm.config.RedisDualOptions.Store.Port,
 		Addrs:                 []string{},
+		Username:              dm.config.RedisDualOptions.Store.Username,
 		Password:              dm.config.RedisDualOptions.Store.Password,
 		Database:              dm.config.RedisDualOptions.Store.Database,
 		MaxIdle:               dm.config.RedisDualOptions.Store.MaxIdle,

@@ -1,0 +1,63 @@
+# Git 相关
+.git/
+.gitignore
+.gitattributes
+
+# 编辑器和 IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 构建产物
+tmp/
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# 依赖和缓存
+vendor/
+.cache/
+
+# 日志文件
+*.log
+logs/
+
+# 文档
+docs/
+*.md
+README.md
+
+# 测试相关
+coverage.out
+coverage.html
+*.coverprofile
+
+# 脚本和工具
+script/
+scripts/
+Makefile
+*.sh
+*.bash
+
+# 备份文件
+*.bak
+*.backup
+*.backup[0-9]
+
+# 环境配置（生产环境配置已经在 Dockerfile 中复制）
+.env
+.env.local
+.env.*.local
+
+# 其他
+demo-*.sh
+test-*.sh
+test_*.go

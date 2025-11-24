@@ -92,32 +92,32 @@ git clone https://github.com/yshujie/questionnaire-scale.git
 cd questionnaire-scale
 ```
 
-#### 2. 配置环境
+#### 2. 环境要求
+
+确保已安装并启动以下基础设施组件（由独立的 infra 项目管理）：
+
+- MySQL 8.0+
+- MongoDB 6.0+
+- Redis 7.0+
+- NSQ（可选，用于消息队列）
+
+> **注意**：开发环境中的所有基础设施组件由外部 infra 项目统一管理，无需在本项目中配置。
+
+#### 3. 配置环境变量
 
 ```bash
-# 复制配置文件
-cp configs/env/config.env.example configs/env/config.env
+# 加载开发环境配置
+source configs/env/.env.dev
 
-# 编辑配置文件
-vim configs/env/config.env
+# 检查基础设施是否就绪
+make check-infra
 ```
 
-#### 3. 启动数据库
+**环境变量配置说明：**
 
-```bash
-# 使用 Docker Compose 启动
-docker-compose up -d mysql mongodb redis
-
-# 或手动启动
-# MySQL
-mysql -u root -p < configs/mysql/questionnaire.sql
-
-# MongoDB
-mongod --config configs/mongodb/mongod.conf
-
-# Redis
-redis-server configs/redis/redis.conf
-```
+- `configs/env/.env.dev` - 开发环境配置（包含所有基础设施连接信息）
+- `configs/env/.env.prod` - 生产环境模板
+- 详细使用说明请查看 [环境配置文档](configs/env/README.md)
 
 #### 4. 编译运行
 
@@ -125,28 +125,61 @@ redis-server configs/redis/redis.conf
 # 编译所有服务
 make build
 
-# 启动 API Server
-make run-apiserver
+# 启动所有服务（自动检查基础设施）
+make run-all
 
-# 启动 Collection Server
-make run-collection-server
-
-# 启动 Evaluation Server
-make run-evaluation-server
+# 或单独启动服务
+make run-apiserver       # 启动 API Server (端口: 9080)
+make run-collection      # 启动 Collection Server (端口: 9081)
 ```
 
 #### 5. 验证部署
 
 ```bash
+# 检查所有服务状态
+make status-all
+
 # 检查 API Server 健康状态
-curl http://localhost:8080/health
+curl http://localhost:9080/health
 
 # 检查 Collection Server 健康状态
-curl http://localhost:8081/health
+curl http://localhost:9081/health
 
-# 检查 Evaluation Server 健康状态
-curl http://localhost:8082/health
+# 查看服务日志
+make logs
 ```
+
+### 基础设施检查
+
+在启动服务前，可以使用以下命令检查基础设施是否就绪：
+
+```bash
+# 检查所有基础设施组件
+make check-infra
+
+# 单独检查各个组件
+make check-mysql     # 检查 MySQL 数据库
+make check-redis     # 检查 Redis 缓存
+make check-mongodb   # 检查 MongoDB 数据库
+make check-nsq       # 检查 NSQ 消息队列
+```
+
+**检查输出示例：**
+
+```text
+===========================================
+检查基础设施组件
+===========================================
+
+MySQL           [✓] 运行正常 (127.0.0.1:3306)
+Redis           [✓] 运行正常 (127.0.0.1:6379)
+MongoDB         [✓] 运行正常 (127.0.0.1:27017)
+NSQ             [✓] 运行正常 (lookupd:4161, nsqd:4151)
+
+✓ 所有基础设施组件就绪！
+```
+
+> **提示**：如果检查失败，请确保 infra 项目已正确启动。详见 [独立启动服务指南](docs/独立启动服务指南.md)
 
 ### 开发环境
 
@@ -359,12 +392,11 @@ mongodump --db questionnaire --out backup/
 - 更新相关文档
 - 提供清晰的提交信息
 
-
 ## 联系方式
 
-- **项目地址**: https://github.com/yshujie/questionnaire-scale
-- **问题反馈**: https://github.com/yshujie/questionnaire-scale/issues
-- **邮箱**: yshujie@163.com
+- **项目地址**: <https://github.com/yshujie/questionnaire-scale>
+- **问题反馈**: <https://github.com/yshujie/questionnaire-scale/issues>
+- **邮箱**: <yshujie@163.com>
 
 ## 更新日志
 

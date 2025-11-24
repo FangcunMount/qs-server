@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	userapp "github.com/FangcunMount/qs-server/internal/collection-server/application/user"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/validation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/auth"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infrastructure/grpc"
@@ -22,7 +21,6 @@ type Container struct {
 	// 基础设施层
 	QuestionnaireClient grpc.QuestionnaireClient
 	AnswersheetClient   grpc.AnswersheetClient
-	UserServiceClient   *grpc.UserServiceClient
 	Publisher           pubsub.Publisher
 	JWTManager          *auth.JWTManager
 
@@ -31,8 +29,6 @@ type Container struct {
 	ValidationServiceConcurrent validation.ServiceConcurrent
 	AnswersheetService          answersheet.Service
 	QuestionnaireService        questionnaire.Service
-	TesteeRegistrar             *userapp.TesteeRegistrar
-	UserQueryer                 *userapp.UserQueryer
 
 	// 接口层
 	QuestionnaireHandler handler.QuestionnaireHandler
@@ -108,13 +104,6 @@ func (c *Container) initializeInfrastructure() error {
 	}
 	c.AnswersheetClient = answersheetClient
 
-	// 创建用户服务 GRPC 客户端
-	userServiceClient, err := grpc.NewUserServiceClient(c.grpcClientConfig.Endpoint, c.grpcClientConfig.Timeout)
-	if err != nil {
-		return fmt.Errorf("failed to create user service client: %w", err)
-	}
-	c.UserServiceClient = userServiceClient
-
 	log.Info("   ✅ GRPC clients initialized")
 
 	// 创建 JWT 管理器
@@ -164,10 +153,6 @@ func (c *Container) initializeApplication() error {
 
 	// 再创建答卷应用服务
 	c.AnswersheetService = answersheet.NewService(c.AnswersheetClient, c.Publisher, c.QuestionnaireService)
-
-	// 创建用户应用服务
-	c.TesteeRegistrar = userapp.NewTesteeRegistrar(c.UserServiceClient)
-	c.UserQueryer = userapp.NewUserQueryer(c.UserServiceClient)
 
 	log.Infof("   ✅ Application services initialized (using concurrent validation, max concurrency: %d)", c.concurrencyConfig.MaxConcurrency)
 	return nil
@@ -227,12 +212,6 @@ func (c *Container) Cleanup() error {
 	if c.AnswersheetClient != nil {
 		if err := c.AnswersheetClient.Close(); err != nil {
 			log.Errorf("Failed to close answersheet client: %v", err)
-		}
-	}
-
-	if c.UserServiceClient != nil {
-		if err := c.UserServiceClient.Close(); err != nil {
-			log.Errorf("Failed to close user service client: %v", err)
 		}
 	}
 

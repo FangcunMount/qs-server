@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # ===================================
+  # QS API Server
+  # ===================================
+  qs-apiserver:
+    build:
+      context: ../../
+      dockerfile: build/docker/Dockerfile.qs-apiserver
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME}
+        GIT_COMMIT: ${GIT_COMMIT}
+        GIT_BRANCH: ${GIT_BRANCH:-main}
+    image: qs-apiserver:${VERSION:-latest}
+    container_name: qs-apiserver
+    restart: unless-stopped
+    ports:
+      - "9080:9080"
+    volumes:
+      - ../../configs/apiserver.yaml:/app/configs/apiserver.yaml:ro
+      - ../../configs/cert:/app/configs/cert:ro
+      - apiserver-logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - ENV=${ENV:-prod}
+    networks:
+      - qs-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===================================
+  # Collection Server
+  # ===================================
+  collection-server:
+    build:
+      context: ../../
+      dockerfile: build/docker/Dockerfile.collection-server
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME}
+        GIT_COMMIT: ${GIT_COMMIT}
+        GIT_BRANCH: ${GIT_BRANCH:-main}
+    image: collection-server:${VERSION:-latest}
+    container_name: collection-server
+    restart: unless-stopped
+    ports:
+      - "9081:9081"
+    volumes:
+      - ../../configs/collection-server.yaml:/app/configs/collection-server.yaml:ro
+      - ../../configs/cert:/app/configs/cert:ro
+      - collection-logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - ENV=${ENV:-prod}
+    networks:
+      - qs-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ===================================
+# 网络配置
+# ===================================
+networks:
+  qs-network:
+    driver: bridge
+    name: qs-network
+
+# ===================================
+# 数据卷配置
+# ===================================
+volumes:
+  apiserver-logs:
+    name: qs-apiserver-logs
+  collection-logs:
+    name: qs-collection-logs

@@ -1,0 +1,14 @@
+# 忽略本地环境配置文件
+.env.local
+.env.*.local
+.env.prod.local
+.env.test.local
+
+# 忽略包含实际密码的文件
+*.secret
+*.credentials
+*.password
+
+# 忽略备份文件
+*.bak
+*.backup
