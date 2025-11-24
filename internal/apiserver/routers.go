@@ -148,11 +148,9 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	// 受试者路由
 	testees := apiV1.Group("/testees")
 	{
-		testees.POST("", actorHandler.CreateTestee)       // 创建受试者
-		testees.GET("", actorHandler.ListTestees)         // 查询受试者列表
-		testees.GET("/:id", actorHandler.GetTestee)       // 获取受试者详情
-		testees.PUT("/:id", actorHandler.UpdateTestee)    // 更新受试者
-		testees.DELETE("/:id", actorHandler.DeleteTestee) // 删除受试者
+		testees.GET("", actorHandler.ListTestees)      // 查询受试者列表
+		testees.GET("/:id", actorHandler.GetTestee)    // 获取受试者详情
+		testees.PUT("/:id", actorHandler.UpdateTestee) // 更新受试者
 	}
 
 	// 员工路由

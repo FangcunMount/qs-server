@@ -5,8 +5,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff_management"
-	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee_management"
-	testeeReg "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee_registration"
+	testeeManagement "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/management"
+	testeeRegistration "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/registration"
+	testeeShared "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
@@ -25,11 +26,11 @@ type ActorModule struct {
 	ActorHandler *handler.ActorHandler
 
 	// testee service 层
-	TesteeRegistrationService testeeReg.TesteeRegistrationApplicationService
-	TesteeProfileService      testeeApp.TesteeProfileApplicationService
-	TesteeTagService          testeeApp.TesteeTagApplicationService
-	TesteeQueryService        testeeApp.TesteeQueryApplicationService
-	TesteeService             testeeApp.Service // 聚合服务，用于 gRPC
+	TesteeRegistrationService testeeShared.TesteeRegistrationApplicationService
+	TesteeProfileService      testeeShared.TesteeProfileApplicationService
+	TesteeTagService          testeeShared.TesteeTagApplicationService
+	TesteeQueryService        testeeShared.TesteeQueryApplicationService
+	TesteeService             testeeShared.Service // 聚合服务，用于 gRPC
 
 	// staff service 层
 	StaffService        staffApp.StaffApplicationService
@@ -58,10 +59,11 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	m.StaffRepo = actorInfra.NewStaffRepository(mysqlDB)
 
 	// 初始化 testee domain services
-	testeeValidator := testee.NewValidator()
+	testeeValidator := testee.NewValidator(m.TesteeRepo)
 	testeeFactory := testee.NewFactory(m.TesteeRepo, testeeValidator)
 	testeeEditor := testee.NewEditor(testeeValidator)
 	testeeBinder := testee.NewBinder(m.TesteeRepo)
+	testeeTagger := testee.NewTagger(testeeValidator)
 
 	// 初始化 staff domain services
 	staffValidator := staff.NewValidator()
@@ -71,26 +73,27 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	staffIAMSync := staff.NewIAMSynchronizer(m.StaffRepo, staffValidator)
 
 	// 初始化 testee service 层
-	m.TesteeRegistrationService = testeeReg.NewRegistrationService(
+	m.TesteeRegistrationService = testeeRegistration.NewRegistrationService(
 		m.TesteeRepo,
 		testeeFactory,
 		testeeValidator,
 		testeeBinder,
 		uow,
 	)
-	m.TesteeProfileService = testeeApp.NewProfileService(
+	m.TesteeProfileService = testeeManagement.NewProfileService(
 		m.TesteeRepo,
 		testeeValidator,
 		testeeEditor,
 		testeeBinder,
 		uow,
 	)
-	m.TesteeTagService = testeeApp.NewTagService(
+	m.TesteeTagService = testeeManagement.NewTagService(
 		m.TesteeRepo,
+		testeeTagger,
 		testeeEditor,
 		uow,
 	)
-	m.TesteeQueryService = testeeApp.NewQueryService(m.TesteeRepo)
+	m.TesteeQueryService = testeeManagement.NewQueryService(m.TesteeRepo)
 
 	// 初始化 staff service 层
 	m.StaffService = staffApp.NewStaffService(
@@ -116,7 +119,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	m.StaffQueryService = staffApp.NewQueryService(m.StaffRepo)
 
 	// 初始化聚合服务（为 Handler 提供统一接口）
-	testeeCompositeService := testeeApp.NewCompositeService(
+	testeeCompositeService := testeeShared.NewCompositeService(
 		m.TesteeRegistrationService,
 		m.TesteeProfileService,
 		m.TesteeTagService,

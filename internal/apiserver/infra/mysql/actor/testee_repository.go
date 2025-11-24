@@ -92,6 +92,26 @@ func (r *testeeRepository) FindByIAMChild(ctx context.Context, orgID int64, iamC
 	return r.mapper.ToDomain(&po), nil
 }
 
+// FindByProfile 根据用户档案ID查找受试者
+// 注意：当前 ProfileID 对应 IAM.Child.ID
+func (r *testeeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*testee.Testee, error) {
+	var po TesteePO
+	// 将 uint64 转换为 int64 用于数据库查询
+	iamChildID := int64(profileID)
+	err := r.WithContext(ctx).
+		Where("org_id = ? AND iam_child_id = ? AND deleted_at IS NULL", orgID, iamChildID).
+		First(&po).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
+		}
+		return nil, err
+	}
+
+	return r.mapper.ToDomain(&po), nil
+}
+
 // FindByOrgAndName 根据机构和姓名查找受试者列表（用于模糊匹配）
 func (r *testeeRepository) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*testee.Testee, error) {
 	var pos []*TesteePO

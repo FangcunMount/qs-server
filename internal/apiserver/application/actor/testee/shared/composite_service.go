@@ -1,17 +1,16 @@
-package testee_management
+package shared
 
 import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee_registration"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // compositeService 是聚合服务的实现
 // 它组合多个细粒度的应用服务，提供统一的接口
 type compositeService struct {
-	registrationService testee_registration.TesteeRegistrationApplicationService
+	registrationService TesteeRegistrationApplicationService
 	profileService      TesteeProfileApplicationService
 	tagService          TesteeTagApplicationService
 	queryService        TesteeQueryApplicationService
@@ -19,7 +18,7 @@ type compositeService struct {
 
 // NewCompositeService 创建聚合服务
 func NewCompositeService(
-	registrationService testee_registration.TesteeRegistrationApplicationService,
+	registrationService TesteeRegistrationApplicationService,
 	profileService TesteeProfileApplicationService,
 	tagService TesteeTagApplicationService,
 	queryService TesteeQueryApplicationService,
@@ -33,9 +32,9 @@ func NewCompositeService(
 }
 
 // Create 创建受试者
-func (s *compositeService) Create(ctx context.Context, dto CreateTesteeDTO) (*TesteeResult, error) {
+func (s *compositeService) Create(ctx context.Context, dto CreateTesteeDTO) (*CompositeTesteeResult, error) {
 	// 转换为注册服务的 DTO
-	regDTO := testee_registration.RegisterTesteeDTO{
+	regDTO := RegisterTesteeDTO{
 		OrgID:     dto.OrgID,
 		ProfileID: dto.ProfileID,
 		Name:      dto.Name,
@@ -70,17 +69,17 @@ func (s *compositeService) Create(ctx context.Context, dto CreateTesteeDTO) (*Te
 }
 
 // GetByID 获取受试者详情
-func (s *compositeService) GetByID(ctx context.Context, testeeID uint64) (*TesteeResult, error) {
+func (s *compositeService) GetByID(ctx context.Context, testeeID uint64) (*CompositeTesteeResult, error) {
 	result, err := s.queryService.GetByID(ctx, testeeID)
 	if err != nil {
 		return nil, err
 	}
 
-	return toTesteeResult(result), nil
+	return toCompositeResult(result), nil
 }
 
 // Update 更新受试者
-func (s *compositeService) Update(ctx context.Context, testeeID uint64, dto UpdateTesteeDTO) (*TesteeResult, error) {
+func (s *compositeService) Update(ctx context.Context, testeeID uint64, dto UpdateTesteeDTO) (*CompositeTesteeResult, error) {
 	// 更新基本信息
 	if dto.Name != nil || dto.Gender != nil || dto.Birthday != nil {
 		profileDTO := UpdateTesteeProfileDTO{
@@ -129,7 +128,7 @@ func (s *compositeService) Delete(ctx context.Context, testeeID uint64) error {
 }
 
 // FindByName 根据姓名查找受试者
-func (s *compositeService) FindByName(ctx context.Context, orgID int64, name string) ([]*TesteeResult, error) {
+func (s *compositeService) FindByName(ctx context.Context, orgID int64, name string) ([]*CompositeTesteeResult, error) {
 	// 使用 ListTestees 方法进行模糊搜索
 	listDTO := ListTesteeDTO{
 		OrgID:  orgID,
@@ -143,16 +142,16 @@ func (s *compositeService) FindByName(ctx context.Context, orgID int64, name str
 		return nil, err
 	}
 
-	results := make([]*TesteeResult, 0, len(listResult.Items))
+	results := make([]*CompositeTesteeResult, 0, len(listResult.Items))
 	for _, item := range listResult.Items {
-		results = append(results, toTesteeResult(item))
+		results = append(results, toCompositeResult(item))
 	}
 
 	return results, nil
 }
 
 // ListByTags 根据标签列表查询
-func (s *compositeService) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*TesteeResult, error) {
+func (s *compositeService) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*CompositeTesteeResult, error) {
 	listDTO := ListTesteeDTO{
 		OrgID:  orgID,
 		Tags:   tags,
@@ -165,31 +164,31 @@ func (s *compositeService) ListByTags(ctx context.Context, orgID int64, tags []s
 		return nil, err
 	}
 
-	results := make([]*TesteeResult, 0, len(listResult.Items))
+	results := make([]*CompositeTesteeResult, 0, len(listResult.Items))
 	for _, item := range listResult.Items {
-		results = append(results, toTesteeResult(item))
+		results = append(results, toCompositeResult(item))
 	}
 
 	return results, nil
 }
 
 // ListKeyFocus 查询重点关注的受试者
-func (s *compositeService) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*TesteeResult, error) {
+func (s *compositeService) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*CompositeTesteeResult, error) {
 	listResult, err := s.queryService.ListKeyFocus(ctx, orgID, offset, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	results := make([]*TesteeResult, 0, len(listResult.Items))
+	results := make([]*CompositeTesteeResult, 0, len(listResult.Items))
 	for _, item := range listResult.Items {
-		results = append(results, toTesteeResult(item))
+		results = append(results, toCompositeResult(item))
 	}
 
 	return results, nil
 }
 
 // ListByOrg 查询机构下所有受试者
-func (s *compositeService) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*TesteeResult, error) {
+func (s *compositeService) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*CompositeTesteeResult, error) {
 	listDTO := ListTesteeDTO{
 		OrgID:  orgID,
 		Offset: offset,
@@ -201,9 +200,9 @@ func (s *compositeService) ListByOrg(ctx context.Context, orgID int64, offset, l
 		return nil, err
 	}
 
-	results := make([]*TesteeResult, 0, len(listResult.Items))
+	results := make([]*CompositeTesteeResult, 0, len(listResult.Items))
 	for _, item := range listResult.Items {
-		results = append(results, toTesteeResult(item))
+		results = append(results, toCompositeResult(item))
 	}
 
 	return results, nil
@@ -226,18 +225,18 @@ func (s *compositeService) CountByOrg(ctx context.Context, orgID int64) (int64, 
 }
 
 // FindByProfileID 根据用户档案 ID 查找受试者
-func (s *compositeService) FindByProfileID(ctx context.Context, orgID int64, profileID uint64) (*TesteeResult, error) {
+func (s *compositeService) FindByProfileID(ctx context.Context, orgID int64, profileID uint64) (*CompositeTesteeResult, error) {
 	result, err := s.queryService.FindByProfile(ctx, orgID, profileID)
 	if err != nil {
 		return nil, err
 	}
 
-	return toTesteeResult(result), nil
+	return toCompositeResult(result), nil
 }
 
-// toTesteeResult 转换为 TesteeResult
-func toTesteeResult(src *TesteeManagementResult) *TesteeResult {
-	return &TesteeResult{
+// toCompositeResult 转换为 CompositeTesteeResult
+func toCompositeResult(src *TesteeManagementResult) *CompositeTesteeResult {
+	result := &CompositeTesteeResult{
 		ID:         src.ID,
 		OrgID:      src.OrgID,
 		ProfileID:  src.ProfileID,

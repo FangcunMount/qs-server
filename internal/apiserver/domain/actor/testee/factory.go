@@ -41,13 +41,7 @@ func (f *factory) GetOrCreateByProfile(
 	// 使用 ErrUserNotFound 代表记录不存在的情况
 	if errors.IsCode(err, code.ErrUserNotFound) {
 		// 验证创建参数
-		if err := f.validator.ValidateOrgID(orgID); err != nil {
-			return nil, err
-		}
-		if err := f.validator.ValidateName(name, true); err != nil {
-			return nil, err
-		}
-		if err := f.validator.ValidateGender(Gender(gender)); err != nil {
+		if err := f.validator.ValidateForCreation(ctx, orgID, name, Gender(gender)); err != nil {
 			return nil, err
 		}
 		if err := f.validator.ValidateBirthday(birthday); err != nil {
@@ -78,13 +72,7 @@ func (f *factory) CreateTemporary(
 	source string,
 ) (*Testee, error) {
 	// 验证创建参数
-	if err := f.validator.ValidateOrgID(orgID); err != nil {
-		return nil, err
-	}
-	if err := f.validator.ValidateName(name, true); err != nil {
-		return nil, err
-	}
-	if err := f.validator.ValidateGender(Gender(gender)); err != nil {
+	if err := f.validator.ValidateForCreation(ctx, orgID, name, Gender(gender)); err != nil {
 		return nil, err
 	}
 	if err := f.validator.ValidateBirthday(birthday); err != nil {

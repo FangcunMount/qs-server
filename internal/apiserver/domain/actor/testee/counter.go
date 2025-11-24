@@ -8,41 +8,48 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// StatsUpdater 测评统计更新器领域服务
-// 负责更新 Testee 的测评统计快照
+// AssessmentCounter 测评统计领域服务
+// 负责更新受试者的测评统计信息
 // 注意：此服务应该由测评完成的领域事件触发调用
-type StatsUpdater interface {
-	// UpdateAfterAssessment 测评完成后更新统计
+type AssessmentCounter interface {
+	// AddAssessment 添加测评记录并更新统计
 	// 参数：
 	//   - testee: 受试者
 	//   - assessmentTime: 测评完成时间
 	//   - riskLevel: 风险等级
-	UpdateAfterAssessment(ctx context.Context, testee *Testee, assessmentTime time.Time, riskLevel string) error
+	AddAssessment(ctx context.Context, testee *Testee, assessmentTime time.Time, riskLevel string) error
 
 	// RecalculateStats 重新计算统计（用于修复数据）
 	// 从数据库查询该受试者的所有测评记录，重新计算统计
 	RecalculateStats(ctx context.Context, testee *Testee) error
-
-	// IncrementCount 仅增加计数（快速路径，不更新其他信息）
-	IncrementCount(testee *Testee) error
 }
 
-// statsUpdater 统计更新器实现
-type statsUpdater struct {
+// StatsUpdater 兼容旧接口名（已废弃）
+// Deprecated: Use AssessmentCounter instead
+type StatsUpdater = AssessmentCounter
+
+// assessmentCounter 测评统计器实现
+type assessmentCounter struct {
 	repo Repository
-	// assessmentRepo 可能需要查询测评记录
+	// TODO: 可能需要查询测评记录的仓储
 	// assessmentRepo assessment.Repository
 }
 
-// NewStatsUpdater 创建统计更新器
-func NewStatsUpdater(repo Repository) StatsUpdater {
-	return &statsUpdater{
+// NewAssessmentCounter 创建测评统计器
+func NewAssessmentCounter(repo Repository) AssessmentCounter {
+	return &assessmentCounter{
 		repo: repo,
 	}
 }
 
-// UpdateAfterAssessment 测评完成后更新统计
-func (s *statsUpdater) UpdateAfterAssessment(
+// NewStatsUpdater 创建统计更新器（已废弃，保留用于兼容）
+// Deprecated: Use NewAssessmentCounter instead
+func NewStatsUpdater(repo Repository) StatsUpdater {
+	return NewAssessmentCounter(repo)
+}
+
+// AddAssessment 添加测评记录并更新统计
+func (s *assessmentCounter) AddAssessment(
 	ctx context.Context,
 	testee *Testee,
 	assessmentTime time.Time,
@@ -91,7 +98,7 @@ func (s *statsUpdater) UpdateAfterAssessment(
 }
 
 // RecalculateStats 重新计算统计
-func (s *statsUpdater) RecalculateStats(ctx context.Context, testee *Testee) error {
+func (s *assessmentCounter) RecalculateStats(ctx context.Context, testee *Testee) error {
 	// TODO: 实现从 assessment 仓储查询并重新计算
 	// 这个方法用于数据修复或定期校验
 
@@ -120,22 +127,4 @@ func (s *statsUpdater) RecalculateStats(ctx context.Context, testee *Testee) err
 	// testee.UpdateAssessmentStats(newStats)
 
 	return errors.New("not implemented yet")
-}
-
-// IncrementCount 仅增加计数
-func (s *statsUpdater) IncrementCount(testee *Testee) error {
-	if testee.assessmentStats == nil {
-		return errors.WithCode(code.ErrValidation, "cannot increment count: no stats initialized")
-	}
-
-	currentStats := testee.assessmentStats
-	newStats := NewAssessmentStats(
-		currentStats.LastAssessmentAt(),
-		currentStats.TotalCount()+1,
-		currentStats.LastRiskLevel(),
-	)
-
-	testee.updateAssessmentStats(newStats)
-
-	return nil
 }

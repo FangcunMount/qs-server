@@ -23,14 +23,18 @@ func (m *TesteeMapper) ToPO(domain *testee.Testee) *TesteePO {
 
 	po := &TesteePO{
 		OrgID:      domain.OrgID(),
-		IAMUserID:  domain.IAMUserID(),
-		IAMChildID: domain.IAMChildID(),
 		Name:       domain.Name(),
 		Gender:     int8(domain.Gender()),
 		Birthday:   domain.Birthday(),
-		Tags:       domain.Tags(),
+		Tags:       domain.TagsAsStrings(),
 		Source:     domain.Source(),
 		IsKeyFocus: domain.IsKeyFocus(),
+	}
+
+	// 处理 ProfileID (当前对应 IAM.Child.ID)
+	if profileID := domain.ProfileID(); profileID != nil {
+		iamChildID := int64(*profileID)
+		po.IAMChildID = &iamChildID
 	}
 
 	// 设置ID（如果已存在）
@@ -83,9 +87,14 @@ func (m *TesteeMapper) ToDomain(po *TesteePO) *testee.Testee {
 	}
 
 	// 从仓储恢复状态
+	// 注意：当前 ProfileID 对应 IAM.Child.ID
+	var profileID *uint64
+	if po.IAMChildID != nil {
+		pid := uint64(*po.IAMChildID)
+		profileID = &pid
+	}
 	domain.RestoreFromRepository(
-		po.IAMUserID,
-		po.IAMChildID,
+		profileID,
 		po.Tags,
 		po.IsKeyFocus,
 		stats,

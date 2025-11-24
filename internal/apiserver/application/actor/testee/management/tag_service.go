@@ -1,9 +1,10 @@
-package testee_management
+package management
 
 import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
@@ -12,6 +13,7 @@ import (
 // tagService 受试者标签服务实现
 type tagService struct {
 	repo   testee.Repository
+	tagger testee.Tagger
 	editor testee.Editor
 	uow    *mysql.UnitOfWork
 }
@@ -19,11 +21,13 @@ type tagService struct {
 // NewTagService 创建受试者标签服务
 func NewTagService(
 	repo testee.Repository,
+	tagger testee.Tagger,
 	editor testee.Editor,
 	uow *mysql.UnitOfWork,
-) TesteeTagApplicationService {
+) shared.TesteeTagApplicationService {
 	return &tagService{
 		repo:   repo,
+		tagger: tagger,
 		editor: editor,
 		uow:    uow,
 	}
@@ -41,7 +45,7 @@ func (s *tagService) AddTag(ctx context.Context, testeeID uint64, tag string) er
 		}
 
 		// 2. 使用领域服务添加标签
-		if err := s.editor.AddTag(t, tag); err != nil {
+		if err := s.tagger.Tag(txCtx, t, testee.Tag(tag)); err != nil {
 			return err
 		}
 
@@ -66,7 +70,7 @@ func (s *tagService) RemoveTag(ctx context.Context, testeeID uint64, tag string)
 		}
 
 		// 2. 移除标签
-		if err := s.editor.RemoveTag(t, tag); err != nil {
+		if err := s.tagger.UnTag(txCtx, t, testee.Tag(tag)); err != nil {
 			return err
 		}
 
@@ -90,8 +94,8 @@ func (s *tagService) MarkAsKeyFocus(ctx context.Context, testeeID uint64) error 
 			return errors.Wrap(err, "failed to find testee")
 		}
 
-		// 2. 使用领域服务标记（需要提供原因）
-		if err := s.editor.MarkAsKeyFocus(t, "marked by staff"); err != nil {
+		// 2. 使用领域服务标记
+		if err := s.editor.MarkAsKeyFocus(txCtx, t); err != nil {
 			return err
 		}
 
@@ -116,7 +120,7 @@ func (s *tagService) UnmarkKeyFocus(ctx context.Context, testeeID uint64) error 
 		}
 
 		// 2. 取消标记
-		if err := s.editor.UnmarkAsKeyFocus(t); err != nil {
+		if err := s.editor.UnmarkAsKeyFocus(txCtx, t); err != nil {
 			return err
 		}
 

@@ -1,6 +1,7 @@
 package testee
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -33,6 +34,18 @@ func (g Gender) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+// Tag 标签类型
+type Tag string
+
+func (t Tag) String() string {
+	return string(t)
+}
+
+func (t Tag) IsValid() bool {
+	// 规则：只允许字母、数字、下划线、中文
+	return regexp.MustCompile(`^[\w\p{Han}]+$`).MatchString(string(t))
 }
 
 // AssessmentStats 测评统计快照（值对象）

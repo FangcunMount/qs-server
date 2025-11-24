@@ -23,9 +23,9 @@ type Testee struct {
 	birthday *time.Time // 出生日期
 
 	// === 业务标签与关注 ===
-	tags       []string // 业务标签：["high_risk", "adhd_suspect", "vip"]
-	source     string   // 数据来源：online_form / clinic_import / screening_campaign
-	isKeyFocus bool     // 是否重点关注对象
+	tags       []Tag  // 业务标签：["high_risk", "adhd_suspect", "vip"]
+	source     string // 数据来源：online_form / clinic_import / screening_campaign
+	isKeyFocus bool   // 是否重点关注对象
 
 	// === 测评统计快照（读模型优化）===
 	// 注意：这些快照数据通过领域事件异步更新，不应直接修改
@@ -45,7 +45,7 @@ func NewTestee(
 		gender:   gender,
 		birthday: birthday,
 		source:   "unknown",
-		tags:     make([]string, 0),
+		tags:     make([]Tag, 0),
 	}
 }
 
@@ -131,14 +131,23 @@ func (t *Testee) updateBasicInfo(name string, gender Gender, birthday *time.Time
 // === 标签管理方法 ===
 
 // Tags 获取标签列表（返回副本，防止外部修改）
-func (t *Testee) Tags() []string {
-	tags := make([]string, len(t.tags))
+func (t *Testee) Tags() []Tag {
+	tags := make([]Tag, len(t.tags))
 	copy(tags, t.tags)
 	return tags
 }
 
+// TagsAsStrings 获取标签的字符串列表（用于序列化和外部展示）
+func (t *Testee) TagsAsStrings() []string {
+	tags := make([]string, len(t.tags))
+	for i, tag := range t.tags {
+		tags[i] = string(tag)
+	}
+	return tags
+}
+
 // HasTag 检查是否有某个标签
-func (t *Testee) HasTag(tag string) bool {
+func (t *Testee) HasTag(tag Tag) bool {
 	for _, existing := range t.tags {
 		if existing == tag {
 			return true
@@ -147,8 +156,13 @@ func (t *Testee) HasTag(tag string) bool {
 	return false
 }
 
-// addTag 添加标签（包内方法，应通过 Editor 调用）
-func (t *Testee) addTag(tag string) {
+// HasTagString 检查是否有某个标签（字符串版本）
+func (t *Testee) HasTagString(tag string) bool {
+	return t.HasTag(Tag(tag))
+}
+
+// addTag 添加标签（包内方法，应通过 Tagger 调用）
+func (t *Testee) addTag(tag Tag) {
 	if tag == "" {
 		return
 	}
@@ -159,8 +173,8 @@ func (t *Testee) addTag(tag string) {
 	t.tags = append(t.tags, tag)
 }
 
-// removeTag 移除标签（包内方法，应通过 Editor 调用）
-func (t *Testee) removeTag(tag string) {
+// removeTag 移除标签（包内方法，应通过 Tagger 调用）
+func (t *Testee) removeTag(tag Tag) {
 	for i, existing := range t.tags {
 		if existing == tag {
 			t.tags = append(t.tags[:i], t.tags[i+1:]...)
@@ -169,9 +183,9 @@ func (t *Testee) removeTag(tag string) {
 	}
 }
 
-// clearTags 清空所有标签（包内方法，应通过 Editor 调用）
+// clearTags 清空所有标签（包内方法，应通过 Tagger 调用）
 func (t *Testee) clearTags() {
-	t.tags = make([]string, 0)
+	t.tags = make([]Tag, 0)
 }
 
 // === 关注度管理 ===
@@ -233,11 +247,23 @@ func (t *Testee) SetKeyFocus(isKeyFocus bool) {
 }
 
 // SetTags 设置标签列表（仅用于从数据库加载）
-func (t *Testee) SetTags(tags []string) {
+func (t *Testee) SetTags(tags []Tag) {
 	if tags == nil {
-		t.tags = make([]string, 0)
+		t.tags = make([]Tag, 0)
 	} else {
 		t.tags = tags
+	}
+}
+
+// SetTagsFromStrings 从字符串列表设置标签（仅用于从数据库加载）
+func (t *Testee) SetTagsFromStrings(tags []string) {
+	if tags == nil {
+		t.tags = make([]Tag, 0)
+		return
+	}
+	t.tags = make([]Tag, len(tags))
+	for i, tag := range tags {
+		t.tags[i] = Tag(tag)
 	}
 }
 
@@ -250,7 +276,7 @@ func (t *Testee) RestoreFromRepository(
 	assessmentStats *AssessmentStats,
 ) {
 	t.profileID = profileID
-	t.SetTags(tags)
+	t.SetTagsFromStrings(tags)
 	t.SetKeyFocus(isKeyFocus)
 	t.assessmentStats = assessmentStats
 }

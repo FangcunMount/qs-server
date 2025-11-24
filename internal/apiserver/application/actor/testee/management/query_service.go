@@ -1,10 +1,11 @@
-package testee_management
+package management
 
 import (
 	"context"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
@@ -14,14 +15,14 @@ type queryService struct {
 }
 
 // NewQueryService 创建受试者查询服务
-func NewQueryService(repo testee.Repository) TesteeQueryApplicationService {
+func NewQueryService(repo testee.Repository) shared.TesteeQueryApplicationService {
 	return &queryService{
 		repo: repo,
 	}
 }
 
 // GetByID 根据ID查询受试者
-func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeManagementResult, error) {
+func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*shared.TesteeManagementResult, error) {
 	t, err := s.repo.FindByID(ctx, testee.ID(testeeID))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find testee")
@@ -30,18 +31,18 @@ func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeMan
 	return toManagementResult(t), nil
 }
 
-// FindByIAMChild 根据 IAM Child ID 查询受试者
-func (s *queryService) FindByIAMChild(ctx context.Context, orgID int64, iamChildID int64) (*TesteeManagementResult, error) {
-	t, err := s.repo.FindByIAMChild(ctx, orgID, iamChildID)
+// FindByProfile 根据用户档案 ID 查询受试者
+func (s *queryService) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*shared.TesteeManagementResult, error) {
+	t, err := s.repo.FindByProfile(ctx, orgID, profileID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find testee by iam child id")
+		return nil, errors.Wrap(err, "failed to find testee by profile id")
 	}
 
 	return toManagementResult(t), nil
 }
 
 // ListTestees 列出受试者
-func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*TesteeListResult, error) {
+func (s *queryService) ListTestees(ctx context.Context, dto shared.ListTesteeDTO) (*shared.TesteeListResult, error) {
 	// 根据条件选择查询方法
 	var testees []*testee.Testee
 	var err error
@@ -67,12 +68,12 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 	}
 
 	// 转换为 DTO
-	items := make([]*TesteeManagementResult, len(testees))
+	items := make([]*shared.TesteeManagementResult, len(testees))
 	for i, t := range testees {
 		items[i] = toManagementResult(t)
 	}
 
-	return &TesteeListResult{
+	return &shared.TesteeListResult{
 		Items:      items,
 		TotalCount: totalCount,
 		Offset:     dto.Offset,
@@ -81,7 +82,7 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 }
 
 // ListKeyFocus 列出重点关注的受试者
-func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) (*TesteeListResult, error) {
+func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) (*shared.TesteeListResult, error) {
 	testees, err := s.repo.ListKeyFocus(ctx, orgID, offset, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list key focus testees")
@@ -94,12 +95,12 @@ func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, li
 	}
 
 	// 转换为 DTO
-	items := make([]*TesteeManagementResult, len(testees))
+	items := make([]*shared.TesteeManagementResult, len(testees))
 	for i, t := range testees {
 		items[i] = toManagementResult(t)
 	}
 
-	return &TesteeListResult{
+	return &shared.TesteeListResult{
 		Items:      items,
 		TotalCount: totalCount,
 		Offset:     offset,
@@ -108,20 +109,19 @@ func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, li
 }
 
 // toManagementResult 将领域对象转换为管理 DTO
-func toManagementResult(t *testee.Testee) *TesteeManagementResult {
+func toManagementResult(t *testee.Testee) *shared.TesteeManagementResult {
 	if t == nil {
 		return nil
 	}
 
-	result := &TesteeManagementResult{
+	result := &shared.TesteeManagementResult{
 		ID:         uint64(t.ID()),
 		OrgID:      t.OrgID(),
-		IAMUserID:  t.IAMUserID(),
-		IAMChildID: t.IAMChildID(),
+		ProfileID:  t.ProfileID(),
 		Name:       t.Name(),
 		Gender:     int8(t.Gender()),
 		Birthday:   t.Birthday(),
-		Tags:       t.Tags(),
+		Tags:       t.TagsAsStrings(),
 		Source:     t.Source(),
 		IsKeyFocus: t.IsKeyFocus(),
 	}

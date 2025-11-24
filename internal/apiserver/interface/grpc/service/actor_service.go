@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee_management"
+	testeeShared "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -15,11 +15,11 @@ import (
 // ActorService Actor 服务的 gRPC 实现
 type ActorService struct {
 	pb.UnimplementedActorServiceServer
-	testeeService testee_management.Service
+	testeeService testeeShared.Service
 }
 
 // NewActorService 创建 Actor 服务
-func NewActorService(testeeService testee_management.Service) *ActorService {
+func NewActorService(testeeService testeeShared.Service) *ActorService {
 	return &ActorService{
 		testeeService: testeeService,
 	}
@@ -32,14 +32,14 @@ func (s *ActorService) RegisterService(server *grpc.Server) {
 
 // CreateTestee 创建受试者
 func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeRequest) (*pb.TesteeResponse, error) {
-	log.Infof("gRPC CreateTestee called: org_id=%d, name=%s, iam_child_id=%d",
+	log.Infof("gRPC CreateTestee called: org_id=%d, name=%s, profile_id=%d",
 		req.OrgId, req.Name, req.IamChildId)
 
 	// 构建应用层 DTO
-	dto := testee_management.CreateTesteeDTO{
+	// 注意：当前 ProfileID 对应 IAM.Child.ID（使用 IamChildId 字段）
+	dto := testeeShared.CreateTesteeDTO{
 		OrgID:      int64(req.OrgId),
-		IAMUserID:  toInt64Ptr(req.IamUserId),
-		IAMChildID: toInt64Ptr(req.IamChildId),
+		ProfileID:  toUint64Ptr(req.IamChildId),
 		Name:       req.Name,
 		Gender:     int8(req.Gender),
 		Birthday:   toTimePtr(req.Birthday),
@@ -77,7 +77,7 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 	log.Infof("gRPC UpdateTestee called: id=%d", req.Id)
 
 	// 构建应用层 DTO
-	dto := testee_management.UpdateTesteeDTO{
+	dto := testeeShared.UpdateTesteeDTO{
 		Name:       &req.Name,
 		Tags:       req.Tags,
 		IsKeyFocus: &req.IsKeyFocus,
@@ -106,9 +106,10 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 
 // TesteeExists 检查受试者是否存在
 func (s *ActorService) TesteeExists(ctx context.Context, req *pb.TesteeExistsRequest) (*pb.TesteeExistsResponse, error) {
-	log.Infof("gRPC TesteeExists called: org_id=%d, iam_child_id=%d", req.OrgId, req.IamChildId)
+	log.Infof("gRPC TesteeExists called: org_id=%d, profile_id=%d", req.OrgId, req.IamChildId)
 
-	testee, err := s.testeeService.FindByIAMChildID(ctx, int64(req.OrgId), req.IamChildId)
+	// 注意：当前 ProfileID 对应 IAM.Child.ID（使用 IamChildId 字段）
+	testee, err := s.testeeService.FindByProfileID(ctx, int64(req.OrgId), req.IamChildId)
 	if err != nil {
 		// 如果是未找到错误，返回不存在
 		return &pb.TesteeExistsResponse{
@@ -154,12 +155,13 @@ func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTestees
 }
 
 // toTesteeProtoResponse 将应用层结果转换为 proto 响应
-func toTesteeProtoResponse(result *testee_management.TesteeResult) *pb.TesteeResponse {
+func toTesteeProtoResponse(result *testeeShared.CompositeTesteeResult) *pb.TesteeResponse {
+	// 注意：当前 ProfileID 对应 IAM.Child.ID（映射到 IamChildId 字段）
 	resp := &pb.TesteeResponse{
 		Id:         result.ID,
 		OrgId:      uint64(result.OrgID),
-		IamUserId:  toUint64FromInt64Ptr(result.IAMUserID),
-		IamChildId: toUint64FromInt64Ptr(result.IAMChildID),
+		IamUserId:  0, // 已废弃
+		IamChildId: toUint64FromUint64Ptr(result.ProfileID),
 		Name:       result.Name,
 		Gender:     int32(result.Gender),
 		Birthday:   toTimestampPtr(result.Birthday),
@@ -188,12 +190,28 @@ func toInt64Ptr(v uint64) *int64 {
 	return &i
 }
 
+// toUint64Ptr 将 uint64 转换为 *uint64
+func toUint64Ptr(v uint64) *uint64 {
+	if v == 0 {
+		return nil
+	}
+	return &v
+}
+
 // toUint64FromInt64Ptr 将 *int64 转换为 uint64
 func toUint64FromInt64Ptr(v *int64) uint64 {
 	if v == nil {
 		return 0
 	}
 	return uint64(*v)
+}
+
+// toUint64FromUint64Ptr 将 *uint64 转换为 uint64
+func toUint64FromUint64Ptr(v *uint64) uint64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 // toTimePtr 将 *timestamppb.Timestamp 转换为 *time.Time

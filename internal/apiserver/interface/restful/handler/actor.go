@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff_management"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee_management"
+	testeeShared "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/gin-gonic/gin"
@@ -14,13 +14,13 @@ import (
 // ActorHandler Actor 模块的 HTTP Handler
 type ActorHandler struct {
 	*BaseHandler
-	testeeService testee_management.Service
+	testeeService testeeShared.Service
 	staffService  staff_management.Service
 }
 
 // NewActorHandler 创建 Actor Handler
 func NewActorHandler(
-	testeeService testee_management.Service,
+	testeeService testeeShared.Service,
 	staffService staff_management.Service,
 ) *ActorHandler {
 	return &ActorHandler{
@@ -31,33 +31,6 @@ func NewActorHandler(
 }
 
 // ========== Testee API ==========
-
-// CreateTestee 创建受试者
-// @Summary 创建受试者
-// @Tags Actor
-// @Accept json
-// @Produce json
-// @Param body body request.CreateTesteeRequest true "创建受试者请求"
-// @Success 200 {object} Response{data=response.TesteeResponse}
-// @Router /api/v1/testees [post]
-func (h *ActorHandler) CreateTestee(c *gin.Context) {
-	var req request.CreateTesteeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Errorf("Invalid request: %v", err)
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	dto := toCreateTesteeDTO(&req)
-	result, err := h.testeeService.Create(c.Request.Context(), dto)
-	if err != nil {
-		log.Errorf("Failed to create testee: %v", err)
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	h.SuccessResponseWithMessage(c, "受试者创建成功", toTesteeResponse(result))
-}
 
 // GetTestee 获取受试者详情
 // @Summary 获取受试者详情
@@ -121,31 +94,6 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "受试者更新成功", toTesteeResponse(result))
 }
 
-// DeleteTestee 删除受试者
-// @Summary 删除受试者
-// @Tags Actor
-// @Produce json
-// @Param id path int true "受试者ID"
-// @Success 200 {object} Response
-// @Router /api/v1/testees/{id} [delete]
-func (h *ActorHandler) DeleteTestee(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		log.Errorf("Invalid testee ID: %v", err)
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	if err := h.testeeService.Delete(c.Request.Context(), id); err != nil {
-		log.Errorf("Failed to delete testee: %v", err)
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	h.SuccessResponseWithMessage(c, "受试者删除成功", nil)
-}
-
 // ListTestees 查询受试者列表
 // @Summary 查询受试者列表
 // @Tags Actor
@@ -176,7 +124,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 	offset := (req.Page - 1) * req.PageSize
 
 	// 根据查询条件调用不同的服务方法
-	var results []*testee_management.TesteeResult
+	var results []*testeeShared.CompositeTesteeResult
 	var total int64
 	var err error
 
@@ -193,7 +141,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		start := offset
 		end := offset + req.PageSize
 		if start >= len(results) {
-			results = []*testee_management.TesteeResult{}
+			results = []*testeeShared.CompositeTesteeResult{}
 		} else {
 			if end > len(results) {
 				end = len(results)
@@ -401,7 +349,7 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 // ========== 映射辅助函数 ==========
 
 // toCreateTesteeDTO 将创建请求转换为应用层 DTO
-func toCreateTesteeDTO(req *request.CreateTesteeRequest) testee_management.CreateTesteeDTO {
+func toCreateTesteeDTO(req *request.CreateTesteeRequest) testeeShared.CreateTesteeDTO {
 	var gender int8
 	switch req.Gender {
 	case "male", "男":
@@ -412,10 +360,19 @@ func toCreateTesteeDTO(req *request.CreateTesteeRequest) testee_management.Creat
 		gender = 0
 	}
 
-	return testee_management.CreateTesteeDTO{
+	// 处理 ProfileID：优先使用 ProfileID，否则使用 IAMChildID（向后兼容）
+	var profileID *uint64
+	if req.ProfileID != nil {
+		profileID = req.ProfileID
+	} else if req.IAMChildID != nil {
+		// 向后兼容：将 IAMChildID 转换为 ProfileID
+		pid := uint64(*req.IAMChildID)
+		profileID = &pid
+	}
+
+	return testeeShared.CreateTesteeDTO{
 		OrgID:      req.OrgID,
-		IAMUserID:  req.IAMUserID,
-		IAMChildID: req.IAMChildID,
+		ProfileID:  profileID,
 		Name:       req.Name,
 		Gender:     gender,
 		Birthday:   req.Birthday,
@@ -426,8 +383,8 @@ func toCreateTesteeDTO(req *request.CreateTesteeRequest) testee_management.Creat
 }
 
 // toUpdateTesteeDTO 将更新请求转换为应用层 DTO
-func toUpdateTesteeDTO(req *request.UpdateTesteeRequest) testee_management.UpdateTesteeDTO {
-	dto := testee_management.UpdateTesteeDTO{
+func toUpdateTesteeDTO(req *request.UpdateTesteeRequest) testeeShared.UpdateTesteeDTO {
+	dto := testeeShared.UpdateTesteeDTO{
 		Name:       req.Name,
 		Birthday:   req.Birthday,
 		Tags:       req.Tags,
@@ -451,7 +408,7 @@ func toUpdateTesteeDTO(req *request.UpdateTesteeRequest) testee_management.Updat
 }
 
 // toTesteeResponse 将应用层结果转换为响应
-func toTesteeResponse(result *testee_management.TesteeResult) *response.TesteeResponse {
+func toTesteeResponse(result *testeeShared.CompositeTesteeResult) *response.TesteeResponse {
 	var gender string
 	switch result.Gender {
 	case 1:
@@ -465,8 +422,8 @@ func toTesteeResponse(result *testee_management.TesteeResult) *response.TesteeRe
 	resp := &response.TesteeResponse{
 		ID:         result.ID,
 		OrgID:      result.OrgID,
-		IAMUserID:  result.IAMUserID,
-		IAMChildID: result.IAMChildID,
+		ProfileID:  result.ProfileID,
+		IAMChildID: result.ProfileID, // 向后兼容：使用 ProfileID 填充
 		Name:       result.Name,
 		Gender:     gender,
 		Birthday:   result.Birthday,
@@ -487,7 +444,7 @@ func toTesteeResponse(result *testee_management.TesteeResult) *response.TesteeRe
 }
 
 // toTesteeListResponse 将应用层列表结果转换为响应
-func toTesteeListResponse(results []*testee_management.TesteeResult, total int64, page, pageSize int) *response.TesteeListResponse {
+func toTesteeListResponse(results []*testeeShared.CompositeTesteeResult, total int64, page, pageSize int) *response.TesteeListResponse {
 	items := make([]*response.TesteeResponse, 0, len(results))
 	for _, result := range results {
 		items = append(items, toTesteeResponse(result))

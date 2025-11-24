@@ -5,8 +5,8 @@ import "time"
 // CreateTesteeRequest 创建受试者请求
 type CreateTesteeRequest struct {
 	OrgID      int64      `json:"org_id" binding:"required"` // 机构ID
-	IAMUserID  *int64     `json:"iam_user_id"`               // IAM用户ID（成年人）
-	IAMChildID *int64     `json:"iam_child_id"`              // IAM儿童ID（未成年人）
+	ProfileID  *uint64    `json:"profile_id"`                // 用户档案ID（新字段）
+	IAMChildID *int64     `json:"iam_child_id"`              // IAM儿童ID（已废弃，向后兼容）
 	Name       string     `json:"name" binding:"required"`   // 姓名
 	Gender     string     `json:"gender"`                    // 性别
 	Birthday   *time.Time `json:"birthday"`                  // 出生日期
