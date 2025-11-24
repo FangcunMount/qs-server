@@ -141,7 +141,7 @@ err = migrator.Rollback()
 ### 环境变量配置
 
 ```yaml
-# configs/apiserver.yaml
+# configs/apiserver.dev.yaml
 mysql:
   host: ${MYSQL_HOST:127.0.0.1}
   port: ${MYSQL_PORT:3306}

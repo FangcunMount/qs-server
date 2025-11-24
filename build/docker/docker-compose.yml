@@ -16,10 +16,12 @@ services:
     image: qs-apiserver:${VERSION:-latest}
     container_name: qs-apiserver
     restart: unless-stopped
+    command: ["/app/qs-apiserver", "--config=/app/configs/apiserver.prod.yaml"]
     ports:
-      - "9080:9080"
+      - "8081:8080"   # 宿主机端口后移一位，避开已有 IAM 8080
+      - "8444:8443"
     volumes:
-      - ../../configs/apiserver.yaml:/app/configs/apiserver.yaml:ro
+      - ../../configs/apiserver.prod.yaml:/app/configs/apiserver.prod.yaml:ro
       - ../../configs/cert:/app/configs/cert:ro
       - apiserver-logs:/app/logs
     environment:
@@ -28,7 +30,7 @@ services:
     networks:
       - qs-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -54,10 +56,12 @@ services:
     image: collection-server:${VERSION:-latest}
     container_name: collection-server
     restart: unless-stopped
+    command: ["/app/collection-server", "--config=/app/configs/collection-server.prod.yaml"]
     ports:
-      - "9081:9081"
+      - "8082:8080"   # 宿主机端口后移一位，避开已有 IAM 8080/8081
+      - "8445:8443"
     volumes:
-      - ../../configs/collection-server.yaml:/app/configs/collection-server.yaml:ro
+      - ../../configs/collection-server.prod.yaml:/app/configs/collection-server.prod.yaml:ro
       - ../../configs/cert:/app/configs/cert:ro
       - collection-logs:/app/logs
     environment:
@@ -66,7 +70,7 @@ services:
     networks:
       - qs-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9081/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3

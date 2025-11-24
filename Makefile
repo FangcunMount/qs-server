@@ -35,11 +35,19 @@ COVERAGE_DIR := coverage
 APISERVER_BIN := $(BIN_DIR)/qs-apiserver
 COLLECTION_BIN := $(BIN_DIR)/collection-server
 
-APISERVER_CONFIG := configs/apiserver.yaml
-COLLECTION_CONFIG := configs/collection-server.yaml
-
-APISERVER_PORT := 9080
-COLLECTION_PORT := 9081
+# 根据 ENV 选择配置与端口（默认 dev）
+ifeq ($(ENV),prod)
+  APISERVER_CONFIG := configs/apiserver.prod.yaml
+  COLLECTION_CONFIG := configs/collection-server.prod.yaml
+  # 宿主机端口为避免与已部署的 IAM 冲突，统一后移一位
+  APISERVER_PORT := 8081
+  COLLECTION_PORT := 8082
+else
+  APISERVER_CONFIG := configs/apiserver.dev.yaml
+  COLLECTION_CONFIG := configs/collection-server.dev.yaml
+  APISERVER_PORT := 18082
+  COLLECTION_PORT := 18083
+endif
 
 # 环境配置
 ENV ?= dev

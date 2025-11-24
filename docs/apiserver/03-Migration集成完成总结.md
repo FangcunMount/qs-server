@@ -41,7 +41,7 @@
 
 ### 4. 配置文件更新
 
-**文件**: `configs/apiserver.yaml`
+**文件**: `configs/apiserver.dev.yaml`
 
 在 MySQL 配置段添加了迁移配置：
 
@@ -103,10 +103,10 @@ migration.Migrator.Run()
 
 ```bash
 # 启用迁移（默认）
-./tmp/apiserver --config=configs/apiserver.yaml
+./tmp/apiserver --config=configs/apiserver.dev.yaml
 
 # 禁用迁移
-./tmp/apiserver --config=configs/apiserver.yaml --mysql.enable-migration=false
+./tmp/apiserver --config=configs/apiserver.dev.yaml --mysql.enable-migration=false
 ```
 
 ### 日志输出示例
@@ -220,7 +220,7 @@ go mod tidy
 4. **启动服务**:
 
    ```bash
-   ./tmp/apiserver --config=configs/apiserver.yaml
+   ./tmp/apiserver --config=configs/apiserver.dev.yaml
    ```
 
    服务会自动检测并执行新的迁移。
@@ -236,7 +236,7 @@ go mod tidy
 
 ### 配置文件
 
-- ✅ `configs/apiserver.yaml` - 服务配置（已修改）
+- ✅ `configs/apiserver.dev.yaml` - 服务配置（已修改）
 
 ### 文档
 

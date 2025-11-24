@@ -54,19 +54,20 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder --chown=appuser:appuser /build/bin/collection-server /app/collection-server
 
-# 复制配置文件
-COPY --chown=appuser:appuser configs/collection-server.yaml /app/configs/collection-server.yaml
+# 复制配置文件（包含 dev/prod，镜像内默认使用 prod）
+COPY --chown=appuser:appuser configs/collection-server.dev.yaml /app/configs/collection-server.dev.yaml
+COPY --chown=appuser:appuser configs/collection-server.prod.yaml /app/configs/collection-server.prod.yaml
 COPY --chown=appuser:appuser configs/cert/ /app/configs/cert/
 
 # 切换到非 root 用户
 USER appuser
 
-# 暴露端口
-EXPOSE 9081
+# 暴露端口（生产配置）
+EXPOSE 8080 8443
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:9081/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # 启动服务
 ENTRYPOINT ["/app/collection-server"]

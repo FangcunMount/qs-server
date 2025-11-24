@@ -3,7 +3,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["--config=configs/collection-server.yaml"]
+  args_bin = ["--config=configs/collection-server.dev.yaml"]
   bin = "./tmp/collection"
   cmd = "go build -o ./tmp/collection ./cmd/collection-server"
   working_dir = "."

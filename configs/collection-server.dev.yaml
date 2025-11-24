@@ -3,12 +3,12 @@
 # 服务器配置
 insecure:
   bind-address: "127.0.0.1"
-  bind-port: 9081
+  bind-port: 18083
 
 # 安全服务配置
 secure:
   bind-address: "127.0.0.1"
-  bind-port: 9445
+  bind-port: 18443
   tls:
     cert-file: "./configs/cert/collection-server.crt"
     private-key-file: "./configs/cert/collection-server.key"

@@ -3,7 +3,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["--config=configs/apiserver.yaml"]
+  args_bin = ["--config=configs/apiserver.dev.yaml"]
   bin = "./tmp/apiserver"
   cmd = "go build -o ./tmp/apiserver ./cmd/qs-apiserver"
   working_dir = "."

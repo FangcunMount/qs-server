@@ -60,7 +60,7 @@ check_redis
 
 # 2. 启动 apiserver
 echo "🔧 启动 apiserver..."
-./qs-apiserver --config=configs/apiserver.yaml > logs/apiserver.log 2>&1 &
+./qs-apiserver --config=configs/apiserver.dev.yaml > logs/apiserver.log 2>&1 &
 APISERVER_PID=$!
 echo "apiserver PID: $APISERVER_PID"
 
@@ -80,7 +80,7 @@ check_service "evaluation-server" 8082
 
 # 4. 启动 collection-server (发布者)
 echo "📡 启动 collection-server (发布者)..."
-./collection-server --config=configs/collection-server.yaml > logs/collection-server.log 2>&1 &
+./collection-server --config=configs/collection-server.dev.yaml > logs/collection-server.log 2>&1 &
 COLLECTION_PID=$!
 echo "collection-server PID: $COLLECTION_PID"
 

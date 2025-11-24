@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// 设置配置文件
-	viper.SetConfigFile("configs/apiserver.yaml")
+	viper.SetConfigFile("configs/apiserver.dev.yaml")
 	viper.SetConfigType("yaml")
 
 	// 读取配置文件

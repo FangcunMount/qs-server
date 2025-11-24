@@ -1,0 +1,121 @@
+# qs-apiserver 生产环境配置
+
+# 应用配置
+app:
+  name: "qs-apiserver"
+  version: "1.0.0"
+  mode: "production"  # development, production
+
+# RESTful 服务配置
+server:
+    mode: release # 生产环境默认 release
+    healthz: true
+    middlewares: recovery,enhanced_logger,secure,nocache,cors
+    max-ping-count: 3
+
+# GRPC 配置
+grpc:
+  bind-address: "0.0.0.0"
+  bind-port: 9090
+  healthz-port: 9091
+
+# 不安全服务配置（HTTP）
+insecure:
+  bind-address: "0.0.0.0"
+  bind-port: 8080
+
+# 安全服务配置（HTTPS）
+secure:
+  bind-address: "0.0.0.0"
+  bind-port: 8443
+  tls:
+    cert-file: "./configs/cert/qs-apiserver.crt"
+    private-key-file: "./configs/cert/qs-apiserver.key"
+
+# MySQL 数据库配置
+mysql:
+  host: "<YOUR_MYSQL_HOST>:3306"
+  username: "<YOUR_MYSQL_USER>"
+  password: "<YOUR_MYSQL_PASSWORD>"
+  database: "questionnaire_scale"
+  max-idle-connections: 20
+  max-open-connections: 200
+  max-connection-life-time: "2h"
+  log-level: 2 # 生产降低日志级别
+
+# 数据库迁移配置
+migration:
+  enabled: true   # 生产环境建议开启
+  autoseed: false
+  database: "questionnaire_scale"
+
+# Redis 配置（双实例架构）
+redis:
+  cache:
+    host: "<YOUR_REDIS_CACHE_HOST>"
+    port: 6379
+    username: "<YOUR_REDIS_CACHE_USERNAME>"
+    password: "<YOUR_REDIS_CACHE_PASSWORD>"
+    database: 0
+    max-idle: 100
+    max-active: 200
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
+  store:
+    host: "<YOUR_REDIS_STORE_HOST>"
+    port: 6380
+    username: "<YOUR_REDIS_STORE_USERNAME>"
+    password: "<YOUR_REDIS_STORE_PASSWORD>"
+    database: 0
+    max-idle: 100
+    max-active: 200
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
+
+# MongoDB 数据库配置
+mongodb:
+  url: "mongodb://<YOUR_MONGO_USER>:<YOUR_MONGO_PASSWORD>@<YOUR_MONGO_HOST>:27017/questionnaire_scale?authSource=admin"
+  database: "questionnaire_scale"
+  use-ssl: true
+  ssl-insecure-skip-verify: false
+  ssl-allow-invalid-hostnames: false
+  ssl-ca-file: ""
+  ssl-pem-keyfile: ""
+
+# 日志配置（生产环境）
+log:
+  disable-caller: true
+  disable-stacktrace: true
+  level: info
+  format: json
+  enable-color: false
+  development: false
+  name: "qs-apiserver"
+  max-size: 100
+  max-age: 30
+  max-backups: 10
+  compress: true
+  enable-time-rotation: true
+  time-rotation-format: "2006-01-02"
+  enable-level-output: true
+  level-output-mode: "duplicate"
+  level-output-paths:
+    all:
+      - stdout
+      - /data/logs/qs/qs-apiserver.log
+    warn:
+      - /data/logs/qs/qs-apiserver-warn.log
+    error:
+      - stderr
+      - /data/logs/qs/qs-apiserver-error.log
+
+# JWT 配置
+jwt:
+  realm: "qs jwt"
+  key: "<YOUR_JWT_SECRET_KEY>"
+  timeout: "24h"
+  max-refresh: "168h"

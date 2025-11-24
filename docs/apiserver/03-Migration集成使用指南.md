@@ -6,7 +6,7 @@ Migration package 已成功集成到 `qs-apiserver` 服务中，会在服务启�
 
 ## 📋 配置说明
 
-### 1. 配置文件（`configs/apiserver.yaml`）
+### 1. 配置文件（`configs/apiserver.dev.yaml`）
 
 ```yaml
 mysql:
@@ -120,7 +120,7 @@ ALTER TABLE testee DROP COLUMN `nickname`;
 
 ```bash
 go build -o tmp/apiserver cmd/qs-apiserver/apiserver.go
-./tmp/apiserver --config=configs/apiserver.yaml
+./tmp/apiserver --config=configs/apiserver.dev.yaml
 ```
 
 服务启动时会自动检测并执行新的迁移。

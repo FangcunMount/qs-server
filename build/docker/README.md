@@ -16,12 +16,12 @@
 ### 服务列表
 
 1. **qs-apiserver** - 问卷量表 API 服务
-   - 端口: 9080
-   - 健康检查: http://localhost:9080/health
+   - 宿主机映射: 8081 (HTTP) / 8444 (HTTPS) → 容器 8080/8443
+   - 健康检查: http://localhost:8081/health
 
 2. **collection-server** - 数据采集服务
-   - 端口: 9081
-   - 健康检查: http://localhost:9081/health
+   - 宿主机映射: 8082 (HTTP) / 8445 (HTTPS) → 容器 8080/8443
+   - 健康检查: http://localhost:8082/health
 
 ### 依赖说明
 
@@ -98,8 +98,10 @@ docker-compose down -v
 
 ```
 configs/
-├── apiserver.yaml              # QS API Server 配置
-├── collection-server.yaml      # Collection Server 配置
+├── apiserver.dev.yaml          # QS API Server 开发配置
+├── apiserver.prod.yaml         # QS API Server 生产配置
+├── collection-server.dev.yaml  # Collection Server 开发配置
+├── collection-server.prod.yaml # Collection Server 生产配置
 └── cert/                       # SSL 证书目录
 ```
 
@@ -177,8 +179,8 @@ docker-compose exec collection-server sh
 ### 检查健康状态
 ```bash
 docker-compose ps
-curl http://localhost:9080/health
-curl http://localhost:9081/health
+curl http://localhost:8081/health
+curl http://localhost:8082/health
 ```
 
 ### 重启服务

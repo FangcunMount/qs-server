@@ -129,8 +129,8 @@ make build
 make run-all
 
 # 或单独启动服务
-make run-apiserver       # 启动 API Server (端口: 9080)
-make run-collection      # 启动 Collection Server (端口: 9081)
+make run-apiserver       # 启动 API Server (dev: 18082，prod 宿主机: 8081/8444 -> 容器 8080/8443，使用 configs/apiserver.prod.yaml)
+make run-collection      # 启动 Collection Server (dev: 18083，prod 宿主机: 8082/8445 -> 容器 8080/8443，使用 configs/collection-server.prod.yaml)
 ```
 
 #### 5. 验证部署
@@ -139,11 +139,15 @@ make run-collection      # 启动 Collection Server (端口: 9081)
 # 检查所有服务状态
 make status-all
 
-# 检查 API Server 健康状态
-curl http://localhost:9080/health
+# 检查 API Server 健康状态（dev）
+curl http://localhost:18082/health
+# 生产示例
+# curl http://localhost:8081/health
 
-# 检查 Collection Server 健康状态
-curl http://localhost:9081/health
+# 检查 Collection Server 健康状态（dev）
+curl http://localhost:18083/health
+# 生产示例
+# curl http://localhost:8082/health
 
 # 查看服务日志
 make logs
@@ -260,9 +264,8 @@ docker build -t questionnaire-scale:latest .
 # 运行容器
 docker run -d \
   --name questionnaire-scale \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  -p 8082:8082 \
+  -p 8081:8080 \
+  -p 8082:8080 \
   questionnaire-scale:latest
 ```
 
@@ -289,8 +292,6 @@ spec:
         image: questionnaire-scale:latest
         ports:
         - containerPort: 8080
-        - containerPort: 8081
-        - containerPort: 8082
 ```
 
 ## 监控运维

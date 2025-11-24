@@ -22,12 +22,12 @@ grpc:
 # 不安全服务配置
 insecure:
   bind-address: "127.0.0.1"
-  bind-port: 9080
+  bind-port: 18082
 
 # 安全服务配置
 secure:
   bind-address: "127.0.0.1"
-  bind-port: 9444
+  bind-port: 18442
   tls:
     cert-file: "./configs/cert/qs-apiserver.crt"
     private-key-file: "./configs/cert/qs-apiserver.key"

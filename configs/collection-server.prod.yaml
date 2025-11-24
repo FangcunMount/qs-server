@@ -1,0 +1,51 @@
+# collection-server 生产环境配置
+
+# 服务器配置（HTTP）
+insecure:
+  bind-address: "0.0.0.0"
+  bind-port: 8080
+
+# 安全服务配置（HTTPS）
+secure:
+  bind-address: "0.0.0.0"
+  bind-port: 8443
+  tls:
+    cert-file: "./configs/cert/collection-server.crt"
+    private-key-file: "./configs/cert/collection-server.key"
+
+# GRPC 客户端配置
+grpc_client:
+  endpoint: "apiserver:9090"  # 生产部署请根据服务发现或网关调整
+  timeout: 30
+  insecure: true
+
+# JWT 配置
+jwt:
+  secret_key: "<YOUR_COLLECTION_JWT_SECRET_KEY>"
+  token_duration: 168  # 7 天 (24*7小时)
+
+# 日志配置
+log:
+  name: "collection-server"
+  level: "info"
+  format: "json"
+  enable-color: false
+  disable-caller: true
+  disable-stacktrace: true
+  development: false
+  output-paths: ["/data/logs/qs/collection-server.log", "stdout"]
+  error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"]
+  max-size: 100
+  max-age: 30
+  max-backups: 10
+  compress: true
+
+# Redis 配置
+redis:
+  host: <YOUR_REDIS_HOST>
+  port: 6379
+  password: <YOUR_REDIS_PASSWORD>
+  database: 0
+  max-idle: 100
+  max-active: 200
+  timeout: 5
