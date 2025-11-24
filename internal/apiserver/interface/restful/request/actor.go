@@ -36,13 +36,13 @@ type ListTesteeRequest struct {
 
 // CreateStaffRequest 创建员工请求
 type CreateStaffRequest struct {
-	OrgID     int64    `json:"org_id" binding:"required"`       // 机构ID
-	IAMUserID int64    `json:"iam_user_id" binding:"required"`  // IAM用户ID
-	Roles     []string `json:"roles" binding:"required,min=1"`  // 角色列表
-	Name      string   `json:"name" binding:"required"`         // 姓名
-	Email     string   `json:"email" binding:"omitempty,email"` // 邮箱
-	Phone     string   `json:"phone"`                           // 电话
-	IsActive  bool     `json:"is_active"`                       // 是否激活
+	OrgID    int64    `json:"org_id" binding:"required"`       // 机构ID
+	UserID   int64    `json:"user_id" binding:"required"`      // 用户ID
+	Roles    []string `json:"roles" binding:"required,min=1"`  // 角色列表
+	Name     string   `json:"name" binding:"required"`         // 姓名
+	Email    string   `json:"email" binding:"omitempty,email"` // 邮箱
+	Phone    string   `json:"phone"`                           // 电话
+	IsActive bool     `json:"is_active"`                       // 是否激活
 }
 
 // UpdateStaffRequest 更新员工请求

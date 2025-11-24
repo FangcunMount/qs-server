@@ -70,13 +70,13 @@ type AssessmentStatsPO struct {
 type StaffPO struct {
 	mysql.AuditFields
 
-	OrgID     int64          `gorm:"column:org_id;not null;index:idx_org_id"`
-	IAMUserID int64          `gorm:"column:iam_user_id;not null;index:idx_iam_user_id"`
-	Roles     StringSliceCol `gorm:"column:roles;type:json;not null"`
-	Name      string         `gorm:"column:name;size:100;not null"`
-	Email     string         `gorm:"column:email;size:255"`
-	Phone     string         `gorm:"column:phone;size:20"`
-	IsActive  bool           `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
+	OrgID    int64          `gorm:"column:org_id;not null;index:idx_org_id"`
+	UserID   int64          `gorm:"column:user_id;not null;index:idx_user_id"`
+	Roles    StringSliceCol `gorm:"column:roles;type:json;not null"`
+	Name     string         `gorm:"column:name;size:100;not null"`
+	Email    string         `gorm:"column:email;size:255"`
+	Phone    string         `gorm:"column:phone;size:20"`
+	IsActive bool           `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
 }
 
 // TableName 指定表名

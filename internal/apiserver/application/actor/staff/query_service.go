@@ -1,4 +1,4 @@
-package staff_management
+package staff
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 )
 
 // queryService 员工查询服务实现
+// 行为者：所有需要查询员工信息的用户
 type queryService struct {
 	repo staff.Repository
 }
 
 // NewQueryService 创建员工查询服务
-func NewQueryService(repo staff.Repository) StaffQueryApplicationService {
+func NewQueryService(repo staff.Repository) StaffQueryService {
 	return &queryService{
 		repo: repo,
 	}
@@ -30,14 +31,14 @@ func (s *queryService) GetByID(ctx context.Context, staffID uint64) (*StaffResul
 	return toStaffResult(st), nil
 }
 
-// GetByIAMUser 根据IAM用户ID查询员工
-func (s *queryService) GetByIAMUser(ctx context.Context, orgID int64, iamUserID int64) (*StaffResult, error) {
-	st, err := s.repo.FindByIAMUser(ctx, orgID, iamUserID)
+// GetByUser 根据用户ID查询员工
+func (s *queryService) GetByUser(ctx context.Context, orgID int64, userID int64) (*StaffResult, error) {
+	st, err := s.repo.FindByUser(ctx, orgID, userID)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "staff not found")
 		}
-		return nil, errors.Wrap(err, "failed to find staff by iam user")
+		return nil, errors.Wrap(err, "failed to find staff by user")
 	}
 
 	return toStaffResult(st), nil

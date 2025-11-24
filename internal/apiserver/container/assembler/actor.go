@@ -4,7 +4,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff_management"
+	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeManagement "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/management"
 	testeeRegistration "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/registration"
 	testeeShared "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
@@ -32,11 +32,10 @@ type ActorModule struct {
 	TesteeQueryService        testeeShared.TesteeQueryApplicationService
 	TesteeService             testeeShared.Service // 聚合服务，用于 gRPC
 
-	// staff service 层
-	StaffService        staffApp.StaffApplicationService
-	StaffProfileService staffApp.StaffProfileApplicationService
-	StaffRoleService    staffApp.StaffRoleApplicationService
-	StaffQueryService   staffApp.StaffQueryApplicationService
+	// staff service 层（按行为者组织）
+	StaffLifecycleService     staffApp.StaffLifecycleService     // 生命周期服务 - 人事/行政
+	StaffAuthorizationService staffApp.StaffAuthorizationService // 权限管理服务 - IT管理员
+	StaffQueryService         staffApp.StaffQueryService         // 查询服务 - 通用
 }
 
 // NewActorModule 创建 Actor 模块
@@ -69,8 +68,9 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	staffValidator := staff.NewValidator()
 	staffFactory := staff.NewFactory(m.StaffRepo, staffValidator)
 	staffEditor := staff.NewEditor(staffValidator)
-	staffRoleManager := staff.NewRoleManager(staffValidator)
-	staffIAMSync := staff.NewIAMSynchronizer(m.StaffRepo, staffValidator)
+	staffBinder := staff.NewBinder(m.StaffRepo, staffValidator)
+	staffRoleAllocator := staff.NewRoleAllocator(staffValidator)
+	staffLifecycler := staff.NewLifecycler(staffRoleAllocator)
 
 	// 初始化 testee service 层
 	m.TesteeRegistrationService = testeeRegistration.NewRegistrationService(
@@ -95,27 +95,26 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	)
 	m.TesteeQueryService = testeeManagement.NewQueryService(m.TesteeRepo)
 
-	// 初始化 staff service 层
-	m.StaffService = staffApp.NewStaffService(
+	// 初始化 staff service 层（按行为者组织）
+	// 生命周期服务 - 服务于人事/行政部门
+	m.StaffLifecycleService = staffApp.NewLifecycleService(
 		m.StaffRepo,
 		staffFactory,
 		staffValidator,
-		staffRoleManager,
-		uow,
-	)
-	m.StaffProfileService = staffApp.NewProfileService(
-		m.StaffRepo,
 		staffEditor,
-		staffIAMSync,
+		staffRoleAllocator,
+		staffBinder,
 		uow,
 	)
-	m.StaffRoleService = staffApp.NewRoleService(
+	// 权限管理服务 - 服务于IT管理员
+	m.StaffAuthorizationService = staffApp.NewAuthorizationService(
 		m.StaffRepo,
 		staffValidator,
-		staffRoleManager,
-		staffEditor,
+		staffRoleAllocator,
+		staffLifecycler,
 		uow,
 	)
+	// 查询服务 - 服务于所有需要查询的用户
 	m.StaffQueryService = staffApp.NewQueryService(m.StaffRepo)
 
 	// 初始化聚合服务（为 Handler 提供统一接口）
@@ -127,17 +126,12 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	)
 	m.TesteeService = testeeCompositeService // 保存聚合服务供 gRPC 使用
 
-	staffCompositeService := staffApp.NewCompositeService(
-		m.StaffService,
-		m.StaffProfileService,
-		m.StaffRoleService,
-		m.StaffQueryService,
-	)
-
-	// 初始化 handler 层
+	// 初始化 handler 层 - 直接使用按行为者划分的服务,不需要 CompositeService
 	m.ActorHandler = handler.NewActorHandler(
 		testeeCompositeService,
-		staffCompositeService,
+		m.StaffLifecycleService,
+		m.StaffAuthorizationService,
+		m.StaffQueryService,
 	)
 
 	return nil

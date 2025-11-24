@@ -11,8 +11,8 @@ type Validator interface {
 	// ValidateOrgID 验证机构ID
 	ValidateOrgID(orgID int64) error
 
-	// ValidateIAMUserID 验证IAM用户ID
-	ValidateIAMUserID(iamUserID int64) error
+	// ValidateUserID 验证用户ID
+	ValidateUserID(userID int64) error
 
 	// ValidateName 验证姓名
 	// required: 是否必填
@@ -29,6 +29,9 @@ type Validator interface {
 
 	// ValidateRoles 验证角色列表
 	ValidateRoles(roles []Role) error
+
+	// ValidateForCreation 验证创建时的必填字段
+	ValidateForCreation(orgID int64, userID int64, name string) error
 }
 
 // validator 验证器实现
@@ -47,10 +50,10 @@ func (v *validator) ValidateOrgID(orgID int64) error {
 	return nil
 }
 
-// ValidateIAMUserID 验证IAM用户ID
-func (v *validator) ValidateIAMUserID(iamUserID int64) error {
-	if iamUserID <= 0 {
-		return errors.WithCode(code.ErrValidation, "iamUserID must be positive")
+// ValidateUserID 验证用户ID
+func (v *validator) ValidateUserID(userID int64) error {
+	if userID <= 0 {
+		return errors.WithCode(code.ErrValidation, "userID must be positive")
 	}
 	return nil
 }
@@ -146,6 +149,26 @@ func (v *validator) ValidateRoles(roles []Role) error {
 		if err := v.ValidateRole(role); err != nil {
 			return errors.Wrapf(err, "invalid role: %s", role)
 		}
+	}
+
+	return nil
+}
+
+// ValidateForCreation 验证创建时的必填字段
+func (v *validator) ValidateForCreation(orgID int64, userID int64, name string) error {
+	// 验证机构ID
+	if err := v.ValidateOrgID(orgID); err != nil {
+		return err
+	}
+
+	// 验证用户ID
+	if err := v.ValidateUserID(userID); err != nil {
+		return err
+	}
+
+	// 验证姓名
+	if err := v.ValidateName(name, true); err != nil {
+		return err
 	}
 
 	return nil

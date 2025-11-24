@@ -58,11 +58,11 @@ func (r *staffRepository) FindByID(ctx context.Context, id staff.ID) (*staff.Sta
 	return r.mapper.ToDomain(po), nil
 }
 
-// FindByIAMUser 根据IAM用户ID查找员工
-func (r *staffRepository) FindByIAMUser(ctx context.Context, orgID int64, iamUserID int64) (*staff.Staff, error) {
+// FindByUser 根据用户ID查找员工
+func (r *staffRepository) FindByUser(ctx context.Context, orgID int64, userID int64) (*staff.Staff, error) {
 	var po StaffPO
 	err := r.WithContext(ctx).
-		Where("org_id = ? AND iam_user_id = ? AND deleted_at IS NULL", orgID, iamUserID).
+		Where("org_id = ? AND user_id = ? AND deleted_at IS NULL", orgID, userID).
 		First(&po).Error
 
 	if err != nil {

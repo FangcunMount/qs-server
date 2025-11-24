@@ -60,17 +60,17 @@ func (r *TesteeRef) IAMChildID() *int64 {
 // StaffRef 员工引用（值对象）
 // 用于在其他聚合根中引用员工
 type StaffRef struct {
-	staffID   staff.ID // 员工ID
-	iamUserID int64    // IAM用户ID（必须）
-	name      string   // 姓名
+	staffID staff.ID // 员工ID
+	userID  int64    // 用户ID（必须）
+	name    string   // 姓名
 }
 
 // NewStaffRef 创建员工引用
-func NewStaffRef(staffID staff.ID, iamUserID int64, name string) *StaffRef {
+func NewStaffRef(staffID staff.ID, userID int64, name string) *StaffRef {
 	return &StaffRef{
-		staffID:   staffID,
-		iamUserID: iamUserID,
-		name:      name,
+		staffID: staffID,
+		userID:  userID,
+		name:    name,
 	}
 }
 
@@ -79,9 +79,9 @@ func (r *StaffRef) StaffID() staff.ID {
 	return r.staffID
 }
 
-// IAMUserID 获取IAM用户ID
-func (r *StaffRef) IAMUserID() int64 {
-	return r.iamUserID
+// UserID 获取用户ID
+func (r *StaffRef) UserID() int64 {
+	return r.userID
 }
 
 // Name 获取姓名

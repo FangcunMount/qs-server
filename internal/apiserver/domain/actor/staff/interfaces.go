@@ -13,8 +13,8 @@ type Repository interface {
 	// FindByID 根据ID查找员工
 	FindByID(ctx context.Context, id ID) (*Staff, error)
 
-	// FindByIAMUser 根据IAM用户ID查找员工
-	FindByIAMUser(ctx context.Context, orgID int64, iamUserID int64) (*Staff, error)
+	// FindByUser 根据用户ID查找员工
+	FindByUser(ctx context.Context, orgID int64, userID int64) (*Staff, error)
 
 	// ListByOrg 列出机构下的员工
 	ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*Staff, error)
@@ -31,14 +31,11 @@ type Repository interface {
 
 // Factory 员工工厂领域服务
 type Factory interface {
-	// GetOrCreateByIAMUser 根据IAM用户ID获取或创建员工
-	GetOrCreateByIAMUser(
+	// GetOrCreateByUser 根据用户ID获取或创建员工（幂等）
+	GetOrCreateByUser(
 		ctx context.Context,
 		orgID int64,
-		iamUserID int64,
+		userID int64,
 		name string,
 	) (*Staff, error)
-
-	// SyncFromIAM 从IAM同步员工信息
-	SyncFromIAM(ctx context.Context, staff *Staff, name, email, phone string) error
 }

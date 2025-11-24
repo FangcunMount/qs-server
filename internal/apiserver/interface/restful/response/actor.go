@@ -39,7 +39,7 @@ type TesteeListResponse struct {
 type StaffResponse struct {
 	ID        uint64    `json:"id"`              // ID
 	OrgID     int64     `json:"org_id"`          // 机构ID
-	IAMUserID int64     `json:"iam_user_id"`     // IAM用户ID
+	UserID    int64     `json:"user_id"`         // 用户ID
 	Roles     []string  `json:"roles"`           // 角色列表
 	Name      string    `json:"name"`            // 姓名
 	Email     string    `json:"email,omitempty"` // 邮箱

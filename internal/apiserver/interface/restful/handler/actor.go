@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff_management"
+	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeShared "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -15,18 +15,25 @@ import (
 type ActorHandler struct {
 	*BaseHandler
 	testeeService testeeShared.Service
-	staffService  staff_management.Service
+	// Staff 服务按行为者组织
+	staffLifecycleService     staffApp.StaffLifecycleService
+	staffAuthorizationService staffApp.StaffAuthorizationService
+	staffQueryService         staffApp.StaffQueryService
 }
 
 // NewActorHandler 创建 Actor Handler
 func NewActorHandler(
 	testeeService testeeShared.Service,
-	staffService staff_management.Service,
+	staffLifecycleService staffApp.StaffLifecycleService,
+	staffAuthorizationService staffApp.StaffAuthorizationService,
+	staffQueryService staffApp.StaffQueryService,
 ) *ActorHandler {
 	return &ActorHandler{
-		BaseHandler:   NewBaseHandler(),
-		testeeService: testeeService,
-		staffService:  staffService,
+		BaseHandler:               NewBaseHandler(),
+		testeeService:             testeeService,
+		staffLifecycleService:     staffLifecycleService,
+		staffAuthorizationService: staffAuthorizationService,
+		staffQueryService:         staffQueryService,
 	}
 }
 
@@ -217,7 +224,8 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 	}
 
 	dto := toRegisterStaffDTO(&req)
-	result, err := h.staffService.Register(c.Request.Context(), dto)
+	// 使用生命周期服务 - 服务于人事/行放部门
+	result, err := h.staffLifecycleService.Register(c.Request.Context(), dto)
 	if err != nil {
 		log.Errorf("Failed to create staff: %v", err)
 		h.ErrorResponse(c, err)
@@ -243,7 +251,8 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 		return
 	}
 
-	result, err := h.staffService.GetByID(c.Request.Context(), id)
+	// 使用查询服务
+	result, err := h.staffQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
 		log.Errorf("Failed to get staff: %v", err)
 		h.ErrorResponse(c, err)
@@ -269,7 +278,8 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 		return
 	}
 
-	if err := h.staffService.Delete(c.Request.Context(), id); err != nil {
+	// 使用生命周期服务 - 服务于人事/行政部门
+	if err := h.staffLifecycleService.Delete(c.Request.Context(), id); err != nil {
 		log.Errorf("Failed to delete staff: %v", err)
 		h.ErrorResponse(c, err)
 		return
@@ -307,41 +317,27 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 	offset := (req.Page - 1) * req.PageSize
 
 	// 根据查询条件调用不同的服务方法
-	var results []*staff_management.StaffResult
+	var results []*staffApp.StaffResult
 	var total int64
 	var err error
 
-	if req.Role != "" {
-		// 按角色搜索
-		results, err = h.staffService.ListByRole(c.Request.Context(), req.OrgID, req.Role, offset, req.PageSize)
-		if err != nil {
-			log.Errorf("Failed to list staff by role: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-		// 获取总数
-		total, err = h.staffService.CountByOrg(c.Request.Context(), req.OrgID)
-		if err != nil {
-			log.Errorf("Failed to count staff: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-	} else {
-		// 查询机构下所有员工
-		results, err = h.staffService.ListByOrg(c.Request.Context(), req.OrgID, offset, req.PageSize)
-		if err != nil {
-			log.Errorf("Failed to list staff: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
-		// 获取总数
-		total, err = h.staffService.CountByOrg(c.Request.Context(), req.OrgID)
-		if err != nil {
-			log.Errorf("Failed to count staff: %v", err)
-			h.ErrorResponse(c, err)
-			return
-		}
+	// 使用查询服务
+	listDTO := staffApp.ListStaffDTO{
+		OrgID:  req.OrgID,
+		Role:   req.Role,
+		Offset: offset,
+		Limit:  req.PageSize,
 	}
+
+	listResult, err := h.staffQueryService.ListStaffs(c.Request.Context(), listDTO)
+	if err != nil {
+		log.Errorf("Failed to list staff: %v", err)
+		h.ErrorResponse(c, err)
+		return
+	}
+
+	results = listResult.Items
+	total = listResult.TotalCount
 
 	h.SuccessResponse(c, toStaffListResponse(results, total, req.Page, req.PageSize))
 }
@@ -465,33 +461,33 @@ func toTesteeListResponse(results []*testeeShared.CompositeTesteeResult, total i
 }
 
 // toRegisterStaffDTO 将创建请求转换为应用层 DTO
-func toRegisterStaffDTO(req *request.CreateStaffRequest) staff_management.RegisterStaffDTO {
-	return staff_management.RegisterStaffDTO{
-		OrgID:     req.OrgID,
-		IAMUserID: req.IAMUserID,
-		Roles:     req.Roles,
-		Name:      req.Name,
-		Email:     req.Email,
-		Phone:     req.Phone,
+func toRegisterStaffDTO(req *request.CreateStaffRequest) staffApp.RegisterStaffDTO {
+	return staffApp.RegisterStaffDTO{
+		OrgID:  req.OrgID,
+		UserID: req.UserID,
+		Roles:  req.Roles,
+		Name:   req.Name,
+		Email:  req.Email,
+		Phone:  req.Phone,
 	}
 }
 
 // toStaffResponse 将应用层结果转换为响应
-func toStaffResponse(result *staff_management.StaffResult) *response.StaffResponse {
+func toStaffResponse(result *staffApp.StaffResult) *response.StaffResponse {
 	return &response.StaffResponse{
-		ID:        result.ID,
-		OrgID:     result.OrgID,
-		IAMUserID: result.IAMUserID,
-		Roles:     result.Roles,
-		Name:      result.Name,
-		Email:     result.Email,
-		Phone:     result.Phone,
-		IsActive:  result.IsActive,
+		ID:       result.ID,
+		OrgID:    result.OrgID,
+		UserID:   result.UserID,
+		Roles:    result.Roles,
+		Name:     result.Name,
+		Email:    result.Email,
+		Phone:    result.Phone,
+		IsActive: result.IsActive,
 	}
 }
 
 // toStaffListResponse 将应用层列表结果转换为响应
-func toStaffListResponse(results []*staff_management.StaffResult, total int64, page, pageSize int) *response.StaffListResponse {
+func toStaffListResponse(results []*staffApp.StaffResult, total int64, page, pageSize int) *response.StaffListResponse {
 	items := make([]*response.StaffResponse, 0, len(results))
 	for _, result := range results {
 		items = append(items, toStaffResponse(result))

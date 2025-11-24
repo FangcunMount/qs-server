@@ -26,13 +26,13 @@ func (m *StaffMapper) ToPO(domain *staff.Staff) *StaffPO {
 	}
 
 	po := &StaffPO{
-		OrgID:     domain.OrgID(),
-		IAMUserID: domain.IAMUserID(),
-		Roles:     roles,
-		Name:      domain.Name(),
-		Email:     domain.Email(),
-		Phone:     domain.Phone(),
-		IsActive:  domain.IsActive(),
+		OrgID:    domain.OrgID(),
+		UserID:   domain.UserID(),
+		Roles:    roles,
+		Name:     domain.Name(),
+		Email:    domain.Email(),
+		Phone:    domain.Phone(),
+		IsActive: domain.IsActive(),
 	}
 
 	// 设置ID（如果已存在）
@@ -50,7 +50,7 @@ func (m *StaffMapper) ToDomain(po *StaffPO) *staff.Staff {
 	}
 
 	// 创建员工
-	domain := staff.NewStaff(po.OrgID, po.IAMUserID, po.Name)
+	domain := staff.NewStaff(po.OrgID, po.UserID, po.Name)
 
 	// 设置ID
 	domain.SetID(staff.ID(po.ID))

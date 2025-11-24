@@ -16,24 +16,24 @@ package staff
 //   - 不过度暴露内部状态，保持封装性
 //   - 审计字段由基础设施层（PO）处理
 type Staff struct {
-	id        ID     // 内部员工ID（主键）
-	orgID     int64  // 所属机构（多租户隔离）
-	iamUserID int64  // IAM.UserID（外键，必须绑定）
-	roles     []Role // 业务角色列表（核心业务数据）
-	name      string // 姓名（冗余缓存，可从 IAM 同步）
-	email     string // 邮箱（冗余缓存，可从 IAM 同步）
-	phone     string // 手机号（冗余缓存，可从 IAM 同步）
-	isActive  bool   // 在本系统内的激活状态
+	id       ID     // 内部员工ID（主键）
+	orgID    int64  // 所属机构（多租户隔离）
+	userID   int64  // 用户ID（外键，必须绑定）
+	roles    []Role // 业务角色列表（核心业务数据）
+	name     string // 姓名（缓存字段）
+	email    string // 邮箱（缓存字段）
+	phone    string // 手机号（缓存字段）
+	isActive bool   // 在本系统内的激活状态
 }
 
 // NewStaff 创建新的员工
-func NewStaff(orgID int64, iamUserID int64, name string) *Staff {
+func NewStaff(orgID int64, userID int64, name string) *Staff {
 	return &Staff{
-		orgID:     orgID,
-		iamUserID: iamUserID,
-		name:      name,
-		roles:     make([]Role, 0),
-		isActive:  true,
+		orgID:    orgID,
+		userID:   userID,
+		name:     name,
+		roles:    make([]Role, 0),
+		isActive: true,
 	}
 }
 
@@ -49,9 +49,9 @@ func (s *Staff) OrgID() int64 {
 	return s.orgID
 }
 
-// IAMUserID 获取IAM用户ID
-func (s *Staff) IAMUserID() int64 {
-	return s.iamUserID
+// UserID 获取用户ID
+func (s *Staff) UserID() int64 {
+	return s.userID
 }
 
 // Roles 获取角色列表
