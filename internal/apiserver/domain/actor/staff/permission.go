@@ -1,7 +1,6 @@
 package staff
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -82,8 +81,11 @@ func (pv *permissionValidator) ValidateAll(staff *Staff, requiredRoles ...Role) 
 		}
 	}
 	if len(missRoles) > 0 {
-		msg := fmt.Sprintf("staff missing required roles: %s", strings.Join(missRoles, ", "))
-		return errors.WithCode(code.ErrPermissionDenied, msg)
+		return errors.WithCode(
+			code.ErrPermissionDenied,
+			"staff missing required roles: %s",
+			strings.Join(missRoles, ", "),
+		)
 	}
 
 	return nil
