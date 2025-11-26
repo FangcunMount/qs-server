@@ -125,11 +125,14 @@ func (r *GRPCRegistry) registerActorService() error {
 		return nil
 	}
 
-	// TODO: 重构 Actor gRPC 服务以适配新的按行为者组织的服务接口
-	// 暂时禁用，直到完成 gRPC 服务的重构
-	// actorService := service.NewActorService(...)
-	// r.server.RegisterService(actorService)
-	log.Warn("   ⚠️  Actor gRPC service temporarily disabled - needs refactoring for actor-based services")
+	// 使用按行为者组织的服务
+	actorService := service.NewActorService(
+		r.container.ActorModule.TesteeRegistrationService,
+		r.container.ActorModule.TesteeManagementService,
+		r.container.ActorModule.TesteeQueryService,
+	)
+	r.server.RegisterService(actorService)
+	log.Info("   👥 Actor service registered")
 	return nil
 }
 

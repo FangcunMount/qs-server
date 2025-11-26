@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal/apiserver/interface/grpc/proto/actor/actor.proto
+// source: actor/actor.proto
 
 package actor
 
@@ -285,5 +285,5 @@ var ActorService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/apiserver/interface/grpc/proto/actor/actor.proto",
+	Metadata: "actor/actor.proto",
 }

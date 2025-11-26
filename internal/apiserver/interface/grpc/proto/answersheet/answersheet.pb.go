@@ -26,7 +26,7 @@ type AnswerSheet struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	QuestionnaireCode    string                 `protobuf:"bytes,2,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
-	Version string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=Version,proto3" json:"questionnaire_version,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Title                string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	Score                float64                `protobuf:"fixed64,5,opt,name=score,proto3" json:"score,omitempty"` // 总分(使用 double 支持小数)
 	WriterId             uint64                 `protobuf:"varint,6,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
@@ -84,9 +84,9 @@ func (x *AnswerSheet) GetQuestionnaireCode() string {
 	return ""
 }
 
-func (x *AnswerSheet) GetVersion() string {
+func (x *AnswerSheet) GetQuestionnaireVersion() string {
 	if x != nil {
-		return x.Version
+		return x.QuestionnaireVersion
 	}
 	return ""
 }
@@ -158,7 +158,7 @@ func (x *AnswerSheet) GetUpdatedAt() string {
 type Answer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	QuestionCode  string                 `protobuf:"bytes,1,opt,name=question_code,json=questionCode,proto3" json:"question_code,omitempty"`
-	QuestionType  string                 `protobuf:"bytes,2,opt,name=question_type,json=QuestionType,proto3" json:"question_type,omitempty"`
+	QuestionType  string                 `protobuf:"bytes,2,opt,name=question_type,json=questionType,proto3" json:"question_type,omitempty"`
 	Score         uint32                 `protobuf:"varint,3,opt,name=score,proto3" json:"score,omitempty"`
 	Value         string                 `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"` // JSON 字符串，可以表示各种类型的答案值
 	unknownFields protoimpl.UnknownFields
@@ -227,7 +227,7 @@ func (x *Answer) GetValue() string {
 type SaveAnswerSheetRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
-	Version string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=Version,proto3" json:"questionnaire_version,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Title                string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	WriterId             uint64                 `protobuf:"varint,4,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
@@ -273,9 +273,9 @@ func (x *SaveAnswerSheetRequest) GetQuestionnaireCode() string {
 	return ""
 }
 
-func (x *SaveAnswerSheetRequest) GetVersion() string {
+func (x *SaveAnswerSheetRequest) GetQuestionnaireVersion() string {
 	if x != nil {
-		return x.Version
+		return x.QuestionnaireVersion
 	}
 	return ""
 }
@@ -455,7 +455,7 @@ func (x *GetAnswerSheetResponse) GetAnswerSheet() *AnswerSheet {
 type ListAnswerSheetsRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
-	Version string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=Version,proto3" json:"questionnaire_version,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	WriterId             uint64                 `protobuf:"varint,3,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,4,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
 	Page                 int32                  `protobuf:"varint,5,opt,name=page,proto3" json:"page,omitempty"`
@@ -501,9 +501,9 @@ func (x *ListAnswerSheetsRequest) GetQuestionnaireCode() string {
 	return ""
 }
 
-func (x *ListAnswerSheetsRequest) GetVersion() string {
+func (x *ListAnswerSheetsRequest) GetQuestionnaireVersion() string {
 	if x != nil {
-		return x.Version
+		return x.QuestionnaireVersion
 	}
 	return ""
 }
@@ -719,7 +719,7 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\vAnswerSheet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x03 \x01(\tR\x14Version\x12\x14\n" +
+	"\x15questionnaire_version\x18\x03 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12\x14\n" +
 	"\x05score\x18\x05 \x01(\x01R\x05score\x12\x1b\n" +
 	"\twriter_id\x18\x06 \x01(\x04R\bwriterId\x12\x1f\n" +
@@ -736,12 +736,12 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"updated_at\x18\f \x01(\tR\tupdatedAt\"~\n" +
 	"\x06Answer\x12#\n" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
-	"\rquestion_type\x18\x02 \x01(\tR\fQuestionType\x12\x14\n" +
+	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
 	"\x05value\x18\x04 \x01(\tR\x05value\"\xfb\x01\n" +
 	"\x16SaveAnswerSheetRequest\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x02 \x01(\tR\x14Version\x12\x14\n" +
+	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1b\n" +
 	"\twriter_id\x18\x04 \x01(\x04R\bwriterId\x12\x1b\n" +
 	"\ttestee_id\x18\x05 \x01(\x04R\btesteeId\x12-\n" +
@@ -755,7 +755,7 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\fanswer_sheet\x18\x01 \x01(\v2\x18.answersheet.AnswerSheetR\vanswerSheet\"\xe8\x01\n" +
 	"\x17ListAnswerSheetsRequest\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x02 \x01(\tR\x14Version\x12\x1b\n" +
+	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x1b\n" +
 	"\twriter_id\x18\x03 \x01(\x04R\bwriterId\x12\x1b\n" +
 	"\ttestee_id\x18\x04 \x01(\x04R\btesteeId\x12\x12\n" +
 	"\x04page\x18\x05 \x01(\x05R\x04page\x12\x1b\n" +

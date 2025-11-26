@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: internal/apiserver/interface/grpc/proto/actor/actor.proto
+// source: actor/actor.proto
 
 package actor
 
@@ -40,7 +40,7 @@ type CreateTesteeRequest struct {
 
 func (x *CreateTesteeRequest) Reset() {
 	*x = CreateTesteeRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[0]
+	mi := &file_actor_actor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -52,7 +52,7 @@ func (x *CreateTesteeRequest) String() string {
 func (*CreateTesteeRequest) ProtoMessage() {}
 
 func (x *CreateTesteeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[0]
+	mi := &file_actor_actor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -65,7 +65,7 @@ func (x *CreateTesteeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTesteeRequest.ProtoReflect.Descriptor instead.
 func (*CreateTesteeRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{0}
+	return file_actor_actor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CreateTesteeRequest) GetOrgId() uint64 {
@@ -141,7 +141,7 @@ type GetTesteeRequest struct {
 
 func (x *GetTesteeRequest) Reset() {
 	*x = GetTesteeRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[1]
+	mi := &file_actor_actor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -153,7 +153,7 @@ func (x *GetTesteeRequest) String() string {
 func (*GetTesteeRequest) ProtoMessage() {}
 
 func (x *GetTesteeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[1]
+	mi := &file_actor_actor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -166,7 +166,7 @@ func (x *GetTesteeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTesteeRequest.ProtoReflect.Descriptor instead.
 func (*GetTesteeRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{1}
+	return file_actor_actor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetTesteeRequest) GetId() uint64 {
@@ -191,7 +191,7 @@ type UpdateTesteeRequest struct {
 
 func (x *UpdateTesteeRequest) Reset() {
 	*x = UpdateTesteeRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[2]
+	mi := &file_actor_actor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -203,7 +203,7 @@ func (x *UpdateTesteeRequest) String() string {
 func (*UpdateTesteeRequest) ProtoMessage() {}
 
 func (x *UpdateTesteeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[2]
+	mi := &file_actor_actor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -216,7 +216,7 @@ func (x *UpdateTesteeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTesteeRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTesteeRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{2}
+	return file_actor_actor_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UpdateTesteeRequest) GetId() uint64 {
@@ -272,7 +272,7 @@ type TesteeExistsRequest struct {
 
 func (x *TesteeExistsRequest) Reset() {
 	*x = TesteeExistsRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[3]
+	mi := &file_actor_actor_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -284,7 +284,7 @@ func (x *TesteeExistsRequest) String() string {
 func (*TesteeExistsRequest) ProtoMessage() {}
 
 func (x *TesteeExistsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[3]
+	mi := &file_actor_actor_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -297,7 +297,7 @@ func (x *TesteeExistsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TesteeExistsRequest.ProtoReflect.Descriptor instead.
 func (*TesteeExistsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{3}
+	return file_actor_actor_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *TesteeExistsRequest) GetOrgId() uint64 {
@@ -325,7 +325,7 @@ type TesteeExistsResponse struct {
 
 func (x *TesteeExistsResponse) Reset() {
 	*x = TesteeExistsResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[4]
+	mi := &file_actor_actor_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -337,7 +337,7 @@ func (x *TesteeExistsResponse) String() string {
 func (*TesteeExistsResponse) ProtoMessage() {}
 
 func (x *TesteeExistsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[4]
+	mi := &file_actor_actor_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -350,7 +350,7 @@ func (x *TesteeExistsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TesteeExistsResponse.ProtoReflect.Descriptor instead.
 func (*TesteeExistsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{4}
+	return file_actor_actor_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TesteeExistsResponse) GetExists() bool {
@@ -379,7 +379,7 @@ type ListTesteesByOrgRequest struct {
 
 func (x *ListTesteesByOrgRequest) Reset() {
 	*x = ListTesteesByOrgRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[5]
+	mi := &file_actor_actor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +391,7 @@ func (x *ListTesteesByOrgRequest) String() string {
 func (*ListTesteesByOrgRequest) ProtoMessage() {}
 
 func (x *ListTesteesByOrgRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[5]
+	mi := &file_actor_actor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +404,7 @@ func (x *ListTesteesByOrgRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTesteesByOrgRequest.ProtoReflect.Descriptor instead.
 func (*ListTesteesByOrgRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{5}
+	return file_actor_actor_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListTesteesByOrgRequest) GetOrgId() uint64 {
@@ -451,7 +451,7 @@ type TesteeResponse struct {
 
 func (x *TesteeResponse) Reset() {
 	*x = TesteeResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[6]
+	mi := &file_actor_actor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -463,7 +463,7 @@ func (x *TesteeResponse) String() string {
 func (*TesteeResponse) ProtoMessage() {}
 
 func (x *TesteeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[6]
+	mi := &file_actor_actor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -476,7 +476,7 @@ func (x *TesteeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TesteeResponse.ProtoReflect.Descriptor instead.
 func (*TesteeResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{6}
+	return file_actor_actor_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TesteeResponse) GetId() uint64 {
@@ -582,7 +582,7 @@ type AssessmentStats struct {
 
 func (x *AssessmentStats) Reset() {
 	*x = AssessmentStats{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[7]
+	mi := &file_actor_actor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -594,7 +594,7 @@ func (x *AssessmentStats) String() string {
 func (*AssessmentStats) ProtoMessage() {}
 
 func (x *AssessmentStats) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[7]
+	mi := &file_actor_actor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -607,7 +607,7 @@ func (x *AssessmentStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssessmentStats.ProtoReflect.Descriptor instead.
 func (*AssessmentStats) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{7}
+	return file_actor_actor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AssessmentStats) GetTotalCount() int32 {
@@ -642,7 +642,7 @@ type TesteeListResponse struct {
 
 func (x *TesteeListResponse) Reset() {
 	*x = TesteeListResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[8]
+	mi := &file_actor_actor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +654,7 @@ func (x *TesteeListResponse) String() string {
 func (*TesteeListResponse) ProtoMessage() {}
 
 func (x *TesteeListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes[8]
+	mi := &file_actor_actor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +667,7 @@ func (x *TesteeListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TesteeListResponse.ProtoReflect.Descriptor instead.
 func (*TesteeListResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP(), []int{8}
+	return file_actor_actor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TesteeListResponse) GetItems() []*TesteeResponse {
@@ -684,11 +684,11 @@ func (x *TesteeListResponse) GetTotal() int64 {
 	return 0
 }
 
-var File_internal_apiserver_interface_grpc_proto_actor_actor_proto protoreflect.FileDescriptor
+var File_actor_actor_proto protoreflect.FileDescriptor
 
-const file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDesc = "" +
+const file_actor_actor_proto_rawDesc = "" +
 	"\n" +
-	"9internal/apiserver/interface/grpc/proto/actor/actor.proto\x12\x05actor\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa0\x02\n" +
+	"\x11actor/actor.proto\x12\x05actor\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa0\x02\n" +
 	"\x13CreateTesteeRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12\x1e\n" +
 	"\viam_user_id\x18\x02 \x01(\x04R\tiamUserId\x12 \n" +
@@ -757,19 +757,19 @@ const file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDesc = "
 	"\x10ListTesteesByOrg\x12\x1e.actor.ListTesteesByOrgRequest\x1a\x19.actor.TesteeListResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actorb\x06proto3"
 
 var (
-	file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescOnce sync.Once
-	file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescData []byte
+	file_actor_actor_proto_rawDescOnce sync.Once
+	file_actor_actor_proto_rawDescData []byte
 )
 
-func file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescGZIP() []byte {
-	file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescOnce.Do(func() {
-		file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDesc)))
+func file_actor_actor_proto_rawDescGZIP() []byte {
+	file_actor_actor_proto_rawDescOnce.Do(func() {
+		file_actor_actor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_actor_actor_proto_rawDesc), len(file_actor_actor_proto_rawDesc)))
 	})
-	return file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDescData
+	return file_actor_actor_proto_rawDescData
 }
 
-var file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_internal_apiserver_interface_grpc_proto_actor_actor_proto_goTypes = []any{
+var file_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_actor_actor_proto_goTypes = []any{
 	(*CreateTesteeRequest)(nil),     // 0: actor.CreateTesteeRequest
 	(*GetTesteeRequest)(nil),        // 1: actor.GetTesteeRequest
 	(*UpdateTesteeRequest)(nil),     // 2: actor.UpdateTesteeRequest
@@ -781,7 +781,7 @@ var file_internal_apiserver_interface_grpc_proto_actor_actor_proto_goTypes = []a
 	(*TesteeListResponse)(nil),      // 8: actor.TesteeListResponse
 	(*timestamppb.Timestamp)(nil),   // 9: google.protobuf.Timestamp
 }
-var file_internal_apiserver_interface_grpc_proto_actor_actor_proto_depIdxs = []int32{
+var file_actor_actor_proto_depIdxs = []int32{
 	9,  // 0: actor.CreateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
 	9,  // 1: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
 	9,  // 2: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
@@ -807,26 +807,26 @@ var file_internal_apiserver_interface_grpc_proto_actor_actor_proto_depIdxs = []i
 	0,  // [0:8] is the sub-list for field type_name
 }
 
-func init() { file_internal_apiserver_interface_grpc_proto_actor_actor_proto_init() }
-func file_internal_apiserver_interface_grpc_proto_actor_actor_proto_init() {
-	if File_internal_apiserver_interface_grpc_proto_actor_actor_proto != nil {
+func init() { file_actor_actor_proto_init() }
+func file_actor_actor_proto_init() {
+	if File_actor_actor_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_actor_actor_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_actor_actor_proto_rawDesc), len(file_actor_actor_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_apiserver_interface_grpc_proto_actor_actor_proto_goTypes,
-		DependencyIndexes: file_internal_apiserver_interface_grpc_proto_actor_actor_proto_depIdxs,
-		MessageInfos:      file_internal_apiserver_interface_grpc_proto_actor_actor_proto_msgTypes,
+		GoTypes:           file_actor_actor_proto_goTypes,
+		DependencyIndexes: file_actor_actor_proto_depIdxs,
+		MessageInfos:      file_actor_actor_proto_msgTypes,
 	}.Build()
-	File_internal_apiserver_interface_grpc_proto_actor_actor_proto = out.File
-	file_internal_apiserver_interface_grpc_proto_actor_actor_proto_goTypes = nil
-	file_internal_apiserver_interface_grpc_proto_actor_actor_proto_depIdxs = nil
+	File_actor_actor_proto = out.File
+	file_actor_actor_proto_goTypes = nil
+	file_actor_actor_proto_depIdxs = nil
 }
