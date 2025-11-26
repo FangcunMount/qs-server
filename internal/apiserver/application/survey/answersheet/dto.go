@@ -8,7 +8,7 @@ import "time"
 // SubmitAnswerSheetDTO 提交答卷 DTO
 type SubmitAnswerSheetDTO struct {
 	QuestionnaireCode string      // 问卷编码
-	QuestionnaireVer  string      // 问卷版本
+	QuestionnaireVer  int         // 问卷版本
 	FillerID          uint64      // 填写人ID
 	Answers           []AnswerDTO // 答案列表
 }
@@ -32,7 +32,7 @@ type ListMyAnswerSheetsDTO struct {
 // ListAnswerSheetsDTO 查询答卷列表 DTO（管理员用）
 type ListAnswerSheetsDTO struct {
 	QuestionnaireCode string            // 问卷编码（可选）
-	FillerID          uint64            // 填写人ID（可选）
+	FillerID          *uint64           // 填写人ID（可选）
 	StartTime         *time.Time        // 开始时间（可选）
 	EndTime           *time.Time        // 结束时间（可选）
 	Page              int               // 页码
@@ -42,12 +42,6 @@ type ListAnswerSheetsDTO struct {
 
 // UpdateScoreDTO 更新分数 DTO
 type UpdateScoreDTO struct {
-	AnswerSheetID uint64           // 答卷ID
-	AnswerScores  []AnswerScoreDTO // 各题分数（总分由服务自动计算）
-}
-
-// AnswerScoreDTO 答案分数 DTO
-type AnswerScoreDTO struct {
-	QuestionCode string  // 问题编码
-	Score        float64 // 得分
+	AnswerSheetID uint64             // 答卷ID
+	AnswerScores  map[string]float64 // 各题分数 (key: 问题编码, value: 得分)
 }

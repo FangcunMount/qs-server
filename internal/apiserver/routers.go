@@ -86,39 +86,54 @@ func (r *Router) registerUserProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由
 func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
-	quesHandler := r.container.QuestionnaireModule.QuesHandler
+	quesHandler := r.container.SurveyModule.Questionnaire.Handler
 	if quesHandler == nil {
 		return
 	}
 
 	questionnaires := apiV1.Group("/questionnaires")
 	{
-		// 问卷CRUD操作
-		questionnaires.POST("", quesHandler.CreateQuestionnaire) // 创建问卷
-		questionnaires.GET("", quesHandler.QueryList)            // 获取问卷列表
-		questionnaires.GET("/:code", quesHandler.QueryOne)       // 获取指定问卷
-		questionnaires.PUT("/:code", quesHandler.EditBasicInfo)  // 更新问卷
+		// 生命周期管理
+		questionnaires.POST("", quesHandler.Create)                    // 创建问卷
+		questionnaires.PUT("/:code", quesHandler.UpdateBasicInfo)      // 更新基本信息
+		questionnaires.POST("/:code/draft", quesHandler.SaveDraft)     // 保存草稿
+		questionnaires.POST("/:code/publish", quesHandler.Publish)     // 发布问卷
+		questionnaires.POST("/:code/unpublish", quesHandler.Unpublish) // 取消发布
+		questionnaires.POST("/:code/archive", quesHandler.Archive)     // 归档问卷
+		questionnaires.DELETE("/:code", quesHandler.Delete)            // 删除问卷
 
-		// 问卷状态管理
-		questionnaires.POST("/:code/publish", quesHandler.PublishQuestionnaire)   // 发布问卷
-		questionnaires.POST("/:code/archive", quesHandler.UnpublishQuestionnaire) // 归档问卷
+		// 问题内容管理
+		questionnaires.POST("/:code/questions", quesHandler.AddQuestion)               // 添加问题
+		questionnaires.PUT("/:code/questions/:qcode", quesHandler.UpdateQuestion)      // 更新问题
+		questionnaires.DELETE("/:code/questions/:qcode", quesHandler.RemoveQuestion)   // 删除问题
+		questionnaires.POST("/:code/questions/reorder", quesHandler.ReorderQuestions)  // 重排问题
+		questionnaires.PUT("/:code/questions/batch", quesHandler.BatchUpdateQuestions) // 批量更新
 
-		// 问卷问题管理
-		questionnaires.PUT("/:code/questions", quesHandler.UpdateQuestions) // 更新问卷问题
+		// 查询接口
+		questionnaires.GET("/:code", quesHandler.GetByCode)                    // 获取问卷详情
+		questionnaires.GET("", quesHandler.List)                               // 获取问卷列表
+		questionnaires.GET("/published/:code", quesHandler.GetPublishedByCode) // 获取已发布问卷
+		questionnaires.GET("/published", quesHandler.ListPublished)            // 获取已发布列表
 	}
 }
 
 // registerAnswersheetProtectedRoutes 注册答卷相关的受保护路由
 func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
-	answersheetHandler := r.container.AnswersheetModule.AnswersheetHandler
+	answersheetHandler := r.container.SurveyModule.AnswerSheet.Handler
 	if answersheetHandler == nil {
 		return
 	}
 
 	answersheets := apiV1.Group("/answersheets")
 	{
-		answersheets.POST("", answersheetHandler.Save)   // 保存答卷
-		answersheets.GET("/:id", answersheetHandler.Get) // 获取答卷
+		// 管理接口
+		answersheets.GET("/:id", answersheetHandler.GetByID)              // 获取答卷详情
+		answersheets.GET("", answersheetHandler.List)                     // 获取答卷列表
+		answersheets.DELETE("/:id", answersheetHandler.Delete)            // 删除答卷
+		answersheets.GET("/statistics", answersheetHandler.GetStatistics) // 获取统计信息
+
+		// 评分接口
+		answersheets.PUT("/:id/score", answersheetHandler.UpdateScore) // 更新分数
 	}
 }
 

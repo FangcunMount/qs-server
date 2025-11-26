@@ -53,13 +53,13 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量不能超过100")
 	}
 
-	// 2. 构建查询条件
+	// 构建查询条件
 	conditions := make(map[string]interface{})
 	if dto.QuestionnaireCode != "" {
 		conditions["questionnaire_code"] = dto.QuestionnaireCode
 	}
-	if dto.FillerID > 0 {
-		conditions["filler_id"] = dto.FillerID
+	if dto.FillerID != nil && *dto.FillerID > 0 {
+		conditions["filler_id"] = *dto.FillerID
 	}
 	if dto.StartTime != nil {
 		conditions["start_time"] = dto.StartTime

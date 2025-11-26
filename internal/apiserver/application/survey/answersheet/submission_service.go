@@ -3,6 +3,7 @@ package answersheet
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -41,7 +42,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	if dto.QuestionnaireCode == "" {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "问卷编码不能为空")
 	}
-	if dto.QuestionnaireVer == "" {
+	if dto.QuestionnaireVer <= 0 {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "问卷版本不能为空")
 	}
 	if dto.FillerID == 0 {
@@ -61,9 +62,10 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 验证问卷版本是否匹配
-	if qnr.GetVersion().String() != dto.QuestionnaireVer {
+	qnrVer, _ := strconv.Atoi(qnr.GetVersion().Value())
+	if qnrVer != dto.QuestionnaireVer {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
-			fmt.Sprintf("问卷版本不匹配，期望: %s, 实际: %s", dto.QuestionnaireVer, qnr.GetVersion().String()))
+			fmt.Sprintf("问卷版本不匹配，期望: %d, 实际: %d", dto.QuestionnaireVer, qnrVer))
 	}
 
 	// 验证问卷是否已发布（只能对已发布的问卷提交答卷）
@@ -80,7 +82,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	// 4. 构建问卷引用
 	questionnaireRef := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
-		dto.QuestionnaireVer,
+		strconv.Itoa(dto.QuestionnaireVer),
 		qnr.GetTitle(), // 使用查询到的问卷标题
 	)
 

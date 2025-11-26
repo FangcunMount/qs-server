@@ -44,11 +44,8 @@ func (s *scoringService) UpdateScore(ctx context.Context, dto UpdateScoreDTO) (*
 	for _, answer := range sheet.Answers() {
 		// 查找对应问题的分数
 		score := float64(0)
-		for _, answerScore := range dto.AnswerScores {
-			if answerScore.QuestionCode == answer.QuestionCode() {
-				score = answerScore.Score
-				break
-			}
+		if questionScore, exists := dto.AnswerScores[answer.QuestionCode()]; exists {
+			score = questionScore
 		}
 		// 使用 WithScore 创建新的答案（不可变性）
 		updatedAnswers = append(updatedAnswers, answer.WithScore(score))

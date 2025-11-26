@@ -56,16 +56,15 @@ func (r *GRPCRegistry) RegisterServices() error {
 
 // registerAnswerSheetService 注册答卷服务
 func (r *GRPCRegistry) registerAnswerSheetService() error {
-	if r.container.AnswersheetModule == nil {
-		log.Warn("AnswersheetModule is not initialized, skipping answersheet service registration")
+	if r.container.SurveyModule == nil {
+		log.Warn("SurveyModule is not initialized, skipping answersheet service registration")
 		return nil
 	}
 
+	// 使用 SurveyModule 中的 SubmissionService
 	answerSheetService := service.NewAnswerSheetService(
-		r.container.AnswersheetModule.AnswersheetSaver,
-		r.container.AnswersheetModule.AnswersheetQueryer,
+		r.container.SurveyModule.AnswerSheet.SubmissionService,
 	)
-
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")
 	return nil
@@ -73,14 +72,14 @@ func (r *GRPCRegistry) registerAnswerSheetService() error {
 
 // registerQuestionnaireService 注册问卷服务
 func (r *GRPCRegistry) registerQuestionnaireService() error {
-	if r.container.QuestionnaireModule == nil {
-		log.Warn("QuestionnaireModule is not initialized, skipping questionnaire service registration")
+	if r.container.SurveyModule == nil {
+		log.Warn("SurveyModule is not initialized, skipping questionnaire service registration")
 		return nil
 	}
 
-	// 只需要查询服务
+	// 使用 QueryService
 	questionnaireService := service.NewQuestionnaireService(
-		r.container.QuestionnaireModule.QuesQueryer,
+		r.container.SurveyModule.Questionnaire.QueryService,
 	)
 
 	r.server.RegisterService(questionnaireService)
@@ -138,12 +137,8 @@ func (r *GRPCRegistry) registerActorService() error {
 func (r *GRPCRegistry) GetRegisteredServices() []string {
 	services := make([]string, 0)
 
-	if r.container.AnswersheetModule != nil {
-		services = append(services, "AnswerSheetService")
-	}
-
-	if r.container.QuestionnaireModule != nil {
-		services = append(services, "QuestionnaireService")
+	if r.container.SurveyModule != nil {
+		services = append(services, "AnswerSheetService", "QuestionnaireService")
 	}
 
 	if r.container.MedicalScaleModule != nil {

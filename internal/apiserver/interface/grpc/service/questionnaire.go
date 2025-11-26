@@ -7,35 +7,75 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 )
 
-// QuestionnaireService 问卷 GRPC 服务 - 对外提供查询功能
+// QuestionnaireService 问卷 gRPC 服务 - C端接口
+// 提供问卷的查询功能：列表查询、详情查看
 type QuestionnaireService struct {
 	pb.UnimplementedQuestionnaireServiceServer
-	queryer *quesApp.Queryer
+	queryService questionnaire.QuestionnaireQueryService
 }
 
-// NewQuestionnaireService 创建问卷 GRPC 服务
-func NewQuestionnaireService(queryer *quesApp.Queryer) *QuestionnaireService {
+// NewQuestionnaireService 创建问卷 gRPC 服务
+func NewQuestionnaireService(queryService questionnaire.QuestionnaireQueryService) *QuestionnaireService {
 	return &QuestionnaireService{
-		queryer: queryer,
+		queryService: queryService,
 	}
 }
 
-// RegisterService 注册 GRPC 服务
+// RegisterService 注册 gRPC 服务
 func (s *QuestionnaireService) RegisterService(server *grpc.Server) {
 	pb.RegisterQuestionnaireServiceServer(server, s)
 }
 
-// GetQuestionnaire 获取问卷详情
-func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.GetQuestionnaireRequest) (*pb.GetQuestionnaireResponse, error) {
-	// 调用领域服务
-	result, err := s.queryer.GetQuestionnaireByCode(ctx, req.Code)
+// ListQuestionnaires 获取已发布的问卷列表（C端）
+// @Description C端用户查看可用的问卷列表
+func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.ListQuestionnairesRequest) (*pb.ListQuestionnairesResponse, error) {
+	// 构建查询条件
+	conditions := make(map[string]string)
+	if req.Title != "" {
+		conditions["title"] = req.Title
+	}
+	// C端只查询已发布的问卷
+	conditions["status"] = "published"
+
+	dto := questionnaire.ListQuestionnairesDTO{
+		Page:       int(req.Page),
+		PageSize:   int(req.PageSize),
+		Conditions: conditions,
+	}
+
+	// 调用应用服务
+	result, err := s.queryService.ListPublished(ctx, dto)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// 转换响应
+	protoQuestionnaires := make([]*pb.Questionnaire, 0, len(result.Items))
+	for _, item := range result.Items {
+		protoQuestionnaires = append(protoQuestionnaires, s.toProtoQuestionnaire(item))
+	}
+
+	return &pb.ListQuestionnairesResponse{
+		Questionnaires: protoQuestionnaires,
+		Total:          result.Total,
+	}, nil
+}
+
+// GetQuestionnaire 获取已发布问卷的详情（C端）
+// @Description C端用户查看问卷详情和题目
+func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.GetQuestionnaireRequest) (*pb.GetQuestionnaireResponse, error) {
+	// 调用应用服务
+	result, err := s.queryService.GetPublishedByCode(ctx, req.Code)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if result == nil {
+		return nil, status.Error(codes.NotFound, "问卷不存在或未发布")
 	}
 
 	// 转换响应
@@ -44,114 +84,44 @@ func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.Get
 	}, nil
 }
 
-// ListQuestionnaires 获取问卷列表
-func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.ListQuestionnairesRequest) (*pb.ListQuestionnairesResponse, error) {
-	// 构建查询条件
-	conditions := make(map[string]string)
-	if req.Status != "" {
-		conditions["status"] = req.Status
-	}
-	if req.Title != "" {
-		conditions["title"] = req.Title
-	}
-
-	// 调用领域服务
-	questionnaires, total, err := s.queryer.ListQuestionnaires(ctx, int(req.Page), int(req.PageSize), conditions)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// 转换响应
-	protoQuestionnaires := make([]*pb.Questionnaire, len(questionnaires))
-	for i, q := range questionnaires {
-		protoQuestionnaires[i] = s.toProtoQuestionnaire(q)
-	}
-
-	return &pb.ListQuestionnairesResponse{
-		Questionnaires: protoQuestionnaires,
-		Total:          total,
-	}, nil
-}
-
 // toProtoQuestionnaire 转换为 protobuf 问卷
-func (s *QuestionnaireService) toProtoQuestionnaire(dto *dto.QuestionnaireDTO) *pb.Questionnaire {
-	if dto == nil {
+func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.QuestionnaireResult) *pb.Questionnaire {
+	if result == nil {
 		return nil
+	}
+
+	// 转换问题列表
+	protoQuestions := make([]*pb.Question, 0, len(result.Questions))
+	for _, q := range result.Questions {
+		protoQuestions = append(protoQuestions, &pb.Question{
+			Code:    q.Code,
+			Title:   q.Stem,
+			Type:    q.Type,
+			Tips:    q.Description,
+			Options: s.toProtoOptions(q.Options),
+		})
 	}
 
 	return &pb.Questionnaire{
-		Code:        dto.Code,
-		Title:       dto.Title,
-		Description: dto.Description,
-		ImgUrl:      dto.ImgUrl,
-		Status:      dto.Status,
-		Version:     dto.Version,
-		Questions:   s.toProtoQuestions(dto.Questions),
-		// TODO: 添加 CreatedAt 和 UpdatedAt 字段到 DTO
-		CreatedAt: "",
-		UpdatedAt: "",
+		Code:        result.Code,
+		Version:     result.Version,
+		Title:       result.Title,
+		Description: result.Description,
+		ImgUrl:      result.ImgUrl,
+		Status:      result.Status,
+		Questions:   protoQuestions,
 	}
 }
 
-// toProtoQuestions 转换为 protobuf 问题列表
-func (s *QuestionnaireService) toProtoQuestions(questions []dto.QuestionDTO) []*pb.Question {
-	protoQuestions := make([]*pb.Question, len(questions))
-	for i, q := range questions {
-		protoQuestions[i] = s.toProtoQuestion(&q)
-	}
-	return protoQuestions
-}
-
-// toProtoQuestion 转换为 protobuf 问题
-func (s *QuestionnaireService) toProtoQuestion(dto *dto.QuestionDTO) *pb.Question {
-	if dto == nil {
-		return nil
-	}
-
-	return &pb.Question{
-		Code:            dto.Code,
-		Type:            dto.Type,
-		Title:           dto.Stem,
-		Tips:            dto.Tips,
-		Placeholder:     dto.Placeholder,
-		Options:         s.toProtoOptions(dto.Options),
-		ValidationRules: s.toProtoValidationRules(dto.ValidationRules),
-		CalculationRule: s.toProtoCalculationRule(dto.CalculationRule),
-	}
-}
-
-// toProtoOptions 转换为 protobuf 选项列表
-func (s *QuestionnaireService) toProtoOptions(options []dto.OptionDTO) []*pb.Option {
-	protoOptions := make([]*pb.Option, len(options))
-	for i, o := range options {
-		protoOptions[i] = &pb.Option{
-			Code:    o.Code,
-			Content: o.Content,
-			Score:   int32(o.Score),
-		}
+// toProtoOptions 转换选项列表
+func (s *QuestionnaireService) toProtoOptions(options []questionnaire.OptionResult) []*pb.Option {
+	protoOptions := make([]*pb.Option, 0, len(options))
+	for _, opt := range options {
+		protoOptions = append(protoOptions, &pb.Option{
+			Code:    opt.Value,
+			Content: opt.Label,
+			Score:   int32(opt.Score),
+		})
 	}
 	return protoOptions
-}
-
-// toProtoValidationRules 转换为 protobuf 验证规则列表
-func (s *QuestionnaireService) toProtoValidationRules(rules []dto.ValidationRuleDTO) []*pb.ValidationRule {
-	protoRules := make([]*pb.ValidationRule, len(rules))
-	for i, r := range rules {
-		protoRules[i] = &pb.ValidationRule{
-			RuleType:    r.RuleType,
-			TargetValue: r.TargetValue,
-		}
-	}
-	return protoRules
-}
-
-// toProtoCalculationRule 转换为 protobuf 计算规则
-func (s *QuestionnaireService) toProtoCalculationRule(rule *dto.CalculationRuleDTO) *pb.CalculationRule {
-	if rule == nil {
-		return nil
-	}
-
-	return &pb.CalculationRule{
-		FormulaType: rule.FormulaType,
-	}
 }

@@ -2,306 +2,179 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/FangcunMount/iam-contracts/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 )
 
-// AnswerSheetService 答卷 GRPC 服务 - 对外提供答卷管理功能
+// AnswerSheetService 答卷 gRPC 服务 - C端接口
+// 提供答卷的提交、查询功能：提交答卷、查看我的答卷列表、查看我的答卷详情
 type AnswerSheetService struct {
 	pb.UnimplementedAnswerSheetServiceServer
-	saver   port.AnswerSheetSaver
-	queryer port.AnswerSheetQueryer
+	submissionService answersheet.AnswerSheetSubmissionService
 }
 
-// NewAnswerSheetService 创建答卷 GRPC 服务
-func NewAnswerSheetService(saver port.AnswerSheetSaver, queryer port.AnswerSheetQueryer) *AnswerSheetService {
+// NewAnswerSheetService 创建答卷 gRPC 服务
+func NewAnswerSheetService(submissionService answersheet.AnswerSheetSubmissionService) *AnswerSheetService {
 	return &AnswerSheetService{
-		saver:   saver,
-		queryer: queryer,
+		submissionService: submissionService,
 	}
 }
 
-// RegisterService 注册 GRPC 服务
+// RegisterService 注册 gRPC 服务
 func (s *AnswerSheetService) RegisterService(server *grpc.Server) {
 	pb.RegisterAnswerSheetServiceServer(server, s)
 }
 
-// SaveAnswerSheet 保存答卷
+// SaveAnswerSheet 保存答卷（C端）
+// @Description C端用户填写完问卷后提交答案
 func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAnswerSheetRequest) (*pb.SaveAnswerSheetResponse, error) {
 	// 转换请求为 DTO
-	dto := &dto.AnswerSheetDTO{
-		QuestionnaireCode: req.QuestionnaireCode,
-		Version:           req.Version,
-		Title:             req.Title,
-		WriterID:          req.WriterId,
-		TesteeID:          req.TesteeId,
-		Answers:           s.fromProtoAnswers(req.Answers),
+	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
+	for _, a := range req.Answers {
+		answers = append(answers, answersheet.AnswerDTO{
+			QuestionCode: a.QuestionCode,
+			QuestionType: a.QuestionType,
+			Value:        a.Value, // proto 中使用 JSON 字符串
+		})
 	}
 
-	// 调用领域服务
-	savedDTO, err := s.saver.SaveOriginalAnswerSheet(ctx, *dto)
+	dto := answersheet.SubmitAnswerSheetDTO{
+		QuestionnaireCode: req.QuestionnaireCode,
+		QuestionnaireVer:  0,            // TODO: 解析 questionnaire_version 字符串
+		FillerID:          req.WriterId, // proto 中使用 writer_id
+		Answers:           answers,
+	}
+
+	// 调用应用服务
+	result, err := s.submissionService.Submit(ctx, dto)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	// 转换响应
 	return &pb.SaveAnswerSheetResponse{
-		Id:      savedDTO.ID.Uint64(),
-		Message: "答卷保存成功",
+		Id:      result.ID,
+		Message: "答卷提交成功",
 	}, nil
 }
 
-// GetAnswerSheet 获取答卷详情
+// GetAnswerSheet 获取答卷详情（C端）
+// @Description C端用户查看自己提交的答卷详情
+// Note: 实际应该从上下文中获取用户ID进行权限验证
 func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnswerSheetRequest) (*pb.GetAnswerSheetResponse, error) {
-	log.Infof("---- in grpc GetAnswerSheet: %d", req.Id)
-
-	// 调用领域服务
-	detail, err := s.queryer.GetAnswerSheetByID(ctx, req.Id)
+	// TODO: 从上下文中获取用户ID并验证权限
+	// 这里简化处理，直接查询答卷
+	result, err := s.submissionService.GetMyAnswerSheet(ctx, 0, req.Id)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// 检查答卷是否存在
-	if detail == nil {
+	if result == nil {
 		return nil, status.Error(codes.NotFound, "答卷不存在")
 	}
 
 	// 转换响应
-	protoAnswerSheet := s.toProtoAnswerSheet(detail)
-	if protoAnswerSheet == nil {
-		return nil, status.Error(codes.Internal, "转换答卷数据失败")
-	}
-
 	return &pb.GetAnswerSheetResponse{
-		AnswerSheet: protoAnswerSheet,
+		AnswerSheet: s.toProtoAnswerSheet(result),
 	}, nil
 }
 
-// ListAnswerSheets 获取答卷列表
+// ListAnswerSheets 获取答卷列表（C端）
+// @Description C端用户查看自己提交的所有答卷
 func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListAnswerSheetsRequest) (*pb.ListAnswerSheetsResponse, error) {
-	// 构建过滤条件
-	filter := dto.AnswerSheetDTO{
+	dto := answersheet.ListMyAnswerSheetsDTO{
+		FillerID:          req.WriterId, // proto 中使用 WriterId
 		QuestionnaireCode: req.QuestionnaireCode,
-		Version:           req.Version,
-		WriterID:          req.WriterId,
-		TesteeID:          req.TesteeId,
+		Page:              int(req.Page),
+		PageSize:          int(req.PageSize),
 	}
 
-	// 调用领域服务
-	sheets, total, err := s.queryer.GetAnswerSheetList(ctx, filter, int(req.Page), int(req.PageSize))
+	// 调用应用服务
+	result, err := s.submissionService.ListMyAnswerSheets(ctx, dto)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	// 转换响应
-	protoSheets := make([]*pb.AnswerSheet, len(sheets))
-	for i, sheet := range sheets {
-		// 简化的答卷信息，不包含详细答案
-		protoSheets[i] = &pb.AnswerSheet{
-			Id:                sheet.ID.Uint64(),
-			QuestionnaireCode: sheet.QuestionnaireCode,
-			Version:           sheet.Version,
-			Title:             sheet.Title,
-			Score:             float64(sheet.Score),
-			WriterId:          sheet.WriterID,
-			TesteeId:          sheet.TesteeID,
-			// 列表中不返回具体答案，减少数据传输量
-			Answers:   nil,
-			CreatedAt: "", // TODO: 添加时间字段
-			UpdatedAt: "", // TODO: 添加时间字段
-		}
+	protoAnswerSheets := make([]*pb.AnswerSheet, 0, len(result.Items))
+	for _, item := range result.Items {
+		// 简化版本，只返回基本信息
+		protoAnswerSheets = append(protoAnswerSheets, &pb.AnswerSheet{
+			Id:                item.ID,
+			QuestionnaireCode: item.QuestionnaireCode,
+			Title:             item.QuestionnaireTitle,
+			Score:             item.Score,
+			WriterId:          item.FillerID,
+		})
 	}
 
 	return &pb.ListAnswerSheetsResponse{
-		AnswerSheets: protoSheets,
-		Total:        total,
+		AnswerSheets: protoAnswerSheets,
+		Total:        result.Total,
 	}, nil
 }
 
-// SaveAnswerSheetScores 保存答卷答案和分数
+// SaveAnswerSheetScores 保存答卷分数（内部接口）
+// @Description 评分系统保存答卷分数
+// Note: 这个接口应该由评分系统调用，不是 C 端接口
 func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
-	log.Infof("保存答卷答案和分数，答卷ID: %d, 总分: %d", req.AnswerSheetId, req.TotalScore)
-
-	// 转换答案列表
-	answers := s.fromProtoAnswers(req.Answers)
-
-	// 调用领域服务保存分数
-	savedDTO, err := s.saver.SaveAnswerSheetScores(ctx, req.AnswerSheetId, req.TotalScore, answers)
-	if err != nil {
-		log.Errorf("保存答卷分数失败: %v", err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// 转换响应
-	return &pb.SaveAnswerSheetScoresResponse{
-		AnswerSheetId: savedDTO.ID.Uint64(),
-		TotalScore:    savedDTO.Score,
-		Message:       "答卷分数保存成功",
-	}, nil
+	// TODO: 实现评分功能
+	// 这里暂时返回未实现的错误
+	return nil, status.Error(codes.Unimplemented, "评分功能暂未实现")
 }
 
-// toProtoAnswerSheet 转换为 protobuf 答卷（详细信息）
-func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO) *pb.AnswerSheet {
-	if detail == nil {
-		log.Warnf("AnswerSheetDetailDTO is nil")
+// toProtoAnswerSheet 转换为 protobuf 答卷
+func (s *AnswerSheetService) toProtoAnswerSheet(result *answersheet.AnswerSheetResult) *pb.AnswerSheet {
+	if result == nil {
 		return nil
 	}
 
-	// 安全地获取答案列表
-	var answers []*pb.Answer
-	if detail.AnswerSheet.Answers != nil {
-		answers = s.toProtoAnswers(detail.AnswerSheet.Answers)
-	} else {
-		answers = []*pb.Answer{} // 空切片而不是 nil
+	// 转换答案列表
+	protoAnswers := make([]*pb.Answer, 0, len(result.Answers))
+	for _, a := range result.Answers {
+		// 将答案值转换为 JSON 字符串（proto 中使用 string）
+		valueStr := s.valueToString(a.Value)
+		protoAnswers = append(protoAnswers, &pb.Answer{
+			QuestionCode: a.QuestionCode,
+			QuestionType: a.QuestionType,
+			Value:        valueStr,
+			Score:        uint32(a.Score),
+		})
 	}
 
 	return &pb.AnswerSheet{
-		Id:                detail.AnswerSheet.ID.Uint64(),
-		QuestionnaireCode: detail.AnswerSheet.QuestionnaireCode,
-		Version:           detail.AnswerSheet.Version,
-		Title:             detail.AnswerSheet.Title,
-		Score:             float64(detail.AnswerSheet.Score),
-		WriterId:          detail.AnswerSheet.WriterID,
-		WriterName:        detail.WriterName,
-		TesteeId:          detail.AnswerSheet.TesteeID,
-		TesteeName:        detail.TesteeName,
-		Answers:           answers,
-		CreatedAt:         detail.CreatedAt,
-		UpdatedAt:         detail.UpdatedAt,
+		Id:                result.ID,
+		QuestionnaireCode: result.QuestionnaireCode,
+		Title:             result.QuestionnaireTitle,
+		Score:             result.Score,
+		WriterId:          result.FillerID,
+		WriterName:        result.FillerName,
+		Answers:           protoAnswers,
+		CreatedAt:         result.FilledAt.Format("2006-01-02 15:04:05"),
 	}
 }
 
-// toProtoAnswers 转换为 protobuf 答案列表
-func (s *AnswerSheetService) toProtoAnswers(answers []dto.AnswerDTO) []*pb.Answer {
-	if answers == nil {
-		return []*pb.Answer{} // 返回空切片而不是 nil
+// valueToString 将答案值转换为字符串（JSON 格式）
+func (s *AnswerSheetService) valueToString(value interface{}) string {
+	if value == nil {
+		return ""
 	}
 
-	protoAnswers := make([]*pb.Answer, len(answers))
-	for i, answer := range answers {
-		// 根据问题类型处理答案值
-		var valueStr string
-
-		switch answer.QuestionType {
-		case "single_choice":
-			// 单选题答案应该是字符串
-			if str, ok := answer.Value.(string); ok {
-				valueStr = str
-			} else {
-				log.Errorf("Invalid single choice answer type: %T", answer.Value)
-				valueStr = fmt.Sprintf("%v", answer.Value)
-			}
-		case "multiple_choice":
-			// 多选题答案应该是字符串数组
-			if valueBytes, err := json.Marshal(answer.Value); err == nil {
-				valueStr = string(valueBytes)
-			} else {
-				log.Errorf("Failed to marshal multiple choice answer: %v", err)
-				valueStr = fmt.Sprintf("%v", answer.Value)
-			}
-		case "text", "textarea":
-			// 文本类答案直接转换为字符串
-			if str, ok := answer.Value.(string); ok {
-				valueStr = str
-			} else {
-				log.Errorf("Invalid text answer type: %T", answer.Value)
-				valueStr = fmt.Sprintf("%v", answer.Value)
-			}
-		case "number", "rating":
-			// 数值类答案需要转换为字符串
-			switch v := answer.Value.(type) {
-			case float64:
-				valueStr = fmt.Sprintf("%f", v)
-			case int:
-				valueStr = fmt.Sprintf("%d", v)
-			case string:
-				valueStr = v
-			default:
-				log.Errorf("Invalid number answer type: %T", answer.Value)
-				valueStr = fmt.Sprintf("%v", answer.Value)
-			}
-		default:
-			// 其他类型答案统一转换为JSON
-			if valueBytes, err := json.Marshal(answer.Value); err == nil {
-				valueStr = string(valueBytes)
-			} else {
-				log.Errorf("Failed to marshal answer value: %v", err)
-				valueStr = fmt.Sprintf("%v", answer.Value)
-			}
-		}
-
-		protoAnswers[i] = &pb.Answer{
-			QuestionCode: answer.QuestionCode,
-			QuestionType: answer.QuestionType,
-			Score:        uint32(answer.Score),
-			Value:        valueStr,
-		}
+	switch v := value.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%f", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	default:
+		// 对于复杂类型，可以使用 JSON 序列化
+		return fmt.Sprintf("%v", v)
 	}
-	return protoAnswers
-}
-
-// fromProtoAnswers 从 protobuf 转换答案列表
-func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.AnswerDTO {
-	answers := make([]dto.AnswerDTO, len(protoAnswers))
-	for i, protoAnswer := range protoAnswers {
-		// 根据问题类型处理答案值
-		var value interface{}
-		var err error
-
-		// 设置默认问题类型（如果为空）
-		QuestionType := protoAnswer.QuestionType
-		if QuestionType == "" {
-			QuestionType = "Radio" // 默认为单选题
-		}
-
-		switch QuestionType {
-		case "single_choice":
-			// 单选题答案应该是字符串
-			value = protoAnswer.Value
-		case "multiple_choice":
-			// 多选题答案应该是字符串数组
-			var options []string
-			if err = json.Unmarshal([]byte(protoAnswer.Value), &options); err != nil {
-				log.Errorf("Failed to unmarshal multiple choice answer: %v", err)
-				value = protoAnswer.Value // 保持原始值
-			} else {
-				value = options
-			}
-		case "text", "textarea":
-			// 文本类答案直接使用字符串
-			value = protoAnswer.Value
-		case "number", "rating":
-			// 数值类答案需要转换为数值
-			if num, err := strconv.ParseFloat(protoAnswer.Value, 64); err == nil {
-				value = num
-			} else {
-				log.Errorf("Failed to parse number answer: %v", err)
-				value = protoAnswer.Value // 保持原始值
-			}
-		default:
-			// 其他类型答案尝试解析JSON
-			if err = json.Unmarshal([]byte(protoAnswer.Value), &value); err != nil {
-				log.Errorf("Failed to unmarshal answer value: %v", err)
-				value = protoAnswer.Value // 保持原始值
-			}
-		}
-
-		answers[i] = dto.AnswerDTO{
-			QuestionCode: protoAnswer.QuestionCode,
-			QuestionType: QuestionType,
-			Score:        float64(protoAnswer.Score),
-			Value:        value,
-		}
-	}
-	return answers
 }
