@@ -5,14 +5,14 @@ import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 // AnswerSheetDTO 表示答卷数据传输对象
 // 用于应用层和领域层之间的数据传输
 type AnswerSheetDTO struct {
-	ID                   meta.ID     // 答卷ID
-	QuestionnaireCode    string      // 问卷代码
-	QuestionnaireVersion string      // 问卷版本
-	Title                string      // 答卷标题
-	Score                float64     // 总分
-	WriterID             uint64      // 填写人ID
-	TesteeID             uint64      // 被测试者ID
-	Answers              []AnswerDTO // 答案列表
+	ID                meta.ID     // 答卷ID
+	QuestionnaireCode string      // 问卷代码
+	Version           string      // 问卷版本
+	Title             string      // 答卷标题
+	Score             float64     // 总分
+	WriterID          uint64      // 填写人ID
+	TesteeID          uint64      // 被测试者ID
+	Answers           []AnswerDTO // 答案列表
 }
 
 // AnswerDTO 表示答案数据传输对象
@@ -36,11 +36,11 @@ type AnswerSheetDetailDTO struct {
 
 // AnswerSheetStatisticsDTO 答卷统计数据传输对象
 type AnswerSheetStatisticsDTO struct {
-	QuestionnaireCode    string                  // 问卷代码
-	QuestionnaireVersion string                  // 问卷版本
-	TotalCount           int64                   // 答卷总数
-	AverageScore         float64                 // 平均分
-	QuestionStatistics   []QuestionStatisticsDTO // 题目统计
+	QuestionnaireCode  string                  // 问卷代码
+	Version            string                  // 问卷版本
+	TotalCount         int64                   // 答卷总数
+	AverageScore       float64                 // 平均分
+	QuestionStatistics []QuestionStatisticsDTO // 题目统计
 }
 
 // QuestionStatisticsDTO 问题统计数据传输对象

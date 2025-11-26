@@ -1,8 +1,9 @@
 # 11-04 Survey 子域设计（V2）
 
-> **版本**：V2.0  
+> **版本**：V2.1  
+> **最后更新**：2025-11-26  
 > **范围**：问卷&量表 BC 中的 survey 子域  
-> **目标**：阐述问卷子域的核心职责、可扩展题型设计（注册器+构造者+工厂）、可扩展答案设计（注册器+工厂）、策略模式校验规则
+> **目标**：阐述问卷子域的核心职责、可扩展题型设计（注册器+参数容器+工厂）、Questionnaire 聚合领域服务、版本管理策略、可扩展答案设计（注册器+工厂）、策略模式校验规则
 
 ---
 
@@ -54,7 +55,7 @@ assessment (依赖 survey + scale)
 
 ---
 
-## 2. 可扩展的题型设计（注册器+构造者+工厂）
+## 2. 可扩展的题型设计（注册器+参数容器+工厂）
 
 ### 2.1 设计目标
 
@@ -102,324 +103,712 @@ func (t QuestionType) Value() string {
 
 const (
     QuestionTypeSection  QuestionType = "Section"  // 段落
-    QuestionTypeRadio    QuestionType = "Radio"    // 单选
-    QuestionTypeCheckbox QuestionType = "Checkbox" // 多选
-    QuestionTypeText     QuestionType = "Text"     // 文本
-    QuestionTypeTextarea QuestionType = "Textarea" // 文本域
-    QuestionTypeNumber   QuestionType = "Number"   // 数字
+    RadioQuestion    QuestionType = "Radio"    // 单选
+    CheckboxQuestion QuestionType = "Checkbox" // 多选
+    TextQuestion     QuestionType = "Text"     // 文本
+    TextareaQuestion QuestionType = "Textarea" // 文本域
+    NumberQuestion   QuestionType = "Number"   // 数字
 )
 ```
 
 ### 2.3 注册器设计
 
 ```go
-// QuestionFactory 注册函数签名
-type QuestionFactory func(builder *QuestionBuilder) Question
+// QuestionFactory 工厂函数签名
+type QuestionFactory func(*QuestionParams) (Question, error)
 
-// registry 注册表本体
-var registry = make(map[QuestionType]QuestionFactory)
+// registry 注册表
+var questionRegistry = make(map[QuestionType]QuestionFactory)
 
-// RegisterQuestionFactory 注册函数
+// RegisterQuestionFactory 注册题型工厂
 func RegisterQuestionFactory(typ QuestionType, factory QuestionFactory) {
-    if _, exists := registry[typ]; exists {
-        log.Errorf("question type already registered: %s", typ)
+    if _, exists := questionRegistry[typ]; exists {
+        panic(fmt.Sprintf("question type already registered: %s", typ))
     }
-    registry[typ] = factory
+    questionRegistry[typ] = factory
 }
 
-// CreateQuestionFromBuilder 创建统一入口
-func CreateQuestionFromBuilder(builder *QuestionBuilder) Question {
-    factory, ok := registry[builder.GetQuestionType()]
-    if !ok {
-        log.Errorf("unknown question type: %s", builder.GetQuestionType())
-        return nil
+// NewQuestion 统一创建入口
+func NewQuestion(opts ...QuestionParamsOption) (Question, error) {
+    // 1. 创建参数容器并收集参数
+    params := NewQuestionParams(opts...)
+    
+    // 2. 校验参数完整性
+    if err := params.Validate(); err != nil {
+        return nil, err
     }
-    return factory(builder)
+    
+    // 3. 根据题型选择工厂函数
+    factory, ok := questionRegistry[params.GetCore().typ]
+    if !ok {
+        return nil, fmt.Errorf("unknown question type: %s", params.GetCore().typ)
+    }
+    
+    // 4. 使用工厂函数创建实例
+    return factory(params)
 }
 ```
 
-### 2.4 构造者（Builder）模式
+### 2.4 QuestionParams 参数容器
+
+**设计原则**：QuestionParams 是纯数据容器，只负责收集参数，不负责创建 Question 实例。
 
 ```go
-// QuestionBuilder 问题构建器 - 纯配置容器
-type QuestionBuilder struct {
-    // 基础信息
-    code         meta.Code
-    title        string
-    tips         string
-    questionType QuestionType
-
-    // 特定属性
-    placeholder string
-    options     []Option
-
-    // 能力配置
+// QuestionParams 题型参数容器
+type QuestionParams struct {
+    core            QuestionCore
+    placeholder     string
+    options         []Option
     validationRules []validation.ValidationRule
     calculationRule *calculation.CalculationRule
 }
 
-// NewQuestionBuilder 创建新的问题构建器
-func NewQuestionBuilder() *QuestionBuilder {
-    return &QuestionBuilder{
+// QuestionCore 所有题型共享的核心字段
+type QuestionCore struct {
+    code meta.Code
+    stem string
+    typ  QuestionType
+    tips string
+}
+
+// NewQuestionParams 创建参数容器
+func NewQuestionParams(opts ...QuestionParamsOption) *QuestionParams {
+    params := &QuestionParams{
         options:         make([]Option, 0),
         validationRules: make([]validation.ValidationRule, 0),
     }
+    // 应用所有选项
+    for _, opt := range opts {
+        opt(params)
+    }
+    return params
+}
+
+// Validate 校验参数完整性
+func (p *QuestionParams) Validate() error {
+    if p.core.code.IsEmpty() {
+        return errors.New("question code is required")
+    }
+    if p.core.stem == "" {
+        return errors.New("question stem is required")
+    }
+    if p.core.typ == "" {
+        return errors.New("question type is required")
+    }
+    return nil
 }
 ```
+
+**职责分离**：
+
+| 组件 | 职责 | 不负责 |
+|-----|-----|-------|
+| **QuestionParams** | 参数收集、参数校验、提供 Getter | ❌ 不创建 Question 实例 |
+| **QuestionFactory** | 根据参数创建 Question 实例 | - |
+| **NewQuestion** | 协调流程：收集→校验→选择工厂→创建 | - |
 
 #### 2.4.1 函数式选项模式
 
 ```go
-// BuilderOption 构建器选项函数类型
-type BuilderOption func(*QuestionBuilder)
+// QuestionParamsOption 参数选项函数类型
+type QuestionParamsOption func(*QuestionParams)
 
 // WithCode 设置问题编码
-func WithCode(code meta.Code) BuilderOption {
-    return func(b *QuestionBuilder) {
-        b.code = code
+func WithCode(code meta.Code) QuestionParamsOption {
+    return func(p *QuestionParams) {
+        p.core.code = code
     }
 }
 
-// WithTitle 设置问题标题
-func WithTitle(title string) BuilderOption {
-    return func(b *QuestionBuilder) {
-        b.title = title
+// WithStem 设置问题题干
+func WithStem(stem string) QuestionParamsOption {
+    return func(p *QuestionParams) {
+        p.core.stem = stem
     }
 }
 
 // WithQuestionType 设置问题类型
-func WithQuestionType(questionType QuestionType) BuilderOption {
-    return func(b *QuestionBuilder) {
-        b.questionType = questionType
+func WithQuestionType(typ QuestionType) QuestionParamsOption {
+    return func(p *QuestionParams) {
+        p.core.typ = typ
     }
 }
 
-// WithOptions 设置选项列表
-func WithOptions(options []Option) BuilderOption {
-    return func(b *QuestionBuilder) {
-        b.options = options
+// WithOption 添加选项
+func WithOption(code, content string, score int) QuestionParamsOption {
+    return func(p *QuestionParams) {
+        opt := NewOption(code, content, score)
+        p.options = append(p.options, opt)
     }
 }
 
-// WithValidationRule 添加单个校验规则
-func WithValidationRule(ruleType validation.RuleType, targetValue string) BuilderOption {
-    return func(b *QuestionBuilder) {
-        rule := validation.NewValidationRule(ruleType, targetValue)
-        b.validationRules = append(b.validationRules, rule)
+// WithRequired 设置必填
+func WithRequired() QuestionParamsOption {
+    return func(p *QuestionParams) {
+        rule := validation.NewValidationRule(validation.RuleTypeRequired, "")
+        p.validationRules = append(p.validationRules, rule)
     }
 }
-```
 
-#### 2.4.2 链式调用 API
-
-```go
-// SetCode 设置编码（链式调用）
-func (b *QuestionBuilder) SetCode(code meta.Code) *QuestionBuilder {
-    b.code = code
-    return b
-}
-
-// SetTitle 设置标题（链式调用）
-func (b *QuestionBuilder) SetTitle(title string) *QuestionBuilder {
-    b.title = title
-    return b
-}
-
-// SetQuestionType 设置题型（链式调用）
-func (b *QuestionBuilder) SetQuestionType(questionType QuestionType) *QuestionBuilder {
-    b.questionType = questionType
-    return b
-}
-
-// AddOption 添加选项（链式调用）
-func (b *QuestionBuilder) AddOption(code, content string, score int) *QuestionBuilder {
-    opt := NewOptionWithStringCode(code, content, score)
-    b.options = append(b.options, opt)
-    return b
-}
-
-// Build 构建问题实例
-func (b *QuestionBuilder) Build() Question {
-    if !b.IsValid() {
-        log.Errorf("invalid question builder state")
-        return nil
+// WithCalculationRule 设置计算规则
+func WithCalculationRule(formulaType calculation.FormulaType) QuestionParamsOption {
+    return func(p *QuestionParams) {
+        rule := calculation.NewCalculationRule(formulaType)
+        p.calculationRule = &rule
     }
-    return CreateQuestionFromBuilder(b)
 }
 ```
 
 ### 2.5 具体题型实现
 
-#### 2.5.1 BaseQuestion 基类
-
-```go
-// BaseQuestion 基础问题 - 提供通用实现
-type BaseQuestion struct {
-    code         meta.Code
-    title        string
-    tips         string
-    placeholder  string
-    questionType QuestionType
-}
-
-func NewBaseQuestion(code meta.Code, title string, questionType QuestionType) BaseQuestion {
-    return BaseQuestion{
-        code:         code,
-        title:        title,
-        questionType: questionType,
-    }
-}
-
-func (q *BaseQuestion) GetCode() meta.Code           { return q.code }
-func (q *BaseQuestion) GetTitle() string             { return q.title }
-func (q *BaseQuestion) GetType() QuestionType        { return q.questionType }
-func (q *BaseQuestion) GetTips() string              { return q.tips }
-func (q *BaseQuestion) GetPlaceholder() string       { return q.placeholder }
-func (q *BaseQuestion) GetOptions() []Option         { return nil }
-func (q *BaseQuestion) GetValidationRules() []validation.ValidationRule { return nil }
-func (q *BaseQuestion) GetCalculationRule() *calculation.CalculationRule { return nil }
-```
-
-#### 2.5.2 RadioQuestion 单选题
+#### 2.5.1 RadioQuestion 单选题
 
 ```go
 // RadioQuestion 单选问题
 type RadioQuestion struct {
-    BaseQuestion
-    ability.ValidationAbility
-    ability.CalculationAbility
-
-    options []question.Option
+    QuestionCore                                      // 核心字段
+    options         []Option                          // 选项列表
+    validationRules []validation.ValidationRule       // 校验规则
+    calculationRule *calculation.CalculationRule      // 计算规则
 }
 
-// 注册单选问题
+// 注册单选问题工厂
 func init() {
-    question.RegisterQuestionFactory(question.QuestionTypeRadio, func(builder *question.QuestionBuilder) question.Question {
-        // 创建单选问题
-        q := newRadioQuestion(builder.GetCode(), builder.GetTitle())
-
-        // 设置选项
-        q.setOptions(builder.GetOptions())
-
-        // 设置校验规则
-        for _, rule := range builder.GetValidationRules() {
-            q.addValidationRule(rule)
-        }
-
-        // 设置计算规则
-        if builder.GetCalculationRule() != nil {
-            q.setCalculationRule(builder.GetCalculationRule())
-        }
-        return q
-    })
+    RegisterQuestionFactory(TypeRadio, newRadioQuestionFactory)
 }
 
-// newRadioQuestion 创建单选问题
-func newRadioQuestion(code meta.Code, title string) *RadioQuestion {
-    return &RadioQuestion{
-        BaseQuestion: NewBaseQuestion(code, title, question.QuestionTypeRadio),
+// newRadioQuestionFactory 单选题工厂函数
+func newRadioQuestionFactory(params *QuestionParams) (Question, error) {
+    // 业务规则校验
+    if len(params.GetOptions()) == 0 {
+        return nil, errors.New("radio question requires at least one option")
     }
+    
+    return &RadioQuestion{
+        QuestionCore:    params.GetCore(),
+        options:         params.GetOptions(),
+        validationRules: params.GetValidationRules(),
+        calculationRule: params.GetCalculationRule(),
+    }, nil
 }
 
-// setOptions 设置选项
-func (q *RadioQuestion) setOptions(options []question.Option) {
-    q.options = options
-}
-
-// GetOptions 获取选项
-func (q *RadioQuestion) GetOptions() []question.Option {
-    return q.options
-}
-
-// GetValidationRules 获取校验规则 - 重写BaseQuestion的默认实现
+// Question 接口实现
+func (q *RadioQuestion) GetCode() meta.Code                     { return q.code }
+func (q *RadioQuestion) GetStem() string                        { return q.stem }
+func (q *RadioQuestion) GetType() QuestionType                  { return q.typ }
+func (q *RadioQuestion) GetOptions() []Option                   { return q.options }
 func (q *RadioQuestion) GetValidationRules() []validation.ValidationRule {
-    return q.ValidationAbility.GetValidationRules()
+    return q.validationRules
 }
-
-// GetCalculationRule 获取计算规则 - 重写BaseQuestion的默认实现
 func (q *RadioQuestion) GetCalculationRule() *calculation.CalculationRule {
-    return q.CalculationAbility.GetCalculationRule()
+    return q.calculationRule
 }
 ```
+
+**关键理解**：
+
+> **QuestionParams 是参数容器，不是构造者**
+>
+> - ✅ 它收集参数
+> - ✅ 它验证参数
+> - ✅ 它提供 Getter
+> - ❌ 它不创建对象
+>
+> **创建对象是 QuestionFactory 的职责！**
+
+这种设计使得参数收集和对象创建完全解耦，便于扩展和测试。
 
 ### 2.6 使用示例
 
-#### 2.6.1 函数式选项模式创建
+#### 2.6.1 创建单选题
 
 ```go
-// 创建单选题
-question := question.NewQuestionBuilder().
-    Apply(
-        question.WithCode(meta.NewCode("Q1")),
-        question.WithTitle("您的性别是？"),
-        question.WithQuestionType(question.QuestionTypeRadio),
-        question.WithOption("A", "男", 0),
-        question.WithOption("B", "女", 0),
-        question.WithValidationRule(validation.RuleTypeRequired, ""),
-    ).
-    Build()
+question, err := questionnaire.NewQuestion(
+    questionnaire.WithCode(meta.NewCode("Q1")),
+    questionnaire.WithStem("您的性别是？"),
+    questionnaire.WithQuestionType(questionnaire.TypeRadio),
+    questionnaire.WithOption("A", "男", 0),
+    questionnaire.WithOption("B", "女", 0),
+    questionnaire.WithRequired(),
+    questionnaire.WithCalculationRule(calculation.FormulaTypeScore),
+)
+if err != nil {
+    // 处理错误
+}
+
+// NewQuestion 内部流程：
+// 1. NewQuestionParams(opts...) - 创建参数容器收集参数
+// 2. params.Validate() - 校验参数完整性
+// 3. questionRegistry[params.GetCore().typ] - 选择工厂函数
+// 4. factory(params) - 工厂函数创建 RadioQuestion 实例
 ```
 
-#### 2.6.2 链式调用创建
+#### 2.6.2 创建多选题
 
 ```go
-// 创建数字题
-question := question.NewQuestionBuilder().
-    SetCode(meta.NewCode("Q2")).
-    SetTitle("您的年龄是？").
-    SetQuestionType(question.QuestionTypeNumber).
-    SetPlaceholder("请输入年龄").
-    AddValidationRule(validation.RuleTypeRequired, "").
-    AddValidationRule(validation.RuleTypeMinValue, "0").
-    AddValidationRule(validation.RuleTypeMaxValue, "150").
-    Build()
+question, err := questionnaire.NewQuestion(
+    questionnaire.WithCode(meta.NewCode("Q2")),
+    questionnaire.WithStem("您的兴趣爱好？"),
+    questionnaire.WithQuestionType(questionnaire.TypeCheckbox),
+    questionnaire.WithOption("A", "运动", 1),
+    questionnaire.WithOption("B", "阅读", 1),
+    questionnaire.WithOption("C", "音乐", 1),
+    questionnaire.WithRequired(),
+    questionnaire.WithMinSelections(1),
+    questionnaire.WithMaxSelections(3),
+)
+```
+
+#### 2.6.3 创建文本题
+
+```go
+question, err := questionnaire.NewQuestion(
+    questionnaire.WithCode(meta.NewCode("Q3")),
+    questionnaire.WithStem("请输入您的姓名"),
+    questionnaire.WithQuestionType(questionnaire.TypeText),
+    questionnaire.WithPlaceholder("请输入真实姓名"),
+    questionnaire.WithRequired(),
+    questionnaire.WithMinLength(2),
+    questionnaire.WithMaxLength(20),
+)
 ```
 
 ### 2.7 扩展性保证
 
 当需要新增题型（如日期选择器）时：
 
-1. **定义新的 QuestionType 常量**
+**1. 定义题型常量**
 
 ```go
+// types.go
 const (
-    // ... 现有题型
-    QuestionTypeDate QuestionType = "Date" // 新增日期题型
+    TypeDate QuestionType = "Date"  // 新增日期题型
 )
 ```
 
-2. **实现新的 Question 类型**
+**2. 定义题型结构**
 
 ```go
+// question.go
 type DateQuestion struct {
-    BaseQuestion
-    ability.ValidationAbility
-    
-    minDate time.Time
-    maxDate time.Time
+    QuestionCore
+    placeholder     string
+    validationRules []validation.ValidationRule
+    minDate         string
+    maxDate         string
 }
 
-func (q *DateQuestion) GetMinDate() time.Time { return q.minDate }
-func (q *DateQuestion) GetMaxDate() time.Time { return q.maxDate }
+func (q *DateQuestion) GetPlaceholder() string { return q.placeholder }
+func (q *DateQuestion) GetValidationRules() []validation.ValidationRule {
+    return q.validationRules
+}
 ```
 
-3. **注册到工厂**
+**3. 注册工厂函数**
 
 ```go
+// question.go
 func init() {
-    question.RegisterQuestionFactory(question.QuestionTypeDate, func(builder *question.QuestionBuilder) question.Question {
-        q := newDateQuestion(builder.GetCode(), builder.GetTitle())
-        // 设置校验规则等
-        return q
-    })
+    RegisterQuestionFactory(TypeDate, newDateQuestionFactory)
+}
+
+func newDateQuestionFactory(params *QuestionParams) (Question, error) {
+    return &DateQuestion{
+        QuestionCore:    params.GetCore(),
+        placeholder:     params.GetPlaceholder(),
+        validationRules: params.GetValidationRules(),
+        // 可以从 params 扩展字段中获取 minDate, maxDate
+    }, nil
 }
 ```
 
-4. **核心代码无需改动**，Builder 和 Factory 自动支持新题型
+**4. 核心代码无需改动**
+
+- ✅ QuestionParams 自动支持新题型
+- ✅ NewQuestion 自动路由到新工厂
+- ✅ 其他题型代码不受影响
 
 ---
 
-## 3. 可扩展的答案设计（注册器+工厂）
+## 3. Questionnaire 聚合的领域服务
+
+Questionnaire 聚合采用**领域服务**模式来管理复杂的业务逻辑，避免聚合根过于臃肿。
+
+### 3.1 领域服务概览
+
+| 领域服务 | 职责 | 核心方法 |
+|---------|-----|---------|
+| **Lifecycle** | 生命周期管理 | Publish(), Unpublish(), Archive() |
+| **BaseInfo** | 基础信息管理 | UpdateTitle(), UpdateDescription() |
+| **QuestionManager** | 问题管理 | AddQuestion(), RemoveQuestion(), UpdateQuestion() |
+| **Versioning** | 版本管理 | InitializeVersion(), IncrementMinorVersion(), IncrementMajorVersion() |
+| **Validator** | 业务规则验证 | ValidateForPublish(), ValidateBasicInfo(), ValidateQuestion() |
+
+### 3.2 Lifecycle - 生命周期服务
+
+```go
+// Lifecycle 生命周期服务
+type Lifecycle struct {
+    versioning *Versioning
+    validator  *Validator
+}
+
+// NewLifecycle 创建生命周期服务
+func NewLifecycle(versioning *Versioning, validator *Validator) *Lifecycle {
+    return &Lifecycle{
+        versioning: versioning,
+        validator:  validator,
+    }
+}
+
+// Publish 发布问卷
+func (l *Lifecycle) Publish(q *Questionnaire) error {
+    // 1. 检查状态
+    if q.status == StatusPublished {
+        return errors.New("questionnaire already published")
+    }
+    if q.status == StatusArchived {
+        return errors.New("archived questionnaire cannot be published")
+    }
+    
+    // 2. 业务规则验证
+    if err := l.validator.ValidateForPublish(q); err != nil {
+        return err
+    }
+    
+    // 3. 大版本递增（发布是重大变更）
+    l.versioning.IncrementMajorVersion(q)
+    
+    // 4. 更新状态
+    q.status = StatusPublished
+    return nil
+}
+
+// Unpublish 下架问卷
+func (l *Lifecycle) Unpublish(q *Questionnaire) error {
+    if q.status != StatusPublished {
+        return errors.New("only published questionnaire can be unpublished")
+    }
+    q.status = StatusDraft
+    return nil
+}
+
+// Archive 归档问卷
+func (l *Lifecycle) Archive(q *Questionnaire) error {
+    if q.status == StatusArchived {
+        return errors.New("questionnaire already archived")
+    }
+    q.status = StatusArchived
+    return nil
+}
+```
+
+### 3.3 BaseInfo - 基础信息服务
+
+```go
+// BaseInfo 基础信息服务
+type BaseInfo struct{}
+
+// NewBaseInfo 创建基础信息服务
+func NewBaseInfo() *BaseInfo {
+    return &BaseInfo{}
+}
+
+// UpdateTitle 更新标题
+func (b *BaseInfo) UpdateTitle(q *Questionnaire, title string) error {
+    if title == "" {
+        return errors.New("title cannot be empty")
+    }
+    if len(title) > 100 {
+        return errors.New("title length cannot exceed 100")
+    }
+    q.title = title
+    return nil
+}
+
+// UpdateDescription 更新描述
+func (b *BaseInfo) UpdateDescription(q *Questionnaire, description string) error {
+    if len(description) > 500 {
+        return errors.New("description length cannot exceed 500")
+    }
+    q.description = description
+    return nil
+}
+```
+
+### 3.4 QuestionManager - 问题管理服务
+
+```go
+// QuestionManager 问题管理服务
+type QuestionManager struct{}
+
+// NewQuestionManager 创建问题管理服务
+func NewQuestionManager() *QuestionManager {
+    return &QuestionManager{}
+}
+
+// AddQuestion 添加问题
+func (m *QuestionManager) AddQuestion(q *Questionnaire, question Question) error {
+    // 检查编码唯一性
+    for _, existingQ := range q.questions {
+        if existingQ.GetCode().Equals(question.GetCode()) {
+            return fmt.Errorf("question code already exists: %s", question.GetCode().Value())
+        }
+    }
+    q.questions = append(q.questions, question)
+    return nil
+}
+
+// RemoveQuestion 移除问题
+func (m *QuestionManager) RemoveQuestion(q *Questionnaire, code meta.Code) error {
+    for i, question := range q.questions {
+        if question.GetCode().Equals(code) {
+            q.questions = append(q.questions[:i], q.questions[i+1:]...)
+            return nil
+        }
+    }
+    return fmt.Errorf("question not found: %s", code.Value())
+}
+
+// UpdateQuestion 更新问题
+func (m *QuestionManager) UpdateQuestion(q *Questionnaire, code meta.Code, newQuestion Question) error {
+    for i, question := range q.questions {
+        if question.GetCode().Equals(code) {
+            q.questions[i] = newQuestion
+            return nil
+        }
+    }
+    return fmt.Errorf("question not found: %s", code.Value())
+}
+```
+
+### 3.5 Versioning - 版本管理服务
+
+**设计原则**：采用**语义化版本管理策略**，格式为 `x.y.z`，自动化管理，不支持手动设置。
+
+**版本规则**：
+
+* **默认版本**：新建问卷从 `0.0.1` 开始
+* **小版本递增**（存草稿）：`0.0.1 → 0.0.2` （递增第三位）
+* **大版本递增**（发布）：`0.0.5 → 1.0.1`、`1.0.3 → 2.0.1` （递增第一位，重置为 x.0.1）
+* **发布后再编辑**：再次发布时继续递增大版本
+
+```go
+// Versioning 版本管理服务
+type Versioning struct{}
+
+// NewVersioning 创建版本管理服务
+func NewVersioning() *Versioning {
+    return &Versioning{}
+}
+
+// InitializeVersion 初始化版本
+// 新建问卷时将版本设置为 0.0.1
+func (v *Versioning) InitializeVersion(q *Questionnaire) {
+    if q.version.IsEmpty() {
+        q.version = Version("0.0.1")
+    }
+}
+
+// IncrementMinorVersion 小版本递增（存草稿）
+// 示例：0.0.1 → 0.0.2, 1.0.5 → 1.0.6
+func (v *Versioning) IncrementMinorVersion(q *Questionnaire) {
+    if q.version.IsEmpty() {
+        q.version = Version("0.0.1")
+        return
+    }
+    q.version = q.version.IncrementMinor()
+}
+
+// IncrementMajorVersion 大版本递增（发布）
+// 示例：0.0.5 → 1.0.1, 1.0.3 → 2.0.1
+func (v *Versioning) IncrementMajorVersion(q *Questionnaire) {
+    if q.version.IsEmpty() {
+        q.version = Version("1.0.1")
+        return
+    }
+    q.version = q.version.IncrementMajor()
+}
+```
+
+**Version 值对象实现**：
+
+```go
+// Version 版本值对象
+type Version string
+
+// IncrementMinor 小版本递增
+func (v Version) IncrementMinor() Version {
+    parts := strings.Split(strings.TrimPrefix(string(v), "v"), ".")
+    
+    // 处理不同格式
+    switch len(parts) {
+    case 1:
+        return Version(parts[0] + ".0.1")
+    case 2:
+        return Version(parts[0] + "." + parts[1] + ".1")
+    case 3:
+        minor := parseNumber(parts[2])
+        return Version(fmt.Sprintf("%s.%s.%d", parts[0], parts[1], minor+1))
+    default:
+        return v
+    }
+}
+
+// IncrementMajor 大版本递增
+func (v Version) IncrementMajor() Version {
+    parts := strings.Split(strings.TrimPrefix(string(v), "v"), ".")
+    
+    major := parseNumber(parts[0])
+    return Version(fmt.Sprintf("%d.0.1", major+1))
+}
+```
+
+**版本管理工作流示例**：
+
+```
+创建问卷: 0.0.1
+存草稿: 0.0.1 → 0.0.2
+存草稿: 0.0.2 → 0.0.3
+发布: 0.0.3 → 1.0.1
+编辑+存草稿: 1.0.1 → 1.0.2
+存草稿: 1.0.2 → 1.0.3
+再次发布: 1.0.3 → 2.0.1
+```
+
+### 3.6 Validator - 业务规则验证服务
+
+```go
+// Validator 验证服务
+type Validator struct{}
+
+// NewValidator 创建验证服务
+func NewValidator() *Validator {
+    return &Validator{}
+}
+
+// ValidateForPublish 发布前验证
+func (v *Validator) ValidateForPublish(q *Questionnaire) error {
+    var errs []error
+    
+    // 验证基础信息
+    if err := v.ValidateBasicInfo(q); err != nil {
+        errs = append(errs, err)
+    }
+    
+    // 验证版本
+    if q.version.IsEmpty() || q.version.Validate() != nil {
+        errs = append(errs, errors.New("invalid version"))
+    }
+    
+    // 验证问题列表
+    if err := v.ValidateQuestions(q); err != nil {
+        errs = append(errs, err)
+    }
+    
+    if len(errs) > 0 {
+        return fmt.Errorf("validation failed: %v", errs)
+    }
+    return nil
+}
+
+// ValidateBasicInfo 验证基础信息
+func (v *Validator) ValidateBasicInfo(q *Questionnaire) error {
+    if q.title == "" {
+        return errors.New("title cannot be empty")
+    }
+    if len(q.title) > 100 {
+        return errors.New("title length cannot exceed 100")
+    }
+    return nil
+}
+
+// ValidateQuestions 验证问题列表
+func (v *Validator) ValidateQuestions(q *Questionnaire) error {
+    if len(q.questions) == 0 {
+        return errors.New("questionnaire must have at least one question")
+    }
+    
+    // 检查问题编码唯一性
+    codeSet := make(map[string]bool)
+    for _, question := range q.questions {
+        code := question.GetCode().Value()
+        if codeSet[code] {
+            return fmt.Errorf("duplicate question code: %s", code)
+        }
+        codeSet[code] = true
+        
+        // 验证单个问题
+        if err := v.ValidateQuestion(question); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+// ValidateQuestion 验证单个问题
+func (v *Validator) ValidateQuestion(q Question) error {
+    if q.GetCode().IsEmpty() {
+        return errors.New("question code cannot be empty")
+    }
+    if q.GetStem() == "" {
+        return errors.New("question stem cannot be empty")
+    }
+    
+    // 验证选项题的选项数量
+    if q.GetType() == TypeRadio || q.GetType() == TypeCheckbox {
+        if len(q.GetOptions()) < 2 {
+            return fmt.Errorf("question %s requires at least 2 options", q.GetCode().Value())
+        }
+    }
+    
+    return nil
+}
+```
+
+### 3.7 领域服务的使用示例
+
+```go
+// 创建领域服务实例
+versioning := NewVersioning()
+validator := NewValidator()
+lifecycle := NewLifecycle(versioning, validator)
+baseInfo := NewBaseInfo()
+questionManager := NewQuestionManager()
+
+// 创建问卷
+questionnaire := NewQuestionnaire(...)
+versioning.InitializeVersion(questionnaire) // 设置为 0.0.1
+
+// 添加问题
+q1, _ := NewQuestion(...)
+questionManager.AddQuestion(questionnaire, q1)
+
+// 存草稿（小版本递增）
+versioning.IncrementMinorVersion(questionnaire) // 0.0.1 → 0.0.2
+
+// 继续编辑
+q2, _ := NewQuestion(...)
+questionManager.AddQuestion(questionnaire, q2)
+versioning.IncrementMinorVersion(questionnaire) // 0.0.2 → 0.0.3
+
+// 发布（大版本递增，带验证）
+err := lifecycle.Publish(questionnaire) // 0.0.3 → 1.0.1
+if err != nil {
+    // 处理验证错误
+}
+
+// 发布后编辑
+baseInfo.UpdateTitle(questionnaire, "新标题")
+versioning.IncrementMinorVersion(questionnaire) // 1.0.1 → 1.0.2
+
+// 再次发布
+lifecycle.Publish(questionnaire) // 1.0.2 → 2.0.1
+```
+
+---
+
+## 4. 可扩展的答案设计（注册器+工厂）
 
 ### 3.1 设计目标
 
@@ -588,7 +977,7 @@ func (v NumberValue) Raw() any { return v.Value }
 // Answer 答案聚合
 type Answer struct {
     questionCode meta.Code
-    questionType question.QuestionType
+    QuestionType question.QuestionType
     score        float64
     value        AnswerValue
 }
@@ -606,7 +995,7 @@ func NewAnswer(qCode meta.Code, qType question.QuestionType, score float64, v an
     
     return Answer{
         questionCode: qCode,
-        questionType: qType,
+        QuestionType: qType,
         score:        score,
         value:        answerValue,
     }, nil
@@ -616,7 +1005,7 @@ func NewAnswer(qCode meta.Code, qType question.QuestionType, score float64, v an
 func (a Answer) GetQuestionCode() meta.Code { return a.questionCode }
 
 // GetQuestionType 获取题目类型
-func (a Answer) GetQuestionType() question.QuestionType { return a.questionType }
+func (a Answer) GetQuestionType() question.QuestionType { return a.QuestionType }
 
 // GetScore 获取分数
 func (a Answer) GetScore() float64 { return a.score }
@@ -627,13 +1016,13 @@ func (a Answer) GetValue() AnswerValue { return a.value }
 // mapQuestionTypeToValueType 题型到答案类型的映射
 func mapQuestionTypeToValueType(qType question.QuestionType) AnswerValueType {
     switch qType {
-    case question.QuestionTypeRadio:
+    case question.RadioQuestion:
         return OptionValueType
-    case question.QuestionTypeCheckbox:
+    case question.CheckboxQuestion:
         return OptionsValueType
-    case question.QuestionTypeText, question.QuestionTypeTextarea:
+    case question.TextQuestion, question.TextareaQuestion:
         return StringValueType
-    case question.QuestionTypeNumber:
+    case question.NumberQuestion:
         return NumberValueType
     default:
         return StringValueType
@@ -647,7 +1036,7 @@ func mapQuestionTypeToValueType(qType question.QuestionType) AnswerValueType {
 // 创建单选答案
 answer1, _ := answer.NewAnswer(
     meta.NewCode("Q1"),
-    question.QuestionTypeRadio,
+    question.RadioQuestion,
     1.0,
     "A", // 原始值
 )
@@ -655,7 +1044,7 @@ answer1, _ := answer.NewAnswer(
 // 创建多选答案
 answer2, _ := answer.NewAnswer(
     meta.NewCode("Q2"),
-    question.QuestionTypeCheckbox,
+    question.CheckboxQuestion,
     2.0,
     []string{"A", "C"}, // 原始值
 )
@@ -663,7 +1052,7 @@ answer2, _ := answer.NewAnswer(
 // 创建文本答案
 answer3, _ := answer.NewAnswer(
     meta.NewCode("Q3"),
-    question.QuestionTypeText,
+    question.TextQuestion,
     0.0,
     "这是我的回答", // 原始值
 )
@@ -728,7 +1117,7 @@ func mapQuestionTypeToValueType(qType question.QuestionType) AnswerValueType {
 
 ---
 
-## 4. 策略模式实现的校验规则
+## 5. 策略模式实现的校验规则
 
 ### 4.1 校验规则概述
 
@@ -983,29 +1372,32 @@ func (s *AnswerSheetAppService) SubmitAnswerSheet(ctx context.Context, cmd Submi
 
 ---
 
-## 5. 总结
+## 6. 总结
 
-### 5.1 Survey 子域的核心职责
+### 6.1 Survey 子域的核心职责
 
-1. **题型管理**：通过注册器+构造者+工厂模式支持可扩展的题型体系
-2. **答案管理**：通过注册器+工厂模式支持可扩展的答案类型体系
-3. **校验规则**：通过 ValidationRule 值对象存储规则配置，由应用层执行校验策略
+1. **题型管理**：通过注册器+参数容器+工厂模式支持可扩展的题型体系
+2. **Questionnaire 领域服务**：通过 Lifecycle、BaseInfo、QuestionManager、Versioning、Validator 服务管理复杂业务逻辑
+3. **版本管理**：采用语义化版本管理策略（x.y.z），小版本对应草稿，大版本对应发布
+4. **答案管理**：通过注册器+工厂模式支持可扩展的答案类型体系
+5. **校验规则**：通过 ValidationRule 值对象存储规则配置，由应用层执行校验策略
 
-### 5.2 设计模式应用
+### 6.2 设计模式应用
 
 * **注册器模式**：QuestionFactory、AnswerValueFactory 注册表
-* **构造者模式**：QuestionBuilder 配置题目
-* **工厂模式**：CreateQuestionFromBuilder、CreateAnswerValuer 统一创建入口
+* **参数容器模式**：QuestionParams 收集和校验参数
+* **工厂模式**：QuestionFactory、CreateAnswerValuer 统一创建入口
+* **函数式选项模式**：WithCode、WithStem 等函数式选项配置参数
 * **策略模式**：ValidationRule + 应用层校验器实现不同的校验策略
-* **组合模式**：ValidationAbility、CalculationAbility 能力组合
+* **领域服务模式**：Lifecycle、Versioning、Validator 等服务管理复杂逻辑
 
-### 5.3 与其他子域的关系
+### 6.3 与其他子域的关系
 
 * **Survey → Scale**：提供 Question、Answer 的只读视图，Scale 读取后进行计分和解读
 * **Survey ← Assessment**：Assessment 引用 QuestionnaireID 和 AnswerSheetID
 * **Survey 不依赖任何子域**：保持领域纯粹性
 
-### 5.4 扩展性保证
+### 6.4 扩展性保证
 
 * **新增题型**：注册新的 QuestionFactory，无需修改核心代码
 * **新增答案类型**：注册新的 AnswerValueFactory，更新题型映射
@@ -1015,25 +1407,33 @@ func (s *AnswerSheetAppService) SubmitAnswerSheet(ctx context.Context, cmd Submi
 
 ## 附录：目录结构
 
+**实际代码组织结构**：
+
 ```text
-internal/apiserver/domain/
+internal/apiserver/domain/survey/
 ├── questionnaire/              # Questionnaire 聚合
 │   ├── questionnaire.go        # 聚合根
-│   └── question/               # Question 子实体
-│       ├── question.go         # Question 接口 + QuestionType
-│       ├── factory.go          # 注册器 + 工厂
-│       ├── builder.go          # QuestionBuilder
-│       ├── option.go           # Option 值对象
-│       ├── ability/            # 能力组合
-│       │   ├── validation-ability.go
-│       │   └── calculation-ability.go
-│       └── types/              # 具体题型实现
-│           ├── base-question.go
-│           ├── radio-question.go
-│           ├── checkbox-question.go
-│           ├── text-question.go
-│           ├── num-question.go
-│           └── section-question.go
+│   ├── types.go                # 值对象（Version、Status等）
+│   ├── question.go             # Question 接口 + 具体实现
+│   ├── factory.go              # 注册器 + 工厂
+│   ├── question_builder.go     # QuestionParams 参数容器
+│   ├── option.go               # Option 值对象
+│   ├── repository.go           # 仓储接口
+│   ├── # --- 领域服务 ---
+│   ├── lifecycle.go            # 生命周期服务
+│   ├── baseinfo.go             # 基础信息服务
+│   ├── question_manager.go     # 问题管理服务
+│   ├── versioning.go           # 版本管理服务
+│   ├── validator.go            # 业务规则验证服务
+│   ├── # --- 测试文件 ---
+│   ├── question_example_test.go
+│   ├── versioning_test.go
+│   ├── version_test.go
+│   ├── validator_test.go
+│   ├── # --- 文档 ---
+│   ├── ARCHITECTURE.md         # 架构说明
+│   └── QUESTION_README.md      # Question 设计说明
+│
 └── answersheet/                # AnswerSheet 聚合
     ├── answersheet.go          # 聚合根
     └── answer/                 # Answer 子实体
@@ -1046,9 +1446,18 @@ internal/apiserver/domain/
             └── number-value.go
 
 internal/pkg/
-└── validation/
-    └── validation-rule.go      # ValidationRule 值对象
+├── validation/
+│   └── validation-rule.go      # ValidationRule 值对象
+└── calculation/
+    └── calculation-rule.go     # CalculationRule 值对象
 ```
+
+**设计特点**：
+
+1. **扩状结构**：为简化实现，所有 Question 相关代码位于 questionnaire 目录下，而非嵌套的 question 子目录
+2. **领域服务集中管理**：Lifecycle、BaseInfo、QuestionManager、Versioning、Validator 五个领域服务独立文件
+3. **参数容器模式**：question_builder.go 实际是 QuestionParams 参数容器，不是构造者
+4. **注册器模式**：factory.go 包含 QuestionFactory 注册表和 NewQuestion 统一创建入口
 
 ---
 

@@ -1,11 +1,11 @@
 package questionnaire
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // QuestionnaireMapper 问卷映射器
@@ -31,7 +31,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 	for _, questionBO := range bo.GetQuestions() {
 		questionPO := QuestionPO{
 			Code:            questionBO.GetCode().Value(),
-			Title:           questionBO.GetTitle(),
+			Title:           questionBO.GetStem(),
 			QuestionType:    string(questionBO.GetType()),
 			Tips:            questionBO.GetTips(),
 			Placeholder:     questionBO.GetPlaceholder(),
@@ -54,7 +54,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 }
 
 // mapOptions 转换选项
-func (m *QuestionnaireMapper) mapOptions(options []question.Option) []OptionPO {
+func (m *QuestionnaireMapper) mapOptions(options []questionnaire.Option) []OptionPO {
 	if options == nil {
 		return []OptionPO{} // 返回空切片而不是nil
 	}
@@ -99,14 +99,14 @@ func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRu
 // ToBO 将MongoDB持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	// 创建问卷对象
-	q := questionnaire.NewQuestionnaire(
+	q, _ := questionnaire.NewQuestionnaire(
 		meta.NewCode(po.Code),
 		po.Title,
 		questionnaire.WithID(meta.ID(po.DomainID)),
-		questionnaire.WithDescription(po.Description),
+		questionnaire.WithDesc(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
-		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(po.Version)),
-		questionnaire.WithStatus(questionnaire.QuestionnaireStatus(po.Status)),
+		questionnaire.WithVersion(questionnaire.NewVersion(po.Version)),
+		questionnaire.WithStatus(questionnaire.Status(po.Status)),
 		questionnaire.WithQuestions(m.mapQuestions(po.Questions)),
 	)
 
@@ -114,53 +114,52 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 }
 
 // mapQuestions 将问题PO转换为问题BO - 使用重构后的Builder和Factory
-func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []question.Question {
+func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []questionnaire.Question {
 	if questionsPO == nil {
-		return []question.Question{}
+		return []questionnaire.Question{}
 	}
 
-	var questions []question.Question
+	var questions []questionnaire.Question
 
 	for _, questionPO := range questionsPO {
 		// 构建配置选项列表
-		opts := []question.BuilderOption{
-			question.WithCode(meta.NewCode(questionPO.Code)),
-			question.WithTitle(questionPO.Title),
-			question.WithTips(questionPO.Tips),
-			question.WithQuestionType(question.QuestionType(questionPO.QuestionType)),
-			question.WithPlaceholder(questionPO.Placeholder),
-			question.WithOptions(m.mapOptionsPOToBO(questionPO.Options)),
-			question.WithValidationRules(m.mapValidationRulesPOToBO(questionPO.ValidationRules)),
+		opts := []questionnaire.QuestionParamsOption{
+			questionnaire.WithCode(meta.NewCode(questionPO.Code)),
+			questionnaire.WithStem(questionPO.Title),
+			questionnaire.WithTips(questionPO.Tips),
+			questionnaire.WithQuestionType(questionnaire.QuestionType(questionPO.QuestionType)),
+			questionnaire.WithPlaceholder(questionPO.Placeholder),
+			questionnaire.WithOptions(m.mapOptionsPOToBO(questionPO.Options)),
+			questionnaire.WithValidationRules(m.mapValidationRulesPOToBO(questionPO.ValidationRules)),
 		}
 
 		// 添加计算规则（如果有的话）
 		if questionPO.CalculationRule.Formula != "" {
-			opts = append(opts, question.WithCalculationRule(calculation.FormulaType(questionPO.CalculationRule.Formula)))
+			opts = append(opts, questionnaire.WithCalculationRule(calculation.FormulaType(questionPO.CalculationRule.Formula)))
 		}
 
-		// 1. 创建配置
-		builder := question.BuildQuestionConfig(opts...)
-
-		// 2. 创建对象
-		questionBO := question.CreateQuestionFromBuilder(builder)
-		if questionBO != nil {
-			questions = append(questions, questionBO)
+		questionBO, err := questionnaire.NewQuestion(opts...)
+		if err != nil {
+			log.Errorf("failed to build question %s: %v", questionPO.Code, err)
+			continue
 		}
+		questions = append(questions, questionBO)
 	}
 
 	return questions
 }
 
 // mapOptionsPOToBO 将选项PO转换为选项BO
-func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []question.Option {
+func (m *QuestionnaireMapper) mapOptionsPOToBO(optionsPO []OptionPO) []questionnaire.Option {
 	if optionsPO == nil {
-		return []question.Option{}
+		return []questionnaire.Option{}
 	}
 
-	var options []question.Option
+	var options []questionnaire.Option
 	for _, optionPO := range optionsPO {
-		optionBO := question.NewOptionWithStringCode(optionPO.Code, optionPO.Content, optionPO.Score)
-		options = append(options, optionBO)
+		if optionBO, err := questionnaire.NewOptionWithStringCode(optionPO.Code, optionPO.Content, optionPO.Score); err == nil {
+			options = append(options, optionBO)
+		}
 	}
 	return options
 }

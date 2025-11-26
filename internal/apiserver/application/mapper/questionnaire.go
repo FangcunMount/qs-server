@@ -4,11 +4,10 @@ import (
 	"errors"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
 	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // QuestionnaireMapper DTO 与领域对象转换器
@@ -38,7 +37,7 @@ func (m *QuestionnaireMapper) ToDTO(bo *questionnaire.Questionnaire) *dto.Questi
 }
 
 // toQuestionDTOs 将问题领域对象转换为 DTO
-func (m *QuestionnaireMapper) toQuestionDTOs(questions []question.Question) []dto.QuestionDTO {
+func (m *QuestionnaireMapper) toQuestionDTOs(questions []questionnaire.Question) []dto.QuestionDTO {
 	if len(questions) == 0 {
 		return nil
 	}
@@ -47,7 +46,7 @@ func (m *QuestionnaireMapper) toQuestionDTOs(questions []question.Question) []dt
 	for _, q := range questions {
 		dtos = append(dtos, dto.QuestionDTO{
 			Code:            q.GetCode().Value(),
-			Title:           q.GetTitle(),
+			Stem:            q.GetStem(),
 			Type:            string(q.GetType()),
 			Tips:            q.GetTips(),
 			Options:         m.toOptionDTOs(q.GetOptions()),
@@ -60,7 +59,7 @@ func (m *QuestionnaireMapper) toQuestionDTOs(questions []question.Question) []dt
 }
 
 // toOptionDTOs 将选项领域对象转换为 DTO
-func (m *QuestionnaireMapper) toOptionDTOs(options []question.Option) []dto.OptionDTO {
+func (m *QuestionnaireMapper) toOptionDTOs(options []questionnaire.Option) []dto.OptionDTO {
 	if len(options) == 0 {
 		return nil
 	}
@@ -104,47 +103,48 @@ func (m *QuestionnaireMapper) toCalculationRuleDTO(rule *calculation.Calculation
 }
 
 // QuestionFromDTO 将问题 DTO 转换为领域对象
-func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (question.Question, error) {
+func (m *QuestionnaireMapper) QuestionFromDTO(dto *dto.QuestionDTO) (questionnaire.Question, error) {
 	if dto == nil {
 		return nil, errors.New("问题 DTO 不能为空")
 	}
 
-	// 创建问题构建器
-	builder := question.NewQuestionBuilder()
-
-	// 设置基本属性
-	builder.SetCode(meta.NewCode(dto.Code))
-	builder.SetTitle(dto.Title)
-	builder.SetTips(dto.Tips)
-	builder.SetQuestionType(question.QuestionType(dto.Type))
-	builder.SetPlaceholder(dto.Tips)
+	opts := []questionnaire.QuestionParamsOption{
+		questionnaire.WithCode(meta.NewCode(dto.Code)),
+		questionnaire.WithStem(dto.Stem),
+		questionnaire.WithTips(dto.Tips),
+		questionnaire.WithQuestionType(questionnaire.QuestionType(dto.Type)),
+		questionnaire.WithPlaceholder(dto.Placeholder),
+	}
 
 	// 设置选项
 	if len(dto.Options) > 0 {
+		options := make([]questionnaire.Option, 0, len(dto.Options))
 		for _, optionDTO := range dto.Options {
-			builder.AddOption(optionDTO.Code, optionDTO.Content, optionDTO.Score)
+			if opt, err := questionnaire.NewOptionWithStringCode(optionDTO.Code, optionDTO.Content, optionDTO.Score); err == nil {
+				options = append(options, opt)
+			}
 		}
+		opts = append(opts, questionnaire.WithOptions(options))
 	}
 
 	// 设置验证规则
 	if len(dto.ValidationRules) > 0 {
 		for _, ruleDTO := range dto.ValidationRules {
-			builder.AddValidationRule(validation.RuleType(ruleDTO.RuleType), ruleDTO.TargetValue)
+			opts = append(opts, questionnaire.WithValidationRule(validation.RuleType(ruleDTO.RuleType), ruleDTO.TargetValue))
 		}
 	}
 
 	// 设置计算规则
 	if dto.CalculationRule != nil {
-		builder.SetCalculationRule(calculation.FormulaType(dto.CalculationRule.FormulaType))
+		opts = append(opts, questionnaire.WithCalculationRule(calculation.FormulaType(dto.CalculationRule.FormulaType)))
 	}
 
-	// 使用工厂函数创建问题
-	q := question.CreateQuestionFromBuilder(builder)
-	if q == nil {
-		return nil, errors.New("创建问题失败")
+	questionBO, err := questionnaire.NewQuestion(opts...)
+	if err != nil {
+		return nil, err
 	}
 
-	return q, nil
+	return questionBO, nil
 }
 
 // FromDTO 将 DTO 转换为领域对象
@@ -156,9 +156,9 @@ func (m *QuestionnaireMapper) FromDTO(dto *dto.QuestionnaireDTO) (*questionnaire
 	// 构建选项列表
 	opts := []questionnaire.QuestionnaireOption{
 		questionnaire.WithID(dto.ID),
-		questionnaire.WithDescription(dto.Description),
+		questionnaire.WithDesc(dto.Description),
 		questionnaire.WithImgUrl(dto.ImgUrl),
-		questionnaire.WithVersion(questionnaire.NewQuestionnaireVersion(dto.Version)),
+		questionnaire.WithVersion(questionnaire.NewVersion(dto.Version)),
 	}
 
 	// 设置状态
@@ -175,7 +175,7 @@ func (m *QuestionnaireMapper) FromDTO(dto *dto.QuestionnaireDTO) (*questionnaire
 
 	// 如果有问题列表，则转换问题
 	if len(dto.Questions) > 0 {
-		questions := make([]question.Question, 0, len(dto.Questions))
+		questions := make([]questionnaire.Question, 0, len(dto.Questions))
 		for _, qDTO := range dto.Questions {
 			q, err := m.QuestionFromDTO(&qDTO)
 			if err != nil {
@@ -187,9 +187,13 @@ func (m *QuestionnaireMapper) FromDTO(dto *dto.QuestionnaireDTO) (*questionnaire
 	}
 
 	// 创建问卷对象
-	return questionnaire.NewQuestionnaire(
+	q, err := questionnaire.NewQuestionnaire(
 		meta.NewCode(dto.Code),
 		dto.Title,
 		opts...,
-	), nil
+	)
+	if err != nil {
+		return nil, err
+	}
+	return q, nil
 }

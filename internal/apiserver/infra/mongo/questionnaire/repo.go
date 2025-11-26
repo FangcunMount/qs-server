@@ -8,8 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
 
@@ -20,7 +19,7 @@ type Repository struct {
 }
 
 // NewRepository 创建问卷MongoDB存储库
-func NewRepository(db *mongo.Database) port.QuestionnaireRepositoryMongo {
+func NewRepository(db *mongo.Database) questionnaire.Repository {
 	po := &QuestionnairePO{}
 	return &Repository{
 		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),

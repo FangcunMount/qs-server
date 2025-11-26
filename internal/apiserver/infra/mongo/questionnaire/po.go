@@ -141,9 +141,9 @@ func (p *QuestionPO) ToBsonM() (bson.M, error) {
 
 // OptionPO 选项
 type OptionPO struct {
-	Code    string `bson:"code" json:"code"`
-	Content string `bson:"content" json:"content"`
-	Score   int    `bson:"score" json:"score"`
+	Code    string  `bson:"code" json:"code"`
+	Content string  `bson:"content" json:"content"`
+	Score   float64 `bson:"score" json:"score"`
 }
 
 // ToBsonM 将 OptionPO 转换为 bson.M

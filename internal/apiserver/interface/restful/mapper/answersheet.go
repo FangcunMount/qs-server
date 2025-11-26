@@ -53,36 +53,36 @@ func (m *AnswerSheetMapper) ToAnswerViewModels(dtos []dto.AnswerDTO) []viewmodel
 // ToAnswerSheetDTO 将保存请求转换为 DTO
 func (m *AnswerSheetMapper) ToAnswerSheetDTO(req viewmodel.SaveAnswerSheetRequest) dto.AnswerSheetDTO {
 	return dto.AnswerSheetDTO{
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-		Title:                req.Title,
-		WriterID:             req.WriterID,
-		TesteeID:             req.TesteeID,
-		Answers:              m.ToAnswerDTOs(req.Answers),
+		QuestionnaireCode: req.QuestionnaireCode,
+		Version:           req.Version,
+		Title:             req.Title,
+		WriterID:          req.WriterID,
+		TesteeID:          req.TesteeID,
+		Answers:           m.ToAnswerDTOs(req.Answers),
 	}
 }
 
 // ToAnswerSheetFilterDTO 将查询请求转换为过滤 DTO
 func (m *AnswerSheetMapper) ToAnswerSheetFilterDTO(req viewmodel.ListAnswerSheetsRequest) dto.AnswerSheetDTO {
 	return dto.AnswerSheetDTO{
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-		WriterID:             req.WriterID,
-		TesteeID:             req.TesteeID,
+		QuestionnaireCode: req.QuestionnaireCode,
+		Version:           req.Version,
+		WriterID:          req.WriterID,
+		TesteeID:          req.TesteeID,
 	}
 }
 
 // ToAnswerSheetViewModel 将答卷 DTO 转换为视图模型
 func (m *AnswerSheetMapper) ToAnswerSheetViewModel(dto dto.AnswerSheetDTO) viewmodel.AnswerSheetViewModel {
 	return viewmodel.AnswerSheetViewModel{
-		ID:                   dto.ID,
-		QuestionnaireCode:    dto.QuestionnaireCode,
-		QuestionnaireVersion: dto.QuestionnaireVersion,
-		Title:                dto.Title,
-		Score:                dto.Score,
-		WriterID:             dto.WriterID,
-		TesteeID:             dto.TesteeID,
-		Answers:              m.ToAnswerViewModels(dto.Answers),
+		ID:                dto.ID,
+		QuestionnaireCode: dto.QuestionnaireCode,
+		Version:           dto.Version,
+		Title:             dto.Title,
+		Score:             dto.Score,
+		WriterID:          dto.WriterID,
+		TesteeID:          dto.TesteeID,
+		Answers:           m.ToAnswerViewModels(dto.Answers),
 	}
 }
 

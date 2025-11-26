@@ -8,18 +8,18 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 )
 
 // QuestionnaireService 问卷 GRPC 服务 - 对外提供查询功能
 type QuestionnaireService struct {
 	pb.UnimplementedQuestionnaireServiceServer
-	queryer port.QuestionnaireQueryer
+	queryer *quesApp.Queryer
 }
 
 // NewQuestionnaireService 创建问卷 GRPC 服务
-func NewQuestionnaireService(queryer port.QuestionnaireQueryer) *QuestionnaireService {
+func NewQuestionnaireService(queryer *quesApp.Queryer) *QuestionnaireService {
 	return &QuestionnaireService{
 		queryer: queryer,
 	}
@@ -111,7 +111,7 @@ func (s *QuestionnaireService) toProtoQuestion(dto *dto.QuestionDTO) *pb.Questio
 	return &pb.Question{
 		Code:            dto.Code,
 		Type:            dto.Type,
-		Title:           dto.Title,
+		Title:           dto.Stem,
 		Tips:            dto.Tips,
 		Placeholder:     dto.Placeholder,
 		Options:         s.toProtoOptions(dto.Options),

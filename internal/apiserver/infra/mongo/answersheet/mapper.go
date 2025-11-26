@@ -1,9 +1,8 @@
 package answersheet
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/answer"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/question"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 
 	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
 	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
@@ -56,13 +55,13 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 
 	// 创建PO对象，但不设置DomainID，让BeforeInsert方法来设置
 	po := &AnswerSheetPO{
-		QuestionnaireCode:    bo.GetQuestionnaireCode(),
-		QuestionnaireVersion: bo.GetQuestionnaireVersion(),
-		Title:                bo.GetTitle(),
-		Score:                bo.GetScore(),
-		Answers:              answers,
-		Writer:               writer,
-		Testee:               testee,
+		QuestionnaireCode: bo.GetQuestionnaireCode(),
+		Version:           bo.GetVersion(),
+		Title:             bo.GetTitle(),
+		Score:             bo.GetScore(),
+		Answers:           answers,
+		Writer:            writer,
+		Testee:            testee,
 	}
 
 	// 设置时间字段
@@ -91,18 +90,16 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 
 	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
 	// 临时注释掉，直接传 nil
-	var writer interface{}
-	var testee interface{}
 
 	return answersheet.NewAnswerSheet(
 		po.QuestionnaireCode,
-		po.QuestionnaireVersion,
+		po.Version,
 		answersheet.WithID(meta.ID(po.DomainID)),
 		answersheet.WithTitle(po.Title),
 		answersheet.WithScore(po.Score),
 		answersheet.WithAnswers(answers),
-		answersheet.WithWriter(writer),
-		answersheet.WithTestee(testee),
+		answersheet.WithWriter(nil),
+		answersheet.WithTestee(nil),
 		answersheet.WithCreatedAt(po.CreatedAt),
 		answersheet.WithUpdatedAt(po.UpdatedAt),
 	)
@@ -124,7 +121,7 @@ func (m *AnswerSheetMapper) mapAnswerToPO(answerBO answer.Answer) *AnswerPO {
 func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) answer.Answer {
 	ans, _ := answer.NewAnswer(
 		meta.NewCode(answerPO.QuestionCode),
-		question.QuestionType(answerPO.QuestionType),
+		questionnaire.QuestionType(answerPO.QuestionType),
 		answerPO.Score,
 		answerPO.Value.Value,
 	)

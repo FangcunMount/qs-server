@@ -12,29 +12,29 @@ type SaveAnswerSheetResponse struct {
 
 // GetAnswerSheetResponse 获取答卷响应
 type GetAnswerSheetResponse struct {
-	ID                   meta.ID               `json:"id"`
-	QuestionnaireCode    string                `json:"questionnaire_code"`
-	QuestionnaireVersion string                `json:"questionnaire_version"`
-	Title                string                `json:"title"`
-	Score                float64               `json:"score"`
-	WriterID             meta.ID               `json:"writer_id"`
-	WriterName           string                `json:"writer_name"`
-	TesteeID             meta.ID               `json:"testee_id"`
-	TesteeName           string                `json:"testee_name"`
-	Answers              []viewmodel.AnswerDTO `json:"answers"`
-	CreatedAt            string                `json:"created_at"`
-	UpdatedAt            string                `json:"updated_at"`
+	ID                meta.ID               `json:"id"`
+	QuestionnaireCode string                `json:"questionnaire_code"`
+	Version           string                `json:"questionnaire_version"`
+	Title             string                `json:"title"`
+	Score             float64               `json:"score"`
+	WriterID          meta.ID               `json:"writer_id"`
+	WriterName        string                `json:"writer_name"`
+	TesteeID          meta.ID               `json:"testee_id"`
+	TesteeName        string                `json:"testee_name"`
+	Answers           []viewmodel.AnswerDTO `json:"answers"`
+	CreatedAt         string                `json:"created_at"`
+	UpdatedAt         string                `json:"updated_at"`
 }
 
 // AnswerSheetItem 答卷列表项
 type AnswerSheetItem struct {
-	ID                   meta.ID `json:"id"`
-	QuestionnaireCode    string  `json:"questionnaire_code"`
-	QuestionnaireVersion string  `json:"questionnaire_version"`
-	Title                string  `json:"title"`
-	Score                float64 `json:"score"`
-	WriterID             meta.ID `json:"writer_id"`
-	TesteeID             meta.ID `json:"testee_id"`
+	ID                meta.ID `json:"id"`
+	QuestionnaireCode string  `json:"questionnaire_code"`
+	Version           string  `json:"questionnaire_version"`
+	Title             string  `json:"title"`
+	Score             float64 `json:"score"`
+	WriterID          meta.ID `json:"writer_id"`
+	TesteeID          meta.ID `json:"testee_id"`
 }
 
 // ListAnswerSheetsResponse 获取答卷列表响应

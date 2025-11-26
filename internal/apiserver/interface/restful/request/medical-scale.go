@@ -2,17 +2,17 @@ package request
 
 // CreateMedicalScaleRequest 创建医学量表请求
 type CreateMedicalScaleRequest struct {
-	Code                 string `json:"code" binding:"required"`
-	Title                string `json:"title" binding:"required"`
-	QuestionnaireCode    string `json:"questionnaire_code" binding:"required"`
-	QuestionnaireVersion string `json:"questionnaire_version" binding:"required"`
+	Code              string `json:"code" binding:"required"`
+	Title             string `json:"title" binding:"required"`
+	QuestionnaireCode string `json:"questionnaire_code" binding:"required"`
+	Version           string `json:"questionnaire_version" binding:"required"`
 }
 
 // UpdateMedicalScaleRequest 更新医学量表基础信息请求
 type UpdateMedicalScaleRequest struct {
-	Title                string `json:"title" binding:"required"`
-	QuestionnaireCode    string `json:"questionnaire_code" binding:"required"`
-	QuestionnaireVersion string `json:"questionnaire_version" binding:"required"`
+	Title             string `json:"title" binding:"required"`
+	QuestionnaireCode string `json:"questionnaire_code" binding:"required"`
+	Version           string `json:"questionnaire_version" binding:"required"`
 }
 
 // UpdateMedicalScaleFactorRequest 更新医学量表因子请求

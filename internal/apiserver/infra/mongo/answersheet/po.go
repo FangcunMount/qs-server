@@ -14,14 +14,14 @@ import (
 // AnswerSheetPO 答卷MongoDB持久化对象
 // 对应MongoDB集合结构
 type AnswerSheetPO struct {
-	base.BaseDocument    `bson:",inline"`
-	QuestionnaireCode    string     `bson:"questionnaire_code" json:"questionnaire_code"`
-	QuestionnaireVersion string     `bson:"questionnaire_version" json:"questionnaire_version"`
-	Title                string     `bson:"title" json:"title"`
-	Score                float64    `bson:"score" json:"score"`
-	Answers              []AnswerPO `bson:"answers" json:"answers"`
-	Writer               *WriterPO  `bson:"writer" json:"writer"`
-	Testee               *TesteePO  `bson:"testee" json:"testee"`
+	base.BaseDocument `bson:",inline"`
+	QuestionnaireCode string     `bson:"questionnaire_code" json:"questionnaire_code"`
+	Version           string     `bson:"questionnaire_version" json:"questionnaire_version"`
+	Title             string     `bson:"title" json:"title"`
+	Score             float64    `bson:"score" json:"score"`
+	Answers           []AnswerPO `bson:"answers" json:"answers"`
+	Writer            *WriterPO  `bson:"writer" json:"writer"`
+	Testee            *TesteePO  `bson:"testee" json:"testee"`
 }
 
 // CollectionName 集合名称

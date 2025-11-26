@@ -260,12 +260,12 @@ type Time = time.Time
 type QuestionnaireID string
 type QuestionID string
 
-type QuestionnaireStatus string
+type Status string
 
 const (
-    QuestionnaireStatusDraft     QuestionnaireStatus = "draft"
-    QuestionnaireStatusPublished QuestionnaireStatus = "published"
-    QuestionnaireStatusArchived  QuestionnaireStatus = "archived"
+    StatusDraft     Status = "draft"
+    StatusPublished Status = "published"
+    StatusArchived  Status = "archived"
 )
 
 type Questionnaire struct {
@@ -274,7 +274,7 @@ type Questionnaire struct {
     title       string
     description string
     version     int
-    status      QuestionnaireStatus
+    status      Status
     questions   []Question
     createdAt   time.Time
     updatedAt   time.Time
@@ -289,8 +289,8 @@ type QuestionType string
 const (
     QuestionTypeSingleChoice QuestionType = "single_choice"
     QuestionTypeMultiChoice  QuestionType = "multi_choice"
-    QuestionTypeNumber       QuestionType = "number"
-    QuestionTypeText         QuestionType = "text"
+    NumberQuestion       QuestionType = "number"
+    TextQuestion         QuestionType = "text"
 )
 
 type RuleType string

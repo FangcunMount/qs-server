@@ -11,6 +11,12 @@ const (
 	// ErrQuestionnaireArchived - 400: Questionnaire is archived.
 	ErrQuestionnaireArchived
 
+	// ErrQuestionnaireInvalidCode - 400: Invalid questionnaire code.
+	ErrQuestionnaireInvalidCode
+
+	// ErrQuestionnaireInvalidTitle - 400: Invalid questionnaire title.
+	ErrQuestionnaireInvalidTitle
+
 	// ErrQuestionnaireInvalidInput - 400: Invalid input for questionnaire.
 	ErrQuestionnaireInvalidInput
 
@@ -32,6 +38,10 @@ const (
 	// ErrQuestionnaireQuestionInvalid - 400: Question is invalid.
 	ErrQuestionnaireQuestionInvalid
 
-	// ErrQuestionnaireStatusInvalid - 400: Invalid status transition.
-	ErrQuestionnaireStatusInvalid
+	// ErrStatusInvalid - 400: Invalid status transition.
+	ErrStatusInvalid
+
+	ErrQuestionAlreadyExists
+
+	ErrOptionEmpty
 )

@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"

@@ -12,7 +12,7 @@ import (
 
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet/port"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 )
 
@@ -40,12 +40,12 @@ func (s *AnswerSheetService) RegisterService(server *grpc.Server) {
 func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAnswerSheetRequest) (*pb.SaveAnswerSheetResponse, error) {
 	// 转换请求为 DTO
 	dto := &dto.AnswerSheetDTO{
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-		Title:                req.Title,
-		WriterID:             req.WriterId,
-		TesteeID:             req.TesteeId,
-		Answers:              s.fromProtoAnswers(req.Answers),
+		QuestionnaireCode: req.QuestionnaireCode,
+		Version:           req.Version,
+		Title:             req.Title,
+		WriterID:          req.WriterId,
+		TesteeID:          req.TesteeId,
+		Answers:           s.fromProtoAnswers(req.Answers),
 	}
 
 	// 调用领域服务
@@ -91,10 +91,10 @@ func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnsw
 func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListAnswerSheetsRequest) (*pb.ListAnswerSheetsResponse, error) {
 	// 构建过滤条件
 	filter := dto.AnswerSheetDTO{
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-		WriterID:             req.WriterId,
-		TesteeID:             req.TesteeId,
+		QuestionnaireCode: req.QuestionnaireCode,
+		Version:           req.Version,
+		WriterID:          req.WriterId,
+		TesteeID:          req.TesteeId,
 	}
 
 	// 调用领域服务
@@ -108,13 +108,13 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 	for i, sheet := range sheets {
 		// 简化的答卷信息，不包含详细答案
 		protoSheets[i] = &pb.AnswerSheet{
-			Id:                   sheet.ID.Uint64(),
-			QuestionnaireCode:    sheet.QuestionnaireCode,
-			QuestionnaireVersion: sheet.QuestionnaireVersion,
-			Title:                sheet.Title,
-			Score:                float64(sheet.Score),
-			WriterId:             sheet.WriterID,
-			TesteeId:             sheet.TesteeID,
+			Id:                sheet.ID.Uint64(),
+			QuestionnaireCode: sheet.QuestionnaireCode,
+			Version:           sheet.Version,
+			Title:             sheet.Title,
+			Score:             float64(sheet.Score),
+			WriterId:          sheet.WriterID,
+			TesteeId:          sheet.TesteeID,
 			// 列表中不返回具体答案，减少数据传输量
 			Answers:   nil,
 			CreatedAt: "", // TODO: 添加时间字段
@@ -166,18 +166,18 @@ func (s *AnswerSheetService) toProtoAnswerSheet(detail *dto.AnswerSheetDetailDTO
 	}
 
 	return &pb.AnswerSheet{
-		Id:                   detail.AnswerSheet.ID.Uint64(),
-		QuestionnaireCode:    detail.AnswerSheet.QuestionnaireCode,
-		QuestionnaireVersion: detail.AnswerSheet.QuestionnaireVersion,
-		Title:                detail.AnswerSheet.Title,
-		Score:                float64(detail.AnswerSheet.Score),
-		WriterId:             detail.AnswerSheet.WriterID,
-		WriterName:           detail.WriterName,
-		TesteeId:             detail.AnswerSheet.TesteeID,
-		TesteeName:           detail.TesteeName,
-		Answers:              answers,
-		CreatedAt:            detail.CreatedAt,
-		UpdatedAt:            detail.UpdatedAt,
+		Id:                detail.AnswerSheet.ID.Uint64(),
+		QuestionnaireCode: detail.AnswerSheet.QuestionnaireCode,
+		Version:           detail.AnswerSheet.Version,
+		Title:             detail.AnswerSheet.Title,
+		Score:             float64(detail.AnswerSheet.Score),
+		WriterId:          detail.AnswerSheet.WriterID,
+		WriterName:        detail.WriterName,
+		TesteeId:          detail.AnswerSheet.TesteeID,
+		TesteeName:        detail.TesteeName,
+		Answers:           answers,
+		CreatedAt:         detail.CreatedAt,
+		UpdatedAt:         detail.UpdatedAt,
 	}
 }
 
@@ -259,12 +259,12 @@ func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.A
 		var err error
 
 		// 设置默认问题类型（如果为空）
-		questionType := protoAnswer.QuestionType
-		if questionType == "" {
-			questionType = "Radio" // 默认为单选题
+		QuestionType := protoAnswer.QuestionType
+		if QuestionType == "" {
+			QuestionType = "Radio" // 默认为单选题
 		}
 
-		switch questionType {
+		switch QuestionType {
 		case "single_choice":
 			// 单选题答案应该是字符串
 			value = protoAnswer.Value
@@ -298,7 +298,7 @@ func (s *AnswerSheetService) fromProtoAnswers(protoAnswers []*pb.Answer) []dto.A
 
 		answers[i] = dto.AnswerDTO{
 			QuestionCode: protoAnswer.QuestionCode,
-			QuestionType: questionType,
+			QuestionType: QuestionType,
 			Score:        float64(protoAnswer.Score),
 			Value:        value,
 		}

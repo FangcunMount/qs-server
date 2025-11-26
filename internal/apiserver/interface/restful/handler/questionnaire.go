@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/mapper"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -17,18 +17,18 @@ import (
 // QuestionnaireHandler 问卷处理器
 type QuestionnaireHandler struct {
 	BaseHandler
-	questionnaireCreator   port.QuestionnaireCreator
-	questionnaireEditor    port.QuestionnaireEditor
-	questionnairePublisher port.QuestionnairePublisher
-	questionnaireQueryer   port.QuestionnaireQueryer
+	questionnaireCreator   *quesApp.Creator
+	questionnaireEditor    *quesApp.Editor
+	questionnairePublisher *quesApp.Publisher
+	questionnaireQueryer   *quesApp.Queryer
 }
 
 // NewQuestionnaireHandler 创建问卷处理器
 func NewQuestionnaireHandler(
-	questionnaireCreator port.QuestionnaireCreator,
-	questionnaireEditor port.QuestionnaireEditor,
-	questionnairePublisher port.QuestionnairePublisher,
-	questionnaireQueryer port.QuestionnaireQueryer,
+	questionnaireCreator *quesApp.Creator,
+	questionnaireEditor *quesApp.Editor,
+	questionnairePublisher *quesApp.Publisher,
+	questionnaireQueryer *quesApp.Queryer,
 ) *QuestionnaireHandler {
 	return &QuestionnaireHandler{
 		questionnaireCreator:   questionnaireCreator,

@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/questionnaire/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	quesDocInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -14,16 +14,16 @@ import (
 // Module 问卷模块
 type QuestionnaireModule struct {
 	// repository 层
-	QuesRepo port.QuestionnaireRepositoryMongo
+	QuesRepo questionnaire.Repository
 
 	// handler 层
 	QuesHandler *handler.QuestionnaireHandler
 
 	// service 层
-	QuesCreator   port.QuestionnaireCreator
-	QuesEditor    port.QuestionnaireEditor
-	QuesPublisher port.QuestionnairePublisher
-	QuesQueryer   port.QuestionnaireQueryer
+	QuesCreator   *quesApp.Creator
+	QuesEditor    *quesApp.Editor
+	QuesPublisher *quesApp.Publisher
+	QuesQueryer   *quesApp.Queryer
 }
 
 // NewModule 创建用户模块

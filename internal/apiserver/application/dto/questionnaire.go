@@ -23,7 +23,7 @@ type QuestionnaireListDTO struct {
 // QuestionDTO 用于 application 层问题组合结构
 type QuestionDTO struct {
 	Code        string      // 问题编码
-	Title       string      // 问题标题
+	Stem        string      // 题干
 	Type        string      // 问题类型
 	Tips        string      // 问题提示
 	Placeholder string      // 占位符（用于文本类型问题）
@@ -38,9 +38,9 @@ type QuestionDTO struct {
 
 // OptionDTO 用于 application 层选项组合结构
 type OptionDTO struct {
-	Code    string // 选项编码
-	Content string // 选项内容
-	Score   int    // 选项分值
+	Code    string  // 选项编码
+	Content string  // 选项内容
+	Score   float64 // 选项分值（支持小数）
 }
 
 // ValidationRuleDTO 验证规则 DTO

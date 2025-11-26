@@ -20,10 +20,10 @@ func (m *QuestionMapper) ToDTO(vm *viewmodel.QuestionDTO) *dto.QuestionDTO {
 	}
 
 	questionDTO := &dto.QuestionDTO{
-		Code:  vm.Code,
-		Type:  vm.Type,
-		Title: vm.Title,
-		Tips:  vm.Tips,
+		Code: vm.Code,
+		Type: vm.Type,
+		Stem: vm.Stem,
+		Tips: vm.Tips,
 	}
 
 	if vm.Options != nil {
@@ -63,10 +63,10 @@ func (m *QuestionMapper) ToViewModel(dto *dto.QuestionDTO) *viewmodel.QuestionDT
 	}
 
 	vm := &viewmodel.QuestionDTO{
-		Code:  dto.Code,
-		Type:  dto.Type,
-		Title: dto.Title,
-		Tips:  dto.Tips,
+		Code: dto.Code,
+		Type: dto.Type,
+		Stem: dto.Stem,
+		Tips: dto.Tips,
 	}
 
 	if dto.Options != nil {

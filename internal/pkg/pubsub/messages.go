@@ -24,12 +24,12 @@ const (
 
 // AnswersheetSavedData 答卷已保存数据
 type AnswersheetSavedData struct {
-	ResponseID           string `json:"response_id"`
-	QuestionnaireCode    string `json:"questionnaire_code"`
-	QuestionnaireVersion string `json:"questionnaire_version"`
-	AnswerSheetID        uint64 `json:"answer_sheet_id"`
-	WriterID             uint64 `json:"writer_id"`
-	SubmittedAt          int64  `json:"submitted_at"`
+	ResponseID        string `json:"response_id"`
+	QuestionnaireCode string `json:"questionnaire_code"`
+	Version           string `json:"questionnaire_version"`
+	AnswerSheetID     uint64 `json:"answer_sheet_id"`
+	WriterID          uint64 `json:"writer_id"`
+	SubmittedAt       int64  `json:"submitted_at"`
 }
 
 // AnswersheetSavedMessage 答卷已保存消息

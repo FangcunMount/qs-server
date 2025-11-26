@@ -13,12 +13,12 @@ import (
 
 // MedicalScalePO 医学量表MongoDB持久化对象
 type MedicalScalePO struct {
-	base.BaseDocument    `bson:",inline"`
-	Code                 string     `bson:"code" json:"code"`
-	Title                string     `bson:"title" json:"title"`
-	QuestionnaireCode    string     `bson:"questionnaire_code" json:"questionnaire_code"`
-	QuestionnaireVersion string     `bson:"questionnaire_version" json:"questionnaire_version"`
-	Factors              []FactorPO `bson:"factors" json:"factors"`
+	base.BaseDocument `bson:",inline"`
+	Code              string     `bson:"code" json:"code"`
+	Title             string     `bson:"title" json:"title"`
+	QuestionnaireCode string     `bson:"questionnaire_code" json:"questionnaire_code"`
+	Version           string     `bson:"questionnaire_version" json:"questionnaire_version"`
+	Factors           []FactorPO `bson:"factors" json:"factors"`
 }
 
 // CollectionName 集合名称

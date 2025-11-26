@@ -2,10 +2,10 @@ package viewmodel
 
 // QuestionDTO 问题
 type QuestionDTO struct {
-	Code  string `json:"code"`          // 问题ID，仅更新/编辑时提供
-	Type  string `json:"question_type"` // 问题题型：single_choice, multi_choice, text 等
-	Title string `json:"title"`         // 问题主标题
-	Tips  string `json:"tips"`          // 问题提示
+	Code string `json:"code"`          // 问题ID，仅更新/编辑时提供
+	Type string `json:"question_type"` // 问题题型：single_choice, multi_choice, text 等
+	Stem string `json:"stem"`          // 问题题干
+	Tips string `json:"tips"`          // 问题提示
 
 	// 特定属性
 	Placeholder string      `json:"placeholder"`       // 问题占位符
@@ -18,9 +18,9 @@ type QuestionDTO struct {
 
 // Option 选项
 type OptionDTO struct {
-	Code    string `json:"code"`    // 选项ID，仅更新/编辑时提供
-	Content string `json:"content"` // 选项内容
-	Score   int    `json:"score"`   // 选项分数
+	Code    string  `json:"code"`    // 选项ID，仅更新/编辑时提供
+	Content string  `json:"content"` // 选项内容
+	Score   float64 `json:"score"`   // 选项分数（支持小数）
 }
 
 // ValidationRule 校验规则

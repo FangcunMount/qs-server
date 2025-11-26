@@ -2,7 +2,7 @@ package assembler
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/answersheet/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"go.mongodb.org/mongo-driver/mongo"
 
