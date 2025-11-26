@@ -65,7 +65,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	qnrVer, _ := strconv.Atoi(qnr.GetVersion().Value())
 	if qnrVer != dto.QuestionnaireVer {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
-			fmt.Sprintf("问卷版本不匹配，期望: %d, 实际: %d", dto.QuestionnaireVer, qnrVer))
+			"%s", fmt.Sprintf("问卷版本不匹配，期望: %d, 实际: %d", dto.QuestionnaireVer, qnrVer))
 	}
 
 	// 验证问卷是否已发布（只能对已发布的问卷提交答卷）
@@ -93,7 +93,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		question, exists := questionMap[answerDTO.QuestionCode]
 		if !exists {
 			return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
-				fmt.Sprintf("问题 %s 不存在于问卷中", answerDTO.QuestionCode))
+				"%s", fmt.Sprintf("问题 %s 不存在于问卷中", answerDTO.QuestionCode))
 		}
 
 		// 5.2 使用工厂方法创建答案值对象
@@ -103,7 +103,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		)
 		if err != nil {
 			return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid,
-				fmt.Sprintf("创建答案值失败 [%s]", answerDTO.QuestionCode))
+				"%s", fmt.Sprintf("创建答案值失败 [%s]", answerDTO.QuestionCode))
 		}
 
 		// 5.3 验证答案值是否符合问题的校验规则
@@ -116,7 +116,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 				errMessages = append(errMessages, validationErr.GetMessage())
 			}
 			return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
-				fmt.Sprintf("问题 %s 答案验证失败: %v", answerDTO.QuestionCode, errMessages))
+				"%s", fmt.Sprintf("问题 %s 答案验证失败: %v", answerDTO.QuestionCode, errMessages))
 		}
 
 		// 5.4 创建答案对象
@@ -128,7 +128,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		)
 		if err != nil {
 			return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid,
-				fmt.Sprintf("创建答案失败 [%s]", answerDTO.QuestionCode))
+				"%s", fmt.Sprintf("创建答案失败 [%s]", answerDTO.QuestionCode))
 		}
 
 		answers = append(answers, answer)
