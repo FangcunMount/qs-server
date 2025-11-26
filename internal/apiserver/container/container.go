@@ -21,8 +21,7 @@ type Container struct {
 	mongoDB *mongo.Database
 
 	// 业务模块
-	QuestionnaireModule   *assembler.QuestionnaireModule
-	AnswersheetModule     *assembler.AnswersheetModule
+	SurveyModule          *assembler.SurveyModule // Survey 模块（包含问卷和答卷子模块）
 	MedicalScaleModule    *assembler.MedicalScaleModule
 	InterpretReportModule *assembler.InterpretReportModule
 	ActorModule           *assembler.ActorModule
@@ -46,14 +45,9 @@ func (c *Container) Initialize() error {
 		return nil
 	}
 
-	// 初始化问卷模块
-	if err := c.initQuestionnaireModule(); err != nil {
-		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
-	}
-
-	// 初始化答卷模块
-	if err := c.initAnswersheetModule(); err != nil {
-		return fmt.Errorf("failed to initialize answersheet module: %w", err)
+	// 初始化 Survey 模块（包含问卷和答卷子模块）
+	if err := c.initSurveyModule(); err != nil {
+		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
 	// 初始化医学量表模块
@@ -77,31 +71,17 @@ func (c *Container) Initialize() error {
 	return nil
 }
 
-// initQuestionnaireModule 初始化问卷模块
-func (c *Container) initQuestionnaireModule() error {
-	quesModule := assembler.NewQuestionnaireModule()
-	if err := quesModule.Initialize(c.mongoDB); err != nil {
-		return fmt.Errorf("failed to initialize questionnaire module: %w", err)
+// initSurveyModule 初始化 Survey 模块（包含问卷和答卷子模块）
+func (c *Container) initSurveyModule() error {
+	surveyModule := assembler.NewSurveyModule()
+	if err := surveyModule.Initialize(c.mongoDB); err != nil {
+		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
-	c.QuestionnaireModule = quesModule
-	modulePool["questionnaire"] = quesModule
+	c.SurveyModule = surveyModule
+	modulePool["survey"] = surveyModule
 
-	fmt.Printf("📦 Questionnaire module initialized\n")
-	return nil
-}
-
-// initAnswersheetModule 初始化答卷模块
-func (c *Container) initAnswersheetModule() error {
-	answersheetModule := assembler.NewAnswersheetModule()
-	if err := answersheetModule.Initialize(c.mongoDB); err != nil {
-		return fmt.Errorf("failed to initialize answersheet module: %w", err)
-	}
-
-	c.AnswersheetModule = answersheetModule
-	modulePool["answersheet"] = answersheetModule
-
-	fmt.Printf("📦 Answersheet module initialized\n")
+	fmt.Printf("📦 Survey module initialized (questionnaire + answersheet)\n")
 	return nil
 }
 
