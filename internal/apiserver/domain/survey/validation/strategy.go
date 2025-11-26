@@ -42,3 +42,24 @@ func RegisterStrategy(strategy ValidationStrategy) {
 func GetStrategy(ruleType RuleType) ValidationStrategy {
 	return strategyRegistry[ruleType]
 }
+
+// init 初始化时注册所有内置策略
+func init() {
+	// 注册必填策略
+	RegisterStrategy(&RequiredStrategy{})
+
+	// 注册字符串长度策略
+	RegisterStrategy(&MinLengthStrategy{})
+	RegisterStrategy(&MaxLengthStrategy{})
+
+	// 注册数值范围策略
+	RegisterStrategy(&MinValueStrategy{})
+	RegisterStrategy(&MaxValueStrategy{})
+
+	// 注册多选数量策略
+	RegisterStrategy(&MinSelectionsStrategy{})
+	RegisterStrategy(&MaxSelectionsStrategy{})
+
+	// 注册正则表达式策略
+	RegisterStrategy(&PatternStrategy{})
+}
