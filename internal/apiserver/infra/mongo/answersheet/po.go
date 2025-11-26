@@ -14,14 +14,15 @@ import (
 // AnswerSheetPO 答卷MongoDB持久化对象
 // 对应MongoDB集合结构
 type AnswerSheetPO struct {
-	base.BaseDocument `bson:",inline"`
-	QuestionnaireCode string     `bson:"questionnaire_code" json:"questionnaire_code"`
-	Version           string     `bson:"questionnaire_version" json:"questionnaire_version"`
-	Title             string     `bson:"title" json:"title"`
-	Score             float64    `bson:"score" json:"score"`
-	Answers           []AnswerPO `bson:"answers" json:"answers"`
-	Writer            *WriterPO  `bson:"writer" json:"writer"`
-	Testee            *TesteePO  `bson:"testee" json:"testee"`
+	base.BaseDocument    `bson:",inline"`
+	QuestionnaireCode    string     `bson:"questionnaire_code" json:"questionnaire_code"`
+	QuestionnaireVersion string     `bson:"questionnaire_version" json:"questionnaire_version"`
+	QuestionnaireTitle   string     `bson:"questionnaire_title" json:"questionnaire_title"`
+	FillerID             int64      `bson:"filler_id" json:"filler_id"`
+	FillerType           string     `bson:"filler_type" json:"filler_type"`
+	TotalScore           float64    `bson:"total_score" json:"total_score"`
+	FilledAt             time.Time  `bson:"filled_at" json:"filled_at"`
+	Answers              []AnswerPO `bson:"answers" json:"answers"`
 }
 
 // CollectionName 集合名称
@@ -126,51 +127,6 @@ type AnswerValuePO struct {
 
 // ToBsonM 将 AnswerValuePO 转换为 bson.M
 func (p *AnswerValuePO) ToBsonM() (bson.M, error) {
-	data, err := bson.Marshal(p)
-	if err != nil {
-		return nil, err
-	}
-
-	var result bson.M
-	err = bson.Unmarshal(data, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-// WriterPO 答卷者持久化对象
-type WriterPO struct {
-	UserID uint64 `bson:"id" json:"id"`
-}
-
-// ToBsonM 将 WriterPO 转换为 bson.M
-func (p *WriterPO) ToBsonM() (bson.M, error) {
-	data, err := bson.Marshal(p)
-	if err != nil {
-		return nil, err
-	}
-
-	var result bson.M
-	err = bson.Unmarshal(data, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-// TesteePO 被试者持久化对象
-type TesteePO struct {
-	UserID uint64 `bson:"id" json:"id"`
-	Name   string `bson:"name" json:"name"`
-	Sex    uint8  `bson:"sex" json:"sex"`
-	Age    int    `bson:"age" json:"age"`
-}
-
-// ToBsonM 将 TesteePO 转换为 bson.M
-func (p *TesteePO) ToBsonM() (bson.M, error) {
 	data, err := bson.Marshal(p)
 	if err != nil {
 		return nil, err

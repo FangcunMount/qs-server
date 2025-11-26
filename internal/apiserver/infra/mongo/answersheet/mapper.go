@@ -1,12 +1,9 @@
 package answersheet
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-
-	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
-	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user"
-	// "github.com/FangcunMount/qs-server/internal/apiserver/domain/user/role"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -25,52 +22,40 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 	}
 
 	// 转换答案
-	answers := make([]AnswerPO, 0, len(bo.GetAnswers()))
-	for _, answer := range bo.GetAnswers() {
+	answers := make([]AnswerPO, 0, len(bo.Answers()))
+	for _, answer := range bo.Answers() {
 		if po := m.mapAnswerToPO(answer); po != nil {
 			answers = append(answers, *po)
 		}
 	}
 
-	// TODO: 重构 - 使用 actor.FillerRef
-	// 临时注释掉
-	var writer *WriterPO
-	// if bo.GetWriter() != nil {
-	// 	writer = &WriterPO{
-	// 		UserID: bo.GetWriter().GetUserID().Uint64(),
-	// 	}
-	// }
+	// 获取问卷信息
+	code, version, title := bo.QuestionnaireInfo()
 
-	// TODO: 重构 - 使用 actor.TesteeRef
-	// 临时注释掉
-	var testee *TesteePO
-	// if bo.GetTestee() != nil {
-	// 	testee = &TesteePO{
-	// 		UserID: bo.GetTestee().GetUserID().Uint64(),
-	// 		Name:   bo.GetTestee().GetName(),
-	// 		Sex:    bo.GetTestee().GetSex(),
-	// 		Age:    bo.GetTestee().GetAge(),
-	// 	}
-	// }
-
-	// 创建PO对象，但不设置DomainID，让BeforeInsert方法来设置
-	po := &AnswerSheetPO{
-		QuestionnaireCode: bo.GetQuestionnaireCode(),
-		Version:           bo.GetVersion(),
-		Title:             bo.GetTitle(),
-		Score:             bo.GetScore(),
-		Answers:           answers,
-		Writer:            writer,
-		Testee:            testee,
+	// 获取填写者信息
+	filler := bo.Filler()
+	var fillerID int64
+	var fillerType string
+	if filler != nil {
+		fillerID = filler.UserID()
+		fillerType = string(filler.FillerType())
 	}
 
-	// 设置时间字段
-	po.CreatedAt = bo.GetCreatedAt()
-	po.UpdatedAt = bo.GetUpdatedAt()
+	// 创建PO对象
+	po := &AnswerSheetPO{
+		QuestionnaireCode:    code,
+		QuestionnaireVersion: version,
+		QuestionnaireTitle:   title,
+		FillerID:             fillerID,
+		FillerType:           fillerType,
+		TotalScore:           bo.Score(),
+		FilledAt:             bo.FilledAt(),
+		Answers:              answers,
+	}
 
 	// 如果领域对象有ID，则设置DomainID
-	if !bo.GetID().IsZero() {
-		po.DomainID = bo.GetID()
+	if !bo.ID().IsZero() {
+		po.DomainID = bo.ID()
 	}
 
 	return po
@@ -83,47 +68,70 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	}
 
 	// 转换答案
-	answers := make([]answer.Answer, 0, len(po.Answers))
+	answers := make([]answersheet.Answer, 0, len(po.Answers))
 	for _, answerPO := range po.Answers {
-		answers = append(answers, m.mapAnswerToBO(answerPO))
+		answer, err := m.mapAnswerToBO(answerPO)
+		if err != nil {
+			// 如果答案转换失败，跳过该答案
+			continue
+		}
+		answers = append(answers, answer)
 	}
 
-	// TODO: 重构 - 使用 actor.FillerRef 和 actor.TesteeRef
-	// 临时注释掉，直接传 nil
-
-	return answersheet.NewAnswerSheet(
+	// 构建问卷引用
+	questionnaireRef := answersheet.NewQuestionnaireRef(
 		po.QuestionnaireCode,
-		po.Version,
-		answersheet.WithID(meta.ID(po.DomainID)),
-		answersheet.WithTitle(po.Title),
-		answersheet.WithScore(po.Score),
-		answersheet.WithAnswers(answers),
-		answersheet.WithWriter(nil),
-		answersheet.WithTestee(nil),
-		answersheet.WithCreatedAt(po.CreatedAt),
-		answersheet.WithUpdatedAt(po.UpdatedAt),
+		po.QuestionnaireVersion,
+		po.QuestionnaireTitle,
+	)
+
+	// 构建填写者引用
+	filler := actor.NewFillerRef(po.FillerID, actor.FillerType(po.FillerType))
+
+	// 使用 Reconstruct 重建答卷对象
+	return answersheet.Reconstruct(
+		po.DomainID,
+		questionnaireRef,
+		filler,
+		answers,
+		po.FilledAt,
+		po.TotalScore,
 	)
 }
 
 // mapAnswerToPO 将答案领域对象转换为 AnswerPO
-func (m *AnswerSheetMapper) mapAnswerToPO(answerBO answer.Answer) *AnswerPO {
+func (m *AnswerSheetMapper) mapAnswerToPO(answerBO answersheet.Answer) *AnswerPO {
 	return &AnswerPO{
-		QuestionCode: answerBO.GetQuestionCode(),
-		QuestionType: answerBO.GetQuestionType(),
-		Score:        answerBO.GetScore(),
+		QuestionCode: answerBO.QuestionCode(),
+		QuestionType: answerBO.QuestionType(),
+		Score:        answerBO.Score(),
 		Value: AnswerValuePO{
-			Value: answerBO.GetValue().Raw(),
+			Value: answerBO.Value().Raw(),
 		},
 	}
 }
 
 // mapAnswerToBO 将 AnswerPO 转换为答案领域对象
-func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) answer.Answer {
-	ans, _ := answer.NewAnswer(
-		meta.NewCode(answerPO.QuestionCode),
+func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) (answersheet.Answer, error) {
+	// 创建答案值
+	answerValue, err := answersheet.CreateAnswerValueFromRaw(
 		questionnaire.QuestionType(answerPO.QuestionType),
-		answerPO.Score,
 		answerPO.Value.Value,
 	)
-	return ans
+	if err != nil {
+		return answersheet.Answer{}, err
+	}
+
+	// 创建答案对象（带分数）
+	answer, err := answersheet.NewAnswer(
+		meta.NewCode(answerPO.QuestionCode),
+		questionnaire.QuestionType(answerPO.QuestionType),
+		answerValue,
+		answerPO.Score,
+	)
+	if err != nil {
+		return answersheet.Answer{}, err
+	}
+
+	return answer, nil
 }
