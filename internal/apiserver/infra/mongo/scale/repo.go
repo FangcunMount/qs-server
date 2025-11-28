@@ -1,0 +1,227 @@
+package scale
+
+import (
+	"context"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+)
+
+// Repository Scale MongoDB 存储库
+type Repository struct {
+	mongoBase.BaseRepository
+	mapper *ScaleMapper
+}
+
+// NewRepository 创建 Scale MongoDB 存储库
+func NewRepository(db *mongo.Database) scale.Repository {
+	po := &ScalePO{}
+	return &Repository{
+		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),
+		mapper:         NewScaleMapper(),
+	}
+}
+
+// Create 创建量表
+func (r *Repository) Create(ctx context.Context, domain *scale.MedicalScale) error {
+	po := r.mapper.ToPO(domain)
+	po.BeforeInsert()
+
+	insertData, err := po.ToBsonM()
+	if err != nil {
+		return err
+	}
+
+	_, err = r.InsertOne(ctx, insertData)
+	return err
+}
+
+// FindByCode 根据编码查询量表
+func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	filter := bson.M{
+		"code":       code,
+		"deleted_at": nil, // 排除已软删除的记录
+	}
+
+	var po ScalePO
+	err := r.FindOne(ctx, filter, &po)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	return r.mapper.ToDomain(&po), nil
+}
+
+// FindByQuestionnaireCode 根据问卷编码查询量表
+func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+	filter := bson.M{
+		"questionnaire_code": questionnaireCode,
+		"deleted_at":         nil,
+	}
+
+	var po ScalePO
+	err := r.FindOne(ctx, filter, &po)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	return r.mapper.ToDomain(&po), nil
+}
+
+// FindList 分页查询量表列表
+func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.MedicalScale, error) {
+	filter := r.buildFilter(conditions)
+
+	// 设置分页选项
+	skip := int64((page - 1) * pageSize)
+	limit := int64(pageSize)
+	opts := options.Find().
+		SetSkip(skip).
+		SetLimit(limit).
+		SetSort(bson.D{{Key: "created_at", Value: -1}}) // 按创建时间倒序
+
+	cursor, err := r.Collection().Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var poList []ScalePO
+	if err := cursor.All(ctx, &poList); err != nil {
+		return nil, err
+	}
+
+	// 转换为领域模型
+	result := make([]*scale.MedicalScale, 0, len(poList))
+	for _, po := range poList {
+		if domain := r.mapper.ToDomain(&po); domain != nil {
+			result = append(result, domain)
+		}
+	}
+
+	return result, nil
+}
+
+// CountWithConditions 根据条件统计量表数量
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
+	filter := r.buildFilter(conditions)
+	return r.Collection().CountDocuments(ctx, filter)
+}
+
+// Update 更新量表
+func (r *Repository) Update(ctx context.Context, domain *scale.MedicalScale) error {
+	po := r.mapper.ToPO(domain)
+	po.BeforeUpdate()
+
+	filter := bson.M{
+		"code":       domain.GetCode().String(),
+		"deleted_at": nil,
+	}
+
+	updateData, err := po.ToBsonM()
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{"$set": updateData}
+
+	result, err := r.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+
+	return nil
+}
+
+// Remove 删除量表（软删除）
+func (r *Repository) Remove(ctx context.Context, code string) error {
+	filter := bson.M{
+		"code":       code,
+		"deleted_at": nil,
+	}
+
+	now := time.Now()
+	update := bson.M{
+		"$set": bson.M{
+			"deleted_at": now,
+			"updated_at": now,
+		},
+	}
+
+	result, err := r.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+
+	return nil
+}
+
+// ExistsByCode 检查编码是否存在
+func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error) {
+	filter := bson.M{
+		"code":       code,
+		"deleted_at": nil,
+	}
+
+	count, err := r.Collection().CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+// buildFilter 构建查询过滤条件
+func (r *Repository) buildFilter(conditions map[string]string) bson.M {
+	filter := bson.M{
+		"deleted_at": nil, // 排除已软删除的记录
+	}
+
+	if conditions == nil {
+		return filter
+	}
+
+	// 状态过滤
+	if status, ok := conditions["status"]; ok && status != "" {
+		// 将状态字符串转换为对应的数值
+		switch status {
+		case "草稿", "draft":
+			filter["status"] = uint8(0)
+		case "已发布", "published":
+			filter["status"] = uint8(1)
+		case "已归档", "archived":
+			filter["status"] = uint8(2)
+		}
+	}
+
+	// 标题模糊搜索
+	if title, ok := conditions["title"]; ok && title != "" {
+		filter["title"] = bson.M{"$regex": title, "$options": "i"}
+	}
+
+	// 问卷编码过滤
+	if qCode, ok := conditions["questionnaire_code"]; ok && qCode != "" {
+		filter["questionnaire_code"] = qCode
+	}
+
+	return filter
+}

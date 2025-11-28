@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -37,20 +38,20 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
-	// TODO: 初始化 repository 层（待实现 Scale Repository）
-	// m.Repo = scaleInfra.NewRepository(mongoDB)
+	// 初始化 repository 层
+	m.Repo = scaleInfra.NewRepository(mongoDB)
 
-	// TODO: 初始化 service 层（依赖 repository）
-	// m.LifecycleService = scaleApp.NewLifecycleService(m.Repo)
-	// m.FactorService = scaleApp.NewFactorService(m.Repo)
-	// m.QueryService = scaleApp.NewQueryService(m.Repo)
+	// 初始化 service 层（依赖 repository）
+	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo)
+	m.FactorService = scaleApp.NewFactorService(m.Repo)
+	m.QueryService = scaleApp.NewQueryService(m.Repo)
 
-	// TODO: 初始化 handler 层
-	// m.Handler = handler.NewScaleHandler(
-	//     m.LifecycleService,
-	//     m.FactorService,
-	//     m.QueryService,
-	// )
+	// 初始化 handler 层
+	m.Handler = handler.NewScaleHandler(
+		m.LifecycleService,
+		m.FactorService,
+		m.QueryService,
+	)
 
 	return nil
 }
