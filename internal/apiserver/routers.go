@@ -68,8 +68,11 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册答卷相关的受保护路由
 	r.registerAnswersheetProtectedRoutes(apiV1)
 
-	// 注册医学量表相关的受保护路由
+	// 注册医学量表相关的受保护路由（旧版，待废弃）
 	r.registerMedicalScaleProtectedRoutes(apiV1)
+
+	// 注册量表相关的受保护路由（重构版）
+	r.registerScaleProtectedRoutes(apiV1)
 
 	// 注册 Actor 模块相关的受保护路由
 	r.registerActorProtectedRoutes(apiV1)
@@ -150,6 +153,37 @@ func (r *Router) registerMedicalScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		medicalScales.GET("/:code", medicalScaleHandler.Get)
 		medicalScales.PUT("/:code", medicalScaleHandler.UpdateBaseInfo)
 		medicalScales.PUT("/:code/factors", medicalScaleHandler.UpdateFactor)
+	}
+}
+
+// registerScaleProtectedRoutes 注册量表相关的受保护路由（重构版）
+func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
+	scaleHandler := r.container.ScaleModule.Handler
+	if scaleHandler == nil {
+		return
+	}
+
+	scales := apiV1.Group("/scales")
+	{
+		// 生命周期管理
+		scales.POST("", scaleHandler.Create)                                 // 创建量表
+		scales.PUT("/:code/basic-info", scaleHandler.UpdateBasicInfo)        // 更新基本信息
+		scales.PUT("/:code/questionnaire", scaleHandler.UpdateQuestionnaire) // 更新关联问卷
+		scales.POST("/:code/publish", scaleHandler.Publish)                  // 发布量表
+		scales.POST("/:code/unpublish", scaleHandler.Unpublish)              // 下架量表
+		scales.POST("/:code/archive", scaleHandler.Archive)                  // 归档量表
+		scales.DELETE("/:code", scaleHandler.Delete)                         // 删除量表
+
+		// 因子管理（仅提供批量操作）
+		scales.PUT("/:code/factors", scaleHandler.ReplaceFactors)                // 批量替换因子
+		scales.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
+
+		// 查询接口
+		scales.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
+		scales.GET("", scaleHandler.List)                                    // 获取量表列表
+		scales.GET("/by-questionnaire", scaleHandler.GetByQuestionnaireCode) // 根据问卷获取量表
+		scales.GET("/published/:code", scaleHandler.GetPublishedByCode)      // 获取已发布量表
+		scales.GET("/published", scaleHandler.ListPublished)                 // 获取已发布列表
 	}
 }
 

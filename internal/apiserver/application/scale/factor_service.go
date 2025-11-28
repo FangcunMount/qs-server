@@ -234,6 +234,59 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto Upda
 	return toScaleResult(m), nil
 }
 
+// ReplaceInterpretRules 批量设置所有因子的解读规则
+func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode string, dtos []UpdateFactorInterpretRulesDTO) (*ScaleResult, error) {
+	// 1. 验证输入参数
+	if scaleCode == "" {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
+	}
+	if len(dtos) == 0 {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子解读规则列表不能为空")
+	}
+
+	// 2. 获取量表
+	m, err := s.repo.FindByCode(ctx, scaleCode)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	}
+
+	// 3. 检查量表状态
+	if m.IsArchived() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
+	}
+
+	// 4. 批量更新各因子的解读规则
+	for _, dto := range dtos {
+		if dto.FactorCode == "" {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
+		}
+
+		// 转换解读规则
+		rules := make([]scale.InterpretationRule, 0, len(dto.InterpretRules))
+		for _, ruleDTO := range dto.InterpretRules {
+			rule := scale.NewInterpretationRule(
+				scale.NewScoreRange(ruleDTO.MinScore, ruleDTO.MaxScore),
+				scale.RiskLevel(ruleDTO.RiskLevel),
+				ruleDTO.Conclusion,
+				ruleDTO.Suggestion,
+			)
+			rules = append(rules, rule)
+		}
+
+		// 更新解读规则
+		if err := s.factorManager.UpdateFactorInterpretRules(m, scale.NewFactorCode(dto.FactorCode), rules); err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新因子[%s]解读规则失败", dto.FactorCode)
+		}
+	}
+
+	// 5. 持久化
+	if err := s.repo.Update(ctx, m); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
+	}
+
+	return toScaleResult(m), nil
+}
+
 // ============= 辅助函数 =============
 
 // toFactorDomain 将 DTO 转换为因子领域对象

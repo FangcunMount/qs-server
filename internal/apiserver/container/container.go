@@ -21,8 +21,9 @@ type Container struct {
 	mongoDB *mongo.Database
 
 	// 业务模块
-	SurveyModule          *assembler.SurveyModule // Survey 模块（包含问卷和答卷子模块）
-	MedicalScaleModule    *assembler.MedicalScaleModule
+	SurveyModule          *assembler.SurveyModule       // Survey 模块（包含问卷和答卷子模块）
+	MedicalScaleModule    *assembler.MedicalScaleModule // 医学量表模块（旧版，待废弃）
+	ScaleModule           *assembler.ScaleModule        // Scale 模块（重构版）
 	InterpretReportModule *assembler.InterpretReportModule
 	ActorModule           *assembler.ActorModule
 
@@ -50,9 +51,14 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
-	// 初始化医学量表模块
+	// 初始化医学量表模块（旧版，待废弃）
 	if err := c.initMedicalScaleModule(); err != nil {
 		return fmt.Errorf("failed to initialize medical scale module: %w", err)
+	}
+
+	// 初始化 Scale 模块（重构版）
+	if err := c.initScaleModule(); err != nil {
+		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 
 	// 初始化解读报告模块
@@ -85,7 +91,7 @@ func (c *Container) initSurveyModule() error {
 	return nil
 }
 
-// initMedicalScaleModule 初始化医学量表模块
+// initMedicalScaleModule 初始化医学量表模块（旧版，待废弃）
 func (c *Container) initMedicalScaleModule() error {
 	medicalScaleModule := assembler.NewMedicalScaleModule()
 	if err := medicalScaleModule.Initialize(c.mongoDB); err != nil {
@@ -96,6 +102,20 @@ func (c *Container) initMedicalScaleModule() error {
 	modulePool["medicalscale"] = medicalScaleModule
 
 	fmt.Printf("📦 Medical scale module initialized\n")
+	return nil
+}
+
+// initScaleModule 初始化 Scale 模块（重构版）
+func (c *Container) initScaleModule() error {
+	scaleModule := assembler.NewScaleModule()
+	if err := scaleModule.Initialize(c.mongoDB); err != nil {
+		return fmt.Errorf("failed to initialize scale module: %w", err)
+	}
+
+	c.ScaleModule = scaleModule
+	modulePool["scale"] = scaleModule
+
+	fmt.Printf("📦 Scale module initialized (refactored)\n")
 	return nil
 }
 

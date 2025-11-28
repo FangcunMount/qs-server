@@ -1,0 +1,73 @@
+package request
+
+// ============= Scale Lifecycle Requests =============
+
+// CreateScaleRequest 创建量表请求
+type CreateScaleRequest struct {
+	Title                string `json:"title" valid:"required~量表标题不能为空"`
+	Description          string `json:"description"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+}
+
+// UpdateScaleBasicInfoRequest 更新量表基本信息请求
+type UpdateScaleBasicInfoRequest struct {
+	Title       string `json:"title" valid:"required~量表标题不能为空"`
+	Description string `json:"description"`
+}
+
+// UpdateScaleQuestionnaireRequest 更新量表关联问卷请求
+type UpdateScaleQuestionnaireRequest struct {
+	QuestionnaireCode    string `json:"questionnaire_code" valid:"required~问卷编码不能为空"`
+	QuestionnaireVersion string `json:"questionnaire_version" valid:"required~问卷版本不能为空"`
+}
+
+// ============= Scale Factor Requests =============
+
+// ReplaceFactorsRequest 批量替换因子请求
+type ReplaceFactorsRequest struct {
+	Factors []FactorModel `json:"factors" valid:"required~因子列表不能为空"`
+}
+
+// ReplaceInterpretRulesRequest 批量设置解读规则请求
+type ReplaceInterpretRulesRequest struct {
+	FactorRules []FactorInterpretRulesModel `json:"factor_rules" valid:"required~因子解读规则列表不能为空"`
+}
+
+// FactorInterpretRulesModel 因子解读规则模型
+type FactorInterpretRulesModel struct {
+	FactorCode     string               `json:"factor_code" valid:"required~因子编码不能为空"`
+	InterpretRules []InterpretRuleModel `json:"interpret_rules"`
+}
+
+// ============= Shared Models =============
+
+// FactorModel 因子模型（用于请求）
+type FactorModel struct {
+	Code            string               `json:"code" valid:"required~因子编码不能为空"`
+	Title           string               `json:"title" valid:"required~因子标题不能为空"`
+	FactorType      string               `json:"factor_type"`
+	IsTotalScore    bool                 `json:"is_total_score"`
+	QuestionCodes   []string             `json:"question_codes"`
+	ScoringStrategy string               `json:"scoring_strategy"`
+	ScoringParams   map[string]string    `json:"scoring_params"`
+	InterpretRules  []InterpretRuleModel `json:"interpret_rules"`
+}
+
+// InterpretRuleModel 解读规则模型（用于请求）
+type InterpretRuleModel struct {
+	MinScore   float64 `json:"min_score"`
+	MaxScore   float64 `json:"max_score"`
+	RiskLevel  string  `json:"risk_level"`
+	Conclusion string  `json:"conclusion"`
+	Suggestion string  `json:"suggestion"`
+}
+
+// ============= Query Requests =============
+
+// ListScalesRequest 查询量表列表请求
+type ListScalesRequest struct {
+	Page       int               `form:"page" valid:"required~页码不能为空"`
+	PageSize   int               `form:"page_size" valid:"required~每页数量不能为空"`
+	Conditions map[string]string `form:"conditions"`
+}

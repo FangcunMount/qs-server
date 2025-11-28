@@ -48,28 +48,33 @@ type ScaleLifecycleService interface {
 
 // ScaleFactorService 量表因子编辑服务
 // 行为者：量表因子编辑者 (Factor Editor)
-// 职责：因子的增删改、解读规则配置
+// 职责：因子的批量管理、解读规则配置
 // 变更来源：因子编辑的业务需求变化
+// 设计说明：API 层仅提供批量操作接口，内部服务保留细粒度方法供内部调用
 type ScaleFactorService interface {
-	// AddFactor 添加因子
+	// AddFactor 添加因子（内部使用）
 	// 场景：编辑者为量表添加新因子
 	AddFactor(ctx context.Context, dto AddFactorDTO) (*ScaleResult, error)
 
-	// UpdateFactor 更新因子
+	// UpdateFactor 更新因子（内部使用）
 	// 场景：编辑者修改因子标题、关联题目、计分策略
 	UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (*ScaleResult, error)
 
-	// RemoveFactor 删除因子
+	// RemoveFactor 删除因子（内部使用）
 	// 场景：编辑者从量表中移除因子
 	RemoveFactor(ctx context.Context, scaleCode, factorCode string) (*ScaleResult, error)
 
-	// ReplaceFactors 替换所有因子
+	// ReplaceFactors 批量替换所有因子
 	// 场景：编辑者一次性替换量表的所有因子（批量导入）
 	ReplaceFactors(ctx context.Context, scaleCode string, factors []FactorDTO) (*ScaleResult, error)
 
-	// UpdateFactorInterpretRules 更新因子解读规则
+	// UpdateFactorInterpretRules 更新单个因子解读规则（内部使用）
 	// 场景：编辑者为因子配置分数区间和解读文案
 	UpdateFactorInterpretRules(ctx context.Context, dto UpdateFactorInterpretRulesDTO) (*ScaleResult, error)
+
+	// ReplaceInterpretRules 批量设置所有因子的解读规则
+	// 场景：编辑者一次性设置量表所有因子的解读规则
+	ReplaceInterpretRules(ctx context.Context, scaleCode string, rules []UpdateFactorInterpretRulesDTO) (*ScaleResult, error)
 }
 
 // ScaleQueryService 量表查询服务
