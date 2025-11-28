@@ -285,6 +285,14 @@ func (o Origin) IsScreening() bool {
 	return o.originType == OriginScreening
 }
 
+// ReconstructOrigin 从持久化数据重建 Origin（用于仓储层）
+func ReconstructOrigin(originType OriginType, originID *string) Origin {
+	return Origin{
+		originType: originType,
+		originID:   originID,
+	}
+}
+
 // ==================== 因子编码（复用 scale 子域定义） ====================
 
 // FactorCode 因子编码（复用 scale 子域的定义）

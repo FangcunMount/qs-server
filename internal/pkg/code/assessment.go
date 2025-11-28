@@ -46,6 +46,9 @@ const (
 	// ErrAssessmentScoreNotFound - 404: Assessment score not found.
 	ErrAssessmentScoreNotFound
 
+	// ErrAssessmentScoreSaveFailed - 500: Failed to save assessment score.
+	ErrAssessmentScoreSaveFailed
+
 	// ErrAssessmentCreateFailed - 500: Failed to create assessment.
 	ErrAssessmentCreateFailed
 
