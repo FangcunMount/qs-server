@@ -68,10 +68,7 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册答卷相关的受保护路由
 	r.registerAnswersheetProtectedRoutes(apiV1)
 
-	// 注册医学量表相关的受保护路由（旧版，待废弃）
-	r.registerMedicalScaleProtectedRoutes(apiV1)
-
-	// 注册量表相关的受保护路由（重构版）
+	// 注册量表相关的受保护路由
 	r.registerScaleProtectedRoutes(apiV1)
 
 	// 注册 Actor 模块相关的受保护路由
@@ -140,23 +137,7 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 	}
 }
 
-// registerMedicalScaleProtectedRoutes 注册医学量表相关的受保护路由
-func (r *Router) registerMedicalScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
-	medicalScaleHandler := r.container.MedicalScaleModule.MSHandler
-	if medicalScaleHandler == nil {
-		return
-	}
-
-	medicalScales := apiV1.Group("/medical-scales")
-	{
-		medicalScales.POST("", medicalScaleHandler.Create)
-		medicalScales.GET("/:code", medicalScaleHandler.Get)
-		medicalScales.PUT("/:code", medicalScaleHandler.UpdateBaseInfo)
-		medicalScales.PUT("/:code/factors", medicalScaleHandler.UpdateFactor)
-	}
-}
-
-// registerScaleProtectedRoutes 注册量表相关的受保护路由（重构版）
+// registerScaleProtectedRoutes 注册量表相关的受保护路由
 func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 	scaleHandler := r.container.ScaleModule.Handler
 	if scaleHandler == nil {

@@ -35,11 +35,6 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
-	// 注册医学量表服务
-	if err := r.registerMedicalScaleService(); err != nil {
-		return err
-	}
-
 	// 注册解读报告服务
 	if err := r.registerInterpretReportService(); err != nil {
 		return err
@@ -87,20 +82,6 @@ func (r *GRPCRegistry) registerQuestionnaireService() error {
 	return nil
 }
 
-// registerMedicalScaleService 注册医学量表服务
-func (r *GRPCRegistry) registerMedicalScaleService() error {
-	if r.container.MedicalScaleModule == nil {
-		log.Warn("MedicalScaleModule is not initialized, skipping medical scale service registration")
-		return nil
-	}
-
-	// 创建并注册医学量表服务
-	medicalScaleService := service.NewMedicalScaleService(r.container.MedicalScaleModule.MSQueryer)
-	r.server.RegisterService(medicalScaleService)
-	log.Info("   🏥 MedicalScale service registered (read-only)")
-	return nil
-}
-
 // registerInterpretReportService 注册解读报告服务
 func (r *GRPCRegistry) registerInterpretReportService() error {
 	if r.container.InterpretReportModule == nil {
@@ -144,8 +125,8 @@ func (r *GRPCRegistry) GetRegisteredServices() []string {
 		services = append(services, "AnswerSheetService", "QuestionnaireService")
 	}
 
-	if r.container.MedicalScaleModule != nil {
-		services = append(services, "MedicalScaleService")
+	if r.container.ScaleModule != nil {
+		services = append(services, "ScaleService")
 	}
 
 	if r.container.InterpretReportModule != nil {
