@@ -1,0 +1,184 @@
+package scale
+
+// ===================== 量表状态 =================
+
+// Status 量表状态
+type Status uint8
+
+const (
+	StatusDraft     Status = 0 // 草稿
+	StatusPublished Status = 1 // 已发布
+	StatusArchived  Status = 2 // 已归档
+)
+
+// Value 获取状态值
+func (s Status) Value() uint8 {
+	return uint8(s)
+}
+
+// String 获取状态字符串
+func (s Status) String() string {
+	statusMap := map[uint8]string{
+		0: "草稿",
+		1: "已发布",
+		2: "已归档",
+	}
+	return statusMap[s.Value()]
+}
+
+// IsDraft 是否草稿状态
+func (s Status) IsDraft() bool {
+	return s == StatusDraft
+}
+
+// IsPublished 是否已发布状态
+func (s Status) IsPublished() bool {
+	return s == StatusPublished
+}
+
+// IsArchived 是否已归档状态
+func (s Status) IsArchived() bool {
+	return s == StatusArchived
+}
+
+// ===================== 因子编码 =================
+
+// FactorCode 因子编码
+type FactorCode string
+
+// NewFactorCode 创建因子编码
+func NewFactorCode(value string) FactorCode {
+	return FactorCode(value)
+}
+
+// Value 获取编码值
+func (c FactorCode) Value() string {
+	return string(c)
+}
+
+// String 获取编码字符串
+func (c FactorCode) String() string {
+	return string(c)
+}
+
+// IsEmpty 判断编码是否为空
+func (c FactorCode) IsEmpty() bool {
+	return c == ""
+}
+
+// Equals 判断编码是否相等
+func (c FactorCode) Equals(other FactorCode) bool {
+	return c == other
+}
+
+// ===================== 因子类型 =================
+
+// FactorType 因子类型
+type FactorType string
+
+const (
+	// FactorTypePrimary 一级因子
+	FactorTypePrimary FactorType = "primary"
+	// FactorTypeMultilevel 多级因子
+	FactorTypeMultilevel FactorType = "multilevel"
+)
+
+// String 返回因子类型的字符串表示
+func (ft FactorType) String() string {
+	return string(ft)
+}
+
+// IsValid 检查因子类型是否有效
+func (ft FactorType) IsValid() bool {
+	return ft == FactorTypePrimary || ft == FactorTypeMultilevel
+}
+
+// ===================== 计分策略 =================
+
+// ScoringStrategyCode 因子计分策略编码
+type ScoringStrategyCode string
+
+const (
+	// ScoringStrategySum 求和策略
+	ScoringStrategySum ScoringStrategyCode = "sum"
+	// ScoringStrategyAvg 平均策略
+	ScoringStrategyAvg ScoringStrategyCode = "avg"
+	// ScoringStrategyCustom 自定义策略
+	ScoringStrategyCustom ScoringStrategyCode = "custom"
+)
+
+// String 返回计分策略的字符串表示
+func (s ScoringStrategyCode) String() string {
+	return string(s)
+}
+
+// IsValid 检查计分策略是否有效
+func (s ScoringStrategyCode) IsValid() bool {
+	return s == ScoringStrategySum || s == ScoringStrategyAvg || s == ScoringStrategyCustom
+}
+
+// ===================== 风险等级 =================
+
+// RiskLevel 风险等级
+type RiskLevel string
+
+const (
+	// RiskLevelNone 无风险
+	RiskLevelNone RiskLevel = "none"
+	// RiskLevelLow 低风险
+	RiskLevelLow RiskLevel = "low"
+	// RiskLevelMedium 中风险
+	RiskLevelMedium RiskLevel = "medium"
+	// RiskLevelHigh 高风险
+	RiskLevelHigh RiskLevel = "high"
+	// RiskLevelSevere 严重风险
+	RiskLevelSevere RiskLevel = "severe"
+)
+
+// String 返回风险等级的字符串表示
+func (r RiskLevel) String() string {
+	return string(r)
+}
+
+// IsValid 检查风险等级是否有效
+func (r RiskLevel) IsValid() bool {
+	switch r {
+	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 分数区间 =================
+
+// ScoreRange 分数区间 [Min, Max)
+type ScoreRange struct {
+	min float64
+	max float64
+}
+
+// NewScoreRange 创建分数区间
+func NewScoreRange(min, max float64) ScoreRange {
+	return ScoreRange{min: min, max: max}
+}
+
+// Min 获取最小值
+func (r ScoreRange) Min() float64 {
+	return r.min
+}
+
+// Max 获取最大值
+func (r ScoreRange) Max() float64 {
+	return r.max
+}
+
+// Contains 判断分数是否在区间内 [min, max)
+func (r ScoreRange) Contains(score float64) bool {
+	return score >= r.min && score < r.max
+}
+
+// IsValid 检查区间是否有效
+func (r ScoreRange) IsValid() bool {
+	return r.min < r.max
+}
