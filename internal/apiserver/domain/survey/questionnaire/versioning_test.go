@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

@@ -4,7 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
-	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
