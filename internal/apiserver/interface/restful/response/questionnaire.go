@@ -1,7 +1,6 @@
 package response
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/dto"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
@@ -81,46 +80,5 @@ func NewQuestionnaireListResponseFromResult(result *questionnaire.QuestionnaireL
 	return &QuestionnaireListResponse{
 		Questionnaires: questionnaires,
 		TotalCount:     result.Total,
-	}
-}
-
-// NewQuestionnaireResponse 创建问卷响应（兼容旧版本）
-// 注意：Questions 需要在 handler 层单独映射，避免循环依赖
-func NewQuestionnaireResponse(dto *dto.QuestionnaireDTO, questions []viewmodel.QuestionDTO) *QuestionnaireResponse {
-	if dto == nil {
-		return nil
-	}
-
-	response := &QuestionnaireResponse{
-		Code:        dto.Code,
-		Title:       dto.Title,
-		Description: dto.Description,
-		ImgUrl:      dto.ImgUrl,
-		Version:     dto.Version,
-		Status:      dto.Status,
-		Questions:   questions,
-	}
-
-	return response
-}
-
-// NewQuestionnaireListResponse 创建问卷列表响应（兼容旧版本）
-// 注意：Questions 需要在 handler 层单独映射，避免循环依赖
-func NewQuestionnaireListResponse(dtos []*dto.QuestionnaireDTO, total int64, page, pageSize int) *QuestionnaireListResponse {
-	if dtos == nil {
-		return nil
-	}
-
-	questionnaires := make([]QuestionnaireResponse, len(dtos))
-	for i, dto := range dtos {
-		// 列表视图不需要详细的 Questions，传入 nil
-		questionnaires[i] = *NewQuestionnaireResponse(dto, nil)
-	}
-
-	return &QuestionnaireListResponse{
-		Questionnaires: questionnaires,
-		TotalCount:     total,
-		Page:           page,
-		PageSize:       pageSize,
 	}
 }
