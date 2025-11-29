@@ -64,29 +64,13 @@ type AssessmentManagementService interface {
 }
 
 // ==================== 评估引擎服务 ====================
-
-// EvaluationService 评估服务
+//
+// 注意：EvaluationService 已独立到 engine 包中
+// 请使用: github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine
+//
 // 行为者：评估引擎 (Evaluation Engine / qs-worker)
 // 职责：执行计分、解读、生成报告
 // 变更来源：评估算法和流程变化
-// 说明：此服务由 qs-worker 调用，消费 AssessmentSubmittedEvent
-type EvaluationService interface {
-	// Evaluate 执行评估
-	// 场景：qs-worker 消费 AssessmentSubmittedEvent 后调用
-	// 流程：
-	//   1. 加载 Assessment、MedicalScale、Questionnaire、AnswerSheet
-	//   2. 调用 calculation 功能域计算各因子得分
-	//   3. 调用 interpretation 功能域生成解读
-	//   4. 组装 EvaluationResult
-	//   5. 应用评估结果到 Assessment
-	//   6. 保存 AssessmentScore
-	//   7. 生成并保存 InterpretReport
-	Evaluate(ctx context.Context, assessmentID uint64) error
-
-	// EvaluateBatch 批量评估
-	// 场景：批量处理积压的测评任务
-	EvaluateBatch(ctx context.Context, assessmentIDs []uint64) (*BatchEvaluationResult, error)
-}
 
 // ==================== 报告服务 ====================
 

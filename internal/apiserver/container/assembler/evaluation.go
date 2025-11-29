@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -36,14 +37,16 @@ type EvaluationModule struct {
 	// 管理服务 - 服务于管理员 (Staff/Admin)
 	ManagementService assessmentApp.AssessmentManagementService
 
-	// 评估服务 - 服务于评估引擎 (qs-worker)
-	EvaluationService assessmentApp.EvaluationService
-
 	// 报告查询服务 - 服务于报告查询者
 	ReportQueryService assessmentApp.ReportQueryService
 
 	// 得分查询服务 - 服务于数据分析
 	ScoreQueryService assessmentApp.ScoreQueryService
+
+	// ==================== 评估引擎 ====================
+
+	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
+	EvaluationService engine.Service
 
 	// ==================== Report 应用服务 ====================
 
@@ -99,15 +102,25 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// 创建 AssessmentCreator（领域服务）
 	assessmentCreator := assessment.NewDefaultAssessmentCreator()
 
-	// 创建 ReportBuilder（领域服务）
-	reportBuilder := report.NewDefaultReportBuilder()
-
 	// 创建 SuggestionGenerator（领域服务）
 	suggestionGenerator := report.NewRuleBasedSuggestionGenerator()
 
 	// 创建 ReportExporter（领域服务）- 暂使用 nil，后续在 infra 层实现
 	// TODO: 在 infra 层实现真正的 ReportExporter
 	var reportExporter report.ReportExporter = nil
+
+	// ==================== 初始化评估引擎 ====================
+	// 注意：如果有 scaleRepo，则初始化 EvaluationService
+	if scaleRepo != nil {
+		reportBuilder := report.NewDefaultReportBuilder()
+		m.EvaluationService = engine.NewService(
+			m.AssessmentRepo,
+			m.ScoreRepo,
+			m.ReportRepo,
+			scaleRepo,
+			reportBuilder,
+		)
+	}
 
 	// ==================== 初始化 Report 应用服务 ====================
 
@@ -137,16 +150,6 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// 管理服务 - 服务于管理员 (Staff/Admin)
 	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo)
 
-	// 评估服务 - 服务于评估引擎 (qs-worker)
-	// 注意：如果没有 scaleRepo，评估服务将无法完整工作
-	m.EvaluationService = assessmentApp.NewEvaluationService(
-		m.AssessmentRepo,
-		m.ScoreRepo,
-		m.ReportRepo,
-		scaleRepo,
-		reportBuilder,
-	)
-
 	// 报告查询服务 - 服务于报告查询者
 	m.ReportQueryService = assessmentApp.NewReportQueryService(m.ReportRepo)
 
@@ -171,7 +174,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 func (m *EvaluationModule) SetScaleRepository(scaleRepo scale.Repository) {
 	// 重新创建需要 scaleRepo 的服务
 	reportBuilder := report.NewDefaultReportBuilder()
-	m.EvaluationService = assessmentApp.NewEvaluationService(
+	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,
 		m.ScoreRepo,
 		m.ReportRepo,

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 )
 
 // ============= Assessment 相关响应 =============
@@ -254,7 +255,7 @@ func NewAssessmentStatisticsResponse(result *assessment.AssessmentStatistics) *A
 }
 
 // NewBatchEvaluationResponse 从应用层 Result 创建批量评估响应
-func NewBatchEvaluationResponse(result *assessment.BatchEvaluationResult) *BatchEvaluationResponse {
+func NewBatchEvaluationResponse(result *engine.BatchResult) *BatchEvaluationResponse {
 	if result == nil {
 		return nil
 	}

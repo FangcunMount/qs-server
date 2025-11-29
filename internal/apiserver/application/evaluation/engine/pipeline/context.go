@@ -1,0 +1,45 @@
+package pipeline
+
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+)
+
+// Context 评估上下文
+// 在职责链中传递，携带评估所需的所有数据和中间结果
+type Context struct {
+	// 输入数据
+	Assessment   *assessment.Assessment
+	MedicalScale *scale.MedicalScale
+	// TODO: AnswerSheet 待集成 survey 域
+
+	// 中间结果（由各处理器填充）
+	FactorScores     []assessment.FactorScoreResult // 因子得分列表
+	TotalScore       float64                        // 总分
+	RiskLevel        assessment.RiskLevel           // 风险等级
+	Conclusion       string                         // 总结论
+	Suggestion       string                         // 总建议
+	EvaluationResult *assessment.EvaluationResult   // 完整评估结果
+
+	// 错误信息
+	Error error
+}
+
+// NewContext 创建评估上下文
+func NewContext(a *assessment.Assessment, medicalScale *scale.MedicalScale) *Context {
+	return &Context{
+		Assessment:   a,
+		MedicalScale: medicalScale,
+		FactorScores: make([]assessment.FactorScoreResult, 0),
+	}
+}
+
+// HasError 检查是否有错误
+func (c *Context) HasError() bool {
+	return c.Error != nil
+}
+
+// SetError 设置错误
+func (c *Context) SetError(err error) {
+	c.Error = err
+}

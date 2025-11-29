@@ -114,14 +114,6 @@ type ScaleStatistics struct {
 	AverageScore *float64 // 平均分
 }
 
-// BatchEvaluationResult 批量评估结果
-type BatchEvaluationResult struct {
-	TotalCount   int      // 总数
-	SuccessCount int      // 成功数
-	FailedCount  int      // 失败数
-	FailedIDs    []uint64 // 失败的测评ID列表
-}
-
 // ReportResult 报告结果
 type ReportResult struct {
 	AssessmentID uint64            // 测评ID
