@@ -6,10 +6,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,22 +15,19 @@ import (
 // 由 gRPC 服务处理，不在此 RESTful Handler 中实现
 
 // AnswerSheetHandler 答卷处理器
-// RESTful Handler 只处理 B端管理和评分系统的 API
+// RESTful Handler 只处理 B端管理的 API
 // C端提交相关的 API 由 gRPC 服务处理
 type AnswerSheetHandler struct {
 	BaseHandler
 	managementService answersheet.AnswerSheetManagementService
-	scoringService    answersheet.AnswerSheetScoringService
 }
 
 // NewAnswerSheetHandler 创建答卷处理器
 func NewAnswerSheetHandler(
 	managementService answersheet.AnswerSheetManagementService,
-	scoringService answersheet.AnswerSheetScoringService,
 ) *AnswerSheetHandler {
 	return &AnswerSheetHandler{
 		managementService: managementService,
-		scoringService:    scoringService,
 	}
 }
 
@@ -132,32 +127,6 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 	h.SuccessResponse(c, response.NewAnswerSheetListResponse(result))
 }
 
-// Delete 删除答卷
-// @Summary 删除答卷
-// @Description 管理员删除无效或测试的答卷
-// @Tags AnswerSheet-Management
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path int true "答卷ID"
-// @Success 200 {object} response.Response
-// @Router /api/v1/admin/answersheets/{id} [delete]
-func (h *AnswerSheetHandler) Delete(c *gin.Context) {
-	answerSheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.ErrorResponse(c, errors.WithCode(code.ErrAnswerSheetInvalid, "无效的答卷ID"))
-		return
-	}
-
-	err = h.managementService.Delete(c.Request.Context(), answerSheetID)
-	if err != nil {
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	h.SuccessResponse(c, gin.H{"message": "删除成功"})
-}
-
 // GetStatistics 获取答卷统计
 // @Summary 获取答卷统计
 // @Description 管理员查看某问卷的答卷统计数据
@@ -182,41 +151,4 @@ func (h *AnswerSheetHandler) GetStatistics(c *gin.Context) {
 	}
 
 	h.SuccessResponse(c, response.NewAnswerSheetStatisticsResponse(result))
-}
-
-// ============= Scoring API (评分系统) =============
-
-// UpdateScore 更新答卷分数
-// @Summary 更新答卷分数
-// @Description 评分系统更新答卷的各题分数和总分
-// @Tags AnswerSheet-Scoring
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 系统令牌"
-// @Param request body request.UpdateScoreRequest true "更新分数请求"
-// @Success 200 {object} response.Response{data=response.AnswerSheetResponse}
-// @Router /api/v1/system/answersheets/score [post]
-func (h *AnswerSheetHandler) UpdateScore(c *gin.Context) {
-	var req request.UpdateScoreRequest
-	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
-		return
-	}
-	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	dto := answersheet.UpdateScoreDTO{
-		AnswerSheetID: req.AnswerSheetID,
-		AnswerScores:  req.AnswerScores,
-	}
-
-	result, err := h.scoringService.UpdateScore(c.Request.Context(), dto)
-	if err != nil {
-		h.ErrorResponse(c, err)
-		return
-	}
-
-	h.SuccessResponse(c, response.NewAnswerSheetResponse(result))
 }

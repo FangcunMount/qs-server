@@ -50,7 +50,6 @@ type AnswerSheetSubModule struct {
 	// service 层 - 按行为者组织
 	SubmissionService asApp.AnswerSheetSubmissionService
 	ManagementService asApp.AnswerSheetManagementService
-	ScoringService    asApp.AnswerSheetScoringService
 }
 
 // NewSurveyModule 创建 Survey 模块
@@ -124,12 +123,10 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	// 初始化 service 层 - 按行为者组织的服务
 	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, quesRepo, validator)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
-	sub.ScoringService = asApp.NewScoringService(sub.Repo)
 
 	// 初始化 handler 层
 	sub.Handler = handler.NewAnswerSheetHandler(
 		sub.ManagementService,
-		sub.ScoringService,
 	)
 
 	return nil

@@ -99,44 +99,12 @@ func (a *AnswerSheet) AssignID(id meta.ID) {
 	a.id = id
 }
 
-// BelongsToQuestionnaire 判断是否属于指定问卷
-func (a *AnswerSheet) BelongsToQuestionnaire(code, version string) bool {
-	return a.questionnaireRef.Code() == code && a.questionnaireRef.Version() == version
-}
-
 // IsFilledBy 判断是否由指定填写者填写
 func (a *AnswerSheet) IsFilledBy(filler *actor.FillerRef) bool {
 	if a.filler == nil || filler == nil {
 		return false
 	}
 	return a.filler.UserID() == filler.UserID()
-}
-
-// FindAnswer 查找指定问题的答案
-func (a *AnswerSheet) FindAnswer(questionCode string) (Answer, bool) {
-	for _, ans := range a.answers {
-		if ans.QuestionCode() == questionCode {
-			return ans, true
-		}
-	}
-	return Answer{}, false
-}
-
-// AnswerCount 答案数量
-func (a *AnswerSheet) AnswerCount() int {
-	return len(a.answers)
-}
-
-// CalculateScore 计算总分（返回新的答卷对象，保持不可变性）
-func (a *AnswerSheet) CalculateScore() *AnswerSheet {
-	totalScore := 0.0
-	for _, ans := range a.answers {
-		totalScore += ans.Score()
-	}
-
-	newSheet := *a
-	newSheet.score = totalScore
-	return &newSheet
 }
 
 // Score 获取总分
@@ -164,24 +132,4 @@ func (a *AnswerSheet) Answers() []Answer {
 	result := make([]Answer, len(a.answers))
 	copy(result, a.answers)
 	return result
-}
-
-// FilterAnswersByType 按问题类型筛选答案
-func (a *AnswerSheet) FilterAnswersByType(questionType string) []Answer {
-	filtered := make([]Answer, 0)
-	for _, ans := range a.answers {
-		if ans.QuestionType() == questionType {
-			filtered = append(filtered, ans)
-		}
-	}
-	return filtered
-}
-
-// ScoresByQuestion 获取每个问题的得分映射
-func (a *AnswerSheet) ScoresByQuestion() map[string]float64 {
-	scoreMap := make(map[string]float64)
-	for _, ans := range a.answers {
-		scoreMap[ans.QuestionCode()] = ans.Score()
-	}
-	return scoreMap
 }

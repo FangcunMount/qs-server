@@ -132,11 +132,7 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 		// 管理接口
 		answersheets.GET("/:id", answersheetHandler.GetByID)              // 获取答卷详情
 		answersheets.GET("", answersheetHandler.List)                     // 获取答卷列表
-		answersheets.DELETE("/:id", answersheetHandler.Delete)            // 删除答卷
 		answersheets.GET("/statistics", answersheetHandler.GetStatistics) // 获取统计信息
-
-		// 评分接口
-		answersheets.PUT("/:id/score", answersheetHandler.UpdateScore) // 更新分数
 	}
 }
 

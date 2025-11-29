@@ -39,9 +39,3 @@ type ListAnswerSheetsDTO struct {
 	PageSize          int               // 每页数量
 	Conditions        map[string]string // 其他查询条件
 }
-
-// UpdateScoreDTO 更新分数 DTO
-type UpdateScoreDTO struct {
-	AnswerSheetID uint64             // 答卷ID
-	AnswerScores  map[string]float64 // 各题分数 (key: 问题编码, value: 得分)
-}

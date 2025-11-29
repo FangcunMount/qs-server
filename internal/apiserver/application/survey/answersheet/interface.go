@@ -51,14 +51,3 @@ type AnswerSheetManagementService interface {
 	// 场景：管理员查看某问卷的答卷统计数据（提交数、平均分等）
 	GetStatistics(ctx context.Context, questionnaireCode string) (*AnswerSheetStatistics, error)
 }
-
-// AnswerSheetScoringService 答卷评分服务
-// 行为者：评分系统 (Scoring System / Assessment Domain)
-// 职责：接收评分结果并保存（分数计算由 Assessment 域完成）
-// 变更来源：评分流程的变化
-type AnswerSheetScoringService interface {
-	// UpdateScore 更新答卷分数
-	// 场景：Assessment 域计算出各题分数后，调用此方法更新答卷
-	// 说明：服务内部会自动计算总分并保存
-	UpdateScore(ctx context.Context, dto UpdateScoreDTO) (*AnswerSheetResult, error)
-}
