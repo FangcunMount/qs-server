@@ -35,11 +35,6 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
-	// 注册解读报告服务
-	if err := r.registerInterpretReportService(); err != nil {
-		return err
-	}
-
 	// 注册 Actor 服务
 	if err := r.registerActorService(); err != nil {
 		return err
@@ -82,23 +77,6 @@ func (r *GRPCRegistry) registerQuestionnaireService() error {
 	return nil
 }
 
-// registerInterpretReportService 注册解读报告服务
-func (r *GRPCRegistry) registerInterpretReportService() error {
-	if r.container.InterpretReportModule == nil {
-		log.Warn("InterpretReportModule is not initialized, skipping interpret report service registration")
-		return nil
-	}
-
-	// 创建并注册解读报告服务
-	interpretReportService := service.NewInterpretReportService(
-		r.container.InterpretReportModule.IRCreator,
-		r.container.InterpretReportModule.IRQueryer,
-	)
-	r.server.RegisterService(interpretReportService)
-	log.Info("   📊 InterpretReport service registered")
-	return nil
-}
-
 // registerActorService 注册 Actor 服务
 func (r *GRPCRegistry) registerActorService() error {
 	if r.container.ActorModule == nil {
@@ -127,10 +105,6 @@ func (r *GRPCRegistry) GetRegisteredServices() []string {
 
 	if r.container.ScaleModule != nil {
 		services = append(services, "ScaleService")
-	}
-
-	if r.container.InterpretReportModule != nil {
-		services = append(services, "InterpretReportService")
 	}
 
 	if r.container.ActorModule != nil {

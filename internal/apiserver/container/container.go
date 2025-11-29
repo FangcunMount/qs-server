@@ -21,10 +21,10 @@ type Container struct {
 	mongoDB *mongo.Database
 
 	// 业务模块
-	SurveyModule          *assembler.SurveyModule // Survey 模块（包含问卷和答卷子模块）
-	ScaleModule           *assembler.ScaleModule  // Scale 模块
-	InterpretReportModule *assembler.InterpretReportModule
-	ActorModule           *assembler.ActorModule
+	SurveyModule     *assembler.SurveyModule     // Survey 模块（包含问卷和答卷子模块）
+	ScaleModule      *assembler.ScaleModule      // Scale 模块
+	ActorModule      *assembler.ActorModule      // Actor 模块
+	EvaluationModule *assembler.EvaluationModule // Evaluation 模块（测评、得分、报告）
 
 	// 容器状态
 	initialized bool
@@ -55,14 +55,14 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 
-	// 初始化解读报告模块
-	if err := c.initInterpretReportModule(); err != nil {
-		return fmt.Errorf("failed to initialize interpret report module: %w", err)
-	}
-
 	// 初始化 Actor 模块
 	if err := c.initActorModule(); err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
+	}
+
+	// 初始化 Evaluation 模块
+	if err := c.initEvaluationModule(); err != nil {
+		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
 
 	c.initialized = true
@@ -99,17 +99,6 @@ func (c *Container) initScaleModule() error {
 	return nil
 }
 
-// initInterpretReportModule 初始化解读报告模块
-func (c *Container) initInterpretReportModule() error {
-	interpretReportModule := assembler.NewInterpretReportModule(c.mongoDB)
-
-	c.InterpretReportModule = interpretReportModule
-	modulePool["interpretreport"] = interpretReportModule
-
-	fmt.Printf("📦 Interpret report module initialized\n")
-	return nil
-}
-
 // initActorModule 初始化 Actor 模块
 func (c *Container) initActorModule() error {
 	actorModule := assembler.NewActorModule()
@@ -121,6 +110,20 @@ func (c *Container) initActorModule() error {
 	modulePool["actor"] = actorModule
 
 	fmt.Printf("📦 Actor module initialized\n")
+	return nil
+}
+
+// initEvaluationModule 初始化 Evaluation 模块
+func (c *Container) initEvaluationModule() error {
+	evaluationModule := assembler.NewEvaluationModule()
+	if err := evaluationModule.Initialize(c.mysqlDB, c.mongoDB); err != nil {
+		return fmt.Errorf("failed to initialize evaluation module: %w", err)
+	}
+
+	c.EvaluationModule = evaluationModule
+	modulePool["evaluation"] = evaluationModule
+
+	fmt.Printf("📦 Evaluation module initialized\n")
 	return nil
 }
 
