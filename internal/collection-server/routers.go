@@ -1,8 +1,6 @@
 package collection
 
 import (
-	"net/http"
-
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
@@ -28,7 +26,8 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	// 注册公开路由
 	r.registerPublicRoutes(engine)
 
-	// TODO: 注册业务路由
+	// 注册业务路由
+	r.registerBusinessRoutes(engine)
 }
 
 // setupGlobalMiddleware 设置全局中间件
@@ -55,42 +54,74 @@ func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
 
 // registerPublicRoutes 注册公开路由
 func (r *Router) registerPublicRoutes(engine *gin.Engine) {
+	healthHandler := r.container.HealthHandler()
+
 	// 健康检查路由
-	engine.GET("/health", r.healthCheck)
-	engine.GET("/ping", r.ping)
+	engine.GET("/health", healthHandler.Health)
+	engine.GET("/ping", healthHandler.Ping)
 
 	// 公开的API路由
 	publicAPI := engine.Group("/api/v1/public")
 	{
-		publicAPI.GET("/info", r.getServerInfo)
+		publicAPI.GET("/info", healthHandler.Info)
 	}
 }
 
-// 公共路由处理函数
+// registerBusinessRoutes 注册业务路由
+func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
+	// TODO: 添加认证中间件
+	// 目前暂时不加认证，后续可以添加 JWT 或其他认证方式
+	api := engine.Group("/api/v1")
 
-// getServerInfo 获取服务器信息
-func (r *Router) getServerInfo(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"service":     "collection-server",
-		"version":     "2.0.0",
-		"description": "问卷收集服务",
-		"status":      "ready",
-	})
+	// 问卷相关路由
+	r.registerQuestionnaireRoutes(api)
+
+	// 答卷相关路由
+	r.registerAnswerSheetRoutes(api)
+
+	// 测评相关路由
+	r.registerEvaluationRoutes(api)
 }
 
-// healthCheck 健康检查处理函数
-func (r *Router) healthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "healthy",
-		"service": "collection-server",
-		"version": "2.0.0",
-	})
+// registerQuestionnaireRoutes 注册问卷相关路由
+func (r *Router) registerQuestionnaireRoutes(api *gin.RouterGroup) {
+	questionnaireHandler := r.container.QuestionnaireHandler()
+
+	questionnaires := api.Group("/questionnaires")
+	{
+		questionnaires.GET("", questionnaireHandler.List)
+		questionnaires.GET("/:code", questionnaireHandler.Get)
+	}
 }
 
-// ping 简单的连通性测试
-func (r *Router) ping(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "pong",
-		"service": "collection-server",
-	})
+// registerAnswerSheetRoutes 注册答卷相关路由
+func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
+	answerSheetHandler := r.container.AnswerSheetHandler()
+
+	answersheets := api.Group("/answersheets")
+	{
+		answersheets.POST("", answerSheetHandler.Submit)
+		answersheets.GET("/:id", answerSheetHandler.Get)
+	}
+}
+
+// registerEvaluationRoutes 注册测评相关路由
+func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
+	evaluationHandler := r.container.EvaluationHandler()
+
+	assessments := api.Group("/assessments")
+	{
+		// 测评列表
+		assessments.GET("", evaluationHandler.ListMyAssessments)
+		// 因子趋势（放在 :id 前面避免路由冲突）
+		assessments.GET("/trend", evaluationHandler.GetFactorTrend)
+		// 高风险因子
+		assessments.GET("/high-risk", evaluationHandler.GetHighRiskFactors)
+		// 测评详情
+		assessments.GET("/:id", evaluationHandler.GetMyAssessment)
+		// 测评得分
+		assessments.GET("/:id/scores", evaluationHandler.GetAssessmentScores)
+		// 测评报告
+		assessments.GET("/:id/report", evaluationHandler.GetAssessmentReport)
+	}
 }
