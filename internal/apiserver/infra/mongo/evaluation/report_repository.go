@@ -100,7 +100,7 @@ func (r *ReportRepository) FindByID(ctx context.Context, id report.ID) (*report.
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("报告不存在: %d", id)
+			return nil, report.ErrReportNotFound
 		}
 		return nil, fmt.Errorf("查找报告失败: %w", err)
 	}
@@ -193,7 +193,7 @@ func (r *ReportRepository) Update(ctx context.Context, rpt *report.InterpretRepo
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("报告不存在")
+		return report.ErrReportNotFound
 	}
 
 	return nil
@@ -218,7 +218,7 @@ func (r *ReportRepository) Delete(ctx context.Context, id report.ID) error {
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("报告不存在")
+		return report.ErrReportNotFound
 	}
 
 	return nil
