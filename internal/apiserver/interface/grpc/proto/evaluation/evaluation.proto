@@ -1,0 +1,223 @@
+syntax = "proto3";
+
+package evaluation;
+
+option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation";
+
+// 测评服务 - C端用户接口
+// 提供测评结果查询、报告查看等功能
+service EvaluationService {
+  // ==================== 测评查询 ====================
+  
+  // 获取我的测评详情
+  rpc GetMyAssessment(GetMyAssessmentRequest) returns (GetMyAssessmentResponse);
+  
+  // 获取我的测评列表
+  rpc ListMyAssessments(ListMyAssessmentsRequest) returns (ListMyAssessmentsResponse);
+  
+  // ==================== 得分查询 ====================
+  
+  // 获取测评得分详情
+  rpc GetAssessmentScores(GetAssessmentScoresRequest) returns (GetAssessmentScoresResponse);
+  
+  // 获取因子得分趋势
+  rpc GetFactorTrend(GetFactorTrendRequest) returns (GetFactorTrendResponse);
+  
+  // 获取高风险因子
+  rpc GetHighRiskFactors(GetHighRiskFactorsRequest) returns (GetHighRiskFactorsResponse);
+  
+  // ==================== 报告查询 ====================
+  
+  // 获取测评报告
+  rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
+  
+  // 获取我的报告列表
+  rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
+}
+
+// ==================== 通用消息类型 ====================
+
+// 测评摘要信息
+message AssessmentSummary {
+  uint64 id = 1;                      // 测评ID
+  uint64 questionnaire_id = 2;        // 问卷ID
+  string questionnaire_code = 3;      // 问卷编码
+  string questionnaire_version = 4;   // 问卷版本
+  string scale_code = 5;              // 量表编码（可选）
+  string scale_name = 6;              // 量表名称（可选）
+  string origin_type = 7;             // 来源类型：adhoc/plan/screening
+  string status = 8;                  // 状态：pending/submitted/interpreted/failed
+  double total_score = 9;             // 总分（已解读时有值）
+  string risk_level = 10;             // 风险等级（已解读时有值）
+  string created_at = 11;             // 创建时间
+  string submitted_at = 12;           // 提交时间
+  string interpreted_at = 13;         // 解读时间
+}
+
+// 测评详情
+message AssessmentDetail {
+  uint64 id = 1;
+  uint64 org_id = 2;
+  uint64 testee_id = 3;
+  uint64 questionnaire_id = 4;
+  string questionnaire_code = 5;
+  string questionnaire_version = 6;
+  uint64 answer_sheet_id = 7;
+  string scale_code = 8;
+  string scale_name = 9;
+  string origin_type = 10;
+  string origin_id = 11;
+  string status = 12;
+  double total_score = 13;
+  string risk_level = 14;
+  string created_at = 15;
+  string submitted_at = 16;
+  string interpreted_at = 17;
+  string failed_at = 18;
+  string failure_reason = 19;
+}
+
+// 因子得分
+message FactorScore {
+  string factor_code = 1;     // 因子编码
+  string factor_name = 2;     // 因子名称
+  double raw_score = 3;       // 原始分
+  string risk_level = 4;      // 风险等级
+  string conclusion = 5;      // 结论
+  string suggestion = 6;      // 建议
+  bool is_total_score = 7;    // 是否为总分因子
+}
+
+// 趋势数据点
+message TrendPoint {
+  uint64 assessment_id = 1;   // 测评ID
+  double score = 2;           // 得分
+  string risk_level = 3;      // 风险等级
+  string created_at = 4;      // 时间
+}
+
+// 维度解读
+message DimensionInterpret {
+  string factor_code = 1;     // 因子编码
+  string factor_name = 2;     // 因子名称
+  double raw_score = 3;       // 原始分
+  string risk_level = 4;      // 风险等级
+  string description = 5;     // 解读描述
+}
+
+// 测评报告
+message AssessmentReport {
+  uint64 assessment_id = 1;             // 测评ID
+  string scale_code = 2;                // 量表编码
+  string scale_name = 3;                // 量表名称
+  double total_score = 4;               // 总分
+  string risk_level = 5;                // 风险等级
+  string conclusion = 6;                // 总结论
+  repeated DimensionInterpret dimensions = 7;  // 维度解读列表
+  repeated string suggestions = 8;      // 建议列表
+  string created_at = 9;                // 创建时间
+}
+
+// ==================== 测评查询请求/响应 ====================
+
+// 获取我的测评详情请求
+message GetMyAssessmentRequest {
+  uint64 testee_id = 1;       // 受试者ID（从上下文获取）
+  uint64 assessment_id = 2;   // 测评ID
+}
+
+// 获取我的测评详情响应
+message GetMyAssessmentResponse {
+  AssessmentDetail assessment = 1;
+}
+
+// 获取我的测评列表请求
+message ListMyAssessmentsRequest {
+  uint64 testee_id = 1;       // 受试者ID（从上下文获取）
+  string status = 2;          // 状态筛选（可选）
+  int32 page = 3;             // 页码
+  int32 page_size = 4;        // 每页数量
+}
+
+// 获取我的测评列表响应
+message ListMyAssessmentsResponse {
+  repeated AssessmentSummary items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  int32 total_pages = 5;
+}
+
+// ==================== 得分查询请求/响应 ====================
+
+// 获取测评得分请求
+message GetAssessmentScoresRequest {
+  uint64 testee_id = 1;       // 受试者ID（权限校验）
+  uint64 assessment_id = 2;   // 测评ID
+}
+
+// 获取测评得分响应
+message GetAssessmentScoresResponse {
+  uint64 assessment_id = 1;
+  double total_score = 2;
+  string risk_level = 3;
+  repeated FactorScore factor_scores = 4;
+}
+
+// 获取因子趋势请求
+message GetFactorTrendRequest {
+  uint64 testee_id = 1;       // 受试者ID
+  string factor_code = 2;     // 因子编码
+  int32 limit = 3;            // 返回记录数限制
+}
+
+// 获取因子趋势响应
+message GetFactorTrendResponse {
+  uint64 testee_id = 1;
+  string factor_code = 2;
+  string factor_name = 3;
+  repeated TrendPoint data_points = 4;
+}
+
+// 获取高风险因子请求
+message GetHighRiskFactorsRequest {
+  uint64 testee_id = 1;       // 受试者ID（权限校验）
+  uint64 assessment_id = 2;   // 测评ID
+}
+
+// 获取高风险因子响应
+message GetHighRiskFactorsResponse {
+  uint64 assessment_id = 1;
+  bool has_high_risk = 2;
+  repeated FactorScore high_risk_factors = 3;
+  bool needs_urgent_care = 4;
+}
+
+// ==================== 报告查询请求/响应 ====================
+
+// 获取测评报告请求
+message GetAssessmentReportRequest {
+  uint64 testee_id = 1;       // 受试者ID（权限校验）
+  uint64 assessment_id = 2;   // 测评ID
+}
+
+// 获取测评报告响应
+message GetAssessmentReportResponse {
+  AssessmentReport report = 1;
+}
+
+// 获取我的报告列表请求
+message ListMyReportsRequest {
+  uint64 testee_id = 1;       // 受试者ID
+  int32 page = 2;             // 页码
+  int32 page_size = 3;        // 每页数量
+}
+
+// 获取我的报告列表响应
+message ListMyReportsResponse {
+  repeated AssessmentReport items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  int32 total_pages = 5;
+}

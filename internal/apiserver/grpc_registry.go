@@ -40,6 +40,11 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
+	// 注册 Evaluation 服务
+	if err := r.registerEvaluationService(); err != nil {
+		return err
+	}
+
 	log.Info("✅ All GRPC services registered successfully")
 	return nil
 }
@@ -95,6 +100,24 @@ func (r *GRPCRegistry) registerActorService() error {
 	return nil
 }
 
+// registerEvaluationService 注册测评服务
+func (r *GRPCRegistry) registerEvaluationService() error {
+	if r.container.EvaluationModule == nil {
+		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
+		return nil
+	}
+
+	// 使用 EvaluationModule 中的服务
+	evaluationService := service.NewEvaluationService(
+		r.container.EvaluationModule.SubmissionService,
+		r.container.EvaluationModule.ReportQueryService,
+		r.container.EvaluationModule.ScoreQueryService,
+	)
+	r.server.RegisterService(evaluationService)
+	log.Info("   📊 Evaluation service registered")
+	return nil
+}
+
 // GetRegisteredServices 获取已注册的服务列表
 func (r *GRPCRegistry) GetRegisteredServices() []string {
 	services := make([]string, 0)
@@ -109,6 +132,10 @@ func (r *GRPCRegistry) GetRegisteredServices() []string {
 
 	if r.container.ActorModule != nil {
 		services = append(services, "ActorService")
+	}
+
+	if r.container.EvaluationModule != nil {
+		services = append(services, "EvaluationService")
 	}
 
 	return services

@@ -23,22 +23,6 @@ protoc --proto_path=${PROTO_PATH} \
        --go-grpc_opt=paths=source_relative \
        ${PROTO_PATH}/questionnaire/questionnaire.proto
 
-# 生成 medical-scale 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/medical-scale/medical-scale.proto
-
-# 生成 interpret-report 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/interpret-report/interpret-report.proto
-
 # 生成 actor 服务代码
 protoc --proto_path=${PROTO_PATH} \
        --go_out=${GO_OUT_PATH} \
@@ -46,5 +30,13 @@ protoc --proto_path=${PROTO_PATH} \
        --go-grpc_out=${GO_OUT_PATH} \
        --go-grpc_opt=paths=source_relative \
        ${PROTO_PATH}/actor/actor.proto
+
+# 生成 evaluation 服务代码
+protoc --proto_path=${PROTO_PATH} \
+       --go_out=${GO_OUT_PATH} \
+       --go_opt=paths=source_relative \
+       --go-grpc_out=${GO_OUT_PATH} \
+       --go-grpc_opt=paths=source_relative \
+       ${PROTO_PATH}/evaluation/evaluation.proto
 
 echo "Proto files generated successfully!" 

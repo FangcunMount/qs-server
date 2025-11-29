@@ -74,6 +74,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册 Actor 模块相关的受保护路由
 	r.registerActorProtectedRoutes(apiV1)
 
+	// 注册 Evaluation 模块相关的受保护路由
+	r.registerEvaluationProtectedRoutes(apiV1)
+
 	// 管理员路由（需要额外的权限检查）
 	r.registerAdminRoutes(apiV1)
 }
@@ -190,6 +193,49 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 		staff.GET("", actorHandler.ListStaff)          // 查询员工列表
 		staff.GET("/:id", actorHandler.GetStaff)       // 获取员工详情
 		staff.DELETE("/:id", actorHandler.DeleteStaff) // 删除员工
+	}
+}
+
+// registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由
+func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
+	evalHandler := r.container.EvaluationModule.Handler
+	if evalHandler == nil {
+		return
+	}
+
+	evaluations := apiV1.Group("/evaluations")
+	{
+		// ==================== Assessment 查询路由（后台管理）====================
+		assessments := evaluations.Group("/assessments")
+		{
+			// 查询
+			assessments.GET("", evalHandler.ListAssessments)          // 查询测评列表
+			assessments.GET("/statistics", evalHandler.GetStatistics) // 获取统计数据
+			assessments.GET("/:id", evalHandler.GetAssessment)        // 获取测评详情
+
+			// 得分和报告
+			assessments.GET("/:id/scores", evalHandler.GetScores)                     // 获取测评得分
+			assessments.GET("/:id/report", evalHandler.GetReport)                     // 获取测评报告
+			assessments.GET("/:id/high-risk-factors", evalHandler.GetHighRiskFactors) // 获取高风险因子
+
+			// 管理操作
+			assessments.POST("/:id/retry", evalHandler.RetryFailed) // 重试失败的测评
+		}
+
+		// ==================== Score 相关路由 ====================
+		scores := evaluations.Group("/scores")
+		{
+			scores.GET("/trend", evalHandler.GetFactorTrend) // 获取因子趋势
+		}
+
+		// ==================== Report 相关路由 ====================
+		reports := evaluations.Group("/reports")
+		{
+			reports.GET("", evalHandler.ListReports) // 查询报告列表
+		}
+
+		// ==================== 批量操作路由 ====================
+		evaluations.POST("/batch-evaluate", evalHandler.BatchEvaluate) // 批量评估
 	}
 }
 

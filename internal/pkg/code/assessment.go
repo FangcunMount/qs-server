@@ -63,4 +63,31 @@ const (
 
 	// ErrForbidden - 403: Access denied.
 	ErrForbidden
+
+	// ErrAssessmentListFailed - 500: Failed to list assessments.
+	ErrAssessmentListFailed
+
+	// ErrAssessmentStatisticsFailed - 500: Failed to get assessment statistics.
+	ErrAssessmentStatisticsFailed
+
+	// ErrAssessmentEvaluateFailed - 500: Failed to evaluate assessment.
+	ErrAssessmentEvaluateFailed
+
+	// ErrAssessmentRetryFailed - 500: Failed to retry assessment.
+	ErrAssessmentRetryFailed
+
+	// ErrReportNotFound - 404: Report not found.
+	ErrReportNotFound
+
+	// ErrReportListFailed - 500: Failed to list reports.
+	ErrReportListFailed
+
+	// ErrScoreNotFound - 404: Score not found.
+	ErrScoreNotFound
+
+	// ErrScoreTrendFailed - 500: Failed to get score trend.
+	ErrScoreTrendFailed
+
+	// ErrScoreHighRiskFailed - 500: Failed to get high risk factors.
+	ErrScoreHighRiskFailed
 )

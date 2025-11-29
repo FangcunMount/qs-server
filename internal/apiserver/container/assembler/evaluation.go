@@ -12,12 +12,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // EvaluationModule 评估模块（测评、得分、报告）
 // 整合 evaluation 子域的所有功能
 type EvaluationModule struct {
+	// ==================== Interface 层 ====================
+	Handler *handler.EvaluationHandler
+
 	// ==================== Repository 层 ====================
 	AssessmentRepo assessment.Repository
 	ScoreRepo      assessment.ScoreRepository
@@ -150,6 +154,14 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		m.ScoreRepo,
 		m.AssessmentRepo,
+	)
+
+	// ==================== 初始化 Interface 层 ====================
+	m.Handler = handler.NewEvaluationHandler(
+		m.ManagementService,
+		m.ReportQueryService,
+		m.ScoreQueryService,
+		m.EvaluationService,
 	)
 
 	return nil
