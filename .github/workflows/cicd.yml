@@ -7,14 +7,17 @@ name: CI/CD Pipeline
 #   SVRA_HOST, SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
 #   SVRA_SUDO_PASSWORD (可选，如果 sudo 需要密码)
 #   MONGODB_HOST, MONGODB_PORT
+#   MYSQL_HOST, MYSQL_PORT (Worker 使用)
 #   REDIS_HOST, REDIS_PORT
-#   NSQ_NSQD_HOST, NSQ_NSQD_PORT
+#   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 #
 # Repository Secrets (仓库级别，敏感信息):
 #   MONGODB_USERNAME, MONGODB_PASSWORD, MONGODB_DBNAME
+#   MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DATABASE (Worker 使用)
 #   REDIS_PASSWORD
 #   JWT_SECRET
+#   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
 #   WWW_UID, WWW_GID (可选，默认 1000/1000)
 # ============================================================================
 
@@ -33,6 +36,7 @@ on:
           - all
           - apiserver
           - collection
+          - worker
 
 env:
   GO_VERSION: '1.24'
@@ -187,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [apiserver, collection]
+        service: [apiserver, collection, worker]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -219,7 +223,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [apiserver, collection]
+        service: [apiserver, collection, worker]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -246,6 +250,9 @@ jobs:
           if [ "${{ matrix.service }}" = "apiserver" ]; then
             echo "image_name=qs-apiserver" >> $GITHUB_OUTPUT
             echo "dockerfile=build/docker/Dockerfile.qs-apiserver" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.service }}" = "worker" ]; then
+            echo "image_name=qs-worker" >> $GITHUB_OUTPUT
+            echo "dockerfile=build/docker/Dockerfile.qs-worker" >> $GITHUB_OUTPUT
           else
             echo "image_name=qs-collection-server" >> $GITHUB_OUTPUT
             echo "dockerfile=build/docker/Dockerfile.collection-server" >> $GITHUB_OUTPUT
@@ -291,8 +298,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver')
     environment:
-      name: production-apiserver
-      url: https://qs-api.yangshujie.com
+      name: production
     env:
       WWW_UID: ${{ secrets.WWW_UID || '1000' }}
       WWW_GID: ${{ secrets.WWW_GID || '1000' }}
@@ -531,8 +537,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'collection')
     environment:
-      name: production-collection
-      url: https://qs-collection.yangshujie.com
+      name: production
     env:
       WWW_UID: ${{ secrets.WWW_UID || '1000' }}
       WWW_GID: ${{ secrets.WWW_GID || '1000' }}
@@ -728,9 +733,205 @@ jobs:
 
             echo "✅ ${CONTAINER_NAME} deployed"
 
+  deploy-worker:
+    name: Deploy Worker
+    needs: [docker]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' &&
+      (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'worker')
+    environment:
+      name: production
+    env:
+      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
+      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      SERVICE_NAME: qs-worker
+      IMAGE_NAME: qs-worker
+      CONTAINER_NAME: qs-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare deployment files
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
+          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
+          NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
+          NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT || 4161 }}
+          GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR || 'qs-apiserver:9090' }}
+        run: |
+          mkdir -p deploy-package/configs/env
+          cp -r configs deploy-package/
+
+          cat > deploy-package/configs/env/config.prod.env <<EOF
+          # Auto-generated production environment configuration for QS Worker
+          QS_WORKER_MONGODB_URL=mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DBNAME}?authSource=admin
+          
+          QS_WORKER_MYSQL_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+          QS_WORKER_MYSQL_USERNAME=${MYSQL_USERNAME}
+          QS_WORKER_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+          QS_WORKER_MYSQL_DATABASE=${MYSQL_DATABASE}
+          
+          QS_WORKER_MESSAGING_PROVIDER=nsq
+          QS_WORKER_NSQ_ADDR=${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}
+          QS_WORKER_NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}
+          
+          QS_WORKER_GRPC_APISERVER_ADDR=${GRPC_APISERVER_ADDR}
+          EOF
+
+          echo "=========================================="
+          echo "📋 Generated config.prod.env for Worker"
+          echo "=========================================="
+          cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g'
+          echo "=========================================="
+
+          tar -czf deploy-package.tar.gz -C deploy-package .
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-package.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ env.WWW_UID }}
+          WWW_GID: ${{ env.WWW_GID }}
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,GHCR_USERNAME,GHCR_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          script: |
+            set -Eeuo pipefail
+
+            APP_UID="${WWW_UID:-1000}"
+            APP_GID="${WWW_GID:-1000}"
+
+            # SUDO 助手
+            if sudo -n true 2>/dev/null; then
+              SUDO="sudo"
+            else
+              if [ -z "${SUDO_PASSWORD:-}" ]; then
+                echo "❌ sudo needs password." >&2
+                exit 1
+              fi
+              sudo_pw() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
+              export -f sudo_pw
+              SUDO="sudo_pw"
+              $SUDO -v || true
+            fi
+
+            echo "=========================================="
+            echo "Deploying ${CONTAINER_NAME}"
+            echo "=========================================="
+
+            # 目录准备
+            $SUDO mkdir -p /opt/qs-server/${CONTAINER_NAME}/configs/env
+            $SUDO mkdir -p /data/logs/qs-server/${CONTAINER_NAME}
+            $SUDO mkdir -p /opt/backups/qs-server/${CONTAINER_NAME}
+
+            # 备份
+            BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            if [ -d "/opt/qs-server/${CONTAINER_NAME}/configs" ] && [ "$(ls -A /opt/qs-server/${CONTAINER_NAME}/configs 2>/dev/null)" != "" ]; then
+              $SUDO tar -czf "$BACKUP_DIR/backup_${TIMESTAMP}.tar.gz" \
+                /opt/qs-server/${CONTAINER_NAME}/configs \
+                2>/dev/null || echo "No previous backup"
+            fi
+
+            # 解包
+            DEPLOY_TMP="/tmp/qs-deploy-$$"
+            mkdir -p "$DEPLOY_TMP"
+            tar -xzf /tmp/deploy-package.tar.gz -C "$DEPLOY_TMP"
+
+            $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
+            $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
+            $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
+
+            rm -rf "$DEPLOY_TMP"
+            rm -f /tmp/deploy-package.tar.gz
+
+            # 网络
+            if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
+              $SUDO docker network create qs-network
+            fi
+
+            # 登录 GHCR
+            if [ -n "${GHCR_TOKEN:-}" ]; then
+              echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
+            fi
+
+            # 拉取镜像
+            $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
+
+            # 停旧容器
+            if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
+              $SUDO docker stop ${CONTAINER_NAME} || true
+              $SUDO docker rm ${CONTAINER_NAME} || true
+            fi
+
+            # 启动 (Worker 无 HTTP 端口，无 TLS)
+            DOCKER_OPTIONS="--name ${CONTAINER_NAME} \
+              --restart unless-stopped \
+              --network qs-network \
+              --user ${APP_UID}:${APP_GID} \
+              -v /opt/qs-server/${CONTAINER_NAME}/configs:/app/configs \
+              -v /data/logs/qs-server/${CONTAINER_NAME}:/var/log/qs-server \
+              --env-file /opt/qs-server/${CONTAINER_NAME}/configs/env/config.prod.env"
+
+            $SUDO docker run -d $DOCKER_OPTIONS \
+              "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
+              --config=/app/configs/worker.prod.yaml
+
+            # Worker 无 HTTP 健康检查，检查容器是否正常运行
+            echo "Waiting for container to start..."
+            sleep 10
+            
+            if $SUDO docker ps --filter "name=${CONTAINER_NAME}" --filter "status=running" | grep -q ${CONTAINER_NAME}; then
+              echo "✅ Container is running"
+              $SUDO docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}"
+              # 检查最近日志确认无启动错误
+              echo "📋 Recent logs:"
+              $SUDO docker logs --tail 20 ${CONTAINER_NAME}
+            else
+              echo "❌ Container failed to start"
+              $SUDO docker logs --tail 100 ${CONTAINER_NAME} || true
+              exit 1
+            fi
+
+            # 清理旧备份
+            $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
+
+            echo "✅ ${CONTAINER_NAME} deployed"
+
   notify:
     name: Send Notification
-    needs: [deploy-apiserver, deploy-collection]
+    needs: [deploy-apiserver, deploy-collection, deploy-worker]
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
@@ -741,8 +942,11 @@ jobs:
           echo "=========================================="
           echo "API Server: ${{ needs.deploy-apiserver.result }}"
           echo "Collection Server: ${{ needs.deploy-collection.result }}"
+          echo "Worker: ${{ needs.deploy-worker.result }}"
           
-          if [ "${{ needs.deploy-apiserver.result }}" == "success" ] && [ "${{ needs.deploy-collection.result }}" == "success" ]; then
+          if [ "${{ needs.deploy-apiserver.result }}" == "success" ] && \
+             [ "${{ needs.deploy-collection.result }}" == "success" ] && \
+             [ "${{ needs.deploy-worker.result }}" == "success" ]; then
             echo "✅ All deployments succeeded"
           else
             echo "❌ Some deployments failed"

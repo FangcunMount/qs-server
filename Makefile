@@ -69,15 +69,15 @@ COLOR_RED := \033[31m
 # ============================================================================
 
 .PHONY: help version debug
-.PHONY: build build-all build-apiserver build-collection clean
-.PHONY: run run-all run-apiserver run-collection
-.PHONY: stop stop-all stop-apiserver stop-collection
-.PHONY: restart restart-all restart-apiserver restart-collection
-.PHONY: status status-all status-apiserver status-collection
-.PHONY: logs logs-all logs-apiserver logs-collection
+.PHONY: build build-all build-apiserver build-collection build-worker clean
+.PHONY: run run-all run-apiserver run-collection run-worker
+.PHONY: stop stop-all stop-apiserver stop-collection stop-worker
+.PHONY: restart restart-all restart-apiserver restart-collection restart-worker
+.PHONY: status status-all status-apiserver status-collection status-worker
+.PHONY: logs logs-all logs-apiserver logs-collection logs-worker
 .PHONY: health health-check
 .PHONY: check-infra check-mysql check-redis check-mongodb check-nsq
-.PHONY: dev dev-apiserver dev-collection dev-stop dev-status dev-logs
+.PHONY: dev dev-apiserver dev-collection dev-worker dev-stop dev-status dev-logs
 .PHONY: test test-unit test-coverage test-race test-bench test-all
 .PHONY: test-submit test-message-queue
 .PHONY: lint fmt fmt-check
@@ -133,8 +133,9 @@ quick-start: check-infra build-all run-all ## 快速启动 (检查环境 + 构�
 	@echo "$(COLOR_GREEN)✅ 开发环境已就绪!$(COLOR_RESET)"
 	@echo ""
 	@echo "$(COLOR_BLUE)ℹ️  已启动服务:$(COLOR_RESET)"
-	@echo "  $(COLOR_GREEN)•$(COLOR_RESET) API Server       ($(APISERVER_PORT))"
+	@echo "  $(COLOR_GREEN)•$(COLOR_RESET) API Server        ($(APISERVER_PORT))"
 	@echo "  $(COLOR_GREEN)•$(COLOR_RESET) Collection Server ($(COLLECTION_PORT))"
+	@echo "  $(COLOR_GREEN)•$(COLOR_RESET) Worker            (后台处理)"
 	@echo ""
 	@$(MAKE) status-all
 
@@ -182,6 +183,8 @@ run-all: check-infra ## 启动所有服务（先检查基础设施）
 	@$(MAKE) run-apiserver
 	@sleep 2
 	@$(MAKE) run-collection
+	@sleep 2
+	@$(MAKE) run-worker
 	@echo "$(COLOR_GREEN)✅ 所有服务已启动$(COLOR_RESET)"
 	@echo ""
 	@$(MAKE) status-all
@@ -242,6 +245,7 @@ stop: stop-all ## 停止所有服务
 
 stop-all: ## 停止所有服务
 	@echo "⏹️  停止所有服务..."
+	@$(MAKE) stop-worker
 	@$(MAKE) stop-collection
 	@$(MAKE) stop-apiserver
 	@echo "✅ 所有服务已停止"
@@ -332,6 +336,7 @@ status-all: ## 查看所有服务状态
 	@echo "============"
 	@$(MAKE) status-apiserver
 	@$(MAKE) status-collection
+	@$(MAKE) status-worker
 
 status-apiserver: ## 查看 API 服务器状态
 	@if [ -f $(PID_DIR)/apiserver.pid ]; then \
@@ -357,12 +362,24 @@ status-collection: ## 查看 Collection 服务器状态
 		echo "⚪ collection-server - 未运行"; \
 	fi
 
+status-worker: ## 查看 Worker 服务状态
+	@if [ -f $(PID_DIR)/worker.pid ]; then \
+		PID=$$(cat $(PID_DIR)/worker.pid); \
+		if kill -0 $$PID 2>/dev/null; then \
+			echo "✅ qs-worker         - 运行中 (PID: $$PID)"; \
+		else \
+			echo "❌ qs-worker         - 已停止 (PID 文件存在但进程不存在)"; \
+		fi; \
+	else \
+		echo "⚪ qs-worker         - 未运行"; \
+	fi
+
 logs: logs-all ## 查看所有日志
 
 logs-all: ## 查看所有服务日志
 	@echo "📋 查看所有服务日志..."
 	@echo "使用 Ctrl+C 退出"
-	@tail -f $(LOG_DIR)/apiserver.log $(LOG_DIR)/collection-server.log
+	@tail -f $(LOG_DIR)/apiserver.log $(LOG_DIR)/collection-server.log $(LOG_DIR)/worker.log
 
 logs-apiserver: ## 查看 API 服务器日志
 	@echo "📋 查看 qs-apiserver 日志..."
@@ -371,6 +388,10 @@ logs-apiserver: ## 查看 API 服务器日志
 logs-collection: ## 查看 Collection 服务器日志
 	@echo "📋 查看 collection-server 日志..."
 	@tail -f $(LOG_DIR)/collection-server.log
+
+logs-worker: ## 查看 Worker 服务日志
+	@echo "📋 查看 qs-worker 日志..."
+	@tail -f $(LOG_DIR)/worker.log
 
 # ============================================================================
 # 健康检查
@@ -383,6 +404,12 @@ health-check: ## 检查所有服务健康状态
 	@echo "============"
 	@echo -n "qs-apiserver:      "; curl -s http://localhost:$(APISERVER_PORT)/healthz || echo "❌ 无响应"
 	@echo -n "collection-server: "; curl -s http://localhost:$(COLLECTION_PORT)/healthz || echo "❌ 无响应"
+	@echo -n "qs-worker:         "; \
+		if [ -f $(PID_DIR)/worker.pid ] && kill -0 $$(cat $(PID_DIR)/worker.pid) 2>/dev/null; then \
+			echo "✅ 运行中 (后台消费者)"; \
+		else \
+			echo "❌ 未运行"; \
+		fi
 
 # ============================================================================
 # 基础设施检查
@@ -416,6 +443,9 @@ dev: ## 启动开发环境（热更新）
 	@echo "启动 collection-server..."
 	@air -c .air-collection.toml & echo $$! > $(PID_DIR)/air-collection.pid
 	@sleep 2
+	@echo "启动 qs-worker..."
+	@air -c .air-worker.toml & echo $$! > $(PID_DIR)/air-worker.pid
+	@sleep 2
 	@echo "✅ 所有服务已启动（热更新模式）"
 	@echo "提示：使用 Ctrl+C 停止所有服务"
 	@echo "      或使用 make dev-stop 停止服务"
@@ -430,8 +460,17 @@ dev-collection: ## 独立启动 Collection 服务器（热更新）
 	@mkdir -p $(PID_DIR)
 	@air -c .air-collection.toml
 
+dev-worker: ## 独立启动 Worker 服务（热更新）
+	@echo "🚀 启动 qs-worker 开发环境..."
+	@mkdir -p $(PID_DIR)
+	@air -c .air-worker.toml
+
 dev-stop: ## 停止开发环境
 	@echo "⏹️  停止开发环境..."
+	@if [ -f $(PID_DIR)/air-worker.pid ]; then \
+		kill $$(cat $(PID_DIR)/air-worker.pid) 2>/dev/null || true; \
+		rm -f $(PID_DIR)/air-worker.pid; \
+	fi
 	@if [ -f $(PID_DIR)/air-collection.pid ]; then \
 		kill $$(cat $(PID_DIR)/air-collection.pid) 2>/dev/null || true; \
 		rm -f $(PID_DIR)/air-collection.pid; \
@@ -454,6 +493,11 @@ dev-status: ## 查看开发环境状态
 		echo "✅ collection-server - 运行中 (PID: $$(cat $(PID_DIR)/air-collection.pid))"; \
 	else \
 		echo "⚪ collection-server - 未运行"; \
+	fi
+	@if [ -f $(PID_DIR)/air-worker.pid ] && kill -0 $$(cat $(PID_DIR)/air-worker.pid) 2>/dev/null; then \
+		echo "✅ qs-worker         - 运行中 (PID: $$(cat $(PID_DIR)/air-worker.pid))"; \
+	else \
+		echo "⚪ qs-worker         - 未运行"; \
 	fi
 
 dev-logs: ## 查看开发环境日志

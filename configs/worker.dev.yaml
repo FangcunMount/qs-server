@@ -1,30 +1,83 @@
+# ============================================================================
 # qs-worker 开发环境配置
+# ============================================================================
+# Worker 服务 - 负责后台任务处理、事件消费
+# 主要职责：
+#   1. 消费消息队列中的领域事件
+#   2. 执行测评计算、缓存刷新等后台任务
+#   3. 调用 apiserver gRPC 服务完成业务操作
+# ============================================================================
+
+# 服务配置
 server:
-  mode: debug
+  mode: debug  # server mode: release, debug, test
 
-log:
-  level: debug
-  format: text
-
-mysql:
-  host: 127.0.0.1:3306
-  username: root
-  password: root
-  database: qingshan_dev
-
-mongodb:
-  url: mongodb://localhost:27017/qingshan_dev
-
-messaging:
-  provider: nsq
-  nsq-addr: 127.0.0.1:4150
-  nsq-lookupd-addr: 127.0.0.1:4161
-  rabbitmq-url: amqp://guest:guest@localhost:5672/
-
-grpc:
-  apiserver-addr: 127.0.0.1:9090
-
+# ============================================================================
+# Worker 配置
+# ============================================================================
 worker:
-  concurrency: 5
-  max-retries: 3
-  service-name: qs-worker
+  service-name: "qs-worker"   # 服务名称（用于日志和监控）
+  concurrency: 5              # 并发处理数（开发环境适度）
+  max-retries: 3              # 最大重试次数
+
+# ============================================================================
+# 消息队列配置
+# ============================================================================
+messaging:
+  provider: nsq               # 消息队列提供者: nsq, rabbitmq
+  # NSQ 配置（开发环境默认）
+  nsq-addr: "127.0.0.1:4150"           # NSQ Daemon 地址
+  nsq-lookupd-addr: "127.0.0.1:4161"   # NSQ Lookupd 地址
+  # RabbitMQ 配置（可选）
+  rabbitmq-url: "amqp://guest:guest@localhost:5672/"
+
+# ============================================================================
+# gRPC 客户端配置
+# ============================================================================
+grpc:
+  apiserver-addr: "127.0.0.1:9090"  # qs-apiserver gRPC 地址
+
+# ============================================================================
+# MySQL 数据库配置
+# ============================================================================
+mysql:
+  host: "127.0.0.1:3306"          # MySQL 服务器地址
+  username: "app_user"             # 数据库用户名
+  password: "dev_app_pass_123"     # 数据库密码
+  database: "questionnaire_scale"  # 数据库名称
+  max-idle-connections: 10         # 最大空闲连接数
+  max-open-connections: 50         # 最大打开连接数
+  max-connection-life-time: "1h"   # 连接最大生存时间
+  log-level: 4                     # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
+
+# ============================================================================
+# MongoDB 数据库配置
+# ============================================================================
+mongodb:
+  url: "mongodb://app_user:dev_app_pass_123@127.0.0.1:27017/questionnaire_scale?authSource=admin"
+  use-ssl: false
+  ssl-insecure-skip-verify: false
+  ssl-allow-invalid-hostnames: false
+  ssl-ca-file: ""
+  ssl-pem-keyfile: ""
+
+# ============================================================================
+# 日志配置（开发环境 - 控制台友好）
+# ============================================================================
+log:
+  disable-caller: false         # 开发环境显示调用者信息
+  disable-stacktrace: false     # 开发环境显示堆栈
+  level: debug                  # 日志级别: debug, info, warn, error, fatal, panic
+  format: console               # 日志格式: console(开发), json(生产)
+  enable-color: true            # 开发环境启用颜色
+  development: true             # 开发模式
+  name: "qs-worker"             # 日志名称
+  max-size: 100                 # 单个日志文件最大 100MB
+  max-age: 7                    # 保留 7 天
+  max-backups: 3                # 保留 3 个备份文件
+  compress: false               # 开发环境不压缩
+  output-paths:
+    - stdout
+  error-output-paths:
+    - stderr
+

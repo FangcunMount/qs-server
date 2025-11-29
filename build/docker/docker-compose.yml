@@ -81,6 +81,51 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ===================================
+  # QS Worker
+  # ===================================
+  qs-worker:
+    build:
+      context: ../../
+      dockerfile: build/docker/Dockerfile.qs-worker
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME}
+        GIT_COMMIT: ${GIT_COMMIT}
+        GIT_BRANCH: ${GIT_BRANCH:-main}
+    image: qs-worker:${VERSION:-latest}
+    container_name: qs-worker
+    restart: unless-stopped
+    command: ["/app/qs-worker", "--config=/app/configs/worker.prod.yaml"]
+    volumes:
+      - ../../configs/worker.prod.yaml:/app/configs/worker.prod.yaml:ro
+      - worker-logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - ENV=${ENV:-prod}
+      # 消息队列配置
+      - MESSAGING_PROVIDER=${MESSAGING_PROVIDER:-nsq}
+      - NSQ_ADDR=${NSQ_ADDR:-nsq:4150}
+      - NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_ADDR:-nsqlookupd:4161}
+      - RABBITMQ_URL=${RABBITMQ_URL:-}
+      # gRPC 客户端配置
+      - GRPC_APISERVER_ADDR=${GRPC_APISERVER_ADDR:-qs-apiserver:9090}
+      # 数据库配置
+      - MYSQL_HOST=${MYSQL_HOST:-mysql}
+      - MYSQL_USER=${MYSQL_USER:-app_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-questionnaire_scale}
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongo:27017/questionnaire_scale}
+    networks:
+      - qs-network
+    depends_on:
+      - qs-apiserver
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 # ===================================
 # 网络配置
 # ===================================
@@ -97,3 +142,5 @@ volumes:
     name: qs-apiserver-logs
   collection-logs:
     name: qs-collection-logs
+  worker-logs:
+    name: qs-worker-logs

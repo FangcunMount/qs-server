@@ -1,0 +1,65 @@
+# ===================================
+# 构建阶段
+# ===================================
+FROM golang:1.24.0-alpine AS builder
+
+# 设置工作目录
+WORKDIR /build
+
+# 安装必要的构建工具
+RUN apk add --no-cache git make gcc musl-dev
+
+# 复制 go.mod 和 go.sum 文件
+COPY go.mod go.sum ./
+
+# 下载依赖
+RUN go mod download
+
+# 复制项目源代码
+COPY . .
+
+# 构建二进制文件
+ARG VERSION=dev
+ARG BUILD_TIME
+ARG GIT_COMMIT
+ARG GIT_BRANCH=main
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags "-s -w \
+    -X github.com/FangcunMount/qs-server/pkg/version.GitVersion=${VERSION} \
+    -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GIT_COMMIT} \
+    -X github.com/FangcunMount/qs-server/pkg/version.GitBranch=${GIT_BRANCH} \
+    -X github.com/FangcunMount/qs-server/pkg/version.BuildDate=${BUILD_TIME}" \
+    -o /build/bin/qs-worker \
+    ./cmd/qs-worker/main.go
+
+# ===================================
+# 运行阶段
+# ===================================
+FROM alpine:3.21
+
+# 安装必要的运行时依赖
+RUN apk add --no-cache ca-certificates tzdata
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 创建应用用户
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+# 设置工作目录
+WORKDIR /app
+
+# 创建必要的目录
+RUN mkdir -p /app/configs /app/logs && \
+    chown -R appuser:appuser /app
+
+# 从构建阶段复制二进制文件
+COPY --from=builder /build/bin/qs-worker /app/qs-worker
+
+# 切换到非 root 用户
+USER appuser
+
+# 默认命令
+CMD ["/app/qs-worker", "--config=/app/configs/worker.prod.yaml"]

@@ -7,7 +7,8 @@
 ## 文件说明
 
 - `Dockerfile.qs-apiserver` - QS API Server 的 Dockerfile
-- `Dockerfile.collection-server` - Collection Server 的 Dockerfile  
+- `Dockerfile.collection-server` - Collection Server 的 Dockerfile
+- `Dockerfile.qs-worker` - QS Worker 的 Dockerfile
 - `docker-compose.yml` - Docker Compose 编排文件
 - `.dockerignore` - Docker 构建时忽略的文件
 
@@ -19,9 +20,13 @@
    - 宿主机映射: 8081 (HTTP) / 8444 (HTTPS) → 容器 8080/8443
    - 健康检查: http://localhost:8081/health
 
-2. **collection-server** - 数据采集服务
+2. **collection-server** - 数据采集服务（BFF）
    - 宿主机映射: 8082 (HTTP) / 8445 (HTTPS) → 容器 8080/8443
    - 健康检查: http://localhost:8082/health
+
+3. **qs-worker** - 后台任务处理服务
+   - 无 HTTP 端口（消息队列消费者）
+   - 依赖 qs-apiserver 的 gRPC 服务
 
 ### 依赖说明
 
@@ -62,6 +67,7 @@ docker-compose build
 # 或者单独构建某个服务
 docker-compose build qs-apiserver
 docker-compose build collection-server
+docker-compose build qs-worker
 ```
 
 ### 3. 启动服务
@@ -77,6 +83,7 @@ docker-compose ps
 docker-compose logs -f
 docker-compose logs -f qs-apiserver
 docker-compose logs -f collection-server
+docker-compose logs -f qs-worker
 ```
 
 ### 4. 停止服务
@@ -102,6 +109,8 @@ configs/
 ├── apiserver.prod.yaml         # QS API Server 生产配置
 ├── collection-server.dev.yaml  # Collection Server 开发配置
 ├── collection-server.prod.yaml # Collection Server 生产配置
+├── worker.dev.yaml             # QS Worker 开发配置
+├── worker.prod.yaml            # QS Worker 生产配置
 └── cert/                       # SSL 证书目录
 ```
 
@@ -135,8 +144,10 @@ configs/
 ## 数据持久化
 
 日志文件通过数据卷持久化：
+
 - `qs-apiserver-logs` - API Server 日志
 - `qs-collection-logs` - Collection Server 日志
+- `qs-worker-logs` - Worker 日志
 
 ## 健康检查
 

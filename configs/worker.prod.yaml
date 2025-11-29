@@ -1,30 +1,85 @@
+# ============================================================================
 # qs-worker 生产环境配置
+# ============================================================================
+# Worker 服务 - 负责后台任务处理、事件消费
+# ============================================================================
+
+# 服务配置
 server:
-  mode: release
+  mode: release  # server mode: release, debug, test
 
-log:
-  level: info
-  format: json
+# ============================================================================
+# Worker 配置
+# ============================================================================
+worker:
+  service-name: "qs-worker"   # 服务名称（用于日志和监控）
+  concurrency: 10             # 并发处理数（生产环境提高）
+  max-retries: 5              # 最大重试次数
 
+# ============================================================================
+# 消息队列配置
+# ============================================================================
+messaging:
+  provider: ${MESSAGING_PROVIDER}  # 消息队列提供者: nsq, rabbitmq
+  nsq-addr: ${NSQ_ADDR}
+  nsq-lookupd-addr: ${NSQ_LOOKUPD_ADDR}
+  rabbitmq-url: ${RABBITMQ_URL}
+
+# ============================================================================
+# gRPC 客户端配置
+# ============================================================================
+grpc:
+  apiserver-addr: ${GRPC_APISERVER_ADDR}  # qs-apiserver gRPC 地址
+
+# ============================================================================
+# MySQL 数据库配置
+# ============================================================================
 mysql:
   host: ${MYSQL_HOST}:3306
   username: ${MYSQL_USER}
   password: ${MYSQL_PASSWORD}
   database: ${MYSQL_DATABASE}
+  max-idle-connections: 20
+  max-open-connections: 100
+  max-connection-life-time: "1h"
+  log-level: 2  # 生产环境只记录 Error
 
+# ============================================================================
+# MongoDB 数据库配置
+# ============================================================================
 mongodb:
   url: ${MONGODB_URL}
+  use-ssl: ${MONGODB_USE_SSL}
+  ssl-insecure-skip-verify: false
+  ssl-allow-invalid-hostnames: false
+  ssl-ca-file: ${MONGODB_SSL_CA_FILE}
+  ssl-pem-keyfile: ${MONGODB_SSL_PEM_KEYFILE}
 
-messaging:
-  provider: ${MESSAGING_PROVIDER}
-  nsq-addr: ${NSQ_ADDR}
-  nsq-lookupd-addr: ${NSQ_LOOKUPD_ADDR}
-  rabbitmq-url: ${RABBITMQ_URL}
-
-grpc:
-  apiserver-addr: ${GRPC_APISERVER_ADDR}
-
-worker:
-  concurrency: 10
-  max-retries: 5
-  service-name: qs-worker
+# ============================================================================
+# 日志配置（生产环境 - JSON 格式便于采集）
+# ============================================================================
+log:
+  disable-caller: true          # 生产环境禁用调用者信息（性能优化）
+  disable-stacktrace: true      # 仅在 panic 时记录堆栈
+  level: info                   # 日志级别: debug, info, warn, error, fatal, panic
+  format: json                  # 日志格式: console(开发), json(生产)
+  enable-color: false           # 生产环境禁用颜色
+  development: false            # 生产模式
+  name: "qs-worker"             # 日志名称
+  max-size: 100                 # 单个日志文件最大 100MB
+  max-age: 30                   # 保留 30 天
+  max-backups: 10               # 保留 10 个备份文件
+  compress: true                # 压缩旧文件节省空间
+  enable-time-rotation: true
+  time-rotation-format: "2006-01-02"
+  enable-level-output: true
+  level-output-mode: "duplicate"
+  level-output-paths:
+    all:
+      - stdout
+      - /data/logs/qs/qs-worker.log
+    warn:
+      - /data/logs/qs/qs-worker-warn.log
+    error:
+      - stderr
+      - /data/logs/qs/qs-worker-error.log
