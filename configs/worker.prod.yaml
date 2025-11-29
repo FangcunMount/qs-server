@@ -1,0 +1,30 @@
+# qs-worker 生产环境配置
+server:
+  mode: release
+
+log:
+  level: info
+  format: json
+
+mysql:
+  host: ${MYSQL_HOST}:3306
+  username: ${MYSQL_USER}
+  password: ${MYSQL_PASSWORD}
+  database: ${MYSQL_DATABASE}
+
+mongodb:
+  url: ${MONGODB_URL}
+
+messaging:
+  provider: ${MESSAGING_PROVIDER}
+  nsq-addr: ${NSQ_ADDR}
+  nsq-lookupd-addr: ${NSQ_LOOKUPD_ADDR}
+  rabbitmq-url: ${RABBITMQ_URL}
+
+grpc:
+  apiserver-addr: ${GRPC_APISERVER_ADDR}
+
+worker:
+  concurrency: 10
+  max-retries: 5
+  service-name: qs-worker

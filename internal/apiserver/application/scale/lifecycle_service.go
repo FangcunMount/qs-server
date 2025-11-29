@@ -2,27 +2,31 @@ package scale
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // lifecycleService 量表生命周期服务实现
 // 行为者：量表设计者/管理员
 type lifecycleService struct {
-	repo      scale.Repository
-	lifecycle scale.Lifecycle
-	baseInfo  scale.BaseInfo
+	repo           scale.Repository
+	lifecycle      scale.Lifecycle
+	baseInfo       scale.BaseInfo
+	eventPublisher event.EventPublisher
 }
 
 // NewLifecycleService 创建量表生命周期服务
-func NewLifecycleService(repo scale.Repository) ScaleLifecycleService {
+func NewLifecycleService(repo scale.Repository, eventPublisher event.EventPublisher) ScaleLifecycleService {
 	return &lifecycleService{
-		repo:      repo,
-		lifecycle: scale.NewLifecycle(),
-		baseInfo:  scale.BaseInfo{},
+		repo:           repo,
+		lifecycle:      scale.NewLifecycle(),
+		baseInfo:       scale.BaseInfo{},
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -153,6 +157,18 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*ScaleResu
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
 	}
 
+	// 5. 发布量表发布事件（异步通知缓存更新）
+	if s.eventPublisher != nil {
+		publishEvent := scale.NewScalePublishedEvent(
+			uint64(m.GetID()),
+			m.GetCode().String(),
+			m.GetQuestionnaireVersion(),
+			m.GetTitle(),
+			time.Now(),
+		)
+		_ = s.eventPublisher.Publish(ctx, publishEvent)
+	}
+
 	return toScaleResult(m), nil
 }
 
@@ -179,6 +195,17 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*ScaleRe
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
 	}
 
+	// 5. 发布量表下架事件（异步通知缓存清除）
+	if s.eventPublisher != nil {
+		unpublishEvent := scale.NewScaleUnpublishedEvent(
+			uint64(m.GetID()),
+			m.GetCode().String(),
+			m.GetQuestionnaireVersion(),
+			time.Now(),
+		)
+		_ = s.eventPublisher.Publish(ctx, unpublishEvent)
+	}
+
 	return toScaleResult(m), nil
 }
 
@@ -203,6 +230,17 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*ScaleResu
 	// 4. 持久化
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
+	}
+
+	// 5. 发布量表归档事件（异步通知清除缓存和规则）
+	if s.eventPublisher != nil {
+		archiveEvent := scale.NewScaleArchivedEvent(
+			uint64(m.GetID()),
+			m.GetCode().String(),
+			m.GetQuestionnaireVersion(),
+			time.Now(),
+		)
+		_ = s.eventPublisher.Publish(ctx, archiveEvent)
 	}
 
 	return toScaleResult(m), nil

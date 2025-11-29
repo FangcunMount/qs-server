@@ -2,19 +2,22 @@ package questionnaire
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // lifecycleService 问卷生命周期服务实现
 // 行为者：问卷设计者/管理员
 type lifecycleService struct {
-	repo      questionnaire.Repository
-	validator questionnaire.Validator
-	lifecycle questionnaire.Lifecycle
+	repo           questionnaire.Repository
+	validator      questionnaire.Validator
+	lifecycle      questionnaire.Lifecycle
+	eventPublisher event.EventPublisher
 }
 
 // NewLifecycleService 创建问卷生命周期服务
@@ -22,11 +25,13 @@ func NewLifecycleService(
 	repo questionnaire.Repository,
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
+	eventPublisher event.EventPublisher,
 ) QuestionnaireLifecycleService {
 	return &lifecycleService{
-		repo:      repo,
-		validator: validator,
-		lifecycle: lifecycle,
+		repo:           repo,
+		validator:      validator,
+		lifecycle:      lifecycle,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -162,6 +167,19 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
+	// 7. 发布问卷发布事件（异步通知缓存更新）
+	if s.eventPublisher != nil {
+		publishEvent := questionnaire.NewQuestionnairePublishedEvent(
+			uint64(q.GetID()),
+			q.GetCode().String(),
+			q.GetVersion().String(),
+			q.GetTitle(),
+			time.Now(),
+		)
+		// 事件发布失败不影响主流程，仅记录日志
+		_ = s.eventPublisher.Publish(ctx, publishEvent)
+	}
+
 	return toQuestionnaireResult(q), nil
 }
 
@@ -196,6 +214,17 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
+	// 6. 发布问卷下架事件（异步通知缓存清除）
+	if s.eventPublisher != nil {
+		unpublishEvent := questionnaire.NewQuestionnaireUnpublishedEvent(
+			uint64(q.GetID()),
+			q.GetCode().String(),
+			q.GetVersion().String(),
+			time.Now(),
+		)
+		_ = s.eventPublisher.Publish(ctx, unpublishEvent)
+	}
+
 	return toQuestionnaireResult(q), nil
 }
 
@@ -225,6 +254,17 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 	// 5. 持久化
 	if err := s.repo.Update(ctx, q); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
+	}
+
+	// 6. 发布问卷归档事件（异步通知清除所有版本缓存）
+	if s.eventPublisher != nil {
+		archiveEvent := questionnaire.NewQuestionnaireArchivedEvent(
+			uint64(q.GetID()),
+			q.GetCode().String(),
+			q.GetVersion().String(),
+			time.Now(),
+		)
+		_ = s.eventPublisher.Publish(ctx, archiveEvent)
 	}
 
 	return toQuestionnaireResult(q), nil

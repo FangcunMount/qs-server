@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
-	"github.com/FangcunMount/qs-server/pkg/pubsub"
 	"github.com/spf13/pflag"
 )
 
@@ -133,18 +132,6 @@ func (j *JWTOptions) AddFlags(fs *pflag.FlagSet) {
 		"The secret key for JWT token signing.")
 	fs.IntVar(&j.TokenDuration, "jwt.token-duration", j.TokenDuration,
 		"The duration of JWT token in hours.")
-}
-
-// ToPubSubConfig 将RedisOptions转换为pubsub.Config
-func (o *Options) ToPubSubConfig() *pubsub.Config {
-	addr := fmt.Sprintf("%s:%d", o.Redis.Host, o.Redis.Port)
-	config := pubsub.DefaultConfig()
-	config.Addr = addr
-	config.Password = o.Redis.Password
-	config.DB = o.Redis.Database
-	config.ConsumerGroup = "collection-server-group"
-	config.Consumer = "collection-server-consumer"
-	return config
 }
 
 // Complete 完成配置选项

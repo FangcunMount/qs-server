@@ -13,6 +13,7 @@ import (
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // SurveyModule Survey 模块（问卷&答卷）
@@ -92,8 +93,11 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database) error
 	lifecycle := questionnaire.NewLifecycle()
 	questionMgr := questionnaire.QuestionManager{}
 
+	// 初始化事件发布器（当前使用空实现，后续可注入实际实现）
+	eventPublisher := event.NewNopEventPublisher()
+
 	// 初始化 service 层 - 按行为者组织的服务
-	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle)
+	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
 	sub.QueryService = quesApp.NewQueryService(sub.Repo)
 

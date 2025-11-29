@@ -3,8 +3,10 @@ package pubsub
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
-	"github.com/FangcunMount/qs-server/pkg/pubsub"
+	"github.com/FangcunMount/qs-server/pkg/messaging"
+	"github.com/google/uuid"
 )
 
 // 消息类型常量
@@ -22,6 +24,72 @@ const (
 	SourceEvaluationServer = "evaluation-server"
 )
 
+// ==================== 基础消息封装 ====================
+
+// BaseMessage 基础消息（封装 pkg/messaging.Message）
+// 提供与旧接口兼容的消息结构
+type BaseMessage struct {
+	Type      string      `json:"type"`      // 消息类型
+	Source    string      `json:"source"`    // 消息来源
+	Timestamp time.Time   `json:"timestamp"` // 消息时间戳
+	Data      interface{} `json:"data"`      // 消息数据
+}
+
+// NewBaseMessage 创建基础消息
+func NewBaseMessage(msgType, source string, data interface{}) *BaseMessage {
+	return &BaseMessage{
+		Type:      msgType,
+		Source:    source,
+		Timestamp: time.Now(),
+		Data:      data,
+	}
+}
+
+// GetType 获取消息类型
+func (m *BaseMessage) GetType() string {
+	return m.Type
+}
+
+// GetSource 获取消息来源
+func (m *BaseMessage) GetSource() string {
+	return m.Source
+}
+
+// GetTimestamp 获取消息时间戳
+func (m *BaseMessage) GetTimestamp() time.Time {
+	return m.Timestamp
+}
+
+// GetData 获取消息数据
+func (m *BaseMessage) GetData() interface{} {
+	return m.Data
+}
+
+// Marshal 序列化消息
+func (m *BaseMessage) Marshal() ([]byte, error) {
+	return json.Marshal(m)
+}
+
+// ToMessagingMessage 转换为 pkg/messaging.Message
+func (m *BaseMessage) ToMessagingMessage() *messaging.Message {
+	payload, _ := json.Marshal(m)
+	msg := messaging.NewMessage(uuid.New().String(), payload)
+	msg.Metadata["type"] = m.Type
+	msg.Metadata["source"] = m.Source
+	return msg
+}
+
+// UnmarshalBaseMessage 反序列化消息
+func UnmarshalBaseMessage(data []byte) (*BaseMessage, error) {
+	var msg BaseMessage
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// ==================== 具体消息类型 ====================
+
 // AnswersheetSavedData 答卷已保存数据
 type AnswersheetSavedData struct {
 	ResponseID        string `json:"response_id"`
@@ -34,14 +102,14 @@ type AnswersheetSavedData struct {
 
 // AnswersheetSavedMessage 答卷已保存消息
 type AnswersheetSavedMessage struct {
-	*pubsub.BaseMessage
+	*BaseMessage
 	AnswersheetData *AnswersheetSavedData `json:"answersheet_data"`
 }
 
 // NewAnswersheetSavedMessage 创建答卷已保存消息
 func NewAnswersheetSavedMessage(source string, data *AnswersheetSavedData) *AnswersheetSavedMessage {
 	return &AnswersheetSavedMessage{
-		BaseMessage:     pubsub.NewBaseMessage(MessageTypeAnswersheetSaved, source, data),
+		BaseMessage:     NewBaseMessage(MessageTypeAnswersheetSaved, source, data),
 		AnswersheetData: data,
 	}
 }
@@ -72,14 +140,14 @@ type EvaluationCompletedData struct {
 
 // EvaluationCompletedMessage 评估完成消息
 type EvaluationCompletedMessage struct {
-	*pubsub.BaseMessage
+	*BaseMessage
 	EvaluationData *EvaluationCompletedData `json:"evaluation_data"`
 }
 
 // NewEvaluationCompletedMessage 创建评估完成消息
 func NewEvaluationCompletedMessage(source string, data *EvaluationCompletedData) *EvaluationCompletedMessage {
 	return &EvaluationCompletedMessage{
-		BaseMessage:    pubsub.NewBaseMessage(MessageTypeEvaluationCompleted, source, data),
+		BaseMessage:    NewBaseMessage(MessageTypeEvaluationCompleted, source, data),
 		EvaluationData: data,
 	}
 }
@@ -109,14 +177,14 @@ type ReportGeneratedData struct {
 
 // ReportGeneratedMessage 报告生成消息
 type ReportGeneratedMessage struct {
-	*pubsub.BaseMessage
+	*BaseMessage
 	ReportData *ReportGeneratedData `json:"report_data"`
 }
 
 // NewReportGeneratedMessage 创建报告生成消息
 func NewReportGeneratedMessage(source string, data *ReportGeneratedData) *ReportGeneratedMessage {
 	return &ReportGeneratedMessage{
-		BaseMessage: pubsub.NewBaseMessage(MessageTypeReportGenerated, source, data),
+		BaseMessage: NewBaseMessage(MessageTypeReportGenerated, source, data),
 		ReportData:  data,
 	}
 }
@@ -135,6 +203,15 @@ func UnmarshalReportGeneratedMessage(data []byte) (*ReportGeneratedMessage, erro
 	return &msg, nil
 }
 
+// Message 消息接口
+type Message interface {
+	GetType() string
+	GetSource() string
+	GetTimestamp() time.Time
+	GetData() interface{}
+	Marshal() ([]byte, error)
+}
+
 // MessageFactory 消息工厂
 type MessageFactory struct{}
 
@@ -144,7 +221,7 @@ func NewMessageFactory() *MessageFactory {
 }
 
 // CreateMessage 根据类型创建消息
-func (f *MessageFactory) CreateMessage(msgType string, data []byte) (pubsub.Message, error) {
+func (f *MessageFactory) CreateMessage(msgType string, data []byte) (Message, error) {
 	switch msgType {
 	case MessageTypeAnswersheetSaved:
 		return UnmarshalAnswersheetSavedMessage(data)
@@ -154,14 +231,14 @@ func (f *MessageFactory) CreateMessage(msgType string, data []byte) (pubsub.Mess
 		return UnmarshalReportGeneratedMessage(data)
 	default:
 		// 对于未知类型，返回基础消息
-		return pubsub.UnmarshalMessage(data)
+		return UnmarshalBaseMessage(data)
 	}
 }
 
 // ParseMessage 解析原始消息数据
-func (f *MessageFactory) ParseMessage(data []byte) (pubsub.Message, error) {
+func (f *MessageFactory) ParseMessage(data []byte) (Message, error) {
 	// 先解析基础消息以获取类型
-	baseMsg, err := pubsub.UnmarshalMessage(data)
+	baseMsg, err := UnmarshalBaseMessage(data)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +248,7 @@ func (f *MessageFactory) ParseMessage(data []byte) (pubsub.Message, error) {
 }
 
 // GetAnswersheetSavedData 从基础消息中提取答卷已保存数据
-func GetAnswersheetSavedData(msg pubsub.Message) (*AnswersheetSavedData, error) {
+func GetAnswersheetSavedData(msg Message) (*AnswersheetSavedData, error) {
 	// 尝试从 answersheet_data 字段获取数据
 	if answersheetMsg, ok := msg.(*AnswersheetSavedMessage); ok {
 		return answersheetMsg.AnswersheetData, nil

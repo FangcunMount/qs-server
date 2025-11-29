@@ -9,6 +9,7 @@ import (
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // ScaleModule Scale 模块（量表子域）
@@ -41,8 +42,11 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 	// 初始化 repository 层
 	m.Repo = scaleInfra.NewRepository(mongoDB)
 
+	// 初始化事件发布器（当前使用空实现，后续可注入实际实现）
+	eventPublisher := event.NewNopEventPublisher()
+
 	// 初始化 service 层（依赖 repository）
-	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo)
+	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, eventPublisher)
 	m.FactorService = scaleApp.NewFactorService(m.Repo)
 	m.QueryService = scaleApp.NewQueryService(m.Repo)
 

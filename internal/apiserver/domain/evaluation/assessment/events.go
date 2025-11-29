@@ -1,58 +1,23 @@
 package assessment
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/google/uuid"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// DomainEvent 领域事件接口
-type DomainEvent interface {
-	// EventID 事件唯一标识
-	EventID() string
+// 重新导出共享内核的 DomainEvent 接口
+// 这样 assessment 包的使用者无需直接依赖 shared/event 包
+type DomainEvent = event.DomainEvent
 
-	// EventType 事件类型
-	EventType() string
+// AggregateTypeName Assessment 聚合根类型名称
+const AggregateTypeName = "Assessment"
 
-	// OccurredAt 事件发生时间
-	OccurredAt() time.Time
-
-	// AggregateID 聚合根ID
-	AggregateID() ID
-}
-
-// ==================== 事件基类 ====================
-
-// baseEvent 事件基类
-type baseEvent struct {
-	eventID    string
-	eventType  string
-	occurredAt time.Time
-}
-
-// newBaseEvent 创建事件基类
-func newBaseEvent(eventType string) baseEvent {
-	return baseEvent{
-		eventID:    uuid.New().String(),
-		eventType:  eventType,
-		occurredAt: time.Now(),
-	}
-}
-
-// EventID 获取事件ID
-func (e baseEvent) EventID() string {
-	return e.eventID
-}
-
-// EventType 获取事件类型
-func (e baseEvent) EventType() string {
-	return e.eventType
-}
-
-// OccurredAt 获取事件发生时间
-func (e baseEvent) OccurredAt() time.Time {
-	return e.occurredAt
+// newBaseEvent 创建事件基类（内部辅助函数）
+func newBaseEvent(eventType string, assessmentID ID) event.BaseEvent {
+	return event.NewBaseEvent(eventType, AggregateTypeName, strconv.FormatInt(int64(assessmentID), 10))
 }
 
 // ==================== AssessmentSubmittedEvent ====================
@@ -62,7 +27,7 @@ func (e baseEvent) OccurredAt() time.Time {
 // - qs-worker 消费此事件，触发评估流程
 // - 通知服务消费此事件，发送"答卷已提交"通知
 type AssessmentSubmittedEvent struct {
-	baseEvent
+	event.BaseEvent
 
 	assessmentID     ID
 	testeeID         testee.ID
@@ -82,7 +47,7 @@ func NewAssessmentSubmittedEvent(
 	submittedAt time.Time,
 ) *AssessmentSubmittedEvent {
 	return &AssessmentSubmittedEvent{
-		baseEvent:        newBaseEvent("assessment.submitted"),
+		BaseEvent:        newBaseEvent("assessment.submitted", assessmentID),
 		assessmentID:     assessmentID,
 		testeeID:         testeeID,
 		questionnaireRef: questionnaireRef,
@@ -90,11 +55,6 @@ func NewAssessmentSubmittedEvent(
 		medicalScaleRef:  medicalScaleRef,
 		submittedAt:      submittedAt,
 	}
-}
-
-// AggregateID 获取聚合根ID
-func (e *AssessmentSubmittedEvent) AggregateID() ID {
-	return e.assessmentID
 }
 
 // AssessmentID 获取测评ID
@@ -140,7 +100,7 @@ func (e *AssessmentSubmittedEvent) NeedsEvaluation() bool {
 // - 预警服务消费此事件，对高风险案例发送预警
 // - 统计服务消费此事件，更新实时统计数据
 type AssessmentInterpretedEvent struct {
-	baseEvent
+	event.BaseEvent
 
 	assessmentID    ID
 	testeeID        testee.ID
@@ -160,7 +120,7 @@ func NewAssessmentInterpretedEvent(
 	interpretedAt time.Time,
 ) *AssessmentInterpretedEvent {
 	return &AssessmentInterpretedEvent{
-		baseEvent:       newBaseEvent("assessment.interpreted"),
+		BaseEvent:       newBaseEvent("assessment.interpreted", assessmentID),
 		assessmentID:    assessmentID,
 		testeeID:        testeeID,
 		medicalScaleRef: medicalScaleRef,
@@ -168,11 +128,6 @@ func NewAssessmentInterpretedEvent(
 		riskLevel:       riskLevel,
 		interpretedAt:   interpretedAt,
 	}
-}
-
-// AggregateID 获取聚合根ID
-func (e *AssessmentInterpretedEvent) AggregateID() ID {
-	return e.assessmentID
 }
 
 // AssessmentID 获取测评ID
@@ -218,7 +173,7 @@ func (e *AssessmentInterpretedEvent) IsHighRisk() bool {
 // - 监控服务统计失败率
 // - 通知服务发送失败通知（可选）
 type AssessmentFailedEvent struct {
-	baseEvent
+	event.BaseEvent
 
 	assessmentID ID
 	testeeID     testee.ID
@@ -234,17 +189,12 @@ func NewAssessmentFailedEvent(
 	failedAt time.Time,
 ) *AssessmentFailedEvent {
 	return &AssessmentFailedEvent{
-		baseEvent:    newBaseEvent("assessment.failed"),
+		BaseEvent:    newBaseEvent("assessment.failed", assessmentID),
 		assessmentID: assessmentID,
 		testeeID:     testeeID,
 		reason:       reason,
 		failedAt:     failedAt,
 	}
-}
-
-// AggregateID 获取聚合根ID
-func (e *AssessmentFailedEvent) AggregateID() ID {
-	return e.assessmentID
 }
 
 // AssessmentID 获取测评ID

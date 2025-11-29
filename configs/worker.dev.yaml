@@ -1,0 +1,30 @@
+# qs-worker 开发环境配置
+server:
+  mode: debug
+
+log:
+  level: debug
+  format: text
+
+mysql:
+  host: 127.0.0.1:3306
+  username: root
+  password: root
+  database: qingshan_dev
+
+mongodb:
+  url: mongodb://localhost:27017/qingshan_dev
+
+messaging:
+  provider: nsq
+  nsq-addr: 127.0.0.1:4150
+  nsq-lookupd-addr: 127.0.0.1:4161
+  rabbitmq-url: amqp://guest:guest@localhost:5672/
+
+grpc:
+  apiserver-addr: 127.0.0.1:9090
+
+worker:
+  concurrency: 5
+  max-retries: 3
+  service-name: qs-worker

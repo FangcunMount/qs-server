@@ -6,7 +6,7 @@ import (
 
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/pkg/pubsub"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // EventPublishHandler 事件发布处理器
@@ -21,26 +21,17 @@ import (
 // - 统计服务：更新实时统计数据
 type EventPublishHandler struct {
 	*BaseHandler
-	publisher pubsub.Publisher
-	topic     string
+	publisher event.EventPublisher
 }
 
 // EventPublishHandlerOption 事件发布处理器选项
 type EventPublishHandlerOption func(*EventPublishHandler)
 
-// WithTopic 设置事件主题
-func WithTopic(topic string) EventPublishHandlerOption {
-	return func(h *EventPublishHandler) {
-		h.topic = topic
-	}
-}
-
 // NewEventPublishHandler 创建事件发布处理器
-func NewEventPublishHandler(publisher pubsub.Publisher, opts ...EventPublishHandlerOption) *EventPublishHandler {
+func NewEventPublishHandler(publisher event.EventPublisher, opts ...EventPublishHandlerOption) *EventPublishHandler {
 	h := &EventPublishHandler{
 		BaseHandler: NewBaseHandler("EventPublishHandler"),
 		publisher:   publisher,
-		topic:       "assessment.interpreted", // 默认主题
 	}
 
 	for _, opt := range opts {
@@ -59,11 +50,11 @@ func (h *EventPublishHandler) Handle(ctx context.Context, evalCtx *Context) erro
 	}
 
 	// 构建领域事件
-	event := h.buildEvent(evalCtx)
+	domainEvent := h.buildEvent(evalCtx)
 
 	// 发布事件
 	if h.publisher != nil {
-		if err := h.publisher.Publish(ctx, h.topic, event); err != nil {
+		if err := h.publisher.Publish(ctx, domainEvent); err != nil {
 			// 事件发布失败不应该中断整个流程
 			// 记录错误但继续执行（可以通过重试机制补偿）
 			log.Warnf("failed to publish AssessmentInterpretedEvent for assessment %d: %v",

@@ -34,17 +34,20 @@ COVERAGE_DIR := coverage
 # 服务配置
 APISERVER_BIN := $(BIN_DIR)/qs-apiserver
 COLLECTION_BIN := $(BIN_DIR)/collection-server
+WORKER_BIN := $(BIN_DIR)/qs-worker
 
 # 根据 ENV 选择配置与端口（默认 dev）
 ifeq ($(ENV),prod)
   APISERVER_CONFIG := configs/apiserver.prod.yaml
   COLLECTION_CONFIG := configs/collection-server.prod.yaml
+  WORKER_CONFIG := configs/worker.prod.yaml
   # 宿主机端口为避免与已部署的 IAM 冲突，统一后移一位
   APISERVER_PORT := 8081
   COLLECTION_PORT := 8082
 else
   APISERVER_CONFIG := configs/apiserver.dev.yaml
   COLLECTION_CONFIG := configs/collection-server.dev.yaml
+  WORKER_CONFIG := configs/worker.dev.yaml
   APISERVER_PORT := 18082
   COLLECTION_PORT := 18083
 endif
@@ -146,6 +149,7 @@ build-all: ## 构建所有服务
 	@$(MAKE) create-dirs
 	@$(MAKE) build-apiserver
 	@$(MAKE) build-collection
+	@$(MAKE) build-worker
 	@echo "$(COLOR_GREEN)✅ 所有服务构建完成$(COLOR_RESET)"
 
 build-apiserver: ## 构建 API 服务器
@@ -159,6 +163,12 @@ build-collection: ## 构建 Collection 服务器
 	@$(MAKE) create-dirs
 	@$(GO_BUILD) $(GO_LDFLAGS) -o $(COLLECTION_BIN) ./cmd/collection-server/
 	@echo "$(COLOR_GREEN)✅ Collection 服务器构建完成: $(COLLECTION_BIN)$(COLOR_RESET)"
+
+build-worker: ## 构建 Worker 服务
+	@echo "$(COLOR_BLUE)🔨 构建 Worker 服务...$(COLOR_RESET)"
+	@$(MAKE) create-dirs
+	@$(GO_BUILD) $(GO_LDFLAGS) -o $(WORKER_BIN) ./cmd/qs-worker/
+	@echo "$(COLOR_GREEN)✅ Worker 服务构建完成: $(WORKER_BIN)$(COLOR_RESET)"
 
 # ============================================================================
 # 服务运行管理
@@ -208,6 +218,22 @@ run-collection: ## 启动 Collection 服务器
 	@nohup ./$(COLLECTION_BIN) --config=$(COLLECTION_CONFIG) > $(LOG_DIR)/collection-server.log 2>&1 & echo $$! > $(PID_DIR)/collection.pid
 	@echo "✅ collection-server 已启动 (PID: $$(cat $(PID_DIR)/collection.pid))"
 
+run-worker: ## 启动 Worker 服务
+	@echo "🚀 启动 qs-worker..."
+	@$(MAKE) create-dirs
+	@if [ -f $(PID_DIR)/worker.pid ]; then \
+		echo "⚠️  qs-worker 可能已在运行 (PID: $$(cat $(PID_DIR)/worker.pid))"; \
+		if ! kill -0 $$(cat $(PID_DIR)/worker.pid) 2>/dev/null; then \
+			echo "🧹 清理无效的 PID 文件"; \
+			rm -f $(PID_DIR)/worker.pid; \
+		else \
+			echo "❌ qs-worker 已在运行，请先停止"; \
+			exit 1; \
+		fi; \
+	fi
+	@nohup ./$(WORKER_BIN) --config=$(WORKER_CONFIG) > $(LOG_DIR)/worker.log 2>&1 & echo $$! > $(PID_DIR)/worker.pid
+	@echo "✅ qs-worker 已启动 (PID: $$(cat $(PID_DIR)/worker.pid))"
+
 # ============================================================================
 # 服务停止管理
 # ============================================================================
@@ -250,6 +276,21 @@ stop-collection: ## 停止 Collection 服务器
 		echo "ℹ️  collection-server 未运行"; \
 	fi
 
+stop-worker: ## 停止 Worker 服务
+	@echo "⏹️  停止 qs-worker..."
+	@if [ -f $(PID_DIR)/worker.pid ]; then \
+		PID=$$(cat $(PID_DIR)/worker.pid); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID && echo "✅ qs-worker 已停止 (PID: $$PID)"; \
+			rm -f $(PID_DIR)/worker.pid; \
+		else \
+			echo "⚠️  qs-worker 进程不存在，清理 PID 文件"; \
+			rm -f $(PID_DIR)/worker.pid; \
+		fi; \
+	else \
+		echo "ℹ️  qs-worker 未运行"; \
+	fi
+
 # ============================================================================
 # 服务重启管理
 # ============================================================================
@@ -273,6 +314,12 @@ restart-collection: ## 重启 Collection 服务器
 	@$(MAKE) stop-collection
 	@sleep 1
 	@$(MAKE) run-collection
+
+restart-worker: ## 重启 Worker 服务
+	@echo "🔄 重启 qs-worker..."
+	@$(MAKE) stop-worker
+	@sleep 1
+	@$(MAKE) run-worker
 
 # ============================================================================
 # 服务状态和日志
