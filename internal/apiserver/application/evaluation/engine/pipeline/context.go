@@ -3,6 +3,7 @@ package pipeline
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 )
 
 // Context 评估上下文
@@ -11,7 +12,7 @@ type Context struct {
 	// 输入数据
 	Assessment   *assessment.Assessment
 	MedicalScale *scale.MedicalScale
-	// TODO: AnswerSheet 待集成 survey 域
+	AnswerSheet  *answersheet.AnswerSheet // 答卷数据
 
 	// 中间结果（由各处理器填充）
 	FactorScores     []assessment.FactorScoreResult // 因子得分列表
@@ -26,10 +27,15 @@ type Context struct {
 }
 
 // NewContext 创建评估上下文
-func NewContext(a *assessment.Assessment, medicalScale *scale.MedicalScale) *Context {
+func NewContext(
+	a *assessment.Assessment,
+	medicalScale *scale.MedicalScale,
+	answerSheet *answersheet.AnswerSheet,
+) *Context {
 	return &Context{
 		Assessment:   a,
 		MedicalScale: medicalScale,
+		AnswerSheet:  answerSheet,
 		FactorScores: make([]assessment.FactorScoreResult, 0),
 	}
 }

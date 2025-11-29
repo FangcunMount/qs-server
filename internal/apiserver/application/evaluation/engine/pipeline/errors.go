@@ -39,4 +39,13 @@ var (
 
 	// ErrAnswerSheetRefRequired 答卷引用不能为空
 	ErrAnswerSheetRefRequired = NewHandlerError("answer sheet reference is required")
+
+	// ErrMedicalScaleNotPublished 量表未发布
+	ErrMedicalScaleNotPublished = NewHandlerError("medical scale is not published")
+
+	// ErrMedicalScaleQuestionnaireMismatch 量表与问卷不匹配
+	ErrMedicalScaleQuestionnaireMismatch = NewHandlerError("medical scale does not match the questionnaire")
+
+	// ErrAnswerSheetNotFound 答卷未找到
+	ErrAnswerSheetNotFound = NewHandlerError("answer sheet not found")
 )

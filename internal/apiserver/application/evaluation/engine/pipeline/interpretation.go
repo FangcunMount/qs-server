@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -77,8 +78,8 @@ func (h *InterpretationHandler) generateFactorInterpretations(evalCtx *Context) 
 	updatedScores := make([]assessment.FactorScoreResult, 0, len(evalCtx.FactorScores))
 
 	for _, fs := range evalCtx.FactorScores {
-		// 根据因子的风险等级生成结论和建议
-		conclusion, suggestion := h.interpretFactor(fs.FactorName, fs.RiskLevel, fs.RawScore)
+		// 尝试从量表获取因子的解读规则
+		conclusion, suggestion := h.interpretFactorWithRules(evalCtx, fs)
 
 		updatedScore := assessment.NewFactorScoreResult(
 			fs.FactorCode,
@@ -95,10 +96,29 @@ func (h *InterpretationHandler) generateFactorInterpretations(evalCtx *Context) 
 	evalCtx.FactorScores = updatedScores
 }
 
-// interpretFactor 解读单个因子
-func (h *InterpretationHandler) interpretFactor(factorName string, riskLevel assessment.RiskLevel, score float64) (conclusion, suggestion string) {
-	// TODO: 根据因子类型和量表规则生成更精确的解读
-	// 当前使用通用模板
+// interpretFactorWithRules 使用量表规则解读因子
+func (h *InterpretationHandler) interpretFactorWithRules(evalCtx *Context, fs assessment.FactorScoreResult) (conclusion, suggestion string) {
+	// 优先使用量表中定义的解读规则
+	if evalCtx.MedicalScale != nil {
+		scaleFactorCode := scale.NewFactorCode(string(fs.FactorCode))
+		if factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode); found {
+			if rule := factor.FindInterpretRule(fs.RawScore); rule != nil {
+				conclusion = rule.GetConclusion()
+				suggestion = rule.GetSuggestion()
+				// 如果规则中有具体的结论和建议，直接使用
+				if conclusion != "" && suggestion != "" {
+					return conclusion, suggestion
+				}
+			}
+		}
+	}
+
+	// 使用默认模板生成解读
+	return h.interpretFactorDefault(fs.FactorName, fs.RiskLevel, fs.RawScore)
+}
+
+// interpretFactorDefault 使用默认模板解读因子
+func (h *InterpretationHandler) interpretFactorDefault(factorName string, riskLevel assessment.RiskLevel, score float64) (conclusion, suggestion string) {
 	switch riskLevel {
 	case assessment.RiskLevelSevere:
 		conclusion = fmt.Sprintf("%s因子得分%.1f分，处于严重异常水平", factorName, score)
@@ -121,7 +141,30 @@ func (h *InterpretationHandler) interpretFactor(factorName string, riskLevel ass
 
 // generateOverallInterpretation 生成整体解读
 func (h *InterpretationHandler) generateOverallInterpretation(evalCtx *Context) {
-	// TODO: 根据量表类型和整体风险等级生成更精确的解读
+	// 尝试从总分因子的解读规则获取整体解读
+	if evalCtx.MedicalScale != nil {
+		for _, fs := range evalCtx.FactorScores {
+			if fs.IsTotalScore {
+				scaleFactorCode := scale.NewFactorCode(string(fs.FactorCode))
+				if factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode); found {
+					if rule := factor.FindInterpretRule(fs.RawScore); rule != nil {
+						if rule.GetConclusion() != "" {
+							evalCtx.Conclusion = rule.GetConclusion()
+							evalCtx.Suggestion = rule.GetSuggestion()
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 使用默认模板生成整体解读
+	h.generateOverallInterpretationDefault(evalCtx)
+}
+
+// generateOverallInterpretationDefault 使用默认模板生成整体解读
+func (h *InterpretationHandler) generateOverallInterpretationDefault(evalCtx *Context) {
 	switch evalCtx.RiskLevel {
 	case assessment.RiskLevelSevere:
 		evalCtx.Conclusion = "测评结果显示存在严重问题，需要立即关注"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/pkg/pubsub"
 )
@@ -65,9 +66,14 @@ func (h *EventPublishHandler) Handle(ctx context.Context, evalCtx *Context) erro
 		if err := h.publisher.Publish(ctx, h.topic, event); err != nil {
 			// 事件发布失败不应该中断整个流程
 			// 记录错误但继续执行（可以通过重试机制补偿）
-			// TODO: 添加日志记录
-			// logger.Warnf("failed to publish AssessmentInterpretedEvent: %v", err)
+			log.Warnf("failed to publish AssessmentInterpretedEvent for assessment %d: %v",
+				evalCtx.Assessment.ID(), err)
+		} else {
+			log.Infof("AssessmentInterpretedEvent published for assessment %d, risk level: %s",
+				evalCtx.Assessment.ID(), evalCtx.RiskLevel)
 		}
+	} else {
+		log.Debugf("publisher is nil, skip event publishing for assessment %d", evalCtx.Assessment.ID())
 	}
 
 	// 同时将事件添加到 Assessment 的事件列表中（供仓储层使用）

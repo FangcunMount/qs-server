@@ -60,9 +60,15 @@ func (h *ValidationHandler) validateMedicalScale(evalCtx *Context) error {
 		return ErrMedicalScaleNoFactors
 	}
 
-	// TODO: 可以添加更多校验
-	// - 检查量表状态是否为已发布
-	// - 检查量表与问卷的匹配性
+	// 检查量表状态是否为已发布
+	if !evalCtx.MedicalScale.IsPublished() {
+		return ErrMedicalScaleNotPublished
+	}
+
+	// 检查量表与问卷的匹配性
+	if evalCtx.MedicalScale.GetQuestionnaireCode() != evalCtx.Assessment.QuestionnaireRef().Code() {
+		return ErrMedicalScaleQuestionnaireMismatch
+	}
 
 	return nil
 }
@@ -75,7 +81,10 @@ func (h *ValidationHandler) validateAnswerSheetRef(evalCtx *Context) error {
 		return ErrAnswerSheetRefRequired
 	}
 
-	// TODO: 后续集成 survey 域后，可以校验答卷是否存在、是否已完成
+	// 校验答卷是否存在
+	if evalCtx.AnswerSheet == nil {
+		return ErrAnswerSheetNotFound
+	}
 
 	return nil
 }

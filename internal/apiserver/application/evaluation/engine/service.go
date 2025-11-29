@@ -104,7 +104,8 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	// 3. 创建评估上下文
-	evalCtx := pipeline.NewContext(a, medicalScale)
+	// TODO: 加载答卷数据，当前传 nil，由 AnswerSheetScoreHandler 模拟得分
+	evalCtx := pipeline.NewContext(a, medicalScale, nil)
 
 	// 4. 执行处理器链
 	if err := s.pipeline.Execute(ctx, evalCtx); err != nil {

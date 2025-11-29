@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -39,12 +40,12 @@ func (h *AssessmentScoreHandler) Handle(ctx context.Context, evalCtx *Context) e
 	totalScore := h.calculateTotalScore(evalCtx.FactorScores)
 	evalCtx.TotalScore = totalScore
 
-	// 2. 计算整体风险等级
-	riskLevel := h.calculateOverallRiskLevel(evalCtx.FactorScores, totalScore)
-	evalCtx.RiskLevel = riskLevel
-
-	// 3. 更新因子得分的风险等级（根据量表的阈值规则）
+	// 2. 更新因子得分的风险等级（根据量表的阈值规则）
 	h.updateFactorRiskLevels(evalCtx)
+
+	// 3. 计算整体风险等级（基于因子风险等级）
+	riskLevel := h.calculateOverallRiskLevel(evalCtx)
+	evalCtx.RiskLevel = riskLevel
 
 	// 4. 保存 AssessmentScore
 	if err := h.saveAssessmentScore(ctx, evalCtx); err != nil {
@@ -70,39 +71,17 @@ func (h *AssessmentScoreHandler) calculateTotalScore(factorScores []assessment.F
 		count++
 	}
 
-	// 如果没有总分因子，计算平均分
-	if count > 0 {
-		return totalScore / float64(count)
-	}
-	return 0
-}
-
-// calculateOverallRiskLevel 计算整体风险等级
-func (h *AssessmentScoreHandler) calculateOverallRiskLevel(factorScores []assessment.FactorScoreResult, totalScore float64) assessment.RiskLevel {
-	// TODO: 根据量表的阈值规则计算风险等级
-	// 当前使用简单的阈值判断
-	switch {
-	case totalScore >= 80:
-		return assessment.RiskLevelSevere
-	case totalScore >= 60:
-		return assessment.RiskLevelHigh
-	case totalScore >= 40:
-		return assessment.RiskLevelMedium
-	case totalScore >= 20:
-		return assessment.RiskLevelLow
-	default:
-		return assessment.RiskLevelNone
-	}
+	// 如果没有总分因子，返回所有因子得分之和
+	return totalScore
 }
 
 // updateFactorRiskLevels 更新因子风险等级
+// 使用量表中定义的解读规则来计算每个因子的风险等级
 func (h *AssessmentScoreHandler) updateFactorRiskLevels(evalCtx *Context) {
-	// TODO: 根据量表中各因子的阈值规则更新风险等级
-	// 当前使用简单的阈值判断
 	updatedScores := make([]assessment.FactorScoreResult, 0, len(evalCtx.FactorScores))
 
 	for _, fs := range evalCtx.FactorScores {
-		riskLevel := h.calculateFactorRiskLevel(fs.RawScore)
+		riskLevel := h.calculateFactorRiskLevel(evalCtx.MedicalScale, fs.FactorCode, fs.RawScore)
 
 		updatedScore := assessment.NewFactorScoreResult(
 			fs.FactorCode,
@@ -120,8 +99,58 @@ func (h *AssessmentScoreHandler) updateFactorRiskLevels(evalCtx *Context) {
 }
 
 // calculateFactorRiskLevel 计算因子风险等级
-func (h *AssessmentScoreHandler) calculateFactorRiskLevel(score float64) assessment.RiskLevel {
-	// TODO: 根据因子的具体阈值规则计算
+// 优先使用量表中定义的解读规则，如果没有则使用默认阈值
+func (h *AssessmentScoreHandler) calculateFactorRiskLevel(
+	medicalScale *scale.MedicalScale,
+	factorCode assessment.FactorCode,
+	score float64,
+) assessment.RiskLevel {
+	// 尝试从量表获取因子的解读规则
+	if medicalScale != nil {
+		scaleFactorCode := scale.NewFactorCode(string(factorCode))
+		if factor, found := medicalScale.FindFactorByCode(scaleFactorCode); found {
+			if rule := factor.FindInterpretRule(score); rule != nil {
+				// 将 scale.RiskLevel 转换为 assessment.RiskLevel
+				return convertScaleRiskLevel(rule.GetRiskLevel())
+			}
+		}
+	}
+
+	// 使用默认阈值判断
+	return h.defaultRiskLevelByScore(score)
+}
+
+// calculateOverallRiskLevel 计算整体风险等级
+// 综合所有因子的风险等级，取最高风险作为整体风险
+func (h *AssessmentScoreHandler) calculateOverallRiskLevel(evalCtx *Context) assessment.RiskLevel {
+	// 优先使用量表的整体解读规则
+	if evalCtx.MedicalScale != nil {
+		// 尝试查找总分因子的解读规则
+		for _, fs := range evalCtx.FactorScores {
+			if fs.IsTotalScore {
+				scaleFactorCode := scale.NewFactorCode(string(fs.FactorCode))
+				if factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode); found {
+					if rule := factor.FindInterpretRule(fs.RawScore); rule != nil {
+						return convertScaleRiskLevel(rule.GetRiskLevel())
+					}
+				}
+			}
+		}
+	}
+
+	// 没有总分因子规则时，取所有因子中的最高风险等级
+	maxRisk := assessment.RiskLevelNone
+	for _, fs := range evalCtx.FactorScores {
+		if riskLevelOrder(fs.RiskLevel) > riskLevelOrder(maxRisk) {
+			maxRisk = fs.RiskLevel
+		}
+	}
+
+	return maxRisk
+}
+
+// defaultRiskLevelByScore 根据分数使用默认阈值计算风险等级
+func (h *AssessmentScoreHandler) defaultRiskLevelByScore(score float64) assessment.RiskLevel {
 	switch {
 	case score >= 80:
 		return assessment.RiskLevelSevere
@@ -133,6 +162,42 @@ func (h *AssessmentScoreHandler) calculateFactorRiskLevel(score float64) assessm
 		return assessment.RiskLevelLow
 	default:
 		return assessment.RiskLevelNone
+	}
+}
+
+// convertScaleRiskLevel 将 scale.RiskLevel 转换为 assessment.RiskLevel
+func convertScaleRiskLevel(scaleLevel scale.RiskLevel) assessment.RiskLevel {
+	switch scaleLevel {
+	case scale.RiskLevelNone:
+		return assessment.RiskLevelNone
+	case scale.RiskLevelLow:
+		return assessment.RiskLevelLow
+	case scale.RiskLevelMedium:
+		return assessment.RiskLevelMedium
+	case scale.RiskLevelHigh:
+		return assessment.RiskLevelHigh
+	case scale.RiskLevelSevere:
+		return assessment.RiskLevelSevere
+	default:
+		return assessment.RiskLevelNone
+	}
+}
+
+// riskLevelOrder 返回风险等级的排序值（用于比较）
+func riskLevelOrder(level assessment.RiskLevel) int {
+	switch level {
+	case assessment.RiskLevelNone:
+		return 0
+	case assessment.RiskLevelLow:
+		return 1
+	case assessment.RiskLevelMedium:
+		return 2
+	case assessment.RiskLevelHigh:
+		return 3
+	case assessment.RiskLevelSevere:
+		return 4
+	default:
+		return 0
 	}
 }
 
