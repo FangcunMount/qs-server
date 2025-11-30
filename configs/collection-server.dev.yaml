@@ -40,12 +40,32 @@ log:
   max-backups: 10 # 保留旧日志文件的最大个数
   compress: true # 是否压缩旧日志文件
 
-# Redis 配置
+# Redis 配置（双实例架构）
 redis:
-  host: 127.0.0.1              # Redis 服务器主机
-  port: 6379                   # Redis 服务器端口
-  password: questionnaire_redis_2024  # Redis 密码
-  database: 0                  # Redis 数据库编号
-  max-idle: 50                 # 最大空闲连接数
-  max-active: 100              # 最大活跃连接数
-  timeout: 5                   # 连接超时时间（秒）
+  # Cache Redis - 用于缓存、会话、限流等临时数据
+  cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"  # Redis 6.0+ ACL 用户名
+    password: "dev_app_123"
+    database: 0  # 缓存使用 DB 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）
+  
+  # Store Redis - 用于持久化存储、队列、发布订阅等
+  store:
+    host: "127.0.0.1"
+    port: 6380  # 使用 Store Redis 实例（端口 6380）
+    username: "app"  # Redis 6.0+ ACL 用户名
+    password: "dev_app_123"
+    database: 0  # Store Redis 使用 DB 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）

@@ -31,11 +31,15 @@ func run(opts *options.Options) app.RunFunc {
 		log.Init(opts.Log)
 		defer log.Flush()
 
-		log.Info("Starting collection-server ...")
+		log.Infof("Starting collection-server ... (mode=%s, healthz=%v)", opts.GenericServerRunOptions.Mode, opts.GenericServerRunOptions.Healthz)
+		log.Infof("HTTP bind: %s:%d, HTTPS bind: %s:%d, gRPC endpoint: %s",
+			opts.InsecureServing.BindAddress, opts.InsecureServing.BindPort,
+			opts.SecureServing.BindAddress, opts.SecureServing.BindPort,
+			opts.GRPCClient.Endpoint)
 
-		// 打印配置信息
-		log.Infof("Server mode: %s", opts.GenericServerRunOptions.Mode)
-		log.Infof("Health check enabled: %v", opts.GenericServerRunOptions.Healthz)
+		// 打印安全与并发配置
+		log.Infof("TLS cert: %s, key: %s", opts.SecureServing.TLS.CertFile, opts.SecureServing.TLS.KeyFile)
+		log.Infof("Concurrency: max=%d, JWT expiry(h): %d", opts.Concurrency.MaxConcurrency, opts.JWT.TokenDuration)
 
 		// 根据 options 创建 app 配置
 		cfg, err := config.CreateConfigFromOptions(opts)

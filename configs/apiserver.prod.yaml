@@ -34,57 +34,57 @@ secure:
 
 # MySQL 数据库配置
 mysql:
-  host: "<YOUR_MYSQL_HOST>:3306"
-  username: "<YOUR_MYSQL_USER>"
-  password: "<YOUR_MYSQL_PASSWORD>"
-  database: "questionnaire_scale"
-  max-idle-connections: 20
-  max-open-connections: 200
-  max-connection-life-time: "2h"
-  log-level: 2 # 生产降低日志级别
+  host: ${MYSQL_HOST}:${MYSQL_PORT}
+  username: ${MYSQL_USER}
+  password: ${MYSQL_PASSWORD}
+  database: ${MYSQL_DATABASE}
+  max-idle-connections: ${MYSQL_MAX_IDLE_CONNECTIONS}
+  max-open-connections: ${MYSQL_MAX_OPEN_CONNECTIONS}
+  max-connection-life-time: ${MYSQL_MAX_CONNECTION_LIFE_TIME}
+  log-level: ${MYSQL_LOG_LEVEL} # 生产降低日志级别
 
 # 数据库迁移配置
 migration:
-  enabled: true   # 生产环境建议开启
-  autoseed: false
-  database: "questionnaire_scale"
+  enabled: ${MIGRATION_ENABLED}   # 生产环境建议开启
+  autoseed: ${MIGRATION_AUTOSEED}
+  database: ${MIGRATION_DATABASE}
 
 # Redis 配置（双实例架构）
 redis:
   cache:
-    host: "<YOUR_REDIS_CACHE_HOST>"
-    port: 6379
-    username: "<YOUR_REDIS_CACHE_USERNAME>"
-    password: "<YOUR_REDIS_CACHE_PASSWORD>"
-    database: 0
-    max-idle: 100
-    max-active: 200
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
+    host: ${REDIS_CACHE_HOST}
+    port: ${REDIS_CACHE_PORT}
+    username: ${REDIS_CACHE_USERNAME}
+    password: ${REDIS_CACHE_PASSWORD}
+    database: ${REDIS_CACHE_DB}
+    max-idle: ${REDIS_CACHE_MAX_IDLE}
+    max-active: ${REDIS_CACHE_MAX_ACTIVE}
+    timeout: ${REDIS_CACHE_TIMEOUT}
+    enable-cluster: ${REDIS_CACHE_ENABLE_CLUSTER}
+    use-ssl: ${REDIS_CACHE_USE_SSL}
+    enable-logging: ${REDIS_CACHE_ENABLE_LOGGING}
   store:
-    host: "<YOUR_REDIS_STORE_HOST>"
-    port: 6380
-    username: "<YOUR_REDIS_STORE_USERNAME>"
-    password: "<YOUR_REDIS_STORE_PASSWORD>"
-    database: 0
-    max-idle: 100
-    max-active: 200
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
+    host: ${REDIS_STORE_HOST}
+    port: ${REDIS_STORE_PORT}
+    username: ${REDIS_STORE_USERNAME}
+    password: ${REDIS_STORE_PASSWORD}
+    database: ${REDIS_STORE_DB}
+    max-idle: ${REDIS_STORE_MAX_IDLE}
+    max-active: ${REDIS_STORE_MAX_ACTIVE}
+    timeout: ${REDIS_STORE_TIMEOUT}
+    enable-cluster: ${REDIS_STORE_ENABLE_CLUSTER}
+    use-ssl: ${REDIS_STORE_USE_SSL}
+    enable-logging: ${REDIS_STORE_ENABLE_LOGGING}
 
 # MongoDB 数据库配置
 mongodb:
-  url: "mongodb://<YOUR_MONGO_USER>:<YOUR_MONGO_PASSWORD>@<YOUR_MONGO_HOST>:27017/questionnaire_scale?authSource=admin"
-  database: "questionnaire_scale"
-  use-ssl: true
-  ssl-insecure-skip-verify: false
-  ssl-allow-invalid-hostnames: false
-  ssl-ca-file: ""
-  ssl-pem-keyfile: ""
+  url: ${MONGO_URL}
+  database: ${MONGO_DATABASE}
+  use-ssl: ${MONGO_USE_SSL}
+  ssl-insecure-skip-verify: ${MONGO_SSL_INSECURE_SKIP_VERIFY}
+  ssl-allow-invalid-hostnames: ${MONGO_SSL_ALLOW_INVALID_HOSTNAMES}
+  ssl-ca-file: ${MONGO_SSL_CA_FILE}
+  ssl-pem-keyfile: ${MONGO_SSL_PEM_KEYFILE}
 
 # 日志配置（生产环境）
 log:
@@ -116,6 +116,6 @@ log:
 # JWT 配置
 jwt:
   realm: "qs jwt"
-  key: "<YOUR_JWT_SECRET_KEY>"
-  timeout: "24h"
-  max-refresh: "168h"
+  key: ${JWT_SECRET_KEY}
+  timeout: ${JWT_TIMEOUT}
+  max-refresh: ${JWT_MAX_REFRESH}

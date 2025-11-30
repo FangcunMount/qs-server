@@ -83,3 +83,35 @@ log:
     error:
       - stderr
       - /data/logs/qs/qs-worker-error.log
+
+# ============================================================================
+# Redis 配置（双实例）
+# ============================================================================
+redis:
+  # Cache Redis - 缓存/会话/限流
+  cache:
+    host: ${REDIS_CACHE_HOST}
+    port: ${REDIS_CACHE_PORT}
+    username: ${REDIS_CACHE_USER}
+    password: ${REDIS_CACHE_PASSWORD}
+    database: ${REDIS_CACHE_DB}
+    max-idle: ${REDIS_CACHE_MAX_IDLE}
+    max-active: ${REDIS_CACHE_MAX_ACTIVE}
+    timeout: ${REDIS_CACHE_TIMEOUT}
+    enable-cluster: ${REDIS_CACHE_ENABLE_CLUSTER}
+    use-ssl: ${REDIS_CACHE_USE_SSL}
+    enable-logging: ${REDIS_CACHE_ENABLE_LOGGING}
+
+  # Store Redis - 持久化/队列/订阅
+  store:
+    host: ${REDIS_STORE_HOST}
+    port: ${REDIS_STORE_PORT}
+    username: ${REDIS_STORE_USER}
+    password: ${REDIS_STORE_PASSWORD}
+    database: ${REDIS_STORE_DB}
+    max-idle: ${REDIS_STORE_MAX_IDLE}
+    max-active: ${REDIS_STORE_MAX_ACTIVE}
+    timeout: ${REDIS_STORE_TIMEOUT}
+    enable-cluster: ${REDIS_STORE_ENABLE_CLUSTER}
+    use-ssl: ${REDIS_STORE_USE_SSL}
+    enable-logging: ${REDIS_STORE_ENABLE_LOGGING}

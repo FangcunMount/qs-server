@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
@@ -17,8 +18,10 @@ var modulePool = make(map[string]assembler.Module)
 // 组合所有业务模块和基础设施组件
 type Container struct {
 	// 基础设施
-	mysqlDB *gorm.DB
-	mongoDB *mongo.Database
+	mysqlDB    *gorm.DB
+	mongoDB    *mongo.Database
+	redisCache redis.UniversalClient
+	redisStore redis.UniversalClient
 
 	// 业务模块
 	SurveyModule     *assembler.SurveyModule     // Survey 模块（包含问卷和答卷子模块）
@@ -31,10 +34,12 @@ type Container struct {
 }
 
 // NewContainer 创建容器
-func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database) *Container {
+func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, redisStore redis.UniversalClient) *Container {
 	return &Container{
 		mysqlDB:     mysqlDB,
 		mongoDB:     mongoDB,
+		redisCache:  redisCache,
+		redisStore:  redisStore,
 		initialized: false,
 	}
 }
@@ -147,6 +152,18 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 		}
 	}
 
+	// 检查 Redis 连接
+	if c.redisCache != nil {
+		if err := c.redisCache.Ping(ctx).Err(); err != nil {
+			return fmt.Errorf("redis cache ping failed: %w", err)
+		}
+	}
+	if c.redisStore != nil {
+		if err := c.redisStore.Ping(ctx).Err(); err != nil {
+			return fmt.Errorf("redis store ping failed: %w", err)
+		}
+	}
+
 	// 检查模块健康状态
 	if err := c.checkModulesHealth(ctx); err != nil {
 		return fmt.Errorf("modules health check failed: %w", err)
@@ -198,6 +215,7 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"infrastructure": map[string]bool{
 			"mysql":   c.mysqlDB != nil,
 			"mongodb": c.mongoDB != nil,
+			"redis":   c.redisCache != nil || c.redisStore != nil,
 		},
 	}
 }

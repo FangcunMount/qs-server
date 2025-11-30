@@ -22,7 +22,7 @@ type Client struct {
 }
 
 // NewClient 创建 gRPC 客户端
-func NewClient(cfg *ClientConfig) (*Client, error) {
+func NewClient(cfg *ClientConfig, dialOpts ...grpc.DialOption) (*Client, error) {
 	opts := []grpc.DialOption{
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(10*1024*1024), // 10MB
@@ -33,6 +33,7 @@ func NewClient(cfg *ClientConfig) (*Client, error) {
 	if cfg.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
+	opts = append(opts, dialOpts...)
 
 	// 创建连接
 	conn, err := grpc.NewClient(cfg.Endpoint, opts...)

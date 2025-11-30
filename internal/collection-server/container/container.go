@@ -1,8 +1,6 @@
 package container
 
 import (
-	"time"
-
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -10,17 +8,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	redis "github.com/redis/go-redis/v9"
 )
 
 // Container 主容器，负责管理所有组件
 type Container struct {
 	initialized bool
 	opts        *options.Options
+	redisCache  redis.UniversalClient
+	redisStore  redis.UniversalClient
 
-	// 基础设施层
-	grpcClientManager *grpcclient.Client
-
-	// gRPC 客户端
+	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient   *grpcclient.AnswerSheetClient
 	questionnaireClient *grpcclient.QuestionnaireClient
 	evaluationClient    *grpcclient.EvaluationClient
@@ -38,9 +36,11 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options) *Container {
+func NewContainer(opts *options.Options, redisCache redis.UniversalClient, redisStore redis.UniversalClient) *Container {
 	return &Container{
 		opts:        opts,
+		redisCache:  redisCache,
+		redisStore:  redisStore,
 		initialized: false,
 	}
 }
@@ -53,45 +53,15 @@ func (c *Container) Initialize() error {
 
 	log.Info("🔧 Initializing Collection Server Container...")
 
-	// 1. 初始化基础设施层
-	if err := c.initInfrastructure(); err != nil {
-		return err
-	}
-
-	// 2. 初始化应用层
+	// 1. 初始化应用层
 	c.initApplicationServices()
 
-	// 3. 初始化接口层
+	// 2. 初始化接口层
 	c.initHandlers()
 
 	c.initialized = true
 	log.Info("✅ Collection Server Container initialized successfully")
 
-	return nil
-}
-
-// initInfrastructure 初始化基础设施层
-func (c *Container) initInfrastructure() error {
-	log.Info("📡 Initializing gRPC client...")
-
-	// 创建 gRPC 客户端管理器
-	var err error
-	c.grpcClientManager, err = grpcclient.NewClient(&grpcclient.ClientConfig{
-		Endpoint: c.opts.GRPCClient.Endpoint,
-		Timeout:  time.Duration(c.opts.GRPCClient.Timeout) * time.Second,
-		Insecure: c.opts.GRPCClient.Insecure,
-	})
-	if err != nil {
-		log.Errorf("Failed to create gRPC client: %v", err)
-		return err
-	}
-
-	// 创建各服务的 gRPC 客户端
-	c.answerSheetClient = grpcclient.NewAnswerSheetClient(c.grpcClientManager)
-	c.questionnaireClient = grpcclient.NewQuestionnaireClient(c.grpcClientManager)
-	c.evaluationClient = grpcclient.NewEvaluationClient(c.grpcClientManager)
-
-	log.Infof("✅ Connected to apiserver at %s", c.opts.GRPCClient.Endpoint)
 	return nil
 }
 
@@ -122,13 +92,6 @@ func (c *Container) initHandlers() {
 func (c *Container) Cleanup() {
 	log.Info("🧹 Cleaning up container resources...")
 
-	// 关闭 gRPC 连接
-	if c.grpcClientManager != nil {
-		if err := c.grpcClientManager.Close(); err != nil {
-			log.Errorf("Error closing gRPC connection: %v", err)
-		}
-	}
-
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")
 }
@@ -158,4 +121,21 @@ func (c *Container) HealthHandler() *handler.HealthHandler {
 // EvaluationHandler 获取测评处理器
 func (c *Container) EvaluationHandler() *handler.EvaluationHandler {
 	return c.evaluationHandler
+}
+
+// ==================== Setters (用于 GRPCClientRegistry 注入) ====================
+
+// SetAnswerSheetClient 设置答卷客户端
+func (c *Container) SetAnswerSheetClient(client *grpcclient.AnswerSheetClient) {
+	c.answerSheetClient = client
+}
+
+// SetQuestionnaireClient 设置问卷客户端
+func (c *Container) SetQuestionnaireClient(client *grpcclient.QuestionnaireClient) {
+	c.questionnaireClient = client
+}
+
+// SetEvaluationClient 设置测评客户端
+func (c *Container) SetEvaluationClient(client *grpcclient.EvaluationClient) {
+	c.evaluationClient = client
 }

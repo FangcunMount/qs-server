@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	redis "github.com/go-redis/redis/v7"
+	redis "github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -19,8 +19,10 @@ import (
 
 // DatabaseManager 数据库管理器
 type DatabaseManager struct {
-	registry *database.Registry
-	config   *config.Config
+	registry   *database.Registry
+	config     *config.Config
+	cacheRedis *database.RedisConnection
+	storeRedis *database.RedisConnection
 }
 
 // NewDatabaseManager 创建数据库管理器
@@ -113,6 +115,7 @@ func (dm *DatabaseManager) initRedis() error {
 		if err := dm.registry.Register(database.Redis, cacheConfig, cacheConn); err != nil {
 			return fmt.Errorf("failed to register cache redis: %w", err)
 		}
+		dm.cacheRedis = cacheConn
 		log.Info("Cache Redis initialized successfully")
 	}
 
@@ -136,11 +139,12 @@ func (dm *DatabaseManager) initRedis() error {
 		log.Info("Store Redis host not configured, skipping Store Redis initialization")
 	} else {
 		storeConn := database.NewRedisConnection(storeConfig)
-		// 注册为 RedisStore 实例（如果需要单独访问）
-		// 这里可以扩展 database.Type 来支持多个 Redis 实例
-		// 暂时只注册一个主实例，Store 实例需要业务代码直接创建连接
-		log.Info("Store Redis initialized successfully (not registered in registry)")
-		_ = storeConn // 暂时不使用，未来可以扩展注册机制
+		if err := storeConn.Connect(); err != nil {
+			return fmt.Errorf("failed to connect store redis (%s:%d): %w", storeConfig.Host, storeConfig.Port, err)
+		}
+		dm.storeRedis = storeConn
+		log.Infof("Store Redis connected successfully to %s:%d (not registered in registry)", storeConfig.Host, storeConfig.Port)
+		_ = storeConn // 暂时不注册到 registry，后续如需复用可扩展注册机制
 	}
 
 	return nil
@@ -194,6 +198,14 @@ func (dm *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
 	}
 
 	return redisClient, nil
+}
+
+// GetStoreRedisClient 获取 Store Redis 客户端（未注册到 registry）
+func (dm *DatabaseManager) GetStoreRedisClient() (redis.UniversalClient, error) {
+	if dm.storeRedis == nil {
+		return nil, fmt.Errorf("store redis not initialized")
+	}
+	return dm.storeRedis.GetClient().(redis.UniversalClient), nil
 }
 
 // GetMongoClient 获取MongoDB客户端

@@ -82,8 +82,18 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to get MongoDB connection: %v", err)
 	}
 
+	// 获取 Redis 客户端（cache/store）
+	redisCache, err := s.dbManager.GetRedisClient()
+	if err != nil {
+		log.Warnf("Cache Redis not available: %v", err)
+	}
+	redisStore, err := s.dbManager.GetStoreRedisClient()
+	if err != nil {
+		log.Warnf("Store Redis not available: %v", err)
+	}
+
 	// 创建六边形架构容器（自动发现版本）
-	s.container = container.NewContainer(mysqlDB, mongoDB)
+	s.container = container.NewContainer(mysqlDB, mongoDB, redisCache, redisStore)
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {

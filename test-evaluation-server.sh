@@ -19,9 +19,9 @@ echo "✅ Build successful"
 echo "🏃 Starting evaluation-server in background..."
 ./evaluation-server \
     --insecure.bind-port=8082 \
-    --grpc-client.endpoint=localhost:8090 \
-    --grpc-client.timeout=30 \
-    --grpc-client.insecure=true \
+    --grpc_client.endpoint=localhost:8090 \
+    --grpc_client.timeout=30 \
+    --grpc_client.insecure=true \
     --message-queue.type=redis \
     --message-queue.endpoint=localhost:6379 \
     --message-queue.topic=answersheet_saved \

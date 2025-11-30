@@ -2,6 +2,7 @@ package options
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -22,6 +23,8 @@ type Options struct {
 	GRPC *GRPCOptions `json:"grpc" mapstructure:"grpc"`
 	// Worker 配置
 	Worker *WorkerOptions `json:"worker" mapstructure:"worker"`
+	// Redis 双实例配置（cache/store）
+	Redis *genericoptions.RedisDualOptions `json:"redis" mapstructure:"redis"`
 }
 
 // MessagingOptions 消息队列配置
@@ -71,6 +74,7 @@ func NewOptions() *Options {
 			MaxRetries:  3,
 			ServiceName: "qs-worker",
 		},
+		Redis: genericoptions.NewRedisDualOptions(),
 	}
 }
 
@@ -106,6 +110,9 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	workerFS.StringVar(&o.Worker.ServiceName, "worker.service-name", o.Worker.ServiceName,
 		"Service name for message queue channel")
 
+	// Redis flags
+	o.Redis.AddFlags(fss.FlagSet("redis"))
+
 	return fss
 }
 
@@ -117,6 +124,20 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.GenericServerRunOptions.Validate()...)
 	errs = append(errs, o.MySQL.Validate()...)
 	errs = append(errs, o.MongoDB.Validate()...)
+
+	// Redis 校验（cache/store 主机端口）
+	if o.Redis.Cache.Host == "" {
+		errs = append(errs, fmt.Errorf("redis.cache.host cannot be empty"))
+	}
+	if o.Redis.Cache.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.cache.port must be greater than 0"))
+	}
+	if o.Redis.Store.Host == "" {
+		errs = append(errs, fmt.Errorf("redis.store.host cannot be empty"))
+	}
+	if o.Redis.Store.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.store.port must be greater than 0"))
+	}
 
 	return errs
 }

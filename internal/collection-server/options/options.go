@@ -16,14 +16,10 @@ type Options struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server"   mapstructure:"server"`
 	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"   mapstructure:"secure"`
-	// GRPC 客户端配置，用于连接 apiserver
-	GRPCClient *GRPCClientOptions `json:"grpc_client" mapstructure:"grpc_client"`
-	// Redis 配置，用于消息队列
-	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
-	// 并发处理配置
-	Concurrency *ConcurrencyOptions `json:"concurrency" mapstructure:"concurrency"`
-	// JWT 配置
-	JWT *JWTOptions `json:"jwt" mapstructure:"jwt"`
+	GRPCClient              *GRPCClientOptions                     `json:"grpc_client" mapstructure:"grpc_client"`
+	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
+	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
+	JWT                     *JWTOptions                            `json:"jwt" mapstructure:"jwt"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -85,7 +81,7 @@ func NewOptions() *Options {
 			Timeout:  30,
 			Insecure: true,
 		},
-		Redis: genericoptions.NewRedisOptions(),
+		RedisDualOptions: genericoptions.NewRedisDualOptions(),
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
@@ -102,8 +98,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.GenericServerRunOptions.AddFlags(fss.FlagSet("server"))
 	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
-	o.GRPCClient.AddFlags(fss.FlagSet("grpc-client"))
-	o.Redis.AddFlags(fss.FlagSet("redis"))
+	o.GRPCClient.AddFlags(fss.FlagSet("grpc_client"))
+	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
@@ -112,11 +108,11 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 
 // AddFlags 添加 GRPC 客户端相关的命令行参数
 func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&g.Endpoint, "grpc-client.endpoint", g.Endpoint,
+	fs.StringVar(&g.Endpoint, "grpc_client.endpoint", g.Endpoint,
 		"The endpoint of apiserver gRPC service.")
-	fs.IntVar(&g.Timeout, "grpc-client.timeout", g.Timeout,
+	fs.IntVar(&g.Timeout, "grpc_client.timeout", g.Timeout,
 		"The timeout for gRPC client requests in seconds.")
-	fs.BoolVar(&g.Insecure, "grpc-client.insecure", g.Insecure,
+	fs.BoolVar(&g.Insecure, "grpc_client.insecure", g.Insecure,
 		"Whether to use insecure gRPC connection.")
 }
 
@@ -154,18 +150,24 @@ func (o *Options) Validate() []error {
 
 	// 验证 GRPC 客户端配置
 	if o.GRPCClient.Endpoint == "" {
-		errs = append(errs, fmt.Errorf("grpc-client.endpoint cannot be empty"))
+		errs = append(errs, fmt.Errorf("grpc_client.endpoint cannot be empty"))
 	}
 	if o.GRPCClient.Timeout <= 0 {
-		errs = append(errs, fmt.Errorf("grpc-client.timeout must be greater than 0"))
+		errs = append(errs, fmt.Errorf("grpc_client.timeout must be greater than 0"))
 	}
 
-	// 验证 Redis 配置
-	if o.Redis.Host == "" {
-		errs = append(errs, fmt.Errorf("redis.host cannot be empty"))
+	// 验证 Redis 配置（cache/store 至少需要配置主机和端口）
+	if o.RedisDualOptions.Cache.Host == "" {
+		errs = append(errs, fmt.Errorf("redis.cache.host cannot be empty"))
 	}
-	if o.Redis.Port <= 0 {
-		errs = append(errs, fmt.Errorf("redis.port must be greater than 0"))
+	if o.RedisDualOptions.Cache.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.cache.port must be greater than 0"))
+	}
+	if o.RedisDualOptions.Store.Host == "" {
+		errs = append(errs, fmt.Errorf("redis.store.host cannot be empty"))
+	}
+	if o.RedisDualOptions.Store.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.store.port must be greater than 0"))
 	}
 
 	// 验证并发配置
