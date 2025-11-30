@@ -498,12 +498,12 @@ jobs:
               "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
               --config=/app/configs/apiserver.prod.yaml
 
-            # 健康检查
+            # 健康检查（apiserver 公开的是 /health）
             echo "Waiting for service to be ready..."
             ATTEMPTS=0
             MAX_ATTEMPTS=30
             while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-              if curl -sf http://localhost:${HTTP_PORT}/healthz > /dev/null 2>&1; then
+              if curl -sf http://localhost:${HTTP_PORT}/health > /dev/null 2>&1; then
                 echo "✅ Health check passed (attempt $ATTEMPTS)"
                 $SUDO docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}"
                 break
@@ -708,11 +708,11 @@ jobs:
               "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
               --config=/app/configs/collection-server.prod.yaml
 
-            # 健康检查
+            # 健康检查（collection-server 公开的是 /health）
             ATTEMPTS=0
             MAX_ATTEMPTS=30
             while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-              if curl -sf http://localhost:${HTTP_PORT}/healthz > /dev/null 2>&1; then
+              if curl -sf http://localhost:${HTTP_PORT}/health > /dev/null 2>&1; then
                 echo "✅ Health check passed"
                 break
               fi

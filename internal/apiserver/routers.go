@@ -24,8 +24,12 @@ func NewRouter(c *container.Container) *Router {
 
 // RegisterRoutes 注册所有路由
 func (r *Router) RegisterRoutes(engine *gin.Engine) {
-	// Swagger 文档
-	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger 文档：静态文件由 api/apiserver 提供，UI 入口指向该路径
+	engine.Static("/api/apiserver", "./api/apiserver")
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerFiles.Handler,
+		ginSwagger.URL("/api/apiserver/swagger.json"),
+	))
 
 	// 注册公开路由（不需要认证）
 	r.registerPublicRoutes(engine)

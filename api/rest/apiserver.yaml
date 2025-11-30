@@ -1,0 +1,2452 @@
+openapi: 3.1.0
+info:
+  description: Questionnaire Scale API server (REST & gRPC)
+  title: QS API Server
+  contact: {}
+  version: '1.0'
+tags: []
+paths:
+  /admin/answersheets:
+    get:
+      tags:
+      - AnswerSheet-Management
+      summary: 查询答卷列表
+      description: 管理员查询答卷列表，支持多维度筛选
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 10
+        description: 每页数量
+        name: page_size
+        in: query
+      - type: string
+        description: 问卷编码
+        name: questionnaire_code
+        in: query
+      - type: integer
+        description: 填写人ID
+        name: filler_id
+        in: query
+      - type: string
+        description: 开始时间
+        name: start_time
+        in: query
+      - type: string
+        description: 结束时间
+        name: end_time
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AnswerSheetListResponse'
+  /admin/answersheets/statistics:
+    get:
+      tags:
+      - AnswerSheet-Management
+      summary: 获取答卷统计
+      description: 管理员查看某问卷的答卷统计数据
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AnswerSheetStatisticsResponse'
+  /admin/answersheets/{id}:
+    get:
+      tags:
+      - AnswerSheet-Management
+      summary: 获取答卷详情
+      description: 管理员查看答卷的完整信息
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 答卷ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AnswerSheetResponse'
+  /evaluations/assessments:
+    get:
+      tags:
+      - Evaluation-Assessment
+      summary: 查询测评列表
+      description: 分页查询测评列表
+      parameters:
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 10
+        description: 每页数量
+        name: page_size
+        in: query
+      - type: string
+        description: 状态筛选
+        name: status
+        in: query
+      - type: integer
+        description: 受试者ID筛选
+        name: testee_id
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentListResponse'
+  /evaluations/assessments/statistics:
+    get:
+      tags:
+      - Evaluation-Assessment
+      summary: 获取测评统计数据
+      description: 获取指定时间范围内的测评统计数据
+      parameters:
+      - type: string
+        description: 开始时间（格式：2006-01-02）
+        name: start_time
+        in: query
+      - type: string
+        description: 结束时间（格式：2006-01-02）
+        name: end_time
+        in: query
+      - type: string
+        description: 量表编码筛选
+        name: scale_code
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentStatisticsResponse'
+  /evaluations/assessments/{id}:
+    get:
+      tags:
+      - Evaluation-Assessment
+      summary: 获取测评详情
+      description: 根据ID获取测评详细信息
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentResponse'
+  /evaluations/assessments/{id}/high-risk-factors:
+    get:
+      tags:
+      - Evaluation-Score
+      summary: 获取高风险因子
+      description: 获取指定测评的高风险因子列表
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.HighRiskFactorsResponse'
+  /evaluations/assessments/{id}/report:
+    get:
+      tags:
+      - Evaluation-Report
+      summary: 获取测评报告
+      description: 获取指定测评的解读报告
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ReportResponse'
+  /evaluations/assessments/{id}/retry:
+    post:
+      tags:
+      - Evaluation-Admin
+      summary: 重试失败的测评
+      description: 重试指定测评的评估流程
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentResponse'
+  /evaluations/assessments/{id}/scores:
+    get:
+      tags:
+      - Evaluation-Score
+      summary: 获取测评得分
+      description: 获取指定测评的得分详情
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScoreResponse'
+  /evaluations/batch-evaluate:
+    post:
+      tags:
+      - Evaluation-Admin
+      summary: 批量评估
+      description: 批量执行测评评估（管理员/Worker使用）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.BatchEvaluateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.BatchEvaluationResponse'
+  /evaluations/reports:
+    get:
+      tags:
+      - Evaluation-Report
+      summary: 查询报告列表
+      description: 查询指定受试者的报告列表
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 10
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ReportListResponse'
+  /evaluations/scores/trend:
+    get:
+      tags:
+      - Evaluation-Score
+      summary: 获取因子趋势
+      description: 获取指定受试者某因子的历史得分趋势
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      - type: string
+        description: 因子编码
+        name: factor_code
+        in: query
+        required: true
+      - type: integer
+        default: 10
+        description: 返回记录数限制
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.FactorTrendResponse'
+  /public/questionnaires:
+    get:
+      tags:
+      - Questionnaire-Query
+      summary: 查询已发布问卷列表
+      description: 分页查询已发布的问卷列表（C端答题使用）
+      parameters:
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 10
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireListResponse'
+  /public/questionnaires/{code}:
+    get:
+      tags:
+      - Questionnaire-Query
+      summary: 获取已发布问卷
+      description: 根据编码获取已发布的问卷（C端答题使用）
+      parameters:
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires:
+    get:
+      tags:
+      - Questionnaire-Query
+      summary: 查询问卷列表
+      description: 分页查询问卷列表，支持条件筛选（管理端使用）
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 10
+        description: 每页数量
+        name: page_size
+        in: query
+      - type: string
+        description: 状态筛选
+        name: status
+        in: query
+      - type: string
+        description: 标题筛选
+        name: title
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireListResponse'
+    post:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 创建问卷
+      description: 创建新问卷，初始状态为草稿
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateQuestionnaireRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}:
+    get:
+      tags:
+      - Questionnaire-Query
+      summary: 获取问卷详情
+      description: 根据编码获取问卷的完整信息（管理端使用）
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+    delete:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 删除问卷
+      description: 删除草稿状态的问卷
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.Response'
+  /questionnaires/{code}/archive:
+    post:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 归档问卷
+      description: 归档不再使用的问卷
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/basic-info:
+    put:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 更新问卷基本信息
+      description: 更新问卷的标题、描述、封面图
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateQuestionnaireBasicInfoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/draft:
+    post:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 保存草稿
+      description: 保存问卷为草稿状态，小版本号递增
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/publish:
+    post:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 发布问卷
+      description: 发布问卷使其可用，大版本号递增
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/questions:
+    post:
+      tags:
+      - Questionnaire-Content
+      summary: 添加问题
+      description: 向问卷添加新问题
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.AddQuestionRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/questions/batch:
+    put:
+      tags:
+      - Questionnaire-Content
+      summary: 批量更新问题
+      description: 批量更新问卷的所有问题（前端保存时使用）
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.BatchUpdateQuestionsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/questions/reorder:
+    post:
+      tags:
+      - Questionnaire-Content
+      summary: 重排问题顺序
+      description: 调整问卷中问题的显示顺序
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.ReorderQuestionsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/questions/{questionCode}:
+    put:
+      tags:
+      - Questionnaire-Content
+      summary: 更新问题
+      description: 更新问卷中的某个问题
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      - type: string
+        description: 问题编码
+        name: questionCode
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateQuestionRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+    delete:
+      tags:
+      - Questionnaire-Content
+      summary: 删除问题
+      description: 从问卷中删除某个问题
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      - type: string
+        description: 问题编码
+        name: questionCode
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/unpublish:
+    post:
+      tags:
+      - Questionnaire-Lifecycle
+      summary: 下架问卷
+      description: 将已发布的问卷下架
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /scales:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取量表列表
+      description: 分页获取量表列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 页码
+        name: page
+        in: query
+        required: true
+      - type: integer
+        description: 每页数量
+        name: page_size
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleListResponse'
+    post:
+      tags:
+      - Scale-Lifecycle
+      summary: 创建量表
+      description: 创建新量表，初始状态为草稿
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateScaleRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/by-questionnaire:
+    get:
+      tags:
+      - Scale-Query
+      summary: 根据问卷编码获取量表
+      description: 根据关联的问卷编码获取量表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 问卷编码
+        name: questionnaireCode
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/published:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取已发布量表列表
+      description: 分页获取已发布的量表列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 页码
+        name: page
+        in: query
+        required: true
+      - type: integer
+        description: 每页数量
+        name: page_size
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleListResponse'
+  /scales/published/{code}:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取已发布的量表
+      description: 根据编码获取已发布的量表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取量表详情
+      description: 根据编码获取量表详情
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+    delete:
+      tags:
+      - Scale-Lifecycle
+      summary: 删除量表
+      description: 删除草稿状态的量表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.Response'
+  /scales/{code}/archive:
+    post:
+      tags:
+      - Scale-Lifecycle
+      summary: 归档量表
+      description: 归档量表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/basic-info:
+    put:
+      tags:
+      - Scale-Lifecycle
+      summary: 更新量表基本信息
+      description: 更新量表的标题、描述
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateScaleBasicInfoRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/factors:
+    put:
+      tags:
+      - Scale-Factor
+      summary: 批量替换因子
+      description: 批量替换量表中的所有因子
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.ReplaceFactorsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/interpret-rules:
+    put:
+      tags:
+      - Scale-Factor
+      summary: 批量设置解读规则
+      description: 批量设置量表所有因子的解读规则
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.ReplaceInterpretRulesRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/publish:
+    post:
+      tags:
+      - Scale-Lifecycle
+      summary: 发布量表
+      description: 发布量表使其可用
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/questionnaire:
+    put:
+      tags:
+      - Scale-Lifecycle
+      summary: 更新关联的问卷
+      description: 更新量表关联的问卷编码和版本
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateScaleQuestionnaireRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/unpublish:
+    post:
+      tags:
+      - Scale-Lifecycle
+      summary: 下架量表
+      description: 下架量表使其不可用
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleResponse'
+  /staff:
+    get:
+      tags:
+      - Actor
+      summary: 查询员工列表
+      parameters:
+      - type: integer
+        description: 机构ID
+        name: org_id
+        in: query
+        required: true
+      - type: string
+        description: 角色筛选
+        name: role
+        in: query
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StaffListResponse'
+    post:
+      tags:
+      - Actor
+      summary: 创建员工
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateStaffRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StaffResponse'
+  /staff/{id}:
+    get:
+      tags:
+      - Actor
+      summary: 获取员工详情
+      parameters:
+      - type: integer
+        description: 员工ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StaffResponse'
+    delete:
+      tags:
+      - Actor
+      summary: 删除员工
+      parameters:
+      - type: integer
+        description: 员工ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.Response'
+  /testees:
+    get:
+      tags:
+      - Actor
+      summary: 查询受试者列表
+      parameters:
+      - type: integer
+        description: 机构ID
+        name: org_id
+        in: query
+        required: true
+      - type: string
+        description: 姓名（模糊匹配）
+        name: name
+        in: query
+      - type: boolean
+        description: 是否重点关注
+        name: is_key_focus
+        in: query
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeListResponse'
+  /testees/{id}:
+    get:
+      tags:
+      - Actor
+      summary: 获取受试者详情
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeResponse'
+    put:
+      tags:
+      - Actor
+      summary: 更新受试者
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateTesteeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/handler.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeResponse'
+  /health:
+    get:
+      tags:
+      - 系统
+      summary: 健康检查
+      description: 检查 API Server 健康状态
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /ping:
+    get:
+      tags:
+      - 系统
+      summary: Ping
+      description: 测试 API Server 连通性
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+components:
+  schemas:
+    handler.Response:
+      type: object
+      properties:
+        code:
+          type: integer
+        data: {}
+        message:
+          type: string
+        reference:
+          type: string
+    meta.ID:
+      type: integer
+      format: int64
+      enum:
+      - 0
+      x-enum-varnames:
+      - ZeroID
+    request.AddQuestionRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.OptionDTO'
+        required:
+          type: boolean
+        stem:
+          type: string
+        type:
+          type: string
+    request.BatchEvaluateRequest:
+      type: object
+      properties:
+        assessment_ids:
+          description: 测评ID列表
+          type: array
+          items:
+            type: integer
+    request.BatchUpdateQuestionsRequest:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.QuestionDTO'
+    request.CreateQuestionnaireRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        img_url:
+          type: string
+        title:
+          type: string
+    request.CreateScaleRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        title:
+          type: string
+    request.CreateStaffRequest:
+      type: object
+      required:
+      - name
+      - org_id
+      - roles
+      - user_id
+      properties:
+        email:
+          description: 邮箱
+          type: string
+        is_active:
+          description: 是否激活
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        org_id:
+          description: 机构ID
+          type: integer
+        phone:
+          description: 电话
+          type: string
+        roles:
+          description: 角色列表
+          type: array
+          minItems: 1
+          items:
+            type: string
+        user_id:
+          description: 用户ID
+          type: integer
+    request.FactorInterpretRulesModel:
+      type: object
+      properties:
+        factor_code:
+          type: string
+        interpret_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.InterpretRuleModel'
+    request.FactorModel:
+      type: object
+      properties:
+        code:
+          type: string
+        factor_type:
+          type: string
+        interpret_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.InterpretRuleModel'
+        is_total_score:
+          type: boolean
+        question_codes:
+          type: array
+          items:
+            type: string
+        scoring_params:
+          type: object
+          additionalProperties:
+            type: string
+        scoring_strategy:
+          type: string
+        title:
+          type: string
+    request.InterpretRuleModel:
+      type: object
+      properties:
+        conclusion:
+          type: string
+        max_score:
+          type: number
+        min_score:
+          type: number
+        risk_level:
+          type: string
+        suggestion:
+          type: string
+    request.ReorderQuestionsRequest:
+      type: object
+      properties:
+        question_codes:
+          type: array
+          items:
+            type: string
+    request.ReplaceFactorsRequest:
+      type: object
+      properties:
+        factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.FactorModel'
+    request.ReplaceInterpretRulesRequest:
+      type: object
+      properties:
+        factor_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.FactorInterpretRulesModel'
+    request.UpdateQuestionRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.OptionDTO'
+        required:
+          type: boolean
+        stem:
+          type: string
+        type:
+          type: string
+    request.UpdateQuestionnaireBasicInfoRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        img_url:
+          type: string
+        title:
+          type: string
+    request.UpdateScaleBasicInfoRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        title:
+          type: string
+    request.UpdateScaleQuestionnaireRequest:
+      type: object
+      properties:
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+    request.UpdateTesteeRequest:
+      type: object
+      properties:
+        birthday:
+          description: 出生日期
+          type: string
+        gender:
+          description: 性别
+          type: string
+        is_key_focus:
+          description: 是否重点关注
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        tags:
+          description: 标签
+          type: array
+          items:
+            type: string
+    response.AnswerSheetListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.AnswerSheetSummaryItem'
+        total:
+          type: integer
+    response.AnswerSheetResponse:
+      type: object
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.AnswerDTO'
+        filled_at:
+          type: string
+        filler_id:
+          $ref: '#/components/schemas/meta.ID'
+        filler_name:
+          type: string
+        id:
+          $ref: '#/components/schemas/meta.ID'
+        questionnaire_code:
+          type: string
+        questionnaire_ver:
+          type: string
+        score:
+          type: number
+        title:
+          type: string
+    response.AnswerSheetStatisticsResponse:
+      type: object
+      properties:
+        average_score:
+          type: number
+        max_score:
+          type: number
+        min_score:
+          type: number
+        questionnaire_code:
+          type: string
+        total_count:
+          type: integer
+    response.AnswerSheetSummaryItem:
+      type: object
+      properties:
+        filled_at:
+          type: string
+        filler_id:
+          $ref: '#/components/schemas/meta.ID'
+        id:
+          $ref: '#/components/schemas/meta.ID'
+        questionnaire_code:
+          type: string
+        questionnaire_ver:
+          type: string
+        score:
+          type: number
+        title:
+          type: string
+    response.AssessmentListResponse:
+      type: object
+      properties:
+        items:
+          description: 测评列表
+          type: array
+          items:
+            $ref: '#/components/schemas/response.AssessmentResponse'
+        page:
+          description: 当前页
+          type: integer
+        page_size:
+          description: 每页数量
+          type: integer
+        total:
+          description: 总数
+          type: integer
+        total_pages:
+          description: 总页数
+          type: integer
+    response.AssessmentResponse:
+      type: object
+      properties:
+        answer_sheet_id:
+          description: 答卷ID
+          type: integer
+        failed_at:
+          type: string
+        failure_reason:
+          type: string
+        id:
+          description: 测评ID
+          type: integer
+        interpreted_at:
+          type: string
+        medical_scale_code:
+          description: 量表编码
+          type: string
+        medical_scale_id:
+          description: 量表ID
+          type: integer
+        medical_scale_name:
+          description: 量表名称
+          type: string
+        org_id:
+          description: 组织ID
+          type: integer
+        origin_id:
+          description: 来源ID
+          type: string
+        origin_type:
+          description: 来源类型
+          type: string
+        questionnaire_code:
+          description: 问卷编码
+          type: string
+        questionnaire_id:
+          description: 问卷ID
+          type: integer
+        questionnaire_version:
+          description: 问卷版本
+          type: string
+        risk_level:
+          description: 风险等级
+          type: string
+        status:
+          description: 状态
+          type: string
+        submitted_at:
+          description: 提交时间
+          type: string
+        testee_id:
+          description: 受试者ID
+          type: integer
+        total_score:
+          description: 总分（格式化后的字符串）
+          type: string
+    response.AssessmentStatisticsResponse:
+      type: object
+      properties:
+        average_score:
+          description: 平均分
+          type: number
+        failed_count:
+          description: 失败数
+          type: integer
+        interpreted_count:
+          description: 已解读数
+          type: integer
+        pending_count:
+          description: 待提交数
+          type: integer
+        risk_distribution:
+          description: 风险等级分布
+          type: object
+          additionalProperties:
+            type: integer
+        scale_stats:
+          description: 按量表统计
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ScaleStatResponse'
+        submitted_count:
+          description: 已提交数
+          type: integer
+        total_count:
+          description: 总测评数
+          type: integer
+    response.AssessmentStatsResponse:
+      type: object
+      properties:
+        last_assessment_at:
+          description: 最后测评时间
+          type: string
+        last_risk_level:
+          description: 最后风险等级
+          type: string
+        total_count:
+          description: 总次数
+          type: integer
+    response.BatchEvaluationResponse:
+      type: object
+      properties:
+        failed_count:
+          description: 失败数
+          type: integer
+        failed_ids:
+          description: 失败的测评ID列表
+          type: array
+          items:
+            type: integer
+        success_count:
+          description: 成功数
+          type: integer
+        total_count:
+          description: 总数
+          type: integer
+    response.DimensionItem:
+      type: object
+      properties:
+        description:
+          description: 解读描述
+          type: string
+        factor_code:
+          description: 因子编码
+          type: string
+        factor_name:
+          description: 因子名称
+          type: string
+        raw_score:
+          description: 原始分
+          type: number
+        risk_level:
+          description: 风险等级
+          type: string
+    response.FactorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        factor_type:
+          type: string
+        interpret_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.InterpretRuleResponse'
+        is_total_score:
+          type: boolean
+        question_codes:
+          type: array
+          items:
+            type: string
+        scoring_params:
+          type: object
+          additionalProperties:
+            type: string
+        scoring_strategy:
+          type: string
+        title:
+          type: string
+    response.FactorScoreItem:
+      type: object
+      properties:
+        conclusion:
+          description: 结论
+          type: string
+        factor_code:
+          description: 因子编码
+          type: string
+        factor_name:
+          description: 因子名称
+          type: string
+        is_total_score:
+          description: 是否为总分因子
+          type: boolean
+        raw_score:
+          description: 原始分
+          type: number
+        risk_level:
+          description: 风险等级
+          type: string
+        suggestion:
+          description: 建议
+          type: string
+    response.FactorTrendResponse:
+      type: object
+      properties:
+        data_points:
+          description: 数据点列表
+          type: array
+          items:
+            $ref: '#/components/schemas/response.TrendDataPoint'
+        factor_code:
+          description: 因子编码
+          type: string
+        factor_name:
+          description: 因子名称
+          type: string
+        testee_id:
+          description: 受试者ID
+          type: integer
+    response.HighRiskFactorsResponse:
+      type: object
+      properties:
+        assessment_id:
+          description: 测评ID
+          type: integer
+        has_high_risk:
+          description: 是否存在高风险
+          type: boolean
+        high_risk_factors:
+          description: 高风险因子列表
+          type: array
+          items:
+            $ref: '#/components/schemas/response.FactorScoreItem'
+        needs_urgent_care:
+          description: 是否需要紧急关注
+          type: boolean
+    response.InterpretRuleResponse:
+      type: object
+      properties:
+        conclusion:
+          type: string
+        max_score:
+          type: number
+        min_score:
+          type: number
+        risk_level:
+          type: string
+        suggestion:
+          type: string
+    response.QuestionnaireListResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        questionnaires:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.QuestionnaireResponse'
+        total_count:
+          type: integer
+    response.QuestionnaireResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        img_url:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.QuestionDTO'
+        status:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+    response.ReportListResponse:
+      type: object
+      properties:
+        items:
+          description: 报告列表
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ReportResponse'
+        page:
+          description: 当前页
+          type: integer
+        page_size:
+          description: 每页数量
+          type: integer
+        total:
+          description: 总数
+          type: integer
+        total_pages:
+          description: 总页数
+          type: integer
+    response.ReportResponse:
+      type: object
+      properties:
+        assessment_id:
+          description: 测评ID
+          type: integer
+        conclusion:
+          description: 总结论
+          type: string
+        created_at:
+          description: 创建时间
+          type: string
+        dimensions:
+          description: 维度解读列表
+          type: array
+          items:
+            $ref: '#/components/schemas/response.DimensionItem'
+        risk_level:
+          description: 风险等级
+          type: string
+        scale_code:
+          description: 量表编码
+          type: string
+        scale_name:
+          description: 量表名称
+          type: string
+        suggestions:
+          description: 建议列表
+          type: array
+          items:
+            type: string
+        total_score:
+          description: 总分
+          type: number
+    response.ScaleListResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        scales:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ScaleResponse'
+        total_count:
+          type: integer
+    response.ScaleResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.FactorResponse'
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        title:
+          type: string
+    response.ScaleStatResponse:
+      type: object
+      properties:
+        average_score:
+          description: 平均分
+          type: number
+        count:
+          description: 测评数
+          type: integer
+        scale_code:
+          description: 量表编码
+          type: string
+        scale_name:
+          description: 量表名称
+          type: string
+    response.ScoreResponse:
+      type: object
+      properties:
+        assessment_id:
+          description: 测评ID
+          type: integer
+        factor_scores:
+          description: 因子得分列表
+          type: array
+          items:
+            $ref: '#/components/schemas/response.FactorScoreItem'
+        risk_level:
+          description: 整体风险等级
+          type: string
+        total_score:
+          description: 总分
+          type: number
+    response.StaffListResponse:
+      type: object
+      properties:
+        items:
+          description: 列表数据
+          type: array
+          items:
+            $ref: '#/components/schemas/response.StaffResponse'
+        page:
+          description: 当前页码
+          type: integer
+        page_size:
+          description: 每页数量
+          type: integer
+        total:
+          description: 总数
+          type: integer
+        total_pages:
+          description: 总页数
+          type: integer
+    response.StaffResponse:
+      type: object
+      properties:
+        created_at:
+          description: 创建时间
+          type: string
+        email:
+          description: 邮箱
+          type: string
+        id:
+          description: ID
+          type: integer
+        is_active:
+          description: 是否激活
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        org_id:
+          description: 机构ID
+          type: integer
+        phone:
+          description: 电话
+          type: string
+        roles:
+          description: 角色列表
+          type: array
+          items:
+            type: string
+        updated_at:
+          description: 更新时间
+          type: string
+        user_id:
+          description: 用户ID
+          type: integer
+    response.TesteeListResponse:
+      type: object
+      properties:
+        items:
+          description: 列表数据
+          type: array
+          items:
+            $ref: '#/components/schemas/response.TesteeResponse'
+        page:
+          description: 当前页码
+          type: integer
+        page_size:
+          description: 每页数量
+          type: integer
+        total:
+          description: 总数
+          type: integer
+        total_pages:
+          description: 总页数
+          type: integer
+    response.TesteeResponse:
+      type: object
+      properties:
+        assessment_stats:
+          description: 测评统计
+          allOf:
+          - $ref: '#/components/schemas/response.AssessmentStatsResponse'
+        birthday:
+          description: 出生日期
+          type: string
+        created_at:
+          description: 创建时间
+          type: string
+        gender:
+          description: 性别
+          type: string
+        iam_child_id:
+          description: IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
+          type: integer
+        id:
+          description: ID
+          type: integer
+        is_key_focus:
+          description: 是否重点关注
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        org_id:
+          description: 机构ID
+          type: integer
+        profile_id:
+          description: 用户档案ID（新字段）
+          type: integer
+        source:
+          description: 来源
+          type: string
+        tags:
+          description: 标签
+          type: array
+          items:
+            type: string
+        updated_at:
+          description: 更新时间
+          type: string
+    response.TrendDataPoint:
+      type: object
+      properties:
+        assessment_id:
+          description: 测评ID
+          type: integer
+        raw_score:
+          description: 得分
+          type: number
+        risk_level:
+          description: 风险等级
+          type: string
+    viewmodel.AnswerDTO:
+      type: object
+      properties:
+        question_code:
+          type: string
+        question_type:
+          type: string
+        score:
+          type: number
+        value: {}
+    viewmodel.CalculationRuleDTO:
+      type: object
+      properties:
+        formula_type:
+          description: 公式类型
+          type: string
+    viewmodel.OptionDTO:
+      type: object
+      properties:
+        code:
+          description: 选项ID，仅更新/编辑时提供
+          type: string
+        content:
+          description: 选项内容
+          type: string
+        score:
+          description: 选项分数（支持小数）
+          type: number
+    viewmodel.QuestionDTO:
+      type: object
+      properties:
+        calculation_rule:
+          description: 问题算分规则（可选项，结构化题型）
+          allOf:
+          - $ref: '#/components/schemas/viewmodel.CalculationRuleDTO'
+        code:
+          description: 问题ID，仅更新/编辑时提供
+          type: string
+        options:
+          description: 问题选项（可选项，结构化题型）
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.OptionDTO'
+        placeholder:
+          description: 特定属性
+          type: string
+        question_type:
+          description: 问题题型：single_choice, multi_choice, text 等
+          type: string
+        stem:
+          description: 问题题干
+          type: string
+        tips:
+          description: 问题提示
+          type: string
+        validation_rules:
+          description: 能力属性
+          type: array
+          items:
+            $ref: '#/components/schemas/viewmodel.ValidationRuleDTO'
+    viewmodel.ValidationRuleDTO:
+      type: object
+      properties:
+        rule_type:
+          description: 规则类型
+          type: string
+        target_value:
+          description: 目标值
+          type: string
+servers:
+- url: http://localhost:8081/api/v1
+- url: https://api.example.com/api/v1

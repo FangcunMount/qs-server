@@ -25,8 +25,12 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	// 设置全局中间件
 	r.setupGlobalMiddleware(engine)
 
-	// Swagger 文档
-	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger 文档：静态文件由 api/collection 提供，UI 入口指向该路径
+	engine.Static("/api/collection", "./api/collection")
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerFiles.Handler,
+		ginSwagger.URL("/api/collection/swagger.json"),
+	))
 
 	// 注册公开路由
 	r.registerPublicRoutes(engine)
