@@ -41,7 +41,7 @@ func NewAnswerSheetHandler(
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path int true "答卷ID"
-// @Success 200 {object} response.Response{data=response.AnswerSheetResponse}
+// @Success 200 {object} handler.Response{data=response.AnswerSheetResponse}
 // @Router /api/v1/admin/answersheets/{id} [get]
 func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 	answerSheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -72,7 +72,7 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Param filler_id query int false "填写人ID"
 // @Param start_time query string false "开始时间"
 // @Param end_time query string false "结束时间"
-// @Success 200 {object} response.Response{data=response.AnswerSheetListResponse}
+// @Success 200 {object} handler.Response{data=response.AnswerSheetListResponse}
 // @Router /api/v1/admin/answersheets [get]
 func (h *AnswerSheetHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -135,7 +135,7 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code query string true "问卷编码"
-// @Success 200 {object} response.Response{data=response.AnswerSheetStatisticsResponse}
+// @Success 200 {object} handler.Response{data=response.AnswerSheetStatisticsResponse}
 // @Router /api/v1/admin/answersheets/statistics [get]
 func (h *AnswerSheetHandler) GetStatistics(c *gin.Context) {
 	questionnaireCode := c.Query("code")

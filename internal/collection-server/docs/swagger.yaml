@@ -1,0 +1,713 @@
+basePath: /api/v1
+definitions:
+  answersheet.AnswerSheetResponse:
+    properties:
+      answers:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer'
+        type: array
+      created_at:
+        type: string
+      id:
+        type: integer
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      score:
+        type: number
+      testee_id:
+        type: integer
+      testee_name:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      writer_id:
+        type: integer
+      writer_name:
+        type: string
+    type: object
+  answersheet.SubmitAnswerSheetRequest:
+    properties:
+      answers:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer'
+        type: array
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      testee_id:
+        type: integer
+      title:
+        type: string
+    required:
+    - answers
+    - questionnaire_code
+    - questionnaire_version
+    - testee_id
+    type: object
+  answersheet.SubmitAnswerSheetResponse:
+    properties:
+      id:
+        type: integer
+      message:
+        type: string
+    type: object
+  core.ErrResponse:
+    properties:
+      code:
+        description: Code 定义了业务错误代码
+        type: integer
+      message:
+        description: |-
+          Message 包含此消息的详细信息
+          此消息适合暴露给外部
+        type: string
+      reference:
+        description: Reference 返回参考文档，可能有助于解决此错误
+        type: string
+    type: object
+  evaluation.AssessmentDetailResponse:
+    properties:
+      answer_sheet_id:
+        type: integer
+      created_at:
+        type: string
+      failed_at:
+        type: string
+      failure_reason:
+        type: string
+      id:
+        type: integer
+      interpreted_at:
+        type: string
+      org_id:
+        type: integer
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_id:
+        type: integer
+      questionnaire_version:
+        type: string
+      risk_level:
+        type: string
+      scale_code:
+        type: string
+      scale_name:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        type: integer
+      total_score:
+        type: number
+    type: object
+  evaluation.AssessmentReportResponse:
+    properties:
+      assessment_id:
+        type: integer
+      conclusion:
+        type: string
+      created_at:
+        type: string
+      dimensions:
+        items:
+          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
+        type: array
+      risk_level:
+        type: string
+      scale_code:
+        type: string
+      scale_name:
+        type: string
+      suggestions:
+        items:
+          type: string
+        type: array
+      total_score:
+        type: number
+    type: object
+  evaluation.AssessmentSummaryResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      interpreted_at:
+        type: string
+      origin_type:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_id:
+        type: integer
+      questionnaire_version:
+        type: string
+      risk_level:
+        type: string
+      scale_code:
+        type: string
+      scale_name:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      total_score:
+        type: number
+    type: object
+  evaluation.DimensionInterpretResponse:
+    properties:
+      description:
+        type: string
+      factor_code:
+        type: string
+      factor_name:
+        type: string
+      raw_score:
+        type: number
+      risk_level:
+        type: string
+    type: object
+  evaluation.FactorScoreResponse:
+    properties:
+      conclusion:
+        type: string
+      factor_code:
+        type: string
+      factor_name:
+        type: string
+      is_total_score:
+        type: boolean
+      raw_score:
+        type: number
+      risk_level:
+        type: string
+      suggestion:
+        type: string
+    type: object
+  evaluation.ListAssessmentsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  evaluation.TrendPointResponse:
+    properties:
+      assessment_id:
+        type: integer
+      created_at:
+        type: string
+      risk_level:
+        type: string
+      score:
+        type: number
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer:
+    properties:
+      question_code:
+        type: string
+      question_type:
+        type: string
+      score:
+        type: integer
+      value:
+        description: JSON 字符串
+        type: string
+    required:
+    - question_code
+    - question_type
+    - value
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      questionnaires:
+        items:
+          $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  questionnaire.CalculationRuleResponse:
+    properties:
+      formula_type:
+        type: string
+    type: object
+  questionnaire.OptionResponse:
+    properties:
+      code:
+        type: string
+      content:
+        type: string
+      score:
+        type: integer
+    type: object
+  questionnaire.QuestionResponse:
+    properties:
+      calculation_rule:
+        $ref: '#/definitions/questionnaire.CalculationRuleResponse'
+      code:
+        type: string
+      options:
+        items:
+          $ref: '#/definitions/questionnaire.OptionResponse'
+        type: array
+      placeholder:
+        type: string
+      tips:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      validation_rules:
+        items:
+          $ref: '#/definitions/questionnaire.ValidationRuleResponse'
+        type: array
+    type: object
+  questionnaire.QuestionnaireResponse:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      img_url:
+        type: string
+      questions:
+        items:
+          $ref: '#/definitions/questionnaire.QuestionResponse'
+        type: array
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: string
+    type: object
+  questionnaire.ValidationRuleResponse:
+    properties:
+      rule_type:
+        type: string
+      target_value:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Questionnaire collection/BFF layer
+  title: Collection Server
+  version: "1.0"
+paths:
+  /api/v1/answersheets:
+    post:
+      consumes:
+      - application/json
+      description: 用户提交问卷答卷
+      parameters:
+      - description: 答卷数据
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/answersheet.SubmitAnswerSheetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/answersheet.SubmitAnswerSheetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 提交答卷
+      tags:
+      - 答卷
+  /api/v1/answersheets/{id}:
+    get:
+      description: 根据ID获取答卷详情
+      parameters:
+      - description: 答卷ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/answersheet.AnswerSheetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取答卷详情
+      tags:
+      - 答卷
+  /api/v1/assessments:
+    get:
+      description: 分页获取当前用户的测评列表
+      parameters:
+      - description: 状态筛选
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/evaluation.ListAssessmentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取我的测评列表
+      tags:
+      - 测评
+  /api/v1/assessments/{id}:
+    get:
+      description: 根据测评ID获取测评详情
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/evaluation.AssessmentDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取我的测评详情
+      tags:
+      - 测评
+  /api/v1/assessments/{id}/factors/high-risk:
+    get:
+      description: 获取指定测评的高风险因子列表
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/evaluation.FactorScoreResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取高风险因子
+      tags:
+      - 测评
+  /api/v1/assessments/{id}/report:
+    get:
+      description: 获取测评的解读报告
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/evaluation.AssessmentReportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取测评报告
+      tags:
+      - 测评
+  /api/v1/assessments/{id}/scores:
+    get:
+      description: 获取测评的因子得分详情
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/evaluation.FactorScoreResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取测评得分详情
+      tags:
+      - 测评
+  /api/v1/assessments/trend:
+    get:
+      description: 获取指定因子的历史得分趋势
+      parameters:
+      - description: 因子编码
+        in: query
+        name: factor_code
+        required: true
+        type: string
+      - default: 10
+        description: 数据点数量
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/evaluation.TrendPointResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取因子得分趋势
+      tags:
+      - 测评
+  /api/v1/public/info:
+    get:
+      description: 获取服务基本信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 服务信息
+      tags:
+      - 系统
+  /api/v1/questionnaires:
+    get:
+      description: 分页获取问卷列表
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 状态过滤
+        in: query
+        name: status
+        type: string
+      - description: 标题过滤
+        in: query
+        name: title
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取问卷列表
+      tags:
+      - 问卷
+  /api/v1/questionnaires/{code}:
+    get:
+      description: 根据问卷编码获取问卷详情
+      parameters:
+      - description: 问卷编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取问卷详情
+      tags:
+      - 问卷
+  /health:
+    get:
+      description: 检查服务健康状态
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 健康检查
+      tags:
+      - 系统
+  /ping:
+    get:
+      description: 测试服务连通性
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Ping
+      tags:
+      - 系统
+schemes:
+- http
+- https
+swagger: "2.0"

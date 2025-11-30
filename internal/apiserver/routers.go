@@ -6,6 +6,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Router 集中的路由管理器
@@ -22,6 +24,9 @@ func NewRouter(c *container.Container) *Router {
 
 // RegisterRoutes 注册所有路由
 func (r *Router) RegisterRoutes(engine *gin.Engine) {
+	// Swagger 文档
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// 注册公开路由（不需要认证）
 	r.registerPublicRoutes(engine)
 
@@ -257,6 +262,12 @@ func (r *Router) placeholder(c *gin.Context) {
 }
 
 // healthCheck 健康检查处理函数
+// @Summary 健康检查
+// @Description 检查 API Server 健康状态
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /health [get]
 func (r *Router) healthCheck(c *gin.Context) {
 	response := gin.H{
 		"status":       "healthy",
@@ -278,6 +289,12 @@ func (r *Router) healthCheck(c *gin.Context) {
 }
 
 // ping 简单的连通性测试
+// @Summary Ping
+// @Description 测试 API Server 连通性
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /ping [get]
 func (r *Router) ping(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",

@@ -4,6 +4,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Router 集中的路由管理器
@@ -22,6 +24,9 @@ func NewRouter(c *container.Container) *Router {
 func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	// 设置全局中间件
 	r.setupGlobalMiddleware(engine)
+
+	// Swagger 文档
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// 注册公开路由
 	r.registerPublicRoutes(engine)
