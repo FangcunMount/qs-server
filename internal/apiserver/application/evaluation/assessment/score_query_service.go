@@ -86,7 +86,6 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 				AssessmentID: score.AssessmentID().Uint64(),
 				RawScore:     fs.RawScore(),
 				RiskLevel:    string(fs.RiskLevel()),
-				CreatedAt:    score.CreatedAt(),
 			})
 		}
 	}

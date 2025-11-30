@@ -1,18 +1,17 @@
--- 初始化 actor 模块表结构
+-- 初始化 actor/evaluation 模块表结构
 -- 创建时间: 2025-11-20
 -- 版本: v1
 
--- 受试者表
+
 CREATE TABLE IF NOT EXISTS `testee` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `org_id` bigint NOT NULL COMMENT '机构ID',
-  `iam_user_id` bigint DEFAULT NULL COMMENT 'IAM用户ID（成年人）',
-  `iam_child_id` bigint DEFAULT NULL COMMENT 'IAM儿童ID（未成年人）',
+  `profile_id` bigint unsigned DEFAULT NULL COMMENT '用户档案ID',
   `name` varchar(100) NOT NULL COMMENT '姓名',
-  `gender` varchar(20) DEFAULT NULL COMMENT '性别',
+  `gender` tinyint NOT NULL COMMENT '性别',
   `birthday` date DEFAULT NULL COMMENT '出生日期',
   `tags` json DEFAULT NULL COMMENT '标签（JSON数组）',
-  `source` varchar(50) DEFAULT NULL COMMENT '来源',
+  `source` varchar(50) NOT NULL DEFAULT 'unknown' COMMENT '来源',
   `is_key_focus` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否重点关注',
   `total_assessments` int NOT NULL DEFAULT '0' COMMENT '总测评次数',
   `last_assessment_at` datetime DEFAULT NULL COMMENT '最后测评时间',
@@ -20,23 +19,23 @@ CREATE TABLE IF NOT EXISTS `testee` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted_at` datetime DEFAULT NULL COMMENT '删除时间（软删除）',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人ID',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人ID',
-  `deleted_by` bigint DEFAULT NULL COMMENT '删除人ID',
-  `version` int NOT NULL DEFAULT '1' COMMENT '版本号（乐观锁）',
+  `created_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '创建人ID',
+  `updated_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '更新人ID',
+  `deleted_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '删除人ID',
+  `version` int unsigned NOT NULL DEFAULT '1' COMMENT '版本号（乐观锁）',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_org_iam_user` (`org_id`,`iam_user_id`,`deleted_at`),
-  UNIQUE KEY `uk_org_iam_child` (`org_id`,`iam_child_id`,`deleted_at`),
-  KEY `idx_org_name` (`org_id`,`name`),
-  KEY `idx_org_key_focus` (`org_id`,`is_key_focus`),
+  KEY `idx_org_id` (`org_id`),
+  KEY `idx_profile_id` (`profile_id`),
+  KEY `idx_name` (`name`),
+  KEY `idx_is_key_focus` (`is_key_focus`),
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='受试者表';
 
--- 员工表
+
 CREATE TABLE IF NOT EXISTS `staff` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `org_id` bigint NOT NULL COMMENT '机构ID',
-  `iam_user_id` bigint NOT NULL COMMENT 'IAM用户ID',
+  `user_id` bigint NOT NULL COMMENT '用户ID',
   `roles` json NOT NULL COMMENT '角色列表（JSON数组）',
   `name` varchar(100) NOT NULL COMMENT '姓名',
   `email` varchar(255) DEFAULT NULL COMMENT '邮箱',
@@ -45,12 +44,84 @@ CREATE TABLE IF NOT EXISTS `staff` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted_at` datetime DEFAULT NULL COMMENT '删除时间（软删除）',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人ID',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人ID',
-  `deleted_by` bigint DEFAULT NULL COMMENT '删除人ID',
-  `version` int NOT NULL DEFAULT '1' COMMENT '版本号（乐观锁）',
+  `created_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '创建人ID',
+  `updated_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '更新人ID',
+  `deleted_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '删除人ID',
+  `version` int unsigned NOT NULL DEFAULT '1' COMMENT '版本号（乐观锁）',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_org_iam_user` (`org_id`,`iam_user_id`,`deleted_at`),
-  KEY `idx_org_active` (`org_id`,`is_active`),
+  KEY `idx_org_id` (`org_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_is_active` (`is_active`),
   KEY `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='员工表';
+
+
+CREATE TABLE IF NOT EXISTS `assessment` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `org_id` bigint NOT NULL COMMENT '机构ID',
+  `testee_id` bigint unsigned NOT NULL COMMENT '受试者ID',
+  `questionnaire_id` bigint unsigned NOT NULL COMMENT '问卷ID',
+  `questionnaire_code` varchar(100) NOT NULL COMMENT '问卷代码',
+  `questionnaire_version` varchar(50) NOT NULL COMMENT '问卷版本',
+  `medical_scale_id` bigint unsigned DEFAULT NULL COMMENT '量表ID',
+  `medical_scale_code` varchar(100) DEFAULT NULL COMMENT '量表代码',
+  `medical_scale_name` varchar(255) DEFAULT NULL COMMENT '量表名称',
+  `answer_sheet_id` bigint unsigned NOT NULL COMMENT '答卷ID',
+  `origin_type` varchar(50) NOT NULL COMMENT '来源类型',
+  `origin_id` varchar(100) DEFAULT NULL COMMENT '来源ID',
+  `status` varchar(50) NOT NULL COMMENT '状态',
+  `total_score` double DEFAULT NULL COMMENT '总得分',
+  `risk_level` varchar(50) DEFAULT NULL COMMENT '风险等级',
+  `submitted_at` datetime DEFAULT NULL COMMENT '提交时间',
+  `interpreted_at` datetime DEFAULT NULL COMMENT '解读时间',
+  `failed_at` datetime DEFAULT NULL COMMENT '失败时间',
+  `failure_reason` varchar(500) DEFAULT NULL COMMENT '失败原因',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted_at` datetime DEFAULT NULL COMMENT '删除时间（软删除）',
+  `created_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '创建人ID',
+  `updated_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '更新人ID',
+  `deleted_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '删除人ID',
+  `version` int unsigned NOT NULL DEFAULT '1' COMMENT '版本号（乐观锁）',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_answer_sheet_id` (`answer_sheet_id`),
+  KEY `idx_org_id` (`org_id`),
+  KEY `idx_testee_id` (`testee_id`),
+  KEY `idx_questionnaire_id` (`questionnaire_id`),
+  KEY `idx_origin_type` (`origin_type`),
+  KEY `idx_origin_id` (`origin_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_risk_level` (`risk_level`),
+  KEY `idx_medical_scale_id` (`medical_scale_id`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测评表';
+
+
+CREATE TABLE IF NOT EXISTS `assessment_score` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `assessment_id` bigint unsigned NOT NULL COMMENT '测评ID',
+  `testee_id` bigint unsigned NOT NULL COMMENT '受试者ID',
+  `medical_scale_id` bigint unsigned NOT NULL COMMENT '量表ID',
+  `medical_scale_code` varchar(100) NOT NULL COMMENT '量表代码',
+  `factor_code` varchar(100) NOT NULL COMMENT '因子代码',
+  `factor_name` varchar(255) NOT NULL COMMENT '因子名称',
+  `is_total_score` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否总分',
+  `raw_score` double NOT NULL COMMENT '原始得分',
+  `risk_level` varchar(50) NOT NULL COMMENT '风险等级',
+  `conclusion` text COMMENT '结论',
+  `suggestion` text COMMENT '建议',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted_at` datetime DEFAULT NULL COMMENT '删除时间（软删除）',
+  `created_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '创建人ID',
+  `updated_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '更新人ID',
+  `deleted_by` bigint unsigned NOT NULL DEFAULT '0' COMMENT '删除人ID',
+  `version` int unsigned NOT NULL DEFAULT '1' COMMENT '版本号（乐观锁）',
+  PRIMARY KEY (`id`),
+  KEY `idx_assessment_id` (`assessment_id`),
+  KEY `idx_testee_id` (`testee_id`),
+  KEY `idx_medical_scale_id` (`medical_scale_id`),
+  KEY `idx_factor_code` (`factor_code`),
+  KEY `idx_risk_level` (`risk_level`),
+  KEY `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测评分表';

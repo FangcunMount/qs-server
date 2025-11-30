@@ -34,7 +34,6 @@ type Assessment struct {
 	riskLevel  *RiskLevel
 
 	// === 时间戳 ===
-	createdAt     time.Time
 	submittedAt   *time.Time
 	interpretedAt *time.Time
 	failedAt      *time.Time
@@ -84,7 +83,6 @@ func NewAssessment(
 		answerSheetRef:   answerSheetRef,
 		origin:           origin,
 		status:           StatusPending,
-		createdAt:        time.Now(),
 		events:           make([]DomainEvent, 0),
 	}
 
@@ -97,9 +95,7 @@ func NewAssessment(
 
 // WithMedicalScale 设置关联的量表
 func WithMedicalScale(scaleRef MedicalScaleRef) AssessmentOption {
-	return func(a *Assessment) {
-		a.medicalScaleRef = &scaleRef
-	}
+	return func(a *Assessment) { a.medicalScaleRef = &scaleRef }
 }
 
 // WithID 设置ID（用于重建）
@@ -113,13 +109,6 @@ func WithID(id ID) AssessmentOption {
 func WithStatus(status Status) AssessmentOption {
 	return func(a *Assessment) {
 		a.status = status
-	}
-}
-
-// WithCreatedAt 设置创建时间（用于重建）
-func WithCreatedAt(t time.Time) AssessmentOption {
-	return func(a *Assessment) {
-		a.createdAt = t
 	}
 }
 
@@ -195,7 +184,6 @@ func Reconstruct(
 	status Status,
 	totalScore *float64,
 	riskLevel *RiskLevel,
-	createdAt time.Time,
 	submittedAt *time.Time,
 	interpretedAt *time.Time,
 	failedAt *time.Time,
@@ -212,7 +200,6 @@ func Reconstruct(
 		status:           status,
 		totalScore:       totalScore,
 		riskLevel:        riskLevel,
-		createdAt:        createdAt,
 		submittedAt:      submittedAt,
 		interpretedAt:    interpretedAt,
 		failedAt:         failedAt,
@@ -417,11 +404,6 @@ func (a *Assessment) RiskLevel() *RiskLevel {
 }
 
 // ==================== 时间戳查询方法 ====================
-
-// CreatedAt 获取创建时间
-func (a *Assessment) CreatedAt() time.Time {
-	return a.createdAt
-}
 
 // SubmittedAt 获取提交时间
 func (a *Assessment) SubmittedAt() *time.Time {

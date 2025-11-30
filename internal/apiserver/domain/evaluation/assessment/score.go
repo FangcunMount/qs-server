@@ -19,7 +19,6 @@ type AssessmentScore struct {
 	totalScore   float64
 	riskLevel    RiskLevel
 	factorScores []FactorScore
-	createdAt    time.Time
 }
 
 // NewAssessmentScore 创建测评得分
@@ -34,7 +33,6 @@ func NewAssessmentScore(
 		totalScore:   totalScore,
 		riskLevel:    riskLevel,
 		factorScores: factorScores,
-		createdAt:    time.Now(),
 	}
 }
 
@@ -44,14 +42,12 @@ func ReconstructAssessmentScore(
 	totalScore float64,
 	riskLevel RiskLevel,
 	factorScores []FactorScore,
-	createdAt time.Time,
 ) *AssessmentScore {
 	return &AssessmentScore{
 		assessmentID: assessmentID,
 		totalScore:   totalScore,
 		riskLevel:    riskLevel,
 		factorScores: factorScores,
-		createdAt:    createdAt,
 	}
 }
 
@@ -101,11 +97,6 @@ func (s *AssessmentScore) RiskLevel() RiskLevel {
 // FactorScores 获取所有因子得分
 func (s *AssessmentScore) FactorScores() []FactorScore {
 	return s.factorScores
-}
-
-// CreatedAt 获取创建时间
-func (s *AssessmentScore) CreatedAt() time.Time {
-	return s.createdAt
 }
 
 // ==================== AssessmentScore 业务方法 ====================

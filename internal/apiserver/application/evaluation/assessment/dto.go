@@ -78,7 +78,6 @@ type AssessmentResult struct {
 	Status               string     // 状态
 	TotalScore           *float64   // 总分
 	RiskLevel            *string    // 风险等级
-	CreatedAt            time.Time  // 创建时间
 	SubmittedAt          *time.Time // 提交时间
 	InterpretedAt        *time.Time // 解读时间
 	FailedAt             *time.Time // 失败时间
@@ -174,10 +173,9 @@ type FactorTrendResult struct {
 
 // TrendDataPoint 趋势数据点
 type TrendDataPoint struct {
-	AssessmentID uint64    // 测评ID
-	RawScore     float64   // 得分
-	RiskLevel    string    // 风险等级
-	CreatedAt    time.Time // 时间
+	AssessmentID uint64  // 测评ID
+	RawScore     float64 // 得分
+	RiskLevel    string  // 风险等级
 }
 
 // HighRiskFactorsResult 高风险因子结果

@@ -27,7 +27,6 @@ type AssessmentResponse struct {
 	Status               string  `json:"status"`                 // 状态
 	TotalScore           *string `json:"total_score,omitempty"`  // 总分（格式化后的字符串）
 	RiskLevel            *string `json:"risk_level,omitempty"`   // 风险等级
-	CreatedAt            string  `json:"created_at"`             // 创建时间
 	SubmittedAt          *string `json:"submitted_at,omitempty"` // 提交时间
 	InterpretedAt        *string `json:"interpreted_at,omitempty"`
 	FailedAt             *string `json:"failed_at,omitempty"`
@@ -105,7 +104,6 @@ type TrendDataPoint struct {
 	AssessmentID uint64  `json:"assessment_id"` // 测评ID
 	RawScore     float64 `json:"raw_score"`     // 得分
 	RiskLevel    string  `json:"risk_level"`    // 风险等级
-	CreatedAt    string  `json:"created_at"`    // 时间
 }
 
 // HighRiskFactorsResponse 高风险因子响应
@@ -179,7 +177,6 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 		OriginID:             result.OriginID,
 		Status:               result.Status,
 		RiskLevel:            result.RiskLevel,
-		CreatedAt:            result.CreatedAt.Format(time.RFC3339),
 	}
 
 	// 格式化总分
@@ -307,7 +304,6 @@ func NewFactorTrendResponse(result *assessment.FactorTrendResult) *FactorTrendRe
 			AssessmentID: dp.AssessmentID,
 			RawScore:     dp.RawScore,
 			RiskLevel:    dp.RiskLevel,
-			CreatedAt:    dp.CreatedAt.Format(time.RFC3339),
 		})
 	}
 

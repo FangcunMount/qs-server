@@ -170,7 +170,6 @@ func (s *EvaluationService) GetFactorTrend(ctx context.Context, req *pb.GetFacto
 			AssessmentId: dp.AssessmentID,
 			Score:        dp.RawScore,
 			RiskLevel:    dp.RiskLevel,
-			CreatedAt:    dp.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -298,7 +297,6 @@ func toProtoAssessmentDetail(result *assessmentApp.AssessmentResult) *pb.Assessm
 		AnswerSheetId:        result.AnswerSheetID,
 		OriginType:           result.OriginType,
 		Status:               result.Status,
-		CreatedAt:            result.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
 
 	if result.MedicalScaleCode != nil {
@@ -345,7 +343,6 @@ func toProtoAssessmentSummary(result *assessmentApp.AssessmentResult) *pb.Assess
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		OriginType:           result.OriginType,
 		Status:               result.Status,
-		CreatedAt:            result.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
 
 	if result.MedicalScaleCode != nil {

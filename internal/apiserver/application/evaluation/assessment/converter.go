@@ -23,7 +23,6 @@ func toAssessmentResult(a *assessment.Assessment) *AssessmentResult {
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
 		OriginType:           a.Origin().Type().String(),
 		Status:               a.Status().String(),
-		CreatedAt:            a.CreatedAt(),
 	}
 
 	// 量表引用（可选）
@@ -96,7 +95,6 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 		Conclusion:   r.Conclusion(),
 		Dimensions:   dimensions,
 		Suggestions:  r.Suggestions(),
-		CreatedAt:    r.CreatedAt(),
 	}
 }
 

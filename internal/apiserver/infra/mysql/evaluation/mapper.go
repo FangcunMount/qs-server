@@ -124,7 +124,6 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		assessment.Status(po.Status),
 		po.TotalScore,
 		riskLevel,
-		po.CreatedAt,
 		po.SubmittedAt,
 		po.InterpretedAt,
 		po.FailedAt,
@@ -235,7 +234,6 @@ func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.AssessmentS
 		totalScore,
 		riskLevel,
 		factorScores,
-		firstPO.CreatedAt,
 	)
 }
 

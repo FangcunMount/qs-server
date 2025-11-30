@@ -187,7 +187,6 @@ func (r *scoreRepository) toSingleFactorDomainList(pos []*AssessmentScorePO) []*
 			po.RawScore,
 			assessment.RiskLevel(po.RiskLevel),
 			[]assessment.FactorScore{factorScore},
-			po.CreatedAt,
 		)
 		result = append(result, score)
 	}

@@ -13,8 +13,7 @@ type TesteePO struct {
 	mysql.AuditFields
 
 	OrgID      int64          `gorm:"column:org_id;not null;index:idx_org_id"`
-	IAMUserID  *int64         `gorm:"column:iam_user_id;index:idx_iam_user_id"`
-	IAMChildID *int64         `gorm:"column:iam_child_id;index:idx_iam_child_id"`
+	ProfileID  *uint64        `gorm:"column:profile_id;type:bigint unsigned;index:idx_profile_id"`
 	Name       string         `gorm:"column:name;size:100;not null;index:idx_name"`
 	Gender     int8           `gorm:"column:gender;not null"`
 	Birthday   *time.Time     `gorm:"column:birthday"`

@@ -58,48 +58,12 @@ func (r *testeeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.
 	return r.mapper.ToDomain(po), nil
 }
 
-// FindByIAMUser 根据IAM用户ID查找受试者
-func (r *testeeRepository) FindByIAMUser(ctx context.Context, orgID int64, iamUserID int64) (*testee.Testee, error) {
-	var po TesteePO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND iam_user_id = ? AND deleted_at IS NULL", orgID, iamUserID).
-		First(&po).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
-		}
-		return nil, err
-	}
-
-	return r.mapper.ToDomain(&po), nil
-}
-
-// FindByIAMChild 根据IAM儿童ID查找受试者
-func (r *testeeRepository) FindByIAMChild(ctx context.Context, orgID int64, iamChildID int64) (*testee.Testee, error) {
-	var po TesteePO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND iam_child_id = ? AND deleted_at IS NULL", orgID, iamChildID).
-		First(&po).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
-		}
-		return nil, err
-	}
-
-	return r.mapper.ToDomain(&po), nil
-}
-
 // FindByProfile 根据用户档案ID查找受试者
 // 注意：当前 ProfileID 对应 IAM.Child.ID
 func (r *testeeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*testee.Testee, error) {
 	var po TesteePO
-	// 将 uint64 转换为 int64 用于数据库查询
-	iamChildID := int64(profileID)
 	err := r.WithContext(ctx).
-		Where("org_id = ? AND iam_child_id = ? AND deleted_at IS NULL", orgID, iamChildID).
+		Where("org_id = ? AND profile_id = ? AND deleted_at IS NULL", orgID, profileID).
 		First(&po).Error
 
 	if err != nil {
