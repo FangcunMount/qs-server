@@ -9,21 +9,21 @@ import (
 
 // EvaluationClient 测评服务客户端
 type EvaluationClient struct {
-	manager *ClientManager
+	manager *Manager
 	client  pb.EvaluationServiceClient
 }
 
 // NewEvaluationClient 创建测评服务客户端
-func NewEvaluationClient(manager *ClientManager) *EvaluationClient {
+func NewEvaluationClient(manager *Manager) *EvaluationClient {
 	return &EvaluationClient{
 		manager: manager,
-		client:  pb.NewEvaluationServiceClient(manager.Connection()),
+		client:  pb.NewEvaluationServiceClient(manager.Conn()),
 	}
 }
 
 // GetAssessmentScores 获取测评得分详情
 func (c *EvaluationClient) GetAssessmentScores(ctx context.Context, assessmentID uint64) (*pb.GetAssessmentScoresResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.RequestTimeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.GetAssessmentScores(ctx, &pb.GetAssessmentScoresRequest{
@@ -38,7 +38,7 @@ func (c *EvaluationClient) GetAssessmentScores(ctx context.Context, assessmentID
 
 // GetAssessmentReport 获取测评报告
 func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, assessmentID uint64) (*pb.GetAssessmentReportResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.RequestTimeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{

@@ -9,21 +9,21 @@ import (
 
 // AnswerSheetClient 答卷服务客户端
 type AnswerSheetClient struct {
-	manager *ClientManager
+	manager *Manager
 	client  pb.AnswerSheetServiceClient
 }
 
 // NewAnswerSheetClient 创建答卷服务客户端
-func NewAnswerSheetClient(manager *ClientManager) *AnswerSheetClient {
+func NewAnswerSheetClient(manager *Manager) *AnswerSheetClient {
 	return &AnswerSheetClient{
 		manager: manager,
-		client:  pb.NewAnswerSheetServiceClient(manager.Connection()),
+		client:  pb.NewAnswerSheetServiceClient(manager.Conn()),
 	}
 }
 
 // GetAnswerSheet 获取答卷详情
 func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, id uint64) (*pb.GetAnswerSheetResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.RequestTimeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.GetAnswerSheet(ctx, &pb.GetAnswerSheetRequest{
@@ -38,7 +38,7 @@ func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, id uint64) (*pb.
 
 // ListAnswerSheets 获取答卷列表
 func (c *AnswerSheetClient) ListAnswerSheets(ctx context.Context, req *pb.ListAnswerSheetsRequest) (*pb.ListAnswerSheetsResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.RequestTimeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.ListAnswerSheets(ctx, req)
@@ -51,7 +51,7 @@ func (c *AnswerSheetClient) ListAnswerSheets(ctx context.Context, req *pb.ListAn
 
 // SaveAnswerSheetScores 保存答卷答案和分数
 func (c *AnswerSheetClient) SaveAnswerSheetScores(ctx context.Context, req *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.RequestTimeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.SaveAnswerSheetScores(ctx, req)

@@ -1,11 +1,14 @@
 package config
 
 import (
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
 // Config Worker 运行时配置
 type Config struct {
+	// Options 原始配置选项
+	Options *options.Options
 	// Log 日志配置
 	Log *LogConfig
 	// MySQL 数据库配置
@@ -18,6 +21,8 @@ type Config struct {
 	GRPC *GRPCConfig
 	// Worker 配置
 	Worker *WorkerConfig
+	// Redis 双实例配置
+	Redis *genericoptions.RedisDualOptions
 }
 
 // LogConfig 日志配置
@@ -62,6 +67,7 @@ type WorkerConfig struct {
 // CreateConfigFromOptions 从 Options 创建 Config
 func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 	return &Config{
+		Options: opts,
 		Log: &LogConfig{
 			Level:  opts.Log.Level,
 			Format: opts.Log.Format,
@@ -89,5 +95,6 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 			MaxRetries:  opts.Worker.MaxRetries,
 			ServiceName: opts.Worker.ServiceName,
 		},
+		Redis: opts.Redis,
 	}, nil
 }
