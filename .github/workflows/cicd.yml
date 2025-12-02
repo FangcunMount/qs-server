@@ -84,8 +84,8 @@ jobs:
             echo "ℹ️ Not on main branch – required secrets reported for awareness only."
           fi
 
-          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD REDIS_CACHE_HOST REDIS_STORE_HOST JWT_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
-          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT REDIS_CACHE_PORT REDIS_CACHE_DB REDIS_CACHE_USERNAME REDIS_CACHE_PASSWORD REDIS_STORE_PORT REDIS_STORE_DB REDIS_STORE_USERNAME REDIS_STORE_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID)
+          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_CACHE_HOST REDIS_STORE_HOST JWT_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
+          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_CACHE_PORT REDIS_CACHE_DB REDIS_CACHE_USERNAME REDIS_CACHE_PASSWORD REDIS_STORE_PORT REDIS_STORE_DB REDIS_STORE_USERNAME REDIS_STORE_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID)
 
           for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
             VALUE=${!SECRET_NAME}
@@ -403,6 +403,11 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
           REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
           REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
           REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
@@ -417,6 +422,26 @@ jobs:
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
         run: |
+          require_env() {
+            local missing=0
+            for var in "$@"; do
+              if [ -z "${!var}" ]; then
+                echo "❌ Missing required env: $var"
+                missing=1
+              fi
+            done
+            if [ $missing -ne 0 ]; then
+              echo "❌ Required deployment envs are not set, abort."
+              exit 1
+            fi
+          }
+
+          require_env \
+            MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
+            MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
+            REDIS_CACHE_HOST REDIS_CACHE_PORT REDIS_STORE_HOST REDIS_STORE_PORT \
+            JWT_SECRET NSQ_NSQD_HOST NSQ_NSQD_PORT
+
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
@@ -427,6 +452,11 @@ jobs:
           QS_APISERVER_MONGODB_USERNAME=${MONGODB_USERNAME}
           QS_APISERVER_MONGODB_PASSWORD=${MONGODB_PASSWORD}
           QS_APISERVER_MONGODB_DATABASE=${MONGODB_DBNAME}
+
+          QS_APISERVER_MYSQL_HOST=${MYSQL_HOST}:${MYSQL_PORT}
+          QS_APISERVER_MYSQL_USERNAME=${MYSQL_USERNAME}
+          QS_APISERVER_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+          QS_APISERVER_MYSQL_DATABASE=${MYSQL_DATABASE}
           
           # Redis Cache (ServerA 本地缓存)
           QS_APISERVER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
@@ -661,6 +691,23 @@ jobs:
           REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          require_env() {
+            local missing=0
+            for var in "$@"; do
+              if [ -z "${!var}" ]; then
+                echo "❌ Missing required env: $var"
+                missing=1
+              fi
+            done
+            if [ $missing -ne 0 ]; then
+              echo "❌ Required deployment envs are not set, abort."
+              exit 1
+            fi
+          }
+
+          require_env \
+            REDIS_CACHE_HOST REDIS_CACHE_PORT REDIS_STORE_HOST REDIS_STORE_PORT JWT_SECRET
+
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
@@ -887,6 +934,26 @@ jobs:
           REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
           REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
         run: |
+          require_env() {
+            local missing=0
+            for var in "$@"; do
+              if [ -z "${!var}" ]; then
+                echo "❌ Missing required env: $var"
+                missing=1
+              fi
+            done
+            if [ $missing -ne 0 ]; then
+              echo "❌ Required deployment envs are not set, abort."
+              exit 1
+            fi
+          }
+
+          require_env \
+            MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
+            MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
+            NSQ_NSQD_HOST NSQ_NSQD_PORT NSQ_LOOKUPD_HOST NSQ_LOOKUPD_PORT \
+            REDIS_CACHE_HOST REDIS_CACHE_PORT REDIS_STORE_HOST REDIS_STORE_PORT
+
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
