@@ -545,9 +545,6 @@ jobs:
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
 
-            rm -rf "$DEPLOY_TMP"
-            rm -f /tmp/deploy-package.tar.gz
-
             # 网络
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
               echo "Creating Docker network qs-network..."
@@ -620,6 +617,9 @@ jobs:
 
             # 清理旧备份
             $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true'
+
+            rm -rf "$DEPLOY_TMP"
+            rm -f /tmp/deploy-package.tar.gz
 
             echo "=========================================="
             echo "✅ ${CONTAINER_NAME} deployment completed"
@@ -777,9 +777,6 @@ jobs:
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
 
-            rm -rf "$DEPLOY_TMP"
-            rm -f /tmp/deploy-package.tar.gz
-
             # 网络
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
               $SUDO docker network create qs-network
@@ -813,8 +810,8 @@ jobs:
 
             # 启动（使用 compose）
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml pull qs-collection-server || true
-            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d qs-collection-server
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-collection-server || true
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-collection-server
 
             # 健康检查（collection-server 公开的是 /health）
             ATTEMPTS=0
@@ -838,6 +835,9 @@ jobs:
 
             # 清理旧备份
             $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
+
+            rm -rf "$DEPLOY_TMP"
+            rm -f /tmp/deploy-package.tar.gz
 
             echo "✅ ${CONTAINER_NAME} deployed"
 
@@ -1010,9 +1010,6 @@ jobs:
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
 
-            rm -rf "$DEPLOY_TMP"
-            rm -f /tmp/deploy-package.tar.gz
-
             # 网络
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
               $SUDO docker network create qs-network
@@ -1034,8 +1031,8 @@ jobs:
 
             # 启动 (使用 compose，Worker 无端口/TLS)
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml pull qs-worker || true
-            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d qs-worker
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker || true
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-worker
 
             # Worker 无 HTTP 健康检查，检查容器是否正常运行
             echo "Waiting for container to start..."
@@ -1056,6 +1053,9 @@ jobs:
             $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
 
             echo "✅ ${CONTAINER_NAME} deployed"
+
+            rm -rf "$DEPLOY_TMP"
+            rm -f /tmp/deploy-package.tar.gz
 
   # ==========================================================================
   # 5) 总体通知 —— 把 skipped 也视为 OK，支持「只部署部分服务」
