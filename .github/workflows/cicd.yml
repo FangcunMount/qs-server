@@ -39,11 +39,15 @@ on:
           - worker
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.22'
   DOCKER_REGISTRY: ghcr.io
   DOCKER_REPOSITORY: fangcunmount
 
 jobs:
+  # ==========================================================================
+  # 1) 校验 Secrets（只在 main 上严格要求）
+  # ==========================================================================
+
   validate-secrets:
     name: Validate Secrets
     runs-on: ubuntu-latest
@@ -64,6 +68,7 @@ jobs:
           echo "🔍 Validating GitHub Action secrets..."
           VALIDATION_FAILED=0
           ENFORCE_REQUIRED=0
+
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             ENFORCE_REQUIRED=1
             echo "📋 Checking required secrets for main branch deployment..."
@@ -123,16 +128,20 @@ jobs:
 
           echo ""
           if [ $ENFORCE_REQUIRED -eq 1 ] && [ $VALIDATION_FAILED -eq 1 ]; then
-            echo "⚠️ Secrets validation failed! Please configure the missing required secrets."
-            echo "ℹ️ Continuing anyway for non-deployment jobs..."
+            echo "❌ Secrets validation failed for main branch! Please configure the missing required secrets."
+            exit 1
           else
-            echo "✅ Required secrets look good!"
+            echo "✅ Required secrets look good (or not enforced for this branch)."
           fi
+
+  # ==========================================================================
+  # 2) Test / Lint / Build —— 跑在 Mac mini 自托管 runner 上
+  # ==========================================================================
 
   test:
     name: Run Tests
     needs: [validate-secrets]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macmini, qs]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -166,7 +175,7 @@ jobs:
   lint:
     name: Lint Code
     needs: [validate-secrets]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macmini, qs]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -185,10 +194,48 @@ jobs:
         run: |
           make lint
 
+  docs:
+    name: Docs & API Sync
+    needs: [validate-secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install swagger toolchain
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@v1.16.4
+
+      - name: Download dependencies
+        run: |
+          go mod download
+
+      - name: Regenerate swagger docs
+        run: |
+          swag init --parseInternal -g apiserver.go -d cmd/qs-apiserver,internal/apiserver,internal/pkg -o internal/apiserver/docs
+          swag init --parseInternal --parseDependency -g main.go -d cmd/collection-server,internal/collection-server,pkg -o internal/collection-server/docs
+
+      - name: Sync rest docs from swagger
+        run: |
+          python -m pip install --quiet pyyaml
+          python scripts/generate_rest_from_swagger.py --swagger api/apiserver/swagger.json --output api/rest/apiserver.yaml --server http://localhost:8081 --server https://api.example.com
+          python scripts/generate_rest_from_swagger.py --swagger api/collection/swagger.json --output api/rest/collection.yaml --server http://localhost:8082 --server https://api.example.com
+          python scripts/compare_api_docs.py
+
+      - name: Ensure no doc drift
+        run: |
+          git diff --exit-code
+
   build:
     name: Build Applications
-    needs: [test, lint]
-    runs-on: ubuntu-latest
+    needs: [test, lint, docs]
+    runs-on: [self-hosted, macmini, qs]
     strategy:
       matrix:
         service: [apiserver, collection, worker]
@@ -213,11 +260,17 @@ jobs:
           path: bin/*
           retention-days: 7
 
+  # ==========================================================================
+  # 3) 构建 Docker 镜像 —— 继续用 Linux runner，因为用了 docker/* action
+  # ==========================================================================
+
   docker:
     name: Build Docker Images
     needs: [build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       packages: write
@@ -289,16 +342,19 @@ jobs:
           echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest"
           echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}"
 
+  # ==========================================================================
+  # 4) 部署 API Server / Collection Server / Worker —— 仍然在 Linux 上跑
+  #    支持：push main 全量部署；workflow_dispatch 只部署指定 service
+  # ==========================================================================
+
   deploy-apiserver:
     name: Deploy API Server
     needs: [docker]
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main' &&
-      (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver')
-    environment:
-      name: production
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver'))
     env:
       WWW_UID: ${{ secrets.WWW_UID || '1000' }}
       WWW_GID: ${{ secrets.WWW_GID || '1000' }}
@@ -329,6 +385,7 @@ jobs:
         run: |
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
+          cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
 
           cat > deploy-package/configs/env/config.prod.env <<EOF
           # Auto-generated production environment configuration for QS API Server
@@ -481,22 +538,10 @@ jobs:
               $SUDO docker rm ${CONTAINER_NAME} || true
             fi
 
-            # 启动容器
-            DOCKER_OPTIONS="--name ${CONTAINER_NAME} \
-              --restart unless-stopped \
-              --network qs-network \
-              --user ${APP_UID}:${APP_GID} \
-              -p ${HTTP_PORT}:${INTERNAL_HTTP_PORT} \
-              -p ${HTTPS_PORT}:${INTERNAL_HTTPS_PORT} \
-              -v /opt/qs-server/${CONTAINER_NAME}/configs:/app/configs \
-              -v /data/logs/qs-server/${CONTAINER_NAME}:/var/log/qs-server \
-              --env-file /opt/qs-server/${CONTAINER_NAME}/configs/env/config.prod.env \
-              $TLS_MOUNTS"
-
-            echo "Starting ${CONTAINER_NAME}..."
-            $SUDO docker run -d $DOCKER_OPTIONS \
-              "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
-              --config=/app/configs/apiserver.prod.yaml
+            # 启动容器（使用 compose）
+            cd /opt/qs-server/${CONTAINER_NAME}
+            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml pull qs-apiserver || true
+            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d qs-apiserver
 
             # 健康检查（apiserver 公开的是 /health）
             echo "Waiting for service to be ready..."
@@ -533,11 +578,9 @@ jobs:
     needs: [docker]
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main' &&
-      (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'collection')
-    environment:
-      name: production
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.service == 'all' || github.event.inputs.service == 'collection'))
     env:
       WWW_UID: ${{ secrets.WWW_UID || '1000' }}
       WWW_GID: ${{ secrets.WWW_GID || '1000' }}
@@ -561,6 +604,7 @@ jobs:
         run: |
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
+          cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
 
           cat > deploy-package/configs/env/config.prod.env <<EOF
           # Auto-generated production environment configuration for Collection Server
@@ -692,21 +736,10 @@ jobs:
               $SUDO docker rm ${CONTAINER_NAME} || true
             fi
 
-            # 启动
-            DOCKER_OPTIONS="--name ${CONTAINER_NAME} \
-              --restart unless-stopped \
-              --network qs-network \
-              --user ${APP_UID}:${APP_GID} \
-              -p ${HTTP_PORT}:${INTERNAL_HTTP_PORT} \
-              -p ${HTTPS_PORT}:${INTERNAL_HTTPS_PORT} \
-              -v /opt/qs-server/${CONTAINER_NAME}/configs:/app/configs \
-              -v /data/logs/qs-server/${CONTAINER_NAME}:/var/log/qs-server \
-              --env-file /opt/qs-server/${CONTAINER_NAME}/configs/env/config.prod.env \
-              $TLS_MOUNTS"
-
-            $SUDO docker run -d $DOCKER_OPTIONS \
-              "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
-              --config=/app/configs/collection-server.prod.yaml
+            # 启动（使用 compose）
+            cd /opt/qs-server/${CONTAINER_NAME}
+            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml pull qs-collection-server || true
+            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d qs-collection-server
 
             # 健康检查（collection-server 公开的是 /health）
             ATTEMPTS=0
@@ -738,11 +771,9 @@ jobs:
     needs: [docker]
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main' &&
-      (github.event.inputs.service == '' || github.event.inputs.service == 'all' || github.event.inputs.service == 'worker')
-    environment:
-      name: production
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.service == 'all' || github.event.inputs.service == 'worker'))
     env:
       WWW_UID: ${{ secrets.WWW_UID || '1000' }}
       WWW_GID: ${{ secrets.WWW_GID || '1000' }}
@@ -773,6 +804,7 @@ jobs:
         run: |
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
+          cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
 
           cat > deploy-package/configs/env/config.prod.env <<EOF
           # Auto-generated production environment configuration for QS Worker
@@ -895,18 +927,10 @@ jobs:
               $SUDO docker rm ${CONTAINER_NAME} || true
             fi
 
-            # 启动 (Worker 无 HTTP 端口，无 TLS)
-            DOCKER_OPTIONS="--name ${CONTAINER_NAME} \
-              --restart unless-stopped \
-              --network qs-network \
-              --user ${APP_UID}:${APP_GID} \
-              -v /opt/qs-server/${CONTAINER_NAME}/configs:/app/configs \
-              -v /data/logs/qs-server/${CONTAINER_NAME}:/var/log/qs-server \
-              --env-file /opt/qs-server/${CONTAINER_NAME}/configs/env/config.prod.env"
-
-            $SUDO docker run -d $DOCKER_OPTIONS \
-              "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" \
-              --config=/app/configs/worker.prod.yaml
+            # 启动 (使用 compose，Worker 无端口/TLS)
+            cd /opt/qs-server/${CONTAINER_NAME}
+            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml pull qs-worker || true
+            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d qs-worker
 
             # Worker 无 HTTP 健康检查，检查容器是否正常运行
             echo "Waiting for container to start..."
@@ -915,7 +939,6 @@ jobs:
             if $SUDO docker ps --filter "name=${CONTAINER_NAME}" --filter "status=running" | grep -q ${CONTAINER_NAME}; then
               echo "✅ Container is running"
               $SUDO docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}"
-              # 检查最近日志确认无启动错误
               echo "📋 Recent logs:"
               $SUDO docker logs --tail 20 ${CONTAINER_NAME}
             else
@@ -929,11 +952,19 @@ jobs:
 
             echo "✅ ${CONTAINER_NAME} deployed"
 
+  # ==========================================================================
+  # 5) 总体通知 —— 把 skipped 也视为 OK，支持「只部署部分服务」
+  # ==========================================================================
+
   notify:
     name: Send Notification
     needs: [deploy-apiserver, deploy-collection, deploy-worker]
     runs-on: ubuntu-latest
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      always() && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - name: Log deployment status
         run: |
@@ -943,11 +974,15 @@ jobs:
           echo "API Server: ${{ needs.deploy-apiserver.result }}"
           echo "Collection Server: ${{ needs.deploy-collection.result }}"
           echo "Worker: ${{ needs.deploy-worker.result }}"
-          
-          if [ "${{ needs.deploy-apiserver.result }}" == "success" ] && \
-             [ "${{ needs.deploy-collection.result }}" == "success" ] && \
-             [ "${{ needs.deploy-worker.result }}" == "success" ]; then
-            echo "✅ All deployments succeeded"
+
+          ok() {
+            [ "$1" = "success" ] || [ "$1" = "skipped" ]
+          }
+
+          if ok "${{ needs.deploy-apiserver.result }}" &&
+             ok "${{ needs.deploy-collection.result }}" &&
+             ok "${{ needs.deploy-worker.result }}"; then
+            echo "✅ All deployments succeeded or were skipped by design"
           else
             echo "❌ Some deployments failed"
             exit 1

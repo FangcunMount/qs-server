@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  qs-apiserver:
+    image: ghcr.io/fangcunmount/qs-apiserver:latest
+    container_name: qs-apiserver
+    restart: unless-stopped
+    networks:
+      - qs-network
+      - infra-network
+    ports:
+      - "8081:9080"
+      - "9445:9444"
+    env_file:
+      - ../../deploy-package/configs/env/config.prod.env
+    volumes:
+      - /opt/qs-server/qs-apiserver/configs:/app/configs
+      - /data/logs/qs-server/qs-apiserver:/var/log/qs-server
+      - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
+      - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
+    command: ["--config=/app/configs/apiserver.prod.yaml"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 384M
+
+  qs-collection-server:
+    image: ghcr.io/fangcunmount/qs-collection-server:latest
+    container_name: qs-collection-server
+    restart: unless-stopped
+    networks:
+      - qs-network
+      - infra-network
+    ports:
+      - "8082:9080"
+      - "9446:9444"
+    env_file:
+      - ../../deploy-package/configs/env/config.prod.env
+    volumes:
+      - /opt/qs-server/qs-collection-server/configs:/app/configs
+      - /data/logs/qs-server/qs-collection-server:/var/log/qs-server
+      - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
+      - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
+    command: ["--config=/app/configs/collection-server.prod.yaml"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 256M
+
+  qs-worker:
+    image: ghcr.io/fangcunmount/qs-worker:latest
+    container_name: qs-worker
+    restart: unless-stopped
+    networks:
+      - qs-network
+      - infra-network
+    env_file:
+      - ../../deploy-package/configs/env/config.prod.env
+    volumes:
+      - /opt/qs-server/qs-worker/configs:/app/configs
+      - /data/logs/qs-server/qs-worker:/var/log/qs-server
+    command: ["--config=/app/configs/worker.prod.yaml"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 256M
+
+networks:
+  qs-network:
+    external: true
+  infra-network:
+    external: true
