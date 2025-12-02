@@ -454,6 +454,7 @@ jobs:
           cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g' | sed 's/SECRET=.*/SECRET=***REDACTED***/g'
           echo "=========================================="
 
+          # 以目录形式上传，避免双重 tar 丢失文件
           tar -czf deploy-package.tar.gz -C deploy-package .
 
       - name: Upload deployment package
@@ -528,10 +529,17 @@ jobs:
                 2>/dev/null || echo "No previous version to backup"
             fi
 
-            # 解包
+            # 解包（兼容不同落盘路径，优先查找 /tmp 下的 deploy-package.tar.gz）
+            PKG_PATH=$(find /tmp -maxdepth 2 -name "deploy-package.tar.gz" | head -n1 || true)
+            if [ -z "$PKG_PATH" ]; then
+              echo "❌ deploy-package.tar.gz not found under /tmp" >&2
+              ls -al /tmp || true
+              exit 1
+            fi
+
             DEPLOY_TMP="/tmp/qs-deploy-$$"
             mkdir -p "$DEPLOY_TMP"
-            tar -xzf /tmp/deploy-package.tar.gz -C "$DEPLOY_TMP"
+            tar -xzf "$PKG_PATH" -C "$DEPLOY_TMP"
 
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
@@ -757,7 +765,13 @@ jobs:
             # 解包
             DEPLOY_TMP="/tmp/qs-deploy-$$"
             mkdir -p "$DEPLOY_TMP"
-            tar -xzf /tmp/deploy-package.tar.gz -C "$DEPLOY_TMP"
+            PKG_PATH=$(find /tmp -maxdepth 2 -name "deploy-package.tar.gz" | head -n1 || true)
+            if [ -z "$PKG_PATH" ]; then
+              echo "❌ deploy-package.tar.gz not found under /tmp" >&2
+              ls -al /tmp || true
+              exit 1
+            fi
+            tar -xzf "$PKG_PATH" -C "$DEPLOY_TMP"
 
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
@@ -984,7 +998,13 @@ jobs:
             # 解包
             DEPLOY_TMP="/tmp/qs-deploy-$$"
             mkdir -p "$DEPLOY_TMP"
-            tar -xzf /tmp/deploy-package.tar.gz -C "$DEPLOY_TMP"
+            PKG_PATH=$(find /tmp -maxdepth 2 -name "deploy-package.tar.gz" | head -n1 || true)
+            if [ -z "$PKG_PATH" ]; then
+              echo "❌ deploy-package.tar.gz not found under /tmp" >&2
+              ls -al /tmp || true
+              exit 1
+            fi
+            tar -xzf "$PKG_PATH" -C "$DEPLOY_TMP"
 
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
