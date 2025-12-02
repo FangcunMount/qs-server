@@ -20,25 +20,25 @@ worker:
 # 消息队列配置
 # ============================================================================
 messaging:
-  provider: ${MESSAGING_PROVIDER}  # 消息队列提供者: nsq, rabbitmq
-  nsq-addr: ${NSQ_ADDR}
-  nsq-lookupd-addr: ${NSQ_LOOKUPD_ADDR}
-  rabbitmq-url: ${RABBITMQ_URL}
+  provider: nsq  # 消息队列提供者: nsq, rabbitmq
+  nsq-addr: "127.0.0.1:4150"
+  nsq-lookupd-addr: "127.0.0.1:4161"
+  rabbitmq-url: "amqp://guest:guest@127.0.0.1:5672/"
 
 # ============================================================================
 # gRPC 客户端配置
 # ============================================================================
 grpc:
-  apiserver-addr: ${GRPC_APISERVER_ADDR}  # qs-apiserver gRPC 地址
+  apiserver-addr: "127.0.0.1:9090"  # qs-apiserver gRPC 地址
 
 # ============================================================================
 # MySQL 数据库配置
 # ============================================================================
 mysql:
-  host: ${MYSQL_HOST}:3306
-  username: ${MYSQL_USER}
-  password: ${MYSQL_PASSWORD}
-  database: ${MYSQL_DATABASE}
+  host: "127.0.0.1:3306"
+  username: "app_user"
+  password: ""
+  database: "questionnaire_scale"
   max-idle-connections: 20
   max-open-connections: 100
   max-connection-life-time: "1h"
@@ -48,12 +48,12 @@ mysql:
 # MongoDB 数据库配置
 # ============================================================================
 mongodb:
-  url: ${MONGODB_URL}
-  use-ssl: ${MONGODB_USE_SSL}
+  url: "mongodb://app_user:password@127.0.0.1:27017/questionnaire_scale?authSource=admin"
+  use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false
-  ssl-ca-file: ${MONGODB_SSL_CA_FILE}
-  ssl-pem-keyfile: ${MONGODB_SSL_PEM_KEYFILE}
+  ssl-ca-file: ""
+  ssl-pem-keyfile: ""
 
 # ============================================================================
 # 日志配置（生产环境 - JSON 格式便于采集）
@@ -90,28 +90,28 @@ log:
 redis:
   # Cache Redis - 缓存/会话/限流
   cache:
-    host: ${REDIS_CACHE_HOST}
-    port: ${REDIS_CACHE_PORT}
-    username: ${REDIS_CACHE_USER}
-    password: ${REDIS_CACHE_PASSWORD}
-    database: ${REDIS_CACHE_DB}
-    max-idle: ${REDIS_CACHE_MAX_IDLE}
-    max-active: ${REDIS_CACHE_MAX_ACTIVE}
-    timeout: ${REDIS_CACHE_TIMEOUT}
-    enable-cluster: ${REDIS_CACHE_ENABLE_CLUSTER}
-    use-ssl: ${REDIS_CACHE_USE_SSL}
-    enable-logging: ${REDIS_CACHE_ENABLE_LOGGING}
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
 
   # Store Redis - 持久化/队列/订阅
   store:
-    host: ${REDIS_STORE_HOST}
-    port: ${REDIS_STORE_PORT}
-    username: ${REDIS_STORE_USER}
-    password: ${REDIS_STORE_PASSWORD}
-    database: ${REDIS_STORE_DB}
-    max-idle: ${REDIS_STORE_MAX_IDLE}
-    max-active: ${REDIS_STORE_MAX_ACTIVE}
-    timeout: ${REDIS_STORE_TIMEOUT}
-    enable-cluster: ${REDIS_STORE_ENABLE_CLUSTER}
-    use-ssl: ${REDIS_STORE_USE_SSL}
-    enable-logging: ${REDIS_STORE_ENABLE_LOGGING}
+    host: "127.0.0.1"
+    port: 6380
+    username: ""
+    password: ""
+    database: 1
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false

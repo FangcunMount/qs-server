@@ -34,10 +34,10 @@ secure:
 
 # MySQL 数据库配置
 mysql:
-  host: ${MYSQL_HOST}:${MYSQL_PORT}
-  username: ${MYSQL_USER}
-  password: ${MYSQL_PASSWORD}
-  database: ${MYSQL_DATABASE}
+  host: "127.0.0.1:3306"
+  username: "app_user"
+  password: ""
+  database: "questionnaire_scale"
   max-idle-connections: 20
   max-open-connections: 200
   max-connection-life-time: 1h
@@ -47,16 +47,16 @@ mysql:
 migration:
   enabled: true   # 生产环境建议开启
   autoseed: false
-  database: ${MIGRATION_DATABASE}
+  database: "questionnaire_scale"
 
 # Redis 配置（双实例架构）
 redis:
   cache:
-    host: ${REDIS_CACHE_HOST}
-    port: ${REDIS_CACHE_PORT}
-    username: ${REDIS_CACHE_USERNAME}
-    password: ${REDIS_CACHE_PASSWORD}
-    database: ${REDIS_CACHE_DB}
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 0
     max-idle: 50
     max-active: 100
     timeout: 5
@@ -64,11 +64,11 @@ redis:
     use-ssl: false
     enable-logging: false
   store:
-    host: ${REDIS_STORE_HOST}
-    port: ${REDIS_STORE_PORT}
-    username: ${REDIS_STORE_USERNAME}
-    password: ${REDIS_STORE_PASSWORD}
-    database: ${REDIS_STORE_DB}
+    host: "127.0.0.1"
+    port: 6380
+    username: ""
+    password: ""
+    database: 1
     max-idle: 50
     max-active: 100
     timeout: 5
@@ -78,8 +78,8 @@ redis:
 
 # MongoDB 数据库配置
 mongodb:
-  url: ${MONGO_URL}
-  database: ${MONGO_DATABASE}
+  url: "mongodb://app_user:password@127.0.0.1:27017/questionnaire_scale?authSource=admin"
+  database: "questionnaire_scale"
   use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false
@@ -116,6 +116,6 @@ log:
 # JWT 配置
 jwt:
   realm: "qs jwt"
-  key: ${JWT_SECRET_KEY}
-  timeout: ${JWT_TIMEOUT}
-  max-refresh: ${JWT_MAX_REFRESH}
+  key: "change-me"
+  timeout: "24h"
+  max-refresh: "168h"

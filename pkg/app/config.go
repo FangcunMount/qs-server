@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/util/homedir"
-	"github.com/gosuri/uitable"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -60,7 +59,7 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 			viper.SetConfigName(basename)
 		}
 
-		// 读取配置文件
+		// 读取配置文件（支持环境变量占位符）
 		if err := viper.ReadInConfig(); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Error: failed to read configuration file(%s): %v\n", cfgFile, err)
 			os.Exit(1)
@@ -69,19 +68,4 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 		// 打印配置信息
 		fmt.Printf("Viper Config: %+v\n", viper.AllSettings())
 	})
-}
-
-// printConfig 打印配置
-func printConfig() {
-	if keys := viper.AllKeys(); len(keys) > 0 {
-		fmt.Printf("%v Configuration items:\n", progressMessage)
-		table := uitable.New()
-		table.Separator = " "
-		table.MaxColWidth = 80
-		table.RightAlign(0)
-		for _, k := range keys {
-			table.AddRow(fmt.Sprintf("%s:", k), viper.Get(k))
-		}
-		fmt.Printf("%v", table)
-	}
 }
