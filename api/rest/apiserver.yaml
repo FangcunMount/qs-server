@@ -1566,7 +1566,6 @@ components:
           type: string
     meta.ID:
       type: integer
-      format: int64
       enum:
       - 0
       x-enum-varnames:

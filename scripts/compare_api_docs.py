@@ -53,7 +53,11 @@ def load_paths_from_swagger(file_path: Path) -> Set[Tuple[str, str]]:
 
 def compare(service: str) -> None:
     rest_path = ROOT / "api" / "rest" / f"{service}.yaml"
-    swagger_path = ROOT / "api" / service / "swagger.json"
+    # Prefer new internal swagger outputs; fall back to legacy api/<service>/swagger.json if present.
+    swagger_path = ROOT / "internal" / f"{service}" / "docs" / "swagger.json"
+    legacy_swagger_path = ROOT / "api" / service / "swagger.json"
+    if not swagger_path.exists() and legacy_swagger_path.exists():
+        swagger_path = legacy_swagger_path
     if not rest_path.exists():
         print(f"[{service}] missing REST doc: {rest_path}")
         return

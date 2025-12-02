@@ -13,7 +13,6 @@ definitions:
   meta.ID:
     enum:
     - 0
-    format: int64
     type: integer
     x-enum-varnames:
     - ZeroID
