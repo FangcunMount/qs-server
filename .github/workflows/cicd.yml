@@ -376,9 +376,16 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
+          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
+          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
+          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
+          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
+          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
+          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT || 6380 }}
+          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB || 1 }}
+          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
+          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
@@ -394,9 +401,19 @@ jobs:
           QS_APISERVER_MONGODB_PASSWORD=${MONGODB_PASSWORD}
           QS_APISERVER_MONGODB_DATABASE=${MONGODB_DBNAME}
           
-          QS_APISERVER_REDIS_HOST=${REDIS_HOST}
-          QS_APISERVER_REDIS_PORT=${REDIS_PORT}
-          QS_APISERVER_REDIS_PASSWORD=${REDIS_PASSWORD}
+          # Redis Cache (ServerA 本地缓存)
+          QS_APISERVER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
+          QS_APISERVER_REDIS_CACHE_PORT=${REDIS_CACHE_PORT}
+          QS_APISERVER_REDIS_CACHE_USERNAME=${REDIS_CACHE_USERNAME}
+          QS_APISERVER_REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
+          QS_APISERVER_REDIS_CACHE_DB=${REDIS_CACHE_DB}
+          
+          # Redis Store (云持久化 Redis)
+          QS_APISERVER_REDIS_STORE_HOST=${REDIS_STORE_HOST}
+          QS_APISERVER_REDIS_STORE_PORT=${REDIS_STORE_PORT}
+          QS_APISERVER_REDIS_STORE_USERNAME=${REDIS_STORE_USERNAME}
+          QS_APISERVER_REDIS_STORE_PASSWORD=${REDIS_STORE_PASSWORD}
+          QS_APISERVER_REDIS_STORE_DB=${REDIS_STORE_DB}
           
           QS_APISERVER_JWT_SECRET=${JWT_SECRET}
           
@@ -597,9 +614,16 @@ jobs:
 
       - name: Prepare deployment files
         env:
-          REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
+          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
+          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
+          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
+          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
+          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
+          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT || 6380 }}
+          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB || 1 }}
+          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
+          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           mkdir -p deploy-package/configs/env
@@ -608,9 +632,19 @@ jobs:
 
           cat > deploy-package/configs/env/config.prod.env <<EOF
           # Auto-generated production environment configuration for Collection Server
-          COLLECTION_SERVER_REDIS_HOST=${REDIS_HOST}
-          COLLECTION_SERVER_REDIS_PORT=${REDIS_PORT}
-          COLLECTION_SERVER_REDIS_PASSWORD=${REDIS_PASSWORD}
+          # Redis Cache (ServerA 本地缓存)
+          COLLECTION_SERVER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
+          COLLECTION_SERVER_REDIS_CACHE_PORT=${REDIS_CACHE_PORT}
+          COLLECTION_SERVER_REDIS_CACHE_USERNAME=${REDIS_CACHE_USERNAME}
+          COLLECTION_SERVER_REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
+          COLLECTION_SERVER_REDIS_CACHE_DB=${REDIS_CACHE_DB}
+          
+          # Redis Store (云持久化 Redis)
+          COLLECTION_SERVER_REDIS_STORE_HOST=${REDIS_STORE_HOST}
+          COLLECTION_SERVER_REDIS_STORE_PORT=${REDIS_STORE_PORT}
+          COLLECTION_SERVER_REDIS_STORE_USERNAME=${REDIS_STORE_USERNAME}
+          COLLECTION_SERVER_REDIS_STORE_PASSWORD=${REDIS_STORE_PASSWORD}
+          COLLECTION_SERVER_REDIS_STORE_DB=${REDIS_STORE_DB}
           
           COLLECTION_SERVER_JWT_SECRET=${JWT_SECRET}
           EOF
@@ -801,6 +835,16 @@ jobs:
           NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
           NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT || 4161 }}
           GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR || 'qs-apiserver:9090' }}
+          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
+          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
+          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
+          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
+          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
+          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
+          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT || 6380 }}
+          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB || 1 }}
+          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
+          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
         run: |
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
@@ -820,6 +864,20 @@ jobs:
           QS_WORKER_NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}
           
           QS_WORKER_GRPC_APISERVER_ADDR=${GRPC_APISERVER_ADDR}
+          
+          # Redis Cache (ServerA 本地缓存)
+          QS_WORKER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
+          QS_WORKER_REDIS_CACHE_PORT=${REDIS_CACHE_PORT}
+          QS_WORKER_REDIS_CACHE_USERNAME=${REDIS_CACHE_USERNAME}
+          QS_WORKER_REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
+          QS_WORKER_REDIS_CACHE_DB=${REDIS_CACHE_DB}
+          
+          # Redis Store (云持久化 Redis)
+          QS_WORKER_REDIS_STORE_HOST=${REDIS_STORE_HOST}
+          QS_WORKER_REDIS_STORE_PORT=${REDIS_STORE_PORT}
+          QS_WORKER_REDIS_STORE_USERNAME=${REDIS_STORE_USERNAME}
+          QS_WORKER_REDIS_STORE_PASSWORD=${REDIS_STORE_PASSWORD}
+          QS_WORKER_REDIS_STORE_DB=${REDIS_STORE_DB}
           EOF
 
           echo "=========================================="
