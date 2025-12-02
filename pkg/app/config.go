@@ -65,7 +65,12 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 			os.Exit(1)
 		}
 
-		// 打印配置信息
-		fmt.Printf("Viper Config: %+v\n", viper.AllSettings())
+		fmt.Printf("%v Config file used: %s\n", progressMessage, viper.ConfigFileUsed())
+		printConfigStage("Config loaded from file (before flags/env overrides)")
 	})
+}
+
+// printConfigStage prints current viper settings with a stage label.
+func printConfigStage(stage string) {
+	fmt.Printf("%v %s: %+v\n", progressMessage, stage, viper.AllSettings())
 }

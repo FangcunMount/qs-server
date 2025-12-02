@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -198,7 +199,9 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 		}
 
 		// 打印配置信息
-		fmt.Printf("Viper Config: %+v\n", viper.AllSettings())
+		printConfigStage("Config after binding flags/env")
+		// 输出当前 viper 读取到的配置以及关键环境变量
+		printViperConfig(a.basename)
 
 		// 如果选项不为空，则反序列化选项
 		if err := viper.Unmarshal(a.options); err != nil {
@@ -279,4 +282,39 @@ func addCmdTemplate(cmd *cobra.Command, namedFlagSets cliflag.NamedFlagSets) {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
+}
+
+// printViperConfig 输出当前 viper 读取到的配置以及关键环境变量，用于调试覆盖行为
+func printViperConfig(basename string) {
+	fmt.Printf("Viper Config (AllSettings): %+v\n", viper.AllSettings())
+
+	envPrefix := strings.Replace(strings.ToUpper(basename), "-", "_", -1)
+	fmt.Printf("Using env prefix: %s_\n", envPrefix)
+
+	// 打印常用的覆盖变量，便于排查是否生效
+	keys := []string{
+		"MYSQL_HOST",
+		"MYSQL_DATABASE",
+		"MYSQL_USERNAME",
+		"MYSQL_PASSWORD",
+		"REDIS_CACHE_HOST",
+		"REDIS_CACHE_PORT",
+		"REDIS_CACHE_USERNAME",
+		"REDIS_CACHE_PASSWORD",
+		"REDIS_STORE_HOST",
+		"REDIS_STORE_PORT",
+		"REDIS_STORE_USERNAME",
+		"REDIS_STORE_PASSWORD",
+		"MONGODB_HOST",
+		"MONGODB_PORT",
+		"MONGODB_USERNAME",
+		"MONGODB_PASSWORD",
+		"MONGODB_DBNAME",
+		"JWT_SECRET",
+		"IDP_ENCRYPTION_KEY",
+	}
+	for _, key := range keys {
+		envKey := envPrefix + "_" + key
+		fmt.Printf("ENV %s=%s\n", key, os.Getenv(envKey))
+	}
 }
