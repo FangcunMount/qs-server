@@ -48,6 +48,7 @@ env:
   GO_VERSION: '1.22'
   DOCKER_REGISTRY: ghcr.io
   DOCKER_REPOSITORY: fangcunmount
+  GOTOOLCHAIN: local
   DOCS_VERIFY: 'false' # 需要文档校验时设为 'true'（例如 workflow_dispatch 手动触发）
 
 jobs:
