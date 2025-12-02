@@ -28,6 +28,12 @@ func NewQuestion(opts ...QuestionParamsOption) (Question, error) {
 
 	// 2. 校验参数
 	if err := params.Validate(); err != nil {
+		// 即便参数校验失败，也尝试构建问题实例以便后续验证时使用
+		if factory, ok := questionRegistry[params.GetCore().typ]; ok {
+			if q, buildErr := factory(params); buildErr == nil {
+				return q, errors.WrapC(err, code.ErrQuestionnaireInvalidQuestion, "invalid question parameters")
+			}
+		}
 		return nil, errors.WrapC(err, code.ErrQuestionnaireInvalidQuestion, "invalid question parameters")
 	}
 
