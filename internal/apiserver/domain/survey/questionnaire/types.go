@@ -1,6 +1,9 @@
 package questionnaire
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // Status 问卷状态
 type Status uint8
@@ -88,6 +91,11 @@ func (v Version) IncrementMinor() Version {
 // 例如：0.0.5 -> 1.0.1, 1.0.3 -> 2.0.1, 5.2.8 -> 6.0.1
 func (v Version) IncrementMajor() Version {
 	s := string(v)
+	prefix := ""
+	if strings.HasPrefix(s, "v") {
+		prefix = "v"
+		s = s[1:]
+	}
 
 	// 解析版本号
 	parts := splitByDot(s)
@@ -96,11 +104,15 @@ func (v Version) IncrementMajor() Version {
 		// 递增第一位，重置后面的为 0.1
 		major := parseNumber(parts[0])
 		major++
-		return Version(intToString(major) + ".0.1")
+		// 保持带 v 前缀的版本格式，例如 v1 -> v2
+		if prefix != "" && len(parts) == 1 {
+			return Version(prefix + intToString(major))
+		}
+		return Version(prefix + intToString(major) + ".0.1")
 	}
 
 	// 无法解析，返回 1.0.1
-	return Version("1.0.1")
+	return Version(prefix + "1.0.1")
 }
 
 // parseNumber 解析字符串为数字
