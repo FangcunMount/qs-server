@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	log.Println("=== 基础中间件演示 ===\n")
+	log.Println("=== 基础中间件演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -51,7 +51,7 @@ func main() {
 
 // demonstrateLogger 演示日志中间件
 func demonstrateLogger(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("【演示 1】Logger 中间件 - 记录消息处理日志\n")
+	log.Println("【演示 1】Logger 中间件 - 记录消息处理日志")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -76,7 +76,7 @@ func demonstrateLogger(bus messaging.EventBus, logger *log.Logger) {
 
 // demonstrateRetry 演示重试中间件
 func demonstrateRetry(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 2】Retry 中间件 - 自动重试失败的消息\n")
+	log.Println("\n【演示 2】Retry 中间件 - 自动重试失败的消息")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -118,7 +118,7 @@ func demonstrateRetry(bus messaging.EventBus, logger *log.Logger) {
 
 // demonstrateTimeout 演示超时中间件
 func demonstrateTimeout(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 3】Timeout 中间件 - 限制处理时间\n")
+	log.Println("\n【演示 3】Timeout 中间件 - 限制处理时间")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -153,7 +153,7 @@ func demonstrateTimeout(bus messaging.EventBus, logger *log.Logger) {
 
 // demonstrateRecover 演示恢复中间件
 func demonstrateRecover(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 4】Recover 中间件 - 捕获 Panic\n")
+	log.Println("\n【演示 4】Recover 中间件 - 捕获 Panic")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -187,7 +187,7 @@ func demonstrateRecover(bus messaging.EventBus, logger *log.Logger) {
 
 // demonstrateCombined 演示组合使用多个中间件
 func demonstrateCombined(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 5】组合中间件 - 最佳实践\n")
+	log.Println("\n【演示 5】组合中间件 - 最佳实践")
 
 	router := bus.Router()
 
@@ -217,7 +217,7 @@ func demonstrateCombined(bus messaging.EventBus, logger *log.Logger) {
 	time.Sleep(time.Second)
 
 	log.Println("发布消息（观察中间件链执行顺序）...")
-	log.Println("中间件顺序：Recover → Logger → Timeout → Retry → Handler\n")
+	log.Println("中间件顺序：Recover → Logger → Timeout → Retry → Handler")
 
 	bus.Publisher().Publish(context.Background(), "demo.combined", []byte("测试组合"))
 

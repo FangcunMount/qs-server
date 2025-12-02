@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	log.Println("=== 高级中间件演示 ===\n")
+	log.Println("=== 高级中间件演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -92,7 +92,7 @@ func (r *SimpleRateLimiter) Wait(ctx context.Context) error {
 
 // demonstrateRateLimit 演示限流中间件
 func demonstrateRateLimit(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("【演示 1】RateLimit 中间件 - 流量控制\n")
+	log.Println("【演示 1】RateLimit 中间件 - 流量控制")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -121,7 +121,7 @@ func demonstrateRateLimit(bus messaging.EventBus, logger *log.Logger) {
 	time.Sleep(time.Second)
 
 	log.Println("快速发送 10 条消息（观察限流效果）...")
-	log.Println("限流配置：5 条/秒\n")
+	log.Println("限流配置：5 条/秒")
 
 	for i := 1; i <= 10; i++ {
 		msg := fmt.Sprintf("消息 #%d", i)
@@ -231,7 +231,7 @@ func (s *SimpleDeduplicationStore) cleanup() {
 
 // demonstrateCircuitBreaker 演示熔断器中间件
 func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 2】CircuitBreaker 中间件 - 熔断保护\n")
+	log.Println("\n【演示 2】CircuitBreaker 中间件 - 熔断保护")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -266,7 +266,7 @@ func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("连续发送消息（观察熔断过程）...\n")
+	log.Println("连续发送消息（观察熔断过程）...")
 
 	for i := 1; i <= 6; i++ {
 		msg := fmt.Sprintf("消息 #%d", i)
@@ -274,7 +274,7 @@ func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
 		time.Sleep(500 * time.Millisecond)
 
 		if i == 3 {
-			log.Println("\n⚡ 熔断器打开！后续请求将被拒绝...\n")
+			log.Println("\n⚡ 熔断器打开！后续请求将被拒绝...")
 		}
 	}
 
@@ -284,7 +284,7 @@ func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
 
 // demonstrateFilter 演示过滤器中间件
 func demonstrateFilter(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 3】Filter 中间件 - 消息过滤\n")
+	log.Println("\n【演示 3】Filter 中间件 - 消息过滤")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -320,7 +320,7 @@ func demonstrateFilter(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发送不同优先级的消息（过滤规则：priority >= 5）...\n")
+	log.Println("发送不同优先级的消息（过滤规则：priority >= 5）...")
 
 	priorities := []int{2, 4, 5, 7, 9, 3}
 	for _, p := range priorities {
@@ -339,7 +339,7 @@ func demonstrateFilter(bus messaging.EventBus, logger *log.Logger) {
 
 // demonstratePriority 演示优先级中间件
 func demonstratePriority(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 4】Priority 中间件 - 优先级队列\n")
+	log.Println("\n【演示 4】Priority 中间件 - 优先级队列")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -375,7 +375,7 @@ func demonstratePriority(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("快速发送不同优先级的消息...\n")
+	log.Println("快速发送不同优先级的消息...")
 
 	tasks := []struct {
 		priority int
@@ -397,14 +397,14 @@ func demonstratePriority(bus messaging.EventBus, logger *log.Logger) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	log.Println("\n观察处理顺序（高优先级优先处理）...\n")
+	log.Println("\n观察处理顺序（高优先级优先处理）...")
 	time.Sleep(4 * time.Second)
 	router.Stop()
 }
 
 // demonstrateDeduplication 演示去重中间件
 func demonstrateDeduplication(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 5】Deduplication 中间件 - 消息去重\n")
+	log.Println("\n【演示 5】Deduplication 中间件 - 消息去重")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -433,7 +433,7 @@ func demonstrateDeduplication(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发送重复的消息（观察去重效果）...\n")
+	log.Println("发送重复的消息（观察去重效果）...")
 
 	// 使用固定UUID发送相同的消息 3 次
 	uuid := "fixed-uuid-12345"

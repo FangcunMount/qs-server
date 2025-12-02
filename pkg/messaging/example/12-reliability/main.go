@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	log.Println("=== 可靠性保障演示 ===\n")
+	log.Println("=== 可靠性保障演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -112,7 +112,7 @@ func SmartRetryMiddleware(maxRetries int, delay time.Duration) messaging.Middlew
 }
 
 func demonstrateErrorHandling(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("【演示 1】错误处理 - 区分可重试和不可重试错误\n")
+	log.Println("【演示 1】错误处理 - 区分可重试和不可重试错误")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -140,7 +140,7 @@ func demonstrateErrorHandling(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("测试不同错误类型的处理...\n")
+	log.Println("测试不同错误类型的处理...")
 
 	for i := 1; i <= 3; i++ {
 		log.Printf("发送消息 #%d", i)
@@ -192,7 +192,7 @@ func ExponentialRetryMiddleware(maxRetries int) messaging.Middleware {
 }
 
 func demonstrateRetryStrategy(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 2】重试策略 - 指数退避\n")
+	log.Println("\n【演示 2】重试策略 - 指数退避")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -225,7 +225,7 @@ func demonstrateRetryStrategy(bus messaging.EventBus, logger *log.Logger) {
 	time.Sleep(time.Second)
 
 	log.Println("发送消息（观察指数退避）...")
-	log.Println("重试间隔: 100ms → 200ms → 400ms → 800ms → 1600ms\n")
+	log.Println("重试间隔: 100ms → 200ms → 400ms → 800ms → 1600ms")
 
 	bus.Publisher().Publish(context.Background(), "demo.retry", []byte("测试"))
 
@@ -311,7 +311,7 @@ func (cb *AdvancedCircuitBreaker) Execute(ctx context.Context, msg *messaging.Me
 }
 
 func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 3】熔断降级 - 三态熔断器\n")
+	log.Println("\n【演示 3】熔断降级 - 三态熔断器")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -352,7 +352,7 @@ func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发送消息（观察熔断器状态变化）...\n")
+	log.Println("发送消息（观察熔断器状态变化）...")
 
 	for i := 1; i <= 8; i++ {
 		log.Printf("发送消息 #%d", i)
@@ -360,10 +360,10 @@ func demonstrateCircuitBreaker(bus messaging.EventBus, logger *log.Logger) {
 		time.Sleep(800 * time.Millisecond)
 
 		if i == 3 {
-			log.Println("\n→ 熔断器应该已打开\n")
+			log.Println("\n→ 熔断器应该已打开")
 		}
 		if i == 6 {
-			log.Println("\n→ 等待熔断器超时，进入半开状态\n")
+			log.Println("\n→ 等待熔断器超时，进入半开状态")
 		}
 	}
 
@@ -453,7 +453,7 @@ func IdempotencyMiddleware(store *IdempotencyStore) messaging.Middleware {
 }
 
 func demonstrateIdempotency(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 4】消息幂等性 - 防止重复处理\n")
+	log.Println("\n【演示 4】消息幂等性 - 防止重复处理")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -480,7 +480,7 @@ func demonstrateIdempotency(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发送重复的消息（相同 UUID）...\n")
+	log.Println("发送重复的消息（相同 UUID）...")
 
 	// 使用相同的 UUID 发送 3 次
 	msg := messaging.NewMessage("", []byte("支付订单-12345"))

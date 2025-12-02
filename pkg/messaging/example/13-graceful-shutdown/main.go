@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	log.Println("=== 优雅关闭演示 ===\n")
+	log.Println("=== 优雅关闭演示 ===")
 
 	// ========== 演示 1: 基础信号处理 ==========
 	// demonstrateBasicShutdown()
@@ -32,7 +32,7 @@ func main() {
 // ========== 演示 1: 基础信号处理 ==========
 
 func demonstrateBasicShutdown() {
-	log.Println("【演示 1】基础信号处理\n")
+	log.Println("【演示 1】基础信号处理")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	logger := log.New(os.Stdout, "[Basic] ", log.LstdFlags)
@@ -62,7 +62,7 @@ func demonstrateBasicShutdown() {
 	}()
 
 	// 监听终止信号
-	log.Println("按 Ctrl+C 触发优雅关闭...\n")
+	log.Println("按 Ctrl+C 触发优雅关闭...")
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -175,7 +175,7 @@ func (sm *ShutdownManager) Shutdown(timeout time.Duration) error {
 	log.Printf("运行时长: %v", time.Since(sm.startTime))
 	log.Printf("关闭耗时: %v", time.Since(shutdownStart))
 	log.Printf("剩余任务: %d", sm.ProcessingCount())
-	log.Println("============================\n")
+	log.Println("============================")
 
 	return nil
 }
@@ -201,7 +201,7 @@ func (sm *ShutdownManager) WrapHandler(handler messaging.Handler) messaging.Hand
 }
 
 func demonstrateGracefulShutdown() {
-	log.Println("【演示 2】完整的优雅关闭\n")
+	log.Println("【演示 2】完整的优雅关闭")
 
 	// 创建关闭管理器
 	shutdownMgr := NewShutdownManager()
@@ -282,7 +282,7 @@ func demonstrateGracefulShutdown() {
 	// 监听终止信号
 	log.Println("服务已启动")
 	log.Println("提示: 按 Ctrl+C 触发优雅关闭")
-	log.Println("观察: 正在处理的任务会完成，新任务会被拒绝\n")
+	log.Println("观察: 正在处理的任务会完成，新任务会被拒绝")
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

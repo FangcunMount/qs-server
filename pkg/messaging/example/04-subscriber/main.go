@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	log.Println("=== Subscriber 演示 ===\n")
+	log.Println("=== Subscriber 演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -47,7 +47,7 @@ func main() {
 // ========== 演示 1: 基础订阅 ==========
 
 func demonstrateBasicSubscribe(bus messaging.EventBus) {
-	log.Println("【演示 1】基础订阅 - Subscribe() 方法\n")
+	log.Println("【演示 1】基础订阅 - Subscribe() 方法")
 
 	logger := log.New(os.Stdout, "[Basic] ", log.LstdFlags)
 	router := bus.Router()
@@ -70,7 +70,7 @@ func demonstrateBasicSubscribe(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布消息
-	log.Println("发布 3 条消息...\n")
+	log.Println("发布 3 条消息...")
 	publisher := bus.Publisher()
 	for i := 1; i <= 3; i++ {
 		data := []byte(fmt.Sprintf("消息-%d", i))
@@ -86,7 +86,7 @@ func demonstrateBasicSubscribe(bus messaging.EventBus) {
 // ========== 演示 2: 多订阅者（负载均衡）==========
 
 func demonstrateMultiSubscriber(bus messaging.EventBus) {
-	log.Println("\n【演示 2】多订阅者 - 负载均衡模式\n")
+	log.Println("\n【演示 2】多订阅者 - 负载均衡模式")
 
 	logger := log.New(os.Stdout, "[Multi] ", log.LstdFlags)
 	router := bus.Router()
@@ -117,7 +117,7 @@ func demonstrateMultiSubscriber(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布 10 条消息
-	log.Println("发布 10 条消息（观察负载均衡）...\n")
+	log.Println("发布 10 条消息（观察负载均衡）...")
 	publisher := bus.Publisher()
 	for i := 1; i <= 10; i++ {
 		data := []byte(fmt.Sprintf("任务-%d", i))
@@ -133,7 +133,7 @@ func demonstrateMultiSubscriber(bus messaging.EventBus) {
 // ========== 演示 3: 订阅多个 Topic ==========
 
 func demonstrateMultiTopicSubscribe(bus messaging.EventBus) {
-	log.Println("\n【演示 3】订阅多个 Topic - 统一处理\n")
+	log.Println("\n【演示 3】订阅多个 Topic - 统一处理")
 
 	logger := log.New(os.Stdout, "[MultiTopic] ", log.LstdFlags)
 	router := bus.Router()
@@ -163,7 +163,7 @@ func demonstrateMultiTopicSubscribe(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布到不同 Topic
-	log.Println("发布到不同的 Topic...\n")
+	log.Println("发布到不同的 Topic...")
 	publisher := bus.Publisher()
 
 	events := []struct {
@@ -190,7 +190,7 @@ func demonstrateMultiTopicSubscribe(bus messaging.EventBus) {
 // ========== 演示 4: 订阅者生命周期 ==========
 
 func demonstrateSubscriberLifecycle(bus messaging.EventBus) {
-	log.Println("\n【演示 4】订阅者生命周期 - 启动、暂停、恢复、停止\n")
+	log.Println("\n【演示 4】订阅者生命周期 - 启动、暂停、恢复、停止")
 
 	logger := log.New(os.Stdout, "[Lifecycle] ", log.LstdFlags)
 	router := bus.Router()
@@ -216,7 +216,7 @@ func demonstrateSubscriberLifecycle(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布消息
-	log.Println("发布消息...\n")
+	log.Println("发布消息...")
 	for i := 1; i <= 3; i++ {
 		data := []byte(fmt.Sprintf("消息-%d", i))
 		publisher.Publish(context.Background(), "demo.lifecycle", data)
@@ -239,7 +239,7 @@ func demonstrateSubscriberLifecycle(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 再次发布消息
-	log.Println("再次发布消息...\n")
+	log.Println("再次发布消息...")
 	for i := 4; i <= 6; i++ {
 		data := []byte(fmt.Sprintf("消息-%d", i))
 		publisher.Publish(context.Background(), "demo.lifecycle", data)

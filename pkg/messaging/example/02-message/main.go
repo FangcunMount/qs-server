@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	log.Println("=== Message 消息模型详解 ===\n")
+	log.Println("=== Message 消息模型详解 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -42,7 +42,7 @@ func main() {
 // demonstrateUUID 演示 UUID 的使用
 func demonstrateUUID(bus messaging.EventBus) {
 	log.Println("【演示 1】UUID - 全局唯一标识")
-	log.Println("用途：消息追踪、去重、日志关联\n")
+	log.Println("用途：消息追踪、去重、日志关联")
 
 	// 订阅
 	bus.Subscriber().Subscribe("demo.uuid", "uuid-demo", func(ctx context.Context, msg *messaging.Message) error {
@@ -69,7 +69,7 @@ func demonstrateUUID(bus messaging.EventBus) {
 // demonstrateMetadata 演示 Metadata 的使用
 func demonstrateMetadata(bus messaging.EventBus) {
 	log.Println("\n【演示 2】Metadata - 元数据")
-	log.Println("用途：链路追踪、业务标识、消息路由\n")
+	log.Println("用途：链路追踪、业务标识、消息路由")
 
 	// 订阅
 	bus.Subscriber().Subscribe("demo.metadata", "metadata-demo", func(ctx context.Context, msg *messaging.Message) error {
@@ -104,7 +104,7 @@ func demonstrateMetadata(bus messaging.EventBus) {
 func demonstrateAckNack(bus messaging.EventBus) {
 	log.Println("\n【演示 3】Ack/Nack - 消息确认机制")
 	log.Println("Ack  : 确认消息处理成功，不会重新投递")
-	log.Println("Nack : 拒绝消息，触发重试（NSQ 会自动重新投递）\n")
+	log.Println("Nack : 拒绝消息，触发重试（NSQ 会自动重新投递）")
 
 	processCount := 0
 
@@ -128,7 +128,7 @@ func demonstrateAckNack(bus messaging.EventBus) {
 	// 发布消息
 	publisher := bus.Publisher()
 	publisher.Publish(context.Background(), "demo.ack-nack", []byte("需要重试的消息"))
-	log.Println("✓ 发布消息（观察重试机制）\n")
+	log.Println("✓ 发布消息（观察重试机制）")
 
 	time.Sleep(3 * time.Second)
 }

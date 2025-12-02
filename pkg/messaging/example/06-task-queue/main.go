@@ -27,7 +27,7 @@ type EmailTask struct {
 
 func main() {
 	log.Println("=== 任务队列模式演示 ===")
-	log.Println("场景：10 个 Worker 负载均衡处理 100 个邮件发送任务\n")
+	log.Println("场景：10 个 Worker 负载均衡处理 100 个邮件发送任务")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -82,7 +82,7 @@ func main() {
 	log.Printf("   速度: %.0f 任务/秒\n", float64(taskCount)/elapsed.Seconds())
 
 	log.Println("等待所有任务处理完成...")
-	log.Println("（观察任务如何在 Worker 之间负载均衡）\n")
+	log.Println("（观察任务如何在 Worker 之间负载均衡）")
 
 	// 等待一段时间让任务处理完成
 	time.Sleep(15 * time.Second)

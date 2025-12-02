@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	log.Println("=== 性能优化演示 ===\n")
+	log.Println("=== 性能优化演示 ===")
 
 	// ========== 演示 1: 基准测试 ==========
 	demonstrateBenchmark()
@@ -69,11 +69,11 @@ func (pm *PerformanceMetrics) Report() {
 		float64(pm.TotalMessages)/pm.TotalDuration.Seconds())
 	log.Printf("平均延迟: %.2f ms",
 		float64(pm.TotalDuration.Milliseconds())/float64(pm.TotalMessages))
-	log.Println("=============================\n")
+	log.Println("=============================")
 }
 
 func demonstrateBenchmark() {
-	log.Println("【演示 1】基准测试 - 测量吞吐量和延迟\n")
+	log.Println("【演示 1】基准测试 - 测量吞吐量和延迟")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -130,7 +130,7 @@ func demonstrateBenchmark() {
 // ========== 演示 2: 并发优化 ==========
 
 func demonstrateConcurrency() {
-	log.Println("【演示 2】并发优化 - 多 Worker 并行处理\n")
+	log.Println("【演示 2】并发优化 - 多 Worker 并行处理")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -254,7 +254,7 @@ func (bp *BatchProcessor) Close() {
 }
 
 func demonstrateBatchProcessing() {
-	log.Println("【演示 3】批量处理优化 - 批量操作提升性能\n")
+	log.Println("【演示 3】批量处理优化 - 批量操作提升性能")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -363,7 +363,7 @@ func testBatchProcessing(bus messaging.EventBus, logger *log.Logger) {
 // ========== 演示 4: 内存优化 ==========
 
 func demonstrateMemoryOptimization() {
-	log.Println("\n【演示 4】内存优化 - 对象池和零拷贝\n")
+	log.Println("\n【演示 4】内存优化 - 对象池和零拷贝")
 
 	// 使用 sync.Pool 优化内存分配
 	msgPool := &sync.Pool{

@@ -26,7 +26,7 @@ var metrics = &MetricsCollector{
 }
 
 func main() {
-	log.Println("=== 可观测性演示 ===\n")
+	log.Println("=== 可观测性演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -35,7 +35,7 @@ func main() {
 
 	// 启动 Metrics HTTP 服务
 	go startMetricsServer()
-	log.Println("Metrics 服务已启动: http://localhost:9090/metrics\n")
+	log.Println("Metrics 服务已启动: http://localhost:9090/metrics")
 
 	// ========== 演示 1: Metrics 监控 ==========
 	demonstrateMetrics(bus, logger)
@@ -131,7 +131,7 @@ func startMetricsServer() {
 }
 
 func demonstrateMetrics(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("【演示 1】Metrics 监控 - 收集处理指标\n")
+	log.Println("【演示 1】Metrics 监控 - 收集处理指标")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -157,7 +157,7 @@ func demonstrateMetrics(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发送 10 条消息并收集指标...\n")
+	log.Println("发送 10 条消息并收集指标...")
 
 	for i := 1; i <= 10; i++ {
 		msg := messaging.NewMessage("", []byte(fmt.Sprintf("消息-%d", i)))
@@ -224,7 +224,7 @@ func generateID() string {
 }
 
 func demonstrateTracing(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 2】Tracing 追踪 - 分布式追踪\n")
+	log.Println("\n【演示 2】Tracing 追踪 - 分布式追踪")
 
 	router := bus.Router()
 	router.AddMiddleware(messaging.LoggerMiddleware(logger))
@@ -249,7 +249,7 @@ func demonstrateTracing(bus messaging.EventBus, logger *log.Logger) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发送带追踪信息的消息...\n")
+	log.Println("发送带追踪信息的消息...")
 
 	// 模拟请求链路
 	msg := messaging.NewMessage("", []byte("用户请求"))
@@ -265,7 +265,7 @@ func demonstrateTracing(bus messaging.EventBus, logger *log.Logger) {
 // ========== Health Check 健康检查 ==========
 
 func demonstrateHealthCheck(bus messaging.EventBus, logger *log.Logger) {
-	log.Println("\n【演示 3】Health Check - 健康检查\n")
+	log.Println("\n【演示 3】Health Check - 健康检查")
 
 	// 启动健康检查 HTTP 服务
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -292,7 +292,7 @@ func demonstrateHealthCheck(bus messaging.EventBus, logger *log.Logger) {
 	})
 
 	go http.ListenAndServe(":9091", nil)
-	log.Println("Health Check 服务已启动: http://localhost:9091/health\n")
+	log.Println("Health Check 服务已启动: http://localhost:9091/health")
 
 	// 定期检查健康状态
 	ticker := time.NewTicker(2 * time.Second)

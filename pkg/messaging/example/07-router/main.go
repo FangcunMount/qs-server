@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	log.Println("=== Router 演示 ===\n")
+	log.Println("=== Router 演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -47,7 +47,7 @@ func main() {
 // ========== 演示 1: 基础路由 ==========
 
 func demonstrateBasicRouter(bus messaging.EventBus) {
-	log.Println("【演示 1】基础路由 - 注册多个处理器\n")
+	log.Println("【演示 1】基础路由 - 注册多个处理器")
 
 	logger := log.New(os.Stdout, "[Router] ", log.LstdFlags)
 	router := bus.Router()
@@ -76,7 +76,7 @@ func demonstrateBasicRouter(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布到不同 Topic
-	log.Println("发布到不同 Topic...\n")
+	log.Println("发布到不同 Topic...")
 	publisher := bus.Publisher()
 
 	events := []struct {
@@ -101,7 +101,7 @@ func demonstrateBasicRouter(bus messaging.EventBus) {
 // ========== 演示 2: 全局中间件 ==========
 
 func demonstrateGlobalMiddleware(bus messaging.EventBus) {
-	log.Println("\n【演示 2】全局中间件 - 应用到所有处理器\n")
+	log.Println("\n【演示 2】全局中间件 - 应用到所有处理器")
 
 	logger := log.New(os.Stdout, "[Global] ", log.LstdFlags)
 	router := bus.Router()
@@ -114,7 +114,7 @@ func demonstrateGlobalMiddleware(bus messaging.EventBus) {
 	log.Println("全局中间件:")
 	log.Println("  1. RecoverMiddleware（捕获 panic）")
 	log.Println("  2. LoggerMiddleware（记录日志）")
-	log.Println("  3. TimeoutMiddleware（超时控制）\n")
+	log.Println("  3. TimeoutMiddleware（超时控制）")
 
 	// 注册处理器
 	router.AddHandler("demo.global", "handler-1", func(ctx context.Context, msg *messaging.Message) error {
@@ -134,7 +134,7 @@ func demonstrateGlobalMiddleware(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布消息
-	log.Println("发布消息（观察全局中间件）...\n")
+	log.Println("发布消息（观察全局中间件）...")
 	publisher := bus.Publisher()
 
 	for i := 1; i <= 2; i++ {
@@ -151,7 +151,7 @@ func demonstrateGlobalMiddleware(bus messaging.EventBus) {
 // ========== 演示 3: 局部中间件 ==========
 
 func demonstrateLocalMiddleware(bus messaging.EventBus) {
-	log.Println("\n【演示 3】局部中间件 - 只应用到特定处理器\n")
+	log.Println("\n【演示 3】局部中间件 - 只应用到特定处理器")
 
 	logger := log.New(os.Stdout, "[Local] ", log.LstdFlags)
 	router := bus.Router()
@@ -190,7 +190,7 @@ func demonstrateLocalMiddleware(bus messaging.EventBus) {
 	time.Sleep(time.Second)
 
 	// 发布消息
-	log.Println("发布消息（观察局部中间件）...\n")
+	log.Println("发布消息（观察局部中间件）...")
 	publisher := bus.Publisher()
 	publisher.Publish(context.Background(), "demo.local", []byte("测试"))
 
@@ -202,7 +202,7 @@ func demonstrateLocalMiddleware(bus messaging.EventBus) {
 // ========== 演示 4: 中间件执行顺序 ==========
 
 func demonstrateMiddlewareOrder(bus messaging.EventBus) {
-	log.Println("\n【演示 4】中间件执行顺序 - 洋葱模型\n")
+	log.Println("\n【演示 4】中间件执行顺序 - 洋葱模型")
 
 	router := bus.Router()
 
@@ -240,10 +240,10 @@ func demonstrateMiddlewareOrder(bus messaging.EventBus) {
 
 	time.Sleep(time.Second)
 
-	log.Println("发布消息（观察执行顺序）...\n")
+	log.Println("发布消息（观察执行顺序）...")
 	log.Println("期望顺序:")
 	log.Println("  请求: Global-1 → Global-2 → Local-1 → Local-2 → Handler")
-	log.Println("  响应: Handler → Local-2 → Local-1 → Global-2 → Global-1\n")
+	log.Println("  响应: Handler → Local-2 → Local-1 → Global-2 → Global-1")
 
 	publisher := bus.Publisher()
 	publisher.Publish(context.Background(), "demo.order", []byte("测试消息"))

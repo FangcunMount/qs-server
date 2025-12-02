@@ -28,7 +28,7 @@ func main() {
 
 	log.Println("\n提示: 取消注释上面的演示代码并确保相应的消息中间件正在运行")
 	log.Println("  - NSQ: 运行 `nsqlookupd` 和 `nsqd`")
-	log.Println("  - RabbitMQ: 运行 `rabbitmq-server`\n")
+	log.Println("  - RabbitMQ: 运行 `rabbitmq-server`")
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -38,7 +38,7 @@ func main() {
 // ========== 演示 1: 切换 Provider ==========
 
 func demonstrateProviderSwitch() {
-	log.Println("【演示 1】切换 Provider - NSQ vs RabbitMQ\n")
+	log.Println("【演示 1】切换 Provider - NSQ vs RabbitMQ")
 
 	// 配置 NSQ
 	nsqConfig := &messaging.Config{
@@ -171,8 +171,8 @@ func (b *MessageBridge) Stop() {
 }
 
 func demonstrateMultiProvider() {
-	log.Println("【演示 2】混合使用多个 Provider\n")
-	log.Println("场景: NSQ 接收消息 → 桥接 → RabbitMQ 处理\n")
+	log.Println("【演示 2】混合使用多个 Provider")
+	log.Println("场景: NSQ 接收消息 → 桥接 → RabbitMQ 处理")
 
 	// NSQ 配置（作为入口）
 	nsqConfig := &messaging.Config{
@@ -223,7 +223,7 @@ func demonstrateMultiProvider() {
 	nsqBus, _ := messaging.NewEventBus(nsqConfig)
 	defer nsqBus.Close()
 
-	log.Println("从 NSQ 发送消息...\n")
+	log.Println("从 NSQ 发送消息...")
 
 	for i := 1; i <= 5; i++ {
 		data := []byte(fmt.Sprintf("跨 Provider 消息 #%d", i))

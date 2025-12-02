@@ -18,7 +18,7 @@ import (
 func main() {
 	log.Println("=== 完整应用演示 ===")
 	log.Println("提示: 这是一个综合性的生产级示例")
-	log.Println("包括: 配置管理、中间件链、可观测性、错误处理、优雅关闭\n")
+	log.Println("包括: 配置管理、中间件链、可观测性、错误处理、优雅关闭")
 
 	// 创建默认配置的 EventBus
 	bus, err := messaging.NewEventBus(messaging.DefaultConfig())

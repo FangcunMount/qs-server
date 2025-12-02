@@ -25,7 +25,7 @@ type UserCreatedEvent struct {
 
 func main() {
 	log.Println("=== 事件驱动架构演示 ===")
-	log.Println("场景：用户注册后，通知多个服务（邮件、统计、审计）\n")
+	log.Println("场景：用户注册后，通知多个服务（邮件、统计、审计）")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -45,7 +45,7 @@ func main() {
 	log.Println("启动服务：审计服务（audit-service）")
 	bus.Subscriber().Subscribe("user.created", "audit-service", auditService)
 
-	log.Println("\n所有服务已就绪，开始发布事件...\n")
+	log.Println("\n所有服务已就绪，开始发布事件...")
 	time.Sleep(2 * time.Second)
 
 	// ========== 发布事件 ==========

@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	log.Println("=== Publisher 演示 ===\n")
+	log.Println("=== Publisher 演示 ===")
 
 	bus, _ := messaging.NewEventBus(messaging.DefaultConfig())
 	defer bus.Close()
@@ -77,7 +77,7 @@ func setupConsumer(bus messaging.EventBus) {
 // ========== 演示 1: 基础发布 ==========
 
 func demonstrateBasicPublish(bus messaging.EventBus) {
-	log.Println("【演示 1】基础发布 - Publish() 方法\n")
+	log.Println("【演示 1】基础发布 - Publish() 方法")
 
 	publisher := bus.Publisher()
 
@@ -98,7 +98,7 @@ func demonstrateBasicPublish(bus messaging.EventBus) {
 // ========== 演示 2: 发布带 Metadata 的消息 ==========
 
 func demonstratePublishWithMetadata(bus messaging.EventBus) {
-	log.Println("\n【演示 2】发布带 Metadata 的消息 - PublishMessage() 方法\n")
+	log.Println("\n【演示 2】发布带 Metadata 的消息 - PublishMessage() 方法")
 
 	publisher := bus.Publisher()
 
@@ -134,7 +134,7 @@ func demonstratePublishWithMetadata(bus messaging.EventBus) {
 // ========== 演示 3: 批量发布 ==========
 
 func demonstrateBatchPublish(bus messaging.EventBus) {
-	log.Println("\n【演示 3】批量发布 - 提升性能\n")
+	log.Println("\n【演示 3】批量发布 - 提升性能")
 
 	publisher := bus.Publisher()
 
@@ -156,7 +156,7 @@ func demonstrateBatchPublish(bus messaging.EventBus) {
 // ========== 演示 4: 发布到多个 Topic ==========
 
 func demonstrateMultiTopicPublish(bus messaging.EventBus) {
-	log.Println("\n【演示 4】发布到多个 Topic - 扇出模式\n")
+	log.Println("\n【演示 4】发布到多个 Topic - 扇出模式")
 
 	publisher := bus.Publisher()
 

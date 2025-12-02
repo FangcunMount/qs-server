@@ -361,14 +361,14 @@ BatchMiddleware(5, 2*time.Second),
 		time.Sleep(300 * time.Millisecond)
 
 		if i == 5 {
-			log.Println("\n→ 达到批次大小（5 条），触发处理\n")
+			log.Println("\n→ 达到批次大小（5 条），触发处理")
 		}
 		if i == 10 {
-			log.Println("\n→ 达到批次大小（5 条），再次触发处理\n")
+			log.Println("\n→ 达到批次大小（5 条），再次触发处理")
 		}
 	}
 
-	log.Println("\n等待最后一批（超时触发）...\n")
+	log.Println("\n等待最后一批（超时触发）...")
 	time.Sleep(3 * time.Second)
 	router.Stop()
 }
