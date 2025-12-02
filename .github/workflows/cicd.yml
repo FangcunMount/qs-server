@@ -67,8 +67,29 @@ jobs:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          # 兼容两种命名：优先 MYSQL_DATABASE，其次 MYSQL_DBNAME
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
           REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
+          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT }}
+          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB }}
+          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
+          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
           REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
+          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT }}
+          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB }}
+          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
+          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
+          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
+          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT }}
+          SVRA_SSH_PORT: ${{ secrets.SVRA_SSH_PORT }}
+          SVRA_SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ secrets.WWW_UID }}
+          WWW_GID: ${{ secrets.WWW_GID }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -407,7 +428,8 @@ jobs:
           MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          # 兼容两种命名：优先 MYSQL_DATABASE，其次 MYSQL_DBNAME
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
           REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
           REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
           REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
