@@ -315,6 +315,6 @@ func printViperConfig(basename string) {
 	}
 	for _, key := range keys {
 		envKey := envPrefix + "_" + key
-		fmt.Printf("ENV %s=%s\n", key, os.Getenv(envKey))
+		fmt.Printf("ENV %s=%s\n", envKey, os.Getenv(envKey))
 	}
 }
