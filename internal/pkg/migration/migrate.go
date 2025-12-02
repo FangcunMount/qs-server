@@ -6,35 +6,62 @@ import (
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/mysql"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // migrations 嵌入迁移文件
 // 这样打包后的二进制文件中就包含了迁移 SQL，无需挂载外部文件
 //
-//go:embed migrations/*.sql
+//go:embed migrations/mysql/* migrations/mongodb/*
 var migrations embed.FS
+
+const (
+	defaultTable = "schema_migrations"
+)
 
 // Config 迁移配置
 type Config struct {
-	Enabled  bool   // 是否启用自动迁移
-	AutoSeed bool   // 是否自动加载种子数据
-	Database string // 数据库名称
+	Enabled              bool   // 是否启用自动迁移
+	AutoSeed             bool   // 是否自动加载种子数据
+	Database             string // 数据库名称
+	MigrationsTable      string // MySQL 迁移记录表名
+	MigrationsCollection string // MongoDB 迁移记录集合名
 }
 
 // Migrator 数据库迁移器
 type Migrator struct {
-	db     *sql.DB
+	driver Driver
 	config *Config
 }
 
-// NewMigrator 创建迁移器
+// NewMigrator 创建 MySQL 迁移器（保持向后兼容）
 func NewMigrator(db *sql.DB, config *Config) *Migrator {
 	return &Migrator{
-		db:     db,
-		config: config,
+		driver: NewMySQLDriver(db),
+		config: ensureConfigDefaults(config),
 	}
+}
+
+// NewMongoMigrator 创建 MongoDB 迁移器（保持向后兼容）
+func NewMongoMigrator(client *mongo.Client, config *Config) *Migrator {
+	return &Migrator{
+		driver: NewMongoDriver(client),
+		config: ensureConfigDefaults(config),
+	}
+}
+
+// NewMigratorWithDriver 使用自定义驱动创建迁移器
+// 这是推荐的创建方式，支持任意实现 Driver 接口的数据库
+func NewMigratorWithDriver(driver Driver, config *Config) *Migrator {
+	return &Migrator{
+		driver: driver,
+		config: ensureConfigDefaults(config),
+	}
+}
+
+// Backend 返回当前使用的后端类型
+func (m *Migrator) Backend() Backend {
+	return m.driver.Backend()
 }
 
 // Run 执行数据库迁移并返回最新版本以及是否执行了迁移
@@ -50,8 +77,12 @@ func (m *Migrator) Run() (uint, bool, error) {
 		return 0, false, nil
 	}
 
+	if err := m.validate(); err != nil {
+		return 0, false, err
+	}
+
 	// 创建 migrate 实例
-	instance, err := m.createMigrate()
+	instance, err := m.driver.CreateInstance(migrations, m.config)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to create migrate instance: %w", err)
 	}
@@ -96,7 +127,11 @@ func (m *Migrator) Run() (uint, bool, error) {
 
 // Rollback 回滚最近的一次迁移
 func (m *Migrator) Rollback() error {
-	instance, err := m.createMigrate()
+	if err := m.validate(); err != nil {
+		return err
+	}
+
+	instance, err := m.driver.CreateInstance(migrations, m.config)
 	if err != nil {
 		return err
 	}
@@ -113,7 +148,11 @@ func (m *Migrator) Rollback() error {
 
 // Version 获取当前数据库版本
 func (m *Migrator) Version() (uint, bool, error) {
-	instance, err := m.createMigrate()
+	if err := m.validate(); err != nil {
+		return 0, false, err
+	}
+
+	instance, err := m.driver.CreateInstance(migrations, m.config)
 	if err != nil {
 		return 0, false, err
 	}
@@ -129,34 +168,29 @@ func (m *Migrator) Version() (uint, bool, error) {
 	return version, dirty, nil
 }
 
-// createMigrate 创建 migrate 实例
-func (m *Migrator) createMigrate() (*migrate.Migrate, error) {
-	// 1. 从嵌入文件系统创建源驱动
-	sourceDriver, err := iofs.New(migrations, "migrations")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create source driver: %w", err)
+// validate 验证迁移器配置
+func (m *Migrator) validate() error {
+	if m.driver == nil {
+		return fmt.Errorf("migration driver is nil")
 	}
-
-	// 2. 创建 MySQL 数据库驱动
-	databaseDriver, err := mysql.WithInstance(m.db, &mysql.Config{
-		DatabaseName: m.config.Database,
-		// 迁移表名，用于记录版本
-		MigrationsTable: "schema_migrations",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create database driver: %w", err)
+	if m.config == nil {
+		return fmt.Errorf("migration config is nil")
 	}
-
-	// 3. 创建 migrate 实例
-	instance, err := migrate.NewWithInstance(
-		"iofs",
-		sourceDriver,
-		"mysql",
-		databaseDriver,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create migrate instance: %w", err)
+	if m.config.Database == "" {
+		return fmt.Errorf("database name is required for migration")
 	}
+	return nil
+}
 
-	return instance, nil
+func ensureConfigDefaults(cfg *Config) *Config {
+	if cfg == nil {
+		cfg = &Config{}
+	}
+	if cfg.MigrationsTable == "" {
+		cfg.MigrationsTable = defaultTable
+	}
+	if cfg.MigrationsCollection == "" {
+		cfg.MigrationsCollection = defaultTable
+	}
+	return cfg
 }

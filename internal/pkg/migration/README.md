@@ -33,14 +33,57 @@
 
 ```text
 migration/
-├── migrate.go              # 迁移工具实现
-├── migrations/             # 迁移 SQL 文件（嵌入到二进制）
-│   ├── 000001_init_schema.up.sql      # 初始化表结构
-│   ├── 000001_init_schema.down.sql    # 回滚表结构
-│   ├── 000002_seed_data.up.sql        # 种子数据
-│   ├── 000002_seed_data.down.sql      # 回滚种子数据
-│   └── ...
+├── migrate.go              # 迁移器核心实现
+├── driver.go               # Driver 接口定义
+├── driver_mysql.go         # MySQL 驱动实现
+├── driver_mongo.go         # MongoDB 驱动实现
+├── migrations/             # 迁移文件（嵌入到二进制）
+│   ├── mysql/              # MySQL 迁移文件（独立版本号）
+│   │   ├── 000001_init_actor_schema.up.sql
+│   │   └── 000001_init_actor_schema.down.sql
+│   └── mongodb/            # MongoDB 迁移文件（独立版本号）
+│       ├── 000001_init_collections.up.json
+│       └── 000001_init_collections.down.json
 └── README.md               # 本文件
+```
+
+> ⚠️ **注意**: MySQL 和 MongoDB 的迁移版本号是**独立**的！
+> `mysql/000003_xxx` 和 `mongodb/000001_xxx` 可以同时存在，互不影响。
+
+## 🏗️ 架构设计
+
+采用 **驱动模式** 设计，通过 `Driver` 接口抽象不同数据库的迁移逻辑：
+
+```go
+// Driver 定义数据库迁移驱动接口
+type Driver interface {
+    Backend() Backend
+    SourcePath() string
+    CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error)
+}
+```
+
+### 支持的数据库
+
+| 数据库 | 驱动类型 | 迁移文件格式 |
+|--------|----------|--------------|
+| MySQL  | MySQLDriver | `.sql` |
+| MongoDB | MongoDriver | `.json` |
+
+### 扩展新数据库
+
+只需实现 `Driver` 接口即可添加新的数据库支持：
+
+```go
+type PostgresDriver struct {
+    db *sql.DB
+}
+
+func (d *PostgresDriver) Backend() Backend { return "postgres" }
+func (d *PostgresDriver) SourcePath() string { return "migrations/postgres" }
+func (d *PostgresDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error) {
+    // 实现创建逻辑...
+}
 ```
 
 ## 🚀 快速开始
@@ -51,13 +94,16 @@ migration/
 # 添加 golang-migrate 依赖
 go get -u github.com/golang-migrate/migrate/v4
 go get -u github.com/golang-migrate/migrate/v4/database/mysql
+go get -u github.com/golang-migrate/migrate/v4/database/mongodb
 go get -u github.com/golang-migrate/migrate/v4/source/iofs
 
 # （可选）安装 CLI 工具，用于创建迁移文件
-go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+go install -tags 'mysql mongodb' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
 
 ### 2. 在应用中使用
+
+#### MySQL 迁移
 
 ```go
 package main
@@ -66,13 +112,13 @@ import (
     "database/sql"
     "fmt"
     
-    "github.com/FangcunMount/iam-contracts/internal/pkg/migration"
+    "github.com/fangcun-mount/qs-server/internal/pkg/migration"
     _ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
     // 1. 连接数据库
-    db, err := sql.Open("mysql", "user:pass@tcp(localhost:3306)/iam_contracts")
+    db, err := sql.Open("mysql", "user:pass@tcp(localhost:3306)/mydb")
     if err != nil {
         panic(err)
     }
@@ -80,9 +126,9 @@ func main() {
 
     // 2. 配置迁移器
     cfg := &migration.Config{
-        Enabled:  true,              // 启用自动迁移
-        AutoSeed: false,             // 生产环境设为 false
-        Database: "iam_contracts",   // 数据库名称
+        Enabled:  true,
+        AutoSeed: false,
+        Database: "mydb",
     }
 
     // 3. 创建迁移器并执行
@@ -94,9 +140,58 @@ func main() {
     } else {
         fmt.Printf("database already up to date (version %d)\n", version)
     }
-
-    // 4. 启动应用...
 }
+```
+
+#### MongoDB 迁移
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/fangcun-mount/qs-server/internal/pkg/migration"
+    "go.mongodb.org/mongo-driver/mongo"
+    "go.mongodb.org/mongo-driver/mongo/options"
+)
+
+func main() {
+    // 1. 连接 MongoDB
+    client, err := mongo.Connect(context.Background(), options.Client().ApplyURI("mongodb://localhost:27017"))
+    if err != nil {
+        panic(err)
+    }
+    defer client.Disconnect(context.Background())
+
+    // 2. 配置迁移器
+    cfg := &migration.Config{
+        Enabled:              true,
+        Database:             "mydb",
+        MigrationsCollection: "schema_migrations",
+    }
+
+    // 3. 创建迁移器并执行
+    migrator := migration.NewMongoMigrator(client, cfg)
+    if version, applied, err := migrator.Run(); err != nil {
+        panic(err)
+    } else if applied {
+        fmt.Printf("migrated to version %d\n", version)
+    } else {
+        fmt.Printf("database already up to date (version %d)\n", version)
+    }
+}
+```
+
+#### 使用自定义驱动
+
+```go
+// 创建自定义驱动
+driver := migration.NewMySQLDriver(db)
+
+// 使用驱动创建迁移器
+migrator := migration.NewMigratorWithDriver(driver, cfg)
 ```
 
 ### 3. 创建新的迁移
@@ -174,9 +269,36 @@ CMD ["./apiserver"]
 
 容器启动时会自动执行迁移，无需手动操作。
 
-## 📊 迁移表
+## 📊 迁移版本管理
 
-`golang-migrate` 会自动创建 `schema_migrations` 表来追踪版本：
+### 独立版本控制
+
+MySQL 和 MongoDB 的迁移版本是**完全独立**的，各自在自己的数据库中维护版本记录：
+
+| 数据库 | 版本存储位置 | 迁移文件目录 |
+|--------|-------------|-------------|
+| MySQL | MySQL 的 `schema_migrations` 表 | `migrations/mysql/` |
+| MongoDB | MongoDB 的 `schema_migrations` 集合 | `migrations/mongodb/` |
+
+**示例场景**：
+
+```text
+MySQL (schema_migrations 表):          MongoDB (schema_migrations 集合):
+┌─────────┬───────┐                    ┌─────────┬───────┐
+│ version │ dirty │                    │ version │ dirty │
+├─────────┼───────┤                    ├─────────┼───────┤
+│    3    │   0   │ ← MySQL v3         │    1    │   0   │ ← MongoDB v1
+└─────────┴───────┘                    └─────────┴───────┘
+```
+
+这意味着：
+- ✅ MySQL 可以有 10 个迁移版本，MongoDB 只有 2 个，互不影响
+- ✅ 可以只更新 MySQL 迁移，不触发 MongoDB 迁移
+- ✅ 各自独立回滚，互不干扰
+
+### MySQL 迁移表
+
+`golang-migrate` 会自动创建 `schema_migrations` 表：
 
 ```sql
 mysql> SELECT * FROM schema_migrations;
@@ -185,6 +307,15 @@ mysql> SELECT * FROM schema_migrations;
 +---------+-------+
 |       2 |     0 |
 +---------+-------+
+```
+
+### MongoDB 迁移集合
+
+MongoDB 中会自动创建 `schema_migrations` 集合：
+
+```javascript
+db.schema_migrations.find()
+// { "version": 1, "dirty": false }
 ```
 
 - `version`: 当前数据库版本号

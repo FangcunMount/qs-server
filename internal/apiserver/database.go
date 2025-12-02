@@ -274,46 +274,80 @@ func (dm *DatabaseManager) runMigrations() error {
 		return nil
 	}
 
-	// 获取 MySQL 连接
-	gormDB, err := dm.GetMySQLDB()
-	if err != nil {
-		log.Warn("MySQL not configured, skipping migration")
-		return nil
-	}
+	var ran bool
 
-	// 获取底层的 *sql.DB
-	sqlDB, err := gormDB.DB()
-	if err != nil {
-		return fmt.Errorf("failed to get sql.DB: %w", err)
-	}
-
-	// 使用配置中的数据库名，如果未配置则使用 MySQL 配置中的数据库名
-	database := dm.config.MigrationOptions.Database
-	if database == "" {
-		database = dm.config.MySQLOptions.Database
-	}
-
-	// 创建迁移配置
-	migrationConfig := &migration.Config{
-		Enabled:  dm.config.MigrationOptions.Enabled,
-		AutoSeed: dm.config.MigrationOptions.AutoSeed,
-		Database: database,
-	}
-
-	// 创建迁移器
-	migrator := migration.NewMigrator(sqlDB, migrationConfig)
-
-	// 执行迁移
-	log.Info("Starting database migration...")
-	version, migrated, err := migrator.Run()
-	if err != nil {
-		return fmt.Errorf("migration failed: %w", err)
-	}
-
-	if migrated {
-		log.Infof("✅ Database migration completed successfully! Current version: %d", version)
+	// MySQL 迁移
+	if gormDB, err := dm.GetMySQLDB(); err != nil {
+		log.Warn("MySQL not configured, skipping MySQL migration")
 	} else {
-		log.Infof("✅ Database is already up to date! Current version: %d", version)
+		sqlDB, derr := gormDB.DB()
+		if derr != nil {
+			return fmt.Errorf("failed to get sql.DB: %w", derr)
+		}
+
+		database := dm.config.MigrationOptions.Database
+		if database == "" {
+			database = dm.config.MySQLOptions.Database
+		}
+
+		migrationConfig := &migration.Config{
+			Enabled:  dm.config.MigrationOptions.Enabled,
+			AutoSeed: dm.config.MigrationOptions.AutoSeed,
+			Database: database,
+		}
+
+		migrator := migration.NewMigrator(sqlDB, migrationConfig)
+
+		log.Info("Starting MySQL database migration...")
+		version, migrated, merr := migrator.Run()
+		if merr != nil {
+			return fmt.Errorf("mysql migration failed: %w", merr)
+		}
+
+		if migrated {
+			log.Infof("✅ MySQL migration completed successfully! Current version: %d", version)
+		} else {
+			log.Infof("✅ MySQL schema is already up to date! Current version: %d", version)
+		}
+		ran = true
+	}
+
+	// MongoDB 迁移（可选）
+	mongoDBName := viper.GetString("mongodb.database")
+	if mongoClient, err := dm.GetMongoClient(); err != nil {
+		log.Infof("MongoDB not configured or unavailable, skipping migration: %v", err)
+	} else if mongoDBName == "" {
+		log.Warn("MongoDB database name not configured, skipping MongoDB migration")
+	} else {
+		mongoDatabase := dm.config.MigrationOptions.Database
+		if mongoDatabase == "" {
+			mongoDatabase = mongoDBName
+		}
+
+		mongoConfig := &migration.Config{
+			Enabled:              dm.config.MigrationOptions.Enabled,
+			AutoSeed:             dm.config.MigrationOptions.AutoSeed,
+			Database:             mongoDatabase,
+			MigrationsCollection: "schema_migrations",
+		}
+
+		mongoMigrator := migration.NewMongoMigrator(mongoClient, mongoConfig)
+		log.Info("Starting MongoDB migration...")
+		mongoVersion, mongoMigrated, merr := mongoMigrator.Run()
+		if merr != nil {
+			return fmt.Errorf("mongodb migration failed: %w", merr)
+		}
+
+		if mongoMigrated {
+			log.Infof("✅ MongoDB migration completed successfully! Current version: %d", mongoVersion)
+		} else {
+			log.Infof("✅ MongoDB schema is already up to date! Current version: %d", mongoVersion)
+		}
+		ran = true
+	}
+
+	if !ran {
+		log.Warn("No database migration target configured, skipping...")
 	}
 
 	return nil

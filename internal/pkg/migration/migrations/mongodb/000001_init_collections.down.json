@@ -1,0 +1,14 @@
+[
+  {
+    "drop": "interpret_reports"
+  },
+  {
+    "drop": "scales"
+  },
+  {
+    "drop": "questionnaires"
+  },
+  {
+    "drop": "answersheets"
+  }
+]

@@ -1,0 +1,146 @@
+[
+  {
+    "create": "answersheets"
+  },
+  {
+    "create": "questionnaires"
+  },
+  {
+    "create": "scales"
+  },
+  {
+    "create": "interpret_reports"
+  },
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "idx_domain_id",
+        "unique": true
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1 },
+        "name": "idx_questionnaire"
+      },
+      {
+        "key": { "filler_id": 1, "filler_type": 1 },
+        "name": "idx_filler"
+      },
+      {
+        "key": { "filled_at": -1 },
+        "name": "idx_filled_at"
+      },
+      {
+        "key": { "deleted_at": 1 },
+        "name": "idx_deleted_at",
+        "partialFilterExpression": { "deleted_at": { "$exists": true } }
+      },
+      {
+        "key": { "created_at": -1 },
+        "name": "idx_created_at"
+      }
+    ]
+  },
+  {
+    "createIndexes": "questionnaires",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "idx_domain_id",
+        "unique": true,
+        "partialFilterExpression": { "domain_id": { "$exists": true, "$ne": 0 } }
+      },
+      {
+        "key": { "code": 1, "version": 1 },
+        "name": "idx_code_version",
+        "unique": true
+      },
+      {
+        "key": { "code": 1 },
+        "name": "idx_code"
+      },
+      {
+        "key": { "status": 1 },
+        "name": "idx_status"
+      },
+      {
+        "key": { "deleted_at": 1 },
+        "name": "idx_deleted_at",
+        "partialFilterExpression": { "deleted_at": { "$exists": true } }
+      },
+      {
+        "key": { "created_at": -1 },
+        "name": "idx_created_at"
+      }
+    ]
+  },
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "idx_domain_id",
+        "unique": true,
+        "partialFilterExpression": { "domain_id": { "$exists": true, "$ne": 0 } }
+      },
+      {
+        "key": { "code": 1 },
+        "name": "idx_code",
+        "unique": true
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1 },
+        "name": "idx_questionnaire"
+      },
+      {
+        "key": { "status": 1 },
+        "name": "idx_status"
+      },
+      {
+        "key": { "deleted_at": 1 },
+        "name": "idx_deleted_at",
+        "partialFilterExpression": { "deleted_at": { "$exists": true } }
+      },
+      {
+        "key": { "created_at": -1 },
+        "name": "idx_created_at"
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpret_reports",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "idx_domain_id",
+        "unique": true
+      },
+      {
+        "key": { "testee_id": 1 },
+        "name": "idx_testee_id"
+      },
+      {
+        "key": { "scale_code": 1 },
+        "name": "idx_scale_code"
+      },
+      {
+        "key": { "risk_level": 1 },
+        "name": "idx_risk_level"
+      },
+      {
+        "key": { "testee_id": 1, "scale_code": 1, "created_at": -1 },
+        "name": "idx_testee_scale_created"
+      },
+      {
+        "key": { "deleted_at": 1 },
+        "name": "idx_deleted_at",
+        "partialFilterExpression": { "deleted_at": { "$exists": true } }
+      },
+      {
+        "key": { "created_at": -1 },
+        "name": "idx_created_at"
+      }
+    ]
+  }
+]
