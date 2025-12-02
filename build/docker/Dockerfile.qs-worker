@@ -61,5 +61,6 @@ COPY --from=builder /build/bin/qs-worker /app/qs-worker
 # 切换到非 root 用户
 USER appuser
 
-# 默认命令
-CMD ["/app/qs-worker", "--config=/app/configs/worker.prod.yaml"]
+# 入口与默认参数
+ENTRYPOINT ["/app/qs-worker"]
+CMD ["--config=/app/configs/worker.prod.yaml"]
