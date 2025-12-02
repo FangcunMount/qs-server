@@ -25,20 +25,6 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	// OpenAPI 契约（OAS 3.1）与 UI
 	engine.Static("/api/rest", "./api/rest")
 	engine.Static("/swagger-ui", "./web/swagger-ui/swagger-ui-dist")
-	engine.GET("/swagger-ui/swagger-initializer.js", func(c *gin.Context) {
-		c.Header("Content-Type", "application/javascript")
-		c.String(http.StatusOK, `window.onload = function() {
-  window.ui = SwaggerUIBundle({
-    url: "/api/rest/apiserver.yaml",
-    dom_id: '#swagger-ui',
-    presets: [
-      SwaggerUIBundle.presets.apis,
-      SwaggerUIStandalonePreset
-    ],
-    layout: "StandaloneLayout"
-  });
-};`)
-	})
 	// 兼容入口
 	engine.GET("/swagger", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/swagger-ui/")
