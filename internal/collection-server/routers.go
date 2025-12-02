@@ -1,11 +1,11 @@
 package collection
 
 import (
+	"net/http"
+
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Router 集中的路由管理器
@@ -25,12 +25,26 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	// 设置全局中间件
 	r.setupGlobalMiddleware(engine)
 
-	// Swagger 文档：静态文件由 api/collection 提供，UI 入口指向该路径
-	engine.Static("/api/collection", "./api/collection")
-	engine.GET("/swagger/*any", ginSwagger.WrapHandler(
-		swaggerFiles.Handler,
-		ginSwagger.URL("/api/collection/swagger.json"),
-	))
+	// OpenAPI 契约（OAS 3.1）与 UI
+	engine.Static("/api/rest", "./api/rest")
+	engine.Static("/swagger-ui", "./web/swagger-ui/swagger-ui-dist")
+	engine.GET("/swagger-ui/swagger-initializer.js", func(c *gin.Context) {
+		c.Header("Content-Type", "application/javascript")
+		c.String(http.StatusOK, `window.onload = function() {
+  window.ui = SwaggerUIBundle({
+    url: "/api/rest/collection.yaml",
+    dom_id: '#swagger-ui',
+    presets: [
+      SwaggerUIBundle.presets.apis,
+      SwaggerUIStandalonePreset
+    ],
+    layout: "StandaloneLayout"
+  });
+};`)
+	})
+	engine.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/swagger-ui/")
+	})
 
 	// 注册公开路由
 	r.registerPublicRoutes(engine)
