@@ -21,7 +21,7 @@ grpc_client:
 
 # JWT 配置
 jwt:
-  secret_key: "<YOUR_COLLECTION_JWT_SECRET_KEY>"
+  secret_key: ${COLLECTION_SERVER_JWT_SECRET}
   token_duration: 168  # 7 天 (24*7小时)
 
 # 日志配置
@@ -44,28 +44,28 @@ log:
 redis:
   # Cache Redis - 用于缓存、会话、限流等临时数据
   cache:
-    host: ${REDIS_CACHE_HOST}
-    port: ${REDIS_CACHE_PORT}
-    username: ${REDIS_CACHE_USER}
-    password: ${REDIS_CACHE_PASSWORD}
-    database: ${REDIS_CACHE_DB}
-    max-idle: ${REDIS_CACHE_MAX_IDLE}
-    max-active: ${REDIS_CACHE_MAX_ACTIVE}
-    timeout: ${REDIS_CACHE_TIMEOUT}
-    enable-cluster: ${REDIS_CACHE_ENABLE_CLUSTER}
-    use-ssl: ${REDIS_CACHE_USE_SSL}
-    enable-logging: ${REDIS_CACHE_ENABLE_LOGGING}
+    host: ${COLLECTION_SERVER_REDIS_CACHE_HOST}
+    port: ${COLLECTION_SERVER_REDIS_CACHE_PORT}
+    username: ${COLLECTION_SERVER_REDIS_CACHE_USERNAME}
+    password: ${COLLECTION_SERVER_REDIS_CACHE_PASSWORD}
+    database: ${COLLECTION_SERVER_REDIS_CACHE_DB}
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
 
   # Store Redis - 用于持久化存储、队列、发布订阅等
   store:
-    host: ${REDIS_STORE_HOST}
-    port: ${REDIS_STORE_PORT}
-    username: ${REDIS_STORE_USER}
-    password: ${REDIS_STORE_PASSWORD}
-    database: ${REDIS_STORE_DB}
-    max-idle: ${REDIS_STORE_MAX_IDLE}
-    max-active: ${REDIS_STORE_MAX_ACTIVE}
-    timeout: ${REDIS_STORE_TIMEOUT}
-    enable-cluster: ${REDIS_STORE_ENABLE_CLUSTER}
-    use-ssl: ${REDIS_STORE_USE_SSL}
-    enable-logging: ${REDIS_STORE_ENABLE_LOGGING}
+    host: ${COLLECTION_SERVER_REDIS_STORE_HOST}
+    port: ${COLLECTION_SERVER_REDIS_STORE_PORT}
+    username: ${COLLECTION_SERVER_REDIS_STORE_USERNAME}
+    password: ${COLLECTION_SERVER_REDIS_STORE_PASSWORD}
+    database: ${COLLECTION_SERVER_REDIS_STORE_DB}
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
