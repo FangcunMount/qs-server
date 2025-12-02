@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   qs-apiserver:
     image: ghcr.io/fangcunmount/qs-apiserver:latest
@@ -12,7 +10,7 @@ services:
       - "8081:9080"
       - "9445:9444"
     env_file:
-      - ../../deploy-package/configs/env/config.prod.env
+      - /opt/qs-server/qs-apiserver/configs/env/config.prod.env
     volumes:
       - /opt/qs-server/qs-apiserver/configs:/app/configs
       - /data/logs/qs-server/qs-apiserver:/var/log/qs-server
@@ -36,7 +34,7 @@ services:
       - "8082:9080"
       - "9446:9444"
     env_file:
-      - ../../deploy-package/configs/env/config.prod.env
+      - /opt/qs-server/qs-collection-server/configs/env/config.prod.env
     volumes:
       - /opt/qs-server/qs-collection-server/configs:/app/configs
       - /data/logs/qs-server/qs-collection-server:/var/log/qs-server
@@ -57,7 +55,7 @@ services:
       - qs-network
       - infra-network
     env_file:
-      - ../../deploy-package/configs/env/config.prod.env
+      - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:
       - /opt/qs-server/qs-worker/configs:/app/configs
       - /data/logs/qs-server/qs-worker:/var/log/qs-server
