@@ -530,7 +530,7 @@ jobs:
             fi
 
             # 解包（兼容不同落盘路径，优先查找 /tmp 下的 deploy-package.tar.gz）
-            PKG_PATH=$(find /tmp -maxdepth 2 -name "deploy-package.tar.gz" | head -n1 || true)
+            PKG_PATH=$(find /tmp -maxdepth 1 -name "deploy-package.tar.gz" 2>/dev/null | head -n1 || true)
             if [ -z "$PKG_PATH" ]; then
               echo "❌ deploy-package.tar.gz not found under /tmp" >&2
               ls -al /tmp || true
@@ -592,8 +592,8 @@ jobs:
 
             # 启动容器（使用 compose）
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml pull qs-apiserver || true
-            $SUDO docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d qs-apiserver
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-apiserver || true
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-apiserver
 
             # 健康检查（apiserver 公开的是 /health）
             echo "Waiting for service to be ready..."
@@ -765,7 +765,7 @@ jobs:
             # 解包
             DEPLOY_TMP="/tmp/qs-deploy-$$"
             mkdir -p "$DEPLOY_TMP"
-            PKG_PATH=$(find /tmp -maxdepth 2 -name "deploy-package.tar.gz" | head -n1 || true)
+            PKG_PATH=$(find /tmp -maxdepth 1 -name "deploy-package.tar.gz" 2>/dev/null | head -n1 || true)
             if [ -z "$PKG_PATH" ]; then
               echo "❌ deploy-package.tar.gz not found under /tmp" >&2
               ls -al /tmp || true
@@ -998,7 +998,7 @@ jobs:
             # 解包
             DEPLOY_TMP="/tmp/qs-deploy-$$"
             mkdir -p "$DEPLOY_TMP"
-            PKG_PATH=$(find /tmp -maxdepth 2 -name "deploy-package.tar.gz" | head -n1 || true)
+            PKG_PATH=$(find /tmp -maxdepth 1 -name "deploy-package.tar.gz" 2>/dev/null | head -n1 || true)
             if [ -z "$PKG_PATH" ]; then
               echo "❌ deploy-package.tar.gz not found under /tmp" >&2
               ls -al /tmp || true
