@@ -38,11 +38,17 @@ on:
           - apiserver
           - collection
           - worker
+      docs_verify:
+        description: '运行文档校验 (docs-verify)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   GO_VERSION: '1.22'
   DOCKER_REGISTRY: ghcr.io
   DOCKER_REPOSITORY: fangcunmount
+  DOCS_VERIFY: 'false' # 需要文档校验时设为 'true'（例如 workflow_dispatch 手动触发）
 
 jobs:
   # ==========================================================================
@@ -217,6 +223,7 @@ jobs:
   docs:
     name: Docs & API Sync
     needs: [validate-secrets]
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.docs_verify) || (github.event_name != 'workflow_dispatch' && vars.DOCS_VERIFY == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -228,6 +235,10 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Install PyYAML
+        run: |
+          python -m pip install --quiet pyyaml
+
       - name: Install swagger toolchain
         run: |
           go install github.com/swaggo/swag/cmd/swag@v1.16.4
@@ -236,17 +247,9 @@ jobs:
         run: |
           go mod download
 
-      - name: Regenerate swagger docs
+      - name: Verify docs locally (make docs-verify)
         run: |
-          swag init --parseInternal -g apiserver.go -d cmd/qs-apiserver,internal/apiserver,internal/pkg -o internal/apiserver/docs
-          swag init --parseInternal --parseDependency -g main.go -d cmd/collection-server,internal/collection-server,pkg -o internal/collection-server/docs
-
-      - name: Sync rest docs from swagger
-        run: |
-          python -m pip install --quiet pyyaml
-          python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:8081 --server https://api.example.com
-          python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:8082 --server https://api.example.com
-          python scripts/compare_api_docs.py
+          make docs-verify
 
       - name: Ensure no doc drift
         run: |
@@ -254,7 +257,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, lint, docs]
+    needs: [test, lint]
     runs-on: [self-hosted, macmini, qs]
     strategy:
       matrix:

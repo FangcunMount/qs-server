@@ -85,6 +85,7 @@ COLOR_RED := \033[31m
 .PHONY: install-tools install-air create-dirs
 .PHONY: up down re st log
 .PHONY: quick-start
+.PHONY: docs-swagger docs-rest docs-verify
 
 # ============================================================================
 # 帮助信息
@@ -116,6 +117,19 @@ help: ## 显示帮助信息
 	@echo "$(COLOR_BOLD)📚 其他命令:$(COLOR_RESET)"
 	@grep -E '^(deps|install|clean|version|debug|up|down|quick).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
+
+docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
+	@command -v swag >/dev/null 2>&1 || { echo "swag 未安装，请先执行: go install github.com/swaggo/swag/cmd/swag@v1.16.4"; exit 1; }
+	swag init --parseInternal -g apiserver.go -d cmd/qs-apiserver,internal/apiserver,internal/pkg -o internal/apiserver/docs
+	swag init --parseInternal --parseDependency -g main.go -d cmd/collection-server,internal/collection-server,pkg -o internal/collection-server/docs
+
+docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
+	@python -c "import yaml" 2>/dev/null || { echo "缺少 PyYAML，先执行: python -m pip install --quiet pyyaml"; exit 1; }
+	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:8081 --server https://api.example.com
+	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:8082 --server https://api.example.com
+
+docs-verify: docs-rest ## 对比 api/rest 与 swagger，检查是否有漂移
+	python scripts/compare_api_docs.py
 
 version: ## 显示版本信息
 	@echo "$(COLOR_BOLD)版本信息:$(COLOR_RESET)"
