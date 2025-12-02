@@ -44,7 +44,7 @@ mysql:
   host: "127.0.0.1:3306"          # MySQL 服务器地址
   username: "app_user"             # 数据库用户名
   password: "dev_app_pass_123"     # 数据库密码
-  database: "questionnaire_scale"  # 数据库名称
+  database: "qs"  # 数据库名称
   max-idle-connections: 10         # 最大空闲连接数
   max-open-connections: 50         # 最大打开连接数
   max-connection-life-time: "1h"   # 连接最大生存时间

@@ -133,7 +133,7 @@ migration.Migrator.Run()
 
 ```sql
 -- 连接数据库
-mysql -u qs_app_user -p questionnaire_scale
+mysql -u qs_app_user -p qs
 
 -- 查看迁移版本
 SELECT * FROM schema_migrations;

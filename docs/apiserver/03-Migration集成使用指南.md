@@ -13,7 +13,7 @@ mysql:
   host: "127.0.0.1:3306"
   username: "qs_app_user"
   password: "qs_app_password_2024"
-  database: "questionnaire_scale"
+  database: "qs"
   # ... 其他配置 ...
   
   # Migration 配置
@@ -205,7 +205,7 @@ mysql:
 目前需要手动执行 `.down.sql` 文件来回滚：
 
 ```bash
-mysql -u qs_app_user -p questionnaire_scale < internal/pkg/migration/migrations/000001_init_actor_schema.down.sql
+mysql -u qs_app_user -p qs < internal/pkg/migration/migrations/000001_init_actor_schema.down.sql
 ```
 
 ## 📚 相关文档

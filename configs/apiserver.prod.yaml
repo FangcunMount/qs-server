@@ -37,7 +37,7 @@ mysql:
   host: "127.0.0.1:3306"
   username: "app_user"
   password: ""
-  database: "questionnaire_scale"
+  database: "qs"
   max-idle-connections: 20
   max-open-connections: 200
   max-connection-life-time: 1h
@@ -47,7 +47,7 @@ mysql:
 migration:
   enabled: true   # 生产环境建议开启
   autoseed: false
-  database: "questionnaire_scale"
+  database: "qs"
 
 # Redis 配置（双实例架构）
 redis:

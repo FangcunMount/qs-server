@@ -114,7 +114,7 @@ services:
       - MYSQL_HOST=${MYSQL_HOST:-mysql}
       - MYSQL_USER=${MYSQL_USER:-app_user}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-questionnaire_scale}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-qs}
       - MONGODB_URL=${MONGODB_URL:-mongodb://mongo:27017/questionnaire_scale}
     networks:
       - qs-network
