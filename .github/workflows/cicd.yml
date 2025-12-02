@@ -161,13 +161,13 @@ jobs:
           fi
 
   # ==========================================================================
-  # 2) Test / Lint / Build —— 跑在 Mac mini 自托管 runner 上
+  # 2) Test / Lint / Build —— 跑在 GitHub 托管 runner 上
   # ==========================================================================
 
   test:
     name: Run Tests
     needs: [validate-secrets]
-    runs-on: [self-hosted, macmini, qs]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -202,7 +202,7 @@ jobs:
   lint:
     name: Lint Code
     needs: [validate-secrets]
-    runs-on: [self-hosted, macmini, qs]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -261,7 +261,7 @@ jobs:
   build:
     name: Build Applications
     needs: [test, lint]
-    runs-on: [self-hosted, macmini, qs]
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         service: [apiserver, collection, worker]
