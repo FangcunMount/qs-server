@@ -152,8 +152,12 @@ func (dm *DatabaseManager) initRedis() error {
 
 // initMongoDB 初始化MongoDB连接
 func (dm *DatabaseManager) initMongoDB() error {
+	// 直接传递分离参数，由 MongoConfig.BuildURL() 构建连接 URL
 	mongoConfig := &database.MongoConfig{
-		URL:                      dm.config.MongoDBOptions.URL,
+		Host:                     dm.config.MongoDBOptions.Host,
+		Username:                 dm.config.MongoDBOptions.Username,
+		Password:                 dm.config.MongoDBOptions.Password,
+		Database:                 dm.config.MongoDBOptions.Database,
 		UseSSL:                   dm.config.MongoDBOptions.UseSSL,
 		SSLInsecureSkipVerify:    dm.config.MongoDBOptions.SSLInsecureSkipVerify,
 		SSLAllowInvalidHostnames: dm.config.MongoDBOptions.SSLAllowInvalidHostnames,
@@ -161,8 +165,8 @@ func (dm *DatabaseManager) initMongoDB() error {
 		SSLPEMKeyfile:            dm.config.MongoDBOptions.SSLPEMKeyfile,
 	}
 
-	if mongoConfig.URL == "" {
-		log.Info("MongoDB URL not configured, skipping MongoDB initialization")
+	if mongoConfig.Host == "" {
+		log.Info("MongoDB host not configured, skipping MongoDB initialization")
 		return nil
 	}
 

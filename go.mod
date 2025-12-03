@@ -3,7 +3,7 @@ module github.com/FangcunMount/qs-server
 go 1.24.0
 
 require (
-	github.com/FangcunMount/component-base v0.3.4
+	github.com/FangcunMount/component-base v0.3.5
 	github.com/FangcunMount/iam-contracts v0.0.0-20251027062840-64032f817e9e
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20

@@ -41,7 +41,10 @@ type MySQLConfig struct {
 
 // MongoDBConfig MongoDB 配置
 type MongoDBConfig struct {
-	URL string
+	Host     string
+	Username string
+	Password string
+	Database string
 }
 
 // MessagingConfig 消息队列配置
@@ -79,7 +82,10 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 			Database: opts.MySQL.Database,
 		},
 		MongoDB: &MongoDBConfig{
-			URL: opts.MongoDB.URL,
+			Host:     opts.MongoDB.Host,
+			Username: opts.MongoDB.Username,
+			Password: opts.MongoDB.Password,
+			Database: opts.MongoDB.Database,
 		},
 		Messaging: &MessagingConfig{
 			Provider:       opts.Messaging.Provider,

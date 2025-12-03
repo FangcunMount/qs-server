@@ -80,14 +80,18 @@ redis:
     enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）
 
 # MongoDB 数据库配置
+# 支持两种方式：分离参数（推荐）或直接 URL
 mongodb:
-  url: "mongodb://app_user:dev_app_pass_123@127.0.0.1:27017/questionnaire_scale?authSource=admin" # MongoDB 连接URL
-  database: "questionnaire_scale" # 数据库名称
-  use-ssl: false # 是否使用SSL
-  ssl-insecure-skip-verify: false # 是否跳过SSL证书验证
+  host: "127.0.0.1:27017"           # MongoDB 主机地址
+  username: "app_user"              # 用户名
+  password: "dev_app_pass_123"      # 密码
+  database: "questionnaire_scale"   # 数据库名称
+  # url: ""                         # 可选，如果设置则优先使用
+  use-ssl: false                    # 是否使用SSL
+  ssl-insecure-skip-verify: false   # 是否跳过SSL证书验证
   ssl-allow-invalid-hostnames: false # 是否允许无效的主机名
-  ssl-ca-file: "" # SSL CA 证书文件路径
-  ssl-pem-keyfile: "" # SSL PEM 密钥文件路径
+  ssl-ca-file: ""                   # SSL CA 证书文件路径
+  ssl-pem-keyfile: ""               # SSL PEM 密钥文件路径
 
 # 日志配置（生产环境 - 使用 component-base v0.2.9 duplicate 模式）
 log:

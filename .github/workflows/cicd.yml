@@ -470,10 +470,11 @@ jobs:
 
           cat > deploy-package/configs/env/config.prod.env <<'ENVEOF'
           # Auto-generated production environment configuration for QS API Server
+          # MongoDB 分离参数配置（程序会自动拼接 URL）
           QS_APISERVER_MONGODB_HOST=__MONGODB_HOST__
           QS_APISERVER_MONGODB_USERNAME=__MONGODB_USERNAME__
           QS_APISERVER_MONGODB_PASSWORD=__MONGODB_PASSWORD__
-          QS_APISERVER_MONGODB_DATABASE=__MONGODB_DBNAME__
+          QS_APISERVER_MONGODB_DATABASE=__MONGODB_DATABASE__
 
           QS_APISERVER_MYSQL_HOST=__MYSQL_HOST__
           QS_APISERVER_MYSQL_USERNAME=__MYSQL_USERNAME__
@@ -502,10 +503,11 @@ jobs:
 
           # 去除前导空格并替换占位符为实际值
           sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
+          # MongoDB 分离参数
           sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}:${MONGODB_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_USERNAME__|${MONGODB_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_PASSWORD__|${MONGODB_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__MONGODB_DBNAME__|${MONGODB_DBNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_DATABASE__|${MONGODB_DBNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_HOST__|${MYSQL_HOST}:${MYSQL_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_USERNAME__|${MYSQL_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_PASSWORD__|${MYSQL_PASSWORD}|g" deploy-package/configs/env/config.prod.env
@@ -1030,7 +1032,11 @@ jobs:
 
           cat > deploy-package/configs/env/config.prod.env <<'ENVEOF'
           # Auto-generated production environment configuration for QS Worker
-          QS_WORKER_MONGODB_URL=__MONGODB_URL__
+          # MongoDB 分离参数配置（程序会自动拼接 URL）
+          QS_WORKER_MONGODB_HOST=__MONGODB_HOST__
+          QS_WORKER_MONGODB_USERNAME=__MONGODB_USERNAME__
+          QS_WORKER_MONGODB_PASSWORD=__MONGODB_PASSWORD__
+          QS_WORKER_MONGODB_DATABASE=__MONGODB_DATABASE__
 
           QS_WORKER_MYSQL_HOST=__MYSQL_HOST__
           QS_WORKER_MYSQL_USERNAME=__MYSQL_USERNAME__
@@ -1060,7 +1066,11 @@ jobs:
 
           # 去除前导空格并替换占位符为实际值
           sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
-          sed -i "s|__MONGODB_URL__|mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DBNAME}?authSource=admin|g" deploy-package/configs/env/config.prod.env
+          # MongoDB 分离参数
+          sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}:${MONGODB_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_USERNAME__|${MONGODB_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_PASSWORD__|${MONGODB_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_DATABASE__|${MONGODB_DBNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_HOST__|${MYSQL_HOST}:${MYSQL_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_USERNAME__|${MYSQL_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_PASSWORD__|${MYSQL_PASSWORD}|g" deploy-package/configs/env/config.prod.env

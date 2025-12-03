@@ -52,9 +52,14 @@ mysql:
 
 # ============================================================================
 # MongoDB 数据库配置
+# 支持两种方式：分离参数（推荐）或直接 URL
 # ============================================================================
 mongodb:
-  url: "mongodb://app_user:dev_app_pass_123@127.0.0.1:27017/questionnaire_scale?authSource=admin"
+  host: "127.0.0.1:27017"
+  username: "app_user"
+  password: "dev_app_pass_123"
+  database: "questionnaire_scale"
+  # url: ""  # 可选，如果设置则优先使用
   use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false

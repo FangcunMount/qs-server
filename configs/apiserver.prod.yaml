@@ -77,9 +77,15 @@ redis:
     enable-logging: false
 
 # MongoDB 数据库配置
+# 支持两种方式：
+# 1. 分离参数（推荐，便于通过环境变量覆盖）
+# 2. 直接 URL（如果设置了 url，则忽略分离参数）
 mongodb:
-  url: "mongodb://app_user:password@127.0.0.1:27017/questionnaire_scale?authSource=admin"
+  host: "127.0.0.1:27017"
+  username: "app_user"
+  password: ""
   database: "questionnaire_scale"
+  # url: ""  # 可选，如果设置则优先使用
   use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false
