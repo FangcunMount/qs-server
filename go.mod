@@ -3,7 +3,7 @@ module github.com/FangcunMount/qs-server
 go 1.24.0
 
 require (
-	github.com/FangcunMount/component-base v0.3.5
+	github.com/FangcunMount/component-base v0.3.7
 	github.com/FangcunMount/iam-contracts v0.0.0-20251027062840-64032f817e9e
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
@@ -33,8 +33,8 @@ require (
 
 require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/nsqio/go-nsq v1.1.0
-	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/nsqio/go-nsq v1.1.0 // indirect
+	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect

@@ -7,15 +7,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
+	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
-	"github.com/FangcunMount/qs-server/pkg/messaging"
-	"github.com/FangcunMount/qs-server/pkg/messaging/nsq"
-	"github.com/FangcunMount/qs-server/pkg/messaging/rabbitmq"
 )
 
 // workerServer 定义了 Worker 服务器的基本结构

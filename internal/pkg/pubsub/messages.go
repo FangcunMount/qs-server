@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/pkg/messaging"
+	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/google/uuid"
 )
 

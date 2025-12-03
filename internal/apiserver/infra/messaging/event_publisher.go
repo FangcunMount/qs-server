@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	"github.com/FangcunMount/qs-server/pkg/messaging"
 )
 
 // MessagingEventPublisher 消息队列事件发布器
