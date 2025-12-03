@@ -411,8 +411,8 @@ jobs:
       CONTAINER_NAME: qs-apiserver
       HTTP_PORT: 8081
       HTTPS_PORT: 9445
-      INTERNAL_HTTP_PORT: 9080
-      INTERNAL_HTTPS_PORT: 9444
+      INTERNAL_HTTP_PORT: 8080
+      INTERNAL_HTTPS_PORT: 8443
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -724,8 +724,8 @@ jobs:
       CONTAINER_NAME: qs-collection-server
       HTTP_PORT: 8082
       HTTPS_PORT: 9446
-      INTERNAL_HTTP_PORT: 9080
-      INTERNAL_HTTPS_PORT: 9444
+      INTERNAL_HTTP_PORT: 8080
+      INTERNAL_HTTPS_PORT: 8443
     steps:
       - name: Checkout
         uses: actions/checkout@v4
