@@ -32,8 +32,8 @@ type MessagingOptions struct {
 	// Provider 消息队列提供者 (nsq, rabbitmq)
 	Provider string `json:"provider" mapstructure:"provider"`
 	// NSQ 配置
-	NSQAddr        string `json:"nsq_addr" mapstructure:"nsq_addr"`
-	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq_lookupd_addr"`
+	NSQAddr        string `json:"nsq_addr" mapstructure:"nsq-addr"`
+	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
 	// RabbitMQ 配置
 	RabbitMQURL string `json:"rabbitmq_url" mapstructure:"rabbitmq_url"`
 }
@@ -43,15 +43,15 @@ type WorkerOptions struct {
 	// Concurrency 并发处理数
 	Concurrency int `json:"concurrency" mapstructure:"concurrency"`
 	// MaxRetries 最大重试次数
-	MaxRetries int `json:"max_retries" mapstructure:"max_retries"`
+	MaxRetries int `json:"max_retries" mapstructure:"max-retries"`
 	// ServiceName 服务名称（用于消息队列 channel）
-	ServiceName string `json:"service_name" mapstructure:"service_name"`
+	ServiceName string `json:"service_name" mapstructure:"service-name"`
 }
 
 // GRPCOptions gRPC 客户端配置
 type GRPCOptions struct {
 	// ApiserverAddr apiserver gRPC 服务地址
-	ApiserverAddr string `json:"apiserver_addr" mapstructure:"apiserver_addr"`
+	ApiserverAddr string `json:"apiserver_addr" mapstructure:"apiserver-addr"`
 }
 
 // NewOptions 创建默认配置
