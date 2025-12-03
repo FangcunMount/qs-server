@@ -12,7 +12,7 @@ Staff 是否需要存储到数据库？它和 IAM 中的 User/Account 是什么�
 
 ### Staff 与 IAM.User 的关系
 
-```
+```text
 IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 ┌──────────────────┐            ┌──────────────────────┐
 │ User/Account     │            │ Staff                │
@@ -42,6 +42,7 @@ IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 **问题**：IAM 只管通用权限（如 "能否访问量表模块"），不管业务细节。
 
 **业务角色示例**：
+
 - `scale_admin`：量表管理员，能配置量表模板
 - `evaluator`：评估人员，能填写评估报告
 - `screening_owner`：筛查项目负责人，能创建筛查项目
@@ -75,6 +76,7 @@ func (s *ScaleService) UpdateScale(ctx context.Context, staffID StaffID, scale *
 | 1002 | 医院A | S-003 | screening_owner |
 
 **实现**：
+
 ```go
 // 查询时需要 OrgID + IAMUserID 才能定位唯一的 Staff
 staff, err := staffRepo.FindByIAMUser(ctx, orgID, iamUserID)
@@ -92,6 +94,7 @@ staff, err := staffRepo.FindByIAMUser(ctx, orgID, iamUserID)
 | 用 `StaffID` | 业务语义清晰；历史记录稳定 | 需要维护 Staff 表 |
 
 **示例**：
+
 ```go
 type Testee struct {
     // ...
@@ -132,11 +135,13 @@ func (f *StaffFactory) SyncFromIAM(ctx context.Context, staff *Staff, name, emai
 ### 1. 轻量级设计
 
 **不存储的内容**（由 IAM 管理）：
+
 - ❌ 密码、Token
 - ❌ 登录状态
 - ❌ 通用权限（如 "能否访问后台"）
 
 **存储的内容**（本 BC 业务数据）：
+
 - ✅ 业务角色（roles）
 - ✅ 机构隔离（orgID）
 - ✅ 激活状态（isActive）

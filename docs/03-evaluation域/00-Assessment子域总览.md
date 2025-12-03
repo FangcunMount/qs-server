@@ -759,6 +759,7 @@ func (e *AssessmentSubmittedEvent) SubmittedAt() time.Time { return e.submittedA
 ```
 
 **用途**：
+
 * qs-worker 消费此事件，触发评估流程
 * 通知服务消费此事件，发送"答卷已提交"通知
 
@@ -805,6 +806,7 @@ func (e *AssessmentInterpretedEvent) InterpretedAt() time.Time { return e.interp
 ```
 
 **用途**：
+
 * 通知服务消费此事件，发送"报告已生成"通知
 * 预警服务消费此事件，对高风险案例发送预警
 * 统计服务消费此事件，更新实时统计数据
@@ -844,6 +846,7 @@ func (e *AssessmentFailedEvent) FailedAt() time.Time { return e.failedAt }
 ```
 
 **用途**：
+
 * 日志服务记录失败原因
 * 监控服务统计失败率
 * 通知服务发送失败通知（可选）
@@ -1146,6 +1149,7 @@ type Assessment struct {
 | failure_reason | TEXT NULL | 失败原因 |
 
 **索引**：
+
 * PRIMARY KEY (id)
 * INDEX idx_testee_id (testee_id)
 * INDEX idx_answer_sheet_id (answer_sheet_id)
@@ -1167,10 +1171,12 @@ type Assessment struct {
 | created_at | TIMESTAMP | 创建时间 |
 
 **索引**：
+
 * PRIMARY KEY (assessment_id, factor_code)
 * INDEX idx_factor_code (factor_code)
 
 **支持查询**：
+
 * 按 AssessmentID 查询所有因子得分
 * 按 TesteeID + FactorCode 查询趋势（需要 JOIN assessments 表）
 
@@ -1203,6 +1209,7 @@ type Assessment struct {
 ```
 
 **索引**：
+
 * PRIMARY KEY (_id)
 * INDEX (createdAt)
 
@@ -1220,6 +1227,7 @@ type Assessment struct {
 * **未来扩展**：体检套餐、健康档案等
 
 新增业务来源只需：
+
 1. 增加 `AssessmentOriginType` 枚举值
 2. 新增对应的创建测评快捷方法
 3. 不影响现有代码

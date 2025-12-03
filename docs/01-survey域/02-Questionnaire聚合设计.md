@@ -228,6 +228,7 @@ type Question interface {
 ```
 
 **设计说明**：
+
 - ✅ 统一接口简化使用，问卷层面无需关心具体题型
 - ✅ 部分方法某些题型返回空值（如文本题无选项）
 - ⚠️ 如果接口过度膨胀可考虑拆分，但当前规模合理
@@ -353,6 +354,7 @@ classDiagram
 ```
 
 📄 **代码位置**：
+
 - [`questionnaire/question_radio.go`](../../internal/apiserver/domain/questionnaire/question_radio.go)
 - [`questionnaire/question_checkbox.go`](../../internal/apiserver/domain/questionnaire/question_checkbox.go)
 - [`questionnaire/question_text.go`](../../internal/apiserver/domain/questionnaire/question_text.go)
@@ -453,6 +455,7 @@ question := NewQuestion(
 ```
 
 📄 **代码位置**：
+
 - [`questionnaire/question_params.go`](../../internal/apiserver/domain/questionnaire/question_params.go)
 - [`questionnaire/question_options.go`](../../internal/apiserver/domain/questionnaire/question_options.go)
 
@@ -536,6 +539,7 @@ dateQ := NewQuestion(
 ```
 
 **关键点**：
+
 - ✅ 无需修改 `NewQuestion` 函数
 - ✅ 无需修改 `Question` 接口
 - ✅ 无需修改其他题型代码
@@ -838,7 +842,7 @@ sequenceDiagram
 
 **语义化版本规则**：
 
-```
+```text
 格式：Major.Minor.Patch
 示例：2.1.3
 
@@ -903,6 +907,7 @@ func (v Version) IncrementMajor() Version {
 ```
 
 📄 **代码位置**：
+
 - [`questionnaire/versioning.go`](../../internal/apiserver/domain/questionnaire/versioning.go)
 - [`questionnaire/version.go`](../../internal/apiserver/domain/questionnaire/version.go)
 
@@ -1331,7 +1336,7 @@ graph LR
 
 ### 9.1 目录结构
 
-```
+```text
 internal/apiserver/domain/questionnaire/
 ├── questionnaire.go              # 聚合根
 ├── question.go                   # Question 接口
@@ -1363,16 +1368,19 @@ internal/apiserver/domain/questionnaire/
 ### 9.2 核心代码链接
 
 #### 聚合根与接口
+
 - [questionnaire.go](../../internal/apiserver/domain/questionnaire/questionnaire.go) - 问卷聚合根
 - [question.go](../../internal/apiserver/domain/questionnaire/question.go) - Question 接口定义
 - [question_types.go](../../internal/apiserver/domain/questionnaire/question_types.go) - 题型枚举
 
 #### 题型扩展机制
+
 - [question_registry.go](../../internal/apiserver/domain/questionnaire/question_registry.go) - 注册器
 - [question_params.go](../../internal/apiserver/domain/questionnaire/question_params.go) - 参数容器
 - [question_options.go](../../internal/apiserver/domain/questionnaire/question_options.go) - 函数式选项
 
 #### 具体题型实现
+
 - [question_radio.go](../../internal/apiserver/domain/questionnaire/question_radio.go) - 单选题
 - [question_checkbox.go](../../internal/apiserver/domain/questionnaire/question_checkbox.go) - 多选题
 - [question_text.go](../../internal/apiserver/domain/questionnaire/question_text.go) - 文本题
@@ -1380,6 +1388,7 @@ internal/apiserver/domain/questionnaire/
 - [question_number.go](../../internal/apiserver/domain/questionnaire/question_number.go) - 数字题
 
 #### 领域服务
+
 - [lifecycle.go](../../internal/apiserver/domain/questionnaire/lifecycle.go) - 生命周期管理
 - [question_manager.go](../../internal/apiserver/domain/questionnaire/question_manager.go) - 题目管理
 - [versioning.go](../../internal/apiserver/domain/questionnaire/versioning.go) - 版本管理
@@ -1387,6 +1396,7 @@ internal/apiserver/domain/questionnaire/
 - [baseinfo.go](../../internal/apiserver/domain/questionnaire/baseinfo.go) - 基本信息管理
 
 #### 值对象
+
 - [version.go](../../internal/apiserver/domain/questionnaire/version.go) - 版本号
 - [option.go](../../internal/apiserver/domain/questionnaire/option.go) - 选项
 - [code.go](../../internal/apiserver/domain/questionnaire/code.go) - 编码
@@ -1451,6 +1461,7 @@ A: 不能，版本号只能递增，体现演进的单向性。
 ---
 
 **文档变更历史**：
+
 - V4.0 (2025-11-26) - 金字塔结构重构，增强可视化和代码链接
 - V3.0 (2025-11-26) - 设计阐述版
 - V2.0 (2025-11-25) - 实现细节版
