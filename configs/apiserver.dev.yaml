@@ -82,10 +82,10 @@ redis:
 # MongoDB 数据库配置
 # 支持两种方式：分离参数（推荐）或直接 URL
 mongodb:
-  host: "127.0.0.1:27017"           # MongoDB 主机地址
+  host: "127.0.0.1:27018"           # MongoDB 主机地址
   username: "app_user"              # 用户名
-  password: "dev_app_pass_123"      # 密码
-  database: "questionnaire_scale"   # 数据库名称
+  password: "d3v_App@M0ngo"      # 密码
+  database: "qs"   # 数据库名称
   # url: ""                         # 可选，如果设置则优先使用
   use-ssl: false                    # 是否使用SSL
   ssl-insecure-skip-verify: false   # 是否跳过SSL证书验证
