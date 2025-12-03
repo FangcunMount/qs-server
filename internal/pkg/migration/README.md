@@ -292,6 +292,7 @@ MySQL (schema_migrations 表):          MongoDB (schema_migrations 集合):
 ```
 
 这意味着：
+
 - ✅ MySQL 可以有 10 个迁移版本，MongoDB 只有 2 个，互不影响
 - ✅ 可以只更新 MySQL 迁移，不触发 MongoDB 迁移
 - ✅ 各自独立回滚，互不干扰
