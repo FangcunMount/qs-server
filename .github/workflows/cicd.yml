@@ -468,37 +468,61 @@ jobs:
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
 
-          cat > deploy-package/configs/env/config.prod.env <<EOF
+          cat > deploy-package/configs/env/config.prod.env <<'ENVEOF'
           # Auto-generated production environment configuration for QS API Server
-          QS_APISERVER_MONGODB_HOST=${MONGODB_HOST}:${MONGODB_PORT}
-          QS_APISERVER_MONGODB_USERNAME=${MONGODB_USERNAME}
-          QS_APISERVER_MONGODB_PASSWORD=${MONGODB_PASSWORD}
-          QS_APISERVER_MONGODB_DATABASE=${MONGODB_DBNAME}
+          QS_APISERVER_MONGODB_HOST=__MONGODB_HOST__
+          QS_APISERVER_MONGODB_USERNAME=__MONGODB_USERNAME__
+          QS_APISERVER_MONGODB_PASSWORD=__MONGODB_PASSWORD__
+          QS_APISERVER_MONGODB_DATABASE=__MONGODB_DBNAME__
 
-          QS_APISERVER_MYSQL_HOST=${MYSQL_HOST}:${MYSQL_PORT}
-          QS_APISERVER_MYSQL_USERNAME=${MYSQL_USERNAME}
-          QS_APISERVER_MYSQL_PASSWORD=${MYSQL_PASSWORD}
-          QS_APISERVER_MYSQL_DATABASE=${MYSQL_DATABASE}
-          
+          QS_APISERVER_MYSQL_HOST=__MYSQL_HOST__
+          QS_APISERVER_MYSQL_USERNAME=__MYSQL_USERNAME__
+          QS_APISERVER_MYSQL_PASSWORD=__MYSQL_PASSWORD__
+          QS_APISERVER_MYSQL_DATABASE=__MYSQL_DATABASE__
+
           # Redis Cache (ServerA 本地缓存)
-          QS_APISERVER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
-          QS_APISERVER_REDIS_CACHE_PORT=${REDIS_CACHE_PORT}
-          QS_APISERVER_REDIS_CACHE_USERNAME=${REDIS_CACHE_USERNAME}
-          QS_APISERVER_REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
-          QS_APISERVER_REDIS_CACHE_DB=${REDIS_CACHE_DB}
-          
+          QS_APISERVER_REDIS_CACHE_HOST=__REDIS_CACHE_HOST__
+          QS_APISERVER_REDIS_CACHE_PORT=__REDIS_CACHE_PORT__
+          QS_APISERVER_REDIS_CACHE_USERNAME=__REDIS_CACHE_USERNAME__
+          QS_APISERVER_REDIS_CACHE_PASSWORD=__REDIS_CACHE_PASSWORD__
+          QS_APISERVER_REDIS_CACHE_DB=__REDIS_CACHE_DB__
+
           # Redis Store (云持久化 Redis)
-          QS_APISERVER_REDIS_STORE_HOST=${REDIS_STORE_HOST}
-          QS_APISERVER_REDIS_STORE_PORT=${REDIS_STORE_PORT}
-          QS_APISERVER_REDIS_STORE_USERNAME=${REDIS_STORE_USERNAME}
-          QS_APISERVER_REDIS_STORE_PASSWORD=${REDIS_STORE_PASSWORD}
-          QS_APISERVER_REDIS_STORE_DB=${REDIS_STORE_DB}
-          
-          QS_APISERVER_JWT_SECRET=${JWT_SECRET}
-          
-          QS_APISERVER_NSQ_NSQD_HOST=${NSQ_NSQD_HOST}
-          QS_APISERVER_NSQ_NSQD_PORT=${NSQ_NSQD_PORT}
-          EOF
+          QS_APISERVER_REDIS_STORE_HOST=__REDIS_STORE_HOST__
+          QS_APISERVER_REDIS_STORE_PORT=__REDIS_STORE_PORT__
+          QS_APISERVER_REDIS_STORE_USERNAME=__REDIS_STORE_USERNAME__
+          QS_APISERVER_REDIS_STORE_PASSWORD=__REDIS_STORE_PASSWORD__
+          QS_APISERVER_REDIS_STORE_DB=__REDIS_STORE_DB__
+
+          QS_APISERVER_JWT_SECRET=__JWT_SECRET__
+
+          QS_APISERVER_NSQ_NSQD_HOST=__NSQ_NSQD_HOST__
+          QS_APISERVER_NSQ_NSQD_PORT=__NSQ_NSQD_PORT__
+          ENVEOF
+
+          # 去除前导空格并替换占位符为实际值
+          sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}:${MONGODB_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_USERNAME__|${MONGODB_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_PASSWORD__|${MONGODB_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_DBNAME__|${MONGODB_DBNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_HOST__|${MYSQL_HOST}:${MYSQL_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_USERNAME__|${MYSQL_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_PASSWORD__|${MYSQL_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_DATABASE__|${MYSQL_DATABASE}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_HOST__|${REDIS_CACHE_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_PORT__|${REDIS_CACHE_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_USERNAME__|${REDIS_CACHE_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_PASSWORD__|${REDIS_CACHE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_DB__|${REDIS_CACHE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_HOST__|${REDIS_STORE_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_PORT__|${REDIS_STORE_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_USERNAME__|${REDIS_STORE_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_PASSWORD__|${REDIS_STORE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_DB__|${REDIS_STORE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__NSQ_NSQD_HOST__|${NSQ_NSQD_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__NSQ_NSQD_PORT__|${NSQ_NSQD_PORT}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
           echo "📋 Generated config.prod.env for API Server"
@@ -507,7 +531,8 @@ jobs:
           echo "=========================================="
 
           # 以目录形式上传，避免双重 tar 丢失文件
-          tar -czf deploy-package.tar.gz -C deploy-package .
+          # 使用服务名称作为前缀，避免并行部署时文件冲突
+          tar -czf deploy-package-apiserver.tar.gz -C deploy-package .
 
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
@@ -516,7 +541,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package.tar.gz"
+          source: "deploy-package-apiserver.tar.gz"
           target: "/tmp"
 
       - name: Deploy to Production Server
@@ -581,15 +606,15 @@ jobs:
                 2>/dev/null || echo "No previous version to backup"
             fi
 
-            # 解包（兼容不同落盘路径，优先查找 /tmp 下的 deploy-package.tar.gz）
-            PKG_PATH=$(find /tmp -maxdepth 1 -name "deploy-package.tar.gz" 2>/dev/null | head -n1 || true)
-            if [ -z "$PKG_PATH" ]; then
-              echo "❌ deploy-package.tar.gz not found under /tmp" >&2
-              ls -al /tmp || true
+            # 解包（使用服务专用的包名，避免并行部署冲突）
+            PKG_PATH="/tmp/deploy-package-apiserver.tar.gz"
+            if [ ! -f "$PKG_PATH" ]; then
+              echo "❌ $PKG_PATH not found" >&2
+              ls -al /tmp/deploy-package*.tar.gz 2>/dev/null || true
               exit 1
             fi
 
-            DEPLOY_TMP="/tmp/qs-deploy-$$"
+            DEPLOY_TMP="/tmp/qs-deploy-apiserver-$$"
             mkdir -p "$DEPLOY_TMP"
             tar -xzf "$PKG_PATH" -C "$DEPLOY_TMP"
 
@@ -597,10 +622,14 @@ jobs:
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
 
-            # 网络
+            # 网络（创建 qs-network，检查 infra-network）
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
               echo "Creating Docker network qs-network..."
               $SUDO docker network create qs-network
+            fi
+            if ! $SUDO docker network ls --format '{{.Name}}' | grep -w infra-network > /dev/null 2>&1; then
+              echo "❌ infra-network not found. Please ensure infrastructure is deployed first."
+              exit 1
             fi
 
             # 证书路径
@@ -671,7 +700,7 @@ jobs:
             $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true'
 
             rm -rf "$DEPLOY_TMP"
-            rm -f /tmp/deploy-package.tar.gz
+            rm -f /tmp/deploy-package-apiserver.tar.gz
 
             echo "=========================================="
             echo "✅ ${CONTAINER_NAME} deployment completed"
@@ -734,24 +763,38 @@ jobs:
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
 
-          cat > deploy-package/configs/env/config.prod.env <<EOF
+          cat > deploy-package/configs/env/config.prod.env <<'ENVEOF'
           # Auto-generated production environment configuration for Collection Server
           # Redis Cache (ServerA 本地缓存)
-          COLLECTION_SERVER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
-          COLLECTION_SERVER_REDIS_CACHE_PORT=${REDIS_CACHE_PORT}
-          COLLECTION_SERVER_REDIS_CACHE_USERNAME=${REDIS_CACHE_USERNAME}
-          COLLECTION_SERVER_REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
-          COLLECTION_SERVER_REDIS_CACHE_DB=${REDIS_CACHE_DB}
-          
+          COLLECTION_SERVER_REDIS_CACHE_HOST=__REDIS_CACHE_HOST__
+          COLLECTION_SERVER_REDIS_CACHE_PORT=__REDIS_CACHE_PORT__
+          COLLECTION_SERVER_REDIS_CACHE_USERNAME=__REDIS_CACHE_USERNAME__
+          COLLECTION_SERVER_REDIS_CACHE_PASSWORD=__REDIS_CACHE_PASSWORD__
+          COLLECTION_SERVER_REDIS_CACHE_DB=__REDIS_CACHE_DB__
+
           # Redis Store (云持久化 Redis)
-          COLLECTION_SERVER_REDIS_STORE_HOST=${REDIS_STORE_HOST}
-          COLLECTION_SERVER_REDIS_STORE_PORT=${REDIS_STORE_PORT}
-          COLLECTION_SERVER_REDIS_STORE_USERNAME=${REDIS_STORE_USERNAME}
-          COLLECTION_SERVER_REDIS_STORE_PASSWORD=${REDIS_STORE_PASSWORD}
-          COLLECTION_SERVER_REDIS_STORE_DB=${REDIS_STORE_DB}
-          
-          COLLECTION_SERVER_JWT_SECRET=${JWT_SECRET}
-          EOF
+          COLLECTION_SERVER_REDIS_STORE_HOST=__REDIS_STORE_HOST__
+          COLLECTION_SERVER_REDIS_STORE_PORT=__REDIS_STORE_PORT__
+          COLLECTION_SERVER_REDIS_STORE_USERNAME=__REDIS_STORE_USERNAME__
+          COLLECTION_SERVER_REDIS_STORE_PASSWORD=__REDIS_STORE_PASSWORD__
+          COLLECTION_SERVER_REDIS_STORE_DB=__REDIS_STORE_DB__
+
+          COLLECTION_SERVER_JWT_SECRET=__JWT_SECRET__
+          ENVEOF
+
+          # 去除前导空格并替换占位符为实际值
+          sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_HOST__|${REDIS_CACHE_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_PORT__|${REDIS_CACHE_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_USERNAME__|${REDIS_CACHE_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_PASSWORD__|${REDIS_CACHE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_DB__|${REDIS_CACHE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_HOST__|${REDIS_STORE_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_PORT__|${REDIS_STORE_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_USERNAME__|${REDIS_STORE_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_PASSWORD__|${REDIS_STORE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_DB__|${REDIS_STORE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
           echo "📋 Generated config.prod.env for Collection Server"
@@ -759,7 +802,7 @@ jobs:
           cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g' | sed 's/SECRET=.*/SECRET=***REDACTED***/g'
           echo "=========================================="
 
-          tar -czf deploy-package.tar.gz -C deploy-package .
+          tar -czf deploy-package-collection.tar.gz -C deploy-package .
 
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
@@ -768,7 +811,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package.tar.gz"
+          source: "deploy-package-collection.tar.gz"
           target: "/tmp"
 
       - name: Deploy to Production Server
@@ -831,24 +874,29 @@ jobs:
                 2>/dev/null || echo "No previous backup"
             fi
 
-            # 解包
-            DEPLOY_TMP="/tmp/qs-deploy-$$"
-            mkdir -p "$DEPLOY_TMP"
-            PKG_PATH=$(find /tmp -maxdepth 1 -name "deploy-package.tar.gz" 2>/dev/null | head -n1 || true)
-            if [ -z "$PKG_PATH" ]; then
-              echo "❌ deploy-package.tar.gz not found under /tmp" >&2
-              ls -al /tmp || true
+            # 解包（使用服务专用的包名，避免并行部署冲突）
+            PKG_PATH="/tmp/deploy-package-collection.tar.gz"
+            if [ ! -f "$PKG_PATH" ]; then
+              echo "❌ $PKG_PATH not found" >&2
+              ls -al /tmp/deploy-package*.tar.gz 2>/dev/null || true
               exit 1
             fi
+
+            DEPLOY_TMP="/tmp/qs-deploy-collection-$$"
+            mkdir -p "$DEPLOY_TMP"
             tar -xzf "$PKG_PATH" -C "$DEPLOY_TMP"
 
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
 
-            # 网络
+            # 网络（创建 qs-network，检查 infra-network）
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
               $SUDO docker network create qs-network
+            fi
+            if ! $SUDO docker network ls --format '{{.Name}}' | grep -w infra-network > /dev/null 2>&1; then
+              echo "❌ infra-network not found. Please ensure infrastructure is deployed first."
+              exit 1
             fi
 
             # 证书
@@ -906,7 +954,7 @@ jobs:
             $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
 
             rm -rf "$DEPLOY_TMP"
-            rm -f /tmp/deploy-package.tar.gz
+            rm -f /tmp/deploy-package-collection.tar.gz
 
             echo "✅ ${CONTAINER_NAME} deployed"
 
@@ -980,35 +1028,56 @@ jobs:
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
 
-          cat > deploy-package/configs/env/config.prod.env <<EOF
+          cat > deploy-package/configs/env/config.prod.env <<'ENVEOF'
           # Auto-generated production environment configuration for QS Worker
-          QS_WORKER_MONGODB_URL=mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DBNAME}?authSource=admin
-          
-          QS_WORKER_MYSQL_HOST=${MYSQL_HOST}:${MYSQL_PORT}
-          QS_WORKER_MYSQL_USERNAME=${MYSQL_USERNAME}
-          QS_WORKER_MYSQL_PASSWORD=${MYSQL_PASSWORD}
-          QS_WORKER_MYSQL_DATABASE=${MYSQL_DATABASE}
-          
+          QS_WORKER_MONGODB_URL=__MONGODB_URL__
+
+          QS_WORKER_MYSQL_HOST=__MYSQL_HOST__
+          QS_WORKER_MYSQL_USERNAME=__MYSQL_USERNAME__
+          QS_WORKER_MYSQL_PASSWORD=__MYSQL_PASSWORD__
+          QS_WORKER_MYSQL_DATABASE=__MYSQL_DATABASE__
+
           QS_WORKER_MESSAGING_PROVIDER=nsq
-          QS_WORKER_NSQ_ADDR=${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}
-          QS_WORKER_NSQ_LOOKUPD_ADDR=${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}
-          
-          QS_WORKER_GRPC_APISERVER_ADDR=${GRPC_APISERVER_ADDR}
-          
+          QS_WORKER_NSQ_ADDR=__NSQ_ADDR__
+          QS_WORKER_NSQ_LOOKUPD_ADDR=__NSQ_LOOKUPD_ADDR__
+
+          QS_WORKER_GRPC_APISERVER_ADDR=__GRPC_APISERVER_ADDR__
+
           # Redis Cache (ServerA 本地缓存)
-          QS_WORKER_REDIS_CACHE_HOST=${REDIS_CACHE_HOST}
-          QS_WORKER_REDIS_CACHE_PORT=${REDIS_CACHE_PORT}
-          QS_WORKER_REDIS_CACHE_USERNAME=${REDIS_CACHE_USERNAME}
-          QS_WORKER_REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
-          QS_WORKER_REDIS_CACHE_DB=${REDIS_CACHE_DB}
-          
+          QS_WORKER_REDIS_CACHE_HOST=__REDIS_CACHE_HOST__
+          QS_WORKER_REDIS_CACHE_PORT=__REDIS_CACHE_PORT__
+          QS_WORKER_REDIS_CACHE_USERNAME=__REDIS_CACHE_USERNAME__
+          QS_WORKER_REDIS_CACHE_PASSWORD=__REDIS_CACHE_PASSWORD__
+          QS_WORKER_REDIS_CACHE_DB=__REDIS_CACHE_DB__
+
           # Redis Store (云持久化 Redis)
-          QS_WORKER_REDIS_STORE_HOST=${REDIS_STORE_HOST}
-          QS_WORKER_REDIS_STORE_PORT=${REDIS_STORE_PORT}
-          QS_WORKER_REDIS_STORE_USERNAME=${REDIS_STORE_USERNAME}
-          QS_WORKER_REDIS_STORE_PASSWORD=${REDIS_STORE_PASSWORD}
-          QS_WORKER_REDIS_STORE_DB=${REDIS_STORE_DB}
-          EOF
+          QS_WORKER_REDIS_STORE_HOST=__REDIS_STORE_HOST__
+          QS_WORKER_REDIS_STORE_PORT=__REDIS_STORE_PORT__
+          QS_WORKER_REDIS_STORE_USERNAME=__REDIS_STORE_USERNAME__
+          QS_WORKER_REDIS_STORE_PASSWORD=__REDIS_STORE_PASSWORD__
+          QS_WORKER_REDIS_STORE_DB=__REDIS_STORE_DB__
+          ENVEOF
+
+          # 去除前导空格并替换占位符为实际值
+          sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_URL__|mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DBNAME}?authSource=admin|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_HOST__|${MYSQL_HOST}:${MYSQL_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_USERNAME__|${MYSQL_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_PASSWORD__|${MYSQL_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MYSQL_DATABASE__|${MYSQL_DATABASE}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__NSQ_ADDR__|${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__NSQ_LOOKUPD_ADDR__|${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__GRPC_APISERVER_ADDR__|${GRPC_APISERVER_ADDR}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_HOST__|${REDIS_CACHE_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_PORT__|${REDIS_CACHE_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_USERNAME__|${REDIS_CACHE_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_PASSWORD__|${REDIS_CACHE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_CACHE_DB__|${REDIS_CACHE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_HOST__|${REDIS_STORE_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_PORT__|${REDIS_STORE_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_USERNAME__|${REDIS_STORE_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_PASSWORD__|${REDIS_STORE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_STORE_DB__|${REDIS_STORE_DB}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
           echo "📋 Generated config.prod.env for Worker"
@@ -1016,7 +1085,7 @@ jobs:
           cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g'
           echo "=========================================="
 
-          tar -czf deploy-package.tar.gz -C deploy-package .
+          tar -czf deploy-package-worker.tar.gz -C deploy-package .
 
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
@@ -1025,7 +1094,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package.tar.gz"
+          source: "deploy-package-worker.tar.gz"
           target: "/tmp"
 
       - name: Deploy to Production Server
@@ -1084,24 +1153,29 @@ jobs:
                 2>/dev/null || echo "No previous backup"
             fi
 
-            # 解包
-            DEPLOY_TMP="/tmp/qs-deploy-$$"
-            mkdir -p "$DEPLOY_TMP"
-            PKG_PATH=$(find /tmp -maxdepth 1 -name "deploy-package.tar.gz" 2>/dev/null | head -n1 || true)
-            if [ -z "$PKG_PATH" ]; then
-              echo "❌ deploy-package.tar.gz not found under /tmp" >&2
-              ls -al /tmp || true
+            # 解包（使用服务专用的包名，避免并行部署冲突）
+            PKG_PATH="/tmp/deploy-package-worker.tar.gz"
+            if [ ! -f "$PKG_PATH" ]; then
+              echo "❌ $PKG_PATH not found" >&2
+              ls -al /tmp/deploy-package*.tar.gz 2>/dev/null || true
               exit 1
             fi
+
+            DEPLOY_TMP="/tmp/qs-deploy-worker-$$"
+            mkdir -p "$DEPLOY_TMP"
             tar -xzf "$PKG_PATH" -C "$DEPLOY_TMP"
 
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
 
-            # 网络
+            # 网络（创建 qs-network，检查 infra-network）
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
               $SUDO docker network create qs-network
+            fi
+            if ! $SUDO docker network ls --format '{{.Name}}' | grep -w infra-network > /dev/null 2>&1; then
+              echo "❌ infra-network not found. Please ensure infrastructure is deployed first."
+              exit 1
             fi
 
             # 登录 GHCR
@@ -1144,7 +1218,7 @@ jobs:
             echo "✅ ${CONTAINER_NAME} deployed"
 
             rm -rf "$DEPLOY_TMP"
-            rm -f /tmp/deploy-package.tar.gz
+            rm -f /tmp/deploy-package-worker.tar.gz
 
   # ==========================================================================
   # 5) 总体通知 —— 把 skipped 也视为 OK，支持「只部署部分服务」
