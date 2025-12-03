@@ -26,19 +26,30 @@ jwt:
 
 # 日志配置
 log:
-  name: "collection-server"
-  level: "info"
-  format: "json"
-  enable-color: false
   disable-caller: true
   disable-stacktrace: true
+  level: info
+  format: json
+  enable-color: false
   development: false
-  output-paths: ["/data/logs/qs/collection-server.log", "stdout"]
-  error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"]
+  name: "qs-collection-server"
   max-size: 100
   max-age: 30
   max-backups: 10
   compress: true
+  enable-time-rotation: true
+  time-rotation-format: "2006-01-02"
+  enable-level-output: true
+  level-output-mode: "duplicate"
+  level-output-paths:
+    all:
+      - stdout
+      - /data/logs/qs/qs-collection-server.log
+    warn:
+      - /data/logs/qs/qs-collection-server-warn.log
+    error:
+      - stderr
+      - /data/logs/qs/qs-collection-server-error.log
 
 # Redis 配置
 redis:

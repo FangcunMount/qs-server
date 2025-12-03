@@ -84,7 +84,7 @@ mongodb:
   host: "127.0.0.1:27017"
   username: "app_user"
   password: ""
-  database: "questionnaire_scale"
+  database: "qs"
   # url: ""  # 可选，如果设置则优先使用
   use-ssl: false
   ssl-insecure-skip-verify: false
