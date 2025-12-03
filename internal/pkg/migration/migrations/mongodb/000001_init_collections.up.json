@@ -49,7 +49,7 @@
         "key": { "domain_id": 1 },
         "name": "idx_domain_id",
         "unique": true,
-        "partialFilterExpression": { "domain_id": { "$exists": true, "$ne": 0 } }
+        "partialFilterExpression": { "domain_id": { "$gt": 0 } }
       },
       {
         "key": { "code": 1, "version": 1 },
@@ -82,7 +82,7 @@
         "key": { "domain_id": 1 },
         "name": "idx_domain_id",
         "unique": true,
-        "partialFilterExpression": { "domain_id": { "$exists": true, "$ne": 0 } }
+        "partialFilterExpression": { "domain_id": { "$gt": 0 } }
       },
       {
         "key": { "code": 1 },
@@ -114,7 +114,8 @@
       {
         "key": { "domain_id": 1 },
         "name": "idx_domain_id",
-        "unique": true
+        "unique": true,
+        "partialFilterExpression": { "domain_id": { "$gt": 0 } }
       },
       {
         "key": { "testee_id": 1 },
