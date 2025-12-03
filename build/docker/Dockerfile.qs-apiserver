@@ -58,6 +58,8 @@ COPY --from=builder --chown=appuser:appuser /build/bin/qs-apiserver /app/qs-apis
 COPY --chown=appuser:appuser configs/apiserver.dev.yaml /app/configs/apiserver.dev.yaml
 COPY --chown=appuser:appuser configs/apiserver.prod.yaml /app/configs/apiserver.prod.yaml
 COPY --chown=appuser:appuser configs/cert/ /app/configs/cert/
+COPY --chown=appuser:appuser api/rest /app/api/rest
+COPY --chown=appuser:appuser web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/swagger-ui-dist
 
 # 切换到非 root 用户
 USER appuser
