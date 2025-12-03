@@ -504,7 +504,7 @@ jobs:
           # 去除前导空格并替换占位符为实际值
           sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
           # MongoDB 分离参数（HOST 格式为 host:port，不需要额外拼接端口）
-          sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}:${MONGODB_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_USERNAME__|${MONGODB_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_PASSWORD__|${MONGODB_PASSWORD}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_DATABASE__|${MONGODB_DBNAME}|g" deploy-package/configs/env/config.prod.env
@@ -1067,7 +1067,7 @@ jobs:
           # 去除前导空格并替换占位符为实际值
           sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
           # MongoDB 分离参数（HOST 格式为 host:port，不需要额外拼接端口）
-          sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__MONGODB_HOST__|${MONGODB_HOST}:${MONGODB_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_USERNAME__|${MONGODB_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_PASSWORD__|${MONGODB_PASSWORD}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MONGODB_DATABASE__|${MONGODB_DBNAME}|g" deploy-package/configs/env/config.prod.env
