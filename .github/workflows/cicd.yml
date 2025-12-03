@@ -675,12 +675,12 @@ jobs:
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-apiserver || true
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-apiserver
 
-            # 健康检查（apiserver 公开的是 /health）
-            echo "Waiting for service to be ready..."
+            # 健康检查：直接在容器内访问内部端口，避免宿主端口配置失误导致误判
+            echo "Waiting for service to be ready (in-container health check)..."
             ATTEMPTS=0
-            MAX_ATTEMPTS=30
+            MAX_ATTEMPTS=60
             while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-              if curl -sf http://localhost:${HTTP_PORT}/health > /dev/null 2>&1; then
+              if $SUDO docker exec ${CONTAINER_NAME} wget -qO- http://127.0.0.1:${INTERNAL_HTTP_PORT}/health >/dev/null 2>&1; then
                 echo "✅ Health check passed (attempt $ATTEMPTS)"
                 $SUDO docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}"
                 break
@@ -932,16 +932,17 @@ jobs:
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-collection-server || true
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-collection-server
 
-            # 健康检查（collection-server 公开的是 /health）
+            # 健康检查：容器内访问内部端口，避免宿主端口误配置
             ATTEMPTS=0
-            MAX_ATTEMPTS=30
+            MAX_ATTEMPTS=60
             while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-              if curl -sf http://localhost:${HTTP_PORT}/health > /dev/null 2>&1; then
+              if $SUDO docker exec ${CONTAINER_NAME} wget -qO- http://127.0.0.1:${INTERNAL_HTTP_PORT}/health >/dev/null 2>&1; then
                 echo "✅ Health check passed"
                 break
               fi
               ATTEMPTS=$((ATTEMPTS + 1))
               if [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; then
+                echo "⏳ Health check attempt $ATTEMPTS/$MAX_ATTEMPTS, retrying..."
                 sleep 5
               fi
             done
