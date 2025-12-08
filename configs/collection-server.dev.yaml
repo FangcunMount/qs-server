@@ -19,10 +19,56 @@ grpc_client:
   timeout: 30
   insecure: true
 
-# JWT 配置
+# JWT 配置（已废弃，使用 IAM 统一认证）
 jwt:
   secret_key: "qs-collection-server-jwt-secret-key-2024"
   token_duration: 168  # 7 天 (24*7小时)
+
+# IAM 集成配置
+iam:
+  enabled: false  # 开发环境默认禁用，需要时启用
+  grpc-enabled: true
+  jwks-enabled: true
+  
+  # gRPC 客户端配置
+  grpc:
+    address: "iam-apiserver:9080"  # IAM gRPC 服务地址（Docker 容器名）
+    timeout: 30s
+    retry-max: 3
+    
+    # mTLS 配置
+    tls:
+      enabled: true   # 启用 mTLS 双向认证
+      ca-file: "/data/ssl/iam-contracts/grpc/ca/ca-chain.crt"     # CA 证书链（容器内挂载）
+      cert-file: "/data/ssl/iam-contracts/grpc/clients/qs.crt"    # QS 客户端证书
+      key-file: "/data/ssl/iam-contracts/grpc/clients/qs.key"     # QS 客户端私钥
+  
+  # JWT 验证配置
+  jwt:
+    issuer: "https://iam-apiserver:9080"
+    audience: ["collection-api", "qs-api"]
+    algorithms: ["RS256", "ES256"]
+    clock-skew: 30s
+    required-claims: ["sub", "exp"]
+  
+  # JWKS 配置
+  jwks:
+    url: "http://iam-apiserver:9080/.well-known/jwks.json"
+    refresh-interval: 1h
+    cache-ttl: 24h
+    fetch-strategies: ["grpc", "http", "cache"]  # 优先使用 gRPC
+  
+  # 用户信息缓存
+  user-cache:
+    enabled: true
+    ttl: 5m
+    max-size: 10000
+  
+  # 监护关系缓存
+  guardianship-cache:
+    enabled: true
+    ttl: 10m
+    max-size: 50000
 
 # 日志配置
 log:

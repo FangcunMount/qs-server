@@ -1,7 +1,7 @@
 package apiserver
 
 import (
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/pkg/app"

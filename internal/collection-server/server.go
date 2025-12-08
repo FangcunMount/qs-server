@@ -1,9 +1,11 @@
 package collection
 
 import (
+	"context"
+
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
-	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
@@ -92,19 +94,28 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		storeRedis,
 	)
 
-	// 4. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
+	// 4. 初始化 IAM 模块（优先）
+	ctx := context.Background()
+	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
+	if err != nil {
+		log.Fatalf("Failed to initialize IAM module: %v", err)
+	}
+	s.container.IAMModule = iamModule
+	log.Info("✅ IAM module initialized")
+
+	// 5. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
 	grpcRegistry := NewGRPCClientRegistry(s.grpcManager, s.container)
 	if err := grpcRegistry.RegisterClients(); err != nil {
 		log.Fatalf("Failed to register gRPC clients: %v", err)
 	}
 
-	// 5. 初始化容器中的所有组件
+	// 6. 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
 	log.Infof("Router registering with middlewares: %v", s.config.GenericServerRunOptions.Middlewares)
 
-	// 6. 创建并初始化路由器
+	// 7. 创建并初始化路由器
 	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
 
 	log.Info("🏗️  Collection Server initialized successfully!")
@@ -116,6 +127,11 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		}
 		if s.grpcManager != nil {
 			_ = s.grpcManager.Close()
+		}
+
+		// 关闭 IAM 模块
+		if s.container.IAMModule != nil {
+			_ = s.container.IAMModule.Close()
 		}
 
 		// 清理容器资源

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -65,7 +66,13 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 创建需要认证的API组
 	apiV1 := engine.Group("/api/v1")
 
-	// 认证由上游网关或 IAM 负责，这里不再强制中间件
+	// 应用 IAM JWT 认证中间件（如果启用）
+	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
+		apiV1.Use(middleware.JWTAuthMiddleware(r.container.IAMModule.Client().SDK()))
+		fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1\n")
+	} else {
+		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
+	}
 
 	// 注册用户相关的受保护路由
 	r.registerUserProtectedRoutes(apiV1)

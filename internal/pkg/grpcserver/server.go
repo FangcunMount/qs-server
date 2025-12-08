@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"

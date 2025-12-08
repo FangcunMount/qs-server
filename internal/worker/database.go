@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/database"
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
 )

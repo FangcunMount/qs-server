@@ -28,6 +28,7 @@ type Container struct {
 	ScaleModule      *assembler.ScaleModule      // Scale 模块
 	ActorModule      *assembler.ActorModule      // Actor 模块
 	EvaluationModule *assembler.EvaluationModule // Evaluation 模块（测评、得分、报告）
+	IAMModule        *IAMModule                  // IAM 集成模块
 
 	// 容器状态
 	initialized bool
@@ -49,6 +50,10 @@ func (c *Container) Initialize() error {
 	if c.initialized {
 		return nil
 	}
+
+	// 初始化 IAM 模块（优先，因为其他模块可能依赖）
+	// 注意：这里需要传入 IAMOptions，在实际调用时需要从外部传入
+	// 暂时留空，在 InitializeWithOptions 方法中初始化
 
 	// 初始化 Survey 模块（包含问卷和答卷子模块）
 	if err := c.initSurveyModule(); err != nil {
@@ -134,6 +139,13 @@ func (c *Container) initEvaluationModule() error {
 
 // HealthCheck 健康检查
 func (c *Container) HealthCheck(ctx context.Context) error {
+	// 检查 IAM 连接
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		if err := c.IAMModule.HealthCheck(ctx); err != nil {
+			return fmt.Errorf("IAM health check failed: %w", err)
+		}
+	}
+
 	// 检查MySQL连接
 	if c.mysqlDB != nil {
 		sqlDB, err := c.mysqlDB.DB()
@@ -185,6 +197,14 @@ func (c *Container) checkModulesHealth(ctx context.Context) error {
 // Cleanup 清理资源
 func (c *Container) Cleanup() error {
 	fmt.Printf("🧹 Cleaning up container resources...\n")
+
+	// 清理 IAM 模块
+	if c.IAMModule != nil {
+		if err := c.IAMModule.Close(); err != nil {
+			return fmt.Errorf("failed to cleanup IAM module: %w", err)
+		}
+		fmt.Printf("   ✅ IAM module cleaned up\n")
+	}
 
 	for _, module := range modulePool {
 		if err := module.Cleanup(); err != nil {

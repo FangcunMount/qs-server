@@ -1,7 +1,7 @@
 package container
 
 import (
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
@@ -17,6 +17,9 @@ type Container struct {
 	opts        *options.Options
 	redisCache  redis.UniversalClient
 	redisStore  redis.UniversalClient
+
+	// IAM 模块
+	IAMModule *IAMModule
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient   *grpcclient.AnswerSheetClient

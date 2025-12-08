@@ -16,6 +16,9 @@ services:
       - /data/logs/qs-server/qs-apiserver:/data/logs/qs
       - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
       - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
+      # IAM mTLS 证书挂载
+      - /data/ssl/iam-contracts/grpc/ca:/app/certs/ca:ro
+      - /data/ssl/iam-contracts/grpc/clients:/app/certs/clients:ro
     command: ["--config=/app/configs/apiserver.prod.yaml"]
     deploy:
       resources:
@@ -40,6 +43,9 @@ services:
       - /data/logs/qs-server/qs-collection-server:/data/logs/qs
       - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
       - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
+      # IAM mTLS 证书挂载
+      - /data/ssl/iam-contracts/grpc/ca:/app/certs/ca:ro
+      - /data/ssl/iam-contracts/grpc/clients:/app/certs/clients:ro
     command: ["--config=/app/configs/collection-server.prod.yaml"]
     deploy:
       resources:

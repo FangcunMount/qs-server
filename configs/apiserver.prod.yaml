@@ -92,6 +92,60 @@ mongodb:
   ssl-ca-file: ""
   ssl-pem-keyfile: ""
 
+# IAM 集成配置
+iam:
+  # 功能开关（灰度发布控制）
+  enabled: true                   # 是否启用 IAM 集成（生产环境开启）
+  grpc-enabled: true              # 是否启用 gRPC 调用
+  jwks-enabled: true              # 是否启用 JWKS 本地验签
+  
+  # gRPC 连接配置
+  grpc:
+    address: "iam-apiserver:9080"  # IAM gRPC 服务地址（Docker 容器）
+    timeout: 5s                   # 请求超时时间
+    retry-max: 3                  # 最大重试次数
+    
+    # mTLS 证书配置
+    tls:
+      enabled: true               # 启用 mTLS 双向认证
+      ca-file: "/app/certs/ca/ca-chain.crt"           # CA 证书链（容器内挂载路径）
+      cert-file: "/app/certs/clients/qs.crt"          # QS 客户端证书
+      key-file: "/app/certs/clients/qs.key"           # QS 客户端私钥
+  
+  # JWT 验证配置
+  jwt:
+    issuer: "http://iam-apiserver:9080"                # Token 签发者（Docker 容器）
+    audience: ["qs"]                                   # 允许的受众（QS 服务标识）
+    algorithms: ["RS256", "ES256"]                     # 支持的签名算法
+    clock-skew: 60s                                    # 时钟偏移容忍度
+    required-claims: ["user_id", "tenant_id"]          # 必需的 Claims
+  
+  # JWKS 配置（JWT 公钥管理）
+  jwks:
+    url: "http://iam-apiserver:9080/.well-known/jwks.json"  # JWKS HTTP 端点
+    refresh-interval: 5m                               # 定时刷新间隔
+    cache-ttl: 30m                                     # 缓存有效期
+    fetch-strategies: ["grpc", "http", "cache"]        # 降级策略：gRPC → HTTP → 缓存
+  
+  # 服务间认证配置（可选，用于 QS 调用其他服务）
+  service-auth:
+    service-id: "qs-service"                           # QS 服务 ID
+    target-audience: ["iam-service"]                   # 目标服务列表
+    token-ttl: 1h                                      # 服务 Token 有效期
+    refresh-before: 5m                                 # 提前刷新时间
+  
+  # 用户信息缓存配置
+  user-cache:
+    enabled: true                                      # 启用用户信息缓存
+    ttl: 5m                                            # 缓存时长
+    max-size: 10000                                    # 最大缓存条目数
+  
+  # 监护关系缓存配置
+  guardianship-cache:
+    enabled: true                                      # 启用监护关系缓存
+    ttl: 10m                                           # 缓存时长（监护关系变化较少）
+    max-size: 50000                                    # 最大缓存条目数
+
 # 日志配置（生产环境）
 log:
   disable-caller: true

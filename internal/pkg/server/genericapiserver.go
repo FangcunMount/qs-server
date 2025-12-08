@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/FangcunMount/qs-server/pkg/version"
 	"github.com/gin-gonic/gin"

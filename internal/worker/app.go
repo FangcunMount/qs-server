@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/FangcunMount/qs-server/pkg/app"

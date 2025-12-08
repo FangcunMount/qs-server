@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
@@ -78,9 +79,15 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 
 // registerBusinessRoutes 注册业务路由
 func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
-	// TODO: 添加认证中间件
-	// 目前暂时不加认证，后续可以添加 JWT 或其他认证方式
 	api := engine.Group("/api/v1")
+
+	// 应用 IAM JWT 认证中间件（如果启用）
+	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
+		api.Use(pkgmiddleware.JWTAuthMiddleware(r.container.IAMModule.Client().SDK()))
+		fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1\n")
+	} else {
+		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
+	}
 
 	// 问卷相关路由
 	r.registerQuestionnaireRoutes(api)

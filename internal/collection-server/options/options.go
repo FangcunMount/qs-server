@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -20,6 +20,7 @@ type Options struct {
 	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
 	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
 	JWT                     *JWTOptions                            `json:"jwt" mapstructure:"jwt"`
+	IAMOptions              *genericoptions.IAMOptions             `json:"iam" mapstructure:"iam"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -89,6 +90,7 @@ func NewOptions() *Options {
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
 		},
+		IAMOptions: genericoptions.NewIAMOptions(),
 	}
 }
 
@@ -98,6 +100,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.GenericServerRunOptions.AddFlags(fss.FlagSet("server"))
 	o.InsecureServing.AddFlags(fss.FlagSet("insecure"))
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
+	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc_client"))
 	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))

@@ -3,7 +3,7 @@ package options
 import (
 	"encoding/json"
 
-	"github.com/FangcunMount/iam-contracts/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 )
@@ -19,6 +19,7 @@ type Options struct {
 	MigrationOptions        *genericoptions.MigrationOptions       `json:"migration" mapstructure:"migration"`
 	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
 	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"   mapstructure:"mongodb"`
+	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -33,6 +34,7 @@ func NewOptions() *Options {
 		MigrationOptions:        genericoptions.NewMigrationOptions(),
 		RedisDualOptions:        genericoptions.NewRedisDualOptions(),
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
+		IAMOptions:              genericoptions.NewIAMOptions(),
 	}
 }
 
@@ -47,6 +49,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.MigrationOptions.AddFlags(fss.FlagSet("migration"))
 	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
+	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 
 	return fss
 }

@@ -1,9 +1,11 @@
 package apiserver
 
 import (
+	"context"
+
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
-	"github.com/FangcunMount/iam-contracts/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/pkg/grpcserver"
@@ -22,6 +24,8 @@ type apiServer struct {
 	dbManager *DatabaseManager
 	// Container 主容器
 	container *container.Container
+	// 配置
+	config *config.Config
 }
 
 // preparedAPIServer 定义了准备运行的 API 服务器
@@ -58,6 +62,7 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		genericAPIServer: genericServer,
 		dbManager:        dbManager,
 		grpcServer:       grpcServer,
+		config:           cfg,
 	}
 
 	return server, nil
@@ -94,6 +99,14 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 
 	// 创建六边形架构容器（自动发现版本）
 	s.container = container.NewContainer(mysqlDB, mongoDB, redisCache, redisStore)
+	// 初始化 IAM 模块（优先）
+	ctx := context.Background()
+	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
+	if err != nil {
+		log.Fatalf("Failed to initialize IAM module: %v", err)
+	}
+	s.container.IAMModule = iamModule
+	s.container.IAMModule = iamModule
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
