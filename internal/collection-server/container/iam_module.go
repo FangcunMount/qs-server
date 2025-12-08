@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 // IAMModule IAM 集成模块
 type IAMModule struct {
-	client *iam.Client
+	client        *iam.Client
+	tokenVerifier *iam.TokenVerifier
 }
 
 // NewIAMModule 创建 IAM 模块
@@ -31,16 +33,40 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}
 
+	// 创建 Token 验证器（使用 SDK 的 JWKS 本地验签 + 远程降级）
+	var tokenVerifier *iam.TokenVerifier
+	if client.IsEnabled() {
+		tokenVerifier, err = iam.NewTokenVerifier(ctx, client)
+		if err != nil {
+			log.Warnf("Failed to create token verifier: %v, will use remote verification only", err)
+			// 不返回错误，允许降级到远程验证
+		}
+	}
+
 	log.Info("IAM module initialized successfully")
 
 	return &IAMModule{
-		client: client,
+		client:        client,
+		tokenVerifier: tokenVerifier,
 	}, nil
 }
 
 // Client 返回 IAM 客户端
 func (m *IAMModule) Client() *iam.Client {
 	return m.client
+}
+
+// TokenVerifier 返回 Token 验证器包装
+func (m *IAMModule) TokenVerifier() *iam.TokenVerifier {
+	return m.tokenVerifier
+}
+
+// SDKTokenVerifier 返回 SDK 的 TokenVerifier（用于 REST 中间件等需要原生 SDK 类型的场景）
+func (m *IAMModule) SDKTokenVerifier() *auth.TokenVerifier {
+	if m.tokenVerifier == nil {
+		return nil
+	}
+	return m.tokenVerifier.SDKVerifier()
 }
 
 // IsEnabled 检查 IAM 模块是否启用
@@ -50,6 +76,11 @@ func (m *IAMModule) IsEnabled() bool {
 
 // Close 关闭 IAM 模块
 func (m *IAMModule) Close() error {
+	// 先关闭 TokenVerifier（停止 JWKS 后台刷新）
+	if m.tokenVerifier != nil {
+		m.tokenVerifier.Close()
+	}
+	// 再关闭 Client
 	if m.client != nil {
 		return m.client.Close()
 	}

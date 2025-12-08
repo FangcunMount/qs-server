@@ -7,6 +7,7 @@ import (
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	basemtls "github.com/FangcunMount/component-base/pkg/grpc/mtls"
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
@@ -18,10 +19,12 @@ import (
 // Server gRPC 服务器结构体
 type Server struct {
 	*grpc.Server
-	config      *Config
-	services    []Service
-	mtlsCreds   *basemtls.ServerCredentials
-	healthCheck *health.Server
+	config          *Config
+	services        []Service
+	mtlsCreds       *basemtls.ServerCredentials
+	healthCheck     *health.Server
+	tokenVerifier   *auth.TokenVerifier // SDK TokenVerifier（支持本地 JWKS 验签）
+	authInterceptor *IAMAuthInterceptor
 }
 
 // Service gRPC 服务接口
@@ -30,12 +33,13 @@ type Service interface {
 }
 
 // NewServer 创建新的 gRPC 服务器（使用 component-base 提供的能力）
-func NewServer(config *Config) (*Server, error) {
+// tokenVerifier: SDK 的 TokenVerifier，支持本地 JWKS 验签和远程降级
+func NewServer(config *Config, tokenVerifier *auth.TokenVerifier) (*Server, error) {
 	var serverOpts []grpc.ServerOption
 	var mtlsCreds *basemtls.ServerCredentials
 
 	// 1. 构建拦截器链（使用 component-base 的拦截器）
-	unaryInterceptors := buildUnaryInterceptors(config)
+	unaryInterceptors := buildUnaryInterceptors(config, tokenVerifier)
 	serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 
 	// 2. 配置消息大小限制
@@ -96,17 +100,25 @@ func NewServer(config *Config) (*Server, error) {
 		log.Info("gRPC server: reflection service registered")
 	}
 
+	// 创建 IAM 认证拦截器
+	var authInterceptor *IAMAuthInterceptor
+	if config.Auth.Enabled && tokenVerifier != nil {
+		authInterceptor = NewIAMAuthInterceptor(tokenVerifier, &config.Auth)
+	}
+
 	return &Server{
-		Server:      grpcServer,
-		config:      config,
-		services:    make([]Service, 0),
-		mtlsCreds:   mtlsCreds,
-		healthCheck: healthCheck,
+		Server:          grpcServer,
+		config:          config,
+		services:        make([]Service, 0),
+		mtlsCreds:       mtlsCreds,
+		healthCheck:     healthCheck,
+		tokenVerifier:   tokenVerifier,
+		authInterceptor: authInterceptor,
 	}, nil
 }
 
 // buildUnaryInterceptors 构建一元拦截器链（使用 component-base 提供的拦截器）
-func buildUnaryInterceptors(config *Config) []grpc.UnaryServerInterceptor {
+func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) []grpc.UnaryServerInterceptor {
 	var interceptorChain []grpc.UnaryServerInterceptor
 
 	// 1. Recovery（最外层，捕获所有 panic）
@@ -130,32 +142,26 @@ func buildUnaryInterceptors(config *Config) []grpc.UnaryServerInterceptor {
 		log.Info("gRPC server: mTLS identity interceptor enabled")
 	}
 
-	// 5. Credential Validation（应用层凭证验证）
-	if config.Auth.Enabled {
-		// TODO: 实现凭证验证器
-		// extractor := ... // 实现 CredentialExtractor
-		// validator := ... // 实现 CredentialValidator
-		// interceptorChain = append(interceptorChain,
-		// 	basegrpc.CredentialInterceptor(extractor, validator))
-		log.Info("gRPC server: credential validation interceptor (TODO)")
+	// 5. IAM Authentication（IAM JWT 认证 - 使用 SDK TokenVerifier 本地验签）
+	if config.Auth.Enabled && tokenVerifier != nil {
+		authInterceptor := NewIAMAuthInterceptor(tokenVerifier, &config.Auth)
+		interceptorChain = append(interceptorChain,
+			authInterceptor.UnaryServerInterceptor())
+		log.Info("gRPC server: IAM authentication interceptor enabled (local JWKS verification)")
+	} else if config.Auth.Enabled {
+		log.Warn("gRPC server: auth enabled but TokenVerifier not provided, skipping authentication")
 	}
 
 	// 6. ACL（权限控制）
 	if config.ACL.Enabled {
-		// TODO: 实现 ACL
-		// acl := ... // 实现 AccessChecker
-		// interceptorChain = append(interceptorChain,
-		// 	basegrpc.ACLInterceptor(acl))
-		log.Info("gRPC server: ACL interceptor (TODO)")
+		// TODO: 实现 ACL - 可以基于 IAM 的角色/权限进行访问控制
+		log.Info("gRPC server: ACL interceptor (TODO - needs role-based access control)")
 	}
 
 	// 7. Audit（审计日志）
 	if config.Audit.Enabled {
-		// TODO: 实现审计日志
-		// auditor := ... // 实现 AuditLogger
-		// interceptorChain = append(interceptorChain,
-		// 	basegrpc.AuditInterceptor(auditor))
-		log.Info("gRPC server: audit interceptor (TODO)")
+		// TODO: 实现审计日志 - 记录所有 gRPC 调用的审计信息
+		log.Info("gRPC server: audit interceptor (TODO - needs audit logger)")
 	}
 
 	return interceptorChain

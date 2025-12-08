@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/FangcunMount/component-base v0.3.8
-	github.com/FangcunMount/iam-contracts v0.0.2
+	github.com/FangcunMount/iam-contracts v0.0.3
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2

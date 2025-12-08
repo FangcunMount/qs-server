@@ -66,10 +66,15 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 创建需要认证的API组
 	apiV1 := engine.Group("/api/v1")
 
-	// 应用 IAM JWT 认证中间件（如果启用）
+	// 应用 IAM JWT 认证中间件（如果启用，使用 SDK TokenVerifier 本地验签）
 	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
-		apiV1.Use(middleware.JWTAuthMiddleware(r.container.IAMModule.Client().SDK()))
-		fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1\n")
+		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
+		if tokenVerifier != nil {
+			apiV1.Use(middleware.JWTAuthMiddleware(tokenVerifier))
+			fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1 (local JWKS verification)\n")
+		} else {
+			fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled!\n")
+		}
 	} else {
 		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
 	}

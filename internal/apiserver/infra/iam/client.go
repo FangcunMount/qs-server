@@ -3,9 +3,11 @@ package iam
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 )
 
@@ -139,12 +141,36 @@ func (c *Client) Close() error {
 }
 
 // HealthCheck 健康检查
+// 通过尝试调用 IAM 服务来验证连接是否正常
 func (c *Client) HealthCheck(ctx context.Context) error {
 	if !c.enabled {
 		return nil
 	}
 
-	// 简单的健康检查：尝试获取 JWKS（不会实际调用）
-	// 或者可以实现一个专门的 Ping 方法
+	if c.sdk == nil {
+		return fmt.Errorf("IAM SDK client is nil")
+	}
+
+	// 尝试使用一个空的 token 调用 VerifyToken
+	// 如果 IAM 服务可达，应该返回 token 无效的错误，而不是连接错误
+	// 这样可以验证 gRPC 连接和证书是否正常
+	_, err := c.sdk.Auth().VerifyToken(ctx, &authnv1.VerifyTokenRequest{
+		AccessToken: "", // 空 token，预期返回无效错误
+	})
+	if err != nil {
+		// 检查是否是连接错误（而非业务错误）
+		// 业务错误（如 token 无效）是预期的，说明服务可达
+		errStr := err.Error()
+		// 如果是 InvalidArgument 或 Unauthenticated 错误，说明服务可达
+		if strings.Contains(errStr, "InvalidArgument") ||
+			strings.Contains(errStr, "Unauthenticated") ||
+			strings.Contains(errStr, "invalid") ||
+			strings.Contains(errStr, "token") {
+			return nil // 服务可达，健康
+		}
+		// 其他错误（如连接失败、证书错误等）则认为不健康
+		return fmt.Errorf("IAM health check failed: %w", err)
+	}
+
 	return nil
 }

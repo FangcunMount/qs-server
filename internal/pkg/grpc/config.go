@@ -4,6 +4,7 @@ import (
 	"time"
 
 	basemtls "github.com/FangcunMount/component-base/pkg/grpc/mtls"
+	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 )
 
 // Config gRPC 服务器配置
@@ -181,7 +182,7 @@ func (c *Config) Complete() CompletedConfig {
 	return CompletedConfig{c}
 }
 
-// New 创建服务器
-func (c CompletedConfig) New() (*Server, error) {
-	return NewServer(c.Config)
+// New 创建服务器（使用 SDK TokenVerifier 进行本地 JWKS 验签）
+func (c CompletedConfig) New(tokenVerifier *auth.TokenVerifier) (*Server, error) {
+	return NewServer(c.Config, tokenVerifier)
 }

@@ -8,8 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
-	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
+	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 )
 
 // UserClaimsContextKey 用户声明上下文键
@@ -22,9 +21,18 @@ type UserClaims struct {
 	Roles    []string
 }
 
-// JWTAuthMiddleware JWT 认证中间件
-func JWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
+// JWTAuthMiddleware JWT 认证中间件（使用 SDK TokenVerifier 本地 JWKS 验签）
+func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 检查 verifier 是否可用
+		if verifier == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "token verifier not configured",
+			})
+			c.Abort()
+			return
+		}
+
 		// 提取 Token
 		token := extractToken(c)
 		if token == "" {
@@ -35,10 +43,8 @@ func JWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
 			return
 		}
 
-		// 验证 Token
-		resp, err := client.Auth().VerifyToken(c.Request.Context(), &authnv1.VerifyTokenRequest{
-			AccessToken: token,
-		})
+		// 使用 SDK TokenVerifier 验证（本地 JWKS 优先，远程降级）
+		result, err := verifier.Verify(c.Request.Context(), token, nil)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": fmt.Sprintf("token verification failed: %v", err),
@@ -47,7 +53,7 @@ func JWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
 			return
 		}
 
-		if !resp.Valid {
+		if !result.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token",
 			})
@@ -56,7 +62,7 @@ func JWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
 		}
 
 		// 将用户信息存入上下文
-		tokenClaims := resp.GetClaims()
+		tokenClaims := result.Claims
 		if tokenClaims == nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token claims",
@@ -65,18 +71,10 @@ func JWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
 			return
 		}
 
-		// 从 Attributes 中提取角色（如果存在）
-		roles := make([]string, 0)
-		if attrs := tokenClaims.GetAttributes(); attrs != nil {
-			if rolesStr, ok := attrs["roles"]; ok {
-				roles = strings.Split(rolesStr, ",")
-			}
-		}
-
 		claims := &UserClaims{
-			UserID:   tokenClaims.GetUserId(),
-			TenantID: tokenClaims.GetTenantId(),
-			Roles:    roles,
+			UserID:   tokenClaims.UserID,
+			TenantID: tokenClaims.TenantID,
+			Roles:    tokenClaims.Roles,
 		}
 
 		c.Set("user_claims", claims)
@@ -87,8 +85,8 @@ func JWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
 	}
 }
 
-// OptionalJWTAuthMiddleware 可选的 JWT 认证中间件
-func OptionalJWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
+// OptionalJWTAuthMiddleware 可选的 JWT 认证中间件（使用 SDK TokenVerifier）
+func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 提取 Token
 		token := extractToken(c)
@@ -98,36 +96,32 @@ func OptionalJWTAuthMiddleware(client *sdk.Client) gin.HandlerFunc {
 			return
 		}
 
-		// 验证 Token
-		resp, err := client.Auth().VerifyToken(c.Request.Context(), &authnv1.VerifyTokenRequest{
-			AccessToken: token,
-		})
-		if err != nil || !resp.Valid {
+		// 检查 verifier 是否可用
+		if verifier == nil {
+			c.Next()
+			return
+		}
+
+		// 使用 SDK TokenVerifier 验证
+		result, err := verifier.Verify(c.Request.Context(), token, nil)
+		if err != nil || !result.Valid {
 			// Token 无效，继续执行但不设置用户信息
 			c.Next()
 			return
 		}
 
 		// 将用户信息存入上下文
-		tokenClaims := resp.GetClaims()
+		tokenClaims := result.Claims
 		if tokenClaims == nil {
 			// Token 无效，继续执行但不设置用户信息
 			c.Next()
 			return
 		}
 
-		// 从 Attributes 中提取角色（如果存在）
-		roles := make([]string, 0)
-		if attrs := tokenClaims.GetAttributes(); attrs != nil {
-			if rolesStr, ok := attrs["roles"]; ok {
-				roles = strings.Split(rolesStr, ",")
-			}
-		}
-
 		claims := &UserClaims{
-			UserID:   tokenClaims.GetUserId(),
-			TenantID: tokenClaims.GetTenantId(),
-			Roles:    roles,
+			UserID:   tokenClaims.UserID,
+			TenantID: tokenClaims.TenantID,
+			Roles:    tokenClaims.Roles,
 		}
 
 		c.Set("user_claims", claims)

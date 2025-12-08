@@ -46,22 +46,15 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		return nil, err
 	}
 
-	// 创建 GRPC 服务器
-	grpcServer, err := buildGRPCServer(cfg)
-	if err != nil {
-		log.Fatalf("Failed to build GRPC server: %v", err)
-		return nil, err
-	}
-
 	// 创建数据库管理器
 	dbManager := NewDatabaseManager(cfg)
 
-	// 创建 API 服务器实例
+	// 创建 API 服务器实例（gRPC Server 在 PrepareRun 中创建，因为需要 IAM SDK）
 	server := &apiServer{
 		gs:               gs,
 		genericAPIServer: genericServer,
 		dbManager:        dbManager,
-		grpcServer:       grpcServer,
+		grpcServer:       nil, // 延迟初始化
 		config:           cfg,
 	}
 
@@ -106,11 +99,16 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to initialize IAM module: %v", err)
 	}
 	s.container.IAMModule = iamModule
-	s.container.IAMModule = iamModule
 
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize hexagonal architecture container: %v", err)
+	}
+
+	// 现在创建 GRPC 服务器（IAM Module 已初始化）
+	s.grpcServer, err = buildGRPCServer(s.config, s.container)
+	if err != nil {
+		log.Fatalf("Failed to build GRPC server: %v", err)
 	}
 
 	// 创建并初始化路由器
@@ -231,7 +229,7 @@ func buildGenericConfig(cfg *config.Config) (genericConfig *genericapiserver.Con
 }
 
 // buildGRPCServer 构建 GRPC 服务器（使用 component-base 提供的能力）
-func buildGRPCServer(cfg *config.Config) (*grpcpkg.Server, error) {
+func buildGRPCServer(cfg *config.Config, container *container.Container) (*grpcpkg.Server, error) {
 	// 创建 GRPC 配置
 	grpcConfig := grpcpkg.NewConfig()
 
@@ -240,8 +238,16 @@ func buildGRPCServer(cfg *config.Config) (*grpcpkg.Server, error) {
 		return nil, err
 	}
 
+	// 获取 SDK TokenVerifier（使用 SDK 的本地 JWKS 验签能力）
+	tokenVerifier := container.IAMModule.SDKTokenVerifier()
+	if tokenVerifier != nil {
+		log.Info("gRPC server: TokenVerifier injected for authentication (local JWKS verification)")
+	} else {
+		log.Warn("gRPC server: TokenVerifier not available, authentication disabled")
+	}
+
 	// 完成配置并创建服务器
-	return grpcConfig.Complete().New()
+	return grpcConfig.Complete().New(tokenVerifier)
 }
 
 // applyGRPCOptions 应用 GRPC 选项到配置
