@@ -102,9 +102,11 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	}
 
 	iamOpts := &iam.IAMOptions{
-		Enabled:     opts.Enabled,
-		GRPCEnabled: opts.GRPCEnabled,
-		JWKSEnabled: opts.JWKSEnabled,
+		Enabled:       opts.Enabled,
+		GRPCEnabled:   opts.GRPCEnabled,
+		JWKSEnabled:   opts.JWKSEnabled,
+		EnableTracing: opts.EnableTracing,
+		EnableMetrics: opts.EnableMetrics,
 	}
 
 	// GRPC 配置

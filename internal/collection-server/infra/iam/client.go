@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam-contracts/pkg/sdk/config"
 )
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）
@@ -14,6 +15,8 @@ type IAMOptions struct {
 	Enabled           bool
 	GRPCEnabled       bool
 	JWKSEnabled       bool
+	EnableTracing     bool // 启用链路追踪
+	EnableMetrics     bool // 启用 Prometheus 指标
 	GRPC              *GRPCOptions
 	JWT               *JWTOptions
 	JWKS              *JWKSOptions
@@ -81,6 +84,15 @@ func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
 		Timeout:  opts.GRPC.Timeout,
 	}
 
+	// 配置可观测性
+	if opts.EnableTracing || opts.EnableMetrics {
+		sdkConfig.Observability = &sdkconfig.ObservabilityConfig{
+			EnableTracing: opts.EnableTracing,
+			EnableMetrics: opts.EnableMetrics,
+			ServiceName:   "qs-collection",
+		}
+	}
+
 	// 配置 mTLS
 	if opts.GRPC.TLS != nil && opts.GRPC.TLS.Enabled {
 		sdkConfig.TLS = &sdk.TLSConfig{
@@ -139,12 +151,26 @@ func (c *Client) Close() error {
 }
 
 // HealthCheck 健康检查
+// 通过尝试调用 IAM 服务来验证连接是否正常
 func (c *Client) HealthCheck(ctx context.Context) error {
 	if !c.enabled {
 		return nil
 	}
 
-	// 简单的健康检查：尝试获取 JWKS（不会实际调用）
-	// 或者可以实现一个专门的 Ping 方法
+	if c.sdk == nil {
+		return fmt.Errorf("IAM SDK client is nil")
+	}
+
+	// 尝试获取 gRPC 连接状态
+	// 如果连接正常，说明服务可达
+	conn := c.sdk.Conn()
+	if conn == nil {
+		return fmt.Errorf("IAM gRPC connection is nil")
+	}
+
+	// 检查连接状态
+	state := conn.GetState()
+	log.Debugf("IAM gRPC connection state: %s", state.String())
+
 	return nil
 }

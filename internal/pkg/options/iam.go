@@ -13,6 +13,10 @@ type IAMOptions struct {
 	GRPCEnabled bool `json:"grpc-enabled"  mapstructure:"grpc-enabled"`
 	JWKSEnabled bool `json:"jwks-enabled"  mapstructure:"jwks-enabled"`
 
+	// 可观测性配置
+	EnableTracing bool `json:"enable-tracing" mapstructure:"enable-tracing"` // 启用链路追踪
+	EnableMetrics bool `json:"enable-metrics" mapstructure:"enable-metrics"` // 启用 Prometheus 指标
+
 	// gRPC 配置
 	GRPC *IAMGRPCOptions `json:"grpc" mapstructure:"grpc"`
 
@@ -85,9 +89,11 @@ type IAMCacheOptions struct {
 // NewIAMOptions 创建默认的 IAM 配置
 func NewIAMOptions() *IAMOptions {
 	return &IAMOptions{
-		Enabled:     false, // 默认关闭，需要明确启用
-		GRPCEnabled: true,
-		JWKSEnabled: true,
+		Enabled:       false, // 默认关闭，需要明确启用
+		GRPCEnabled:   true,
+		JWKSEnabled:   true,
+		EnableTracing: true, // 默认启用链路追踪
+		EnableMetrics: true, // 默认启用 Prometheus 指标
 
 		GRPC: &IAMGRPCOptions{
 			Address:  "127.0.0.1:9090",
@@ -188,6 +194,12 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"Enable IAM gRPC calls")
 	fs.BoolVar(&o.JWKSEnabled, "iam.jwks-enabled", o.JWKSEnabled,
 		"Enable JWKS local token verification")
+
+	// 可观测性配置
+	fs.BoolVar(&o.EnableTracing, "iam.enable-tracing", o.EnableTracing,
+		"Enable OpenTelemetry tracing for IAM SDK")
+	fs.BoolVar(&o.EnableMetrics, "iam.enable-metrics", o.EnableMetrics,
+		"Enable Prometheus metrics for IAM SDK")
 
 	// gRPC 配置
 	fs.StringVar(&o.GRPC.Address, "iam.grpc.address", o.GRPC.Address,

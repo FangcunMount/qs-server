@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam-contracts/pkg/sdk/config"
 )
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）
@@ -16,6 +17,8 @@ type IAMOptions struct {
 	Enabled           bool
 	GRPCEnabled       bool
 	JWKSEnabled       bool
+	EnableTracing     bool // 启用链路追踪
+	EnableMetrics     bool // 启用 Prometheus 指标
 	GRPC              *GRPCOptions
 	JWT               *JWTOptions
 	JWKS              *JWKSOptions
@@ -81,6 +84,15 @@ func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
 	sdkConfig := &sdk.Config{
 		Endpoint: opts.GRPC.Address,
 		Timeout:  opts.GRPC.Timeout,
+	}
+
+	// 配置可观测性
+	if opts.EnableTracing || opts.EnableMetrics {
+		sdkConfig.Observability = &sdkconfig.ObservabilityConfig{
+			EnableTracing: opts.EnableTracing,
+			EnableMetrics: opts.EnableMetrics,
+			ServiceName:   "qs-apiserver",
+		}
 	}
 
 	// 配置 mTLS

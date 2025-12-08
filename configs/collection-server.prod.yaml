@@ -37,6 +37,10 @@ iam:
   grpc-enabled: true
   jwks-enabled: true
   
+  # 可观测性配置
+  enable-tracing: true            # 启用 OpenTelemetry 链路追踪
+  enable-metrics: true            # 启用 Prometheus 指标
+  
   # gRPC 客户端配置
   grpc:
     address: "iam-apiserver:9080"  # IAM gRPC 服务地址（Docker 容器名）
@@ -61,9 +65,10 @@ iam:
   # JWKS 配置
   jwks:
     url: "http://iam-apiserver:9080/.well-known/jwks.json"
+    grpc-endpoint: "iam-apiserver:9080"                    # gRPC 降级端点（HTTP 失败时使用）
     refresh-interval: 1h
     cache-ttl: 24h
-    fetch-strategies: ["grpc", "http", "cache"]  # 优先使用 gRPC
+    fetch-strategies: ["http", "grpc", "cache"]  # 降级策略：HTTP → gRPC → 缓存
   
   # 用户信息缓存
   user-cache:
