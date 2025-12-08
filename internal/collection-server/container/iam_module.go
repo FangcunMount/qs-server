@@ -13,8 +13,11 @@ import (
 
 // IAMModule IAM 集成模块
 type IAMModule struct {
-	client        *iam.Client
-	tokenVerifier *iam.TokenVerifier
+	client            *iam.Client
+	tokenVerifier     *iam.TokenVerifier
+	serviceAuthHelper *iam.ServiceAuthHelper
+	identityService   *iam.IdentityService
+	guardianshipSvc   *iam.GuardianshipService
 }
 
 // NewIAMModule 创建 IAM 模块
@@ -43,11 +46,48 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
+	// 创建服务间认证助手（如果配置了 ServiceAuth）
+	var serviceAuthHelper *iam.ServiceAuthHelper
+	if client.IsEnabled() && opts.ServiceAuth != nil && opts.ServiceAuth.ServiceID != "" {
+		serviceAuthConfig := &iam.ServiceAuthConfig{
+			ServiceID:      opts.ServiceAuth.ServiceID,
+			TargetAudience: opts.ServiceAuth.TargetAudience,
+			TokenTTL:       int64(opts.ServiceAuth.TokenTTL.Seconds()),
+			RefreshBefore:  int64(opts.ServiceAuth.RefreshBefore.Seconds()),
+		}
+		serviceAuthHelper, err = iam.NewServiceAuthHelper(ctx, client, serviceAuthConfig)
+		if err != nil {
+			log.Warnf("Failed to create service auth helper: %v, service-to-service auth will not be available", err)
+			// 不返回错误，允许继续运行
+		}
+	}
+
+	// 创建 Identity 服务
+	var identityService *iam.IdentityService
+	if client.IsEnabled() {
+		identityService, err = iam.NewIdentityService(client)
+		if err != nil {
+			log.Warnf("Failed to create identity service: %v", err)
+		}
+	}
+
+	// 创建 Guardianship 服务
+	var guardianshipSvc *iam.GuardianshipService
+	if client.IsEnabled() {
+		guardianshipSvc, err = iam.NewGuardianshipService(client)
+		if err != nil {
+			log.Warnf("Failed to create guardianship service: %v", err)
+		}
+	}
+
 	log.Info("IAM module initialized successfully")
 
 	return &IAMModule{
-		client:        client,
-		tokenVerifier: tokenVerifier,
+		client:            client,
+		tokenVerifier:     tokenVerifier,
+		serviceAuthHelper: serviceAuthHelper,
+		identityService:   identityService,
+		guardianshipSvc:   guardianshipSvc,
 	}, nil
 }
 
@@ -69,6 +109,24 @@ func (m *IAMModule) SDKTokenVerifier() *auth.TokenVerifier {
 	return m.tokenVerifier.SDKVerifier()
 }
 
+// ServiceAuthHelper 返回服务间认证助手
+// 用于 Collection 服务以服务身份调用 IAM 或 QS-APIServer
+func (m *IAMModule) ServiceAuthHelper() *iam.ServiceAuthHelper {
+	return m.serviceAuthHelper
+}
+
+// IdentityService 返回身份服务
+// 用于用户信息查询
+func (m *IAMModule) IdentityService() *iam.IdentityService {
+	return m.identityService
+}
+
+// GuardianshipService 返回监护关系服务
+// 用于监护关系验证和查询
+func (m *IAMModule) GuardianshipService() *iam.GuardianshipService {
+	return m.guardianshipSvc
+}
+
 // IsEnabled 检查 IAM 模块是否启用
 func (m *IAMModule) IsEnabled() bool {
 	return m.client != nil && m.client.IsEnabled()
@@ -76,11 +134,15 @@ func (m *IAMModule) IsEnabled() bool {
 
 // Close 关闭 IAM 模块
 func (m *IAMModule) Close() error {
-	// 先关闭 TokenVerifier（停止 JWKS 后台刷新）
+	// 先关闭 ServiceAuthHelper（停止后台刷新）
+	if m.serviceAuthHelper != nil {
+		m.serviceAuthHelper.Stop()
+	}
+	// 关闭 TokenVerifier（停止 JWKS 后台刷新）
 	if m.tokenVerifier != nil {
 		m.tokenVerifier.Close()
 	}
-	// 再关闭 Client
+	// 最后关闭 Client
 	if m.client != nil {
 		return m.client.Close()
 	}
