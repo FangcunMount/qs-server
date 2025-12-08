@@ -61,6 +61,10 @@ COPY --chown=appuser:appuser configs/apiserver.prod.yaml /app/configs/apiserver.
 COPY --chown=appuser:appuser api/rest /app/api/rest
 COPY --chown=appuser:appuser web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/swagger-ui-dist
 
+# 预创建 TLS 目录，便于以文件方式挂载证书/私钥
+RUN mkdir -p /etc/qs-server/ssl/ca /etc/qs-server/ssl/server && \
+    chown -R appuser:appuser /etc/qs-server/ssl
+
 # 切换到非 root 用户
 USER appuser
 
