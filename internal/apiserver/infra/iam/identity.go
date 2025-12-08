@@ -68,10 +68,14 @@ func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv1.Searc
 	return s.client.SearchUsers(ctx, req)
 }
 
-// NOTE: GetChild 和 BatchGetChildren 方法在 SDK identity.Client 中不存在
-// 如果需要访问儿童信息，可以：
-// 1. 通过 Guardianship 服务的 ListChildren 获取
-// 2. 使用 Raw() 获取底层客户端，直接调用 gRPC 服务
+// LinkExternalIdentity 关联外部身份（SDK v0.0.5 新增）
+// 用于将用户与第三方身份提供商关联
+func (s *IdentityService) LinkExternalIdentity(ctx context.Context, req *identityv1.LinkExternalIdentityRequest) (*identityv1.LinkExternalIdentityResponse, error) {
+	if !s.enabled {
+		return nil, fmt.Errorf("identity service not enabled")
+	}
+	return s.client.LinkExternalIdentity(ctx, req)
+}
 
 // Raw 返回原始 SDK 客户端（用于高级用法）
 func (s *IdentityService) Raw() *identity.Client {

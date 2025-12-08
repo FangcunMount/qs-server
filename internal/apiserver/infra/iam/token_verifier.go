@@ -38,8 +38,9 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 		verifyCfg.AllowedAudience = config.JWT.Audience
 		verifyCfg.AllowedIssuer = config.JWT.Issuer
 		verifyCfg.ClockSkew = config.JWT.ClockSkew
-		// 注意: RequiredClaims 和 AllowedAlgorithms 在当前 SDK 版本中未支持
-		// 这些配置将在 SDK 内部通过其他方式处理（如 JWKS 公钥限制算法）
+		// SDK v0.0.5 新增支持
+		verifyCfg.RequiredClaims = config.JWT.RequiredClaims
+		verifyCfg.Algorithms = config.JWT.Algorithms
 	}
 
 	// 构建 SDK JWKSConfig（如果启用 JWKS 本地验签）
