@@ -184,9 +184,9 @@ iam:
     # mTLS 证书配置（开发环境示例，需要时启用）
     tls:
       enabled: false              # 开发环境禁用 mTLS（需要时改为 true）
-      ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链（infra 统一管理）
-      cert-file: "/data/infra/ssl/grpc/server/qs.crt"       # QS 客户端证书
-      key-file: "/data/infra/ssl/grpc/server/qs.key"        # QS 客户端私钥
+      ca-file: "/etc/qs-server/ssl/ca/ca-chain.crt"       # CA 证书链
+      cert-file: "/etc/qs-server/ssl/server/qs-apiserver.crt" # QS 客户端证书
+      key-file: "/etc/qs-server/ssl/server/qs-apiserver.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

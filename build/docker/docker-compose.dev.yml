@@ -24,9 +24,8 @@ services:
       - ../../configs/apiserver.prod.yaml:/app/configs/apiserver.prod.yaml:ro
       - ../../configs/cert:/app/configs/cert:ro
       - apiserver-logs:/app/logs
-      # IAM mTLS 证书挂载（开发环境）
-      - /data/ssl/iam-contracts/grpc/ca:/app/certs/ca:ro
-      - /data/ssl/iam-contracts/grpc/clients:/app/certs/clients:ro
+      # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl:ro
     environment:
       - TZ=Asia/Shanghai
       - ENV=${ENV:-prod}
@@ -67,9 +66,8 @@ services:
       - ../../configs/collection-server.prod.yaml:/app/configs/collection-server.prod.yaml:ro
       - ../../configs/cert:/app/configs/cert:ro
       - collection-logs:/app/logs
-      # IAM mTLS 证书挂载（开发环境）
-      - /data/ssl/iam-contracts/grpc/ca:/app/certs/ca:ro
-      - /data/ssl/iam-contracts/grpc/clients:/app/certs/clients:ro
+      # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl:ro
     environment:
       - TZ=Asia/Shanghai
       - ENV=${ENV:-prod}

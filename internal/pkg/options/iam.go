@@ -60,9 +60,11 @@ type IAMJWTOptions struct {
 // IAMJWKSOptions JWKS 配置
 type IAMJWKSOptions struct {
 	URL             string        `json:"url"               mapstructure:"url"`
+	GRPCEndpoint    string        `json:"grpc-endpoint"     mapstructure:"grpc-endpoint"` // gRPC 降级端点（HTTP 失败时使用）
 	RefreshInterval time.Duration `json:"refresh-interval"  mapstructure:"refresh-interval"`
 	CacheTTL        time.Duration `json:"cache-ttl"         mapstructure:"cache-ttl"`
-	FetchStrategies []string      `json:"fetch-strategies"  mapstructure:"fetch-strategies"`
+	// Deprecated: FetchStrategies 已弃用，SDK 会根据 URL 和 GRPCEndpoint 自动构建策略链
+	FetchStrategies []string `json:"fetch-strategies,omitempty" mapstructure:"fetch-strategies"`
 }
 
 // IAMServiceAuthOptions 服务间认证配置
@@ -109,9 +111,9 @@ func NewIAMOptions() *IAMOptions {
 
 		JWKS: &IAMJWKSOptions{
 			URL:             "https://iam.example.com/.well-known/jwks.json",
+			GRPCEndpoint:    "", // 可选：设置为 "iam.example.com:8081" 启用 gRPC 降级
 			RefreshInterval: 5 * time.Minute,
 			CacheTTL:        30 * time.Minute,
-			FetchStrategies: []string{"http", "grpc", "cache"},
 		},
 
 		ServiceAuth: &IAMServiceAuthOptions{

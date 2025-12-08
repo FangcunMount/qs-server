@@ -45,10 +45,10 @@ iam:
     
     # mTLS 配置（开发环境示例，需要时启用）
     tls:
-      enabled: false              # 开发环境禁用 mTLS（需要时改为 true）
-      ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链（infra 统一管理）
-      cert-file: "/data/infra/ssl/grpc/server/qs.crt"       # QS 客户端证书
-      key-file: "/data/infra/ssl/grpc/server/qs.key"        # QS 客户端私钥
+      enabled: true              # 开发环境禁用 mTLS（需要时改为 true）
+      ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链
+      cert-file: "/data/infra/ssl/grpc/server/qs-collection.crt" # QS 客户端证书
+      key-file: "/data/infra/ssl/grpc/server/qs-collection.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

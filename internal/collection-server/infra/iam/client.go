@@ -45,9 +45,9 @@ type JWTOptions struct {
 
 type JWKSOptions struct {
 	URL             string
+	GRPCEndpoint    string // gRPC 降级端点（HTTP 失败时使用）
 	RefreshInterval time.Duration
 	CacheTTL        time.Duration
-	FetchStrategies []string
 }
 
 type CacheOptions struct {

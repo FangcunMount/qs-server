@@ -152,19 +152,50 @@ func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) [
 		log.Warn("gRPC server: auth enabled but TokenVerifier not provided, skipping authentication")
 	}
 
-	// 6. ACL（权限控制）
+	// 6. ACL（权限控制 - 使用 component-base 的 ServiceACL）
 	if config.ACL.Enabled {
-		// TODO: 实现 ACL - 可以基于 IAM 的角色/权限进行访问控制
-		log.Info("gRPC server: ACL interceptor (TODO - needs role-based access control)")
+		acl := loadACLConfig(config.ACL.ConfigFile, config.ACL.DefaultPolicy)
+		interceptorChain = append(interceptorChain,
+			basegrpc.ACLInterceptor(acl, basegrpc.WithACLLogger(NewComponentBaseLogger())))
+		log.Infof("gRPC server: ACL interceptor enabled (default_policy=%s, config_file=%s)",
+			config.ACL.DefaultPolicy, config.ACL.ConfigFile)
 	}
 
-	// 7. Audit（审计日志）
+	// 7. Audit（审计日志 - 使用 component-base 的 AuditInterceptor）
 	if config.Audit.Enabled {
-		// TODO: 实现审计日志 - 记录所有 gRPC 调用的审计信息
-		log.Info("gRPC server: audit interceptor (TODO - needs audit logger)")
+		auditLogger := basegrpc.NewDefaultAuditLogger(NewComponentBaseLogger())
+		interceptorChain = append(interceptorChain,
+			basegrpc.AuditInterceptor(auditLogger))
+		log.Infof("gRPC server: Audit interceptor enabled (output=%s)", config.Audit.OutputPath)
 	}
 
 	return interceptorChain
+}
+
+// loadACLConfig 从配置文件加载 ACL 规则
+// 如果文件不存在或解析失败，返回仅包含默认策略的 ACL
+func loadACLConfig(configFile, defaultPolicy string) *basegrpc.ServiceACL {
+	cfg := &basegrpc.ACLConfig{
+		DefaultPolicy: defaultPolicy,
+		Services:      make([]*basegrpc.ServicePermissions, 0),
+	}
+
+	if configFile != "" {
+		// TODO: 从 YAML/JSON 文件加载 ACL 规则
+		// 示例配置文件格式:
+		// default_policy: deny
+		// services:
+		//   - service_name: collection-server
+		//     enabled: true
+		//     allowed_methods:
+		//       - /qs.survey.v1.SurveyService/*
+		//       - /qs.evaluation.v1.EvaluationService/*
+		//     denied_methods:
+		//       - /qs.admin.v1.AdminService/*
+		log.Infof("gRPC ACL: loading config from %s (not yet implemented)", configFile)
+	}
+
+	return basegrpc.NewServiceACL(cfg)
 }
 
 // RegisterService 注册服务

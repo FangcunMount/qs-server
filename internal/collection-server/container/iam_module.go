@@ -141,9 +141,9 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	if opts.JWKS != nil {
 		iamOpts.JWKS = &iam.JWKSOptions{
 			URL:             opts.JWKS.URL,
+			GRPCEndpoint:    opts.JWKS.GRPCEndpoint, // gRPC 降级端点
 			RefreshInterval: opts.JWKS.RefreshInterval,
 			CacheTTL:        opts.JWKS.CacheTTL,
-			FetchStrategies: opts.JWKS.FetchStrategies,
 		}
 	}
 

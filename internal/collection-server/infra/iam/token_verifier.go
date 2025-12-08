@@ -45,12 +45,13 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 	if config.JWKSEnabled && config.JWKS != nil {
 		jwksCfg = &sdk.JWKSConfig{
 			URL:             config.JWKS.URL,
+			GRPCEndpoint:    config.JWKS.GRPCEndpoint, // gRPC 降级端点
 			RefreshInterval: config.JWKS.RefreshInterval,
 			CacheTTL:        config.JWKS.CacheTTL,
 			FallbackOnError: true, // 失败时使用缓存
 		}
-		log.Infof("JWKS enabled: URL=%s, RefreshInterval=%v, CacheTTL=%v",
-			config.JWKS.URL, config.JWKS.RefreshInterval, config.JWKS.CacheTTL)
+		log.Infof("JWKS enabled: URL=%s, GRPCEndpoint=%s, RefreshInterval=%v, CacheTTL=%v",
+			config.JWKS.URL, config.JWKS.GRPCEndpoint, config.JWKS.RefreshInterval, config.JWKS.CacheTTL)
 	} else {
 		log.Warn("JWKS disabled, will use remote verification only")
 	}

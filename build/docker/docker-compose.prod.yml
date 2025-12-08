@@ -17,8 +17,8 @@ services:
       # Web 证书（HTTPS REST API）
       - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
       - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
-      # gRPC mTLS 证书（包含与 IAM 通信的证书）
-      - /data/infra/ssl/grpc:/etc/qs-server/grpc:ro
+      # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl:ro
     command: ["--config=/app/configs/apiserver.prod.yaml"]
     deploy:
       resources:
@@ -44,8 +44,8 @@ services:
       # Web 证书（HTTPS REST API）
       - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
       - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
-      # gRPC mTLS 证书（包含与 IAM/apiserver 通信的证书）
-      - /data/infra/ssl/grpc:/etc/qs-server/grpc:ro
+      # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl:ro
     command: ["--config=/app/configs/collection-server.prod.yaml"]
     deploy:
       resources:

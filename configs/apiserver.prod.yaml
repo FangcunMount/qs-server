@@ -20,9 +20,9 @@ grpc:
   
   # 生产环境必须启用 TLS
   insecure: false
-  # 证书路径（容器内路径，由 CI/CD 从宿主机挂载）
-  tls-cert-file: "/etc/qs-server/grpc/server/qs-apiserver.crt"
-  tls-key-file: "/etc/qs-server/grpc/server/qs-apiserver.key"
+  # 证书路径（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
+  tls-cert-file: "/etc/qs-server/ssl/server/qs-apiserver.crt"
+  tls-key-file: "/etc/qs-server/ssl/server/qs-apiserver.key"
   
   # 消息大小限制
   max-msg-size: 4194304  # 4MB
@@ -34,7 +34,7 @@ grpc:
   # mTLS 双向认证配置（用于内部服务间通信）
   mtls:
     enabled: true
-    ca-file: "/etc/qs-server/grpc/ca/ca-chain.crt"  # CA 证书链（由 CI/CD 挂载）
+    ca-file: "/etc/qs-server/ssl/ca/ca-chain.crt"  # CA 证书链
     require-client-cert: true
     
     # 证书白名单：只允许这些服务访问
@@ -154,12 +154,12 @@ iam:
     timeout: 5s                   # 请求超时时间
     retry-max: 3                  # 最大重试次数
     
-    # mTLS 证书配置
+    # mTLS 证书配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
     tls:
       enabled: true               # 启用 mTLS 双向认证
-      ca-file: "/app/certs/ca/ca-chain.crt"           # CA 证书链（容器内挂载路径）
-      cert-file: "/app/certs/clients/qs.crt"          # QS 客户端证书
-      key-file: "/app/certs/clients/qs.key"           # QS 客户端私钥
+      ca-file: "/etc/qs-server/ssl/ca/ca-chain.crt"           # CA 证书链
+      cert-file: "/etc/qs-server/ssl/server/qs-apiserver.crt" # QS 客户端证书
+      key-file: "/etc/qs-server/ssl/server/qs-apiserver.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:
