@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	"github.com/FangcunMount/qs-server/internal/pkg/grpcserver"
+	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
 
@@ -19,7 +19,7 @@ type apiServer struct {
 	// 通用 API 服务器
 	genericAPIServer *genericapiserver.GenericAPIServer
 	// GRPC 服务器
-	grpcServer *grpcserver.Server
+	grpcServer *grpcpkg.Server
 	// 数据库管理器
 	dbManager *DatabaseManager
 	// Container 主容器
@@ -230,10 +230,10 @@ func buildGenericConfig(cfg *config.Config) (genericConfig *genericapiserver.Con
 	return
 }
 
-// buildGRPCServer 构建 GRPC 服务器
-func buildGRPCServer(cfg *config.Config) (*grpcserver.Server, error) {
+// buildGRPCServer 构建 GRPC 服务器（使用 component-base 提供的能力）
+func buildGRPCServer(cfg *config.Config) (*grpcpkg.Server, error) {
 	// 创建 GRPC 配置
-	grpcConfig := grpcserver.NewConfig()
+	grpcConfig := grpcpkg.NewConfig()
 
 	// 应用配置选项
 	if err := applyGRPCOptions(cfg, grpcConfig); err != nil {
@@ -245,16 +245,51 @@ func buildGRPCServer(cfg *config.Config) (*grpcserver.Server, error) {
 }
 
 // applyGRPCOptions 应用 GRPC 选项到配置
-func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcserver.Config) error {
+func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcpkg.Config) error {
+	opts := cfg.GRPCOptions
+
 	// 应用基本配置
-	grpcConfig.BindAddress = cfg.GRPCOptions.BindAddress
-	grpcConfig.BindPort = cfg.GRPCOptions.BindPort
+	grpcConfig.BindAddress = opts.BindAddress
+	grpcConfig.BindPort = opts.BindPort
+	grpcConfig.Insecure = opts.Insecure
 
 	// 应用 TLS 配置
-	if cfg.SecureServing != nil {
-		grpcConfig.TLSCertFile = cfg.SecureServing.TLS.CertFile
-		grpcConfig.TLSKeyFile = cfg.SecureServing.TLS.KeyFile
+	grpcConfig.TLSCertFile = opts.TLSCertFile
+	grpcConfig.TLSKeyFile = opts.TLSKeyFile
+
+	// 应用消息和连接配置
+	grpcConfig.MaxMsgSize = opts.MaxMsgSize
+	grpcConfig.MaxConnectionAge = opts.MaxConnectionAge
+	grpcConfig.MaxConnectionAgeGrace = opts.MaxConnectionAgeGrace
+
+	// 应用 mTLS 配置
+	if opts.MTLS != nil {
+		grpcConfig.MTLS.Enabled = opts.MTLS.Enabled
+		grpcConfig.MTLS.CAFile = opts.MTLS.CAFile
+		grpcConfig.MTLS.RequireClientCert = opts.MTLS.RequireClientCert
+		grpcConfig.MTLS.AllowedCNs = opts.MTLS.AllowedCNs
+		grpcConfig.MTLS.AllowedOUs = opts.MTLS.AllowedOUs
+		grpcConfig.MTLS.MinTLSVersion = opts.MTLS.MinTLSVersion
 	}
+
+	// 应用认证配置
+	if opts.Auth != nil {
+		grpcConfig.Auth.Enabled = opts.Auth.Enabled
+	}
+
+	// 应用 ACL 配置
+	if opts.ACL != nil {
+		grpcConfig.ACL.Enabled = opts.ACL.Enabled
+	}
+
+	// 应用审计配置
+	if opts.Audit != nil {
+		grpcConfig.Audit.Enabled = opts.Audit.Enabled
+	}
+
+	// 应用功能开关
+	grpcConfig.EnableReflection = opts.EnableReflection
+	grpcConfig.EnableHealthCheck = opts.EnableHealthCheck
 
 	return nil
 }

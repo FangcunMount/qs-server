@@ -13,24 +13,73 @@ server:
     middlewares: recovery,enhanced_logger,secure,nocache,cors
     max-ping-count: 3
 
-# GRPC 配置
+# gRPC 配置（生产环境 - 安全模式）
 grpc:
   bind-address: "0.0.0.0"
   bind-port: 9090
-  healthz-port: 9091
+  
+  # 生产环境必须启用 TLS
+  insecure: false
+  # 证书路径（容器内路径，由 CI/CD 从宿主机挂载）
+  tls-cert-file: "/etc/qs-server/grpc/server/qs-apiserver.crt"
+  tls-key-file: "/etc/qs-server/grpc/server/qs-apiserver.key"
+  
+  # 消息大小限制
+  max-msg-size: 4194304  # 4MB
+  
+  # 连接管理
+  max-connection-age: 120s
+  max-connection-age-grace: 20s
+  
+  # mTLS 双向认证配置（用于内部服务间通信）
+  mtls:
+    enabled: true
+    ca-file: "/etc/qs-server/grpc/ca/ca-chain.crt"  # CA 证书链（由 CI/CD 挂载）
+    require-client-cert: true
+    
+    # 证书白名单：只允许这些服务访问
+    allowed-cns:
+      - "collection-server"
+      - "evaluation-server"
+      - "admin-tool"
+    
+    # 组织单元白名单
+    allowed-ous:
+      - "qs-platform"
+      - "qs-ops"
+    
+    # TLS 版本控制
+    min-tls-version: "1.2"
+  
+  # 认证配置（如需对外暴露 gRPC API 时启用）
+  auth:
+    enabled: false  # 内部服务通信无需 JWT，mTLS 已提供身份验证
+  
+  # ACL 配置（未来扩展）
+  acl:
+    enabled: false
+  
+  # 审计配置（未来扩展）
+  audit:
+    enabled: false
+  
+  # 功能开关
+  enable-reflection: false    # 生产环境禁用反射（安全考虑）
+  enable-health-check: true   # 启用健康检查
 
 # 不安全服务配置（HTTP）
 insecure:
   bind-address: "0.0.0.0"
   bind-port: 8080
 
-# 安全服务配置（HTTPS）
+# 安全服务配置（HTTPS REST API - 供浏览器访问）
 secure:
   bind-address: "0.0.0.0"
   bind-port: 8443
   tls:
-    cert-file: "./configs/cert/qs-apiserver.crt"
-    private-key-file: "./configs/cert/qs-apiserver.key"
+    # Web 证书（容器内路径，由 docker-compose 从宿主机挂载）
+    cert-file: "/etc/qs-server/ssl/yangshujie.com.crt"
+    private-key-file: "/etc/qs-server/ssl/yangshujie.com.key"
 
 # MySQL 数据库配置
 mysql:

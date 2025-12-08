@@ -5,19 +5,26 @@ insecure:
   bind-address: "127.0.0.1"
   bind-port: 18083
 
-# 安全服务配置
+# 安全服务配置（HTTPS REST API - 供浏览器访问）
 secure:
   bind-address: "127.0.0.1"
   bind-port: 18443
   tls:
-    cert-file: "./configs/cert/collection-server.crt"
-    private-key-file: "./configs/cert/collection-server.key"
+    # 使用 Web 证书（用于浏览器 HTTPS 访问）
+    cert-file: "/data/infra/ssl/web/qs-collection.crt"
+    private-key-file: "/data/infra/ssl/web/qs-collection.key"
 
-# GRPC 客户端配置
+# gRPC 客户端配置（连接 apiserver - mTLS 测试模式）
 grpc_client:
   endpoint: "127.0.0.1:9090"
   timeout: 30
-  insecure: true
+  insecure: false  # 启用 TLS 进行 mTLS 测试
+  
+  # mTLS 客户端配置（使用 infra 项目生成的证书）
+  tls-cert-file: "/data/infra/ssl/grpc/server/qs-collection.crt"
+  tls-key-file: "/data/infra/ssl/grpc/server/qs-collection.key"
+  tls-ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"
+  tls-server-name: "qs-apiserver.svc"  # 必须与服务端证书的 CN 匹配
 
 # JWT 配置（已废弃，使用 IAM 统一认证）
 jwt:
@@ -36,12 +43,12 @@ iam:
     timeout: 30s
     retry-max: 3
     
-    # mTLS 配置
+    # mTLS 配置（开发环境示例，需要时启用）
     tls:
-      enabled: true   # 启用 mTLS 双向认证
-      ca-file: "/data/ssl/iam-contracts/grpc/ca/ca-chain.crt"     # CA 证书链（容器内挂载）
-      cert-file: "/data/ssl/iam-contracts/grpc/clients/qs.crt"    # QS 客户端证书
-      key-file: "/data/ssl/iam-contracts/grpc/clients/qs.key"     # QS 客户端私钥
+      enabled: false              # 开发环境禁用 mTLS（需要时改为 true）
+      ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链（infra 统一管理）
+      cert-file: "/data/infra/ssl/grpc/server/qs.crt"       # QS 客户端证书
+      key-file: "/data/infra/ssl/grpc/server/qs.key"        # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

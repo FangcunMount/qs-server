@@ -13,24 +13,65 @@ server:
     middlewares: recovery,enhanced_logger,secure,nocache,cors,dump # 加载的 gin 中间件列表，多个中间件，逗号(,)隔开
     max-ping-count: 3 # http 服务启动后，自检尝试次数，默认 3
 
-# GRPC 配置
+# gRPC 配置（开发环境 - mTLS 测试模式）
 grpc:
   bind-address: "127.0.0.1"
   bind-port: 9090
-  healthz-port: 9091
+  
+  # 启用 TLS 进行 mTLS 测试
+  insecure: false
+  tls-cert-file: "/data/infra/ssl/grpc/server/qs-apiserver.crt"
+  tls-key-file: "/data/infra/ssl/grpc/server/qs-apiserver.key"
+  
+  # 消息大小限制（可选）
+  max-msg-size: 4194304  # 4MB
+  
+  # 连接管理（可选）
+  max-connection-age: 120s
+  max-connection-age-grace: 20s
+  
+  # mTLS 双向认证配置（开发环境测试）
+  mtls:
+    enabled: true
+    ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"
+    require-client-cert: true
+    # 证书白名单：允许 collection-server 访问
+    allowed-cns:
+      - "qs-collection.svc"  # collection-server 的 CN
+      - "localhost"
+    allowed-ous:
+      - "QS"
+    min-tls-version: "1.2"
+  
+  # 认证配置（开发环境禁用）
+  auth:
+    enabled: false
+  
+  # ACL 配置（开发环境禁用）
+  acl:
+    enabled: false
+  
+  # 审计配置（开发环境禁用）
+  audit:
+    enabled: false
+  
+  # 功能开关
+  enable-reflection: true     # 启用反射，方便 grpcurl 调试
+  enable-health-check: true   # 启用健康检查
 
 # 不安全服务配置
 insecure:
   bind-address: "127.0.0.1"
   bind-port: 18082
 
-# 安全服务配置
+# 安全服务配置（HTTPS REST API - 供浏览器访问）
 secure:
   bind-address: "127.0.0.1"
   bind-port: 18442
   tls:
-    cert-file: "./configs/cert/qs-apiserver.crt"
-    private-key-file: "./configs/cert/qs-apiserver.key"
+    # 使用 Web 证书（用于浏览器 HTTPS 访问）
+    cert-file: "/data/infra/ssl/web/qs-apiserver.crt"
+    private-key-file: "/data/infra/ssl/web/qs-apiserver.key"
 
 # MySQL 数据库配置
 mysql:
@@ -130,7 +171,7 @@ log:
 # IAM 集成配置
 iam:
   # 功能开关（灰度发布控制）
-  enabled: true                   # 是否启用 IAM 集成（开发环境开启）
+  enabled: false                  # 开发环境禁用 IAM 集成（避免证书依赖）
   grpc-enabled: true              # 是否启用 gRPC 调用
   jwks-enabled: true              # 是否启用 JWKS 本地验签
   
@@ -140,12 +181,12 @@ iam:
     timeout: 5s                   # 请求超时时间
     retry-max: 3                  # 最大重试次数
     
-    # mTLS 证书配置
+    # mTLS 证书配置（开发环境示例，需要时启用）
     tls:
-      enabled: true               # 启用 mTLS 双向认证
-      ca-file: "/data/ssl/iam-contracts/grpc/ca/ca-chain.crt"            # CA 证书链（容器内挂载路径）
-      cert-file: "/data/ssl/iam-contracts/grpc/clients/qs.crt"           # QS 客户端证书
-      key-file: "/data/ssl/iam-contracts/grpc/clients/qs.key"            # QS 客户端私钥
+      enabled: false              # 开发环境禁用 mTLS（需要时改为 true）
+      ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链（infra 统一管理）
+      cert-file: "/data/infra/ssl/grpc/server/qs.crt"       # QS 客户端证书
+      key-file: "/data/infra/ssl/grpc/server/qs.key"        # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

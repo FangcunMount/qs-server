@@ -85,12 +85,16 @@ func (r *GRPCClientRegistry) registerEvaluationClient() error {
 }
 
 // CreateGRPCClientManager 创建 gRPC 客户端管理器
-func CreateGRPCClientManager(endpoint string, timeout int, insecure bool) (*grpcclient.Manager, error) {
+func CreateGRPCClientManager(endpoint string, timeout int, insecure bool, tlsCertFile, tlsKeyFile, tlsCAFile, tlsServerName string) (*grpcclient.Manager, error) {
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{
-		Endpoint: endpoint,
-		Timeout:  time.Duration(timeout) * time.Second,
-		Insecure: insecure,
-		PoolSize: 1,
+		Endpoint:      endpoint,
+		Timeout:       time.Duration(timeout) * time.Second,
+		Insecure:      insecure,
+		PoolSize:      1,
+		TLSCertFile:   tlsCertFile,
+		TLSKeyFile:    tlsKeyFile,
+		TLSCAFile:     tlsCAFile,
+		TLSServerName: tlsServerName,
 	})
 	if err != nil {
 		return nil, err

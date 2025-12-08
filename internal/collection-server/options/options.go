@@ -28,6 +28,12 @@ type GRPCClientOptions struct {
 	Endpoint string `json:"endpoint" mapstructure:"endpoint"`
 	Timeout  int    `json:"timeout"  mapstructure:"timeout"`  // 超时时间（秒）
 	Insecure bool   `json:"insecure" mapstructure:"insecure"` // 是否使用不安全连接
+
+	// TLS 配置
+	TLSCertFile   string `json:"tls_cert_file"   mapstructure:"tls-cert-file"`   // 客户端证书文件
+	TLSKeyFile    string `json:"tls_key_file"    mapstructure:"tls-key-file"`    // 客户端密钥文件
+	TLSCAFile     string `json:"tls_ca_file"     mapstructure:"tls-ca-file"`     // CA 证书文件
+	TLSServerName string `json:"tls_server_name" mapstructure:"tls-server-name"` // 服务端名称（用于验证）
 }
 
 // ConcurrencyOptions 并发处理配置

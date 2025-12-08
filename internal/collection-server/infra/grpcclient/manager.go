@@ -1,11 +1,16 @@
 package grpcclient
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -16,6 +21,12 @@ type ManagerConfig struct {
 	Insecure   bool          // 是否使用不安全连接（开发环境）
 	PoolSize   int           // 连接池大小（默认 1）
 	MaxRetries int           // 最大重试次数
+
+	// TLS 配置
+	TLSCertFile   string // 客户端证书文件
+	TLSKeyFile    string // 客户端密钥文件
+	TLSCAFile     string // CA 证书文件
+	TLSServerName string // 服务端名称（用于验证）
 }
 
 // Manager gRPC 客户端管理器，负责连接池管理和客户端缓存
@@ -65,7 +76,17 @@ func (m *Manager) connect() error {
 	}
 
 	if m.config.Insecure {
+		// 不安全连接（开发环境）
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		log.Warn("gRPC client: using insecure connection (not recommended for production)")
+	} else {
+		// 安全连接（TLS/mTLS）
+		creds, err := m.loadTLSCredentials()
+		if err != nil {
+			return err
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+		log.Info("gRPC client: using secure connection (TLS/mTLS)")
 	}
 
 	conn, err := grpc.NewClient(m.config.Endpoint, opts...)
@@ -75,6 +96,43 @@ func (m *Manager) connect() error {
 
 	m.conn = conn
 	return nil
+}
+
+// loadTLSCredentials 加载 TLS 凭证（支持 mTLS）
+func (m *Manager) loadTLSCredentials() (credentials.TransportCredentials, error) {
+	// 加载 CA 证书
+	caCert, err := os.ReadFile(m.config.TLSCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to add CA certificate to pool")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: certPool,
+	}
+
+	// 如果提供了服务端名称，用于验证
+	if m.config.TLSServerName != "" {
+		tlsConfig.ServerName = m.config.TLSServerName
+	}
+
+	// 如果提供了客户端证书，启用 mTLS
+	if m.config.TLSCertFile != "" && m.config.TLSKeyFile != "" {
+		clientCert, err := tls.LoadX509KeyPair(m.config.TLSCertFile, m.config.TLSKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{clientCert}
+		log.Info("gRPC client: mTLS enabled (client certificate loaded)")
+	} else {
+		log.Info("gRPC client: TLS enabled (one-way, no client certificate)")
+	}
+
+	return credentials.NewTLS(tlsConfig), nil
 }
 
 // RegisterClients 注册所有 gRPC 客户端

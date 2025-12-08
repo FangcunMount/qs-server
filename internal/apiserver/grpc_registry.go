@@ -4,17 +4,17 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/service"
-	"github.com/FangcunMount/qs-server/internal/pkg/grpcserver"
+	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 )
 
 // GRPCRegistry GRPC 服务注册器
 type GRPCRegistry struct {
-	server    *grpcserver.Server
+	server    *grpcpkg.Server
 	container *container.Container
 }
 
 // NewGRPCRegistry 创建 GRPC 服务注册器
-func NewGRPCRegistry(server *grpcserver.Server, container *container.Container) *GRPCRegistry {
+func NewGRPCRegistry(server *grpcpkg.Server, container *container.Container) *GRPCRegistry {
 	return &GRPCRegistry{
 		server:    server,
 		container: container,

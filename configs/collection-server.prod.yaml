@@ -10,14 +10,21 @@ secure:
   bind-address: "0.0.0.0"
   bind-port: 8443
   tls:
-    cert-file: "./configs/cert/collection-server.crt"
-    private-key-file: "./configs/cert/collection-server.key"
+    # Web 证书（容器内路径，由 docker-compose 从宿主机挂载）
+    cert-file: "/etc/qs-server/ssl/yangshujie.com.crt"
+    private-key-file: "/etc/qs-server/ssl/yangshujie.com.key"
 
-# GRPC 客户端配置
+# gRPC 客户端配置（连接 apiserver）
 grpc_client:
   endpoint: "apiserver:9090"  # 生产部署请根据服务发现或网关调整
   timeout: 30
-  insecure: true
+  insecure: false  # 生产环境启用 TLS
+  
+  # mTLS 客户端配置（证书由 CI/CD 从宿主机挂载到容器）
+  tls-cert-file: "/etc/qs-server/grpc/server/qs-collection.crt"
+  tls-key-file: "/etc/qs-server/grpc/server/qs-collection.key"
+  tls-ca-file: "/etc/qs-server/grpc/ca/ca-chain.crt"
+  tls-server-name: "qs-apiserver"  # 服务端证书的 CN，用于验证
 
 # JWT 配置（已废弃，使用 IAM 统一认证）
 jwt:
@@ -36,12 +43,12 @@ iam:
     timeout: 30s
     retry-max: 3
     
-    # mTLS 配置（生产环境建议启用）
+    # mTLS 配置（生产环境建议启用，证书由 CI/CD 挂载）
     tls:
       enabled: true   # 启用 mTLS 双向认证
-      ca-file: "/app/certs/ca/ca-chain.crt"     # CA 证书链（容器内挂载）
-      cert-file: "/app/certs/clients/qs.crt"    # QS 客户端证书
-      key-file: "/app/certs/clients/qs.key"     # QS 客户端私钥
+      ca-file: "/etc/qs-server/grpc/ca/ca-chain.crt"        # CA 证书链
+      cert-file: "/etc/qs-server/grpc/server/qs.crt"        # QS 客户端证书（调用 IAM）
+      key-file: "/etc/qs-server/grpc/server/qs.key"         # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

@@ -81,6 +81,10 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		s.config.GRPCClient.Endpoint,
 		s.config.GRPCClient.Timeout,
 		s.config.GRPCClient.Insecure,
+		s.config.GRPCClient.TLSCertFile,
+		s.config.GRPCClient.TLSKeyFile,
+		s.config.GRPCClient.TLSCAFile,
+		s.config.GRPCClient.TLSServerName,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create gRPC client manager: %v", err)

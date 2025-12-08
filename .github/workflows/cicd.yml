@@ -634,21 +634,25 @@ jobs:
               exit 1
             fi
 
-            # 证书路径
+            # 证书路径检查（docker-compose 会自动挂载）
             CERT_HOST_PATH="/data/ssl/certs/yangshujie.com.crt"
             KEY_HOST_PATH="/data/ssl/private/yangshujie.com.key"
+            GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
             if ! $SUDO test -r "$CERT_HOST_PATH"; then
-              echo "❌ CERT not readable: $CERT_HOST_PATH"
+              echo "❌ Web CERT not readable: $CERT_HOST_PATH"
               exit 1
             fi
             if ! $SUDO test -r "$KEY_HOST_PATH"; then
-              echo "❌ KEY not readable: $KEY_HOST_PATH"
+              echo "❌ Web KEY not readable: $KEY_HOST_PATH"
+              exit 1
+            fi
+            if ! $SUDO test -d "$GRPC_CERT_DIR"; then
+              echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
 
-            TLS_MOUNTS="-v $CERT_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.crt:ro \
-                        -v $KEY_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.key:ro"
+            echo "✅ All certificate paths verified"
 
             # GHCR 登录
             if [ -n "${GHCR_TOKEN:-}" ]; then
@@ -901,17 +905,21 @@ jobs:
               exit 1
             fi
 
-            # 证书
+            # 证书路径检查（docker-compose 会自动挂载）
             CERT_HOST_PATH="/data/ssl/certs/yangshujie.com.crt"
             KEY_HOST_PATH="/data/ssl/private/yangshujie.com.key"
+            GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
             if ! $SUDO test -r "$CERT_HOST_PATH" || ! $SUDO test -r "$KEY_HOST_PATH"; then
-              echo "❌ TLS certificates not found"
+              echo "❌ Web certificates not found"
+              exit 1
+            fi
+            if ! $SUDO test -d "$GRPC_CERT_DIR"; then
+              echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
 
-            TLS_MOUNTS="-v $CERT_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.crt:ro \
-                        -v $KEY_HOST_PATH:/etc/qs-server/ssl/yangshujie.com.key:ro"
+            echo "✅ All certificate paths verified"
 
             # 登录 GHCR
             if [ -n "${GHCR_TOKEN:-}" ]; then
