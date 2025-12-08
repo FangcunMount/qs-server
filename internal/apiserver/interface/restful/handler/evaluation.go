@@ -378,10 +378,15 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 // ============= 辅助方法 =============
 
 // getOrgIDFromContext 从上下文获取组织ID
-// 实际项目中应从认证中间件中获取
+// 优先从 JWT claims 的 TenantID 获取，降级到 Header/Query
 func (h *EvaluationHandler) getOrgIDFromContext(c *gin.Context) uint64 {
-	// TODO: 从认证信息中获取 OrgID
-	// 这里暂时从 header 或 query 中获取
+	// 优先从 JWT claims 获取（由 UserIdentityMiddleware 设置）
+	orgID := h.GetOrgID(c)
+	if orgID > 0 {
+		return orgID
+	}
+
+	// 降级：从 header 或 query 中获取（兼容旧代码）
 	orgIDStr := c.GetHeader("X-Org-ID")
 	if orgIDStr == "" {
 		orgIDStr = c.Query("org_id")
@@ -390,6 +395,6 @@ func (h *EvaluationHandler) getOrgIDFromContext(c *gin.Context) uint64 {
 		return 0
 	}
 
-	orgID, _ := strconv.ParseUint(orgIDStr, 10, 64)
+	orgID, _ = strconv.ParseUint(orgIDStr, 10, 64)
 	return orgID
 }

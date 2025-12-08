@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -71,6 +72,8 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
 		if tokenVerifier != nil {
 			apiV1.Use(middleware.JWTAuthMiddleware(tokenVerifier))
+			// 添加用户身份解析中间件：从 JWT claims 提取 UserID、OrgID、Roles
+			apiV1.Use(restmiddleware.UserIdentityMiddleware())
 			fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1 (local JWKS verification)\n")
 		} else {
 			fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled!\n")

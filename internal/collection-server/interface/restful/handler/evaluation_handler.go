@@ -11,21 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TesteeIDKey 受试者ID在context中的key
-const TesteeIDKey = "testee_id"
-
-// GetTesteeID 从 gin.Context 获取受试者ID
-func GetTesteeID(c *gin.Context) uint64 {
-	val, exists := c.Get(TesteeIDKey)
-	if !exists {
-		return 0
-	}
-	if id, ok := val.(uint64); ok {
-		return id
-	}
-	return 0
-}
-
 // EvaluationHandler 测评处理器
 type EvaluationHandler struct {
 	queryService *evaluation.QueryService
@@ -44,6 +29,7 @@ func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHand
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
 // @Success 200 {object} evaluation.AssessmentDetailResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
@@ -51,9 +37,15 @@ func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHand
 // @Security Bearer
 // @Router /api/v1/assessments/{id} [get]
 func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
-	testeeID := GetTesteeID(c)
-	if testeeID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "testee not authenticated"), nil)
+	// 从 query 参数获取 testee_id（监护关系验证已在中间件完成，或由业务逻辑验证）
+	testeeIDStr := c.Query("testee_id")
+	if testeeIDStr == "" {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
 
@@ -83,6 +75,7 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 // @Description 分页获取当前用户的测评列表
 // @Tags 测评
 // @Produce json
+// @Param testee_id query int true "受试者ID"
 // @Param status query string false "状态筛选"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
@@ -92,9 +85,15 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments [get]
 func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
-	testeeID := GetTesteeID(c)
-	if testeeID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "testee not authenticated"), nil)
+	// 从 query 参数获取 testee_id
+	testeeIDStr := c.Query("testee_id")
+	if testeeIDStr == "" {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
 
@@ -119,15 +118,22 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
 // @Success 200 {array} evaluation.FactorScoreResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
-	testeeID := GetTesteeID(c)
-	if testeeID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "testee not authenticated"), nil)
+	// 从 query 参数获取 testee_id
+	testeeIDStr := c.Query("testee_id")
+	if testeeIDStr == "" {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
 
@@ -153,6 +159,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
 // @Success 200 {object} evaluation.AssessmentReportResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
@@ -160,9 +167,15 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
-	testeeID := GetTesteeID(c)
-	if testeeID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "testee not authenticated"), nil)
+	// 从 query 参数获取 testee_id
+	testeeIDStr := c.Query("testee_id")
+	if testeeIDStr == "" {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
 
@@ -192,6 +205,7 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 // @Description 获取指定因子的历史得分趋势
 // @Tags 测评
 // @Produce json
+// @Param testee_id query int true "受试者ID"
 // @Param factor_code query string true "因子编码"
 // @Param limit query int false "数据点数量" default(10)
 // @Success 200 {array} evaluation.TrendPointResponse
@@ -200,9 +214,15 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
-	testeeID := GetTesteeID(c)
-	if testeeID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "testee not authenticated"), nil)
+	// 从 query 参数获取 testee_id
+	testeeIDStr := c.Query("testee_id")
+	if testeeIDStr == "" {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
 
@@ -227,15 +247,22 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
 // @Success 200 {array} evaluation.FactorScoreResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/factors/high-risk [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
-	testeeID := GetTesteeID(c)
-	if testeeID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "testee not authenticated"), nil)
+	// 从 query 参数获取 testee_id
+	testeeIDStr := c.Query("testee_id")
+	if testeeIDStr == "" {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
 

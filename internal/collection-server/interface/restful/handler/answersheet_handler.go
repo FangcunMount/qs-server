@@ -6,25 +6,11 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
-
-// UserIDKey 用户ID在context中的key
-const UserIDKey = "user_id"
-
-// GetUserID 从 gin.Context 获取用户ID
-func GetUserID(c *gin.Context) uint64 {
-	val, exists := c.Get(UserIDKey)
-	if !exists {
-		return 0
-	}
-	if id, ok := val.(uint64); ok {
-		return id
-	}
-	return 0
-}
 
 // AnswerSheetHandler 答卷处理器
 type AnswerSheetHandler struct {
@@ -58,8 +44,8 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		return
 	}
 
-	// 从上下文获取当前用户ID
-	writerID := GetUserID(c)
+	// 从上下文获取当前用户ID（由 UserIdentityMiddleware 设置）
+	writerID := middleware.GetUserID(c)
 	if writerID == 0 {
 		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "user not authenticated"), nil)
 		return

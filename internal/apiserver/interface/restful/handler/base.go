@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -191,15 +192,35 @@ func (h *BaseHandler) GetQueryParamInt(c *gin.Context, key string, defaultValue 
 }
 
 // GetUserID 从上下文获取当前用户ID（需要认证中间件设置）
+// 返回 string 类型的 UserID（兼容旧代码）
 func (h *BaseHandler) GetUserID(c *gin.Context) (string, bool) {
-	userID, exists := c.Get("user_id")
-	if !exists || userID == nil {
+	userID := middleware.GetUserIDStr(c)
+	if userID == "" {
 		return "", false
 	}
+	return userID, true
+}
 
-	if id, ok := userID.(string); ok {
-		return id, true
+// GetUserIDUint64 从上下文获取当前用户ID（uint64 类型）
+func (h *BaseHandler) GetUserIDUint64(c *gin.Context) (uint64, bool) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		return 0, false
 	}
+	return userID, true
+}
 
-	return "", false
+// GetOrgID 从上下文获取组织ID（从 JWT TenantID 解析）
+func (h *BaseHandler) GetOrgID(c *gin.Context) uint64 {
+	return middleware.GetOrgID(c)
+}
+
+// GetRoles 从上下文获取用户角色列表
+func (h *BaseHandler) GetRoles(c *gin.Context) []string {
+	return middleware.GetRoles(c)
+}
+
+// HasRole 检查用户是否拥有指定角色
+func (h *BaseHandler) HasRole(c *gin.Context, role string) bool {
+	return middleware.HasRole(c, role)
 }
