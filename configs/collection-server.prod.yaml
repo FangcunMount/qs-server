@@ -11,8 +11,8 @@ secure:
   bind-port: 8443
   tls:
     # Web 证书（容器内路径，由 docker-compose 从宿主机挂载）
-    cert-file: "/etc/qs-server/ssl/yangshujie.com.crt"
-    private-key-file: "/etc/qs-server/ssl/yangshujie.com.key"
+    cert-file: "/etc/qs-server/ssl/certs/yangshujie.com.crt"
+    private-key-file: "/etc/qs-server/ssl/private/yangshujie.com.key"
 
 # gRPC 客户端配置（连接 apiserver）
 grpc_client:
@@ -21,9 +21,9 @@ grpc_client:
   insecure: false  # 生产环境启用 TLS
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
-  tls-cert-file: "/etc/qs-server/ssl/server/qs-collection.crt"
-  tls-key-file: "/etc/qs-server/ssl/server/qs-collection.key"
-  tls-ca-file: "/etc/qs-server/ssl/ca/ca-chain.crt"
+  tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection.crt"
+  tls-key-file: "/etc/qs-server/ssl/grpc/server/qs-collection.key"
+  tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
   tls-server-name: "qs-apiserver.svc"  # 服务端证书的 CN，用于验证
 
 # JWT 配置（已废弃，使用 IAM 统一认证）
@@ -50,9 +50,9 @@ iam:
     # mTLS 配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
     tls:
       enabled: true   # 启用 mTLS 双向认证
-      ca-file: "/etc/qs-server/ssl/ca/ca-chain.crt"           # CA 证书链
-      cert-file: "/etc/qs-server/ssl/server/qs-collection.crt" # QS 客户端证书（调用 IAM）
-      key-file: "/etc/qs-server/ssl/server/qs-collection.key"  # QS 客户端私钥
+      ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"           # CA 证书链
+      cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection.crt" # QS 客户端证书（调用 IAM）
+      key-file: "/etc/qs-server/ssl/grpc/server/qs-collection.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

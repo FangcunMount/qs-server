@@ -58,6 +58,10 @@ RUN mkdir -p /app/configs /app/logs && \
 # 预创建日志目录，避免默认路径在未挂载卷时因权限问题启动失败
 RUN mkdir -p /data/logs/qs && chown -R appuser:appuser /data/logs
 
+# 预创建 TLS 目录，便于以文件方式挂载证书/私钥
+RUN mkdir -p /etc/qs-server/ssl/ca /etc/qs-server/ssl/server && \
+    chown -R appuser:appuser /etc/qs-server/ssl
+
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/bin/qs-worker /app/qs-worker
 

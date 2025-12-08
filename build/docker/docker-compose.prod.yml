@@ -14,11 +14,11 @@ services:
     volumes:
       - /opt/qs-server/qs-apiserver/configs:/app/configs
       - /data/logs/qs-server/qs-apiserver:/data/logs/qs
-      # Web 证书（HTTPS REST API）
-      - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
-      - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
-      # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
-      - /data/infra/ssl/grpc:/etc/qs-server/ssl:ro
+      # 证书与密钥目录统一挂载（避免单文件挂载在只读目录内创建 mountpoint 失败）
+      - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
+      - /data/ssl/private:/etc/qs-server/ssl/private:ro
+      # gRPC mTLS 证书目录
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     command: ["--config=/app/configs/apiserver.prod.yaml"]
     deploy:
       resources:
@@ -41,11 +41,11 @@ services:
     volumes:
       - /opt/qs-server/qs-collection-server/configs:/app/configs
       - /data/logs/qs-server/qs-collection-server:/data/logs/qs
-      # Web 证书（HTTPS REST API）
-      - /data/ssl/certs/yangshujie.com.crt:/etc/qs-server/ssl/yangshujie.com.crt:ro
-      - /data/ssl/private/yangshujie.com.key:/etc/qs-server/ssl/yangshujie.com.key:ro
-      # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
-      - /data/infra/ssl/grpc:/etc/qs-server/ssl:ro
+      # 证书与密钥目录统一挂载
+      - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
+      - /data/ssl/private:/etc/qs-server/ssl/private:ro
+      # gRPC mTLS 证书目录
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     command: ["--config=/app/configs/collection-server.prod.yaml"]
     deploy:
       resources:
