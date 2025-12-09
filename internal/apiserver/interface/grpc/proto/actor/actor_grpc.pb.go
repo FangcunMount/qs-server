@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ActorService_CreateTestee_FullMethodName     = "/actor.ActorService/CreateTestee"
-	ActorService_GetTestee_FullMethodName        = "/actor.ActorService/GetTestee"
-	ActorService_UpdateTestee_FullMethodName     = "/actor.ActorService/UpdateTestee"
-	ActorService_TesteeExists_FullMethodName     = "/actor.ActorService/TesteeExists"
-	ActorService_ListTesteesByOrg_FullMethodName = "/actor.ActorService/ListTesteesByOrg"
+	ActorService_CreateTestee_FullMethodName      = "/actor.ActorService/CreateTestee"
+	ActorService_GetTestee_FullMethodName         = "/actor.ActorService/GetTestee"
+	ActorService_UpdateTestee_FullMethodName      = "/actor.ActorService/UpdateTestee"
+	ActorService_TesteeExists_FullMethodName      = "/actor.ActorService/TesteeExists"
+	ActorService_ListTesteesByOrg_FullMethodName  = "/actor.ActorService/ListTesteesByOrg"
+	ActorService_ListTesteesByUser_FullMethodName = "/actor.ActorService/ListTesteesByUser"
 )
 
 // ActorServiceClient is the client API for ActorService service.
@@ -43,6 +44,9 @@ type ActorServiceClient interface {
 	TesteeExists(ctx context.Context, in *TesteeExistsRequest, opts ...grpc.CallOption) (*TesteeExistsResponse, error)
 	// ListTesteesByOrg 根据机构查询受试者列表
 	ListTesteesByOrg(ctx context.Context, in *ListTesteesByOrgRequest, opts ...grpc.CallOption) (*TesteeListResponse, error)
+	// ListTesteesByUser 根据用户（监护人）查询受试者列表
+	// 用于 collection-server 查询当前用户的受试者
+	ListTesteesByUser(ctx context.Context, in *ListTesteesByUserRequest, opts ...grpc.CallOption) (*TesteeListResponse, error)
 }
 
 type actorServiceClient struct {
@@ -103,6 +107,16 @@ func (c *actorServiceClient) ListTesteesByOrg(ctx context.Context, in *ListTeste
 	return out, nil
 }
 
+func (c *actorServiceClient) ListTesteesByUser(ctx context.Context, in *ListTesteesByUserRequest, opts ...grpc.CallOption) (*TesteeListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TesteeListResponse)
+	err := c.cc.Invoke(ctx, ActorService_ListTesteesByUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ActorServiceServer is the server API for ActorService service.
 // All implementations must embed UnimplementedActorServiceServer
 // for forward compatibility.
@@ -120,6 +134,9 @@ type ActorServiceServer interface {
 	TesteeExists(context.Context, *TesteeExistsRequest) (*TesteeExistsResponse, error)
 	// ListTesteesByOrg 根据机构查询受试者列表
 	ListTesteesByOrg(context.Context, *ListTesteesByOrgRequest) (*TesteeListResponse, error)
+	// ListTesteesByUser 根据用户（监护人）查询受试者列表
+	// 用于 collection-server 查询当前用户的受试者
+	ListTesteesByUser(context.Context, *ListTesteesByUserRequest) (*TesteeListResponse, error)
 	mustEmbedUnimplementedActorServiceServer()
 }
 
@@ -144,6 +161,9 @@ func (UnimplementedActorServiceServer) TesteeExists(context.Context, *TesteeExis
 }
 func (UnimplementedActorServiceServer) ListTesteesByOrg(context.Context, *ListTesteesByOrgRequest) (*TesteeListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListTesteesByOrg not implemented")
+}
+func (UnimplementedActorServiceServer) ListTesteesByUser(context.Context, *ListTesteesByUserRequest) (*TesteeListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTesteesByUser not implemented")
 }
 func (UnimplementedActorServiceServer) mustEmbedUnimplementedActorServiceServer() {}
 func (UnimplementedActorServiceServer) testEmbeddedByValue()                      {}
@@ -256,6 +276,24 @@ func _ActorService_ListTesteesByOrg_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ActorService_ListTesteesByUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTesteesByUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActorServiceServer).ListTesteesByUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActorService_ListTesteesByUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActorServiceServer).ListTesteesByUser(ctx, req.(*ListTesteesByUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ActorService_ServiceDesc is the grpc.ServiceDesc for ActorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -282,6 +320,10 @@ var ActorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTesteesByOrg",
 			Handler:    _ActorService_ListTesteesByOrg_Handler,
+		},
+		{
+			MethodName: "ListTesteesByUser",
+			Handler:    _ActorService_ListTesteesByUser_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

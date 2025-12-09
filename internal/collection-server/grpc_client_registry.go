@@ -41,6 +41,11 @@ func (r *GRPCClientRegistry) RegisterClients() error {
 		return err
 	}
 
+	// 注册 Actor 客户端
+	if err := r.registerActorClient(); err != nil {
+		return err
+	}
+
 	log.Info("✅ All gRPC clients registered to container")
 	return nil
 }
@@ -81,6 +86,19 @@ func (r *GRPCClientRegistry) registerEvaluationClient() error {
 
 	r.container.SetEvaluationClient(client)
 	log.Info("   📊 Evaluation client injected to container")
+	return nil
+}
+
+// registerActorClient 注册 Actor 客户端
+func (r *GRPCClientRegistry) registerActorClient() error {
+	client := r.manager.ActorClient()
+	if client == nil {
+		log.Warn("Actor client is not initialized, skipping registration")
+		return nil
+	}
+
+	r.container.SetActorClient(client)
+	log.Info("   👤 Actor client injected to container")
 	return nil
 }
 

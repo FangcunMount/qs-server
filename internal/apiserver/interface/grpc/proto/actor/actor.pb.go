@@ -428,6 +428,68 @@ func (x *ListTesteesByOrgRequest) GetLimit() int32 {
 	return 0
 }
 
+// ListTesteesByUserRequest 根据用户（监护人）查询受试者列表请求
+// 通过传入监护人的所有孩子ID列表来查询
+type ListTesteesByUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IamChildIds   []uint64               `protobuf:"varint,1,rep,packed,name=iam_child_ids,json=iamChildIds,proto3" json:"iam_child_ids,omitempty"` // IAM儿童ID列表（监护人的所有孩子）
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`                                       // 偏移量
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                                         // 限制数量
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTesteesByUserRequest) Reset() {
+	*x = ListTesteesByUserRequest{}
+	mi := &file_actor_actor_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTesteesByUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTesteesByUserRequest) ProtoMessage() {}
+
+func (x *ListTesteesByUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_actor_actor_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTesteesByUserRequest.ProtoReflect.Descriptor instead.
+func (*ListTesteesByUserRequest) Descriptor() ([]byte, []int) {
+	return file_actor_actor_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListTesteesByUserRequest) GetIamChildIds() []uint64 {
+	if x != nil {
+		return x.IamChildIds
+	}
+	return nil
+}
+
+func (x *ListTesteesByUserRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *ListTesteesByUserRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
@@ -451,7 +513,7 @@ type TesteeResponse struct {
 
 func (x *TesteeResponse) Reset() {
 	*x = TesteeResponse{}
-	mi := &file_actor_actor_proto_msgTypes[6]
+	mi := &file_actor_actor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -463,7 +525,7 @@ func (x *TesteeResponse) String() string {
 func (*TesteeResponse) ProtoMessage() {}
 
 func (x *TesteeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_actor_actor_proto_msgTypes[6]
+	mi := &file_actor_actor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -476,7 +538,7 @@ func (x *TesteeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TesteeResponse.ProtoReflect.Descriptor instead.
 func (*TesteeResponse) Descriptor() ([]byte, []int) {
-	return file_actor_actor_proto_rawDescGZIP(), []int{6}
+	return file_actor_actor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TesteeResponse) GetId() uint64 {
@@ -582,7 +644,7 @@ type AssessmentStats struct {
 
 func (x *AssessmentStats) Reset() {
 	*x = AssessmentStats{}
-	mi := &file_actor_actor_proto_msgTypes[7]
+	mi := &file_actor_actor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -594,7 +656,7 @@ func (x *AssessmentStats) String() string {
 func (*AssessmentStats) ProtoMessage() {}
 
 func (x *AssessmentStats) ProtoReflect() protoreflect.Message {
-	mi := &file_actor_actor_proto_msgTypes[7]
+	mi := &file_actor_actor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -607,7 +669,7 @@ func (x *AssessmentStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssessmentStats.ProtoReflect.Descriptor instead.
 func (*AssessmentStats) Descriptor() ([]byte, []int) {
-	return file_actor_actor_proto_rawDescGZIP(), []int{7}
+	return file_actor_actor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AssessmentStats) GetTotalCount() int32 {
@@ -642,7 +704,7 @@ type TesteeListResponse struct {
 
 func (x *TesteeListResponse) Reset() {
 	*x = TesteeListResponse{}
-	mi := &file_actor_actor_proto_msgTypes[8]
+	mi := &file_actor_actor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +716,7 @@ func (x *TesteeListResponse) String() string {
 func (*TesteeListResponse) ProtoMessage() {}
 
 func (x *TesteeListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_actor_actor_proto_msgTypes[8]
+	mi := &file_actor_actor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +729,7 @@ func (x *TesteeListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TesteeListResponse.ProtoReflect.Descriptor instead.
 func (*TesteeListResponse) Descriptor() ([]byte, []int) {
-	return file_actor_actor_proto_rawDescGZIP(), []int{8}
+	return file_actor_actor_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *TesteeListResponse) GetItems() []*TesteeResponse {
@@ -721,6 +783,10 @@ const file_actor_actor_proto_rawDesc = "" +
 	"\x17ListTesteesByOrgRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"l\n" +
+	"\x18ListTesteesByUserRequest\x12\"\n" +
+	"\riam_child_ids\x18\x01 \x03(\x04R\viamChildIds\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\"\xe4\x03\n" +
 	"\x0eTesteeResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x15\n" +
@@ -748,13 +814,14 @@ const file_actor_actor_proto_rawDesc = "" +
 	"\x0flast_risk_level\x18\x03 \x01(\tR\rlastRiskLevel\"W\n" +
 	"\x12TesteeListResponse\x12+\n" +
 	"\x05items\x18\x01 \x03(\v2\x15.actor.TesteeResponseR\x05items\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total2\xe9\x02\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total2\xba\x03\n" +
 	"\fActorService\x12A\n" +
 	"\fCreateTestee\x12\x1a.actor.CreateTesteeRequest\x1a\x15.actor.TesteeResponse\x12;\n" +
 	"\tGetTestee\x12\x17.actor.GetTesteeRequest\x1a\x15.actor.TesteeResponse\x12A\n" +
 	"\fUpdateTestee\x12\x1a.actor.UpdateTesteeRequest\x1a\x15.actor.TesteeResponse\x12G\n" +
 	"\fTesteeExists\x12\x1a.actor.TesteeExistsRequest\x1a\x1b.actor.TesteeExistsResponse\x12M\n" +
-	"\x10ListTesteesByOrg\x12\x1e.actor.ListTesteesByOrgRequest\x1a\x19.actor.TesteeListResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actorb\x06proto3"
+	"\x10ListTesteesByOrg\x12\x1e.actor.ListTesteesByOrgRequest\x1a\x19.actor.TesteeListResponse\x12O\n" +
+	"\x11ListTesteesByUser\x12\x1f.actor.ListTesteesByUserRequest\x1a\x19.actor.TesteeListResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actorb\x06proto3"
 
 var (
 	file_actor_actor_proto_rawDescOnce sync.Once
@@ -768,40 +835,43 @@ func file_actor_actor_proto_rawDescGZIP() []byte {
 	return file_actor_actor_proto_rawDescData
 }
 
-var file_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_actor_actor_proto_goTypes = []any{
-	(*CreateTesteeRequest)(nil),     // 0: actor.CreateTesteeRequest
-	(*GetTesteeRequest)(nil),        // 1: actor.GetTesteeRequest
-	(*UpdateTesteeRequest)(nil),     // 2: actor.UpdateTesteeRequest
-	(*TesteeExistsRequest)(nil),     // 3: actor.TesteeExistsRequest
-	(*TesteeExistsResponse)(nil),    // 4: actor.TesteeExistsResponse
-	(*ListTesteesByOrgRequest)(nil), // 5: actor.ListTesteesByOrgRequest
-	(*TesteeResponse)(nil),          // 6: actor.TesteeResponse
-	(*AssessmentStats)(nil),         // 7: actor.AssessmentStats
-	(*TesteeListResponse)(nil),      // 8: actor.TesteeListResponse
-	(*timestamppb.Timestamp)(nil),   // 9: google.protobuf.Timestamp
+	(*CreateTesteeRequest)(nil),      // 0: actor.CreateTesteeRequest
+	(*GetTesteeRequest)(nil),         // 1: actor.GetTesteeRequest
+	(*UpdateTesteeRequest)(nil),      // 2: actor.UpdateTesteeRequest
+	(*TesteeExistsRequest)(nil),      // 3: actor.TesteeExistsRequest
+	(*TesteeExistsResponse)(nil),     // 4: actor.TesteeExistsResponse
+	(*ListTesteesByOrgRequest)(nil),  // 5: actor.ListTesteesByOrgRequest
+	(*ListTesteesByUserRequest)(nil), // 6: actor.ListTesteesByUserRequest
+	(*TesteeResponse)(nil),           // 7: actor.TesteeResponse
+	(*AssessmentStats)(nil),          // 8: actor.AssessmentStats
+	(*TesteeListResponse)(nil),       // 9: actor.TesteeListResponse
+	(*timestamppb.Timestamp)(nil),    // 10: google.protobuf.Timestamp
 }
 var file_actor_actor_proto_depIdxs = []int32{
-	9,  // 0: actor.CreateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
-	9,  // 1: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
-	9,  // 2: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
-	7,  // 3: actor.TesteeResponse.assessment_stats:type_name -> actor.AssessmentStats
-	9,  // 4: actor.TesteeResponse.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: actor.TesteeResponse.updated_at:type_name -> google.protobuf.Timestamp
-	9,  // 6: actor.AssessmentStats.last_assessment_at:type_name -> google.protobuf.Timestamp
-	6,  // 7: actor.TesteeListResponse.items:type_name -> actor.TesteeResponse
+	10, // 0: actor.CreateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
+	10, // 1: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
+	10, // 2: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
+	8,  // 3: actor.TesteeResponse.assessment_stats:type_name -> actor.AssessmentStats
+	10, // 4: actor.TesteeResponse.created_at:type_name -> google.protobuf.Timestamp
+	10, // 5: actor.TesteeResponse.updated_at:type_name -> google.protobuf.Timestamp
+	10, // 6: actor.AssessmentStats.last_assessment_at:type_name -> google.protobuf.Timestamp
+	7,  // 7: actor.TesteeListResponse.items:type_name -> actor.TesteeResponse
 	0,  // 8: actor.ActorService.CreateTestee:input_type -> actor.CreateTesteeRequest
 	1,  // 9: actor.ActorService.GetTestee:input_type -> actor.GetTesteeRequest
 	2,  // 10: actor.ActorService.UpdateTestee:input_type -> actor.UpdateTesteeRequest
 	3,  // 11: actor.ActorService.TesteeExists:input_type -> actor.TesteeExistsRequest
 	5,  // 12: actor.ActorService.ListTesteesByOrg:input_type -> actor.ListTesteesByOrgRequest
-	6,  // 13: actor.ActorService.CreateTestee:output_type -> actor.TesteeResponse
-	6,  // 14: actor.ActorService.GetTestee:output_type -> actor.TesteeResponse
-	6,  // 15: actor.ActorService.UpdateTestee:output_type -> actor.TesteeResponse
-	4,  // 16: actor.ActorService.TesteeExists:output_type -> actor.TesteeExistsResponse
-	8,  // 17: actor.ActorService.ListTesteesByOrg:output_type -> actor.TesteeListResponse
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
+	6,  // 13: actor.ActorService.ListTesteesByUser:input_type -> actor.ListTesteesByUserRequest
+	7,  // 14: actor.ActorService.CreateTestee:output_type -> actor.TesteeResponse
+	7,  // 15: actor.ActorService.GetTestee:output_type -> actor.TesteeResponse
+	7,  // 16: actor.ActorService.UpdateTestee:output_type -> actor.TesteeResponse
+	4,  // 17: actor.ActorService.TesteeExists:output_type -> actor.TesteeExistsResponse
+	9,  // 18: actor.ActorService.ListTesteesByOrg:output_type -> actor.TesteeListResponse
+	9,  // 19: actor.ActorService.ListTesteesByUser:output_type -> actor.TesteeListResponse
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -818,7 +888,7 @@ func file_actor_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_actor_actor_proto_rawDesc), len(file_actor_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

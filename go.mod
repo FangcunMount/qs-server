@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/FangcunMount/component-base v0.3.8
-	github.com/FangcunMount/iam-contracts v0.0.5
+	github.com/FangcunMount/iam-contracts v0.0.6
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
@@ -110,7 +110,7 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/protobuf v1.36.10
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -135,5 +135,5 @@ require (
 	golang.org/x/sync v0.18.0
 	golang.org/x/time v0.12.0
 	google.golang.org/grpc v1.77.0
-	gorm.io/driver/mysql v1.6.0 // indirect
+	gorm.io/driver/mysql v1.6.0
 )

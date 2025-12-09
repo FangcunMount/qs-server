@@ -5,7 +5,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	redis "github.com/redis/go-redis/v9"
@@ -25,16 +27,19 @@ type Container struct {
 	answerSheetClient   *grpcclient.AnswerSheetClient
 	questionnaireClient *grpcclient.QuestionnaireClient
 	evaluationClient    *grpcclient.EvaluationClient
+	actorClient         *grpcclient.ActorClient
 
 	// 应用层服务
 	submissionService         *answersheet.SubmissionService
 	questionnaireQueryService *questionnaire.QueryService
 	evaluationQueryService    *evaluation.QueryService
+	testeeService             *testee.Service
 
 	// 接口层处理器
 	answerSheetHandler   *handler.AnswerSheetHandler
 	questionnaireHandler *handler.QuestionnaireHandler
 	evaluationHandler    *handler.EvaluationHandler
+	testeeHandler        *handler.TesteeHandler
 	healthHandler        *handler.HealthHandler
 }
 
@@ -75,6 +80,7 @@ func (c *Container) initApplicationServices() {
 	c.submissionService = answersheet.NewSubmissionService(c.answerSheetClient)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient)
+	c.testeeService = testee.NewService(c.actorClient)
 
 	log.Info("✅ Application services initialized")
 }
@@ -83,9 +89,16 @@ func (c *Container) initApplicationServices() {
 func (c *Container) initHandlers() {
 	log.Info("🌐 Initializing REST handlers...")
 
+	// 获取 GuardianshipService（如果 IAM 启用）
+	var guardianshipService *iam.GuardianshipService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		guardianshipService = c.IAMModule.GuardianshipService()
+	}
+
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService)
+	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, guardianshipService)
 	c.healthHandler = handler.NewHealthHandler("collection-server", "2.0.0")
 
 	log.Info("✅ REST handlers initialized")
@@ -126,6 +139,11 @@ func (c *Container) EvaluationHandler() *handler.EvaluationHandler {
 	return c.evaluationHandler
 }
 
+// TesteeHandler 获取受试者处理器
+func (c *Container) TesteeHandler() *handler.TesteeHandler {
+	return c.testeeHandler
+}
+
 // ==================== Setters (用于 GRPCClientRegistry 注入) ====================
 
 // SetAnswerSheetClient 设置答卷客户端
@@ -141,4 +159,14 @@ func (c *Container) SetQuestionnaireClient(client *grpcclient.QuestionnaireClien
 // SetEvaluationClient 设置测评客户端
 func (c *Container) SetEvaluationClient(client *grpcclient.EvaluationClient) {
 	c.evaluationClient = client
+}
+
+// SetActorClient 设置 Actor 客户端
+func (c *Container) SetActorClient(client *grpcclient.ActorClient) {
+	c.actorClient = client
+}
+
+// ActorClient 获取 Actor 客户端
+func (c *Container) ActorClient() *grpcclient.ActorClient {
+	return c.actorClient
 }

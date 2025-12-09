@@ -77,6 +77,10 @@ type TesteeQueryService interface {
 
 	// ListKeyFocus 列出重点关注的受试者
 	ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) (*TesteeListResult, error)
+
+	// ListByProfileIDs 根据多个用户档案ID查询受试者列表
+	// 用于查询当前用户（监护人）的所有受试者
+	ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) (*TesteeListResult, error)
 }
 
 // ============= DTOs =============

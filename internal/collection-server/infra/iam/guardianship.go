@@ -77,6 +77,15 @@ func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (
 	})
 }
 
+// GetUserChildren 获取用户的所有儿童（便捷方法，SDK v0.0.6 新增）
+// 这是 ListChildren 的快捷方式，直接传入 userID 字符串
+func (s *GuardianshipService) GetUserChildren(ctx context.Context, userID string) (*identityv1.ListChildrenResponse, error) {
+	if !s.enabled {
+		return nil, fmt.Errorf("guardianship service not enabled")
+	}
+	return s.client.GetUserChildren(ctx, userID)
+}
+
 // ListGuardians 列出儿童的所有监护人
 func (s *GuardianshipService) ListGuardians(ctx context.Context, childID string) (*identityv1.ListGuardiansResponse, error) {
 	if !s.enabled {

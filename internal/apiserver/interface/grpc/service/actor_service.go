@@ -230,6 +230,33 @@ func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTestees
 	return s.toProtoTesteeListResponse(result), nil
 }
 
+// ListTesteesByUser 根据用户（监护人）查询受试者列表
+// @Description 查询指定用户（监护人）的所有受试者
+func (s *ActorService) ListTesteesByUser(ctx context.Context, req *pb.ListTesteesByUserRequest) (*pb.TesteeListResponse, error) {
+	if len(req.IamChildIds) == 0 {
+		return &pb.TesteeListResponse{
+			Items: []*pb.TesteeResponse{},
+			Total: 0,
+		}, nil
+	}
+
+	offset := int(req.Offset)
+	limit := int(req.Limit)
+
+	// 设置默认值
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	result, err := s.queryService.ListByProfileIDs(ctx, req.IamChildIds, offset, limit)
+	if err != nil {
+		log.Errorf("查询用户受试者列表失败: %v", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return s.toProtoTesteeListResponse(result), nil
+}
+
 // toProtoTesteeResponse 转换为 proto TesteeResponse
 func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) *pb.TesteeResponse {
 	if result == nil {

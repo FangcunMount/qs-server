@@ -126,3 +126,41 @@ func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, li
 		Limit:      limit,
 	}, nil
 }
+
+// ListByProfileIDs 根据多个用户档案ID查询受试者列表
+func (s *queryService) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) (*TesteeListResult, error) {
+	if len(profileIDs) == 0 {
+		return &TesteeListResult{
+			Items:      []*TesteeResult{},
+			TotalCount: 0,
+			Offset:     offset,
+			Limit:      limit,
+		}, nil
+	}
+
+	testees, err := s.repo.ListByProfileIDs(ctx, profileIDs, offset, limit)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list testees by profile IDs")
+	}
+
+	// 注意：这里的总数是所有 profileIDs 的受试者总数
+	// 为了精确计数，我们需要单独查询（不带分页）
+	allTestees, err := s.repo.ListByProfileIDs(ctx, profileIDs, 0, 999999)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count testees by profile IDs")
+	}
+	totalCount := int64(len(allTestees))
+
+	// 转换为 DTO
+	items := make([]*TesteeResult, len(testees))
+	for i, testee := range testees {
+		items[i] = toTesteeResult(testee)
+	}
+
+	return &TesteeListResult{
+		Items:      items,
+		TotalCount: totalCount,
+		Offset:     offset,
+		Limit:      limit,
+	}, nil
+}

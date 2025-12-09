@@ -31,6 +31,10 @@ type Repository interface {
 	// ListKeyFocus 列出重点关注的受试者
 	ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*Testee, error)
 
+	// ListByProfileIDs 根据多个用户档案ID查找受试者列表
+	// 用于按用户（监护人）查询其所有受试者
+	ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*Testee, error)
+
 	// Delete 删除受试者（软删除）
 	Delete(ctx context.Context, id ID) error
 

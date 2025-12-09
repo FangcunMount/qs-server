@@ -150,6 +150,27 @@ func (r *testeeRepository) ListKeyFocus(ctx context.Context, orgID int64, offset
 	return r.mapper.ToDomains(pos), nil
 }
 
+// ListByProfileIDs 根据多个用户档案ID查找受试者列表
+func (r *testeeRepository) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*testee.Testee, error) {
+	if len(profileIDs) == 0 {
+		return []*testee.Testee{}, nil
+	}
+
+	var pos []*TesteePO
+	err := r.WithContext(ctx).
+		Where("profile_id IN ? AND deleted_at IS NULL", profileIDs).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&pos).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r.mapper.ToDomains(pos), nil
+}
+
 // Delete 删除受试者（软删除）
 func (r *testeeRepository) Delete(ctx context.Context, id testee.ID) error {
 	return r.DeleteByID(ctx, uint64(id))

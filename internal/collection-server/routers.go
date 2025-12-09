@@ -105,6 +105,9 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 测评相关路由
 	r.registerEvaluationRoutes(api)
+
+	// 受试者相关路由
+	r.registerTesteeRoutes(api)
 }
 
 // registerQuestionnaireRoutes 注册问卷相关路由
@@ -147,5 +150,24 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		assessments.GET("/:id/scores", evaluationHandler.GetAssessmentScores)
 		// 测评报告
 		assessments.GET("/:id/report", evaluationHandler.GetAssessmentReport)
+	}
+}
+
+// registerTesteeRoutes 注册受试者相关路由
+func (r *Router) registerTesteeRoutes(api *gin.RouterGroup) {
+	testeeHandler := r.container.TesteeHandler()
+
+	testees := api.Group("/testees")
+	{
+		// 检查受试者是否存在（放在 :id 前面避免路由冲突）
+		testees.GET("/exists", testeeHandler.Exists)
+		// 创建受试者
+		testees.POST("", testeeHandler.Create)
+		// 查询受试者列表
+		testees.GET("", testeeHandler.List)
+		// 获取受试者详情
+		testees.GET("/:id", testeeHandler.Get)
+		// 更新受试者信息
+		testees.PUT("/:id", testeeHandler.Update)
 	}
 }

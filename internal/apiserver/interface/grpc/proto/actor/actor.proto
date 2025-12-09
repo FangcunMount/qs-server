@@ -25,6 +25,10 @@ service ActorService {
   
   // ListTesteesByOrg 根据机构查询受试者列表
   rpc ListTesteesByOrg(ListTesteesByOrgRequest) returns (TesteeListResponse);
+  
+  // ListTesteesByUser 根据用户（监护人）查询受试者列表
+  // 用于 collection-server 查询当前用户的受试者
+  rpc ListTesteesByUser(ListTesteesByUserRequest) returns (TesteeListResponse);
 }
 
 // ========== Testee 消息定义 ==========
@@ -72,6 +76,14 @@ message TesteeExistsResponse {
 // ListTesteesByOrgRequest 根据机构查询受试者列表请求
 message ListTesteesByOrgRequest {
   uint64 org_id = 1;                    // 机构ID
+  int32 offset = 2;                     // 偏移量
+  int32 limit = 3;                      // 限制数量
+}
+
+// ListTesteesByUserRequest 根据用户（监护人）查询受试者列表请求
+// 通过传入监护人的所有孩子ID列表来查询
+message ListTesteesByUserRequest {
+  repeated uint64 iam_child_ids = 1;    // IAM儿童ID列表（监护人的所有孩子）
   int32 offset = 2;                     // 偏移量
   int32 limit = 3;                      // 限制数量
 }
