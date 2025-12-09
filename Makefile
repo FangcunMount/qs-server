@@ -125,8 +125,8 @@ docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
 
 docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
 	@python -c "import yaml" 2>/dev/null || { echo "缺少 PyYAML，先执行: python -m pip install --quiet pyyaml"; exit 1; }
-	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:8081 --server https://api.example.com
-	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:8082 --server https://api.example.com
+	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:18082 --server https://qs.yangshujie.com
+	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:18083 --server https://collect.yangshujie.com
 
 docs-verify: docs-rest ## 对比 api/rest 与 swagger，检查是否有漂移
 	python scripts/compare_api_docs.py

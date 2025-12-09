@@ -141,6 +141,13 @@ const docTemplate = `{
                 "summary": "获取我的测评列表",
                 "parameters": [
                     {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "type": "string",
                         "description": "状态筛选",
                         "name": "status",
@@ -199,6 +206,13 @@ const docTemplate = `{
                 ],
                 "summary": "获取因子得分趋势",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "因子编码",
@@ -261,6 +275,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -313,6 +334,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -361,6 +389,13 @@ const docTemplate = `{
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -413,6 +448,13 @@ const docTemplate = `{
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
                         "required": true
                     }
                 ],

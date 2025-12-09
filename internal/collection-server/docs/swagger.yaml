@@ -396,6 +396,11 @@ paths:
     get:
       description: 分页获取当前用户的测评列表
       parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       - description: 状态筛选
         in: query
         name: status
@@ -439,6 +444,11 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -472,6 +482,11 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -501,6 +516,11 @@ paths:
       - description: 测评ID
         in: path
         name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
         required: true
         type: integer
       produces:
@@ -536,6 +556,11 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -562,6 +587,11 @@ paths:
     get:
       description: 获取指定因子的历史得分趋势
       parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       - description: 因子编码
         in: query
         name: factor_code

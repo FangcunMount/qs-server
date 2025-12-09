@@ -8,6 +8,7 @@
 3) 剥离 basePath 前缀，保持 api/rest 与 compare 脚本一致的路径形态。
 4) requestBody：将 in: body/formData 合并为 application/json；其他参数直接保留。
 5) servers：可通过 --server 指定多个；若未指定则使用 basePath 或 "/"。
+6) 输出采用紧凑的新格式：添加 contact、servers 带描述、tags 带描述、operationId 等。
 
 用法示例：
   python scripts/generate_rest_from_swagger.py \\
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -91,19 +93,78 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
     base_path = swagger.get("basePath", "") or ""
     base_path = base_path.rstrip("/") or ""
 
+    # 构建 info，添加 contact 信息
+    info = deepcopy(swagger.get("info", {}))
+    if "contact" not in info or not info.get("contact"):
+        info["contact"] = {
+            "name": "API Support",
+            "email": "yshujie@163.com",
+            "url": "https://github.com/FangcunMount/qs-server"
+        }
+
+    # 从 paths 中收集所有使用的 tags，并添加默认描述
+    tag_descriptions = {
+        "AnswerSheet-Management": "答卷管理",
+        "Evaluation-Assessment": "测评评估",
+        "Evaluation-Score": "测评得分",
+        "Evaluation-Report": "测评报告",
+        "Evaluation-Admin": "测评管理",
+        "Questionnaire-Query": "问卷查询",
+        "Questionnaire-Lifecycle": "问卷生命周期",
+        "Questionnaire-Content": "问卷内容",
+        "Scale-Query": "量表查询",
+        "Scale-Lifecycle": "量表生命周期",
+        "Scale-Factor": "量表因子",
+        "Actor": "人员管理",
+        "Health": "健康检查",
+        "系统": "系统健康检查",
+        "答卷": "答卷提交与查询",
+        "测评": "测评管理",
+        "问卷": "问卷查询",
+    }
+    
+    # 收集所有使用的 tags
+    used_tags = set()
+    for path_methods in swagger.get("paths", {}).values():
+        for method_spec in path_methods.values():
+            if isinstance(method_spec, dict) and "tags" in method_spec:
+                used_tags.update(method_spec["tags"])
+    
+    # 构建 tags 列表
+    tags = []
+    for tag_name in sorted(used_tags):
+        tags.append({
+            "name": tag_name,
+            "description": tag_descriptions.get(tag_name, tag_name)
+        })
+
     oas: Dict[str, Any] = {
         "openapi": "3.1.0",
-        "info": swagger.get("info", {}),
-        "tags": swagger.get("tags", []),
+        "info": info,
         "paths": {},
         "components": {"schemas": rewrite_refs(swagger.get("definitions", {}))},
     }
 
-    # servers
+    # servers - 添加描述
     if servers:
-        oas["servers"] = [{"url": s.rstrip("/") + (base_path or "")} for s in servers]
+        server_list = []
+        for s in servers:
+            url = s.rstrip("/") + (base_path or "")
+            # 根据 URL 自动添加描述
+            if "localhost" in url or "127.0.0.1" in url:
+                desc = "本地开发"
+            elif "dev" in url or "staging" in url:
+                desc = "开发环境"
+            else:
+                desc = "生产环境"
+            server_list.append({"url": url, "description": desc})
+        oas["servers"] = server_list
     else:
-        oas["servers"] = [{"url": base_path or "/"}]
+        oas["servers"] = [{"url": base_path or "/", "description": "默认服务器"}]
+
+    # tags - 在 servers 之后
+    if tags:
+        oas["tags"] = tags
 
     # securitySchemes
     sec_defs = swagger.get("securityDefinitions") or {}
@@ -129,6 +190,14 @@ def convert(swagger: Dict[str, Any], servers: List[str]) -> Dict[str, Any]:
                 for k in ["tags", "summary", "description", "operationId", "deprecated"]
                 if spec.get(k) is not None
             }
+
+            # 如果没有 operationId，从 summary 生成
+            if "operationId" not in op and "summary" in spec:
+                summary = spec.get("summary", "")
+                # 移除特殊字符，生成 operationId
+                op_id = re.sub(r'[^\w\u4e00-\u9fff]', '', summary)
+                if op_id:
+                    op["operationId"] = op_id
 
             params = deepcopy(spec.get("parameters", []))
             request_body, remain_params = to_request_body(params)
@@ -171,9 +240,20 @@ def main():
     swagger_data = json.loads(swagger_path.read_text())
     oas = convert(swagger_data, args.server)
 
+    # 确保输出顺序正确：openapi → info → servers → tags → paths → components
+    ordered_oas = {}
+    ordered_oas["openapi"] = oas["openapi"]
+    ordered_oas["info"] = oas["info"]
+    if "servers" in oas:
+        ordered_oas["servers"] = oas["servers"]
+    if "tags" in oas:
+        ordered_oas["tags"] = oas["tags"]
+    ordered_oas["paths"] = oas["paths"]
+    ordered_oas["components"] = oas["components"]
+
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(yaml.safe_dump(oas, sort_keys=False, allow_unicode=True))
+    output_path.write_text(yaml.safe_dump(ordered_oas, sort_keys=False, allow_unicode=True))
     print(f"Generated: {output_path}")
 
 

@@ -2,9 +2,25 @@ openapi: 3.1.0
 info:
   description: Questionnaire collection/BFF layer
   title: Collection Server
-  contact: {}
+  contact:
+    name: API Support
+    email: yshujie@163.com
+    url: https://github.com/FangcunMount/qs-server
   version: '1.0'
-tags: []
+servers:
+- url: http://localhost:18083/api/v1
+  description: 本地开发
+- url: https://collect.yangshujie.com/api/v1
+  description: 生产环境
+tags:
+- name: 测评
+  description: 测评管理
+- name: 答卷
+  description: 答卷提交与查询
+- name: 系统
+  description: 系统健康检查
+- name: 问卷
+  description: 问卷查询
 paths:
   /answersheets:
     post:
@@ -12,6 +28,7 @@ paths:
       - 答卷
       summary: 提交答卷
       description: 用户提交问卷答卷
+      operationId: 提交答卷
       requestBody:
         required: true
         content:
@@ -49,6 +66,7 @@ paths:
       - 答卷
       summary: 获取答卷详情
       description: 根据ID获取答卷详情
+      operationId: 获取答卷详情
       parameters:
       - type: integer
         description: 答卷ID
@@ -86,7 +104,13 @@ paths:
       - 测评
       summary: 获取我的测评列表
       description: 分页获取当前用户的测评列表
+      operationId: 获取我的测评列表
       parameters:
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
       - type: string
         description: 状态筛选
         name: status
@@ -126,7 +150,13 @@ paths:
       - 测评
       summary: 获取因子得分趋势
       description: 获取指定因子的历史得分趋势
+      operationId: 获取因子得分趋势
       parameters:
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
       - type: string
         description: 因子编码
         name: factor_code
@@ -164,11 +194,17 @@ paths:
       - 测评
       summary: 获取我的测评详情
       description: 根据测评ID获取测评详情
+      operationId: 获取我的测评详情
       parameters:
       - type: integer
         description: 测评ID
         name: id
         in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
         required: true
       responses:
         '200':
@@ -201,11 +237,17 @@ paths:
       - 测评
       summary: 获取高风险因子
       description: 获取指定测评的高风险因子列表
+      operationId: 获取高风险因子
       parameters:
       - type: integer
         description: 测评ID
         name: id
         in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
         required: true
       responses:
         '200':
@@ -234,11 +276,17 @@ paths:
       - 测评
       summary: 获取测评报告
       description: 获取测评的解读报告
+      operationId: 获取测评报告
       parameters:
       - type: integer
         description: 测评ID
         name: id
         in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
         required: true
       responses:
         '200':
@@ -271,11 +319,17 @@ paths:
       - 测评
       summary: 获取测评得分详情
       description: 获取测评的因子得分详情
+      operationId: 获取测评得分详情
       parameters:
       - type: integer
         description: 测评ID
         name: id
         in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
         required: true
       responses:
         '200':
@@ -304,6 +358,7 @@ paths:
       - 系统
       summary: 服务信息
       description: 获取服务基本信息
+      operationId: 服务信息
       responses:
         '200':
           description: OK
@@ -318,6 +373,7 @@ paths:
       - 问卷
       summary: 获取问卷列表
       description: 分页获取问卷列表
+      operationId: 获取问卷列表
       parameters:
       - type: integer
         default: 1
@@ -362,6 +418,7 @@ paths:
       - 问卷
       summary: 获取问卷详情
       description: 根据问卷编码获取问卷详情
+      operationId: 获取问卷详情
       parameters:
       - type: string
         description: 问卷编码
@@ -399,6 +456,7 @@ paths:
       - 系统
       summary: 健康检查
       description: 检查服务健康状态
+      operationId: 健康检查
       responses:
         '200':
           description: OK
@@ -413,6 +471,7 @@ paths:
       - 系统
       summary: Ping
       description: 测试服务连通性
+      operationId: Ping
       responses:
         '200':
           description: OK
@@ -740,6 +799,3 @@ components:
           type: string
         target_value:
           type: string
-servers:
-- url: http://localhost:8082/api/v1
-- url: https://api.example.com/api/v1

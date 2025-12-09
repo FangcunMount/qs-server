@@ -2,9 +2,43 @@ openapi: 3.1.0
 info:
   description: Questionnaire Scale API server (REST & gRPC)
   title: QS API Server
-  contact: {}
+  contact:
+    name: API Support
+    email: yshujie@163.com
+    url: https://github.com/FangcunMount/qs-server
   version: '1.0'
-tags: []
+servers:
+- url: http://localhost:18082/api/v1
+  description: 本地开发
+- url: https://qs.yangshujie.com/api/v1
+  description: 生产环境
+tags:
+- name: Actor
+  description: 人员管理
+- name: AnswerSheet-Management
+  description: 答卷管理
+- name: Evaluation-Admin
+  description: 测评管理
+- name: Evaluation-Assessment
+  description: 测评评估
+- name: Evaluation-Report
+  description: 测评报告
+- name: Evaluation-Score
+  description: 测评得分
+- name: Questionnaire-Content
+  description: 问卷内容
+- name: Questionnaire-Lifecycle
+  description: 问卷生命周期
+- name: Questionnaire-Query
+  description: 问卷查询
+- name: Scale-Factor
+  description: 量表因子
+- name: Scale-Lifecycle
+  description: 量表生命周期
+- name: Scale-Query
+  description: 量表查询
+- name: 系统
+  description: 系统健康检查
 paths:
   /admin/answersheets:
     get:
@@ -12,6 +46,7 @@ paths:
       - AnswerSheet-Management
       summary: 查询答卷列表
       description: 管理员查询答卷列表，支持多维度筛选
+      operationId: 查询答卷列表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -62,6 +97,7 @@ paths:
       - AnswerSheet-Management
       summary: 获取答卷统计
       description: 管理员查看某问卷的答卷统计数据
+      operationId: 获取答卷统计
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -91,6 +127,7 @@ paths:
       - AnswerSheet-Management
       summary: 获取答卷详情
       description: 管理员查看答卷的完整信息
+      operationId: 获取答卷详情
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -120,6 +157,7 @@ paths:
       - Evaluation-Assessment
       summary: 查询测评列表
       description: 分页查询测评列表
+      operationId: 查询测评列表
       parameters:
       - type: integer
         default: 1
@@ -157,6 +195,7 @@ paths:
       - Evaluation-Assessment
       summary: 获取测评统计数据
       description: 获取指定时间范围内的测评统计数据
+      operationId: 获取测评统计数据
       parameters:
       - type: string
         description: 开始时间（格式：2006-01-02）
@@ -188,6 +227,7 @@ paths:
       - Evaluation-Assessment
       summary: 获取测评详情
       description: 根据ID获取测评详细信息
+      operationId: 获取测评详情
       parameters:
       - type: integer
         description: 测评ID
@@ -212,6 +252,7 @@ paths:
       - Evaluation-Score
       summary: 获取高风险因子
       description: 获取指定测评的高风险因子列表
+      operationId: 获取高风险因子
       parameters:
       - type: integer
         description: 测评ID
@@ -236,6 +277,7 @@ paths:
       - Evaluation-Report
       summary: 获取测评报告
       description: 获取指定测评的解读报告
+      operationId: 获取测评报告
       parameters:
       - type: integer
         description: 测评ID
@@ -260,6 +302,7 @@ paths:
       - Evaluation-Admin
       summary: 重试失败的测评
       description: 重试指定测评的评估流程
+      operationId: 重试失败的测评
       parameters:
       - type: integer
         description: 测评ID
@@ -284,6 +327,7 @@ paths:
       - Evaluation-Score
       summary: 获取测评得分
       description: 获取指定测评的得分详情
+      operationId: 获取测评得分
       parameters:
       - type: integer
         description: 测评ID
@@ -308,6 +352,7 @@ paths:
       - Evaluation-Admin
       summary: 批量评估
       description: 批量执行测评评估（管理员/Worker使用）
+      operationId: 批量评估
       requestBody:
         required: true
         content:
@@ -332,6 +377,7 @@ paths:
       - Evaluation-Report
       summary: 查询报告列表
       description: 查询指定受试者的报告列表
+      operationId: 查询报告列表
       parameters:
       - type: integer
         description: 受试者ID
@@ -366,6 +412,7 @@ paths:
       - Evaluation-Score
       summary: 获取因子趋势
       description: 获取指定受试者某因子的历史得分趋势
+      operationId: 获取因子趋势
       parameters:
       - type: integer
         description: 受试者ID
@@ -400,6 +447,7 @@ paths:
       - Questionnaire-Query
       summary: 查询已发布问卷列表
       description: 分页查询已发布的问卷列表（C端答题使用）
+      operationId: 查询已发布问卷列表
       parameters:
       - type: integer
         default: 1
@@ -429,6 +477,7 @@ paths:
       - Questionnaire-Query
       summary: 获取已发布问卷
       description: 根据编码获取已发布的问卷（C端答题使用）
+      operationId: 获取已发布问卷
       parameters:
       - type: string
         description: 问卷编码
@@ -453,6 +502,7 @@ paths:
       - Questionnaire-Query
       summary: 查询问卷列表
       description: 分页查询问卷列表，支持条件筛选（管理端使用）
+      operationId: 查询问卷列表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -494,6 +544,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 创建问卷
       description: 创建新问卷，初始状态为草稿
+      operationId: 创建问卷
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -524,6 +575,7 @@ paths:
       - Questionnaire-Query
       summary: 获取问卷详情
       description: 根据编码获取问卷的完整信息（管理端使用）
+      operationId: 获取问卷详情
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -552,6 +604,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 删除问卷
       description: 删除草稿状态的问卷
+      operationId: 删除问卷
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -576,6 +629,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 归档问卷
       description: 归档不再使用的问卷
+      operationId: 归档问卷
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -605,6 +659,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 更新问卷基本信息
       description: 更新问卷的标题、描述、封面图
+      operationId: 更新问卷基本信息
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -640,6 +695,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 保存草稿
       description: 保存问卷为草稿状态，小版本号递增
+      operationId: 保存草稿
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -669,6 +725,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 发布问卷
       description: 发布问卷使其可用，大版本号递增
+      operationId: 发布问卷
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -698,6 +755,7 @@ paths:
       - Questionnaire-Content
       summary: 添加问题
       description: 向问卷添加新问题
+      operationId: 添加问题
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -733,6 +791,7 @@ paths:
       - Questionnaire-Content
       summary: 批量更新问题
       description: 批量更新问卷的所有问题（前端保存时使用）
+      operationId: 批量更新问题
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -768,6 +827,7 @@ paths:
       - Questionnaire-Content
       summary: 重排问题顺序
       description: 调整问卷中问题的显示顺序
+      operationId: 重排问题顺序
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -803,6 +863,7 @@ paths:
       - Questionnaire-Content
       summary: 更新问题
       description: 更新问卷中的某个问题
+      operationId: 更新问题
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -842,6 +903,7 @@ paths:
       - Questionnaire-Content
       summary: 删除问题
       description: 从问卷中删除某个问题
+      operationId: 删除问题
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -876,6 +938,7 @@ paths:
       - Questionnaire-Lifecycle
       summary: 下架问卷
       description: 将已发布的问卷下架
+      operationId: 下架问卷
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -905,6 +968,7 @@ paths:
       - Scale-Query
       summary: 获取量表列表
       description: 分页获取量表列表
+      operationId: 获取量表列表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -938,6 +1002,7 @@ paths:
       - Scale-Lifecycle
       summary: 创建量表
       description: 创建新量表，初始状态为草稿
+      operationId: 创建量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -968,6 +1033,7 @@ paths:
       - Scale-Query
       summary: 根据问卷编码获取量表
       description: 根据关联的问卷编码获取量表
+      operationId: 根据问卷编码获取量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -997,6 +1063,7 @@ paths:
       - Scale-Query
       summary: 获取已发布量表列表
       description: 分页获取已发布的量表列表
+      operationId: 获取已发布量表列表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1031,6 +1098,7 @@ paths:
       - Scale-Query
       summary: 获取已发布的量表
       description: 根据编码获取已发布的量表
+      operationId: 获取已发布的量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1060,6 +1128,7 @@ paths:
       - Scale-Query
       summary: 获取量表详情
       description: 根据编码获取量表详情
+      operationId: 获取量表详情
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1088,6 +1157,7 @@ paths:
       - Scale-Lifecycle
       summary: 删除量表
       description: 删除草稿状态的量表
+      operationId: 删除量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1112,6 +1182,7 @@ paths:
       - Scale-Lifecycle
       summary: 归档量表
       description: 归档量表
+      operationId: 归档量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1141,6 +1212,7 @@ paths:
       - Scale-Lifecycle
       summary: 更新量表基本信息
       description: 更新量表的标题、描述
+      operationId: 更新量表基本信息
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1176,6 +1248,7 @@ paths:
       - Scale-Factor
       summary: 批量替换因子
       description: 批量替换量表中的所有因子
+      operationId: 批量替换因子
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1211,6 +1284,7 @@ paths:
       - Scale-Factor
       summary: 批量设置解读规则
       description: 批量设置量表所有因子的解读规则
+      operationId: 批量设置解读规则
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1246,6 +1320,7 @@ paths:
       - Scale-Lifecycle
       summary: 发布量表
       description: 发布量表使其可用
+      operationId: 发布量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1275,6 +1350,7 @@ paths:
       - Scale-Lifecycle
       summary: 更新关联的问卷
       description: 更新量表关联的问卷编码和版本
+      operationId: 更新关联的问卷
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1310,6 +1386,7 @@ paths:
       - Scale-Lifecycle
       summary: 下架量表
       description: 下架量表使其不可用
+      operationId: 下架量表
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1338,6 +1415,7 @@ paths:
       tags:
       - Actor
       summary: 查询员工列表
+      operationId: 查询员工列表
       parameters:
       - type: integer
         description: 机构ID
@@ -1374,6 +1452,7 @@ paths:
       tags:
       - Actor
       summary: 创建员工
+      operationId: 创建员工
       requestBody:
         required: true
         content:
@@ -1397,6 +1476,7 @@ paths:
       tags:
       - Actor
       summary: 获取员工详情
+      operationId: 获取员工详情
       parameters:
       - type: integer
         description: 员工ID
@@ -1419,6 +1499,7 @@ paths:
       tags:
       - Actor
       summary: 删除员工
+      operationId: 删除员工
       parameters:
       - type: integer
         description: 员工ID
@@ -1437,6 +1518,7 @@ paths:
       tags:
       - Actor
       summary: 查询受试者列表
+      operationId: 查询受试者列表
       parameters:
       - type: integer
         description: 机构ID
@@ -1478,6 +1560,7 @@ paths:
       tags:
       - Actor
       summary: 获取受试者详情
+      operationId: 获取受试者详情
       parameters:
       - type: integer
         description: 受试者ID
@@ -1500,6 +1583,7 @@ paths:
       tags:
       - Actor
       summary: 更新受试者
+      operationId: 更新受试者
       parameters:
       - type: integer
         description: 受试者ID
@@ -1530,6 +1614,7 @@ paths:
       - 系统
       summary: 健康检查
       description: 检查 API Server 健康状态
+      operationId: 健康检查
       responses:
         '200':
           description: OK
@@ -1544,6 +1629,7 @@ paths:
       - 系统
       summary: Ping
       description: 测试 API Server 连通性
+      operationId: Ping
       responses:
         '200':
           description: OK
@@ -1566,6 +1652,7 @@ components:
           type: string
     meta.ID:
       type: integer
+      format: int64
       enum:
       - 0
       x-enum-varnames:
@@ -2446,6 +2533,3 @@ components:
         target_value:
           description: 目标值
           type: string
-servers:
-- url: http://localhost:8081/api/v1
-- url: https://api.example.com/api/v1

@@ -2679,6 +2679,7 @@ const docTemplate = `{
         },
         "meta.ID": {
             "type": "integer",
+            "format": "int64",
             "enum": [
                 0
             ],

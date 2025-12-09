@@ -138,6 +138,13 @@
                 "summary": "获取我的测评列表",
                 "parameters": [
                     {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "type": "string",
                         "description": "状态筛选",
                         "name": "status",
@@ -196,6 +203,13 @@
                 ],
                 "summary": "获取因子得分趋势",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "因子编码",
@@ -258,6 +272,13 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -310,6 +331,13 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -358,6 +386,13 @@
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -410,6 +445,13 @@
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
                         "required": true
                     }
                 ],
