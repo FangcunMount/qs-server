@@ -175,7 +175,7 @@ iam:
   
   # JWKS 配置（JWT 公钥管理）
   jwks:
-    url: "http://iam-apiserver:9080/.well-known/jwks.json"  # JWKS HTTP 端点
+    url: "https://iam.yangshujie.com/api/v1/.well-known/jwks.json"  # JWKS HTTP 端点
     grpc-endpoint: "iam-apiserver:9080"                    # gRPC 降级端点（HTTP 失败时使用）
     refresh-interval: 5m                               # 定时刷新间隔
     cache-ttl: 30m                                     # 缓存有效期

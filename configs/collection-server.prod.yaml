@@ -33,9 +33,9 @@ jwt:
 
 # IAM 集成配置
 iam:
-  enabled: false  # 生产环境部署前设置为 true
-  grpc-enabled: true
-  jwks-enabled: true
+  enabled: true       # 启用 IAM 集成
+  grpc-enabled: true  # 启用 gRPC 认证
+  jwks-enabled: true  # 启用 JWKS 认证
   
   # 可观测性配置
   enable-tracing: true            # 启用 OpenTelemetry 链路追踪
@@ -64,7 +64,7 @@ iam:
   
   # JWKS 配置
   jwks:
-    url: "http://iam-apiserver:9080/.well-known/jwks.json"
+    url: "https://iam.yangshujie.com/api/v1/.well-known/jwks.json"
     grpc-endpoint: "iam-apiserver:9080"                    # gRPC 降级端点（HTTP 失败时使用）
     refresh-interval: 1h
     cache-ttl: 24h
