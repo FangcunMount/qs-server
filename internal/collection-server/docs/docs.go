@@ -611,6 +611,293 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/testees": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "查询当前用户（监护人）的所有受试者列表（支持分页）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "查询我的受试者列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "偏移量",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/testee.ListTesteesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "创建新的受试者信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "创建受试者",
+                "parameters": [
+                    {
+                        "description": "受试者数据",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/testee.CreateTesteeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/testee.TesteeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/exists": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "根据机构ID和IAM儿童ID检查受试者是否存在",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "检查受试者是否存在",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "机构ID",
+                        "name": "org_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "IAM儿童ID",
+                        "name": "iam_child_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/testee.TesteeExistsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "根据ID获取受试者详细信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "获取受试者详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/testee.TesteeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "更新受试者的基本信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "更新受试者信息",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新数据",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/testee.UpdateTesteeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/testee.TesteeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "检查服务健康状态",
@@ -1129,6 +1416,194 @@ const docTemplate = `{
                 },
                 "target_value": {
                     "type": "string"
+                }
+            }
+        },
+        "testee.AssessmentStatsDTO": {
+            "type": "object",
+            "properties": {
+                "last_assessment_at": {
+                    "description": "最后测评时间",
+                    "type": "string"
+                },
+                "last_risk_level": {
+                    "description": "最后风险等级",
+                    "type": "string"
+                },
+                "total_count": {
+                    "description": "总测评次数",
+                    "type": "integer"
+                }
+            }
+        },
+        "testee.CreateTesteeRequest": {
+            "type": "object",
+            "required": [
+                "gender",
+                "iam_child_id",
+                "name",
+                "org_id"
+            ],
+            "properties": {
+                "birthday": {
+                    "description": "出生日期",
+                    "type": "string"
+                },
+                "gender": {
+                    "description": "性别：1-男，2-女，3-其他",
+                    "type": "integer"
+                },
+                "iam_child_id": {
+                    "description": "IAM儿童ID",
+                    "type": "integer"
+                },
+                "iam_user_id": {
+                    "description": "IAM用户ID（成人）",
+                    "type": "integer"
+                },
+                "is_key_focus": {
+                    "description": "是否重点关注",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "org_id": {
+                    "description": "机构ID",
+                    "type": "integer"
+                },
+                "source": {
+                    "description": "来源：online_form/plan/screening/imported",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "标签列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "testee.ListTesteesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "description": "受试者列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/testee.TesteeResponse"
+                    }
+                },
+                "total": {
+                    "description": "总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "testee.TesteeExistsResponse": {
+            "type": "object",
+            "properties": {
+                "exists": {
+                    "description": "是否存在",
+                    "type": "boolean"
+                },
+                "testee_id": {
+                    "description": "受试者ID（如果存在）",
+                    "type": "integer"
+                }
+            }
+        },
+        "testee.TesteeResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_stats": {
+                    "description": "测评统计信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/testee.AssessmentStatsDTO"
+                        }
+                    ]
+                },
+                "birthday": {
+                    "description": "出生日期",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
+                "gender": {
+                    "description": "性别",
+                    "type": "integer"
+                },
+                "iam_child_id": {
+                    "description": "IAM儿童ID",
+                    "type": "integer"
+                },
+                "iam_user_id": {
+                    "description": "IAM用户ID",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "受试者ID",
+                    "type": "integer"
+                },
+                "is_key_focus": {
+                    "description": "是否重点关注",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "org_id": {
+                    "description": "机构ID",
+                    "type": "integer"
+                },
+                "source": {
+                    "description": "来源",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "标签列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "description": "更新时间",
+                    "type": "string"
+                }
+            }
+        },
+        "testee.UpdateTesteeRequest": {
+            "type": "object",
+            "properties": {
+                "birthday": {
+                    "description": "出生日期",
+                    "type": "string"
+                },
+                "gender": {
+                    "description": "性别",
+                    "type": "integer"
+                },
+                "is_key_focus": {
+                    "description": "是否重点关注",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "标签列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         }

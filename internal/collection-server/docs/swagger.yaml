@@ -317,6 +317,140 @@ definitions:
       target_value:
         type: string
     type: object
+  testee.AssessmentStatsDTO:
+    properties:
+      last_assessment_at:
+        description: 最后测评时间
+        type: string
+      last_risk_level:
+        description: 最后风险等级
+        type: string
+      total_count:
+        description: 总测评次数
+        type: integer
+    type: object
+  testee.CreateTesteeRequest:
+    properties:
+      birthday:
+        description: 出生日期
+        type: string
+      gender:
+        description: 性别：1-男，2-女，3-其他
+        type: integer
+      iam_child_id:
+        description: IAM儿童ID
+        type: integer
+      iam_user_id:
+        description: IAM用户ID（成人）
+        type: integer
+      is_key_focus:
+        description: 是否重点关注
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      org_id:
+        description: 机构ID
+        type: integer
+      source:
+        description: 来源：online_form/plan/screening/imported
+        type: string
+      tags:
+        description: 标签列表
+        items:
+          type: string
+        type: array
+    required:
+    - gender
+    - iam_child_id
+    - name
+    - org_id
+    type: object
+  testee.ListTesteesResponse:
+    properties:
+      items:
+        description: 受试者列表
+        items:
+          $ref: '#/definitions/testee.TesteeResponse'
+        type: array
+      total:
+        description: 总数
+        type: integer
+    type: object
+  testee.TesteeExistsResponse:
+    properties:
+      exists:
+        description: 是否存在
+        type: boolean
+      testee_id:
+        description: 受试者ID（如果存在）
+        type: integer
+    type: object
+  testee.TesteeResponse:
+    properties:
+      assessment_stats:
+        allOf:
+        - $ref: '#/definitions/testee.AssessmentStatsDTO'
+        description: 测评统计信息
+      birthday:
+        description: 出生日期
+        type: string
+      created_at:
+        description: 创建时间
+        type: string
+      gender:
+        description: 性别
+        type: integer
+      iam_child_id:
+        description: IAM儿童ID
+        type: integer
+      iam_user_id:
+        description: IAM用户ID
+        type: integer
+      id:
+        description: 受试者ID
+        type: integer
+      is_key_focus:
+        description: 是否重点关注
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      org_id:
+        description: 机构ID
+        type: integer
+      source:
+        description: 来源
+        type: string
+      tags:
+        description: 标签列表
+        items:
+          type: string
+        type: array
+      updated_at:
+        description: 更新时间
+        type: string
+    type: object
+  testee.UpdateTesteeRequest:
+    properties:
+      birthday:
+        description: 出生日期
+        type: string
+      gender:
+        description: 性别
+        type: integer
+      is_key_focus:
+        description: 是否重点关注
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      tags:
+        description: 标签列表
+        items:
+          type: string
+        type: array
+    type: object
 info:
   contact: {}
   description: Questionnaire collection/BFF layer
@@ -709,6 +843,190 @@ paths:
       summary: 获取问卷详情
       tags:
       - 问卷
+  /api/v1/testees:
+    get:
+      description: 查询当前用户（监护人）的所有受试者列表（支持分页）
+      parameters:
+      - default: 0
+        description: 偏移量
+        in: query
+        name: offset
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/testee.ListTesteesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 查询我的受试者列表
+      tags:
+      - 受试者
+    post:
+      consumes:
+      - application/json
+      description: 创建新的受试者信息
+      parameters:
+      - description: 受试者数据
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/testee.CreateTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/testee.TesteeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 创建受试者
+      tags:
+      - 受试者
+  /api/v1/testees/{id}:
+    get:
+      description: 根据ID获取受试者详细信息
+      parameters:
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/testee.TesteeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 获取受试者详情
+      tags:
+      - 受试者
+    put:
+      consumes:
+      - application/json
+      description: 更新受试者的基本信息
+      parameters:
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新数据
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/testee.UpdateTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/testee.TesteeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 更新受试者信息
+      tags:
+      - 受试者
+  /api/v1/testees/exists:
+    get:
+      description: 根据机构ID和IAM儿童ID检查受试者是否存在
+      parameters:
+      - description: 机构ID
+        in: query
+        name: org_id
+        required: true
+        type: integer
+      - description: IAM儿童ID
+        in: query
+        name: iam_child_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/testee.TesteeExistsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 检查受试者是否存在
+      tags:
+      - 受试者
   /health:
     get:
       description: 检查服务健康状态
