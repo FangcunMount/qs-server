@@ -7318,10 +7318,6 @@
       required: '1'
       min_words: '0'
       max_words: '3000'
-- code: V5WpJj
-  name: 儿童生活教育问卷
-  description: brief
-  icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
 - code: jrtmJU
   name: 不良反应问诊
   description: 请您根据孩子的治疗情况和近期的身体情况完成填写和评估
@@ -9688,10 +9684,6 @@
     validate_rules:
       min_words: '0'
       max_words: '3000'
-- code: rITXUy
-  name: 体验课家长反馈收集表
-  description: PTBM体验课后收集家长反馈，从而形成PDCA
-  icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
 - code: mpysX6
   name: PTBM家庭教育体验课适配性调研问卷2.0
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png

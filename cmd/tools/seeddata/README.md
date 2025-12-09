@@ -25,9 +25,9 @@ QS 系统测试数据生成工具。
 ```bash
 # 使用命令行参数(完整示例)
 go run ./cmd/tools/seeddata \
-  --mysql-dsn "root:password@tcp(localhost:3306)/qs_apiserver?parseTime=true&loc=Local" \
-  --mongo-uri "mongodb://localhost:27017" \
-  --mongo-database "qs_apiserver" \
+  --mysql-dsn "app_user:dev_app_pass_123@tcp(localhost:3306)/qs?parseTime=true&loc=Local" \
+  --mongo-uri "mongodb://app_dev:d3v_App%40M0ngo@localhost:27017" \
+  --mongo-database "qs" \
   --config "./configs/seeddata.yaml"
 
 # 使用环境变量

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	qApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -13,6 +14,7 @@ import (
 	qDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	qInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // seedScales 创建完整的医学量表（问卷 + 因子）并发布
@@ -186,12 +188,16 @@ func ensureQuestionnaire(
 	if err != nil {
 		return "", fmt.Errorf("get questionnaire %s for publish check failed: %w", code, err)
 	}
-	if latestQ.Status != "已发布" && latestQ.Status != "已归档" {
-		if _, err := lifecycleSvc.Publish(ctx, code); err != nil {
-			return "", fmt.Errorf("publish questionnaire %s failed: %w", code, err)
-		}
+	if len(questionDTOs) == 0 {
+		logger.Warnw("Skip publish questionnaire with no questions", "code", code)
 	} else {
-		logger.Debugw("Questionnaire already published/archived, skipping publish", "code", code, "status", latestQ.Status)
+		if _, err := lifecycleSvc.Publish(ctx, code); err != nil {
+			if errors.IsCode(err, errorCode.ErrQuestionnaireInvalidStatus) {
+				logger.Debugw("Questionnaire already published/archived, skipping publish", "code", code, "status", latestQ.Status)
+			} else {
+				return "", fmt.Errorf("publish questionnaire %s failed: %w", code, err)
+			}
+		}
 	}
 
 	return publishedVersion, nil
@@ -201,9 +207,13 @@ func ensureQuestionnaire(
 func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 	dtos := make([]scaleApp.FactorDTO, 0, len(sc.Factors))
 	groupInterp := mergeInterpretationGroup(sc.Interpretation)
+	hasTotal := false
 
 	for _, f := range sc.Factors {
 		isTotal := f.IsTotalScore == "1"
+		if isTotal {
+			hasTotal = true
+		}
 		factorGroup := mergeInterpretationGroupWithFallback(f.InterpretRule, f.Interpretations)
 		interpretRules := toInterpretRules(factorGroup, groupInterp, logger)
 
@@ -232,6 +242,24 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 			ScoringParams:   scoringParams,
 			InterpretRules:  interpretRules,
 		})
+	}
+
+	// 若缺少总分因子，自动补充一个占位总分因子，避免发布校验失败
+	if !hasTotal {
+		autoCode := sc.Code + "_total_auto"
+		dtos = append(dtos, scaleApp.FactorDTO{
+			Code:            autoCode,
+			Title:           "总分(自动补齐)",
+			FactorType:      string(scaleDomain.FactorTypePrimary),
+			IsTotalScore:    true,
+			QuestionCodes:   collectQuestionCodes(sc),
+			ScoringStrategy: string(scaleDomain.ScoringStrategySum),
+			ScoringParams:   map[string]string{"auto": "true"},
+			InterpretRules: []scaleApp.InterpretRuleDTO{
+				{MinScore: 0, MaxScore: 9999, RiskLevel: string(scaleDomain.RiskLevelNone), Conclusion: "暂无解读", Suggestion: ""},
+			},
+		})
+		logger.Warnw("Added auto total factor", "scale", sc.Code, "factor", autoCode)
 	}
 	return dtos
 }
@@ -312,4 +340,15 @@ func parseFloat(ptr *float64, raw string) float64 {
 		return 0
 	}
 	return val
+}
+
+// collectQuestionCodes 收集量表题目编码，用于自动补齐总分因子
+func collectQuestionCodes(sc ScaleConfig) []string {
+	codes := make([]string, 0, len(sc.Questions))
+	for _, q := range sc.Questions {
+		if q.Code != "" {
+			codes = append(codes, q.Code)
+		}
+	}
+	return codes
 }

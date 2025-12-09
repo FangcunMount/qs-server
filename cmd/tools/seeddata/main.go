@@ -144,7 +144,7 @@ func main() {
 	// 加载量表问卷配置（追加到问卷列表）
 	if strings.TrimSpace(*scaleQuestionnaireFile) != "" {
 		logger.Infow("Loading medical scale questionnaire config", "file", *scaleQuestionnaireFile)
-		scaleCfg, err := LoadSeedConfig(*scaleQuestionnaireFile)
+		scaleCfg, err := LoadSeedConfigWithPreference(*scaleQuestionnaireFile, true)
 		if err != nil {
 			logger.Fatalw("Failed to load medical scale questionnaire config", "error", err)
 		}

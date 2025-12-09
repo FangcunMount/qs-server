@@ -42,6 +42,30 @@ func (f FlexFloat) Float64() float64 {
 	return float64(f)
 }
 
+// BoolString 兼容布尔值或字符串的字段，最终存储为字符串
+type BoolString string
+
+// UnmarshalYAML 支持 bool / string
+func (b *BoolString) UnmarshalYAML(node *yaml.Node) error {
+	var boolVal bool
+	if err := node.Decode(&boolVal); err == nil {
+		if boolVal {
+			*b = "1"
+		} else {
+			*b = "0"
+		}
+		return nil
+	}
+
+	var strVal string
+	if err := node.Decode(&strVal); err == nil {
+		*b = BoolString(strVal)
+		return nil
+	}
+
+	return fmt.Errorf("cannot unmarshal %v into BoolString", node.Value)
+}
+
 // SeedConfig 定义整个种子数据配置结构
 type SeedConfig struct {
 	// 全局配置
@@ -90,9 +114,9 @@ type QuestionConfig struct {
 	Text           string         `yaml:"text"`  // 旧格式字段
 	Title          string         `yaml:"title"` // 新格式字段
 	Tips           string         `yaml:"tips"`
-	Router         string         `yaml:"router"`
-	ShowController string         `yaml:"show_controller"`
-	Description    string         `yaml:"description"` // 问题描述
+	Router         any            `yaml:"router"`
+	ShowController any            `yaml:"show_controller"` // 可能是 null/map，放宽为 any
+	Description    string         `yaml:"description"`     // 问题描述
 	Required       bool           `yaml:"required"`
 	Order          int            `yaml:"order"`
 	Options        []OptionConfig `yaml:"options"` // 选项列表
@@ -111,16 +135,16 @@ type CalcRuleConfig struct {
 
 // OptionConfig 选项配置，保留原始数据字段
 type OptionConfig struct {
-	Code              string    `yaml:"code"`
-	Text              string    `yaml:"text"`    // 旧格式字段
-	Content           string    `yaml:"content"` // 新格式字段
-	Score             FlexFloat `yaml:"score"`
-	Order             int       `yaml:"order"`
-	IsSelect          string    `yaml:"is_select"`
-	IsOther           string    `yaml:"is_other"`
-	AllowExtendText   string    `yaml:"allow_extend_text"`
-	ExtendContent     string    `yaml:"extend_content"`
-	ExtendPlaceholder string    `yaml:"extend_placeholder"`
+	Code              string     `yaml:"code"`
+	Text              string     `yaml:"text"`    // 旧格式字段
+	Content           string     `yaml:"content"` // 新格式字段
+	Score             FlexFloat  `yaml:"score"`
+	Order             int        `yaml:"order"`
+	IsSelect          BoolString `yaml:"is_select"`
+	IsOther           BoolString `yaml:"is_other"`
+	AllowExtendText   BoolString `yaml:"allow_extend_text"`
+	ExtendContent     string     `yaml:"extend_content"`
+	ExtendPlaceholder string     `yaml:"extend_placeholder"`
 }
 
 // ScaleConfig 量表配置
@@ -174,6 +198,11 @@ type InterpretationGroupConfig struct {
 
 // LoadSeedConfig 从 YAML 文件加载种子数据配置
 func LoadSeedConfig(filepath string) (*SeedConfig, error) {
+	return LoadSeedConfigWithPreference(filepath, false)
+}
+
+// LoadSeedConfigWithPreference 允许指定是否优先按 Scales 解析（用于量表问卷文件）
+func LoadSeedConfigWithPreference(filepath string, preferScale bool) (*SeedConfig, error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -186,18 +215,46 @@ func LoadSeedConfig(filepath string) (*SeedConfig, error) {
 		}
 	}
 
-	// 兼容问卷/量表列表顶层直接是数组的配置文件
+	// 兼容问卷/量表列表顶层直接是数组的配置文件（可指定优先解析量表）
 	var questionnaires []QuestionnaireConfig
-	if err := yaml.Unmarshal(data, &questionnaires); err == nil && len(questionnaires) > 0 {
+	var scales []ScaleConfig
+
+	// 如果偏好量表，先尝试解析量表
+	if preferScale {
+		_ = yaml.Unmarshal(data, &scales)
+		if len(scales) > 0 {
+			return &SeedConfig{Scales: scales}, nil
+		}
+	}
+
+	if err := yaml.Unmarshal(data, &questionnaires); err == nil && len(questionnaires) > 0 && !preferScale {
 		return &SeedConfig{Questionnaires: questionnaires}, nil
 	}
 
-	var scales []ScaleConfig
 	if err := yaml.Unmarshal(data, &scales); err == nil && len(scales) > 0 {
-		return &SeedConfig{Scales: scales}, nil
+		hasScaleSignal := false
+		for _, s := range scales {
+			if len(s.Factors) > 0 || s.QuestionnaireVersion != "" || !isEmptyInterpretationGroup(s.Interpretation) {
+				hasScaleSignal = true
+				break
+			}
+		}
+		if hasScaleSignal {
+			return &SeedConfig{Scales: scales}, nil
+		}
+	}
+
+	// 如果 preferScale=false 且问卷解析成功（即使 scales 存在，也优先问卷）
+	if len(questionnaires) > 0 {
+		return &SeedConfig{Questionnaires: questionnaires}, nil
 	}
 
 	return nil, fmt.Errorf("failed to parse config file: unrecognized format")
+}
+
+// 判断解读规则组是否为空
+func isEmptyInterpretationGroup(g InterpretationGroupConfig) bool {
+	return g.IsShow == "" && len(g.Items) == 0 && len(g.Interpretation) == 0
 }
 
 // ParseDate 解析日期字符串
