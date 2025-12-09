@@ -38,9 +38,15 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 	}
 
 	// 2. 生成量表编码
-	code, err := meta.GenerateCode()
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "生成量表编码失败")
+	var code meta.Code
+	var err error
+	if dto.Code != "" {
+		code = meta.NewCode(dto.Code)
+	} else {
+		code, err = meta.GenerateCode()
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "生成量表编码失败")
+		}
 	}
 
 	// 3. 创建量表领域模型

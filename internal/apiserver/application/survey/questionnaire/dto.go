@@ -5,9 +5,11 @@ package questionnaire
 
 // CreateQuestionnaireDTO 创建问卷 DTO
 type CreateQuestionnaireDTO struct {
+	Code        string // 问卷编码（可选，用于导入/种子）
 	Title       string // 问卷标题
 	Description string // 问卷描述
 	ImgUrl      string // 封面图URL
+	Version     string // 初始版本（可选）
 }
 
 // UpdateQuestionnaireBasicInfoDTO 更新问卷基本信息 DTO

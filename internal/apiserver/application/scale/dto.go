@@ -5,6 +5,7 @@ package scale
 
 // CreateScaleDTO 创建量表 DTO
 type CreateScaleDTO struct {
+	Code                string // 量表编码（可选，用于导入/种子）
 	Title                string // 量表标题
 	Description          string // 量表描述
 	QuestionnaireCode    string // 关联的问卷编码

@@ -246,13 +246,18 @@ func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, require
 		opts = append(opts, opt)
 	}
 
-	// 使用领域层工厂方法创建问题
-	return questionnaire.NewQuestion(
+	qOptions := []questionnaire.QuestionParamsOption{
 		questionnaire.WithCode(meta.NewCode(code)),
 		questionnaire.WithStem(stem),
 		questionnaire.WithQuestionType(questionnaire.QuestionType(qType)),
 		questionnaire.WithOptions(opts),
 		questionnaire.WithTips(description),
-		// TODO: 根据 required 参数添加验证规则
-	)
+	}
+
+	if required {
+		qOptions = append(qOptions, questionnaire.WithRequired())
+	}
+
+	// 使用领域层工厂方法创建问题
+	return questionnaire.NewQuestion(qOptions...)
 }

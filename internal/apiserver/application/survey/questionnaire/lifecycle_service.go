@@ -37,10 +37,21 @@ func NewLifecycleService(
 
 // Create 创建问卷
 func (s *lifecycleService) Create(ctx context.Context, dto CreateQuestionnaireDTO) (*QuestionnaireResult, error) {
-	// 1. 生成问卷编码
-	code, err := meta.GenerateCode()
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "生成问卷编码失败")
+	// 1. 生成问卷编码（允许外部传入以支持导入场景）
+	var code meta.Code
+	var err error
+	if dto.Code != "" {
+		code = meta.NewCode(dto.Code)
+	} else {
+		code, err = meta.GenerateCode()
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "生成问卷编码失败")
+		}
+	}
+
+	version := questionnaire.NewVersion("1.0")
+	if dto.Version != "" {
+		version = questionnaire.NewVersion(dto.Version)
 	}
 
 	// 2. 创建问卷领域模型
@@ -49,7 +60,7 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateQuestionnaireDT
 		dto.Title,
 		questionnaire.WithDesc(dto.Description),
 		questionnaire.WithImgUrl(dto.ImgUrl),
-		questionnaire.WithVersion(questionnaire.NewVersion("1.0")),
+		questionnaire.WithVersion(version),
 		questionnaire.WithStatus(questionnaire.STATUS_DRAFT),
 	)
 	if err != nil {
