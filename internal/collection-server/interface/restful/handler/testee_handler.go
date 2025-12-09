@@ -194,10 +194,9 @@ func (h *TesteeHandler) List(c *gin.Context) {
 
 // Exists 检查受试者是否存在
 // @Summary 检查受试者是否存在
-// @Description 根据机构ID和IAM儿童ID检查受试者是否存在
+// @Description 根据IAM儿童ID检查受试者是否存在
 // @Tags 受试者
 // @Produce json
-// @Param org_id query int true "机构ID"
 // @Param iam_child_id query int true "IAM儿童ID"
 // @Success 200 {object} testee.TesteeExistsResponse
 // @Failure 400 {object} core.ErrResponse
@@ -206,14 +205,7 @@ func (h *TesteeHandler) List(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/testees/exists [get]
 func (h *TesteeHandler) Exists(c *gin.Context) {
-	orgIDStr := c.Query("org_id")
 	iamChildIDStr := c.Query("iam_child_id")
-
-	orgID, err := strconv.ParseUint(orgIDStr, 10, 64)
-	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid org_id format"), nil)
-		return
-	}
 
 	iamChildID, err := strconv.ParseUint(iamChildIDStr, 10, 64)
 	if err != nil {
@@ -228,7 +220,7 @@ func (h *TesteeHandler) Exists(c *gin.Context) {
 		return
 	}
 
-	result, err := h.testeeService.TesteeExists(c.Request.Context(), orgID, iamChildID)
+	result, err := h.testeeService.TesteeExists(c.Request.Context(), iamChildID)
 	if err != nil {
 		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "check testee existence failed: %v", err), nil)
 		return

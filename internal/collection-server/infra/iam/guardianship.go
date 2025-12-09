@@ -136,6 +136,13 @@ func (s *GuardianshipService) ImportGuardians(ctx context.Context, req *identity
 	return s.client.ImportGuardians(ctx, req)
 }
 
+// GetDefaultOrgID 获取默认机构ID
+// 在单租户场景下，返回固定的机构ID
+// TODO: 未来如果需要多租户支持，可以通过 IAM SDK 获取用户所属机构
+func (s *GuardianshipService) GetDefaultOrgID() uint64 {
+	return 1
+}
+
 // Raw 返回原始 SDK 客户端（用于高级用法）
 func (s *GuardianshipService) Raw() *identity.GuardianshipClient {
 	return s.client

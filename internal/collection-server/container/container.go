@@ -77,10 +77,16 @@ func (c *Container) Initialize() error {
 func (c *Container) initApplicationServices() {
 	log.Info("🎯 Initializing application services...")
 
+	// 获取 GuardianshipService（如果 IAM 启用）
+	var guardianshipService *iam.GuardianshipService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		guardianshipService = c.IAMModule.GuardianshipService()
+	}
+
 	c.submissionService = answersheet.NewSubmissionService(c.answerSheetClient)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient)
-	c.testeeService = testee.NewService(c.actorClient)
+	c.testeeService = testee.NewService(c.actorClient, guardianshipService)
 
 	log.Info("✅ Application services initialized")
 }

@@ -3,8 +3,8 @@ package testee
 import "time"
 
 // CreateTesteeRequest 创建受试者请求
+// 注意：机构ID由系统自动设置，不需要用户传入
 type CreateTesteeRequest struct {
-	OrgID      uint64     `json:"org_id" binding:"required"`       // 机构ID
 	IAMUserID  uint64     `json:"iam_user_id"`                     // IAM用户ID（成人）
 	IAMChildID uint64     `json:"iam_child_id" binding:"required"` // IAM儿童ID
 	Name       string     `json:"name" binding:"required"`         // 姓名

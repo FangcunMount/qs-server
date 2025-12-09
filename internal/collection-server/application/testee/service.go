@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 )
 
 // Service 受试者服务
@@ -13,23 +14,28 @@ import (
 // 2. 调用 apiserver 的 Actor gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type Service struct {
-	actorClient *grpcclient.ActorClient
+	actorClient         *grpcclient.ActorClient
+	guardianshipService *iam.GuardianshipService
 }
 
 // NewService 创建受试者服务
-func NewService(actorClient *grpcclient.ActorClient) *Service {
+func NewService(actorClient *grpcclient.ActorClient, guardianshipService *iam.GuardianshipService) *Service {
 	return &Service{
-		actorClient: actorClient,
+		actorClient:         actorClient,
+		guardianshipService: guardianshipService,
 	}
 }
 
 // CreateTestee 创建受试者
 func (s *Service) CreateTestee(ctx context.Context, req *CreateTesteeRequest) (*TesteeResponse, error) {
-	log.Infof("Creating testee: orgID=%d, name=%s, iamChildID=%d", req.OrgID, req.Name, req.IAMChildID)
+	log.Infof("Creating testee: name=%s, iamChildID=%d", req.Name, req.IAMChildID)
+
+	// 从 IAM 获取默认机构ID（单租户场景）
+	orgID := s.guardianshipService.GetDefaultOrgID()
 
 	// 调用 gRPC 服务
 	result, err := s.actorClient.CreateTestee(ctx, &grpcclient.CreateTesteeRequest{
-		OrgID:      req.OrgID,
+		OrgID:      orgID,
 		IAMUserID:  req.IAMUserID,
 		IAMChildID: req.IAMChildID,
 		Name:       req.Name,
@@ -110,7 +116,9 @@ func (s *Service) ListMyTestees(ctx context.Context, childIDs []uint64, req *Lis
 }
 
 // TesteeExists 检查受试者是否存在
-func (s *Service) TesteeExists(ctx context.Context, orgID, iamChildID uint64) (*TesteeExistsResponse, error) {
+func (s *Service) TesteeExists(ctx context.Context, iamChildID uint64) (*TesteeExistsResponse, error) {
+	// 从 IAM 获取默认机构ID（单租户场景）
+	orgID := s.guardianshipService.GetDefaultOrgID()
 	log.Infof("Checking testee existence: orgID=%d, iamChildID=%d", orgID, iamChildID)
 
 	exists, testeeID, err := s.actorClient.TesteeExists(ctx, orgID, iamChildID)
