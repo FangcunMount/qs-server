@@ -1,11 +1,32 @@
+# ============================================================
 # collection-server 生产环境配置
+# ============================================================
+# 用途：BFF 层服务，提供前端友好的 REST API，调用 apiserver gRPC 服务
+# 维护人：DevOps Team
+# 最后更新：2025-01-20
+# ============================================================
 
-# 服务器配置（HTTP）
+# ============================================================
+# 1. 应用配置
+# ============================================================
+# 应用级别的基础配置
+
+# ============================================================
+# 2. 端口配置
+# ============================================================
+# HTTP、HTTPS 服务端口配置
+# 说明：collection-server 是纯 REST API 服务，不对外暴露 gRPC
+
+# -------------------------------------------------------
+# 2.1 HTTP 服务（开发测试用）
+# -------------------------------------------------------
 insecure:
   bind-address: "0.0.0.0"
   bind-port: 8080
 
-# 安全服务配置（HTTPS）
+# -------------------------------------------------------
+# 2.2 HTTPS 服务（生产环境）
+# -------------------------------------------------------
 secure:
   bind-address: "0.0.0.0"
   bind-port: 8443
@@ -14,11 +35,13 @@ secure:
     cert-file: "/etc/qs-server/ssl/certs/yangshujie.com.crt"
     private-key-file: "/etc/qs-server/ssl/private/yangshujie.com.key"
 
-# gRPC 客户端配置（连接 apiserver）
+# -------------------------------------------------------
+# 2.3 gRPC 客户端配置（调用 apiserver）
+# -------------------------------------------------------
 grpc_client:
   endpoint: "apiserver:9090"  # 生产部署请根据服务发现或网关调整
   timeout: 30
-  insecure: false  # 生产环境启用 TLS
+  insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection.crt"
@@ -26,12 +49,59 @@ grpc_client:
   tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
   tls-server-name: "qs-apiserver.svc"  # 服务端证书的 CN，用于验证
 
-# JWT 配置（已废弃，使用 IAM 统一认证）
-jwt:
-  secret_key: "change-me"
-  token_duration: 168  # 7 天 (24*7小时)
+# ============================================================
+# 3. 存储配置
+# ============================================================
+# 数据库、缓存等存储服务配置
 
-# IAM 集成配置
+# -------------------------------------------------------
+# 3.1 Redis 缓存（Cache Redis）
+# -------------------------------------------------------
+# 用途：缓存、会话、限流等临时数据
+redis:
+  cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
+
+  # -------------------------------------------------------
+  # 3.2 Redis 存储（Store Redis）
+  # -------------------------------------------------------
+  # 用途：持久化存储、队列、发布订阅等
+  store:
+    host: "127.0.0.1"
+    port: 6380
+    username: ""
+    password: ""
+    database: 1
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: false
+
+# ============================================================
+# 4. 集成配置
+# ============================================================
+# 外部服务集成配置（IAM 等）
+
+# -------------------------------------------------------
+# 4.1 IAM 认证集成
+# -------------------------------------------------------
+# 说明：IAM 服务端口规划
+# - 9080: HTTP REST API（内部调用，不加密）
+# - 9444: HTTPS REST API（外网访问，SSL 加密）
+# - 9090: gRPC with mTLS（服务间调用，双向认证）
+# - 9091: Health Check（健康检查端口）
 iam:
   enabled: true       # 启用 IAM 集成
   grpc-enabled: true  # 启用 gRPC 认证
@@ -83,7 +153,14 @@ iam:
     ttl: 10m
     max-size: 50000
 
-# 日志配置
+# ============================================================
+# 5. 系统配置
+# ============================================================
+# 日志、JWT 等系统级配置
+
+# -------------------------------------------------------
+# 5.1 日志配置
+# -------------------------------------------------------
 log:
   disable-caller: true
   disable-stacktrace: true
@@ -110,32 +187,10 @@ log:
       - stderr
       - /data/logs/qs/qs-collection-server-error.log
 
-# Redis 配置
-redis:
-  # Cache Redis - 用于缓存、会话、限流等临时数据
-  cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
-    database: 0
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
-
-  # Store Redis - 用于持久化存储、队列、发布订阅等
-  store:
-    host: "127.0.0.1"
-    port: 6380
-    username: ""
-    password: ""
-    database: 1
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
+# -------------------------------------------------------
+# 5.2 JWT 配置（已废弃）
+# -------------------------------------------------------
+# 说明：已迁移到 IAM 统一认证，此配置保留用于降级方案
+jwt:
+  secret_key: "change-me"
+  token_duration: 168  # 7 天 (24*7小时)

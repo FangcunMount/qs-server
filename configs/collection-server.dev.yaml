@@ -1,11 +1,31 @@
-# Collection Server 配置文件
+# ============================================================
+# collection-server 开发环境配置
+# ============================================================
+# 用途：BFF 层服务，提供前端友好的 REST API，调用 apiserver gRPC 服务
+# 维护人：DevOps Team
+# 最后更新：2025-01-20
+# ============================================================
 
-# 服务器配置
+# ============================================================
+# 1. 应用配置
+# ============================================================
+# 应用级别的基础配置（开发环境）
+
+# ============================================================
+# 2. 端口配置
+# ============================================================
+# HTTP、HTTPS 服务端口配置（开发环境使用 18xxx 端口避免冲突）
+
+# -------------------------------------------------------
+# 2.1 HTTP 服务（开发主端口）
+# -------------------------------------------------------
 insecure:
   bind-address: "127.0.0.1"
   bind-port: 18083
 
-# 安全服务配置（HTTPS REST API - 供浏览器访问）
+# -------------------------------------------------------
+# 2.2 HTTPS 服务（测试 TLS）
+# -------------------------------------------------------
 secure:
   bind-address: "127.0.0.1"
   bind-port: 18443
@@ -14,11 +34,13 @@ secure:
     cert-file: "/data/infra/ssl/web/qs-collection.crt"
     private-key-file: "/data/infra/ssl/web/qs-collection.key"
 
-# gRPC 客户端配置（连接 apiserver - mTLS 测试模式）
+# -------------------------------------------------------
+# 2.3 gRPC 客户端配置（调用 apiserver）
+# -------------------------------------------------------
 grpc_client:
   endpoint: "127.0.0.1:9090"
   timeout: 30
-  insecure: false  # 启用 TLS 进行 mTLS 测试
+  insecure: false  # 启用 TLS 进行 mTLS 测试（insecure=false 表示启用 TLS）
   
   # mTLS 客户端配置（使用 infra 项目生成的证书）
   tls-cert-file: "/data/infra/ssl/grpc/server/qs-collection.crt"
@@ -26,14 +48,59 @@ grpc_client:
   tls-ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"
   tls-server-name: "qs-apiserver.svc"  # 必须与服务端证书的 CN 匹配
 
-# JWT 配置（已废弃，使用 IAM 统一认证）
-jwt:
-  secret_key: "qs-collection-server-jwt-secret-key-2024"
-  token_duration: 168  # 7 天 (24*7小时)
+# ============================================================
+# 3. 存储配置
+# ============================================================
+# 数据库、缓存等存储服务配置（开发环境）
 
-# IAM 集成配置
+# -------------------------------------------------------
+# 3.1 Redis 缓存（Cache Redis）
+# -------------------------------------------------------
+# 用途：缓存、会话、限流等临时数据
+redis:
+  cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"  # Redis 6.0+ ACL 用户名
+    password: "dev_app_123"
+    database: 0  # 缓存使用 DB 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: true  # 开发环境启用日志便于调试
+
+  # -------------------------------------------------------
+  # 3.2 Redis 存储（Store Redis）
+  # -------------------------------------------------------
+  # 用途：持久化存储、队列、发布订阅等
+  store:
+    host: "127.0.0.1"
+    port: 6380  # 使用 Store Redis 实例（端口 6380）
+    username: "app"  # Redis 6.0+ ACL 用户名
+    password: "dev_app_123"
+    database: 0  # Store Redis 使用 DB 0
+    max-idle: 50
+    max-active: 100
+    timeout: 5
+    enable-cluster: false
+    use-ssl: false
+    enable-logging: true  # 开发环境启用日志便于调试
+
+# ============================================================
+# 4. 集成配置
+# ============================================================
+# 外部服务集成配置（IAM 等）
+
+# -------------------------------------------------------
+# 4.1 IAM 认证集成（开发环境）
+# -------------------------------------------------------
+# 说明：开发环境可选择性启用 IAM 集成
+# - enabled: true 启用 IAM，需要 IAM 服务运行
+# - enabled: false 禁用 IAM，使用本地 JWT 认证
 iam:
-  enabled: true  # 开发环境默认禁用，需要时启用
+  enabled: true  # 开发环境默认启用，测试 IAM 集成
   grpc-enabled: true
   jwks-enabled: true
   
@@ -43,13 +110,13 @@ iam:
   
   # gRPC 客户端配置
   grpc:
-    address: "iam-apiserver:9080"  # IAM gRPC 服务地址（Docker 容器名）
+    address: "iam-apiserver:9090"  # IAM gRPC 服务地址（需修正为 9090）
     timeout: 30s
     retry-max: 3
     
-    # mTLS 配置（开发环境示例，需要时启用）
+    # mTLS 配置（开发环境测试）
     tls:
-      enabled: true              # 开发环境禁用 mTLS（需要时改为 true）
+      enabled: true              # 开发环境可启用 mTLS 测试
       ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链
       cert-file: "/data/infra/ssl/grpc/server/qs-collection.crt" # QS 客户端证书
       key-file: "/data/infra/ssl/grpc/server/qs-collection.key"  # QS 客户端私钥
@@ -65,7 +132,7 @@ iam:
   # JWKS 配置
   jwks:
     url: "http://iam-apiserver:9080/.well-known/jwks.json"
-    grpc-endpoint: "iam-apiserver:9080"                    # gRPC 降级端点（HTTP 失败时使用）
+    grpc-endpoint: "iam-apiserver:9090"  # 修正为 9090 端口
     refresh-interval: 1h
     cache-ttl: 24h
     fetch-strategies: ["http", "grpc", "cache"]  # 降级策略：HTTP → gRPC → 缓存
@@ -82,48 +149,33 @@ iam:
     ttl: 10m
     max-size: 50000
 
-# 日志配置
+# ============================================================
+# 5. 系统配置
+# ============================================================
+# 日志、JWT 等系统级配置（开发环境）
+
+# -------------------------------------------------------
+# 5.1 日志配置（开发环境 - 控制台友好）
+# -------------------------------------------------------
 log:
   name: "collection-server"
-  level: "debug" # 日志级别：debug, info, warn, error, fatal, panic
-  format: "console" # 日志格式：console, json
-  enable-color: true # 是否开启颜色
-  disable-caller: false # 是否禁用调用者
-  disable-stacktrace: false # 是否禁用堆栈跟踪
-  development: false # 是否为开发环境
-  output-paths: ["/data/logs/qs/collection-server.log", "stdout"] # 输出路径
-  error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"] # 错误输出路径
-  max-size: 100 # 单个日志文件最大大小（MB）
-  max-age: 30 # 保留旧日志文件的最大天数
-  max-backups: 10 # 保留旧日志文件的最大个数
-  compress: true # 是否压缩旧日志文件
+  level: "debug" # 开发环境使用 debug 级别
+  format: "console" # 控制台格式便于阅读
+  enable-color: true # 启用颜色便于区分
+  disable-caller: false # 显示调用者信息
+  disable-stacktrace: false # 显示堆栈跟踪
+  development: true # 开发模式
+  output-paths: ["/data/logs/qs/collection-server.log", "stdout"]
+  error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"]
+  max-size: 100
+  max-age: 7  # 开发环境保留 7 天
+  max-backups: 3  # 开发环境保留 3 个备份
+  compress: false # 开发环境不压缩
 
-# Redis 配置（双实例架构）
-redis:
-  # Cache Redis - 用于缓存、会话、限流等临时数据
-  cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: "app"  # Redis 6.0+ ACL 用户名
-    password: "dev_app_123"
-    database: 0  # 缓存使用 DB 0
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）
-  
-  # Store Redis - 用于持久化存储、队列、发布订阅等
-  store:
-    host: "127.0.0.1"
-    port: 6380  # 使用 Store Redis 实例（端口 6380）
-    username: "app"  # Redis 6.0+ ACL 用户名
-    password: "dev_app_123"
-    database: 0  # Store Redis 使用 DB 0
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: true  # 开启 Redis 命令日志（用于调试，生产环境建议关闭）
+# -------------------------------------------------------
+# 5.2 JWT 配置（本地认证降级方案）
+# -------------------------------------------------------
+# 说明：当 IAM 不可用时的降级认证方式
+jwt:
+  secret_key: "qs-collection-server-jwt-secret-key-2024"
+  token_duration: 168  # 7 天 (24*7小时)
