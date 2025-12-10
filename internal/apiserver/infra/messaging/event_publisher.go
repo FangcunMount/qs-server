@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -31,7 +31,11 @@ func NewMessagingEventPublisher(publisher messaging.Publisher) *MessagingEventPu
 // Publish 发布单个领域事件
 func (p *MessagingEventPublisher) Publish(ctx context.Context, evt event.DomainEvent) error {
 	if p.publisher == nil {
-		log.Warnf("publisher is nil, skip event publishing: %s", evt.EventType())
+		logger.L(ctx).Warnw("publisher is nil, skip event publishing",
+			"action", "publish_event",
+			"event_type", evt.EventType(),
+			"result", "skipped",
+		)
 		return nil
 	}
 
@@ -53,8 +57,14 @@ func (p *MessagingEventPublisher) Publish(ctx context.Context, evt event.DomainE
 		return fmt.Errorf("failed to publish event %s: %w", evt.EventType(), err)
 	}
 
-	log.Infof("event published: type=%s, id=%s, aggregate=%s/%s",
-		evt.EventType(), evt.EventID(), evt.AggregateType(), evt.AggregateID())
+	logger.L(ctx).Infow("event published",
+		"action", "publish_event",
+		"event_type", evt.EventType(),
+		"event_id", evt.EventID(),
+		"aggregate_type", evt.AggregateType(),
+		"aggregate_id", evt.AggregateID(),
+		"result", "success",
+	)
 
 	return nil
 }
@@ -91,12 +101,13 @@ func NewLoggingEventPublisher() *LoggingEventPublisher {
 
 // Publish 记录事件日志
 func (p *LoggingEventPublisher) Publish(ctx context.Context, evt event.DomainEvent) error {
-	log.Infof("[DomainEvent] type=%s, id=%s, aggregate=%s/%s, occurred_at=%s",
-		evt.EventType(),
-		evt.EventID(),
-		evt.AggregateType(),
-		evt.AggregateID(),
-		evt.OccurredAt().Format("2006-01-02T15:04:05.000Z07:00"),
+	logger.L(ctx).Infow("[DomainEvent]",
+		"action", "log_event",
+		"event_type", evt.EventType(),
+		"event_id", evt.EventID(),
+		"aggregate_type", evt.AggregateType(),
+		"aggregate_id", evt.AggregateID(),
+		"occurred_at", evt.OccurredAt().Format("2006-01-02T15:04:05.000Z07:00"),
 	)
 	return nil
 }

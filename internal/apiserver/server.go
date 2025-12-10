@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
@@ -42,6 +43,10 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 	// 创建  服务器
 	genericServer, err := buildGenericServer(cfg)
 	if err != nil {
+		logger.L(context.Background()).Errorw("Failed to build generic server",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 		log.Fatalf("Failed to build generic server: %v", err)
 		return nil, err
 	}
@@ -65,29 +70,47 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 func (s *apiServer) PrepareRun() preparedAPIServer {
 	// 初始化数据库连接
 	if err := s.dbManager.Initialize(); err != nil {
+		logger.L(context.Background()).Errorw("Failed to initialize database",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
 	// 获取 MySQL 数据库连接
 	mysqlDB, err := s.dbManager.GetMySQLDB()
 	if err != nil {
+		logger.L(context.Background()).Errorw("Failed to get MySQL connection",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 		log.Fatalf("Failed to get MySQL connection: %v", err)
 	}
 
 	// 获取 MongoDB 数据库链接
 	mongoDB, err := s.dbManager.GetMongoDB()
 	if err != nil {
+		logger.L(context.Background()).Errorw("Failed to get MongoDB connection",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 		log.Fatalf("Failed to get MongoDB connection: %v", err)
 	}
 
 	// 获取 Redis 客户端（cache/store）
 	redisCache, err := s.dbManager.GetRedisClient()
 	if err != nil {
-		log.Warnf("Cache Redis not available: %v", err)
+		logger.L(context.Background()).Warnw("Cache Redis not available",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 	}
 	redisStore, err := s.dbManager.GetStoreRedisClient()
 	if err != nil {
-		log.Warnf("Store Redis not available: %v", err)
+		logger.L(context.Background()).Warnw("Store Redis not available",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 	}
 
 	// 创建六边形架构容器（自动发现版本）
@@ -96,6 +119,10 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	ctx := context.Background()
 	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
 	if err != nil {
+		logger.L(context.Background()).Errorw("Failed to initialize IAM module",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
 		log.Fatalf("Failed to initialize IAM module: %v", err)
 	}
 	s.container.IAMModule = iamModule

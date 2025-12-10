@@ -4,12 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/gin-gonic/gin"
-
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/gin-gonic/gin"
 )
 
 // BaseHandler 基础Handler结构
@@ -55,7 +54,10 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 	}
 
 	// 记录错误日志
-	log.Errorf("HTTP Handler Error: %+v", err)
+	logger.L(c.Request.Context()).Errorw("HTTP Handler Error",
+		"action", "http_error",
+		"error", err.Error(),
+	)
 
 	var httpStatus int
 	var errorCode int

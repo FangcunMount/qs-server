@@ -3,7 +3,7 @@ package handler
 import (
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
@@ -52,12 +52,16 @@ func NewActorHandler(
 // @Produce json
 // @Param id path int true "受试者ID"
 // @Success 200 {object} Response{data=response.TesteeResponse}
-// @Router /api/v1/testees/{id} [get]
+// GetTestee 获取受试者详情
 func (h *ActorHandler) GetTestee(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		log.Errorf("Invalid testee ID: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
+			"action", "get_testee",
+			"testee_id", idStr,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -65,7 +69,11 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 	// 使用查询服务
 	result, err := h.testeeQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
-		log.Errorf("Failed to get testee: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to get testee",
+			"action", "get_testee",
+			"testee_id", id,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -81,19 +89,27 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Param id path int true "受试者ID"
 // @Param body body request.UpdateTesteeRequest true "更新受试者请求"
 // @Success 200 {object} Response{data=response.TesteeResponse}
-// @Router /api/v1/testees/{id} [put]
+// UpdateTestee 更新受试者
 func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		log.Errorf("Invalid testee ID: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
+			"action", "update_testee",
+			"testee_id", idStr,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	var req request.UpdateTesteeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Errorf("Invalid request: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid request",
+			"action", "update_testee",
+			"testee_id", id,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -103,7 +119,12 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 		dto := toUpdateTesteeProfileDTO(id, &req)
 		err = h.testeeManagementService.UpdateBasicInfo(c.Request.Context(), dto)
 		if err != nil {
-			log.Errorf("Failed to update testee profile: %v", err)
+			logger.L(c.Request.Context()).Errorw("Failed to update testee profile",
+				"action", "update_testee",
+				"resource", "testee",
+				"testee_id", id,
+				"error", err.Error(),
+			)
 			h.ErrorResponse(c, err)
 			return
 		}
@@ -122,7 +143,13 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 			err = h.testeeManagementService.UnmarkKeyFocus(c.Request.Context(), id)
 		}
 		if err != nil {
-			log.Errorf("Failed to update key focus status: %v", err)
+			logger.L(c.Request.Context()).Errorw("Failed to update key focus status",
+				"action", "update_testee",
+				"resource", "testee",
+				"testee_id", id,
+				"field", "is_key_focus",
+				"error", err.Error(),
+			)
 			h.ErrorResponse(c, err)
 			return
 		}
@@ -131,7 +158,12 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 	// 查询更新后的结果
 	result, err := h.testeeQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
-		log.Errorf("Failed to get updated testee: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to get updated testee",
+			"action", "update_testee",
+			"resource", "testee",
+			"testee_id", id,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -153,7 +185,11 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 func (h *ActorHandler) ListTestees(c *gin.Context) {
 	var req request.ListTesteeRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		log.Errorf("Invalid request: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid list testees request",
+			"action", "list_testees",
+			"resource", "testee",
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -178,7 +214,12 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 
 	listResult, err := h.testeeQueryService.ListTestees(c.Request.Context(), dto)
 	if err != nil {
-		log.Errorf("Failed to list testees: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to list testees",
+			"action", "list_testees",
+			"resource", "testee",
+			"org_id", dto.OrgID,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -199,7 +240,11 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 func (h *ActorHandler) CreateStaff(c *gin.Context) {
 	var req request.CreateStaffRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Errorf("Invalid request: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid create staff request",
+			"action", "create_staff",
+			"resource", "staff",
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -208,7 +253,13 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 	// 使用生命周期服务 - 服务于人事/行放部门
 	result, err := h.staffLifecycleService.Register(c.Request.Context(), dto)
 	if err != nil {
-		log.Errorf("Failed to create staff: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to create staff",
+			"action", "create_staff",
+			"resource", "staff",
+			"org_id", dto.OrgID,
+			"user_id", dto.UserID,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -227,7 +278,12 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		log.Errorf("Invalid staff ID: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid staff ID",
+			"action", "get_staff",
+			"resource", "staff",
+			"staff_id", idStr,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -235,7 +291,12 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 	// 使用查询服务
 	result, err := h.staffQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
-		log.Errorf("Failed to get staff: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to get staff",
+			"action", "get_staff",
+			"resource", "staff",
+			"staff_id", id,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -254,14 +315,24 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		log.Errorf("Invalid staff ID: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid staff ID",
+			"action", "delete_staff",
+			"resource", "staff",
+			"staff_id", idStr,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
 
 	// 使用生命周期服务 - 服务于人事/行政部门
 	if err := h.staffLifecycleService.Delete(c.Request.Context(), id); err != nil {
-		log.Errorf("Failed to delete staff: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to delete staff",
+			"action", "delete_staff",
+			"resource", "staff",
+			"staff_id", id,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -282,7 +353,11 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 func (h *ActorHandler) ListStaff(c *gin.Context) {
 	var req request.ListStaffRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		log.Errorf("Invalid request: %v", err)
+		logger.L(c.Request.Context()).Warnw("Invalid list staff request",
+			"action", "list_staff",
+			"resource", "staff",
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}
@@ -312,7 +387,12 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 
 	listResult, err := h.staffQueryService.ListStaffs(c.Request.Context(), listDTO)
 	if err != nil {
-		log.Errorf("Failed to list staff: %v", err)
+		logger.L(c.Request.Context()).Errorw("Failed to list staff",
+			"action", "list_staff",
+			"resource", "staff",
+			"org_id", listDTO.OrgID,
+			"error", err.Error(),
+		)
 		h.ErrorResponse(c, err)
 		return
 	}

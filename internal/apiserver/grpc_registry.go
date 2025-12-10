@@ -1,7 +1,10 @@
 package apiserver
 
 import (
+	"context"
+
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
@@ -23,7 +26,10 @@ func NewGRPCRegistry(server *grpcpkg.Server, container *container.Container) *GR
 
 // RegisterServices 注册所有 GRPC 服务
 func (r *GRPCRegistry) RegisterServices() error {
-	log.Info("🔧 Registering GRPC services...")
+	logger.L(context.Background()).Infow("Registering GRPC services",
+		"component", "grpc",
+		"action", "register_services",
+	)
 
 	// 注册答卷服务
 	if err := r.registerAnswerSheetService(); err != nil {
@@ -45,7 +51,10 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
-	log.Info("✅ All GRPC services registered successfully")
+	logger.L(context.Background()).Infow("All GRPC services registered successfully",
+		"component", "grpc",
+		"result", "success",
+	)
 	return nil
 }
 

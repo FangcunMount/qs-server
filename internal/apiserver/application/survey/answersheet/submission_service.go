@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -38,38 +39,109 @@ func NewSubmissionService(
 
 // Submit 提交答卷
 func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO) (*AnswerSheetResult, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	l.Infow("开始提交答卷",
+		"action", "submit",
+		"resource", "answersheet",
+		"questionnaire_code", dto.QuestionnaireCode,
+		"questionnaire_ver", dto.QuestionnaireVer,
+		"filler_id", dto.FillerID,
+		"answer_count", len(dto.Answers),
+	)
+
 	// 1. 验证输入参数
 	if dto.QuestionnaireCode == "" {
+		l.Warnw("答卷提交失败：问卷编码为空",
+			"action", "submit",
+			"resource", "answersheet",
+			"result", "failed",
+			"reason", "empty_questionnaire_code",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "问卷编码不能为空")
 	}
 	if dto.QuestionnaireVer <= 0 {
+		l.Warnw("答卷提交失败：问卷版本无效",
+			"action", "submit",
+			"resource", "answersheet",
+			"result", "failed",
+			"questionnaire_ver", dto.QuestionnaireVer,
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "问卷版本不能为空")
 	}
 	if dto.FillerID == 0 {
+		l.Warnw("答卷提交失败：填写人ID为空",
+			"action", "submit",
+			"resource", "answersheet",
+			"result", "failed",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "填写人ID不能为空")
 	}
 	if len(dto.Answers) == 0 {
+		l.Warnw("答卷提交失败：答案列表为空",
+			"action", "submit",
+			"resource", "answersheet",
+			"result", "failed",
+			"questionnaire_code", dto.QuestionnaireCode,
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答案列表不能为空")
 	}
+
+	l.Debugw("输入参数验证通过",
+		"questionnaire_code", dto.QuestionnaireCode,
+		"filler_id", dto.FillerID,
+	)
 
 	// 2. 构建填写人引用
 	fillerRef := actor.NewFillerRef(int64(dto.FillerID), actor.FillerTypeSelf)
 
 	// 3. 获取问卷信息（用于验证）
+	l.Debugw("开始获取问卷信息",
+		"questionnaire_code", dto.QuestionnaireCode,
+		"action", "read",
+		"resource", "questionnaire",
+	)
+
 	qnr, err := s.questionnaireRepo.FindByCode(ctx, dto.QuestionnaireCode)
 	if err != nil {
+		l.Errorw("获取问卷信息失败",
+			"questionnaire_code", dto.QuestionnaireCode,
+			"action", "read",
+			"resource", "questionnaire",
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
 	}
+
+	l.Debugw("问卷信息获取成功",
+		"questionnaire_code", dto.QuestionnaireCode,
+		"questionnaire_title", qnr.GetTitle(),
+		"question_count", len(qnr.GetQuestions()),
+		"result", "success",
+	)
 
 	// 验证问卷版本是否匹配
 	qnrVer, _ := strconv.Atoi(qnr.GetVersion().Value())
 	if qnrVer != dto.QuestionnaireVer {
+		l.Warnw("问卷版本不匹配",
+			"questionnaire_code", dto.QuestionnaireCode,
+			"expected_version", dto.QuestionnaireVer,
+			"actual_version", qnrVer,
+			"result", "failed",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
 			"%s", fmt.Sprintf("问卷版本不匹配，期望: %d, 实际: %d", dto.QuestionnaireVer, qnrVer))
 	}
 
 	// 验证问卷是否已发布（只能对已发布的问卷提交答卷）
 	if !qnr.IsPublished() {
+		l.Warnw("问卷未发布，无法提交答卷",
+			"questionnaire_code", dto.QuestionnaireCode,
+			"status", qnr.GetStatus().String(),
+			"result", "failed",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "只能对已发布的问卷提交答卷")
 	}
 
@@ -79,6 +151,12 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		questionMap[q.GetCode().Value()] = q
 	}
 
+	l.Debugw("问卷验证通过",
+		"questionnaire_code", dto.QuestionnaireCode,
+		"version", qnrVer,
+		"question_count", len(questionMap),
+	)
+
 	// 4. 构建问卷引用
 	questionnaireRef := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
@@ -87,11 +165,23 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	)
 
 	// 5. 转换答案列表并验证
+	l.Infow("开始验证答案",
+		"answer_count", len(dto.Answers),
+		"action", "validate",
+		"resource", "answer",
+	)
+
 	answers := make([]answersheet.Answer, 0, len(dto.Answers))
-	for _, answerDTO := range dto.Answers {
+	validatedCount := 0
+	for i, answerDTO := range dto.Answers {
 		// 5.1 检查问题是否存在于问卷中
 		question, exists := questionMap[answerDTO.QuestionCode]
 		if !exists {
+			l.Warnw("问题不存在于问卷中",
+				"question_code", answerDTO.QuestionCode,
+				"answer_index", i,
+				"result", "failed",
+			)
 			return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
 				"%s", fmt.Sprintf("问题 %s 不存在于问卷中", answerDTO.QuestionCode))
 		}
@@ -102,6 +192,12 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 			answerDTO.Value,
 		)
 		if err != nil {
+			l.Warnw("创建答案值失败",
+				"question_code", answerDTO.QuestionCode,
+				"question_type", answerDTO.QuestionType,
+				"error", err.Error(),
+				"result", "failed",
+			)
 			return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid,
 				"%s", fmt.Sprintf("创建答案值失败 [%s]", answerDTO.QuestionCode))
 		}
@@ -115,6 +211,11 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 			for _, validationErr := range validationResult.GetErrors() {
 				errMessages = append(errMessages, validationErr.GetMessage())
 			}
+			l.Warnw("答案验证失败",
+				"question_code", answerDTO.QuestionCode,
+				"validation_errors", fmt.Sprintf("%v", errMessages),
+				"result", "failed",
+			)
 			return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
 				"%s", fmt.Sprintf("问题 %s 答案验证失败: %v", answerDTO.QuestionCode, errMessages))
 		}
@@ -127,14 +228,32 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 			0, // 初始分数为0，后续由评分系统计算
 		)
 		if err != nil {
+			l.Errorw("创建答案对象失败",
+				"question_code", answerDTO.QuestionCode,
+				"error", err.Error(),
+				"result", "failed",
+			)
 			return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid,
 				"%s", fmt.Sprintf("创建答案失败 [%s]", answerDTO.QuestionCode))
 		}
 
 		answers = append(answers, answer)
+		validatedCount++
 	}
 
+	l.Infow("答案验证完成",
+		"validated_count", validatedCount,
+		"total_count", len(dto.Answers),
+		"result", "success",
+	)
+
 	// 6. 创建答卷领域对象
+	l.Debugw("开始创建答卷领域对象",
+		"questionnaire_code", dto.QuestionnaireCode,
+		"filler_id", dto.FillerID,
+		"answer_count", len(answers),
+	)
+
 	sheet, err := answersheet.NewAnswerSheet(
 		questionnaireRef,
 		fillerRef,
@@ -142,13 +261,43 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		time.Now(), // 填写时间
 	)
 	if err != nil {
+		l.Errorw("创建答卷领域对象失败",
+			"questionnaire_code", dto.QuestionnaireCode,
+			"error", err.Error(),
+			"result", "failed",
+		)
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷失败")
 	}
 
 	// 7. 持久化
+	l.Infow("开始保存答卷",
+		"action", "create",
+		"resource", "answersheet",
+		"questionnaire_code", dto.QuestionnaireCode,
+	)
+
 	if err := s.repo.Create(ctx, sheet); err != nil {
+		l.Errorw("保存答卷失败",
+			"action", "create",
+			"resource", "answersheet",
+			"questionnaire_code", dto.QuestionnaireCode,
+			"error", err.Error(),
+			"result", "failed",
+		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
 	}
+
+	duration := time.Since(startTime)
+	l.Infow("答卷提交成功",
+		"action", "submit",
+		"resource", "answersheet",
+		"result", "success",
+		"answersheet_id", sheet.ID().Uint64(),
+		"questionnaire_code", dto.QuestionnaireCode,
+		"filler_id", dto.FillerID,
+		"answer_count", len(answers),
+		"duration_ms", duration.Milliseconds(),
+	)
 
 	return toAnswerSheetResult(sheet), nil
 }

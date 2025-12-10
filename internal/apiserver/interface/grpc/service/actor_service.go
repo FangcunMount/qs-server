@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor"
 )
@@ -74,18 +74,36 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 	}
 
 	// 调用应用服务
-	log.Infof("Creating testee: OrgID=%d, ProfileID=%v, Name=%s", dto.OrgID, dto.ProfileID, dto.Name)
+	logger.L(ctx).Infow("Creating testee",
+		"action", "create_testee",
+		"org_id", dto.OrgID,
+		"profile_id", dto.ProfileID,
+		"name", dto.Name,
+	)
 	result, err := s.registrationService.Register(ctx, dto)
 	if err != nil {
-		log.Errorf("创建受试者失败: %v (OrgID=%d, Name=%s)", err, dto.OrgID, dto.Name)
+		logger.L(ctx).Errorw("Failed to create testee",
+			"action", "create_testee",
+			"org_id", dto.OrgID,
+			"name", dto.Name,
+			"error", err.Error(),
+		)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	log.Infof("Testee created successfully: ID=%d, Name=%s", result.ID, result.Name)
+	logger.L(ctx).Infow("Testee created successfully",
+		"action", "create_testee",
+		"testee_id", result.ID,
+		"name", result.Name,
+	)
 
 	// 如果需要标记为重点关注
 	if req.IsKeyFocus {
 		if err := s.managementService.MarkAsKeyFocus(ctx, result.ID); err != nil {
-			log.Warnf("标记重点关注失败: %v", err)
+			logger.L(ctx).Warnw("Failed to mark as key focus",
+				"action", "mark_key_focus",
+				"testee_id", result.ID,
+				"error", err.Error(),
+			)
 			// 不影响主流程，继续返回结果
 		}
 	}
@@ -94,7 +112,12 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 	for _, tag := range req.Tags {
 		if tag != "" {
 			if err := s.managementService.AddTag(ctx, result.ID, tag); err != nil {
-				log.Warnf("添加标签失败: %v", err)
+				logger.L(ctx).Warnw("Failed to add tag",
+					"action", "add_tag",
+					"testee_id", result.ID,
+					"tag", tag,
+					"error", err.Error(),
+				)
 				// 不影响主流程
 			}
 		}
@@ -112,7 +135,11 @@ func (s *ActorService) GetTestee(ctx context.Context, req *pb.GetTesteeRequest) 
 
 	result, err := s.queryService.GetByID(ctx, req.Id)
 	if err != nil {
-		log.Errorf("获取受试者失败: %v", err)
+		logger.L(ctx).Errorw("Failed to get testee",
+			"action", "get_testee",
+			"testee_id", req.Id,
+			"error", err.Error(),
+		)
 		return nil, status.Error(codes.NotFound, "受试者不存在")
 	}
 
@@ -142,7 +169,11 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 
 	// 调用应用服务
 	if err := s.managementService.UpdateBasicInfo(ctx, dto); err != nil {
-		log.Errorf("更新受试者失败: %v", err)
+		logger.L(ctx).Errorw("Failed to update testee",
+			"action", "update_testee",
+			"testee_id", dto.TesteeID,
+			"error", err.Error(),
+		)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -151,7 +182,11 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 		// 获取当前受试者信息
 		current, err := s.queryService.GetByID(ctx, req.Id)
 		if err != nil {
-			log.Warnf("获取受试者当前信息失败: %v", err)
+			logger.L(ctx).Warnw("Failed to get current testee info",
+				"action", "update_tags",
+				"testee_id", req.Id,
+				"error", err.Error(),
+			)
 		} else {
 			// 简单处理：先删除所有旧标签，再添加新标签
 			for _, oldTag := range current.Tags {
@@ -225,7 +260,11 @@ func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTestees
 
 	result, err := s.queryService.ListTestees(ctx, dto)
 	if err != nil {
-		log.Errorf("查询受试者列表失败: %v", err)
+		logger.L(ctx).Errorw("Failed to list testees",
+			"action", "list_testees",
+			"org_id", dto.OrgID,
+			"error", err.Error(),
+		)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -252,7 +291,11 @@ func (s *ActorService) ListTesteesByUser(ctx context.Context, req *pb.ListTestee
 
 	result, err := s.queryService.ListByProfileIDs(ctx, req.IamChildIds, offset, limit)
 	if err != nil {
-		log.Errorf("查询用户受试者列表失败: %v", err)
+		logger.L(ctx).Errorw("Failed to list testees by user",
+			"action", "list_testees_by_user",
+			"profile_count", len(req.IamChildIds),
+			"error", err.Error(),
+		)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

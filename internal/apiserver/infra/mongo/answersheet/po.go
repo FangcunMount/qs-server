@@ -3,7 +3,6 @@ package answersheet
 import (
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/util/idutil"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -39,9 +38,6 @@ func (p *AnswerSheetPO) BeforeInsert() {
 	// 生成DomainID
 	domainID := meta.ID(idutil.GetIntID())
 	p.DomainID = domainID
-
-	// 添加调试日志
-	log.Infof("生成答卷DomainID: %d", domainID)
 
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 )
@@ -53,10 +53,17 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 			CacheTTL:        config.JWKS.CacheTTL,
 			FallbackOnError: true, // 失败时使用缓存
 		}
-		log.Infof("JWKS enabled: URL=%s, GRPCEndpoint=%s, RefreshInterval=%v, CacheTTL=%v",
-			config.JWKS.URL, config.JWKS.GRPCEndpoint, config.JWKS.RefreshInterval, config.JWKS.CacheTTL)
+		logger.L(ctx).Infow("JWKS enabled",
+			"component", "iam.token_verifier",
+			"url", config.JWKS.URL,
+			"grpc_endpoint", config.JWKS.GRPCEndpoint,
+			"refresh_interval", config.JWKS.RefreshInterval,
+			"cache_ttl", config.JWKS.CacheTTL,
+		)
 	} else {
-		log.Warn("JWKS disabled, will use remote verification only")
+		logger.L(ctx).Warnw("JWKS disabled, will use remote verification only",
+			"component", "iam.token_verifier",
+		)
 	}
 
 	// 使用 SDK 的 NewTokenVerifier（自动创建 JWKSManager 和选择验证策略）
@@ -65,8 +72,11 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 		return nil, fmt.Errorf("failed to create token verifier: %w", err)
 	}
 
-	log.Info("Token verifier initialized successfully (using IAM SDK)")
-	log.Infof("  Strategy: %s", verifier.Strategy().Name())
+	logger.L(ctx).Infow("Token verifier initialized successfully",
+		"component", "iam.token_verifier",
+		"strategy", verifier.Strategy().Name(),
+		"result", "success",
+	)
 
 	return &TokenVerifier{
 		verifier: verifier,
@@ -95,10 +105,9 @@ func (v *TokenVerifier) SDKVerifier() *auth.TokenVerifier {
 	return v.verifier
 }
 
-// Close 关闭验证器
+// Close 关闭Token验证器
 func (v *TokenVerifier) Close() {
 	if v.jwksManager != nil {
 		v.jwksManager.Stop()
 	}
-	log.Debug("Token verifier closed")
 }

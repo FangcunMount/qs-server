@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -53,18 +53,29 @@ func (h *EventPublishHandler) Handle(ctx context.Context, evalCtx *Context) erro
 	domainEvent := h.buildEvent(evalCtx)
 
 	// 发布事件
+	l := logger.L(ctx)
 	if h.publisher != nil {
 		if err := h.publisher.Publish(ctx, domainEvent); err != nil {
 			// 事件发布失败不应该中断整个流程
 			// 记录错误但继续执行（可以通过重试机制补偿）
-			log.Warnf("failed to publish AssessmentInterpretedEvent for assessment %d: %v",
-				evalCtx.Assessment.ID(), err)
+			l.Warnw("failed to publish AssessmentInterpretedEvent",
+				"action", "publish_event",
+				"assessment_id", evalCtx.Assessment.ID(),
+				"result", "failed",
+				"error", err.Error(),
+			)
 		} else {
-			log.Infof("AssessmentInterpretedEvent published for assessment %d, risk level: %s",
-				evalCtx.Assessment.ID(), evalCtx.RiskLevel)
+			l.Infow("AssessmentInterpretedEvent published",
+				"action", "publish_event",
+				"assessment_id", evalCtx.Assessment.ID(),
+				"risk_level", evalCtx.RiskLevel,
+				"result", "success",
+			)
 		}
 	} else {
-		log.Debugf("publisher is nil, skip event publishing for assessment %d", evalCtx.Assessment.ID())
+		l.Debugw("publisher is nil, skip event publishing",
+			"assessment_id", evalCtx.Assessment.ID(),
+		)
 	}
 
 	// 同时将事件添加到 Assessment 的事件列表中（供仓储层使用）

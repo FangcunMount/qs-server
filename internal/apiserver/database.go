@@ -11,9 +11,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/FangcunMount/component-base/pkg/database"
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
-	"github.com/FangcunMount/qs-server/internal/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 )
 
@@ -35,20 +34,24 @@ func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 
 // Initialize 初始化所有数据库连接
 func (dm *DatabaseManager) Initialize() error {
-	log.Info("Initializing database connections...")
+	ctx := context.Background()
+	logger.L(ctx).Infow("Initializing database connections...",
+		"component", "DatabaseManager",
+		"action", "initialize",
+	)
 
 	// 初始化MySQL连接
-	if err := dm.initMySQL(); err != nil {
+	if err := dm.initMySQL(ctx); err != nil {
 		return fmt.Errorf("failed to initialize MySQL: %w", err)
 	}
 
 	// 初始化Redis连接
-	if err := dm.initRedis(); err != nil {
+	if err := dm.initRedis(ctx); err != nil {
 		return fmt.Errorf("failed to initialize Redis: %w", err)
 	}
 
 	// 初始化MongoDB连接
-	if err := dm.initMongoDB(); err != nil {
+	if err := dm.initMongoDB(ctx); err != nil {
 		return fmt.Errorf("failed to initialize MongoDB: %w", err)
 	}
 
@@ -58,16 +61,20 @@ func (dm *DatabaseManager) Initialize() error {
 	}
 
 	// 执行数据库迁移
-	if err := dm.runMigrations(); err != nil {
+	if err := dm.runMigrations(ctx); err != nil {
 		return fmt.Errorf("failed to run database migrations: %w", err)
 	}
 
-	log.Info("All database connections initialized successfully")
+	logger.L(ctx).Infow("All database connections initialized successfully",
+		"component", "DatabaseManager",
+		"action", "initialize",
+		"result", "success",
+	)
 	return nil
 }
 
 // initMySQL 初始化MySQL连接
-func (dm *DatabaseManager) initMySQL() error {
+func (dm *DatabaseManager) initMySQL(ctx context.Context) error {
 	mysqlConfig := &database.MySQLConfig{
 		Host:                  dm.config.MySQLOptions.Host,
 		Username:              dm.config.MySQLOptions.Username,
@@ -77,24 +84,34 @@ func (dm *DatabaseManager) initMySQL() error {
 		MaxOpenConnections:    dm.config.MySQLOptions.MaxOpenConnections,
 		MaxConnectionLifeTime: dm.config.MySQLOptions.MaxConnectionLifeTime,
 		LogLevel:              dm.config.MySQLOptions.LogLevel,
-		Logger:                logger.New(dm.config.MySQLOptions.LogLevel),
+		Logger:                logger.NewGormLogger(dm.config.MySQLOptions.LogLevel),
 	}
 
 	if mysqlConfig.Host == "" {
-		log.Info("MySQL host not configured, skipping MySQL initialization")
+		logger.L(ctx).Infow("MySQL host not configured, skipping MySQL initialization",
+			"component", "MySQL",
+			"action", "initialize",
+			"result", "skipped",
+		)
 		return nil
 	}
 
-	log.Infof("Initializing MySQL connection: Host=%s, Database=%s, MaxIdle=%d, MaxOpen=%d, MaxLifeTime=%v",
-		mysqlConfig.Host, mysqlConfig.Database, mysqlConfig.MaxIdleConnections,
-		mysqlConfig.MaxOpenConnections, mysqlConfig.MaxConnectionLifeTime)
+	logger.L(ctx).Infow("Initializing MySQL connection",
+		"component", "MySQL",
+		"action", "initialize",
+		"host", mysqlConfig.Host,
+		"database", mysqlConfig.Database,
+		"max_idle_connections", mysqlConfig.MaxIdleConnections,
+		"max_open_connections", mysqlConfig.MaxOpenConnections,
+		"max_connection_lifetime", mysqlConfig.MaxConnectionLifeTime.String(),
+	)
 
 	mysqlConn := database.NewMySQLConnection(mysqlConfig)
 	return dm.registry.Register(database.MySQL, mysqlConfig, mysqlConn)
 }
 
 // initRedis 初始化Redis连接（双实例架构）
-func (dm *DatabaseManager) initRedis() error {
+func (dm *DatabaseManager) initRedis(ctx context.Context) error {
 	// 初始化 Cache Redis
 	cacheConfig := &database.RedisConfig{
 		Host:                  dm.config.RedisDualOptions.Cache.Host,
@@ -112,7 +129,11 @@ func (dm *DatabaseManager) initRedis() error {
 	}
 
 	if cacheConfig.Host == "" {
-		log.Info("Cache Redis host not configured, skipping Cache Redis initialization")
+		logger.L(ctx).Infow("Cache Redis host not configured, skipping Cache Redis initialization",
+			"component", "CacheRedis",
+			"action", "initialize",
+			"result", "skipped",
+		)
 	} else {
 		cacheConn := database.NewRedisConnection(cacheConfig)
 		// 注册为主 Redis 实例（保持向后兼容）
@@ -120,7 +141,14 @@ func (dm *DatabaseManager) initRedis() error {
 			return fmt.Errorf("failed to register cache redis: %w", err)
 		}
 		dm.cacheRedis = cacheConn
-		log.Info("Cache Redis initialized successfully")
+		logger.L(ctx).Infow("Cache Redis initialized successfully",
+			"component", "CacheRedis",
+			"action", "initialize",
+			"result", "success",
+			"host", cacheConfig.Host,
+			"port", cacheConfig.Port,
+			"database", cacheConfig.Database,
+		)
 	}
 
 	// 初始化 Store Redis
@@ -140,14 +168,26 @@ func (dm *DatabaseManager) initRedis() error {
 	}
 
 	if storeConfig.Host == "" {
-		log.Info("Store Redis host not configured, skipping Store Redis initialization")
+		logger.L(ctx).Infow("Store Redis host not configured, skipping Store Redis initialization",
+			"component", "StoreRedis",
+			"action", "initialize",
+			"result", "skipped",
+		)
 	} else {
 		storeConn := database.NewRedisConnection(storeConfig)
 		if err := storeConn.Connect(); err != nil {
 			return fmt.Errorf("failed to connect store redis (%s:%d): %w", storeConfig.Host, storeConfig.Port, err)
 		}
 		dm.storeRedis = storeConn
-		log.Infof("Store Redis connected successfully to %s:%d (not registered in registry)", storeConfig.Host, storeConfig.Port)
+		logger.L(ctx).Infow("Store Redis connected successfully",
+			"component", "StoreRedis",
+			"action", "initialize",
+			"result", "success",
+			"host", storeConfig.Host,
+			"port", storeConfig.Port,
+			"database", storeConfig.Database,
+			"note", "not registered in registry",
+		)
 		_ = storeConn // 暂时不注册到 registry，后续如需复用可扩展注册机制
 	}
 
@@ -155,7 +195,7 @@ func (dm *DatabaseManager) initRedis() error {
 }
 
 // initMongoDB 初始化MongoDB连接
-func (dm *DatabaseManager) initMongoDB() error {
+func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 	// 直接传递分离参数，由 MongoConfig.BuildURL() 构建连接 URL
 	mongoConfig := &database.MongoConfig{
 		Host:                     dm.config.MongoDBOptions.Host,
@@ -170,7 +210,11 @@ func (dm *DatabaseManager) initMongoDB() error {
 	}
 
 	if mongoConfig.Host == "" {
-		log.Info("MongoDB host not configured, skipping MongoDB initialization")
+		logger.L(ctx).Infow("MongoDB host not configured, skipping MongoDB initialization",
+			"component", "MongoDB",
+			"action", "initialize",
+			"result", "skipped",
+		)
 		return nil
 	}
 
@@ -180,9 +224,15 @@ func (dm *DatabaseManager) initMongoDB() error {
 
 // GetMySQLDB 获取MySQL数据库连接
 func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
+	ctx := context.Background()
 	client, err := dm.registry.GetClient(database.MySQL)
 	if err != nil {
-		log.Errorf("Failed to get MySQL client from registry: %v", err)
+		logger.L(ctx).Errorw("Failed to get MySQL client from registry",
+			"component", "MySQL",
+			"action", "query",
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 
@@ -194,18 +244,34 @@ func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
 	// 检查连接状态
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Errorf("Failed to get sql.DB from gorm.DB: %v", err)
+		logger.L(ctx).Errorw("Failed to get sql.DB from gorm.DB",
+			"component", "MySQL",
+			"action", "get_sql_db",
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
 	if err := sqlDB.Ping(); err != nil {
-		log.Errorf("MySQL connection ping failed: %v", err)
+		logger.L(ctx).Errorw("MySQL connection ping failed",
+			"component", "MySQL",
+			"action", "ping",
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, fmt.Errorf("mysql ping failed: %w", err)
 	}
 
 	stats := sqlDB.Stats()
-	log.Debugf("MySQL connection stats: OpenConnections=%d, InUse=%d, Idle=%d, WaitCount=%d, MaxOpenConnections=%d",
-		stats.OpenConnections, stats.InUse, stats.Idle, stats.WaitCount, stats.MaxOpenConnections)
+	logger.L(ctx).Debugw("MySQL connection stats",
+		"component", "MySQL",
+		"open_connections", stats.OpenConnections,
+		"in_use", stats.InUse,
+		"idle", stats.Idle,
+		"wait_count", stats.WaitCount,
+		"max_open_connections", stats.MaxOpenConnections,
+	)
 
 	return db, nil
 }
@@ -282,7 +348,11 @@ func (dm *DatabaseManager) HealthCheck() error {
 
 // Close 关闭所有数据库连接
 func (dm *DatabaseManager) Close() error {
-	log.Info("Closing database connections...")
+	ctx := context.Background()
+	logger.L(ctx).Infow("Closing database connections...",
+		"component", "DatabaseManager",
+		"action", "close",
+	)
 	return dm.registry.Close()
 }
 
@@ -292,10 +362,13 @@ func (dm *DatabaseManager) GetRegistry() *database.Registry {
 }
 
 // runMigrations 执行数据库迁移
-func (dm *DatabaseManager) runMigrations() error {
+func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 	// 检查是否启用迁移
 	if !dm.config.MigrationOptions.Enabled {
-		log.Info("Database migration is disabled, skipping...")
+		logger.L(ctx).Infow("Database migration is disabled, skipping...",
+			"component", "Migration",
+			"result", "skipped",
+		)
 		return nil
 	}
 
@@ -303,7 +376,10 @@ func (dm *DatabaseManager) runMigrations() error {
 
 	// MySQL 迁移
 	if gormDB, err := dm.GetMySQLDB(); err != nil {
-		log.Warn("MySQL not configured, skipping MySQL migration")
+		logger.L(ctx).Warnw("MySQL not configured, skipping MySQL migration",
+			"component", "MySQLMigration",
+			"result", "skipped",
+		)
 	} else {
 		sqlDB, derr := gormDB.DB()
 		if derr != nil {
@@ -323,16 +399,29 @@ func (dm *DatabaseManager) runMigrations() error {
 
 		migrator := migration.NewMigrator(sqlDB, migrationConfig)
 
-		log.Info("Starting MySQL database migration...")
+		logger.L(ctx).Infow("Starting MySQL database migration...",
+			"component", "MySQLMigration",
+			"action", "migrate",
+			"database", database,
+		)
 		version, migrated, merr := migrator.Run()
 		if merr != nil {
 			return fmt.Errorf("mysql migration failed: %w", merr)
 		}
 
 		if migrated {
-			log.Infof("✅ MySQL migration completed successfully! Current version: %d", version)
+			logger.L(ctx).Infow("✅ MySQL migration completed successfully",
+				"component", "MySQLMigration",
+				"action", "migrate",
+				"result", "success",
+				"version", version,
+			)
 		} else {
-			log.Infof("✅ MySQL schema is already up to date! Current version: %d", version)
+			logger.L(ctx).Infow("✅ MySQL schema is already up to date",
+				"component", "MySQLMigration",
+				"result", "up_to_date",
+				"version", version,
+			)
 		}
 		ran = true
 	}
@@ -340,9 +429,16 @@ func (dm *DatabaseManager) runMigrations() error {
 	// MongoDB 迁移（可选）
 	mongoDBName := viper.GetString("mongodb.database")
 	if mongoClient, err := dm.GetMongoClient(); err != nil {
-		log.Infof("MongoDB not configured or unavailable, skipping migration: %v", err)
+		logger.L(ctx).Infow("MongoDB not configured or unavailable, skipping migration",
+			"component", "MongoDBMigration",
+			"result", "skipped",
+			"error", err.Error(),
+		)
 	} else if mongoDBName == "" {
-		log.Warn("MongoDB database name not configured, skipping MongoDB migration")
+		logger.L(ctx).Warnw("MongoDB database name not configured, skipping MongoDB migration",
+			"component", "MongoDBMigration",
+			"result", "skipped",
+		)
 	} else {
 		mongoDatabase := dm.config.MigrationOptions.Database
 		if mongoDatabase == "" {
@@ -357,22 +453,38 @@ func (dm *DatabaseManager) runMigrations() error {
 		}
 
 		mongoMigrator := migration.NewMongoMigrator(mongoClient, mongoConfig)
-		log.Info("Starting MongoDB migration...")
+		logger.L(ctx).Infow("Starting MongoDB migration...",
+			"component", "MongoDBMigration",
+			"action", "migrate",
+			"database", mongoDatabase,
+		)
 		mongoVersion, mongoMigrated, merr := mongoMigrator.Run()
 		if merr != nil {
 			return fmt.Errorf("mongodb migration failed: %w", merr)
 		}
 
 		if mongoMigrated {
-			log.Infof("✅ MongoDB migration completed successfully! Current version: %d", mongoVersion)
+			logger.L(ctx).Infow("✅ MongoDB migration completed successfully",
+				"component", "MongoDBMigration",
+				"action", "migrate",
+				"result", "success",
+				"version", mongoVersion,
+			)
 		} else {
-			log.Infof("✅ MongoDB schema is already up to date! Current version: %d", mongoVersion)
+			logger.L(ctx).Infow("✅ MongoDB schema is already up to date",
+				"component", "MongoDBMigration",
+				"result", "up_to_date",
+				"version", mongoVersion,
+			)
 		}
 		ran = true
 	}
 
 	if !ran {
-		log.Warn("No database migration target configured, skipping...")
+		logger.L(ctx).Warnw("No database migration target configured, skipping...",
+			"component", "Migration",
+			"result", "skipped",
+		)
 	}
 
 	return nil

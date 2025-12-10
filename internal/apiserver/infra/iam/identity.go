@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/identity"
 )
@@ -32,7 +32,10 @@ func NewIdentityService(client *Client) (*IdentityService, error) {
 		return nil, fmt.Errorf("identity client is nil")
 	}
 
-	log.Info("IdentityService initialized")
+	logger.L(context.Background()).Infow("IdentityService initialized",
+		"component", "iam.identity",
+		"result", "success",
+	)
 	return &IdentityService{
 		client:  identityClient,
 		enabled: true,

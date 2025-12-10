@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/identity"
 )
@@ -32,7 +32,10 @@ func NewGuardianshipService(client *Client) (*GuardianshipService, error) {
 		return nil, fmt.Errorf("guardianship client is nil")
 	}
 
-	log.Info("GuardianshipService initialized")
+	logger.L(context.Background()).Infow("GuardianshipService initialized",
+		"component", "iam.guardianship",
+		"result", "success",
+	)
 	return &GuardianshipService{
 		client:  guardianshipClient,
 		enabled: true,

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"google.golang.org/grpc"
@@ -58,8 +58,12 @@ func NewServiceAuthHelper(ctx context.Context, client *Client, config *ServiceAu
 		return nil, fmt.Errorf("failed to create service auth helper: %w", err)
 	}
 
-	log.Infof("ServiceAuthHelper initialized: ServiceID=%s, TargetAudience=%v",
-		config.ServiceID, config.TargetAudience)
+	logger.L(ctx).Infow("ServiceAuthHelper initialized",
+		"component", "iam.service_auth",
+		"service_id", config.ServiceID,
+		"target_audience", config.TargetAudience,
+		"result", "success",
+	)
 
 	return &ServiceAuthHelper{
 		helper: helper,
@@ -121,7 +125,9 @@ func (h *ServiceAuthHelper) Stop() {
 	if h.helper != nil {
 		h.helper.Stop()
 	}
-	log.Debug("ServiceAuthHelper stopped")
+	logger.L(context.Background()).Debugw("ServiceAuthHelper stopped",
+		"component", "iam.service_auth",
+	)
 }
 
 // 确保实现 PerRPCCredentials 接口

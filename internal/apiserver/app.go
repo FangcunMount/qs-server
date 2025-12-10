@@ -1,7 +1,10 @@
 package apiserver
 
 import (
+	"context"
+
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/pkg/app"
@@ -32,11 +35,11 @@ func run(opts *options.Options) app.RunFunc {
 		log.Init(opts.Log)
 		defer log.Flush()
 
-		log.Info("Starting questionnaire-scale ...")
-
-		// 打印配置信息
-		log.Infof("Server mode: %s", opts.GenericServerRunOptions.Mode)
-		log.Infof("Health check enabled: %v", opts.GenericServerRunOptions.Healthz)
+		logger.L(context.Background()).Infow("Starting questionnaire-scale",
+			"component", "apiserver",
+			"mode", opts.GenericServerRunOptions.Mode,
+			"healthz", opts.GenericServerRunOptions.Healthz,
+		)
 
 		// 根据 options 创建 app 配置
 		cfg, err := config.CreateConfigFromOptions(opts)

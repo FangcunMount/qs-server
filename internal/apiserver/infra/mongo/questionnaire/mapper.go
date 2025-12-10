@@ -1,10 +1,9 @@
 package questionnaire
 
 import (
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/calculation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -140,7 +139,7 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []questionn
 
 		questionBO, err := questionnaire.NewQuestion(opts...)
 		if err != nil {
-			log.Errorf("failed to build question %s: %v", questionPO.Code, err)
+			// 跳过不符合条件的问题
 			continue
 		}
 		questions = append(questions, questionBO)

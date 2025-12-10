@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 	sdkconfig "github.com/FangcunMount/iam-contracts/pkg/sdk/config"
@@ -70,15 +70,22 @@ type Client struct {
 
 // NewClient 创建 IAM 客户端
 func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
+	l := logger.L(ctx)
+
 	if opts == nil || !opts.Enabled {
-		log.Info("IAM integration is disabled, skipping client initialization")
+		l.Infow("IAM integration is disabled, skipping client initialization",
+			"component", "iam.client",
+		)
 		return &Client{
 			enabled: false,
 			config:  opts,
 		}, nil
 	}
 
-	log.Info("Initializing IAM SDK client", log.String("address", opts.GRPC.Address))
+	l.Infow("Initializing IAM SDK client",
+		"component", "iam.client",
+		"address", opts.GRPC.Address,
+	)
 
 	// 构建 SDK 配置
 	sdkConfig := &sdk.Config{
@@ -118,7 +125,11 @@ func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
 		return nil, fmt.Errorf("failed to create IAM SDK client: %w", err)
 	}
 
-	log.Info("IAM SDK client initialized successfully")
+	l.Infow("IAM SDK client initialized successfully",
+		"component", "iam.client",
+		"address", opts.GRPC.Address,
+		"result", "success",
+	)
 
 	return &Client{
 		sdk:     client,
@@ -148,7 +159,7 @@ func (c *Client) Close() error {
 		return nil
 	}
 
-	log.Info("Closing IAM SDK client")
+	logger.L(context.Background()).Infow("Closing IAM SDK client")
 	return c.sdk.Close()
 }
 

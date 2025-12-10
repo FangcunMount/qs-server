@@ -49,14 +49,14 @@ func Secure(c *gin.Context) {
 // defaultMiddlewares 返回默认的中间件
 func defaultMiddlewares() map[string]gin.HandlerFunc {
 	return map[string]gin.HandlerFunc{
-		"recovery":        gin.Recovery(),
-		"secure":          Secure,
-		"options":         Options,
-		"nocache":         NoCache,
-		"cors":            Cors(),
-		"requestid":       RequestID(),
-		"logger":          Logger(),
-		"enhanced_logger": EnhancedLogger(), // 增强日志中间件
-		"dump":            gindump.Dump(),
+		"recovery":  gin.Recovery(),
+		"secure":    Secure,
+		"options":   Options,
+		"nocache":   NoCache,
+		"cors":      Cors(),
+		"requestid": RequestID(),
+		"logger":    Logger(),
+		"apilogger": APILogger(), // 结构化 HTTP 日志中间件 (来自 component-base)
+		"dump":      gindump.Dump(),
 	}
 }

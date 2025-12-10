@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -23,7 +23,9 @@ type IAMModule struct {
 // NewIAMModule 创建 IAM 模块
 func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, error) {
 	if opts == nil || !opts.Enabled {
-		log.Info("IAM integration is disabled")
+		logger.L(context.Background()).Infow("IAM integration is disabled",
+			"component", "iam_module",
+		)
 		return &IAMModule{}, nil
 	}
 
@@ -41,7 +43,10 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 	if client.IsEnabled() {
 		tokenVerifier, err = iam.NewTokenVerifier(ctx, client)
 		if err != nil {
-			log.Warnf("Failed to create token verifier: %v, will use remote verification only", err)
+			logger.L(context.Background()).Warnw("Failed to create token verifier, will use remote verification only",
+				"component", "iam_module",
+				"error", err.Error(),
+			)
 			// 不返回错误，允许降级到远程验证
 		}
 	}
@@ -57,7 +62,10 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 		serviceAuthHelper, err = iam.NewServiceAuthHelper(ctx, client, serviceAuthConfig)
 		if err != nil {
-			log.Warnf("Failed to create service auth helper: %v, service-to-service auth will not be available", err)
+			logger.L(context.Background()).Warnw("Failed to create service auth helper, service-to-service auth will not be available",
+				"component", "iam_module",
+				"error", err.Error(),
+			)
 			// 不返回错误，允许继续运行
 		}
 	}
@@ -67,7 +75,10 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 	if client.IsEnabled() {
 		identityService, err = iam.NewIdentityService(client)
 		if err != nil {
-			log.Warnf("Failed to create identity service: %v", err)
+			logger.L(context.Background()).Warnw("Failed to create identity service",
+				"component", "iam_module",
+				"error", err.Error(),
+			)
 		}
 	}
 
@@ -76,11 +87,17 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 	if client.IsEnabled() {
 		guardianshipSvc, err = iam.NewGuardianshipService(client)
 		if err != nil {
-			log.Warnf("Failed to create guardianship service: %v", err)
+			logger.L(context.Background()).Warnw("Failed to create guardianship service",
+				"component", "iam_module",
+				"error", err.Error(),
+			)
 		}
 	}
 
-	log.Info("IAM module initialized successfully")
+	logger.L(context.Background()).Infow("IAM module initialized successfully",
+		"component", "iam_module",
+		"result", "success",
+	)
 
 	return &IAMModule{
 		client:            client,
