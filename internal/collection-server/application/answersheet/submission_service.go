@@ -2,8 +2,10 @@ package answersheet
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
 
@@ -28,8 +30,19 @@ func NewSubmissionService(
 // Submit 提交答卷
 // writerID 来自认证中间件解析的当前用户
 func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
 	log.Infof("Submitting answer sheet: writerID=%d, testeeID=%d, questionnaireCode=%s",
 		writerID, req.TesteeID, req.QuestionnaireCode)
+
+	l.Infow("开始提交答卷",
+		"action", "submit_answersheet",
+		"writer_id", writerID,
+		"testee_id", req.TesteeID,
+		"questionnaire_code", req.QuestionnaireCode,
+		"answer_count", len(req.Answers),
+	)
 
 	// 转换 answers
 	answers := make([]grpcclient.AnswerInput, len(req.Answers))
@@ -43,6 +56,11 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 	}
 
 	// 调用 gRPC 服务
+	l.Debugw("调用 gRPC 服务提交答卷",
+		"questionnaire_code", req.QuestionnaireCode,
+		"testee_id", req.TesteeID,
+	)
+
 	result, err := s.answerSheetClient.SaveAnswerSheet(ctx, &grpcclient.SaveAnswerSheetInput{
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
@@ -53,8 +71,22 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 	})
 	if err != nil {
 		log.Errorf("Failed to save answer sheet via gRPC: %v", err)
+		l.Errorw("提交答卷失败",
+			"action", "submit_answersheet",
+			"questionnaire_code", req.QuestionnaireCode,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, err
 	}
+
+	duration := time.Since(startTime)
+	l.Infow("提交答卷成功",
+		"action", "submit_answersheet",
+		"result", "success",
+		"answersheet_id", result.ID,
+		"duration_ms", duration.Milliseconds(),
+	)
 
 	return &SubmitAnswerSheetResponse{
 		ID:      result.ID,
@@ -64,11 +96,25 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 
 // Get 获取答卷详情
 func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
 	log.Infof("Getting answer sheet: id=%d", id)
+
+	l.Debugw("获取答卷详情",
+		"action", "get_answersheet",
+		"answersheet_id", id,
+	)
 
 	result, err := s.answerSheetClient.GetAnswerSheet(ctx, id)
 	if err != nil {
 		log.Errorf("Failed to get answer sheet via gRPC: %v", err)
+		l.Errorw("获取答卷失败",
+			"action", "get_answersheet",
+			"answersheet_id", id,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 
@@ -82,6 +128,15 @@ func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetRes
 			Value:        a.Value,
 		}
 	}
+
+	duration := time.Since(startTime)
+	l.Debugw("获取答卷成功",
+		"action", "get_answersheet",
+		"answersheet_id", id,
+		"questionnaire_code", result.QuestionnaireCode,
+		"answer_count", len(answers),
+		"duration_ms", duration.Milliseconds(),
+	)
 
 	return &AnswerSheetResponse{
 		ID:                   result.ID,

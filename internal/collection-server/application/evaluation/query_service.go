@@ -2,8 +2,10 @@ package evaluation
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
 
@@ -26,17 +28,43 @@ func NewQueryService(
 
 // GetMyAssessment 获取我的测评详情
 func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
 	log.Infof("Getting my assessment: testeeID=%d, assessmentID=%d", testeeID, assessmentID)
+
+	l.Debugw("获取我的测评详情",
+		"action", "get_my_assessment",
+		"testee_id", testeeID,
+		"assessment_id", assessmentID,
+	)
 
 	result, err := s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
 	if err != nil {
 		log.Errorf("Failed to get assessment via gRPC: %v", err)
+		l.Errorw("获取测评失败",
+			"action", "get_my_assessment",
+			"testee_id", testeeID,
+			"assessment_id", assessmentID,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 
 	if result == nil {
+		l.Warnw("获取的测评为空",
+			"assessment_id", assessmentID,
+		)
 		return nil, nil
 	}
+
+	duration := time.Since(startTime)
+	l.Debugw("获取测评成功",
+		"assessment_id", assessmentID,
+		"status", result.Status,
+		"duration_ms", duration.Milliseconds(),
+	)
 
 	return &AssessmentDetailResponse{
 		ID:                   result.ID,
@@ -63,7 +91,18 @@ func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessment
 
 // ListMyAssessments 获取我的测评列表
 func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
 	log.Infof("Listing my assessments: testeeID=%d, page=%d, pageSize=%d", testeeID, req.Page, req.PageSize)
+
+	l.Debugw("查询我的测评列表",
+		"action", "list_my_assessments",
+		"testee_id", testeeID,
+		"page", req.Page,
+		"page_size", req.PageSize,
+		"status_filter", req.Status,
+	)
 
 	// 默认分页参数
 	if req.Page <= 0 {
@@ -73,9 +112,21 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		req.PageSize = 20
 	}
 
+	l.Debugw("开始从 gRPC 服务查询测评列表",
+		"testee_id", testeeID,
+		"page", req.Page,
+		"page_size", req.PageSize,
+	)
+
 	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, req.Page, req.PageSize)
 	if err != nil {
 		log.Errorf("Failed to list assessments via gRPC: %v", err)
+		l.Errorw("查询测评列表失败",
+			"action", "list_my_assessments",
+			"testee_id", testeeID,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 
@@ -98,6 +149,16 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		}
 	}
 
+	duration := time.Since(startTime)
+	l.Debugw("查询我的测评列表成功",
+		"action", "list_my_assessments",
+		"result", "success",
+		"testee_id", testeeID,
+		"total_count", result.Total,
+		"page_count", len(items),
+		"duration_ms", duration.Milliseconds(),
+	)
+
 	return &ListAssessmentsResponse{
 		Items:      items,
 		Total:      result.Total,
@@ -109,13 +170,36 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 
 // GetAssessmentScores 获取测评得分详情
 func (s *QueryService) GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
 	log.Infof("Getting assessment scores: testeeID=%d, assessmentID=%d", testeeID, assessmentID)
+
+	l.Debugw("获取测评得分详情",
+		"action", "get_assessment_scores",
+		"testee_id", testeeID,
+		"assessment_id", assessmentID,
+	)
 
 	result, err := s.evaluationClient.GetAssessmentScores(ctx, testeeID, assessmentID)
 	if err != nil {
 		log.Errorf("Failed to get assessment scores via gRPC: %v", err)
+		l.Errorw("获取测评得分失败",
+			"action", "get_assessment_scores",
+			"assessment_id", assessmentID,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, err
 	}
+
+	duration := time.Since(startTime)
+	l.Debugw("获取测评得分成功",
+		"action", "get_assessment_scores",
+		"assessment_id", assessmentID,
+		"score_count", len(result),
+		"duration_ms", duration.Milliseconds(),
+	)
 
 	scores := make([]FactorScoreResponse, len(result))
 	for i, score := range result {

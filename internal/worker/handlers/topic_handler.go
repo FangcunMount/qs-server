@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers/core"
 )
 
@@ -55,12 +56,24 @@ func NewGenericTopicHandler(topic, name string, logger *slog.Logger) *GenericTop
 // RegisterHandler 注册消息处理器
 func (h *GenericTopicHandler) RegisterHandler(handler core.MessageHandler) {
 	h.dispatcher.Register(handler)
+	l := logger.L(context.Background())
+	l.Debugw("注册消息处理器",
+		"topic", h.Topic(),
+		"handler", h.Name(),
+		"event_type", handler.EventType(),
+	)
 }
 
 // RegisterHandlers 批量注册消息处理器
 func (h *GenericTopicHandler) RegisterHandlers(handlers ...core.MessageHandler) {
+	l := logger.L(context.Background())
 	for _, handler := range handlers {
 		h.dispatcher.Register(handler)
+		l.Debugw("注册消息处理器",
+			"topic", h.Topic(),
+			"handler", h.Name(),
+			"event_type", handler.EventType(),
+		)
 	}
 }
 
@@ -72,14 +85,36 @@ func (h *GenericTopicHandler) HandlerCount() int {
 // Handle 分发处理消息
 func (h *GenericTopicHandler) Handle(ctx context.Context, payload []byte) error {
 	// 提取事件类型
+	l := logger.L(ctx)
+
+	l.Debugw("收到消息",
+		"action", "handle_message",
+		"topic", h.Topic(),
+		"handler", h.Name(),
+		"payload_size", len(payload),
+	)
+
 	eventType, err := ExtractEventType(payload)
 	if err != nil {
+		l.Errorw("提取事件类型失败",
+			"action", "handle_message",
+			"topic", h.Topic(),
+			"handler", h.Name(),
+			"result", "failed",
+			"error", err.Error(),
+		)
 		h.logger.Error("failed to extract event type",
 			slog.String("handler", h.Name()),
 			slog.String("error", err.Error()),
 		)
 		return err
 	}
+
+	l.Debugw("提取事件类型成功",
+		"topic", h.Topic(),
+		"handler", h.Name(),
+		"event_type", eventType,
+	)
 
 	h.logger.Debug("received event",
 		slog.String("topic", h.Topic()),

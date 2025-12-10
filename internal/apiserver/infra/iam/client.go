@@ -159,7 +159,7 @@ func (c *Client) Close() error {
 		return nil
 	}
 
-	logger.L(context.Background()).Infow("Closing IAM SDK client")
+	logger.L(context.Background()).Infow("Closing IAM SDK client", "component", "iam.client")
 	return c.sdk.Close()
 }
 

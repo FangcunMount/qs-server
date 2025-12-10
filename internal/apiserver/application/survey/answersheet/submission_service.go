@@ -304,58 +304,153 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 
 // GetMyAnswerSheet 获取我的答卷
 func (s *submissionService) GetMyAnswerSheet(ctx context.Context, fillerID uint64, answerSheetID uint64) (*AnswerSheetResult, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	l.Debugw("查询我的答卷",
+		"action", "get_my_answersheet",
+		"filler_id", fillerID,
+		"answersheet_id", answerSheetID,
+	)
+
 	// 1. 验证输入参数
 	if fillerID == 0 {
+		l.Warnw("填写人 ID 为空",
+			"action", "get_my_answersheet",
+			"result", "invalid_params",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "填写人ID不能为空")
 	}
 	if answerSheetID == 0 {
+		l.Warnw("答卷 ID 为空", "action", "get_my_answersheet", "result", "invalid_params")
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答卷ID不能为空")
 	}
 
 	// 2. 获取答卷
+	l.Debugw("加载答卷数据", "answersheet_id", answerSheetID)
 	sheet, err := s.repo.FindByID(ctx, meta.ID(answerSheetID))
 	if err != nil {
+		l.Errorw("加载答卷失败",
+			"action", "get_my_answersheet",
+			"answersheet_id", answerSheetID,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "获取答卷失败")
 	}
 
 	// 3. 验证是否是本人的答卷
+	l.Debugw("验证答卷权限", "filler_id", fillerID, "answersheet_filler_id", sheet.Filler().UserID())
 	fillerRef := actor.NewFillerRef(int64(fillerID), actor.FillerTypeSelf)
 	if !sheet.IsFilledBy(fillerRef) {
+		l.Warnw("无权查看答卷",
+			"action", "get_my_answersheet",
+			"filler_id", fillerID,
+			"answersheet_filler_id", sheet.Filler().UserID(),
+			"result", "permission_denied",
+		)
 		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "无权查看此答卷")
 	}
 
+	duration := time.Since(startTime)
+	l.Debugw("查询我的答卷成功",
+		"action", "get_my_answersheet",
+		"result", "success",
+		"answersheet_id", answerSheetID,
+		"duration_ms", duration.Milliseconds(),
+	)
 	return toAnswerSheetResult(sheet), nil
 }
 
 // ListMyAnswerSheets 查询我的答卷列表
 func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAnswerSheetsDTO) (*AnswerSheetListResult, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	l.Debugw("查询我的答卷列表",
+		"action", "list_my_answersheets",
+		"filler_id", dto.FillerID,
+		"page", dto.Page,
+		"page_size", dto.PageSize,
+	)
+
 	// 1. 验证输入参数
 	if dto.FillerID == 0 {
+		l.Warnw("填写人 ID 为空",
+			"action", "list_my_answersheets",
+			"result", "invalid_params",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "填写人ID不能为空")
 	}
 	if dto.Page <= 0 {
+		l.Warnw("页码有效性检查失败",
+			"action", "list_my_answersheets",
+			"page", dto.Page,
+			"result", "invalid_params",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "页码必须大于0")
 	}
 	if dto.PageSize <= 0 {
+		l.Warnw("每页数量有效性检查失败",
+			"action", "list_my_answersheets",
+			"page_size", dto.PageSize,
+			"result", "invalid_params",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量必须大于0")
 	}
 	if dto.PageSize > 100 {
+		l.Warnw("每页数量超限",
+			"action", "list_my_answersheets",
+			"page_size", dto.PageSize,
+			"max_size", 100,
+			"result", "invalid_params",
+		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量不能超过100")
 	}
 
 	// 2. 查询答卷列表（使用 FillerID）
+	l.Debugw("开始查询答卷列表",
+		"filler_id", dto.FillerID,
+		"page", dto.Page,
+		"page_size", dto.PageSize,
+	)
 	sheets, err := s.repo.FindListByFiller(ctx, dto.FillerID, dto.Page, dto.PageSize)
 	if err != nil {
+		l.Errorw("查询答卷列表失败",
+			"action", "list_my_answersheets",
+			"filler_id", dto.FillerID,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询答卷列表失败")
 	}
 
 	// 3. 获取总数
+	l.Debugw("查询答卷总数",
+		"filler_id", dto.FillerID,
+	)
 	total, err := s.repo.CountWithConditions(ctx, map[string]interface{}{
 		"filler_id": dto.FillerID,
 	})
 	if err != nil {
+		l.Errorw("获取答卷总数失败",
+			"action", "list_my_answersheets",
+			"filler_id", dto.FillerID,
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取答卷总数失败")
 	}
+
+	duration := time.Since(startTime)
+	l.Debugw("查询我的答卷列表成功",
+		"action", "list_my_answersheets",
+		"result", "success",
+		"filler_id", dto.FillerID,
+		"total_count", total,
+		"page_count", len(sheets),
+		"duration_ms", duration.Milliseconds(),
+	)
 
 	return toAnswerSheetListResult(sheets, total), nil
 }
