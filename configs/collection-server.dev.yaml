@@ -43,8 +43,8 @@ grpc_client:
   insecure: false  # 启用 TLS 进行 mTLS 测试（insecure=false 表示启用 TLS）
   
   # mTLS 客户端配置（使用 infra 项目生成的证书）
-  tls-cert-file: "/data/infra/ssl/grpc/server/qs-collection.crt"
-  tls-key-file: "/data/infra/ssl/grpc/server/qs-collection.key"
+  tls-cert-file: "/data/infra/ssl/grpc/server/qs-collection-server.crt"
+  tls-key-file: "/data/infra/ssl/grpc/server/qs-collection-server.key"
   tls-ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"
   tls-server-name: "qs-apiserver.svc"  # 必须与服务端证书的 CN 匹配
 
@@ -118,8 +118,8 @@ iam:
     tls:
       enabled: true              # 开发环境可启用 mTLS 测试
       ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"       # CA 证书链
-      cert-file: "/data/infra/ssl/grpc/server/qs-collection.crt" # QS 客户端证书
-      key-file: "/data/infra/ssl/grpc/server/qs-collection.key"  # QS 客户端私钥
+      cert-file: "/data/infra/ssl/grpc/server/qs-collection-server.crt" # QS 客户端证书
+      key-file: "/data/infra/ssl/grpc/server/qs-collection-server.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

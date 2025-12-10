@@ -44,8 +44,8 @@ grpc_client:
   insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
-  tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection.crt"
-  tls-key-file: "/etc/qs-server/ssl/grpc/server/qs-collection.key"
+  tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
+  tls-key-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.key"
   tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
   tls-server-name: "qs-apiserver.svc"  # 服务端证书的 CN，用于验证
 
@@ -122,8 +122,8 @@ iam:
     tls:
       enabled: true   # 启用 mTLS 双向认证（与 IAM 9090 端口匹配）
       ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"           # CA 证书链
-      cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection.crt" # QS 客户端证书（调用 IAM）
-      key-file: "/etc/qs-server/ssl/grpc/server/qs-collection.key"  # QS 客户端私钥
+      cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt" # QS 客户端证书（调用 IAM）
+      key-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:

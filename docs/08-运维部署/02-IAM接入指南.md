@@ -124,7 +124,7 @@ QS 作为 IAM gRPC 的客户端，需准备：
 |------|------|----------|
 | `ca-chain.crt` | CA 证书链（验证 IAM 服务端） | `/data/infra/ssl/grpc/ca/ca-chain.crt` |
 | `qs-apiserver.crt` / `qs-apiserver.key` | QS API 网关/服务调用 IAM 时的客户端证书与私钥 | `/data/infra/ssl/grpc/server/qs-apiserver.{crt,key}` |
-| `qs-collection.crt` / `qs-collection.key` | （如采集侧单独调用 IAM）客户端证书与私钥 | `/data/infra/ssl/grpc/server/qs-collection.{crt,key}` |
+| `qs-collection-server.crt` / `qs-collection-server.key` | （如采集侧单独调用 IAM）客户端证书与私钥 | `/data/infra/ssl/grpc/server/qs-collection-server.{crt,key}` |
 | `*-fullchain.crt` | 可选，包含中间证书链的版本 | 与对应 `.crt` 同目录 |
 
 **开发环境**：在 infra 项目中生成测试证书

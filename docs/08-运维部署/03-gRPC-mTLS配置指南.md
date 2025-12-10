@@ -12,7 +12,7 @@
 
 ### 🔒 安全架构
 
-```
+```text
 collection-server (前端数据收集)
     ↓ gRPC + mTLS
 apiserver (核心业务处理)
@@ -39,7 +39,7 @@ MySQL + MongoDB
 
 > **与 IAM 接入指南保持一致**：使用 infra 项目统一管理的证书结构
 
-```
+```text
 /data/infra/ssl/grpc/
 ├── ca/
 │   ├── ca-chain.crt          # CA 证书链（所有服务共享）
@@ -50,9 +50,9 @@ MySQL + MongoDB
     ├── qs-apiserver.crt      # apiserver 服务端证书
     ├── qs-apiserver.key      # apiserver 服务端私钥
     ├── qs-apiserver-fullchain.crt  # 带链的完整证书（可选）
-    ├── qs-collection.crt     # collection-server 客户端证书
-    ├── qs-collection.key     # collection-server 客户端私钥
-    ├── qs-collection-fullchain.crt  # 带链的完整证书（可选）
+    ├── qs-collection-server.crt     # collection-server 客户端证书
+    ├── qs-collection-server.key     # collection-server 客户端私钥
+    ├── qs-collection-server-fullchain.crt  # 带链的完整证书（可选）
     ├── iam-grpc.crt          # IAM gRPC 服务端证书
     └── iam-grpc.key          # IAM gRPC 服务端私钥
 ```
@@ -74,7 +74,7 @@ MySQL + MongoDB
 #### 服务端证书（apiserver）
 
 - **CN (Common Name)**: `qs-apiserver` 或具体域名
-- **SAN (Subject Alternative Name)**: 
+- **SAN (Subject Alternative Name)**:
   - `DNS:qs-apiserver`
   - `DNS:apiserver`
   - `DNS:localhost`
@@ -219,7 +219,7 @@ cd /path/to/infra
 ./scripts/cert/generate-grpc-certs.sh generate-server qs-apiserver QS qs-apiserver.internal.example.com
 
 # 3. 为 collection-server 生成证书
-./scripts/cert/generate-grpc-certs.sh generate-server qs-collection QS qs-collection.internal.example.com
+./scripts/cert/generate-grpc-certs.sh generate-server qs-collection-server QS qs-collection-server.internal.example.com
 
 # 4. 验证证书
 ./scripts/cert/generate-grpc-certs.sh verify
@@ -231,8 +231,8 @@ cd /path/to/infra
 # └── server/
 #     ├── qs-apiserver.crt  # apiserver 证书
 #     ├── qs-apiserver.key  # apiserver 私钥
-#     ├── qs-collection.crt # collection-server 证书
-#     └── qs-collection.key # collection-server 私钥
+#     ├── qs-collection-server.crt # collection-server 证书
+#     └── qs-collection-server.key # collection-server 私钥
 ```
 
 #### 生产环境
@@ -246,7 +246,7 @@ cd /path/to/infra
    ```bash
    cd /path/to/infra
    ./scripts/cert/generate-grpc-certs.sh generate-server qs-apiserver QS qs-apiserver.svc
-   ./scripts/cert/generate-grpc-certs.sh generate-server qs-collection QS qs-collection.svc
+   ./scripts/cert/generate-grpc-certs.sh generate-server qs-collection-server QS qs-collection-server.svc
    ```
 
 2. **CI/CD 管道将证书注入容器**
@@ -406,12 +406,12 @@ openssl x509 -req -in /data/infra/ssl/grpc/server/qs-apiserver.csr \
 
 ```bash
 # 生成私钥
-openssl genrsa -out /data/infra/ssl/grpc/server/qs-collection.key 2048
+openssl genrsa -out /data/infra/ssl/grpc/server/qs-collection-server.key 2048
 
 # 生成 CSR
-openssl req -new -key /data/infra/ssl/grpc/server/qs-collection.key \
-  -out /data/infra/ssl/grpc/server/qs-collection.csr \
-  -subj "/C=CN/ST=Beijing/L=Beijing/O=QS Platform/OU=qs-platform/CN=qs-collection"
+openssl req -new -key /data/infra/ssl/grpc/server/qs-collection-server.key \
+  -out /data/infra/ssl/grpc/server/qs-collection-server.csr \
+  -subj "/C=CN/ST=Beijing/L=Beijing/O=QS Platform/OU=qs-platform/CN=qs-collection-server"
 
 # 创建扩展配置
 cat > /tmp/client-ext.cnf << EOF
@@ -419,10 +419,10 @@ extendedKeyUsage = clientAuth
 EOF
 
 # 使用 CA 签发证书
-openssl x509 -req -in /data/infra/ssl/grpc/server/qs-collection.csr \
+openssl x509 -req -in /data/infra/ssl/grpc/server/qs-collection-server.csr \
   -CA /data/infra/ssl/grpc/ca/ca-chain.crt \
   -CAkey /data/infra/ssl/grpc/ca/ca.key \
-  -CAcreateserial -out /data/infra/ssl/grpc/server/qs-collection.crt \
+  -CAcreateserial -out /data/infra/ssl/grpc/server/qs-collection-server.crt \
   -days 365 -extfile /tmp/client-ext.cnf
 ```
 
@@ -435,18 +435,19 @@ openssl verify -CAfile /data/infra/ssl/grpc/ca/ca-chain.crt \
 
 # 验证客户端证书
 openssl verify -CAfile /data/infra/ssl/grpc/ca/ca-chain.crt \
-  /data/infra/ssl/grpc/server/qs-collection.crt
+  /data/infra/ssl/grpc/server/qs-collection-server.crt
 
 # 查看证书详情
 openssl x509 -in /data/infra/ssl/grpc/server/qs-apiserver.crt -text -noout
 
 # 查看证书 CN 和 OU（用于白名单配置）
-openssl x509 -in /data/infra/ssl/grpc/server/qs-collection.crt -noout -subject
+openssl x509 -in /data/infra/ssl/grpc/server/qs-collection-server.crt -noout -subject
 ```
 
 ---
 
 ## 部署流程
+
 #### docker-compose.yml
 
 ```yaml
@@ -484,8 +485,8 @@ kubectl create secret generic grpc-certs \
   --from-file=ca.crt=/data/infra/ssl/grpc/ca/ca-chain.crt \
   --from-file=apiserver.crt=/data/infra/ssl/grpc/server/qs-apiserver.crt \
   --from-file=apiserver.key=/data/infra/ssl/grpc/server/qs-apiserver.key \
-  --from-file=collection.crt=/data/infra/ssl/grpc/server/qs-collection.crt \
-  --from-file=collection.key=/data/infra/ssl/grpc/server/qs-collection.key
+  --from-file=collection.crt=/data/infra/ssl/grpc/server/qs-collection-server.crt \
+  --from-file=collection.key=/data/infra/ssl/grpc/server/qs-collection-server.key
 ```
 
 #### Deployment
@@ -541,7 +542,7 @@ openssl verify -CAfile /data/infra/ssl/grpc/ca/ca-chain.crt \
 
 ```bash
 # 检查客户端证书的 CN 是否在白名单中
-openssl x509 -in /data/infra/ssl/grpc/server/qs-collection.crt -noout -subject
+openssl x509 -in /data/infra/ssl/grpc/server/qs-collection-server.crt -noout -subject
 
 # 检查 apiserver 配置
 cat configs/apiserver.prod.yaml | grep -A 10 "allowed-cns"
@@ -568,15 +569,15 @@ cd /path/to/infra
 # 使用 grpcurl 测试（需要证书）
 grpcurl \
   -cacert /data/infra/ssl/grpc/ca/ca-chain.crt \
-  -cert /data/infra/ssl/grpc/server/qs-collection.crt \
-  -key /data/infra/ssl/grpc/server/qs-collection.key \
+  -cert /data/infra/ssl/grpc/server/qs-collection-server.crt \
+  -key /data/infra/ssl/grpc/server/qs-collection-server.key \
   apiserver:9090 list
 
 # 测试健康检查
 grpcurl \
   -cacert /data/infra/ssl/grpc/ca/ca-chain.crt \
-  -cert /data/infra/ssl/grpc/server/qs-collection.crt \
-  -key /data/infra/ssl/grpc/server/qs-collection.key \
+  -cert /data/infra/ssl/grpc/server/qs-collection-server.crt \
+  -key /data/infra/ssl/grpc/server/qs-collection-server.key \
   apiserver:9090 grpc.health.v1.Health/Check
 ```key /etc/qs-server/cert/grpc/client/collection-server.key \
   apiserver:9090 grpc.health.v1.Health/Check
