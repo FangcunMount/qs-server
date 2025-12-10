@@ -43,20 +43,21 @@ iam:
   
   # gRPC 客户端配置
   grpc:
-    address: "iam-apiserver:9080"  # IAM gRPC 服务地址（Docker 容器名）
+    address: "iam-apiserver:9090"  # IAM gRPC 服务地址（Docker 容器名，端口 9090）
     timeout: 30s
     retry-max: 3
     
     # mTLS 配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
+    # IAM gRPC 服务端口 9090 启用了 mTLS 保护
     tls:
-      enabled: true   # 启用 mTLS 双向认证
+      enabled: true   # 启用 mTLS 双向认证（与 IAM 9090 端口匹配）
       ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"           # CA 证书链
       cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection.crt" # QS 客户端证书（调用 IAM）
       key-file: "/etc/qs-server/ssl/grpc/server/qs-collection.key"  # QS 客户端私钥
   
   # JWT 验证配置
   jwt:
-    issuer: "https://iam-apiserver:9080"
+    issuer: "https://iam-apiserver:9444"  # HTTPS 端口
     audience: ["collection-api", "qs-api"]
     algorithms: ["RS256", "ES256"]
     clock-skew: 30s
@@ -65,7 +66,7 @@ iam:
   # JWKS 配置
   jwks:
     url: "https://iam.yangshujie.com/api/v1/.well-known/jwks.json"
-    grpc-endpoint: "iam-apiserver:9080"                    # gRPC 降级端点（HTTP 失败时使用）
+    grpc-endpoint: "iam-apiserver:9090"                    # gRPC 降级端点（HTTP 失败时使用，端口 9090）
     refresh-interval: 1h
     cache-ttl: 24h
     fetch-strategies: ["http", "grpc", "cache"]  # 降级策略：HTTP → gRPC → 缓存
