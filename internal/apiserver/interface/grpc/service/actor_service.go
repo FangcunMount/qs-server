@@ -74,11 +74,13 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 	}
 
 	// 调用应用服务
+	log.Infof("Creating testee: OrgID=%d, ProfileID=%v, Name=%s", dto.OrgID, dto.ProfileID, dto.Name)
 	result, err := s.registrationService.Register(ctx, dto)
 	if err != nil {
-		log.Errorf("创建受试者失败: %v", err)
+		log.Errorf("创建受试者失败: %v (OrgID=%d, Name=%s)", err, dto.OrgID, dto.Name)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	log.Infof("Testee created successfully: ID=%d, Name=%s", result.ID, result.Name)
 
 	// 如果需要标记为重点关注
 	if req.IsKeyFocus {

@@ -85,6 +85,10 @@ func (dm *DatabaseManager) initMySQL() error {
 		return nil
 	}
 
+	log.Infof("Initializing MySQL connection: Host=%s, Database=%s, MaxIdle=%d, MaxOpen=%d, MaxLifeTime=%v",
+		mysqlConfig.Host, mysqlConfig.Database, mysqlConfig.MaxIdleConnections,
+		mysqlConfig.MaxOpenConnections, mysqlConfig.MaxConnectionLifeTime)
+
 	mysqlConn := database.NewMySQLConnection(mysqlConfig)
 	return dm.registry.Register(database.MySQL, mysqlConfig, mysqlConn)
 }
@@ -178,6 +182,7 @@ func (dm *DatabaseManager) initMongoDB() error {
 func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
 	client, err := dm.registry.GetClient(database.MySQL)
 	if err != nil {
+		log.Errorf("Failed to get MySQL client from registry: %v", err)
 		return nil, err
 	}
 
@@ -185,6 +190,22 @@ func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
 	if !ok {
 		return nil, fmt.Errorf("failed to cast client to *gorm.DB")
 	}
+
+	// 检查连接状态
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Errorf("Failed to get sql.DB from gorm.DB: %v", err)
+		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
+	}
+
+	if err := sqlDB.Ping(); err != nil {
+		log.Errorf("MySQL connection ping failed: %v", err)
+		return nil, fmt.Errorf("mysql ping failed: %w", err)
+	}
+
+	stats := sqlDB.Stats()
+	log.Debugf("MySQL connection stats: OpenConnections=%d, InUse=%d, Idle=%d, WaitCount=%d, MaxOpenConnections=%d",
+		stats.OpenConnections, stats.InUse, stats.Idle, stats.WaitCount, stats.MaxOpenConnections)
 
 	return db, nil
 }

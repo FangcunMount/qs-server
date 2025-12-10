@@ -37,6 +37,15 @@ func (u *UnitOfWork) WithinTransaction(ctx context.Context, fn func(txCtx contex
 		return fn(ctx)
 	}
 
+	// 检查数据库连接状态
+	sqlDB, err := u.db.DB()
+	if err != nil {
+		return err
+	}
+	if err := sqlDB.Ping(); err != nil {
+		return err
+	}
+
 	return u.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 将事务注入到 context 中，使用类型安全的 key
 		txCtx := context.WithValue(ctx, txKey{}, tx)

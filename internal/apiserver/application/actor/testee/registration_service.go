@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/log"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -40,13 +41,19 @@ func NewRegistrationService(
 func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDTO) (*TesteeResult, error) {
 	var result *domain.Testee
 
+	log := log.WithContext(ctx)
+	log.Infof("Starting testee registration: OrgID=%d, Name=%s, ProfileID=%v", dto.OrgID, dto.Name, dto.ProfileID)
+
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		log.Debugf("Inside transaction: validating parameters")
 		// 1. 验证参数
 		if err := s.validator.ValidateName(dto.Name, true); err != nil {
+			log.Errorf("Name validation failed: %v", err)
 			return err
 		}
 		gender := domain.Gender(dto.Gender)
 		if err := s.validator.ValidateGender(gender); err != nil {
+			log.Errorf("Gender validation failed: %v", err)
 			return err
 		}
 
@@ -74,18 +81,23 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			if err := s.binder.Bind(txCtx, result, *dto.ProfileID); err != nil {
 				return err
 			}
-		} // 6. 持久化
+		// 6. 持久化
+		log.Debugf("Saving testee to repository: ID=%s, Name=%s", result.ID().String(), result.Name())
 		if err := s.repo.Save(txCtx, result); err != nil {
+			log.Errorf("Failed to save testee to repository: %v", err)
 			return errors.Wrap(err, "failed to save testee")
 		}
+		log.Infof("Testee saved successfully: ID=%s", result.ID().String())
 
 		return nil
 	})
 
 	if err != nil {
+		log.Errorf("Transaction failed: %v", err)
 		return nil, err
 	}
 
+	log.Infof("Testee registration completed successfully: ID=%s, Name=%s", result.ID().String(), result.Name())
 	return toTesteeResult(result), nil
 }
 
