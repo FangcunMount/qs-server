@@ -118,9 +118,10 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 20
-  max-open-connections: 200
-  max-connection-life-time: 1h
+  max-idle-connections: 10        # 降低空闲连接数
+  max-open-connections: 100       # 降低最大连接数（阿里云 RDS 有限制）
+  max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
+  max-idle-time: 10m              # 添加空闲超时
   log-level: 2 # 生产降低日志级别
 
 # ----------------------------------------------------------------------------
