@@ -41,8 +41,8 @@ func NewRegistrationService(
 func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDTO) (*TesteeResult, error) {
 	var result *domain.Testee
 
-	log := log.WithContext(ctx)
-	log.Infof("Starting testee registration: OrgID=%d, Name=%s, ProfileID=%v", dto.OrgID, dto.Name, dto.ProfileID)
+	logger := log.L(context.Background())
+	logger.Infow("Starting testee registration: OrgID=%d, Name=%s, ProfileID=%v", dto.OrgID, dto.Name, dto.ProfileID)
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		log.Debugf("Inside transaction: validating parameters")
@@ -81,6 +81,8 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			if err := s.binder.Bind(txCtx, result, *dto.ProfileID); err != nil {
 				return err
 			}
+		}
+
 		// 6. 持久化
 		log.Debugf("Saving testee to repository: ID=%s, Name=%s", result.ID().String(), result.Name())
 		if err := s.repo.Save(txCtx, result); err != nil {
