@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Service 受试者服务
@@ -40,7 +41,7 @@ func (s *Service) CreateTestee(ctx context.Context, req *CreateTesteeRequest) (*
 		IAMChildID: req.IAMChildID,
 		Name:       req.Name,
 		Gender:     req.Gender,
-		Birthday:   req.Birthday,
+		Birthday:   req.Birthday.ToTimePtr(), // 转换 Date 为 *time.Time
 		Tags:       req.Tags,
 		Source:     req.Source,
 		IsKeyFocus: req.IsKeyFocus,
@@ -74,7 +75,7 @@ func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *Update
 		ID:         testeeID,
 		Name:       req.Name,
 		Gender:     req.Gender,
-		Birthday:   req.Birthday,
+		Birthday:   req.Birthday.ToTimePtr(), // 转换 Date 为 *time.Time
 		Tags:       req.Tags,
 		IsKeyFocus: req.IsKeyFocus,
 	})
@@ -146,7 +147,7 @@ func convertToTesteeResponse(from *grpcclient.TesteeResponse) *TesteeResponse {
 		IAMChildID: from.IAMChildID,
 		Name:       from.Name,
 		Gender:     from.Gender,
-		Birthday:   from.Birthday,
+		Birthday:   meta.NewBirthday(from.Birthday.Format("2006-01-02")),
 		Tags:       from.Tags,
 		Source:     from.Source,
 		IsKeyFocus: from.IsKeyFocus,

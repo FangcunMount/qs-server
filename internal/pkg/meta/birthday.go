@@ -1,6 +1,11 @@
 package meta
 
-import "database/sql/driver"
+import (
+	"database/sql/driver"
+	"fmt"
+	"strings"
+	"time"
+)
 
 type Birthday struct {
 	day string // YYYY-MM-DD
@@ -55,4 +60,42 @@ func (b *Birthday) Scan(src interface{}) error {
 	default:
 		return nil
 	}
+}
+
+// MarshalJSON 实现 json.Marshaler 接口
+func (b Birthday) MarshalJSON() ([]byte, error) {
+	if b.IsEmpty() {
+		return []byte("null"), nil
+	}
+	return []byte(`"` + b.day + `"`), nil
+}
+
+// UnmarshalJSON 实现 json.Unmarshaler 接口
+func (b *Birthday) UnmarshalJSON(data []byte) error {
+	// 去除引号
+	str := strings.Trim(string(data), `"`)
+	if str == "" || str == "null" {
+		*b = Birthday{}
+		return nil
+	}
+
+	// 验证日期格式 YYYY-MM-DD
+	if _, err := time.Parse("2006-01-02", str); err != nil {
+		return fmt.Errorf("invalid birthday format, expected YYYY-MM-DD: %w", err)
+	}
+
+	*b = Birthday{day: str}
+	return nil
+}
+
+// ToTimePtr 转换为 *time.Time
+func (b *Birthday) ToTimePtr() *time.Time {
+	if b == nil || b.IsEmpty() {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", b.day)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
