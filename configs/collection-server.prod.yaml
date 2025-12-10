@@ -39,7 +39,7 @@ secure:
 # 2.3 gRPC 客户端配置（调用 apiserver）
 # -------------------------------------------------------
 grpc_client:
-  endpoint: "apiserver:9090"  # 生产部署请根据服务发现或网关调整
+  endpoint: "qs-apiserver:9090"  # Docker 容器服务名
   timeout: 30
   insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
   

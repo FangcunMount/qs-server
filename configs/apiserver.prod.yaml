@@ -69,23 +69,19 @@ grpc:
   max-connection-age: 120s
   max-connection-age-grace: 20s
   
-  # mTLS 双向认证配置（用于内部服务间通信）
+  # mTLS 双向认证配置（QS 内部服务简化模式）
+  # 说明：QS 三件套内部通信，通过 OU 白名单简化管理，无需维护 CN 白名单
   mtls:
     enabled: true
     ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"  # CA 证书链
     require-client-cert: true  # 强制客户端提供证书
     
-    # 证书白名单：只允许这些服务访问
-    allowed-cns:
-      - "collection-server"
-      - "evaluation-server"
-      - "admin-tool"
+    # CN 白名单：留空以简化管理（新增 QS 服务无需修改配置）
+    allowed-cns: []
     
-    # 组织单元白名单
+    # OU 白名单：只允许 QS 组织的服务访问
     allowed-ous:
-      - "qs-platform"
-      - "qs-ops"
-      - "QS"  # 兼容 IAM 的 OU 命名
+      - "QS"  # 所有 OU=QS 的证书都可访问（包括 collection-server, evaluation-server 等）
     
     # TLS 版本控制
     min-tls-version: "1.2"
