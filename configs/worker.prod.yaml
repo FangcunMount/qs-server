@@ -43,7 +43,7 @@ messaging:
 # 调用 apiserver 的 gRPC 服务
 
 grpc:
-  apiserver-addr: "127.0.0.1:9090"  # qs-apiserver gRPC 地址
+  apiserver-addr: "qs-apiserver:9090"  # Docker 容器服务名
 
 # ============================================================
 # 4. 存储配置
