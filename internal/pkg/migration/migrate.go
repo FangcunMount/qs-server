@@ -86,9 +86,8 @@ func (m *Migrator) Run() (uint, bool, error) {
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to create migrate instance: %w", err)
 	}
-	defer func() {
-		_, _ = instance.Close()
-	}()
+	// 注意：不要关闭 migrate 实例，因为它会关闭我们传入的数据库连接
+	// migrate 实例内部的 source driver 会在进程结束时自动清理
 
 	// 获取当前版本
 	currentVersion, dirty, err := instance.Version()
@@ -135,9 +134,7 @@ func (m *Migrator) Rollback() error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_, _ = instance.Close()
-	}()
+	// 注意：不关闭 migrate 实例，避免关闭数据库连接
 
 	if err := instance.Steps(-1); err != nil {
 		return fmt.Errorf("rollback failed: %w", err)
@@ -156,9 +153,7 @@ func (m *Migrator) Version() (uint, bool, error) {
 	if err != nil {
 		return 0, false, err
 	}
-	defer func() {
-		_, _ = instance.Close()
-	}()
+	// 注意：不关闭 migrate 实例，避免关闭数据库连接
 
 	version, dirty, err := instance.Version()
 	if err != nil {
