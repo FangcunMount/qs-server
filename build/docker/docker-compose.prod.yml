@@ -23,8 +23,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: 384M
+          cpus: "0.5"
+          memory: 512M
 
   qs-collection-server:
     image: ghcr.io/fangcunmount/qs-collection-server:latest
@@ -50,8 +50,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.20"
-          memory: 256M
+          cpus: "0.5"
+          memory: 512M
 
   qs-worker:
     image: ghcr.io/fangcunmount/qs-worker:latest
@@ -69,8 +69,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
-          memory: 256M
+          cpus: "0.3"
+          memory: 384M
 
 networks:
   qs-network:
