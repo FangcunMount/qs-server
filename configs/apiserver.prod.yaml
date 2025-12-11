@@ -183,7 +183,13 @@ mongodb:
   ssl-pem-keyfile: ""
   # MongoDB 日志配置
   enable-logger: true             # 启用 MongoDB 命令日志
-  slow-threshold: 200ms           # 慢查询阈值（生产环境可以调高，如 500ms）
+  slow-threshold: 500ms           # 慢查询阈值（生产环境建议调高）
+  
+  # 详细日志配置（component-base v0.4.1+ 已支持，查询详情会自动脱敏）
+  # 生产环境可以适度启用 log-command-detail 用于问题排查，性能影响很小
+  log-command-detail: true        # 记录查询详情（用于慢查询分析和问题排查）
+  log-reply-detail: false         # 生产环境禁用响应详情（避免日志过大）
+  log-started: false              # 生产环境禁用命令开始日志（减少日志量）
 
 # ============================================================================
 # 4. 外部服务集成配置

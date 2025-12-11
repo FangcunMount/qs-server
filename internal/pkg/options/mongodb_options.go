@@ -25,6 +25,11 @@ type MongoDBOptions struct {
 	// 日志配置
 	EnableLogger  bool          `json:"enable-logger,omitempty"  mapstructure:"enable-logger"`  // 是否启用日志
 	SlowThreshold time.Duration `json:"slow-threshold,omitempty" mapstructure:"slow-threshold"` // 慢查询阈值
+
+	// 详细日志配置（component-base v0.4.1+ 已支持）
+	LogCommandDetail bool `json:"log-command-detail,omitempty" mapstructure:"log-command-detail"` // 是否记录命令详情（查询语句）
+	LogReplyDetail   bool `json:"log-reply-detail,omitempty"   mapstructure:"log-reply-detail"`   // 是否记录响应详情
+	LogStarted       bool `json:"log-started,omitempty"        mapstructure:"log-started"`        // 是否记录命令开始
 }
 
 // NewMongoDBOptions create a `zero` value instance.
@@ -41,6 +46,10 @@ func NewMongoDBOptions() *MongoDBOptions {
 		SSLPEMKeyfile:            "",
 		EnableLogger:             true,                   // 默认启用 MongoDB 日志
 		SlowThreshold:            200 * time.Millisecond, // 默认慢查询阈值 200ms
+		// 详细日志配置（开发环境可以启用，生产环境按需配置）
+		LogCommandDetail: true,  // 默认启用查询详情（类似 GORM 的 SQL 日志，敏感信息会自动脱敏）
+		LogReplyDetail:   false, // 默认不记录响应详情（避免日志过大）
+		LogStarted:       false, // 默认不记录命令开始（减少日志量）
 	}
 }
 
@@ -85,4 +94,14 @@ func (o *MongoDBOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&o.SlowThreshold, "mongodb.slow-threshold", o.SlowThreshold, ""+
 		"Slow query threshold for mongodb (e.g., 200ms).")
+
+	// 详细日志配置（component-base v0.4.1+ 已支持）
+	fs.BoolVar(&o.LogCommandDetail, "mongodb.log-command-detail", o.LogCommandDetail, ""+
+		"Enable detailed command logging (includes query statements, sensitive data will be sanitized).")
+
+	fs.BoolVar(&o.LogReplyDetail, "mongodb.log-reply-detail", o.LogReplyDetail, ""+
+		"Enable detailed reply logging (may increase log size significantly).")
+
+	fs.BoolVar(&o.LogStarted, "mongodb.log-started", o.LogStarted, ""+
+		"Enable logging of command start events (increases log volume, use for debugging only).")
 }

@@ -81,6 +81,11 @@ mongodb:
   # MongoDB 日志配置
   enable-logger: true             # 生产环境启用 MongoDB 命令日志
   slow-threshold: 500ms           # 生产环境慢查询阈值（可以调高）
+  
+  # 详细日志配置（component-base v0.4.1+ 已支持）
+  log-command-detail: true        # 启用查询详情（用于慢查询分析）
+  log-reply-detail: false         # 生产环境禁用响应详情
+  log-started: false              # 生产环境禁用命令开始日志
 
 # -------------------------------------------------------
 # 4.3 Redis 缓存（Cache Redis）
