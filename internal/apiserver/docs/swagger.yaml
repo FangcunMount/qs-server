@@ -1,13 +1,17 @@
 basePath: /api/v1
 definitions:
-  handler.Response:
+  core.Response:
     properties:
       code:
+        description: Code 业务状态码，0 表示成功
         type: integer
-      data: {}
+      data:
+        description: Data 响应数据
       message:
+        description: Message 响应消息
         type: string
       reference:
+        description: Reference 返回参考文档（错误时使用）
         type: string
     type: object
   meta.ID:
@@ -943,7 +947,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AnswerSheetListResponse'
@@ -974,7 +978,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AnswerSheetResponse'
@@ -1005,7 +1009,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AnswerSheetStatisticsResponse'
@@ -1042,7 +1046,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AssessmentListResponse'
@@ -1066,7 +1070,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AssessmentResponse'
@@ -1090,7 +1094,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.HighRiskFactorsResponse'
@@ -1114,7 +1118,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ReportResponse'
@@ -1138,7 +1142,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AssessmentResponse'
@@ -1162,7 +1166,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScoreResponse'
@@ -1193,7 +1197,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.AssessmentStatisticsResponse'
@@ -1220,7 +1224,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.BatchEvaluationResponse'
@@ -1254,7 +1258,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ReportListResponse'
@@ -1288,7 +1292,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.FactorTrendResponse'
@@ -1319,7 +1323,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireListResponse'
@@ -1345,7 +1349,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1389,7 +1393,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireListResponse'
@@ -1420,7 +1424,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1450,7 +1454,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.Response'
+            $ref: '#/definitions/core.Response'
       summary: 删除问卷
       tags:
       - Questionnaire-Lifecycle
@@ -1476,7 +1480,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1507,7 +1511,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1544,7 +1548,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1575,7 +1579,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1606,7 +1610,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1643,7 +1647,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1679,7 +1683,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1720,7 +1724,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1757,7 +1761,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1794,7 +1798,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1825,7 +1829,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.QuestionnaireResponse'
@@ -1861,7 +1865,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleListResponse'
@@ -1892,7 +1896,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -1922,7 +1926,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.Response'
+            $ref: '#/definitions/core.Response'
       summary: 删除量表
       tags:
       - Scale-Lifecycle
@@ -1948,7 +1952,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -1979,7 +1983,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2016,7 +2020,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2053,7 +2057,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2090,7 +2094,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2121,7 +2125,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2158,7 +2162,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2189,7 +2193,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2220,7 +2224,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2256,7 +2260,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleListResponse'
@@ -2287,7 +2291,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
@@ -2324,7 +2328,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.StaffListResponse'
@@ -2349,7 +2353,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.StaffResponse'
@@ -2371,7 +2375,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.Response'
+            $ref: '#/definitions/core.Response'
       summary: 删除员工
       tags:
       - Actor
@@ -2389,7 +2393,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.StaffResponse'
@@ -2430,65 +2434,12 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/handler.Response'
+            - $ref: '#/definitions/core.Response'
             - properties:
                 data:
                   $ref: '#/definitions/response.TesteeListResponse'
               type: object
       summary: 查询受试者列表
-      tags:
-      - Actor
-  /api/v1/testees/{id}:
-    get:
-      parameters:
-      - description: 受试者ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handler.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TesteeResponse'
-              type: object
-      summary: 获取受试者详情
-      tags:
-      - Actor
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: 受试者ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 更新受试者请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/request.UpdateTesteeRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/handler.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TesteeResponse'
-              type: object
-      summary: 更新受试者
       tags:
       - Actor
   /health:

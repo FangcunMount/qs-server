@@ -51,7 +51,7 @@ func NewActorHandler(
 // @Tags Actor
 // @Produce json
 // @Param id path int true "受试者ID"
-// @Success 200 {object} Response{data=response.TesteeResponse}
+// @Success 200 {object} core.Response{data=response.TesteeResponse}
 // GetTestee 获取受试者详情
 func (h *ActorHandler) GetTestee(c *gin.Context) {
 	idStr := c.Param("id")
@@ -88,7 +88,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Produce json
 // @Param id path int true "受试者ID"
 // @Param body body request.UpdateTesteeRequest true "更新受试者请求"
-// @Success 200 {object} Response{data=response.TesteeResponse}
+// @Success 200 {object} core.Response{data=response.TesteeResponse}
 // UpdateTestee 更新受试者
 func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 	idStr := c.Param("id")
@@ -180,7 +180,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Param is_key_focus query bool false "是否重点关注"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} Response{data=response.TesteeListResponse}
+// @Success 200 {object} core.Response{data=response.TesteeListResponse}
 // @Router /api/v1/testees [get]
 func (h *ActorHandler) ListTestees(c *gin.Context) {
 	var req request.ListTesteeRequest
@@ -235,7 +235,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body request.CreateStaffRequest true "创建员工请求"
-// @Success 200 {object} Response{data=response.StaffResponse}
+// @Success 200 {object} core.Response{data=response.StaffResponse}
 // @Router /api/v1/staff [post]
 func (h *ActorHandler) CreateStaff(c *gin.Context) {
 	var req request.CreateStaffRequest
@@ -272,7 +272,7 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 // @Tags Actor
 // @Produce json
 // @Param id path int true "员工ID"
-// @Success 200 {object} Response{data=response.StaffResponse}
+// @Success 200 {object} core.Response{data=response.StaffResponse}
 // @Router /api/v1/staff/{id} [get]
 func (h *ActorHandler) GetStaff(c *gin.Context) {
 	idStr := c.Param("id")
@@ -309,7 +309,7 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 // @Tags Actor
 // @Produce json
 // @Param id path int true "员工ID"
-// @Success 200 {object} Response
+// @Success 200 {object} core.Response
 // @Router /api/v1/staff/{id} [delete]
 func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 	idStr := c.Param("id")
@@ -348,7 +348,7 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 // @Param role query string false "角色筛选"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} Response{data=response.StaffListResponse}
+// @Success 200 {object} core.Response{data=response.StaffListResponse}
 // @Router /api/v1/staff [get]
 func (h *ActorHandler) ListStaff(c *gin.Context) {
 	var req request.ListStaffRequest

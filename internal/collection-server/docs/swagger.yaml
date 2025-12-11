@@ -70,6 +70,20 @@ definitions:
         description: Reference 返回参考文档，可能有助于解决此错误
         type: string
     type: object
+  core.Response:
+    properties:
+      code:
+        description: Code 业务状态码，0 表示成功
+        type: integer
+      data:
+        description: Data 响应数据
+      message:
+        description: Message 响应消息
+        type: string
+      reference:
+        description: Reference 返回参考文档（错误时使用）
+        type: string
+    type: object
   evaluation.AssessmentDetailResponse:
     properties:
       answer_sheet_id:
@@ -250,6 +264,8 @@ definitions:
       total:
         type: integer
     type: object
+  meta.Birthday:
+    type: object
   questionnaire.CalculationRuleResponse:
     properties:
       formula_type:
@@ -332,8 +348,9 @@ definitions:
   testee.CreateTesteeRequest:
     properties:
       birthday:
-        description: 出生日期
-        type: string
+        allOf:
+        - $ref: '#/definitions/meta.Birthday'
+        description: 出生日期（格式：YYYY-MM-DD）
       gender:
         description: 性别：1-男，2-女，3-其他
         type: integer
@@ -349,9 +366,6 @@ definitions:
       name:
         description: 姓名
         type: string
-      org_id:
-        description: 机构ID
-        type: integer
       source:
         description: 来源：online_form/plan/screening/imported
         type: string
@@ -364,7 +378,6 @@ definitions:
     - gender
     - iam_child_id
     - name
-    - org_id
     type: object
   testee.ListTesteesResponse:
     properties:
@@ -393,8 +406,9 @@ definitions:
         - $ref: '#/definitions/testee.AssessmentStatsDTO'
         description: 测评统计信息
       birthday:
-        description: 出生日期
-        type: string
+        allOf:
+        - $ref: '#/definitions/meta.Birthday'
+        description: 出生日期（格式：YYYY-MM-DD）
       created_at:
         description: 创建时间
         type: string
@@ -434,8 +448,9 @@ definitions:
   testee.UpdateTesteeRequest:
     properties:
       birthday:
-        description: 出生日期
-        type: string
+        allOf:
+        - $ref: '#/definitions/meta.Birthday'
+        description: 出生日期（格式：YYYY-MM-DD）
       gender:
         description: 性别
         type: integer
@@ -475,7 +490,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/answersheet.SubmitAnswerSheetResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/answersheet.SubmitAnswerSheetResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -508,7 +528,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/answersheet.AnswerSheetResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/answersheet.AnswerSheetResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -555,7 +580,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/evaluation.ListAssessmentsResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.ListAssessmentsResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -589,7 +619,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/evaluation.AssessmentDetailResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.AssessmentDetailResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -627,9 +662,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/evaluation.FactorScoreResponse'
-            type: array
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/evaluation.FactorScoreResponse'
+                  type: array
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -663,7 +703,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/evaluation.AssessmentReportResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.AssessmentReportResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -701,9 +746,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/evaluation.FactorScoreResponse'
-            type: array
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/evaluation.FactorScoreResponse'
+                  type: array
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -742,9 +792,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/evaluation.TrendPointResponse'
-            type: array
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/evaluation.TrendPointResponse'
+                  type: array
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -767,8 +822,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/core.Response'
       summary: 服务信息
       tags:
       - 系统
@@ -800,7 +854,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -827,7 +886,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -863,7 +927,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/testee.ListTesteesResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/testee.ListTesteesResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -898,7 +967,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/testee.TesteeResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/testee.TesteeResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -931,7 +1005,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/testee.TesteeResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/testee.TesteeResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -971,7 +1050,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/testee.TesteeResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/testee.TesteeResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -991,13 +1075,8 @@ paths:
       - 受试者
   /api/v1/testees/exists:
     get:
-      description: 根据机构ID和IAM儿童ID检查受试者是否存在
+      description: 根据IAM儿童ID检查受试者是否存在
       parameters:
-      - description: 机构ID
-        in: query
-        name: org_id
-        required: true
-        type: integer
       - description: IAM儿童ID
         in: query
         name: iam_child_id
@@ -1009,7 +1088,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/testee.TesteeExistsResponse'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/testee.TesteeExistsResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1036,8 +1120,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/core.Response'
       summary: 健康检查
       tags:
       - 系统
@@ -1050,8 +1133,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/core.Response'
       summary: Ping
       tags:
       - 系统

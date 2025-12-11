@@ -43,7 +43,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/answersheet.SubmitAnswerSheetResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/answersheet.SubmitAnswerSheetResponse'
         '400':
           description: Bad Request
           content:
@@ -81,7 +86,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/answersheet.AnswerSheetResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/answersheet.AnswerSheetResponse'
         '400':
           description: Bad Request
           content:
@@ -133,7 +143,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/evaluation.ListAssessmentsResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.ListAssessmentsResponse'
         '400':
           description: Bad Request
           content:
@@ -175,9 +190,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/evaluation.TrendPointResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/evaluation.TrendPointResponse'
         '400':
           description: Bad Request
           content:
@@ -214,7 +234,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/evaluation.AssessmentDetailResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentDetailResponse'
         '400':
           description: Bad Request
           content:
@@ -257,9 +282,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/evaluation.FactorScoreResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/evaluation.FactorScoreResponse'
         '400':
           description: Bad Request
           content:
@@ -296,7 +326,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/evaluation.AssessmentReportResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentReportResponse'
         '400':
           description: Bad Request
           content:
@@ -339,9 +374,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/evaluation.FactorScoreResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/evaluation.FactorScoreResponse'
         '400':
           description: Bad Request
           content:
@@ -367,8 +407,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: '#/components/schemas/core.Response'
   /questionnaires:
     get:
       tags:
@@ -401,7 +440,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse'
         '400':
           description: Bad Request
           content:
@@ -433,7 +477,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
         '400':
           description: Bad Request
           content:
@@ -476,7 +525,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/testee.ListTesteesResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/testee.ListTesteesResponse'
         '400':
           description: Bad Request
           content:
@@ -513,7 +567,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/testee.TesteeResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/testee.TesteeResponse'
         '400':
           description: Bad Request
           content:
@@ -537,14 +596,9 @@ paths:
       tags:
       - 受试者
       summary: 检查受试者是否存在
-      description: 根据机构ID和IAM儿童ID检查受试者是否存在
+      description: 根据IAM儿童ID检查受试者是否存在
       operationId: 检查受试者是否存在
       parameters:
-      - type: integer
-        description: 机构ID
-        name: org_id
-        in: query
-        required: true
       - type: integer
         description: IAM儿童ID
         name: iam_child_id
@@ -556,7 +610,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/testee.TesteeExistsResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/testee.TesteeExistsResponse'
         '400':
           description: Bad Request
           content:
@@ -594,7 +653,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/testee.TesteeResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/testee.TesteeResponse'
         '400':
           description: Bad Request
           content:
@@ -637,7 +701,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/testee.TesteeResponse'
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/testee.TesteeResponse'
         '400':
           description: Bad Request
           content:
@@ -669,8 +738,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: '#/components/schemas/core.Response'
   /ping:
     get:
       tags:
@@ -684,8 +752,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: '#/components/schemas/core.Response'
 components:
   schemas:
     answersheet.AnswerSheetResponse:
@@ -757,6 +824,20 @@ components:
           type: string
         reference:
           description: Reference 返回参考文档，可能有助于解决此错误
+          type: string
+    core.Response:
+      type: object
+      properties:
+        code:
+          description: Code 业务状态码，0 表示成功
+          type: integer
+        data:
+          description: Data 响应数据
+        message:
+          description: Message 响应消息
+          type: string
+        reference:
+          description: Reference 返回参考文档（错误时使用）
           type: string
     evaluation.AssessmentDetailResponse:
       type: object
@@ -938,6 +1019,8 @@ components:
             $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
         total:
           type: integer
+    meta.Birthday:
+      type: object
     questionnaire.CalculationRuleResponse:
       type: object
       properties:
@@ -1023,11 +1106,11 @@ components:
       - gender
       - iam_child_id
       - name
-      - org_id
       properties:
         birthday:
-          description: 出生日期
-          type: string
+          description: 出生日期（格式：YYYY-MM-DD）
+          allOf:
+          - $ref: '#/components/schemas/meta.Birthday'
         gender:
           description: 性别：1-男，2-女，3-其他
           type: integer
@@ -1043,9 +1126,6 @@ components:
         name:
           description: 姓名
           type: string
-        org_id:
-          description: 机构ID
-          type: integer
         source:
           description: 来源：online_form/plan/screening/imported
           type: string
@@ -1082,8 +1162,9 @@ components:
           allOf:
           - $ref: '#/components/schemas/testee.AssessmentStatsDTO'
         birthday:
-          description: 出生日期
-          type: string
+          description: 出生日期（格式：YYYY-MM-DD）
+          allOf:
+          - $ref: '#/components/schemas/meta.Birthday'
         created_at:
           description: 创建时间
           type: string
@@ -1123,8 +1204,9 @@ components:
       type: object
       properties:
         birthday:
-          description: 出生日期
-          type: string
+          description: 出生日期（格式：YYYY-MM-DD）
+          allOf:
+          - $ref: '#/components/schemas/meta.Birthday'
         gender:
           description: 性别
           type: integer

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -13,12 +12,14 @@ import (
 
 // EvaluationHandler 测评处理器
 type EvaluationHandler struct {
+	*BaseHandler
 	queryService *evaluation.QueryService
 }
 
 // NewEvaluationHandler 创建测评处理器
 func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHandler {
 	return &EvaluationHandler{
+		BaseHandler:  NewBaseHandler(),
 		queryService: queryService,
 	}
 }
@@ -30,7 +31,7 @@ func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHand
 // @Produce json
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
-// @Success 200 {object} evaluation.AssessmentDetailResponse
+// @Success 200 {object} core.Response{data=evaluation.AssessmentDetailResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -38,36 +39,36 @@ func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHand
 // @Router /api/v1/assessments/{id} [get]
 func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 	// 从 query 参数获取 testee_id（监护关系验证已在中间件完成，或由业务逻辑验证）
-	testeeIDStr := c.Query("testee_id")
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
 	if testeeIDStr == "" {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		h.BadRequestResponse(c, "testee_id is required", nil)
 		return
 	}
 	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
+		h.BadRequestResponse(c, "invalid testee_id format", err)
 		return
 	}
 
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid assessment id"), nil)
+		h.BadRequestResponse(c, "invalid assessment id", err)
 		return
 	}
 
 	result, err := h.queryService.GetMyAssessment(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get assessment failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get assessment failed", err)
 		return
 	}
 
 	if result == nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrPageNotFound, "assessment not found"), nil)
+		h.NotFoundResponse(c, "assessment not found", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // ListMyAssessments 获取我的测评列表
@@ -79,37 +80,36 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 // @Param status query string false "状态筛选"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} evaluation.ListAssessmentsResponse
+// @Success 200 {object} core.Response{data=evaluation.ListAssessmentsResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/assessments [get]
 func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 	// 从 query 参数获取 testee_id
-	testeeIDStr := c.Query("testee_id")
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
 	if testeeIDStr == "" {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		h.BadRequestResponse(c, "testee_id is required", nil)
 		return
 	}
 	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
+		h.BadRequestResponse(c, "invalid testee_id format", err)
 		return
 	}
 
 	var req evaluation.ListAssessmentsRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind query failed: %v", err), nil)
+	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
 
 	result, err := h.queryService.ListMyAssessments(c.Request.Context(), testeeID, &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "list assessments failed: %v", err), nil)
+		h.InternalErrorResponse(c, "list assessments failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // GetAssessmentScores 获取测评得分详情
@@ -119,7 +119,7 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 // @Produce json
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
-// @Success 200 {array} evaluation.FactorScoreResponse
+// @Success 200 {object} core.Response{data=[]evaluation.FactorScoreResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
@@ -137,20 +137,20 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 		return
 	}
 
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid assessment id"), nil)
+		h.BadRequestResponse(c, "invalid assessment id", err)
 		return
 	}
 
 	result, err := h.queryService.GetAssessmentScores(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get scores failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get scores failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // GetAssessmentReport 获取测评报告
@@ -160,7 +160,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Produce json
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
-// @Success 200 {object} evaluation.AssessmentReportResponse
+// @Success 200 {object} core.Response{data=evaluation.AssessmentReportResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -168,36 +168,36 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Router /api/v1/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 	// 从 query 参数获取 testee_id
-	testeeIDStr := c.Query("testee_id")
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
 	if testeeIDStr == "" {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		h.BadRequestResponse(c, "testee_id is required", nil)
 		return
 	}
 	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
+		h.BadRequestResponse(c, "invalid testee_id format", err)
 		return
 	}
 
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid assessment id"), nil)
+		h.BadRequestResponse(c, "invalid assessment id", err)
 		return
 	}
 
 	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get report failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get report failed", err)
 		return
 	}
 
 	if result == nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrPageNotFound, "report not found"), nil)
+		h.NotFoundResponse(c, "report not found", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -208,37 +208,36 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 // @Param testee_id query int true "受试者ID"
 // @Param factor_code query string true "因子编码"
 // @Param limit query int false "数据点数量" default(10)
-// @Success 200 {array} evaluation.TrendPointResponse
+// @Success 200 {object} core.Response{data=[]evaluation.TrendPointResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/assessments/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	// 从 query 参数获取 testee_id
-	testeeIDStr := c.Query("testee_id")
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
 	if testeeIDStr == "" {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		h.BadRequestResponse(c, "testee_id is required", nil)
 		return
 	}
 	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
+		h.BadRequestResponse(c, "invalid testee_id format", err)
 		return
 	}
 
 	var req evaluation.GetFactorTrendRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind query failed: %v", err), nil)
+	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
 
 	result, err := h.queryService.GetFactorTrend(c.Request.Context(), testeeID, &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get trend failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get trend failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // GetHighRiskFactors 获取高风险因子
@@ -248,36 +247,36 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Produce json
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
-// @Success 200 {array} evaluation.FactorScoreResponse
+// @Success 200 {object} core.Response{data=[]evaluation.FactorScoreResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/factors/high-risk [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 	// 从 query 参数获取 testee_id
-	testeeIDStr := c.Query("testee_id")
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
 	if testeeIDStr == "" {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
+		h.BadRequestResponse(c, "testee_id is required", nil)
 		return
 	}
 	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
+		h.BadRequestResponse(c, "invalid testee_id format", err)
 		return
 	}
 
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid assessment id"), nil)
+		h.BadRequestResponse(c, "invalid assessment id", err)
 		return
 	}
 
 	result, err := h.queryService.GetHighRiskFactors(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get high risk factors failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get high risk factors failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }

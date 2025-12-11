@@ -86,7 +86,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -116,7 +116,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -146,7 +146,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -184,7 +184,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -216,7 +216,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -241,7 +241,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -266,7 +266,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -291,7 +291,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -316,7 +316,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -341,7 +341,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -366,7 +366,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -401,7 +401,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -436,7 +436,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -466,7 +466,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -491,7 +491,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -534,7 +534,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -564,7 +564,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -594,7 +594,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -622,7 +622,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handler.Response'
+                $ref: '#/components/schemas/core.Response'
   /questionnaires/{code}/archive:
     post:
       tags:
@@ -648,7 +648,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -684,7 +684,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -714,7 +714,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -744,7 +744,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -780,7 +780,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -816,7 +816,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -852,7 +852,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -893,7 +893,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -927,7 +927,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -957,7 +957,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -992,7 +992,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1022,7 +1022,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1052,7 +1052,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1087,7 +1087,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1117,7 +1117,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1147,7 +1147,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1175,7 +1175,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handler.Response'
+                $ref: '#/components/schemas/core.Response'
   /scales/{code}/archive:
     post:
       tags:
@@ -1201,7 +1201,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1237,7 +1237,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1273,7 +1273,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1309,7 +1309,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1339,7 +1339,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1375,7 +1375,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1405,7 +1405,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1443,7 +1443,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1466,7 +1466,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1490,7 +1490,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
@@ -1512,7 +1512,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handler.Response'
+                $ref: '#/components/schemas/core.Response'
   /testees:
     get:
       tags:
@@ -1550,64 +1550,11 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/handler.Response'
+                - $ref: '#/components/schemas/core.Response'
                 - type: object
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TesteeListResponse'
-  /testees/{id}:
-    get:
-      tags:
-      - Actor
-      summary: 获取受试者详情
-      operationId: 获取受试者详情
-      parameters:
-      - type: integer
-        description: 受试者ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/handler.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.TesteeResponse'
-    put:
-      tags:
-      - Actor
-      summary: 更新受试者
-      operationId: 更新受试者
-      parameters:
-      - type: integer
-        description: 受试者ID
-        name: id
-        in: path
-        required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/request.UpdateTesteeRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/handler.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.TesteeResponse'
   /health:
     get:
       tags:
@@ -1640,15 +1587,19 @@ paths:
                 additionalProperties: true
 components:
   schemas:
-    handler.Response:
+    core.Response:
       type: object
       properties:
         code:
+          description: Code 业务状态码，0 表示成功
           type: integer
-        data: {}
+        data:
+          description: Data 响应数据
         message:
+          description: Message 响应消息
           type: string
         reference:
+          description: Reference 返回参考文档（错误时使用）
           type: string
     meta.ID:
       type: integer

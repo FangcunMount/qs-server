@@ -48,7 +48,7 @@ func NewEvaluationHandler(
 // @Tags Evaluation-Assessment
 // @Produce json
 // @Param id path int true "测评ID"
-// @Success 200 {object} Response{data=response.AssessmentResponse}
+// @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Router /api/v1/evaluations/assessments/{id} [get]
 func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -76,7 +76,7 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 // @Param page_size query int false "每页数量" default(10)
 // @Param status query string false "状态筛选"
 // @Param testee_id query int false "受试者ID筛选"
-// @Success 200 {object} Response{data=response.AssessmentListResponse}
+// @Success 200 {object} core.Response{data=response.AssessmentListResponse}
 // @Router /api/v1/evaluations/assessments [get]
 func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	var req request.ListAssessmentsRequest
@@ -127,7 +127,7 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Param start_time query string false "开始时间（格式：2006-01-02）"
 // @Param end_time query string false "结束时间（格式：2006-01-02）"
 // @Param scale_code query string false "量表编码筛选"
-// @Success 200 {object} Response{data=response.AssessmentStatisticsResponse}
+// @Success 200 {object} core.Response{data=response.AssessmentStatisticsResponse}
 // @Router /api/v1/evaluations/assessments/statistics [get]
 func (h *EvaluationHandler) GetStatistics(c *gin.Context) {
 	var req request.GetStatisticsRequest
@@ -174,7 +174,7 @@ func (h *EvaluationHandler) GetStatistics(c *gin.Context) {
 // @Tags Evaluation-Score
 // @Produce json
 // @Param id path int true "测评ID"
-// @Success 200 {object} Response{data=response.ScoreResponse}
+// @Success 200 {object} core.Response{data=response.ScoreResponse}
 // @Router /api/v1/evaluations/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetScores(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -201,7 +201,7 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 // @Param testee_id query int true "受试者ID"
 // @Param factor_code query string true "因子编码"
 // @Param limit query int false "返回记录数限制" default(10)
-// @Success 200 {object} Response{data=response.FactorTrendResponse}
+// @Success 200 {object} core.Response{data=response.FactorTrendResponse}
 // @Router /api/v1/evaluations/scores/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	var req request.GetFactorTrendRequest
@@ -236,7 +236,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Tags Evaluation-Score
 // @Produce json
 // @Param id path int true "测评ID"
-// @Success 200 {object} Response{data=response.HighRiskFactorsResponse}
+// @Success 200 {object} core.Response{data=response.HighRiskFactorsResponse}
 // @Router /api/v1/evaluations/assessments/{id}/high-risk-factors [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -263,7 +263,7 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Tags Evaluation-Report
 // @Produce json
 // @Param id path int true "测评ID"
-// @Success 200 {object} Response{data=response.ReportResponse}
+// @Success 200 {object} core.Response{data=response.ReportResponse}
 // @Router /api/v1/evaluations/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetReport(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -290,7 +290,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 // @Param testee_id query int true "受试者ID"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
-// @Success 200 {object} Response{data=response.ReportListResponse}
+// @Success 200 {object} core.Response{data=response.ReportListResponse}
 // @Router /api/v1/evaluations/reports [get]
 func (h *EvaluationHandler) ListReports(c *gin.Context) {
 	var req request.ListReportsRequest
@@ -331,7 +331,7 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body request.BatchEvaluateRequest true "批量评估请求"
-// @Success 200 {object} Response{data=response.BatchEvaluationResponse}
+// @Success 200 {object} core.Response{data=response.BatchEvaluationResponse}
 // @Router /api/v1/evaluations/batch-evaluate [post]
 func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 	var req request.BatchEvaluateRequest
@@ -356,7 +356,7 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 // @Tags Evaluation-Admin
 // @Produce json
 // @Param id path int true "测评ID"
-// @Success 200 {object} Response{data=response.AssessmentResponse}
+// @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Router /api/v1/evaluations/assessments/{id}/retry [post]
 func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

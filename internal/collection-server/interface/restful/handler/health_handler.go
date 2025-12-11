@@ -1,8 +1,7 @@
 package handler
 
 import (
-	"net/http"
-
+	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,10 +24,10 @@ func NewHealthHandler(serviceName, version string) *HealthHandler {
 // @Description 检查服务健康状态
 // @Tags 系统
 // @Produce json
-// @Success 200 {object} map[string]interface{}
+// @Success 200 {object} core.Response
 // @Router /health [get]
 func (h *HealthHandler) Health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	core.WriteResponse(c, nil, gin.H{
 		"status":  "healthy",
 		"service": h.serviceName,
 		"version": h.version,
@@ -40,10 +39,10 @@ func (h *HealthHandler) Health(c *gin.Context) {
 // @Description 测试服务连通性
 // @Tags 系统
 // @Produce json
-// @Success 200 {object} map[string]interface{}
+// @Success 200 {object} core.Response
 // @Router /ping [get]
 func (h *HealthHandler) Ping(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	core.WriteResponse(c, nil, gin.H{
 		"message": "pong",
 		"service": h.serviceName,
 	})
@@ -54,10 +53,10 @@ func (h *HealthHandler) Ping(c *gin.Context) {
 // @Description 获取服务基本信息
 // @Tags 系统
 // @Produce json
-// @Success 200 {object} map[string]interface{}
+// @Success 200 {object} core.Response
 // @Router /api/v1/public/info [get]
 func (h *HealthHandler) Info(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	core.WriteResponse(c, nil, gin.H{
 		"service":     h.serviceName,
 		"version":     h.version,
 		"description": "问卷收集服务 - BFF 层",

@@ -1,21 +1,17 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
 
 // TesteeHandler 受试者处理器
 type TesteeHandler struct {
+	*BaseHandler
 	testeeService       *testee.Service
 	guardianshipService *iam.GuardianshipService
 }
@@ -23,6 +19,7 @@ type TesteeHandler struct {
 // NewTesteeHandler 创建受试者处理器
 func NewTesteeHandler(testeeService *testee.Service, guardianshipService *iam.GuardianshipService) *TesteeHandler {
 	return &TesteeHandler{
+		BaseHandler:         NewBaseHandler(),
 		testeeService:       testeeService,
 		guardianshipService: guardianshipService,
 	}
@@ -35,7 +32,7 @@ func NewTesteeHandler(testeeService *testee.Service, guardianshipService *iam.Gu
 // @Accept json
 // @Produce json
 // @Param request body testee.CreateTesteeRequest true "受试者数据"
-// @Success 200 {object} testee.TesteeResponse
+// @Success 200 {object} core.Response{data=testee.TesteeResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -43,25 +40,24 @@ func NewTesteeHandler(testeeService *testee.Service, guardianshipService *iam.Gu
 // @Router /api/v1/testees [post]
 func (h *TesteeHandler) Create(c *gin.Context) {
 	var req testee.CreateTesteeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind request failed: %v", err), nil)
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	// 验证用户是否已认证
-	userID := middleware.GetUserID(c)
+	userID := h.GetUserID(c)
 	if userID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "user not authenticated"), nil)
+		h.UnauthorizedResponse(c, "user not authenticated")
 		return
 	}
 
 	result, err := h.testeeService.CreateTestee(c.Request.Context(), &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "create testee failed: %v", err), nil)
+		h.InternalErrorResponse(c, "create testee failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // Get 获取受试者详情
@@ -70,27 +66,27 @@ func (h *TesteeHandler) Create(c *gin.Context) {
 // @Tags 受试者
 // @Produce json
 // @Param id path int true "受试者ID"
-// @Success 200 {object} testee.TesteeResponse
+// @Success 200 {object} core.Response{data=testee.TesteeResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/testees/{id} [get]
 func (h *TesteeHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid id format"), nil)
+		h.BadRequestResponse(c, "invalid id format", err)
 		return
 	}
 
 	result, err := h.testeeService.GetTestee(c.Request.Context(), id)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get testee failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get testee failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // Update 更新受试者信息
@@ -101,40 +97,39 @@ func (h *TesteeHandler) Get(c *gin.Context) {
 // @Produce json
 // @Param id path int true "受试者ID"
 // @Param request body testee.UpdateTesteeRequest true "更新数据"
-// @Success 200 {object} testee.TesteeResponse
+// @Success 200 {object} core.Response{data=testee.TesteeResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/testees/{id} [put]
 func (h *TesteeHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid id format"), nil)
+		h.BadRequestResponse(c, "invalid id format", err)
 		return
 	}
 
 	var req testee.UpdateTesteeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind request failed: %v", err), nil)
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	// 验证用户是否已认证
-	userID := middleware.GetUserID(c)
+	userID := h.GetUserID(c)
 	if userID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "user not authenticated"), nil)
+		h.UnauthorizedResponse(c, "user not authenticated")
 		return
 	}
 
 	result, err := h.testeeService.UpdateTestee(c.Request.Context(), id, &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "update testee failed: %v", err), nil)
+		h.InternalErrorResponse(c, "update testee failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // List 查询当前用户的受试者列表
@@ -144,7 +139,7 @@ func (h *TesteeHandler) Update(c *gin.Context) {
 // @Produce json
 // @Param offset query int false "偏移量" default(0)
 // @Param limit query int false "每页数量" default(20)
-// @Success 200 {object} testee.ListTesteesResponse
+// @Success 200 {object} core.Response{data=testee.ListTesteesResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -152,15 +147,14 @@ func (h *TesteeHandler) Update(c *gin.Context) {
 // @Router /api/v1/testees [get]
 func (h *TesteeHandler) List(c *gin.Context) {
 	var req testee.ListTesteesRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind request failed: %v", err), nil)
+	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
 
 	// 验证用户是否已认证
-	userID := middleware.GetUserID(c)
+	userID := h.GetUserID(c)
 	if userID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "user not authenticated"), nil)
+		h.UnauthorizedResponse(c, "user not authenticated")
 		return
 	}
 
@@ -185,11 +179,11 @@ func (h *TesteeHandler) List(c *gin.Context) {
 
 	result, err := h.testeeService.ListMyTestees(c.Request.Context(), childIDs, &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "list my testees failed: %v", err), nil)
+		h.InternalErrorResponse(c, "list my testees failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // Exists 检查受试者是否存在
@@ -198,33 +192,33 @@ func (h *TesteeHandler) List(c *gin.Context) {
 // @Tags 受试者
 // @Produce json
 // @Param iam_child_id query int true "IAM儿童ID"
-// @Success 200 {object} testee.TesteeExistsResponse
+// @Success 200 {object} core.Response{data=testee.TesteeExistsResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/testees/exists [get]
 func (h *TesteeHandler) Exists(c *gin.Context) {
-	iamChildIDStr := c.Query("iam_child_id")
+	iamChildIDStr := h.GetQueryParam(c, "iam_child_id")
 
 	iamChildID, err := strconv.ParseUint(iamChildIDStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid iam_child_id format"), nil)
+		h.BadRequestResponse(c, "invalid iam_child_id format", err)
 		return
 	}
 
 	// 验证用户是否已认证
-	userID := middleware.GetUserID(c)
+	userID := h.GetUserID(c)
 	if userID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "user not authenticated"), nil)
+		h.UnauthorizedResponse(c, "user not authenticated")
 		return
 	}
 
 	result, err := h.testeeService.TesteeExists(c.Request.Context(), iamChildID)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "check testee existence failed: %v", err), nil)
+		h.InternalErrorResponse(c, "check testee existence failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }

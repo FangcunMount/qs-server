@@ -1,25 +1,22 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
-	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
 
 // AnswerSheetHandler 答卷处理器
 type AnswerSheetHandler struct {
+	*BaseHandler
 	submissionService *answersheet.SubmissionService
 }
 
 // NewAnswerSheetHandler 创建答卷处理器
 func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *AnswerSheetHandler {
 	return &AnswerSheetHandler{
+		BaseHandler:       NewBaseHandler(),
 		submissionService: submissionService,
 	}
 }
@@ -31,7 +28,7 @@ func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *An
 // @Accept json
 // @Produce json
 // @Param request body answersheet.SubmitAnswerSheetRequest true "答卷数据"
-// @Success 200 {object} answersheet.SubmitAnswerSheetResponse
+// @Success 200 {object} core.Response{data=answersheet.SubmitAnswerSheetResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -39,25 +36,24 @@ func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *An
 // @Router /api/v1/answersheets [post]
 func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	var req answersheet.SubmitAnswerSheetRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind request failed: %v", err), nil)
+	if err := h.BindJSON(c, &req); err != nil {
 		return
 	}
 
 	// 从上下文获取当前用户ID（由 UserIdentityMiddleware 设置）
-	writerID := middleware.GetUserID(c)
+	writerID := h.GetUserID(c)
 	if writerID == 0 {
-		core.WriteResponse(c, errors.WithCode(code.ErrTokenInvalid, "user not authenticated"), nil)
+		h.UnauthorizedResponse(c, "user not authenticated")
 		return
 	}
 
 	result, err := h.submissionService.Submit(c.Request.Context(), writerID, &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "save answer sheet failed: %v", err), nil)
+		h.InternalErrorResponse(c, "save answer sheet failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // Get 获取答卷详情
@@ -66,30 +62,30 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 // @Tags 答卷
 // @Produce json
 // @Param id path int true "答卷ID"
-// @Success 200 {object} answersheet.AnswerSheetResponse
+// @Success 200 {object} core.Response{data=answersheet.AnswerSheetResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
 // @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := h.GetPathParam(c, "id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid id format"), nil)
+		h.BadRequestResponse(c, "invalid id format", err)
 		return
 	}
 
 	result, err := h.submissionService.Get(c.Request.Context(), id)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get answer sheet failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get answer sheet failed", err)
 		return
 	}
 
 	if result == nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrPageNotFound, "answer sheet not found"), nil)
+		h.NotFoundResponse(c, "answer sheet not found", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }

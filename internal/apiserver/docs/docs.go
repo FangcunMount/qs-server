@@ -81,7 +81,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -132,7 +132,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -183,7 +183,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -243,7 +243,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -295,7 +295,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -336,7 +336,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -377,7 +377,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -418,7 +418,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -459,7 +459,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -500,7 +500,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -546,7 +546,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -601,7 +601,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -656,7 +656,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -707,7 +707,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -751,7 +751,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -821,7 +821,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -872,7 +872,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -923,7 +923,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -970,7 +970,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.Response"
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -1011,7 +1011,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1071,7 +1071,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1122,7 +1122,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1173,7 +1173,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1233,7 +1233,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1293,7 +1293,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1353,7 +1353,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1420,7 +1420,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1476,7 +1476,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1527,7 +1527,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1585,7 +1585,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1636,7 +1636,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1687,7 +1687,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1745,7 +1745,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1796,7 +1796,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1847,7 +1847,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1894,7 +1894,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.Response"
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -1935,7 +1935,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1995,7 +1995,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2055,7 +2055,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2115,7 +2115,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2166,7 +2166,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2226,7 +2226,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2277,7 +2277,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2337,7 +2337,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2380,7 +2380,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2420,7 +2420,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
@@ -2456,7 +2456,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.Response"
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -2512,103 +2512,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/handler.Response"
+                                    "$ref": "#/definitions/core.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/response.TesteeListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/testees/{id}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Actor"
-                ],
-                "summary": "获取受试者详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TesteeResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Actor"
-                ],
-                "summary": "更新受试者",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "更新受试者请求",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.UpdateTesteeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/handler.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TesteeResponse"
                                         }
                                     }
                                 }
@@ -2662,17 +2572,22 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handler.Response": {
+        "core.Response": {
             "type": "object",
             "properties": {
                 "code": {
+                    "description": "Code 业务状态码，0 表示成功",
                     "type": "integer"
                 },
-                "data": {},
+                "data": {
+                    "description": "Data 响应数据"
+                },
                 "message": {
+                    "description": "Message 响应消息",
                     "type": "string"
                 },
                 "reference": {
+                    "description": "Reference 返回参考文档（错误时使用）",
                     "type": "string"
                 }
             }

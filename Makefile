@@ -120,7 +120,7 @@ help: ## 显示帮助信息
 
 docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
 	@command -v swag >/dev/null 2>&1 || { echo "swag 未安装，请先执行: go install github.com/swaggo/swag/cmd/swag@v1.16.4"; exit 1; }
-	swag init --parseInternal -g apiserver.go -d cmd/qs-apiserver,internal/apiserver,internal/pkg -o internal/apiserver/docs
+	swag init --parseInternal -g apiserver.go -d cmd/qs-apiserver,internal/apiserver,internal/pkg,pkg -o internal/apiserver/docs
 	swag init --parseInternal --parseDependency -g main.go -d cmd/collection-server,internal/collection-server,pkg -o internal/collection-server/docs
 
 docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要

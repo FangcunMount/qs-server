@@ -44,7 +44,7 @@ func NewQuestionnaireHandler(
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body request.CreateQuestionnaireRequest true "创建问卷请求"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires [post]
 func (h *QuestionnaireHandler) Create(c *gin.Context) {
 	var req request.CreateQuestionnaireRequest
@@ -81,7 +81,7 @@ func (h *QuestionnaireHandler) Create(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
 // @Param request body request.UpdateQuestionnaireBasicInfoRequest true "更新请求"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/basic-info [put]
 func (h *QuestionnaireHandler) UpdateBasicInfo(c *gin.Context) {
 	qCode := c.Param("code")
@@ -124,7 +124,7 @@ func (h *QuestionnaireHandler) UpdateBasicInfo(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/draft [post]
 func (h *QuestionnaireHandler) SaveDraft(c *gin.Context) {
 	qCode := c.Param("code")
@@ -150,7 +150,7 @@ func (h *QuestionnaireHandler) SaveDraft(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/publish [post]
 func (h *QuestionnaireHandler) Publish(c *gin.Context) {
 	qCode := c.Param("code")
@@ -176,7 +176,7 @@ func (h *QuestionnaireHandler) Publish(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/unpublish [post]
 func (h *QuestionnaireHandler) Unpublish(c *gin.Context) {
 	qCode := c.Param("code")
@@ -202,7 +202,7 @@ func (h *QuestionnaireHandler) Unpublish(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/archive [post]
 func (h *QuestionnaireHandler) Archive(c *gin.Context) {
 	qCode := c.Param("code")
@@ -228,7 +228,7 @@ func (h *QuestionnaireHandler) Archive(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response
+// @Success 200 {object} core.Response
 // @Router /api/v1/questionnaires/{code} [delete]
 func (h *QuestionnaireHandler) Delete(c *gin.Context) {
 	qCode := c.Param("code")
@@ -257,7 +257,7 @@ func (h *QuestionnaireHandler) Delete(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
 // @Param request body request.AddQuestionRequest true "添加问题请求"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions [post]
 func (h *QuestionnaireHandler) AddQuestion(c *gin.Context) {
 	qCode := c.Param("code")
@@ -311,7 +311,7 @@ func (h *QuestionnaireHandler) AddQuestion(c *gin.Context) {
 // @Param code path string true "问卷编码"
 // @Param questionCode path string true "问题编码"
 // @Param request body request.UpdateQuestionRequest true "更新问题请求"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions/{questionCode} [put]
 func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 	qCode := c.Param("code")
@@ -365,7 +365,7 @@ func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
 // @Param questionCode path string true "问题编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions/{questionCode} [delete]
 func (h *QuestionnaireHandler) RemoveQuestion(c *gin.Context) {
 	qCode := c.Param("code")
@@ -393,7 +393,7 @@ func (h *QuestionnaireHandler) RemoveQuestion(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
 // @Param request body request.ReorderQuestionsRequest true "重排问题请求"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions/reorder [post]
 func (h *QuestionnaireHandler) ReorderQuestions(c *gin.Context) {
 	qCode := c.Param("code")
@@ -426,7 +426,7 @@ func (h *QuestionnaireHandler) ReorderQuestions(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
 // @Param request body request.BatchUpdateQuestionsRequest true "批量更新请求"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code}/questions/batch [put]
 func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 	qCode := c.Param("code")
@@ -482,7 +482,7 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/questionnaires/{code} [get]
 func (h *QuestionnaireHandler) GetByCode(c *gin.Context) {
 	qCode := c.Param("code")
@@ -511,7 +511,7 @@ func (h *QuestionnaireHandler) GetByCode(c *gin.Context) {
 // @Param page_size query int false "每页数量" default(10)
 // @Param status query string false "状态筛选"
 // @Param title query string false "标题筛选"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireListResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireListResponse}
 // @Router /api/v1/questionnaires [get]
 func (h *QuestionnaireHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -556,7 +556,7 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param code path string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.QuestionnaireResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/public/questionnaires/{code} [get]
 func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 	qCode := c.Param("code")
@@ -582,7 +582,7 @@ func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
-// @Success 200 {object} handler.Response{data=response.QuestionnaireListResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireListResponse}
 // @Router /api/v1/public/questionnaires [get]
 func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))

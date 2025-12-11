@@ -48,7 +48,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/answersheet.SubmitAnswerSheetResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/answersheet.SubmitAnswerSheetResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -100,7 +112,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/answersheet.AnswerSheetResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/answersheet.AnswerSheetResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -172,7 +196,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/evaluation.ListAssessmentsResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.ListAssessmentsResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -232,10 +268,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/evaluation.TrendPointResponse"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/evaluation.TrendPointResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -288,7 +336,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/evaluation.AssessmentDetailResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -347,10 +407,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/evaluation.FactorScoreResponse"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/evaluation.FactorScoreResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -403,7 +475,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/evaluation.AssessmentReportResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentReportResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -462,10 +546,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/evaluation.FactorScoreResponse"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/evaluation.FactorScoreResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -497,8 +593,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -546,7 +641,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -587,7 +694,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -646,7 +765,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/testee.ListTesteesResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/testee.ListTesteesResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -701,7 +832,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/testee.TesteeResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/testee.TesteeResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -732,7 +875,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "根据机构ID和IAM儿童ID检查受试者是否存在",
+                "description": "根据IAM儿童ID检查受试者是否存在",
                 "produces": [
                     "application/json"
                 ],
@@ -741,13 +884,6 @@ const docTemplate = `{
                 ],
                 "summary": "检查受试者是否存在",
                 "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "机构ID",
-                        "name": "org_id",
-                        "in": "query",
-                        "required": true
-                    },
                     {
                         "type": "integer",
                         "description": "IAM儿童ID",
@@ -760,7 +896,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/testee.TesteeExistsResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/testee.TesteeExistsResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -812,7 +960,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/testee.TesteeResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/testee.TesteeResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -874,7 +1034,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/testee.TesteeResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/testee.TesteeResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -912,8 +1084,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -933,8 +1104,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/core.Response"
                         }
                     }
                 }
@@ -1039,6 +1209,26 @@ const docTemplate = `{
                 },
                 "reference": {
                     "description": "Reference 返回参考文档，可能有助于解决此错误",
+                    "type": "string"
+                }
+            }
+        },
+        "core.Response": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Code 业务状态码，0 表示成功",
+                    "type": "integer"
+                },
+                "data": {
+                    "description": "Data 响应数据"
+                },
+                "message": {
+                    "description": "Message 响应消息",
+                    "type": "string"
+                },
+                "reference": {
+                    "description": "Reference 返回参考文档（错误时使用）",
                     "type": "string"
                 }
             }
@@ -1316,6 +1506,9 @@ const docTemplate = `{
                 }
             }
         },
+        "meta.Birthday": {
+            "type": "object"
+        },
         "questionnaire.CalculationRuleResponse": {
             "type": "object",
             "properties": {
@@ -1441,13 +1634,16 @@ const docTemplate = `{
             "required": [
                 "gender",
                 "iam_child_id",
-                "name",
-                "org_id"
+                "name"
             ],
             "properties": {
                 "birthday": {
-                    "description": "出生日期",
-                    "type": "string"
+                    "description": "出生日期（格式：YYYY-MM-DD）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/meta.Birthday"
+                        }
+                    ]
                 },
                 "gender": {
                     "description": "性别：1-男，2-女，3-其他",
@@ -1468,10 +1664,6 @@ const docTemplate = `{
                 "name": {
                     "description": "姓名",
                     "type": "string"
-                },
-                "org_id": {
-                    "description": "机构ID",
-                    "type": "integer"
                 },
                 "source": {
                     "description": "来源：online_form/plan/screening/imported",
@@ -1527,8 +1719,12 @@ const docTemplate = `{
                     ]
                 },
                 "birthday": {
-                    "description": "出生日期",
-                    "type": "string"
+                    "description": "出生日期（格式：YYYY-MM-DD）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/meta.Birthday"
+                        }
+                    ]
                 },
                 "created_at": {
                     "description": "创建时间",
@@ -1583,8 +1779,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "birthday": {
-                    "description": "出生日期",
-                    "type": "string"
+                    "description": "出生日期（格式：YYYY-MM-DD）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/meta.Birthday"
+                        }
+                    ]
                 },
                 "gender": {
                     "description": "性别",

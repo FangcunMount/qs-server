@@ -1,23 +1,20 @@
 package handler
 
 import (
-	"net/http"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
 
 // QuestionnaireHandler 问卷处理器
 type QuestionnaireHandler struct {
+	*BaseHandler
 	queryService *questionnaire.QueryService
 }
 
 // NewQuestionnaireHandler 创建问卷处理器
 func NewQuestionnaireHandler(queryService *questionnaire.QueryService) *QuestionnaireHandler {
 	return &QuestionnaireHandler{
+		BaseHandler:  NewBaseHandler(),
 		queryService: queryService,
 	}
 }
@@ -28,7 +25,7 @@ func NewQuestionnaireHandler(queryService *questionnaire.QueryService) *Question
 // @Tags 问卷
 // @Produce json
 // @Param code path string true "问卷编码"
-// @Success 200 {object} questionnaire.QuestionnaireResponse
+// @Success 200 {object} core.Response{data=questionnaire.QuestionnaireResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -36,22 +33,22 @@ func NewQuestionnaireHandler(queryService *questionnaire.QueryService) *Question
 func (h *QuestionnaireHandler) Get(c *gin.Context) {
 	qcode := c.Param("code")
 	if qcode == "" {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "code is required"), nil)
+		h.BadRequestResponse(c, "code is required", nil)
 		return
 	}
 
 	result, err := h.queryService.Get(c.Request.Context(), qcode)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "get questionnaire failed: %v", err), nil)
+		h.InternalErrorResponse(c, "get questionnaire failed", err)
 		return
 	}
 
 	if result == nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrPageNotFound, "questionnaire not found"), nil)
+		h.NotFoundResponse(c, "questionnaire not found", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }
 
 // List 获取问卷列表
@@ -63,22 +60,21 @@ func (h *QuestionnaireHandler) Get(c *gin.Context) {
 // @Param page_size query int false "每页数量" default(20)
 // @Param status query string false "状态过滤"
 // @Param title query string false "标题过滤"
-// @Success 200 {object} questionnaire.ListQuestionnairesResponse
+// @Success 200 {object} core.Response{data=questionnaire.ListQuestionnairesResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/questionnaires [get]
 func (h *QuestionnaireHandler) List(c *gin.Context) {
 	var req questionnaire.ListQuestionnairesRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrBind, "bind query failed: %v", err), nil)
+	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
 
 	result, err := h.queryService.List(c.Request.Context(), &req)
 	if err != nil {
-		core.WriteResponse(c, errors.WithCode(code.ErrDatabase, "list questionnaires failed: %v", err), nil)
+		h.InternalErrorResponse(c, "list questionnaires failed", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	h.SuccessResponse(c, result)
 }

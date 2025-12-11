@@ -44,7 +44,7 @@ func NewScaleHandler(
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body request.CreateScaleRequest true "创建量表请求"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales [post]
 func (h *ScaleHandler) Create(c *gin.Context) {
 	var req request.CreateScaleRequest
@@ -82,7 +82,7 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
 // @Param request body request.UpdateScaleBasicInfoRequest true "更新请求"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/basic-info [put]
 func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -125,7 +125,7 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
 // @Param request body request.UpdateScaleQuestionnaireRequest true "更新请求"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/questionnaire [put]
 func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -167,7 +167,7 @@ func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/publish [post]
 func (h *ScaleHandler) Publish(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -193,7 +193,7 @@ func (h *ScaleHandler) Publish(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/unpublish [post]
 func (h *ScaleHandler) Unpublish(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -219,7 +219,7 @@ func (h *ScaleHandler) Unpublish(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/archive [post]
 func (h *ScaleHandler) Archive(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -245,7 +245,7 @@ func (h *ScaleHandler) Archive(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Success 200 {object} handler.Response
+// @Success 200 {object} core.Response
 // @Router /api/v1/scales/{code} [delete]
 func (h *ScaleHandler) Delete(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -273,7 +273,7 @@ func (h *ScaleHandler) Delete(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
 // @Param request body request.ReplaceFactorsRequest true "替换因子请求"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/factors [put]
 func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -324,7 +324,7 @@ func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
 // @Param request body request.ReplaceInterpretRulesRequest true "设置解读规则请求"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/interpret-rules [put]
 func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -372,7 +372,7 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code} [get]
 func (h *ScaleHandler) GetByCode(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -398,7 +398,7 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param questionnaireCode query string true "问卷编码"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/by-questionnaire [get]
 func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 	questionnaireCode := c.Query("questionnaire_code")
@@ -425,7 +425,7 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
-// @Success 200 {object} handler.Response{data=response.ScaleListResponse}
+// @Success 200 {object} core.Response{data=response.ScaleListResponse}
 // @Router /api/v1/scales [get]
 func (h *ScaleHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -471,7 +471,7 @@ func (h *ScaleHandler) List(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Success 200 {object} handler.Response{data=response.ScaleResponse}
+// @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/published/{code} [get]
 func (h *ScaleHandler) GetPublishedByCode(c *gin.Context) {
 	scaleCode := c.Param("code")
@@ -498,7 +498,7 @@ func (h *ScaleHandler) GetPublishedByCode(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
-// @Success 200 {object} handler.Response{data=response.ScaleListResponse}
+// @Success 200 {object} core.Response{data=response.ScaleListResponse}
 // @Router /api/v1/scales/published [get]
 func (h *ScaleHandler) ListPublished(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
