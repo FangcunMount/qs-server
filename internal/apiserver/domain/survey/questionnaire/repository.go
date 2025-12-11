@@ -12,6 +12,7 @@ type QuestionnaireSummary struct {
 	ImgUrl        string // 封面图URL
 	Version       string // 版本号
 	Status        Status // 状态
+	Type          QuestionnaireType // 问卷分类
 	QuestionCount int    // 问题数量
 }
 

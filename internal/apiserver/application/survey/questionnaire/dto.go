@@ -10,6 +10,7 @@ type CreateQuestionnaireDTO struct {
 	Description string // 问卷描述
 	ImgUrl      string // 封面图URL
 	Version     string // 初始版本（可选）
+	Type        string // 问卷分类：调查问卷/医学量表
 }
 
 // UpdateQuestionnaireBasicInfoDTO 更新问卷基本信息 DTO
@@ -18,6 +19,7 @@ type UpdateQuestionnaireBasicInfoDTO struct {
 	Title       string // 问卷标题
 	Description string // 问卷描述
 	ImgUrl      string // 封面图URL
+	Type        string // 问卷分类
 }
 
 // AddQuestionDTO 添加问题 DTO

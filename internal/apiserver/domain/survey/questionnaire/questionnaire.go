@@ -12,6 +12,7 @@ type Questionnaire struct {
 	code meta.Code
 
 	// —— 基本信息
+	typ   QuestionnaireType // 问卷分类：调查问卷/医学量表
 	title  string // 问卷标题
 	desc   string // 问卷描述
 	imgUrl string // 问卷封面图片URL
@@ -46,6 +47,14 @@ func NewQuestionnaire(c meta.Code, t string, opts ...QuestionnaireOption) (*Ques
 		opt(q)
 	}
 
+	// 设置默认类型并校验
+	if q.typ == "" {
+		q.typ = DefaultQuestionnaireType()
+	}
+	if !q.typ.IsValid() {
+		return nil, errors.WithCode(code.ErrQuestionnaireInvalidInput, "invalid questionnaire type")
+	}
+
 	return q, nil
 }
 
@@ -56,6 +65,9 @@ func WithDesc(d string) QuestionnaireOption      { return func(q *Questionnaire)
 func WithImgUrl(url string) QuestionnaireOption  { return func(q *Questionnaire) { q.imgUrl = url } }
 func WithVersion(v Version) QuestionnaireOption  { return func(q *Questionnaire) { q.version = v } }
 func WithStatus(s Status) QuestionnaireOption    { return func(q *Questionnaire) { q.status = s } }
+func WithType(t QuestionnaireType) QuestionnaireOption {
+	return func(q *Questionnaire) { q.typ = t }
+}
 func WithQuestions(ques []Question) QuestionnaireOption {
 	return func(q *Questionnaire) { q.questions = ques }
 }
@@ -67,6 +79,12 @@ func WithQuestions(ques []Question) QuestionnaireOption {
 // 获取问卷基本信息
 func (q *Questionnaire) GetID() meta.ID         { return q.id }
 func (q *Questionnaire) GetCode() meta.Code     { return q.code }
+func (q *Questionnaire) GetType() QuestionnaireType {
+	if q.typ == "" {
+		return DefaultQuestionnaireType()
+	}
+	return q.typ
+}
 func (q *Questionnaire) GetTitle() string       { return q.title }
 func (q *Questionnaire) GetDescription() string { return q.desc }
 func (q *Questionnaire) GetImgUrl() string      { return q.imgUrl }
@@ -133,6 +151,16 @@ func (q *Questionnaire) updateBasicInfo(title, desc, imgUrl string) error {
 	}
 
 	q.title, q.desc, q.imgUrl = title, desc, imgUrl
+	return nil
+}
+
+// updateType 更新问卷类型
+func (q *Questionnaire) updateType(newType QuestionnaireType) error {
+	normalized := NormalizeQuestionnaireType(newType.String())
+	if newType != "" && normalized != newType {
+		return errors.WithCode(code.ErrQuestionnaireInvalidInput, "invalid questionnaire type")
+	}
+	q.typ = normalized
 	return nil
 }
 

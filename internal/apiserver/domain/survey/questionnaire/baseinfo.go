@@ -41,7 +41,7 @@ func (BaseInfo) UpdateCoverImage(q *Questionnaire, newImgUrl string) error {
 }
 
 // UpdateAll 批量更新基础信息
-func (BaseInfo) UpdateAll(q *Questionnaire, title, description, imgUrl string) error {
+func (BaseInfo) UpdateAll(q *Questionnaire, title, description, imgUrl string, typ QuestionnaireType) error {
 	title = strings.TrimSpace(title)
 	if len(title) == 0 {
 		return errors.WithCode(code.ErrQuestionnaireInvalidTitle, "标题不能为空")
@@ -53,5 +53,15 @@ func (BaseInfo) UpdateAll(q *Questionnaire, title, description, imgUrl string) e
 		return errors.WithCode(code.ErrQuestionnaireInvalidInput, "描述长度不能超过 500 字符")
 	}
 
-	return q.updateBasicInfo(title, description, imgUrl)
+	if err := q.updateBasicInfo(title, description, imgUrl); err != nil {
+		return err
+	}
+
+	if typ != "" {
+		if err := q.updateType(typ); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

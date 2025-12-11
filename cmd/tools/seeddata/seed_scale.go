@@ -160,6 +160,7 @@ func ensureQuestionnaire(
 			Description: qc.Description,
 			ImgUrl:      qImg,
 			Version:     version,
+			Type:        string(qDomain.TypeMedicalScale),
 		}); err != nil {
 			return "", fmt.Errorf("create questionnaire %s failed: %w", code, err)
 		}
@@ -169,6 +170,7 @@ func ensureQuestionnaire(
 			Title:       title,
 			Description: qc.Description,
 			ImgUrl:      qImg,
+			Type:        string(qDomain.TypeMedicalScale),
 		}); err != nil {
 			return "", fmt.Errorf("update questionnaire %s basic info failed: %w", code, err)
 		}

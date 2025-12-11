@@ -102,6 +102,10 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	}
 
 	// 2. 获取问卷摘要列表（轻量级查询，不包含 questions 字段）
+	if t, ok := dto.Conditions["type"].(string); ok && t != "" {
+		dto.Conditions["type"] = questionnaire.NormalizeQuestionnaireType(t).String()
+	}
+
 	summaries, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
 		l.Errorw("查询问卷摘要列表失败",
@@ -229,6 +233,9 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 		dto.Conditions = make(map[string]interface{})
 	}
 	dto.Conditions["status"] = uint8(questionnaire.STATUS_PUBLISHED)
+	if t, ok := dto.Conditions["type"].(string); ok && t != "" {
+		dto.Conditions["type"] = questionnaire.NormalizeQuestionnaireType(t).String()
+	}
 
 	// 3. 获取问卷摘要列表（轻量级查询）
 	summaries, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)

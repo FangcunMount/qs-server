@@ -20,6 +20,7 @@ type QuestionnairePO struct {
 	ImgUrl            string       `bson:"img_url,omitempty" json:"img_url,omitempty"`
 	Version           string       `bson:"version" json:"version"`
 	Status            uint8        `bson:"status" json:"status"`
+	Type              string       `bson:"type" json:"type"`
 	Questions         []QuestionPO `bson:"questions,omitempty" json:"questions,omitempty"`
 }
 
@@ -33,6 +34,7 @@ type QuestionnaireSummaryPO struct {
 	ImgUrl        string             `bson:"img_url,omitempty" json:"img_url,omitempty"`
 	Version       string             `bson:"version" json:"version"`
 	Status        uint8              `bson:"status" json:"status"`
+	Type          string             `bson:"type" json:"type"`
 	QuestionCount int                `bson:"question_count" json:"question_count"` // 由聚合管道计算
 }
 

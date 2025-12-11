@@ -25,6 +25,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		ImgUrl:      bo.GetImgUrl(),
 		Version:     bo.GetVersion().Value(),
 		Status:      bo.GetStatus().Value(),
+		Type:        bo.GetType().String(),
 	}
 
 	for _, questionBO := range bo.GetQuestions() {
@@ -106,6 +107,7 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewVersion(po.Version)),
 		questionnaire.WithStatus(questionnaire.Status(po.Status)),
+		questionnaire.WithType(questionnaire.NormalizeQuestionnaireType(po.Type)),
 		questionnaire.WithQuestions(m.mapQuestions(po.Questions)),
 	)
 

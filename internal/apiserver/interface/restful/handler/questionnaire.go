@@ -61,6 +61,7 @@ func (h *QuestionnaireHandler) Create(c *gin.Context) {
 		Title:       req.Title,
 		Description: req.Description,
 		ImgUrl:      req.ImgUrl,
+		Type:        req.Type,
 	}
 
 	result, err := h.lifecycleService.Create(c.Request.Context(), dto)
@@ -105,6 +106,7 @@ func (h *QuestionnaireHandler) UpdateBasicInfo(c *gin.Context) {
 		Title:       req.Title,
 		Description: req.Description,
 		ImgUrl:      req.ImgUrl,
+		Type:        req.Type,
 	}
 
 	result, err := h.lifecycleService.UpdateBasicInfo(c.Request.Context(), dto)
@@ -533,6 +535,9 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 	if title := c.Query("title"); title != "" {
 		conditions["title"] = title
 	}
+	if typ := c.Query("type"); typ != "" {
+		conditions["type"] = typ
+	}
 
 	dto := questionnaire.ListQuestionnairesDTO{
 		Page:       page,
@@ -601,6 +606,9 @@ func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 		Page:       page,
 		PageSize:   pageSize,
 		Conditions: make(map[string]interface{}),
+	}
+	if typ := c.Query("type"); typ != "" {
+		dto.Conditions["type"] = typ
 	}
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)

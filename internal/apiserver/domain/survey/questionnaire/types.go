@@ -29,6 +29,43 @@ func (s Status) String() string {
 	return statusMap[s.Value()]
 }
 
+// QuestionnaireType 问卷分类
+type QuestionnaireType string
+
+const (
+	TypeSurvey       QuestionnaireType = "Survey"       // 调查问卷
+	TypeMedicalScale QuestionnaireType = "MedicalScale" // 医学量表
+)
+
+// Value 获取类型值
+func (t QuestionnaireType) Value() string {
+	return string(t)
+}
+
+// String 获取类型字符串
+func (t QuestionnaireType) String() string {
+	return string(t)
+}
+
+// IsValid 判断类型是否有效
+func (t QuestionnaireType) IsValid() bool {
+	return t == TypeSurvey || t == TypeMedicalScale
+}
+
+// NormalizeQuestionnaireType 将空或非法值归一化为默认值
+func NormalizeQuestionnaireType(value string) QuestionnaireType {
+	t := QuestionnaireType(value)
+	if t.IsValid() {
+		return t
+	}
+	return TypeSurvey
+}
+
+// DefaultQuestionnaireType 默认问卷类型
+func DefaultQuestionnaireType() QuestionnaireType {
+	return TypeSurvey
+}
+
 // Version 问卷版本
 type Version string
 

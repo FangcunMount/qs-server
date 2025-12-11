@@ -13,6 +13,7 @@ type QuestionnaireResponse struct {
 	ImgUrl      string                  `json:"img_url"`
 	Version     string                  `json:"version"`
 	Status      string                  `json:"status"`
+	Type        string                  `json:"type"`
 	Questions   []viewmodel.QuestionDTO `json:"questions,omitempty"`
 }
 
@@ -32,6 +33,7 @@ type QuestionnaireSummaryResponse struct {
 	ImgUrl      string `json:"img_url"`
 	Version     string `json:"version"`
 	Status      string `json:"status"`
+	Type        string `json:"type"`
 }
 
 // QuestionnaireSummaryListResponse 问卷摘要列表响应
@@ -73,6 +75,7 @@ func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResul
 		ImgUrl:      result.ImgUrl,
 		Version:     result.Version,
 		Status:      result.Status,
+		Type:        result.Type,
 		Questions:   questions,
 	}
 }
@@ -117,6 +120,7 @@ func NewQuestionnaireSummaryListResponse(result *questionnaire.QuestionnaireSumm
 			ImgUrl:      item.ImgUrl,
 			Version:     item.Version,
 			Status:      item.Status,
+			Type:        item.Type,
 		})
 	}
 

@@ -173,6 +173,9 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 	if status, ok := conditions["status"]; ok && status != nil {
 		filter["status"] = status // 直接使用，支持 uint8 或其他类型
 	}
+	if typ, ok := conditions["type"].(string); ok && typ != "" {
+		filter["type"] = typ
+	}
 
 	return r.CountDocuments(ctx, filter)
 }
@@ -193,6 +196,9 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 	if status, ok := conditions["status"]; ok && status != nil {
 		filter["status"] = status // 直接使用，支持 uint8 或其他类型
 	}
+	if typ, ok := conditions["type"].(string); ok && typ != "" {
+		filter["type"] = typ
+	}
 
 	// 计算分页
 	skip := int64((page - 1) * pageSize)
@@ -210,6 +216,7 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			"img_url":        1,
 			"version":        1,
 			"status":         1,
+			"type":           1,
 			"question_count": bson.M{"$size": bson.M{"$ifNull": []interface{}{"$questions", []interface{}{}}}},
 			// questions 数组不返回，只返回其长度
 		}},
@@ -234,6 +241,7 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			ImgUrl:        po.ImgUrl,
 			Version:       po.Version,
 			Status:        questionnaire.Status(po.Status),
+			Type:          questionnaire.NormalizeQuestionnaireType(po.Type),
 			QuestionCount: po.QuestionCount,
 		})
 	}

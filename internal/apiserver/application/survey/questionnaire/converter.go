@@ -15,6 +15,7 @@ type QuestionnaireResult struct {
 	Description string           // 问卷描述
 	ImgUrl      string           // 封面图URL
 	Status      string           // 状态
+	Type        string           // 问卷分类
 	Questions   []QuestionResult // 问题列表
 }
 
@@ -49,6 +50,7 @@ type QuestionnaireSummaryResult struct {
 	Description   string // 问卷描述
 	ImgUrl        string // 封面图URL
 	Status        string // 状态
+	Type          string // 问卷分类
 	QuestionCount int    // 问题数量
 }
 
@@ -73,6 +75,7 @@ func toQuestionnaireResult(q *questionnaire.Questionnaire) *QuestionnaireResult 
 		Description: q.GetDescription(),
 		ImgUrl:      q.GetImgUrl(),
 		Status:      string(q.GetStatus()),
+		Type:        q.GetType().String(),
 		Questions:   make([]QuestionResult, 0),
 	}
 
@@ -144,6 +147,7 @@ func toQuestionnaireSummaryResult(s *questionnaire.QuestionnaireSummary) *Questi
 		Description:   s.Description,
 		ImgUrl:        s.ImgUrl,
 		Status:        string(s.Status),
+		Type:          s.Type.String(),
 		QuestionCount: s.QuestionCount,
 	}
 }

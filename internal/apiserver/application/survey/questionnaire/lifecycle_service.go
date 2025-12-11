@@ -53,6 +53,7 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateQuestionnaireDT
 	if dto.Version != "" {
 		version = questionnaire.NewVersion(dto.Version)
 	}
+	qType := questionnaire.NormalizeQuestionnaireType(dto.Type)
 
 	// 2. 创建问卷领域模型
 	q, err := questionnaire.NewQuestionnaire(
@@ -62,6 +63,7 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateQuestionnaireDT
 		questionnaire.WithImgUrl(dto.ImgUrl),
 		questionnaire.WithVersion(version),
 		questionnaire.WithStatus(questionnaire.STATUS_DRAFT),
+		questionnaire.WithType(qType),
 	)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "创建问卷失败")
@@ -130,7 +132,7 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateQuesti
 
 	// 4. 更新基本信息
 	baseInfo := questionnaire.BaseInfo{}
-	if err := baseInfo.UpdateAll(q, dto.Title, dto.Description, dto.ImgUrl); err != nil {
+	if err := baseInfo.UpdateAll(q, dto.Title, dto.Description, dto.ImgUrl, questionnaire.NormalizeQuestionnaireType(dto.Type)); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "更新基本信息失败")
 	}
 

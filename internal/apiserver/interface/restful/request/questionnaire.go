@@ -9,6 +9,7 @@ type CreateQuestionnaireRequest struct {
 	Title       string `json:"title" valid:"required~标题不能为空"`
 	Description string `json:"description"`
 	ImgUrl      string `json:"img_url"`
+	Type        string `json:"type" valid:"required~问卷类型不能为空,in(Survey|MedicalScale)~问卷类型必须是Survey或MedicalScale"`
 }
 
 // UpdateQuestionnaireBasicInfoRequest 更新问卷基本信息请求
@@ -16,6 +17,7 @@ type UpdateQuestionnaireBasicInfoRequest struct {
 	Title       string `json:"title" valid:"required~标题不能为空"`
 	Description string `json:"description"`
 	ImgUrl      string `json:"img_url"`
+	Type        string `json:"type" valid:"in(Survey|MedicalScale)~问卷类型必须是Survey或MedicalScale"`
 }
 
 // AddQuestionRequest 添加问题请求

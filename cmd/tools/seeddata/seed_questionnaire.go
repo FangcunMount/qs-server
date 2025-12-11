@@ -61,6 +61,7 @@ func seedQuestionnaires(ctx context.Context, deps *dependencies, state *seedCont
 				Description: qc.Description,
 				ImgUrl:      qImg,
 				Version:     desiredQuestionnaireVersion,
+				Type:        string(qDomain.TypeSurvey),
 			})
 			return err
 		}
@@ -83,6 +84,7 @@ func seedQuestionnaires(ctx context.Context, deps *dependencies, state *seedCont
 			Title:       title,
 			Description: qc.Description,
 			ImgUrl:      qImg,
+			Type:        string(qDomain.TypeSurvey),
 		}); err != nil {
 			logger.Errorw("Update questionnaire basic info failed", "code", code, "error", err)
 			return fmt.Errorf("update questionnaire %s basic info failed: %w", code, err)

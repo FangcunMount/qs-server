@@ -46,6 +46,14 @@ func (Validator) ValidateForPublish(q *Questionnaire) []ValidationError {
 		})
 	}
 
+	// 1.1 验证问卷分类
+	if !q.GetType().IsValid() {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "type",
+			Message: "问卷分类无效",
+		})
+	}
+
 	// 2. 验证版本
 	if q.version.IsEmpty() {
 		validationErrors = append(validationErrors, ValidationError{
