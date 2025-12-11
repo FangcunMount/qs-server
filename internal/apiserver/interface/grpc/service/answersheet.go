@@ -44,9 +44,13 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 		})
 	}
 
+	// 版本号处理：空字符串表示使用最新版本
+	questionnaireVer := req.QuestionnaireVersion
+	// 空字符串表示不指定版本，自动使用最新版
+
 	dto := answersheet.SubmitAnswerSheetDTO{
 		QuestionnaireCode: req.QuestionnaireCode,
-		QuestionnaireVer:  0,            // TODO: 解析 questionnaire_version 字符串
+		QuestionnaireVer:  questionnaireVer,
 		FillerID:          req.WriterId, // proto 中使用 writer_id
 		Answers:           answers,
 	}

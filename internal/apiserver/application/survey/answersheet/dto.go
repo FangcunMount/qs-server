@@ -8,7 +8,7 @@ import "time"
 // SubmitAnswerSheetDTO 提交答卷 DTO
 type SubmitAnswerSheetDTO struct {
 	QuestionnaireCode string      // 问卷编码
-	QuestionnaireVer  int         // 问卷版本
+	QuestionnaireVer  string      // 问卷版本（如 "1.0.1"，空字符串表示使用最新版本）
 	FillerID          uint64      // 填写人ID
 	Answers           []AnswerDTO // 答案列表
 }

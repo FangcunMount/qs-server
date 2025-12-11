@@ -3,7 +3,6 @@ package answersheet
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -61,15 +60,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "问卷编码不能为空")
 	}
-	if dto.QuestionnaireVer <= 0 {
-		l.Warnw("答卷提交失败：问卷版本无效",
-			"action", "submit",
-			"resource", "answersheet",
-			"result", "failed",
-			"questionnaire_ver", dto.QuestionnaireVer,
-		)
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "问卷版本不能为空")
-	}
+	// 注意：版本号为空字符串表示使用最新版本
 	if dto.FillerID == 0 {
 		l.Warnw("答卷提交失败：填写人ID为空",
 			"action", "submit",
@@ -122,9 +113,17 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		"result", "success",
 	)
 
-	// 验证问卷版本是否匹配
-	qnrVer, _ := strconv.Atoi(qnr.GetVersion().Value())
-	if qnrVer != dto.QuestionnaireVer {
+	// 如果版本号为空，使用查询到的最新版本；否则验证版本是否匹配
+	qnrVer := qnr.GetVersion().Value()
+	if dto.QuestionnaireVer == "" {
+		// 使用最新版本
+		dto.QuestionnaireVer = qnrVer
+		l.Debugw("使用最新问卷版本",
+			"questionnaire_code", dto.QuestionnaireCode,
+			"version", qnrVer,
+		)
+	} else if qnrVer != dto.QuestionnaireVer {
+		// 验证版本是否匹配
 		l.Warnw("问卷版本不匹配",
 			"questionnaire_code", dto.QuestionnaireCode,
 			"expected_version", dto.QuestionnaireVer,
@@ -132,7 +131,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 			"result", "failed",
 		)
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid,
-			"%s", fmt.Sprintf("问卷版本不匹配，期望: %d, 实际: %d", dto.QuestionnaireVer, qnrVer))
+			"%s", fmt.Sprintf("问卷版本不匹配，期望: %s, 实际: %s", dto.QuestionnaireVer, qnrVer))
 	}
 
 	// 验证问卷是否已发布（只能对已发布的问卷提交答卷）
@@ -160,7 +159,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	// 4. 构建问卷引用
 	questionnaireRef := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
-		strconv.Itoa(dto.QuestionnaireVer),
+		dto.QuestionnaireVer,
 		qnr.GetTitle(), // 使用查询到的问卷标题
 	)
 
