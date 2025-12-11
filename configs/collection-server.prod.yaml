@@ -164,8 +164,8 @@ iam:
 log:
   disable-caller: true
   disable-stacktrace: true
-  level: info
-  format: json
+  level: debug
+  format: console
   enable-color: true
   development: true
   name: "qs-collection-server"

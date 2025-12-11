@@ -270,8 +270,8 @@ iam:
 log:
   level: debug                   # 日志基本级别：debug, info, warn, error, fatal, panic
   format: console                  # 日志格式（json 适合生产环境，console 适合开发环境）
-  enable-color: false           # 文件输出禁用颜色
-  development: false            # 生产模式
+  enable-color: true           # 文件输出禁用颜色
+  development: true            # 生产模式
   name: "qs-apiserver"          # 日志名称
   
   # 📊 日志轮转配置
