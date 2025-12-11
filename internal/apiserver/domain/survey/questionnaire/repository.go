@@ -11,8 +11,8 @@ type Repository interface {
 	Create(ctx context.Context, qDomain *Questionnaire) error
 	FindByCode(ctx context.Context, code string) (*Questionnaire, error)
 	FindByCodeVersion(ctx context.Context, code, version string) (*Questionnaire, error)
-	FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*Questionnaire, error)
-	CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error)
+	FindList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*Questionnaire, error)
+	CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error)
 	Update(ctx context.Context, qDomain *Questionnaire) error
 	Remove(ctx context.Context, code string) error
 	HardDelete(ctx context.Context, code string) error

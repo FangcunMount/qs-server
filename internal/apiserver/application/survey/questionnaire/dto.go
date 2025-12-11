@@ -61,7 +61,7 @@ type QuestionDTO struct {
 
 // ListQuestionnairesDTO 查询问卷列表 DTO
 type ListQuestionnairesDTO struct {
-	Page       int               // 页码
-	PageSize   int               // 每页数量
-	Conditions map[string]string // 查询条件
+	Page       int                    // 页码
+	PageSize   int                    // 每页数量
+	Conditions map[string]interface{} // 查询条件
 }

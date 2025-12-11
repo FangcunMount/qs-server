@@ -187,21 +187,21 @@ func (r *Repository) FindActiveQuestionnaires(ctx context.Context) ([]*questionn
 	return questionnaires, nil
 }
 
-// FindList 根据条件查询问卷列表
-func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, error) {
+// FindList 根据条件查询问卷列表（分页）
+func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.Questionnaire, error) {
 	filter := bson.M{
 		"deleted_at": nil,
 	}
 
 	// 添加条件过滤
-	if code, ok := conditions["code"]; ok && code != "" {
+	if code, ok := conditions["code"].(string); ok && code != "" {
 		filter["code"] = code
 	}
-	if title, ok := conditions["title"]; ok && title != "" {
+	if title, ok := conditions["title"].(string); ok && title != "" {
 		filter["title"] = bson.M{"$regex": title, "$options": "i"} // 模糊查询，不区分大小写
 	}
-	if status, ok := conditions["status"]; ok && status != "" {
-		filter["status"] = status
+	if status, ok := conditions["status"]; ok && status != nil {
+		filter["status"] = status // 直接使用，支持 uint8 或其他类型
 	}
 
 	// 计算分页
@@ -234,20 +234,20 @@ func (r *Repository) FindList(ctx context.Context, page, pageSize int, condition
 }
 
 // CountWithConditions 根据条件统计问卷数量
-func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
 	filter := bson.M{
 		"deleted_at": nil,
 	}
 
 	// 添加条件过滤
-	if code, ok := conditions["code"]; ok && code != "" {
+	if code, ok := conditions["code"].(string); ok && code != "" {
 		filter["code"] = code
 	}
-	if title, ok := conditions["title"]; ok && title != "" {
+	if title, ok := conditions["title"].(string); ok && title != "" {
 		filter["title"] = bson.M{"$regex": title, "$options": "i"}
 	}
-	if status, ok := conditions["status"]; ok && status != "" {
-		filter["status"] = status
+	if status, ok := conditions["status"]; ok && status != nil {
+		filter["status"] = status // 直接使用，支持 uint8 或其他类型
 	}
 
 	return r.CountDocuments(ctx, filter)

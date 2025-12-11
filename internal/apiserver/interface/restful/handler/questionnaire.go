@@ -526,7 +526,7 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 		return
 	}
 
-	conditions := make(map[string]string)
+	conditions := make(map[string]interface{})
 	if status := c.Query("status"); status != "" {
 		conditions["status"] = status
 	}
@@ -600,7 +600,7 @@ func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 	dto := questionnaire.ListQuestionnairesDTO{
 		Page:       page,
 		PageSize:   pageSize,
-		Conditions: make(map[string]string),
+		Conditions: make(map[string]interface{}),
 	}
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)

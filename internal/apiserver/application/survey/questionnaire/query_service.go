@@ -263,9 +263,9 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	)
 
 	if dto.Conditions == nil {
-		dto.Conditions = make(map[string]string)
+		dto.Conditions = make(map[string]interface{})
 	}
-	dto.Conditions["status"] = string(questionnaire.STATUS_PUBLISHED)
+	dto.Conditions["status"] = uint8(questionnaire.STATUS_PUBLISHED)
 
 	// 3. 获取问卷列表
 	l.Debugw("开始查询已发布问卷列表",

@@ -34,7 +34,7 @@ func (s *QuestionnaireService) RegisterService(server *grpc.Server) {
 // @Description C端用户查看可用的问卷列表
 func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.ListQuestionnairesRequest) (*pb.ListQuestionnairesResponse, error) {
 	// 构建查询条件
-	conditions := make(map[string]string)
+	conditions := make(map[string]interface{})
 	if req.Title != "" {
 		conditions["title"] = req.Title
 	}
