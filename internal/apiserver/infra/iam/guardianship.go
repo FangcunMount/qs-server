@@ -70,6 +70,45 @@ func (s *GuardianshipService) IsGuardianWithDetails(ctx context.Context, userID,
 	return s.client.IsGuardian(ctx, userID, childID)
 }
 
+// ValidateChildExists 验证儿童是否存在
+// 通过查询该 childID 的监护人列表来判断儿童是否存在
+// 如果 childID 不存在，IAM 系统会返回错误或空列表
+func (s *GuardianshipService) ValidateChildExists(ctx context.Context, childID string) error {
+	if !s.enabled {
+		// IAM 未启用时，跳过验证
+		logger.L(ctx).Debugw("IAM service not enabled, skip child validation",
+			"component", "iam.guardianship",
+			"child_id", childID,
+		)
+		return nil
+	}
+
+	// 通过查询监护人列表来验证 child 是否存在
+	resp, err := s.client.ListGuardians(ctx, &identityv1.ListGuardiansRequest{
+		ChildId: childID,
+	})
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to validate child existence",
+			"component", "iam.guardianship",
+			"child_id", childID,
+			"error", err.Error(),
+		)
+		return fmt.Errorf("failed to validate child existence in IAM: %w", err)
+	}
+
+	// 检查是否有返回结果（即使没有监护人，child 存在也应该返回空列表）
+	if resp == nil {
+		return fmt.Errorf("child %s does not exist in IAM system", childID)
+	}
+
+	logger.L(ctx).Debugw("Child validation passed",
+		"component", "iam.guardianship",
+		"child_id", childID,
+		"guardians_count", len(resp.Items),
+	)
+	return nil
+}
+
 // ListChildren 列出用户的所有被监护儿童
 func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (*identityv1.ListChildrenResponse, error) {
 	if !s.enabled {

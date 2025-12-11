@@ -2,11 +2,13 @@ package testee
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
@@ -14,11 +16,12 @@ import (
 // registrationService 受试者注册服务实现
 // 行为者：C端用户(患者/家长)
 type registrationService struct {
-	repo      domain.Repository
-	factory   domain.Factory
-	validator domain.Validator
-	binder    domain.Binder
-	uow       *mysql.UnitOfWork
+	repo            domain.Repository
+	factory         domain.Factory
+	validator       domain.Validator
+	binder          domain.Binder
+	uow             *mysql.UnitOfWork
+	guardianshipSvc *iam.GuardianshipService
 }
 
 // NewRegistrationService 创建受试者注册服务
@@ -28,13 +31,15 @@ func NewRegistrationService(
 	validator domain.Validator,
 	binder domain.Binder,
 	uow *mysql.UnitOfWork,
+	guardianshipSvc *iam.GuardianshipService,
 ) TesteeRegistrationService {
 	return &registrationService{
-		repo:      repo,
-		factory:   factory,
-		validator: validator,
-		binder:    binder,
-		uow:       uow,
+		repo:            repo,
+		factory:         factory,
+		validator:       validator,
+		binder:          binder,
+		uow:             uow,
+		guardianshipSvc: guardianshipSvc,
 	}
 }
 
@@ -83,7 +88,31 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			"result", "success",
 		)
 
-		// 2. 如果提供了 ProfileID，检查是否已存在
+		// 2. 如果提供了 ProfileID，先验证该 child 在 IAM 中是否存在
+		if dto.ProfileID != nil && *dto.ProfileID > 0 {
+			l.Debugw("验证ProfileID在IAM中是否存在",
+				"profile_id", *dto.ProfileID,
+			)
+
+			if s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
+				childID := strconv.FormatUint(*dto.ProfileID, 10)
+				if err := s.guardianshipSvc.ValidateChildExists(txCtx, childID); err != nil {
+					l.Warnw("ProfileID在IAM中不存在",
+						"profile_id", *dto.ProfileID,
+						"child_id", childID,
+						"result", "failed",
+						"error", err.Error(),
+					)
+					return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
+				}
+				l.Debugw("ProfileID验证通过",
+					"profile_id", *dto.ProfileID,
+					"child_id", childID,
+				)
+			}
+		}
+
+		// 3. 如果提供了 ProfileID，检查是否已存在
 		if dto.ProfileID != nil && *dto.ProfileID > 0 {
 			l.Debugw("检查Profile是否已存在",
 				"profile_id", *dto.ProfileID,
@@ -112,14 +141,14 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			)
 		}
 
-		// 3. 创建受试者
+		// 4. 创建受试者
 		result = domain.NewTestee(dto.OrgID, dto.Name, gender, dto.Birthday)
 		l.Debugw("创建受试者实体",
 			"testee_id", result.ID().String(),
 			"name", result.Name(),
 		)
 
-		// 4. 设置数据来源
+		// 5. 设置数据来源
 		if dto.Source != "" {
 			result.SetSource(dto.Source)
 			l.Debugw("设置数据来源",
@@ -127,7 +156,7 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			)
 		}
 
-		// 5. 如果提供了 ProfileID，绑定
+		// 6. 如果提供了 ProfileID，绑定
 		if dto.ProfileID != nil && *dto.ProfileID > 0 {
 			l.Debugw("绑定Profile",
 				"profile_id", *dto.ProfileID,
@@ -143,7 +172,7 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			}
 		}
 
-		// 6. 持久化
+		// 7. 持久化
 		l.Debugw("保存受试者",
 			"testee_id", result.ID().String(),
 			"name", result.Name(),
@@ -213,6 +242,28 @@ func (s *registrationService) EnsureByProfile(ctx context.Context, dto EnsureTes
 				"result", "failed",
 			)
 			return errors.WithCode(code.ErrInvalidArgument, "profileID is required for ensure operation")
+		}
+
+		// 验证 ProfileID 在 IAM 中是否存在
+		if s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
+			childID := strconv.FormatUint(*dto.ProfileID, 10)
+			l.Debugw("验证ProfileID在IAM中是否存在",
+				"profile_id", *dto.ProfileID,
+				"child_id", childID,
+			)
+			if err := s.guardianshipSvc.ValidateChildExists(txCtx, childID); err != nil {
+				l.Warnw("ProfileID在IAM中不存在",
+					"profile_id", *dto.ProfileID,
+					"child_id", childID,
+					"result", "failed",
+					"error", err.Error(),
+				)
+				return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
+			}
+			l.Debugw("ProfileID验证通过",
+				"profile_id", *dto.ProfileID,
+				"child_id", childID,
+			)
 		}
 
 		// 使用工厂的幂等创建方法

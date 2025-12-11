@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 )
 
 // modulePool 模块池
@@ -112,7 +113,14 @@ func (c *Container) initScaleModule() error {
 // initActorModule 初始化 Actor 模块
 func (c *Container) initActorModule() error {
 	actorModule := assembler.NewActorModule()
-	if err := actorModule.Initialize(c.mysqlDB); err != nil {
+
+	// 获取 guardianshipSvc（如果 IAM 模块已启用）
+	var guardianshipSvc *iam.GuardianshipService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		guardianshipSvc = c.IAMModule.GuardianshipService()
+	}
+
+	if err := actorModule.Initialize(c.mysqlDB, guardianshipSvc); err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
 	}
 

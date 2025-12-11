@@ -8,6 +8,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -46,6 +47,14 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
+	// 提取可选的 guardianshipSvc 参数
+	var guardianshipSvc *iam.GuardianshipService
+	if len(params) > 1 {
+		if svc, ok := params[1].(*iam.GuardianshipService); ok {
+			guardianshipSvc = svc
+		}
+	}
+
 	// 初始化 UnitOfWork
 	uow := mysql.NewUnitOfWork(mysqlDB)
 
@@ -76,6 +85,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		testeeValidator,
 		testeeBinder,
 		uow,
+		guardianshipSvc,
 	)
 	// 管理服务 - 服务于B端员工（Staff）
 	m.TesteeManagementService = testeeApp.NewManagementService(
