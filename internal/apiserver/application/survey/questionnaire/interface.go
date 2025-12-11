@@ -82,15 +82,15 @@ type QuestionnaireQueryService interface {
 	// 场景：查询指定问卷的完整信息
 	GetByCode(ctx context.Context, code string) (*QuestionnaireResult, error)
 
-	// List 查询问卷列表
+	// List 查询问卷摘要列表（轻量级，不包含问题详情）
 	// 场景：分页查询问卷列表，支持条件筛选
-	List(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireListResult, error)
+	List(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error)
 
 	// GetPublishedByCode 获取已发布的问卷
 	// 场景：答题者查询可用的问卷（只返回已发布状态）
 	GetPublishedByCode(ctx context.Context, code string) (*QuestionnaireResult, error)
 
-	// ListPublished 查询已发布问卷列表
+	// ListPublished 查询已发布问卷摘要列表（轻量级，不包含问题详情）
 	// 场景：答题者浏览可答题的问卷列表
-	ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireListResult, error)
+	ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error)
 }

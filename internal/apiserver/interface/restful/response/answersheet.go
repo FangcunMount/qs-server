@@ -106,6 +106,33 @@ func NewAnswerSheetListResponse(result *answersheet.AnswerSheetListResult) *Answ
 	}
 }
 
+// NewAnswerSheetSummaryListResponse 从应用层 SummaryListResult 创建摘要列表响应
+func NewAnswerSheetSummaryListResponse(result *answersheet.AnswerSheetSummaryListResult) *AnswerSheetListResponse {
+	if result == nil {
+		return &AnswerSheetListResponse{
+			Total: 0,
+			Items: []AnswerSheetSummaryItem{},
+		}
+	}
+
+	items := make([]AnswerSheetSummaryItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, AnswerSheetSummaryItem{
+			ID:                meta.ID(item.ID),
+			QuestionnaireCode: item.QuestionnaireCode,
+			Title:             item.QuestionnaireTitle,
+			Score:             item.Score,
+			FillerID:          meta.ID(item.FillerID),
+			FilledAt:          item.FilledAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	return &AnswerSheetListResponse{
+		Total: result.Total,
+		Items: items,
+	}
+}
+
 // NewAnswerSheetStatisticsResponse 从应用层 Statistics 创建响应
 func NewAnswerSheetStatisticsResponse(stats *answersheet.AnswerSheetStatistics) *AnswerSheetStatisticsResponse {
 	if stats == nil {

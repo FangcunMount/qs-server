@@ -46,6 +46,23 @@ type ScaleListResponse struct {
 	PageSize   int             `json:"page_size"`
 }
 
+// ScaleSummaryResponse 量表摘要响应（不包含因子详情）
+type ScaleSummaryResponse struct {
+	Code              string `json:"code"`
+	Title             string `json:"title"`
+	Description       string `json:"description"`
+	QuestionnaireCode string `json:"questionnaire_code"`
+	Status            string `json:"status"`
+}
+
+// ScaleSummaryListResponse 量表摘要列表响应
+type ScaleSummaryListResponse struct {
+	Scales     []ScaleSummaryResponse `json:"scales"`
+	TotalCount int64                  `json:"total_count"`
+	Page       int                    `json:"page"`
+	PageSize   int                    `json:"page_size"`
+}
+
 // ============= Converters =============
 
 // NewScaleResponse 从 ScaleResult 创建 ScaleResponse
@@ -114,6 +131,36 @@ func NewScaleListResponse(result *scale.ScaleListResult, page, pageSize int) *Sc
 	}
 
 	return &ScaleListResponse{
+		Scales:     scales,
+		TotalCount: result.Total,
+		Page:       page,
+		PageSize:   pageSize,
+	}
+}
+
+// NewScaleSummaryListResponse 从 ScaleSummaryListResult 创建摘要列表响应
+func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pageSize int) *ScaleSummaryListResponse {
+	if result == nil {
+		return &ScaleSummaryListResponse{
+			Scales:     []ScaleSummaryResponse{},
+			TotalCount: 0,
+			Page:       page,
+			PageSize:   pageSize,
+		}
+	}
+
+	scales := make([]ScaleSummaryResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		scales = append(scales, ScaleSummaryResponse{
+			Code:              item.Code,
+			Title:             item.Title,
+			Description:       item.Description,
+			QuestionnaireCode: item.QuestionnaireCode,
+			Status:            item.Status,
+		})
+	}
+
+	return &ScaleSummaryListResponse{
 		Scales:     scales,
 		TotalCount: result.Total,
 		Page:       page,

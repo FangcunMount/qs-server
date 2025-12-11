@@ -95,3 +95,12 @@ type InterpretRulePO struct {
 	Conclusion string  `bson:"conclusion" json:"conclusion"`
 	Suggestion string  `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
 }
+
+// ScaleSummaryPO 量表摘要持久化对象（不包含 factors，用于列表查询）
+type ScaleSummaryPO struct {
+	Code              string `bson:"code"`
+	Title             string `bson:"title"`
+	Description       string `bson:"description"`
+	QuestionnaireCode string `bson:"questionnaire_code"`
+	Status            uint8  `bson:"status"`
+}

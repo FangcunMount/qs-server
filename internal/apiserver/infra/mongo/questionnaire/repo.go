@@ -158,37 +158,28 @@ func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error
 	return r.ExistsByFilter(ctx, filter)
 }
 
-// FindActiveQuestionnaires 查找活跃的问卷
-func (r *Repository) FindActiveQuestionnaires(ctx context.Context) ([]*questionnaire.Questionnaire, error) {
+// CountWithConditions 根据条件统计问卷数量
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
 	filter := bson.M{
-		"status":     1, // StatusActive
 		"deleted_at": nil,
 	}
 
-	cursor, err := r.Find(ctx, filter)
-	if err != nil {
-		return nil, err
+	// 添加条件过滤
+	if code, ok := conditions["code"].(string); ok && code != "" {
+		filter["code"] = code
 	}
-	defer cursor.Close(ctx)
-
-	var questionnaires []*questionnaire.Questionnaire
-	for cursor.Next(ctx) {
-		var po QuestionnairePO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		questionnaires = append(questionnaires, r.mapper.ToBO(&po))
+	if title, ok := conditions["title"].(string); ok && title != "" {
+		filter["title"] = bson.M{"$regex": title, "$options": "i"}
+	}
+	if status, ok := conditions["status"]; ok && status != nil {
+		filter["status"] = status // 直接使用，支持 uint8 或其他类型
 	}
 
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-
-	return questionnaires, nil
+	return r.CountDocuments(ctx, filter)
 }
 
-// FindList 根据条件查询问卷列表（分页）
-func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.Questionnaire, error) {
+// FindSummaryList 查询问卷摘要列表（轻量级，使用 Projection 排除 questions 字段）
+func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.QuestionnaireSummary, error) {
 	filter := bson.M{
 		"deleted_at": nil,
 	}
@@ -208,8 +199,20 @@ func (r *Repository) FindList(ctx context.Context, page, pageSize int, condition
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
 
-	// 创建查询选项
-	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	// 创建查询选项，使用 Projection 排除 questions 字段
+	opts := options.Find().
+		SetSkip(skip).
+		SetLimit(limit).
+		SetProjection(bson.M{
+			"_id":         1,
+			"code":        1,
+			"title":       1,
+			"description": 1,
+			"img_url":     1,
+			"version":     1,
+			"status":      1,
+			// 排除 questions 字段，大幅减少内存占用
+		})
 
 	cursor, err := r.Find(ctx, filter, opts)
 	if err != nil {
@@ -217,38 +220,25 @@ func (r *Repository) FindList(ctx context.Context, page, pageSize int, condition
 	}
 	defer cursor.Close(ctx)
 
-	var questionnaires []*questionnaire.Questionnaire
+	var summaries []*questionnaire.QuestionnaireSummary
 	for cursor.Next(ctx) {
-		var po QuestionnairePO
+		var po QuestionnaireSummaryPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		questionnaires = append(questionnaires, r.mapper.ToBO(&po))
+		summaries = append(summaries, &questionnaire.QuestionnaireSummary{
+			Code:        po.Code,
+			Title:       po.Title,
+			Description: po.Description,
+			ImgUrl:      po.ImgUrl,
+			Version:     po.Version,
+			Status:      questionnaire.Status(po.Status),
+		})
 	}
 
 	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 
-	return questionnaires, nil
-}
-
-// CountWithConditions 根据条件统计问卷数量
-func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	filter := bson.M{
-		"deleted_at": nil,
-	}
-
-	// 添加条件过滤
-	if code, ok := conditions["code"].(string); ok && code != "" {
-		filter["code"] = code
-	}
-	if title, ok := conditions["title"].(string); ok && title != "" {
-		filter["title"] = bson.M{"$regex": title, "$options": "i"}
-	}
-	if status, ok := conditions["status"]; ok && status != nil {
-		filter["status"] = status // 直接使用，支持 uint8 或其他类型
-	}
-
-	return r.CountDocuments(ctx, filter)
+	return summaries, nil
 }

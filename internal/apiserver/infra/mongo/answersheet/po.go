@@ -136,3 +136,14 @@ func (p *AnswerValuePO) ToBsonM() (bson.M, error) {
 
 	return result, nil
 }
+
+// AnswerSheetSummaryPO 答卷摘要持久化对象（不包含 answers 字段，用于列表查询）
+type AnswerSheetSummaryPO struct {
+	DomainID           uint64     `bson:"domain_id"`
+	QuestionnaireCode  string     `bson:"questionnaire_code"`
+	QuestionnaireTitle string     `bson:"questionnaire_title"`
+	FillerID           int64      `bson:"filler_id"`
+	FillerType         string     `bson:"filler_type"`
+	TotalScore         float64    `bson:"total_score"`
+	FilledAt           *time.Time `bson:"filled_at"`
+}

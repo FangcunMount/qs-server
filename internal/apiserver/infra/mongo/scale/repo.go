@@ -79,17 +79,24 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 	return r.mapper.ToDomain(&po), nil
 }
 
-// FindList 分页查询量表列表
-func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.MedicalScale, error) {
+// FindSummaryList 分页查询量表摘要列表（不包含 factors）
+func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.ScaleSummary, error) {
 	filter := r.buildFilter(conditions)
 
-	// 设置分页选项
+	// 设置分页选项和投影（排除 factors 字段）
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(limit).
-		SetSort(bson.D{{Key: "created_at", Value: -1}}) // 按创建时间倒序
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetProjection(bson.M{
+			"code":               1,
+			"title":              1,
+			"description":        1,
+			"questionnaire_code": 1,
+			"status":             1,
+		})
 
 	cursor, err := r.Collection().Find(ctx, filter, opts)
 	if err != nil {
@@ -97,17 +104,21 @@ func (r *Repository) FindList(ctx context.Context, page, pageSize int, condition
 	}
 	defer cursor.Close(ctx)
 
-	var poList []ScalePO
+	var poList []ScaleSummaryPO
 	if err := cursor.All(ctx, &poList); err != nil {
 		return nil, err
 	}
 
-	// 转换为领域模型
-	result := make([]*scale.MedicalScale, 0, len(poList))
+	// 转换为领域摘要对象
+	result := make([]*scale.ScaleSummary, 0, len(poList))
 	for _, po := range poList {
-		if domain := r.mapper.ToDomain(&po); domain != nil {
-			result = append(result, domain)
-		}
+		result = append(result, &scale.ScaleSummary{
+			Code:              po.Code,
+			Title:             po.Title,
+			Description:       po.Description,
+			QuestionnaireCode: po.QuestionnaireCode,
+			Status:            scale.Status(po.Status),
+		})
 	}
 
 	return result, nil

@@ -31,7 +31,7 @@ func (s *QuestionnaireService) RegisterService(server *grpc.Server) {
 }
 
 // ListQuestionnaires 获取已发布的问卷列表（C端）
-// @Description C端用户查看可用的问卷列表
+// @Description C端用户查看可用的问卷列表，使用轻量级摘要查询（不包含问题详情）
 func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.ListQuestionnairesRequest) (*pb.ListQuestionnairesResponse, error) {
 	// 构建查询条件
 	conditions := make(map[string]interface{})
@@ -39,7 +39,6 @@ func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.L
 		conditions["title"] = req.Title
 	}
 	// C端只查询已发布的问卷
-	conditions["status"] = "published"
 
 	dto := questionnaire.ListQuestionnairesDTO{
 		Page:       int(req.Page),
@@ -47,16 +46,16 @@ func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.L
 		Conditions: conditions,
 	}
 
-	// 调用应用服务
+	// 调用应用服务 - 使用轻量级摘要查询
 	result, err := s.queryService.ListPublished(ctx, dto)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// 转换响应
+	// 转换响应（摘要不包含 questions）
 	protoQuestionnaires := make([]*pb.Questionnaire, 0, len(result.Items))
 	for _, item := range result.Items {
-		protoQuestionnaires = append(protoQuestionnaires, s.toProtoQuestionnaire(item))
+		protoQuestionnaires = append(protoQuestionnaires, s.toProtoQuestionnaireSummary(item))
 	}
 
 	return &pb.ListQuestionnairesResponse{
@@ -124,4 +123,21 @@ func (s *QuestionnaireService) toProtoOptions(options []questionnaire.OptionResu
 		})
 	}
 	return protoOptions
+}
+
+// toProtoQuestionnaireSummary 转换为 protobuf 问卷摘要（不包含问题详情）
+func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire.QuestionnaireSummaryResult) *pb.Questionnaire {
+	if result == nil {
+		return nil
+	}
+
+	return &pb.Questionnaire{
+		Code:        result.Code,
+		Version:     result.Version,
+		Title:       result.Title,
+		Description: result.Description,
+		ImgUrl:      result.ImgUrl,
+		Status:      result.Status,
+		Questions:   nil, // 摘要不包含问题详情
+	}
 }

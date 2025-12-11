@@ -108,20 +108,29 @@ func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.Ans
 	return r.mapper.ToBO(&po), nil
 }
 
-// FindListByFiller 查询填写者的答卷列表
-func (r *Repository) FindListByFiller(ctx context.Context, fillerID uint64, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
+// FindSummaryListByFiller 查询填写者的答卷摘要列表（不包含 answers）
+func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint64, page, pageSize int) ([]*answersheet.AnswerSheetSummary, error) {
 	filter := bson.M{
 		"filler_id":  int64(fillerID),
 		"deleted_at": nil,
 	}
 
-	// 设置分页选项
+	// 设置分页选项和投影（排除 answers 字段）
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(limit).
-		SetSort(bson.M{"filled_at": -1}) // 按填写时间倒序
+		SetSort(bson.M{"filled_at": -1}).
+		SetProjection(bson.M{
+			"domain_id":           1,
+			"questionnaire_code":  1,
+			"questionnaire_title": 1,
+			"filler_id":           1,
+			"filler_type":         1,
+			"total_score":         1,
+			"filled_at":           1,
+		})
 
 	cursor, err := r.Find(ctx, filter, opts)
 	if err != nil {
@@ -129,36 +138,56 @@ func (r *Repository) FindListByFiller(ctx context.Context, fillerID uint64, page
 	}
 	defer cursor.Close(ctx)
 
-	var sheets []*answersheet.AnswerSheet
+	var summaries []*answersheet.AnswerSheetSummary
 	for cursor.Next(ctx) {
-		var po AnswerSheetPO
+		var po AnswerSheetSummaryPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		sheets = append(sheets, r.mapper.ToBO(&po))
+		summary := &answersheet.AnswerSheetSummary{
+			ID:                 meta.ID(po.DomainID),
+			QuestionnaireCode:  po.QuestionnaireCode,
+			QuestionnaireTitle: po.QuestionnaireTitle,
+			FillerID:           uint64(po.FillerID),
+			FillerType:         po.FillerType,
+			TotalScore:         po.TotalScore,
+		}
+		if po.FilledAt != nil {
+			summary.FilledAt = *po.FilledAt
+		}
+		summaries = append(summaries, summary)
 	}
 
 	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 
-	return sheets, nil
+	return summaries, nil
 }
 
-// FindListByQuestionnaire 查询问卷的答卷列表
-func (r *Repository) FindListByQuestionnaire(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
+// FindSummaryListByQuestionnaire 查询问卷的答卷摘要列表（不包含 answers）
+func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*answersheet.AnswerSheetSummary, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
 		"deleted_at":         nil,
 	}
 
-	// 设置分页选项
+	// 设置分页选项和投影（排除 answers 字段）
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(limit).
-		SetSort(bson.M{"filled_at": -1}) // 按填写时间倒序
+		SetSort(bson.M{"filled_at": -1}).
+		SetProjection(bson.M{
+			"domain_id":           1,
+			"questionnaire_code":  1,
+			"questionnaire_title": 1,
+			"filler_id":           1,
+			"filler_type":         1,
+			"total_score":         1,
+			"filled_at":           1,
+		})
 
 	cursor, err := r.Find(ctx, filter, opts)
 	if err != nil {
@@ -166,20 +195,31 @@ func (r *Repository) FindListByQuestionnaire(ctx context.Context, questionnaireC
 	}
 	defer cursor.Close(ctx)
 
-	var sheets []*answersheet.AnswerSheet
+	var summaries []*answersheet.AnswerSheetSummary
 	for cursor.Next(ctx) {
-		var po AnswerSheetPO
+		var po AnswerSheetSummaryPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		sheets = append(sheets, r.mapper.ToBO(&po))
+		summary := &answersheet.AnswerSheetSummary{
+			ID:                 meta.ID(po.DomainID),
+			QuestionnaireCode:  po.QuestionnaireCode,
+			QuestionnaireTitle: po.QuestionnaireTitle,
+			FillerID:           uint64(po.FillerID),
+			FillerType:         po.FillerType,
+			TotalScore:         po.TotalScore,
+		}
+		if po.FilledAt != nil {
+			summary.FilledAt = *po.FilledAt
+		}
+		summaries = append(summaries, summary)
 	}
 
 	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 
-	return sheets, nil
+	return summaries, nil
 }
 
 // CountWithConditions 根据条件统计数量
@@ -189,6 +229,24 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 	// 添加软删除过滤条件
 	filter["deleted_at"] = nil
 
+	return r.CountDocuments(ctx, filter)
+}
+
+// CountByFiller 统计填写者的答卷数量
+func (r *Repository) CountByFiller(ctx context.Context, fillerID uint64) (int64, error) {
+	filter := bson.M{
+		"filler_id":  int64(fillerID),
+		"deleted_at": nil,
+	}
+	return r.CountDocuments(ctx, filter)
+}
+
+// CountByQuestionnaire 统计问卷的答卷数量
+func (r *Repository) CountByQuestionnaire(ctx context.Context, questionnaireCode string) (int64, error) {
+	filter := bson.M{
+		"questionnaire_code": questionnaireCode,
+		"deleted_at":         nil,
+	}
 	return r.CountDocuments(ctx, filter)
 }
 

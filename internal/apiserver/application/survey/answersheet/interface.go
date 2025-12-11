@@ -25,9 +25,9 @@ type AnswerSheetSubmissionService interface {
 	// 场景：答题者查看自己提交的答卷详情
 	GetMyAnswerSheet(ctx context.Context, fillerID uint64, answerSheetID uint64) (*AnswerSheetResult, error)
 
-	// ListMyAnswerSheets 查询我的答卷列表
-	// 场景：答题者查看自己提交的所有答卷
-	ListMyAnswerSheets(ctx context.Context, dto ListMyAnswerSheetsDTO) (*AnswerSheetListResult, error)
+	// ListMyAnswerSheets 查询我的答卷摘要列表
+	// 场景：答题者查看自己提交的所有答卷（摘要信息，不含答案详情）
+	ListMyAnswerSheets(ctx context.Context, dto ListMyAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error)
 }
 
 // AnswerSheetManagementService 答卷管理服务
@@ -39,9 +39,9 @@ type AnswerSheetManagementService interface {
 	// 场景：管理员查看答卷的完整信息
 	GetByID(ctx context.Context, id uint64) (*AnswerSheetResult, error)
 
-	// List 查询答卷列表
-	// 场景：管理员查询答卷列表，支持按问卷、填写人、时间等条件筛选
-	List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetListResult, error)
+	// List 查询答卷摘要列表
+	// 场景：管理员查询答卷列表（摘要信息，不含答案详情），支持按问卷、填写人、时间等条件筛选
+	List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error)
 
 	// Delete 删除答卷
 	// 场景：管理员删除无效或测试的答卷

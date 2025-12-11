@@ -124,7 +124,7 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, response.NewAnswerSheetListResponse(result))
+	h.Success(c, response.NewAnswerSheetSummaryListResponse(result))
 }
 
 // GetStatistics 获取答卷统计

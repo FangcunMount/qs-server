@@ -24,6 +24,22 @@ type QuestionnaireListResponse struct {
 	PageSize       int                     `json:"page_size"`
 }
 
+// QuestionnaireSummaryResponse 问卷摘要响应（不包含问题详情）
+type QuestionnaireSummaryResponse struct {
+	Code        string `json:"code"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ImgUrl      string `json:"img_url"`
+	Version     string `json:"version"`
+	Status      string `json:"status"`
+}
+
+// QuestionnaireSummaryListResponse 问卷摘要列表响应
+type QuestionnaireSummaryListResponse struct {
+	Questionnaires []QuestionnaireSummaryResponse `json:"questionnaires"`
+	TotalCount     int64                          `json:"total_count"`
+}
+
 // NewQuestionnaireResponseFromResult 从应用层 Result 创建问卷响应
 func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResult) *QuestionnaireResponse {
 	if result == nil {
@@ -78,6 +94,33 @@ func NewQuestionnaireListResponseFromResult(result *questionnaire.QuestionnaireL
 	}
 
 	return &QuestionnaireListResponse{
+		Questionnaires: questionnaires,
+		TotalCount:     result.Total,
+	}
+}
+
+// NewQuestionnaireSummaryListResponse 从应用层 SummaryListResult 创建摘要列表响应
+func NewQuestionnaireSummaryListResponse(result *questionnaire.QuestionnaireSummaryListResult) *QuestionnaireSummaryListResponse {
+	if result == nil {
+		return &QuestionnaireSummaryListResponse{
+			Questionnaires: []QuestionnaireSummaryResponse{},
+			TotalCount:     0,
+		}
+	}
+
+	questionnaires := make([]QuestionnaireSummaryResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		questionnaires = append(questionnaires, QuestionnaireSummaryResponse{
+			Code:        item.Code,
+			Title:       item.Title,
+			Description: item.Description,
+			ImgUrl:      item.ImgUrl,
+			Version:     item.Version,
+			Status:      item.Status,
+		})
+	}
+
+	return &QuestionnaireSummaryListResponse{
 		Questionnaires: questionnaires,
 		TotalCount:     result.Total,
 	}

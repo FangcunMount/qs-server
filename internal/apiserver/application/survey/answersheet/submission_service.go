@@ -363,7 +363,7 @@ func (s *submissionService) GetMyAnswerSheet(ctx context.Context, fillerID uint6
 }
 
 // ListMyAnswerSheets 查询我的答卷列表
-func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAnswerSheetsDTO) (*AnswerSheetListResult, error) {
+func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
@@ -408,13 +408,13 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量不能超过100")
 	}
 
-	// 2. 查询答卷列表（使用 FillerID）
+	// 2. 查询答卷摘要列表（使用 FillerID）
 	l.Debugw("开始查询答卷列表",
 		"filler_id", dto.FillerID,
 		"page", dto.Page,
 		"page_size", dto.PageSize,
 	)
-	sheets, err := s.repo.FindListByFiller(ctx, dto.FillerID, dto.Page, dto.PageSize)
+	sheets, err := s.repo.FindSummaryListByFiller(ctx, dto.FillerID, dto.Page, dto.PageSize)
 	if err != nil {
 		l.Errorw("查询答卷列表失败",
 			"action", "list_my_answersheets",
@@ -452,5 +452,5 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return toAnswerSheetListResult(sheets, total), nil
+	return toSummaryListResult(sheets, total), nil
 }

@@ -36,6 +36,23 @@ type AnswerSheetListResult struct {
 	Total int64                // 总数
 }
 
+// AnswerSheetSummaryResult 答卷摘要结果（不包含答案详情，用于列表展示）
+type AnswerSheetSummaryResult struct {
+	ID                 uint64    // 答卷ID
+	QuestionnaireCode  string    // 问卷编码
+	QuestionnaireTitle string    // 问卷标题
+	FillerID           uint64    // 填写人ID
+	FillerType         string    // 填写人类型
+	Score              float64   // 总分
+	FilledAt           time.Time // 填写时间
+}
+
+// AnswerSheetSummaryListResult 答卷摘要列表结果
+type AnswerSheetSummaryListResult struct {
+	Items []*AnswerSheetSummaryResult // 答卷摘要列表
+	Total int64                       // 总数
+}
+
 // AnswerSheetStatistics 答卷统计结果
 type AnswerSheetStatistics struct {
 	QuestionnaireCode string  // 问卷编码
@@ -96,6 +113,28 @@ func toAnswerSheetListResult(items []*answersheet.AnswerSheet, total int64) *Ans
 
 	for _, item := range items {
 		result.Items = append(result.Items, toAnswerSheetResult(item))
+	}
+
+	return result
+}
+
+// toSummaryListResult 将答卷摘要列表转换为结果对象
+func toSummaryListResult(items []*answersheet.AnswerSheetSummary, total int64) *AnswerSheetSummaryListResult {
+	result := &AnswerSheetSummaryListResult{
+		Items: make([]*AnswerSheetSummaryResult, 0, len(items)),
+		Total: total,
+	}
+
+	for _, item := range items {
+		result.Items = append(result.Items, &AnswerSheetSummaryResult{
+			ID:                 uint64(item.ID),
+			QuestionnaireCode:  item.QuestionnaireCode,
+			QuestionnaireTitle: item.QuestionnaireTitle,
+			FillerID:           item.FillerID,
+			FillerType:         item.FillerType,
+			Score:              item.TotalScore,
+			FilledAt:           item.FilledAt,
+		})
 	}
 
 	return result

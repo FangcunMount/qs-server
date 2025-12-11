@@ -460,7 +460,7 @@ func (h *ScaleHandler) List(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, response.NewScaleListResponse(result, page, pageSize))
+	h.Success(c, response.NewScaleSummaryListResponse(result, page, pageSize))
 }
 
 // GetPublishedByCode 获取已发布的量表
@@ -525,7 +525,7 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, response.NewScaleListResponse(result, page, pageSize))
+	h.Success(c, response.NewScaleSummaryListResponse(result, page, pageSize))
 }
 
 // ============= Helper Functions =============

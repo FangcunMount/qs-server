@@ -23,6 +23,18 @@ type QuestionnairePO struct {
 	Questions         []QuestionPO `bson:"questions,omitempty" json:"questions,omitempty"`
 }
 
+// QuestionnaireSummaryPO 问卷摘要持久化对象（轻量级，不包含问题详情）
+// 用于列表查询时减少内存占用
+type QuestionnaireSummaryPO struct {
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	Code        string             `bson:"code" json:"code"`
+	Title       string             `bson:"title" json:"title"`
+	Description string             `bson:"description,omitempty" json:"description,omitempty"`
+	ImgUrl      string             `bson:"img_url,omitempty" json:"img_url,omitempty"`
+	Version     string             `bson:"version" json:"version"`
+	Status      uint8              `bson:"status" json:"status"`
+}
+
 // CollectionName 集合名称
 func (QuestionnairePO) CollectionName() string {
 	return "questionnaires"

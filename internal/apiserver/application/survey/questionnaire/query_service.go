@@ -73,13 +73,13 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 	return toQuestionnaireResult(q), nil
 }
 
-// List 查询问卷列表
-func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireListResult, error) {
+// List 查询问卷摘要列表（轻量级，不包含问题详情）
+func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
-	l.Debugw("查询问卷列表",
-		"action", "list_questionnaires",
+	l.Debugw("查询问卷摘要列表",
+		"action", "list",
 		"page", dto.Page,
 		"page_size", dto.PageSize,
 		"conditions", dto.Conditions,
@@ -87,43 +87,25 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 
 	// 1. 验证分页参数
 	if dto.Page <= 0 {
-		l.Warnw("页码有效性检查失败",
-			"action", "list_questionnaires",
-			"page", dto.Page,
-			"result", "invalid_params",
-		)
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "页码必须大于0")
 	}
 	if dto.PageSize <= 0 {
-		l.Warnw("每页数量有效性检查失败",
-			"action", "list_questionnaires",
-			"page_size", dto.PageSize,
-			"result", "invalid_params",
-		)
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量必须大于0")
 	}
-	if dto.PageSize > 100 {
-		l.Warnw("每页数量超限",
-			"action", "list_questionnaires",
-			"page_size", dto.PageSize,
-			"max_size", 100,
-			"result", "invalid_params",
+	// 限制最大分页大小为 50
+	if dto.PageSize > 50 {
+		dto.PageSize = 50
+		l.Debugw("分页大小超限，已调整为最大值",
+			"action", "list",
+			"max_page_size", 50,
 		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量不能超过100")
 	}
 
-	// 2. 获取问卷列表
-	l.Debugw("开始查询问卷列表",
-		"page", dto.Page,
-		"page_size", dto.PageSize,
-	)
-
-	questionnaires, err := s.repo.FindList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	// 2. 获取问卷摘要列表（轻量级查询，不包含 questions 字段）
+	summaries, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
-		l.Errorw("查询问卷列表失败",
-			"action", "list_questionnaires",
-			"page", dto.Page,
-			"page_size", dto.PageSize,
+		l.Errorw("查询问卷摘要列表失败",
+			"action", "list",
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -131,14 +113,10 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	}
 
 	// 3. 获取总数
-	l.Debugw("查询问卷总数",
-		"action", "count",
-	)
-
 	total, err := s.repo.CountWithConditions(ctx, dto.Conditions)
 	if err != nil {
 		l.Errorw("获取问卷总数失败",
-			"action", "list_questionnaires",
+			"action", "list",
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -146,15 +124,15 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	}
 
 	duration := time.Since(startTime)
-	l.Debugw("查询问卷列表成功",
-		"action", "list_questionnaires",
+	l.Debugw("查询问卷摘要列表成功",
+		"action", "list",
 		"result", "success",
 		"total_count", total,
-		"page_count", len(questionnaires),
+		"page_count", len(summaries),
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return toQuestionnaireListResult(questionnaires, total), nil
+	return toQuestionnaireSummaryListResult(summaries, total), nil
 }
 
 // GetPublishedByCode 获取已发布的问卷
@@ -219,12 +197,12 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	return toQuestionnaireResult(q), nil
 }
 
-// ListPublished 查询已发布问卷列表
-func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireListResult, error) {
+// ListPublished 查询已发布问卷摘要列表（轻量级）
+func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
-	l.Debugw("查询已发布问卷列表",
+	l.Debugw("查询已发布问卷摘要列表",
 		"action", "list_published",
 		"page", dto.Page,
 		"page_size", dto.PageSize,
@@ -232,53 +210,31 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 
 	// 1. 验证分页参数
 	if dto.Page <= 0 {
-		l.Warnw("页码有效性检查失败",
-			"action", "list_published",
-			"page", dto.Page,
-			"result", "invalid_params",
-		)
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "页码必须大于0")
 	}
 	if dto.PageSize <= 0 {
-		l.Warnw("每页数量有效性检查失败",
-			"action", "list_published",
-			"page_size", dto.PageSize,
-			"result", "invalid_params",
-		)
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量必须大于0")
 	}
-	if dto.PageSize > 100 {
-		l.Warnw("每页数量超限",
+	// 限制最大分页大小为 50
+	if dto.PageSize > 50 {
+		dto.PageSize = 50
+		l.Debugw("分页大小超限，已调整为最大值",
 			"action", "list_published",
-			"page_size", dto.PageSize,
-			"max_size", 100,
-			"result", "invalid_params",
+			"max_page_size", 50,
 		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量不能超过100")
 	}
 
 	// 2. 添加状态过滤条件
-	l.Debugw("添加状态过滤条件",
-		"status_filter", "published",
-	)
-
 	if dto.Conditions == nil {
 		dto.Conditions = make(map[string]interface{})
 	}
 	dto.Conditions["status"] = uint8(questionnaire.STATUS_PUBLISHED)
 
-	// 3. 获取问卷列表
-	l.Debugw("开始查询已发布问卷列表",
-		"page", dto.Page,
-		"page_size", dto.PageSize,
-	)
-
-	questionnaires, err := s.repo.FindList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	// 3. 获取问卷摘要列表（轻量级查询）
+	summaries, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
-		l.Errorw("查询已发布问卷列表失败",
+		l.Errorw("查询已发布问卷摘要列表失败",
 			"action", "list_published",
-			"page", dto.Page,
-			"page_size", dto.PageSize,
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -286,10 +242,6 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	// 4. 获取总数
-	l.Debugw("查询已发布问卷总数",
-		"action", "count",
-	)
-
 	total, err := s.repo.CountWithConditions(ctx, dto.Conditions)
 	if err != nil {
 		l.Errorw("获取已发布问卷总数失败",
@@ -301,13 +253,13 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	duration := time.Since(startTime)
-	l.Debugw("查询已发布问卷列表成功",
+	l.Debugw("查询已发布问卷摘要列表成功",
 		"action", "list_published",
 		"result", "success",
 		"total_count", total,
-		"page_count", len(questionnaires),
+		"page_count", len(summaries),
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return toQuestionnaireListResult(questionnaires, total), nil
+	return toQuestionnaireSummaryListResult(summaries, total), nil
 }

@@ -41,7 +41,7 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerShee
 }
 
 // List 查询答卷列表
-func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetListResult, error) {
+func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error) {
 	// 1. 验证分页参数
 	if dto.Page <= 0 {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "页码必须大于0")
@@ -72,8 +72,8 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 		conditions[k] = v
 	}
 
-	// 3. 查询答卷列表
-	sheets, err := s.repo.FindListByQuestionnaire(ctx, dto.QuestionnaireCode, dto.Page, dto.PageSize)
+	// 3. 查询答卷摘要列表
+	sheets, err := s.repo.FindSummaryListByQuestionnaire(ctx, dto.QuestionnaireCode, dto.Page, dto.PageSize)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询答卷列表失败")
 	}
@@ -84,7 +84,7 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取答卷总数失败")
 	}
 
-	return toAnswerSheetListResult(sheets, total), nil
+	return toSummaryListResult(sheets, total), nil
 }
 
 // Delete 删除答卷
@@ -123,10 +123,9 @@ func (s *managementService) GetStatistics(ctx context.Context, questionnaireCode
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "统计答卷总数失败")
 	}
 
-	// 3. 获取所有答卷计算统计数据
-	// TODO: 这里需要Repository提供更高效的统计方法，避免一次性加载所有答卷
-	// 暂时使用简单实现
-	sheets, err := s.repo.FindListByQuestionnaire(ctx, questionnaireCode, 1, int(total))
+	// 3. 获取答卷摘要列表计算统计数据
+	// 使用摘要查询，只需 total_score 字段，避免加载完整答案
+	sheets, err := s.repo.FindSummaryListByQuestionnaire(ctx, questionnaireCode, 1, int(total))
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取答卷列表失败")
 	}
@@ -134,11 +133,11 @@ func (s *managementService) GetStatistics(ctx context.Context, questionnaireCode
 	// 4. 计算统计数据
 	var totalScore, maxScore, minScore float64
 	if len(sheets) > 0 {
-		maxScore = sheets[0].Score()
-		minScore = sheets[0].Score()
+		maxScore = sheets[0].TotalScore
+		minScore = sheets[0].TotalScore
 
 		for _, sheet := range sheets {
-			score := sheet.Score()
+			score := sheet.TotalScore
 			totalScore += score
 			if score > maxScore {
 				maxScore = score

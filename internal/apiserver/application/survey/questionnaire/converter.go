@@ -41,6 +41,22 @@ type QuestionnaireListResult struct {
 	Total int64                  // 总数
 }
 
+// QuestionnaireSummaryResult 问卷摘要结果（轻量级，不包含问题详情）
+type QuestionnaireSummaryResult struct {
+	Code        string // 问卷编码
+	Version     string // 版本号
+	Title       string // 问卷标题
+	Description string // 问卷描述
+	ImgUrl      string // 封面图URL
+	Status      string // 状态
+}
+
+// QuestionnaireSummaryListResult 问卷摘要列表结果
+type QuestionnaireSummaryListResult struct {
+	Items []*QuestionnaireSummaryResult // 问卷摘要列表
+	Total int64                         // 总数
+}
+
 // ============= Converter 转换器 =============
 
 // toQuestionnaireResult 将领域模型转换为结果对象
@@ -109,6 +125,36 @@ func toQuestionnaireListResult(items []*questionnaire.Questionnaire, total int64
 
 	for _, item := range items {
 		result.Items = append(result.Items, toQuestionnaireResult(item))
+	}
+
+	return result
+}
+
+// toQuestionnaireSummaryResult 将问卷摘要领域模型转换为结果对象
+func toQuestionnaireSummaryResult(s *questionnaire.QuestionnaireSummary) *QuestionnaireSummaryResult {
+	if s == nil {
+		return nil
+	}
+
+	return &QuestionnaireSummaryResult{
+		Code:        s.Code,
+		Version:     s.Version,
+		Title:       s.Title,
+		Description: s.Description,
+		ImgUrl:      s.ImgUrl,
+		Status:      string(s.Status),
+	}
+}
+
+// toQuestionnaireSummaryListResult 将问卷摘要列表转换为结果对象
+func toQuestionnaireSummaryListResult(items []*questionnaire.QuestionnaireSummary, total int64) *QuestionnaireSummaryListResult {
+	result := &QuestionnaireSummaryListResult{
+		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
+		Total: total,
+	}
+
+	for _, item := range items {
+		result.Items = append(result.Items, toQuestionnaireSummaryResult(item))
 	}
 
 	return result

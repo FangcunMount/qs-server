@@ -546,7 +546,7 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, response.NewQuestionnaireListResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireSummaryListResponse(result))
 }
 
 // GetPublishedByCode 获取已发布问卷
@@ -609,5 +609,5 @@ func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, response.NewQuestionnaireListResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireSummaryListResponse(result))
 }

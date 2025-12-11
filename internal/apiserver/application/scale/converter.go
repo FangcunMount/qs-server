@@ -45,6 +45,21 @@ type ScaleListResult struct {
 	Total int64          // 总数
 }
 
+// ScaleSummaryResult 量表摘要结果（不包含因子列表，用于列表展示）
+type ScaleSummaryResult struct {
+	Code              string // 量表编码
+	Title             string // 量表标题
+	Description       string // 量表描述
+	QuestionnaireCode string // 关联的问卷编码
+	Status            string // 状态
+}
+
+// ScaleSummaryListResult 量表摘要列表结果
+type ScaleSummaryListResult struct {
+	Items []*ScaleSummaryResult // 量表摘要列表
+	Total int64                 // 总数
+}
+
 // ============= Converter 转换器 =============
 
 // toScaleResult 将领域模型转换为结果对象
@@ -112,6 +127,26 @@ func toScaleListResult(items []*scale.MedicalScale, total int64) *ScaleListResul
 
 	for _, item := range items {
 		result.Items = append(result.Items, toScaleResult(item))
+	}
+
+	return result
+}
+
+// toSummaryListResult 将量表摘要列表转换为结果对象
+func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummaryListResult {
+	result := &ScaleSummaryListResult{
+		Items: make([]*ScaleSummaryResult, 0, len(items)),
+		Total: total,
+	}
+
+	for _, item := range items {
+		result.Items = append(result.Items, &ScaleSummaryResult{
+			Code:              item.Code,
+			Title:             item.Title,
+			Description:       item.Description,
+			QuestionnaireCode: item.QuestionnaireCode,
+			Status:            item.Status.String(),
+		})
 	}
 
 	return result

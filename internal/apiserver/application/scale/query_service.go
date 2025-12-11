@@ -53,8 +53,8 @@ func (s *queryService) GetByQuestionnaireCode(ctx context.Context, questionnaire
 	return toScaleResult(m), nil
 }
 
-// List 查询量表列表
-func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleListResult, error) {
+// List 查询量表摘要列表
+func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error) {
 	// 1. 验证分页参数
 	if dto.Page <= 0 {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "页码必须大于0")
@@ -66,8 +66,8 @@ func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleListR
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "每页数量不能超过100")
 	}
 
-	// 2. 获取量表列表
-	items, err := s.repo.FindList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	// 2. 获取量表摘要列表
+	items, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表列表失败")
 	}
@@ -78,7 +78,7 @@ func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleListR
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	return toScaleListResult(items, total), nil
+	return toSummaryListResult(items, total), nil
 }
 
 // GetPublishedByCode 获取已发布的量表
@@ -102,8 +102,8 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Sc
 	return toScaleResult(m), nil
 }
 
-// ListPublished 查询已发布量表列表
-func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*ScaleListResult, error) {
+// ListPublished 查询已发布量表摘要列表
+func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error) {
 	// 1. 验证分页参数
 	if dto.Page <= 0 {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "页码必须大于0")
@@ -122,8 +122,8 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 	}
 	conditions["status"] = scale.StatusPublished.String()
 
-	// 3. 获取量表列表
-	items, err := s.repo.FindList(ctx, dto.Page, dto.PageSize, conditions)
+	// 3. 获取量表摘要列表
+	items, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, conditions)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表列表失败")
 	}
@@ -134,5 +134,5 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	return toScaleListResult(items, total), nil
+	return toSummaryListResult(items, total), nil
 }

@@ -90,15 +90,15 @@ type ScaleQueryService interface {
 	// 场景：查询关联到指定问卷的量表
 	GetByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*ScaleResult, error)
 
-	// List 查询量表列表
+	// List 查询量表摘要列表（轻量级，不包含因子详情）
 	// 场景：分页查询量表列表，支持条件筛选
-	List(ctx context.Context, dto ListScalesDTO) (*ScaleListResult, error)
+	List(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error)
 
 	// GetPublishedByCode 获取已发布的量表
 	// 场景：评估服务查询可用的量表（只返回已发布状态）
 	GetPublishedByCode(ctx context.Context, code string) (*ScaleResult, error)
 
-	// ListPublished 查询已发布量表列表
+	// ListPublished 查询已发布量表摘要列表（轻量级，不包含因子详情）
 	// 场景：浏览可用的量表列表
-	ListPublished(ctx context.Context, dto ListScalesDTO) (*ScaleListResult, error)
+	ListPublished(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error)
 }
