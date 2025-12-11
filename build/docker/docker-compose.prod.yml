@@ -3,6 +3,9 @@ services:
     image: ghcr.io/fangcunmount/qs-apiserver:latest
     container_name: qs-apiserver
     restart: unless-stopped
+    # docker compose (非 swarm) 资源限制
+    mem_limit: "1g"
+    cpus: "0.5"
     networks:
       - qs-network
       - infra-network
@@ -30,6 +33,10 @@ services:
     image: ghcr.io/fangcunmount/qs-collection-server:latest
     container_name: qs-collection-server
     restart: unless-stopped
+    # docker compose (非 swarm) 资源限制
+    # 注意：Go 程序需要足够的内存用于 GC，建议至少 1GB
+    mem_limit: "1g"
+    cpus: "0.5"
     networks:
       - qs-network
       - infra-network
@@ -46,17 +53,23 @@ services:
       - /data/ssl/private:/etc/qs-server/ssl/private:ro
       # gRPC mTLS 证书目录
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
+    # 设置 Go 内存限制，帮助 GC 更积极地回收内存
+    environment:
+      - GOMEMLIMIT=900MiB
     command: ["--config=/app/configs/collection-server.prod.yaml"]
     deploy:
       resources:
         limits:
           cpus: "0.5"
-          memory: 512M
+          memory: 1024M
 
   qs-worker:
     image: ghcr.io/fangcunmount/qs-worker:latest
     container_name: qs-worker
     restart: unless-stopped
+    # docker compose (非 swarm) 资源限制
+    mem_limit: "384m"
+    cpus: "0.25"
     networks:
       - qs-network
       - infra-network
