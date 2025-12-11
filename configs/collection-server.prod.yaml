@@ -66,7 +66,7 @@ redis:
     password: ""
     database: 0
     max-idle: 50
-    max-active: 100
+    max-active: 60
     timeout: 5
     enable-cluster: false
     use-ssl: false
@@ -83,7 +83,7 @@ redis:
     password: ""
     database: 1
     max-idle: 50
-    max-active: 100
+    max-active: 60
     timeout: 5
     enable-cluster: false
     use-ssl: false
@@ -208,9 +208,3 @@ runtime:
 # 并发/连接池调优
 concurrency:
   max-concurrency: 4
-
-redis:
-  cache:
-    max-active: 60
-  store:
-    max-active: 60
