@@ -23,11 +23,6 @@ services:
       # gRPC mTLS 证书目录
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     command: ["--config=/app/configs/apiserver.prod.yaml"]
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
 
   qs-collection-server:
     image: ghcr.io/fangcunmount/qs-collection-server:latest
@@ -57,11 +52,6 @@ services:
     environment:
       - GOMEMLIMIT=900MiB
     command: ["--config=/app/configs/collection-server.prod.yaml"]
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 1024M
 
   qs-worker:
     image: ghcr.io/fangcunmount/qs-worker:latest
@@ -79,11 +69,6 @@ services:
       - /opt/qs-server/qs-worker/configs:/app/configs
       - /data/logs/qs-server/qs-worker:/data/logs/qs
     command: ["--config=/app/configs/worker.prod.yaml"]
-    deploy:
-      resources:
-        limits:
-          cpus: "0.3"
-          memory: 384M
 
 networks:
   qs-network:
