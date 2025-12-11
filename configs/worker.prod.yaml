@@ -78,6 +78,9 @@ mongodb:
   ssl-allow-invalid-hostnames: false
   ssl-ca-file: ""
   ssl-pem-keyfile: ""
+  # MongoDB 日志配置
+  enable-logger: true             # 生产环境启用 MongoDB 命令日志
+  slow-threshold: 500ms           # 生产环境慢查询阈值（可以调高）
 
 # -------------------------------------------------------
 # 4.3 Redis 缓存（Cache Redis）

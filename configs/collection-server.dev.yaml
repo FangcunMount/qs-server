@@ -162,8 +162,8 @@ log:
   level: "debug" # 开发环境使用 debug 级别
   format: "console" # 控制台格式便于阅读
   enable-color: true # 启用颜色便于区分
-  disable-caller: false # 显示调用者信息
-  disable-stacktrace: false # 显示堆栈跟踪
+  disable-caller: true # 显示调用者信息
+  disable-stacktrace: true # 显示堆栈跟踪
   development: true # 开发模式
   output-paths: ["/data/logs/qs/collection-server.log", "stdout"]
   error-output-paths: ["/data/logs/qs/collection-server-error.log", "stderr"]

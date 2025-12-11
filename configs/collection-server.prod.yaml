@@ -166,8 +166,8 @@ log:
   disable-stacktrace: true
   level: info
   format: json
-  enable-color: false
-  development: false
+  enable-color: true
+  development: true
   name: "qs-collection-server"
   max-size: 100
   max-age: 30

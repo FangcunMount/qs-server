@@ -1,6 +1,8 @@
 package options
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 )
 
@@ -19,6 +21,10 @@ type MongoDBOptions struct {
 	SSLAllowInvalidHostnames bool   `json:"ssl-allow-invalid-hostnames,omitempty" mapstructure:"ssl-allow-invalid-hostnames"`
 	SSLCAFile                string `json:"ssl-ca-file,omitempty"              mapstructure:"ssl-ca-file"`
 	SSLPEMKeyfile            string `json:"ssl-pem-keyfile,omitempty"          mapstructure:"ssl-pem-keyfile"`
+
+	// 日志配置
+	EnableLogger  bool          `json:"enable-logger,omitempty"  mapstructure:"enable-logger"`  // 是否启用日志
+	SlowThreshold time.Duration `json:"slow-threshold,omitempty" mapstructure:"slow-threshold"` // 慢查询阈值
 }
 
 // NewMongoDBOptions create a `zero` value instance.
@@ -33,6 +39,8 @@ func NewMongoDBOptions() *MongoDBOptions {
 		SSLAllowInvalidHostnames: false,
 		SSLCAFile:                "",
 		SSLPEMKeyfile:            "",
+		EnableLogger:             true,                   // 默认启用 MongoDB 日志
+		SlowThreshold:            200 * time.Millisecond, // 默认慢查询阈值 200ms
 	}
 }
 
@@ -71,4 +79,10 @@ func (o *MongoDBOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.SSLPEMKeyfile, "mongodb.ssl-pem-keyfile", o.SSLPEMKeyfile, ""+
 		"Path to SSL PEM key file for mongodb.")
+
+	fs.BoolVar(&o.EnableLogger, "mongodb.enable-logger", o.EnableLogger, ""+
+		"Enable MongoDB command logging.")
+
+	fs.DurationVar(&o.SlowThreshold, "mongodb.slow-threshold", o.SlowThreshold, ""+
+		"Slow query threshold for mongodb (e.g., 200ms).")
 }

@@ -175,6 +175,9 @@ mongodb:
   ssl-allow-invalid-hostnames: false # 是否允许无效的主机名
   ssl-ca-file: ""                   # SSL CA 证书文件路径
   ssl-pem-keyfile: ""               # SSL PEM 密钥文件路径
+  # MongoDB 日志配置
+  enable-logger: true               # 是否启用 MongoDB 命令日志
+  slow-threshold: 200ms             # 慢查询阈值（超过此时间记录警告）
 
 # ============================================================
 # 4. 集成配置

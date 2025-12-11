@@ -122,7 +122,7 @@ mysql:
   max-open-connections: 100       # 降低最大连接数（阿里云 RDS 有限制）
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
-  log-level: 2 # 生产降低日志级别
+  log-level: 4 # 生产降低日志级别
 
 # ----------------------------------------------------------------------------
 # 3.2 数据库迁移配置
@@ -181,6 +181,9 @@ mongodb:
   ssl-allow-invalid-hostnames: false
   ssl-ca-file: ""
   ssl-pem-keyfile: ""
+  # MongoDB 日志配置
+  enable-logger: true             # 启用 MongoDB 命令日志
+  slow-threshold: 200ms           # 慢查询阈值（生产环境可以调高，如 500ms）
 
 # ============================================================================
 # 4. 外部服务集成配置

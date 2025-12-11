@@ -207,6 +207,9 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		SSLAllowInvalidHostnames: dm.config.MongoDBOptions.SSLAllowInvalidHostnames,
 		SSLCAFile:                dm.config.MongoDBOptions.SSLCAFile,
 		SSLPEMKeyfile:            dm.config.MongoDBOptions.SSLPEMKeyfile,
+		// 日志配置
+		EnableLogger:  dm.config.MongoDBOptions.EnableLogger,
+		SlowThreshold: dm.config.MongoDBOptions.SlowThreshold,
 	}
 
 	if mongoConfig.Host == "" {
