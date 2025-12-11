@@ -61,6 +61,14 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 		)
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
 	}
+	if q == nil {
+		l.Warnw("问卷不存在",
+			"code", code,
+			"action", "get_by_code",
+			"result", "not_found",
+		)
+		return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+	}
 
 	duration := time.Since(startTime)
 	l.Debugw("获取问卷成功",
@@ -174,6 +182,14 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+	}
+	if q == nil {
+		l.Warnw("问卷不存在",
+			"code", code,
+			"action", "get_published_by_code",
+			"result", "not_found",
+		)
+		return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
 	}
 
 	// 3. 检查问卷状态
