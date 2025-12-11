@@ -93,7 +93,7 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"domain_id":  uint64(id),
-		"deleted_at": bson.M{"$exists": false},
+		"deleted_at": nil,
 	}
 
 	var po AnswerSheetPO
@@ -112,7 +112,7 @@ func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.Ans
 func (r *Repository) FindListByFiller(ctx context.Context, fillerID uint64, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"filler_id":  int64(fillerID),
-		"deleted_at": bson.M{"$exists": false},
+		"deleted_at": nil,
 	}
 
 	// 设置分页选项
@@ -149,7 +149,7 @@ func (r *Repository) FindListByFiller(ctx context.Context, fillerID uint64, page
 func (r *Repository) FindListByQuestionnaire(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*answersheet.AnswerSheet, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
-		"deleted_at":         bson.M{"$exists": false},
+		"deleted_at":         nil,
 	}
 
 	// 设置分页选项
@@ -187,7 +187,7 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 	filter := bson.M(conditions)
 
 	// 添加软删除过滤条件
-	filter["deleted_at"] = bson.M{"$exists": false}
+	filter["deleted_at"] = nil
 
 	return r.CountDocuments(ctx, filter)
 }

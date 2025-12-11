@@ -152,7 +152,7 @@ func (r *Repository) HardDelete(ctx context.Context, code string) error {
 func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error) {
 	filter := bson.M{
 		"code":       code,
-		"deleted_at": bson.M{"$exists": false},
+		"deleted_at": nil,
 	}
 
 	return r.ExistsByFilter(ctx, filter)
@@ -162,7 +162,7 @@ func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error
 func (r *Repository) FindActiveQuestionnaires(ctx context.Context) ([]*questionnaire.Questionnaire, error) {
 	filter := bson.M{
 		"status":     1, // StatusActive
-		"deleted_at": bson.M{"$exists": false},
+		"deleted_at": nil,
 	}
 
 	cursor, err := r.Find(ctx, filter)
@@ -190,7 +190,7 @@ func (r *Repository) FindActiveQuestionnaires(ctx context.Context) ([]*questionn
 // FindList 根据条件查询问卷列表
 func (r *Repository) FindList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*questionnaire.Questionnaire, error) {
 	filter := bson.M{
-		"deleted_at": bson.M{"$exists": false},
+		"deleted_at": nil,
 	}
 
 	// 添加条件过滤
@@ -236,7 +236,7 @@ func (r *Repository) FindList(ctx context.Context, page, pageSize int, condition
 // CountWithConditions 根据条件统计问卷数量
 func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
 	filter := bson.M{
-		"deleted_at": bson.M{"$exists": false},
+		"deleted_at": nil,
 	}
 
 	// 添加条件过滤
