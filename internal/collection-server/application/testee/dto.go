@@ -9,8 +9,8 @@ import (
 // CreateTesteeRequest 创建受试者请求
 // 注意：机构ID由系统自动设置，不需要用户传入
 type CreateTesteeRequest struct {
-	IAMUserID  uint64         `json:"iam_user_id"`                     // IAM用户ID（成人）
-	IAMChildID uint64         `json:"iam_child_id" binding:"required"` // IAM儿童ID
+	IAMUserID  string         `json:"iam_user_id"`                     // IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字
+	IAMChildID string         `json:"iam_child_id" binding:"required"` // IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
 	Name       string         `json:"name" binding:"required"`         // 姓名
 	Gender     int32          `json:"gender" binding:"required"`       // 性别：1-男，2-女，3-其他
 	Birthday   *meta.Birthday `json:"birthday"`                        // 出生日期（格式：YYYY-MM-DD）
@@ -32,8 +32,8 @@ type UpdateTesteeRequest struct {
 type TesteeResponse struct {
 	ID         uint64        `json:"id"`           // 受试者ID
 	OrgID      uint64        `json:"org_id"`       // 机构ID
-	IAMUserID  uint64        `json:"iam_user_id"`  // IAM用户ID
-	IAMChildID uint64        `json:"iam_child_id"` // IAM儿童ID
+	IAMUserID  string        `json:"iam_user_id"`  // IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
+	IAMChildID string        `json:"iam_child_id"` // IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
 	Name       string        `json:"name"`         // 姓名
 	Gender     int32         `json:"gender"`       // 性别
 	Birthday   meta.Birthday `json:"birthday"`     // 出生日期（格式：YYYY-MM-DD）

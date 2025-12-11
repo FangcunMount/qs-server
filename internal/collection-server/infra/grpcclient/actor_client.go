@@ -2,6 +2,8 @@ package grpcclient
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,8 +28,8 @@ func NewActorClient(base *Client) *ActorClient {
 // CreateTesteeRequest 创建受试者请求参数
 type CreateTesteeRequest struct {
 	OrgID      uint64     // 机构ID
-	IAMUserID  uint64     // IAM用户ID（成人）
-	IAMChildID uint64     // IAM儿童ID
+	IAMUserID  string     // IAM用户ID（成人）- 字符串格式
+	IAMChildID string     // IAM儿童ID - 字符串格式
 	Name       string     // 姓名
 	Gender     int32      // 性别：1-男，2-女，3-其他
 	Birthday   *time.Time // 出生日期
@@ -40,8 +42,8 @@ type CreateTesteeRequest struct {
 type TesteeResponse struct {
 	ID         uint64    // 受试者ID
 	OrgID      uint64    // 机构ID
-	IAMUserID  uint64    // IAM用户ID
-	IAMChildID uint64    // IAM儿童ID
+	IAMUserID  string    // IAM用户ID - 字符串格式
+	IAMChildID string    // IAM儿童ID - 字符串格式
 	Name       string    // 姓名
 	Gender     int32     // 性别
 	Birthday   time.Time // 出生日期
@@ -68,10 +70,29 @@ func (c *ActorClient) CreateTestee(ctx context.Context, req *CreateTesteeRequest
 	ctx, cancel := c.base.ContextWithTimeout(ctx)
 	defer cancel()
 
+	// 转换字符串 ID 为 uint64
+	var iamUserID uint64
+	var iamChildID uint64
+	var err error
+
+	if req.IAMUserID != "" {
+		iamUserID, err = strconv.ParseUint(req.IAMUserID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid iam_user_id format: %w", err)
+		}
+	}
+
+	if req.IAMChildID != "" {
+		iamChildID, err = strconv.ParseUint(req.IAMChildID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid iam_child_id format: %w", err)
+		}
+	}
+
 	pbReq := &pb.CreateTesteeRequest{
 		OrgId:      req.OrgID,
-		IamUserId:  req.IAMUserID,
-		IamChildId: req.IAMChildID,
+		IamUserId:  iamUserID,
+		IamChildId: iamChildID,
 		Name:       req.Name,
 		Gender:     req.Gender,
 		Tags:       req.Tags,
@@ -211,8 +232,8 @@ func convertTesteeResponse(resp *pb.TesteeResponse) *TesteeResponse {
 	result := &TesteeResponse{
 		ID:         resp.Id,
 		OrgID:      resp.OrgId,
-		IAMUserID:  resp.IamUserId,
-		IAMChildID: resp.IamChildId,
+		IAMUserID:  strconv.FormatUint(resp.IamUserId, 10),
+		IAMChildID: strconv.FormatUint(resp.IamChildId, 10),
 		Name:       resp.Name,
 		Gender:     resp.Gender,
 		Tags:       resp.Tags,

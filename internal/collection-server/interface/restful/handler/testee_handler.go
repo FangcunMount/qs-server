@@ -191,7 +191,7 @@ func (h *TesteeHandler) List(c *gin.Context) {
 // @Description 根据IAM儿童ID检查受试者是否存在
 // @Tags 受试者
 // @Produce json
-// @Param iam_child_id query int true "IAM儿童ID"
+// @Param iam_child_id query string true "IAM儿童ID"
 // @Success 200 {object} core.Response{data=testee.TesteeExistsResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
@@ -199,11 +199,9 @@ func (h *TesteeHandler) List(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/testees/exists [get]
 func (h *TesteeHandler) Exists(c *gin.Context) {
-	iamChildIDStr := h.GetQueryParam(c, "iam_child_id")
-
-	iamChildID, err := strconv.ParseUint(iamChildIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid iam_child_id format", err)
+	iamChildID := h.GetQueryParam(c, "iam_child_id")
+	if iamChildID == "" {
+		h.BadRequestResponse(c, "iam_child_id is required", nil)
 		return
 	}
 

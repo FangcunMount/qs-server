@@ -2,6 +2,8 @@ package testee
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -34,7 +36,7 @@ func (s *Service) CreateTestee(ctx context.Context, req *CreateTesteeRequest) (*
 	l := logger.L(ctx)
 	startTime := time.Now()
 
-	log.Infof("Creating testee: name=%s, iamChildID=%d", req.Name, req.IAMChildID)
+	log.Infof("Creating testee: name=%s, iamChildID=%s", req.Name, req.IAMChildID)
 
 	l.Infow("开始创建受试者",
 		"action", "create_testee",
@@ -220,13 +222,19 @@ func (s *Service) ListMyTestees(ctx context.Context, childIDs []uint64, req *Lis
 }
 
 // TesteeExists 检查受试者是否存在
-func (s *Service) TesteeExists(ctx context.Context, iamChildID uint64) (*TesteeExistsResponse, error) {
+func (s *Service) TesteeExists(ctx context.Context, iamChildID string) (*TesteeExistsResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
+	// 转换 string ID 为 uint64
+	childIDUint, err := strconv.ParseUint(iamChildID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid iam_child_id format: %w", err)
+	}
+
 	// 从 IAM 获取默认机构ID（单租户场景）
 	orgID := s.guardianshipService.GetDefaultOrgID()
-	log.Infof("Checking testee existence: orgID=%d, iamChildID=%d", orgID, iamChildID)
+	log.Infof("Checking testee existence: orgID=%d, iamChildID=%s", orgID, iamChildID)
 
 	l.Debugw("检查受试者存在性",
 		"action", "testee_exists",
@@ -234,7 +242,7 @@ func (s *Service) TesteeExists(ctx context.Context, iamChildID uint64) (*TesteeE
 		"iam_child_id", iamChildID,
 	)
 
-	exists, testeeID, err := s.actorClient.TesteeExists(ctx, orgID, iamChildID)
+	exists, testeeID, err := s.actorClient.TesteeExists(ctx, orgID, childIDUint)
 	if err != nil {
 		log.Errorf("Failed to check testee existence via gRPC: %v", err)
 		l.Errorw("检查受试者存在性失败",
