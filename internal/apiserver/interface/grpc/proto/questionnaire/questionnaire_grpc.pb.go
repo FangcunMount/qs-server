@@ -31,7 +31,7 @@ const (
 type QuestionnaireServiceClient interface {
 	// 获取问卷详情
 	GetQuestionnaire(ctx context.Context, in *GetQuestionnaireRequest, opts ...grpc.CallOption) (*GetQuestionnaireResponse, error)
-	// 获取问卷列表
+	// 获取问卷列表（返回摘要信息，不含 questions）
 	ListQuestionnaires(ctx context.Context, in *ListQuestionnairesRequest, opts ...grpc.CallOption) (*ListQuestionnairesResponse, error)
 }
 
@@ -71,7 +71,7 @@ func (c *questionnaireServiceClient) ListQuestionnaires(ctx context.Context, in 
 type QuestionnaireServiceServer interface {
 	// 获取问卷详情
 	GetQuestionnaire(context.Context, *GetQuestionnaireRequest) (*GetQuestionnaireResponse, error)
-	// 获取问卷列表
+	// 获取问卷列表（返回摘要信息，不含 questions）
 	ListQuestionnaires(context.Context, *ListQuestionnairesRequest) (*ListQuestionnairesResponse, error)
 	mustEmbedUnimplementedQuestionnaireServiceServer()
 }

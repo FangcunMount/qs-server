@@ -6,12 +6,13 @@ import (
 
 // QuestionnaireSummary 问卷摘要（用于列表展示，不包含问题详情）
 type QuestionnaireSummary struct {
-	Code        string // 问卷编码
-	Title       string // 问卷标题
-	Description string // 问卷描述
-	ImgUrl      string // 封面图URL
-	Version     string // 版本号
-	Status      Status // 状态
+	Code          string // 问卷编码
+	Title         string // 问卷标题
+	Description   string // 问卷描述
+	ImgUrl        string // 封面图URL
+	Version       string // 版本号
+	Status        Status // 状态
+	QuestionCount int    // 问题数量
 }
 
 // Repository 问卷存储库接口（出站端口）

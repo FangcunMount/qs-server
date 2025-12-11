@@ -6,7 +6,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -108,21 +107,24 @@ func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.Ans
 	return r.mapper.ToBO(&po), nil
 }
 
-// FindSummaryListByFiller 查询填写者的答卷摘要列表（不包含 answers）
+// FindSummaryListByFiller 查询填写者的答卷摘要列表（使用聚合管道计算 answer_count）
 func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint64, page, pageSize int) ([]*answersheet.AnswerSheetSummary, error) {
 	filter := bson.M{
 		"filler_id":  int64(fillerID),
 		"deleted_at": nil,
 	}
 
-	// 设置分页选项和投影（排除 answers 字段）
+	// 计算分页
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
-	opts := options.Find().
-		SetSkip(skip).
-		SetLimit(limit).
-		SetSort(bson.M{"filled_at": -1}).
-		SetProjection(bson.M{
+
+	// 使用聚合管道：计算 answer_count 并排除 answers 数组
+	pipeline := []bson.M{
+		{"$match": filter},
+		{"$sort": bson.M{"filled_at": -1}},
+		{"$skip": skip},
+		{"$limit": limit},
+		{"$project": bson.M{
 			"domain_id":           1,
 			"questionnaire_code":  1,
 			"questionnaire_title": 1,
@@ -130,9 +132,11 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 			"filler_type":         1,
 			"total_score":         1,
 			"filled_at":           1,
-		})
+			"answer_count":        bson.M{"$size": bson.M{"$ifNull": []interface{}{"$answers", []interface{}{}}}},
+		}},
+	}
 
-	cursor, err := r.Find(ctx, filter, opts)
+	cursor, err := r.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -151,6 +155,7 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 			FillerID:           uint64(po.FillerID),
 			FillerType:         po.FillerType,
 			TotalScore:         po.TotalScore,
+			AnswerCount:        po.AnswerCount,
 		}
 		if po.FilledAt != nil {
 			summary.FilledAt = *po.FilledAt
@@ -165,21 +170,24 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 	return summaries, nil
 }
 
-// FindSummaryListByQuestionnaire 查询问卷的答卷摘要列表（不包含 answers）
+// FindSummaryListByQuestionnaire 查询问卷的答卷摘要列表（使用聚合管道计算 answer_count）
 func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*answersheet.AnswerSheetSummary, error) {
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
 		"deleted_at":         nil,
 	}
 
-	// 设置分页选项和投影（排除 answers 字段）
+	// 计算分页
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
-	opts := options.Find().
-		SetSkip(skip).
-		SetLimit(limit).
-		SetSort(bson.M{"filled_at": -1}).
-		SetProjection(bson.M{
+
+	// 使用聚合管道：计算 answer_count 并排除 answers 数组
+	pipeline := []bson.M{
+		{"$match": filter},
+		{"$sort": bson.M{"filled_at": -1}},
+		{"$skip": skip},
+		{"$limit": limit},
+		{"$project": bson.M{
 			"domain_id":           1,
 			"questionnaire_code":  1,
 			"questionnaire_title": 1,
@@ -187,9 +195,11 @@ func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questio
 			"filler_type":         1,
 			"total_score":         1,
 			"filled_at":           1,
-		})
+			"answer_count":        bson.M{"$size": bson.M{"$ifNull": []interface{}{"$answers", []interface{}{}}}},
+		}},
+	}
 
-	cursor, err := r.Find(ctx, filter, opts)
+	cursor, err := r.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +218,7 @@ func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questio
 			FillerID:           uint64(po.FillerID),
 			FillerType:         po.FillerType,
 			TotalScore:         po.TotalScore,
+			AnswerCount:        po.AnswerCount,
 		}
 		if po.FilledAt != nil {
 			summary.FilledAt = *po.FilledAt

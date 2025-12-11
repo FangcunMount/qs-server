@@ -109,7 +109,11 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		req.Page = 1
 	}
 	if req.PageSize <= 0 {
-		req.PageSize = 20
+		req.PageSize = 50
+	}
+	// 最大分页限制，避免一次查询过多数据
+	if req.PageSize > 100 {
+		req.PageSize = 100
 	}
 
 	l.Debugw("开始从 gRPC 服务查询测评列表",

@@ -86,7 +86,7 @@ func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnsw
 }
 
 // ListAnswerSheets 获取答卷列表（C端）
-// @Description C端用户查看自己提交的所有答卷
+// @Description C端用户查看自己提交的所有答卷（返回摘要，不含 answers）
 func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListAnswerSheetsRequest) (*pb.ListAnswerSheetsResponse, error) {
 	dto := answersheet.ListMyAnswerSheetsDTO{
 		FillerID:          req.WriterId, // proto 中使用 WriterId
@@ -101,16 +101,16 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// 转换响应
-	protoAnswerSheets := make([]*pb.AnswerSheet, 0, len(result.Items))
+	// 转换响应（使用摘要类型，不含 answers）
+	protoAnswerSheets := make([]*pb.AnswerSheetSummary, 0, len(result.Items))
 	for _, item := range result.Items {
-		// 简化版本，只返回基本信息
-		protoAnswerSheets = append(protoAnswerSheets, &pb.AnswerSheet{
+		protoAnswerSheets = append(protoAnswerSheets, &pb.AnswerSheetSummary{
 			Id:                item.ID,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Title:             item.QuestionnaireTitle,
 			Score:             item.Score,
 			WriterId:          item.FillerID,
+			AnswerCount:       int32(item.AnswerCount),
 		})
 	}
 

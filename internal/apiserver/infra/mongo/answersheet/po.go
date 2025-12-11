@@ -145,5 +145,6 @@ type AnswerSheetSummaryPO struct {
 	FillerID           int64      `bson:"filler_id"`
 	FillerType         string     `bson:"filler_type"`
 	TotalScore         float64    `bson:"total_score"`
+	AnswerCount        int        `bson:"answer_count"` // 由聚合管道计算
 	FilledAt           *time.Time `bson:"filled_at"`
 }

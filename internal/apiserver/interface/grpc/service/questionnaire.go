@@ -52,8 +52,8 @@ func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.L
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// 转换响应（摘要不包含 questions）
-	protoQuestionnaires := make([]*pb.Questionnaire, 0, len(result.Items))
+	// 转换响应（使用摘要类型，不包含 questions）
+	protoQuestionnaires := make([]*pb.QuestionnaireSummary, 0, len(result.Items))
 	for _, item := range result.Items {
 		protoQuestionnaires = append(protoQuestionnaires, s.toProtoQuestionnaireSummary(item))
 	}
@@ -126,18 +126,18 @@ func (s *QuestionnaireService) toProtoOptions(options []questionnaire.OptionResu
 }
 
 // toProtoQuestionnaireSummary 转换为 protobuf 问卷摘要（不包含问题详情）
-func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire.QuestionnaireSummaryResult) *pb.Questionnaire {
+func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire.QuestionnaireSummaryResult) *pb.QuestionnaireSummary {
 	if result == nil {
 		return nil
 	}
 
-	return &pb.Questionnaire{
-		Code:        result.Code,
-		Version:     result.Version,
-		Title:       result.Title,
-		Description: result.Description,
-		ImgUrl:      result.ImgUrl,
-		Status:      result.Status,
-		Questions:   nil, // 摘要不包含问题详情
+	return &pb.QuestionnaireSummary{
+		Code:          result.Code,
+		Version:       result.Version,
+		Title:         result.Title,
+		Description:   result.Description,
+		ImgUrl:        result.ImgUrl,
+		Status:        result.Status,
+		QuestionCount: int32(result.QuestionCount),
 	}
 }

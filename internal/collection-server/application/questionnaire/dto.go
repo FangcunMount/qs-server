@@ -51,10 +51,23 @@ type ListQuestionnairesRequest struct {
 	Title    string `form:"title"`
 }
 
+// QuestionnaireSummaryResponse 问卷摘要响应（列表查询，不含问题详情）
+type QuestionnaireSummaryResponse struct {
+	Code          string `json:"code"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	ImgURL        string `json:"img_url"`
+	Status        string `json:"status"`
+	Version       string `json:"version"`
+	QuestionCount int32  `json:"question_count"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+}
+
 // ListQuestionnairesResponse 问卷列表响应
 type ListQuestionnairesResponse struct {
-	Questionnaires []QuestionnaireResponse `json:"questionnaires"`
-	Total          int64                   `json:"total"`
-	Page           int32                   `json:"page"`
-	PageSize       int32                   `json:"page_size"`
+	Questionnaires []QuestionnaireSummaryResponse `json:"questionnaires"`
+	Total          int64                          `json:"total"`
+	Page           int32                          `json:"page"`
+	PageSize       int32                          `json:"page_size"`
 }

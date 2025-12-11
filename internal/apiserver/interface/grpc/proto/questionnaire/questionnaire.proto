@@ -9,11 +9,24 @@ service QuestionnaireService {
   // 获取问卷详情
   rpc GetQuestionnaire(GetQuestionnaireRequest) returns (GetQuestionnaireResponse);
   
-  // 获取问卷列表
+  // 获取问卷列表（返回摘要信息，不含 questions）
   rpc ListQuestionnaires(ListQuestionnairesRequest) returns (ListQuestionnairesResponse);
 }
 
-// 问卷信息
+// 问卷摘要信息（用于列表查询，不含 questions）
+message QuestionnaireSummary {
+  string code = 1;
+  string title = 2;
+  string description = 3;
+  string img_url = 4;
+  string status = 5;
+  string version = 6;
+  int32 question_count = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// 问卷完整信息（用于详情查询）
 message Questionnaire {
   string code = 1;
   string title = 2;
@@ -74,8 +87,8 @@ message ListQuestionnairesRequest {
   string title = 4;
 }
 
-// 获取问卷列表响应
+// 获取问卷列表响应（返回摘要，不含 questions）
 message ListQuestionnairesResponse {
-  repeated Questionnaire questionnaires = 1;
+  repeated QuestionnaireSummary questionnaires = 1;
   int64 total = 2;
 } 

@@ -42,7 +42,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*QuestionnaireResp
 	return s.convertQuestionnaire(result), nil
 }
 
-// List 获取问卷列表
+// List 获取问卷列表（返回摘要，不含问题详情）
 func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest) (*ListQuestionnairesResponse, error) {
 	log.Infof("Listing questionnaires: page=%d, pageSize=%d, status=%s", req.Page, req.PageSize, req.Status)
 
@@ -51,7 +51,11 @@ func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest)
 		req.Page = 1
 	}
 	if req.PageSize <= 0 {
-		req.PageSize = 20
+		req.PageSize = 50
+	}
+	// 最大分页限制，避免一次查询过多数据
+	if req.PageSize > 100 {
+		req.PageSize = 100
 	}
 
 	result, err := s.questionnaireClient.ListQuestionnaires(ctx, req.Page, req.PageSize, req.Status, req.Title)
@@ -60,9 +64,20 @@ func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest)
 		return nil, err
 	}
 
-	questionnaires := make([]QuestionnaireResponse, len(result.Questionnaires))
+	// 直接使用摘要类型，不需要转换完整问卷
+	questionnaires := make([]QuestionnaireSummaryResponse, len(result.Questionnaires))
 	for i, q := range result.Questionnaires {
-		questionnaires[i] = *s.convertQuestionnaire(&q)
+		questionnaires[i] = QuestionnaireSummaryResponse{
+			Code:          q.Code,
+			Title:         q.Title,
+			Description:   q.Description,
+			ImgURL:        q.ImgURL,
+			Status:        q.Status,
+			Version:       q.Version,
+			QuestionCount: q.QuestionCount,
+			CreatedAt:     q.CreatedAt,
+			UpdatedAt:     q.UpdatedAt,
+		}
 	}
 
 	return &ListQuestionnairesResponse{

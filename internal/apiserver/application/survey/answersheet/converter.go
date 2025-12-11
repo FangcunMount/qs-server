@@ -44,6 +44,7 @@ type AnswerSheetSummaryResult struct {
 	FillerID           uint64    // 填写人ID
 	FillerType         string    // 填写人类型
 	Score              float64   // 总分
+	AnswerCount        int       // 答案数量
 	FilledAt           time.Time // 填写时间
 }
 
@@ -133,6 +134,7 @@ func toSummaryListResult(items []*answersheet.AnswerSheetSummary, total int64) *
 			FillerID:           item.FillerID,
 			FillerType:         item.FillerType,
 			Score:              item.TotalScore,
+			AnswerCount:        item.AnswerCount,
 			FilledAt:           item.FilledAt,
 		})
 	}

@@ -16,6 +16,7 @@ type AnswerSheetSummary struct {
 	FillerID             uint64    // 填写者ID
 	FillerType           string    // 填写者类型
 	TotalScore           float64   // 总分
+	AnswerCount          int       // 答案数量
 	FilledAt             time.Time // 填写时间
 }
 

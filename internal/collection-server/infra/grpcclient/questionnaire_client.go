@@ -53,10 +53,23 @@ type CalculationRuleOutput struct {
 
 // ListQuestionnairesOutput 问卷列表输出
 type ListQuestionnairesOutput struct {
-	Questionnaires []QuestionnaireOutput
+	Questionnaires []QuestionnaireSummaryOutput
 	Total          int64
 	Page           int32
 	PageSize       int32
+}
+
+// QuestionnaireSummaryOutput 问卷摘要输出（不含问题详情）
+type QuestionnaireSummaryOutput struct {
+	Code          string
+	Title         string
+	Description   string
+	ImgURL        string
+	Status        string
+	Version       string
+	QuestionCount int32
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 // ==================== Client ====================
@@ -94,7 +107,7 @@ func (c *QuestionnaireClient) GetQuestionnaire(ctx context.Context, code string)
 	return c.convertQuestionnaire(q), nil
 }
 
-// ListQuestionnaires 获取问卷列表
+// ListQuestionnaires 获取问卷列表（摘要）
 func (c *QuestionnaireClient) ListQuestionnaires(ctx context.Context, page, pageSize int32, status, title string) (*ListQuestionnairesOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
@@ -111,9 +124,20 @@ func (c *QuestionnaireClient) ListQuestionnaires(ctx context.Context, page, page
 		return nil, err
 	}
 
-	questionnaires := make([]QuestionnaireOutput, len(resp.GetQuestionnaires()))
+	// 使用轻量级摘要类型，不含问题详情
+	questionnaires := make([]QuestionnaireSummaryOutput, len(resp.GetQuestionnaires()))
 	for i, q := range resp.GetQuestionnaires() {
-		questionnaires[i] = *c.convertQuestionnaire(q)
+		questionnaires[i] = QuestionnaireSummaryOutput{
+			Code:          q.GetCode(),
+			Title:         q.GetTitle(),
+			Description:   q.GetDescription(),
+			ImgURL:        q.GetImgUrl(),
+			Status:        q.GetStatus(),
+			Version:       q.GetVersion(),
+			QuestionCount: q.GetQuestionCount(),
+			CreatedAt:     q.GetCreatedAt(),
+			UpdatedAt:     q.GetUpdatedAt(),
+		}
 	}
 
 	return &ListQuestionnairesOutput{

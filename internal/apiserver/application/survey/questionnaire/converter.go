@@ -43,12 +43,13 @@ type QuestionnaireListResult struct {
 
 // QuestionnaireSummaryResult 问卷摘要结果（轻量级，不包含问题详情）
 type QuestionnaireSummaryResult struct {
-	Code        string // 问卷编码
-	Version     string // 版本号
-	Title       string // 问卷标题
-	Description string // 问卷描述
-	ImgUrl      string // 封面图URL
-	Status      string // 状态
+	Code          string // 问卷编码
+	Version       string // 版本号
+	Title         string // 问卷标题
+	Description   string // 问卷描述
+	ImgUrl        string // 封面图URL
+	Status        string // 状态
+	QuestionCount int    // 问题数量
 }
 
 // QuestionnaireSummaryListResult 问卷摘要列表结果
@@ -137,12 +138,13 @@ func toQuestionnaireSummaryResult(s *questionnaire.QuestionnaireSummary) *Questi
 	}
 
 	return &QuestionnaireSummaryResult{
-		Code:        s.Code,
-		Version:     s.Version,
-		Title:       s.Title,
-		Description: s.Description,
-		ImgUrl:      s.ImgUrl,
-		Status:      string(s.Status),
+		Code:          s.Code,
+		Version:       s.Version,
+		Title:         s.Title,
+		Description:   s.Description,
+		ImgUrl:        s.ImgUrl,
+		Status:        string(s.Status),
+		QuestionCount: s.QuestionCount,
 	}
 }
 
