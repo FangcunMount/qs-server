@@ -68,7 +68,7 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // ListMyAssessments 获取我的测评列表
@@ -109,7 +109,7 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // GetAssessmentScores 获取测评得分详情
@@ -150,7 +150,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // GetAssessmentReport 获取测评报告
@@ -197,7 +197,7 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -237,7 +237,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // GetHighRiskFactors 获取高风险因子
@@ -278,5 +278,5 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }

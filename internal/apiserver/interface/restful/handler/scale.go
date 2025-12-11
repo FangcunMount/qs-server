@@ -49,11 +49,11 @@ func NewScaleHandler(
 func (h *ScaleHandler) Create(c *gin.Context) {
 	var req request.CreateScaleRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -66,11 +66,11 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 
 	result, err := h.lifecycleService.Create(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // UpdateBasicInfo 更新量表基本信息
@@ -87,17 +87,17 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	var req request.UpdateScaleBasicInfoRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -109,11 +109,11 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 
 	result, err := h.lifecycleService.UpdateBasicInfo(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // UpdateQuestionnaire 更新关联的问卷
@@ -130,17 +130,17 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	var req request.UpdateScaleQuestionnaireRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -152,11 +152,11 @@ func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 
 	result, err := h.lifecycleService.UpdateQuestionnaire(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // Publish 发布量表
@@ -172,17 +172,17 @@ func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 func (h *ScaleHandler) Publish(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.Publish(c.Request.Context(), scaleCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // Unpublish 下架量表
@@ -198,17 +198,17 @@ func (h *ScaleHandler) Publish(c *gin.Context) {
 func (h *ScaleHandler) Unpublish(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.Unpublish(c.Request.Context(), scaleCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // Archive 归档量表
@@ -224,17 +224,17 @@ func (h *ScaleHandler) Unpublish(c *gin.Context) {
 func (h *ScaleHandler) Archive(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.Archive(c.Request.Context(), scaleCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // Delete 删除量表
@@ -250,12 +250,12 @@ func (h *ScaleHandler) Archive(c *gin.Context) {
 func (h *ScaleHandler) Delete(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	if err := h.lifecycleService.Delete(c.Request.Context(), scaleCode); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -278,17 +278,17 @@ func (h *ScaleHandler) Delete(c *gin.Context) {
 func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	var req request.ReplaceFactorsRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -308,11 +308,11 @@ func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 
 	result, err := h.factorService.ReplaceFactors(c.Request.Context(), scaleCode, factorDTOs)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // ReplaceInterpretRules 批量设置解读规则
@@ -329,17 +329,17 @@ func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	var req request.ReplaceInterpretRulesRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -355,11 +355,11 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 
 	result, err := h.factorService.ReplaceInterpretRules(c.Request.Context(), scaleCode, dtos)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // ============= Query API (查询) =============
@@ -377,17 +377,17 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 func (h *ScaleHandler) GetByCode(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	result, err := h.queryService.GetByCode(c.Request.Context(), scaleCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // GetByQuestionnaireCode 根据问卷编码获取量表
@@ -403,17 +403,17 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 	questionnaireCode := c.Query("questionnaire_code")
 	if questionnaireCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.queryService.GetByQuestionnaireCode(c.Request.Context(), questionnaireCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // List 获取量表列表
@@ -430,13 +430,13 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 func (h *ScaleHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "页码无效"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "页码无效"))
 		return
 	}
 
 	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	if err != nil || pageSize <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "每页数量无效"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "每页数量无效"))
 		return
 	}
 
@@ -456,11 +456,11 @@ func (h *ScaleHandler) List(c *gin.Context) {
 
 	result, err := h.queryService.List(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleListResponse(result, page, pageSize))
+	h.Success(c, response.NewScaleListResponse(result, page, pageSize))
 }
 
 // GetPublishedByCode 获取已发布的量表
@@ -476,17 +476,17 @@ func (h *ScaleHandler) List(c *gin.Context) {
 func (h *ScaleHandler) GetPublishedByCode(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
 	result, err := h.queryService.GetPublishedByCode(c.Request.Context(), scaleCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleResponse(result))
+	h.Success(c, response.NewScaleResponse(result))
 }
 
 // ListPublished 获取已发布量表列表
@@ -503,13 +503,13 @@ func (h *ScaleHandler) GetPublishedByCode(c *gin.Context) {
 func (h *ScaleHandler) ListPublished(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "页码无效"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "页码无效"))
 		return
 	}
 
 	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	if err != nil || pageSize <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrInvalidArgument, "每页数量无效"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "每页数量无效"))
 		return
 	}
 
@@ -521,11 +521,11 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScaleListResponse(result, page, pageSize))
+	h.Success(c, response.NewScaleListResponse(result, page, pageSize))
 }
 
 // ============= Helper Functions =============

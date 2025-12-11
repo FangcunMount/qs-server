@@ -53,7 +53,7 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // Get 获取答卷详情
@@ -87,5 +87,5 @@ func (h *AnswerSheetHandler) Get(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }

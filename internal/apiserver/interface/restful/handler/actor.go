@@ -62,7 +62,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 			"testee_id", idStr,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -74,11 +74,11 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 			"testee_id", id,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, toTesteeResponse(result))
+	h.Success(c, toTesteeResponse(result))
 }
 
 // UpdateTestee 更新受试者
@@ -99,7 +99,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 			"testee_id", idStr,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 			"testee_id", id,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 				"testee_id", id,
 				"error", err.Error(),
 			)
-			h.ErrorResponse(c, err)
+			h.Error(c, err)
 			return
 		}
 	}
@@ -150,7 +150,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 				"field", "is_key_focus",
 				"error", err.Error(),
 			)
-			h.ErrorResponse(c, err)
+			h.Error(c, err)
 			return
 		}
 	}
@@ -164,7 +164,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 			"testee_id", id,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 			"resource", "testee",
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -220,11 +220,11 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 			"org_id", dto.OrgID,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, toTesteeListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
+	h.Success(c, toTesteeListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
 }
 
 // ========== Staff API ==========
@@ -245,7 +245,7 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 			"resource", "staff",
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -260,7 +260,7 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 			"user_id", dto.UserID,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -284,7 +284,7 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 			"staff_id", idStr,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -297,11 +297,11 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 			"staff_id", id,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, toStaffResponse(result))
+	h.Success(c, toStaffResponse(result))
 }
 
 // DeleteStaff 删除员工
@@ -321,7 +321,7 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 			"staff_id", idStr,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -333,7 +333,7 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 			"staff_id", id,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -358,7 +358,7 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 			"resource", "staff",
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -393,14 +393,14 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 			"org_id", listDTO.OrgID,
 			"error", err.Error(),
 		)
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
 	results = listResult.Items
 	total = listResult.TotalCount
 
-	h.SuccessResponse(c, toStaffListResponse(results, total, req.Page, req.PageSize))
+	h.Success(c, toStaffListResponse(results, total, req.Page, req.PageSize))
 }
 
 // ========== 映射辅助函数 ==========

@@ -60,11 +60,11 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.managementService.GetByID(ctx, id)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAssessmentResponse(result))
+	h.Success(c, response.NewAssessmentResponse(result))
 }
 
 // ListAssessments 查询测评列表
@@ -112,11 +112,11 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.managementService.List(ctx, dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAssessmentListResponse(result))
+	h.Success(c, response.NewAssessmentListResponse(result))
 }
 
 // GetStatistics 获取统计数据
@@ -159,11 +159,11 @@ func (h *EvaluationHandler) GetStatistics(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.managementService.GetStatistics(ctx, dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAssessmentStatisticsResponse(result))
+	h.Success(c, response.NewAssessmentStatisticsResponse(result))
 }
 
 // ============= Score 相关接口 =============
@@ -186,11 +186,11 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.scoreQueryService.GetByAssessmentID(ctx, id)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewScoreResponse(result))
+	h.Success(c, response.NewScoreResponse(result))
 }
 
 // GetFactorTrend 获取因子趋势
@@ -223,11 +223,11 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.scoreQueryService.GetFactorTrend(ctx, dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewFactorTrendResponse(result))
+	h.Success(c, response.NewFactorTrendResponse(result))
 }
 
 // GetHighRiskFactors 获取高风险因子
@@ -248,11 +248,11 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.scoreQueryService.GetHighRiskFactors(ctx, id)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewHighRiskFactorsResponse(result))
+	h.Success(c, response.NewHighRiskFactorsResponse(result))
 }
 
 // ============= Report 相关接口 =============
@@ -275,11 +275,11 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.reportQueryService.GetByAssessmentID(ctx, id)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewReportResponse(result))
+	h.Success(c, response.NewReportResponse(result))
 }
 
 // ListReports 查询报告列表
@@ -315,11 +315,11 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.reportQueryService.ListByTesteeID(ctx, dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewReportListResponse(result))
+	h.Success(c, response.NewReportListResponse(result))
 }
 
 // ============= Evaluation 相关接口（内部/管理员）=============
@@ -343,11 +343,11 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.evaluationService.EvaluateBatch(ctx, req.AssessmentIDs)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewBatchEvaluationResponse(result))
+	h.Success(c, response.NewBatchEvaluationResponse(result))
 }
 
 // RetryFailed 重试失败的测评
@@ -368,11 +368,11 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 	ctx := context.Background()
 	result, err := h.managementService.Retry(ctx, id)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAssessmentResponse(result))
+	h.Success(c, response.NewAssessmentResponse(result))
 }
 
 // ============= 辅助方法 =============

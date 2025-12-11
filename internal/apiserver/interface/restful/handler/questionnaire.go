@@ -49,11 +49,11 @@ func NewQuestionnaireHandler(
 func (h *QuestionnaireHandler) Create(c *gin.Context) {
 	var req request.CreateQuestionnaireRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -65,11 +65,11 @@ func (h *QuestionnaireHandler) Create(c *gin.Context) {
 
 	result, err := h.lifecycleService.Create(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // UpdateBasicInfo 更新问卷基本信息
@@ -86,17 +86,17 @@ func (h *QuestionnaireHandler) Create(c *gin.Context) {
 func (h *QuestionnaireHandler) UpdateBasicInfo(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	var req request.UpdateQuestionnaireBasicInfoRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -109,11 +109,11 @@ func (h *QuestionnaireHandler) UpdateBasicInfo(c *gin.Context) {
 
 	result, err := h.lifecycleService.UpdateBasicInfo(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // SaveDraft 保存草稿
@@ -129,17 +129,17 @@ func (h *QuestionnaireHandler) UpdateBasicInfo(c *gin.Context) {
 func (h *QuestionnaireHandler) SaveDraft(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.SaveDraft(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // Publish 发布问卷
@@ -155,17 +155,17 @@ func (h *QuestionnaireHandler) SaveDraft(c *gin.Context) {
 func (h *QuestionnaireHandler) Publish(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.Publish(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // Unpublish 下架问卷
@@ -181,17 +181,17 @@ func (h *QuestionnaireHandler) Publish(c *gin.Context) {
 func (h *QuestionnaireHandler) Unpublish(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.Unpublish(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // Archive 归档问卷
@@ -207,17 +207,17 @@ func (h *QuestionnaireHandler) Unpublish(c *gin.Context) {
 func (h *QuestionnaireHandler) Archive(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.lifecycleService.Archive(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // Delete 删除问卷
@@ -233,17 +233,17 @@ func (h *QuestionnaireHandler) Archive(c *gin.Context) {
 func (h *QuestionnaireHandler) Delete(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	err := h.lifecycleService.Delete(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, gin.H{"message": "删除成功"})
+	h.Success(c, gin.H{"message": "删除成功"})
 }
 
 // ============= Content API (内容编辑) =============
@@ -262,13 +262,13 @@ func (h *QuestionnaireHandler) Delete(c *gin.Context) {
 func (h *QuestionnaireHandler) AddQuestion(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	var req request.AddQuestionRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -294,11 +294,11 @@ func (h *QuestionnaireHandler) AddQuestion(c *gin.Context) {
 
 	result, err := h.contentService.AddQuestion(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // UpdateQuestion 更新问题
@@ -317,13 +317,13 @@ func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 	qCode := c.Param("code")
 	questionCode := c.Param("questionCode")
 	if qCode == "" || questionCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码和问题编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码和问题编码不能为空"))
 		return
 	}
 
 	var req request.UpdateQuestionRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -349,11 +349,11 @@ func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 
 	result, err := h.contentService.UpdateQuestion(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // RemoveQuestion 删除问题
@@ -371,17 +371,17 @@ func (h *QuestionnaireHandler) RemoveQuestion(c *gin.Context) {
 	qCode := c.Param("code")
 	questionCode := c.Param("questionCode")
 	if qCode == "" || questionCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码和问题编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码和问题编码不能为空"))
 		return
 	}
 
 	result, err := h.contentService.RemoveQuestion(c.Request.Context(), qCode, questionCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // ReorderQuestions 重排问题顺序
@@ -398,23 +398,23 @@ func (h *QuestionnaireHandler) RemoveQuestion(c *gin.Context) {
 func (h *QuestionnaireHandler) ReorderQuestions(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	var req request.ReorderQuestionsRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
 	result, err := h.contentService.ReorderQuestions(c.Request.Context(), qCode, req.QuestionCodes)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // BatchUpdateQuestions 批量更新问题
@@ -431,13 +431,13 @@ func (h *QuestionnaireHandler) ReorderQuestions(c *gin.Context) {
 func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	var req request.BatchUpdateQuestionsRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
@@ -465,11 +465,11 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 
 	result, err := h.contentService.BatchUpdateQuestions(c.Request.Context(), qCode, questions)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // ============= Query API (查询) =============
@@ -487,17 +487,17 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 func (h *QuestionnaireHandler) GetByCode(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.queryService.GetByCode(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // List 查询问卷列表
@@ -516,13 +516,13 @@ func (h *QuestionnaireHandler) GetByCode(c *gin.Context) {
 func (h *QuestionnaireHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "页码必须为正整数"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "页码必须为正整数"))
 		return
 	}
 
 	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	if err != nil || pageSize <= 0 || pageSize > 100 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "每页数量必须为1-100的整数"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "每页数量必须为1-100的整数"))
 		return
 	}
 
@@ -542,11 +542,11 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 
 	result, err := h.queryService.List(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireListResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireListResponseFromResult(result))
 }
 
 // GetPublishedByCode 获取已发布问卷
@@ -561,17 +561,17 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.queryService.GetPublishedByCode(c.Request.Context(), qCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireResponseFromResult(result))
 }
 
 // ListPublished 查询已发布问卷列表
@@ -587,13 +587,13 @@ func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "页码必须为正整数"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "页码必须为正整数"))
 		return
 	}
 
 	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	if err != nil || pageSize <= 0 || pageSize > 100 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "每页数量必须为1-100的整数"))
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "每页数量必须为1-100的整数"))
 		return
 	}
 
@@ -605,9 +605,9 @@ func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewQuestionnaireListResponseFromResult(result))
+	h.Success(c, response.NewQuestionnaireListResponseFromResult(result))
 }

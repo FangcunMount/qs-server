@@ -46,17 +46,17 @@ func NewAnswerSheetHandler(
 func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 	answerSheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		h.ErrorResponse(c, errors.WithCode(code.ErrAnswerSheetInvalid, "无效的答卷ID"))
+		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "无效的答卷ID"))
 		return
 	}
 
 	result, err := h.managementService.GetByID(c.Request.Context(), answerSheetID)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAnswerSheetResponse(result))
+	h.Success(c, response.NewAnswerSheetResponse(result))
 }
 
 // List 查询答卷列表
@@ -77,13 +77,13 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 func (h *AnswerSheetHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrAnswerSheetInvalid, "页码必须为正整数"))
+		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "页码必须为正整数"))
 		return
 	}
 
 	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	if err != nil || pageSize <= 0 || pageSize > 100 {
-		h.ErrorResponse(c, errors.WithCode(code.ErrAnswerSheetInvalid, "每页数量必须为1-100的整数"))
+		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "每页数量必须为1-100的整数"))
 		return
 	}
 
@@ -120,11 +120,11 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 
 	result, err := h.managementService.List(c.Request.Context(), dto)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAnswerSheetListResponse(result))
+	h.Success(c, response.NewAnswerSheetListResponse(result))
 }
 
 // GetStatistics 获取答卷统计
@@ -140,15 +140,15 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 func (h *AnswerSheetHandler) GetStatistics(c *gin.Context) {
 	questionnaireCode := c.Query("code")
 	if questionnaireCode == "" {
-		h.ErrorResponse(c, errors.WithCode(code.ErrAnswerSheetInvalid, "问卷编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "问卷编码不能为空"))
 		return
 	}
 
 	result, err := h.managementService.GetStatistics(c.Request.Context(), questionnaireCode)
 	if err != nil {
-		h.ErrorResponse(c, err)
+		h.Error(c, err)
 		return
 	}
 
-	h.SuccessResponse(c, response.NewAnswerSheetStatisticsResponse(result))
+	h.Success(c, response.NewAnswerSheetStatisticsResponse(result))
 }

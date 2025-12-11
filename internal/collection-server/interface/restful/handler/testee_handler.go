@@ -57,7 +57,7 @@ func (h *TesteeHandler) Create(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // Get 获取受试者详情
@@ -86,7 +86,7 @@ func (h *TesteeHandler) Get(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // Update 更新受试者信息
@@ -129,7 +129,7 @@ func (h *TesteeHandler) Update(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // List 查询当前用户的受试者列表
@@ -183,7 +183,7 @@ func (h *TesteeHandler) List(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // Exists 检查受试者是否存在
@@ -220,5 +220,5 @@ func (h *TesteeHandler) Exists(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }

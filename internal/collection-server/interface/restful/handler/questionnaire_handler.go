@@ -48,7 +48,7 @@ func (h *QuestionnaireHandler) Get(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }
 
 // List 获取问卷列表
@@ -76,5 +76,5 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 		return
 	}
 
-	h.SuccessResponse(c, result)
+	h.Success(c, result)
 }

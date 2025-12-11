@@ -39,7 +39,7 @@ func (h *BaseHandler) SuccessResponseWithMessage(c *gin.Context, message string,
 // ErrorResponse 智能错误响应 - 根据错误类型自动选择合适的HTTP状态码和错误码
 func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 	if err == nil {
-		h.SuccessResponse(c, nil)
+		h.Success(c, nil)
 		return
 	}
 
@@ -78,13 +78,13 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 // ErrorResponseWithCode 直接使用错误码的错误响应
 func (h *BaseHandler) ErrorResponseWithCode(c *gin.Context, code int, format string, args ...interface{}) {
 	err := errors.WithCode(code, format, args...)
-	h.ErrorResponse(c, err)
+	h.Error(c, err)
 }
 
 // BadRequestResponse 400错误响应
 func (h *BaseHandler) BadRequestResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, errors.Wrap(err, message))
+		h.Error(c, errors.Wrap(err, message))
 	} else {
 		h.ErrorResponseWithCode(c, 100001, "%s", message) // ErrBind
 	}
@@ -93,7 +93,7 @@ func (h *BaseHandler) BadRequestResponse(c *gin.Context, message string, err err
 // NotFoundResponse 404错误响应
 func (h *BaseHandler) NotFoundResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, errors.Wrap(err, message))
+		h.Error(c, errors.Wrap(err, message))
 	} else {
 		h.ErrorResponseWithCode(c, 100102, "%s", message) // ErrPageNotFound
 	}
@@ -102,7 +102,7 @@ func (h *BaseHandler) NotFoundResponse(c *gin.Context, message string, err error
 // InternalErrorResponse 500错误响应
 func (h *BaseHandler) InternalErrorResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, errors.Wrap(err, message))
+		h.Error(c, errors.Wrap(err, message))
 	} else {
 		h.ErrorResponseWithCode(c, 100101, "%s", message) // ErrDatabase
 	}
@@ -126,7 +126,7 @@ func (h *BaseHandler) ForbiddenResponse(c *gin.Context, message string) {
 // ConflictResponse 409错误响应
 func (h *BaseHandler) ConflictResponse(c *gin.Context, message string, err error) {
 	if err != nil {
-		h.ErrorResponse(c, errors.Wrap(err, message))
+		h.Error(c, errors.Wrap(err, message))
 	} else {
 		h.ErrorResponseWithCode(c, 100201, "%s", message) // ErrUserAlreadyExists
 	}
@@ -181,4 +181,26 @@ func (h *BaseHandler) GetQueryParamInt(c *gin.Context, key string, defaultValue 
 	}
 
 	return defaultValue
+}
+
+// ====================== 简化方法名别名 ======================
+
+// Success 成功响应的简化别名
+func (h *BaseHandler) Success(c *gin.Context, data interface{}) {
+	h.Success(c, data)
+}
+
+// Error 错误响应的简化别名
+func (h *BaseHandler) Error(c *gin.Context, err error) {
+	h.Error(c, err)
+}
+
+// ErrorWithCode 错误码响应的简化别名
+func (h *BaseHandler) ErrorWithCode(c *gin.Context, code int, format string, args ...interface{}) {
+	h.ErrorResponseWithCode(c, code, format, args...)
+}
+
+// BindURI URI参数绑定的别名（统一命名风格）
+func (h *BaseHandler) BindURI(c *gin.Context, obj interface{}) error {
+	return h.BindUri(c, obj)
 }
