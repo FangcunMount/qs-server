@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
 
 // ManagerConfig gRPC 客户端管理器配置
@@ -74,6 +75,13 @@ func (m *Manager) connect() error {
 			grpc.MaxCallRecvMsgSize(10*1024*1024), // 10MB
 			grpc.MaxCallSendMsgSize(10*1024*1024), // 10MB
 		),
+		// Keepalive 参数配置，避免 "too_many_pings" 错误
+		// 服务端通常要求客户端 ping 间隔 >= 服务端 MinTime（默认 5 分钟）
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                5 * time.Minute,  // 每 5 分钟发送一次 ping（匹配服务端默认 MinTime）
+			Timeout:             20 * time.Second, // ping 响应超时时间
+			PermitWithoutStream: false,            // 无活跃流时不发送 ping
+		}),
 	}
 
 	if m.config.Insecure {

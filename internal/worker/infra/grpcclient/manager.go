@@ -46,7 +46,7 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 		cfg.DialTimeout = 5 * time.Second
 	}
 	if cfg.KeepaliveTime <= 0 {
-		cfg.KeepaliveTime = 10 * time.Second
+		cfg.KeepaliveTime = 5 * time.Minute // 匹配服务端默认 MinTime，避免 "too_many_pings"
 	}
 
 	m := &Manager{
@@ -66,10 +66,11 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 func (m *Manager) connect() error {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		// Keepalive 参数配置，避免 "too_many_pings" 错误
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                m.config.KeepaliveTime,
-			Timeout:             3 * time.Second,
-			PermitWithoutStream: true,
+			Timeout:             20 * time.Second, // ping 响应超时时间
+			PermitWithoutStream: false,            // 无活跃流时不发送 ping
 		}),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(10*1024*1024), // 10MB
