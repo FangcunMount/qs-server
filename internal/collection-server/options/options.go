@@ -21,6 +21,7 @@ type Options struct {
 	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
 	JWT                     *JWTOptions                            `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam" mapstructure:"iam"`
+	Runtime                 *RuntimeOptions                        `json:"runtime" mapstructure:"runtime"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -39,6 +40,12 @@ type GRPCClientOptions struct {
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
 	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
+}
+
+// RuntimeOptions 运行时调优（GC/内存）
+type RuntimeOptions struct {
+	GoMemLimit string `json:"go-mem-limit" mapstructure:"go-mem-limit"` // GOMEMLIMIT，例如 "700MiB"
+	GoGC       int    `json:"gogc" mapstructure:"gogc"`                 // GOGC 百分比
 }
 
 // JWTOptions JWT 配置
@@ -97,6 +104,15 @@ func NewOptions() *Options {
 			TokenDuration: 24 * 7, // 7 天
 		},
 		IAMOptions: genericoptions.NewIAMOptions(),
+		Runtime:    NewRuntimeOptions(),
+	}
+}
+
+// NewRuntimeOptions 创建默认运行时调优选项
+func NewRuntimeOptions() *RuntimeOptions {
+	return &RuntimeOptions{
+		GoMemLimit: "",
+		GoGC:       100,
 	}
 }
 
@@ -110,6 +126,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc_client"))
 	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
+	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
 	return fss
@@ -129,6 +146,14 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
 		"The maximum number of concurrent goroutines for validation.")
+}
+
+// AddFlags 添加运行时相关参数
+func (r *RuntimeOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&r.GoMemLimit, "runtime.go-mem-limit", r.GoMemLimit,
+		"GOMEMLIMIT setting, e.g., 700MiB")
+	fs.IntVar(&r.GoGC, "runtime.gogc", r.GoGC,
+		"GOGC percentage, e.g., 50")
 }
 
 // AddFlags 添加 JWT 相关的命令行参数

@@ -38,6 +38,7 @@ services:
     ports:
       - "8082:8080"
       - "9446:8443"
+      - "6060:6060" # pprof（仅内网调试，生产注意访问控制）
     env_file:
       - /opt/qs-server/qs-collection-server/configs/env/config.prod.env
     volumes:
