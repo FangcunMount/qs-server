@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,8 +10,13 @@ import (
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 )
+
+// ErrServiceTokenNotSupported 表示 IAM 服务未实现 IssueServiceToken
+var ErrServiceTokenNotSupported = errors.New("iam: service token issuing not supported")
 
 // ServiceAuthHelper 服务间认证助手封装
 // 用于简化 Collection 服务以服务身份调用 IAM（而非用户身份）
@@ -55,6 +61,9 @@ func NewServiceAuthHelper(ctx context.Context, client *Client, config *ServiceAu
 	// 使用 SDK 创建 ServiceAuthHelper
 	helper, err := sdk.NewServiceAuthHelper(sdkConfig, client.sdk)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.Unimplemented {
+			return nil, ErrServiceTokenNotSupported
+		}
 		return nil, fmt.Errorf("failed to create service auth helper: %w", err)
 	}
 

@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -62,11 +63,19 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 		serviceAuthHelper, err = iam.NewServiceAuthHelper(ctx, client, serviceAuthConfig)
 		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create service auth helper, service-to-service auth will not be available",
-				"component", "iam_module",
-				"error", err.Error(),
-			)
-			// 不返回错误，允许继续运行
+			if errors.Is(err, iam.ErrServiceTokenNotSupported) {
+				logger.L(context.Background()).Infow("IAM server does not support IssueServiceToken, service-to-service auth disabled",
+					"component", "iam_module",
+					"service_id", serviceAuthConfig.ServiceID,
+					"target_audience", serviceAuthConfig.TargetAudience,
+				)
+			} else {
+				logger.L(context.Background()).Warnw("Failed to create service auth helper, service-to-service auth will not be available",
+					"component", "iam_module",
+					"error", err.Error(),
+				)
+				// 不返回错误，允许继续运行
+			}
 		}
 	}
 

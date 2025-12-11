@@ -236,14 +236,7 @@ iam:
     refresh-interval: 5m                               # 定时刷新间隔
     cache-ttl: 30m                                     # 缓存有效期
     fetch-strategies: ["http", "grpc", "cache"]        # 降级策略：HTTP → gRPC → 缓存
-  
-  # 服务间认证配置（可选，用于 QS 调用其他服务）
-  service-auth:
-    service-id: "qs-service"                           # QS 服务 ID
-    target-audience: ["iam-service"]                   # 目标服务列表
-    token-ttl: 1h                                      # 服务 Token 有效期
-    refresh-before: 5m                                 # 提前刷新时间
-  
+
   # 用户信息缓存配置
     ttl: 10m                                           # 缓存时长（监护关系变化较少）
     max-size: 50000                                    # 最大缓存条目数
