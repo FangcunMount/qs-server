@@ -187,12 +187,12 @@ func (h *BaseHandler) GetQueryParamInt(c *gin.Context, key string, defaultValue 
 
 // Success 成功响应的简化别名
 func (h *BaseHandler) Success(c *gin.Context, data interface{}) {
-	h.Success(c, data)
+	h.SuccessResponse(c, data)
 }
 
 // Error 错误响应的简化别名
 func (h *BaseHandler) Error(c *gin.Context, err error) {
-	h.Error(c, err)
+	h.ErrorResponse(c, err)
 }
 
 // ErrorWithCode 错误码响应的简化别名
