@@ -40,8 +40,7 @@ service EvaluationService {
 // 测评摘要信息
 message AssessmentSummary {
   uint64 id = 1;                      // 测评ID
-  uint64 questionnaire_id = 2;        // 问卷ID
-  string questionnaire_code = 3;      // 问卷编码
+  string questionnaire_code = 3;      // 问卷编码（唯一标识）
   string questionnaire_version = 4;   // 问卷版本
   string scale_code = 5;              // 量表编码（可选）
   string scale_name = 6;              // 量表名称（可选）
@@ -59,8 +58,7 @@ message AssessmentDetail {
   uint64 id = 1;
   uint64 org_id = 2;
   uint64 testee_id = 3;
-  uint64 questionnaire_id = 4;
-  string questionnaire_code = 5;
+  string questionnaire_code = 5;      // 问卷编码（唯一标识）
   string questionnaire_version = 6;
   uint64 answer_sheet_id = 7;
   string scale_code = 8;

@@ -119,7 +119,7 @@ func seedQuestionnaires(ctx context.Context, deps *dependencies, state *seedCont
 			}
 		}
 
-		state.QuestionnaireIDsByCode[code] = publishedVersion
+		state.QuestionnaireVersionsByCode[code] = publishedVersion
 		logger.Infow("Questionnaire upserted", "code", code, "index", i+1)
 	}
 

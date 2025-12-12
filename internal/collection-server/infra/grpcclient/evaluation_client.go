@@ -11,7 +11,6 @@ import (
 // AssessmentSummaryOutput 测评摘要输出
 type AssessmentSummaryOutput struct {
 	ID                   uint64
-	QuestionnaireID      uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	ScaleCode            string
@@ -30,7 +29,6 @@ type AssessmentDetailOutput struct {
 	ID                   uint64
 	OrgID                uint64
 	TesteeID             uint64
-	QuestionnaireID      uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	AnswerSheetID        uint64
@@ -310,7 +308,6 @@ func (c *EvaluationClient) convertAssessmentDetail(a *pb.AssessmentDetail) *Asse
 		ID:                   a.GetId(),
 		OrgID:                a.GetOrgId(),
 		TesteeID:             a.GetTesteeId(),
-		QuestionnaireID:      a.GetQuestionnaireId(),
 		QuestionnaireCode:    a.GetQuestionnaireCode(),
 		QuestionnaireVersion: a.GetQuestionnaireVersion(),
 		AnswerSheetID:        a.GetAnswerSheetId(),
@@ -332,7 +329,6 @@ func (c *EvaluationClient) convertAssessmentDetail(a *pb.AssessmentDetail) *Asse
 func (c *EvaluationClient) convertAssessmentSummary(a *pb.AssessmentSummary) AssessmentSummaryOutput {
 	return AssessmentSummaryOutput{
 		ID:                   a.GetId(),
-		QuestionnaireID:      a.GetQuestionnaireId(),
 		QuestionnaireCode:    a.GetQuestionnaireCode(),
 		QuestionnaireVersion: a.GetQuestionnaireVersion(),
 		ScaleCode:            a.GetScaleCode(),

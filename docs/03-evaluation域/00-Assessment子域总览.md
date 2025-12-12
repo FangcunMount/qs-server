@@ -44,7 +44,7 @@ assessment 子域包含三个核心聚合：
 
 ### 1.3 与其他子域的关系
 
-* **依赖** survey 子域：引用 QuestionnaireID 和 AnswerSheetID
+* **依赖** survey 子域：引用 QuestionnaireCode 和 AnswerSheetID
 * **依赖** scale 子域：引用 MedicalScaleID，调用 Evaluator 执行评估
 * **依赖** user 子域：引用 TesteeID
 * **依赖** plan/screening 子域：引用 PlanID/ScreeningProjectID（可选）
@@ -84,10 +84,10 @@ type Assessment struct {
     orgID  string
     
     // 关联实体（通过 ID 引用，不直接持有对象）
-    testeeID        TesteeID
-    questionnaireID QuestionnaireID
-    answerSheetID   AnswerSheetID
-    medicalScaleID  *MedicalScaleID // 可选：纯问卷模式为 nil
+    testeeID          TesteeID
+    questionnaireCode Code
+    answerSheetID     AnswerSheetID
+    medicalScaleID    *MedicalScaleID // 可选：纯问卷模式为 nil
     
     // 业务来源
     originType AssessmentOriginType // adhoc / plan / screening
@@ -160,7 +160,7 @@ const (
 func NewAssessment(
     orgID string,
     testeeID TesteeID,
-    questionnaireID QuestionnaireID,
+    questionnaireCode Code,
     answerSheetID AnswerSheetID,
     medicalScaleID *MedicalScaleID,
     originType AssessmentOriginType,
@@ -169,15 +169,15 @@ func NewAssessment(
     now := time.Now()
     
     return &Assessment{
-        id:              NewAssessmentID(),
-        orgID:           orgID,
-        testeeID:        testeeID,
-        questionnaireID: questionnaireID,
-        answerSheetID:   answerSheetID,
-        medicalScaleID:  medicalScaleID,
-        originType:      originType,
-        originID:        originID,
-        status:          AssessmentStatusPending,
+        id:                NewAssessmentID(),
+        orgID:             orgID,
+        testeeID:          testeeID,
+        questionnaireCode: questionnaireCode,
+        answerSheetID:     answerSheetID,
+        medicalScaleID:    medicalScaleID,
+        originType:        originType,
+        originID:          originID,
+        status:            AssessmentStatusPending,
         createdAt:       now,
         events:          []DomainEvent{},
     }
@@ -187,14 +187,14 @@ func NewAssessment(
 func NewAdhocAssessment(
     orgID string,
     testeeID TesteeID,
-    questionnaireID QuestionnaireID,
+    questionnaireCode Code,
     answerSheetID AnswerSheetID,
     medicalScaleID *MedicalScaleID,
 ) *Assessment {
     return NewAssessment(
         orgID,
         testeeID,
-        questionnaireID,
+        questionnaireCode,
         answerSheetID,
         medicalScaleID,
         AssessmentOriginAdhoc,
@@ -206,7 +206,7 @@ func NewAdhocAssessment(
 func NewPlanAssessment(
     orgID string,
     testeeID TesteeID,
-    questionnaireID QuestionnaireID,
+    questionnaireCode Code,
     answerSheetID AnswerSheetID,
     medicalScaleID *MedicalScaleID,
     planID string,
@@ -214,7 +214,7 @@ func NewPlanAssessment(
     return NewAssessment(
         orgID,
         testeeID,
-        questionnaireID,
+        questionnaireCode,
         answerSheetID,
         medicalScaleID,
         AssessmentOriginPlan,
@@ -226,7 +226,7 @@ func NewPlanAssessment(
 func NewScreeningAssessment(
     orgID string,
     testeeID TesteeID,
-    questionnaireID QuestionnaireID,
+    questionnaireCode Code,
     answerSheetID AnswerSheetID,
     medicalScaleID *MedicalScaleID,
     screeningProjectID string,
@@ -234,7 +234,7 @@ func NewScreeningAssessment(
     return NewAssessment(
         orgID,
         testeeID,
-        questionnaireID,
+        questionnaireCode,
         answerSheetID,
         medicalScaleID,
         AssessmentOriginScreening,
@@ -267,7 +267,7 @@ func (a *Assessment) Submit() error {
     a.addEvent(NewAssessmentSubmittedEvent(
         a.id,
         a.testeeID,
-        a.questionnaireID,
+        a.questionnaireCode,
         a.answerSheetID,
         a.medicalScaleID,
         now,
@@ -359,7 +359,7 @@ func (a *Assessment) OrgID() string { return a.orgID }
 
 // 关联实体
 func (a *Assessment) TesteeID() TesteeID { return a.testeeID }
-func (a *Assessment) QuestionnaireID() QuestionnaireID { return a.questionnaireID }
+func (a *Assessment) QuestionnaireCode() Code { return a.questionnaireCode }
 func (a *Assessment) AnswerSheetID() AnswerSheetID { return a.answerSheetID }
 func (a *Assessment) MedicalScaleID() *MedicalScaleID { return a.medicalScaleID }
 
@@ -723,36 +723,36 @@ func (r *InterpretReport) CreatedAt() time.Time { return r.createdAt }
 type AssessmentSubmittedEvent struct {
     baseEvent
     
-    assessmentID    AssessmentID
-    testeeID        TesteeID
-    questionnaireID QuestionnaireID
-    answerSheetID   AnswerSheetID
-    medicalScaleID  *MedicalScaleID
-    submittedAt     time.Time
+    assessmentID      AssessmentID
+    testeeID          TesteeID
+    questionnaireCode Code
+    answerSheetID     AnswerSheetID
+    medicalScaleID    *MedicalScaleID
+    submittedAt       time.Time
 }
 
 func NewAssessmentSubmittedEvent(
     assessmentID AssessmentID,
     testeeID TesteeID,
-    questionnaireID QuestionnaireID,
+    questionnaireCode Code,
     answerSheetID AnswerSheetID,
     medicalScaleID *MedicalScaleID,
     submittedAt time.Time,
 ) *AssessmentSubmittedEvent {
     return &AssessmentSubmittedEvent{
-        baseEvent:       newBaseEvent("assessment.submitted"),
-        assessmentID:    assessmentID,
-        testeeID:        testeeID,
-        questionnaireID: questionnaireID,
-        answerSheetID:   answerSheetID,
-        medicalScaleID:  medicalScaleID,
-        submittedAt:     submittedAt,
+        baseEvent:         newBaseEvent("assessment.submitted"),
+        assessmentID:      assessmentID,
+        testeeID:          testeeID,
+        questionnaireCode: questionnaireCode,
+        answerSheetID:     answerSheetID,
+        medicalScaleID:    medicalScaleID,
+        submittedAt:       submittedAt,
     }
 }
 
 func (e *AssessmentSubmittedEvent) AssessmentID() AssessmentID { return e.assessmentID }
 func (e *AssessmentSubmittedEvent) TesteeID() TesteeID { return e.testeeID }
-func (e *AssessmentSubmittedEvent) QuestionnaireID() QuestionnaireID { return e.questionnaireID }
+func (e *AssessmentSubmittedEvent) QuestionnaireCode() Code { return e.questionnaireCode }
 func (e *AssessmentSubmittedEvent) AnswerSheetID() AnswerSheetID { return e.answerSheetID }
 func (e *AssessmentSubmittedEvent) MedicalScaleID() *MedicalScaleID { return e.medicalScaleID }
 func (e *AssessmentSubmittedEvent) SubmittedAt() time.Time { return e.submittedAt }
@@ -967,13 +967,13 @@ type InterpretReportRepository interface {
 
 ### 8.1 与 survey 子域的协作
 
-assessment 引用 survey 的聚合 ID：
+assessment 引用 survey 的聚合 Code：
 
 ```go
 // 引用关系
 type Assessment struct {
-    questionnaireID QuestionnaireID // 引用 survey.Questionnaire
-    answerSheetID   AnswerSheetID   // 引用 survey.AnswerSheet
+    questionnaireCode Code          // 引用 survey.Questionnaire（使用 Code 作为唯一标识）
+    answerSheetID     AnswerSheetID // 引用 survey.AnswerSheet
 }
 ```
 
@@ -1010,7 +1010,7 @@ func (s *AssessmentService) EvaluateAssessment(
     medicalScale, _ := s.scaleRepo.FindByID(ctx, *assessment.MedicalScaleID())
     
     // 3. 加载 Questionnaire 和 AnswerSheet（来自 survey 子域）
-    questionnaire, _ := s.questionnaireRepo.FindByID(ctx, assessment.QuestionnaireID())
+    questionnaire, _ := s.questionnaireRepo.FindByCode(ctx, assessment.QuestionnaireCode())
     answerSheet, _ := s.answerSheetRepo.FindByID(ctx, assessment.AnswerSheetID())
     
     // 4. 调用 Evaluator（来自 scale 子域）
@@ -1268,7 +1268,7 @@ func (s *AssessmentService) RetryAssessment(
     newAssessment := NewAssessment(
         oldAssessment.OrgID(),
         oldAssessment.TesteeID(),
-        oldAssessment.QuestionnaireID(),
+        oldAssessment.QuestionnaireCode(),
         oldAssessment.AnswerSheetID(),
         oldAssessment.MedicalScaleID(),
         oldAssessment.OriginType(),
@@ -1333,7 +1333,7 @@ internal/domain/assessment/
 
 ### 13.3 与其他子域的协作
 
-* **survey**：引用 QuestionnaireID 和 AnswerSheetID
+* **survey**：引用 QuestionnaireCode 和 AnswerSheetID
 * **scale**：引用 MedicalScaleID，调用 Evaluator
 * **user**：引用 TesteeID
 * **plan/screening**：通过 originType 和 originID 关联

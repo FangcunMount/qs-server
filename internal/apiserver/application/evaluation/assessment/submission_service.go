@@ -43,7 +43,7 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 		"action", "create_assessment",
 		"resource", "assessment",
 		"testee_id", dto.TesteeID,
-		"questionnaire_id", dto.QuestionnaireID,
+		"questionnaire_code", dto.QuestionnaireCode,
 		"answersheet_id", dto.AnswerSheetID,
 	)
 
@@ -55,12 +55,13 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 		)
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
 	}
-	if dto.QuestionnaireID == 0 {
-		l.Warnw("问卷ID为空",
+	// 问卷编码验证
+	if dto.QuestionnaireCode == "" {
+		l.Warnw("问卷编码为空",
 			"action", "create_assessment",
 			"result", "invalid_params",
 		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷ID不能为空")
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷编码不能为空")
 	}
 	if dto.AnswerSheetID == 0 {
 		l.Warnw("答卷ID为空",
@@ -324,8 +325,7 @@ func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) assessme
 	req := assessment.CreateAssessmentRequest{
 		OrgID:    int64(dto.OrgID),
 		TesteeID: meta.FromUint64(dto.TesteeID),
-		QuestionnaireRef: assessment.NewQuestionnaireRef(
-			meta.FromUint64(dto.QuestionnaireID),
+		QuestionnaireRef: assessment.NewQuestionnaireRefByCode(
 			meta.NewCode(dto.QuestionnaireCode),
 			dto.QuestionnaireVersion,
 		),

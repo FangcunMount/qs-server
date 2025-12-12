@@ -21,8 +21,7 @@ type AssessmentPO struct {
 	TesteeID uint64 `gorm:"column:testee_id;not null;index:idx_testee_id"`
 
 	// 问卷引用
-	QuestionnaireID      uint64 `gorm:"column:questionnaire_id;not null;index:idx_questionnaire_id"`
-	QuestionnaireCode    string `gorm:"column:questionnaire_code;size:100;not null"`
+	QuestionnaireCode    string `gorm:"column:questionnaire_code;size:100;not null;index:idx_questionnaire_code"`
 	QuestionnaireVersion string `gorm:"column:questionnaire_version;size:50;not null"`
 
 	// 量表引用（可选）

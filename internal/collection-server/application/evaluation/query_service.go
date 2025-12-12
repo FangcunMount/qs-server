@@ -70,7 +70,6 @@ func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessment
 		ID:                   result.ID,
 		OrgID:                result.OrgID,
 		TesteeID:             result.TesteeID,
-		QuestionnaireID:      result.QuestionnaireID,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		AnswerSheetID:        result.AnswerSheetID,
@@ -138,7 +137,6 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 	for i, item := range result.Items {
 		items[i] = AssessmentSummaryResponse{
 			ID:                   item.ID,
-			QuestionnaireID:      item.QuestionnaireID,
 			QuestionnaireCode:    item.QuestionnaireCode,
 			QuestionnaireVersion: item.QuestionnaireVersion,
 			ScaleCode:            item.ScaleCode,

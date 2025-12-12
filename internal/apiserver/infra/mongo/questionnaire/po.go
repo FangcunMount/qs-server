@@ -13,8 +13,7 @@ import (
 // 对应MongoDB集合结构
 type QuestionnairePO struct {
 	base.BaseDocument `bson:",inline"`
-	Code              string       `bson:"code" json:"code"`
-	DomainID          uint64       `bson:"domain_id,omitempty" json:"domain_id,omitempty"`
+	Code              string       `bson:"code" json:"code"` // 问卷唯一标识
 	Title             string       `bson:"title" json:"title"`
 	Description       string       `bson:"description,omitempty" json:"description,omitempty"`
 	ImgUrl            string       `bson:"img_url,omitempty" json:"img_url,omitempty"`

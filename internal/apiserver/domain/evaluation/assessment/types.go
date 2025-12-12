@@ -143,10 +143,18 @@ type QuestionnaireRef struct {
 	version string
 }
 
-// NewQuestionnaireRef 创建问卷引用
+// NewQuestionnaireRef 创建问卷引用（完整版，包含 ID）
 func NewQuestionnaireRef(id meta.ID, code meta.Code, version string) QuestionnaireRef {
 	return QuestionnaireRef{
 		id:      id,
+		code:    code,
+		version: version,
+	}
+}
+
+// NewQuestionnaireRefByCode 通过编码创建问卷引用（推荐，code 是唯一标识）
+func NewQuestionnaireRefByCode(code meta.Code, version string) QuestionnaireRef {
+	return QuestionnaireRef{
 		code:    code,
 		version: version,
 	}
@@ -167,9 +175,9 @@ func (r QuestionnaireRef) Version() string {
 	return r.version
 }
 
-// IsEmpty 是否为空引用
+// IsEmpty 是否为空引用（code 为空即视为空引用）
 func (r QuestionnaireRef) IsEmpty() bool {
-	return r.id.IsZero() && r.code.IsEmpty()
+	return r.code.IsEmpty()
 }
 
 // AnswerSheetRef 答卷引用值对象

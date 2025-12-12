@@ -9,8 +9,7 @@ import "time"
 type CreateAssessmentDTO struct {
 	OrgID                uint64  // 组织ID
 	TesteeID             uint64  // 受试者ID
-	QuestionnaireID      uint64  // 问卷ID
-	QuestionnaireCode    string  // 问卷编码
+	QuestionnaireCode    string  // 问卷编码（唯一标识）
 	QuestionnaireVersion string  // 问卷版本
 	AnswerSheetID        uint64  // 答卷ID
 	MedicalScaleID       *uint64 // 量表ID（可选，纯问卷模式为空）
@@ -66,8 +65,7 @@ type AssessmentResult struct {
 	ID                   uint64     // 测评ID
 	OrgID                uint64     // 组织ID
 	TesteeID             uint64     // 受试者ID
-	QuestionnaireID      uint64     // 问卷ID
-	QuestionnaireCode    string     // 问卷编码
+	QuestionnaireCode    string     // 问卷编码（唯一标识）
 	QuestionnaireVersion string     // 问卷版本
 	AnswerSheetID        uint64     // 答卷ID
 	MedicalScaleID       *uint64    // 量表ID

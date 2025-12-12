@@ -1,7 +1,6 @@
 package questionnaire
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -218,7 +217,6 @@ func (q *Questionnaire) publish() error {
 
 	// 触发领域事件
 	q.addEvent(NewQuestionnairePublishedEvent(
-		uint64(q.id),
 		string(q.code),
 		q.version.String(),
 		q.title,
@@ -237,7 +235,6 @@ func (q *Questionnaire) unpublish() error {
 
 	// 触发领域事件
 	q.addEvent(NewQuestionnaireUnpublishedEvent(
-		uint64(q.id),
 		string(q.code),
 		q.version.String(),
 		time.Now(),
@@ -255,7 +252,6 @@ func (q *Questionnaire) archive() error {
 
 	// 触发领域事件
 	q.addEvent(NewQuestionnaireArchivedEvent(
-		uint64(q.id),
 		string(q.code),
 		q.version.String(),
 		time.Now(),
@@ -282,9 +278,4 @@ func (q *Questionnaire) addEvent(evt event.DomainEvent) {
 		q.events = make([]event.DomainEvent, 0)
 	}
 	q.events = append(q.events, evt)
-}
-
-// idString 获取 ID 字符串（用于事件）
-func (q *Questionnaire) idString() string {
-	return strconv.FormatUint(uint64(q.id), 10)
 }

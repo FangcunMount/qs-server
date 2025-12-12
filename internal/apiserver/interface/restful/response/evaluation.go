@@ -15,8 +15,7 @@ type AssessmentResponse struct {
 	ID                   uint64  `json:"id"`                     // 测评ID
 	OrgID                uint64  `json:"org_id"`                 // 组织ID
 	TesteeID             uint64  `json:"testee_id"`              // 受试者ID
-	QuestionnaireID      uint64  `json:"questionnaire_id"`       // 问卷ID
-	QuestionnaireCode    string  `json:"questionnaire_code"`     // 问卷编码
+	QuestionnaireCode    string  `json:"questionnaire_code"`     // 问卷编码（唯一标识）
 	QuestionnaireVersion string  `json:"questionnaire_version"`  // 问卷版本
 	AnswerSheetID        uint64  `json:"answer_sheet_id"`        // 答卷ID
 	MedicalScaleID       *uint64 `json:"medical_scale_id"`       // 量表ID
@@ -166,7 +165,6 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 		ID:                   result.ID,
 		OrgID:                result.OrgID,
 		TesteeID:             result.TesteeID,
-		QuestionnaireID:      result.QuestionnaireID,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		AnswerSheetID:        result.AnswerSheetID,

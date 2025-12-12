@@ -123,11 +123,11 @@ type AnswerSheetService struct {
 
 func (s *AnswerSheetService) SubmitAnswerSheet(
     sheetID string,
-    questionnaireID string,
+    questionnaireCode string,
 ) error {
     // 1. 加载答卷和问卷
     sheet := s.sheetRepo.FindByID(sheetID)
-    questionnaire := s.questionnaireRepo.FindByID(questionnaireID)
+    questionnaire := s.questionnaireRepo.FindByCode(questionnaireCode)
     
     // 2. 遍历答案进行校验
     for _, ans := range sheet.GetAnswers() {

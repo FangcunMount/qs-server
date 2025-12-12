@@ -19,7 +19,6 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *QuestionnairePO {
 	po := &QuestionnairePO{
 		Code:        bo.GetCode().Value(),
-		DomainID:    uint64(bo.GetID()),
 		Title:       bo.GetTitle(),
 		Description: bo.GetDescription(),
 		ImgUrl:      bo.GetImgUrl(),
@@ -98,11 +97,10 @@ func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRu
 
 // ToBO 将MongoDB持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
-	// 创建问卷对象
+	// 创建问卷对象（code 是唯一标识，不再使用 ID）
 	q, _ := questionnaire.NewQuestionnaire(
 		meta.NewCode(po.Code),
 		po.Title,
-		questionnaire.WithID(meta.ID(po.DomainID)),
 		questionnaire.WithDesc(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewVersion(po.Version)),

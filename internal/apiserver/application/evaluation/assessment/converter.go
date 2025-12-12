@@ -17,7 +17,6 @@ func toAssessmentResult(a *assessment.Assessment) *AssessmentResult {
 		ID:                   a.ID().Uint64(),
 		OrgID:                uint64(a.OrgID()),
 		TesteeID:             a.TesteeID().Uint64(),
-		QuestionnaireID:      a.QuestionnaireRef().ID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),

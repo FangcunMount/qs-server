@@ -73,7 +73,6 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 	duration := time.Since(startTime)
 	l.Debugw("获取问卷成功",
 		"code", code,
-		"questionnaire_id", q.GetID(),
 		"status", q.GetStatus().String(),
 		"duration_ms", duration.Milliseconds(),
 	)
@@ -210,7 +209,6 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	duration := time.Since(startTime)
 	l.Debugw("获取已发布问卷成功",
 		"code", code,
-		"questionnaire_id", q.GetID(),
 		"duration_ms", duration.Milliseconds(),
 	)
 

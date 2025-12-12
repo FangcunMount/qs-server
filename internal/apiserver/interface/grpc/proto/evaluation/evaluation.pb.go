@@ -25,8 +25,7 @@ const (
 type AssessmentSummary struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`                                                                // 测评ID
-	QuestionnaireId      uint64                 `protobuf:"varint,2,opt,name=questionnaire_id,json=questionnaireId,proto3" json:"questionnaire_id,omitempty"`               // 问卷ID
-	QuestionnaireCode    string                 `protobuf:"bytes,3,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`          // 问卷编码
+	QuestionnaireCode    string                 `protobuf:"bytes,3,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`          // 问卷编码（唯一标识）
 	QuestionnaireVersion string                 `protobuf:"bytes,4,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"` // 问卷版本
 	ScaleCode            string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`                                  // 量表编码（可选）
 	ScaleName            string                 `protobuf:"bytes,6,opt,name=scale_name,json=scaleName,proto3" json:"scale_name,omitempty"`                                  // 量表名称（可选）
@@ -74,13 +73,6 @@ func (*AssessmentSummary) Descriptor() ([]byte, []int) {
 func (x *AssessmentSummary) GetId() uint64 {
 	if x != nil {
 		return x.Id
-	}
-	return 0
-}
-
-func (x *AssessmentSummary) GetQuestionnaireId() uint64 {
-	if x != nil {
-		return x.QuestionnaireId
 	}
 	return 0
 }
@@ -168,8 +160,7 @@ type AssessmentDetail struct {
 	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	OrgId                uint64                 `protobuf:"varint,2,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,3,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	QuestionnaireId      uint64                 `protobuf:"varint,4,opt,name=questionnaire_id,json=questionnaireId,proto3" json:"questionnaire_id,omitempty"`
-	QuestionnaireCode    string                 `protobuf:"bytes,5,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireCode    string                 `protobuf:"bytes,5,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"` // 问卷编码（唯一标识）
 	QuestionnaireVersion string                 `protobuf:"bytes,6,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	AnswerSheetId        uint64                 `protobuf:"varint,7,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"`
 	ScaleCode            string                 `protobuf:"bytes,8,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
@@ -235,13 +226,6 @@ func (x *AssessmentDetail) GetOrgId() uint64 {
 func (x *AssessmentDetail) GetTesteeId() uint64 {
 	if x != nil {
 		return x.TesteeId
-	}
-	return 0
-}
-
-func (x *AssessmentDetail) GetQuestionnaireId() uint64 {
-	if x != nil {
-		return x.QuestionnaireId
 	}
 	return 0
 }
@@ -1558,10 +1542,9 @@ var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"\x1bevaluation/evaluation.proto\x12\n" +
-	"evaluation\"\xd2\x03\n" +
+	"evaluation\"\xa7\x03\n" +
 	"\x11AssessmentSummary\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x04R\x02id\x12)\n" +
-	"\x10questionnaire_id\x18\x02 \x01(\x04R\x0fquestionnaireId\x12-\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x03 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x04 \x01(\tR\x14questionnaireVersion\x12\x1d\n" +
 	"\n" +
@@ -1579,12 +1562,11 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\v \x01(\tR\tcreatedAt\x12!\n" +
 	"\fsubmitted_at\x18\f \x01(\tR\vsubmittedAt\x12%\n" +
-	"\x0einterpreted_at\x18\r \x01(\tR\rinterpretedAt\"\x8e\x05\n" +
+	"\x0einterpreted_at\x18\r \x01(\tR\rinterpretedAt\"\xe3\x04\n" +
 	"\x10AssessmentDetail\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x15\n" +
 	"\x06org_id\x18\x02 \x01(\x04R\x05orgId\x12\x1b\n" +
-	"\ttestee_id\x18\x03 \x01(\x04R\btesteeId\x12)\n" +
-	"\x10questionnaire_id\x18\x04 \x01(\x04R\x0fquestionnaireId\x12-\n" +
+	"\ttestee_id\x18\x03 \x01(\x04R\btesteeId\x12-\n" +
 	"\x12questionnaire_code\x18\x05 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x06 \x01(\tR\x14questionnaireVersion\x12&\n" +
 	"\x0fanswer_sheet_id\x18\a \x01(\x04R\ranswerSheetId\x12\x1d\n" +

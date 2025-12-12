@@ -25,7 +25,6 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 	po := &AssessmentPO{
 		OrgID:                int64(domain.OrgID()),
 		TesteeID:             domain.TesteeID().Uint64(),
-		QuestionnaireID:      domain.QuestionnaireRef().ID().Uint64(),
 		QuestionnaireCode:    domain.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: domain.QuestionnaireRef().Version(),
 		AnswerSheetID:        domain.AnswerSheetRef().ID().Uint64(),
@@ -77,9 +76,8 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		return nil
 	}
 
-	// 构建问卷引用
-	questionnaireRef := assessment.NewQuestionnaireRef(
-		meta.ID(po.QuestionnaireID),
+	// 构建问卷引用（使用 Code 作为唯一标识）
+	questionnaireRef := assessment.NewQuestionnaireRefByCode(
 		meta.NewCode(po.QuestionnaireCode),
 		po.QuestionnaireVersion,
 	)

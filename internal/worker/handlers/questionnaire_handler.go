@@ -25,27 +25,24 @@ func init() {
 
 // QuestionnairePublishedPayload 问卷发布事件数据
 type QuestionnairePublishedPayload struct {
-	QuestionnaireID uint64    `json:"questionnaire_id"`
-	Code            string    `json:"code"`
-	Version         string    `json:"version"`
-	Title           string    `json:"title"`
-	PublishedAt     time.Time `json:"published_at"`
+	Code        string    `json:"code"`
+	Version     string    `json:"version"`
+	Title       string    `json:"title"`
+	PublishedAt time.Time `json:"published_at"`
 }
 
 // QuestionnaireUnpublishedPayload 问卷下架事件数据
 type QuestionnaireUnpublishedPayload struct {
-	QuestionnaireID uint64    `json:"questionnaire_id"`
-	Code            string    `json:"code"`
-	Version         string    `json:"version"`
-	UnpublishedAt   time.Time `json:"unpublished_at"`
+	Code          string    `json:"code"`
+	Version       string    `json:"version"`
+	UnpublishedAt time.Time `json:"unpublished_at"`
 }
 
 // QuestionnaireArchivedPayload 问卷归档事件数据
 type QuestionnaireArchivedPayload struct {
-	QuestionnaireID uint64    `json:"questionnaire_id"`
-	Code            string    `json:"code"`
-	Version         string    `json:"version"`
-	ArchivedAt      time.Time `json:"archived_at"`
+	Code       string    `json:"code"`
+	Version    string    `json:"version"`
+	ArchivedAt time.Time `json:"archived_at"`
 }
 
 // ==================== 辅助函数 ====================
@@ -100,7 +97,6 @@ func handleQuestionnairePublished(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Info("processing questionnaire published",
 			slog.String("event_id", env.ID),
-			slog.Uint64("questionnaire_id", data.QuestionnaireID),
 			slog.String("code", data.Code),
 			slog.String("version", data.Version),
 			slog.String("title", data.Title),
@@ -122,7 +118,6 @@ func handleQuestionnaireUnpublished(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Info("processing questionnaire unpublished",
 			slog.String("event_id", env.ID),
-			slog.Uint64("questionnaire_id", data.QuestionnaireID),
 			slog.String("code", data.Code),
 			slog.String("version", data.Version),
 		)
@@ -143,7 +138,6 @@ func handleQuestionnaireArchived(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Info("processing questionnaire archived",
 			slog.String("event_id", env.ID),
-			slog.Uint64("questionnaire_id", data.QuestionnaireID),
 			slog.String("code", data.Code),
 			slog.String("version", data.Version),
 		)

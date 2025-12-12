@@ -268,9 +268,14 @@ type ReportBuilder interface {
 6. Assessment 域生成报告 (InterpretReport)
 ```
 
-### 引用关系
+-### 引用关系
 
-- 引用 `survey.QuestionnaireID` 和 `survey.AnswerSheetID`
+- 引用 `survey.QuestionnaireCode` 和 `survey.AnswerSheetID`
+ 
+## 设计原则
+1. **单一职责**：计算、解读、测评管理各自独立
+2. **无状态设计**：calculation 和 interpretation 为无状态功能域
+3. **聚合边界清晰**：三个聚合各司其职，不越界
 - 引用 `scale.MedicalScaleID`
 - 引用 `actor.TesteeID`
 - 使用 `calculation` 域进行计分

@@ -44,7 +44,7 @@ survey 子域包含两个核心聚合：
 
 * **不依赖** scale 子域：survey 纯粹是"收集和校验"
 * **被依赖** 于 scale 子域：scale 需要读取 Question 和 AnswerSheet 的视图
-* **被依赖** 于 assessment 子域：assessment 引用 QuestionnaireID 和 AnswerSheetID
+* **被依赖于** assessment 子域：assessment 引用 QuestionnaireCode 和 AnswerSheetID
 
 **依赖方向**：
 

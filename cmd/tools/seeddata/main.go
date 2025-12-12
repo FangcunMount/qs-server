@@ -72,8 +72,8 @@ type seedContext struct {
 	// 受试者映射：name -> ID
 	TesteeIDsByName map[string]string
 
-	// 问卷映射：code -> ID
-	QuestionnaireIDsByCode map[string]string
+	// 问卷映射：code -> version
+	QuestionnaireVersionsByCode map[string]string
 
 	// 量表映射：code -> ID
 	ScaleIDsByCode map[string]string
@@ -82,9 +82,9 @@ type seedContext struct {
 // newSeedContext creates a new seed context with initialized maps.
 func newSeedContext() *seedContext {
 	return &seedContext{
-		TesteeIDsByName:        make(map[string]string),
-		QuestionnaireIDsByCode: make(map[string]string),
-		ScaleIDsByCode:         make(map[string]string),
+		TesteeIDsByName:             make(map[string]string),
+		QuestionnaireVersionsByCode: make(map[string]string),
+		ScaleIDsByCode:              make(map[string]string),
 	}
 }
 

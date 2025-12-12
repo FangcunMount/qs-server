@@ -5,8 +5,7 @@ package request
 // CreateAssessmentRequest 创建测评请求
 type CreateAssessmentRequest struct {
 	TesteeID             uint64  `json:"testee_id" valid:"required"`             // 受试者ID
-	QuestionnaireID      uint64  `json:"questionnaire_id" valid:"required"`      // 问卷ID
-	QuestionnaireCode    string  `json:"questionnaire_code" valid:"required"`    // 问卷编码
+	QuestionnaireCode    string  `json:"questionnaire_code" valid:"required"`    // 问卷编码（唯一标识）
 	QuestionnaireVersion string  `json:"questionnaire_version" valid:"required"` // 问卷版本
 	AnswerSheetID        uint64  `json:"answer_sheet_id" valid:"required"`       // 答卷ID
 	MedicalScaleID       *uint64 `json:"medical_scale_id"`                       // 量表ID（可选）

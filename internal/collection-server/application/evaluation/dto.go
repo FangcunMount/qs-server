@@ -3,7 +3,6 @@ package evaluation
 // AssessmentSummaryResponse 测评摘要响应
 type AssessmentSummaryResponse struct {
 	ID                   uint64  `json:"id"`
-	QuestionnaireID      uint64  `json:"questionnaire_id"`
 	QuestionnaireCode    string  `json:"questionnaire_code"`
 	QuestionnaireVersion string  `json:"questionnaire_version"`
 	ScaleCode            string  `json:"scale_code,omitempty"`
@@ -22,7 +21,6 @@ type AssessmentDetailResponse struct {
 	ID                   uint64  `json:"id"`
 	OrgID                uint64  `json:"org_id"`
 	TesteeID             uint64  `json:"testee_id"`
-	QuestionnaireID      uint64  `json:"questionnaire_id"`
 	QuestionnaireCode    string  `json:"questionnaire_code"`
 	QuestionnaireVersion string  `json:"questionnaire_version"`
 	AnswerSheetID        uint64  `json:"answer_sheet_id,omitempty"`

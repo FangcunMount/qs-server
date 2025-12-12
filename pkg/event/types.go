@@ -15,7 +15,7 @@ package event
 // 事件格式规范:
 //   - 事件类型: {aggregate}.{action}，如 "questionnaire.published"
 //   - 聚合类型: 聚合根名称，如 "Questionnaire"
-//   - 聚合ID:   实体的数据库主键 ID（字符串形式）
+//   - 聚合ID:   实体的业务唯一标识（如 Code）
 //
 // 事件载荷规范:
 //   - 所有字段必须导出（首字母大写）
@@ -25,9 +25,9 @@ package event
 // 示例:
 //   type QuestionnairePublishedEvent struct {
 //       event.BaseEvent
-//       QuestionnaireID int64  `json:"questionnaire_id"`
-//       Code            string `json:"code"`
-//       Version         int    `json:"version"`
+//       Code    string `json:"code"`
+//       Version string `json:"version"`
+//       Title   string `json:"title"`
 //   }
 
 // ==================== 事件来源常量 ====================

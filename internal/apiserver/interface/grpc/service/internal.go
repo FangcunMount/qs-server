@@ -11,7 +11,6 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
@@ -23,7 +22,6 @@ type InternalService struct {
 	managementService assessmentApp.AssessmentManagementService
 	engineService     engine.Service
 	scaleRepo         scale.Repository
-	questionnaireRepo questionnaire.Repository
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -32,14 +30,12 @@ func NewInternalService(
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
 	scaleRepo scale.Repository,
-	questionnaireRepo questionnaire.Repository,
 ) *InternalService {
 	return &InternalService{
 		submissionService: submissionService,
 		managementService: managementService,
 		engineService:     engineService,
 		scaleRepo:         scaleRepo,
-		questionnaireRepo: questionnaireRepo,
 	}
 }
 
@@ -101,27 +97,10 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		)
 	}
 
-	// 查询问卷获取 QuestionnaireID
-	var questionnaireID uint64
-	qnr, err := s.questionnaireRepo.FindByCode(ctx, req.QuestionnaireCode)
-	if err != nil {
-		l.Errorw("查询问卷失败",
-			"questionnaire_code", req.QuestionnaireCode,
-			"error", err.Error(),
-		)
-		return nil, status.Errorf(codes.NotFound, "问卷不存在: %v", err)
-	}
-	questionnaireID = qnr.GetID().Uint64()
-	l.Infow("找到问卷",
-		"questionnaire_id", questionnaireID,
-		"questionnaire_code", req.QuestionnaireCode,
-	)
-
-	// 构建创建 DTO
+	// 构建创建 DTO（使用 QuestionnaireCode 作为唯一标识）
 	dto := assessmentApp.CreateAssessmentDTO{
 		OrgID:                0, // 从上下文或答卷获取
 		TesteeID:             req.FillerId,
-		QuestionnaireID:      questionnaireID,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		AnswerSheetID:        req.AnswersheetId,

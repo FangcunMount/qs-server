@@ -422,11 +422,11 @@ type FillerRef struct {
 
 ```go
 type AnswerSheet struct {
-    ID              AnswerSheetID
-    QuestionnaireID QuestionnaireID
+    ID                 AnswerSheetID
+    QuestionnaireCode  Code
 
-    Testee          TesteeRef  // 被测者
-    FilledBy        FillerRef  // 谁操作填写
+    Testee             TesteeRef  // 被测者
+    FilledBy           FillerRef  // 谁操作填写
 
     // ... 其他字段
 }

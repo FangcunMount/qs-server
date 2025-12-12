@@ -144,18 +144,12 @@ func (r *GRPCRegistry) registerInternalService() error {
 		return nil
 	}
 
-	if r.container.SurveyModule == nil || r.container.SurveyModule.Questionnaire == nil {
-		log.Warn("SurveyModule.Questionnaire is not initialized, skipping internal service registration")
-		return nil
-	}
-
-	// 使用 EvaluationModule、ScaleModule 和 SurveyModule 中的服务
+	// 使用 EvaluationModule 和 ScaleModule 中的服务
 	internalService := service.NewInternalService(
 		r.container.EvaluationModule.SubmissionService,
 		r.container.EvaluationModule.ManagementService,
 		r.container.EvaluationModule.EvaluationService,
 		r.container.ScaleModule.Repo,
-		r.container.SurveyModule.Questionnaire.Repo,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")
