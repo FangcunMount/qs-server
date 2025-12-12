@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -201,7 +202,11 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 		// 打印配置信息
 		printConfigStage("Config after binding flags/env")
 		// 输出当前 viper 读取到的配置以及关键环境变量
-		printViperConfig(a.basename)
+		envPrefix := buildEnvPrefix(a.basename)
+		printViperConfig(envPrefix)
+
+		// 兼容 CICD 传入的 NSQ 主机/端口环境变量
+		applyLegacyNSQEnvOverrides(envPrefix)
 
 		// 如果选项不为空，则反序列化选项
 		if err := viper.Unmarshal(a.options); err != nil {
@@ -285,10 +290,9 @@ func addCmdTemplate(cmd *cobra.Command, namedFlagSets cliflag.NamedFlagSets) {
 }
 
 // printViperConfig 输出当前 viper 读取到的配置以及关键环境变量，用于调试覆盖行为
-func printViperConfig(basename string) {
+func printViperConfig(envPrefix string) {
 	fmt.Printf("Viper Config (AllSettings): %+v\n", viper.AllSettings())
 
-	envPrefix := strings.Replace(strings.ToUpper(basename), "-", "_", -1)
 	fmt.Printf("Using env prefix: %s_\n", envPrefix)
 
 	// 打印常用的覆盖变量，便于排查是否生效
@@ -320,4 +324,41 @@ func printViperConfig(basename string) {
 		envKey := envPrefix + "_" + key
 		fmt.Printf("ENV %s=%s\n", envKey, os.Getenv(envKey))
 	}
+}
+
+// buildEnvPrefix 根据 basename 生成环境变量前缀
+func buildEnvPrefix(basename string) string {
+	return strings.Replace(strings.ToUpper(basename), "-", "_", -1)
+}
+
+// applyLegacyNSQEnvOverrides 兼容 CICD 使用的 NSQ 主机/端口环境变量，自动拼接为 nsq-addr/nsq-lookupd-addr
+func applyLegacyNSQEnvOverrides(envPrefix string) {
+	nsqdHost := os.Getenv(envPrefix + "_NSQ_NSQD_HOST")
+	nsqdPort := os.Getenv(envPrefix + "_NSQ_NSQD_PORT")
+	lookupHost := os.Getenv(envPrefix + "_NSQ_LOOKUPD_HOST")
+	lookupPort := os.Getenv(envPrefix + "_NSQ_LOOKUPD_PORT")
+
+	nsqdAddr := buildAddr(nsqdHost, nsqdPort, "4150")
+	lookupAddr := buildAddr(lookupHost, lookupPort, "4161")
+
+	if nsqdAddr != "" {
+		viper.Set("messaging.nsq-addr", nsqdAddr)
+	}
+	if lookupAddr != "" {
+		viper.Set("messaging.nsq-lookupd-addr", lookupAddr)
+	}
+}
+
+// buildAddr 组装 host:port，允许 host 已包含端口
+func buildAddr(host, port, defaultPort string) string {
+	if host == "" {
+		return ""
+	}
+	if strings.Contains(host, ":") {
+		return host
+	}
+	if port == "" {
+		port = defaultPort
+	}
+	return net.JoinHostPort(host, port)
 }
