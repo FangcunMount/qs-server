@@ -1,26 +1,80 @@
 package scale
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// ==================== ScalePublishedEvent ====================
+// ==================== 事件类型常量 ====================
+// 从 eventconfig 包导入，保持事件类型的单一来源
+
+const (
+	// EventTypePublished 量表已发布
+	EventTypePublished = eventconfig.ScalePublished
+	// EventTypeUnpublished 量表已下架
+	EventTypeUnpublished = eventconfig.ScaleUnpublished
+	// EventTypeUpdated 量表已更新
+	EventTypeUpdated = eventconfig.ScaleUpdated
+	// EventTypeArchived 量表已归档
+	EventTypeArchived = eventconfig.ScaleArchived
+)
+
+// AggregateType 聚合根类型
+const AggregateType = "MedicalScale"
+
+// ==================== 事件 Payload 定义 ====================
+
+// ScalePublishedData 量表已发布事件数据
+type ScalePublishedData struct {
+	ScaleID     uint64    `json:"scale_id"`
+	Code        string    `json:"code"`
+	Version     string    `json:"version"`
+	Name        string    `json:"name"`
+	PublishedAt time.Time `json:"published_at"`
+}
+
+// ScaleUnpublishedData 量表已下架事件数据
+type ScaleUnpublishedData struct {
+	ScaleID       uint64    `json:"scale_id"`
+	Code          string    `json:"code"`
+	Version       string    `json:"version"`
+	UnpublishedAt time.Time `json:"unpublished_at"`
+}
+
+// ScaleUpdatedData 量表已更新事件数据
+type ScaleUpdatedData struct {
+	ScaleID   uint64    `json:"scale_id"`
+	Code      string    `json:"code"`
+	Version   string    `json:"version"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ScaleArchivedData 量表已归档事件数据
+type ScaleArchivedData struct {
+	ScaleID    uint64    `json:"scale_id"`
+	Code       string    `json:"code"`
+	Version    string    `json:"version"`
+	ArchivedAt time.Time `json:"archived_at"`
+}
+
+// ==================== 事件类型别名 ====================
 
 // ScalePublishedEvent 量表已发布事件
-// 用途：
-// - collection-server 更新量表缓存
-// - qs-worker 预加载计算规则
-type ScalePublishedEvent struct {
-	event.BaseEvent
+type ScalePublishedEvent = event.Event[ScalePublishedData]
 
-	scaleID     uint64
-	code        string
-	version     string
-	name        string
-	publishedAt time.Time
-}
+// ScaleUnpublishedEvent 量表已下架事件
+type ScaleUnpublishedEvent = event.Event[ScaleUnpublishedData]
+
+// ScaleUpdatedEvent 量表已更新事件
+type ScaleUpdatedEvent = event.Event[ScaleUpdatedData]
+
+// ScaleArchivedEvent 量表已归档事件
+type ScaleArchivedEvent = event.Event[ScaleArchivedData]
+
+// ==================== 事件构造函数 ====================
 
 // NewScalePublishedEvent 创建量表已发布事件
 func NewScalePublishedEvent(
@@ -29,55 +83,16 @@ func NewScalePublishedEvent(
 	version string,
 	name string,
 	publishedAt time.Time,
-) *ScalePublishedEvent {
-	return &ScalePublishedEvent{
-		BaseEvent:   event.NewBaseEvent("scale.published", "MedicalScale", code),
-		scaleID:     scaleID,
-		code:        code,
-		version:     version,
-		name:        name,
-		publishedAt: publishedAt,
-	}
-}
-
-// ScaleID 获取量表ID
-func (e *ScalePublishedEvent) ScaleID() uint64 {
-	return e.scaleID
-}
-
-// Code 获取量表编码
-func (e *ScalePublishedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取量表版本
-func (e *ScalePublishedEvent) Version() string {
-	return e.version
-}
-
-// Name 获取量表名称
-func (e *ScalePublishedEvent) Name() string {
-	return e.name
-}
-
-// PublishedAt 获取发布时间
-func (e *ScalePublishedEvent) PublishedAt() time.Time {
-	return e.publishedAt
-}
-
-// ==================== ScaleUnpublishedEvent ====================
-
-// ScaleUnpublishedEvent 量表已下架事件
-// 用途：
-// - collection-server 清除量表缓存
-// - qs-worker 清除计算规则缓存
-type ScaleUnpublishedEvent struct {
-	event.BaseEvent
-
-	scaleID       uint64
-	code          string
-	version       string
-	unpublishedAt time.Time
+) ScalePublishedEvent {
+	return event.New(EventTypePublished, AggregateType, strconv.FormatUint(scaleID, 10),
+		ScalePublishedData{
+			ScaleID:     scaleID,
+			Code:        code,
+			Version:     version,
+			Name:        name,
+			PublishedAt: publishedAt,
+		},
+	)
 }
 
 // NewScaleUnpublishedEvent 创建量表已下架事件
@@ -86,49 +101,15 @@ func NewScaleUnpublishedEvent(
 	code string,
 	version string,
 	unpublishedAt time.Time,
-) *ScaleUnpublishedEvent {
-	return &ScaleUnpublishedEvent{
-		BaseEvent:     event.NewBaseEvent("scale.unpublished", "MedicalScale", code),
-		scaleID:       scaleID,
-		code:          code,
-		version:       version,
-		unpublishedAt: unpublishedAt,
-	}
-}
-
-// ScaleID 获取量表ID
-func (e *ScaleUnpublishedEvent) ScaleID() uint64 {
-	return e.scaleID
-}
-
-// Code 获取量表编码
-func (e *ScaleUnpublishedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取量表版本
-func (e *ScaleUnpublishedEvent) Version() string {
-	return e.version
-}
-
-// UnpublishedAt 获取下架时间
-func (e *ScaleUnpublishedEvent) UnpublishedAt() time.Time {
-	return e.unpublishedAt
-}
-
-// ==================== ScaleUpdatedEvent ====================
-
-// ScaleUpdatedEvent 量表已更新事件
-// 用途：
-// - qs-worker 重新加载计算规则
-// - 当量表的因子、解读规则等发生变化时触发
-type ScaleUpdatedEvent struct {
-	event.BaseEvent
-
-	scaleID   uint64
-	code      string
-	version   string
-	updatedAt time.Time
+) ScaleUnpublishedEvent {
+	return event.New(EventTypeUnpublished, AggregateType, strconv.FormatUint(scaleID, 10),
+		ScaleUnpublishedData{
+			ScaleID:       scaleID,
+			Code:          code,
+			Version:       version,
+			UnpublishedAt: unpublishedAt,
+		},
+	)
 }
 
 // NewScaleUpdatedEvent 创建量表已更新事件
@@ -137,49 +118,15 @@ func NewScaleUpdatedEvent(
 	code string,
 	version string,
 	updatedAt time.Time,
-) *ScaleUpdatedEvent {
-	return &ScaleUpdatedEvent{
-		BaseEvent: event.NewBaseEvent("scale.updated", "MedicalScale", code),
-		scaleID:   scaleID,
-		code:      code,
-		version:   version,
-		updatedAt: updatedAt,
-	}
-}
-
-// ScaleID 获取量表ID
-func (e *ScaleUpdatedEvent) ScaleID() uint64 {
-	return e.scaleID
-}
-
-// Code 获取量表编码
-func (e *ScaleUpdatedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取量表版本
-func (e *ScaleUpdatedEvent) Version() string {
-	return e.version
-}
-
-// UpdatedAt 获取更新时间
-func (e *ScaleUpdatedEvent) UpdatedAt() time.Time {
-	return e.updatedAt
-}
-
-// ==================== ScaleArchivedEvent ====================
-
-// ScaleArchivedEvent 量表已归档事件
-// 用途：
-// - collection-server 清除缓存
-// - qs-worker 清除计算规则缓存
-type ScaleArchivedEvent struct {
-	event.BaseEvent
-
-	scaleID    uint64
-	code       string
-	version    string
-	archivedAt time.Time
+) ScaleUpdatedEvent {
+	return event.New(EventTypeUpdated, AggregateType, strconv.FormatUint(scaleID, 10),
+		ScaleUpdatedData{
+			ScaleID:   scaleID,
+			Code:      code,
+			Version:   version,
+			UpdatedAt: updatedAt,
+		},
+	)
 }
 
 // NewScaleArchivedEvent 创建量表已归档事件
@@ -188,32 +135,13 @@ func NewScaleArchivedEvent(
 	code string,
 	version string,
 	archivedAt time.Time,
-) *ScaleArchivedEvent {
-	return &ScaleArchivedEvent{
-		BaseEvent:  event.NewBaseEvent("scale.archived", "MedicalScale", code),
-		scaleID:    scaleID,
-		code:       code,
-		version:    version,
-		archivedAt: archivedAt,
-	}
-}
-
-// ScaleID 获取量表ID
-func (e *ScaleArchivedEvent) ScaleID() uint64 {
-	return e.scaleID
-}
-
-// Code 获取量表编码
-func (e *ScaleArchivedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取量表版本
-func (e *ScaleArchivedEvent) Version() string {
-	return e.version
-}
-
-// ArchivedAt 获取归档时间
-func (e *ScaleArchivedEvent) ArchivedAt() time.Time {
-	return e.archivedAt
+) ScaleArchivedEvent {
+	return event.New(EventTypeArchived, AggregateType, strconv.FormatUint(scaleID, 10),
+		ScaleArchivedData{
+			ScaleID:    scaleID,
+			Code:       code,
+			Version:    version,
+			ArchivedAt: archivedAt,
+		},
+	)
 }

@@ -51,6 +51,11 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
+	// 注册 Internal 服务（供 Worker 调用）
+	if err := r.registerInternalService(); err != nil {
+		return err
+	}
+
 	logger.L(context.Background()).Infow("All GRPC services registered successfully",
 		"component", "grpc",
 		"result", "success",
@@ -124,6 +129,30 @@ func (r *GRPCRegistry) registerEvaluationService() error {
 	)
 	r.server.RegisterService(evaluationService)
 	log.Info("   📊 Evaluation service registered")
+	return nil
+}
+
+// registerInternalService 注册内部服务（供 Worker 调用）
+func (r *GRPCRegistry) registerInternalService() error {
+	if r.container.EvaluationModule == nil {
+		log.Warn("EvaluationModule is not initialized, skipping internal service registration")
+		return nil
+	}
+
+	if r.container.ScaleModule == nil {
+		log.Warn("ScaleModule is not initialized, skipping internal service registration")
+		return nil
+	}
+
+	// 使用 EvaluationModule 和 ScaleModule 中的服务
+	internalService := service.NewInternalService(
+		r.container.EvaluationModule.SubmissionService,
+		r.container.EvaluationModule.ManagementService,
+		r.container.EvaluationModule.EvaluationService,
+		r.container.ScaleModule.Repo,
+	)
+	r.server.RegisterService(internalService)
+	log.Info("   🔧 Internal service registered (for Worker)")
 	return nil
 }
 

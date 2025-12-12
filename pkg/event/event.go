@@ -95,6 +95,48 @@ func (e BaseEvent) AggregateID() string {
 	return e.aggregateID
 }
 
+// ==================== 泛型事件 ====================
+
+// Event 泛型领域事件
+// 通过泛型参数 T 携带业务数据，减少模板代码
+//
+// 使用示例：
+//
+//	// 1. 定义 Payload 数据结构
+//	type OrderCreatedData struct {
+//	    OrderID    string `json:"order_id"`
+//	    CustomerID string `json:"customer_id"`
+//	}
+//
+//	// 2. 定义类型别名（可选，提高可读性）
+//	type OrderCreatedEvent = event.Event[OrderCreatedData]
+//
+//	// 3. 创建事件
+//	evt := event.New("order.created", "Order", orderID, OrderCreatedData{...})
+type Event[T any] struct {
+	BaseEvent
+	Data T `json:"data"`
+}
+
+// New 创建泛型事件
+//
+// 参数：
+//   - eventType: 事件类型，如 "assessment.submitted"
+//   - aggregateType: 聚合根类型，如 "Assessment"
+//   - aggregateID: 聚合根ID
+//   - data: 业务数据
+func New[T any](eventType, aggregateType, aggregateID string, data T) Event[T] {
+	return Event[T]{
+		BaseEvent: NewBaseEvent(eventType, aggregateType, aggregateID),
+		Data:      data,
+	}
+}
+
+// Payload 获取事件业务数据
+func (e Event[T]) Payload() T {
+	return e.Data
+}
+
 // ==================== 事件聚合支持 ====================
 
 // EventRaiser 事件产生者接口

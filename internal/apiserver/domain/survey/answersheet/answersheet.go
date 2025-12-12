@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // AnswerSheet 答卷聚合根
@@ -24,9 +25,13 @@ type AnswerSheet struct {
 
 	// 总分
 	score float64
+
+	// 领域事件收集器
+	events []event.DomainEvent
 }
 
 // NewAnswerSheet 创建答卷（提交时创建，不存在草稿状态）
+// 创建即提交，自动触发 AnswerSheetSubmittedEvent
 func NewAnswerSheet(
 	questionnaireRef QuestionnaireRef,
 	filler *actor.FillerRef,
@@ -54,13 +59,19 @@ func NewAnswerSheet(
 		codeSet[code] = true
 	}
 
-	return &AnswerSheet{
+	sheet := &AnswerSheet{
 		questionnaireRef: questionnaireRef,
 		filler:           filler,
 		answers:          answers,
 		filledAt:         filledAt,
 		score:            0, // 初始分数为0，需要通过 CalculateScore 计算
-	}, nil
+		events:           make([]event.DomainEvent, 0),
+	}
+
+	// 创建即提交，触发领域事件
+	sheet.submit()
+
+	return sheet, nil
 }
 
 // Reconstruct 从持久化数据重建答卷对象（用于仓储层）
@@ -132,4 +143,30 @@ func (a *AnswerSheet) Answers() []Answer {
 	result := make([]Answer, len(a.answers))
 	copy(result, a.answers)
 	return result
+}
+
+// ===================== 领域事件相关方法 =====================
+
+// Events 获取待发布的领域事件
+func (a *AnswerSheet) Events() []event.DomainEvent {
+	return a.events
+}
+
+// ClearEvents 清空事件列表（通常在事件发布后调用）
+func (a *AnswerSheet) ClearEvents() {
+	a.events = make([]event.DomainEvent, 0)
+}
+
+// addEvent 添加领域事件（私有方法）
+func (a *AnswerSheet) addEvent(evt event.DomainEvent) {
+	if a.events == nil {
+		a.events = make([]event.DomainEvent, 0)
+	}
+	a.events = append(a.events, evt)
+}
+
+// submit 提交答卷（包内方法，在创建后调用）
+// 触发 AnswerSheetSubmittedEvent
+func (a *AnswerSheet) submit() {
+	a.addEvent(NewAnswerSheetSubmittedEvent(a))
 }

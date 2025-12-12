@@ -8,6 +8,10 @@ import (
 )
 
 // Lifecycle 量表生命周期管理接口
+// 作为领域服务，负责：
+// 1. 业务规则验证
+// 2. 流程编排
+// 3. 调用聚合根的包内方法完成状态变更和事件触发
 type Lifecycle interface {
 	// Publish 发布量表，将草稿状态的量表变更为已发布状态
 	Publish(ctx context.Context, scale *MedicalScale) error
@@ -30,7 +34,7 @@ var _ Lifecycle = (*lifecycle)(nil)
 
 // Publish 发布量表
 func (l *lifecycle) Publish(ctx context.Context, scale *MedicalScale) error {
-	// 状态检查
+	// 1. 前置状态检查
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be published")
 	}
@@ -38,24 +42,20 @@ func (l *lifecycle) Publish(ctx context.Context, scale *MedicalScale) error {
 		return errors.WithCode(code.ErrInvalidArgument, "scale is already published")
 	}
 
-	// 使用 Validator 进行完整的业务规则验证
+	// 2. 业务规则验证
 	validator := Validator{}
 	validationErrors := validator.ValidateForPublish(scale)
 	if len(validationErrors) > 0 {
 		return ToError(validationErrors)
 	}
 
-	// 更新状态
-	if err := scale.updateStatus(StatusPublished); err != nil {
-		return err
-	}
-
-	return nil
+	// 3. 调用聚合根的包内方法（状态变更 + 事件触发）
+	return scale.publish()
 }
 
 // Unpublish 下线量表
 func (l *lifecycle) Unpublish(ctx context.Context, scale *MedicalScale) error {
-	// 状态检查
+	// 1. 前置状态检查
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be unpublished")
 	}
@@ -63,25 +63,17 @@ func (l *lifecycle) Unpublish(ctx context.Context, scale *MedicalScale) error {
 		return errors.WithCode(code.ErrInvalidArgument, "scale is not published")
 	}
 
-	// 更新状态
-	if err := scale.updateStatus(StatusDraft); err != nil {
-		return err
-	}
-
-	return nil
+	// 2. 调用聚合根的包内方法（状态变更 + 事件触发）
+	return scale.unpublish()
 }
 
 // Archive 归档量表
 func (l *lifecycle) Archive(ctx context.Context, scale *MedicalScale) error {
-	// 状态检查
+	// 1. 前置状态检查
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "scale is already archived")
 	}
 
-	// 更新状态
-	if err := scale.updateStatus(StatusArchived); err != nil {
-		return err
-	}
-
-	return nil
+	// 2. 调用聚合根的包内方法（状态变更 + 事件触发）
+	return scale.archive()
 }

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package internalapi;
+
+option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi";
+
+// 内部服务 - 供 Worker 调用
+// 用于事件处理后的业务逻辑调用
+service InternalService {
+  // ==================== Assessment 操作 ====================
+  
+  // 从答卷创建测评
+  // 场景：worker 处理 answersheet.submitted 事件后调用
+  // 流程：根据答卷信息创建 Assessment，如果问卷关联了量表则自动提交
+  rpc CreateAssessmentFromAnswerSheet(CreateAssessmentFromAnswerSheetRequest) 
+      returns (CreateAssessmentFromAnswerSheetResponse);
+  
+  // 执行测评评估
+  // 场景：worker 处理 assessment.submitted 事件后调用
+  // 流程：加载测评和量表，执行计分和解读，保存结果
+  rpc EvaluateAssessment(EvaluateAssessmentRequest) 
+      returns (EvaluateAssessmentResponse);
+}
+
+// ==================== CreateAssessmentFromAnswerSheet ====================
+
+// 从答卷创建测评请求
+message CreateAssessmentFromAnswerSheetRequest {
+  uint64 answersheet_id = 1;         // 答卷ID
+  string questionnaire_code = 2;     // 问卷编码
+  string questionnaire_version = 3;  // 问卷版本
+  uint64 filler_id = 4;              // 填写人ID
+  string filler_type = 5;            // 填写人类型：self/proxy
+  string origin_type = 6;            // 来源类型：adhoc/plan/screening（可选）
+  string origin_id = 7;              // 来源ID（可选）
+}
+
+// 从答卷创建测评响应
+message CreateAssessmentFromAnswerSheetResponse {
+  uint64 assessment_id = 1;          // 创建的测评ID（如果有）
+  bool created = 2;                  // 是否创建了测评
+  bool auto_submitted = 3;           // 是否自动提交（关联量表时）
+  string message = 4;                // 描述信息
+}
+
+// ==================== EvaluateAssessment ====================
+
+// 执行测评评估请求
+message EvaluateAssessmentRequest {
+  uint64 assessment_id = 1;          // 测评ID
+}
+
+// 执行测评评估响应
+message EvaluateAssessmentResponse {
+  bool success = 1;                  // 是否成功
+  string status = 2;                 // 处理后的状态：interpreted/failed/skipped
+  string message = 3;                // 描述信息
+  double total_score = 4;            // 总分（成功时）
+  string risk_level = 5;             // 风险等级（成功时）
+}

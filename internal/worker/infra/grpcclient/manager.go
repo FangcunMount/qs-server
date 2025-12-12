@@ -32,6 +32,7 @@ type Manager struct {
 	// 已注册的客户端
 	answerSheetClient *AnswerSheetClient
 	evaluationClient  *EvaluationClient
+	internalClient    *InternalClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -101,6 +102,11 @@ func (m *Manager) RegisterClients() error {
 	m.clients["evaluation"] = m.evaluationClient
 	log.Info("   📊 Evaluation client registered")
 
+	// 注册 Internal 客户端（用于事件处理）
+	m.internalClient = NewInternalClient(m)
+	m.clients["internal"] = m.internalClient
+	log.Info("   🔧 Internal client registered")
+
 	log.Infof("✅ All gRPC clients registered (endpoint: %s)", m.config.Endpoint)
 	return nil
 }
@@ -113,6 +119,11 @@ func (m *Manager) AnswerSheetClient() *AnswerSheetClient {
 // EvaluationClient 获取测评客户端
 func (m *Manager) EvaluationClient() *EvaluationClient {
 	return m.evaluationClient
+}
+
+// InternalClient 获取内部服务客户端
+func (m *Manager) InternalClient() *InternalClient {
+	return m.internalClient
 }
 
 // GetClient 根据名称获取客户端

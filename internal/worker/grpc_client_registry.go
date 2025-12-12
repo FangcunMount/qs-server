@@ -36,6 +36,11 @@ func (r *GRPCClientRegistry) RegisterClients() error {
 		return err
 	}
 
+	// 注册内部服务客户端
+	if err := r.registerInternalClient(); err != nil {
+		return err
+	}
+
 	log.Info("✅ All gRPC clients registered to container")
 	return nil
 }
@@ -63,6 +68,19 @@ func (r *GRPCClientRegistry) registerEvaluationClient() error {
 
 	r.container.SetEvaluationClient(client)
 	log.Info("   📊 Evaluation client injected to container")
+	return nil
+}
+
+// registerInternalClient 注册内部服务客户端
+func (r *GRPCClientRegistry) registerInternalClient() error {
+	client := r.manager.InternalClient()
+	if client == nil {
+		log.Warn("Internal client is not initialized, skipping registration")
+		return nil
+	}
+
+	r.container.SetInternalClient(client)
+	log.Info("   🔧 Internal client injected to container")
 	return nil
 }
 

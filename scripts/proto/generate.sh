@@ -39,4 +39,12 @@ protoc --proto_path=${PROTO_PATH} \
        --go-grpc_opt=paths=source_relative \
        ${PROTO_PATH}/evaluation/evaluation.proto
 
+# 生成 internal 服务代码（供 Worker 调用）
+protoc --proto_path=${PROTO_PATH} \
+       --go_out=${GO_OUT_PATH} \
+       --go_opt=paths=source_relative \
+       --go-grpc_out=${GO_OUT_PATH} \
+       --go-grpc_opt=paths=source_relative \
+       ${PROTO_PATH}/internalapi/internal.proto
+
 echo "Proto files generated successfully!" 

@@ -1,0 +1,237 @@
+# ============================================================================
+# 领域事件配置
+# ============================================================================
+# 本文件定义事件类型、Topic 映射、消费者配置等
+# 发布端和订阅端共用此配置，确保一致性
+# ============================================================================
+
+# 版本号（用于配置兼容性检查）
+version: "1.0"
+
+# ============================================================================
+# Topic 定义
+# ============================================================================
+topics:
+  questionnaire-lifecycle:
+    name: "questionnaire.lifecycle"
+    description: "问卷和量表生命周期事件"
+    # 消费者配置
+    consumer:
+      group: "qs-worker"
+      concurrency: 2
+      retry:
+        max_attempts: 3
+        initial_interval: 1s
+        max_interval: 30s
+
+  assessment-lifecycle:
+    name: "assessment.lifecycle"
+    description: "测评生命周期事件"
+    consumer:
+      group: "qs-worker"
+      concurrency: 4
+      retry:
+        max_attempts: 5
+        initial_interval: 500ms
+        max_interval: 1m
+
+# ============================================================================
+# 事件定义
+# ============================================================================
+# 每个事件映射到一个 Topic，并指定处理器
+events:
+  # --------------------------------------------------------------------------
+  # Survey 领域
+  # --------------------------------------------------------------------------
+  questionnaire.published:
+    topic: questionnaire-lifecycle
+    aggregate: Questionnaire
+    domain: survey/questionnaire
+    description: "问卷已发布"
+    handler: questionnaire_published_handler
+    consumers:
+      - collection-server
+      - search-service
+
+  questionnaire.unpublished:
+    topic: questionnaire-lifecycle
+    aggregate: Questionnaire
+    domain: survey/questionnaire
+    description: "问卷已下架"
+    handler: questionnaire_unpublished_handler
+    consumers:
+      - collection-server
+      - search-service
+
+  questionnaire.archived:
+    topic: questionnaire-lifecycle
+    aggregate: Questionnaire
+    domain: survey/questionnaire
+    description: "问卷已归档"
+    handler: questionnaire_archived_handler
+    consumers:
+      - collection-server
+
+  answersheet.submitted:
+    topic: assessment-lifecycle
+    aggregate: AnswerSheet
+    domain: survey/answersheet
+    description: "答卷已提交"
+    handler: answersheet_submitted_handler
+    consumers:
+      - qs-worker
+      - notification-service
+
+  # --------------------------------------------------------------------------
+  # Scale 领域
+  # --------------------------------------------------------------------------
+  scale.published:
+    topic: questionnaire-lifecycle
+    aggregate: MedicalScale
+    domain: scale
+    description: "量表已发布"
+    handler: scale_published_handler
+    consumers:
+      - collection-server
+      - qs-worker
+
+  scale.unpublished:
+    topic: questionnaire-lifecycle
+    aggregate: MedicalScale
+    domain: scale
+    description: "量表已下架"
+    handler: scale_unpublished_handler
+    consumers:
+      - collection-server
+      - qs-worker
+
+  scale.updated:
+    topic: questionnaire-lifecycle
+    aggregate: MedicalScale
+    domain: scale
+    description: "量表已更新"
+    handler: scale_updated_handler
+    consumers:
+      - qs-worker
+
+  scale.archived:
+    topic: questionnaire-lifecycle
+    aggregate: MedicalScale
+    domain: scale
+    description: "量表已归档"
+    handler: scale_archived_handler
+    consumers:
+      - collection-server
+      - qs-worker
+
+  # --------------------------------------------------------------------------
+  # Evaluation 领域
+  # --------------------------------------------------------------------------
+  assessment.submitted:
+    topic: assessment-lifecycle
+    aggregate: Assessment
+    domain: evaluation/assessment
+    description: "测评已提交"
+    handler: assessment_submitted_handler
+    consumers:
+      - qs-worker
+      - notification-service
+    # 高优先级事件，需要快速处理
+    priority: high
+
+  assessment.interpreted:
+    topic: assessment-lifecycle
+    aggregate: Assessment
+    domain: evaluation/assessment
+    description: "测评已解读"
+    handler: assessment_interpreted_handler
+    consumers:
+      - notification-service
+      - alert-service
+      - statistics-service
+
+  assessment.failed:
+    topic: assessment-lifecycle
+    aggregate: Assessment
+    domain: evaluation/assessment
+    description: "测评失败"
+    handler: assessment_failed_handler
+    consumers:
+      - logging-service
+      - monitoring-service
+
+  report.generated:
+    topic: assessment-lifecycle
+    aggregate: Report
+    domain: evaluation/report
+    description: "报告已生成"
+    handler: report_generated_handler
+    consumers:
+      - notification-service
+      - alert-service
+
+  report.exported:
+    topic: assessment-lifecycle
+    aggregate: Report
+    domain: evaluation/report
+    description: "报告已导出"
+    handler: report_exported_handler
+    consumers:
+      - statistics-service
+
+# ============================================================================
+# 处理器定义
+# ============================================================================
+# 定义处理器的元信息，实际实现在代码中
+handlers:
+  questionnaire_published_handler:
+    package: questionnaire
+    description: "处理问卷发布事件，更新缓存"
+
+  questionnaire_unpublished_handler:
+    package: questionnaire
+    description: "处理问卷下架事件，清除缓存"
+
+  questionnaire_archived_handler:
+    package: questionnaire
+    description: "处理问卷归档事件"
+
+  scale_published_handler:
+    package: scale
+    description: "处理量表发布事件，预加载计算规则"
+
+  scale_unpublished_handler:
+    package: scale
+    description: "处理量表下架事件"
+
+  scale_updated_handler:
+    package: scale
+    description: "处理量表更新事件，重新加载计算规则"
+
+  scale_archived_handler:
+    package: scale
+    description: "处理量表归档事件"
+
+  answersheet_submitted_handler:
+    package: assessment
+    description: "处理答卷提交事件"
+
+  assessment_submitted_handler:
+    package: assessment
+    description: "处理测评提交事件，触发评估流程"
+
+  assessment_interpreted_handler:
+    package: assessment
+    description: "处理测评解读完成事件"
+
+  assessment_failed_handler:
+    package: assessment
+    description: "处理测评失败事件，记录错误"
+
+  report_generated_handler:
+    package: report
+    description: "处理报告生成事件"
+
+  report_exported_handler:
+    package: report
+    description: "处理报告导出事件"

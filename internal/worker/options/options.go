@@ -46,6 +46,8 @@ type WorkerOptions struct {
 	MaxRetries int `json:"max_retries" mapstructure:"max-retries"`
 	// ServiceName 服务名称（用于消息队列 channel）
 	ServiceName string `json:"service_name" mapstructure:"service-name"`
+	// EventConfigPath 事件配置文件路径
+	EventConfigPath string `json:"event_config_path" mapstructure:"event-config-path"`
 }
 
 // GRPCOptions gRPC 客户端配置

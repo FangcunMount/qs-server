@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/messaging"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // modulePool 模块池
@@ -23,6 +26,13 @@ type Container struct {
 	mongoDB    *mongo.Database
 	redisCache redis.UniversalClient
 	redisStore redis.UniversalClient
+
+	// 消息队列（可选）
+	mqPublisher messaging.Publisher
+
+	// 事件发布器（统一管理）
+	eventPublisher event.EventPublisher
+	publisherMode  eventconfig.PublishMode
 
 	// 业务模块
 	SurveyModule     *assembler.SurveyModule     // Survey 模块（包含问卷和答卷子模块）
@@ -38,12 +48,38 @@ type Container struct {
 // NewContainer 创建容器
 func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, redisStore redis.UniversalClient) *Container {
 	return &Container{
-		mysqlDB:     mysqlDB,
-		mongoDB:     mongoDB,
-		redisCache:  redisCache,
-		redisStore:  redisStore,
-		initialized: false,
+		mysqlDB:       mysqlDB,
+		mongoDB:       mongoDB,
+		redisCache:    redisCache,
+		redisStore:    redisStore,
+		publisherMode: eventconfig.PublishModeLogging, // 默认使用日志模式
+		initialized:   false,
 	}
+}
+
+// ContainerOptions 容器配置选项
+type ContainerOptions struct {
+	// MQPublisher 消息队列发布器（可选，传入则启用 MQ 模式）
+	MQPublisher messaging.Publisher
+	// PublisherMode 事件发布器模式（mq, logging, nop）
+	PublisherMode eventconfig.PublishMode
+	// Env 环境名称（prod, dev, test），用于自动选择发布器模式
+	Env string
+}
+
+// NewContainerWithOptions 创建带配置的容器
+func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, redisStore redis.UniversalClient, opts ContainerOptions) *Container {
+	c := NewContainer(mysqlDB, mongoDB, redisCache, redisStore)
+	c.mqPublisher = opts.MQPublisher
+
+	// 根据环境或显式配置确定发布器模式
+	if opts.PublisherMode != "" {
+		c.publisherMode = opts.PublisherMode
+	} else if opts.Env != "" {
+		c.publisherMode = eventconfig.PublishModeFromEnv(opts.Env)
+	}
+
+	return c
 }
 
 // Initialize 初始化容器
@@ -51,6 +87,16 @@ func (c *Container) Initialize() error {
 	if c.initialized {
 		return nil
 	}
+
+	// 加载事件配置（发布器依赖此配置进行路由）
+	if err := eventconfig.Initialize("configs/events.yaml"); err != nil {
+		return fmt.Errorf("failed to load event config: %w", err)
+	}
+	fmt.Printf("📋 Event config loaded (events.yaml)\n")
+
+	// 初始化事件发布器（所有模块共享）
+	c.initEventPublisher()
+	fmt.Printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
 
 	// 初始化 IAM 模块（优先，因为其他模块可能依赖）
 	// 注意：这里需要传入 IAMOptions，在实际调用时需要从外部传入
@@ -82,10 +128,28 @@ func (c *Container) Initialize() error {
 	return nil
 }
 
+// initEventPublisher 初始化事件发布器
+func (c *Container) initEventPublisher() {
+	c.eventPublisher = eventconfig.NewRoutingPublisher(eventconfig.RoutingPublisherOptions{
+		Mode:        c.publisherMode,
+		Source:      event.SourceAPIServer,
+		MQPublisher: c.mqPublisher,
+	})
+}
+
+// GetEventPublisher 获取事件发布器（供模块使用）
+func (c *Container) GetEventPublisher() event.EventPublisher {
+	if c.eventPublisher == nil {
+		// 如果未初始化，返回空实现
+		return event.NewNopEventPublisher()
+	}
+	return c.eventPublisher
+}
+
 // initSurveyModule 初始化 Survey 模块（包含问卷和答卷子模块）
 func (c *Container) initSurveyModule() error {
 	surveyModule := assembler.NewSurveyModule()
-	if err := surveyModule.Initialize(c.mongoDB); err != nil {
+	if err := surveyModule.Initialize(c.mongoDB, c.eventPublisher); err != nil {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
@@ -99,7 +163,7 @@ func (c *Container) initSurveyModule() error {
 // initScaleModule 初始化 Scale 模块
 func (c *Container) initScaleModule() error {
 	scaleModule := assembler.NewScaleModule()
-	if err := scaleModule.Initialize(c.mongoDB); err != nil {
+	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 
@@ -134,7 +198,8 @@ func (c *Container) initActorModule() error {
 // initEvaluationModule 初始化 Evaluation 模块
 func (c *Container) initEvaluationModule() error {
 	evaluationModule := assembler.NewEvaluationModule()
-	if err := evaluationModule.Initialize(c.mysqlDB, c.mongoDB); err != nil {
+	// 传入 ScaleRepo 和 EventPublisher
+	if err := evaluationModule.Initialize(c.mysqlDB, c.mongoDB, c.ScaleModule.Repo, c.eventPublisher); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
 

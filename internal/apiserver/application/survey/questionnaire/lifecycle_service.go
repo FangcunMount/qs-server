@@ -2,7 +2,6 @@ package questionnaire
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -180,18 +179,8 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
-	// 7. 发布问卷发布事件（异步通知缓存更新）
-	if s.eventPublisher != nil {
-		publishEvent := questionnaire.NewQuestionnairePublishedEvent(
-			uint64(q.GetID()),
-			q.GetCode().String(),
-			q.GetVersion().String(),
-			q.GetTitle(),
-			time.Now(),
-		)
-		// 事件发布失败不影响主流程，仅记录日志
-		_ = s.eventPublisher.Publish(ctx, publishEvent)
-	}
+	// 7. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, q)
 
 	return toQuestionnaireResult(q), nil
 }
@@ -227,16 +216,8 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
-	// 6. 发布问卷下架事件（异步通知缓存清除）
-	if s.eventPublisher != nil {
-		unpublishEvent := questionnaire.NewQuestionnaireUnpublishedEvent(
-			uint64(q.GetID()),
-			q.GetCode().String(),
-			q.GetVersion().String(),
-			time.Now(),
-		)
-		_ = s.eventPublisher.Publish(ctx, unpublishEvent)
-	}
+	// 6. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, q)
 
 	return toQuestionnaireResult(q), nil
 }
@@ -269,16 +250,8 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
 	}
 
-	// 6. 发布问卷归档事件（异步通知清除所有版本缓存）
-	if s.eventPublisher != nil {
-		archiveEvent := questionnaire.NewQuestionnaireArchivedEvent(
-			uint64(q.GetID()),
-			q.GetCode().String(),
-			q.GetVersion().String(),
-			time.Now(),
-		)
-		_ = s.eventPublisher.Publish(ctx, archiveEvent)
-	}
+	// 6. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, q)
 
 	return toQuestionnaireResult(q), nil
 }
@@ -307,4 +280,20 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 	}
 
 	return nil
+}
+
+// publishEvents 发布聚合根收集的领域事件
+func (s *lifecycleService) publishEvents(ctx context.Context, q *questionnaire.Questionnaire) {
+	if s.eventPublisher == nil {
+		return
+	}
+
+	events := q.Events()
+	for _, evt := range events {
+		// 事件发布失败不影响主流程
+		_ = s.eventPublisher.Publish(ctx, evt)
+	}
+
+	// 清空已发布的事件
+	q.ClearEvents()
 }

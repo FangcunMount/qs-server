@@ -1,10 +1,12 @@
 package container
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/worker/application"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 	redis "github.com/redis/go-redis/v9"
@@ -21,9 +23,10 @@ type Container struct {
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient *grpcclient.AnswerSheetClient
 	evaluationClient  *grpcclient.EvaluationClient
+	internalClient    *grpcclient.InternalClient
 
-	// 处理器注册表
-	handlerRegistry *handlers.TopicRegistry
+	// 事件分发器
+	eventDispatcher *application.EventDispatcher
 }
 
 // NewContainer 创建新的容器
@@ -45,8 +48,10 @@ func (c *Container) Initialize() error {
 
 	log.Info("🔧 Initializing Worker Container...")
 
-	// 1. 初始化处理器注册表
-	c.initHandlerRegistry()
+	// 初始化事件分发器
+	if err := c.initEventDispatcher(); err != nil {
+		return err
+	}
 
 	c.initialized = true
 	log.Info("✅ Worker Container initialized successfully")
@@ -54,24 +59,43 @@ func (c *Container) Initialize() error {
 	return nil
 }
 
-// initHandlerRegistry 初始化 Topic 处理器注册表
-func (c *Container) initHandlerRegistry() {
-	log.Info("🎯 Initializing topic handler registry...")
+// initEventDispatcher 初始化事件分发器
+func (c *Container) initEventDispatcher() error {
+	log.Info("🎯 Initializing event dispatcher...")
 
-	c.handlerRegistry = handlers.NewTopicRegistry(c.logger)
-	handlers.RegisterDefaultTopicHandlers(c.handlerRegistry, &handlers.TopicHandlerDeps{
+	// 构建处理器依赖
+	deps := &application.HandlerDependencies{
 		Logger:            c.logger,
 		AnswerSheetClient: c.answerSheetClient,
 		EvaluationClient:  c.evaluationClient,
-	})
+		InternalClient:    c.internalClient,
+		RedisCache:        c.redisCache,
+	}
 
-	log.Info("✅ Topic handler registry initialized")
+	// 创建事件分发器
+	c.eventDispatcher = application.NewEventDispatcher(c.logger, deps)
+
+	// 确定配置路径
+	configPath := "configs/events.yaml"
+	if c.opts.Worker != nil && c.opts.Worker.EventConfigPath != "" {
+		configPath = c.opts.Worker.EventConfigPath
+	}
+
+	// 初始化
+	if err := c.eventDispatcher.Initialize(configPath); err != nil {
+		return err
+	}
+
+	// 打印订阅信息
+	c.eventDispatcher.PrintSubscriptionInfo()
+
+	log.Info("✅ Event dispatcher initialized")
+	return nil
 }
 
 // Cleanup 清理资源
 func (c *Container) Cleanup() {
 	log.Info("🧹 Cleaning up container resources...")
-
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")
 }
@@ -93,11 +117,27 @@ func (c *Container) SetEvaluationClient(client *grpcclient.EvaluationClient) {
 	c.evaluationClient = client
 }
 
+// SetInternalClient 设置内部服务客户端
+func (c *Container) SetInternalClient(client *grpcclient.InternalClient) {
+	c.internalClient = client
+}
+
 // ==================== Getters ====================
 
-// TopicRegistry 获取 Topic 处理器注册表
-func (c *Container) TopicRegistry() *handlers.TopicRegistry {
-	return c.handlerRegistry
+// GetTopicSubscriptions 获取需要订阅的 Topic 列表
+func (c *Container) GetTopicSubscriptions() []eventconfig.TopicSubscription {
+	if c.eventDispatcher == nil {
+		return nil
+	}
+	return c.eventDispatcher.GetTopicSubscriptions()
+}
+
+// DispatchEvent 分发事件到对应的处理器
+func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload []byte) error {
+	if c.eventDispatcher == nil {
+		return nil
+	}
+	return c.eventDispatcher.Dispatch(ctx, eventType, payload)
 }
 
 // Logger 获取日志器

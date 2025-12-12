@@ -7,12 +7,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
-	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
@@ -160,32 +160,73 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 
 // subscribeHandlers 订阅所有 Topic 处理器
 func (s *workerServer) subscribeHandlers() error {
-	registry := s.container.TopicRegistry()
-	for _, handler := range registry.All() {
-		h := handler // 避免闭包问题
-		msgHandler := createMessageHandler(h, s.logger)
-		if err := s.subscriber.Subscribe(h.Topic(), s.config.Worker.ServiceName, msgHandler); err != nil {
+	subscriptions := s.container.GetTopicSubscriptions()
+	for _, sub := range subscriptions {
+		topicName := sub.TopicName
+		msgHandler := s.createDispatchHandler(topicName)
+		if err := s.subscriber.Subscribe(topicName, s.config.Worker.ServiceName, msgHandler); err != nil {
 			s.logger.Error("failed to subscribe",
-				slog.String("topic", h.Topic()),
+				slog.String("topic", topicName),
 				slog.String("error", err.Error()),
 			)
 			return err
 		}
 		s.logger.Info("subscribed to topic",
-			slog.String("topic", h.Topic()),
-			slog.String("handler", h.Name()),
+			slog.String("topic", topicName),
+			slog.String("group", sub.Group),
+			slog.Int("event_count", len(sub.EventTypes)),
 			slog.String("channel", s.config.Worker.ServiceName),
 		)
 	}
 	return nil
 }
 
+// createDispatchHandler 创建分发处理函数
+func (s *workerServer) createDispatchHandler(topicName string) messaging.Handler {
+	return func(ctx context.Context, msg *messaging.Message) error {
+		// 从消息元数据中提取事件类型
+		eventType, ok := msg.Metadata["event_type"]
+		if !ok {
+			s.logger.Warn("message missing event_type",
+				slog.String("topic", topicName),
+				slog.String("msg_id", msg.UUID),
+			)
+			msg.Ack() // 无法处理，直接确认
+			return nil
+		}
+
+		s.logger.Debug("received message",
+			slog.String("topic", topicName),
+			slog.String("event_type", eventType),
+			slog.String("msg_id", msg.UUID),
+		)
+
+		// 分发到对应的处理器
+		if err := s.container.DispatchEvent(ctx, eventType, msg.Payload); err != nil {
+			s.logger.Error("failed to dispatch event",
+				slog.String("topic", topicName),
+				slog.String("event_type", eventType),
+				slog.String("msg_id", msg.UUID),
+				slog.String("error", err.Error()),
+			)
+			msg.Nack()
+			return err
+		}
+
+		msg.Ack()
+		return nil
+	}
+}
+
 // createTopics 在 NSQ 中预创建 Topics
 // 在 subscriber 启动前预先创建所有 topics，避免 TOPIC_NOT_FOUND 日志
 func (s *workerServer) createTopics() error {
 	// 获取所有需要订阅的 topics
-	registry := s.container.TopicRegistry()
-	topics := registry.Topics()
+	subscriptions := s.container.GetTopicSubscriptions()
+	topics := make([]string, 0, len(subscriptions))
+	for _, sub := range subscriptions {
+		topics = append(topics, sub.TopicName)
+	}
 
 	if len(topics) == 0 {
 		s.logger.Debug("No topics to create")
@@ -260,34 +301,5 @@ func createSubscriber(cfg *config.MessagingConfig, logger *slog.Logger) (messagi
 			slog.String("provider", cfg.Provider),
 		)
 		return nsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nil)
-	}
-}
-
-// createMessageHandler 创建消息处理函数
-func createMessageHandler(handler interface {
-	Handle(context.Context, []byte) error
-	Topic() string
-	Name() string
-}, logger *slog.Logger) messaging.Handler {
-	return func(ctx context.Context, msg *messaging.Message) error {
-		logger.Debug("received message",
-			slog.String("topic", handler.Topic()),
-			slog.String("handler", handler.Name()),
-			slog.String("msg_id", msg.UUID),
-		)
-
-		if err := handler.Handle(ctx, msg.Payload); err != nil {
-			logger.Error("failed to handle message",
-				slog.String("topic", handler.Topic()),
-				slog.String("handler", handler.Name()),
-				slog.String("msg_id", msg.UUID),
-				slog.String("error", err.Error()),
-			)
-			msg.Nack()
-			return err
-		}
-
-		msg.Ack()
-		return nil
 	}
 }

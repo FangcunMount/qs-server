@@ -24,6 +24,9 @@ type SurveyModule struct {
 
 	// AnswerSheet 子模块
 	AnswerSheet *AnswerSheetSubModule
+
+	// 事件发布器（由容器统一注入）
+	eventPublisher event.EventPublisher
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -62,10 +65,26 @@ func NewSurveyModule() *SurveyModule {
 }
 
 // Initialize 初始化 Survey 模块
+// params[0]: *mongo.Database
+// params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 func (m *SurveyModule) Initialize(params ...interface{}) error {
-	mongoDB := params[0].(*mongo.Database)
-	if mongoDB == nil {
+	if len(params) < 1 {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	}
+
+	mongoDB, ok := params[0].(*mongo.Database)
+	if !ok || mongoDB == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+
+	// 获取事件发布器（可选参数）
+	if len(params) > 1 {
+		if ep, ok := params[1].(event.EventPublisher); ok && ep != nil {
+			m.eventPublisher = ep
+		}
+	}
+	if m.eventPublisher == nil {
+		m.eventPublisher = event.NewNopEventPublisher()
 	}
 
 	// 初始化问卷子模块
@@ -93,11 +112,8 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database) error
 	lifecycle := questionnaire.NewLifecycle()
 	questionMgr := questionnaire.QuestionManager{}
 
-	// 初始化事件发布器（当前使用空实现，后续可注入实际实现）
-	eventPublisher := event.NewNopEventPublisher()
-
-	// 初始化 service 层 - 按行为者组织的服务
-	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, eventPublisher)
+	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
+	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, m.eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
 	sub.QueryService = quesApp.NewQueryService(sub.Repo)
 
@@ -124,8 +140,8 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	// 创建验证器
 	validator := validation.NewDefaultValidator()
 
-	// 初始化 service 层 - 按行为者组织的服务
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, quesRepo, validator)
+	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, quesRepo, validator, m.eventPublisher)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 
 	// 初始化 handler 层

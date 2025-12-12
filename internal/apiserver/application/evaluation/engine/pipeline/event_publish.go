@@ -86,7 +86,7 @@ func (h *EventPublishHandler) Handle(ctx context.Context, evalCtx *Context) erro
 }
 
 // buildEvent 构建评估完成事件
-func (h *EventPublishHandler) buildEvent(evalCtx *Context) *assessment.AssessmentInterpretedEvent {
+func (h *EventPublishHandler) buildEvent(evalCtx *Context) assessment.AssessmentInterpretedEvent {
 	a := evalCtx.Assessment
 	result := evalCtx.EvaluationResult
 

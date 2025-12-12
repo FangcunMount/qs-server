@@ -25,6 +25,9 @@ type ScaleModule struct {
 	LifecycleService scaleApp.ScaleLifecycleService
 	FactorService    scaleApp.ScaleFactorService
 	QueryService     scaleApp.ScaleQueryService
+
+	// 事件发布器（由容器统一注入）
+	eventPublisher event.EventPublisher
 }
 
 // NewScaleModule 创建 Scale 模块
@@ -33,20 +36,33 @@ func NewScaleModule() *ScaleModule {
 }
 
 // Initialize 初始化 Scale 模块
+// params[0]: *mongo.Database
+// params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 func (m *ScaleModule) Initialize(params ...interface{}) error {
-	mongoDB := params[0].(*mongo.Database)
-	if mongoDB == nil {
+	if len(params) < 1 {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	}
+
+	mongoDB, ok := params[0].(*mongo.Database)
+	if !ok || mongoDB == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+
+	// 获取事件发布器（可选参数）
+	if len(params) > 1 {
+		if ep, ok := params[1].(event.EventPublisher); ok && ep != nil {
+			m.eventPublisher = ep
+		}
+	}
+	if m.eventPublisher == nil {
+		m.eventPublisher = event.NewNopEventPublisher()
 	}
 
 	// 初始化 repository 层
 	m.Repo = scaleInfra.NewRepository(mongoDB)
 
-	// 初始化事件发布器（当前使用空实现，后续可注入实际实现）
-	eventPublisher := event.NewNopEventPublisher()
-
-	// 初始化 service 层（依赖 repository）
-	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, eventPublisher)
+	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
+	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, m.eventPublisher)
 	m.FactorService = scaleApp.NewFactorService(m.Repo)
 	m.QueryService = scaleApp.NewQueryService(m.Repo)
 

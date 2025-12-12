@@ -1,9 +1,13 @@
 package questionnaire
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // Questionnaire 问卷聚合根
@@ -12,10 +16,10 @@ type Questionnaire struct {
 	code meta.Code
 
 	// —— 基本信息
-	typ   QuestionnaireType // 问卷分类：调查问卷/医学量表
-	title  string // 问卷标题
-	desc   string // 问卷描述
-	imgUrl string // 问卷封面图片URL
+	typ    QuestionnaireType // 问卷分类：调查问卷/医学量表
+	title  string            // 问卷标题
+	desc   string            // 问卷描述
+	imgUrl string            // 问卷封面图片URL
 
 	// —— 通用状态
 	version Version // 问卷版本号
@@ -23,6 +27,9 @@ type Questionnaire struct {
 
 	// —— 问题列表
 	questions []Question // 问卷中的所有问题
+
+	// —— 领域事件收集器
+	events []event.DomainEvent
 }
 
 // ===================== Questionnaires 构造相关 =================
@@ -77,8 +84,8 @@ func WithQuestions(ques []Question) QuestionnaireOption {
 // ----------------- 基本信息相关 ----------------
 
 // 获取问卷基本信息
-func (q *Questionnaire) GetID() meta.ID         { return q.id }
-func (q *Questionnaire) GetCode() meta.Code     { return q.code }
+func (q *Questionnaire) GetID() meta.ID     { return q.id }
+func (q *Questionnaire) GetCode() meta.Code { return q.code }
 func (q *Questionnaire) GetType() QuestionnaireType {
 	if q.typ == "" {
 		return DefaultQuestionnaireType()
@@ -198,4 +205,86 @@ func (q *Questionnaire) updateVersion(newVersion Version) error {
 
 	q.version = newVersion
 	return nil
+}
+
+// ===================== 生命周期包内方法（供 Lifecycle 服务调用）=====================
+
+// publish 发布问卷（包内方法）
+// 更新状态并触发 QuestionnairePublishedEvent
+func (q *Questionnaire) publish() error {
+	if err := q.updateStatus(STATUS_PUBLISHED); err != nil {
+		return err
+	}
+
+	// 触发领域事件
+	q.addEvent(NewQuestionnairePublishedEvent(
+		uint64(q.id),
+		string(q.code),
+		q.version.String(),
+		q.title,
+		time.Now(),
+	))
+
+	return nil
+}
+
+// unpublish 下架问卷（包内方法）
+// 更新状态并触发 QuestionnaireUnpublishedEvent
+func (q *Questionnaire) unpublish() error {
+	if err := q.updateStatus(STATUS_DRAFT); err != nil {
+		return err
+	}
+
+	// 触发领域事件
+	q.addEvent(NewQuestionnaireUnpublishedEvent(
+		uint64(q.id),
+		string(q.code),
+		q.version.String(),
+		time.Now(),
+	))
+
+	return nil
+}
+
+// archive 归档问卷（包内方法）
+// 更新状态并触发 QuestionnaireArchivedEvent
+func (q *Questionnaire) archive() error {
+	if err := q.updateStatus(STATUS_ARCHIVED); err != nil {
+		return err
+	}
+
+	// 触发领域事件
+	q.addEvent(NewQuestionnaireArchivedEvent(
+		uint64(q.id),
+		string(q.code),
+		q.version.String(),
+		time.Now(),
+	))
+
+	return nil
+}
+
+// ===================== 领域事件相关方法 =====================
+
+// Events 获取待发布的领域事件
+func (q *Questionnaire) Events() []event.DomainEvent {
+	return q.events
+}
+
+// ClearEvents 清空事件列表（通常在事件发布后调用）
+func (q *Questionnaire) ClearEvents() {
+	q.events = make([]event.DomainEvent, 0)
+}
+
+// addEvent 添加领域事件（私有方法）
+func (q *Questionnaire) addEvent(evt event.DomainEvent) {
+	if q.events == nil {
+		q.events = make([]event.DomainEvent, 0)
+	}
+	q.events = append(q.events, evt)
+}
+
+// idString 获取 ID 字符串（用于事件）
+func (q *Questionnaire) idString() string {
+	return strconv.FormatUint(uint64(q.id), 10)
 }

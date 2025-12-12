@@ -1,26 +1,67 @@
 package questionnaire
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// ==================== QuestionnairePublishedEvent ====================
+// ==================== 事件类型常量 ====================
+// 从 eventconfig 包导入，保持事件类型的单一来源
+
+const (
+	// EventTypePublished 问卷已发布
+	EventTypePublished = eventconfig.QuestionnairePublished
+	// EventTypeUnpublished 问卷已下架
+	EventTypeUnpublished = eventconfig.QuestionnaireUnpublished
+	// EventTypeArchived 问卷已归档
+	EventTypeArchived = eventconfig.QuestionnaireArchived
+)
+
+// AggregateType 聚合根类型
+const AggregateType = "Questionnaire"
+
+// ==================== 事件 Payload 定义 ====================
+
+// QuestionnairePublishedData 问卷已发布事件数据
+type QuestionnairePublishedData struct {
+	QuestionnaireID uint64    `json:"questionnaire_id"`
+	Code            string    `json:"code"`
+	Version         string    `json:"version"`
+	Title           string    `json:"title"`
+	PublishedAt     time.Time `json:"published_at"`
+}
+
+// QuestionnaireUnpublishedData 问卷已下架事件数据
+type QuestionnaireUnpublishedData struct {
+	QuestionnaireID uint64    `json:"questionnaire_id"`
+	Code            string    `json:"code"`
+	Version         string    `json:"version"`
+	UnpublishedAt   time.Time `json:"unpublished_at"`
+}
+
+// QuestionnaireArchivedData 问卷已归档事件数据
+type QuestionnaireArchivedData struct {
+	QuestionnaireID uint64    `json:"questionnaire_id"`
+	Code            string    `json:"code"`
+	Version         string    `json:"version"`
+	ArchivedAt      time.Time `json:"archived_at"`
+}
+
+// ==================== 事件类型别名 ====================
 
 // QuestionnairePublishedEvent 问卷已发布事件
-// 用途：
-// - collection-server 更新 Redis 缓存
-// - 搜索服务更新索引
-type QuestionnairePublishedEvent struct {
-	event.BaseEvent
+type QuestionnairePublishedEvent = event.Event[QuestionnairePublishedData]
 
-	questionnaireID uint64
-	code            string
-	version         string
-	title           string
-	publishedAt     time.Time
-}
+// QuestionnaireUnpublishedEvent 问卷已下架事件
+type QuestionnaireUnpublishedEvent = event.Event[QuestionnaireUnpublishedData]
+
+// QuestionnaireArchivedEvent 问卷已归档事件
+type QuestionnaireArchivedEvent = event.Event[QuestionnaireArchivedData]
+
+// ==================== 事件构造函数 ====================
 
 // NewQuestionnairePublishedEvent 创建问卷已发布事件
 func NewQuestionnairePublishedEvent(
@@ -29,55 +70,16 @@ func NewQuestionnairePublishedEvent(
 	version string,
 	title string,
 	publishedAt time.Time,
-) *QuestionnairePublishedEvent {
-	return &QuestionnairePublishedEvent{
-		BaseEvent:       event.NewBaseEvent("questionnaire.published", "Questionnaire", code),
-		questionnaireID: questionnaireID,
-		code:            code,
-		version:         version,
-		title:           title,
-		publishedAt:     publishedAt,
-	}
-}
-
-// QuestionnaireID 获取问卷ID
-func (e *QuestionnairePublishedEvent) QuestionnaireID() uint64 {
-	return e.questionnaireID
-}
-
-// Code 获取问卷编码
-func (e *QuestionnairePublishedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取问卷版本
-func (e *QuestionnairePublishedEvent) Version() string {
-	return e.version
-}
-
-// Title 获取问卷标题
-func (e *QuestionnairePublishedEvent) Title() string {
-	return e.title
-}
-
-// PublishedAt 获取发布时间
-func (e *QuestionnairePublishedEvent) PublishedAt() time.Time {
-	return e.publishedAt
-}
-
-// ==================== QuestionnaireUnpublishedEvent ====================
-
-// QuestionnaireUnpublishedEvent 问卷已下架事件
-// 用途：
-// - collection-server 清除 Redis 缓存
-// - 搜索服务更新索引
-type QuestionnaireUnpublishedEvent struct {
-	event.BaseEvent
-
-	questionnaireID uint64
-	code            string
-	version         string
-	unpublishedAt   time.Time
+) QuestionnairePublishedEvent {
+	return event.New(EventTypePublished, AggregateType, strconv.FormatUint(questionnaireID, 10),
+		QuestionnairePublishedData{
+			QuestionnaireID: questionnaireID,
+			Code:            code,
+			Version:         version,
+			Title:           title,
+			PublishedAt:     publishedAt,
+		},
+	)
 }
 
 // NewQuestionnaireUnpublishedEvent 创建问卷已下架事件
@@ -86,49 +88,15 @@ func NewQuestionnaireUnpublishedEvent(
 	code string,
 	version string,
 	unpublishedAt time.Time,
-) *QuestionnaireUnpublishedEvent {
-	return &QuestionnaireUnpublishedEvent{
-		BaseEvent:       event.NewBaseEvent("questionnaire.unpublished", "Questionnaire", code),
-		questionnaireID: questionnaireID,
-		code:            code,
-		version:         version,
-		unpublishedAt:   unpublishedAt,
-	}
-}
-
-// QuestionnaireID 获取问卷ID
-func (e *QuestionnaireUnpublishedEvent) QuestionnaireID() uint64 {
-	return e.questionnaireID
-}
-
-// Code 获取问卷编码
-func (e *QuestionnaireUnpublishedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取问卷版本
-func (e *QuestionnaireUnpublishedEvent) Version() string {
-	return e.version
-}
-
-// UnpublishedAt 获取下架时间
-func (e *QuestionnaireUnpublishedEvent) UnpublishedAt() time.Time {
-	return e.unpublishedAt
-}
-
-// ==================== QuestionnaireArchivedEvent ====================
-
-// QuestionnaireArchivedEvent 问卷已归档事件
-// 用途：
-// - collection-server 清除 Redis 缓存
-// - 归档问卷不再对外提供服务
-type QuestionnaireArchivedEvent struct {
-	event.BaseEvent
-
-	questionnaireID uint64
-	code            string
-	version         string
-	archivedAt      time.Time
+) QuestionnaireUnpublishedEvent {
+	return event.New(EventTypeUnpublished, AggregateType, strconv.FormatUint(questionnaireID, 10),
+		QuestionnaireUnpublishedData{
+			QuestionnaireID: questionnaireID,
+			Code:            code,
+			Version:         version,
+			UnpublishedAt:   unpublishedAt,
+		},
+	)
 }
 
 // NewQuestionnaireArchivedEvent 创建问卷已归档事件
@@ -137,32 +105,13 @@ func NewQuestionnaireArchivedEvent(
 	code string,
 	version string,
 	archivedAt time.Time,
-) *QuestionnaireArchivedEvent {
-	return &QuestionnaireArchivedEvent{
-		BaseEvent:       event.NewBaseEvent("questionnaire.archived", "Questionnaire", code),
-		questionnaireID: questionnaireID,
-		code:            code,
-		version:         version,
-		archivedAt:      archivedAt,
-	}
-}
-
-// QuestionnaireID 获取问卷ID
-func (e *QuestionnaireArchivedEvent) QuestionnaireID() uint64 {
-	return e.questionnaireID
-}
-
-// Code 获取问卷编码
-func (e *QuestionnaireArchivedEvent) Code() string {
-	return e.code
-}
-
-// Version 获取问卷版本
-func (e *QuestionnaireArchivedEvent) Version() string {
-	return e.version
-}
-
-// ArchivedAt 获取归档时间
-func (e *QuestionnaireArchivedEvent) ArchivedAt() time.Time {
-	return e.archivedAt
+) QuestionnaireArchivedEvent {
+	return event.New(EventTypeArchived, AggregateType, strconv.FormatUint(questionnaireID, 10),
+		QuestionnaireArchivedData{
+			QuestionnaireID: questionnaireID,
+			Code:            code,
+			Version:         version,
+			ArchivedAt:      archivedAt,
+		},
+	)
 }

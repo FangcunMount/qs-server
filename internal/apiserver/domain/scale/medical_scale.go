@@ -1,9 +1,13 @@
 package scale
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // MedicalScale 医学量表聚合根
@@ -25,6 +29,9 @@ type MedicalScale struct {
 
 	// 因子列表（包含解读规则）
 	factors []*Factor
+
+	// 领域事件收集器
+	events []event.DomainEvent
 }
 
 // ===================== MedicalScale 构造相关 =================
@@ -254,4 +261,86 @@ func (m *MedicalScale) removeFactor(factorCode FactorCode) error {
 // updateFactors 更新因子列表
 func (m *MedicalScale) updateFactors(factors []*Factor) {
 	m.factors = factors
+}
+
+// ===================== 生命周期包内方法（供 Lifecycle 服务调用）=================
+
+// publish 发布量表（包内方法）
+// 更新状态并触发 ScalePublishedEvent
+func (m *MedicalScale) publish() error {
+	if err := m.updateStatus(StatusPublished); err != nil {
+		return err
+	}
+
+	// 触发领域事件
+	m.addEvent(NewScalePublishedEvent(
+		uint64(m.id),
+		string(m.scaleCode),
+		"", // version 暂无
+		m.title,
+		time.Now(),
+	))
+
+	return nil
+}
+
+// unpublish 下架量表（包内方法）
+// 更新状态并触发 ScaleUnpublishedEvent
+func (m *MedicalScale) unpublish() error {
+	if err := m.updateStatus(StatusDraft); err != nil {
+		return err
+	}
+
+	// 触发领域事件
+	m.addEvent(NewScaleUnpublishedEvent(
+		uint64(m.id),
+		string(m.scaleCode),
+		"",
+		time.Now(),
+	))
+
+	return nil
+}
+
+// archive 归档量表（包内方法）
+// 更新状态并触发 ScaleArchivedEvent
+func (m *MedicalScale) archive() error {
+	if err := m.updateStatus(StatusArchived); err != nil {
+		return err
+	}
+
+	// 触发领域事件
+	m.addEvent(NewScaleArchivedEvent(
+		uint64(m.id),
+		string(m.scaleCode),
+		"",
+		time.Now(),
+	))
+
+	return nil
+}
+
+// ===================== 领域事件相关方法 =================
+
+// Events 获取待发布的领域事件
+func (m *MedicalScale) Events() []event.DomainEvent {
+	return m.events
+}
+
+// ClearEvents 清空事件列表（通常在事件发布后调用）
+func (m *MedicalScale) ClearEvents() {
+	m.events = make([]event.DomainEvent, 0)
+}
+
+// addEvent 添加领域事件（私有方法）
+func (m *MedicalScale) addEvent(evt event.DomainEvent) {
+	if m.events == nil {
+		m.events = make([]event.DomainEvent, 0)
+	}
+	m.events = append(m.events, evt)
+}
+
+// idString 获取 ID 字符串（用于事件）
+func (m *MedicalScale) idString() string {
+	return strconv.FormatUint(uint64(m.id), 10)
 }

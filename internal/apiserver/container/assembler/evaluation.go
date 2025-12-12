@@ -15,6 +15,7 @@ import (
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // EvaluationModule 评估模块（测评、得分、报告）
@@ -58,6 +59,9 @@ type EvaluationModule struct {
 
 	// 建议服务 - 服务于评估引擎
 	SuggestionService reportApp.SuggestionService
+
+	// 事件发布器（由容器统一注入）
+	eventPublisher event.EventPublisher
 }
 
 // NewEvaluationModule 创建评估模块
@@ -69,6 +73,7 @@ func NewEvaluationModule() *EvaluationModule {
 // params[0]: *gorm.DB (MySQL)
 // params[1]: *mongo.Database (MongoDB)
 // params[2]: scale.Repository (可选，用于 EvaluationService)
+// params[3]: event.EventPublisher (可选，用于事件发布)
 func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if len(params) < 2 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
@@ -90,6 +95,16 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		if sr, ok := params[2].(scale.Repository); ok {
 			scaleRepo = sr
 		}
+	}
+
+	// 获取事件发布器（可选参数）
+	if len(params) > 3 {
+		if ep, ok := params[3].(event.EventPublisher); ok && ep != nil {
+			m.eventPublisher = ep
+		}
+	}
+	if m.eventPublisher == nil {
+		m.eventPublisher = event.NewNopEventPublisher()
 	}
 
 	// ==================== 初始化 Repository 层 ====================
@@ -145,6 +160,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	m.SubmissionService = assessmentApp.NewSubmissionService(
 		m.AssessmentRepo,
 		assessmentCreator,
+		m.eventPublisher,
 	)
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)

@@ -10,23 +10,27 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // submissionService 测评提交服务实现
 // 行为者：答题者 (Testee)
 type submissionService struct {
-	repo    assessment.Repository
-	creator assessment.AssessmentCreator
+	repo           assessment.Repository
+	creator        assessment.AssessmentCreator
+	eventPublisher event.EventPublisher
 }
 
 // NewSubmissionService 创建测评提交服务
 func NewSubmissionService(
 	repo assessment.Repository,
 	creator assessment.AssessmentCreator,
+	eventPublisher event.EventPublisher,
 ) AssessmentSubmissionService {
 	return &submissionService{
-		repo:    repo,
-		creator: creator,
+		repo:           repo,
+		creator:        creator,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -172,9 +176,9 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
 	}
 
-	// 4. 发布领域事件（由事件发布器处理）
-	// 说明：领域事件已在 Submit() 内部添加到聚合根，
-	// 由基础设施层的事件发布器在事务提交后发布
+	// 4. 发布领域事件
+	// 说明：领域事件已在 Submit() 内部添加到聚合根，这里统一发布
+	s.publishEvents(ctx, a, l)
 
 	duration := time.Since(startTime)
 	l.Infow("提交测评成功",
@@ -377,4 +381,39 @@ func normalizePagination(page, pageSize int) (int, int) {
 		pageSize = 100
 	}
 	return page, pageSize
+}
+
+// publishEvents 发布聚合根收集的领域事件
+func (s *submissionService) publishEvents(ctx context.Context, a *assessment.Assessment, l *logger.RequestLogger) {
+	if s.eventPublisher == nil {
+		l.Warnw("事件发布器未配置，跳过事件发布",
+			"action", "publish_event",
+			"resource", "assessment",
+			"assessment_id", a.ID().Uint64(),
+		)
+		return
+	}
+
+	events := a.Events()
+	for _, evt := range events {
+		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
+			l.Errorw("发布领域事件失败",
+				"action", "publish_event",
+				"resource", "assessment",
+				"assessment_id", a.ID().Uint64(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		} else {
+			l.Infow("发布领域事件成功",
+				"action", "publish_event",
+				"resource", "assessment",
+				"assessment_id", a.ID().Uint64(),
+				"event_type", evt.EventType(),
+			)
+		}
+	}
+
+	// 清空已发布的事件
+	a.ClearEvents()
 }

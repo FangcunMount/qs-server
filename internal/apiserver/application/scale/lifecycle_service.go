@@ -2,7 +2,6 @@ package scale
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -163,17 +162,8 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*ScaleResu
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
 	}
 
-	// 5. 发布量表发布事件（异步通知缓存更新）
-	if s.eventPublisher != nil {
-		publishEvent := scale.NewScalePublishedEvent(
-			uint64(m.GetID()),
-			m.GetCode().String(),
-			m.GetQuestionnaireVersion(),
-			m.GetTitle(),
-			time.Now(),
-		)
-		_ = s.eventPublisher.Publish(ctx, publishEvent)
-	}
+	// 5. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, m)
 
 	return toScaleResult(m), nil
 }
@@ -201,16 +191,8 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*ScaleRe
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
 	}
 
-	// 5. 发布量表下架事件（异步通知缓存清除）
-	if s.eventPublisher != nil {
-		unpublishEvent := scale.NewScaleUnpublishedEvent(
-			uint64(m.GetID()),
-			m.GetCode().String(),
-			m.GetQuestionnaireVersion(),
-			time.Now(),
-		)
-		_ = s.eventPublisher.Publish(ctx, unpublishEvent)
-	}
+	// 5. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, m)
 
 	return toScaleResult(m), nil
 }
@@ -238,16 +220,8 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*ScaleResu
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
 	}
 
-	// 5. 发布量表归档事件（异步通知清除缓存和规则）
-	if s.eventPublisher != nil {
-		archiveEvent := scale.NewScaleArchivedEvent(
-			uint64(m.GetID()),
-			m.GetCode().String(),
-			m.GetQuestionnaireVersion(),
-			time.Now(),
-		)
-		_ = s.eventPublisher.Publish(ctx, archiveEvent)
-	}
+	// 5. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, m)
 
 	return toScaleResult(m), nil
 }
@@ -276,4 +250,20 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 	}
 
 	return nil
+}
+
+// publishEvents 发布聚合根收集的领域事件
+func (s *lifecycleService) publishEvents(ctx context.Context, m *scale.MedicalScale) {
+	if s.eventPublisher == nil {
+		return
+	}
+
+	events := m.Events()
+	for _, evt := range events {
+		// 事件发布失败不影响主流程
+		_ = s.eventPublisher.Publish(ctx, evt)
+	}
+
+	// 清空已发布的事件
+	m.ClearEvents()
 }

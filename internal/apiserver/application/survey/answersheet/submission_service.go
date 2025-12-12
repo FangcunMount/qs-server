@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // submissionService 答卷提交服务实现
@@ -21,6 +22,7 @@ type submissionService struct {
 	repo              answersheet.Repository
 	questionnaireRepo questionnaire.Repository
 	validator         validation.Validator
+	eventPublisher    event.EventPublisher
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -28,11 +30,13 @@ func NewSubmissionService(
 	repo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 	validator validation.Validator,
+	eventPublisher event.EventPublisher,
 ) AnswerSheetSubmissionService {
 	return &submissionService{
 		repo:              repo,
 		questionnaireRepo: questionnaireRepo,
 		validator:         validator,
+		eventPublisher:    eventPublisher,
 	}
 }
 
@@ -286,6 +290,9 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
 	}
 
+	// 7.1 发布领域事件（从聚合根获取）
+	s.publishEvents(ctx, sheet, l)
+
 	duration := time.Since(startTime)
 	l.Infow("答卷提交成功",
 		"action", "submit",
@@ -452,4 +459,39 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 	)
 
 	return toSummaryListResult(sheets, total), nil
+}
+
+// publishEvents 发布聚合根收集的领域事件
+func (s *submissionService) publishEvents(ctx context.Context, sheet *answersheet.AnswerSheet, l *logger.RequestLogger) {
+	if s.eventPublisher == nil {
+		l.Warnw("事件发布器未配置，跳过事件发布",
+			"action", "publish_event",
+			"resource", "answersheet",
+			"answersheet_id", sheet.ID().Uint64(),
+		)
+		return
+	}
+
+	events := sheet.Events()
+	for _, evt := range events {
+		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
+			l.Errorw("发布领域事件失败",
+				"action", "publish_event",
+				"resource", "answersheet",
+				"answersheet_id", sheet.ID().Uint64(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		} else {
+			l.Infow("发布领域事件成功",
+				"action", "publish_event",
+				"resource", "answersheet",
+				"answersheet_id", sheet.ID().Uint64(),
+				"event_type", evt.EventType(),
+			)
+		}
+	}
+
+	// 清空已发布的事件
+	sheet.ClearEvents()
 }
