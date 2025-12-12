@@ -58,6 +58,11 @@ type MessagingConfig struct {
 // GRPCConfig gRPC 客户端配置
 type GRPCConfig struct {
 	ApiserverAddr string
+	Insecure      bool
+	TLSCertFile   string
+	TLSKeyFile    string
+	TLSCAFile     string
+	TLSServerName string
 }
 
 // WorkerConfig Worker 运行配置
@@ -95,6 +100,11 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 		},
 		GRPC: &GRPCConfig{
 			ApiserverAddr: opts.GRPC.ApiserverAddr,
+			Insecure:      opts.GRPC.Insecure,
+			TLSCertFile:   opts.GRPC.TLSCertFile,
+			TLSKeyFile:    opts.GRPC.TLSKeyFile,
+			TLSCAFile:     opts.GRPC.TLSCAFile,
+			TLSServerName: opts.GRPC.TLSServerName,
 		},
 		Worker: &WorkerConfig{
 			Concurrency: opts.Worker.Concurrency,

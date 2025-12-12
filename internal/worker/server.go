@@ -85,7 +85,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 
 	// 2. 创建 gRPC 客户端管理器
 	s.grpcManager, err = CreateGRPCClientManager(
-		s.config.GRPC.ApiserverAddr,
+		s.config.GRPC,
 		30, // 默认超时 30 秒
 	)
 	if err != nil {

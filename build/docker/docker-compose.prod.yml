@@ -69,6 +69,11 @@ services:
     volumes:
       - /opt/qs-server/qs-worker/configs:/app/configs
       - /data/logs/qs-server/qs-worker:/data/logs/qs
+      # 证书与密钥目录统一挂载（REST TLS 证书）
+      - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
+      - /data/ssl/private:/etc/qs-server/ssl/private:ro
+      # gRPC mTLS 证书目录（CA + 客户端证书）
+      - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     command: ["--config=/app/configs/worker.prod.yaml"]
 
 networks:

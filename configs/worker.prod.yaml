@@ -44,6 +44,11 @@ messaging:
 
 grpc:
   apiserver-addr: "qs-apiserver:9090"  # Docker 容器服务名
+  insecure: false
+  tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
+  tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-worker.crt"
+  tls-key-file: "/etc/qs-server/ssl/grpc/server/qs-worker.key"
+  tls-server-name: ""
 
 # ============================================================
 # 4. 存储配置

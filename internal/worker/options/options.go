@@ -54,6 +54,13 @@ type WorkerOptions struct {
 type GRPCOptions struct {
 	// ApiserverAddr apiserver gRPC 服务地址
 	ApiserverAddr string `json:"apiserver_addr" mapstructure:"apiserver-addr"`
+	// Insecure 是否使用明文连接
+	Insecure bool `json:"insecure" mapstructure:"insecure"`
+	// TLS 配置
+	TLSCertFile   string `json:"tls_cert_file" mapstructure:"tls-cert-file"`
+	TLSKeyFile    string `json:"tls_key_file" mapstructure:"tls-key-file"`
+	TLSCAFile     string `json:"tls_ca_file" mapstructure:"tls-ca-file"`
+	TLSServerName string `json:"tls_server_name" mapstructure:"tls-server-name"`
 }
 
 // NewOptions 创建默认配置
@@ -70,6 +77,7 @@ func NewOptions() *Options {
 		},
 		GRPC: &GRPCOptions{
 			ApiserverAddr: "localhost:9090",
+			Insecure:      true,
 		},
 		Worker: &WorkerOptions{
 			Concurrency: 10,
@@ -102,6 +110,16 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	grpcFS := fss.FlagSet("grpc")
 	grpcFS.StringVar(&o.GRPC.ApiserverAddr, "grpc.apiserver-addr", o.GRPC.ApiserverAddr,
 		"Apiserver gRPC service address")
+	grpcFS.BoolVar(&o.GRPC.Insecure, "grpc.insecure", o.GRPC.Insecure,
+		"Use insecure gRPC connection (plaintext, no TLS)")
+	grpcFS.StringVar(&o.GRPC.TLSCertFile, "grpc.tls-cert-file", o.GRPC.TLSCertFile,
+		"gRPC client certificate file (for mTLS)")
+	grpcFS.StringVar(&o.GRPC.TLSKeyFile, "grpc.tls-key-file", o.GRPC.TLSKeyFile,
+		"gRPC client private key file (for mTLS)")
+	grpcFS.StringVar(&o.GRPC.TLSCAFile, "grpc.tls-ca-file", o.GRPC.TLSCAFile,
+		"gRPC CA certificate file")
+	grpcFS.StringVar(&o.GRPC.TLSServerName, "grpc.tls-server-name", o.GRPC.TLSServerName,
+		"gRPC server name override for TLS verification")
 
 	// Worker flags
 	workerFS := fss.FlagSet("worker")

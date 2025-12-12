@@ -1,11 +1,16 @@
 package grpcclient
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 )
@@ -18,6 +23,16 @@ type ManagerConfig struct {
 	PoolSize      int           // 连接池大小（默认 1）
 	MaxRetries    int           // 最大重试次数
 	KeepaliveTime time.Duration // Keepalive 时间
+	Insecure      bool          // 是否使用明文连接
+	TLS           TLSConfig     // TLS 配置
+}
+
+// TLSConfig TLS/mTLS 配置
+type TLSConfig struct {
+	CAFile     string // CA 证书
+	CertFile   string // 客户端证书（可选，启用 mTLS）
+	KeyFile    string // 客户端私钥（可选，启用 mTLS）
+	ServerName string // 服务器名称覆盖（可选）
 }
 
 // Manager gRPC 客户端管理器，负责连接池管理和客户端缓存
@@ -66,7 +81,6 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 // connect 建立 gRPC 连接
 func (m *Manager) connect() error {
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		// Keepalive 参数配置，避免 "too_many_pings" 错误
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                m.config.KeepaliveTime,
@@ -79,6 +93,18 @@ func (m *Manager) connect() error {
 		),
 	}
 
+	if m.config.Insecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		log.Warn("gRPC client: using insecure connection (not recommended for production)")
+	} else {
+		creds, err := m.loadTLSCredentials()
+		if err != nil {
+			return err
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+		log.Info("gRPC client: using secure connection (TLS/mTLS)")
+	}
+
 	conn, err := grpc.NewClient(m.config.Endpoint, opts...)
 	if err != nil {
 		return err
@@ -86,6 +112,41 @@ func (m *Manager) connect() error {
 
 	m.conn = conn
 	return nil
+}
+
+// loadTLSCredentials 加载 TLS/mTLS 凭证
+func (m *Manager) loadTLSCredentials() (credentials.TransportCredentials, error) {
+	if m.config.TLS.CAFile == "" {
+		return nil, fmt.Errorf("TLS CA file is required for secure gRPC connection")
+	}
+
+	caCert, err := os.ReadFile(m.config.TLS.CAFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to add CA certificate to pool")
+	}
+
+	tlsCfg := &tls.Config{
+		RootCAs: certPool,
+	}
+	if m.config.TLS.ServerName != "" {
+		tlsCfg.ServerName = m.config.TLS.ServerName
+	}
+
+	// mTLS（可选）
+	if m.config.TLS.CertFile != "" && m.config.TLS.KeyFile != "" {
+		clientCert, err := tls.LoadX509KeyPair(m.config.TLS.CertFile, m.config.TLS.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+		tlsCfg.Certificates = []tls.Certificate{clientCert}
+		log.Info("gRPC client: mTLS enabled (client certificate loaded)")
+	}
+
+	return credentials.NewTLS(tlsCfg), nil
 }
 
 // RegisterClients 注册所有 gRPC 客户端

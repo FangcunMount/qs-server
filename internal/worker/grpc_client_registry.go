@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 )
@@ -85,11 +86,18 @@ func (r *GRPCClientRegistry) registerInternalClient() error {
 }
 
 // CreateGRPCClientManager 创建 gRPC 客户端管理器
-func CreateGRPCClientManager(endpoint string, timeout int) (*grpcclient.Manager, error) {
+func CreateGRPCClientManager(cfg *config.GRPCConfig, timeout int) (*grpcclient.Manager, error) {
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{
-		Endpoint: endpoint,
+		Endpoint: cfg.ApiserverAddr,
 		Timeout:  time.Duration(timeout) * time.Second,
 		PoolSize: 1,
+		Insecure: cfg.Insecure,
+		TLS: grpcclient.TLSConfig{
+			CAFile:     cfg.TLSCAFile,
+			CertFile:   cfg.TLSCertFile,
+			KeyFile:    cfg.TLSKeyFile,
+			ServerName: cfg.TLSServerName,
+		},
 	})
 	if err != nil {
 		return nil, err
