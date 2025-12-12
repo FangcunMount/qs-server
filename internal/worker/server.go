@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
+	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 )
 
@@ -187,12 +188,20 @@ func (s *workerServer) createDispatchHandler(topicName string) messaging.Handler
 		// 从消息元数据中提取事件类型
 		eventType, ok := msg.Metadata["event_type"]
 		if !ok {
-			s.logger.Warn("message missing event_type",
-				slog.String("topic", topicName),
-				slog.String("msg_id", msg.UUID),
-			)
-			msg.Ack() // 无法处理，直接确认
-			return nil
+			// 尝试从 payload 解析事件信封获取 eventType（兼容未传 metadata 的发布端）
+			env, err := handlers.ParseEventEnvelope(msg.Payload)
+			if err != nil {
+				s.logger.Warn("message missing event_type and payload parse failed",
+					slog.String("topic", topicName),
+					slog.String("msg_id", msg.UUID),
+					slog.String("error", err.Error()),
+				)
+				msg.Ack() // 无法处理，直接确认避免堆积
+				return nil
+			}
+			eventType = env.EventType
+			// 填充 metadata，后续处理链可复用
+			msg.Metadata["event_type"] = eventType
 		}
 
 		s.logger.Debug("received message",
