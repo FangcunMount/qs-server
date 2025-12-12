@@ -19,6 +19,7 @@ type Options struct {
 	MigrationOptions        *genericoptions.MigrationOptions       `json:"migration" mapstructure:"migration"`
 	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
 	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"   mapstructure:"mongodb"`
+	MessagingOptions        *genericoptions.MessagingOptions       `json:"messaging" mapstructure:"messaging"`
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
 }
 
@@ -34,6 +35,7 @@ func NewOptions() *Options {
 		MigrationOptions:        genericoptions.NewMigrationOptions(),
 		RedisDualOptions:        genericoptions.NewRedisDualOptions(),
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
+		MessagingOptions:        genericoptions.NewMessagingOptions(),
 		IAMOptions:              genericoptions.NewIAMOptions(),
 	}
 }
@@ -49,6 +51,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.MigrationOptions.AddFlags(fss.FlagSet("migration"))
 	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
+	o.MessagingOptions.AddFlags(fss.FlagSet("messaging"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 
 	return fss

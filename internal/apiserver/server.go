@@ -5,10 +5,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
@@ -113,8 +115,32 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		)
 	}
 
-	// 创建六边形架构容器（自动发现版本）
-	s.container = container.NewContainer(mysqlDB, mongoDB, redisCache, redisStore)
+	// 创建消息队列 publisher（用于事件发布）
+	var mqPublisher messaging.Publisher
+	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
+		mqPublisher, err = s.config.MessagingOptions.NewPublisher()
+		if err != nil {
+			logger.L(context.Background()).Warnw("Failed to create MQ publisher, falling back to logging mode",
+				"component", "apiserver",
+				"error", err.Error(),
+			)
+			mqPublisher = nil
+		} else {
+			logger.L(context.Background()).Infow("MQ publisher created successfully",
+				"component", "apiserver",
+				"provider", s.config.MessagingOptions.Provider,
+			)
+		}
+	}
+
+	// 创建六边形架构容器（使用 MQ 模式）
+	s.container = container.NewContainerWithOptions(
+		mysqlDB, mongoDB, redisCache, redisStore,
+		container.ContainerOptions{
+			MQPublisher:   mqPublisher,
+			PublisherMode: eventconfig.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode),
+		},
+	)
 	// 初始化 IAM 模块（优先）
 	ctx := context.Background()
 	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
