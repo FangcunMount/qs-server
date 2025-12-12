@@ -117,6 +117,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 
 	// 创建消息队列 publisher（用于事件发布）
 	var mqPublisher messaging.Publisher
+	publishMode := eventconfig.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode)
 	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
 		mqPublisher, err = s.config.MessagingOptions.NewPublisher()
 		if err != nil {
@@ -130,6 +131,8 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 				"component", "apiserver",
 				"provider", s.config.MessagingOptions.Provider,
 			)
+			// 明确开启 MQ 发布模式（避免因 server.mode=release 被误判为 logging）
+			publishMode = eventconfig.PublishModeMQ
 		}
 	}
 
@@ -138,7 +141,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		mysqlDB, mongoDB, redisCache, redisStore,
 		container.ContainerOptions{
 			MQPublisher:   mqPublisher,
-			PublisherMode: eventconfig.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode),
+			PublisherMode: publishMode,
 		},
 	)
 	// 初始化 IAM 模块（优先）
