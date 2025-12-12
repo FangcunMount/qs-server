@@ -47,11 +47,11 @@ type DomainEvent interface {
 //	    CustomerID string
 //	}
 type BaseEvent struct {
-	id            string
-	eventType     string
-	occurredAt    time.Time
-	aggregateType string
-	aggregateID   string
+	ID                 string    `json:"id"`
+	EventTypeValue     string    `json:"eventType"`
+	OccurredAtValue    time.Time `json:"occurredAt"`
+	AggregateTypeValue string    `json:"aggregateType"`
+	AggregateIDValue   string    `json:"aggregateID"`
 }
 
 // NewBaseEvent 创建事件基类
@@ -62,37 +62,37 @@ type BaseEvent struct {
 //   - aggregateID: 聚合根ID
 func NewBaseEvent(eventType, aggregateType, aggregateID string) BaseEvent {
 	return BaseEvent{
-		id:            uuid.New().String(),
-		eventType:     eventType,
-		occurredAt:    time.Now(),
-		aggregateType: aggregateType,
-		aggregateID:   aggregateID,
+		ID:                 uuid.New().String(),
+		EventTypeValue:     eventType,
+		OccurredAtValue:    time.Now(),
+		AggregateTypeValue: aggregateType,
+		AggregateIDValue:   aggregateID,
 	}
 }
 
 // EventID 获取事件ID
 func (e BaseEvent) EventID() string {
-	return e.id
+	return e.ID
 }
 
 // EventType 获取事件类型
 func (e BaseEvent) EventType() string {
-	return e.eventType
+	return e.EventTypeValue
 }
 
 // OccurredAt 获取事件发生时间
 func (e BaseEvent) OccurredAt() time.Time {
-	return e.occurredAt
+	return e.OccurredAtValue
 }
 
 // AggregateType 获取聚合根类型
 func (e BaseEvent) AggregateType() string {
-	return e.aggregateType
+	return e.AggregateTypeValue
 }
 
 // AggregateID 获取聚合根ID
 func (e BaseEvent) AggregateID() string {
-	return e.aggregateID
+	return e.AggregateIDValue
 }
 
 // ==================== 泛型事件 ====================
