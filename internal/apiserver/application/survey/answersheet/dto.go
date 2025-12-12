@@ -9,6 +9,8 @@ import "time"
 type SubmitAnswerSheetDTO struct {
 	QuestionnaireCode string      // 问卷编码
 	QuestionnaireVer  string      // 问卷版本（如 "1.0.1"，空字符串表示使用最新版本）
+	TesteeID          uint64      // 受试者ID（传递给测评层）
+	OrgID             uint64      // 组织ID（传递给测评层）
 	FillerID          uint64      // 填写人ID
 	Answers           []AnswerDTO // 答案列表
 }

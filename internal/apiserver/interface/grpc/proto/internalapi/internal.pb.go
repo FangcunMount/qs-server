@@ -27,10 +27,12 @@ type CreateAssessmentFromAnswerSheetRequest struct {
 	AnswersheetId        uint64                 `protobuf:"varint,1,opt,name=answersheet_id,json=answersheetId,proto3" json:"answersheet_id,omitempty"`                     // 答卷ID
 	QuestionnaireCode    string                 `protobuf:"bytes,2,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`          // 问卷编码
 	QuestionnaireVersion string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"` // 问卷版本
-	FillerId             uint64                 `protobuf:"varint,4,opt,name=filler_id,json=fillerId,proto3" json:"filler_id,omitempty"`                                    // 填写人ID
-	FillerType           string                 `protobuf:"bytes,5,opt,name=filler_type,json=fillerType,proto3" json:"filler_type,omitempty"`                               // 填写人类型：self/proxy
-	OriginType           string                 `protobuf:"bytes,6,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`                               // 来源类型：adhoc/plan/screening（可选）
-	OriginId             string                 `protobuf:"bytes,7,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`                                     // 来源ID（可选）
+	TesteeId             uint64                 `protobuf:"varint,4,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`                                    // 受试者ID
+	OrgId                uint64                 `protobuf:"varint,5,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                                             // 组织ID
+	FillerId             uint64                 `protobuf:"varint,6,opt,name=filler_id,json=fillerId,proto3" json:"filler_id,omitempty"`                                    // 填写人ID
+	FillerType           string                 `protobuf:"bytes,7,opt,name=filler_type,json=fillerType,proto3" json:"filler_type,omitempty"`                               // 填写人类型：self/proxy
+	OriginType           string                 `protobuf:"bytes,8,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`                               // 来源类型：adhoc/plan/screening（可选）
+	OriginId             string                 `protobuf:"bytes,9,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`                                     // 来源ID（可选）
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -84,6 +86,20 @@ func (x *CreateAssessmentFromAnswerSheetRequest) GetQuestionnaireVersion() strin
 		return x.QuestionnaireVersion
 	}
 	return ""
+}
+
+func (x *CreateAssessmentFromAnswerSheetRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *CreateAssessmentFromAnswerSheetRequest) GetOrgId() uint64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
 }
 
 func (x *CreateAssessmentFromAnswerSheetRequest) GetFillerId() uint64 {
@@ -309,17 +325,19 @@ var File_internalapi_internal_proto protoreflect.FileDescriptor
 
 const file_internalapi_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x1ainternalapi/internal.proto\x12\vinternalapi\"\xaf\x02\n" +
+	"\x1ainternalapi/internal.proto\x12\vinternalapi\"\xe3\x02\n" +
 	"&CreateAssessmentFromAnswerSheetRequest\x12%\n" +
 	"\x0eanswersheet_id\x18\x01 \x01(\x04R\ranswersheetId\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x03 \x01(\tR\x14questionnaireVersion\x12\x1b\n" +
-	"\tfiller_id\x18\x04 \x01(\x04R\bfillerId\x12\x1f\n" +
-	"\vfiller_type\x18\x05 \x01(\tR\n" +
+	"\ttestee_id\x18\x04 \x01(\x04R\btesteeId\x12\x15\n" +
+	"\x06org_id\x18\x05 \x01(\x04R\x05orgId\x12\x1b\n" +
+	"\tfiller_id\x18\x06 \x01(\x04R\bfillerId\x12\x1f\n" +
+	"\vfiller_type\x18\a \x01(\tR\n" +
 	"fillerType\x12\x1f\n" +
-	"\vorigin_type\x18\x06 \x01(\tR\n" +
+	"\vorigin_type\x18\b \x01(\tR\n" +
 	"originType\x12\x1b\n" +
-	"\torigin_id\x18\a \x01(\tR\boriginId\"\xa9\x01\n" +
+	"\torigin_id\x18\t \x01(\tR\boriginId\"\xa9\x01\n" +
 	"'CreateAssessmentFromAnswerSheetResponse\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12%\n" +

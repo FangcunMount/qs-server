@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
@@ -23,7 +22,6 @@ type InternalService struct {
 	managementService assessmentApp.AssessmentManagementService
 	engineService     engine.Service
 	scaleRepo         scale.Repository
-	testeeRepo        testee.Repository
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -32,14 +30,12 @@ func NewInternalService(
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
 	scaleRepo scale.Repository,
-	testeeRepo testee.Repository,
 ) *InternalService {
 	return &InternalService{
 		submissionService: submissionService,
 		managementService: managementService,
 		engineService:     engineService,
 		scaleRepo:         scaleRepo,
-		testeeRepo:        testeeRepo,
 	}
 }
 
@@ -101,34 +97,10 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		)
 	}
 
-	// 确定受试者ID（当 filler_type 为 self 时，filler_id 即为 testee_id）
-	var testeeID uint64
-	if req.FillerType == "self" {
-		testeeID = req.FillerId
-	} else {
-		// 代填场景：当前系统设计中答卷未存储受试者ID，暂时使用 filler_id
-		// TODO: 在 proto 中添加 testee_id 字段以支持代填场景
-		testeeID = req.FillerId
-		l.Warnw("代填场景使用 filler_id 作为 testee_id",
-			"filler_type", req.FillerType,
-			"filler_id", req.FillerId,
-		)
-	}
-
-	// 查询受试者获取 OrgID
-	testeeEntity, err := s.testeeRepo.FindByID(ctx, testee.ID(testeeID))
-	if err != nil {
-		l.Errorw("查询受试者失败",
-			"testee_id", testeeID,
-			"error", err.Error(),
-		)
-		return nil, status.Errorf(codes.NotFound, "受试者不存在: %v", err)
-	}
-
 	// 构建创建 DTO（使用 QuestionnaireCode 作为唯一标识）
 	dto := assessmentApp.CreateAssessmentDTO{
-		OrgID:                uint64(testeeEntity.OrgID()),
-		TesteeID:             testeeID,
+		OrgID:                req.OrgId,
+		TesteeID:             req.TesteeId,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		AnswerSheetID:        req.AnswersheetId,

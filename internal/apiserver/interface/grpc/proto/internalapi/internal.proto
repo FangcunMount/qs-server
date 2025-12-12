@@ -29,10 +29,12 @@ message CreateAssessmentFromAnswerSheetRequest {
   uint64 answersheet_id = 1;         // 答卷ID
   string questionnaire_code = 2;     // 问卷编码
   string questionnaire_version = 3;  // 问卷版本
-  uint64 filler_id = 4;              // 填写人ID
-  string filler_type = 5;            // 填写人类型：self/proxy
-  string origin_type = 6;            // 来源类型：adhoc/plan/screening（可选）
-  string origin_id = 7;              // 来源ID（可选）
+  uint64 testee_id = 4;              // 受试者ID
+  uint64 org_id = 5;                 // 组织ID
+  uint64 filler_id = 6;              // 填写人ID
+  string filler_type = 7;            // 填写人类型：self/proxy
+  string origin_type = 8;            // 来源类型：adhoc/plan/screening（可选）
+  string origin_id = 9;              // 来源ID（可选）
 }
 
 // 从答卷创建测评响应

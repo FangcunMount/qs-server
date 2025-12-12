@@ -291,7 +291,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 7.1 生成并发布领域事件（在持久化并分配 ID 之后）
-	sheet.RaiseSubmittedEvent()
+	sheet.RaiseSubmittedEvent(dto.TesteeID, dto.OrgID)
 
 	// 7.2 发布领域事件（从聚合根获取）
 	s.publishEvents(ctx, sheet, l)

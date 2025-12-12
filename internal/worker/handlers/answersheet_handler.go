@@ -25,6 +25,8 @@ type AnswerSheetSubmittedPayload struct {
 	AnswerSheetID        string    `json:"answersheet_id"`
 	QuestionnaireCode    string    `json:"questionnaire_code"`
 	QuestionnaireVersion string    `json:"questionnaire_version"`
+	TesteeID             uint64    `json:"testee_id"` // 受试者ID
+	OrgID                uint64    `json:"org_id"`    // 组织ID
 	FillerID             uint64    `json:"filler_id"`
 	FillerType           string    `json:"filler_type"`
 	SubmittedAt          time.Time `json:"submitted_at"`
@@ -74,6 +76,8 @@ func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 			AnswersheetId:        answerSheetID,
 			QuestionnaireCode:    data.QuestionnaireCode,
 			QuestionnaireVersion: data.QuestionnaireVersion,
+			TesteeId:             data.TesteeID,
+			OrgId:                data.OrgID,
 			FillerId:             data.FillerID,
 			FillerType:           data.FillerType,
 			OriginType:           "adhoc", // 默认为即时测评

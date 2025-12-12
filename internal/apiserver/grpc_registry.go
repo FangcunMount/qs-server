@@ -73,6 +73,7 @@ func (r *GRPCRegistry) registerAnswerSheetService() error {
 	// 使用 SurveyModule 中的 SubmissionService
 	answerSheetService := service.NewAnswerSheetService(
 		r.container.SurveyModule.AnswerSheet.SubmissionService,
+		r.container.ActorModule.TesteeRepo,
 	)
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")
@@ -150,7 +151,6 @@ func (r *GRPCRegistry) registerInternalService() error {
 		r.container.EvaluationModule.ManagementService,
 		r.container.EvaluationModule.EvaluationService,
 		r.container.ScaleModule.Repo,
-		r.container.ActorModule.TesteeRepo,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")
