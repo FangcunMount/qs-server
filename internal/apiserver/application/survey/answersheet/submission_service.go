@@ -290,7 +290,10 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
 	}
 
-	// 7.1 发布领域事件（从聚合根获取）
+	// 7.1 生成并发布领域事件（在持久化并分配 ID 之后）
+	sheet.RaiseSubmittedEvent()
+
+	// 7.2 发布领域事件（从聚合根获取）
 	s.publishEvents(ctx, sheet, l)
 
 	duration := time.Since(startTime)

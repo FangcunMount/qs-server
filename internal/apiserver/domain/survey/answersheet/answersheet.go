@@ -68,9 +68,6 @@ func NewAnswerSheet(
 		events:           make([]event.DomainEvent, 0),
 	}
 
-	// 创建即提交，触发领域事件
-	sheet.submit()
-
 	return sheet, nil
 }
 
@@ -165,8 +162,7 @@ func (a *AnswerSheet) addEvent(evt event.DomainEvent) {
 	a.events = append(a.events, evt)
 }
 
-// submit 提交答卷（包内方法，在创建后调用）
-// 触发 AnswerSheetSubmittedEvent
-func (a *AnswerSheet) submit() {
+// RaiseSubmittedEvent 在持久化后触发提交事件（确保带上持久化后的 ID）
+func (a *AnswerSheet) RaiseSubmittedEvent() {
 	a.addEvent(NewAnswerSheetSubmittedEvent(a))
 }
