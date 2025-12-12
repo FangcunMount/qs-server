@@ -150,6 +150,7 @@ func (r *GRPCRegistry) registerInternalService() error {
 		r.container.EvaluationModule.ManagementService,
 		r.container.EvaluationModule.EvaluationService,
 		r.container.ScaleModule.Repo,
+		r.container.ActorModule.TesteeRepo,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")

@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
@@ -22,6 +23,7 @@ type InternalService struct {
 	managementService assessmentApp.AssessmentManagementService
 	engineService     engine.Service
 	scaleRepo         scale.Repository
+	testeeRepo        testee.Repository
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -30,12 +32,14 @@ func NewInternalService(
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
 	scaleRepo scale.Repository,
+	testeeRepo testee.Repository,
 ) *InternalService {
 	return &InternalService{
 		submissionService: submissionService,
 		managementService: managementService,
 		engineService:     engineService,
 		scaleRepo:         scaleRepo,
+		testeeRepo:        testeeRepo,
 	}
 }
 
@@ -97,9 +101,19 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		)
 	}
 
+	// 查询受试者获取 OrgID
+	testeeEntity, err := s.testeeRepo.FindByID(ctx, testee.ID(req.FillerId))
+	if err != nil {
+		l.Errorw("查询受试者失败",
+			"testee_id", req.FillerId,
+			"error", err.Error(),
+		)
+		return nil, status.Errorf(codes.NotFound, "受试者不存在: %v", err)
+	}
+
 	// 构建创建 DTO（使用 QuestionnaireCode 作为唯一标识）
 	dto := assessmentApp.CreateAssessmentDTO{
-		OrgID:                0, // 从上下文或答卷获取
+		OrgID:                uint64(testeeEntity.OrgID()),
 		TesteeID:             req.FillerId,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
