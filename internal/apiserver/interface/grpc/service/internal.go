@@ -101,11 +101,25 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		)
 	}
 
+	// 确定受试者ID（当 filler_type 为 self 时，filler_id 即为 testee_id）
+	var testeeID uint64
+	if req.FillerType == "self" {
+		testeeID = req.FillerId
+	} else {
+		// 代填场景：当前系统设计中答卷未存储受试者ID，暂时使用 filler_id
+		// TODO: 在 proto 中添加 testee_id 字段以支持代填场景
+		testeeID = req.FillerId
+		l.Warnw("代填场景使用 filler_id 作为 testee_id",
+			"filler_type", req.FillerType,
+			"filler_id", req.FillerId,
+		)
+	}
+
 	// 查询受试者获取 OrgID
-	testeeEntity, err := s.testeeRepo.FindByID(ctx, testee.ID(req.FillerId))
+	testeeEntity, err := s.testeeRepo.FindByID(ctx, testee.ID(testeeID))
 	if err != nil {
 		l.Errorw("查询受试者失败",
-			"testee_id", req.FillerId,
+			"testee_id", testeeID,
 			"error", err.Error(),
 		)
 		return nil, status.Errorf(codes.NotFound, "受试者不存在: %v", err)
@@ -114,7 +128,7 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 	// 构建创建 DTO（使用 QuestionnaireCode 作为唯一标识）
 	dto := assessmentApp.CreateAssessmentDTO{
 		OrgID:                uint64(testeeEntity.OrgID()),
-		TesteeID:             req.FillerId,
+		TesteeID:             testeeID,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		AnswerSheetID:        req.AnswersheetId,
