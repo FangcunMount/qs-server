@@ -311,6 +311,10 @@ func printViperConfig(basename string) {
 		"MONGODB_DATABASE",
 		"JWT_SECRET",
 		"IDP_ENCRYPTION_KEY",
+		"NSQ_NSQD_HOST",
+		"NSQ_NSQD_PORT",
+		"NSQ_LOOKUPD_HOST",
+		"NSQ_LOOKUPD_PORT",
 	}
 	for _, key := range keys {
 		envKey := envPrefix + "_" + key

@@ -33,8 +33,8 @@ worker:
 
 messaging:
   provider: nsq  # 消息队列提供者: nsq, rabbitmq
-  nsq-addr: "127.0.0.1:4150"
-  nsq-lookupd-addr: "127.0.0.1:4161"
+  nsq-addr: "nsqd:4150"
+  nsq-lookupd-addr: "nsqlookupd:4161"
   rabbitmq-url: "amqp://guest:guest@127.0.0.1:5672/"
 
 # ============================================================
