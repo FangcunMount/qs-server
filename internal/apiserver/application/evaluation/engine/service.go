@@ -63,11 +63,11 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	// 1. 前置校验处理器
 	chain.AddHandler(pipeline.NewValidationHandler())
 
-	// 2. 答卷分数计算处理器
-	chain.AddHandler(pipeline.NewAnswerSheetScoreHandler())
+	// 2. 因子分数计算处理器（从答卷读取预计算分数，按因子聚合）
+	chain.AddHandler(pipeline.NewFactorScoreHandler())
 
-	// 3. 测评分数计算处理器
-	chain.AddHandler(pipeline.NewAssessmentScoreHandler(s.scoreRepo))
+	// 3. 风险等级计算处理器（计算风险等级，保存分数）
+	chain.AddHandler(pipeline.NewRiskLevelHandler(s.scoreRepo))
 
 	// 4. 测评分析解读处理器
 	chain.AddHandler(pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder))

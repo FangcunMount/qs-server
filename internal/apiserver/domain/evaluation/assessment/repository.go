@@ -66,8 +66,12 @@ type Repository interface {
 type ScoreRepository interface {
 	// === 批量保存 ===
 
-	// SaveScores 批量保存得分
+	// SaveScores 批量保存得分（已废弃，使用 SaveScoresWithContext）
 	SaveScores(ctx context.Context, scores []*AssessmentScore) error
+
+	// SaveScoresWithContext 带上下文保存得分（包含受试者和量表信息）
+	// 需要传入 Assessment 对象来获取必要的辅助信息（testeeID, scaleID 等）
+	SaveScoresWithContext(ctx context.Context, assessmentDomain *Assessment, score *AssessmentScore) error
 
 	// === 基础查询 ===
 

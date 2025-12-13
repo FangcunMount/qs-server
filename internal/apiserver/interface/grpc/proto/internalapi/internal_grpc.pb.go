@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	InternalService_CalculateAnswerSheetScore_FullMethodName       = "/internalapi.InternalService/CalculateAnswerSheetScore"
 	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
 	InternalService_EvaluateAssessment_FullMethodName              = "/internalapi.InternalService/EvaluateAssessment"
 )
@@ -30,8 +31,12 @@ const (
 // 内部服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用
 type InternalServiceClient interface {
-	// 从答卷创建测评
+	// 计算答卷分数
 	// 场景：worker 处理 answersheet.submitted 事件后调用
+	// 流程：根据问卷评分规则计算每个答案的分数并保存
+	CalculateAnswerSheetScore(ctx context.Context, in *CalculateAnswerSheetScoreRequest, opts ...grpc.CallOption) (*CalculateAnswerSheetScoreResponse, error)
+	// 从答卷创建测评
+	// 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
 	// 流程：根据答卷信息创建 Assessment，如果问卷关联了量表则自动提交
 	CreateAssessmentFromAnswerSheet(ctx context.Context, in *CreateAssessmentFromAnswerSheetRequest, opts ...grpc.CallOption) (*CreateAssessmentFromAnswerSheetResponse, error)
 	// 执行测评评估
@@ -46,6 +51,16 @@ type internalServiceClient struct {
 
 func NewInternalServiceClient(cc grpc.ClientConnInterface) InternalServiceClient {
 	return &internalServiceClient{cc}
+}
+
+func (c *internalServiceClient) CalculateAnswerSheetScore(ctx context.Context, in *CalculateAnswerSheetScoreRequest, opts ...grpc.CallOption) (*CalculateAnswerSheetScoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CalculateAnswerSheetScoreResponse)
+	err := c.cc.Invoke(ctx, InternalService_CalculateAnswerSheetScore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *internalServiceClient) CreateAssessmentFromAnswerSheet(ctx context.Context, in *CreateAssessmentFromAnswerSheetRequest, opts ...grpc.CallOption) (*CreateAssessmentFromAnswerSheetResponse, error) {
@@ -75,8 +90,12 @@ func (c *internalServiceClient) EvaluateAssessment(ctx context.Context, in *Eval
 // 内部服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用
 type InternalServiceServer interface {
-	// 从答卷创建测评
+	// 计算答卷分数
 	// 场景：worker 处理 answersheet.submitted 事件后调用
+	// 流程：根据问卷评分规则计算每个答案的分数并保存
+	CalculateAnswerSheetScore(context.Context, *CalculateAnswerSheetScoreRequest) (*CalculateAnswerSheetScoreResponse, error)
+	// 从答卷创建测评
+	// 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
 	// 流程：根据答卷信息创建 Assessment，如果问卷关联了量表则自动提交
 	CreateAssessmentFromAnswerSheet(context.Context, *CreateAssessmentFromAnswerSheetRequest) (*CreateAssessmentFromAnswerSheetResponse, error)
 	// 执行测评评估
@@ -93,6 +112,9 @@ type InternalServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedInternalServiceServer struct{}
 
+func (UnimplementedInternalServiceServer) CalculateAnswerSheetScore(context.Context, *CalculateAnswerSheetScoreRequest) (*CalculateAnswerSheetScoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CalculateAnswerSheetScore not implemented")
+}
 func (UnimplementedInternalServiceServer) CreateAssessmentFromAnswerSheet(context.Context, *CreateAssessmentFromAnswerSheetRequest) (*CreateAssessmentFromAnswerSheetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAssessmentFromAnswerSheet not implemented")
 }
@@ -118,6 +140,24 @@ func RegisterInternalServiceServer(s grpc.ServiceRegistrar, srv InternalServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&InternalService_ServiceDesc, srv)
+}
+
+func _InternalService_CalculateAnswerSheetScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CalculateAnswerSheetScoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).CalculateAnswerSheetScore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_CalculateAnswerSheetScore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).CalculateAnswerSheetScore(ctx, req.(*CalculateAnswerSheetScoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _InternalService_CreateAssessmentFromAnswerSheet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -163,6 +203,10 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "internalapi.InternalService",
 	HandlerType: (*InternalServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CalculateAnswerSheetScore",
+			Handler:    _InternalService_CalculateAnswerSheetScore_Handler,
+		},
 		{
 			MethodName: "CreateAssessmentFromAnswerSheet",
 			Handler:    _InternalService_CreateAssessmentFromAnswerSheet_Handler,

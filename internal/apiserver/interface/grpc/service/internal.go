@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
@@ -18,24 +19,27 @@ import (
 // 用于事件处理后的业务逻辑调用
 type InternalService struct {
 	pb.UnimplementedInternalServiceServer
-	submissionService assessmentApp.AssessmentSubmissionService
-	managementService assessmentApp.AssessmentManagementService
-	engineService     engine.Service
-	scaleRepo         scale.Repository
+	answerSheetScoringService answerSheetApp.AnswerSheetScoringService
+	submissionService         assessmentApp.AssessmentSubmissionService
+	managementService         assessmentApp.AssessmentManagementService
+	engineService             engine.Service
+	scaleRepo                 scale.Repository
 }
 
 // NewInternalService 创建内部 gRPC 服务
 func NewInternalService(
+	answerSheetScoringService answerSheetApp.AnswerSheetScoringService,
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
 	scaleRepo scale.Repository,
 ) *InternalService {
 	return &InternalService{
-		submissionService: submissionService,
-		managementService: managementService,
-		engineService:     engineService,
-		scaleRepo:         scaleRepo,
+		answerSheetScoringService: answerSheetScoringService,
+		submissionService:         submissionService,
+		managementService:         managementService,
+		engineService:             engineService,
+		scaleRepo:                 scaleRepo,
 	}
 }
 
@@ -44,8 +48,52 @@ func (s *InternalService) RegisterService(server *grpc.Server) {
 	pb.RegisterInternalServiceServer(server, s)
 }
 
-// CreateAssessmentFromAnswerSheet 从答卷创建测评
+// CalculateAnswerSheetScore 计算答卷分数
 // 场景：worker 处理 answersheet.submitted 事件后调用
+func (s *InternalService) CalculateAnswerSheetScore(
+	ctx context.Context,
+	req *pb.CalculateAnswerSheetScoreRequest,
+) (*pb.CalculateAnswerSheetScoreResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到答卷计分请求",
+		"action", "calculate_answersheet_score",
+		"answersheet_id", req.AnswersheetId,
+	)
+
+	// 验证参数
+	if req.AnswersheetId == 0 {
+		return &pb.CalculateAnswerSheetScoreResponse{
+			Success: false,
+			Message: "answersheet_id 不能为空",
+		}, nil
+	}
+
+	// 调用应用服务计算分数
+	err := s.answerSheetScoringService.CalculateAndSave(ctx, req.AnswersheetId)
+	if err != nil {
+		l.Errorw("答卷计分失败",
+			"answersheet_id", req.AnswersheetId,
+			"error", err.Error(),
+		)
+		return &pb.CalculateAnswerSheetScoreResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("答卷计分成功",
+		"answersheet_id", req.AnswersheetId,
+	)
+
+	return &pb.CalculateAnswerSheetScoreResponse{
+		Success: true,
+		Message: "计分成功",
+	}, nil
+}
+
+// CreateAssessmentFromAnswerSheet 从答卷创建测评
+// 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
 func (s *InternalService) CreateAssessmentFromAnswerSheet(
 	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,

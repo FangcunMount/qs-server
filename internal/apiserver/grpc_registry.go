@@ -73,7 +73,6 @@ func (r *GRPCRegistry) registerAnswerSheetService() error {
 	// 使用 SurveyModule 中的 SubmissionService
 	answerSheetService := service.NewAnswerSheetService(
 		r.container.SurveyModule.AnswerSheet.SubmissionService,
-		r.container.ActorModule.TesteeRepo,
 	)
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")
@@ -147,8 +146,14 @@ func (r *GRPCRegistry) registerInternalService() error {
 		return nil
 	}
 
-	// 使用 EvaluationModule 和 ScaleModule 中的服务
+	if r.container.SurveyModule == nil {
+		log.Warn("SurveyModule is not initialized, skipping internal service registration")
+		return nil
+	}
+
+	// 使用 SurveyModule、EvaluationModule 和 ScaleModule 中的服务
 	internalService := service.NewInternalService(
+		r.container.SurveyModule.AnswerSheet.ScoringService,
 		r.container.EvaluationModule.SubmissionService,
 		r.container.EvaluationModule.ManagementService,
 		r.container.EvaluationModule.EvaluationService,

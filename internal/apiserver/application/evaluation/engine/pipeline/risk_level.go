@@ -9,45 +9,43 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// AssessmentScoreHandler 测评分数计算处理器
+// RiskLevelHandler 风险等级计算处理器
 // 职责：
-// 1. 根据因子得分计算总分和风险等级
+// 1. 根据因子得分和量表解读规则计算风险等级
 // 2. 保存 AssessmentScore 到仓储
-// 输入：Context.FactorScores
-// 输出：填充 Context.TotalScore, RiskLevel
-type AssessmentScoreHandler struct {
+// 输入：Context.FactorScores, Context.TotalScore
+// 输出：填充 Context.RiskLevel，更新 Context.FactorScores 的风险等级
+type RiskLevelHandler struct {
 	*BaseHandler
 	scoreRepo assessment.ScoreRepository
 }
 
-// NewAssessmentScoreHandler 创建测评分数计算处理器
-func NewAssessmentScoreHandler(scoreRepo assessment.ScoreRepository) *AssessmentScoreHandler {
-	return &AssessmentScoreHandler{
-		BaseHandler: NewBaseHandler("AssessmentScoreHandler"),
+// NewRiskLevelHandler 创建风险等级计算处理器
+func NewRiskLevelHandler(scoreRepo assessment.ScoreRepository) *RiskLevelHandler {
+	return &RiskLevelHandler{
+		BaseHandler: NewBaseHandler("RiskLevelHandler"),
 		scoreRepo:   scoreRepo,
 	}
 }
 
-// Handle 处理测评分数计算
-func (h *AssessmentScoreHandler) Handle(ctx context.Context, evalCtx *Context) error {
+// Handle 处理风险等级计算
+func (h *RiskLevelHandler) Handle(ctx context.Context, evalCtx *Context) error {
 	// 检查前置条件
 	if len(evalCtx.FactorScores) == 0 {
 		evalCtx.SetError(ErrFactorScoresRequired)
 		return evalCtx.Error
 	}
 
-	// 1. 计算总分
-	totalScore := h.calculateTotalScore(evalCtx.FactorScores)
-	evalCtx.TotalScore = totalScore
+	// 注意：TotalScore 已由 FactorScoreHandler 计算完成
 
-	// 2. 更新因子得分的风险等级（根据量表的阈值规则）
+	// 1. 更新因子得分的风险等级（根据量表的阈值规则）
 	h.updateFactorRiskLevels(evalCtx)
 
-	// 3. 计算整体风险等级（基于因子风险等级）
+	// 2. 计算整体风险等级（基于因子风险等级）
 	riskLevel := h.calculateOverallRiskLevel(evalCtx)
 	evalCtx.RiskLevel = riskLevel
 
-	// 4. 保存 AssessmentScore
+	// 3. 保存 AssessmentScore
 	if err := h.saveAssessmentScore(ctx, evalCtx); err != nil {
 		evalCtx.SetError(err)
 		return err
@@ -57,27 +55,9 @@ func (h *AssessmentScoreHandler) Handle(ctx context.Context, evalCtx *Context) e
 	return h.Next(ctx, evalCtx)
 }
 
-// calculateTotalScore 计算总分
-func (h *AssessmentScoreHandler) calculateTotalScore(factorScores []assessment.FactorScoreResult) float64 {
-	var totalScore float64
-	var count int
-
-	for _, fs := range factorScores {
-		// 如果有明确标记为总分的因子，直接使用
-		if fs.IsTotalScore {
-			return fs.RawScore
-		}
-		totalScore += fs.RawScore
-		count++
-	}
-
-	// 如果没有总分因子，返回所有因子得分之和
-	return totalScore
-}
-
 // updateFactorRiskLevels 更新因子风险等级
 // 使用量表中定义的解读规则来计算每个因子的风险等级
-func (h *AssessmentScoreHandler) updateFactorRiskLevels(evalCtx *Context) {
+func (h *RiskLevelHandler) updateFactorRiskLevels(evalCtx *Context) {
 	updatedScores := make([]assessment.FactorScoreResult, 0, len(evalCtx.FactorScores))
 
 	for _, fs := range evalCtx.FactorScores {
@@ -100,7 +80,7 @@ func (h *AssessmentScoreHandler) updateFactorRiskLevels(evalCtx *Context) {
 
 // calculateFactorRiskLevel 计算因子风险等级
 // 优先使用量表中定义的解读规则，如果没有则使用默认阈值
-func (h *AssessmentScoreHandler) calculateFactorRiskLevel(
+func (h *RiskLevelHandler) calculateFactorRiskLevel(
 	medicalScale *scale.MedicalScale,
 	factorCode assessment.FactorCode,
 	score float64,
@@ -122,7 +102,7 @@ func (h *AssessmentScoreHandler) calculateFactorRiskLevel(
 
 // calculateOverallRiskLevel 计算整体风险等级
 // 综合所有因子的风险等级，取最高风险作为整体风险
-func (h *AssessmentScoreHandler) calculateOverallRiskLevel(evalCtx *Context) assessment.RiskLevel {
+func (h *RiskLevelHandler) calculateOverallRiskLevel(evalCtx *Context) assessment.RiskLevel {
 	// 优先使用量表的整体解读规则
 	if evalCtx.MedicalScale != nil {
 		// 尝试查找总分因子的解读规则
@@ -150,7 +130,7 @@ func (h *AssessmentScoreHandler) calculateOverallRiskLevel(evalCtx *Context) ass
 }
 
 // defaultRiskLevelByScore 根据分数使用默认阈值计算风险等级
-func (h *AssessmentScoreHandler) defaultRiskLevelByScore(score float64) assessment.RiskLevel {
+func (h *RiskLevelHandler) defaultRiskLevelByScore(score float64) assessment.RiskLevel {
 	switch {
 	case score >= 80:
 		return assessment.RiskLevelSevere
@@ -202,7 +182,7 @@ func riskLevelOrder(level assessment.RiskLevel) int {
 }
 
 // saveAssessmentScore 保存测评得分
-func (h *AssessmentScoreHandler) saveAssessmentScore(ctx context.Context, evalCtx *Context) error {
+func (h *RiskLevelHandler) saveAssessmentScore(ctx context.Context, evalCtx *Context) error {
 	// 转换因子得分
 	factorScores := make([]assessment.FactorScore, 0, len(evalCtx.FactorScores))
 	for _, fs := range evalCtx.FactorScores {
@@ -223,8 +203,8 @@ func (h *AssessmentScoreHandler) saveAssessmentScore(ctx context.Context, evalCt
 		factorScores,
 	)
 
-	// 保存到仓储
-	if err := h.scoreRepo.SaveScores(ctx, []*assessment.AssessmentScore{score}); err != nil {
+	// 保存到仓储（使用带上下文的方法，传入 Assessment 对象获取必要的辅助信息）
+	if err := h.scoreRepo.SaveScoresWithContext(ctx, evalCtx.Assessment, score); err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存测评得分失败")
 	}
 

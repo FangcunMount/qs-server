@@ -7,10 +7,18 @@ option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interf
 // 内部服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用
 service InternalService {
+  // ==================== AnswerSheet 操作 ====================
+  
+  // 计算答卷分数
+  // 场景：worker 处理 answersheet.submitted 事件后调用
+  // 流程：根据问卷评分规则计算每个答案的分数并保存
+  rpc CalculateAnswerSheetScore(CalculateAnswerSheetScoreRequest) 
+      returns (CalculateAnswerSheetScoreResponse);
+  
   // ==================== Assessment 操作 ====================
   
   // 从答卷创建测评
-  // 场景：worker 处理 answersheet.submitted 事件后调用
+  // 场景：worker 处理 answersheet.submitted 事件后调用（在计分之后）
   // 流程：根据答卷信息创建 Assessment，如果问卷关联了量表则自动提交
   rpc CreateAssessmentFromAnswerSheet(CreateAssessmentFromAnswerSheetRequest) 
       returns (CreateAssessmentFromAnswerSheetResponse);
@@ -20,6 +28,20 @@ service InternalService {
   // 流程：加载测评和量表，执行计分和解读，保存结果
   rpc EvaluateAssessment(EvaluateAssessmentRequest) 
       returns (EvaluateAssessmentResponse);
+}
+
+// ==================== CalculateAnswerSheetScore ====================
+
+// 计算答卷分数请求
+message CalculateAnswerSheetScoreRequest {
+  uint64 answersheet_id = 1;         // 答卷ID
+}
+
+// 计算答卷分数响应
+message CalculateAnswerSheetScoreResponse {
+  bool success = 1;                  // 是否成功
+  double total_score = 2;            // 总分
+  string message = 3;                // 描述信息
 }
 
 // ==================== CreateAssessmentFromAnswerSheet ====================

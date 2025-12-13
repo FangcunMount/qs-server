@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
+	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 )
 
 // AnswerValueAdapter 将 AnswerValue 适配为 ValidatableValue

@@ -8,11 +8,11 @@ import (
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/validation"
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/validation"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -54,6 +54,7 @@ type AnswerSheetSubModule struct {
 	// service 层 - 按行为者组织
 	SubmissionService asApp.AnswerSheetSubmissionService
 	ManagementService asApp.AnswerSheetManagementService
+	ScoringService    asApp.AnswerSheetScoringService // 新增：计分服务
 }
 
 // NewSurveyModule 创建 Survey 模块
@@ -137,12 +138,16 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	// 获取问卷仓储（答卷服务需要依赖问卷仓储进行验证）
 	quesRepo := m.Questionnaire.Repo
 
-	// 创建验证器
-	validator := validation.NewDefaultValidator()
+	// 创建批量验证器
+	batchValidator := validation.NewBatchValidator()
+
+	// 创建领域服务
+	scoringDomainService := answersheet.NewScoringService()
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, quesRepo, validator, m.eventPublisher)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, quesRepo, batchValidator, m.eventPublisher)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
+	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
 
 	// 初始化 handler 层
 	sub.Handler = handler.NewAnswerSheetHandler(

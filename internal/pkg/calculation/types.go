@@ -108,3 +108,22 @@ func (c *CalculationRule) GetFormula() FormulaType {
 func (c *CalculationRule) GetSourceCodes() []string {
 	return c.sourceCodes
 }
+
+// ==================== 可计分值接口（对应 validation.ValidatableValue）====================
+
+// ScorableValue 可计分的值接口
+// 这是计分服务对"被计分值"的抽象，不关心具体题型
+// 设计原则：与 validation.ValidatableValue 保持对称
+type ScorableValue interface {
+	// IsEmpty 值是否为空
+	IsEmpty() bool
+
+	// AsSingleSelection 获取单选值（选项编码）
+	AsSingleSelection() (string, bool)
+
+	// AsMultipleSelections 获取多选值（选项编码数组）
+	AsMultipleSelections() ([]string, bool)
+
+	// AsNumber 获取数值
+	AsNumber() (float64, bool)
+}

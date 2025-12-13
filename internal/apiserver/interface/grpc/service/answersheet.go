@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 )
 
@@ -18,17 +17,12 @@ import (
 type AnswerSheetService struct {
 	pb.UnimplementedAnswerSheetServiceServer
 	submissionService answersheet.AnswerSheetSubmissionService
-	testeeRepo        testee.Repository
 }
 
 // NewAnswerSheetService 创建答卷 gRPC 服务
-func NewAnswerSheetService(
-	submissionService answersheet.AnswerSheetSubmissionService,
-	testeeRepo testee.Repository,
-) *AnswerSheetService {
+func NewAnswerSheetService(submissionService answersheet.AnswerSheetSubmissionService) *AnswerSheetService {
 	return &AnswerSheetService{
 		submissionService: submissionService,
-		testeeRepo:        testeeRepo,
 	}
 }
 
@@ -54,17 +48,9 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	questionnaireVer := req.QuestionnaireVersion
 	// 空字符串表示不指定版本，自动使用最新版
 
-	// 查询受试者获取 OrgID
-	testeeEntity, err := s.testeeRepo.FindByID(ctx, testee.ID(req.TesteeId))
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "受试者不存在: %v", err)
-	}
-
 	dto := answersheet.SubmitAnswerSheetDTO{
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  questionnaireVer,
-		TesteeID:          req.TesteeId,
-		OrgID:             uint64(testeeEntity.OrgID()),
 		FillerID:          req.WriterId, // proto 中使用 writer_id
 		Answers:           answers,
 	}

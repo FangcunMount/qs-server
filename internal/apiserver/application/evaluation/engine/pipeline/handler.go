@@ -6,8 +6,8 @@
 //
 // 处理器链路：
 //  1. ValidationHandler - 前置校验（校验输入数据完整性）
-//  2. AnswerSheetScoreHandler - 答卷分数计算（根据答卷计算各因子原始得分）
-//  3. AssessmentScoreHandler - 测评分数计算、保存（计算总分、风险等级，保存得分）
+//  2. FactorScoreHandler - 因子分数计算（从答卷读取预计算分数，按因子聚合，计算总分）
+//  3. RiskLevelHandler - 风险等级计算（计算因子/整体风险等级，保存得分）
 //  4. InterpretationHandler - 测评分析解读、保存（生成结论建议，保存报告）
 //  5. EventPublishHandler - 事件发布（发布 AssessmentInterpretedEvent）
 //

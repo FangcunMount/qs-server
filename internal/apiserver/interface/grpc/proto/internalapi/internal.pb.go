@@ -21,6 +21,112 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// 计算答卷分数请求
+type CalculateAnswerSheetScoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnswersheetId uint64                 `protobuf:"varint,1,opt,name=answersheet_id,json=answersheetId,proto3" json:"answersheet_id,omitempty"` // 答卷ID
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CalculateAnswerSheetScoreRequest) Reset() {
+	*x = CalculateAnswerSheetScoreRequest{}
+	mi := &file_internalapi_internal_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalculateAnswerSheetScoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalculateAnswerSheetScoreRequest) ProtoMessage() {}
+
+func (x *CalculateAnswerSheetScoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalculateAnswerSheetScoreRequest.ProtoReflect.Descriptor instead.
+func (*CalculateAnswerSheetScoreRequest) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CalculateAnswerSheetScoreRequest) GetAnswersheetId() uint64 {
+	if x != nil {
+		return x.AnswersheetId
+	}
+	return 0
+}
+
+// 计算答卷分数响应
+type CalculateAnswerSheetScoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                          // 是否成功
+	TotalScore    float64                `protobuf:"fixed64,2,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"` // 总分
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                           // 描述信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CalculateAnswerSheetScoreResponse) Reset() {
+	*x = CalculateAnswerSheetScoreResponse{}
+	mi := &file_internalapi_internal_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalculateAnswerSheetScoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalculateAnswerSheetScoreResponse) ProtoMessage() {}
+
+func (x *CalculateAnswerSheetScoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalculateAnswerSheetScoreResponse.ProtoReflect.Descriptor instead.
+func (*CalculateAnswerSheetScoreResponse) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CalculateAnswerSheetScoreResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CalculateAnswerSheetScoreResponse) GetTotalScore() float64 {
+	if x != nil {
+		return x.TotalScore
+	}
+	return 0
+}
+
+func (x *CalculateAnswerSheetScoreResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 // 从答卷创建测评请求
 type CreateAssessmentFromAnswerSheetRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -39,7 +145,7 @@ type CreateAssessmentFromAnswerSheetRequest struct {
 
 func (x *CreateAssessmentFromAnswerSheetRequest) Reset() {
 	*x = CreateAssessmentFromAnswerSheetRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[0]
+	mi := &file_internalapi_internal_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -51,7 +157,7 @@ func (x *CreateAssessmentFromAnswerSheetRequest) String() string {
 func (*CreateAssessmentFromAnswerSheetRequest) ProtoMessage() {}
 
 func (x *CreateAssessmentFromAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[0]
+	mi := &file_internalapi_internal_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -64,7 +170,7 @@ func (x *CreateAssessmentFromAnswerSheetRequest) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use CreateAssessmentFromAnswerSheetRequest.ProtoReflect.Descriptor instead.
 func (*CreateAssessmentFromAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{0}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateAssessmentFromAnswerSheetRequest) GetAnswersheetId() uint64 {
@@ -143,7 +249,7 @@ type CreateAssessmentFromAnswerSheetResponse struct {
 
 func (x *CreateAssessmentFromAnswerSheetResponse) Reset() {
 	*x = CreateAssessmentFromAnswerSheetResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[1]
+	mi := &file_internalapi_internal_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +261,7 @@ func (x *CreateAssessmentFromAnswerSheetResponse) String() string {
 func (*CreateAssessmentFromAnswerSheetResponse) ProtoMessage() {}
 
 func (x *CreateAssessmentFromAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[1]
+	mi := &file_internalapi_internal_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +274,7 @@ func (x *CreateAssessmentFromAnswerSheetResponse) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use CreateAssessmentFromAnswerSheetResponse.ProtoReflect.Descriptor instead.
 func (*CreateAssessmentFromAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{1}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateAssessmentFromAnswerSheetResponse) GetAssessmentId() uint64 {
@@ -209,7 +315,7 @@ type EvaluateAssessmentRequest struct {
 
 func (x *EvaluateAssessmentRequest) Reset() {
 	*x = EvaluateAssessmentRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[2]
+	mi := &file_internalapi_internal_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +327,7 @@ func (x *EvaluateAssessmentRequest) String() string {
 func (*EvaluateAssessmentRequest) ProtoMessage() {}
 
 func (x *EvaluateAssessmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[2]
+	mi := &file_internalapi_internal_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +340,7 @@ func (x *EvaluateAssessmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateAssessmentRequest.ProtoReflect.Descriptor instead.
 func (*EvaluateAssessmentRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{2}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *EvaluateAssessmentRequest) GetAssessmentId() uint64 {
@@ -258,7 +364,7 @@ type EvaluateAssessmentResponse struct {
 
 func (x *EvaluateAssessmentResponse) Reset() {
 	*x = EvaluateAssessmentResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[3]
+	mi := &file_internalapi_internal_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -270,7 +376,7 @@ func (x *EvaluateAssessmentResponse) String() string {
 func (*EvaluateAssessmentResponse) ProtoMessage() {}
 
 func (x *EvaluateAssessmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[3]
+	mi := &file_internalapi_internal_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +389,7 @@ func (x *EvaluateAssessmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateAssessmentResponse.ProtoReflect.Descriptor instead.
 func (*EvaluateAssessmentResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{3}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *EvaluateAssessmentResponse) GetSuccess() bool {
@@ -325,7 +431,14 @@ var File_internalapi_internal_proto protoreflect.FileDescriptor
 
 const file_internalapi_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x1ainternalapi/internal.proto\x12\vinternalapi\"\xe3\x02\n" +
+	"\x1ainternalapi/internal.proto\x12\vinternalapi\"I\n" +
+	" CalculateAnswerSheetScoreRequest\x12%\n" +
+	"\x0eanswersheet_id\x18\x01 \x01(\x04R\ranswersheetId\"x\n" +
+	"!CalculateAnswerSheetScoreResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1f\n" +
+	"\vtotal_score\x18\x02 \x01(\x01R\n" +
+	"totalScore\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xe3\x02\n" +
 	"&CreateAssessmentFromAnswerSheetRequest\x12%\n" +
 	"\x0eanswersheet_id\x18\x01 \x01(\x04R\ranswersheetId\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
@@ -352,8 +465,9 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\vtotal_score\x18\x04 \x01(\x01R\n" +
 	"totalScore\x12\x1d\n" +
 	"\n" +
-	"risk_level\x18\x05 \x01(\tR\triskLevel2\x87\x02\n" +
-	"\x0fInternalService\x12\x8c\x01\n" +
+	"risk_level\x18\x05 \x01(\tR\triskLevel2\x83\x03\n" +
+	"\x0fInternalService\x12z\n" +
+	"\x19CalculateAnswerSheetScore\x12-.internalapi.CalculateAnswerSheetScoreRequest\x1a..internalapi.CalculateAnswerSheetScoreResponse\x12\x8c\x01\n" +
 	"\x1fCreateAssessmentFromAnswerSheet\x123.internalapi.CreateAssessmentFromAnswerSheetRequest\x1a4.internalapi.CreateAssessmentFromAnswerSheetResponse\x12e\n" +
 	"\x12EvaluateAssessment\x12&.internalapi.EvaluateAssessmentRequest\x1a'.internalapi.EvaluateAssessmentResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
 
@@ -369,20 +483,24 @@ func file_internalapi_internal_proto_rawDescGZIP() []byte {
 	return file_internalapi_internal_proto_rawDescData
 }
 
-var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_internalapi_internal_proto_goTypes = []any{
-	(*CreateAssessmentFromAnswerSheetRequest)(nil),  // 0: internalapi.CreateAssessmentFromAnswerSheetRequest
-	(*CreateAssessmentFromAnswerSheetResponse)(nil), // 1: internalapi.CreateAssessmentFromAnswerSheetResponse
-	(*EvaluateAssessmentRequest)(nil),               // 2: internalapi.EvaluateAssessmentRequest
-	(*EvaluateAssessmentResponse)(nil),              // 3: internalapi.EvaluateAssessmentResponse
+	(*CalculateAnswerSheetScoreRequest)(nil),        // 0: internalapi.CalculateAnswerSheetScoreRequest
+	(*CalculateAnswerSheetScoreResponse)(nil),       // 1: internalapi.CalculateAnswerSheetScoreResponse
+	(*CreateAssessmentFromAnswerSheetRequest)(nil),  // 2: internalapi.CreateAssessmentFromAnswerSheetRequest
+	(*CreateAssessmentFromAnswerSheetResponse)(nil), // 3: internalapi.CreateAssessmentFromAnswerSheetResponse
+	(*EvaluateAssessmentRequest)(nil),               // 4: internalapi.EvaluateAssessmentRequest
+	(*EvaluateAssessmentResponse)(nil),              // 5: internalapi.EvaluateAssessmentResponse
 }
 var file_internalapi_internal_proto_depIdxs = []int32{
-	0, // 0: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
-	2, // 1: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
-	1, // 2: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
-	3, // 3: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	0, // 0: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
+	2, // 1: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
+	4, // 2: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
+	1, // 3: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
+	3, // 4: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
+	5, // 5: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -399,7 +517,7 @@ func file_internalapi_internal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -71,7 +71,29 @@ func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("invalid answersheet_id format: %w", err)
 		}
 
-		// 调用 InternalClient 创建 Assessment
+		// Step 1: 计算答卷分数（在 Survey 域完成）
+		scoreReq := &pb.CalculateAnswerSheetScoreRequest{
+			AnswersheetId: answerSheetID,
+		}
+		scoreResp, err := deps.InternalClient.CalculateAnswerSheetScore(ctx, scoreReq)
+		if err != nil {
+			deps.Logger.Error("failed to calculate answersheet score",
+				slog.String("answersheet_id", data.AnswerSheetID),
+				slog.String("error", err.Error()),
+			)
+			// 计分失败不阻塞后续流程，只记录警告
+			deps.Logger.Warn("continuing without scoring",
+				slog.String("answersheet_id", data.AnswerSheetID),
+			)
+		} else {
+			deps.Logger.Info("answersheet scored",
+				slog.String("answersheet_id", data.AnswerSheetID),
+				slog.Float64("total_score", scoreResp.TotalScore),
+				slog.Bool("success", scoreResp.Success),
+			)
+		}
+
+		// Step 2: 创建 Assessment（在 Evaluation 域完成）
 		req := &pb.CreateAssessmentFromAnswerSheetRequest{
 			AnswersheetId:        answerSheetID,
 			QuestionnaireCode:    data.QuestionnaireCode,

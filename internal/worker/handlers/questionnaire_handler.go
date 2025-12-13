@@ -102,7 +102,16 @@ func handleQuestionnairePublished(deps *Dependencies) HandlerFunc {
 			slog.String("title", data.Title),
 		)
 
-		// TODO: 预热缓存
+		// 缓存预热策略：
+		// 与量表相同，采用 Lazy Loading 模式。问卷数据结构较大（包含题目、选项等），
+		// 主动预热会占用较多内存和Redis空间。
+		//
+		// 建议场景：
+		// - 高并发问卷（如入校筛查）：可在发布时预热，避免瞬时峰值导致的cache stampede
+		// - 低频问卷：按需加载更经济
+		//
+		// 实现参考 handleScalePublished 的注释，实施方案相同。
+		// 缓存key建议格式：questionnaire:{code}:{version}
 
 		return nil
 	}

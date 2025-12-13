@@ -55,3 +55,19 @@ func (c *InternalClient) EvaluateAssessment(
 
 	return resp, nil
 }
+
+// CalculateAnswerSheetScore 计算答卷分数
+func (c *InternalClient) CalculateAnswerSheetScore(
+	ctx context.Context,
+	req *pb.CalculateAnswerSheetScoreRequest,
+) (*pb.CalculateAnswerSheetScoreResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.CalculateAnswerSheetScore(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate answersheet score: %w", err)
+	}
+
+	return resp, nil
+}

@@ -142,6 +142,42 @@ func (a *AnswerSheet) Answers() []Answer {
 	return result
 }
 
+// QuestionnaireRef 获取问卷引用
+func (a *AnswerSheet) QuestionnaireRef() QuestionnaireRef {
+	return a.questionnaireRef
+}
+
+// UpdateScores 更新答卷分数（领域方法）
+// 根据计分结果更新每个答案的分数和总分
+func (a *AnswerSheet) UpdateScores(scoredSheet *ScoredAnswerSheet) error {
+	if scoredSheet == nil {
+		return fmt.Errorf("scored answer sheet is required")
+	}
+
+	// 构建答案映射（按题目编码）
+	answerMap := make(map[string]int) // question_code -> index
+	for i, ans := range a.answers {
+		answerMap[ans.QuestionCode()] = i
+	}
+
+	// 更新每个答案的分数
+	updatedAnswers := make([]Answer, len(a.answers))
+	copy(updatedAnswers, a.answers)
+
+	for _, scoredAns := range scoredSheet.ScoredAnswers {
+		if idx, found := answerMap[scoredAns.QuestionCode]; found {
+			// 使用不可变模式更新分数
+			updatedAnswers[idx] = updatedAnswers[idx].WithScore(scoredAns.Score)
+		}
+	}
+
+	// 更新答案列表和总分
+	a.answers = updatedAnswers
+	a.score = scoredSheet.TotalScore
+
+	return nil
+}
+
 // ===================== 领域事件相关方法 =====================
 
 // Events 获取待发布的领域事件
