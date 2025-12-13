@@ -70,9 +70,10 @@ func (r *GRPCRegistry) registerAnswerSheetService() error {
 		return nil
 	}
 
-	// 使用 SurveyModule 中的 SubmissionService
+	// 使用 SurveyModule 中的 SubmissionService 和 ManagementService
 	answerSheetService := service.NewAnswerSheetService(
 		r.container.SurveyModule.AnswerSheet.SubmissionService,
+		r.container.SurveyModule.AnswerSheet.ManagementService,
 	)
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")

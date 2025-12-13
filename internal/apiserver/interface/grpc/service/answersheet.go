@@ -17,12 +17,17 @@ import (
 type AnswerSheetService struct {
 	pb.UnimplementedAnswerSheetServiceServer
 	submissionService answersheet.AnswerSheetSubmissionService
+	managementService answersheet.AnswerSheetManagementService
 }
 
 // NewAnswerSheetService 创建答卷 gRPC 服务
-func NewAnswerSheetService(submissionService answersheet.AnswerSheetSubmissionService) *AnswerSheetService {
+func NewAnswerSheetService(
+	submissionService answersheet.AnswerSheetSubmissionService,
+	managementService answersheet.AnswerSheetManagementService,
+) *AnswerSheetService {
 	return &AnswerSheetService{
 		submissionService: submissionService,
+		managementService: managementService,
 	}
 }
 
@@ -86,16 +91,15 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 
 // GetAnswerSheet 获取答卷详情（C端）
 // @Description C端用户查看自己提交的答卷详情
-// Note: 实际应该从上下文中获取用户ID进行权限验证
+// Note: gRPC 内部调用，不进行权限验证
 func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnswerSheetRequest) (*pb.GetAnswerSheetResponse, error) {
 	// 参数校验
 	if req.Id == 0 {
 		return nil, status.Error(codes.InvalidArgument, "id 不能为空")
 	}
 
-	// TODO: 从上下文中获取用户ID并验证权限
-	// 这里简化处理，直接查询答卷
-	result, err := s.submissionService.GetMyAnswerSheet(ctx, 0, req.Id)
+	// 直接获取答卷（不验证权限）
+	result, err := s.managementService.GetByID(ctx, req.Id)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
