@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -66,13 +67,19 @@ func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessment
 		"duration_ms", duration.Milliseconds(),
 	)
 
+	// 转换 AnswerSheetID，如果为 0 则转换为空字符串
+	answerSheetID := ""
+	if result.AnswerSheetID != 0 {
+		answerSheetID = strconv.FormatUint(result.AnswerSheetID, 10)
+	}
+
 	return &AssessmentDetailResponse{
-		ID:                   result.ID,
-		OrgID:                result.OrgID,
-		TesteeID:             result.TesteeID,
+		ID:                   strconv.FormatUint(result.ID, 10),
+		OrgID:                strconv.FormatUint(result.OrgID, 10),
+		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        result.AnswerSheetID,
+		AnswerSheetID:        answerSheetID,
 		ScaleCode:            result.ScaleCode,
 		ScaleName:            result.ScaleName,
 		OriginType:           result.OriginType,
@@ -136,7 +143,7 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 	items := make([]AssessmentSummaryResponse, len(result.Items))
 	for i, item := range result.Items {
 		items[i] = AssessmentSummaryResponse{
-			ID:                   item.ID,
+			ID:                   strconv.FormatUint(item.ID, 10),
 			QuestionnaireCode:    item.QuestionnaireCode,
 			QuestionnaireVersion: item.QuestionnaireVersion,
 			ScaleCode:            item.ScaleCode,
@@ -245,7 +252,7 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, testeeID, assess
 	}
 
 	return &AssessmentReportResponse{
-		AssessmentID: result.AssessmentID,
+		AssessmentID: strconv.FormatUint(result.AssessmentID, 10),
 		ScaleCode:    result.ScaleCode,
 		ScaleName:    result.ScaleName,
 		TotalScore:   result.TotalScore,
@@ -274,7 +281,7 @@ func (s *QueryService) GetFactorTrend(ctx context.Context, testeeID uint64, req 
 	points := make([]TrendPointResponse, len(result))
 	for i, point := range result {
 		points[i] = TrendPointResponse{
-			AssessmentID: point.AssessmentID,
+			AssessmentID: strconv.FormatUint(point.AssessmentID, 10),
 			Score:        point.Score,
 			RiskLevel:    point.RiskLevel,
 			CreatedAt:    point.CreatedAt,

@@ -58,7 +58,7 @@ type Answer struct {
 
 // SubmitAnswerSheetResponse 提交答卷响应
 type SubmitAnswerSheetResponse struct {
-	ID      uint64 `json:"id"`
+	ID      string `json:"id"`
 	Message string `json:"message"`
 }
 
@@ -69,14 +69,14 @@ type GetAnswerSheetRequest struct {
 
 // AnswerSheetResponse 答卷响应
 type AnswerSheetResponse struct {
-	ID                   uint64   `json:"id"`
+	ID                   string   `json:"id"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
 	Title                string   `json:"title"`
 	Score                float64  `json:"score"`
-	WriterID             uint64   `json:"writer_id"`
+	WriterID             string   `json:"writer_id"`
 	WriterName           string   `json:"writer_name"`
-	TesteeID             uint64   `json:"testee_id"`
+	TesteeID             string   `json:"testee_id"`
 	TesteeName           string   `json:"testee_name"`
 	Answers              []Answer `json:"answers"`
 	CreatedAt            string   `json:"created_at"`

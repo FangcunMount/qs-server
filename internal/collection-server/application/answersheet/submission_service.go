@@ -85,7 +85,7 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 	)
 
 	return &SubmitAnswerSheetResponse{
-		ID:      result.ID,
+		ID:      strconv.FormatUint(result.ID, 10),
 		Message: result.Message,
 	}, nil
 }
@@ -267,14 +267,14 @@ func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetRes
 	)
 
 	return &AnswerSheetResponse{
-		ID:                   result.ID,
+		ID:                   strconv.FormatUint(result.ID, 10),
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		Title:                result.Title,
 		Score:                result.Score,
-		WriterID:             result.WriterID,
+		WriterID:             strconv.FormatUint(result.WriterID, 10),
 		WriterName:           result.WriterName,
-		TesteeID:             result.TesteeID,
+		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
 		TesteeName:           result.TesteeName,
 		Answers:              answers,
 		CreatedAt:            result.CreatedAt,

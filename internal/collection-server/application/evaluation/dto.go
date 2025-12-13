@@ -2,7 +2,7 @@ package evaluation
 
 // AssessmentSummaryResponse 测评摘要响应
 type AssessmentSummaryResponse struct {
-	ID                   uint64  `json:"id"`
+	ID                   string  `json:"id"`
 	QuestionnaireCode    string  `json:"questionnaire_code"`
 	QuestionnaireVersion string  `json:"questionnaire_version"`
 	ScaleCode            string  `json:"scale_code,omitempty"`
@@ -18,12 +18,12 @@ type AssessmentSummaryResponse struct {
 
 // AssessmentDetailResponse 测评详情响应
 type AssessmentDetailResponse struct {
-	ID                   uint64  `json:"id"`
-	OrgID                uint64  `json:"org_id"`
-	TesteeID             uint64  `json:"testee_id"`
+	ID                   string  `json:"id"`
+	OrgID                string  `json:"org_id"`
+	TesteeID             string  `json:"testee_id"`
 	QuestionnaireCode    string  `json:"questionnaire_code"`
 	QuestionnaireVersion string  `json:"questionnaire_version"`
-	AnswerSheetID        uint64  `json:"answer_sheet_id,omitempty"`
+	AnswerSheetID        string  `json:"answer_sheet_id,omitempty"`
 	ScaleCode            string  `json:"scale_code,omitempty"`
 	ScaleName            string  `json:"scale_name,omitempty"`
 	OriginType           string  `json:"origin_type"`
@@ -60,7 +60,7 @@ type DimensionInterpretResponse struct {
 
 // AssessmentReportResponse 测评报告响应
 type AssessmentReportResponse struct {
-	AssessmentID uint64                       `json:"assessment_id"`
+	AssessmentID string                       `json:"assessment_id"`
 	ScaleCode    string                       `json:"scale_code"`
 	ScaleName    string                       `json:"scale_name"`
 	TotalScore   float64                      `json:"total_score"`
@@ -89,7 +89,7 @@ type ListAssessmentsResponse struct {
 
 // TrendPointResponse 趋势数据点响应
 type TrendPointResponse struct {
-	AssessmentID uint64  `json:"assessment_id"`
+	AssessmentID string  `json:"assessment_id"`
 	Score        float64 `json:"score"`
 	RiskLevel    string  `json:"risk_level"`
 	CreatedAt    string  `json:"created_at"`

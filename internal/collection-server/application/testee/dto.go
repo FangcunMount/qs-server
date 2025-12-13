@@ -30,8 +30,8 @@ type UpdateTesteeRequest struct {
 
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
-	ID         uint64        `json:"id"`           // 受试者ID
-	OrgID      uint64        `json:"org_id"`       // 机构ID
+	ID         string        `json:"id"`           // 受试者ID
+	OrgID      string        `json:"org_id"`       // 机构ID
 	IAMUserID  string        `json:"iam_user_id"`  // IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
 	IAMChildID string        `json:"iam_child_id"` // IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
 	Name       string        `json:"name"`         // 姓名
@@ -71,5 +71,5 @@ type ListTesteesResponse struct {
 // TesteeExistsResponse 受试者是否存在响应
 type TesteeExistsResponse struct {
 	Exists   bool   `json:"exists"`    // 是否存在
-	TesteeID uint64 `json:"testee_id"` // 受试者ID（如果存在）
+	TesteeID string `json:"testee_id"` // 受试者ID（如果存在）
 }

@@ -263,9 +263,15 @@ func (s *Service) TesteeExists(ctx context.Context, iamChildID string) (*TesteeE
 		"duration_ms", duration.Milliseconds(),
 	)
 
+	// 转换 TesteeID，如果为 0 则转换为空字符串
+	testeeIDStr := ""
+	if testeeID != 0 {
+		testeeIDStr = strconv.FormatUint(testeeID, 10)
+	}
+
 	return &TesteeExistsResponse{
 		Exists:   exists,
-		TesteeID: testeeID,
+		TesteeID: testeeIDStr,
 	}, nil
 }
 
@@ -276,8 +282,8 @@ func convertToTesteeResponse(from *grpcclient.TesteeResponse) *TesteeResponse {
 	}
 
 	resp := &TesteeResponse{
-		ID:         from.ID,
-		OrgID:      from.OrgID,
+		ID:         strconv.FormatUint(from.ID, 10),
+		OrgID:      strconv.FormatUint(from.OrgID, 10),
 		IAMUserID:  from.IAMUserID,
 		IAMChildID: from.IAMChildID,
 		Name:       from.Name,
