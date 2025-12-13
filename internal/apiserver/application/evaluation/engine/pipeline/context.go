@@ -4,15 +4,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
 
 // Context 评估上下文
 // 在职责链中传递，携带评估所需的所有数据和中间结果
 type Context struct {
 	// 输入数据
-	Assessment   *assessment.Assessment
-	MedicalScale *scale.MedicalScale
-	AnswerSheet  *answersheet.AnswerSheet // 答卷数据
+	Assessment    *assessment.Assessment
+	MedicalScale  *scale.MedicalScale
+	AnswerSheet   *answersheet.AnswerSheet     // 答卷数据
+	Questionnaire *questionnaire.Questionnaire // 问卷数据（用于获取选项内容等）
 
 	// 中间结果（由各处理器填充）
 	FactorScores     []assessment.FactorScoreResult // 因子得分列表

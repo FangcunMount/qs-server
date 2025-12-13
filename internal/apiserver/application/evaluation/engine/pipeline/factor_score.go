@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
 
 // FactorScoreHandler 因子分数计算处理器
@@ -15,12 +15,14 @@ import (
 // 输出：填充 Context.FactorScores
 type FactorScoreHandler struct {
 	*BaseHandler
+	scoringService scale.ScoringService // 量表计分服务（领域服务）
 }
 
 // NewFactorScoreHandler 创建因子分数计算处理器
 func NewFactorScoreHandler() *FactorScoreHandler {
 	return &FactorScoreHandler{
-		BaseHandler: NewBaseHandler("FactorScoreHandler"),
+		BaseHandler:    NewBaseHandler("FactorScoreHandler"),
+		scoringService: scale.NewScoringService(),
 	}
 }
 
@@ -42,7 +44,7 @@ func (h *FactorScoreHandler) Handle(ctx context.Context, evalCtx *Context) error
 
 	// 计算每个因子的原始得分
 	for _, factor := range factors {
-		rawScore := h.calculateFactorRawScore(factor, evalCtx.AnswerSheet)
+		rawScore := h.calculateFactorRawScore(factor, evalCtx.AnswerSheet, evalCtx.Questionnaire)
 
 		factorScore := assessment.NewFactorScoreResult(
 			assessment.NewFactorCode(string(factor.GetCode())),
@@ -84,84 +86,26 @@ func (h *FactorScoreHandler) calculateTotalScore(factorScores []assessment.Facto
 }
 
 // calculateFactorRawScore 计算因子原始得分
-// 从答卷读取预计算分数，按因子关联的题目聚合
-func (h *FactorScoreHandler) calculateFactorRawScore(factor *scale.Factor, sheet *answersheet.AnswerSheet) float64 {
+// 委托给量表领域的计分服务
+func (h *FactorScoreHandler) calculateFactorRawScore(
+	factor *scale.Factor,
+	sheet *answersheet.AnswerSheet,
+	qnr *questionnaire.Questionnaire,
+) float64 {
 	// 如果没有答卷数据，使用模拟数据
 	if sheet == nil {
 		return h.simulateFactorScore(factor)
 	}
 
-	// 获取该因子关联的题目编码
-	questionCodes := factor.GetQuestionCodes()
-	if len(questionCodes) == 0 {
-		return 0
-	}
-
-	// 收集该因子所有题目的得分
-	var scores []float64
-	scoreMap := h.buildScoreMap(sheet)
-	for _, qCode := range questionCodes {
-		if score, found := scoreMap[qCode.String()]; found {
-			scores = append(scores, score)
-		}
-	}
-
-	if len(scores) == 0 {
-		return 0
-	}
-
-	// 根据计分策略计算最终得分
-	return h.applyScoringStrategy(factor.GetScoringStrategy(), scores)
-}
-
-// buildScoreMap 构建题目得分映射（从答卷读取预计算分数）
-func (h *FactorScoreHandler) buildScoreMap(sheet *answersheet.AnswerSheet) map[string]float64 {
-	scoreMap := make(map[string]float64)
-	for _, ans := range sheet.Answers() {
-		scoreMap[ans.QuestionCode()] = ans.Score()
-	}
-	return scoreMap
-}
-
-// applyScoringStrategy 应用因子计分策略（使用 pkg/calculation 公共服务）
-func (h *FactorScoreHandler) applyScoringStrategy(strategy scale.ScoringStrategyCode, scores []float64) float64 {
-	if len(scores) == 0 {
-		return 0
-	}
-
-	// 将量表策略类型映射到 calculation 策略类型
-	calcStrategy := h.mapToCalculationStrategy(strategy)
-
-	// 获取计算策略
-	scoringStrategy := calculation.GetStrategy(calcStrategy)
-	if scoringStrategy == nil {
-		// 兜底：默认使用求和策略
-		scoringStrategy = calculation.GetStrategy(calculation.StrategyTypeSum)
-	}
-
-	// 执行计算
-	result, err := scoringStrategy.Calculate(scores, nil)
+	// 委托给领域服务计算因子得分
+	score, err := h.scoringService.CalculateFactorScore(factor, sheet, qnr)
 	if err != nil {
-		// 计算失败时返回 0
+		// 计算失败，返回 0
+		// TODO: 添加日志记录
 		return 0
 	}
 
-	return result
-}
-
-// mapToCalculationStrategy 将量表策略类型映射到 calculation 策略类型
-func (h *FactorScoreHandler) mapToCalculationStrategy(strategy scale.ScoringStrategyCode) calculation.StrategyType {
-	switch strategy {
-	case scale.ScoringStrategySum:
-		return calculation.StrategyTypeSum
-	case scale.ScoringStrategyAvg:
-		return calculation.StrategyTypeAverage
-	case scale.ScoringStrategyCustom:
-		// 自定义策略默认使用求和
-		return calculation.StrategyTypeSum
-	default:
-		return calculation.StrategyTypeSum
-	}
+	return score
 }
 
 // simulateFactorScore 模拟因子得分（当没有答卷数据时使用）

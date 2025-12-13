@@ -103,8 +103,8 @@ const (
 	ScoringStrategySum ScoringStrategyCode = "sum"
 	// ScoringStrategyAvg 平均策略
 	ScoringStrategyAvg ScoringStrategyCode = "avg"
-	// ScoringStrategyCustom 自定义策略
-	ScoringStrategyCustom ScoringStrategyCode = "custom"
+	// ScoringStrategyCnt 计数策略（统计匹配特定选项的题目数量）
+	ScoringStrategyCnt ScoringStrategyCode = "cnt"
 )
 
 // String 返回计分策略的字符串表示
@@ -114,7 +114,7 @@ func (s ScoringStrategyCode) String() string {
 
 // IsValid 检查计分策略是否有效
 func (s ScoringStrategyCode) IsValid() bool {
-	return s == ScoringStrategySum || s == ScoringStrategyAvg || s == ScoringStrategyCustom
+	return s == ScoringStrategySum || s == ScoringStrategyAvg || s == ScoringStrategyCnt
 }
 
 // ===================== 风险等级 =================
@@ -152,7 +152,9 @@ func (r RiskLevel) IsValid() bool {
 
 // ===================== 分数区间 =================
 
-// ScoreRange 分数区间 [Min, Max)
+// ScoreRange 分数区间 [Min, Max]
+// 注意：医学量表的解读规则通常使用闭区间，即包含边界值
+// 例如：[0, 10] 表示 0 到 10 分（包括 10 分）都适用该规则
 type ScoreRange struct {
 	min float64
 	max float64
@@ -173,12 +175,14 @@ func (r ScoreRange) Max() float64 {
 	return r.max
 }
 
-// Contains 判断分数是否在区间内 [min, max)
+// Contains 判断分数是否在区间内 [min, max]
+// 使用左闭右闭区间，符合医学量表的实际使用场景
+// 例如：ScoreRange{0, 10}.Contains(10) 返回 true
 func (r ScoreRange) Contains(score float64) bool {
-	return score >= r.min && score < r.max
+	return score >= r.min && score <= r.max
 }
 
 // IsValid 检查区间是否有效
 func (r ScoreRange) IsValid() bool {
-	return r.min < r.max
+	return r.min <= r.max
 }

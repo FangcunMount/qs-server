@@ -91,6 +91,8 @@ func (h *InterpretationHandler) generateFactorInterpretations(evalCtx *Context) 
 			fs.IsTotalScore,
 		)
 		updatedScores = append(updatedScores, updatedScore)
+
+		h.logInterpretation(string(fs.FactorCode), fs.FactorName, fs.RawScore, conclusion, suggestion)
 	}
 
 	evalCtx.FactorScores = updatedScores
@@ -107,13 +109,17 @@ func (h *InterpretationHandler) interpretFactorWithRules(evalCtx *Context, fs as
 				suggestion = rule.GetSuggestion()
 				// 如果规则中有具体的结论和建议，直接使用
 				if conclusion != "" && suggestion != "" {
+					h.logRuleMatch(string(fs.FactorCode), fs.RawScore, rule)
 					return conclusion, suggestion
 				}
+			} else {
+				h.logNoRuleMatch(string(fs.FactorCode), fs.RawScore, factor)
 			}
 		}
 	}
 
 	// 使用默认模板生成解读
+	h.logUseDefault(string(fs.FactorCode), fs.RawScore)
 	return h.interpretFactorDefault(fs.FactorName, fs.RiskLevel, fs.RawScore)
 }
 
@@ -209,4 +215,27 @@ func (h *InterpretationHandler) generateAndSaveReport(ctx context.Context, evalC
 	}
 
 	return nil
+}
+
+// ==================== 日志辅助方法 ====================
+
+// logInterpretation 记录因子解读结果
+func (h *InterpretationHandler) logInterpretation(factorCode, factorName string, score float64, conclusion, suggestion string) {
+	// 这里可以添加更详细的日志，暂时保持简单
+	// 后续可以通过 context 获取 logger
+}
+
+// logRuleMatch 记录规则匹配
+func (h *InterpretationHandler) logRuleMatch(factorCode string, score float64, rule *scale.InterpretationRule) {
+	// 后续可以添加详细日志
+}
+
+// logNoRuleMatch 记录没有匹配的规则
+func (h *InterpretationHandler) logNoRuleMatch(factorCode string, score float64, factor *scale.Factor) {
+	// 后续可以添加详细日志，帮助排查配置问题
+}
+
+// logUseDefault 记录使用默认模板
+func (h *InterpretationHandler) logUseDefault(factorCode string, score float64) {
+	// 后续可以添加详细日志
 }

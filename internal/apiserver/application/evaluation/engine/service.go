@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -18,11 +19,12 @@ import (
 // service 评估引擎服务实现
 type service struct {
 	// 仓储依赖
-	assessmentRepo  assessment.Repository
-	scoreRepo       assessment.ScoreRepository
-	reportRepo      report.ReportRepository
-	scaleRepo       scale.Repository
-	answerSheetRepo answersheet.Repository
+	assessmentRepo    assessment.Repository
+	scoreRepo         assessment.ScoreRepository
+	reportRepo        report.ReportRepository
+	scaleRepo         scale.Repository
+	answerSheetRepo   answersheet.Repository
+	questionnaireRepo questionnaire.Repository
 
 	// 领域服务依赖
 	reportBuilder report.ReportBuilder
@@ -38,15 +40,17 @@ func NewService(
 	reportRepo report.ReportRepository,
 	scaleRepo scale.Repository,
 	answerSheetRepo answersheet.Repository,
+	questionnaireRepo questionnaire.Repository,
 	reportBuilder report.ReportBuilder,
 ) Service {
 	svc := &service{
-		assessmentRepo:  assessmentRepo,
-		scoreRepo:       scoreRepo,
-		reportRepo:      reportRepo,
-		scaleRepo:       scaleRepo,
-		answerSheetRepo: answerSheetRepo,
-		reportBuilder:   reportBuilder,
+		assessmentRepo:    assessmentRepo,
+		scoreRepo:         scoreRepo,
+		reportRepo:        reportRepo,
+		scaleRepo:         scaleRepo,
+		answerSheetRepo:   answerSheetRepo,
+		questionnaireRepo: questionnaireRepo,
+		reportBuilder:     reportBuilder,
 	}
 
 	// 构建处理器链
@@ -194,10 +198,37 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"result", "success",
 	)
 
-	// 4. 创建评估上下文
-	evalCtx := pipeline.NewContext(a, medicalScale, answerSheet)
+	// 4. 加载问卷数据（用于 cnt 等计分规则）
+	qCode, qVersion, _ := answerSheet.QuestionnaireInfo()
+	l.Debugw("加载问卷数据",
+		"questionnaire_code", qCode,
+		"questionnaire_version", qVersion,
+		"action", "read",
+		"resource", "questionnaire",
+	)
 
-	// 5. 执行处理器链
+	qnr, err := s.questionnaireRepo.FindByCodeVersion(ctx, qCode, qVersion)
+	if err != nil {
+		l.Warnw("加载问卷失败，将使用降级计分策略",
+			"questionnaire_code", qCode,
+			"questionnaire_version", qVersion,
+			"error", err.Error(),
+		)
+		// 问卷加载失败不影响评估流程，只是无法使用 cnt 等高级计分规则
+		qnr = nil
+	} else {
+		l.Debugw("问卷数据加载成功",
+			"questionnaire_code", qCode,
+			"question_count", len(qnr.GetQuestions()),
+			"result", "success",
+		)
+	}
+
+	// 5. 创建评估上下文
+	evalCtx := pipeline.NewContext(a, medicalScale, answerSheet)
+	evalCtx.Questionnaire = qnr // 设置问卷数据
+
+	// 6. 执行处理器链
 	l.Infow("开始执行评估处理器链",
 		"assessment_id", assessmentID,
 		"scale_code", scaleCode,
