@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -17,10 +18,11 @@ import (
 // service 评估引擎服务实现
 type service struct {
 	// 仓储依赖
-	assessmentRepo assessment.Repository
-	scoreRepo      assessment.ScoreRepository
-	reportRepo     report.ReportRepository
-	scaleRepo      scale.Repository
+	assessmentRepo  assessment.Repository
+	scoreRepo       assessment.ScoreRepository
+	reportRepo      report.ReportRepository
+	scaleRepo       scale.Repository
+	answerSheetRepo answersheet.Repository
 
 	// 领域服务依赖
 	reportBuilder report.ReportBuilder
@@ -35,14 +37,16 @@ func NewService(
 	scoreRepo assessment.ScoreRepository,
 	reportRepo report.ReportRepository,
 	scaleRepo scale.Repository,
+	answerSheetRepo answersheet.Repository,
 	reportBuilder report.ReportBuilder,
 ) Service {
 	svc := &service{
-		assessmentRepo: assessmentRepo,
-		scoreRepo:      scoreRepo,
-		reportRepo:     reportRepo,
-		scaleRepo:      scaleRepo,
-		reportBuilder:  reportBuilder,
+		assessmentRepo:  assessmentRepo,
+		scoreRepo:       scoreRepo,
+		reportRepo:      reportRepo,
+		scaleRepo:       scaleRepo,
+		answerSheetRepo: answerSheetRepo,
+		reportBuilder:   reportBuilder,
 	}
 
 	// 构建处理器链
@@ -158,11 +162,36 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"result", "success",
 	)
 
-	// 3. 创建评估上下文
-	// TODO: 加载答卷数据，当前传 nil，由 AnswerSheetScoreHandler 模拟得分
-	evalCtx := pipeline.NewContext(a, medicalScale, nil)
+	// 3. 加载答卷数据
+	answerSheetID := a.AnswerSheetRef().ID()
+	l.Debugw("加载答卷数据",
+		"answer_sheet_id", answerSheetID,
+		"action", "read",
+		"resource", "answersheet",
+	)
 
-	// 4. 执行处理器链
+	answerSheet, err := s.answerSheetRepo.FindByID(ctx, answerSheetID)
+	if err != nil {
+		l.Errorw("加载答卷失败",
+			"answer_sheet_id", answerSheetID,
+			"action", "evaluate_assessment",
+			"result", "failed",
+			"error", err.Error(),
+		)
+		s.markAsFailed(ctx, a, "加载答卷失败: "+err.Error())
+		return errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "答卷不存在")
+	}
+
+	l.Debugw("答卷数据加载成功",
+		"answer_sheet_id", answerSheetID,
+		"questionnaire_code", func() string { code, _, _ := answerSheet.QuestionnaireInfo(); return code }(),
+		"result", "success",
+	)
+
+	// 4. 创建评估上下文
+	evalCtx := pipeline.NewContext(a, medicalScale, answerSheet)
+
+	// 5. 执行处理器链
 	l.Infow("开始执行评估处理器链",
 		"assessment_id", assessmentID,
 		"scale_code", scaleCode,

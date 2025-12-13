@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -73,7 +74,8 @@ func NewEvaluationModule() *EvaluationModule {
 // params[0]: *gorm.DB (MySQL)
 // params[1]: *mongo.Database (MongoDB)
 // params[2]: scale.Repository (可选，用于 EvaluationService)
-// params[3]: event.EventPublisher (可选，用于事件发布)
+// params[3]: answersheet.Repository (可选，用于 EvaluationService)
+// params[4]: event.EventPublisher (可选，用于事件发布)
 func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if len(params) < 2 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
@@ -97,9 +99,17 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		}
 	}
 
-	// 获取事件发布器（可选参数）
+	// 可选的 AnswerSheetRepo（用于 EvaluationService）
+	var answerSheetRepo answersheet.Repository
 	if len(params) > 3 {
-		if ep, ok := params[3].(event.EventPublisher); ok && ep != nil {
+		if asr, ok := params[3].(answersheet.Repository); ok {
+			answerSheetRepo = asr
+		}
+	}
+
+	// 获取事件发布器（可选参数）
+	if len(params) > 4 {
+		if ep, ok := params[4].(event.EventPublisher); ok && ep != nil {
 			m.eventPublisher = ep
 		}
 	}
@@ -124,15 +134,16 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// TODO: 在 infra 层实现真正的 ReportExporter
 	var reportExporter report.ReportExporter = nil
 
-	// ==================== 初始化评估引擎 ====================
-	// 注意：如果有 scaleRepo，则初始化 EvaluationService
-	if scaleRepo != nil {
+	// ====================  初始化评估引擎 ====================
+	// 注意：如果有 scaleRepo 和 answerSheetRepo，则初始化 EvaluationService
+	if scaleRepo != nil && answerSheetRepo != nil {
 		reportBuilder := report.NewDefaultReportBuilder()
 		m.EvaluationService = engine.NewService(
 			m.AssessmentRepo,
 			m.ScoreRepo,
 			m.ReportRepo,
 			scaleRepo,
+			answerSheetRepo,
 			reportBuilder,
 		)
 	}
@@ -187,14 +198,19 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 }
 
 // SetScaleRepository 设置量表仓储（用于跨模块依赖注入）
-func (m *EvaluationModule) SetScaleRepository(scaleRepo scale.Repository) {
-	// 重新创建需要 scaleRepo 的服务
+// 注意：需要同时有 answerSheetRepo 才能创建 EvaluationService
+func (m *EvaluationModule) SetScaleRepository(scaleRepo scale.Repository, answerSheetRepo answersheet.Repository) {
+	// 重新创建需要 scaleRepo 和 answerSheetRepo 的服务
+	if answerSheetRepo == nil {
+		return
+	}
 	reportBuilder := report.NewDefaultReportBuilder()
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,
 		m.ScoreRepo,
 		m.ReportRepo,
 		scaleRepo,
+		answerSheetRepo,
 		reportBuilder,
 	)
 }
