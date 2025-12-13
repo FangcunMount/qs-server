@@ -127,6 +127,8 @@ func (r *GRPCRegistry) registerEvaluationService() error {
 		r.container.EvaluationModule.SubmissionService,
 		r.container.EvaluationModule.ReportQueryService,
 		r.container.EvaluationModule.ScoreQueryService,
+		r.container.ActorModule.TesteeRepo,
+		r.container.EvaluationModule.AssessmentRepo,
 	)
 	r.server.RegisterService(evaluationService)
 	log.Info("   📊 Evaluation service registered")

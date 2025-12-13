@@ -8,6 +8,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
 )
 
@@ -18,6 +20,8 @@ type EvaluationService struct {
 	submissionService  assessmentApp.AssessmentSubmissionService
 	reportQueryService assessmentApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
+	testeeRepo         testee.Repository
+	assessmentRepo     assessment.Repository
 }
 
 // NewEvaluationService 创建测评 gRPC 服务
@@ -25,11 +29,15 @@ func NewEvaluationService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
+	testeeRepo testee.Repository,
+	assessmentRepo assessment.Repository,
 ) *EvaluationService {
 	return &EvaluationService{
 		submissionService:  submissionService,
 		reportQueryService: reportQueryService,
 		scoreQueryService:  scoreQueryService,
+		testeeRepo:         testeeRepo,
+		assessmentRepo:     assessmentRepo,
 	}
 }
 
@@ -110,7 +118,12 @@ func (s *EvaluationService) GetAssessmentScores(ctx context.Context, req *pb.Get
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	// TODO: 验证 testee_id 权限
+	// 验证 testee_id 权限：检查该测评是否属于该受试者
+	if req.TesteeId > 0 {
+		if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
+			return nil, err
+		}
+	}
 
 	result, err := s.scoreQueryService.GetByAssessmentID(ctx, req.AssessmentId)
 	if err != nil {
@@ -187,7 +200,12 @@ func (s *EvaluationService) GetHighRiskFactors(ctx context.Context, req *pb.GetH
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	// TODO: 验证 testee_id 权限
+	// 验证 testee_id 权限：检查该测评是否属于该受试者
+	if req.TesteeId > 0 {
+		if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
+			return nil, err
+		}
+	}
 
 	result, err := s.scoreQueryService.GetHighRiskFactors(ctx, req.AssessmentId)
 	if err != nil {
@@ -223,7 +241,12 @@ func (s *EvaluationService) GetAssessmentReport(ctx context.Context, req *pb.Get
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	// TODO: 验证 testee_id 权限
+	// 验证 testee_id 权限：检查该测评是否属于该受试者
+	if req.TesteeId > 0 {
+		if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
+			return nil, err
+		}
+	}
 
 	result, err := s.reportQueryService.GetByAssessmentID(ctx, req.AssessmentId)
 	if err != nil {
@@ -277,6 +300,24 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 		PageSize:   int32(result.PageSize),
 		TotalPages: int32(result.TotalPages),
 	}, nil
+}
+
+// ==================== 权限验证辅助方法 ====================
+
+// validateTesteeAssessmentAccess 验证受试者是否有权访问指定测评
+func (s *EvaluationService) validateTesteeAssessmentAccess(ctx context.Context, testeeID uint64, assessmentID uint64) error {
+	// 1. 查询测评记录
+	assessmentEntity, err := s.assessmentRepo.FindByID(ctx, assessment.ID(assessmentID))
+	if err != nil {
+		return status.Error(codes.NotFound, "测评不存在")
+	}
+
+	// 2. 验证测评是否属于该受试者
+	if uint64(assessmentEntity.TesteeID()) != testeeID {
+		return status.Error(codes.PermissionDenied, "无权访问该测评")
+	}
+
+	return nil
 }
 
 // ==================== 转换函数 ====================
