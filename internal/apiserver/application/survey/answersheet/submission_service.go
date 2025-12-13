@@ -114,11 +114,28 @@ func (s *submissionService) validateSubmitDTO(l *logger.RequestLogger, dto Submi
 		l.Warnw("答卷提交失败：填写人ID为空", "action", "submit", "resource", "answersheet", "result", "failed")
 		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "填写人ID不能为空")
 	}
+	if dto.TesteeID == 0 {
+		l.Warnw("答卷提交失败：受试者ID为空", "action", "submit", "resource", "answersheet", "result", "failed")
+		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "受试者ID不能为空")
+	}
 	if len(dto.Answers) == 0 {
 		l.Warnw("答卷提交失败：答案列表为空", "action", "submit", "resource", "answersheet", "result", "failed", "questionnaire_code", dto.QuestionnaireCode)
 		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答案列表不能为空")
 	}
-	l.Debugw("输入参数验证通过", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID)
+	// 校验答案数据完整性
+	for i, ans := range dto.Answers {
+		if ans.QuestionCode == "" {
+			l.Warnw("答案校验失败：问题编码为空", "answer_index", i, "result", "failed")
+			msg := fmt.Sprintf("第 %d 个答案的问题编码不能为空", i+1)
+			return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", msg)
+		}
+		if ans.QuestionType == "" {
+			l.Warnw("答案校验失败：问题类型为空", "question_code", ans.QuestionCode, "result", "failed")
+			msg := fmt.Sprintf("问题 [%s] 的类型不能为空", ans.QuestionCode)
+			return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", msg)
+		}
+	}
+	l.Debugw("输入参数验证通过", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "testee_id", dto.TesteeID)
 	return nil
 }
 

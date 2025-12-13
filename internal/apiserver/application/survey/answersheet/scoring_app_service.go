@@ -46,6 +46,12 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 		"answersheet_id", answerSheetID,
 	)
 
+	// 参数校验
+	if answerSheetID == 0 {
+		l.Warnw("答卷ID为空", "action", "calculate_score", "result", "invalid_params")
+		return errors.WithCode(errorCode.ErrInvalidArgument, "答卷ID不能为空")
+	}
+
 	// 1. 加载答卷
 	sheet, err := s.answerSheetRepo.FindByID(ctx, meta.ID(answerSheetID))
 	if err != nil {

@@ -37,7 +37,7 @@ func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *An
 func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	var req answersheet.SubmitAnswerSheetRequest
 	if err := h.BindJSON(c, &req); err != nil {
-		return
+		return // BindJSON 已包含 binding 标签校验
 	}
 
 	// 从上下文获取当前用户ID（由 UserIdentityMiddleware 设置）

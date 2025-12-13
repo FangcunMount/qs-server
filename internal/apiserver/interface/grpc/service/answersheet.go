@@ -34,6 +34,20 @@ func (s *AnswerSheetService) RegisterService(server *grpc.Server) {
 // SaveAnswerSheet 保存答卷（C端）
 // @Description C端用户填写完问卷后提交答案
 func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAnswerSheetRequest) (*pb.SaveAnswerSheetResponse, error) {
+	// 参数校验
+	if req.QuestionnaireCode == "" {
+		return nil, status.Error(codes.InvalidArgument, "questionnaire_code 不能为空")
+	}
+	if req.WriterId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "writer_id 不能为空")
+	}
+	if req.TesteeId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
+	if len(req.Answers) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "answers 不能为空")
+	}
+
 	// 转换请求为 DTO
 	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
 	for _, a := range req.Answers {
@@ -73,6 +87,11 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 // @Description C端用户查看自己提交的答卷详情
 // Note: 实际应该从上下文中获取用户ID进行权限验证
 func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnswerSheetRequest) (*pb.GetAnswerSheetResponse, error) {
+	// 参数校验
+	if req.Id == 0 {
+		return nil, status.Error(codes.InvalidArgument, "id 不能为空")
+	}
+
 	// TODO: 从上下文中获取用户ID并验证权限
 	// 这里简化处理，直接查询答卷
 	result, err := s.submissionService.GetMyAnswerSheet(ctx, 0, req.Id)
@@ -93,6 +112,17 @@ func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnsw
 // ListAnswerSheets 获取答卷列表（C端）
 // @Description C端用户查看自己提交的所有答卷（返回摘要，不含 answers）
 func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListAnswerSheetsRequest) (*pb.ListAnswerSheetsResponse, error) {
+	// 参数校验
+	if req.WriterId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "writer_id 不能为空")
+	}
+	if req.Page < 1 {
+		req.Page = 1 // 默认第一页
+	}
+	if req.PageSize < 1 || req.PageSize > 100 {
+		req.PageSize = 20 // 默认每页20条，最大100条
+	}
+
 	dto := answersheet.ListMyAnswerSheetsDTO{
 		FillerID:          req.WriterId, // proto 中使用 WriterId
 		QuestionnaireCode: req.QuestionnaireCode,

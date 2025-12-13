@@ -2,11 +2,14 @@ package answersheet
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 )
 
 // SubmissionService 答卷提交服务
@@ -15,15 +18,21 @@ import (
 // 2. 调用 apiserver 的 gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
-	answerSheetClient *grpcclient.AnswerSheetClient
+	answerSheetClient   *grpcclient.AnswerSheetClient
+	actorClient         *grpcclient.ActorClient
+	guardianshipService *iam.GuardianshipService
 }
 
 // NewSubmissionService 创建答卷提交服务
 func NewSubmissionService(
 	answerSheetClient *grpcclient.AnswerSheetClient,
+	actorClient *grpcclient.ActorClient,
+	guardianshipService *iam.GuardianshipService,
 ) *SubmissionService {
 	return &SubmissionService{
-		answerSheetClient: answerSheetClient,
+		answerSheetClient:   answerSheetClient,
+		actorClient:         actorClient,
+		guardianshipService: guardianshipService,
 	}
 }
 
@@ -44,18 +53,137 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 		"answer_count", len(req.Answers),
 	)
 
-	// 转换 answers
-	answers := make([]grpcclient.AnswerInput, len(req.Answers))
-	for i, a := range req.Answers {
-		answers[i] = grpcclient.AnswerInput{
+	// 1. 校验填写人认证
+	if err := s.validateWriter(ctx, writerID); err != nil {
+		return nil, err
+	}
+
+	// 2. 校验监护关系权限
+	if err := s.validateGuardianship(ctx, writerID, req.TesteeID); err != nil {
+		return nil, err
+	}
+
+	// 3. 转换答案数据
+	answers := s.convertAnswers(req.Answers)
+
+	// 4. 调用 gRPC 服务提交答卷
+	result, err := s.callSaveAnswerSheet(ctx, writerID, req, answers)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. 记录成功日志
+	duration := time.Since(startTime)
+	l.Infow("提交答卷成功", "action", "submit_answersheet", "result", "success",
+		"answersheet_id", result.ID,
+		"duration_ms", duration.Milliseconds(),
+	)
+
+	return &SubmitAnswerSheetResponse{
+		ID:      result.ID,
+		Message: result.Message,
+	}, nil
+}
+
+// validateWriter 校验填写人认证
+func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64) error {
+	if writerID == 0 {
+		l := logger.L(ctx)
+		l.Warnw("提交答卷失败：填写人ID为空", "action", "submit_answersheet", "result", "invalid_params")
+		return fmt.Errorf("用户未认证")
+	}
+	return nil
+}
+
+// validateGuardianship 校验监护关系权限
+func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, testeeID uint64) error {
+	l := logger.L(ctx)
+
+	// 如果 IAM 服务未启用，跳过权限校验
+	if s.guardianshipService == nil || !s.guardianshipService.IsEnabled() {
+		return nil
+	}
+
+	// 查询受试者信息
+	testee, err := s.actorClient.GetTestee(ctx, testeeID)
+	if err != nil {
+		l.Errorw("查询受试者信息失败",
+			"action", "submit_answersheet",
+			"testee_id", testeeID,
+			"error", err.Error(),
+		)
+		return fmt.Errorf("查询受试者信息失败: %w", err)
+	}
+
+	// 如果受试者未绑定 IAM 用户，跳过权限校验
+	if testee.IAMChildID == "" {
+		l.Warnw("受试者未绑定IAM用户，跳过权限校验",
+			"testee_id", testeeID,
+			"testee_name", testee.Name,
+		)
+		return nil
+	}
+
+	// 验证监护关系
+	return s.checkGuardianRelation(ctx, writerID, testeeID, testee.IAMChildID, testee.Name)
+}
+
+// checkGuardianRelation 检查监护关系
+func (s *SubmissionService) checkGuardianRelation(ctx context.Context, writerID, testeeID uint64, iamChildID, testeeName string) error {
+	l := logger.L(ctx)
+
+	userIDStr := strconv.FormatUint(writerID, 10)
+	isGuardian, err := s.guardianshipService.IsGuardian(ctx, userIDStr, iamChildID)
+	if err != nil {
+		l.Errorw("校验监护关系失败",
+			"action", "submit_answersheet",
+			"writer_id", writerID,
+			"testee_id", testeeID,
+			"iam_child_id", iamChildID,
+			"error", err.Error(),
+		)
+		return fmt.Errorf("校验监护关系失败: %w", err)
+	}
+
+	if !isGuardian {
+		l.Warnw("无权为该受试者提交答卷：不是监护人",
+			"action", "submit_answersheet",
+			"writer_id", writerID,
+			"testee_id", testeeID,
+			"iam_child_id", iamChildID,
+			"testee_name", testeeName,
+			"result", "forbidden",
+		)
+		return fmt.Errorf("无权为该受试者提交答卷")
+	}
+
+	l.Infow("监护关系验证通过",
+		"action", "submit_answersheet",
+		"writer_id", writerID,
+		"testee_id", testeeID,
+		"iam_child_id", iamChildID,
+	)
+	return nil
+}
+
+// convertAnswers 转换答案数据
+func (s *SubmissionService) convertAnswers(answers []Answer) []grpcclient.AnswerInput {
+	result := make([]grpcclient.AnswerInput, len(answers))
+	for i, a := range answers {
+		result[i] = grpcclient.AnswerInput{
 			QuestionCode: a.QuestionCode,
 			QuestionType: a.QuestionType,
 			Score:        a.Score,
 			Value:        a.Value,
 		}
 	}
+	return result
+}
 
-	// 调用 gRPC 服务
+// callSaveAnswerSheet 调用 gRPC 服务保存答卷
+func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest, answers []grpcclient.AnswerInput) (*grpcclient.SaveAnswerSheetOutput, error) {
+	l := logger.L(ctx)
+
 	l.Debugw("调用 gRPC 服务提交答卷",
 		"questionnaire_code", req.QuestionnaireCode,
 		"testee_id", req.TesteeID,
@@ -80,18 +208,7 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 		return nil, err
 	}
 
-	duration := time.Since(startTime)
-	l.Infow("提交答卷成功",
-		"action", "submit_answersheet",
-		"result", "success",
-		"answersheet_id", result.ID,
-		"duration_ms", duration.Milliseconds(),
-	)
-
-	return &SubmitAnswerSheetResponse{
-		ID:      result.ID,
-		Message: result.Message,
-	}, nil
+	return result, nil
 }
 
 // Get 获取答卷详情

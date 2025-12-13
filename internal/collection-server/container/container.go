@@ -83,7 +83,7 @@ func (c *Container) initApplicationServices() {
 		guardianshipService = c.IAMModule.GuardianshipService()
 	}
 
-	c.submissionService = answersheet.NewSubmissionService(c.answerSheetClient)
+	c.submissionService = answersheet.NewSubmissionService(c.answerSheetClient, c.actorClient, guardianshipService)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient)
 	c.testeeService = testee.NewService(c.actorClient, guardianshipService)

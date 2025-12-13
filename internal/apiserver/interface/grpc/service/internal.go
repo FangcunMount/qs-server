@@ -114,6 +114,12 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 	if req.QuestionnaireCode == "" {
 		return nil, status.Error(codes.InvalidArgument, "questionnaire_code 不能为空")
 	}
+	if req.QuestionnaireVersion == "" {
+		return nil, status.Error(codes.InvalidArgument, "questionnaire_version 不能为空")
+	}
+	if req.TesteeId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
 	if req.FillerId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "filler_id 不能为空")
 	}

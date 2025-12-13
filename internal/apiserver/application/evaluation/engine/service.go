@@ -91,6 +91,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"assessment_id", assessmentID,
 	)
 
+	// 参数校验
+	if assessmentID == 0 {
+		l.Warnw("测评ID为空", "action", "evaluate", "result", "invalid_params")
+		return errors.WithCode(errorCode.ErrInvalidArgument, "测评ID不能为空")
+	}
+
 	// 1. 加载 Assessment
 	l.Debugw("加载测评数据",
 		"assessment_id", assessmentID,
