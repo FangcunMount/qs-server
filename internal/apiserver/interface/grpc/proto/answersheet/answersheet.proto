@@ -67,6 +67,7 @@ message SaveAnswerSheetRequest {
   uint64 writer_id = 4;
   uint64 testee_id = 5;
   repeated Answer answers = 6;
+  uint64 org_id = 7;  // 机构ID
 }
 
 // 保存答卷响应

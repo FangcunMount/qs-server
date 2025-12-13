@@ -58,16 +58,21 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 		return nil, err
 	}
 
-	// 2. 校验监护关系权限
-	if err := s.validateGuardianship(ctx, writerID, req.TesteeID); err != nil {
+	// 2. 校验监护关系权限，并获取 testee 信息（用于获取 OrgID）
+	testee, err := s.validateGuardianship(ctx, writerID, req.TesteeID)
+	if err != nil {
 		return nil, err
 	}
 
 	// 3. 转换答案数据
 	answers := s.convertAnswers(req.Answers)
 
-	// 4. 调用 gRPC 服务提交答卷
-	result, err := s.callSaveAnswerSheet(ctx, writerID, req, answers)
+	// 4. 调用 gRPC 服务提交答卷（传递 OrgID）
+	orgID := uint64(0)
+	if testee != nil {
+		orgID = testee.OrgID
+	}
+	result, err := s.callSaveAnswerSheet(ctx, writerID, orgID, req, answers)
 	if err != nil {
 		return nil, err
 	}
@@ -95,16 +100,11 @@ func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64)
 	return nil
 }
 
-// validateGuardianship 校验监护关系权限
-func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, testeeID uint64) error {
+// validateGuardianship 校验监护关系权限，返回 testee 信息（用于获取 OrgID）
+func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, testeeID uint64) (*grpcclient.TesteeResponse, error) {
 	l := logger.L(ctx)
 
-	// 如果 IAM 服务未启用，跳过权限校验
-	if s.guardianshipService == nil || !s.guardianshipService.IsEnabled() {
-		return nil
-	}
-
-	// 查询受试者信息
+	// 查询受试者信息（需要获取 OrgID 和 IAMChildID）
 	testee, err := s.actorClient.GetTestee(ctx, testeeID)
 	if err != nil {
 		l.Errorw("查询受试者信息失败",
@@ -112,7 +112,12 @@ func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, 
 			"testee_id", testeeID,
 			"error", err.Error(),
 		)
-		return fmt.Errorf("查询受试者信息失败: %w", err)
+		return nil, fmt.Errorf("查询受试者信息失败: %w", err)
+	}
+
+	// 如果 IAM 服务未启用，直接返回 testee
+	if s.guardianshipService == nil || !s.guardianshipService.IsEnabled() {
+		return testee, nil
 	}
 
 	// 如果受试者未绑定 IAM 用户，跳过权限校验
@@ -121,11 +126,15 @@ func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, 
 			"testee_id", testeeID,
 			"testee_name", testee.Name,
 		)
-		return nil
+		return testee, nil
 	}
 
 	// 验证监护关系
-	return s.checkGuardianRelation(ctx, writerID, testeeID, testee.IAMChildID, testee.Name)
+	if err := s.checkGuardianRelation(ctx, writerID, testeeID, testee.IAMChildID, testee.Name); err != nil {
+		return nil, err
+	}
+
+	return testee, nil
 }
 
 // checkGuardianRelation 检查监护关系
@@ -181,12 +190,13 @@ func (s *SubmissionService) convertAnswers(answers []Answer) []grpcclient.Answer
 }
 
 // callSaveAnswerSheet 调用 gRPC 服务保存答卷
-func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest, answers []grpcclient.AnswerInput) (*grpcclient.SaveAnswerSheetOutput, error) {
+func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, orgID uint64, req *SubmitAnswerSheetRequest, answers []grpcclient.AnswerInput) (*grpcclient.SaveAnswerSheetOutput, error) {
 	l := logger.L(ctx)
 
 	l.Debugw("调用 gRPC 服务提交答卷",
 		"questionnaire_code", req.QuestionnaireCode,
 		"testee_id", req.TesteeID,
+		"org_id", orgID,
 	)
 
 	result, err := s.answerSheetClient.SaveAnswerSheet(ctx, &grpcclient.SaveAnswerSheetInput{
@@ -195,6 +205,7 @@ func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID ui
 		Title:                req.Title,
 		WriterID:             writerID,
 		TesteeID:             req.TesteeID,
+		OrgID:                orgID,
 		Answers:              answers,
 	})
 	if err != nil {

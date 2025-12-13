@@ -365,6 +365,7 @@ type SaveAnswerSheetRequest struct {
 	WriterId             uint64                 `protobuf:"varint,4,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
 	Answers              []*Answer              `protobuf:"bytes,6,rep,name=answers,proto3" json:"answers,omitempty"`
+	OrgId                uint64                 `protobuf:"varint,7,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"` // 机构ID
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -439,6 +440,13 @@ func (x *SaveAnswerSheetRequest) GetAnswers() []*Answer {
 		return x.Answers
 	}
 	return nil
+}
+
+func (x *SaveAnswerSheetRequest) GetOrgId() uint64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
 }
 
 // 保存答卷响应
@@ -889,14 +897,15 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value\"\xfb\x01\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\"\x92\x02\n" +
 	"\x16SaveAnswerSheetRequest\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1b\n" +
 	"\twriter_id\x18\x04 \x01(\x04R\bwriterId\x12\x1b\n" +
 	"\ttestee_id\x18\x05 \x01(\x04R\btesteeId\x12-\n" +
-	"\aanswers\x18\x06 \x03(\v2\x13.answersheet.AnswerR\aanswers\"C\n" +
+	"\aanswers\x18\x06 \x03(\v2\x13.answersheet.AnswerR\aanswers\x12\x15\n" +
+	"\x06org_id\x18\a \x01(\x04R\x05orgId\"C\n" +
 	"\x17SaveAnswerSheetResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
