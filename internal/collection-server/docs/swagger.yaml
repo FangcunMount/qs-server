@@ -574,6 +574,44 @@ paths:
       summary: 获取答卷详情
       tags:
       - 答卷
+  /api/v1/answersheets/{id}/assessment:
+    get:
+      description: 根据答卷ID获取对应的测评详情
+      parameters:
+      - description: 答卷ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.AssessmentDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 通过答卷ID获取测评详情
+      tags:
+      - 答卷
   /api/v1/assessments:
     get:
       description: 分页获取当前用户的测评列表

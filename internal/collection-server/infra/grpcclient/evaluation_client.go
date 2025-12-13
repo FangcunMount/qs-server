@@ -135,6 +135,28 @@ func (c *EvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assess
 	return c.convertAssessmentDetail(assessment), nil
 }
 
+// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
+func (c *EvaluationClient) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentDetailOutput, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+
+	req := &pb.GetMyAssessmentByAnswerSheetIDRequest{
+		AnswerSheetId: answerSheetID,
+	}
+
+	resp, err := c.grpcClient.GetMyAssessmentByAnswerSheetID(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	assessment := resp.GetAssessment()
+	if assessment == nil {
+		return nil, nil
+	}
+
+	return c.convertAssessmentDetail(assessment), nil
+}
+
 // ListMyAssessments 获取我的测评列表
 func (c *EvaluationClient) ListMyAssessments(ctx context.Context, testeeID uint64, status string, page, pageSize int32) (*ListAssessmentsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)

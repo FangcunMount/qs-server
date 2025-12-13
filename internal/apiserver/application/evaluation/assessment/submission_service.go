@@ -245,6 +245,44 @@ func (s *submissionService) GetMyAssessment(ctx context.Context, testeeID, asses
 	return toAssessmentResult(a), nil
 }
 
+// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
+func (s *submissionService) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	l.Debugw("通过答卷ID获取测评详情",
+		"action", "get_assessment_by_answersheet",
+		"answer_sheet_id", answerSheetID,
+	)
+
+	// 通过答卷ID查询测评
+	l.Debugw("从数据库通过答卷ID查询测评",
+		"answer_sheet_id", answerSheetID,
+		"action", "read",
+	)
+	answerSheetRef := assessment.NewAnswerSheetRef(meta.FromUint64(answerSheetID))
+	a, err := s.repo.FindByAnswerSheetID(ctx, answerSheetRef)
+	if err != nil {
+		l.Errorw("通过答卷ID查询测评失败",
+			"answer_sheet_id", answerSheetID,
+			"action", "get_assessment_by_answersheet",
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+	}
+
+	duration := time.Since(startTime)
+	l.Debugw("通过答卷ID获取测评成功",
+		"answer_sheet_id", answerSheetID,
+		"assessment_id", a.ID().Uint64(),
+		"status", a.Status().String(),
+		"duration_ms", duration.Milliseconds(),
+	)
+
+	return toAssessmentResult(a), nil
+}
+
 // ListMyAssessments 查询我的测评列表
 func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error) {
 	l := logger.L(ctx)

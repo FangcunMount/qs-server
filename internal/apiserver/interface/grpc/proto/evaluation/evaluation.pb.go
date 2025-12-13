@@ -781,6 +781,96 @@ func (x *GetMyAssessmentResponse) GetAssessment() *AssessmentDetail {
 	return nil
 }
 
+// 通过答卷ID获取我的测评详情请求
+type GetMyAssessmentByAnswerSheetIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnswerSheetId uint64                 `protobuf:"varint,1,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"` // 答卷ID
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyAssessmentByAnswerSheetIDRequest) Reset() {
+	*x = GetMyAssessmentByAnswerSheetIDRequest{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyAssessmentByAnswerSheetIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyAssessmentByAnswerSheetIDRequest) ProtoMessage() {}
+
+func (x *GetMyAssessmentByAnswerSheetIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyAssessmentByAnswerSheetIDRequest.ProtoReflect.Descriptor instead.
+func (*GetMyAssessmentByAnswerSheetIDRequest) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetMyAssessmentByAnswerSheetIDRequest) GetAnswerSheetId() uint64 {
+	if x != nil {
+		return x.AnswerSheetId
+	}
+	return 0
+}
+
+// 通过答卷ID获取我的测评详情响应
+type GetMyAssessmentByAnswerSheetIDResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Assessment    *AssessmentDetail      `protobuf:"bytes,1,opt,name=assessment,proto3" json:"assessment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyAssessmentByAnswerSheetIDResponse) Reset() {
+	*x = GetMyAssessmentByAnswerSheetIDResponse{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyAssessmentByAnswerSheetIDResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyAssessmentByAnswerSheetIDResponse) ProtoMessage() {}
+
+func (x *GetMyAssessmentByAnswerSheetIDResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyAssessmentByAnswerSheetIDResponse.ProtoReflect.Descriptor instead.
+func (*GetMyAssessmentByAnswerSheetIDResponse) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetMyAssessmentByAnswerSheetIDResponse) GetAssessment() *AssessmentDetail {
+	if x != nil {
+		return x.Assessment
+	}
+	return nil
+}
+
 // 获取我的测评列表请求
 type ListMyAssessmentsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -794,7 +884,7 @@ type ListMyAssessmentsRequest struct {
 
 func (x *ListMyAssessmentsRequest) Reset() {
 	*x = ListMyAssessmentsRequest{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[8]
+	mi := &file_evaluation_evaluation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -806,7 +896,7 @@ func (x *ListMyAssessmentsRequest) String() string {
 func (*ListMyAssessmentsRequest) ProtoMessage() {}
 
 func (x *ListMyAssessmentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[8]
+	mi := &file_evaluation_evaluation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -819,7 +909,7 @@ func (x *ListMyAssessmentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyAssessmentsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyAssessmentsRequest) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{8}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListMyAssessmentsRequest) GetTesteeId() uint64 {
@@ -864,7 +954,7 @@ type ListMyAssessmentsResponse struct {
 
 func (x *ListMyAssessmentsResponse) Reset() {
 	*x = ListMyAssessmentsResponse{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[9]
+	mi := &file_evaluation_evaluation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -876,7 +966,7 @@ func (x *ListMyAssessmentsResponse) String() string {
 func (*ListMyAssessmentsResponse) ProtoMessage() {}
 
 func (x *ListMyAssessmentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[9]
+	mi := &file_evaluation_evaluation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -889,7 +979,7 @@ func (x *ListMyAssessmentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyAssessmentsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyAssessmentsResponse) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{9}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListMyAssessmentsResponse) GetItems() []*AssessmentSummary {
@@ -938,7 +1028,7 @@ type GetAssessmentScoresRequest struct {
 
 func (x *GetAssessmentScoresRequest) Reset() {
 	*x = GetAssessmentScoresRequest{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[10]
+	mi := &file_evaluation_evaluation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -950,7 +1040,7 @@ func (x *GetAssessmentScoresRequest) String() string {
 func (*GetAssessmentScoresRequest) ProtoMessage() {}
 
 func (x *GetAssessmentScoresRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[10]
+	mi := &file_evaluation_evaluation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -963,7 +1053,7 @@ func (x *GetAssessmentScoresRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssessmentScoresRequest.ProtoReflect.Descriptor instead.
 func (*GetAssessmentScoresRequest) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{10}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetAssessmentScoresRequest) GetTesteeId() uint64 {
@@ -993,7 +1083,7 @@ type GetAssessmentScoresResponse struct {
 
 func (x *GetAssessmentScoresResponse) Reset() {
 	*x = GetAssessmentScoresResponse{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[11]
+	mi := &file_evaluation_evaluation_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1005,7 +1095,7 @@ func (x *GetAssessmentScoresResponse) String() string {
 func (*GetAssessmentScoresResponse) ProtoMessage() {}
 
 func (x *GetAssessmentScoresResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[11]
+	mi := &file_evaluation_evaluation_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1018,7 +1108,7 @@ func (x *GetAssessmentScoresResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssessmentScoresResponse.ProtoReflect.Descriptor instead.
 func (*GetAssessmentScoresResponse) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{11}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetAssessmentScoresResponse) GetAssessmentId() uint64 {
@@ -1061,7 +1151,7 @@ type GetFactorTrendRequest struct {
 
 func (x *GetFactorTrendRequest) Reset() {
 	*x = GetFactorTrendRequest{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[12]
+	mi := &file_evaluation_evaluation_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1073,7 +1163,7 @@ func (x *GetFactorTrendRequest) String() string {
 func (*GetFactorTrendRequest) ProtoMessage() {}
 
 func (x *GetFactorTrendRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[12]
+	mi := &file_evaluation_evaluation_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1086,7 +1176,7 @@ func (x *GetFactorTrendRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFactorTrendRequest.ProtoReflect.Descriptor instead.
 func (*GetFactorTrendRequest) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{12}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetFactorTrendRequest) GetTesteeId() uint64 {
@@ -1123,7 +1213,7 @@ type GetFactorTrendResponse struct {
 
 func (x *GetFactorTrendResponse) Reset() {
 	*x = GetFactorTrendResponse{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[13]
+	mi := &file_evaluation_evaluation_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1135,7 +1225,7 @@ func (x *GetFactorTrendResponse) String() string {
 func (*GetFactorTrendResponse) ProtoMessage() {}
 
 func (x *GetFactorTrendResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[13]
+	mi := &file_evaluation_evaluation_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1148,7 +1238,7 @@ func (x *GetFactorTrendResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFactorTrendResponse.ProtoReflect.Descriptor instead.
 func (*GetFactorTrendResponse) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{13}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetFactorTrendResponse) GetTesteeId() uint64 {
@@ -1190,7 +1280,7 @@ type GetHighRiskFactorsRequest struct {
 
 func (x *GetHighRiskFactorsRequest) Reset() {
 	*x = GetHighRiskFactorsRequest{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[14]
+	mi := &file_evaluation_evaluation_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1202,7 +1292,7 @@ func (x *GetHighRiskFactorsRequest) String() string {
 func (*GetHighRiskFactorsRequest) ProtoMessage() {}
 
 func (x *GetHighRiskFactorsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[14]
+	mi := &file_evaluation_evaluation_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1215,7 +1305,7 @@ func (x *GetHighRiskFactorsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHighRiskFactorsRequest.ProtoReflect.Descriptor instead.
 func (*GetHighRiskFactorsRequest) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{14}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetHighRiskFactorsRequest) GetTesteeId() uint64 {
@@ -1245,7 +1335,7 @@ type GetHighRiskFactorsResponse struct {
 
 func (x *GetHighRiskFactorsResponse) Reset() {
 	*x = GetHighRiskFactorsResponse{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[15]
+	mi := &file_evaluation_evaluation_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1257,7 +1347,7 @@ func (x *GetHighRiskFactorsResponse) String() string {
 func (*GetHighRiskFactorsResponse) ProtoMessage() {}
 
 func (x *GetHighRiskFactorsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[15]
+	mi := &file_evaluation_evaluation_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1270,7 +1360,7 @@ func (x *GetHighRiskFactorsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHighRiskFactorsResponse.ProtoReflect.Descriptor instead.
 func (*GetHighRiskFactorsResponse) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{15}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetHighRiskFactorsResponse) GetAssessmentId() uint64 {
@@ -1312,7 +1402,7 @@ type GetAssessmentReportRequest struct {
 
 func (x *GetAssessmentReportRequest) Reset() {
 	*x = GetAssessmentReportRequest{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[16]
+	mi := &file_evaluation_evaluation_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1324,7 +1414,7 @@ func (x *GetAssessmentReportRequest) String() string {
 func (*GetAssessmentReportRequest) ProtoMessage() {}
 
 func (x *GetAssessmentReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[16]
+	mi := &file_evaluation_evaluation_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1337,7 +1427,7 @@ func (x *GetAssessmentReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssessmentReportRequest.ProtoReflect.Descriptor instead.
 func (*GetAssessmentReportRequest) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{16}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetAssessmentReportRequest) GetTesteeId() uint64 {
@@ -1364,7 +1454,7 @@ type GetAssessmentReportResponse struct {
 
 func (x *GetAssessmentReportResponse) Reset() {
 	*x = GetAssessmentReportResponse{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[17]
+	mi := &file_evaluation_evaluation_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1376,7 +1466,7 @@ func (x *GetAssessmentReportResponse) String() string {
 func (*GetAssessmentReportResponse) ProtoMessage() {}
 
 func (x *GetAssessmentReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[17]
+	mi := &file_evaluation_evaluation_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1389,7 +1479,7 @@ func (x *GetAssessmentReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssessmentReportResponse.ProtoReflect.Descriptor instead.
 func (*GetAssessmentReportResponse) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{17}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetAssessmentReportResponse) GetReport() *AssessmentReport {
@@ -1411,7 +1501,7 @@ type ListMyReportsRequest struct {
 
 func (x *ListMyReportsRequest) Reset() {
 	*x = ListMyReportsRequest{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[18]
+	mi := &file_evaluation_evaluation_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1423,7 +1513,7 @@ func (x *ListMyReportsRequest) String() string {
 func (*ListMyReportsRequest) ProtoMessage() {}
 
 func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[18]
+	mi := &file_evaluation_evaluation_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1436,7 +1526,7 @@ func (x *ListMyReportsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReportsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyReportsRequest) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{18}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListMyReportsRequest) GetTesteeId() uint64 {
@@ -1474,7 +1564,7 @@ type ListMyReportsResponse struct {
 
 func (x *ListMyReportsResponse) Reset() {
 	*x = ListMyReportsResponse{}
-	mi := &file_evaluation_evaluation_proto_msgTypes[19]
+	mi := &file_evaluation_evaluation_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1486,7 +1576,7 @@ func (x *ListMyReportsResponse) String() string {
 func (*ListMyReportsResponse) ProtoMessage() {}
 
 func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_evaluation_evaluation_proto_msgTypes[19]
+	mi := &file_evaluation_evaluation_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1499,7 +1589,7 @@ func (x *ListMyReportsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReportsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyReportsResponse) Descriptor() ([]byte, []int) {
-	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{19}
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListMyReportsResponse) GetItems() []*AssessmentReport {
@@ -1646,6 +1736,12 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x17GetMyAssessmentResponse\x12<\n" +
 	"\n" +
 	"assessment\x18\x01 \x01(\v2\x1c.evaluation.AssessmentDetailR\n" +
+	"assessment\"O\n" +
+	"%GetMyAssessmentByAnswerSheetIDRequest\x12&\n" +
+	"\x0fanswer_sheet_id\x18\x01 \x01(\x04R\ranswerSheetId\"f\n" +
+	"&GetMyAssessmentByAnswerSheetIDResponse\x12<\n" +
+	"\n" +
+	"assessment\x18\x01 \x01(\v2\x1c.evaluation.AssessmentDetailR\n" +
 	"assessment\"\x80\x01\n" +
 	"\x18ListMyAssessmentsRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x16\n" +
@@ -1705,9 +1801,10 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1f\n" +
 	"\vtotal_pages\x18\x05 \x01(\x05R\n" +
-	"totalPages2\xb5\x05\n" +
+	"totalPages2\xbf\x06\n" +
 	"\x11EvaluationService\x12Z\n" +
-	"\x0fGetMyAssessment\x12\".evaluation.GetMyAssessmentRequest\x1a#.evaluation.GetMyAssessmentResponse\x12`\n" +
+	"\x0fGetMyAssessment\x12\".evaluation.GetMyAssessmentRequest\x1a#.evaluation.GetMyAssessmentResponse\x12\x87\x01\n" +
+	"\x1eGetMyAssessmentByAnswerSheetID\x121.evaluation.GetMyAssessmentByAnswerSheetIDRequest\x1a2.evaluation.GetMyAssessmentByAnswerSheetIDResponse\x12`\n" +
 	"\x11ListMyAssessments\x12$.evaluation.ListMyAssessmentsRequest\x1a%.evaluation.ListMyAssessmentsResponse\x12f\n" +
 	"\x13GetAssessmentScores\x12&.evaluation.GetAssessmentScoresRequest\x1a'.evaluation.GetAssessmentScoresResponse\x12W\n" +
 	"\x0eGetFactorTrend\x12!.evaluation.GetFactorTrendRequest\x1a\".evaluation.GetFactorTrendResponse\x12c\n" +
@@ -1727,57 +1824,62 @@ func file_evaluation_evaluation_proto_rawDescGZIP() []byte {
 	return file_evaluation_evaluation_proto_rawDescData
 }
 
-var file_evaluation_evaluation_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_evaluation_evaluation_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_evaluation_evaluation_proto_goTypes = []any{
-	(*AssessmentSummary)(nil),           // 0: evaluation.AssessmentSummary
-	(*AssessmentDetail)(nil),            // 1: evaluation.AssessmentDetail
-	(*FactorScore)(nil),                 // 2: evaluation.FactorScore
-	(*TrendPoint)(nil),                  // 3: evaluation.TrendPoint
-	(*DimensionInterpret)(nil),          // 4: evaluation.DimensionInterpret
-	(*AssessmentReport)(nil),            // 5: evaluation.AssessmentReport
-	(*GetMyAssessmentRequest)(nil),      // 6: evaluation.GetMyAssessmentRequest
-	(*GetMyAssessmentResponse)(nil),     // 7: evaluation.GetMyAssessmentResponse
-	(*ListMyAssessmentsRequest)(nil),    // 8: evaluation.ListMyAssessmentsRequest
-	(*ListMyAssessmentsResponse)(nil),   // 9: evaluation.ListMyAssessmentsResponse
-	(*GetAssessmentScoresRequest)(nil),  // 10: evaluation.GetAssessmentScoresRequest
-	(*GetAssessmentScoresResponse)(nil), // 11: evaluation.GetAssessmentScoresResponse
-	(*GetFactorTrendRequest)(nil),       // 12: evaluation.GetFactorTrendRequest
-	(*GetFactorTrendResponse)(nil),      // 13: evaluation.GetFactorTrendResponse
-	(*GetHighRiskFactorsRequest)(nil),   // 14: evaluation.GetHighRiskFactorsRequest
-	(*GetHighRiskFactorsResponse)(nil),  // 15: evaluation.GetHighRiskFactorsResponse
-	(*GetAssessmentReportRequest)(nil),  // 16: evaluation.GetAssessmentReportRequest
-	(*GetAssessmentReportResponse)(nil), // 17: evaluation.GetAssessmentReportResponse
-	(*ListMyReportsRequest)(nil),        // 18: evaluation.ListMyReportsRequest
-	(*ListMyReportsResponse)(nil),       // 19: evaluation.ListMyReportsResponse
+	(*AssessmentSummary)(nil),                      // 0: evaluation.AssessmentSummary
+	(*AssessmentDetail)(nil),                       // 1: evaluation.AssessmentDetail
+	(*FactorScore)(nil),                            // 2: evaluation.FactorScore
+	(*TrendPoint)(nil),                             // 3: evaluation.TrendPoint
+	(*DimensionInterpret)(nil),                     // 4: evaluation.DimensionInterpret
+	(*AssessmentReport)(nil),                       // 5: evaluation.AssessmentReport
+	(*GetMyAssessmentRequest)(nil),                 // 6: evaluation.GetMyAssessmentRequest
+	(*GetMyAssessmentResponse)(nil),                // 7: evaluation.GetMyAssessmentResponse
+	(*GetMyAssessmentByAnswerSheetIDRequest)(nil),  // 8: evaluation.GetMyAssessmentByAnswerSheetIDRequest
+	(*GetMyAssessmentByAnswerSheetIDResponse)(nil), // 9: evaluation.GetMyAssessmentByAnswerSheetIDResponse
+	(*ListMyAssessmentsRequest)(nil),               // 10: evaluation.ListMyAssessmentsRequest
+	(*ListMyAssessmentsResponse)(nil),              // 11: evaluation.ListMyAssessmentsResponse
+	(*GetAssessmentScoresRequest)(nil),             // 12: evaluation.GetAssessmentScoresRequest
+	(*GetAssessmentScoresResponse)(nil),            // 13: evaluation.GetAssessmentScoresResponse
+	(*GetFactorTrendRequest)(nil),                  // 14: evaluation.GetFactorTrendRequest
+	(*GetFactorTrendResponse)(nil),                 // 15: evaluation.GetFactorTrendResponse
+	(*GetHighRiskFactorsRequest)(nil),              // 16: evaluation.GetHighRiskFactorsRequest
+	(*GetHighRiskFactorsResponse)(nil),             // 17: evaluation.GetHighRiskFactorsResponse
+	(*GetAssessmentReportRequest)(nil),             // 18: evaluation.GetAssessmentReportRequest
+	(*GetAssessmentReportResponse)(nil),            // 19: evaluation.GetAssessmentReportResponse
+	(*ListMyReportsRequest)(nil),                   // 20: evaluation.ListMyReportsRequest
+	(*ListMyReportsResponse)(nil),                  // 21: evaluation.ListMyReportsResponse
 }
 var file_evaluation_evaluation_proto_depIdxs = []int32{
 	4,  // 0: evaluation.AssessmentReport.dimensions:type_name -> evaluation.DimensionInterpret
 	1,  // 1: evaluation.GetMyAssessmentResponse.assessment:type_name -> evaluation.AssessmentDetail
-	0,  // 2: evaluation.ListMyAssessmentsResponse.items:type_name -> evaluation.AssessmentSummary
-	2,  // 3: evaluation.GetAssessmentScoresResponse.factor_scores:type_name -> evaluation.FactorScore
-	3,  // 4: evaluation.GetFactorTrendResponse.data_points:type_name -> evaluation.TrendPoint
-	2,  // 5: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
-	5,  // 6: evaluation.GetAssessmentReportResponse.report:type_name -> evaluation.AssessmentReport
-	5,  // 7: evaluation.ListMyReportsResponse.items:type_name -> evaluation.AssessmentReport
-	6,  // 8: evaluation.EvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
-	8,  // 9: evaluation.EvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
-	10, // 10: evaluation.EvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
-	12, // 11: evaluation.EvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
-	14, // 12: evaluation.EvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
-	16, // 13: evaluation.EvaluationService.GetAssessmentReport:input_type -> evaluation.GetAssessmentReportRequest
-	18, // 14: evaluation.EvaluationService.ListMyReports:input_type -> evaluation.ListMyReportsRequest
-	7,  // 15: evaluation.EvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
-	9,  // 16: evaluation.EvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
-	11, // 17: evaluation.EvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
-	13, // 18: evaluation.EvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
-	15, // 19: evaluation.EvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
-	17, // 20: evaluation.EvaluationService.GetAssessmentReport:output_type -> evaluation.GetAssessmentReportResponse
-	19, // 21: evaluation.EvaluationService.ListMyReports:output_type -> evaluation.ListMyReportsResponse
-	15, // [15:22] is the sub-list for method output_type
-	8,  // [8:15] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1,  // 2: evaluation.GetMyAssessmentByAnswerSheetIDResponse.assessment:type_name -> evaluation.AssessmentDetail
+	0,  // 3: evaluation.ListMyAssessmentsResponse.items:type_name -> evaluation.AssessmentSummary
+	2,  // 4: evaluation.GetAssessmentScoresResponse.factor_scores:type_name -> evaluation.FactorScore
+	3,  // 5: evaluation.GetFactorTrendResponse.data_points:type_name -> evaluation.TrendPoint
+	2,  // 6: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
+	5,  // 7: evaluation.GetAssessmentReportResponse.report:type_name -> evaluation.AssessmentReport
+	5,  // 8: evaluation.ListMyReportsResponse.items:type_name -> evaluation.AssessmentReport
+	6,  // 9: evaluation.EvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
+	8,  // 10: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:input_type -> evaluation.GetMyAssessmentByAnswerSheetIDRequest
+	10, // 11: evaluation.EvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
+	12, // 12: evaluation.EvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
+	14, // 13: evaluation.EvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
+	16, // 14: evaluation.EvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
+	18, // 15: evaluation.EvaluationService.GetAssessmentReport:input_type -> evaluation.GetAssessmentReportRequest
+	20, // 16: evaluation.EvaluationService.ListMyReports:input_type -> evaluation.ListMyReportsRequest
+	7,  // 17: evaluation.EvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
+	9,  // 18: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:output_type -> evaluation.GetMyAssessmentByAnswerSheetIDResponse
+	11, // 19: evaluation.EvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
+	13, // 20: evaluation.EvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
+	15, // 21: evaluation.EvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
+	17, // 22: evaluation.EvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
+	19, // 23: evaluation.EvaluationService.GetAssessmentReport:output_type -> evaluation.GetAssessmentReportResponse
+	21, // 24: evaluation.EvaluationService.ListMyReports:output_type -> evaluation.ListMyReportsResponse
+	17, // [17:25] is the sub-list for method output_type
+	9,  // [9:17] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_evaluation_evaluation_proto_init() }
@@ -1791,7 +1893,7 @@ func file_evaluation_evaluation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_evaluation_evaluation_proto_rawDesc), len(file_evaluation_evaluation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

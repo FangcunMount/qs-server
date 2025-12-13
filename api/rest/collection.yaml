@@ -110,6 +110,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /answersheets/{id}/assessment:
+    get:
+      tags:
+      - 答卷
+      summary: 通过答卷ID获取测评详情
+      description: 根据答卷ID获取对应的测评详情
+      operationId: 通过答卷ID获取测评详情
+      parameters:
+      - type: integer
+        description: 答卷ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentDetailResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /assessments:
     get:
       tags:

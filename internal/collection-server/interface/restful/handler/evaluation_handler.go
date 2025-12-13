@@ -280,3 +280,37 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 
 	h.Success(c, result)
 }
+
+// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
+// @Summary 通过答卷ID获取测评详情
+// @Description 根据答卷ID获取对应的测评详情
+// @Tags 答卷
+// @Produce json
+// @Param id path int true "答卷ID"
+// @Success 200 {object} core.Response{data=evaluation.AssessmentDetailResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/answersheets/{id}/assessment [get]
+func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
+	idStr := h.GetPathParam(c, "id")
+	answerSheetID, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid answer sheet id", err)
+		return
+	}
+
+	result, err := h.queryService.GetMyAssessmentByAnswerSheetID(c.Request.Context(), answerSheetID)
+	if err != nil {
+		h.InternalErrorResponse(c, "get assessment by answer sheet failed", err)
+		return
+	}
+
+	if result == nil {
+		h.NotFoundResponse(c, "assessment not found", nil)
+		return
+	}
+
+	h.Success(c, result)
+}

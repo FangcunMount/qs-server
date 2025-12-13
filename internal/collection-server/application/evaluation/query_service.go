@@ -95,6 +95,73 @@ func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessment
 	}, nil
 }
 
+// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
+func (s *QueryService) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentDetailResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	log.Infof("Getting assessment by answer sheet: answerSheetID=%d", answerSheetID)
+
+	l.Debugw("通过答卷ID获取测评详情",
+		"action", "get_assessment_by_answersheet",
+		"answer_sheet_id", answerSheetID,
+	)
+
+	result, err := s.evaluationClient.GetMyAssessmentByAnswerSheetID(ctx, answerSheetID)
+	if err != nil {
+		log.Errorf("Failed to get assessment by answer sheet via gRPC: %v", err)
+		l.Errorw("通过答卷ID获取测评失败",
+			"action", "get_assessment_by_answersheet",
+			"answer_sheet_id", answerSheetID,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	if result == nil {
+		l.Warnw("获取的测评为空",
+			"answer_sheet_id", answerSheetID,
+		)
+		return nil, nil
+	}
+
+	duration := time.Since(startTime)
+	l.Debugw("通过答卷ID获取测评成功",
+		"answer_sheet_id", answerSheetID,
+		"assessment_id", result.ID,
+		"status", result.Status,
+		"duration_ms", duration.Milliseconds(),
+	)
+
+	// 转换 AnswerSheetID，如果为 0 则转换为空字符串
+	answerSheetIDStr := ""
+	if result.AnswerSheetID != 0 {
+		answerSheetIDStr = strconv.FormatUint(result.AnswerSheetID, 10)
+	}
+
+	return &AssessmentDetailResponse{
+		ID:                   strconv.FormatUint(result.ID, 10),
+		OrgID:                strconv.FormatUint(result.OrgID, 10),
+		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
+		QuestionnaireCode:    result.QuestionnaireCode,
+		QuestionnaireVersion: result.QuestionnaireVersion,
+		AnswerSheetID:        answerSheetIDStr,
+		ScaleCode:            result.ScaleCode,
+		ScaleName:            result.ScaleName,
+		OriginType:           result.OriginType,
+		OriginID:             result.OriginID,
+		Status:               result.Status,
+		TotalScore:           result.TotalScore,
+		RiskLevel:            result.RiskLevel,
+		CreatedAt:            result.CreatedAt,
+		SubmittedAt:          result.SubmittedAt,
+		InterpretedAt:        result.InterpretedAt,
+		FailedAt:             result.FailedAt,
+		FailureReason:        result.FailureReason,
+	}, nil
+}
+
 // ListMyAssessments 获取我的测评列表
 func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
 	l := logger.L(ctx)

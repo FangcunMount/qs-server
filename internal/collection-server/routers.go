@@ -124,11 +124,14 @@ func (r *Router) registerQuestionnaireRoutes(api *gin.RouterGroup) {
 // registerAnswerSheetRoutes 注册答卷相关路由
 func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 	answerSheetHandler := r.container.AnswerSheetHandler()
+	evaluationHandler := r.container.EvaluationHandler()
 
 	answersheets := api.Group("/answersheets")
 	{
 		answersheets.POST("", answerSheetHandler.Submit)
 		answersheets.GET("/:id", answerSheetHandler.Get)
+		// 通过答卷ID获取测评详情
+		answersheets.GET("/:id/assessment", evaluationHandler.GetMyAssessmentByAnswerSheetID)
 	}
 }
 

@@ -12,6 +12,9 @@ service EvaluationService {
   // 获取我的测评详情
   rpc GetMyAssessment(GetMyAssessmentRequest) returns (GetMyAssessmentResponse);
   
+  // 通过答卷ID获取我的测评详情
+  rpc GetMyAssessmentByAnswerSheetID(GetMyAssessmentByAnswerSheetIDRequest) returns (GetMyAssessmentByAnswerSheetIDResponse);
+  
   // 获取我的测评列表
   rpc ListMyAssessments(ListMyAssessmentsRequest) returns (ListMyAssessmentsResponse);
   
@@ -126,6 +129,16 @@ message GetMyAssessmentRequest {
 
 // 获取我的测评详情响应
 message GetMyAssessmentResponse {
+  AssessmentDetail assessment = 1;
+}
+
+// 通过答卷ID获取我的测评详情请求
+message GetMyAssessmentByAnswerSheetIDRequest {
+  uint64 answer_sheet_id = 1;  // 答卷ID
+}
+
+// 通过答卷ID获取我的测评详情响应
+message GetMyAssessmentByAnswerSheetIDResponse {
   AssessmentDetail assessment = 1;
 }
 

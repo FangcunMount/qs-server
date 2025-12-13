@@ -34,6 +34,10 @@ type AssessmentSubmissionService interface {
 	// 场景：答题者查看自己的测评结果
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error)
 
+	// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
+	// 场景：通过答卷ID直接查看测评结果
+	GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error)
+
 	// ListMyAssessments 查询我的测评列表
 	// 场景：答题者查看自己的所有测评记录
 	ListMyAssessments(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error)

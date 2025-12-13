@@ -68,6 +68,26 @@ func (s *EvaluationService) GetMyAssessment(ctx context.Context, req *pb.GetMyAs
 	}, nil
 }
 
+// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
+func (s *EvaluationService) GetMyAssessmentByAnswerSheetID(ctx context.Context, req *pb.GetMyAssessmentByAnswerSheetIDRequest) (*pb.GetMyAssessmentByAnswerSheetIDResponse, error) {
+	if req.AnswerSheetId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "answer_sheet_id 不能为空")
+	}
+
+	result, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswerSheetId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if result == nil {
+		return nil, status.Error(codes.NotFound, "测评不存在")
+	}
+
+	return &pb.GetMyAssessmentByAnswerSheetIDResponse{
+		Assessment: toProtoAssessmentDetail(result),
+	}, nil
+}
+
 // ListMyAssessments 获取我的测评列表
 func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListMyAssessmentsRequest) (*pb.ListMyAssessmentsResponse, error) {
 	if req.TesteeId == 0 {
