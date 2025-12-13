@@ -475,3 +475,13 @@ func (a *Assessment) ClearEvents() {
 func (a *Assessment) addEvent(event DomainEvent) {
 	a.events = append(a.events, event)
 }
+
+// setID 设置ID（仓储层使用，用于持久化后同步自增ID）
+func (a *Assessment) setID(id ID) {
+	a.id = id
+}
+
+// SyncIDFromRepository 从仓储层同步ID（供仓储层使用）
+func SyncIDFromRepository(a *Assessment, id uint64) {
+	a.setID(ID(id))
+}

@@ -131,9 +131,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 
 // SyncID 同步ID
 func (m *AssessmentMapper) SyncID(po *AssessmentPO, domain *assessment.Assessment) {
-	// Assessment 使用 meta.ID，需要反射或暴露方法来设置ID
-	// 由于领域对象可能需要设置ID的方法，这里暂时跳过
-	// 如果需要，可以在 Assessment 中添加 SetID 方法
+	assessment.SyncIDFromRepository(domain, uint64(po.ID))
 }
 
 // ToDomainList 批量转换持久化对象为领域对象
