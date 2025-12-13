@@ -106,8 +106,6 @@ definitions:
         type: string
       questionnaire_code:
         type: string
-      questionnaire_id:
-        type: integer
       questionnaire_version:
         type: string
       risk_level:
@@ -162,8 +160,6 @@ definitions:
         type: string
       questionnaire_code:
         type: string
-      questionnaire_id:
-        type: integer
       questionnaire_version:
         type: string
       risk_level:
@@ -259,7 +255,7 @@ definitions:
         type: integer
       questionnaires:
         items:
-          $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+          $ref: '#/definitions/questionnaire.QuestionnaireSummaryResponse'
         type: array
       total:
         type: integer
@@ -326,6 +322,27 @@ definitions:
       version:
         type: string
     type: object
+  questionnaire.QuestionnaireSummaryResponse:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      img_url:
+        type: string
+      question_count:
+        type: integer
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: string
+    type: object
   questionnaire.ValidationRuleResponse:
     properties:
       rule_type:
@@ -355,11 +372,11 @@ definitions:
         description: 性别：1-男，2-女，3-其他
         type: integer
       iam_child_id:
-        description: IAM儿童ID
-        type: integer
+        description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
+        type: string
       iam_user_id:
-        description: IAM用户ID（成人）
-        type: integer
+        description: IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字
+        type: string
       is_key_focus:
         description: 是否重点关注
         type: boolean
@@ -416,11 +433,11 @@ definitions:
         description: 性别
         type: integer
       iam_child_id:
-        description: IAM儿童ID
-        type: integer
+        description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
+        type: string
       iam_user_id:
-        description: IAM用户ID
-        type: integer
+        description: IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
+        type: string
       id:
         description: 受试者ID
         type: integer
@@ -1081,7 +1098,7 @@ paths:
         in: query
         name: iam_child_id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:

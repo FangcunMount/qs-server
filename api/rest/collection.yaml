@@ -599,7 +599,7 @@ paths:
       description: 根据IAM儿童ID检查受试者是否存在
       operationId: 检查受试者是否存在
       parameters:
-      - type: integer
+      - type: string
         description: IAM儿童ID
         name: iam_child_id
         in: query
@@ -862,8 +862,6 @@ components:
           type: string
         questionnaire_code:
           type: string
-        questionnaire_id:
-          type: integer
         questionnaire_version:
           type: string
         risk_level:
@@ -918,8 +916,6 @@ components:
           type: string
         questionnaire_code:
           type: string
-        questionnaire_id:
-          type: integer
         questionnaire_version:
           type: string
         risk_level:
@@ -1016,7 +1012,7 @@ components:
         questionnaires:
           type: array
           items:
-            $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
+            $ref: '#/components/schemas/questionnaire.QuestionnaireSummaryResponse'
         total:
           type: integer
     meta.Birthday:
@@ -1081,6 +1077,27 @@ components:
           type: string
         version:
           type: string
+    questionnaire.QuestionnaireSummaryResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        created_at:
+          type: string
+        description:
+          type: string
+        img_url:
+          type: string
+        question_count:
+          type: integer
+        status:
+          type: string
+        title:
+          type: string
+        updated_at:
+          type: string
+        version:
+          type: string
     questionnaire.ValidationRuleResponse:
       type: object
       properties:
@@ -1115,11 +1132,11 @@ components:
           description: 性别：1-男，2-女，3-其他
           type: integer
         iam_child_id:
-          description: IAM儿童ID
-          type: integer
+          description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
+          type: string
         iam_user_id:
-          description: IAM用户ID（成人）
-          type: integer
+          description: IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字
+          type: string
         is_key_focus:
           description: 是否重点关注
           type: boolean
@@ -1172,11 +1189,11 @@ components:
           description: 性别
           type: integer
         iam_child_id:
-          description: IAM儿童ID
-          type: integer
+          description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
+          type: string
         iam_user_id:
-          description: IAM用户ID
-          type: integer
+          description: IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
+          type: string
         id:
           description: 受试者ID
           type: integer

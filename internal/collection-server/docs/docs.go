@@ -885,7 +885,7 @@ const docTemplate = `{
                 "summary": "检查受试者是否存在",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "IAM儿童ID",
                         "name": "iam_child_id",
                         "in": "query",
@@ -1266,9 +1266,6 @@ const docTemplate = `{
                 "questionnaire_code": {
                     "type": "string"
                 },
-                "questionnaire_id": {
-                    "type": "integer"
-                },
                 "questionnaire_version": {
                     "type": "string"
                 },
@@ -1350,9 +1347,6 @@ const docTemplate = `{
                 },
                 "questionnaire_code": {
                     "type": "string"
-                },
-                "questionnaire_id": {
-                    "type": "integer"
                 },
                 "questionnaire_version": {
                     "type": "string"
@@ -1498,7 +1492,7 @@ const docTemplate = `{
                 "questionnaires": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
+                        "$ref": "#/definitions/questionnaire.QuestionnaireSummaryResponse"
                     }
                 },
                 "total": {
@@ -1601,6 +1595,38 @@ const docTemplate = `{
                 }
             }
         },
+        "questionnaire.QuestionnaireSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "img_url": {
+                    "type": "string"
+                },
+                "question_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "questionnaire.ValidationRuleResponse": {
             "type": "object",
             "properties": {
@@ -1650,12 +1676,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "iam_child_id": {
-                    "description": "IAM儿童ID",
-                    "type": "integer"
+                    "description": "IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字",
+                    "type": "string"
                 },
                 "iam_user_id": {
-                    "description": "IAM用户ID（成人）",
-                    "type": "integer"
+                    "description": "IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字",
+                    "type": "string"
                 },
                 "is_key_focus": {
                     "description": "是否重点关注",
@@ -1735,12 +1761,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "iam_child_id": {
-                    "description": "IAM儿童ID",
-                    "type": "integer"
+                    "description": "IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字",
+                    "type": "string"
                 },
                 "iam_user_id": {
-                    "description": "IAM用户ID",
-                    "type": "integer"
+                    "description": "IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字",
+                    "type": "string"
                 },
                 "id": {
                     "description": "受试者ID",

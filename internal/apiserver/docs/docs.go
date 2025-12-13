@@ -2662,6 +2662,9 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -2866,6 +2869,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
@@ -3088,12 +3094,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "questionnaire_code": {
-                    "description": "问卷编码",
+                    "description": "问卷编码（唯一标识）",
                     "type": "string"
-                },
-                "questionnaire_id": {
-                    "description": "问卷ID",
-                    "type": "integer"
                 },
                 "questionnaire_version": {
                     "description": "问卷版本",
@@ -3411,6 +3413,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 },
                 "version": {

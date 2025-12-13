@@ -61,6 +61,8 @@ definitions:
         type: string
       title:
         type: string
+      type:
+        type: string
     type: object
   request.CreateScaleRequest:
     properties:
@@ -197,6 +199,8 @@ definitions:
       img_url:
         type: string
       title:
+        type: string
+      type:
         type: string
     type: object
   request.UpdateScaleBasicInfoRequest:
@@ -348,11 +352,8 @@ definitions:
         description: 来源类型
         type: string
       questionnaire_code:
-        description: 问卷编码
+        description: 问卷编码（唯一标识）
         type: string
-      questionnaire_id:
-        description: 问卷ID
-        type: integer
       questionnaire_version:
         description: 问卷版本
         type: string
@@ -574,6 +575,8 @@ definitions:
       status:
         type: string
       title:
+        type: string
+      type:
         type: string
       version:
         type: string

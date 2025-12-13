@@ -1649,6 +1649,8 @@ components:
           type: string
         title:
           type: string
+        type:
+          type: string
     request.CreateScaleRequest:
       type: object
       properties:
@@ -1785,6 +1787,8 @@ components:
         img_url:
           type: string
         title:
+          type: string
+        type:
           type: string
     request.UpdateScaleBasicInfoRequest:
       type: object
@@ -1936,11 +1940,8 @@ components:
           description: 来源类型
           type: string
         questionnaire_code:
-          description: 问卷编码
+          description: 问卷编码（唯一标识）
           type: string
-        questionnaire_id:
-          description: 问卷ID
-          type: integer
         questionnaire_version:
           description: 问卷版本
           type: string
@@ -2162,6 +2163,8 @@ components:
         status:
           type: string
         title:
+          type: string
+        type:
           type: string
         version:
           type: string
