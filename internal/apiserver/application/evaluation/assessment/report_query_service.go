@@ -25,13 +25,13 @@ func NewReportQueryService(reportRepo report.ReportRepository) ReportQueryServic
 
 // GetByAssessmentID 根据测评ID获取报告
 func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportResult, error) {
-	id := meta.FromUint64(assessmentID)
-	report, err := s.reportRepo.FindByID(ctx, id)
+	assessmentIDVO := meta.FromUint64(assessmentID)
+	rpt, err := s.reportRepo.FindByAssessmentID(ctx, assessmentIDVO)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInterpretReportNotFound, "报告不存在")
 	}
 
-	return toReportResult(report), nil
+	return toReportResult(rpt), nil
 }
 
 // ListByTesteeID 获取受试者的报告列表
