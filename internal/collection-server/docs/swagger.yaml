@@ -9,7 +9,7 @@ definitions:
       created_at:
         type: string
       id:
-        type: integer
+        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -17,7 +17,7 @@ definitions:
       score:
         type: number
       testee_id:
-        type: integer
+        type: string
       testee_name:
         type: string
       title:
@@ -25,7 +25,7 @@ definitions:
       updated_at:
         type: string
       writer_id:
-        type: integer
+        type: string
       writer_name:
         type: string
     type: object
@@ -52,7 +52,7 @@ definitions:
   answersheet.SubmitAnswerSheetResponse:
     properties:
       id:
-        type: integer
+        type: string
       message:
         type: string
     type: object
@@ -87,7 +87,7 @@ definitions:
   evaluation.AssessmentDetailResponse:
     properties:
       answer_sheet_id:
-        type: integer
+        type: string
       created_at:
         type: string
       failed_at:
@@ -95,11 +95,11 @@ definitions:
       failure_reason:
         type: string
       id:
-        type: integer
+        type: string
       interpreted_at:
         type: string
       org_id:
-        type: integer
+        type: string
       origin_id:
         type: string
       origin_type:
@@ -119,14 +119,14 @@ definitions:
       submitted_at:
         type: string
       testee_id:
-        type: integer
+        type: string
       total_score:
         type: number
     type: object
   evaluation.AssessmentReportResponse:
     properties:
       assessment_id:
-        type: integer
+        type: string
       conclusion:
         type: string
       created_at:
@@ -153,7 +153,7 @@ definitions:
       created_at:
         type: string
       id:
-        type: integer
+        type: string
       interpreted_at:
         type: string
       origin_type:
@@ -223,7 +223,7 @@ definitions:
   evaluation.TrendPointResponse:
     properties:
       assessment_id:
-        type: integer
+        type: string
       created_at:
         type: string
       risk_level:
@@ -317,6 +317,9 @@ definitions:
         type: string
       title:
         type: string
+      type:
+        description: 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
+        type: string
       updated_at:
         type: string
       version:
@@ -337,6 +340,9 @@ definitions:
       status:
         type: string
       title:
+        type: string
+      type:
+        description: 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
         type: string
       updated_at:
         type: string
@@ -414,7 +420,7 @@ definitions:
         type: boolean
       testee_id:
         description: 受试者ID（如果存在）
-        type: integer
+        type: string
     type: object
   testee.TesteeResponse:
     properties:
@@ -440,7 +446,7 @@ definitions:
         type: string
       id:
         description: 受试者ID
-        type: integer
+        type: string
       is_key_focus:
         description: 是否重点关注
         type: boolean
@@ -449,7 +455,7 @@ definitions:
         type: string
       org_id:
         description: 机构ID
-        type: integer
+        type: string
       source:
         description: 来源
         type: string

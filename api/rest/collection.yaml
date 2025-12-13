@@ -765,7 +765,7 @@ components:
         created_at:
           type: string
         id:
-          type: integer
+          type: string
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -773,7 +773,7 @@ components:
         score:
           type: number
         testee_id:
-          type: integer
+          type: string
         testee_name:
           type: string
         title:
@@ -781,7 +781,7 @@ components:
         updated_at:
           type: string
         writer_id:
-          type: integer
+          type: string
         writer_name:
           type: string
     answersheet.SubmitAnswerSheetRequest:
@@ -808,7 +808,7 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
         message:
           type: string
     core.ErrResponse:
@@ -843,7 +843,7 @@ components:
       type: object
       properties:
         answer_sheet_id:
-          type: integer
+          type: string
         created_at:
           type: string
         failed_at:
@@ -851,11 +851,11 @@ components:
         failure_reason:
           type: string
         id:
-          type: integer
+          type: string
         interpreted_at:
           type: string
         org_id:
-          type: integer
+          type: string
         origin_id:
           type: string
         origin_type:
@@ -875,14 +875,14 @@ components:
         submitted_at:
           type: string
         testee_id:
-          type: integer
+          type: string
         total_score:
           type: number
     evaluation.AssessmentReportResponse:
       type: object
       properties:
         assessment_id:
-          type: integer
+          type: string
         conclusion:
           type: string
         created_at:
@@ -909,7 +909,7 @@ components:
         created_at:
           type: string
         id:
-          type: integer
+          type: string
         interpreted_at:
           type: string
         origin_type:
@@ -979,7 +979,7 @@ components:
       type: object
       properties:
         assessment_id:
-          type: integer
+          type: string
         created_at:
           type: string
         risk_level:
@@ -1073,6 +1073,9 @@ components:
           type: string
         title:
           type: string
+        type:
+          description: 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
+          type: string
         updated_at:
           type: string
         version:
@@ -1093,6 +1096,9 @@ components:
         status:
           type: string
         title:
+          type: string
+        type:
+          description: 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
           type: string
         updated_at:
           type: string
@@ -1170,7 +1176,7 @@ components:
           type: boolean
         testee_id:
           description: 受试者ID（如果存在）
-          type: integer
+          type: string
     testee.TesteeResponse:
       type: object
       properties:
@@ -1196,7 +1202,7 @@ components:
           type: string
         id:
           description: 受试者ID
-          type: integer
+          type: string
         is_key_focus:
           description: 是否重点关注
           type: boolean
@@ -1205,7 +1211,7 @@ components:
           type: string
         org_id:
           description: 机构ID
-          type: integer
+          type: string
         source:
           description: 来源
           type: string

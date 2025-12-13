@@ -8,6 +8,7 @@ type QuestionnaireResponse struct {
 	ImgURL      string             `json:"img_url"`
 	Status      string             `json:"status"`
 	Version     string             `json:"version"`
+	Type        string             `json:"type"` // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 	Questions   []QuestionResponse `json:"questions"`
 	CreatedAt   string             `json:"created_at"`
 	UpdatedAt   string             `json:"updated_at"`
@@ -59,6 +60,7 @@ type QuestionnaireSummaryResponse struct {
 	ImgURL        string `json:"img_url"`
 	Status        string `json:"status"`
 	Version       string `json:"version"`
+	Type          string `json:"type"` // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 	QuestionCount int32  `json:"question_count"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`

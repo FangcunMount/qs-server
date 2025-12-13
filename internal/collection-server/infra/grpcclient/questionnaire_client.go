@@ -16,6 +16,7 @@ type QuestionnaireOutput struct {
 	ImgURL      string
 	Status      string
 	Version     string
+	Type        string
 	Questions   []QuestionOutput
 	CreatedAt   string
 	UpdatedAt   string
@@ -67,6 +68,7 @@ type QuestionnaireSummaryOutput struct {
 	ImgURL        string
 	Status        string
 	Version       string
+	Type          string
 	QuestionCount int32
 	CreatedAt     string
 	UpdatedAt     string
@@ -134,6 +136,7 @@ func (c *QuestionnaireClient) ListQuestionnaires(ctx context.Context, page, page
 			ImgURL:        q.GetImgUrl(),
 			Status:        q.GetStatus(),
 			Version:       q.GetVersion(),
+			Type:          q.GetType(),
 			QuestionCount: q.GetQuestionCount(),
 			CreatedAt:     q.GetCreatedAt(),
 			UpdatedAt:     q.GetUpdatedAt(),
@@ -162,6 +165,7 @@ func (c *QuestionnaireClient) convertQuestionnaire(q *pb.Questionnaire) *Questio
 		ImgURL:      q.GetImgUrl(),
 		Status:      q.GetStatus(),
 		Version:     q.GetVersion(),
+		Type:        q.GetType(),
 		Questions:   questions,
 		CreatedAt:   q.GetCreatedAt(),
 		UpdatedAt:   q.GetUpdatedAt(),

@@ -24,6 +24,7 @@ message QuestionnaireSummary {
   int32 question_count = 7;
   string created_at = 8;
   string updated_at = 9;
+  string type = 10; // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 }
 
 // 问卷完整信息（用于详情查询）
@@ -37,6 +38,7 @@ message Questionnaire {
   repeated Question questions = 7;
   string created_at = 8;
   string updated_at = 9;
+  string type = 10; // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 }
 
 // 问题信息

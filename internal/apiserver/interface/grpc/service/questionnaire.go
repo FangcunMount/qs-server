@@ -116,6 +116,7 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 		Description: result.Description,
 		ImgUrl:      result.ImgUrl,
 		Status:      result.Status,
+		Type:        result.Type,
 		Questions:   protoQuestions,
 	}
 }
@@ -146,6 +147,7 @@ func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire
 		Description:   result.Description,
 		ImgUrl:        result.ImgUrl,
 		Status:        result.Status,
+		Type:          result.Type,
 		QuestionCount: int32(result.QuestionCount),
 	}
 }

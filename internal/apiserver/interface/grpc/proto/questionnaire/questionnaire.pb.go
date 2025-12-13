@@ -33,6 +33,7 @@ type QuestionnaireSummary struct {
 	QuestionCount int32                  `protobuf:"varint,7,opt,name=question_count,json=questionCount,proto3" json:"question_count,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Type          string                 `protobuf:"bytes,10,opt,name=type,proto3" json:"type,omitempty"` // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -130,6 +131,13 @@ func (x *QuestionnaireSummary) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *QuestionnaireSummary) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
 // 问卷完整信息（用于详情查询）
 type Questionnaire struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -142,6 +150,7 @@ type Questionnaire struct {
 	Questions     []*Question            `protobuf:"bytes,7,rep,name=questions,proto3" json:"questions,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Type          string                 `protobuf:"bytes,10,opt,name=type,proto3" json:"type,omitempty"` // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -235,6 +244,13 @@ func (x *Questionnaire) GetCreatedAt() string {
 func (x *Questionnaire) GetUpdatedAt() string {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return ""
+}
+
+func (x *Questionnaire) GetType() string {
+	if x != nil {
+		return x.Type
 	}
 	return ""
 }
@@ -715,7 +731,7 @@ var File_questionnaire_questionnaire_proto protoreflect.FileDescriptor
 
 const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\n" +
-	"!questionnaire/questionnaire.proto\x12\rquestionnaire\"\x92\x02\n" +
+	"!questionnaire/questionnaire.proto\x12\rquestionnaire\"\xa6\x02\n" +
 	"\x14QuestionnaireSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -727,7 +743,9 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\tR\tupdatedAt\"\x9b\x02\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\x12\x12\n" +
+	"\x04type\x18\n" +
+	" \x01(\tR\x04type\"\xaf\x02\n" +
 	"\rQuestionnaire\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -739,7 +757,9 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\tR\tupdatedAt\"\xc4\x02\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\x12\x12\n" +
+	"\x04type\x18\n" +
+	" \x01(\tR\x04type\"\xc4\x02\n" +
 	"\bQuestion\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +

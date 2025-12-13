@@ -1125,7 +1125,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -1137,7 +1137,7 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "testee_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "testee_name": {
                     "type": "string"
@@ -1149,7 +1149,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "writer_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "writer_name": {
                     "type": "string"
@@ -1189,7 +1189,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "message": {
                     "type": "string"
@@ -1237,7 +1237,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "answer_sheet_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
@@ -1249,13 +1249,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "interpreted_at": {
                     "type": "string"
                 },
                 "org_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "origin_id": {
                     "type": "string"
@@ -1285,7 +1285,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "testee_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "total_score": {
                     "type": "number"
@@ -1296,7 +1296,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "assessment_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "conclusion": {
                     "type": "string"
@@ -1337,7 +1337,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "interpreted_at": {
                     "type": "string"
@@ -1444,7 +1444,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "assessment_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
@@ -1587,6 +1587,10 @@ const docTemplate = `{
                 "title": {
                     "type": "string"
                 },
+                "type": {
+                    "description": "问卷类型：Survey(调查问卷) / MedicalScale(医学量表)",
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
@@ -1617,6 +1621,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "问卷类型：Survey(调查问卷) / MedicalScale(医学量表)",
                     "type": "string"
                 },
                 "updated_at": {
@@ -1729,7 +1737,7 @@ const docTemplate = `{
                 },
                 "testee_id": {
                     "description": "受试者ID（如果存在）",
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -1770,7 +1778,7 @@ const docTemplate = `{
                 },
                 "id": {
                     "description": "受试者ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "is_key_focus": {
                     "description": "是否重点关注",
@@ -1782,7 +1790,7 @@ const docTemplate = `{
                 },
                 "org_id": {
                     "description": "机构ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "source": {
                     "description": "来源",
