@@ -1394,8 +1394,7 @@ func (x *GetHighRiskFactorsResponse) GetNeedsUrgentCare() bool {
 // 获取测评报告请求
 type GetAssessmentReportRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`             // 受试者ID（权限校验）
-	AssessmentId  uint64                 `protobuf:"varint,2,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"` // 测评ID
+	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"` // 测评ID
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1428,13 +1427,6 @@ func (x *GetAssessmentReportRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetAssessmentReportRequest.ProtoReflect.Descriptor instead.
 func (*GetAssessmentReportRequest) Descriptor() ([]byte, []int) {
 	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *GetAssessmentReportRequest) GetTesteeId() uint64 {
-	if x != nil {
-		return x.TesteeId
-	}
-	return 0
 }
 
 func (x *GetAssessmentReportRequest) GetAssessmentId() uint64 {
@@ -1785,10 +1777,9 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\"\n" +
 	"\rhas_high_risk\x18\x02 \x01(\bR\vhasHighRisk\x12C\n" +
 	"\x11high_risk_factors\x18\x03 \x03(\v2\x17.evaluation.FactorScoreR\x0fhighRiskFactors\x12*\n" +
-	"\x11needs_urgent_care\x18\x04 \x01(\bR\x0fneedsUrgentCare\"^\n" +
-	"\x1aGetAssessmentReportRequest\x12\x1b\n" +
-	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
-	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"S\n" +
+	"\x11needs_urgent_care\x18\x04 \x01(\bR\x0fneedsUrgentCare\"A\n" +
+	"\x1aGetAssessmentReportRequest\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"S\n" +
 	"\x1bGetAssessmentReportResponse\x124\n" +
 	"\x06report\x18\x01 \x01(\v2\x1c.evaluation.AssessmentReportR\x06report\"d\n" +
 	"\x14ListMyReportsRequest\x12\x1b\n" +

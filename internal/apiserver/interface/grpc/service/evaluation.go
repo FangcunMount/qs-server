@@ -261,13 +261,6 @@ func (s *EvaluationService) GetAssessmentReport(ctx context.Context, req *pb.Get
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	// 验证 testee_id 权限：检查该测评是否属于该受试者
-	if req.TesteeId > 0 {
-		if err := s.validateTesteeAssessmentAccess(ctx, req.TesteeId, req.AssessmentId); err != nil {
-			return nil, err
-		}
-	}
-
 	result, err := s.reportQueryService.GetByAssessmentID(ctx, req.AssessmentId)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

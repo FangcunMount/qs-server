@@ -294,10 +294,10 @@ func (s *QueryService) GetAssessmentScores(ctx context.Context, testeeID, assess
 }
 
 // GetAssessmentReport 获取测评报告
-func (s *QueryService) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error) {
-	log.Infof("Getting assessment report: testeeID=%d, assessmentID=%d", testeeID, assessmentID)
+func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uint64) (*AssessmentReportResponse, error) {
+	log.Infof("Getting assessment report: assessmentID=%d", assessmentID)
 
-	result, err := s.evaluationClient.GetAssessmentReport(ctx, testeeID, assessmentID)
+	result, err := s.evaluationClient.GetAssessmentReport(ctx, assessmentID)
 	if err != nil {
 		log.Errorf("Failed to get assessment report via gRPC: %v", err)
 		return nil, err

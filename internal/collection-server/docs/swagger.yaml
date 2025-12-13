@@ -753,11 +753,6 @@ paths:
         name: id
         required: true
         type: integer
-      - description: 受试者ID
-        in: query
-        name: testee_id
-        required: true
-        type: integer
       produces:
       - application/json
       responses:

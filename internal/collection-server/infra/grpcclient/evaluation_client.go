@@ -220,12 +220,11 @@ func (c *EvaluationClient) GetAssessmentScores(ctx context.Context, testeeID, as
 }
 
 // GetAssessmentReport 获取测评报告
-func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error) {
+func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, assessmentID uint64) (*AssessmentReportOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
 	req := &pb.GetAssessmentReportRequest{
-		TesteeId:     testeeID,
 		AssessmentId: assessmentID,
 	}
 

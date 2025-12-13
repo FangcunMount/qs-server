@@ -208,8 +208,7 @@ message GetHighRiskFactorsResponse {
 
 // 获取测评报告请求
 message GetAssessmentReportRequest {
-  uint64 testee_id = 1;       // 受试者ID（权限校验）
-  uint64 assessment_id = 2;   // 测评ID
+  uint64 assessment_id = 1;   // 测评ID
 }
 
 // 获取测评报告响应

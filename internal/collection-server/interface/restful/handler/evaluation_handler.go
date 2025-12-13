@@ -159,7 +159,6 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"
-// @Param testee_id query int true "受试者ID"
 // @Success 200 {object} core.Response{data=evaluation.AssessmentReportResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
@@ -167,18 +166,6 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
-	// 从 query 参数获取 testee_id
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
-		return
-	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return
-	}
-
 	idStr := h.GetPathParam(c, "id")
 	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -186,7 +173,7 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), testeeID, assessmentID)
+	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get report failed", err)
 		return

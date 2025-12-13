@@ -526,13 +526,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "query",
-                        "required": true
                     }
                 ],
                 "responses": {
