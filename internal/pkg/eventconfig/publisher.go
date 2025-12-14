@@ -80,8 +80,21 @@ func (p *RoutingPublisher) Publish(ctx context.Context, evt event.DomainEvent) e
 	// 从配置中查找 Topic
 	topicName, ok := p.registry.GetTopicForEvent(eventType)
 	if !ok {
+		logger.L(ctx).Errorw("event type not found in config, cannot route to topic",
+			"event_type", eventType,
+			"event_id", evt.EventID(),
+			"aggregate_type", evt.AggregateType(),
+			"aggregate_id", evt.AggregateID(),
+		)
 		return fmt.Errorf("event type %q not found in config", eventType)
 	}
+
+	// 记录路由决策（调试用）
+	logger.L(ctx).Debugw("routing event to topic",
+		"event_type", eventType,
+		"topic_name", topicName,
+		"mode", p.mode,
+	)
 
 	switch p.mode {
 	case PublishModeMQ:
@@ -130,10 +143,15 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 
 	// 发布到配置的 Topic
 	if err := p.mqPublisher.PublishMessage(ctx, topicName, msg); err != nil {
+		logger.L(ctx).Errorw("failed to publish event to topic",
+			"event_type", evt.EventType(),
+			"topic", topicName,
+			"error", err.Error(),
+		)
 		return fmt.Errorf("failed to publish to topic %s: %w", topicName, err)
 	}
 
-	logger.L(ctx).Infow("event published",
+	logger.L(ctx).Infow("event published to topic",
 		"action", "publish_event",
 		"event_type", evt.EventType(),
 		"event_id", evt.EventID(),

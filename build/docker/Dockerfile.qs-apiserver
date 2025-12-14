@@ -58,6 +58,7 @@ COPY --from=builder --chown=appuser:appuser /build/bin/qs-apiserver /app/qs-apis
 # 注意：证书文件由 docker-compose 从宿主机挂载，不打包到镜像中
 COPY --chown=appuser:appuser configs/apiserver.dev.yaml /app/configs/apiserver.dev.yaml
 COPY --chown=appuser:appuser configs/apiserver.prod.yaml /app/configs/apiserver.prod.yaml
+COPY --chown=appuser:appuser configs/events.yaml /app/configs/events.yaml
 COPY --chown=appuser:appuser api/rest /app/api/rest
 COPY --chown=appuser:appuser web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/swagger-ui-dist
 

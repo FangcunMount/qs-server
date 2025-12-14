@@ -65,6 +65,11 @@ RUN mkdir -p /etc/qs-server/ssl/ca /etc/qs-server/ssl/server && \
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/bin/qs-worker /app/qs-worker
 
+# 复制配置文件（events.yaml 是事件路由必需的）
+COPY --chown=appuser:appuser configs/worker.dev.yaml /app/configs/worker.dev.yaml
+COPY --chown=appuser:appuser configs/worker.prod.yaml /app/configs/worker.prod.yaml
+COPY --chown=appuser:appuser configs/events.yaml /app/configs/events.yaml
+
 # 切换到非 root 用户
 USER appuser
 
