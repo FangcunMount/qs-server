@@ -44,7 +44,7 @@ func (h *FactorScoreHandler) Handle(ctx context.Context, evalCtx *Context) error
 
 	// 计算每个因子的原始得分
 	for _, factor := range factors {
-		rawScore := h.calculateFactorRawScore(factor, evalCtx.AnswerSheet, evalCtx.Questionnaire)
+		rawScore := h.calculateFactorRawScore(ctx, factor, evalCtx.AnswerSheet, evalCtx.Questionnaire)
 
 		factorScore := assessment.NewFactorScoreResult(
 			assessment.NewFactorCode(string(factor.GetCode())),
@@ -88,6 +88,7 @@ func (h *FactorScoreHandler) calculateTotalScore(factorScores []assessment.Facto
 // calculateFactorRawScore 计算因子原始得分
 // 委托给量表领域的计分服务
 func (h *FactorScoreHandler) calculateFactorRawScore(
+	ctx context.Context,
 	factor *scale.Factor,
 	sheet *answersheet.AnswerSheet,
 	qnr *questionnaire.Questionnaire,
@@ -98,10 +99,9 @@ func (h *FactorScoreHandler) calculateFactorRawScore(
 	}
 
 	// 委托给领域服务计算因子得分
-	score, err := h.scoringService.CalculateFactorScore(factor, sheet, qnr)
+	score, err := h.scoringService.CalculateFactorScore(ctx, factor, sheet, qnr)
 	if err != nil {
 		// 计算失败，返回 0
-		// TODO: 添加日志记录
 		return 0
 	}
 

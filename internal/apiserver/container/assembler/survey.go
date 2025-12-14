@@ -12,7 +12,7 @@ import (
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 

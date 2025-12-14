@@ -1,12 +1,14 @@
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/pkg/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
 // ScoringService 计分服务（领域服务）
@@ -14,6 +16,7 @@ import (
 type ScoringService interface {
 	// CalculateFactorScore 计算因子得分
 	CalculateFactorScore(
+		ctx context.Context,
 		factor *Factor,
 		sheet *answersheet.AnswerSheet,
 		qnr *questionnaire.Questionnaire,
@@ -30,47 +33,78 @@ func NewScoringService() ScoringService {
 
 // CalculateFactorScore 计算因子得分
 func (s *defaultScoringService) CalculateFactorScore(
+	ctx context.Context,
 	factor *Factor,
 	sheet *answersheet.AnswerSheet,
 	qnr *questionnaire.Questionnaire,
 ) (float64, error) {
+	l := logger.L(ctx)
+
 	if factor == nil || sheet == nil {
 		return 0, fmt.Errorf("factor and answer sheet are required")
 	}
 
 	questionCodes := factor.GetQuestionCodes()
 	if len(questionCodes) == 0 {
+		l.Debugw("Factor has no questions, returning score 0",
+			"factor_code", factor.GetCode().Value())
 		return 0, nil
 	}
 
+	l.Infow("Calculating factor score",
+		"factor_code", factor.GetCode().Value(),
+		"strategy", factor.GetScoringStrategy(),
+		"question_count", len(questionCodes))
+
 	// 严格根据配置的计分策略执行，不做降级
+	var score float64
+	var err error
+
 	switch factor.GetScoringStrategy() {
 	case ScoringStrategySum:
-		return s.applySumStrategy(factor, sheet)
+		score, err = s.applySumStrategy(ctx, factor, sheet)
 
 	case ScoringStrategyAvg:
-		return s.applyAvgStrategy(factor, sheet)
+		score, err = s.applyAvgStrategy(ctx, factor, sheet)
 
 	case ScoringStrategyCnt:
 		// cnt 策略需要问卷信息和配置参数
 		if qnr == nil {
 			return 0, fmt.Errorf("questionnaire is required for cnt scoring strategy")
 		}
-		return s.applyCntStrategy(factor, sheet, qnr)
+		score, err = s.applyCntStrategy(ctx, factor, sheet, qnr)
 
 	default:
 		// 未知策略，报错而不是降级
-		return 0, fmt.Errorf("unknown scoring strategy: %s", factor.GetScoringStrategy())
+		err = fmt.Errorf("unknown scoring strategy: %s", factor.GetScoringStrategy())
 	}
+
+	if err != nil {
+		l.Errorw("Failed to calculate factor score",
+			"factor_code", factor.GetCode().Value(),
+			"strategy", factor.GetScoringStrategy(),
+			"error", err)
+		return 0, err
+	}
+
+	l.Infow("Factor score calculated successfully",
+		"factor_code", factor.GetCode().Value(),
+		"strategy", factor.GetScoringStrategy(),
+		"score", score)
+
+	return score, nil
 }
 
 // applyCntStrategy 应用计数策略
 // 统计选择了特定选项内容的题目数量
 func (s *defaultScoringService) applyCntStrategy(
+	ctx context.Context,
 	factor *Factor,
 	sheet *answersheet.AnswerSheet,
 	qnr *questionnaire.Questionnaire,
 ) (float64, error) {
+	l := logger.L(ctx)
+
 	// 从 raw_calc_rule 中提取参数
 	params := factor.GetScoringParams()
 	rawRule, exists := params["raw_calc_rule"]
@@ -97,6 +131,10 @@ func (s *defaultScoringService) applyCntStrategy(
 		return 0, fmt.Errorf("cnt_option_contents is empty")
 	}
 
+	l.Debugw("Applying cnt strategy",
+		"factor_code", factor.GetCode().Value(),
+		"target_contents", targetContents)
+
 	// 构建选项内容映射
 	optionContentMap := buildOptionContentMap(qnr)
 
@@ -105,29 +143,46 @@ func (s *defaultScoringService) applyCntStrategy(
 
 	// 筛选出匹配的题目，收集为 1.0（匹配）或 0.0（不匹配）
 	matchValues := make([]float64, 0, len(factor.GetQuestionCodes()))
+	matchedQuestions := make([]string, 0)
+
 	for _, qCode := range factor.GetQuestionCodes() {
 		answer, found := answerMap[qCode.String()]
 		if !found {
+			l.Debugw("Question not answered", "question_code", qCode.String())
 			continue
 		}
 
 		// 获取答案的选项ID
 		optionID := extractOptionID(answer)
 		if optionID == "" {
+			l.Debugw("No option ID found in answer", "question_code", qCode.String())
 			continue
 		}
 
 		// 获取选项内容
 		optionContent, found := optionContentMap[optionID]
 		if !found {
+			l.Warnw("Option content not found",
+				"question_code", qCode.String(),
+				"option_id", optionID)
 			continue
 		}
 
 		// 判断是否匹配目标内容
 		if containsString(targetContents, optionContent) {
 			matchValues = append(matchValues, 1.0) // 匹配
+			matchedQuestions = append(matchedQuestions, qCode.String())
+			l.Debugw("Question matched target content",
+				"question_code", qCode.String(),
+				"option_content", optionContent)
 		}
 	}
+
+	l.Infow("Cnt strategy matching completed",
+		"factor_code", factor.GetCode().Value(),
+		"total_questions", len(factor.GetQuestionCodes()),
+		"matched_count", len(matchValues),
+		"matched_questions", matchedQuestions)
 
 	// 使用 calculation 包的 Count 策略计数
 	countStrategy := calculation.GetStrategy(calculation.StrategyTypeCount)
@@ -140,11 +195,20 @@ func (s *defaultScoringService) applyCntStrategy(
 }
 
 // applySumStrategy 应用求和策略
-func (s *defaultScoringService) applySumStrategy(factor *Factor, sheet *answersheet.AnswerSheet) (float64, error) {
+func (s *defaultScoringService) applySumStrategy(ctx context.Context, factor *Factor, sheet *answersheet.AnswerSheet) (float64, error) {
+	l := logger.L(ctx)
+
 	scores := s.collectQuestionScores(factor, sheet)
 	if len(scores) == 0 {
+		l.Debugw("No scores collected for sum strategy",
+			"factor_code", factor.GetCode().Value())
 		return 0, nil
 	}
+
+	l.Debugw("Applying sum strategy",
+		"factor_code", factor.GetCode().Value(),
+		"scores", scores,
+		"score_count", len(scores))
 
 	strategy := calculation.GetStrategy(calculation.StrategyTypeSum)
 	if strategy == nil {
@@ -153,18 +217,36 @@ func (s *defaultScoringService) applySumStrategy(factor *Factor, sheet *answersh
 		for _, score := range scores {
 			sum += score
 		}
+		l.Debugw("Sum calculated (manual fallback)",
+			"factor_code", factor.GetCode().Value(),
+			"sum", sum)
 		return sum, nil
 	}
 
-	return strategy.Calculate(scores, nil)
+	result, err := strategy.Calculate(scores, nil)
+	if err == nil {
+		l.Debugw("Sum calculated",
+			"factor_code", factor.GetCode().Value(),
+			"sum", result)
+	}
+	return result, err
 }
 
 // applyAvgStrategy 应用平均值策略
-func (s *defaultScoringService) applyAvgStrategy(factor *Factor, sheet *answersheet.AnswerSheet) (float64, error) {
+func (s *defaultScoringService) applyAvgStrategy(ctx context.Context, factor *Factor, sheet *answersheet.AnswerSheet) (float64, error) {
+	l := logger.L(ctx)
+
 	scores := s.collectQuestionScores(factor, sheet)
 	if len(scores) == 0 {
+		l.Debugw("No scores collected for avg strategy",
+			"factor_code", factor.GetCode().Value())
 		return 0, nil
 	}
+
+	l.Debugw("Applying avg strategy",
+		"factor_code", factor.GetCode().Value(),
+		"scores", scores,
+		"score_count", len(scores))
 
 	strategy := calculation.GetStrategy(calculation.StrategyTypeAverage)
 	if strategy == nil {
@@ -173,10 +255,20 @@ func (s *defaultScoringService) applyAvgStrategy(factor *Factor, sheet *answersh
 		for _, score := range scores {
 			sum += score
 		}
-		return sum / float64(len(scores)), nil
+		avg := sum / float64(len(scores))
+		l.Debugw("Average calculated (manual fallback)",
+			"factor_code", factor.GetCode().Value(),
+			"average", avg)
+		return avg, nil
 	}
 
-	return strategy.Calculate(scores, nil)
+	result, err := strategy.Calculate(scores, nil)
+	if err == nil {
+		l.Debugw("Average calculated",
+			"factor_code", factor.GetCode().Value(),
+			"average", result)
+	}
+	return result, err
 }
 
 // collectQuestionScores 收集因子关联题目的得分

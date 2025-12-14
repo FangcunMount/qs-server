@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 

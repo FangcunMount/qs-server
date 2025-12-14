@@ -1,101 +1,283 @@
-# Interpretation 解读功能域
+# Interpretation 解读领域服务
 
 ## 概述
 
-Interpretation（解读）是一个**无状态的功能性领域**，专门负责根据计算得分生成解读结论。
+interpretation 包是测评解读领域服务，提供**策略模式 + 领域服务**的完整解读能力。
 
-## 设计原则
+**设计原则**：
 
-### 单一职责
+- **无状态**：所有服务和策略都是无状态的，纯函数式计算
+- **可扩展**：支持多种解读策略（区间、阈值、组合）
+- **易用性**：提供统一的领域服务接口，隐藏策略选择细节
+- **高性能**：支持批量解读和并发处理
 
-- 仅负责**解读逻辑**：根据得分判断风险等级、生成解读文本
-- 不负责计分（由 calculation 域处理）
-- 不负责报告持久化（由 assessment 域处理）
+**架构特点**：
 
-### 无状态
+- 与 `domain/calculation` 和 `domain/validation` 保持一致的设计模式
+- 策略模式：多种解读算法可插拔
+- 服务模式：提供统一的解读器接口
+- 批量处理：支持串行和并发批量解读
 
-- 所有解读函数都是**纯函数**
-- 输入：得分 + 解读规则配置
-- 输出：解读结果
-- 无副作用，便于测试和并发
+---
 
-### 策略模式
+## 核心组件
 
-- 支持多种解读策略：阈值解读、区间解读、组合解读等
-- 通过策略注册表管理
-- 便于扩展新的解读方式
+### 1. 策略模式 (Strategy Pattern)
 
-## 核心类型
-
-### InterpretStrategy 解读策略接口
+**策略接口**：
 
 ```go
+// InterpretStrategy 解读策略接口
 type InterpretStrategy interface {
     Interpret(score float64, config *InterpretConfig) (*InterpretResult, error)
     StrategyType() StrategyType
 }
 ```
 
-### InterpretConfig 解读配置
+**内置策略**：
+
+- `RangeStrategy` - 区间解读：根据分数所在区间确定风险等级
+- `ThresholdStrategy` - 阈值解读：超过阈值即为指定风险等级
+- `CompositeStrategyImpl` - 组合解读：多因子组合判断
+
+---
+
+### 2. 领域服务 (Domain Service)
+
+**Interpreter 接口**：
 
 ```go
-type InterpretConfig struct {
-    Rules      []InterpretRule  // 解读规则列表
-    FactorCode string           // 因子编码
-    Params     map[string]string // 额外参数
+type Interpreter interface {
+    // 解读单个因子
+    InterpretFactor(score float64, config *InterpretConfig, strategyType StrategyType) (*InterpretResult, error)
+    
+    // 使用单条规则快速解读
+    InterpretFactorWithRule(score float64, rule InterpretRule) *InterpretResult
+    
+    // 多因子组合解读
+    InterpretMultipleFactors(scores []FactorScore, config *CompositeConfig, strategyType StrategyType) (*CompositeResult, error)
 }
 ```
 
-### InterpretResult 解读结果
+---
+
+### 3. 默认解读提供者 (Default Interpretation Provider)
+
+**DefaultInterpretationProvider**：当没有配置解读规则时，提供通用的默认解读
 
 ```go
-type InterpretResult struct {
-    RiskLevel   RiskLevel  // 风险等级
-    Label       string     // 简短标签
-    Description string     // 详细描述
-    Suggestion  string     // 建议
-}
+type DefaultInterpretationProvider struct{}
+
+// 为因子提供默认解读
+func (p *DefaultInterpretationProvider) ProvideFactor(
+    factorName string, 
+    score float64, 
+    riskLevel RiskLevel,
+) *InterpretResult
+
+// 提供整体默认解读
+func (p *DefaultInterpretationProvider) ProvideOverall(
+    totalScore float64, 
+    riskLevel RiskLevel,
+) *InterpretResult
+
+// 使用自定义模版提供解读
+func (p *DefaultInterpretationProvider) ProvideFactorWithTemplate(
+    template string,
+    factorName string,
+    score float64,
+    riskLevel RiskLevel,
+    suggestion string,
+) *InterpretResult
 ```
 
-## 支持的解读策略
+**设计原则**：
+- 符合医学常规的通用解读文本
+- 根据风险等级自动生成描述和建议
+- 支持自定义模版扩展
 
-| 策略类型 | 说明 | 使用场景 |
-|---------|------|---------|
-| threshold | 阈值解读 | 得分超过某个阈值则为高风险 |
-| range | 区间解读 | 根据得分所在区间确定等级 |
-| composite | 组合解读 | 多个因子组合判断风险等级 |
+---
+
+### 4. 批量处理 (Batch Processing)
+
+```go
+type BatchInterpreter struct {
+    interpreter *DefaultInterpreter
+}
+
+// 串行批量解读
+results := batchInterpreter.InterpretAll(tasks)
+
+// 并发批量解读
+results := batchInterpreter.InterpretAllConcurrent(tasks, workerCount)
+```
+
+---
 
 ## 使用示例
 
-```go
-// 1. 获取解读策略
-strategy := GetStrategy(StrategyTypeRange)
+### 示例 1：单个因子解读（推荐）
 
-// 2. 配置解读规则
-config := &InterpretConfig{
-    FactorCode: "depression",
-    Rules: []InterpretRule{
-        {Min: 0, Max: 10, RiskLevel: RiskLevelNone, Label: "正常"},
-        {Min: 11, Max: 20, RiskLevel: RiskLevelMild, Label: "轻度"},
-        {Min: 21, Max: 30, RiskLevel: RiskLevelModerate, Label: "中度"},
-        {Min: 31, Max: 100, RiskLevel: RiskLevelSevere, Label: "重度"},
-    },
+```go
+// 使用便捷函数
+result, err := interpretation.InterpretFactor(
+    12.0,                                    // 得分
+    config,                                  // 配置
+    interpretation.StrategyTypeRange,        // 策略类型
+)
+```
+
+### 示例 2：使用默认解读提供者
+
+```go
+// 当没有配置解读规则时，使用默认解读
+provider := interpretation.GetDefaultProvider()
+
+// 为因子提供默认解读
+result := provider.ProvideFactor(
+    "注意力不集中",                    // 因子名称
+    15.0,                            // 得分
+    interpretation.RiskLevelHigh,    // 风险等级
+)
+fmt.Printf("描述: %s\n", result.Description)  // "注意力不集中得分15.0分，处于较高风险水平"
+fmt.Printf("建议: %s\n", result.Suggestion)   // "建议尽快咨询专业人员，了解更多信息"
+
+// 提供整体默认解读
+overallResult := provider.ProvideOverall(
+    42.0,                            // 总分
+    interpretation.RiskLevelHigh,    // 风险等级
+)
+
+// 或使用便捷函数
+result := interpretation.ProvideDefaultFactor("注意力不集中", 15.0, interpretation.RiskLevelHigh)
+overallResult := interpretation.ProvideDefaultOverall(42.0, interpretation.RiskLevelHigh)
+```
+
+### 示例 3：使用自定义模版
+
+```go
+provider := interpretation.GetDefaultProvider()
+
+// 使用自定义模版（%s = 因子名，%.1f = 得分）
+result := provider.ProvideFactorWithTemplate(
+    "%s维度评分为%.1f，需要重点关注",  // 自定义模版
+    "情绪稳定性",                     // 因子名称
+    8.5,                             // 得分
+    interpretation.RiskLevelMedium,  // 风险等级
+    "建议进行心理咨询",               // 自定义建议
+)
+```
+
+### 示例 4：批量解读
+
+```go
+// 准备批量任务
+tasks := []interpretation.InterpretTask{
+    {ID: "factor1", Score: 12.0, Config: config1, StrategyType: interpretation.StrategyTypeRange},
+    {ID: "factor2", Score: 8.0, Config: config2, StrategyType: interpretation.StrategyTypeRange},
 }
 
-// 3. 执行解读
-result, err := strategy.Interpret(25.0, config)
-// result.RiskLevel = RiskLevelModerate
-// result.Label = "中度"
+// 并发解读（自动选择工作协程数）
+results := interpretation.InterpretAllConcurrent(tasks, 0)
 ```
 
-## 与其他域的关系
+---
+
+## 最佳实践
+
+### 1. 使用领域服务，而非直接使用策略
+
+❌ **不推荐**（直接使用策略）：
+
+```go
+strategy := interpretation.GetStrategy(interpretation.StrategyTypeRange)
+result, err := strategy.Interpret(score, config)
+```
+
+✅ **推荐**（使用领域服务）：
+
+```go
+result, err := interpretation.InterpretFactor(score, config, interpretation.StrategyTypeRange)
+```
+
+### 2. 优先使用规则解读，降级使用默认解读
+
+✅ **推荐的解读流程**：
+
+```go
+// 1. 尝试使用配置的解读规则
+if config != nil && len(config.Rules) > 0 {
+    result, err := interpretation.InterpretFactor(score, config, interpretation.StrategyTypeRange)
+    if err == nil {
+        return result
+    }
+}
+
+// 2. 降级使用默认解读
+result := interpretation.ProvideDefaultFactor(factorName, score, riskLevel)
+return result
+```
+
+### 3. 使用默认提供者而非硬编码文本
+
+❌ **不推荐**（硬编码）：
+
+```go
+func getDefaultInterpretation(score float64, riskLevel RiskLevel) string {
+    switch riskLevel {
+    case RiskLevelHigh:
+        return fmt.Sprintf("得分%.1f分，风险较高", score)
+    // ...
+    }
+}
+```
+
+✅ **推荐**（使用领域服务）：
+
+```go
+result := interpretation.ProvideDefaultFactor(factorName, score, riskLevel)
+return result.Description
+```
+
+### 4. 优先使用便捷函数
+
+```go
+// 推荐：使用包级便捷函数
+result, err := interpretation.InterpretFactor(score, config, strategyType)
+
+// 而不是
+interpreter := interpretation.GetDefaultInterpreter()
+result, err := interpreter.InterpretFactor(score, config, strategyType)
+```
+
+---
+
+## 与其他领域服务的对比
+
+| 特性 | calculation | validation | interpretation |
+|------|------------|-----------|---------------|
+| **策略模式** | ✅ Sum/Avg/Count | ✅ Required/Range/Pattern | ✅ Range/Threshold/Composite |
+| **领域服务** | ✅ Scorer | ✅ Validator | ✅ Interpreter |
+| **默认提供者** | ❌ | ❌ | ✅ DefaultProvider |
+| **批量处理** | ✅ BatchScorer | ✅ BatchValidator | ✅ BatchInterpreter |
+| **便捷函数** | ✅ Score() | ✅ ValidateValue() | ✅ InterpretFactor() |
+| **并发支持** | ✅ | ❌ | ✅ |
+
+---
+
+## 文件结构
 
 ```text
-[Scale 子域] → 提供解读规则配置
-     ↓
-[Calculation 域] → 提供计算得分
-     ↓
-[Interpretation 域] → 生成解读结果
-     ↓
-[Assessment 域] → 持久化报告
+interpretation/
+├── types.go              # 核心类型定义
+├── strategy.go           # 策略接口和注册表
+├── threshold.go          # 阈值和区间策略实现
+├── composite.go          # 组合策略实现
+├── interpreter.go        # 解读器领域服务 ⭐
+├── default_provider.go   # 默认解读提供者 ⭐
+├── batch.go              # 批量解读服务 ⭐
+├── errors.go             # 错误定义
+└── README.md             # 本文档
 ```
+
+⭐ 标记的文件是新增的领域服务层

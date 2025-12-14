@@ -222,8 +222,14 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 		scoringStrategy := scaleDomain.ScoringStrategySum
 		if f.CalcRule.Formula == "avg" {
 			scoringStrategy = scaleDomain.ScoringStrategyAvg
+		} else if f.CalcRule.Formula == "cnt" {
+			scoringStrategy = scaleDomain.ScoringStrategyCnt
 		} else if f.CalcRule.Formula != "" && f.CalcRule.Formula != "sum" {
-			scoringStrategy = scaleDomain.ScoringStrategyCustom
+			// 其他未知公式，记录警告并使用默认 sum 策略
+			logger.Warnw("Unknown scoring formula, using sum as fallback",
+				"scale_code", sc.Code,
+				"factor_code", f.Code,
+				"formula", f.CalcRule.Formula)
 		}
 
 		rawCalc, _ := json.Marshal(f.CalcRule)
