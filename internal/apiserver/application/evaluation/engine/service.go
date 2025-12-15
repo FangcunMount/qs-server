@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // service 评估引擎服务实现
@@ -29,8 +30,21 @@ type service struct {
 	// 领域服务依赖
 	reportBuilder report.ReportBuilder
 
+	// 事件发布器（可选）
+	eventPublisher event.EventPublisher
+
 	// 处理器链
 	pipeline *pipeline.Chain
+}
+
+// ServiceOption 服务选项
+type ServiceOption func(*service)
+
+// WithEventPublisher 设置事件发布器
+func WithEventPublisher(publisher event.EventPublisher) ServiceOption {
+	return func(s *service) {
+		s.eventPublisher = publisher
+	}
 }
 
 // NewService 创建评估引擎服务
@@ -42,6 +56,7 @@ func NewService(
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 	reportBuilder report.ReportBuilder,
+	opts ...ServiceOption,
 ) Service {
 	svc := &service{
 		assessmentRepo:    assessmentRepo,
@@ -51,6 +66,11 @@ func NewService(
 		answerSheetRepo:   answerSheetRepo,
 		questionnaireRepo: questionnaireRepo,
 		reportBuilder:     reportBuilder,
+	}
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(svc)
 	}
 
 	// 构建处理器链
@@ -77,9 +97,9 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	chain.AddHandler(pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder))
 
 	// 5. 事件发布处理器
-	// 注意：publisher 可以通过依赖注入传入，当前为 nil 表示不发布到消息队列
-	// 领域事件已在 Assessment.ApplyEvaluation 中添加到聚合根
-	chain.AddHandler(pipeline.NewEventPublishHandler(nil))
+	// 注意：如果未设置 eventPublisher，则不会发布 assessment.interpreted 事件到消息队列
+	// 但领域事件仍会添加到聚合根，供仓储层使用
+	chain.AddHandler(pipeline.NewEventPublishHandler(s.eventPublisher))
 
 	return chain
 }

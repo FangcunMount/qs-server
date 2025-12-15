@@ -156,6 +156,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			answerSheetRepo,
 			questionnaireRepo,
 			reportBuilder,
+			engine.WithEventPublisher(m.eventPublisher), // 传递事件发布器
 		)
 	}
 

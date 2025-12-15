@@ -81,12 +81,20 @@ func (b *DefaultReportBuilder) Build(
 
 // buildConclusion 构建总体结论
 func (b *DefaultReportBuilder) buildConclusion(medicalScale *scale.MedicalScale, result *assessment.EvaluationResult) string {
-	// TODO: 调用 interpretService 获取结论
-	// 这里先返回默认结论
-	if assessment.IsHighRisk(result.RiskLevel) {
-		return "测评结果显示存在较高风险，建议进一步关注和干预。"
+	// 优先使用总分因子的解读作为总体结论
+	for _, fs := range result.FactorScores {
+		if fs.IsTotalScore && fs.Conclusion != "" {
+			return fs.Conclusion
+		}
 	}
-	return "测评结果显示状态良好，请继续保持。"
+
+	// 如果没有总分因子解读，使用评估结果的总体结论
+	if result.Conclusion != "" {
+		return result.Conclusion
+	}
+
+	// 如果都没有，返回空字符串
+	return ""
 }
 
 // buildDimensions 构建维度解读
@@ -109,8 +117,9 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 			factorName = string(fs.FactorCode)
 		}
 
-		// TODO: 调用 interpretService 获取描述
-		description := b.getFactorDescription(fs)
+		// 直接使用评估引擎已生成的解读内容
+		// 不使用默认文案兜底，如果没有生成解读则为空
+		description := fs.Conclusion
 
 		dim := NewDimensionInterpret(
 			FactorCode(fs.FactorCode),
@@ -125,23 +134,20 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 	return dimensions
 }
 
-// getFactorDescription 获取因子描述
-func (b *DefaultReportBuilder) getFactorDescription(fs assessment.FactorScoreResult) string {
-	// TODO: 调用 interpretService 获取描述
-	if assessment.IsHighRisk(fs.RiskLevel) {
-		return "该维度得分偏高，需要关注。"
-	}
-	return "该维度得分正常。"
-}
-
 // buildInitialSuggestions 构建初始建议
 func (b *DefaultReportBuilder) buildInitialSuggestions(result *assessment.EvaluationResult) []string {
-	// 基础建议，具体建议由 SuggestionGenerator 生成
-	if assessment.IsHighRisk(result.RiskLevel) {
-		return []string{
-			"建议与专业人员进行沟通",
-			"建议制定个性化干预计划",
+	// 优先使用评估结果中的总体建议
+	if result.Suggestion != "" {
+		return []string{result.Suggestion}
+	}
+
+	// 如果没有总体建议，尝试使用总分因子的建议
+	for _, fs := range result.FactorScores {
+		if fs.IsTotalScore && fs.Suggestion != "" {
+			return []string{fs.Suggestion}
 		}
 	}
+
+	// 如果都没有，返回空列表
 	return nil
 }

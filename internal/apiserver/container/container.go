@@ -207,7 +207,7 @@ func (c *Container) initEvaluationModule() error {
 		c.ScaleModule.Repo,
 		c.SurveyModule.AnswerSheet.Repo,
 		c.SurveyModule.Questionnaire.Repo, // params[4]: QuestionnaireRepo
-		c.eventPublisher,                   // params[5]: EventPublisher
+		c.eventPublisher,                  // params[5]: EventPublisher
 	); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
