@@ -198,8 +198,17 @@ func (c *Container) initActorModule() error {
 // initEvaluationModule 初始化 Evaluation 模块
 func (c *Container) initEvaluationModule() error {
 	evaluationModule := assembler.NewEvaluationModule()
-	// 传入 ScaleRepo、AnswerSheetRepo 和 EventPublisher
-	if err := evaluationModule.Initialize(c.mysqlDB, c.mongoDB, c.ScaleModule.Repo, c.SurveyModule.AnswerSheet.Repo, c.eventPublisher); err != nil {
+	// 传入 ScaleRepo、AnswerSheetRepo、QuestionnaireRepo 和 EventPublisher
+	// 注意：参数顺序必须与 EvaluationModule.Initialize 中的 params 索引一致
+	// params[0]: MySQL, params[1]: MongoDB, params[2]: ScaleRepo, params[3]: AnswerSheetRepo, params[4]: QuestionnaireRepo, params[5]: EventPublisher
+	if err := evaluationModule.Initialize(
+		c.mysqlDB,
+		c.mongoDB,
+		c.ScaleModule.Repo,
+		c.SurveyModule.AnswerSheet.Repo,
+		c.SurveyModule.Questionnaire.Repo, // params[4]: QuestionnaireRepo
+		c.eventPublisher,                   // params[5]: EventPublisher
+	); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
 
