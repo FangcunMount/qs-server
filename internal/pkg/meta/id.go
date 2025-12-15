@@ -8,6 +8,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/FangcunMount/component-base/pkg/util/idutil"
 )
 
 // 0 ID 常量
@@ -21,12 +23,9 @@ type ID int64
 
 // ===== 内部无错构造（业务内调用，不处理外部垃圾输入） =====
 
-// New 内部生成（放你的雪花/序列器），保证 <= MaxInt64
+// New 内部生成（使用 idutil 的 ID 生成器）
 func New() ID {
-	// TODO: 替换为你的发号器
-	// v := yourGenerator() // must be <= math.MaxInt64
-	// return ID(v)
-	panic("meta.New() not wired: plug in your generator")
+	return ID(idutil.GetIntID())
 }
 
 // FromUint64 内部可信数据来源（若越界就 panic —— 逻辑错误尽早暴露）

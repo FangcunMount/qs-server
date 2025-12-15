@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ==================== Assessment 持久化对象 ====================
@@ -55,6 +56,19 @@ func (AssessmentPO) TableName() string {
 	return "assessment"
 }
 
+// BeforeCreate GORM hook，在创建前执行
+func (p *AssessmentPO) BeforeCreate() error {
+	// 如果 ID 为 0，使用 ID 生成器生成 ID
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	// 设置默认版本号
+	if p.Version == 0 {
+		p.Version = mysql.InitialVersion
+	}
+	return nil
+}
+
 // ==================== AssessmentScore 持久化对象 ====================
 
 // AssessmentScorePO 测评得分持久化对象
@@ -88,6 +102,19 @@ type AssessmentScorePO struct {
 // TableName 指定表名
 func (AssessmentScorePO) TableName() string {
 	return "assessment_score"
+}
+
+// BeforeCreate GORM hook，在创建前执行
+func (p *AssessmentScorePO) BeforeCreate() error {
+	// 如果 ID 为 0，使用 ID 生成器生成 ID
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	// 设置默认版本号
+	if p.Version == 0 {
+		p.Version = mysql.InitialVersion
+	}
+	return nil
 }
 
 // ==================== 辅助类型 ====================

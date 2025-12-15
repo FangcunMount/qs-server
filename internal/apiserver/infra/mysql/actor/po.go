@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // TesteePO 受试者持久化对象
@@ -85,6 +86,11 @@ func (StaffPO) TableName() string {
 
 // BeforeCreate GORM hook，在创建前执行
 func (p *TesteePO) BeforeCreate() error {
+	// 如果 ID 为 0，使用 ID 生成器生成 ID
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	// 设置默认版本号
 	if p.Version == 0 {
 		p.Version = mysql.InitialVersion
 	}
@@ -93,6 +99,11 @@ func (p *TesteePO) BeforeCreate() error {
 
 // BeforeCreate GORM hook，在创建前执行
 func (p *StaffPO) BeforeCreate() error {
+	// 如果 ID 为 0，使用 ID 生成器生成 ID
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	// 设置默认版本号
 	if p.Version == 0 {
 		p.Version = mysql.InitialVersion
 	}
