@@ -36,6 +36,7 @@ type AssessmentSummary struct {
 	CreatedAt            string                 `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`                                 // 创建时间
 	SubmittedAt          string                 `protobuf:"bytes,12,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`                           // 提交时间
 	InterpretedAt        string                 `protobuf:"bytes,13,opt,name=interpreted_at,json=interpretedAt,proto3" json:"interpreted_at,omitempty"`                     // 解读时间
+	AnswerSheetId        uint64                 `protobuf:"varint,14,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"`                  // 答卷ID
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -152,6 +153,13 @@ func (x *AssessmentSummary) GetInterpretedAt() string {
 		return x.InterpretedAt
 	}
 	return ""
+}
+
+func (x *AssessmentSummary) GetAnswerSheetId() uint64 {
+	if x != nil {
+		return x.AnswerSheetId
+	}
+	return 0
 }
 
 // 测评详情
@@ -1624,7 +1632,7 @@ var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"\x1bevaluation/evaluation.proto\x12\n" +
-	"evaluation\"\xa7\x03\n" +
+	"evaluation\"\xcf\x03\n" +
 	"\x11AssessmentSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x03 \x01(\tR\x11questionnaireCode\x123\n" +
@@ -1644,7 +1652,8 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\v \x01(\tR\tcreatedAt\x12!\n" +
 	"\fsubmitted_at\x18\f \x01(\tR\vsubmittedAt\x12%\n" +
-	"\x0einterpreted_at\x18\r \x01(\tR\rinterpretedAt\"\xe3\x04\n" +
+	"\x0einterpreted_at\x18\r \x01(\tR\rinterpretedAt\x12&\n" +
+	"\x0fanswer_sheet_id\x18\x0e \x01(\x04R\ranswerSheetId\"\xe3\x04\n" +
 	"\x10AssessmentDetail\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x15\n" +
 	"\x06org_id\x18\x02 \x01(\x04R\x05orgId\x12\x1b\n" +

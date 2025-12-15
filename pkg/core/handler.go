@@ -86,7 +86,7 @@ func (h *BaseHandler) BadRequestResponse(c *gin.Context, message string, err err
 	if err != nil {
 		h.Error(c, errors.Wrap(err, message))
 	} else {
-		h.ErrorResponseWithCode(c, 100001, "%s", message) // ErrBind
+		h.ErrorResponseWithCode(c, 100003, "%s", message) // ErrBind
 	}
 }
 

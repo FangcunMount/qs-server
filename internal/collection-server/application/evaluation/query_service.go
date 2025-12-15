@@ -209,10 +209,17 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 
 	items := make([]AssessmentSummaryResponse, len(result.Items))
 	for i, item := range result.Items {
+		// 转换 AnswerSheetID，如果为 0 则转换为空字符串
+		answerSheetID := ""
+		if item.AnswerSheetID != 0 {
+			answerSheetID = strconv.FormatUint(item.AnswerSheetID, 10)
+		}
+
 		items[i] = AssessmentSummaryResponse{
 			ID:                   strconv.FormatUint(item.ID, 10),
 			QuestionnaireCode:    item.QuestionnaireCode,
 			QuestionnaireVersion: item.QuestionnaireVersion,
+			AnswerSheetID:        answerSheetID,
 			ScaleCode:            item.ScaleCode,
 			ScaleName:            item.ScaleName,
 			OriginType:           item.OriginType,

@@ -13,6 +13,7 @@ type AssessmentSummaryOutput struct {
 	ID                   uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
+	AnswerSheetID        uint64
 	ScaleCode            string
 	ScaleName            string
 	OriginType           string
@@ -352,6 +353,7 @@ func (c *EvaluationClient) convertAssessmentSummary(a *pb.AssessmentSummary) Ass
 		ID:                   a.GetId(),
 		QuestionnaireCode:    a.GetQuestionnaireCode(),
 		QuestionnaireVersion: a.GetQuestionnaireVersion(),
+		AnswerSheetID:        a.GetAnswerSheetId(),
 		ScaleCode:            a.GetScaleCode(),
 		ScaleName:            a.GetScaleName(),
 		OriginType:           a.GetOriginType(),

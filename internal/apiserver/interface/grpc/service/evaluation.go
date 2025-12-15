@@ -393,6 +393,7 @@ func toProtoAssessmentSummary(result *assessmentApp.AssessmentResult) *pb.Assess
 		Id:                   result.ID,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
+		AnswerSheetId:        result.AnswerSheetID,
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 	}

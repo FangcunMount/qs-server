@@ -5,6 +5,7 @@ type AssessmentSummaryResponse struct {
 	ID                   string  `json:"id"`
 	QuestionnaireCode    string  `json:"questionnaire_code"`
 	QuestionnaireVersion string  `json:"questionnaire_version"`
+	AnswerSheetID        string  `json:"answer_sheet_id,omitempty"`
 	ScaleCode            string  `json:"scale_code,omitempty"`
 	ScaleName            string  `json:"scale_name,omitempty"`
 	OriginType           string  `json:"origin_type"`

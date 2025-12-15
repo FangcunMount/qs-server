@@ -54,6 +54,7 @@ message AssessmentSummary {
   string created_at = 11;             // 创建时间
   string submitted_at = 12;           // 提交时间
   string interpreted_at = 13;         // 解读时间
+  uint64 answer_sheet_id = 14;        // 答卷ID
 }
 
 // 测评详情
