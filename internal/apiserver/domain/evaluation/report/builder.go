@@ -1,6 +1,8 @@
 package report
 
 import (
+	"context"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
@@ -29,11 +31,17 @@ type ReportBuilder interface {
 // ==================== 默认实现 ====================
 
 // DefaultReportBuilder 默认报告构建器实现
-type DefaultReportBuilder struct{}
+type DefaultReportBuilder struct {
+	// suggestionGenerator 建议生成器（可选）
+	// 如果不提供，则只使用评估结果中的建议
+	suggestionGenerator SuggestionGenerator
+}
 
 // NewDefaultReportBuilder 创建默认报告构建器
-func NewDefaultReportBuilder() *DefaultReportBuilder {
-	return &DefaultReportBuilder{}
+func NewDefaultReportBuilder(suggestionGenerator SuggestionGenerator) *DefaultReportBuilder {
+	return &DefaultReportBuilder{
+		suggestionGenerator: suggestionGenerator,
+	}
 }
 
 // Build 构建解读报告
@@ -61,8 +69,9 @@ func (b *DefaultReportBuilder) Build(
 	// 3. 构建维度解读
 	dimensions := b.buildDimensions(medicalScale, result)
 
-	// 4. 生成初始建议（可选，也可由 SuggestionGenerator 后续补充）
-	suggestions := b.buildInitialSuggestions(result)
+	// 4. 生成建议
+	// 优先使用评估结果中的建议，然后使用 SuggestionGenerator 增强
+	suggestions := b.buildSuggestions(context.Background(), result, reportID, medicalScale, dimensions)
 
 	// 5. 创建报告
 	report := NewInterpretReport(
@@ -134,20 +143,77 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 	return dimensions
 }
 
-// buildInitialSuggestions 构建初始建议
-func (b *DefaultReportBuilder) buildInitialSuggestions(result *assessment.EvaluationResult) []string {
-	// 优先使用评估结果中的总体建议
-	if result.Suggestion != "" {
-		return []string{result.Suggestion}
+// buildSuggestions 构建建议
+// 策略：
+// 1. 优先使用评估结果中的建议（来自解读规则）
+// 2. 使用 SuggestionGenerator 生成额外建议（多策略模式）
+// 3. 合并去重
+func (b *DefaultReportBuilder) buildSuggestions(
+	ctx context.Context,
+	result *assessment.EvaluationResult,
+	reportID ID,
+	medicalScale *scale.MedicalScale,
+	dimensions []DimensionInterpret,
+) []string {
+	var allSuggestions []string
+
+	// 1. 收集评估结果中的建议
+	initialSuggestions := b.collectInitialSuggestions(result)
+	allSuggestions = append(allSuggestions, initialSuggestions...)
+
+	// 2. 如果配置了 SuggestionGenerator，使用策略生成器生成额外建议
+	if b.suggestionGenerator != nil {
+		// 构建临时报告用于生成建议
+		tempReport := NewInterpretReport(
+			reportID,
+			medicalScale.GetTitle(),
+			medicalScale.GetCode().String(),
+			result.TotalScore,
+			RiskLevel(result.RiskLevel),
+			b.buildConclusion(medicalScale, result),
+			dimensions,
+			nil, // 建议稍后填充
+		)
+
+		generatedSuggestions, err := b.suggestionGenerator.Generate(ctx, tempReport)
+		if err == nil {
+			allSuggestions = append(allSuggestions, generatedSuggestions...)
+		}
+		// 失败不影响报告生成，只记录错误
 	}
 
-	// 如果没有总体建议，尝试使用总分因子的建议
+	// 3. 去重
+	return uniqueStrings(allSuggestions)
+}
+
+// collectInitialSuggestions 收集评估结果中的初始建议
+func (b *DefaultReportBuilder) collectInitialSuggestions(result *assessment.EvaluationResult) []string {
+	var suggestions []string
+
+	// 收集总体建议
+	if result.Suggestion != "" {
+		suggestions = append(suggestions, result.Suggestion)
+	}
+
+	// 收集总分因子的建议
 	for _, fs := range result.FactorScores {
-		if fs.IsTotalScore && fs.Suggestion != "" {
-			return []string{fs.Suggestion}
+		if fs.IsTotalScore && fs.Suggestion != "" && fs.Suggestion != result.Suggestion {
+			suggestions = append(suggestions, fs.Suggestion)
 		}
 	}
 
-	// 如果都没有，返回空列表
-	return nil
+	return suggestions
+}
+
+// uniqueStrings 去除重复字符串
+func uniqueStrings(items []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, item := range items {
+		if item != "" && !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+	return result
 }

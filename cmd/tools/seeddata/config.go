@@ -186,6 +186,7 @@ type InterpretationConfig struct {
 	End         string   `yaml:"end"`
 	Content     string   `yaml:"content"`
 	Level       string   `yaml:"level"`       // "low", "medium", "high"
+	RiskLevel   string   `yaml:"risk_level"`  // 风险等级：none, low, medium, high, severe
 	Description string   `yaml:"description"` // 解读文本
 }
 

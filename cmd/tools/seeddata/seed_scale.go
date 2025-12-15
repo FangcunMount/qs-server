@@ -315,10 +315,14 @@ func toInterpretRules(factorGroup InterpretationGroupConfig, scaleGroup Interpre
 			max = min + 0.0001
 		}
 		text := firstNonEmpty(interp.Description, interp.Content)
+
+		// 解析风险等级
+		riskLevel := parseRiskLevel(interp.RiskLevel, interp.Level)
+
 		rules = append(rules, scaleApp.InterpretRuleDTO{
 			MinScore:   min,
 			MaxScore:   max,
-			RiskLevel:  string(scaleDomain.RiskLevelNone),
+			RiskLevel:  riskLevel,
 			Conclusion: text,
 			Suggestion: text,
 		})
@@ -334,6 +338,46 @@ func toInterpretRules(factorGroup InterpretationGroupConfig, scaleGroup Interpre
 		})
 	}
 	return rules
+}
+
+// parseRiskLevel 解析风险等级
+func parseRiskLevel(riskLevel, level string) string {
+	// 优先使用 risk_level 字段
+	if riskLevel != "" {
+		normalized := normalizeRiskLevel(riskLevel)
+		if normalized != "" {
+			return normalized
+		}
+	}
+
+	// 兼容旧的 level 字段
+	if level != "" {
+		normalized := normalizeRiskLevel(level)
+		if normalized != "" {
+			return normalized
+		}
+	}
+
+	// 默认为 none
+	return string(scaleDomain.RiskLevelNone)
+}
+
+// normalizeRiskLevel 规范化风险等级字符串
+func normalizeRiskLevel(raw string) string {
+	switch raw {
+	case "none", "正常", "无风险":
+		return string(scaleDomain.RiskLevelNone)
+	case "low", "轻度", "低风险":
+		return string(scaleDomain.RiskLevelLow)
+	case "medium", "中度", "中风险":
+		return string(scaleDomain.RiskLevelMedium)
+	case "high", "重度", "高风险":
+		return string(scaleDomain.RiskLevelHigh)
+	case "severe", "严重", "极高风险":
+		return string(scaleDomain.RiskLevelSevere)
+	default:
+		return ""
+	}
 }
 
 func parseFloat(ptr *float64, raw string) float64 {

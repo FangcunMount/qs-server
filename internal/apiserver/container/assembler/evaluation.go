@@ -138,7 +138,11 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	assessmentCreator := assessment.NewDefaultAssessmentCreator()
 
 	// 创建 SuggestionGenerator（领域服务）
-	suggestionGenerator := report.NewRuleBasedSuggestionGenerator()
+	// 注册内置策略：高风险策略、一般健康策略
+	suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
+		&report.HighRiskSuggestionStrategy{},
+		&report.GeneralWellbeingSuggestionStrategy{},
+	)
 
 	// 创建 ReportExporter（领域服务）- 暂使用 nil，后续在 infra 层实现
 	// TODO: 在 infra 层实现真正的 ReportExporter
@@ -147,7 +151,8 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ====================  初始化评估引擎 ====================
 	// 注意：如果有 scaleRepo、answerSheetRepo 和 questionnaireRepo，则初始化 EvaluationService
 	if scaleRepo != nil && answerSheetRepo != nil && questionnaireRepo != nil {
-		reportBuilder := report.NewDefaultReportBuilder()
+		// 创建 ReportBuilder，注入 SuggestionGenerator
+		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 		m.EvaluationService = engine.NewService(
 			m.AssessmentRepo,
 			m.ScoreRepo,
@@ -220,7 +225,12 @@ func (m *EvaluationModule) SetScaleRepository(
 	if answerSheetRepo == nil || questionnaireRepo == nil {
 		return
 	}
-	reportBuilder := report.NewDefaultReportBuilder()
+	// 使用默认策略创建 SuggestionGenerator
+	suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
+		&report.HighRiskSuggestionStrategy{},
+		&report.GeneralWellbeingSuggestionStrategy{},
+	)
+	reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,
 		m.ScoreRepo,
