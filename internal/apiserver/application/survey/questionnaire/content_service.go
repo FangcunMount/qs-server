@@ -239,7 +239,17 @@ func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, require
 	// 构建选项列表
 	opts := make([]questionnaire.Option, 0, len(options))
 	for _, optDTO := range options {
-		opt, err := questionnaire.NewOptionWithStringCode(optDTO.Value, optDTO.Label, float64(optDTO.Score))
+		// 如果选项 code 为空（新增选项），自动生成一个
+		optionCode := optDTO.Value
+		if optionCode == "" {
+			generatedCode, err := meta.GenerateCode()
+			if err != nil {
+				return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "生成选项编码失败")
+			}
+			optionCode = generatedCode.String()
+		}
+
+		opt, err := questionnaire.NewOptionWithStringCode(optionCode, optDTO.Label, float64(optDTO.Score))
 		if err != nil {
 			return nil, err
 		}
