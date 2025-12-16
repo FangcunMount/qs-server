@@ -27,7 +27,8 @@ type ActorModule struct {
 	// testee service 层（按行为者组织）
 	TesteeRegistrationService testeeApp.TesteeRegistrationService // 注册服务 - C端用户
 	TesteeManagementService   testeeApp.TesteeManagementService   // 管理服务 - B端员工
-	TesteeQueryService        testeeApp.TesteeQueryService        // 查询服务 - 通用
+	TesteeQueryService        testeeApp.TesteeQueryService        // 查询服务 - 通用（小程序、C端）
+	TesteeBackendQueryService testeeApp.TesteeBackendQueryService // 后台查询服务 - B端员工（包含家长信息）
 
 	// staff service 层（按行为者组织）
 	StaffLifecycleService     staffApp.StaffLifecycleService     // 生命周期服务 - 人事/行政
@@ -95,8 +96,13 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		testeeTagger,
 		uow,
 	)
-	// 查询服务 - 服务于所有需要查询的用户
+	// 查询服务 - 服务于所有需要查询的用户（小程序、C端）
 	m.TesteeQueryService = testeeApp.NewQueryService(m.TesteeRepo)
+	// 后台查询服务 - 服务于B端员工（包含家长信息）
+	m.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
+		m.TesteeQueryService,
+		guardianshipSvc,
+	)
 
 	// 初始化 staff service 层（按行为者组织）
 	// 生命周期服务 - 服务于人事/行政部门
@@ -134,6 +140,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.TesteeRegistrationService,
 		m.TesteeManagementService,
 		m.TesteeQueryService,
+		m.TesteeBackendQueryService,
 		m.StaffLifecycleService,
 		m.StaffAuthorizationService,
 		m.StaffQueryService,

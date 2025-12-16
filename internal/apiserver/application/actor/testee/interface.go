@@ -62,8 +62,8 @@ type TesteeManagementService interface {
 }
 
 // TesteeQueryService 受试者查询服务（只读）
-// 行为者：所有需要查询受试者信息的用户
-// 职责：提供受试者信息查询能力
+// 行为者：所有需要查询受试者信息的用户（小程序、C端等）
+// 职责：提供受试者基础信息查询能力（不包含家长信息）
 // 变更来源：查询需求变化（通常较少变更）
 type TesteeQueryService interface {
 	// GetByID 根据ID查询受试者
@@ -81,6 +81,20 @@ type TesteeQueryService interface {
 	// ListByProfileIDs 根据多个用户档案ID查询受试者列表
 	// 用于查询当前用户（监护人）的所有受试者
 	ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) (*TesteeListResult, error)
+}
+
+// TesteeBackendQueryService 受试者后台查询服务（只读）
+// 行为者：B端员工(Staff) - 后台管理系统
+// 职责：提供受试者详细信息查询能力（包含家长信息等后台管理所需数据）
+// 变更来源：后台管理需求变化
+type TesteeBackendQueryService interface {
+	// GetByIDWithGuardians 根据ID查询受试者详情（包含家长信息）
+	// 场景：后台管理员查看受试者详情，需要显示家长联系方式等信息
+	GetByIDWithGuardians(ctx context.Context, testeeID uint64) (*TesteeBackendResult, error)
+
+	// ListTesteesWithGuardians 列出受试者（包含家长信息）
+	// 场景：后台管理员查看受试者列表，需要显示家长信息
+	ListTesteesWithGuardians(ctx context.Context, dto ListTesteeDTO) (*TesteeBackendListResult, error)
 }
 
 // ============= DTOs =============
@@ -147,4 +161,27 @@ type TesteeListResult struct {
 	TotalCount int64           // 总数
 	Offset     int             // 偏移量
 	Limit      int             // 限制数量
+}
+
+// ============= Backend DTOs =============
+
+// GuardianInfo 监护人信息
+type GuardianInfo struct {
+	Name     string // 姓名
+	Relation string // 关系（如：father, mother, guardian）
+	Phone    string // 电话
+}
+
+// TesteeBackendResult 受试者后台查询结果 DTO（包含家长信息）
+type TesteeBackendResult struct {
+	*TesteeResult                // 嵌入基础结果
+	Guardians     []GuardianInfo // 监护人信息列表
+}
+
+// TesteeBackendListResult 受试者后台列表结果 DTO
+type TesteeBackendListResult struct {
+	Items      []*TesteeBackendResult // 受试者列表（包含家长信息）
+	TotalCount int64                  // 总数
+	Offset     int                    // 偏移量
+	Limit      int                    // 限制数量
 }

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -19,7 +18,8 @@ type ActorHandler struct {
 	// Testee 服务按行为者组织
 	testeeRegistrationService testeeApp.TesteeRegistrationService
 	testeeManagementService   testeeApp.TesteeManagementService
-	testeeQueryService        testeeApp.TesteeQueryService
+	testeeQueryService        testeeApp.TesteeQueryService        // 通用查询服务（小程序、C端）
+	testeeBackendQueryService testeeApp.TesteeBackendQueryService // 后台查询服务（包含家长信息）
 	// Staff 服务按行为者组织
 	staffLifecycleService     staffApp.StaffLifecycleService
 	staffAuthorizationService staffApp.StaffAuthorizationService
@@ -33,6 +33,7 @@ func NewActorHandler(
 	testeeRegistrationService testeeApp.TesteeRegistrationService,
 	testeeManagementService testeeApp.TesteeManagementService,
 	testeeQueryService testeeApp.TesteeQueryService,
+	testeeBackendQueryService testeeApp.TesteeBackendQueryService,
 	staffLifecycleService staffApp.StaffLifecycleService,
 	staffAuthorizationService staffApp.StaffAuthorizationService,
 	staffQueryService staffApp.StaffQueryService,
@@ -43,6 +44,7 @@ func NewActorHandler(
 		testeeRegistrationService: testeeRegistrationService,
 		testeeManagementService:   testeeManagementService,
 		testeeQueryService:        testeeQueryService,
+		testeeBackendQueryService: testeeBackendQueryService,
 		staffLifecycleService:     staffLifecycleService,
 		staffAuthorizationService: staffAuthorizationService,
 		staffQueryService:         staffQueryService,
@@ -59,7 +61,7 @@ func NewActorHandler(
 // @Param id path int true "受试者ID"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
 // @Router /api/v1/testees/{id} [get]
-// GetTestee 获取受试者详情
+// GetTestee 获取受试者详情（后台管理接口，包含家长信息）
 func (h *ActorHandler) GetTestee(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -73,10 +75,10 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 		return
 	}
 
-	// 使用查询服务
-	result, err := h.testeeQueryService.GetByID(c.Request.Context(), id)
+	// 使用后台查询服务（包含家长信息）
+	backendResult, err := h.testeeBackendQueryService.GetByIDWithGuardians(c.Request.Context(), id)
 	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get testee",
+		logger.L(c.Request.Context()).Errorw("Failed to get testee with guardians",
 			"action", "get_testee",
 			"testee_id", id,
 			"error", err.Error(),
@@ -85,50 +87,8 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 		return
 	}
 
-	// 转换为响应对象
-	resp := toTesteeResponse(result)
-
-	// 如果有profile_id，尝试获取监护人信息
-	if h.guardianshipService != nil && h.guardianshipService.IsEnabled() && result.ProfileID != nil {
-		childID := fmt.Sprintf("%d", *result.ProfileID)
-		guardiansResp, err := h.guardianshipService.ListGuardians(c.Request.Context(), childID)
-		if err != nil {
-			// 监护人信息获取失败不影响主流程，记录日志即可
-			logger.L(c.Request.Context()).Warnw("Failed to get guardians",
-				"action", "get_testee",
-				"testee_id", id,
-				"profile_id", *result.ProfileID,
-				"error", err.Error(),
-			)
-		} else if guardiansResp != nil && len(guardiansResp.Items) > 0 {
-			// 转换监护人信息
-			resp.Guardians = make([]response.GuardianResponse, 0, len(guardiansResp.Items))
-			for _, edge := range guardiansResp.Items {
-				if edge.Guardianship != nil && edge.Guardian != nil {
-					// 获取监护关系和监护人信息
-					relation := edge.Guardianship.GetRelation().String()
-
-					// 从Guardian的Contacts中获取电话号码
-					phone := ""
-					if len(edge.Guardian.Contacts) > 0 {
-						// 优先获取手机号
-						for _, contact := range edge.Guardian.Contacts {
-							if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
-								phone = contact.GetValue()
-								break
-							}
-						}
-					}
-
-					resp.Guardians = append(resp.Guardians, response.GuardianResponse{
-						Name:     edge.Guardian.GetNickname(),
-						Relation: relation,
-						Phone:    phone,
-					})
-				}
-			}
-		}
-	}
+	// 转换为响应对象（包含家长信息）
+	resp := toTesteeBackendResponse(backendResult)
 
 	h.Success(c, resp)
 }
@@ -605,6 +565,26 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 			TotalCount:       result.TotalAssessments,
 			LastAssessmentAt: result.LastAssessmentAt,
 			LastRiskLevel:    result.LastRiskLevel,
+		}
+	}
+
+	return resp
+}
+
+// toTesteeBackendResponse 将后台查询结果转换为响应（包含家长信息）
+func toTesteeBackendResponse(backendResult *testeeApp.TesteeBackendResult) *response.TesteeResponse {
+	// 先转换基础信息
+	resp := toTesteeResponse(backendResult.TesteeResult)
+
+	// 添加家长信息
+	if len(backendResult.Guardians) > 0 {
+		resp.Guardians = make([]response.GuardianResponse, 0, len(backendResult.Guardians))
+		for _, guardian := range backendResult.Guardians {
+			resp.Guardians = append(resp.Guardians, response.GuardianResponse{
+				Name:     guardian.Name,
+				Relation: guardian.Relation,
+				Phone:    guardian.Phone,
+			})
 		}
 	}
 
