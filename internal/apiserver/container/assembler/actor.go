@@ -100,6 +100,14 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 
 	// 初始化 staff service 层（按行为者组织）
 	// 生命周期服务 - 服务于人事/行政部门
+	// 初始化 Staff Lifecycle Service，注入 IAM IdentityService 如果可用
+	var identitySvc *iam.IdentityService
+	// 尝试从外部容器的 IAMModule 提取（在 Initialize 时 container 会传入该参数为 params[2]）
+	if len(params) > 2 {
+		if svc, ok := params[2].(*iam.IdentityService); ok {
+			identitySvc = svc
+		}
+	}
 	m.StaffLifecycleService = staffApp.NewLifecycleService(
 		m.StaffRepo,
 		staffFactory,
@@ -108,6 +116,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		staffRoleAllocator,
 		staffBinder,
 		uow,
+		identitySvc,
 	)
 	// 权限管理服务 - 服务于IT管理员
 	m.StaffAuthorizationService = staffApp.NewAuthorizationService(

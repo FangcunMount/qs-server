@@ -257,7 +257,6 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 			"action", "create_staff",
 			"resource", "staff",
 			"org_id", dto.OrgID,
-			"user_id", dto.UserID,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
@@ -495,12 +494,12 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 // toRegisterStaffDTO 将创建请求转换为应用层 DTO
 func toRegisterStaffDTO(req *request.CreateStaffRequest) staffApp.RegisterStaffDTO {
 	return staffApp.RegisterStaffDTO{
-		OrgID:  req.OrgID,
-		UserID: req.UserID,
-		Roles:  req.Roles,
-		Name:   req.Name,
-		Email:  req.Email,
-		Phone:  req.Phone,
+		OrgID: req.OrgID,
+		// UserID left zero; application service will create/resolve IAM user
+		Roles: req.Roles,
+		Name:  req.Name,
+		Email: req.Email,
+		Phone: req.Phone,
 	}
 }
 
