@@ -534,6 +534,15 @@ definitions:
         description: 受试者ID
         type: integer
     type: object
+  response.GuardianResponse:
+    properties:
+      name:
+        type: string
+      phone:
+        type: string
+      relation:
+        type: string
+    type: object
   response.HighRiskFactorsResponse:
     properties:
       assessment_id:
@@ -563,6 +572,73 @@ definitions:
         type: string
       suggestion:
         type: string
+    type: object
+  response.PeriodicProjectResponse:
+    properties:
+      completed_weeks:
+        description: 已完成周数
+        type: integer
+      completion_rate:
+        description: 完成率（0-100）
+        type: number
+      current_week:
+        description: 当前应该完成的周次
+        type: integer
+      end_date:
+        description: 项目结束日期
+        type: string
+      project_id:
+        description: 项目ID
+        type: integer
+      project_name:
+        description: 项目名称
+        type: string
+      scale_name:
+        description: 关联的量表名称
+        type: string
+      start_date:
+        description: 项目开始日期
+        type: string
+      tasks:
+        description: 各周任务状态（按周次升序排列）
+        items:
+          $ref: '#/definitions/response.PeriodicTaskResponse'
+        type: array
+      total_weeks:
+        description: 总周数
+        type: integer
+    type: object
+  response.PeriodicStatsResponse:
+    properties:
+      active_projects:
+        description: 进行中的项目数
+        type: integer
+      projects:
+        description: 周期性项目列表
+        items:
+          $ref: '#/definitions/response.PeriodicProjectResponse'
+        type: array
+      total_projects:
+        description: 项目总数
+        type: integer
+    type: object
+  response.PeriodicTaskResponse:
+    properties:
+      assessment_id:
+        description: 关联的测评ID（如已完成）
+        type: integer
+      completed_at:
+        description: 完成时间
+        type: string
+      due_date:
+        description: 截止时间
+        type: string
+      status:
+        description: 状态：completed/pending/overdue
+        type: string
+      week:
+        description: 第几周（从1开始）
+        type: integer
     type: object
   response.QuestionnaireListResponse:
     properties:
@@ -652,6 +728,35 @@ definitions:
         description: 总分
         type: number
     type: object
+  response.ScaleAnalysisResponse:
+    properties:
+      scales:
+        description: 量表趋势列表
+        items:
+          $ref: '#/definitions/response.ScaleTrendResponse'
+        type: array
+    type: object
+  response.ScaleFactorResponse:
+    properties:
+      factor_code:
+        description: 因子编码
+        type: string
+      factor_name:
+        description: 因子名称
+        type: string
+      percentile:
+        description: 百分位
+        type: number
+      raw_score:
+        description: 原始分
+        type: number
+      risk_level:
+        description: 风险等级：normal/medium/high
+        type: string
+      t_score:
+        description: T分
+        type: number
+    type: object
   response.ScaleListResponse:
     properties:
       page:
@@ -698,6 +803,46 @@ definitions:
       scale_name:
         description: 量表名称
         type: string
+    type: object
+  response.ScaleTestResponse:
+    properties:
+      assessment_id:
+        description: 测评ID
+        type: integer
+      factors:
+        description: 各因子得分
+        items:
+          $ref: '#/definitions/response.ScaleFactorResponse'
+        type: array
+      result:
+        description: 结果描述，如："轻度焦虑"
+        type: string
+      risk_level:
+        description: 风险等级：normal/medium/high
+        type: string
+      test_date:
+        description: 测评日期
+        type: string
+      total_score:
+        description: 总分
+        type: number
+    type: object
+  response.ScaleTrendResponse:
+    properties:
+      scale_code:
+        description: 量表编码
+        type: string
+      scale_id:
+        description: 量表ID
+        type: integer
+      scale_name:
+        description: 量表名称
+        type: string
+      tests:
+        description: 测评历史记录（按时间升序排列）
+        items:
+          $ref: '#/definitions/response.ScaleTestResponse'
+        type: array
     type: object
   response.ScoreResponse:
     properties:
@@ -806,6 +951,11 @@ definitions:
       gender:
         description: 性别
         type: string
+      guardians:
+        description: 监护人信息列表
+        items:
+          $ref: '#/definitions/response.GuardianResponse'
+        type: array
       iam_child_id:
         description: IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
         type: integer
@@ -2545,6 +2695,68 @@ paths:
       summary: 更新受试者
       tags:
       - Actor
+  /api/v1/testees/{id}/periodic-stats:
+    get:
+      parameters:
+      - description: Testee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PeriodicStatsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取受试者周期统计
+      tags:
+      - Testee
+  /api/v1/testees/{id}/scale-analysis:
+    get:
+      parameters:
+      - description: Testee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ScaleAnalysisResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取受试者量表分析结果
+      tags:
+      - Testee
   /health:
     get:
       description: 检查 API Server 健康状态
