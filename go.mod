@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/FangcunMount/component-base v0.4.1
-	github.com/FangcunMount/iam-contracts v0.0.6
+	github.com/FangcunMount/iam-contracts v0.0.7
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
@@ -127,7 +127,7 @@ require (
 	github.com/nyaruka/phonenumbers v1.6.7
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/sony/sonyflake v1.3.0 // indirect
+	github.com/sony/sonyflake v1.3.0
 	github.com/speps/go-hashids v2.0.0+incompatible // indirect
 	github.com/spf13/pflag v1.0.10
 	github.com/tpkeeper/gin-dump v1.0.1

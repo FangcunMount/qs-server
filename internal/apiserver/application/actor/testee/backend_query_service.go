@@ -15,16 +15,19 @@ import (
 type backendQueryService struct {
 	queryService    TesteeQueryService       // 复用基础查询服务
 	guardianshipSvc *iam.GuardianshipService // IAM 监护关系服务
+	identitySvc     *iam.IdentityService     // IAM 身份服务（用于查询用户详细信息）
 }
 
 // NewBackendQueryService 创建受试者后台查询服务
 func NewBackendQueryService(
 	queryService TesteeQueryService,
 	guardianshipSvc *iam.GuardianshipService,
+	identitySvc *iam.IdentityService,
 ) TesteeBackendQueryService {
 	return &backendQueryService{
 		queryService:    queryService,
 		guardianshipSvc: guardianshipSvc,
+		identitySvc:     identitySvc,
 	}
 }
 
@@ -183,37 +186,76 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 			continue
 		}
 
-		if edge.Guardian == nil {
-			logger.L(ctx).Warnw("Skipping guardian item: Guardian is nil",
-				"action", "fetch_guardians",
-				"profile_id", profileID,
-				"item_index", i,
-				"guardianship_id", edge.Guardianship.Id,
-				"user_id", edge.Guardianship.UserId,
-			)
-			skippedCount++
-			continue
-		}
-
 		// 获取监护关系
 		relation := edge.Guardianship.GetRelation().String()
 
-		// 从 Guardian 的 Contacts 中获取电话号码
-		phone := ""
-		if len(edge.Guardian.Contacts) > 0 {
-			// 优先获取手机号
-			for _, contact := range edge.Guardian.Contacts {
-				if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
-					phone = contact.GetValue()
-					break
+		var guardianInfo GuardianInfo
+		guardianInfo.Relation = relation
+
+		// 如果 edge.Guardian 不为 nil，直接使用
+		if edge.Guardian != nil {
+			// 从 Guardian 的 Contacts 中获取电话号码
+			phone := ""
+			if len(edge.Guardian.Contacts) > 0 {
+				// 优先获取手机号
+				for _, contact := range edge.Guardian.Contacts {
+					if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
+						phone = contact.GetValue()
+						break
+					}
 				}
 			}
-		}
 
-		guardianInfo := GuardianInfo{
-			Name:     edge.Guardian.GetNickname(),
-			Relation: relation,
-			Phone:    phone,
+			guardianInfo.Name = edge.Guardian.GetNickname()
+			guardianInfo.Phone = phone
+		} else {
+			// 如果 edge.Guardian 为 nil，根据 guardianship.user_id 查询用户信息
+			if s.identitySvc != nil && s.identitySvc.IsEnabled() && edge.Guardianship.UserId != "" {
+				logger.L(ctx).Debugw("Guardian is nil, fetching user info by user_id",
+					"action", "fetch_guardians",
+					"profile_id", profileID,
+					"item_index", i,
+					"user_id", edge.Guardianship.UserId,
+				)
+
+				userResp, err := s.identitySvc.GetUser(ctx, edge.Guardianship.UserId)
+				if err != nil {
+					logger.L(ctx).Warnw("Failed to get user info by user_id",
+						"action", "fetch_guardians",
+						"profile_id", profileID,
+						"user_id", edge.Guardianship.UserId,
+						"error", err.Error(),
+					)
+					// 即使查询失败，也至少返回关系信息
+					guardianInfo.Name = ""
+					guardianInfo.Phone = ""
+				} else if userResp != nil && userResp.User != nil {
+					guardianInfo.Name = userResp.User.GetNickname()
+
+					// 从 User 的 Contacts 中获取电话号码
+					phone := ""
+					if len(userResp.User.Contacts) > 0 {
+						for _, contact := range userResp.User.Contacts {
+							if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
+								phone = contact.GetValue()
+								break
+							}
+						}
+					}
+					guardianInfo.Phone = phone
+				}
+			} else {
+				logger.L(ctx).Warnw("Guardian is nil and cannot fetch user info",
+					"action", "fetch_guardians",
+					"profile_id", profileID,
+					"item_index", i,
+					"user_id", edge.Guardianship.UserId,
+					"identity_svc_enabled", s.identitySvc != nil && s.identitySvc.IsEnabled(),
+				)
+				// 即使无法获取用户信息，也至少返回关系信息
+				guardianInfo.Name = ""
+				guardianInfo.Phone = ""
+			}
 		}
 
 		logger.L(ctx).Debugw("Processing guardian item",
@@ -222,7 +264,7 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 			"item_index", i,
 			"guardian_name", guardianInfo.Name,
 			"relation", relation,
-			"has_phone", phone != "",
+			"has_phone", guardianInfo.Phone != "",
 		)
 
 		guardians = append(guardians, guardianInfo)

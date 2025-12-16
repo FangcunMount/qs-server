@@ -98,11 +98,6 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	)
 	// 查询服务 - 服务于所有需要查询的用户（小程序、C端）
 	m.TesteeQueryService = testeeApp.NewQueryService(m.TesteeRepo)
-	// 后台查询服务 - 服务于B端员工（包含家长信息）
-	m.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
-		m.TesteeQueryService,
-		guardianshipSvc,
-	)
 
 	// 初始化 staff service 层（按行为者组织）
 	// 生命周期服务 - 服务于人事/行政部门
@@ -114,6 +109,14 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 			identitySvc = svc
 		}
 	}
+
+	// 后台查询服务 - 服务于B端员工（包含家长信息）
+	// 需要 IdentityService 来查询用户详细信息（当 ListGuardians 只返回 guardianship 时）
+	m.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
+		m.TesteeQueryService,
+		guardianshipSvc,
+		identitySvc,
+	)
 	m.StaffLifecycleService = staffApp.NewLifecycleService(
 		m.StaffRepo,
 		staffFactory,
