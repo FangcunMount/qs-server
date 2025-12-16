@@ -43,7 +43,30 @@ func (s *backendQueryService) GetByIDWithGuardians(ctx context.Context, testeeID
 	}
 
 	// 3. 如果受试者有 profileID 且监护关系服务可用，则获取家长信息
-	if testeeResult.ProfileID != nil && s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
+	if testeeResult.ProfileID == nil {
+		logger.L(ctx).Debugw("Testee has no profileID, skipping guardian fetch",
+			"action", "get_testee_with_guardians",
+			"testee_id", testeeID,
+		)
+	} else if s.guardianshipSvc == nil {
+		logger.L(ctx).Debugw("Guardianship service is nil, skipping guardian fetch",
+			"action", "get_testee_with_guardians",
+			"testee_id", testeeID,
+			"profile_id", *testeeResult.ProfileID,
+		)
+	} else if !s.guardianshipSvc.IsEnabled() {
+		logger.L(ctx).Debugw("Guardianship service is not enabled, skipping guardian fetch",
+			"action", "get_testee_with_guardians",
+			"testee_id", testeeID,
+			"profile_id", *testeeResult.ProfileID,
+		)
+	} else {
+		// 所有条件满足，获取家长信息
+		logger.L(ctx).Debugw("Fetching guardians from IAM",
+			"action", "get_testee_with_guardians",
+			"testee_id", testeeID,
+			"profile_id", *testeeResult.ProfileID,
+		)
 		guardians, err := s.fetchGuardians(ctx, *testeeResult.ProfileID)
 		if err != nil {
 			// 家长信息获取失败不影响主流程，记录日志即可
@@ -54,6 +77,12 @@ func (s *backendQueryService) GetByIDWithGuardians(ctx context.Context, testeeID
 				"error", err.Error(),
 			)
 		} else {
+			logger.L(ctx).Debugw("Successfully fetched guardians",
+				"action", "get_testee_with_guardians",
+				"testee_id", testeeID,
+				"profile_id", *testeeResult.ProfileID,
+				"guardians_count", len(guardians),
+			)
 			backendResult.Guardians = guardians
 		}
 	}
