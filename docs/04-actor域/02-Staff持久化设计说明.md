@@ -31,7 +31,7 @@ IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 |------|------------------|-------|
 | **认证** | ✅ 负责登录、密码、Token | ❌ 不管认证 |
 | **通用权限** | ✅ 能否访问某个模块 | ❌ 不管粗粒度权限 |
-| **业务角色** | ❌ 不管具体业务 | ✅ role:qs:content_manager, role:qs:evaluator 等 |
+| **业务角色** | ❌ 不管具体业务 | ✅ qs:content_manager, qs:evaluator, qs:evaluation_plan_manager, qs:screening_plan_manager 等 |
 | **多租户** | ✅ 跨机构的统一身份 | ✅ 同一人在不同机构的不同角色 |
 | **业务语义** | ❌ 只是技术账号 | ✅ 领域模型的一部分 |
 
@@ -47,6 +47,8 @@ IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 - `qs:content_manager`：内容管理员，能管理问卷与量表
 - `qs:evaluator`：评估员，能执行测评相关操作（只读/重试等）
 - `qs:staff`：普通员工，仅具备查看受试者权限
+- `qs:evaluation_plan_manager`：测评计划管理员，能管理测评计划
+- `qs:screening_plan_manager`：筛查计划管理员，能管理筛查计划
 
 这些角色由权限中心下发并以字符串形式存储在 `roles` 字段中，属于本 BC 的领域概念，需要持久化。
 

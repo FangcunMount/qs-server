@@ -200,10 +200,13 @@ ValidateIAMBinding(ctx, staff) error
 ```go
 const (
     // 新的统一角色标识（来自权限中心）
-    RoleQSAdmin         Role = "qs:admin"
-    RoleContentManager  Role = "qs:content_manager"
-    RoleEvaluatorQS     Role = "qs:evaluator"
-    RoleStaff           Role = "qs:staff"
+    RoleQSAdmin               Role = "qs:admin"
+    RoleContentManager        Role = "qs:content_manager"
+    RoleEvaluatorQS           Role = "qs:evaluator"
+    RoleStaff                 Role = "qs:staff"
+    // 测评计划与筛查计划管理员
+    RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
+    RoleScreeningPlanManager  Role = "qs:screening_plan_manager"
 )
 ```
 

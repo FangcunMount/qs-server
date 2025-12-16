@@ -245,9 +245,9 @@ type AnswerSheet struct {
 
 典型角色（迁移到统一权限中心标识）：
 
-- `qs:admin`：QS 管理员
-- `qs:content_manager`：内容管理员（问卷/量表管理）
-- `qs:evaluator`：评估员
+* `qs:admin`：QS 管理员
+* `qs:content_manager`：内容管理员（问卷/量表管理）
+* `qs:evaluator`：评估员
 
 ### 3.2 字段设计
 
