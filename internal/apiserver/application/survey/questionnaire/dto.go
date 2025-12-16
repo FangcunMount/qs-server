@@ -1,5 +1,9 @@
 package questionnaire
 
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
+)
+
 // ============= DTO 定义 =============
 // DTOs 用于应用服务层的输入参数
 
@@ -53,12 +57,13 @@ type OptionDTO struct {
 
 // QuestionDTO 问题 DTO（用于批量更新）
 type QuestionDTO struct {
-	Code        string      // 问题编码
-	Stem        string      // 题干
-	Type        string      // 问题类型
-	Options     []OptionDTO // 选项列表
-	Required    bool        // 是否必填
-	Description string      // 问题描述
+	Code            string                      // 问题编码
+	Stem            string                      // 题干
+	Type            string                      // 问题类型
+	Options         []OptionDTO                 // 选项列表
+	Required        bool                        // 是否必填
+	Description     string                      // 问题描述
+	ValidationRules []validation.ValidationRule // 校验规则
 }
 
 // ListQuestionnairesDTO 查询问卷列表 DTO

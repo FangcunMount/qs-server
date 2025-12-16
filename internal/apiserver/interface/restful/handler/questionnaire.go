@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -455,13 +456,34 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 			})
 		}
 
+		// 转换 validation_rules
+		validationRules := make([]validation.ValidationRule, 0, len(q.ValidationRules))
+		required := false
+		for _, rule := range q.ValidationRules {
+			// 检查是否为 required 规则
+			if rule.RuleType == "required" {
+				required = true
+			}
+
+			// 将 min_words/max_words 映射到 min_length/max_length
+			ruleType := validation.RuleType(rule.RuleType)
+			if rule.RuleType == "min_words" {
+				ruleType = validation.RuleTypeMinLength
+			} else if rule.RuleType == "max_words" {
+				ruleType = validation.RuleTypeMaxLength
+			}
+
+			validationRules = append(validationRules, validation.NewValidationRule(ruleType, rule.TargetValue))
+		}
+
 		questions = append(questions, questionnaire.QuestionDTO{
-			Code:        q.Code,
-			Stem:        q.Stem,
-			Type:        q.Type,
-			Options:     options,
-			Required:    false, // viewmodel.QuestionDTO 没有 Required 字段
-			Description: q.Tips,
+			Code:            q.Code,
+			Stem:            q.Stem,
+			Type:            q.Type,
+			Options:         options,
+			Required:        required, // 从 validation_rules 中提取
+			Description:     q.Tips,
+			ValidationRules: validationRules,
 		})
 	}
 

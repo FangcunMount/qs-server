@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -55,7 +56,7 @@ func (s *contentService) AddQuestion(ctx context.Context, dto AddQuestionDTO) (*
 	}
 
 	// 4. 构建问题领域对象
-	question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description)
+	question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "创建问题失败")
 	}
@@ -98,7 +99,7 @@ func (s *contentService) UpdateQuestion(ctx context.Context, dto UpdateQuestionD
 	}
 
 	// 4. 构建新的问题对象
-	newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description)
+	newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "创建问题失败")
 	}
@@ -214,7 +215,7 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 	// 4. 转换 DTO 为领域对象
 	domainQuestions := make([]questionnaire.Question, 0, len(questions))
 	for i, qDTO := range questions {
-		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description)
+		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description, qDTO.ValidationRules)
 		if err != nil {
 			return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "第 %d 个问题创建失败", i+1)
 		}
@@ -235,7 +236,7 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 }
 
 // buildQuestionFromDTO 从 DTO 构建问题领域对象
-func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, required bool, description string) (questionnaire.Question, error) {
+func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, required bool, description string, validationRules []validation.ValidationRule) (questionnaire.Question, error) {
 	// 构建选项列表
 	opts := make([]questionnaire.Option, 0, len(options))
 	for _, optDTO := range options {
@@ -266,6 +267,11 @@ func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, require
 
 	if required {
 		qOptions = append(qOptions, questionnaire.WithRequired())
+	}
+
+	// 添加校验规则
+	if len(validationRules) > 0 {
+		qOptions = append(qOptions, questionnaire.WithValidationRules(validationRules))
 	}
 
 	// 使用领域层工厂方法创建问题
