@@ -42,7 +42,7 @@ tags:
 - name: 系统
   description: 系统健康检查
 paths:
-  /admin/answersheets:
+  /answersheets:
     get:
       tags:
       - AnswerSheet-Management
@@ -93,7 +93,7 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AnswerSheetListResponse'
-  /admin/answersheets/statistics:
+  /answersheets/statistics:
     get:
       tags:
       - AnswerSheet-Management
@@ -123,7 +123,7 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AnswerSheetStatisticsResponse'
-  /admin/answersheets/{id}:
+  /answersheets/{id}:
     get:
       tags:
       - AnswerSheet-Management

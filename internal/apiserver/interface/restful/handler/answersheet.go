@@ -42,7 +42,7 @@ func NewAnswerSheetHandler(
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path int true "答卷ID"
 // @Success 200 {object} core.Response{data=response.AnswerSheetResponse}
-// @Router /api/v1/admin/answersheets/{id} [get]
+// @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 	answerSheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -73,7 +73,7 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Param start_time query string false "开始时间"
 // @Param end_time query string false "结束时间"
 // @Success 200 {object} core.Response{data=response.AnswerSheetListResponse}
-// @Router /api/v1/admin/answersheets [get]
+// @Router /api/v1/answersheets [get]
 func (h *AnswerSheetHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {
@@ -136,7 +136,7 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code query string true "问卷编码"
 // @Success 200 {object} core.Response{data=response.AnswerSheetStatisticsResponse}
-// @Router /api/v1/admin/answersheets/statistics [get]
+// @Router /api/v1/answersheets/statistics [get]
 func (h *AnswerSheetHandler) GetStatistics(c *gin.Context) {
 	questionnaireCode := c.Query("code")
 	if questionnaireCode == "" {

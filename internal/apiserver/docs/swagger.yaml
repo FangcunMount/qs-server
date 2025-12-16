@@ -1073,7 +1073,7 @@ info:
   title: QS API Server
   version: "1.0"
 paths:
-  /api/v1/admin/answersheets:
+  /api/v1/answersheets:
     get:
       consumes:
       - application/json
@@ -1125,7 +1125,7 @@ paths:
       summary: 查询答卷列表
       tags:
       - AnswerSheet-Management
-  /api/v1/admin/answersheets/{id}:
+  /api/v1/answersheets/{id}:
     get:
       consumes:
       - application/json
@@ -1156,7 +1156,7 @@ paths:
       summary: 获取答卷详情
       tags:
       - AnswerSheet-Management
-  /api/v1/admin/answersheets/statistics:
+  /api/v1/answersheets/statistics:
     get:
       consumes:
       - application/json

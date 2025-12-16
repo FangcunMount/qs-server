@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/admin/answersheets": {
+        "/api/v1/answersheets": {
             "get": {
                 "description": "管理员查询答卷列表，支持多维度筛选",
                 "consumes": [
@@ -97,7 +97,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/admin/answersheets/statistics": {
+        "/api/v1/answersheets/statistics": {
             "get": {
                 "description": "管理员查看某问卷的答卷统计数据",
                 "consumes": [
@@ -148,7 +148,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/admin/answersheets/{id}": {
+        "/api/v1/answersheets/{id}": {
             "get": {
                 "description": "管理员查看答卷的完整信息",
                 "consumes": [
