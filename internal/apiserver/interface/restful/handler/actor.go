@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/gin-gonic/gin"
@@ -22,6 +24,8 @@ type ActorHandler struct {
 	staffLifecycleService     staffApp.StaffLifecycleService
 	staffAuthorizationService staffApp.StaffAuthorizationService
 	staffQueryService         staffApp.StaffQueryService
+	// IAM 服务（可选）
+	guardianshipService *iam.GuardianshipService
 }
 
 // NewActorHandler 创建 Actor Handler
@@ -32,6 +36,7 @@ func NewActorHandler(
 	staffLifecycleService staffApp.StaffLifecycleService,
 	staffAuthorizationService staffApp.StaffAuthorizationService,
 	staffQueryService staffApp.StaffQueryService,
+	guardianshipService *iam.GuardianshipService,
 ) *ActorHandler {
 	return &ActorHandler{
 		BaseHandler:               NewBaseHandler(),
@@ -41,6 +46,7 @@ func NewActorHandler(
 		staffLifecycleService:     staffLifecycleService,
 		staffAuthorizationService: staffAuthorizationService,
 		staffQueryService:         staffQueryService,
+		guardianshipService:       guardianshipService,
 	}
 }
 
@@ -79,7 +85,140 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, toTesteeResponse(result))
+	// 转换为响应对象
+	resp := toTesteeResponse(result)
+
+	// 如果有profile_id，尝试获取监护人信息
+	if h.guardianshipService != nil && h.guardianshipService.IsEnabled() && result.ProfileID != nil {
+		childID := fmt.Sprintf("%d", *result.ProfileID)
+		guardiansResp, err := h.guardianshipService.ListGuardians(c.Request.Context(), childID)
+		if err != nil {
+			// 监护人信息获取失败不影响主流程，记录日志即可
+			logger.L(c.Request.Context()).Warnw("Failed to get guardians",
+				"action", "get_testee",
+				"testee_id", id,
+				"profile_id", *result.ProfileID,
+				"error", err.Error(),
+			)
+		} else if guardiansResp != nil && len(guardiansResp.Items) > 0 {
+			// 转换监护人信息
+			resp.Guardians = make([]response.GuardianResponse, 0, len(guardiansResp.Items))
+			for _, edge := range guardiansResp.Items {
+				if edge.Guardianship != nil && edge.Guardian != nil {
+					// 获取监护关系和监护人信息
+					relation := edge.Guardianship.GetRelation().String()
+
+					// 从Guardian的Contacts中获取电话号码
+					phone := ""
+					if len(edge.Guardian.Contacts) > 0 {
+						// 优先获取手机号
+						for _, contact := range edge.Guardian.Contacts {
+							if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
+								phone = contact.GetValue()
+								break
+							}
+						}
+					}
+
+					resp.Guardians = append(resp.Guardians, response.GuardianResponse{
+						Name:     edge.Guardian.GetNickname(),
+						Relation: relation,
+						Phone:    phone,
+					})
+				}
+			}
+		}
+	}
+
+	h.Success(c, resp)
+}
+
+// GetScaleAnalysis
+// @Summary 获取受试者量表分析结果
+// @Tags Testee
+// @Produce json
+// @Param id path int true "Testee ID"
+// @Success 200 {object} core.Response{data=response.ScaleAnalysisResponse}
+// @Failure 400 {object} core.Response
+// @Failure 404 {object} core.Response
+// @Router /api/v1/testees/{id}/scale-analysis [get]
+func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
+			"action", "get_scale_analysis",
+			"testee_id", idStr,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	// 验证受试者是否存在
+	_, err = h.testeeQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to get testee",
+			"action", "get_scale_analysis",
+			"testee_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	// TODO: 查询该受试者的所有测评记录，按量表分组
+	// 当前返回空数据结构
+	resp := &response.ScaleAnalysisResponse{
+		Scales: []response.ScaleTrendResponse{},
+	}
+
+	h.Success(c, resp)
+}
+
+// GetPeriodicStats
+// @Summary 获取受试者周期统计
+// @Tags Testee
+// @Produce json
+// @Param id path int true "Testee ID"
+// @Success 200 {object} core.Response{data=response.PeriodicStatsResponse}
+// @Failure 400 {object} core.Response
+// @Failure 404 {object} core.Response
+// @Router /api/v1/testees/{id}/periodic-stats [get]
+func (h *ActorHandler) GetPeriodicStats(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
+			"action", "get_periodic_stats",
+			"testee_id", idStr,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	// 验证受试者是否存在
+	_, err = h.testeeQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to get testee",
+			"action", "get_periodic_stats",
+			"testee_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	// TODO: 查询该受试者参与的周期性测评项目
+	// 当前返回空数据结构
+	resp := &response.PeriodicStatsResponse{
+		Projects:       []response.PeriodicProjectResponse{},
+		TotalProjects:  0,
+		ActiveProjects: 0,
+	}
+
+	h.Success(c, resp)
 }
 
 // UpdateTestee 更新受试者

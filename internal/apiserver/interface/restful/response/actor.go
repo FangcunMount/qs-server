@@ -15,8 +15,16 @@ type TesteeResponse struct {
 	Source          string                   `json:"source,omitempty"`           // 来源
 	IsKeyFocus      bool                     `json:"is_key_focus"`               // 是否重点关注
 	AssessmentStats *AssessmentStatsResponse `json:"assessment_stats,omitempty"` // 测评统计
+	Guardians       []GuardianResponse       `json:"guardians,omitempty"`        // 监护人信息列表
 	CreatedAt       time.Time                `json:"created_at"`                 // 创建时间
 	UpdatedAt       time.Time                `json:"updated_at"`                 // 更新时间
+}
+
+// GuardianResponse 监护人信息响应
+type GuardianResponse struct {
+	Name     string `json:"name"`
+	Relation string `json:"relation"`
+	Phone    string `json:"phone"`
 }
 
 // AssessmentStatsResponse 测评统计响应

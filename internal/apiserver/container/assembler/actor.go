@@ -137,6 +137,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.StaffLifecycleService,
 		m.StaffAuthorizationService,
 		m.StaffQueryService,
+		guardianshipSvc,
 	)
 
 	return nil
