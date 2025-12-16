@@ -1,0 +1,30 @@
+---
+description: Go code conventions + DDD/hexagonal boundaries for this codebase.
+alwaysApply: false
+globs:
+  - "**/*.go"
+  - "cmd/**"
+  - "internal/**"
+  - "pkg/**"
+---
+
+# Go 代码风格与 DDD/六边形边界规则
+
+- Go 风格：
+  - 必须 gofmt；公共函数优先接收/传递 context。
+  - error 统一 wrap（fmt.Errorf("...: %w", err)），不要丢栈与语义。
+  - 不引入“为了炫技”的抽象；能直白就直白。
+
+- DDD/六边形边界：
+  - domain：不依赖 infra；不出现 gorm/tag/json 之类持久化/传输细节。
+  - application：编排用例、事务边界、调用端口（interfaces）。
+  - infra/adapters：实现 repository、mq、cache、http/grpc client；可用第三方库但不外溢到 domain。
+  - interfaces/transport：只做 DTO/参数校验/鉴权入口；业务校验尽量落在 domain 或 usecase。
+
+- 并发（你经常做 seeddata/批处理）：
+  - 默认：有限 worker pool + 上下文取消 + WaitGroup；禁止 goroutine 泄漏。
+  - channel：谁创建谁关闭；接收方不 close。
+  - 不用 time.Sleep 作为同步手段；用条件/信号/同步原语。
+
+- 测试：
+  - 优先表驱动测试；避免随机/时间依赖；必要时固定 seed。

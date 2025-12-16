@@ -1,0 +1,13 @@
+---
+description: Writing docs/notes: pyramid structure, minimal code, link to paths.
+alwaysApply: false
+globs:
+  - "**/*.md"
+  - "**/*.mdx"
+---
+
+# 文档写作规则
+
+- 文档默认金字塔结构：先结论/要点，再展开细节。
+- 代码示例只保留关键片段；其余用“文件路径 + 关键函数名/行号范围”指路。
+- 每节尽量回答：为什么（动机/约束）→ 做什么（结论）→ 怎么做（步骤/伪代码/图）。

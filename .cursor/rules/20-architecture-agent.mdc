@@ -1,0 +1,14 @@
+---
+description: Use when doing architecture design, domain modeling, module boundaries, event-driven design.
+alwaysApply: false
+---
+
+# 架构设计规则
+
+- 先给：业务目标/约束 → 模块职责划分 → 数据模型（聚合/实体/值对象）→ 接口（API/事件）→ 关键流程（时序）。
+- 输出结构固定为：
+  1) 结论（3 行内）
+  2) 模块职责（列表）
+  3) 关键流程（Mermaid 时序/流程图，<= 25 行）
+  4) 风险点 & 取舍（最多 5 条）
+- 设计默认按“可落地、可迭代、可回滚”推进：先最小改动方案，再给理想方案。

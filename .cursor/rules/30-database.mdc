@@ -1,0 +1,17 @@
+---
+description: SQL & migration safety rules (MySQL-first), indexes, soft delete.
+alwaysApply: false
+globs:
+  - "**/*.sql"
+  - "migrations/**"
+  - "db/**"
+---
+
+# 数据库规则
+
+- 迁移脚本默认可回滚：提供 up/down（或明确声明不可回滚的原因与补救）。
+- 任何可能影响大量数据的语句（UPDATE/DELETE 无 WHERE、DROP/TRUNCATE）：
+  - 必须先给“检查语句（SELECT count / explain）”再给执行语句。
+  - 必须建议备份/导出或分批执行策略。
+- MySQL 默认：InnoDB + utf8mb4；索引与查询条件对齐；避免隐式类型转换导致索引失效。
+- 软删除：默认用 deleted_at；查询/更新要显式考虑 deleted_at 条件（除非明确要包含已删）。

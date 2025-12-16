@@ -1,0 +1,95 @@
+---
+description: Event-driven & message queue rules (NSQ + Watermill): idempotency, retries, ordering, DLQ, observability.
+alwaysApply: false
+globs:
+  - "**/*.go"
+  - "internal/**"
+  - "pkg/**"
+  - "cmd/**"
+  - "deploy/**"
+  - "infra/**"
+---
+
+# 事件驱动/消息队列专用规则（NSQ/Watermill）
+
+- 事件优先（Event-first）：把“发生了什么”当事实描述，不要把命令/动作当事件名。
+  - ✅ AnswerSheetSubmitted / ReportGenerated
+  - ❌ GenerateReport / DoScoring
+
+- 事件 schema 必须稳定：
+  - event_id（全局唯一），occurred_at，producer，version
+  - aggregate_id（如 AnswerSheetID），trace_id/request_id（可选但强烈建议）
+  - payload：只放消费者真正需要的字段；避免把整个聚合快照塞进事件
+
+- 事件版本管理：
+  - 允许多版本并存；消费者兼容旧版本
+  - 禁止“破坏性改字段语义”；新增字段必须可选且有默认行为
+  - 事件升级策略：producer 先发新版本；consumer 先兼容再切换
+
+## 幂等（必须）
+
+- 每个 handler 必须可重放、可重复消费：
+  - 使用 idempotency key：优先用 event_id；或（event_type + aggregate_id + occurred_at/seq）
+  - 幂等落地建议：数据库唯一键 / 幂等表（event_id unique）/ Redis setnx（有 TTL）
+- 任何写操作（创建报告、写结果、发二次事件）都必须被幂等保护。
+
+## 重试/失败处理（必须有策略）
+
+- handler 出错分类：
+  - 可重试：网络抖动、依赖服务暂不可用、锁冲突
+  - 不可重试：schema 校验失败、业务前置条件不满足（除非未来会满足）
+- 可重试错误：
+  - 必须 backoff（指数退避 + 抖动 jitter）
+  - 必须有最大重试/最大时长；到达上限进入“失败通道/告警”
+- 不可重试错误：
+  - 直接进入“死信/失败队列”或记录到失败表，触发告警
+  - 不能靠无限重试拖垮系统
+
+## Watermill 实践
+
+- handler 结构固定：
+  1) decode + validate（schema/必填字段）
+  2) 幂等检查（event_id）
+  3) 业务处理（尽量短）
+  4) 产出副作用（DB 写入 / 发新事件）
+  5) ack（由框架处理，但你的逻辑必须保证前面步骤可重入）
+- 发布新事件（outbox 推荐）：
+  - 如果“写 DB + 发事件”要原子：优先 outbox pattern（同库事务写 outbox，再异步投递）
+  - 禁止“先发事件后写 DB”导致消费者读取不到状态
+
+## NSQ 语义注意点（默认假设）
+
+- NSQ 至少一次投递：必须依赖幂等实现“效果上的 exactly-once”
+- 不保证全局顺序：如果需要顺序，必须：
+  - 在同一 aggregate 维度实现序列号（seq）并在 consumer 侧做乱序处理/丢弃旧 seq
+  - 或按 key 做分区（NSQ 原生不强分区，更多靠设计规避顺序依赖）
+
+## 并发与吞吐（你常用的“6 channel 并发”场景）
+
+- 默认使用有限并发：worker 数量可配置（env/flag），并给出安全默认值（如 CPU*2 上限）
+- handler 内禁止开无限 goroutine；需要并发时用 errgroup + ctx
+- I/O 密集任务优先批处理（例如合并写、批量查询），避免每条消息都打 DB
+
+## 可观测性（必须）
+
+- 每条消息处理必须打日志字段：
+  - event_id、event_type、aggregate_id、producer、version、trace_id、elapsed_ms、result
+- 指标（至少）：
+  - 消费成功/失败计数、重试次数、处理耗时直方图、积压（队列深度/延迟）
+- 告警（至少）：
+  - 连续失败阈值、死信增长、处理耗时异常、积压持续上升
+
+## 业务一致性（默认约束）
+
+- 事件驱动默认“最终一致”：
+  - consumer 处理失败不会影响 producer 主流程（除非明确需要强一致）
+  - 需要强一致时：优先改为同步 RPC 或把逻辑收敛到同一服务内
+
+## 交付要求（Cursor 输出约束）
+
+- 你给代码时：只输出 diff，重点展示
+  - 幂等检查
+  - 重试分类与 backoff
+  - outbox（若涉及）
+  - 日志/指标埋点
+- 不要贴整文件；必要时分多个小 patch。

@@ -1,0 +1,20 @@
+---
+description: Infra & CI/CD rules (Docker/Compose/systemd/GitHub Actions). No secrets in repo.
+alwaysApply: false
+globs:
+  - "Dockerfile"
+  - "**/Dockerfile"
+  - "docker-compose*.yml"
+  - "infra/**"
+  - ".github/workflows/**"
+  - "**/*.service"
+  - "**/*.yml"
+  - "**/*.yaml"
+---
+
+# 基础设施与 CI/CD 规则
+
+- Dockerfile：优先多阶段构建；减少层数与缓存抖动；尽量非 root 运行；基础镜像尽量 pin 版本。
+- compose：端口、卷、网络写清楚；健康检查（healthcheck）优先；资源限制要显式（尤其是内存）。
+- 配置与密钥：只用 .env / secret 注入；禁止把 token/password 写进 yaml 或示例日志里。
+- 部署建议必须包含：验证命令（curl/health）、回滚路径、日志定位点。
