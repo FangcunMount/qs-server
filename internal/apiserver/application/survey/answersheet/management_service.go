@@ -123,6 +123,17 @@ func (s *managementService) GetStatistics(ctx context.Context, questionnaireCode
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "统计答卷总数失败")
 	}
 
+	// 如果总数为 0，直接返回空统计结果
+	if total == 0 {
+		return &AnswerSheetStatistics{
+			QuestionnaireCode: questionnaireCode,
+			TotalCount:        0,
+			AverageScore:      0,
+			MaxScore:          0,
+			MinScore:          0,
+		}, nil
+	}
+
 	// 3. 获取答卷摘要列表计算统计数据
 	// 使用摘要查询，只需 total_score 字段，避免加载完整答案
 	sheets, err := s.repo.FindSummaryListByQuestionnaire(ctx, questionnaireCode, 1, int(total))

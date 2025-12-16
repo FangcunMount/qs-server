@@ -109,6 +109,11 @@ func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.Ans
 
 // FindSummaryListByFiller 查询填写者的答卷摘要列表（使用聚合管道计算 answer_count）
 func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint64, page, pageSize int) ([]*answersheet.AnswerSheetSummary, error) {
+	// 如果 pageSize <= 0，直接返回空列表（MongoDB limit 必须为正数）
+	if pageSize <= 0 {
+		return []*answersheet.AnswerSheetSummary{}, nil
+	}
+
 	filter := bson.M{
 		"filler_id":  int64(fillerID),
 		"deleted_at": nil,
@@ -172,6 +177,11 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 
 // FindSummaryListByQuestionnaire 查询问卷的答卷摘要列表（使用聚合管道计算 answer_count）
 func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*answersheet.AnswerSheetSummary, error) {
+	// 如果 pageSize <= 0，直接返回空列表（MongoDB limit 必须为正数）
+	if pageSize <= 0 {
+		return []*answersheet.AnswerSheetSummary{}, nil
+	}
+
 	filter := bson.M{
 		"questionnaire_code": questionnaireCode,
 		"deleted_at":         nil,
