@@ -150,6 +150,8 @@ definitions:
     type: object
   evaluation.AssessmentSummaryResponse:
     properties:
+      answer_sheet_id:
+        type: string
       created_at:
         type: string
       id:

@@ -199,6 +199,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/codes/apply": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "申请唯一 code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "description": "申请请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ApplyCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ApplyCodeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/evaluations/assessments": {
             "get": {
                 "description": "分页查询测评列表",
@@ -2528,6 +2579,96 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/testees/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor"
+                ],
+                "summary": "获取受试者详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor"
+                ],
+                "summary": "更新受试者",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新受试者请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateTesteeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "检查 API Server 健康状态",
@@ -2628,6 +2769,24 @@ const docTemplate = `{
                 }
             }
         },
+        "request.ApplyCodeRequest": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "prefix": {
+                    "type": "string"
+                }
+            }
+        },
         "request.BatchEvaluateRequest": {
             "type": "object",
             "properties": {
@@ -2690,8 +2849,7 @@ const docTemplate = `{
             "required": [
                 "name",
                 "org_id",
-                "roles",
-                "user_id"
+                "roles"
             ],
             "properties": {
                 "email": {
@@ -2721,10 +2879,6 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                },
-                "user_id": {
-                    "description": "用户ID",
-                    "type": "integer"
                 }
             }
         },
@@ -3018,6 +3172,20 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "response.ApplyCodeResponse": {
+            "type": "object",
+            "properties": {
+                "codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "count": {
+                    "type": "integer"
                 }
             }
         },

@@ -1390,6 +1390,9 @@ const docTemplate = `{
         "evaluation.AssessmentSummaryResponse": {
             "type": "object",
             "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },

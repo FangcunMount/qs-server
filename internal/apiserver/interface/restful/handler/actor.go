@@ -52,6 +52,7 @@ func NewActorHandler(
 // @Produce json
 // @Param id path int true "受试者ID"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Router /api/v1/testees/{id} [get]
 // GetTestee 获取受试者详情
 func (h *ActorHandler) GetTestee(c *gin.Context) {
 	idStr := c.Param("id")
@@ -89,6 +90,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Param id path int true "受试者ID"
 // @Param body body request.UpdateTesteeRequest true "更新受试者请求"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Router /api/v1/testees/{id} [put]
 // UpdateTestee 更新受试者
 func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 	idStr := c.Param("id")

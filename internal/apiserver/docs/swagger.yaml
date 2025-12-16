@@ -38,6 +38,18 @@ definitions:
       type:
         type: string
     type: object
+  request.ApplyCodeRequest:
+    properties:
+      count:
+        type: integer
+      kind:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      prefix:
+        type: string
+    type: object
   request.BatchEvaluateRequest:
     properties:
       assessment_ids:
@@ -98,14 +110,10 @@ definitions:
           type: string
         minItems: 1
         type: array
-      user_id:
-        description: 用户ID
-        type: integer
     required:
     - name
     - org_id
     - roles
-    - user_id
     type: object
   request.FactorInterpretRulesModel:
     properties:
@@ -298,6 +306,15 @@ definitions:
         type: number
       title:
         type: string
+    type: object
+  response.ApplyCodeResponse:
+    properties:
+      codes:
+        items:
+          type: string
+        type: array
+      count:
+        type: integer
     type: object
   response.AssessmentListResponse:
     properties:
@@ -1020,6 +1037,36 @@ paths:
       summary: 获取答卷统计
       tags:
       - AnswerSheet-Management
+  /api/v1/codes/apply:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 申请请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ApplyCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ApplyCodeResponse'
+              type: object
+      summary: 申请唯一 code
+      tags:
+      - 系统
   /api/v1/evaluations/assessments:
     get:
       description: 分页查询测评列表
@@ -2443,6 +2490,59 @@ paths:
                   $ref: '#/definitions/response.TesteeListResponse'
               type: object
       summary: 查询受试者列表
+      tags:
+      - Actor
+  /api/v1/testees/{id}:
+    get:
+      parameters:
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeResponse'
+              type: object
+      summary: 获取受试者详情
+      tags:
+      - Actor
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新受试者请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeResponse'
+              type: object
+      summary: 更新受试者
       tags:
       - Actor
   /health:
