@@ -142,14 +142,56 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 		return nil, errors.Wrap(err, "failed to list guardians from IAM")
 	}
 
-	if resp == nil || len(resp.Items) == 0 {
+	if resp == nil {
+		logger.L(ctx).Debugw("IAM ListGuardians returned nil response",
+			"action", "fetch_guardians",
+			"profile_id", profileID,
+			"child_id", childID,
+		)
 		return []GuardianInfo{}, nil
 	}
 
+	if len(resp.Items) == 0 {
+		logger.L(ctx).Debugw("IAM ListGuardians returned empty items",
+			"action", "fetch_guardians",
+			"profile_id", profileID,
+			"child_id", childID,
+			"total", resp.Total,
+		)
+		return []GuardianInfo{}, nil
+	}
+
+	logger.L(ctx).Debugw("IAM ListGuardians response received",
+		"action", "fetch_guardians",
+		"profile_id", profileID,
+		"child_id", childID,
+		"total", resp.Total,
+		"items_count", len(resp.Items),
+	)
+
 	// 转换 IAM 响应为 GuardianInfo
 	guardians := make([]GuardianInfo, 0, len(resp.Items))
-	for _, edge := range resp.Items {
-		if edge.Guardianship == nil || edge.Guardian == nil {
+	skippedCount := 0
+	for i, edge := range resp.Items {
+		if edge.Guardianship == nil {
+			logger.L(ctx).Warnw("Skipping guardian item: Guardianship is nil",
+				"action", "fetch_guardians",
+				"profile_id", profileID,
+				"item_index", i,
+			)
+			skippedCount++
+			continue
+		}
+
+		if edge.Guardian == nil {
+			logger.L(ctx).Warnw("Skipping guardian item: Guardian is nil",
+				"action", "fetch_guardians",
+				"profile_id", profileID,
+				"item_index", i,
+				"guardianship_id", edge.Guardianship.Id,
+				"user_id", edge.Guardianship.UserId,
+			)
+			skippedCount++
 			continue
 		}
 
@@ -168,12 +210,31 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 			}
 		}
 
-		guardians = append(guardians, GuardianInfo{
+		guardianInfo := GuardianInfo{
 			Name:     edge.Guardian.GetNickname(),
 			Relation: relation,
 			Phone:    phone,
-		})
+		}
+
+		logger.L(ctx).Debugw("Processing guardian item",
+			"action", "fetch_guardians",
+			"profile_id", profileID,
+			"item_index", i,
+			"guardian_name", guardianInfo.Name,
+			"relation", relation,
+			"has_phone", phone != "",
+		)
+
+		guardians = append(guardians, guardianInfo)
 	}
+
+	logger.L(ctx).Debugw("Guardians processing completed",
+		"action", "fetch_guardians",
+		"profile_id", profileID,
+		"total_items", len(resp.Items),
+		"processed_count", len(guardians),
+		"skipped_count", skippedCount,
+	)
 
 	return guardians, nil
 }
