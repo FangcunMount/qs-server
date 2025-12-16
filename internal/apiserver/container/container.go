@@ -13,6 +13,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
+
+	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 )
 
 // modulePool 模块池
@@ -40,6 +42,7 @@ type Container struct {
 	ActorModule      *assembler.ActorModule      // Actor 模块
 	EvaluationModule *assembler.EvaluationModule // Evaluation 模块（测评、得分、报告）
 	IAMModule        *IAMModule                  // IAM 集成模块
+	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 
 	// 容器状态
 	initialized bool
@@ -121,6 +124,9 @@ func (c *Container) Initialize() error {
 	if err := c.initEvaluationModule(); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
+
+	// 初始化 CodesService（基于 redisStore）
+	c.initCodesService()
 
 	c.initialized = true
 	fmt.Printf("🏗️  Container initialized successfully\n")
@@ -217,6 +223,27 @@ func (c *Container) initEvaluationModule() error {
 
 	fmt.Printf("📦 Evaluation module initialized\n")
 	return nil
+}
+
+// initCodesService 初始化 CodesService
+func (c *Container) initCodesService() {
+	// 如果已经有实现则不覆盖
+	if c.CodesService != nil {
+		return
+	}
+	if c.redisStore != nil {
+		c.CodesService = codesapp.NewService(c.redisStore)
+		fmt.Printf("🔑 CodesService initialized using redisStore\n")
+		return
+	}
+	if c.redisCache != nil {
+		c.CodesService = codesapp.NewService(c.redisCache)
+		fmt.Printf("🔑 CodesService initialized using redisCache\n")
+		return
+	}
+	// 无 redis 时使用 nil 或者 NewService 会回退到时间戳实现
+	c.CodesService = codesapp.NewService(nil)
+	fmt.Printf("🔑 CodesService initialized using fallback (no redis)\n")
 }
 
 // HealthCheck 健康检查

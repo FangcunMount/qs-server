@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
@@ -100,6 +101,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册 Evaluation 模块相关的受保护路由
 	r.registerEvaluationProtectedRoutes(apiV1)
 
+	// 注册 Codes 申请路由
+	r.registerCodesRoutes(apiV1)
+
 	// 管理员路由（需要额外的权限检查）
 	r.registerAdminRoutes(apiV1)
 }
@@ -108,6 +112,20 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 // 用户管理已迁移到 IAM 服务，此方法保留以便未来扩展
 func (r *Router) registerUserProtectedRoutes(apiV1 *gin.RouterGroup) {
 	// 用户相关功能已迁移到 iam-contracts 项目
+}
+
+// registerCodesRoutes 注册 codes 申请路由
+func (r *Router) registerCodesRoutes(apiV1 *gin.RouterGroup) {
+	if r.container == nil {
+		return
+	}
+
+	if r.container.CodesService == nil {
+		return
+	}
+
+	handler := codesHandler.NewCodesHandler(r.container.CodesService)
+	apiV1.POST("/codes/apply", handler.Apply)
 }
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由

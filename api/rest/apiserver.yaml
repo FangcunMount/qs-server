@@ -1585,6 +1585,36 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /codes/apply:
+    post:
+      tags:
+      - 系统
+      summary: 申请唯一 code
+      description: 申请全局唯一的 code（支持申请问卷、问题、因子等类型），返回生成的 code 列表
+      operationId: 申请Code
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（如需要）
+        name: Authorization
+        in: header
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.ApplyCodeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ApplyCodeResponse'
 components:
   schemas:
     core.Response:
@@ -1824,6 +1854,40 @@ components:
           type: array
           items:
             type: string
+    request.ApplyCodeRequest:
+      type: object
+      required:
+      - kind
+      properties:
+        kind:
+          description: 申请的 code 类型：使用短类型标识（qs=问卷, qu=问题, fa=因子）
+          type: string
+          enum:
+          - qs
+          - qu
+          - fa
+        count:
+          description: 申请数量（默认 1）
+          type: integer
+          default: 1
+        prefix:
+          description: 可选的 code 前缀（用于区分来源）
+          type: string
+        metadata:
+          description: 可选附加信息，用于后端生成逻辑（可不解析）
+          type: object
+          additionalProperties: true
+    response.ApplyCodeResponse:
+      type: object
+      properties:
+        codes:
+          description: 生成的 code 列表
+          type: array
+          items:
+            type: string
+        count:
+          description: 本次返回的数量
+          type: integer
     response.AnswerSheetListResponse:
       type: object
       properties:

@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sony/sonyflake"
 )
 
 // Code 业务编码类型，用于问卷编码、问题编码等业务场景
@@ -34,12 +36,52 @@ func GenerateNewCode() (Code, error) {
 
 // GenerateCodeWithPrefix 生成带前缀的业务编码
 func GenerateCodeWithPrefix(prefix string) (Code, error) {
+	// 首先尝试使用 sonyflake 生成有序的 64-bit ID 并用 base62 编码
+	initSonyflake()
+	if sf != nil {
+		if id, err := sf.NextID(); err == nil {
+			return Code(fmt.Sprintf("%s%s", prefix, base62Encode(id))), nil
+		}
+		// 若 sonyflake 出错，回退到 UUID 方案
+	}
+
+	// 回退：使用时间戳+UUID的短格式
 	id := uuid.New()
-	// 使用时间戳+UUID的短格式
 	timestamp := time.Now().Format("20060102")
 	shortID := strings.ReplaceAll(id.String(), "-", "")[:8]
 	code := fmt.Sprintf("%s%s%s", prefix, timestamp, shortID)
 	return Code(code), nil
+}
+
+var (
+	sf     *sonyflake.Sonyflake
+	sfOnce sync.Once
+)
+
+// initSonyflake 初始化 sonyflake 单例
+func initSonyflake() {
+	sfOnce.Do(func() {
+		var st sonyflake.Settings
+		sf = sonyflake.NewSonyflake(st)
+		// 如果返回 nil，下一步会回退到 UUID
+	})
+}
+
+// base62Encode 将 uint64 编码为 base62 字符串
+func base62Encode(u uint64) string {
+	const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	if u == 0 {
+		return "0"
+	}
+	// 预分配足够长度的缓冲
+	var buf [12]byte
+	i := len(buf)
+	for u > 0 {
+		i--
+		buf[i] = alphabet[u%62]
+		u /= 62
+	}
+	return string(buf[i:])
 }
 
 // ===== 基础方法 =====
