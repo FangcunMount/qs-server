@@ -31,7 +31,7 @@ IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 |------|------------------|-------|
 | **认证** | ✅ 负责登录、密码、Token | ❌ 不管认证 |
 | **通用权限** | ✅ 能否访问某个模块 | ❌ 不管粗粒度权限 |
-| **业务角色** | ❌ 不管具体业务 | ✅ scale_admin, evaluator 等 |
+| **业务角色** | ❌ 不管具体业务 | ✅ role:qs:content_manager, role:qs:evaluator 等 |
 | **多租户** | ✅ 跨机构的统一身份 | ✅ 同一人在不同机构的不同角色 |
 | **业务语义** | ❌ 只是技术账号 | ✅ 领域模型的一部分 |
 
@@ -41,19 +41,19 @@ IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 
 **问题**：IAM 只管通用权限（如 "能否访问量表模块"），不管业务细节。
 
-**业务角色示例**：
+**业务角色示例（已迁移为统一权限中心标识）**：
 
-- `scale_admin`：量表管理员，能配置量表模板
-- `evaluator`：评估人员，能填写评估报告
-- `screening_owner`：筛查项目负责人，能创建筛查项目
-- `report_auditor`：报告审核员，能审核高风险报告
+- `qs:admin`：QS 管理员，拥有系统级管理权限
+- `qs:content_manager`：内容管理员，能管理问卷与量表
+- `qs:evaluator`：评估员，能执行测评相关操作（只读/重试等）
+- `qs:staff`：普通员工，仅具备查看受试者权限
 
-这些角色是**本 BC 的领域概念**，必须持久化。
+这些角色由权限中心下发并以字符串形式存储在 `roles` 字段中，属于本 BC 的领域概念，需要持久化。
 
 ```go
 // 业务逻辑判断示例
 func (s *Staff) CanManageScales() bool {
-    return s.HasRole(StaffRoleScaleAdmin)
+    return s.HasAnyRole(RoleContentManager, RoleQSAdmin)
 }
 
 func (s *ScaleService) UpdateScale(ctx context.Context, staffID StaffID, scale *Scale) error {
@@ -71,9 +71,9 @@ func (s *ScaleService) UpdateScale(ctx context.Context, staffID StaffID, scale *
 
 | IAM.UserID | OrgID | StaffID | Roles |
 |------------|-------|---------|-------|
-| 1001 | 医院A | S-001 | evaluator |
-| 1001 | 医院B | S-002 | scale_admin, evaluator |
-| 1002 | 医院A | S-003 | screening_owner |
+| 1001 | 医院A | S-001 | qs:evaluator |
+| 1001 | 医院B | S-002 | qs:content_manager, qs:evaluator |
+| 1002 | 医院A | S-003 | qs:admin |
 
 **实现**：
 

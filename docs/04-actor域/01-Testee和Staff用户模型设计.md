@@ -237,17 +237,17 @@ type AnswerSheet struct {
 
 ---
 
-## 3. Staff（后台工作人员）
+### 3. Staff（后台工作人员）
 
 ### 3.1 定义
 
 > Staff 表示在问卷&量表系统中执行配置、管理、审核等操作的后台人员。
 
-典型角色：
+典型角色（迁移到统一权限中心标识）：
 
-* ScaleAdmin：量表管理员
-* Evaluator：评估人员
-* ScreeningOwner：筛查项目负责人
+- `qs:admin`：QS 管理员
+- `qs:content_manager`：内容管理员（问卷/量表管理）
+- `qs:evaluator`：评估员
 
 ### 3.2 字段设计
 
@@ -257,9 +257,9 @@ type StaffID string
 type StaffRole string
 
 const (
-    StaffRoleScaleAdmin     StaffRole = "scale_admin"
-    StaffRoleEvaluator      StaffRole = "evaluator"
-    StaffRoleScreeningOwner StaffRole = "screening_owner"
+    StaffRoleQSAdmin        StaffRole = "qs:admin"
+    StaffRoleContentManager StaffRole = "qs:content_manager"
+    StaffRoleEvaluator      StaffRole = "qs:evaluator"
 )
 
 type Staff struct {

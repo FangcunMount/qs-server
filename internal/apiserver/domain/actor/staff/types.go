@@ -13,17 +13,25 @@ func NewID(id uint64) ID {
 // Role 员工角色类型
 type Role string
 
-const (
-	// RoleScaleAdmin 量表管理员
-	RoleScaleAdmin Role = "scale_admin"
-	// RoleEvaluator 评估人员
-	RoleEvaluator Role = "evaluator"
-	// RoleScreeningOwner 筛查项目负责人
-	RoleScreeningOwner Role = "screening_owner"
-	// RoleReportAuditor 报告审核员
-	RoleReportAuditor Role = "report_auditor"
-)
+// 旧的业务角色标识已迁移到统一的权限中心字符串格式。
+// 本文件保留新的统一角色常量，旧常量已删除以避免混淆。
 
 func (r Role) String() string {
 	return string(r)
 }
+
+// 新增的 QS 角色标识（与权限中心保持一致）
+const (
+	// RoleQSAdmin 管理员：所有 QS 资源的所有操作
+	RoleQSAdmin Role = "qs:admin"
+	// RoleContentManager 内容管理员：问卷和量表的完整管理
+	RoleContentManager Role = "qs:content_manager"
+	// RoleEvaluatorQS 评估员：测评相关只读 + 重试
+	RoleEvaluatorQS Role = "qs:evaluator"
+	// RoleEvaluationPlanManager 测评计划管理员：测评计划的管理权限
+	RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
+	// RoleScreeningPlanManager 筛查计划管理员：筛查计划的管理权限
+	RoleScreeningPlanManager Role = "qs:screening_plan_manager"
+	// RoleStaff 普通员工：只能查看受试者
+	RoleStaff Role = "qs:staff"
+)

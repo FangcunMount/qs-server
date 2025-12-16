@@ -151,22 +151,32 @@ func (s *Staff) deactivate() {
 
 // CanManageScales 是否可以管理量表
 func (s *Staff) CanManageScales() bool {
-	return s.HasRole(RoleScaleAdmin)
+	// 内容管理员或管理员可以管理量表
+	return s.HasAnyRole(RoleContentManager, RoleQSAdmin)
 }
 
 // CanEvaluate 是否可以评估
 func (s *Staff) CanEvaluate() bool {
-	return s.HasRole(RoleEvaluator)
+	// QS 评估员或管理员可以评估
+	return s.HasAnyRole(RoleEvaluatorQS, RoleQSAdmin)
 }
 
 // CanManageScreeningProject 是否可以管理筛查项目
 func (s *Staff) CanManageScreeningProject() bool {
-	return s.HasRole(RoleScreeningOwner)
+	// 管理员或筛查计划管理员可以管理筛查项目
+	return s.HasAnyRole(RoleQSAdmin, RoleScreeningPlanManager)
 }
 
 // CanAuditReport 是否可以审核报告
 func (s *Staff) CanAuditReport() bool {
-	return s.HasRole(RoleReportAuditor)
+	// 目前仅管理员可以审核报告
+	return s.HasRole(RoleQSAdmin)
+}
+
+// CanManageEvaluationPlans 是否可以管理测评计划
+func (s *Staff) CanManageEvaluationPlans() bool {
+	// 管理员或测评计划管理员可以管理测评计划
+	return s.HasAnyRole(RoleQSAdmin, RoleEvaluationPlanManager)
 }
 
 // === 仓储层重建方法（用于从数据库加载）===

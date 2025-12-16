@@ -127,11 +127,14 @@ func (v *validator) ValidatePhone(phone string) error {
 	return nil
 }
 
+// 仅接受新的 QS 角色标识
 // ValidateRole 验证角色
 func (v *validator) ValidateRole(role Role) error {
 	// 验证角色是否是预定义的
 	switch role {
-	case RoleScaleAdmin, RoleEvaluator, RoleScreeningOwner, RoleReportAuditor:
+	// 仅接受新的 QS 角色标识
+	case RoleQSAdmin, RoleContentManager, RoleEvaluatorQS, RoleStaff,
+		RoleEvaluationPlanManager, RoleScreeningPlanManager:
 		return nil
 	default:
 		return errors.WithCode(code.ErrValidation, "invalid role")

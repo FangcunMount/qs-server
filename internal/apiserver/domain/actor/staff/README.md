@@ -114,10 +114,10 @@ ValidatePermission(staff, requiredRoles...) error
 roleManager := NewRoleManager(validator)
 
 // 分配角色
-err := roleManager.AssignRole(staff, RoleScaleAdmin)
+err := roleManager.AssignRole(staff, RoleContentManager)
 
 // 验证权限
-err := roleManager.ValidatePermission(staff, RoleScaleAdmin, RoleEvaluator)
+err := roleManager.ValidatePermission(staff, RoleContentManager, RoleEvaluatorQS)
 if err != nil {
     // 无权限
 }
@@ -199,10 +199,11 @@ ValidateIAMBinding(ctx, staff) error
 #### Role - 角色枚举
 ```go
 const (
-    RoleScaleAdmin       Role = "scale_admin"        // 量表管理员
-    RoleEvaluator        Role = "evaluator"          // 评估人员
-    RoleScreeningOwner   Role = "screening_owner"    // 筛查项目负责人
-    RoleReportAuditor    Role = "report_auditor"     // 报告审核员
+    // 新的统一角色标识（来自权限中心）
+    RoleQSAdmin         Role = "qs:admin"
+    RoleContentManager  Role = "qs:content_manager"
+    RoleEvaluatorQS     Role = "qs:evaluator"
+    RoleStaff           Role = "qs:staff"
 )
 ```
 
@@ -296,15 +297,15 @@ validator := staff.NewValidator()
 roleManager := staff.NewRoleManager(validator)
 
 // 分配角色
-err := roleManager.AssignRole(s, staff.RoleScaleAdmin)
-err = roleManager.AssignRole(s, staff.RoleEvaluator)
+err := roleManager.AssignRole(s, staff.RoleContentManager)
+err = roleManager.AssignRole(s, staff.RoleEvaluatorQS)
 
 // 批量替换角色
-newRoles := []staff.Role{staff.RoleScaleAdmin, staff.RoleReportAuditor}
+newRoles := []staff.Role{staff.RoleContentManager, staff.RoleQSAdmin}
 err := roleManager.ReplaceRoles(s, newRoles)
 
 // 验证权限
-err := roleManager.ValidatePermission(s, staff.RoleScaleAdmin)
+err := roleManager.ValidatePermission(s, staff.RoleContentManager)
 if err != nil {
     return errors.New("无权限管理量表")
 }
