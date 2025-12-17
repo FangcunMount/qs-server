@@ -468,6 +468,13 @@ definitions:
         description: 风险等级
         type: string
     type: object
+  response.FactorListResponse:
+    properties:
+      factors:
+        items:
+          $ref: '#/definitions/response.FactorResponse'
+        type: array
+    type: object
   response.FactorResponse:
     properties:
       code:
@@ -2255,6 +2262,36 @@ paths:
       tags:
       - Scale-Lifecycle
   /api/v1/scales/{code}/factors:
+    get:
+      consumes:
+      - application/json
+      description: 根据量表编码获取该量表的所有因子
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 量表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.FactorListResponse'
+              type: object
+      summary: 获取量表的因子列表
+      tags:
+      - Scale-Query
     put:
       consumes:
       - application/json

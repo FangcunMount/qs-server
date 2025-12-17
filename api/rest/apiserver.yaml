@@ -1274,6 +1274,35 @@ paths:
                     data:
                       $ref: '#/components/schemas/response.ScaleResponse'
   /scales/{code}/factors:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取量表的因子列表
+      description: 根据量表编码获取该量表的所有因子
+      operationId: 获取量表的因子列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.FactorListResponse'
     put:
       tags:
       - Scale-Factor
@@ -2211,6 +2240,13 @@ components:
         risk_level:
           description: 风险等级
           type: string
+    response.FactorListResponse:
+      type: object
+      properties:
+        factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.FactorResponse'
     response.FactorResponse:
       type: object
       properties:

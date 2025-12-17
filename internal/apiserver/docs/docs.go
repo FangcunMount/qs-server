@@ -2063,6 +2063,55 @@ const docTemplate = `{
             }
         },
         "/api/v1/scales/{code}/factors": {
+            "get": {
+                "description": "根据量表编码获取该量表的所有因子",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Scale-Query"
+                ],
+                "summary": "获取量表的因子列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "量表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.FactorListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
             "put": {
                 "description": "批量替换量表中的所有因子",
                 "consumes": [
@@ -3501,6 +3550,17 @@ const docTemplate = `{
                 "risk_level": {
                     "description": "风险等级",
                     "type": "string"
+                }
+            }
+        },
+        "response.FactorListResponse": {
+            "type": "object",
+            "properties": {
+                "factors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.FactorResponse"
+                    }
                 }
             }
         },
