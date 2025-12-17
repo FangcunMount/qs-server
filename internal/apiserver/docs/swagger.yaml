@@ -340,14 +340,14 @@ definitions:
     properties:
       answer_sheet_id:
         description: 答卷ID
-        type: integer
+        type: string
       failed_at:
         type: string
       failure_reason:
         type: string
       id:
         description: 测评ID
-        type: integer
+        type: string
       interpreted_at:
         type: string
       medical_scale_code:
@@ -355,13 +355,13 @@ definitions:
         type: string
       medical_scale_id:
         description: 量表ID
-        type: integer
+        type: string
       medical_scale_name:
         description: 量表名称
         type: string
       org_id:
         description: 组织ID
-        type: integer
+        type: string
       origin_id:
         description: 来源ID
         type: string
@@ -385,10 +385,10 @@ definitions:
         type: string
       testee_id:
         description: 受试者ID
-        type: integer
-      total_score:
-        description: 总分（格式化后的字符串）
         type: string
+      total_score:
+        description: 总分
+        type: number
     type: object
   response.AssessmentStatisticsResponse:
     properties:
@@ -441,7 +441,7 @@ definitions:
       failed_ids:
         description: 失败的测评ID列表
         items:
-          type: integer
+          type: string
         type: array
       success_count:
         description: 成功数
@@ -532,7 +532,7 @@ definitions:
         type: string
       testee_id:
         description: 受试者ID
-        type: integer
+        type: string
     type: object
   response.GuardianResponse:
     properties:
@@ -547,7 +547,7 @@ definitions:
     properties:
       assessment_id:
         description: 测评ID
-        type: integer
+        type: string
       has_high_risk:
         description: 是否存在高风险
         type: boolean
@@ -589,7 +589,7 @@ definitions:
         type: string
       project_id:
         description: 项目ID
-        type: integer
+        type: string
       project_name:
         description: 项目名称
         type: string
@@ -626,7 +626,7 @@ definitions:
     properties:
       assessment_id:
         description: 关联的测评ID（如已完成）
-        type: integer
+        type: string
       completed_at:
         description: 完成时间
         type: string
@@ -698,7 +698,7 @@ definitions:
     properties:
       assessment_id:
         description: 测评ID
-        type: integer
+        type: string
       conclusion:
         description: 总结论
         type: string
@@ -808,7 +808,7 @@ definitions:
     properties:
       assessment_id:
         description: 测评ID
-        type: integer
+        type: string
       factors:
         description: 各因子得分
         items:
@@ -834,7 +834,7 @@ definitions:
         type: string
       scale_id:
         description: 量表ID
-        type: integer
+        type: string
       scale_name:
         description: 量表名称
         type: string
@@ -848,7 +848,7 @@ definitions:
     properties:
       assessment_id:
         description: 测评ID
-        type: integer
+        type: string
       factor_scores:
         description: 因子得分列表
         items:
@@ -891,7 +891,7 @@ definitions:
         type: string
       id:
         description: ID
-        type: integer
+        type: string
       is_active:
         description: 是否激活
         type: boolean
@@ -900,7 +900,7 @@ definitions:
         type: string
       org_id:
         description: 机构ID
-        type: integer
+        type: string
       phone:
         description: 电话
         type: string
@@ -914,7 +914,7 @@ definitions:
         type: string
       user_id:
         description: 用户ID
-        type: integer
+        type: string
     type: object
   response.TesteeListResponse:
     properties:
@@ -958,10 +958,10 @@ definitions:
         type: array
       iam_child_id:
         description: IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
-        type: integer
+        type: string
       id:
         description: ID
-        type: integer
+        type: string
       is_key_focus:
         description: 是否重点关注
         type: boolean
@@ -970,10 +970,10 @@ definitions:
         type: string
       org_id:
         description: 机构ID
-        type: integer
+        type: string
       profile_id:
         description: 用户档案ID（新字段）
-        type: integer
+        type: string
       source:
         description: 来源
         type: string
@@ -990,7 +990,7 @@ definitions:
     properties:
       assessment_id:
         description: 测评ID
-        type: integer
+        type: string
       raw_score:
         description: 得分
         type: number
@@ -1127,7 +1127,7 @@ paths:
       - description: 填写人ID
         in: query
         name: filler_id
-        type: integer
+        type: string
       - description: 开始时间
         in: query
         name: start_time
@@ -1166,7 +1166,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1264,7 +1264,7 @@ paths:
       - description: 受试者ID筛选
         in: query
         name: testee_id
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1288,7 +1288,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1312,7 +1312,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1336,7 +1336,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1360,7 +1360,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1384,7 +1384,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -1466,7 +1466,7 @@ paths:
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       - default: 1
         description: 页码
         in: query
@@ -1500,7 +1500,7 @@ paths:
         in: query
         name: testee_id
         required: true
-        type: integer
+        type: string
       - description: 因子编码
         in: query
         name: factor_code
@@ -2532,7 +2532,7 @@ paths:
         in: query
         name: org_id
         required: true
-        type: integer
+        type: string
       - description: 角色筛选
         in: query
         name: role
@@ -2594,7 +2594,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2611,7 +2611,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2634,7 +2634,7 @@ paths:
         in: query
         name: org_id
         required: true
-        type: integer
+        type: string
       - description: 姓名（模糊匹配）
         in: query
         name: name
@@ -2675,7 +2675,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2699,7 +2699,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: 更新受试者请求
         in: body
         name: body
@@ -2728,7 +2728,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -2759,7 +2759,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:

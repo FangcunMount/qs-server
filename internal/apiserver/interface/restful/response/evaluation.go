@@ -12,24 +12,24 @@ import (
 
 // AssessmentResponse 测评响应
 type AssessmentResponse struct {
-	ID                   uint64  `json:"id"`                     // 测评ID
-	OrgID                uint64  `json:"org_id"`                 // 组织ID
-	TesteeID             uint64  `json:"testee_id"`              // 受试者ID
-	QuestionnaireCode    string  `json:"questionnaire_code"`     // 问卷编码（唯一标识）
-	QuestionnaireVersion string  `json:"questionnaire_version"`  // 问卷版本
-	AnswerSheetID        uint64  `json:"answer_sheet_id"`        // 答卷ID
-	MedicalScaleID       *uint64 `json:"medical_scale_id"`       // 量表ID
-	MedicalScaleCode     *string `json:"medical_scale_code"`     // 量表编码
-	MedicalScaleName     *string `json:"medical_scale_name"`     // 量表名称
-	OriginType           string  `json:"origin_type"`            // 来源类型
-	OriginID             *string `json:"origin_id"`              // 来源ID
-	Status               string  `json:"status"`                 // 状态
-	TotalScore           *string `json:"total_score,omitempty"`  // 总分（格式化后的字符串）
-	RiskLevel            *string `json:"risk_level,omitempty"`   // 风险等级
-	SubmittedAt          *string `json:"submitted_at,omitempty"` // 提交时间
-	InterpretedAt        *string `json:"interpreted_at,omitempty"`
-	FailedAt             *string `json:"failed_at,omitempty"`
-	FailureReason        *string `json:"failure_reason,omitempty"`
+	ID                   string   `json:"id"`                     // 测评ID
+	OrgID                string   `json:"org_id"`                 // 组织ID
+	TesteeID             string   `json:"testee_id"`              // 受试者ID
+	QuestionnaireCode    string   `json:"questionnaire_code"`     // 问卷编码（唯一标识）
+	QuestionnaireVersion string   `json:"questionnaire_version"`  // 问卷版本
+	AnswerSheetID        string   `json:"answer_sheet_id"`        // 答卷ID
+	MedicalScaleID       *string  `json:"medical_scale_id"`       // 量表ID
+	MedicalScaleCode     *string  `json:"medical_scale_code"`     // 量表编码
+	MedicalScaleName     *string  `json:"medical_scale_name"`     // 量表名称
+	OriginType           string   `json:"origin_type"`            // 来源类型
+	OriginID             *string  `json:"origin_id"`              // 来源ID
+	Status               string   `json:"status"`                 // 状态
+	TotalScore           *float64 `json:"total_score,omitempty"`  // 总分
+	RiskLevel            *string  `json:"risk_level,omitempty"`   // 风险等级
+	SubmittedAt          *string  `json:"submitted_at,omitempty"` // 提交时间
+	InterpretedAt        *string  `json:"interpreted_at,omitempty"`
+	FailedAt             *string  `json:"failed_at,omitempty"`
+	FailureReason        *string  `json:"failure_reason,omitempty"`
 }
 
 // AssessmentListResponse 测评列表响应
@@ -66,14 +66,14 @@ type BatchEvaluationResponse struct {
 	TotalCount   int      `json:"total_count"`   // 总数
 	SuccessCount int      `json:"success_count"` // 成功数
 	FailedCount  int      `json:"failed_count"`  // 失败数
-	FailedIDs    []uint64 `json:"failed_ids"`    // 失败的测评ID列表
+	FailedIDs    []string `json:"failed_ids"`    // 失败的测评ID列表
 }
 
 // ============= Score 相关响应 =============
 
 // ScoreResponse 得分响应
 type ScoreResponse struct {
-	AssessmentID uint64             `json:"assessment_id"` // 测评ID
+	AssessmentID string             `json:"assessment_id"` // 测评ID
 	TotalScore   float64            `json:"total_score"`   // 总分
 	RiskLevel    string             `json:"risk_level"`    // 整体风险等级
 	FactorScores []*FactorScoreItem `json:"factor_scores"` // 因子得分列表
@@ -92,7 +92,7 @@ type FactorScoreItem struct {
 
 // FactorTrendResponse 因子趋势响应
 type FactorTrendResponse struct {
-	TesteeID   uint64            `json:"testee_id"`   // 受试者ID
+	TesteeID   string            `json:"testee_id"`   // 受试者ID
 	FactorCode string            `json:"factor_code"` // 因子编码
 	FactorName string            `json:"factor_name"` // 因子名称
 	DataPoints []*TrendDataPoint `json:"data_points"` // 数据点列表
@@ -100,14 +100,14 @@ type FactorTrendResponse struct {
 
 // TrendDataPoint 趋势数据点
 type TrendDataPoint struct {
-	AssessmentID uint64  `json:"assessment_id"` // 测评ID
+	AssessmentID string  `json:"assessment_id"` // 测评ID
 	RawScore     float64 `json:"raw_score"`     // 得分
 	RiskLevel    string  `json:"risk_level"`    // 风险等级
 }
 
 // HighRiskFactorsResponse 高风险因子响应
 type HighRiskFactorsResponse struct {
-	AssessmentID    uint64             `json:"assessment_id"`     // 测评ID
+	AssessmentID    string             `json:"assessment_id"`     // 测评ID
 	HasHighRisk     bool               `json:"has_high_risk"`     // 是否存在高风险
 	HighRiskFactors []*FactorScoreItem `json:"high_risk_factors"` // 高风险因子列表
 	NeedsUrgentCare bool               `json:"needs_urgent_care"` // 是否需要紧急关注
@@ -117,7 +117,7 @@ type HighRiskFactorsResponse struct {
 
 // ReportResponse 报告响应
 type ReportResponse struct {
-	AssessmentID uint64           `json:"assessment_id"` // 测评ID
+	AssessmentID string           `json:"assessment_id"` // 测评ID
 	ScaleName    string           `json:"scale_name"`    // 量表名称
 	ScaleCode    string           `json:"scale_code"`    // 量表编码
 	TotalScore   float64          `json:"total_score"`   // 总分
@@ -161,26 +161,33 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 		return nil
 	}
 
+	// 转换 ID 字段为字符串
+	idStr := fmt.Sprintf("%d", result.ID)
+	orgIDStr := fmt.Sprintf("%d", result.OrgID)
+	testeeIDStr := fmt.Sprintf("%d", result.TesteeID)
+	answerSheetIDStr := fmt.Sprintf("%d", result.AnswerSheetID)
+
+	var medicalScaleIDStr *string
+	if result.MedicalScaleID != nil {
+		s := fmt.Sprintf("%d", *result.MedicalScaleID)
+		medicalScaleIDStr = &s
+	}
+
 	resp := &AssessmentResponse{
-		ID:                   result.ID,
-		OrgID:                result.OrgID,
-		TesteeID:             result.TesteeID,
+		ID:                   idStr,
+		OrgID:                orgIDStr,
+		TesteeID:             testeeIDStr,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        result.AnswerSheetID,
-		MedicalScaleID:       result.MedicalScaleID,
+		AnswerSheetID:        answerSheetIDStr,
+		MedicalScaleID:       medicalScaleIDStr,
 		MedicalScaleCode:     result.MedicalScaleCode,
 		MedicalScaleName:     result.MedicalScaleName,
 		OriginType:           result.OriginType,
 		OriginID:             result.OriginID,
 		Status:               result.Status,
+		TotalScore:           result.TotalScore,
 		RiskLevel:            result.RiskLevel,
-	}
-
-	// 格式化总分
-	if result.TotalScore != nil {
-		scoreStr := formatFloat(*result.TotalScore)
-		resp.TotalScore = &scoreStr
 	}
 
 	// 格式化时间
@@ -255,11 +262,17 @@ func NewBatchEvaluationResponse(result *engine.BatchResult) *BatchEvaluationResp
 		return nil
 	}
 
+	// 转换失败的 ID 列表为字符串
+	failedIDs := make([]string, 0, len(result.FailedIDs))
+	for _, id := range result.FailedIDs {
+		failedIDs = append(failedIDs, fmt.Sprintf("%d", id))
+	}
+
 	return &BatchEvaluationResponse{
 		TotalCount:   result.TotalCount,
 		SuccessCount: result.SuccessCount,
 		FailedCount:  result.FailedCount,
-		FailedIDs:    result.FailedIDs,
+		FailedIDs:    failedIDs,
 	}
 }
 
@@ -283,7 +296,7 @@ func NewScoreResponse(result *assessment.ScoreResult) *ScoreResponse {
 	}
 
 	return &ScoreResponse{
-		AssessmentID: result.AssessmentID,
+		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
 		TotalScore:   result.TotalScore,
 		RiskLevel:    result.RiskLevel,
 		FactorScores: factorScores,
@@ -299,14 +312,14 @@ func NewFactorTrendResponse(result *assessment.FactorTrendResult) *FactorTrendRe
 	dataPoints := make([]*TrendDataPoint, 0, len(result.DataPoints))
 	for _, dp := range result.DataPoints {
 		dataPoints = append(dataPoints, &TrendDataPoint{
-			AssessmentID: dp.AssessmentID,
+			AssessmentID: fmt.Sprintf("%d", dp.AssessmentID),
 			RawScore:     dp.RawScore,
 			RiskLevel:    dp.RiskLevel,
 		})
 	}
 
 	return &FactorTrendResponse{
-		TesteeID:   result.TesteeID,
+		TesteeID:   fmt.Sprintf("%d", result.TesteeID),
 		FactorCode: result.FactorCode,
 		FactorName: result.FactorName,
 		DataPoints: dataPoints,
@@ -333,7 +346,7 @@ func NewHighRiskFactorsResponse(result *assessment.HighRiskFactorsResult) *HighR
 	}
 
 	return &HighRiskFactorsResponse{
-		AssessmentID:    result.AssessmentID,
+		AssessmentID:    fmt.Sprintf("%d", result.AssessmentID),
 		HasHighRisk:     result.HasHighRisk,
 		HighRiskFactors: factors,
 		NeedsUrgentCare: result.NeedsUrgentCare,
@@ -358,7 +371,7 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 	}
 
 	return &ReportResponse{
-		AssessmentID: result.AssessmentID,
+		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
 		ScaleName:    result.ScaleName,
 		ScaleCode:    result.ScaleCode,
 		TotalScore:   result.TotalScore,
@@ -388,9 +401,4 @@ func NewReportListResponse(result *assessment.ReportListResult) *ReportListRespo
 		PageSize:   result.PageSize,
 		TotalPages: result.TotalPages,
 	}
-}
-
-// formatFloat 格式化浮点数
-func formatFloat(f float64) string {
-	return fmt.Sprintf("%.2f", f)
 }

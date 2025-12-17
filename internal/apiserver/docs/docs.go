@@ -57,7 +57,7 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "填写人ID",
                         "name": "filler_id",
                         "in": "query"
@@ -170,7 +170,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "答卷ID",
                         "name": "id",
                         "in": "path",
@@ -282,7 +282,7 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "受试者ID筛选",
                         "name": "testee_id",
                         "in": "query"
@@ -374,7 +374,7 @@ const docTemplate = `{
                 "summary": "获取测评详情",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
@@ -415,7 +415,7 @@ const docTemplate = `{
                 "summary": "获取高风险因子",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
@@ -456,7 +456,7 @@ const docTemplate = `{
                 "summary": "获取测评报告",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
@@ -497,7 +497,7 @@ const docTemplate = `{
                 "summary": "重试失败的测评",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
@@ -538,7 +538,7 @@ const docTemplate = `{
                 "summary": "获取测评得分",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
@@ -625,7 +625,7 @@ const docTemplate = `{
                 "summary": "查询报告列表",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "受试者ID",
                         "name": "testee_id",
                         "in": "query",
@@ -680,7 +680,7 @@ const docTemplate = `{
                 "summary": "获取因子趋势",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "受试者ID",
                         "name": "testee_id",
                         "in": "query",
@@ -2355,7 +2355,7 @@ const docTemplate = `{
                 "summary": "查询员工列表",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "机构ID",
                         "name": "org_id",
                         "in": "query",
@@ -2458,7 +2458,7 @@ const docTemplate = `{
                 "summary": "获取员工详情",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "员工ID",
                         "name": "id",
                         "in": "path",
@@ -2496,7 +2496,7 @@ const docTemplate = `{
                 "summary": "删除员工",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "员工ID",
                         "name": "id",
                         "in": "path",
@@ -2524,7 +2524,7 @@ const docTemplate = `{
                 "summary": "查询受试者列表",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "机构ID",
                         "name": "org_id",
                         "in": "query",
@@ -2590,7 +2590,7 @@ const docTemplate = `{
                 "summary": "获取受试者详情",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "受试者ID",
                         "name": "id",
                         "in": "path",
@@ -2631,7 +2631,7 @@ const docTemplate = `{
                 "summary": "更新受试者",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "受试者ID",
                         "name": "id",
                         "in": "path",
@@ -2680,7 +2680,7 @@ const docTemplate = `{
                 "summary": "获取受试者周期统计",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Testee ID",
                         "name": "id",
                         "in": "path",
@@ -2732,7 +2732,7 @@ const docTemplate = `{
                 "summary": "获取受试者量表分析结果",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Testee ID",
                         "name": "id",
                         "in": "path",
@@ -3326,7 +3326,7 @@ const docTemplate = `{
             "properties": {
                 "answer_sheet_id": {
                     "description": "答卷ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "failed_at": {
                     "type": "string"
@@ -3336,7 +3336,7 @@ const docTemplate = `{
                 },
                 "id": {
                     "description": "测评ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "interpreted_at": {
                     "type": "string"
@@ -3347,7 +3347,7 @@ const docTemplate = `{
                 },
                 "medical_scale_id": {
                     "description": "量表ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "medical_scale_name": {
                     "description": "量表名称",
@@ -3355,7 +3355,7 @@ const docTemplate = `{
                 },
                 "org_id": {
                     "description": "组织ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "origin_id": {
                     "description": "来源ID",
@@ -3387,11 +3387,11 @@ const docTemplate = `{
                 },
                 "testee_id": {
                     "description": "受试者ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "total_score": {
-                    "description": "总分（格式化后的字符串）",
-                    "type": "string"
+                    "description": "总分",
+                    "type": "number"
                 }
             }
         },
@@ -3466,7 +3466,7 @@ const docTemplate = `{
                     "description": "失败的测评ID列表",
                     "type": "array",
                     "items": {
-                        "type": "integer"
+                        "type": "string"
                     }
                 },
                 "success_count": {
@@ -3595,7 +3595,7 @@ const docTemplate = `{
                 },
                 "testee_id": {
                     "description": "受试者ID",
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -3618,7 +3618,7 @@ const docTemplate = `{
             "properties": {
                 "assessment_id": {
                     "description": "测评ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "has_high_risk": {
                     "description": "是否存在高风险",
@@ -3678,7 +3678,7 @@ const docTemplate = `{
                 },
                 "project_id": {
                     "description": "项目ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "project_name": {
                     "description": "项目名称",
@@ -3730,7 +3730,7 @@ const docTemplate = `{
             "properties": {
                 "assessment_id": {
                     "description": "关联的测评ID（如已完成）",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "completed_at": {
                     "description": "完成时间",
@@ -3835,7 +3835,7 @@ const docTemplate = `{
             "properties": {
                 "assessment_id": {
                     "description": "测评ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "conclusion": {
                     "description": "总结论",
@@ -3993,7 +3993,7 @@ const docTemplate = `{
             "properties": {
                 "assessment_id": {
                     "description": "测评ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "factors": {
                     "description": "各因子得分",
@@ -4029,7 +4029,7 @@ const docTemplate = `{
                 },
                 "scale_id": {
                     "description": "量表ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "scale_name": {
                     "description": "量表名称",
@@ -4049,7 +4049,7 @@ const docTemplate = `{
             "properties": {
                 "assessment_id": {
                     "description": "测评ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "factor_scores": {
                     "description": "因子得分列表",
@@ -4109,7 +4109,7 @@ const docTemplate = `{
                 },
                 "id": {
                     "description": "ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "is_active": {
                     "description": "是否激活",
@@ -4121,7 +4121,7 @@ const docTemplate = `{
                 },
                 "org_id": {
                     "description": "机构ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "phone": {
                     "description": "电话",
@@ -4140,7 +4140,7 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "description": "用户ID",
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -4204,11 +4204,11 @@ const docTemplate = `{
                 },
                 "iam_child_id": {
                     "description": "IAM儿童ID（已废弃，向后兼容，等同于ProfileID）",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "id": {
                     "description": "ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "is_key_focus": {
                     "description": "是否重点关注",
@@ -4220,11 +4220,11 @@ const docTemplate = `{
                 },
                 "org_id": {
                     "description": "机构ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "profile_id": {
                     "description": "用户档案ID（新字段）",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "source": {
                     "description": "来源",
@@ -4248,7 +4248,7 @@ const docTemplate = `{
             "properties": {
                 "assessment_id": {
                     "description": "测评ID",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "raw_score": {
                     "description": "得分",

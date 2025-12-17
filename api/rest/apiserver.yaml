@@ -69,7 +69,7 @@ paths:
         description: 问卷编码
         name: questionnaire_code
         in: query
-      - type: integer
+      - type: string
         description: 填写人ID
         name: filler_id
         in: query
@@ -136,7 +136,7 @@ paths:
         name: Authorization
         in: header
         required: true
-      - type: integer
+      - type: string
         description: 答卷ID
         name: id
         in: path
@@ -204,7 +204,7 @@ paths:
         description: 状态筛选
         name: status
         in: query
-      - type: integer
+      - type: string
         description: 受试者ID筛选
         name: testee_id
         in: query
@@ -260,7 +260,7 @@ paths:
       description: 根据ID获取测评详细信息
       operationId: 获取测评详情
       parameters:
-      - type: integer
+      - type: string
         description: 测评ID
         name: id
         in: path
@@ -285,7 +285,7 @@ paths:
       description: 获取指定测评的高风险因子列表
       operationId: 获取高风险因子
       parameters:
-      - type: integer
+      - type: string
         description: 测评ID
         name: id
         in: path
@@ -310,7 +310,7 @@ paths:
       description: 获取指定测评的解读报告
       operationId: 获取测评报告
       parameters:
-      - type: integer
+      - type: string
         description: 测评ID
         name: id
         in: path
@@ -335,7 +335,7 @@ paths:
       description: 重试指定测评的评估流程
       operationId: 重试失败的测评
       parameters:
-      - type: integer
+      - type: string
         description: 测评ID
         name: id
         in: path
@@ -360,7 +360,7 @@ paths:
       description: 获取指定测评的得分详情
       operationId: 获取测评得分
       parameters:
-      - type: integer
+      - type: string
         description: 测评ID
         name: id
         in: path
@@ -410,7 +410,7 @@ paths:
       description: 查询指定受试者的报告列表
       operationId: 查询报告列表
       parameters:
-      - type: integer
+      - type: string
         description: 受试者ID
         name: testee_id
         in: query
@@ -445,7 +445,7 @@ paths:
       description: 获取指定受试者某因子的历史得分趋势
       operationId: 获取因子趋势
       parameters:
-      - type: integer
+      - type: string
         description: 受试者ID
         name: testee_id
         in: query
@@ -1448,7 +1448,7 @@ paths:
       summary: 查询员工列表
       operationId: 查询员工列表
       parameters:
-      - type: integer
+      - type: string
         description: 机构ID
         name: org_id
         in: query
@@ -1509,7 +1509,7 @@ paths:
       summary: 获取员工详情
       operationId: 获取员工详情
       parameters:
-      - type: integer
+      - type: string
         description: 员工ID
         name: id
         in: path
@@ -1532,7 +1532,7 @@ paths:
       summary: 删除员工
       operationId: 删除员工
       parameters:
-      - type: integer
+      - type: string
         description: 员工ID
         name: id
         in: path
@@ -1551,7 +1551,7 @@ paths:
       summary: 查询受试者列表
       operationId: 查询受试者列表
       parameters:
-      - type: integer
+      - type: string
         description: 机构ID
         name: org_id
         in: query
@@ -1593,7 +1593,7 @@ paths:
       summary: 获取受试者详情
       operationId: 获取受试者详情
       parameters:
-      - type: integer
+      - type: string
         description: 受试者ID
         name: id
         in: path
@@ -1616,7 +1616,7 @@ paths:
       summary: 更新受试者
       operationId: 更新受试者
       parameters:
-      - type: integer
+      - type: string
         description: 受试者ID
         name: id
         in: path
@@ -1646,7 +1646,7 @@ paths:
       summary: 获取受试者周期统计
       operationId: 获取受试者周期统计
       parameters:
-      - type: integer
+      - type: string
         description: Testee ID
         name: id
         in: path
@@ -1682,7 +1682,7 @@ paths:
       summary: 获取受试者量表分析结果
       operationId: 获取受试者量表分析结果
       parameters:
-      - type: integer
+      - type: string
         description: Testee ID
         name: id
         in: path
@@ -2084,14 +2084,14 @@ components:
       properties:
         answer_sheet_id:
           description: 答卷ID
-          type: integer
+          type: string
         failed_at:
           type: string
         failure_reason:
           type: string
         id:
           description: 测评ID
-          type: integer
+          type: string
         interpreted_at:
           type: string
         medical_scale_code:
@@ -2099,13 +2099,13 @@ components:
           type: string
         medical_scale_id:
           description: 量表ID
-          type: integer
+          type: string
         medical_scale_name:
           description: 量表名称
           type: string
         org_id:
           description: 组织ID
-          type: integer
+          type: string
         origin_id:
           description: 来源ID
           type: string
@@ -2129,10 +2129,10 @@ components:
           type: string
         testee_id:
           description: 受试者ID
-          type: integer
-        total_score:
-          description: 总分（格式化后的字符串）
           type: string
+        total_score:
+          description: 总分
+          type: number
     response.AssessmentStatisticsResponse:
       type: object
       properties:
@@ -2186,7 +2186,7 @@ components:
           description: 失败的测评ID列表
           type: array
           items:
-            type: integer
+            type: string
         success_count:
           description: 成功数
           type: integer
@@ -2276,7 +2276,7 @@ components:
           type: string
         testee_id:
           description: 受试者ID
-          type: integer
+          type: string
     response.GuardianResponse:
       type: object
       properties:
@@ -2291,7 +2291,7 @@ components:
       properties:
         assessment_id:
           description: 测评ID
-          type: integer
+          type: string
         has_high_risk:
           description: 是否存在高风险
           type: boolean
@@ -2333,7 +2333,7 @@ components:
           type: string
         project_id:
           description: 项目ID
-          type: integer
+          type: string
         project_name:
           description: 项目名称
           type: string
@@ -2370,7 +2370,7 @@ components:
       properties:
         assessment_id:
           description: 关联的测评ID（如已完成）
-          type: integer
+          type: string
         completed_at:
           description: 完成时间
           type: string
@@ -2442,7 +2442,7 @@ components:
       properties:
         assessment_id:
           description: 测评ID
-          type: integer
+          type: string
         conclusion:
           description: 总结论
           type: string
@@ -2552,7 +2552,7 @@ components:
       properties:
         assessment_id:
           description: 测评ID
-          type: integer
+          type: string
         factors:
           description: 各因子得分
           type: array
@@ -2578,7 +2578,7 @@ components:
           type: string
         scale_id:
           description: 量表ID
-          type: integer
+          type: string
         scale_name:
           description: 量表名称
           type: string
@@ -2592,7 +2592,7 @@ components:
       properties:
         assessment_id:
           description: 测评ID
-          type: integer
+          type: string
         factor_scores:
           description: 因子得分列表
           type: array
@@ -2635,7 +2635,7 @@ components:
           type: string
         id:
           description: ID
-          type: integer
+          type: string
         is_active:
           description: 是否激活
           type: boolean
@@ -2644,7 +2644,7 @@ components:
           type: string
         org_id:
           description: 机构ID
-          type: integer
+          type: string
         phone:
           description: 电话
           type: string
@@ -2658,7 +2658,7 @@ components:
           type: string
         user_id:
           description: 用户ID
-          type: integer
+          type: string
     response.TesteeListResponse:
       type: object
       properties:
@@ -2702,10 +2702,10 @@ components:
             $ref: '#/components/schemas/response.GuardianResponse'
         iam_child_id:
           description: IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
-          type: integer
+          type: string
         id:
           description: ID
-          type: integer
+          type: string
         is_key_focus:
           description: 是否重点关注
           type: boolean
@@ -2714,10 +2714,10 @@ components:
           type: string
         org_id:
           description: 机构ID
-          type: integer
+          type: string
         profile_id:
           description: 用户档案ID（新字段）
-          type: integer
+          type: string
         source:
           description: 来源
           type: string
@@ -2734,7 +2734,7 @@ components:
       properties:
         assessment_id:
           description: 测评ID
-          type: integer
+          type: string
         raw_score:
           description: 得分
           type: number

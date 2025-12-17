@@ -4,10 +4,10 @@ import "time"
 
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
-	ID              uint64                   `json:"id"`                         // ID
-	OrgID           int64                    `json:"org_id"`                     // 机构ID
-	ProfileID       *uint64                  `json:"profile_id,omitempty"`       // 用户档案ID（新字段）
-	IAMChildID      *uint64                  `json:"iam_child_id,omitempty"`     // IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
+	ID              string                   `json:"id"`                         // ID
+	OrgID           string                   `json:"org_id"`                     // 机构ID
+	ProfileID       *string                  `json:"profile_id,omitempty"`       // 用户档案ID（新字段）
+	IAMChildID      *string                  `json:"iam_child_id,omitempty"`     // IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
 	Name            string                   `json:"name"`                       // 姓名
 	Gender          string                   `json:"gender,omitempty"`           // 性别
 	Birthday        *time.Time               `json:"birthday,omitempty"`         // 出生日期
@@ -45,9 +45,9 @@ type TesteeListResponse struct {
 
 // StaffResponse 员工响应
 type StaffResponse struct {
-	ID        uint64    `json:"id"`              // ID
-	OrgID     int64     `json:"org_id"`          // 机构ID
-	UserID    int64     `json:"user_id"`         // 用户ID
+	ID        string    `json:"id"`              // ID
+	OrgID     string    `json:"org_id"`          // 机构ID
+	UserID    string    `json:"user_id"`         // 用户ID
 	Roles     []string  `json:"roles"`           // 角色列表
 	Name      string    `json:"name"`            // 姓名
 	Email     string    `json:"email,omitempty"` // 邮箱

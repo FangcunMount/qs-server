@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -58,7 +59,7 @@ func NewActorHandler(
 // @Summary 获取受试者详情
 // @Tags Actor
 // @Produce json
-// @Param id path int true "受试者ID"
+// @Param id path string true "受试者ID"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
 // @Router /api/v1/testees/{id} [get]
 // GetTestee 获取受试者详情（后台管理接口，包含家长信息）
@@ -97,7 +98,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Summary 获取受试者量表分析结果
 // @Tags Testee
 // @Produce json
-// @Param id path int true "Testee ID"
+// @Param id path string true "Testee ID"
 // @Success 200 {object} core.Response{data=response.ScaleAnalysisResponse}
 // @Failure 400 {object} core.Response
 // @Failure 404 {object} core.Response
@@ -140,7 +141,7 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 // @Summary 获取受试者周期统计
 // @Tags Testee
 // @Produce json
-// @Param id path int true "Testee ID"
+// @Param id path string true "Testee ID"
 // @Success 200 {object} core.Response{data=response.PeriodicStatsResponse}
 // @Failure 400 {object} core.Response
 // @Failure 404 {object} core.Response
@@ -186,7 +187,7 @@ func (h *ActorHandler) GetPeriodicStats(c *gin.Context) {
 // @Tags Actor
 // @Accept json
 // @Produce json
-// @Param id path int true "受试者ID"
+// @Param id path string true "受试者ID"
 // @Param body body request.UpdateTesteeRequest true "更新受试者请求"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
 // @Router /api/v1/testees/{id} [put]
@@ -276,7 +277,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Summary 查询受试者列表
 // @Tags Actor
 // @Produce json
-// @Param org_id query int true "机构ID"
+// @Param org_id query string true "机构ID"
 // @Param name query string false "姓名（模糊匹配）"
 // @Param is_key_focus query bool false "是否重点关注"
 // @Param page query int false "页码" default(1)
@@ -371,7 +372,7 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 // @Summary 获取员工详情
 // @Tags Actor
 // @Produce json
-// @Param id path int true "员工ID"
+// @Param id path string true "员工ID"
 // @Success 200 {object} core.Response{data=response.StaffResponse}
 // @Router /api/v1/staff/{id} [get]
 func (h *ActorHandler) GetStaff(c *gin.Context) {
@@ -408,7 +409,7 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 // @Summary 删除员工
 // @Tags Actor
 // @Produce json
-// @Param id path int true "员工ID"
+// @Param id path string true "员工ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/staff/{id} [delete]
 func (h *ActorHandler) DeleteStaff(c *gin.Context) {
@@ -444,7 +445,7 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 // @Summary 查询员工列表
 // @Tags Actor
 // @Produce json
-// @Param org_id query int true "机构ID"
+// @Param org_id query string true "机构ID"
 // @Param role query string false "角色筛选"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
@@ -546,11 +547,20 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 		gender = "unknown"
 	}
 
+	// 转换 ID 字段为字符串
+	idStr := fmt.Sprintf("%d", result.ID)
+	orgIDStr := fmt.Sprintf("%d", result.OrgID)
+	var profileIDStr *string
+	if result.ProfileID != nil {
+		s := fmt.Sprintf("%d", *result.ProfileID)
+		profileIDStr = &s
+	}
+
 	resp := &response.TesteeResponse{
-		ID:         result.ID,
-		OrgID:      result.OrgID,
-		ProfileID:  result.ProfileID,
-		IAMChildID: result.ProfileID, // 向后兼容：使用 ProfileID 填充
+		ID:         idStr,
+		OrgID:      orgIDStr,
+		ProfileID:  profileIDStr,
+		IAMChildID: profileIDStr, // 向后兼容：使用 ProfileID 填充
 		Name:       result.Name,
 		Gender:     gender,
 		Birthday:   result.Birthday,
@@ -627,9 +637,9 @@ func toRegisterStaffDTO(req *request.CreateStaffRequest) staffApp.RegisterStaffD
 // toStaffResponse 将应用层结果转换为响应
 func toStaffResponse(result *staffApp.StaffResult) *response.StaffResponse {
 	return &response.StaffResponse{
-		ID:       result.ID,
-		OrgID:    result.OrgID,
-		UserID:   result.UserID,
+		ID:       fmt.Sprintf("%d", result.ID),
+		OrgID:    fmt.Sprintf("%d", result.OrgID),
+		UserID:   fmt.Sprintf("%d", result.UserID),
 		Roles:    result.Roles,
 		Name:     result.Name,
 		Email:    result.Email,

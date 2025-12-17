@@ -40,7 +40,7 @@
 | `placeholder` | string | 否 | 占位符（仅文本类题型使用） |
 | `options` | array | 否 | 选项列表（仅选择题使用） |
 | `validation_rules` | array | 否 | 校验规则列表 |
-| `calculation_rule` | object | 否 | 算分规则（暂不使用） |
+| `calculation_rule` | object | 否 | 算分规则（可选，见下方说明） |
 | `show_controller` | object | 否 | 显示控制器（路由规则），用于控制问题的显示条件 |
 
 ### question_type（问题类型）
@@ -113,6 +113,14 @@
 |--------|------|------|------|
 | `code` | string | 是 | 条件问题编码（引用其他问题的编码） |
 | `select_option_codes` | array | 是 | 选中的选项编码列表。对于单选题，数组长度为 1；对于多选题，数组长度 >= 1 |
+
+### CalculationRuleDTO（算分规则对象）
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `formula_type` | string | 是 | 公式类型，可选值：`score`（选项分值）、`sum`（求和）、`avg`（平均值）、`max`（最大值）、`min`（最小值） |
+
+**注意：** 算分规则主要用于量表类问卷，普通调查问卷通常不需要配置此字段。
 
 **显示控制器逻辑说明：**
 
@@ -435,4 +443,3 @@
 - 重排问题：`POST /api/v1/questionnaires/{code}/questions/reorder`
 
 以上接口的参数格式与批量更新接口保持一致。
-

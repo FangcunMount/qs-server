@@ -40,7 +40,7 @@ func NewAnswerSheetHandler(
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path int true "答卷ID"
+// @Param id path string true "答卷ID"
 // @Success 200 {object} core.Response{data=response.AnswerSheetResponse}
 // @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
@@ -69,7 +69,7 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
 // @Param questionnaire_code query string false "问卷编码"
-// @Param filler_id query int false "填写人ID"
+// @Param filler_id query string false "填写人ID"
 // @Param start_time query string false "开始时间"
 // @Param end_time query string false "结束时间"
 // @Success 200 {object} core.Response{data=response.AnswerSheetListResponse}

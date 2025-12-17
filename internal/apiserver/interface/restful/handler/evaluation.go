@@ -47,7 +47,7 @@ func NewEvaluationHandler(
 // @Description 根据ID获取测评详细信息
 // @Tags Evaluation-Assessment
 // @Produce json
-// @Param id path int true "测评ID"
+// @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Router /api/v1/evaluations/assessments/{id} [get]
 func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
@@ -75,7 +75,7 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
 // @Param status query string false "状态筛选"
-// @Param testee_id query int false "受试者ID筛选"
+// @Param testee_id query string false "受试者ID筛选"
 // @Success 200 {object} core.Response{data=response.AssessmentListResponse}
 // @Router /api/v1/evaluations/assessments [get]
 func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
@@ -173,7 +173,7 @@ func (h *EvaluationHandler) GetStatistics(c *gin.Context) {
 // @Description 获取指定测评的得分详情
 // @Tags Evaluation-Score
 // @Produce json
-// @Param id path int true "测评ID"
+// @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.ScoreResponse}
 // @Router /api/v1/evaluations/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetScores(c *gin.Context) {
@@ -198,7 +198,7 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 // @Description 获取指定受试者某因子的历史得分趋势
 // @Tags Evaluation-Score
 // @Produce json
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID"
 // @Param factor_code query string true "因子编码"
 // @Param limit query int false "返回记录数限制" default(10)
 // @Success 200 {object} core.Response{data=response.FactorTrendResponse}
@@ -235,7 +235,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Description 获取指定测评的高风险因子列表
 // @Tags Evaluation-Score
 // @Produce json
-// @Param id path int true "测评ID"
+// @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.HighRiskFactorsResponse}
 // @Router /api/v1/evaluations/assessments/{id}/high-risk-factors [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
@@ -262,7 +262,7 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Description 获取指定测评的解读报告
 // @Tags Evaluation-Report
 // @Produce json
-// @Param id path int true "测评ID"
+// @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.ReportResponse}
 // @Router /api/v1/evaluations/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetReport(c *gin.Context) {
@@ -287,7 +287,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 // @Description 查询指定受试者的报告列表
 // @Tags Evaluation-Report
 // @Produce json
-// @Param testee_id query int true "受试者ID"
+// @Param testee_id query string true "受试者ID"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
 // @Success 200 {object} core.Response{data=response.ReportListResponse}
@@ -355,7 +355,7 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 // @Description 重试指定测评的评估流程
 // @Tags Evaluation-Admin
 // @Produce json
-// @Param id path int true "测评ID"
+// @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Router /api/v1/evaluations/assessments/{id}/retry [post]
 func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
