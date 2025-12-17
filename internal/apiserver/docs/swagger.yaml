@@ -1046,6 +1046,10 @@ definitions:
       question_type:
         description: 问题题型：single_choice, multi_choice, text 等
         type: string
+      show_controller:
+        allOf:
+        - $ref: '#/definitions/viewmodel.ShowControllerDTO'
+        description: 显示控制器（可选项）
       stem:
         description: 问题题干
         type: string
@@ -1057,6 +1061,28 @@ definitions:
         items:
           $ref: '#/definitions/viewmodel.ValidationRuleDTO'
         type: array
+    type: object
+  viewmodel.ShowControllerConditionDTO:
+    properties:
+      code:
+        description: 问题编码
+        type: string
+      select_option_codes:
+        description: 选中的选项编码列表
+        items:
+          type: string
+        type: array
+    type: object
+  viewmodel.ShowControllerDTO:
+    properties:
+      questions:
+        description: 条件问题列表
+        items:
+          $ref: '#/definitions/viewmodel.ShowControllerConditionDTO'
+        type: array
+      rule:
+        description: 逻辑规则：and 或 or
+        type: string
     type: object
   viewmodel.ValidationRuleDTO:
     properties:

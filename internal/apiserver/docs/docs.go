@@ -4331,6 +4331,14 @@ const docTemplate = `{
                     "description": "问题题型：single_choice, multi_choice, text 等",
                     "type": "string"
                 },
+                "show_controller": {
+                    "description": "显示控制器（可选项）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/viewmodel.ShowControllerDTO"
+                        }
+                    ]
+                },
                 "stem": {
                     "description": "问题题干",
                     "type": "string"
@@ -4345,6 +4353,38 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/viewmodel.ValidationRuleDTO"
                     }
+                }
+            }
+        },
+        "viewmodel.ShowControllerConditionDTO": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "问题编码",
+                    "type": "string"
+                },
+                "select_option_codes": {
+                    "description": "选中的选项编码列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "viewmodel.ShowControllerDTO": {
+            "type": "object",
+            "properties": {
+                "questions": {
+                    "description": "条件问题列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/viewmodel.ShowControllerConditionDTO"
+                    }
+                },
+                "rule": {
+                    "description": "逻辑规则：and 或 or",
+                    "type": "string"
                 }
             }
         },
