@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
@@ -474,6 +475,13 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 			}
 		}
 
+		// 转换 calculation_rule
+		var calculationRule *calculation.CalculationRule
+		if q.CalculationRule != nil && q.CalculationRule.FormulaType != "" {
+			formulaType := calculation.FormulaType(q.CalculationRule.FormulaType)
+			calculationRule = calculation.NewCalculationRule(formulaType, []string{})
+		}
+
 		// 转换 show_controller
 		var showController *domainQuestionnaire.ShowController
 		if q.ShowController != nil {
@@ -499,6 +507,7 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 			Required:        required, // 从 validation_rules 中判断（兼容性字段）
 			Description:     q.Tips,
 			ValidationRules: validationRules,
+			CalculationRule: calculationRule,
 			ShowController:  showController,
 		})
 	}

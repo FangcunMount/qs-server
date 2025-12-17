@@ -40,13 +40,6 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 			ShowController:  m.mapShowController(questionBO.GetShowController()),
 		}
 
-		// 处理计算规则（可能为nil）
-		if rule := questionBO.GetCalculationRule(); rule != nil {
-			questionPO.CalculationRule = CalculationRulePO{
-				Formula: string(rule.GetFormula()),
-			}
-		}
-
 		po.Questions = append(po.Questions, questionPO)
 	}
 

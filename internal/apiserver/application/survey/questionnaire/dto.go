@@ -1,6 +1,7 @@
 package questionnaire
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 )
@@ -65,6 +66,7 @@ type QuestionDTO struct {
 	Required        bool                          // 是否必填
 	Description     string                        // 问题描述
 	ValidationRules []validation.ValidationRule   // 校验规则
+	CalculationRule *calculation.CalculationRule // 计算规则
 	ShowController  *questionnaire.ShowController // 显示控制器
 }
 
