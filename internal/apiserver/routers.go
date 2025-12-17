@@ -200,6 +200,7 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		scales.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
 
 		// 查询接口
+		scales.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
 		scales.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
 		scales.GET("", scaleHandler.List)                                    // 获取量表列表
 		scales.GET("/by-questionnaire", scaleHandler.GetByQuestionnaireCode) // 根据问卷获取量表

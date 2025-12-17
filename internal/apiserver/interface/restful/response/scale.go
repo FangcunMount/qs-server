@@ -167,3 +167,20 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 		PageSize:   pageSize,
 	}
 }
+
+// FactorListResponse 因子列表响应
+type FactorListResponse struct {
+	Factors []FactorResponse `json:"factors"`
+}
+
+// NewFactorListResponse 从应用层 FactorResult 列表创建因子列表响应
+func NewFactorListResponse(factors []scale.FactorResult) *FactorListResponse {
+	factorResponses := make([]FactorResponse, 0, len(factors))
+	for _, f := range factors {
+		factorResponses = append(factorResponses, newFactorResponse(f))
+	}
+
+	return &FactorListResponse{
+		Factors: factorResponses,
+	}
+}

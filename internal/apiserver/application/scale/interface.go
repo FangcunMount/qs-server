@@ -101,4 +101,8 @@ type ScaleQueryService interface {
 	// ListPublished 查询已发布量表摘要列表（轻量级，不包含因子详情）
 	// 场景：浏览可用的量表列表
 	ListPublished(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error)
+
+	// GetFactors 获取量表的因子列表
+	// 场景：查询指定量表的所有因子
+	GetFactors(ctx context.Context, scaleCode string) ([]FactorResult, error)
 }

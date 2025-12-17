@@ -136,3 +136,26 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 
 	return toSummaryListResult(items, total), nil
 }
+
+// GetFactors 获取量表的因子列表
+func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]FactorResult, error) {
+	// 1. 验证输入参数
+	if scaleCode == "" {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表编码不能为空")
+	}
+
+	// 2. 从仓储获取量表
+	m, err := s.repo.FindByCode(ctx, scaleCode)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	}
+
+	// 3. 转换因子列表
+	factors := m.GetFactors()
+	result := make([]FactorResult, 0, len(factors))
+	for _, factor := range factors {
+		result = append(result, toFactorResult(factor))
+	}
+
+	return result, nil
+}

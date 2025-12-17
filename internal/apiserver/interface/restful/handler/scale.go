@@ -528,6 +528,32 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 	h.Success(c, response.NewScaleSummaryListResponse(result, page, pageSize))
 }
 
+// GetFactors 获取量表的因子列表
+// @Summary 获取量表的因子列表
+// @Description 根据量表编码获取该量表的所有因子
+// @Tags Scale-Query
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param code path string true "量表编码"
+// @Success 200 {object} core.Response{data=response.FactorListResponse}
+// @Router /api/v1/scales/{code}/factors [get]
+func (h *ScaleHandler) GetFactors(c *gin.Context) {
+	scaleCode := c.Param("code")
+	if scaleCode == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		return
+	}
+
+	factors, err := h.queryService.GetFactors(c.Request.Context(), scaleCode)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, response.NewFactorListResponse(factors))
+}
+
 // ============= Helper Functions =============
 
 // toInterpretRuleDTOs 转换解读规则请求为 DTO
