@@ -25,7 +25,7 @@ type FactorResponse struct {
 	IsTotalScore    bool                    `json:"is_total_score"`
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
-	ScoringParams   map[string]string       `json:"scoring_params,omitempty"`
+	ScoringParams   map[string]interface{} `json:"scoring_params,omitempty"`
 	InterpretRules  []InterpretRuleResponse `json:"interpret_rules,omitempty"`
 }
 

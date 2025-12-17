@@ -20,14 +20,14 @@ type ScaleResult struct {
 
 // FactorResult 因子结果
 type FactorResult struct {
-	Code            string                // 因子编码
-	Title           string                // 因子标题
-	FactorType      string                // 因子类型
-	IsTotalScore    bool                  // 是否为总分因子
-	QuestionCodes   []string              // 关联的题目编码列表
-	ScoringStrategy string                // 计分策略
-	ScoringParams   map[string]string     // 计分参数
-	InterpretRules  []InterpretRuleResult // 解读规则列表
+	Code            string                 // 因子编码
+	Title           string                 // 因子标题
+	FactorType      string                 // 因子类型
+	IsTotalScore    bool                   // 是否为总分因子
+	QuestionCodes   []string               // 关联的题目编码列表
+	ScoringStrategy string                 // 计分策略
+	ScoringParams   map[string]interface{} // 计分参数
+	InterpretRules  []InterpretRuleResult  // 解读规则列表
 }
 
 // InterpretRuleResult 解读规则结果
@@ -88,7 +88,7 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 
 // toFactorResult 将因子领域模型转换为结果对象
 func toFactorResult(f *scale.Factor) FactorResult {
-	// 转换计分参数为 map[string]string（用于结果输出）
+	// 转换计分参数为 map[string]interface{}（用于结果输出）
 	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
 
 	result := FactorResult{

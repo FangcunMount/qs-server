@@ -1705,7 +1705,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/by-questionnaire": {
             "get": {
-                "description": "根据关联的问卷编码获取量表",
+                "description": "根据关联的问卷编码获取量表。响应中的 scoring_params 为 map[string]interface{}，其中 raw_calc_rule 为结构化对象（包含 formula 和 AppendParams）",
                 "consumes": [
                     "application/json"
                 ],
@@ -1814,7 +1814,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/published/{code}": {
             "get": {
-                "description": "根据编码获取已发布的量表",
+                "description": "根据编码获取已发布的量表。响应中的 scoring_params 为 map[string]interface{}，其中 raw_calc_rule 为结构化对象（包含 formula 和 AppendParams）",
                 "consumes": [
                     "application/json"
                 ],
@@ -1865,7 +1865,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}": {
             "get": {
-                "description": "根据编码获取量表详情",
+                "description": "根据编码获取量表详情。响应中的 scoring_params 为 map[string]interface{}，其中 raw_calc_rule 为结构化对象（包含 formula 和 AppendParams）",
                 "consumes": [
                     "application/json"
                 ],
@@ -2064,7 +2064,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/factors": {
             "get": {
-                "description": "根据量表编码获取该量表的所有因子",
+                "description": "根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，其中 raw_calc_rule 为结构化对象（包含 formula 和 AppendParams）",
                 "consumes": [
                     "application/json"
                 ],
@@ -2115,7 +2115,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/factors/batch": {
             "put": {
-                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组）",
+                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组）\n响应中的 scoring_params 为 map[string]interface{}，其中 raw_calc_rule 为结构化对象",
                 "consumes": [
                     "application/json"
                 ],
@@ -3601,9 +3601,7 @@ const docTemplate = `{
                 },
                 "scoring_params": {
                     "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                    "additionalProperties": true
                 },
                 "scoring_strategy": {
                     "type": "string"

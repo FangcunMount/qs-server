@@ -53,7 +53,7 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 		questionCodes = append(questionCodes, qc.String())
 	}
 
-	// 转换计分参数为 map[string]string（用于持久化）
+	// 转换计分参数为 map[string]interface{}（用于持久化）
 	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
 	
 	return FactorPO{
@@ -139,7 +139,7 @@ func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
 	// 转换解读规则
 	interpretRules := m.mapInterpretRulesToDomain(po.InterpretRules)
 
-	// 从 map[string]string 恢复计分参数
+	// 从 map[string]interface{} 恢复计分参数
 	scoringParams := scale.ScoringParamsFromMap(po.ScoringParams, scale.ScoringStrategyCode(po.ScoringStrategy))
 	
 	// 创建因子

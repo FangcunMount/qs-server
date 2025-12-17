@@ -1,7 +1,5 @@
 package scale
 
-import "encoding/json"
-
 // ===================== 量表状态 =================
 
 // Status 量表状态
@@ -223,10 +221,10 @@ func (p *ScoringParams) GetCntOptionContents() []string {
 	return p.CntOptionContents
 }
 
-// ToMap 转换为 map[string]string（用于持久化）
+// ToMap 转换为 map[string]interface{}（用于持久化）
 // 根据计分策略构建相应的参数结构
-func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]string {
-	result := make(map[string]string)
+func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]interface{} {
+	result := make(map[string]interface{})
 
 	if p == nil {
 		return result
@@ -235,7 +233,7 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]string {
 	// 根据策略类型处理参数
 	switch strategy {
 	case ScoringStrategyCnt:
-		// 计数策略：构建 raw_calc_rule
+		// 计数策略：构建 raw_calc_rule 结构化对象
 		if len(p.CntOptionContents) > 0 {
 			rawCalcRule := map[string]interface{}{
 				"formula": "cnt",
@@ -243,11 +241,7 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]string {
 					"cnt_option_contents": p.CntOptionContents,
 				},
 			}
-
-			jsonBytes, err := json.Marshal(rawCalcRule)
-			if err == nil {
-				result["raw_calc_rule"] = string(jsonBytes)
-			}
+			result["raw_calc_rule"] = rawCalcRule
 		}
 
 	case ScoringStrategySum, ScoringStrategyAvg:
@@ -261,8 +255,8 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]string {
 	return result
 }
 
-// FromMap 从 map[string]string 创建（用于从持久化层恢复）
-func ScoringParamsFromMap(params map[string]string, strategy ScoringStrategyCode) *ScoringParams {
+// FromMap 从 map[string]interface{} 创建（用于从持久化层恢复）
+func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrategyCode) *ScoringParams {
 	if params == nil {
 		return NewScoringParams()
 	}
@@ -273,18 +267,19 @@ func ScoringParamsFromMap(params map[string]string, strategy ScoringStrategyCode
 	switch strategy {
 	case ScoringStrategyCnt:
 		// 从 raw_calc_rule 中提取 cnt_option_contents
-		if rawRule, exists := params["raw_calc_rule"]; exists && rawRule != "" {
-			var rule struct {
-				AppendParams map[string]interface{} `json:"AppendParams"`
-			}
-			if err := json.Unmarshal([]byte(rawRule), &rule); err == nil {
-				if contents, ok := rule.AppendParams["cnt_option_contents"]; ok {
-					if contentsArray, ok := contents.([]interface{}); ok {
-						result.CntOptionContents = make([]string, 0, len(contentsArray))
-						for _, item := range contentsArray {
-							if str, ok := item.(string); ok {
-								result.CntOptionContents = append(result.CntOptionContents, str)
+		if rawRule, exists := params["raw_calc_rule"]; exists && rawRule != nil {
+			if ruleMap, ok := rawRule.(map[string]interface{}); ok {
+				if appendParams, ok := ruleMap["AppendParams"].(map[string]interface{}); ok {
+					if contents, ok := appendParams["cnt_option_contents"]; ok {
+						if contentsArray, ok := contents.([]interface{}); ok {
+							result.CntOptionContents = make([]string, 0, len(contentsArray))
+							for _, item := range contentsArray {
+								if str, ok := item.(string); ok {
+									result.CntOptionContents = append(result.CntOptionContents, str)
+								}
 							}
+						} else if contentsArray, ok := contents.([]string); ok {
+							result.CntOptionContents = contentsArray
 						}
 					}
 				}

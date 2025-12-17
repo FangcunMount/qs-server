@@ -80,8 +80,8 @@ type FactorPO struct {
 	QuestionCodes []string `bson:"question_codes,omitempty" json:"question_codes,omitempty"`
 
 	// 计分策略配置
-	ScoringStrategy string            `bson:"scoring_strategy" json:"scoring_strategy"`
-	ScoringParams   map[string]string `bson:"scoring_params,omitempty" json:"scoring_params,omitempty"`
+	ScoringStrategy string                 `bson:"scoring_strategy" json:"scoring_strategy"`
+	ScoringParams   map[string]interface{} `bson:"scoring_params,omitempty" json:"scoring_params,omitempty"`
 
 	// 解读规则
 	InterpretRules []InterpretRulePO `bson:"interpret_rules,omitempty" json:"interpret_rules,omitempty"`
