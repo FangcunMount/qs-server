@@ -21,12 +21,12 @@ type QuestionnaireResult struct {
 
 // QuestionResult 问题结果
 type QuestionResult struct {
-	Code           string                      // 问题编码
-	Stem           string                      // 题干
-	Type           string                      // 问题类型
-	Options        []OptionResult              // 选项列表
-	Required       bool                        // 是否必填
-	Description    string                      // 问题描述
+	Code           string                        // 问题编码
+	Stem           string                        // 题干
+	Type           string                        // 问题类型
+	Options        []OptionResult                // 选项列表
+	Required       bool                          // 是否必填
+	Description    string                        // 问题描述
 	ShowController *questionnaire.ShowController // 显示控制器
 }
 
@@ -75,7 +75,7 @@ func toQuestionnaireResult(q *questionnaire.Questionnaire) *QuestionnaireResult 
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
 		ImgUrl:      q.GetImgUrl(),
-		Status:      string(q.GetStatus()),
+		Status:      q.GetStatus().String(),
 		Type:        q.GetType().String(),
 		Questions:   make([]QuestionResult, 0),
 	}
@@ -150,7 +150,7 @@ func toQuestionnaireSummaryResult(s *questionnaire.QuestionnaireSummary) *Questi
 		Title:         s.Title,
 		Description:   s.Description,
 		ImgUrl:        s.ImgUrl,
-		Status:        string(s.Status),
+		Status:        s.Status.String(),
 		Type:          s.Type.String(),
 		QuestionCount: s.QuestionCount,
 	}
