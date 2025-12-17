@@ -88,6 +88,9 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 
 // toFactorResult 将因子领域模型转换为结果对象
 func toFactorResult(f *scale.Factor) FactorResult {
+	// 转换计分参数为 map[string]string（用于结果输出）
+	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
+
 	result := FactorResult{
 		Code:            f.GetCode().String(),
 		Title:           f.GetTitle(),
@@ -95,7 +98,7 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		IsTotalScore:    f.IsTotalScore(),
 		QuestionCodes:   make([]string, 0),
 		ScoringStrategy: f.GetScoringStrategy().String(),
-		ScoringParams:   f.GetScoringParams(),
+		ScoringParams:   scoringParamsMap,
 		InterpretRules:  make([]InterpretRuleResult, 0),
 	}
 

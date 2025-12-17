@@ -1,5 +1,7 @@
 package scale
 
+import "encoding/json"
+
 // ===================== 量表状态 =================
 
 // Status 量表状态
@@ -185,4 +187,116 @@ func (r ScoreRange) Contains(score float64) bool {
 // IsValid 检查区间是否有效
 func (r ScoreRange) IsValid() bool {
 	return r.min <= r.max
+}
+
+// ===================== 计分参数 =================
+
+// ScoringParams 计分参数值对象
+// 根据不同的计分策略，使用不同的字段
+type ScoringParams struct {
+	// 计数策略（cnt）专用参数
+	CntOptionContents []string
+}
+
+// NewScoringParams 创建计分参数
+func NewScoringParams() *ScoringParams {
+	return &ScoringParams{
+		CntOptionContents: make([]string, 0),
+	}
+}
+
+// WithCntOptionContents 设置计数策略的选项内容列表
+func (p *ScoringParams) WithCntOptionContents(contents []string) *ScoringParams {
+	if contents == nil {
+		p.CntOptionContents = make([]string, 0)
+	} else {
+		p.CntOptionContents = contents
+	}
+	return p
+}
+
+// GetCntOptionContents 获取计数策略的选项内容列表
+func (p *ScoringParams) GetCntOptionContents() []string {
+	if p == nil {
+		return nil
+	}
+	return p.CntOptionContents
+}
+
+// ToMap 转换为 map[string]string（用于持久化）
+// 根据计分策略构建相应的参数结构
+func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]string {
+	result := make(map[string]string)
+
+	if p == nil {
+		return result
+	}
+
+	// 根据策略类型处理参数
+	switch strategy {
+	case ScoringStrategyCnt:
+		// 计数策略：构建 raw_calc_rule
+		if len(p.CntOptionContents) > 0 {
+			rawCalcRule := map[string]interface{}{
+				"formula": "cnt",
+				"AppendParams": map[string]interface{}{
+					"cnt_option_contents": p.CntOptionContents,
+				},
+			}
+
+			jsonBytes, err := json.Marshal(rawCalcRule)
+			if err == nil {
+				result["raw_calc_rule"] = string(jsonBytes)
+			}
+		}
+
+	case ScoringStrategySum, ScoringStrategyAvg:
+		// 求和和平均策略：当前不需要额外参数
+		// 如果需要扩展，可以在这里添加
+
+	default:
+		// 其他策略：当前不需要额外参数
+	}
+
+	return result
+}
+
+// FromMap 从 map[string]string 创建（用于从持久化层恢复）
+func ScoringParamsFromMap(params map[string]string, strategy ScoringStrategyCode) *ScoringParams {
+	if params == nil {
+		return NewScoringParams()
+	}
+
+	result := NewScoringParams()
+
+	// 根据策略类型解析参数
+	switch strategy {
+	case ScoringStrategyCnt:
+		// 从 raw_calc_rule 中提取 cnt_option_contents
+		if rawRule, exists := params["raw_calc_rule"]; exists && rawRule != "" {
+			var rule struct {
+				AppendParams map[string]interface{} `json:"AppendParams"`
+			}
+			if err := json.Unmarshal([]byte(rawRule), &rule); err == nil {
+				if contents, ok := rule.AppendParams["cnt_option_contents"]; ok {
+					if contentsArray, ok := contents.([]interface{}); ok {
+						result.CntOptionContents = make([]string, 0, len(contentsArray))
+						for _, item := range contentsArray {
+							if str, ok := item.(string); ok {
+								result.CntOptionContents = append(result.CntOptionContents, str)
+							}
+						}
+					}
+				}
+			}
+		}
+
+	case ScoringStrategySum, ScoringStrategyAvg:
+		// 求和和平均策略：当前不需要额外参数
+
+	default:
+		// 其他策略：当前不需要额外参数
+	}
+
+	return result
 }

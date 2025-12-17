@@ -5,7 +5,7 @@ package scale
 
 // CreateScaleDTO 创建量表 DTO
 type CreateScaleDTO struct {
-	Code                string // 量表编码（可选，用于导入/种子）
+	Code                 string // 量表编码（可选，用于导入/种子）
 	Title                string // 量表标题
 	Description          string // 量表描述
 	QuestionnaireCode    string // 关联的问卷编码
@@ -26,6 +26,13 @@ type UpdateScaleQuestionnaireDTO struct {
 	QuestionnaireVersion string // 关联的问卷版本
 }
 
+// ScoringParamsDTO 计分参数 DTO
+// 根据不同的计分策略，使用不同的字段
+type ScoringParamsDTO struct {
+	// 计数策略（cnt）专用参数
+	CntOptionContents []string `json:"cnt_option_contents,omitempty"`
+}
+
 // AddFactorDTO 添加因子 DTO
 type AddFactorDTO struct {
 	ScaleCode       string             // 量表编码
@@ -34,8 +41,8 @@ type AddFactorDTO struct {
 	FactorType      string             // 因子类型：primary/multilevel
 	IsTotalScore    bool               // 是否为总分因子
 	QuestionCodes   []string           // 关联的题目编码列表
-	ScoringStrategy string             // 计分策略：sum/avg/custom
-	ScoringParams   map[string]string  // 计分参数
+	ScoringStrategy string             // 计分策略：sum/avg/cnt
+	ScoringParams   *ScoringParamsDTO  // 计分参数
 	InterpretRules  []InterpretRuleDTO // 解读规则列表
 }
 
@@ -48,7 +55,7 @@ type UpdateFactorDTO struct {
 	IsTotalScore    bool               // 是否为总分因子
 	QuestionCodes   []string           // 关联的题目编码列表
 	ScoringStrategy string             // 计分策略
-	ScoringParams   map[string]string  // 计分参数
+	ScoringParams   *ScoringParamsDTO  // 计分参数
 	InterpretRules  []InterpretRuleDTO // 解读规则列表
 }
 
@@ -60,7 +67,7 @@ type FactorDTO struct {
 	IsTotalScore    bool               // 是否为总分因子
 	QuestionCodes   []string           // 关联的题目编码列表
 	ScoringStrategy string             // 计分策略
-	ScoringParams   map[string]string  // 计分参数
+	ScoringParams   *ScoringParamsDTO  // 计分参数
 	InterpretRules  []InterpretRuleDTO // 解读规则列表
 }
 

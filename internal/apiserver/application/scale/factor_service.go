@@ -295,7 +295,7 @@ func toFactorDomain(
 	isTotalScore bool,
 	questionCodes []string,
 	scoringStrategy string,
-	scoringParams map[string]string,
+	scoringParams *ScoringParamsDTO,
 	interpretRules []InterpretRuleDTO,
 ) (*scale.Factor, error) {
 	// 转换题目编码
@@ -328,6 +328,15 @@ func toFactorDomain(
 		fType = scale.FactorType(factorType)
 	}
 
+	// 转换计分参数为领域层的 ScoringParams
+	var scoringParamsDomain *scale.ScoringParams
+	if scoringParams != nil {
+		scoringParamsDomain = scale.NewScoringParams().
+			WithCntOptionContents(scoringParams.CntOptionContents)
+	} else {
+		scoringParamsDomain = scale.NewScoringParams()
+	}
+
 	// 创建因子
 	factor, err := scale.NewFactor(
 		scale.NewFactorCode(code),
@@ -336,7 +345,7 @@ func toFactorDomain(
 		scale.WithIsTotalScore(isTotalScore),
 		scale.WithQuestionCodes(qCodes),
 		scale.WithScoringStrategy(strategy),
-		scale.WithScoringParams(scoringParams),
+		scale.WithScoringParams(scoringParamsDomain),
 		scale.WithInterpretRules(rules),
 	)
 	if err != nil {

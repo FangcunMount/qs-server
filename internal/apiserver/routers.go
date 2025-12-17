@@ -196,7 +196,7 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		scales.DELETE("/:code", scaleHandler.Delete)                         // 删除量表
 
 		// 因子管理（仅提供批量操作）
-		scales.PUT("/:code/factors", scaleHandler.ReplaceFactors)                // 批量替换因子
+		scales.PUT("/:code/factors/batch", scaleHandler.BatchUpdateFactors)      // 批量更新因子
 		scales.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
 
 		// 查询接口

@@ -2111,9 +2111,11 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/scales/{code}/factors/batch": {
             "put": {
-                "description": "批量替换量表中的所有因子",
+                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组）",
                 "consumes": [
                     "application/json"
                 ],
@@ -2123,7 +2125,7 @@ const docTemplate = `{
                 "tags": [
                     "Scale-Factor"
                 ],
-                "summary": "批量替换因子",
+                "summary": "批量更新因子",
                 "parameters": [
                     {
                         "type": "string",
@@ -2140,12 +2142,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "替换因子请求",
+                        "description": "批量更新因子请求",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/request.ReplaceFactorsRequest"
+                            "$ref": "#/definitions/request.BatchUpdateFactorsRequest"
                         }
                     }
                 ],
@@ -2952,6 +2954,17 @@ const docTemplate = `{
                 }
             }
         },
+        "request.BatchUpdateFactorsRequest": {
+            "type": "object",
+            "properties": {
+                "factors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.FactorModel"
+                    }
+                }
+            }
+        },
         "request.BatchUpdateQuestionsRequest": {
             "type": "object",
             "properties": {
@@ -3074,10 +3087,7 @@ const docTemplate = `{
                     }
                 },
                 "scoring_params": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                    "$ref": "#/definitions/request.ScoringParamsModel"
                 },
                 "scoring_strategy": {
                     "type": "string"
@@ -3118,17 +3128,6 @@ const docTemplate = `{
                 }
             }
         },
-        "request.ReplaceFactorsRequest": {
-            "type": "object",
-            "properties": {
-                "factors": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/request.FactorModel"
-                    }
-                }
-            }
-        },
         "request.ReplaceInterpretRulesRequest": {
             "type": "object",
             "properties": {
@@ -3136,6 +3135,18 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/request.FactorInterpretRulesModel"
+                    }
+                }
+            }
+        },
+        "request.ScoringParamsModel": {
+            "type": "object",
+            "properties": {
+                "cnt_option_contents": {
+                    "description": "计数策略（cnt）专用参数",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 }
             }

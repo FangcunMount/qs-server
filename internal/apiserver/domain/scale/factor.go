@@ -22,7 +22,7 @@ type Factor struct {
 
 	// 计分策略配置
 	scoringStrategy ScoringStrategyCode
-	scoringParams   map[string]string
+	scoringParams   *ScoringParams
 
 	// 解读规则
 	interpretRules []InterpretationRule
@@ -47,7 +47,7 @@ func NewFactor(factorCode FactorCode, title string, opts ...FactorOption) (*Fact
 		title:           title,
 		factorType:      FactorTypePrimary,
 		scoringStrategy: ScoringStrategySum,
-		scoringParams:   make(map[string]string),
+		scoringParams:   NewScoringParams(),
 	}
 
 	for _, opt := range opts {
@@ -88,9 +88,13 @@ func WithScoringStrategy(strategy ScoringStrategyCode) FactorOption {
 }
 
 // WithScoringParams 设置计分参数
-func WithScoringParams(params map[string]string) FactorOption {
+func WithScoringParams(params *ScoringParams) FactorOption {
 	return func(f *Factor) {
-		f.scoringParams = params
+		if params == nil {
+			f.scoringParams = NewScoringParams()
+		} else {
+			f.scoringParams = params
+		}
 	}
 }
 
@@ -134,7 +138,10 @@ func (f *Factor) GetScoringStrategy() ScoringStrategyCode {
 }
 
 // GetScoringParams 获取计分参数
-func (f *Factor) GetScoringParams() map[string]string {
+func (f *Factor) GetScoringParams() *ScoringParams {
+	if f.scoringParams == nil {
+		return NewScoringParams()
+	}
 	return f.scoringParams
 }
 
@@ -187,9 +194,13 @@ func (f *Factor) updateQuestionCodes(codes []meta.Code) {
 }
 
 // updateScoringStrategy 更新计分策略
-func (f *Factor) updateScoringStrategy(strategy ScoringStrategyCode, params map[string]string) {
+func (f *Factor) updateScoringStrategy(strategy ScoringStrategyCode, params *ScoringParams) {
 	f.scoringStrategy = strategy
-	f.scoringParams = params
+	if params == nil {
+		f.scoringParams = NewScoringParams()
+	} else {
+		f.scoringParams = params
+	}
 }
 
 // updateInterpretRules 更新解读规则

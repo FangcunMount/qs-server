@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -232,12 +231,30 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 				"formula", f.CalcRule.Formula)
 		}
 
-		rawCalc, _ := json.Marshal(f.CalcRule)
-		scoringParams := map[string]string{
-			"raw_calc_rule": string(rawCalc),
-		}
-		if f.Type != "" {
-			scoringParams["raw_factor_type"] = f.Type
+		// 构建 ScoringParamsDTO
+		var scoringParams *scaleApp.ScoringParamsDTO
+		if scoringStrategy == scaleDomain.ScoringStrategyCnt {
+			// 从 CalcRule.AppendParams 中提取 cnt_option_contents
+			cntOptionContents := make([]string, 0)
+			if f.CalcRule.AppendParams != nil {
+				if contents, ok := f.CalcRule.AppendParams["cnt_option_contents"]; ok {
+					if contentsArray, ok := contents.([]interface{}); ok {
+						for _, item := range contentsArray {
+							if str, ok := item.(string); ok {
+								cntOptionContents = append(cntOptionContents, str)
+							}
+						}
+					} else if contentsArray, ok := contents.([]string); ok {
+						cntOptionContents = contentsArray
+					}
+				}
+			}
+			scoringParams = &scaleApp.ScoringParamsDTO{
+				CntOptionContents: cntOptionContents,
+			}
+		} else {
+			// sum 和 avg 策略不需要参数
+			scoringParams = nil
 		}
 
 		dtos = append(dtos, scaleApp.FactorDTO{
@@ -262,7 +279,7 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 			IsTotalScore:    true,
 			QuestionCodes:   collectQuestionCodes(sc),
 			ScoringStrategy: string(scaleDomain.ScoringStrategySum),
-			ScoringParams:   map[string]string{"auto": "true"},
+			ScoringParams:   nil, // sum 策略不需要参数
 			InterpretRules: []scaleApp.InterpretRuleDTO{
 				{MinScore: 0, MaxScore: 9999, RiskLevel: string(scaleDomain.RiskLevelNone), Conclusion: "暂无解读", Suggestion: ""},
 			},

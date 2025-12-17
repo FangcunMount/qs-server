@@ -53,6 +53,9 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 		questionCodes = append(questionCodes, qc.String())
 	}
 
+	// 转换计分参数为 map[string]string（用于持久化）
+	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
+	
 	return FactorPO{
 		Code:            f.GetCode().String(),
 		Title:           f.GetTitle(),
@@ -60,7 +63,7 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 		IsTotalScore:    f.IsTotalScore(),
 		QuestionCodes:   questionCodes,
 		ScoringStrategy: f.GetScoringStrategy().String(),
-		ScoringParams:   f.GetScoringParams(),
+		ScoringParams:   scoringParamsMap,
 		InterpretRules:  m.mapInterpretRulesToPO(f.GetInterpretRules()),
 	}
 }
@@ -136,6 +139,9 @@ func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
 	// 转换解读规则
 	interpretRules := m.mapInterpretRulesToDomain(po.InterpretRules)
 
+	// 从 map[string]string 恢复计分参数
+	scoringParams := scale.ScoringParamsFromMap(po.ScoringParams, scale.ScoringStrategyCode(po.ScoringStrategy))
+	
 	// 创建因子
 	factor, err := scale.NewFactor(
 		scale.NewFactorCode(po.Code),
@@ -144,7 +150,7 @@ func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
 		scale.WithIsTotalScore(po.IsTotalScore),
 		scale.WithQuestionCodes(questionCodes),
 		scale.WithScoringStrategy(scale.ScoringStrategyCode(po.ScoringStrategy)),
-		scale.WithScoringParams(po.ScoringParams),
+		scale.WithScoringParams(scoringParams),
 		scale.WithInterpretRules(interpretRules),
 	)
 	if err != nil {

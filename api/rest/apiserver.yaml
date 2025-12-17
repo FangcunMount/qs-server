@@ -1303,12 +1303,17 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.FactorListResponse'
+  /scales/{code}/factors/batch:
     put:
       tags:
       - Scale-Factor
-      summary: 批量替换因子
-      description: 批量替换量表中的所有因子
-      operationId: 批量替换因子
+      summary: 批量更新因子
+      description: '批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：
+
+        - sum/avg 策略：scoring_params 可为空或省略
+
+        - cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组）'
+      operationId: 批量更新因子
       parameters:
       - type: string
         description: Bearer 用户令牌
@@ -1325,7 +1330,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/request.ReplaceFactorsRequest'
+              $ref: '#/components/schemas/request.BatchUpdateFactorsRequest'
       responses:
         '200':
           description: OK
@@ -1830,6 +1835,13 @@ components:
           type: array
           items:
             type: integer
+    request.BatchUpdateFactorsRequest:
+      type: object
+      properties:
+        factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.FactorModel'
     request.BatchUpdateQuestionsRequest:
       type: object
       properties:
@@ -1914,9 +1926,7 @@ components:
           items:
             type: string
         scoring_params:
-          type: object
-          additionalProperties:
-            type: string
+          $ref: '#/components/schemas/request.ScoringParamsModel'
         scoring_strategy:
           type: string
         title:
@@ -1941,13 +1951,6 @@ components:
           type: array
           items:
             type: string
-    request.ReplaceFactorsRequest:
-      type: object
-      properties:
-        factors:
-          type: array
-          items:
-            $ref: '#/components/schemas/request.FactorModel'
     request.ReplaceInterpretRulesRequest:
       type: object
       properties:
@@ -1955,6 +1958,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/request.FactorInterpretRulesModel'
+    request.ScoringParamsModel:
+      type: object
+      properties:
+        cnt_option_contents:
+          description: 计数策略（cnt）专用参数
+          type: array
+          items:
+            type: string
     request.UpdateQuestionRequest:
       type: object
       properties:

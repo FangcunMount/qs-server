@@ -24,8 +24,8 @@ type UpdateScaleQuestionnaireRequest struct {
 
 // ============= Scale Factor Requests =============
 
-// ReplaceFactorsRequest 批量替换因子请求
-type ReplaceFactorsRequest struct {
+// BatchUpdateFactorsRequest 批量更新因子请求
+type BatchUpdateFactorsRequest struct {
 	Factors []FactorModel `json:"factors" valid:"required~因子列表不能为空"`
 }
 
@@ -50,8 +50,19 @@ type FactorModel struct {
 	IsTotalScore    bool                 `json:"is_total_score"`
 	QuestionCodes   []string             `json:"question_codes"`
 	ScoringStrategy string               `json:"scoring_strategy"`
-	ScoringParams   map[string]string    `json:"scoring_params"`
+	ScoringParams   *ScoringParamsModel  `json:"scoring_params,omitempty"`
 	InterpretRules  []InterpretRuleModel `json:"interpret_rules"`
+}
+
+// ScoringParamsModel 计分参数模型
+// 根据不同的计分策略，使用不同的字段
+type ScoringParamsModel struct {
+	// 计数策略（cnt）专用参数
+	CntOptionContents []string `json:"cnt_option_contents,omitempty"`
+
+	// 其他策略的扩展参数（可选）
+	// 如果需要添加其他策略的参数，可以在这里扩展
+	// CustomParams map[string]interface{} `json:"custom_params,omitempty"`
 }
 
 // InterpretRuleModel 解读规则模型（用于请求）

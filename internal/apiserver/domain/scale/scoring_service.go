@@ -2,13 +2,12 @@ package scale
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
 // ScoringService 计分服务（领域服务）
@@ -105,27 +104,9 @@ func (s *defaultScoringService) applyCntStrategy(
 ) (float64, error) {
 	l := logger.L(ctx)
 
-	// 从 raw_calc_rule 中提取参数
+	// 从计分参数中获取计数策略的选项内容列表
 	params := factor.GetScoringParams()
-	rawRule, exists := params["raw_calc_rule"]
-	if !exists || rawRule == "" {
-		return 0, fmt.Errorf("raw_calc_rule is required for cnt scoring strategy")
-	}
-
-	// 解析计分规则，提取 AppendParams
-	var rule struct {
-		AppendParams map[string]interface{} `json:"AppendParams"`
-	}
-	if err := json.Unmarshal([]byte(rawRule), &rule); err != nil {
-		return 0, fmt.Errorf("failed to parse raw_calc_rule: %w", err)
-	}
-
-	appendParams := rule.AppendParams
-	// 获取目标选项内容列表
-	targetContents, err := extractTargetContents(appendParams)
-	if err != nil {
-		return 0, err
-	}
+	targetContents := params.GetCntOptionContents()
 
 	if len(targetContents) == 0 {
 		return 0, fmt.Errorf("cnt_option_contents is empty")
@@ -286,29 +267,6 @@ func (s *defaultScoringService) collectQuestionScores(factor *Factor, sheet *ans
 }
 
 // ==================== 辅助函数 ====================
-
-// extractTargetContents 从附加参数中提取目标选项内容列表
-func extractTargetContents(appendParams map[string]interface{}) ([]string, error) {
-	rawContents, exists := appendParams["cnt_option_contents"]
-	if !exists {
-		return nil, fmt.Errorf("cnt_option_contents not found in append params")
-	}
-
-	switch v := rawContents.(type) {
-	case []interface{}:
-		result := make([]string, 0, len(v))
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				result = append(result, str)
-			}
-		}
-		return result, nil
-	case []string:
-		return v, nil
-	default:
-		return nil, fmt.Errorf("cnt_option_contents has invalid type: %T", rawContents)
-	}
-}
 
 // buildOptionContentMap 构建选项ID到内容的映射
 func buildOptionContentMap(qnr *questionnaire.Questionnaire) map[string]string {

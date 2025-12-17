@@ -58,6 +58,13 @@ definitions:
           type: integer
         type: array
     type: object
+  request.BatchUpdateFactorsRequest:
+    properties:
+      factors:
+        items:
+          $ref: '#/definitions/request.FactorModel'
+        type: array
+    type: object
   request.BatchUpdateQuestionsRequest:
     properties:
       questions:
@@ -141,9 +148,7 @@ definitions:
           type: string
         type: array
       scoring_params:
-        additionalProperties:
-          type: string
-        type: object
+        $ref: '#/definitions/request.ScoringParamsModel'
       scoring_strategy:
         type: string
       title:
@@ -169,18 +174,19 @@ definitions:
           type: string
         type: array
     type: object
-  request.ReplaceFactorsRequest:
-    properties:
-      factors:
-        items:
-          $ref: '#/definitions/request.FactorModel'
-        type: array
-    type: object
   request.ReplaceInterpretRulesRequest:
     properties:
       factor_rules:
         items:
           $ref: '#/definitions/request.FactorInterpretRulesModel'
+        type: array
+    type: object
+  request.ScoringParamsModel:
+    properties:
+      cnt_option_contents:
+        description: 计数策略（cnt）专用参数
+        items:
+          type: string
         type: array
     type: object
   request.UpdateQuestionRequest:
@@ -2292,10 +2298,14 @@ paths:
       summary: 获取量表的因子列表
       tags:
       - Scale-Query
+  /api/v1/scales/{code}/factors/batch:
     put:
       consumes:
       - application/json
-      description: 批量替换量表中的所有因子
+      description: |-
+        批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：
+        - sum/avg 策略：scoring_params 可为空或省略
+        - cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组）
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -2307,12 +2317,12 @@ paths:
         name: code
         required: true
         type: string
-      - description: 替换因子请求
+      - description: 批量更新因子请求
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/request.ReplaceFactorsRequest'
+          $ref: '#/definitions/request.BatchUpdateFactorsRequest'
       produces:
       - application/json
       responses:
@@ -2325,7 +2335,7 @@ paths:
                 data:
                   $ref: '#/definitions/response.ScaleResponse'
               type: object
-      summary: 批量替换因子
+      summary: 批量更新因子
       tags:
       - Scale-Factor
   /api/v1/scales/{code}/interpret-rules:

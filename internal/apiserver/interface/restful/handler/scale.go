@@ -264,25 +264,27 @@ func (h *ScaleHandler) Delete(c *gin.Context) {
 
 // ============= Factor API (因子管理 - 仅批量操作) =============
 
-// ReplaceFactors 批量替换因子
-// @Summary 批量替换因子
-// @Description 批量替换量表中的所有因子
+// BatchUpdateFactors 批量更新因子
+// @Summary 批量更新因子
+// @Description 批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：
+// @Description - sum/avg 策略：scoring_params 可为空或省略
+// @Description - cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组）
 // @Tags Scale-Factor
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Param request body request.ReplaceFactorsRequest true "替换因子请求"
+// @Param request body request.BatchUpdateFactorsRequest true "批量更新因子请求"
 // @Success 200 {object} core.Response{data=response.ScaleResponse}
-// @Router /api/v1/scales/{code}/factors [put]
-func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
+// @Router /api/v1/scales/{code}/factors/batch [put]
+func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
 		return
 	}
 
-	var req request.ReplaceFactorsRequest
+	var req request.BatchUpdateFactorsRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		h.Error(c, err)
 		return
@@ -294,6 +296,14 @@ func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 
 	factorDTOs := make([]scale.FactorDTO, 0, len(req.Factors))
 	for _, f := range req.Factors {
+		// 转换 ScoringParamsModel 为 ScoringParamsDTO
+		var scoringParamsDTO *scale.ScoringParamsDTO
+		if f.ScoringParams != nil {
+			scoringParamsDTO = &scale.ScoringParamsDTO{
+				CntOptionContents: f.ScoringParams.CntOptionContents,
+			}
+		}
+
 		factorDTOs = append(factorDTOs, scale.FactorDTO{
 			Code:            f.Code,
 			Title:           f.Title,
@@ -301,7 +311,7 @@ func (h *ScaleHandler) ReplaceFactors(c *gin.Context) {
 			IsTotalScore:    f.IsTotalScore,
 			QuestionCodes:   f.QuestionCodes,
 			ScoringStrategy: f.ScoringStrategy,
-			ScoringParams:   f.ScoringParams,
+			ScoringParams:   scoringParamsDTO,
 			InterpretRules:  toInterpretRuleDTOs(f.InterpretRules),
 		})
 	}
