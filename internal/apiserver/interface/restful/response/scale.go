@@ -25,7 +25,7 @@ type FactorResponse struct {
 	IsTotalScore    bool                    `json:"is_total_score"`
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
-	ScoringParams   map[string]interface{} `json:"scoring_params,omitempty"`
+	ScoringParams   map[string]interface{}  `json:"scoring_params"`
 	InterpretRules  []InterpretRuleResponse `json:"interpret_rules,omitempty"`
 }
 
@@ -100,6 +100,12 @@ func newFactorResponse(result scale.FactorResult) FactorResponse {
 		})
 	}
 
+	// 确保 scoring_params 不为 nil，至少返回空对象
+	scoringParams := result.ScoringParams
+	if scoringParams == nil {
+		scoringParams = make(map[string]interface{})
+	}
+
 	return FactorResponse{
 		Code:            result.Code,
 		Title:           result.Title,
@@ -107,7 +113,7 @@ func newFactorResponse(result scale.FactorResult) FactorResponse {
 		IsTotalScore:    result.IsTotalScore,
 		QuestionCodes:   result.QuestionCodes,
 		ScoringStrategy: result.ScoringStrategy,
-		ScoringParams:   result.ScoringParams,
+		ScoringParams:   scoringParams,
 		InterpretRules:  rules,
 	}
 }
