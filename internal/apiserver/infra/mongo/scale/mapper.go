@@ -1,6 +1,10 @@
 package scale
 
 import (
+	"encoding/json"
+	"reflect"
+
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -55,7 +59,7 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 
 	// 转换计分参数为 map[string]interface{}（用于持久化）
 	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
-	
+
 	return FactorPO{
 		Code:            f.GetCode().String(),
 		Title:           f.GetTitle(),
@@ -140,8 +144,26 @@ func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
 	interpretRules := m.mapInterpretRulesToDomain(po.InterpretRules)
 
 	// 从 map[string]interface{} 恢复计分参数
+	// 添加日志：记录 PO 层的 scoring_params
+	scoringParamsJSON, _ := json.Marshal(po.ScoringParams)
+	logger.L(nil).Infow("mapFactorToDomain: PO scoring_params",
+		"factor_code", po.Code,
+		"scoring_strategy", po.ScoringStrategy,
+		"scoring_params", string(scoringParamsJSON),
+		"scoring_params_type", getTypeName(po.ScoringParams),
+	)
+
 	scoringParams := scale.ScoringParamsFromMap(po.ScoringParams, scale.ScoringStrategyCode(po.ScoringStrategy))
-	
+
+	// 添加日志：记录转换后的 ScoringParams
+	if scoringParams != nil {
+		cntContentsJSON, _ := json.Marshal(scoringParams.GetCntOptionContents())
+		logger.L(nil).Infow("mapFactorToDomain: Domain ScoringParams",
+			"factor_code", po.Code,
+			"cnt_option_contents", string(cntContentsJSON),
+		)
+	}
+
 	// 创建因子
 	factor, err := scale.NewFactor(
 		scale.NewFactorCode(po.Code),
@@ -158,6 +180,14 @@ func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
 	}
 
 	return factor
+}
+
+// getTypeName 获取类型的字符串表示
+func getTypeName(v interface{}) string {
+	if v == nil {
+		return "nil"
+	}
+	return reflect.TypeOf(v).String()
 }
 
 // mapInterpretRulesToDomain 将解读规则持久化对象列表转换为领域模型

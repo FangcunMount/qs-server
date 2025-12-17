@@ -1,6 +1,11 @@
 package scale
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"reflect"
+
+	"github.com/FangcunMount/component-base/pkg/logger"
+)
 
 // ===================== 量表状态 =================
 
@@ -259,7 +264,16 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]interface
 
 // FromMap 从 map[string]interface{} 创建（用于从持久化层恢复）
 func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrategyCode) *ScoringParams {
+	// 添加日志：记录输入参数
+	paramsJSON, _ := json.Marshal(params)
+	logger.L(nil).Infow("ScoringParamsFromMap: input",
+		"strategy", strategy,
+		"params", string(paramsJSON),
+		"params_type", getTypeName(params),
+	)
+
 	if params == nil {
+		logger.L(nil).Warnw("ScoringParamsFromMap: params is nil")
 		return NewScoringParams()
 	}
 
@@ -270,29 +284,59 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 	case ScoringStrategyCnt:
 		// 从 raw_calc_rule 中提取 cnt_option_contents
 		rawRule, exists := params["raw_calc_rule"]
+		logger.L(nil).Infow("ScoringParamsFromMap: checking raw_calc_rule",
+			"exists", exists,
+			"raw_rule_type", getTypeName(rawRule),
+		)
+
 		if !exists || rawRule == nil {
+			logger.L(nil).Warnw("ScoringParamsFromMap: raw_calc_rule not found or nil")
 			break
 		}
 
+		// 使用 convertToMap 处理 MongoDB 返回的各种类型
 		ruleMap := convertToMap(rawRule)
 		if ruleMap == nil {
+			logger.L(nil).Warnw("ScoringParamsFromMap: convertToMap(rawRule) returned nil")
 			break
 		}
+
+		ruleMapJSON, _ := json.Marshal(ruleMap)
+		logger.L(nil).Infow("ScoringParamsFromMap: ruleMap converted",
+			"rule_map", string(ruleMapJSON),
+		)
 
 		appendParamsRaw, ok := ruleMap["AppendParams"]
 		if !ok {
+			logger.L(nil).Warnw("ScoringParamsFromMap: AppendParams not found in ruleMap")
 			break
 		}
 
+		logger.L(nil).Infow("ScoringParamsFromMap: AppendParams found",
+			"append_params_type", getTypeName(appendParamsRaw),
+		)
+
 		appendParams := convertToMap(appendParamsRaw)
+
 		if appendParams == nil {
+			logger.L(nil).Warnw("ScoringParamsFromMap: convertToMap(appendParamsRaw) returned nil")
 			break
 		}
+
+		appendParamsJSON, _ := json.Marshal(appendParams)
+		logger.L(nil).Infow("ScoringParamsFromMap: appendParams converted",
+			"append_params", string(appendParamsJSON),
+		)
 
 		contents, ok := appendParams["cnt_option_contents"]
 		if !ok {
+			logger.L(nil).Warnw("ScoringParamsFromMap: cnt_option_contents not found in appendParams")
 			break
 		}
+
+		logger.L(nil).Infow("ScoringParamsFromMap: cnt_option_contents found",
+			"contents_type", getTypeName(contents),
+		)
 
 		// 处理数组类型
 		if contentsArray, ok := contents.([]interface{}); ok {
@@ -302,8 +346,20 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 					result.CntOptionContents = append(result.CntOptionContents, str)
 				}
 			}
+			logger.L(nil).Infow("ScoringParamsFromMap: extracted cnt_option_contents",
+				"count", len(result.CntOptionContents),
+				"contents", result.CntOptionContents,
+			)
 		} else if contentsArray, ok := contents.([]string); ok {
 			result.CntOptionContents = contentsArray
+			logger.L(nil).Infow("ScoringParamsFromMap: extracted cnt_option_contents (direct string array)",
+				"count", len(result.CntOptionContents),
+				"contents", result.CntOptionContents,
+			)
+		} else {
+			logger.L(nil).Warnw("ScoringParamsFromMap: cnt_option_contents is not array type",
+				"contents_type", getTypeName(contents),
+			)
 		}
 
 	case ScoringStrategySum, ScoringStrategyAvg:
@@ -313,32 +369,73 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 		// 其他策略：当前不需要额外参数
 	}
 
+	resultJSON, _ := json.Marshal(result.GetCntOptionContents())
+	logger.L(nil).Infow("ScoringParamsFromMap: final result",
+		"cnt_option_contents", string(resultJSON),
+	)
+
 	return result
+}
+
+// getTypeName 获取类型的字符串表示
+func getTypeName(v interface{}) string {
+	if v == nil {
+		return "nil"
+	}
+	return reflect.TypeOf(v).String()
 }
 
 // convertToMap 将 interface{} 转换为 map[string]interface{}
 // 用于处理 MongoDB 返回的 bson.M 等类型
 func convertToMap(v interface{}) map[string]interface{} {
 	if v == nil {
+		logger.L(nil).Debugw("convertToMap: input is nil")
 		return nil
 	}
 
-	// 尝试直接类型断言为 map[string]interface{}
-	if m, ok := v.(map[string]interface{}); ok {
-		return m
+	// 使用反射检查类型
+	rv := reflect.ValueOf(v)
+	logger.L(nil).Debugw("convertToMap: input type",
+		"type", rv.Type().String(),
+		"kind", rv.Kind().String(),
+	)
+
+	if rv.Kind() == reflect.Map {
+		// 检查 key 类型是否为 string
+		if rv.Type().Key().Kind() == reflect.String {
+			result := make(map[string]interface{})
+			for _, key := range rv.MapKeys() {
+				result[key.String()] = rv.MapIndex(key).Interface()
+			}
+			resultJSON, _ := json.Marshal(result)
+			logger.L(nil).Debugw("convertToMap: converted via reflection",
+				"result", string(resultJSON),
+			)
+			return result
+		}
 	}
 
-	// 如果类型断言失败，可能是 bson.M 或其他类型
-	// 使用 JSON 序列化/反序列化来确保类型正确
+	// 如果反射失败，尝试 JSON 转换
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
+		logger.L(nil).Warnw("convertToMap: JSON marshal failed",
+			"error", err.Error(),
+		)
 		return nil
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		logger.L(nil).Warnw("convertToMap: JSON unmarshal failed",
+			"error", err.Error(),
+		)
 		return nil
 	}
+
+	resultJSON, _ := json.Marshal(result)
+	logger.L(nil).Debugw("convertToMap: converted via JSON",
+		"result", string(resultJSON),
+	)
 
 	return result
 }
