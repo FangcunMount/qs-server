@@ -4,8 +4,8 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -29,6 +29,9 @@ type Question interface {
 
 	// 计算规则相关
 	GetCalculationRule() *calculation.CalculationRule
+
+	// 显示控制相关
+	GetShowController() *ShowController
 }
 
 // HasOptions 带选项的问题接口
@@ -53,10 +56,11 @@ type HasCalculation interface {
 
 // QuestionCore 题型核心字段
 type QuestionCore struct {
-	code meta.Code
-	typ  QuestionType
-	stem string
-	tips string
+	code           meta.Code
+	typ            QuestionType
+	stem           string
+	tips           string
+	showController *ShowController
 }
 
 // NewQuestionCore 创建题型核心字段
@@ -80,6 +84,9 @@ func (q *QuestionCore) GetValidationRules() []validation.ValidationRule {
 }
 func (q *QuestionCore) GetCalculationRule() *calculation.CalculationRule {
 	return nil
+}
+func (q *QuestionCore) GetShowController() *ShowController {
+	return q.showController
 }
 
 // ============ 具体题型实现 ============
@@ -295,6 +302,7 @@ type QuestionParams struct {
 	options         []Option
 	validationRules []validation.ValidationRule
 	calculationRule *calculation.CalculationRule
+	showController  *ShowController
 }
 
 // NewQuestionParams 创建参数容器并应用选项
@@ -334,6 +342,7 @@ func (b *QuestionParams) GetPlaceholder() string                           { ret
 func (b *QuestionParams) GetOptions() []Option                             { return b.options }
 func (b *QuestionParams) GetValidationRules() []validation.ValidationRule  { return b.validationRules }
 func (b *QuestionParams) GetCalculationRule() *calculation.CalculationRule { return b.calculationRule }
+func (b *QuestionParams) GetShowController() *ShowController               { return b.showController }
 
 // 核心字段配置
 func WithCode(code meta.Code) QuestionParamsOption {
@@ -388,6 +397,12 @@ func WithValidationRule(ruleType validation.RuleType, targetValue string) Questi
 func WithCalculationRule(formula calculation.FormulaType) QuestionParamsOption {
 	return func(b *QuestionParams) {
 		b.calculationRule = calculation.NewCalculationRule(formula, []string{})
+	}
+}
+func WithShowController(showController *ShowController) QuestionParamsOption {
+	return func(b *QuestionParams) {
+		b.showController = showController
+		b.core.showController = showController
 	}
 }
 

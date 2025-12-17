@@ -112,7 +112,7 @@ func (s *contentService) AddQuestion(ctx context.Context, dto AddQuestionDTO) (*
 		"question_code", dto.Code,
 		"question_type", dto.Type,
 	)
-	question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil)
+	question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil)
 	if err != nil {
 		l.Errorw("创建问题失败",
 			"action", "add_question",
@@ -240,7 +240,7 @@ func (s *contentService) UpdateQuestion(ctx context.Context, dto UpdateQuestionD
 		"questionnaire_code", dto.QuestionnaireCode,
 		"question_code", dto.Code,
 	)
-	newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil)
+	newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil)
 	if err != nil {
 		l.Errorw("创建问题失败",
 			"action", "update_question",
@@ -569,7 +569,7 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 			"options_count", len(qDTO.Options),
 			"validation_rules_count", len(qDTO.ValidationRules),
 		)
-		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description, qDTO.ValidationRules)
+		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description, qDTO.ValidationRules, qDTO.ShowController)
 		if err != nil {
 			l.Errorw("创建问题失败",
 				"action", "batch_update_questions",
@@ -628,7 +628,8 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 }
 
 // buildQuestionFromDTO 从 DTO 构建问题领域对象
-func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, required bool, description string, validationRules []validation.ValidationRule) (questionnaire.Question, error) {
+func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, required bool, description string, validationRules []validation.ValidationRule, showController *questionnaire.ShowController) (questionnaire.Question, error) {
+
 	// 构建选项列表
 	opts := make([]questionnaire.Option, 0, len(options))
 	for i, optDTO := range options {
@@ -664,6 +665,11 @@ func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, require
 	// 添加校验规则
 	if len(validationRules) > 0 {
 		qOptions = append(qOptions, questionnaire.WithValidationRules(validationRules))
+	}
+
+	// 添加显示控制器
+	if showController != nil {
+		qOptions = append(qOptions, questionnaire.WithShowController(showController))
 	}
 
 	// 使用领域层工厂方法创建问题

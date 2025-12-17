@@ -135,6 +135,19 @@ type QuestionPO struct {
 	Options         []OptionPO         `bson:"options" json:"options"`
 	ValidationRules []ValidationRulePO `bson:"validation_rules" json:"validation_rules"`
 	CalculationRule CalculationRulePO  `bson:"calculation_rule" json:"calculation_rule"`
+	ShowController  *ShowControllerPO  `bson:"show_controller,omitempty" json:"show_controller,omitempty"`
+}
+
+// ShowControllerPO 显示控制器持久化对象
+type ShowControllerPO struct {
+	Rule      string                      `bson:"rule" json:"rule"`
+	Questions []ShowControllerConditionPO `bson:"questions" json:"questions"`
+}
+
+// ShowControllerConditionPO 显示控制条件持久化对象
+type ShowControllerConditionPO struct {
+	Code              string   `bson:"code" json:"code"`
+	SelectOptionCodes []string `bson:"select_option_codes" json:"select_option_codes"`
 }
 
 // ToBsonM 将 QuestionPO 转换为 bson.M

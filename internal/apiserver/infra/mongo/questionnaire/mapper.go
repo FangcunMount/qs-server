@@ -37,6 +37,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 			Options:         m.mapOptions(questionBO.GetOptions()),
 			ValidationRules: m.mapValidationRules(questionBO.GetValidationRules()),
 			CalculationRule: m.mapCalculationRule(questionBO.GetCalculationRule()),
+			ShowController:  m.mapShowController(questionBO.GetShowController()),
 		}
 
 		// 处理计算规则（可能为nil）
@@ -137,6 +138,11 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []questionn
 			opts = append(opts, questionnaire.WithCalculationRule(calculation.FormulaType(questionPO.CalculationRule.Formula)))
 		}
 
+		// 添加显示控制器（如果有的话）
+		if showController := m.mapShowControllerPOToBO(questionPO.ShowController); showController != nil {
+			opts = append(opts, questionnaire.WithShowController(showController))
+		}
+
 		questionBO, err := questionnaire.NewQuestion(opts...)
 		if err != nil {
 			// 跳过不符合条件的问题
@@ -186,4 +192,49 @@ func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO)
 
 	formulaType := calculation.FormulaType(rulePO.Formula)
 	return calculation.NewCalculationRule(formulaType, []string{})
+}
+
+// mapShowController 将显示控制器BO转换为PO
+func (m *QuestionnaireMapper) mapShowController(sc *questionnaire.ShowController) *ShowControllerPO {
+	if sc == nil || sc.IsEmpty() {
+		return nil
+	}
+
+	conditions := make([]ShowControllerConditionPO, 0, len(sc.GetQuestions()))
+	for _, cond := range sc.GetQuestions() {
+		optionCodes := make([]string, 0, len(cond.SelectOptionCodes))
+		for _, code := range cond.SelectOptionCodes {
+			optionCodes = append(optionCodes, code.Value())
+		}
+		conditions = append(conditions, ShowControllerConditionPO{
+			Code:              cond.Code.Value(),
+			SelectOptionCodes: optionCodes,
+		})
+	}
+
+	return &ShowControllerPO{
+		Rule:      sc.GetRule(),
+		Questions: conditions,
+	}
+}
+
+// mapShowControllerPOToBO 将显示控制器PO转换为BO
+func (m *QuestionnaireMapper) mapShowControllerPOToBO(scPO *ShowControllerPO) *questionnaire.ShowController {
+	if scPO == nil || scPO.Rule == "" || len(scPO.Questions) == 0 {
+		return nil
+	}
+
+	conditions := make([]questionnaire.ShowControllerCondition, 0, len(scPO.Questions))
+	for _, condPO := range scPO.Questions {
+		optionCodes := make([]meta.Code, 0, len(condPO.SelectOptionCodes))
+		for _, codeStr := range condPO.SelectOptionCodes {
+			optionCodes = append(optionCodes, meta.NewCode(codeStr))
+		}
+		conditions = append(conditions, questionnaire.NewShowControllerCondition(
+			meta.NewCode(condPO.Code),
+			optionCodes,
+		))
+	}
+
+	return questionnaire.NewShowController(scPO.Rule, conditions)
 }

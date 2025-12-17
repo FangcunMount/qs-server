@@ -5,10 +5,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -456,24 +458,37 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 			})
 		}
 
-		// 转换 validation_rules
+		// 转换 validation_rules（直接使用前端传递的值，不做任何转换）
 		validationRules := make([]validation.ValidationRule, 0, len(q.ValidationRules))
-		required := false
 		for _, rule := range q.ValidationRules {
-			// 检查是否为 required 规则
-			if rule.RuleType == "required" {
-				required = true
-			}
-
-			// 将 min_words/max_words 映射到 min_length/max_length
 			ruleType := validation.RuleType(rule.RuleType)
-			if rule.RuleType == "min_words" {
-				ruleType = validation.RuleTypeMinLength
-			} else if rule.RuleType == "max_words" {
-				ruleType = validation.RuleTypeMaxLength
-			}
-
 			validationRules = append(validationRules, validation.NewValidationRule(ruleType, rule.TargetValue))
+		}
+
+		// 从 validation_rules 中判断是否必填（用于兼容性）
+		required := false
+		for _, rule := range validationRules {
+			if rule.GetRuleType() == validation.RuleTypeRequired {
+				required = true
+				break
+			}
+		}
+
+		// 转换 show_controller
+		var showController *domainQuestionnaire.ShowController
+		if q.ShowController != nil {
+			conditions := make([]domainQuestionnaire.ShowControllerCondition, 0, len(q.ShowController.Questions))
+			for _, condDTO := range q.ShowController.Questions {
+				optionCodes := make([]meta.Code, 0, len(condDTO.SelectOptionCodes))
+				for _, codeStr := range condDTO.SelectOptionCodes {
+					optionCodes = append(optionCodes, meta.NewCode(codeStr))
+				}
+				conditions = append(conditions, domainQuestionnaire.NewShowControllerCondition(
+					meta.NewCode(condDTO.Code),
+					optionCodes,
+				))
+			}
+			showController = domainQuestionnaire.NewShowController(q.ShowController.Rule, conditions)
 		}
 
 		questions = append(questions, questionnaire.QuestionDTO{
@@ -481,9 +496,10 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 			Stem:            q.Stem,
 			Type:            q.Type,
 			Options:         options,
-			Required:        required, // 从 validation_rules 中提取
+			Required:        required, // 从 validation_rules 中判断（兼容性字段）
 			Description:     q.Tips,
 			ValidationRules: validationRules,
+			ShowController:  showController,
 		})
 	}
 

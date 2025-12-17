@@ -59,12 +59,33 @@ func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResul
 			})
 		}
 
+		// 转换 show_controller
+		var showController *viewmodel.ShowControllerDTO
+		if q.ShowController != nil {
+			conditions := make([]viewmodel.ShowControllerConditionDTO, 0, len(q.ShowController.GetQuestions()))
+			for _, cond := range q.ShowController.GetQuestions() {
+				optionCodes := make([]string, 0, len(cond.SelectOptionCodes))
+				for _, code := range cond.SelectOptionCodes {
+					optionCodes = append(optionCodes, code.Value())
+				}
+				conditions = append(conditions, viewmodel.ShowControllerConditionDTO{
+					Code:             cond.Code.Value(),
+					SelectOptionCodes: optionCodes,
+				})
+			}
+			showController = &viewmodel.ShowControllerDTO{
+				Rule:     q.ShowController.GetRule(),
+				Questions: conditions,
+			}
+		}
+
 		questions = append(questions, viewmodel.QuestionDTO{
-			Code:    q.Code,
-			Stem:    q.Stem,
-			Type:    q.Type,
-			Tips:    q.Description,
-			Options: options,
+			Code:           q.Code,
+			Stem:           q.Stem,
+			Type:           q.Type,
+			Tips:           q.Description,
+			Options:        options,
+			ShowController: showController,
 		})
 	}
 

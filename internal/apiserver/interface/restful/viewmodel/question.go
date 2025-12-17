@@ -14,6 +14,7 @@ type QuestionDTO struct {
 	// 能力属性
 	ValidationRules []ValidationRuleDTO `json:"validation_rules,omitempty"` // 校验规则（可选项）
 	CalculationRule *CalculationRuleDTO `json:"calculation_rule,omitempty"` // 问题算分规则（可选项，结构化题型）
+	ShowController  *ShowControllerDTO  `json:"show_controller,omitempty"`  // 显示控制器（可选项）
 }
 
 // Option 选项
@@ -32,4 +33,16 @@ type ValidationRuleDTO struct {
 // CalculationRule 算分规则
 type CalculationRuleDTO struct {
 	FormulaType string `json:"formula_type"` // 公式类型
+}
+
+// ShowControllerDTO 显示控制器
+type ShowControllerDTO struct {
+	Rule      string                       `json:"rule"`      // 逻辑规则：and 或 or
+	Questions []ShowControllerConditionDTO `json:"questions"` // 条件问题列表
+}
+
+// ShowControllerConditionDTO 显示控制条件
+type ShowControllerConditionDTO struct {
+	Code              string   `json:"code"`                // 问题编码
+	SelectOptionCodes []string `json:"select_option_codes"` // 选中的选项编码列表
 }

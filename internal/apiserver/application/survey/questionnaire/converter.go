@@ -21,12 +21,13 @@ type QuestionnaireResult struct {
 
 // QuestionResult 问题结果
 type QuestionResult struct {
-	Code        string         // 问题编码
-	Stem        string         // 题干
-	Type        string         // 问题类型
-	Options     []OptionResult // 选项列表
-	Required    bool           // 是否必填
-	Description string         // 问题描述
+	Code           string                      // 问题编码
+	Stem           string                      // 题干
+	Type           string                      // 问题类型
+	Options        []OptionResult              // 选项列表
+	Required       bool                        // 是否必填
+	Description    string                      // 问题描述
+	ShowController *questionnaire.ShowController // 显示控制器
 }
 
 // OptionResult 选项结果
@@ -116,6 +117,9 @@ func toQuestionResult(q questionnaire.Question) QuestionResult {
 			})
 		}
 	}
+
+	// 转换显示控制器（如果有）
+	result.ShowController = q.GetShowController()
 
 	return result
 }
