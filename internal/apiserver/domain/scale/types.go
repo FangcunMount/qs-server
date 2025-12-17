@@ -1,5 +1,7 @@
 package scale
 
+import "encoding/json"
+
 // ===================== 量表状态 =================
 
 // Status 量表状态
@@ -267,23 +269,41 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 	switch strategy {
 	case ScoringStrategyCnt:
 		// 从 raw_calc_rule 中提取 cnt_option_contents
-		if rawRule, exists := params["raw_calc_rule"]; exists && rawRule != nil {
-			if ruleMap, ok := rawRule.(map[string]interface{}); ok {
-				if appendParams, ok := ruleMap["AppendParams"].(map[string]interface{}); ok {
-					if contents, ok := appendParams["cnt_option_contents"]; ok {
-						if contentsArray, ok := contents.([]interface{}); ok {
-							result.CntOptionContents = make([]string, 0, len(contentsArray))
-							for _, item := range contentsArray {
-								if str, ok := item.(string); ok {
-									result.CntOptionContents = append(result.CntOptionContents, str)
-								}
-							}
-						} else if contentsArray, ok := contents.([]string); ok {
-							result.CntOptionContents = contentsArray
-						}
-					}
+		rawRule, exists := params["raw_calc_rule"]
+		if !exists || rawRule == nil {
+			break
+		}
+
+		ruleMap := convertToMap(rawRule)
+		if ruleMap == nil {
+			break
+		}
+
+		appendParamsRaw, ok := ruleMap["AppendParams"]
+		if !ok {
+			break
+		}
+
+		appendParams := convertToMap(appendParamsRaw)
+		if appendParams == nil {
+			break
+		}
+
+		contents, ok := appendParams["cnt_option_contents"]
+		if !ok {
+			break
+		}
+
+		// 处理数组类型
+		if contentsArray, ok := contents.([]interface{}); ok {
+			result.CntOptionContents = make([]string, 0, len(contentsArray))
+			for _, item := range contentsArray {
+				if str, ok := item.(string); ok {
+					result.CntOptionContents = append(result.CntOptionContents, str)
 				}
 			}
+		} else if contentsArray, ok := contents.([]string); ok {
+			result.CntOptionContents = contentsArray
 		}
 
 	case ScoringStrategySum, ScoringStrategyAvg:
@@ -291,6 +311,33 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 
 	default:
 		// 其他策略：当前不需要额外参数
+	}
+
+	return result
+}
+
+// convertToMap 将 interface{} 转换为 map[string]interface{}
+// 用于处理 MongoDB 返回的 bson.M 等类型
+func convertToMap(v interface{}) map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+
+	// 尝试直接类型断言为 map[string]interface{}
+	if m, ok := v.(map[string]interface{}); ok {
+		return m
+	}
+
+	// 如果类型断言失败，可能是 bson.M 或其他类型
+	// 使用 JSON 序列化/反序列化来确保类型正确
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		return nil
 	}
 
 	return result
