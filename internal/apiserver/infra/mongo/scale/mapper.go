@@ -219,7 +219,9 @@ func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []Int
 	for i, r := range rules {
 		// 创建分数区间
 		scoreRange := scale.NewScoreRange(r.MinScore, r.MaxScore)
-		riskLevel := scale.RiskLevel(r.RiskLevel)
+
+		// 规范化风险等级（兼容旧数据）
+		riskLevel := normalizeRiskLevel(r.RiskLevel)
 
 		// 验证并记录日志
 		if !scoreRange.IsValid() {
@@ -231,11 +233,12 @@ func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []Int
 			)
 		}
 		if !riskLevel.IsValid() {
-			logger.L(ctx).Warnw("mapInterpretRulesToDomain: invalid risk level",
+			logger.L(ctx).Warnw("mapInterpretRulesToDomain: invalid risk level after normalization",
 				"rule_index", i,
+				"original_risk_level", r.RiskLevel,
+				"normalized_risk_level", riskLevel,
 				"min_score", r.MinScore,
 				"max_score", r.MaxScore,
-				"risk_level", r.RiskLevel,
 			)
 		}
 
@@ -248,4 +251,24 @@ func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []Int
 		result = append(result, rule)
 	}
 	return result
+}
+
+// normalizeRiskLevel 规范化风险等级字符串（兼容旧数据）
+// 将旧的风险等级值映射到新的有效值
+func normalizeRiskLevel(raw string) scale.RiskLevel {
+	switch raw {
+	case "none", "正常", "无风险", "normal":
+		return scale.RiskLevelNone
+	case "low", "轻度", "低风险":
+		return scale.RiskLevelLow
+	case "medium", "中度", "中风险":
+		return scale.RiskLevelMedium
+	case "high", "重度", "高风险":
+		return scale.RiskLevelHigh
+	case "severe", "严重", "极高风险":
+		return scale.RiskLevelSevere
+	default:
+		// 如果无法映射，返回原始值（让验证层处理）
+		return scale.RiskLevel(raw)
+	}
 }

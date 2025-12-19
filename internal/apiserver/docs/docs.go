@@ -1705,7 +1705,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/by-questionnaire": {
             "get": {
-                "description": "根据关联的问卷编码获取量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段",
+                "description": "根据关联的问卷编码获取量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -1814,7 +1814,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/published/{code}": {
             "get": {
-                "description": "根据编码获取已发布的量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段",
+                "description": "根据编码获取已发布的量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -1865,7 +1865,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}": {
             "get": {
-                "description": "根据编码获取量表详情。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段",
+                "description": "根据编码获取量表详情。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -1953,10 +1953,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/archive": {
             "post": {
-                "description": "归档量表",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "归档量表。量表编码通过 URL 路径参数传递，不需要请求体。",
                 "produces": [
                     "application/json"
                 ],
@@ -2064,7 +2061,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/factors": {
             "get": {
-                "description": "根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段",
+                "description": "根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -2115,7 +2112,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/factors/batch": {
             "put": {
-                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空\n响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段",
+                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空\n- risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe\n响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）",
                 "consumes": [
                     "application/json"
                 ],
@@ -2175,7 +2172,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/interpret-rules": {
             "put": {
-                "description": "批量设置量表所有因子的解读规则",
+                "description": "批量设置量表所有因子的解读规则\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -2235,10 +2232,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/publish": {
             "post": {
-                "description": "发布量表使其可用",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "发布量表使其可用。量表编码通过 URL 路径参数传递，不需要请求体。",
                 "produces": [
                     "application/json"
                 ],
@@ -2346,10 +2340,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/unpublish": {
             "post": {
-                "description": "下架量表使其不可用",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "下架量表使其不可用。量表编码通过 URL 路径参数传递，不需要请求体。",
                 "produces": [
                     "application/json"
                 ],
@@ -3086,6 +3077,10 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "risk_level": {
+                    "description": "因子级别的风险等级（用于批量设置，如果解读规则未指定则使用此值）",
+                    "type": "string"
+                },
                 "scoring_params": {
                     "$ref": "#/definitions/request.ScoringParamsModel"
                 },
@@ -3598,6 +3593,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "risk_level": {
+                    "description": "因子级别的风险等级（从解读规则中提取）",
+                    "type": "string"
                 },
                 "scoring_params": {
                     "type": "object",

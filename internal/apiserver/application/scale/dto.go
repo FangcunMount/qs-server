@@ -68,6 +68,7 @@ type FactorDTO struct {
 	QuestionCodes   []string           // 关联的题目编码列表
 	ScoringStrategy string             // 计分策略
 	ScoringParams   *ScoringParamsDTO  // 计分参数
+	RiskLevel       string             // 因子级别的风险等级（用于批量设置，如果解读规则未指定则使用此值）
 	InterpretRules  []InterpretRuleDTO // 解读规则列表
 }
 

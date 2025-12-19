@@ -26,6 +26,7 @@ type FactorResponse struct {
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
 	ScoringParams   map[string]interface{}  `json:"scoring_params"`
+	RiskLevel       string                  `json:"risk_level,omitempty"` // 因子级别的风险等级（从解读规则中提取）
 	InterpretRules  []InterpretRuleResponse `json:"interpret_rules,omitempty"`
 }
 
@@ -114,6 +115,7 @@ func newFactorResponse(result scale.FactorResult) FactorResponse {
 		QuestionCodes:   result.QuestionCodes,
 		ScoringStrategy: result.ScoringStrategy,
 		ScoringParams:   scoringParams,
+		RiskLevel:       result.RiskLevel,
 		InterpretRules:  rules,
 	}
 }

@@ -27,6 +27,7 @@ type FactorResult struct {
 	QuestionCodes   []string               // 关联的题目编码列表
 	ScoringStrategy string                 // 计分策略
 	ScoringParams   map[string]interface{} // 计分参数
+	RiskLevel       string                 // 因子级别的风险等级（从解读规则中提取，如果有多个规则则使用第一个规则的风险等级）
 	InterpretRules  []InterpretRuleResult  // 解读规则列表
 }
 
@@ -99,6 +100,7 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		QuestionCodes:   make([]string, 0),
 		ScoringStrategy: f.GetScoringStrategy().String(),
 		ScoringParams:   scoringParamsMap,
+		RiskLevel:       "", // 默认值，将从解读规则中提取
 		InterpretRules:  make([]InterpretRuleResult, 0),
 	}
 
@@ -107,15 +109,26 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		result.QuestionCodes = append(result.QuestionCodes, code.String())
 	}
 
-	// 转换解读规则列表
-	for _, rule := range f.GetInterpretRules() {
+	// 转换解读规则列表，并从第一个规则中提取风险等级作为因子级别的默认风险等级
+	rules := f.GetInterpretRules()
+	for i, rule := range rules {
+		riskLevel := rule.GetRiskLevel().String()
 		result.InterpretRules = append(result.InterpretRules, InterpretRuleResult{
 			MinScore:   rule.GetScoreRange().Min(),
 			MaxScore:   rule.GetScoreRange().Max(),
-			RiskLevel:  rule.GetRiskLevel().String(),
+			RiskLevel:  riskLevel,
 			Conclusion: rule.GetConclusion(),
 			Suggestion: rule.GetSuggestion(),
 		})
+		// 使用第一个规则的风险等级作为因子级别的默认风险等级
+		if i == 0 {
+			result.RiskLevel = riskLevel
+		}
+	}
+
+	// 如果没有解读规则，使用默认值 "none"
+	if len(rules) == 0 {
+		result.RiskLevel = "none"
 	}
 
 	return result

@@ -268,7 +268,9 @@ func (h *ScaleHandler) Delete(c *gin.Context) {
 // @Description 批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：
 // @Description - sum/avg 策略：scoring_params 可为空或省略
 // @Description - cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空
+// @Description - risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe
 // @Description 响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）
 // @Tags Scale-Factor
 // @Accept json
 // @Produce json
@@ -304,6 +306,9 @@ func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 			}
 		}
 
+		// 转换解读规则，如果规则中没有指定风险等级，使用因子级别的风险等级
+		interpretRules := toInterpretRuleDTOs(f.InterpretRules, f.RiskLevel)
+
 		factorDTOs = append(factorDTOs, scale.FactorDTO{
 			Code:            f.Code,
 			Title:           f.Title,
@@ -312,7 +317,8 @@ func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 			QuestionCodes:   f.QuestionCodes,
 			ScoringStrategy: f.ScoringStrategy,
 			ScoringParams:   scoringParamsDTO,
-			InterpretRules:  toInterpretRuleDTOs(f.InterpretRules),
+			RiskLevel:       f.RiskLevel,
+			InterpretRules:  interpretRules,
 		})
 	}
 
@@ -328,6 +334,7 @@ func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 // ReplaceInterpretRules 批量设置解读规则
 // @Summary 批量设置解读规则
 // @Description 批量设置量表所有因子的解读规则
+// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Factor
 // @Accept json
 // @Produce json
@@ -359,7 +366,7 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 		dtos = append(dtos, scale.UpdateFactorInterpretRulesDTO{
 			ScaleCode:      scaleCode,
 			FactorCode:     fr.FactorCode,
-			InterpretRules: toInterpretRuleDTOs(fr.InterpretRules),
+			InterpretRules: toInterpretRuleDTOs(fr.InterpretRules, ""), // 批量设置解读规则接口不使用因子级别的风险等级
 		})
 	}
 
@@ -377,6 +384,7 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 // GetByCode 根据编码获取量表
 // @Summary 获取量表详情
 // @Description 根据编码获取量表详情。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -403,6 +411,7 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 // GetByQuestionnaireCode 根据问卷编码获取量表
 // @Summary 根据问卷编码获取量表
 // @Description 根据关联的问卷编码获取量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -476,6 +485,7 @@ func (h *ScaleHandler) List(c *gin.Context) {
 // GetPublishedByCode 获取已发布的量表
 // @Summary 获取已发布的量表
 // @Description 根据编码获取已发布的量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -541,6 +551,7 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 // GetFactors 获取量表的因子列表
 // @Summary 获取量表的因子列表
 // @Description 根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -567,13 +578,24 @@ func (h *ScaleHandler) GetFactors(c *gin.Context) {
 // ============= Helper Functions =============
 
 // toInterpretRuleDTOs 转换解读规则请求为 DTO
-func toInterpretRuleDTOs(rules []request.InterpretRuleModel) []scale.InterpretRuleDTO {
+// defaultRiskLevel 为因子级别的默认风险等级，如果解读规则中没有指定风险等级，则使用此值
+func toInterpretRuleDTOs(rules []request.InterpretRuleModel, defaultRiskLevel string) []scale.InterpretRuleDTO {
 	result := make([]scale.InterpretRuleDTO, 0, len(rules))
 	for _, r := range rules {
+		// 如果解读规则中没有指定风险等级，使用因子级别的默认风险等级
+		riskLevel := r.RiskLevel
+		if riskLevel == "" && defaultRiskLevel != "" {
+			riskLevel = defaultRiskLevel
+		}
+		// 如果都没有指定，使用默认值 "none"
+		if riskLevel == "" {
+			riskLevel = "none"
+		}
+
 		result = append(result, scale.InterpretRuleDTO{
 			MinScore:   r.MinScore,
 			MaxScore:   r.MaxScore,
-			RiskLevel:  r.RiskLevel,
+			RiskLevel:  riskLevel,
 			Conclusion: r.Conclusion,
 			Suggestion: r.Suggestion,
 		})
