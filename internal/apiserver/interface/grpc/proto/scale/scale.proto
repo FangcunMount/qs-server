@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package scale;
+
+option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scale";
+
+// 量表服务 - 对外提供查询功能
+service ScaleService {
+  // 获取量表详情
+  rpc GetScale(GetScaleRequest) returns (GetScaleResponse);
+  
+  // 获取量表列表（返回摘要信息，不含 factors）
+  rpc ListScales(ListScalesRequest) returns (ListScalesResponse);
+  
+  // 获取量表分类列表
+  rpc GetScaleCategories(GetScaleCategoriesRequest) returns (GetScaleCategoriesResponse);
+}
+
+// 量表摘要信息（用于列表查询，不含 factors）
+message ScaleSummary {
+  string code = 1;
+  string title = 2;
+  string description = 3;
+  string category = 4;          // 主类
+  string stage = 5;             // 阶段
+  string applicable_age = 6;     // 使用年龄
+  string reporter = 7;          // 填报人
+  repeated string tags = 8;      // 标签列表
+  string questionnaire_code = 9;
+  string questionnaire_version = 10;
+  string status = 11;
+  string created_at = 12;
+  string updated_at = 13;
+}
+
+// 量表完整信息（用于详情查询）
+message Scale {
+  string code = 1;
+  string title = 2;
+  string description = 3;
+  string category = 4;          // 主类
+  string stage = 5;             // 阶段
+  string applicable_age = 6;     // 使用年龄
+  string reporter = 7;          // 填报人
+  repeated string tags = 8;      // 标签列表
+  string questionnaire_code = 9;
+  string questionnaire_version = 10;
+  string status = 11;
+  repeated Factor factors = 12;
+  string created_at = 13;
+  string updated_at = 14;
+}
+
+// 因子信息
+message Factor {
+  string code = 1;
+  string title = 2;
+  string factor_type = 3;
+  bool is_total_score = 4;
+  repeated string question_codes = 5;
+  string scoring_strategy = 6;
+  map<string, string> scoring_params = 7;
+  string risk_level = 8;
+  repeated InterpretRule interpret_rules = 9;
+}
+
+// 解读规则
+message InterpretRule {
+  double min_score = 1;
+  double max_score = 2;
+  string risk_level = 3;
+  string conclusion = 4;
+  string suggestion = 5;
+}
+
+// 获取量表请求
+message GetScaleRequest {
+  string code = 1;
+}
+
+// 获取量表响应
+message GetScaleResponse {
+  Scale scale = 1;
+}
+
+// 获取量表列表请求
+message ListScalesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string status = 3;
+  string title = 4;
+  string category = 5;      // 按主类过滤
+  string stage = 6;         // 按阶段过滤
+  string applicable_age = 7; // 按使用年龄过滤
+  string reporter = 8;      // 按填报人过滤
+  repeated string tags = 9; // 按标签过滤
+}
+
+// 获取量表列表响应
+message ListScalesResponse {
+  repeated ScaleSummary scales = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// 获取量表分类列表请求
+message GetScaleCategoriesRequest {
+}
+
+// 量表分类信息
+message ScaleCategory {
+  string value = 1;
+  string label = 2;
+}
+
+// 量表阶段信息
+message ScaleStage {
+  string value = 1;
+  string label = 2;
+}
+
+// 使用年龄信息
+message ApplicableAge {
+  string value = 1;
+  string label = 2;
+}
+
+// 填报人信息
+message Reporter {
+  string value = 1;
+  string label = 2;
+}
+
+// 标签信息
+message Tag {
+  string value = 1;
+  string label = 2;
+  string category = 3; // 标签分类：stage, theme, status, reporter
+}
+
+// 获取量表分类列表响应
+message GetScaleCategoriesResponse {
+  repeated ScaleCategory categories = 1;    // 主类列表
+  repeated ScaleStage stages = 2;           // 阶段列表
+  repeated ApplicableAge applicable_ages = 3; // 使用年龄列表
+  repeated Reporter reporters = 4;         // 填报人列表
+  repeated Tag tags = 5;                   // 标签列表
+}
+

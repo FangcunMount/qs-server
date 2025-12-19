@@ -44,6 +44,7 @@ type Manager struct {
 	questionnaireClient *QuestionnaireClient
 	evaluationClient    *EvaluationClient
 	actorClient         *ActorClient
+	scaleClient         *ScaleClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -178,6 +179,11 @@ func (m *Manager) RegisterClients() error {
 	m.clients["actor"] = m.actorClient
 	log.Info("   👤 Actor client registered")
 
+	// 注册 Scale 客户端
+	m.scaleClient = NewScaleClient(baseClient)
+	m.clients["scale"] = m.scaleClient
+	log.Info("   📊 Scale client registered")
+
 	log.Infof("✅ All gRPC clients registered (endpoint: %s)", m.config.Endpoint)
 	return nil
 }
@@ -200,6 +206,11 @@ func (m *Manager) EvaluationClient() *EvaluationClient {
 // ActorClient 获取 Actor 客户端
 func (m *Manager) ActorClient() *ActorClient {
 	return m.actorClient
+}
+
+// ScaleClient 获取量表客户端
+func (m *Manager) ScaleClient() *ScaleClient {
+	return m.scaleClient
 }
 
 // GetClient 根据名称获取客户端

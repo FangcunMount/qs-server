@@ -47,4 +47,12 @@ protoc --proto_path=${PROTO_PATH} \
        --go-grpc_opt=paths=source_relative \
        ${PROTO_PATH}/internalapi/internal.proto
 
+# 生成 scale 服务代码
+protoc --proto_path=${PROTO_PATH} \
+       --go_out=${GO_OUT_PATH} \
+       --go_opt=paths=source_relative \
+       --go-grpc_out=${GO_OUT_PATH} \
+       --go-grpc_opt=paths=source_relative \
+       ${PROTO_PATH}/scale/scale.proto
+
 echo "Proto files generated successfully!" 

@@ -787,6 +787,209 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/scales": {
+            "get": {
+                "description": "分页获取量表列表，支持按主类、阶段、使用年龄、填报人、标签等条件过滤",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "量表"
+                ],
+                "summary": "获取量表列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态过滤",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "标题过滤",
+                        "name": "title",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "主类过滤",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "阶段过滤",
+                        "name": "stage",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "使用年龄过滤",
+                        "name": "applicable_age",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "填报人过滤",
+                        "name": "reporter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "标签过滤",
+                        "name": "tags",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/scales/categories": {
+            "get": {
+                "description": "获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "量表"
+                ],
+                "summary": "获取量表分类列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/scale.ScaleCategoriesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/scales/{code}": {
+            "get": {
+                "description": "根据量表编码获取量表详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "量表"
+                ],
+                "summary": "获取量表详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "量表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/scale.ScaleResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/testees": {
             "get": {
                 "security": [
@@ -1560,6 +1763,26 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "scales": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.ScaleSummaryResponse"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "meta.Birthday": {
             "type": "object"
         },
@@ -1702,6 +1925,248 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "target_value": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.ApplicableAgeResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.FactorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "factor_type": {
+                    "type": "string"
+                },
+                "interpret_rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.InterpretRuleResponse"
+                    }
+                },
+                "is_total_score": {
+                    "type": "boolean"
+                },
+                "question_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "scoring_params": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "scoring_strategy": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.InterpretRuleResponse": {
+            "type": "object",
+            "properties": {
+                "conclusion": {
+                    "type": "string"
+                },
+                "max_score": {
+                    "type": "number"
+                },
+                "min_score": {
+                    "type": "number"
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "suggestion": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.ReporterResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.ScaleCategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.ApplicableAgeResponse"
+                    }
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.CategoryResponse"
+                    }
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.ReporterResponse"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.StageResponse"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.TagResponse"
+                    }
+                }
+            }
+        },
+        "scale.ScaleResponse": {
+            "type": "object",
+            "properties": {
+                "applicable_age": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "factors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.FactorResponse"
+                    }
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "reporter": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.ScaleSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "applicable_age": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "reporter": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.StageResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "scale.TagResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "value": {
                     "type": "string"
                 }
             }

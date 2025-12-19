@@ -106,6 +106,9 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	// 测评相关路由
 	r.registerEvaluationRoutes(api)
 
+	// 量表相关路由
+	r.registerScaleRoutes(api)
+
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
 }
@@ -153,6 +156,21 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		assessments.GET("/:id/scores", evaluationHandler.GetAssessmentScores)
 		// 测评报告
 		assessments.GET("/:id/report", evaluationHandler.GetAssessmentReport)
+	}
+}
+
+// registerScaleRoutes 注册量表相关路由
+func (r *Router) registerScaleRoutes(api *gin.RouterGroup) {
+	scaleHandler := r.container.ScaleHandler()
+
+	scales := api.Group("/scales")
+	{
+		// 获取量表分类列表（放在 :code 前面避免路由冲突）
+		scales.GET("/categories", scaleHandler.GetCategories)
+		// 获取量表列表
+		scales.GET("", scaleHandler.List)
+		// 获取量表详情
+		scales.GET("/:code", scaleHandler.Get)
 	}
 }
 

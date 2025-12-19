@@ -340,6 +340,13 @@ definitions:
       title:
         type: string
     type: object
+  response.ApplicableAgeResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
   response.ApplyCodeResponse:
     properties:
       codes:
@@ -482,6 +489,13 @@ definitions:
       total_count:
         description: 总数
         type: integer
+    type: object
+  response.CategoryResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
     type: object
   response.DimensionItem:
     properties:
@@ -770,12 +784,42 @@ definitions:
         description: 总分
         type: number
     type: object
+  response.ReporterResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
   response.ScaleAnalysisResponse:
     properties:
       scales:
         description: 量表趋势列表
         items:
           $ref: '#/definitions/response.ScaleTrendResponse'
+        type: array
+    type: object
+  response.ScaleCategoriesResponse:
+    properties:
+      applicable_ages:
+        items:
+          $ref: '#/definitions/response.ApplicableAgeResponse'
+        type: array
+      categories:
+        items:
+          $ref: '#/definitions/response.CategoryResponse'
+        type: array
+      reporters:
+        items:
+          $ref: '#/definitions/response.ReporterResponse'
+        type: array
+      stages:
+        items:
+          $ref: '#/definitions/response.StageResponse'
+        type: array
+      tags:
+        items:
+          $ref: '#/definitions/response.TagResponse'
         type: array
     type: object
   response.ScaleFactorResponse:
@@ -968,6 +1012,22 @@ definitions:
         type: string
       user_id:
         description: 用户ID
+        type: string
+    type: object
+  response.StageResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  response.TagResponse:
+    properties:
+      category:
+        type: string
+      label:
+        type: string
+      value:
         type: string
     type: object
   response.TesteeListResponse:
@@ -2549,6 +2609,32 @@ paths:
                   $ref: '#/definitions/response.ScaleResponse'
               type: object
       summary: 根据问卷编码获取量表
+      tags:
+      - Scale-Query
+  /api/v1/scales/categories:
+    get:
+      consumes:
+      - application/json
+      description: 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表，用于前端渲染和配置量表字段
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ScaleCategoriesResponse'
+              type: object
+      summary: 获取量表分类列表
       tags:
       - Scale-Query
   /api/v1/scales/published:

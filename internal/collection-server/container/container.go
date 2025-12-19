@@ -5,6 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
@@ -28,17 +29,20 @@ type Container struct {
 	questionnaireClient *grpcclient.QuestionnaireClient
 	evaluationClient    *grpcclient.EvaluationClient
 	actorClient         *grpcclient.ActorClient
+	scaleClient         *grpcclient.ScaleClient
 
 	// 应用层服务
 	submissionService         *answersheet.SubmissionService
 	questionnaireQueryService *questionnaire.QueryService
 	evaluationQueryService    *evaluation.QueryService
+	scaleQueryService         *scale.QueryService
 	testeeService             *testee.Service
 
 	// 接口层处理器
 	answerSheetHandler   *handler.AnswerSheetHandler
 	questionnaireHandler *handler.QuestionnaireHandler
 	evaluationHandler    *handler.EvaluationHandler
+	scaleHandler         *handler.ScaleHandler
 	testeeHandler        *handler.TesteeHandler
 	healthHandler        *handler.HealthHandler
 }
@@ -86,6 +90,7 @@ func (c *Container) initApplicationServices() {
 	c.submissionService = answersheet.NewSubmissionService(c.answerSheetClient, c.actorClient, guardianshipService)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient)
+	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
 	c.testeeService = testee.NewService(c.actorClient, guardianshipService)
 
 	log.Info("✅ Application services initialized")
@@ -104,6 +109,7 @@ func (c *Container) initHandlers() {
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService)
+	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, guardianshipService)
 	c.healthHandler = handler.NewHealthHandler("collection-server", "2.0.0")
 
@@ -150,6 +156,11 @@ func (c *Container) TesteeHandler() *handler.TesteeHandler {
 	return c.testeeHandler
 }
 
+// ScaleHandler 获取量表处理器
+func (c *Container) ScaleHandler() *handler.ScaleHandler {
+	return c.scaleHandler
+}
+
 // ==================== Setters (用于 GRPCClientRegistry 注入) ====================
 
 // SetAnswerSheetClient 设置答卷客户端
@@ -170,6 +181,11 @@ func (c *Container) SetEvaluationClient(client *grpcclient.EvaluationClient) {
 // SetActorClient 设置 Actor 客户端
 func (c *Container) SetActorClient(client *grpcclient.ActorClient) {
 	c.actorClient = client
+}
+
+// SetScaleClient 设置量表客户端
+func (c *Container) SetScaleClient(client *grpcclient.ScaleClient) {
+	c.scaleClient = client
 }
 
 // ActorClient 获取 Actor 客户端

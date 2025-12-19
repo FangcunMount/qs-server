@@ -9,6 +9,11 @@ type ScaleSummary struct {
 	Code              string
 	Title             string
 	Description       string
+	Category          Category
+	Stage             Stage
+	ApplicableAge     ApplicableAge
+	Reporter          Reporter
+	Tags              []Tag
 	QuestionnaireCode string
 	Status            Status
 }

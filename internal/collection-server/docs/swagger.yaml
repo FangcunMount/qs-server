@@ -262,6 +262,19 @@ definitions:
       total:
         type: integer
     type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      scales:
+        items:
+          $ref: '#/definitions/scale.ScaleSummaryResponse'
+        type: array
+      total:
+        type: integer
+    type: object
   meta.Birthday:
     type: object
   questionnaire.CalculationRuleResponse:
@@ -356,6 +369,164 @@ definitions:
       rule_type:
         type: string
       target_value:
+        type: string
+    type: object
+  scale.ApplicableAgeResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  scale.CategoryResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  scale.FactorResponse:
+    properties:
+      code:
+        type: string
+      factor_type:
+        type: string
+      interpret_rules:
+        items:
+          $ref: '#/definitions/scale.InterpretRuleResponse'
+        type: array
+      is_total_score:
+        type: boolean
+      question_codes:
+        items:
+          type: string
+        type: array
+      risk_level:
+        type: string
+      scoring_params:
+        additionalProperties:
+          type: string
+        type: object
+      scoring_strategy:
+        type: string
+      title:
+        type: string
+    type: object
+  scale.InterpretRuleResponse:
+    properties:
+      conclusion:
+        type: string
+      max_score:
+        type: number
+      min_score:
+        type: number
+      risk_level:
+        type: string
+      suggestion:
+        type: string
+    type: object
+  scale.ReporterResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  scale.ScaleCategoriesResponse:
+    properties:
+      applicable_ages:
+        items:
+          $ref: '#/definitions/scale.ApplicableAgeResponse'
+        type: array
+      categories:
+        items:
+          $ref: '#/definitions/scale.CategoryResponse'
+        type: array
+      reporters:
+        items:
+          $ref: '#/definitions/scale.ReporterResponse'
+        type: array
+      stages:
+        items:
+          $ref: '#/definitions/scale.StageResponse'
+        type: array
+      tags:
+        items:
+          $ref: '#/definitions/scale.TagResponse'
+        type: array
+    type: object
+  scale.ScaleResponse:
+    properties:
+      applicable_age:
+        type: string
+      category:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      factors:
+        items:
+          $ref: '#/definitions/scale.FactorResponse'
+        type: array
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      reporter:
+        type: string
+      stage:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  scale.ScaleSummaryResponse:
+    properties:
+      applicable_age:
+        type: string
+      category:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      reporter:
+        type: string
+      stage:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  scale.StageResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  scale.TagResponse:
+    properties:
+      category:
+        type: string
+      label:
+        type: string
+      value:
         type: string
     type: object
   testee.AssessmentStatsDTO:
@@ -965,6 +1136,132 @@ paths:
       summary: 获取问卷详情
       tags:
       - 问卷
+  /api/v1/scales:
+    get:
+      description: 分页获取量表列表，支持按主类、阶段、使用年龄、填报人、标签等条件过滤
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 状态过滤
+        in: query
+        name: status
+        type: string
+      - description: 标题过滤
+        in: query
+        name: title
+        type: string
+      - description: 主类过滤
+        in: query
+        name: category
+        type: string
+      - description: 阶段过滤
+        in: query
+        name: stage
+        type: string
+      - description: 使用年龄过滤
+        in: query
+        name: applicable_age
+        type: string
+      - description: 填报人过滤
+        in: query
+        name: reporter
+        type: string
+      - collectionFormat: csv
+        description: 标签过滤
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取量表列表
+      tags:
+      - 量表
+  /api/v1/scales/{code}:
+    get:
+      description: 根据量表编码获取量表详情
+      parameters:
+      - description: 量表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/scale.ScaleResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取量表详情
+      tags:
+      - 量表
+  /api/v1/scales/categories:
+    get:
+      description: 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/scale.ScaleCategoriesResponse'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取量表分类列表
+      tags:
+      - 量表
   /api/v1/testees:
     get:
       description: 查询当前用户（监护人）的所有受试者列表（支持分页）

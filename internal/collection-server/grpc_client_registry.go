@@ -46,6 +46,11 @@ func (r *GRPCClientRegistry) RegisterClients() error {
 		return err
 	}
 
+	// 注册 Scale 客户端
+	if err := r.registerScaleClient(); err != nil {
+		return err
+	}
+
 	log.Info("✅ All gRPC clients registered to container")
 	return nil
 }
@@ -99,6 +104,19 @@ func (r *GRPCClientRegistry) registerActorClient() error {
 
 	r.container.SetActorClient(client)
 	log.Info("   👤 Actor client injected to container")
+	return nil
+}
+
+// registerScaleClient 注册量表客户端
+func (r *GRPCClientRegistry) registerScaleClient() error {
+	client := r.manager.ScaleClient()
+	if client == nil {
+		log.Warn("Scale client is not initialized, skipping registration")
+		return nil
+	}
+
+	r.container.SetScaleClient(client)
+	log.Info("   📊 Scale client injected to container")
 	return nil
 }
 

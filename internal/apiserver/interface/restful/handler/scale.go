@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -583,6 +584,90 @@ func (h *ScaleHandler) GetFactors(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewFactorListResponse(factors))
+}
+
+// GetCategories 获取量表分类列表
+// @Summary 获取量表分类列表
+// @Description 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表，用于前端渲染和配置量表字段
+// @Tags Scale-Query
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response{data=response.ScaleCategoriesResponse}
+// @Router /api/v1/scales/categories [get]
+func (h *ScaleHandler) GetCategories(c *gin.Context) {
+	// 构建类别列表
+	categories := []response.CategoryResponse{
+		{Value: string(domainScale.CategoryADHD), Label: "ADHD"},
+		{Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
+		{Value: string(domainScale.CategorySensoryIntegration), Label: "感统"},
+		{Value: string(domainScale.CategoryExecutiveFunction), Label: "执行功能"},
+		{Value: string(domainScale.CategoryMentalHealth), Label: "心理健康"},
+		{Value: string(domainScale.CategoryNeurodevelopmentalScreening), Label: "神经发育筛查"},
+		{Value: string(domainScale.CategoryChronicDiseaseManagement), Label: "慢性病管理"},
+		{Value: string(domainScale.CategoryQualityOfLife), Label: "生活质量"},
+	}
+
+	// 构建阶段列表
+	stages := []response.StageResponse{
+		{Value: string(domainScale.StageScreening), Label: "筛查"},
+		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
+		{Value: string(domainScale.StageFollowUp), Label: "随访"},
+		{Value: string(domainScale.StageOutcome), Label: "结局"},
+	}
+
+	// 构建使用年龄列表
+	applicableAges := []response.ApplicableAgeResponse{
+		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿"},
+		{Value: string(domainScale.ApplicableAgeSchoolAge), Label: "学龄"},
+		{Value: string(domainScale.ApplicableAgeAdolescentAdult), Label: "青少年/成人"},
+		{Value: string(domainScale.ApplicableAgeChildAdolescent), Label: "儿童/青少年"},
+	}
+
+	// 构建填报人列表
+	reporters := []response.ReporterResponse{
+		{Value: string(domainScale.ReporterParent), Label: "家长评"},
+		{Value: string(domainScale.ReporterTeacher), Label: "教师评"},
+		{Value: string(domainScale.ReporterSelf), Label: "自评"},
+		{Value: string(domainScale.ReporterClinical), Label: "临床评定"},
+	}
+
+	// 构建标签列表
+	tags := []response.TagResponse{
+		// 阶段标签
+		{Value: string(domainScale.TagScreening), Label: "筛查", Category: "stage"},
+		{Value: string(domainScale.TagDeepAssessment), Label: "深评", Category: "stage"},
+		{Value: string(domainScale.TagFollowUp), Label: "随访", Category: "stage"},
+		{Value: string(domainScale.TagOutcome), Label: "功能结局", Category: "stage"},
+		// 主题标签
+		{Value: string(domainScale.TagBriefVersion), Label: "简版", Category: "theme"},
+		{Value: string(domainScale.TagBroadSpectrum), Label: "广谱", Category: "theme"},
+		{Value: string(domainScale.TagComorbidity), Label: "共病", Category: "theme"},
+		{Value: string(domainScale.TagFunction), Label: "功能", Category: "theme"},
+		{Value: string(domainScale.TagFamilySystem), Label: "家庭系统", Category: "theme"},
+		{Value: string(domainScale.TagStress), Label: "压力", Category: "theme"},
+		{Value: string(domainScale.TagInfant), Label: "婴幼儿", Category: "theme"},
+		{Value: string(domainScale.TagSchoolAge), Label: "学龄", Category: "theme"},
+		{Value: string(domainScale.TagAdolescent), Label: "青少年/成人", Category: "theme"},
+		// 状态标签
+		{Value: string(domainScale.TagNeedsVersioning), Label: "需定版", Category: "status"},
+		{Value: string(domainScale.TagCustom), Label: "自定义", Category: "status"},
+		// 填报人标签
+		{Value: string(domainScale.TagParentRating), Label: "家长评", Category: "reporter"},
+		{Value: string(domainScale.TagTeacherRating), Label: "教师评", Category: "reporter"},
+		{Value: string(domainScale.TagSelfRating), Label: "自评", Category: "reporter"},
+		{Value: string(domainScale.TagClinicalRating), Label: "临床评定", Category: "reporter"},
+	}
+
+	result := &response.ScaleCategoriesResponse{
+		Categories:     categories,
+		Stages:         stages,
+		ApplicableAges: applicableAges,
+		Reporters:      reporters,
+		Tags:           tags,
+	}
+
+	h.Success(c, result)
 }
 
 // ============= Helper Functions =============

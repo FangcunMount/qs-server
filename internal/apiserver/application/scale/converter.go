@@ -53,11 +53,16 @@ type ScaleListResult struct {
 
 // ScaleSummaryResult 量表摘要结果（不包含因子列表，用于列表展示）
 type ScaleSummaryResult struct {
-	Code              string // 量表编码
-	Title             string // 量表标题
-	Description       string // 量表描述
-	QuestionnaireCode string // 关联的问卷编码
-	Status            string // 状态
+	Code              string   // 量表编码
+	Title             string   // 量表标题
+	Description       string   // 量表描述
+	Category          string   // 主类
+	Stage             string   // 阶段
+	ApplicableAge     string   // 使用年龄
+	Reporter          string   // 填报人
+	Tags              []string // 标签列表
+	QuestionnaireCode string   // 关联的问卷编码
+	Status            string   // 状态
 }
 
 // ScaleSummaryListResult 量表摘要列表结果
@@ -172,10 +177,21 @@ func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummary
 	}
 
 	for _, item := range items {
+		// 转换标签列表
+		tags := make([]string, 0, len(item.Tags))
+		for _, tag := range item.Tags {
+			tags = append(tags, tag.String())
+		}
+
 		result.Items = append(result.Items, &ScaleSummaryResult{
 			Code:              item.Code,
 			Title:             item.Title,
 			Description:       item.Description,
+			Category:          item.Category.String(),
+			Stage:             item.Stage.String(),
+			ApplicableAge:     item.ApplicableAge.String(),
+			Reporter:          item.Reporter.String(),
+			Tags:              tags,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status.String(),
 		})

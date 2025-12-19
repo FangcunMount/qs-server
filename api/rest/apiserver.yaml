@@ -1091,6 +1091,31 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/categories:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取量表分类列表
+      description: 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表，用于前端渲染和配置量表字段
+      operationId: 获取量表分类列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ScaleCategoriesResponse'
   /scales/published:
     get:
       tags:
@@ -2138,6 +2163,13 @@ components:
           type: number
         title:
           type: string
+    response.ApplicableAgeResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
     response.ApplyCodeResponse:
       type: object
       properties:
@@ -2281,6 +2313,13 @@ components:
         total_count:
           description: 总数
           type: integer
+    response.CategoryResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
     response.DimensionItem:
       type: object
       properties:
@@ -2568,6 +2607,13 @@ components:
         total_score:
           description: 总分
           type: number
+    response.ReporterResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
     response.ScaleAnalysisResponse:
       type: object
       properties:
@@ -2576,6 +2622,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/response.ScaleTrendResponse'
+    response.ScaleCategoriesResponse:
+      type: object
+      properties:
+        applicable_ages:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ApplicableAgeResponse'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.CategoryResponse'
+        reporters:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ReporterResponse'
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.StageResponse'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.TagResponse'
     response.ScaleFactorResponse:
       type: object
       properties:
@@ -2767,6 +2836,22 @@ components:
           type: string
         user_id:
           description: 用户ID
+          type: string
+    response.StageResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+    response.TagResponse:
+      type: object
+      properties:
+        category:
+          type: string
+        label:
+          type: string
+        value:
           type: string
     response.TesteeListResponse:
       type: object

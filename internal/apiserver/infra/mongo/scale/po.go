@@ -105,9 +105,14 @@ type InterpretRulePO struct {
 
 // ScaleSummaryPO 量表摘要持久化对象（不包含 factors，用于列表查询）
 type ScaleSummaryPO struct {
-	Code              string `bson:"code"`
-	Title             string `bson:"title"`
-	Description       string `bson:"description"`
-	QuestionnaireCode string `bson:"questionnaire_code"`
-	Status            uint8  `bson:"status"`
+	Code              string   `bson:"code"`
+	Title             string   `bson:"title"`
+	Description       string   `bson:"description"`
+	Category          string   `bson:"category"`
+	Stage             string   `bson:"stage"`
+	ApplicableAge     string   `bson:"applicable_age"`
+	Reporter          string   `bson:"reporter"`
+	Tags              []string `bson:"tags"`
+	QuestionnaireCode string   `bson:"questionnaire_code"`
+	Status            uint8    `bson:"status"`
 }

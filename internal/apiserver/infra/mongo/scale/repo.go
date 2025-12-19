@@ -94,6 +94,11 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			"code":               1,
 			"title":              1,
 			"description":        1,
+			"category":           1,
+			"stage":              1,
+			"applicable_age":     1,
+			"reporter":           1,
+			"tags":               1,
 			"questionnaire_code": 1,
 			"status":             1,
 		})
@@ -112,10 +117,21 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 	// 转换为领域摘要对象
 	result := make([]*scale.ScaleSummary, 0, len(poList))
 	for _, po := range poList {
+		// 转换标签列表
+		tags := make([]scale.Tag, 0, len(po.Tags))
+		for _, tagStr := range po.Tags {
+			tags = append(tags, scale.NewTag(tagStr))
+		}
+
 		result = append(result, &scale.ScaleSummary{
 			Code:              po.Code,
 			Title:             po.Title,
 			Description:       po.Description,
+			Category:          scale.NewCategory(po.Category),
+			Stage:             scale.NewStage(po.Stage),
+			ApplicableAge:     scale.NewApplicableAge(po.ApplicableAge),
+			Reporter:          scale.NewReporter(po.Reporter),
+			Tags:              tags,
 			QuestionnaireCode: po.QuestionnaireCode,
 			Status:            scale.Status(po.Status),
 		})

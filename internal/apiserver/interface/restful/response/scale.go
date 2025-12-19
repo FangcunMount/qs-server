@@ -54,11 +54,16 @@ type ScaleListResponse struct {
 
 // ScaleSummaryResponse 量表摘要响应（不包含因子详情）
 type ScaleSummaryResponse struct {
-	Code              string `json:"code"`
-	Title             string `json:"title"`
-	Description       string `json:"description"`
-	QuestionnaireCode string `json:"questionnaire_code"`
-	Status            string `json:"status"`
+	Code              string   `json:"code"`
+	Title             string   `json:"title"`
+	Description       string   `json:"description"`
+	Category          string   `json:"category,omitempty"`
+	Stage             string   `json:"stage,omitempty"`
+	ApplicableAge     string   `json:"applicable_age,omitempty"`
+	Reporter          string   `json:"reporter,omitempty"`
+	Tags              []string `json:"tags,omitempty"`
+	QuestionnaireCode string   `json:"questionnaire_code"`
+	Status            string   `json:"status"`
 }
 
 // ScaleSummaryListResponse 量表摘要列表响应
@@ -173,6 +178,11 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 			Code:              item.Code,
 			Title:             item.Title,
 			Description:       item.Description,
+			Category:          item.Category,
+			Stage:             item.Stage,
+			ApplicableAge:     item.ApplicableAge,
+			Reporter:          item.Reporter,
+			Tags:              item.Tags,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status,
 		})
@@ -201,4 +211,44 @@ func NewFactorListResponse(factors []scale.FactorResult) *FactorListResponse {
 	return &FactorListResponse{
 		Factors: factorResponses,
 	}
+}
+
+// ScaleCategoriesResponse 量表分类响应
+type ScaleCategoriesResponse struct {
+	Categories     []CategoryResponse      `json:"categories"`
+	Stages         []StageResponse         `json:"stages"`
+	ApplicableAges []ApplicableAgeResponse `json:"applicable_ages"`
+	Reporters      []ReporterResponse      `json:"reporters"`
+	Tags           []TagResponse           `json:"tags"`
+}
+
+// CategoryResponse 类别响应
+type CategoryResponse struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+// StageResponse 阶段响应
+type StageResponse struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+// ApplicableAgeResponse 使用年龄响应
+type ApplicableAgeResponse struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+// ReporterResponse 填报人响应
+type ReporterResponse struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+// TagResponse 标签响应
+type TagResponse struct {
+	Value    string `json:"value"`
+	Label    string `json:"label"`
+	Category string `json:"category"`
 }

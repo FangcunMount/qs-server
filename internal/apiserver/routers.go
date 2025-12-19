@@ -199,13 +199,14 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		scales.PUT("/:code/factors/batch", scaleHandler.BatchUpdateFactors)      // 批量更新因子
 		scales.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
 
-		// 查询接口
-		scales.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
-		scales.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
-		scales.GET("", scaleHandler.List)                                    // 获取量表列表
+		// 查询接口（注意：具体路径要放在参数路径之前，避免路由冲突）
+		scales.GET("/categories", scaleHandler.GetCategories)                // 获取量表分类列表
 		scales.GET("/by-questionnaire", scaleHandler.GetByQuestionnaireCode) // 根据问卷获取量表
 		scales.GET("/published/:code", scaleHandler.GetPublishedByCode)      // 获取已发布量表
 		scales.GET("/published", scaleHandler.ListPublished)                 // 获取已发布列表
+		scales.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
+		scales.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
+		scales.GET("", scaleHandler.List)                                    // 获取量表列表
 	}
 }
 

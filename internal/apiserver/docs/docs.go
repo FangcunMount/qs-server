@@ -1754,6 +1754,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/scales/categories": {
+            "get": {
+                "description": "获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表，用于前端渲染和配置量表字段",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Scale-Query"
+                ],
+                "summary": "获取量表分类列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ScaleCategoriesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/scales/published": {
             "get": {
                 "description": "分页获取已发布的量表列表",
@@ -3370,6 +3414,17 @@ const docTemplate = `{
                 }
             }
         },
+        "response.ApplicableAgeResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "response.ApplyCodeResponse": {
             "type": "object",
             "properties": {
@@ -3567,6 +3622,17 @@ const docTemplate = `{
                 "total_count": {
                     "description": "总数",
                     "type": "integer"
+                }
+            }
+        },
+        "response.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
                 }
             }
         },
@@ -3981,6 +4047,17 @@ const docTemplate = `{
                 }
             }
         },
+        "response.ReporterResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "response.ScaleAnalysisResponse": {
             "type": "object",
             "properties": {
@@ -3989,6 +4066,41 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/response.ScaleTrendResponse"
+                    }
+                }
+            }
+        },
+        "response.ScaleCategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ApplicableAgeResponse"
+                    }
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.CategoryResponse"
+                    }
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ReporterResponse"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.StageResponse"
+                    }
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.TagResponse"
                     }
                 }
             }
@@ -4262,6 +4374,31 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "description": "用户ID",
+                    "type": "string"
+                }
+            }
+        },
+        "response.StageResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.TagResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "value": {
                     "type": "string"
                 }
             }

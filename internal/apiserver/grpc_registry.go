@@ -51,6 +51,11 @@ func (r *GRPCRegistry) RegisterServices() error {
 		return err
 	}
 
+	// 注册 Scale 服务
+	if err := r.registerScaleService(); err != nil {
+		return err
+	}
+
 	// 注册 Internal 服务（供 Worker 调用）
 	if err := r.registerInternalService(); err != nil {
 		return err
@@ -132,6 +137,23 @@ func (r *GRPCRegistry) registerEvaluationService() error {
 	)
 	r.server.RegisterService(evaluationService)
 	log.Info("   📊 Evaluation service registered")
+	return nil
+}
+
+// registerScaleService 注册量表服务
+func (r *GRPCRegistry) registerScaleService() error {
+	if r.container.ScaleModule == nil {
+		log.Warn("ScaleModule is not initialized, skipping scale service registration")
+		return nil
+	}
+
+	// 使用 QueryService
+	scaleService := service.NewScaleService(
+		r.container.ScaleModule.QueryService,
+	)
+
+	r.server.RegisterService(scaleService)
+	log.Info("   📊 Scale service registered (read-only)")
 	return nil
 }
 
