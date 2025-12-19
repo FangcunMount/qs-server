@@ -164,15 +164,29 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
 	}
 
-	// 4. 转换因子列表
+	// 4. 转换因子列表并验证
 	factors := make([]*scale.Factor, 0, len(factorDTOs))
+	var allValidationErrors []scale.ValidationError
+
 	for _, dto := range factorDTOs {
 		factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore,
 			dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.InterpretRules)
 		if err != nil {
 			return nil, err
 		}
+
+		// 验证因子
+		factorErrs := scale.ValidateFactor(factor)
+		if len(factorErrs) > 0 {
+			allValidationErrors = append(allValidationErrors, factorErrs...)
+		}
+
 		factors = append(factors, factor)
+	}
+
+	// 如果有验证错误，返回所有错误
+	if len(allValidationErrors) > 0 {
+		return nil, scale.ToError(allValidationErrors)
 	}
 
 	// 5. 替换因子

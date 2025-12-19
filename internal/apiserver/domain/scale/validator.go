@@ -61,7 +61,7 @@ func (Validator) ValidateForPublish(m *MedicalScale) []ValidationError {
 
 	// 4. 每个因子的验证
 	for _, factor := range m.GetFactors() {
-		factorErrs := validateFactor(factor)
+		factorErrs := ValidateFactor(factor)
 		errs = append(errs, factorErrs...)
 	}
 
@@ -84,8 +84,9 @@ func (Validator) ValidateForPublish(m *MedicalScale) []ValidationError {
 	return errs
 }
 
-// validateFactor 验证单个因子
-func validateFactor(f *Factor) []ValidationError {
+// ValidateFactor 验证单个因子
+// 用于验证因子的有效性，包括标题、题目、解读规则等
+func ValidateFactor(f *Factor) []ValidationError {
 	var errs []ValidationError
 	factorCode := f.GetCode().Value()
 
