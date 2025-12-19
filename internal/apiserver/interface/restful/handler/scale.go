@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -161,9 +162,8 @@ func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 
 // Publish 发布量表
 // @Summary 发布量表
-// @Description 发布量表使其可用
+// @Description 发布量表使其可用。量表编码通过 URL 路径参数传递，不需要请求体。
 // @Tags Scale-Lifecycle
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
@@ -171,8 +171,9 @@ func (h *ScaleHandler) UpdateQuestionnaire(c *gin.Context) {
 // @Router /api/v1/scales/{code}/publish [post]
 func (h *ScaleHandler) Publish(c *gin.Context) {
 	scaleCode := c.Param("code")
+	logger.L(c.Request.Context()).Infow("Publish: 发布量表", "scaleCode", scaleCode)
 	if scaleCode == "" {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空，请通过 URL 路径参数传递，例如：POST /api/v1/scales/{code}/publish"))
 		return
 	}
 
@@ -187,9 +188,8 @@ func (h *ScaleHandler) Publish(c *gin.Context) {
 
 // Unpublish 下架量表
 // @Summary 下架量表
-// @Description 下架量表使其不可用
+// @Description 下架量表使其不可用。量表编码通过 URL 路径参数传递，不需要请求体。
 // @Tags Scale-Lifecycle
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
@@ -198,7 +198,7 @@ func (h *ScaleHandler) Publish(c *gin.Context) {
 func (h *ScaleHandler) Unpublish(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空，请通过 URL 路径参数传递，例如：POST /api/v1/scales/{code}/unpublish"))
 		return
 	}
 
@@ -213,9 +213,8 @@ func (h *ScaleHandler) Unpublish(c *gin.Context) {
 
 // Archive 归档量表
 // @Summary 归档量表
-// @Description 归档量表
+// @Description 归档量表。量表编码通过 URL 路径参数传递，不需要请求体。
 // @Tags Scale-Lifecycle
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
@@ -224,7 +223,7 @@ func (h *ScaleHandler) Unpublish(c *gin.Context) {
 func (h *ScaleHandler) Archive(c *gin.Context) {
 	scaleCode := c.Param("code")
 	if scaleCode == "" {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空，请通过 URL 路径参数传递，例如：POST /api/v1/scales/{code}/archive"))
 		return
 	}
 

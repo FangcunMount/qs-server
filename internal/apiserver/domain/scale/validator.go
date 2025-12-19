@@ -1,6 +1,11 @@
 package scale
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/FangcunMount/component-base/pkg/errors"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+)
 
 // ValidationError 验证错误
 type ValidationError struct {
@@ -122,13 +127,15 @@ func validateFactor(f *Factor) []ValidationError {
 
 // ToError 将验证错误列表转换为单个 error
 // 如果没有错误返回 nil
+// 返回的错误实现了 errors.Coder 接口，会返回 400 状态码
 func ToError(errs []ValidationError) error {
 	if len(errs) == 0 {
 		return nil
 	}
 
-	// 返回第一个错误（简化处理）
-	return &errs[0]
+	// 将第一个验证错误包装为带错误码的错误，确保返回 400 状态码
+	firstErr := errs[0]
+	return errors.WithCode(errorCode.ErrInvalidArgument, "%s: %s", firstErr.Field, firstErr.Message)
 }
 
 // ToErrors 将验证错误列表转换为 error 切片
