@@ -1,6 +1,7 @@
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 
@@ -92,13 +93,13 @@ func (m *ScaleMapper) mapInterpretRulesToPO(rules []scale.InterpretationRule) []
 }
 
 // ToDomain 将持久化对象转换为领域模型
-func (m *ScaleMapper) ToDomain(po *ScalePO) *scale.MedicalScale {
+func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalScale {
 	if po == nil {
 		return nil
 	}
 
 	// 转换因子列表
-	factors := m.mapFactorsToDomain(po.Factors)
+	factors := m.mapFactorsToDomain(ctx, po.Factors)
 
 	// 创建领域模型
 	domain, err := scale.NewMedicalScale(
@@ -118,14 +119,14 @@ func (m *ScaleMapper) ToDomain(po *ScalePO) *scale.MedicalScale {
 }
 
 // mapFactorsToDomain 将因子持久化对象列表转换为领域模型
-func (m *ScaleMapper) mapFactorsToDomain(factors []FactorPO) []*scale.Factor {
+func (m *ScaleMapper) mapFactorsToDomain(ctx context.Context, factors []FactorPO) []*scale.Factor {
 	if factors == nil {
 		return []*scale.Factor{}
 	}
 
 	result := make([]*scale.Factor, 0, len(factors))
 	for _, f := range factors {
-		if factor := m.mapFactorToDomain(f); factor != nil {
+		if factor := m.mapFactorToDomain(ctx, f); factor != nil {
 			result = append(result, factor)
 		}
 	}
@@ -133,7 +134,7 @@ func (m *ScaleMapper) mapFactorsToDomain(factors []FactorPO) []*scale.Factor {
 }
 
 // mapFactorToDomain 将单个因子持久化对象转换为领域模型
-func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
+func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale.Factor {
 	// 转换题目编码
 	questionCodes := make([]meta.Code, 0, len(po.QuestionCodes))
 	for _, qc := range po.QuestionCodes {
@@ -146,19 +147,19 @@ func (m *ScaleMapper) mapFactorToDomain(po FactorPO) *scale.Factor {
 	// 从 map[string]interface{} 恢复计分参数
 	// 添加日志：记录 PO 层的 scoring_params
 	scoringParamsJSON, _ := json.Marshal(po.ScoringParams)
-	logger.L(nil).Infow("mapFactorToDomain: PO scoring_params",
+	logger.L(ctx).Infow("mapFactorToDomain: PO scoring_params",
 		"factor_code", po.Code,
 		"scoring_strategy", po.ScoringStrategy,
 		"scoring_params", string(scoringParamsJSON),
 		"scoring_params_type", getTypeName(po.ScoringParams),
 	)
 
-	scoringParams := scale.ScoringParamsFromMap(po.ScoringParams, scale.ScoringStrategyCode(po.ScoringStrategy))
+	scoringParams := scale.ScoringParamsFromMap(ctx, po.ScoringParams, scale.ScoringStrategyCode(po.ScoringStrategy))
 
 	// 添加日志：记录转换后的 ScoringParams
 	if scoringParams != nil {
 		cntContentsJSON, _ := json.Marshal(scoringParams.GetCntOptionContents())
-		logger.L(nil).Infow("mapFactorToDomain: Domain ScoringParams",
+		logger.L(ctx).Infow("mapFactorToDomain: Domain ScoringParams",
 			"factor_code", po.Code,
 			"cnt_option_contents", string(cntContentsJSON),
 		)

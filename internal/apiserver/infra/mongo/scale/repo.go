@@ -57,7 +57,7 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.Medica
 		return nil, err
 	}
 
-	return r.mapper.ToDomain(&po), nil
+	return r.mapper.ToDomain(ctx, &po), nil
 }
 
 // FindByQuestionnaireCode 根据问卷编码查询量表
@@ -76,7 +76,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 		return nil, err
 	}
 
-	return r.mapper.ToDomain(&po), nil
+	return r.mapper.ToDomain(ctx, &po), nil
 }
 
 // FindSummaryList 分页查询量表摘要列表（不包含 factors）

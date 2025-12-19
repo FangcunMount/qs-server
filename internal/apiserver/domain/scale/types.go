@@ -1,6 +1,7 @@
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 
@@ -263,17 +264,17 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]interface
 }
 
 // FromMap 从 map[string]interface{} 创建（用于从持久化层恢复）
-func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrategyCode) *ScoringParams {
+func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, strategy ScoringStrategyCode) *ScoringParams {
 	// 添加日志：记录输入参数
 	paramsJSON, _ := json.Marshal(params)
-	logger.L(nil).Infow("ScoringParamsFromMap: input",
+	logger.L(ctx).Infow("ScoringParamsFromMap: input",
 		"strategy", strategy,
 		"params", string(paramsJSON),
 		"params_type", getTypeName(params),
 	)
 
 	if params == nil {
-		logger.L(nil).Warnw("ScoringParamsFromMap: params is nil")
+		logger.L(ctx).Warnw("ScoringParamsFromMap: params is nil")
 		return NewScoringParams()
 	}
 
@@ -284,57 +285,57 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 	case ScoringStrategyCnt:
 		// 从 raw_calc_rule 中提取 cnt_option_contents
 		rawRule, exists := params["raw_calc_rule"]
-		logger.L(nil).Infow("ScoringParamsFromMap: checking raw_calc_rule",
+		logger.L(ctx).Infow("ScoringParamsFromMap: checking raw_calc_rule",
 			"exists", exists,
 			"raw_rule_type", getTypeName(rawRule),
 		)
 
 		if !exists || rawRule == nil {
-			logger.L(nil).Warnw("ScoringParamsFromMap: raw_calc_rule not found or nil")
+			logger.L(ctx).Warnw("ScoringParamsFromMap: raw_calc_rule not found or nil")
 			break
 		}
 
 		// 使用 convertToMap 处理 MongoDB 返回的各种类型
 		ruleMap := convertToMap(rawRule)
 		if ruleMap == nil {
-			logger.L(nil).Warnw("ScoringParamsFromMap: convertToMap(rawRule) returned nil")
+			logger.L(ctx).Warnw("ScoringParamsFromMap: convertToMap(rawRule) returned nil")
 			break
 		}
 
 		ruleMapJSON, _ := json.Marshal(ruleMap)
-		logger.L(nil).Infow("ScoringParamsFromMap: ruleMap converted",
+		logger.L(ctx).Infow("ScoringParamsFromMap: ruleMap converted",
 			"rule_map", string(ruleMapJSON),
 		)
 
 		appendParamsRaw, ok := ruleMap["AppendParams"]
 		if !ok {
-			logger.L(nil).Warnw("ScoringParamsFromMap: AppendParams not found in ruleMap")
+			logger.L(ctx).Warnw("ScoringParamsFromMap: AppendParams not found in ruleMap")
 			break
 		}
 
-		logger.L(nil).Infow("ScoringParamsFromMap: AppendParams found",
+		logger.L(ctx).Infow("ScoringParamsFromMap: AppendParams found",
 			"append_params_type", getTypeName(appendParamsRaw),
 		)
 
 		appendParams := convertToMap(appendParamsRaw)
 
 		if appendParams == nil {
-			logger.L(nil).Warnw("ScoringParamsFromMap: convertToMap(appendParamsRaw) returned nil")
+			logger.L(ctx).Warnw("ScoringParamsFromMap: convertToMap(appendParamsRaw) returned nil")
 			break
 		}
 
 		appendParamsJSON, _ := json.Marshal(appendParams)
-		logger.L(nil).Infow("ScoringParamsFromMap: appendParams converted",
+		logger.L(ctx).Infow("ScoringParamsFromMap: appendParams converted",
 			"append_params", string(appendParamsJSON),
 		)
 
 		contents, ok := appendParams["cnt_option_contents"]
 		if !ok {
-			logger.L(nil).Warnw("ScoringParamsFromMap: cnt_option_contents not found in appendParams")
+			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents not found in appendParams")
 			break
 		}
 
-		logger.L(nil).Infow("ScoringParamsFromMap: cnt_option_contents found",
+		logger.L(ctx).Infow("ScoringParamsFromMap: cnt_option_contents found",
 			"contents_type", getTypeName(contents),
 		)
 
@@ -346,18 +347,18 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 					result.CntOptionContents = append(result.CntOptionContents, str)
 				}
 			}
-			logger.L(nil).Infow("ScoringParamsFromMap: extracted cnt_option_contents",
+			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents",
 				"count", len(result.CntOptionContents),
 				"contents", result.CntOptionContents,
 			)
 		} else if contentsArray, ok := contents.([]string); ok {
 			result.CntOptionContents = contentsArray
-			logger.L(nil).Infow("ScoringParamsFromMap: extracted cnt_option_contents (direct string array)",
+			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents (direct string array)",
 				"count", len(result.CntOptionContents),
 				"contents", result.CntOptionContents,
 			)
 		} else {
-			logger.L(nil).Warnw("ScoringParamsFromMap: cnt_option_contents is not array type",
+			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents is not array type",
 				"contents_type", getTypeName(contents),
 			)
 		}
@@ -370,7 +371,7 @@ func ScoringParamsFromMap(params map[string]interface{}, strategy ScoringStrateg
 	}
 
 	resultJSON, _ := json.Marshal(result.GetCntOptionContents())
-	logger.L(nil).Infow("ScoringParamsFromMap: final result",
+	logger.L(ctx).Infow("ScoringParamsFromMap: final result",
 		"cnt_option_contents", string(resultJSON),
 	)
 
