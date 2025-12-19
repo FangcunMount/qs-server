@@ -2,6 +2,7 @@ package scale
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -128,14 +129,24 @@ func validateFactor(f *Factor) []ValidationError {
 // ToError 将验证错误列表转换为单个 error
 // 如果没有错误返回 nil
 // 返回的错误实现了 errors.Coder 接口，会返回 400 状态码
+// 如果有多个错误，会将所有错误合并到一个错误消息中
 func ToError(errs []ValidationError) error {
 	if len(errs) == 0 {
 		return nil
 	}
 
-	// 将第一个验证错误包装为带错误码的错误，确保返回 400 状态码
-	firstErr := errs[0]
-	return errors.WithCode(errorCode.ErrInvalidArgument, "%s: %s", firstErr.Field, firstErr.Message)
+	// 如果有多个错误，合并所有错误信息
+	if len(errs) == 1 {
+		firstErr := errs[0]
+		return errors.WithCode(errorCode.ErrInvalidArgument, "%s: %s", firstErr.Field, firstErr.Message)
+	}
+
+	// 多个错误时，合并所有错误信息
+	var messages []string
+	for _, err := range errs {
+		messages = append(messages, fmt.Sprintf("%s: %s", err.Field, err.Message))
+	}
+	return errors.WithCode(errorCode.ErrInvalidArgument, "验证失败：%s", strings.Join(messages, "; "))
 }
 
 // ToErrors 将验证错误列表转换为 error 切片
