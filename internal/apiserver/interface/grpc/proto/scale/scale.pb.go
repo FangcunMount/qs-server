@@ -27,11 +27,11 @@ type ScaleSummary struct {
 	Code                 string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	Title                string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Category             string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`                                // 主类
-	Stage                string                 `protobuf:"bytes,5,opt,name=stage,proto3" json:"stage,omitempty"`                                      // 阶段
-	ApplicableAge        string                 `protobuf:"bytes,6,opt,name=applicable_age,json=applicableAge,proto3" json:"applicable_age,omitempty"` // 使用年龄
-	Reporters            []string               `protobuf:"bytes,7,rep,name=reporters,proto3" json:"reporters,omitempty"`                              // 填报人列表
-	Tags                 []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                        // 标签列表
+	Category             string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`                                   // 主类
+	Stages               []string               `protobuf:"bytes,5,rep,name=stages,proto3" json:"stages,omitempty"`                                       // 阶段列表
+	ApplicableAges       []string               `protobuf:"bytes,6,rep,name=applicable_ages,json=applicableAges,proto3" json:"applicable_ages,omitempty"` // 使用年龄列表
+	Reporters            []string               `protobuf:"bytes,7,rep,name=reporters,proto3" json:"reporters,omitempty"`                                 // 填报人列表
+	Tags                 []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                           // 标签列表
 	QuestionnaireCode    string                 `protobuf:"bytes,9,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,10,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Status               string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
@@ -99,18 +99,18 @@ func (x *ScaleSummary) GetCategory() string {
 	return ""
 }
 
-func (x *ScaleSummary) GetStage() string {
+func (x *ScaleSummary) GetStages() []string {
 	if x != nil {
-		return x.Stage
+		return x.Stages
 	}
-	return ""
+	return nil
 }
 
-func (x *ScaleSummary) GetApplicableAge() string {
+func (x *ScaleSummary) GetApplicableAges() []string {
 	if x != nil {
-		return x.ApplicableAge
+		return x.ApplicableAges
 	}
-	return ""
+	return nil
 }
 
 func (x *ScaleSummary) GetReporters() []string {
@@ -168,11 +168,11 @@ type Scale struct {
 	Code                 string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	Title                string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Category             string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`                                // 主类
-	Stage                string                 `protobuf:"bytes,5,opt,name=stage,proto3" json:"stage,omitempty"`                                      // 阶段
-	ApplicableAge        string                 `protobuf:"bytes,6,opt,name=applicable_age,json=applicableAge,proto3" json:"applicable_age,omitempty"` // 使用年龄
-	Reporters            []string               `protobuf:"bytes,7,rep,name=reporters,proto3" json:"reporters,omitempty"`                              // 填报人列表
-	Tags                 []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                        // 标签列表
+	Category             string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`                                   // 主类
+	Stages               []string               `protobuf:"bytes,5,rep,name=stages,proto3" json:"stages,omitempty"`                                       // 阶段列表
+	ApplicableAges       []string               `protobuf:"bytes,6,rep,name=applicable_ages,json=applicableAges,proto3" json:"applicable_ages,omitempty"` // 使用年龄列表
+	Reporters            []string               `protobuf:"bytes,7,rep,name=reporters,proto3" json:"reporters,omitempty"`                                 // 填报人列表
+	Tags                 []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                           // 标签列表
 	QuestionnaireCode    string                 `protobuf:"bytes,9,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,10,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Status               string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
@@ -241,18 +241,18 @@ func (x *Scale) GetCategory() string {
 	return ""
 }
 
-func (x *Scale) GetStage() string {
+func (x *Scale) GetStages() []string {
 	if x != nil {
-		return x.Stage
+		return x.Stages
 	}
-	return ""
+	return nil
 }
 
-func (x *Scale) GetApplicableAge() string {
+func (x *Scale) GetApplicableAges() []string {
 	if x != nil {
-		return x.ApplicableAge
+		return x.ApplicableAges
 	}
-	return ""
+	return nil
 }
 
 func (x *Scale) GetReporters() []string {
@@ -589,18 +589,18 @@ func (x *GetScaleResponse) GetScale() *Scale {
 
 // 获取量表列表请求
 type ListScalesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Page          int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
-	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	Category      string                 `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`                                // 按主类过滤
-	Stage         string                 `protobuf:"bytes,6,opt,name=stage,proto3" json:"stage,omitempty"`                                      // 按阶段过滤
-	ApplicableAge string                 `protobuf:"bytes,7,opt,name=applicable_age,json=applicableAge,proto3" json:"applicable_age,omitempty"` // 按使用年龄过滤
-	Reporters     []string               `protobuf:"bytes,8,rep,name=reporters,proto3" json:"reporters,omitempty"`                              // 按填报人过滤
-	Tags          []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`                                        // 按标签过滤
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Page           int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize       int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Status         string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Title          string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	Category       string                 `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`                                   // 按主类过滤
+	Stages         []string               `protobuf:"bytes,6,rep,name=stages,proto3" json:"stages,omitempty"`                                       // 按阶段过滤（数组）
+	ApplicableAges []string               `protobuf:"bytes,7,rep,name=applicable_ages,json=applicableAges,proto3" json:"applicable_ages,omitempty"` // 按使用年龄过滤（数组）
+	Reporters      []string               `protobuf:"bytes,8,rep,name=reporters,proto3" json:"reporters,omitempty"`                                 // 按填报人过滤
+	Tags           []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`                                           // 按标签过滤
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListScalesRequest) Reset() {
@@ -668,18 +668,18 @@ func (x *ListScalesRequest) GetCategory() string {
 	return ""
 }
 
-func (x *ListScalesRequest) GetStage() string {
+func (x *ListScalesRequest) GetStages() []string {
 	if x != nil {
-		return x.Stage
+		return x.Stages
 	}
-	return ""
+	return nil
 }
 
-func (x *ListScalesRequest) GetApplicableAge() string {
+func (x *ListScalesRequest) GetApplicableAges() []string {
 	if x != nil {
-		return x.ApplicableAge
+		return x.ApplicableAges
 	}
-	return ""
+	return nil
 }
 
 func (x *ListScalesRequest) GetReporters() []string {
@@ -1156,14 +1156,14 @@ var File_scale_scale_proto protoreflect.FileDescriptor
 
 const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
-	"\x11scale/scale.proto\x12\x05scale\"\x9f\x03\n" +
+	"\x11scale/scale.proto\x12\x05scale\"\xa3\x03\n" +
 	"\fScaleSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
-	"\bcategory\x18\x04 \x01(\tR\bcategory\x12\x14\n" +
-	"\x05stage\x18\x05 \x01(\tR\x05stage\x12%\n" +
-	"\x0eapplicable_age\x18\x06 \x01(\tR\rapplicableAge\x12\x1c\n" +
+	"\bcategory\x18\x04 \x01(\tR\bcategory\x12\x16\n" +
+	"\x06stages\x18\x05 \x03(\tR\x06stages\x12'\n" +
+	"\x0fapplicable_ages\x18\x06 \x03(\tR\x0eapplicableAges\x12\x1c\n" +
 	"\treporters\x18\a \x03(\tR\treporters\x12\x12\n" +
 	"\x04tags\x18\b \x03(\tR\x04tags\x12-\n" +
 	"\x12questionnaire_code\x18\t \x01(\tR\x11questionnaireCode\x123\n" +
@@ -1173,14 +1173,14 @@ const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\tR\tupdatedAt\"\xc1\x03\n" +
+	"updated_at\x18\r \x01(\tR\tupdatedAt\"\xc5\x03\n" +
 	"\x05Scale\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
-	"\bcategory\x18\x04 \x01(\tR\bcategory\x12\x14\n" +
-	"\x05stage\x18\x05 \x01(\tR\x05stage\x12%\n" +
-	"\x0eapplicable_age\x18\x06 \x01(\tR\rapplicableAge\x12\x1c\n" +
+	"\bcategory\x18\x04 \x01(\tR\bcategory\x12\x16\n" +
+	"\x06stages\x18\x05 \x03(\tR\x06stages\x12'\n" +
+	"\x0fapplicable_ages\x18\x06 \x03(\tR\x0eapplicableAges\x12\x1c\n" +
 	"\treporters\x18\a \x03(\tR\treporters\x12\x12\n" +
 	"\x04tags\x18\b \x03(\tR\x04tags\x12-\n" +
 	"\x12questionnaire_code\x18\t \x01(\tR\x11questionnaireCode\x123\n" +
@@ -1221,15 +1221,15 @@ const file_scale_scale_proto_rawDesc = "" +
 	"\x0fGetScaleRequest\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\"6\n" +
 	"\x10GetScaleResponse\x12\"\n" +
-	"\x05scale\x18\x01 \x01(\v2\f.scale.ScaleR\x05scale\"\xfd\x01\n" +
+	"\x05scale\x18\x01 \x01(\v2\f.scale.ScaleR\x05scale\"\x81\x02\n" +
 	"\x11ListScalesRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12\x1a\n" +
-	"\bcategory\x18\x05 \x01(\tR\bcategory\x12\x14\n" +
-	"\x05stage\x18\x06 \x01(\tR\x05stage\x12%\n" +
-	"\x0eapplicable_age\x18\a \x01(\tR\rapplicableAge\x12\x1c\n" +
+	"\bcategory\x18\x05 \x01(\tR\bcategory\x12\x16\n" +
+	"\x06stages\x18\x06 \x03(\tR\x06stages\x12'\n" +
+	"\x0fapplicable_ages\x18\a \x03(\tR\x0eapplicableAges\x12\x1c\n" +
 	"\treporters\x18\b \x03(\tR\treporters\x12\x12\n" +
 	"\x04tags\x18\t \x03(\tR\x04tags\"\x88\x01\n" +
 	"\x12ListScalesResponse\x12+\n" +

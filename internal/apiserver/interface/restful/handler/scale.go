@@ -45,8 +45,8 @@ func NewScaleHandler(
 // @Description 创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
 // @Description 字段说明：
 // @Description - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
-// @Description - stage: 阶段，可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)
-// @Description - applicable_age: 使用年龄，可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)
+// @Description - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
+// @Description - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 // @Description - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
 // @Description - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
 // @Tags Scale-Lifecycle
@@ -71,8 +71,8 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 		Title:                req.Title,
 		Description:          req.Description,
 		Category:             req.Category,
-		Stage:                req.Stage,
-		ApplicableAge:        req.ApplicableAge,
+		Stages:               req.Stages,
+		ApplicableAges:       req.ApplicableAges,
 		Reporters:            req.Reporters,
 		Tags:                 req.Tags,
 		QuestionnaireCode:    req.QuestionnaireCode,
@@ -93,8 +93,8 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 // @Description 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。
 // @Description 字段说明：
 // @Description - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
-// @Description - stage: 阶段，可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)
-// @Description - applicable_age: 使用年龄，可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)
+// @Description - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
+// @Description - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 // @Description - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
 // @Description - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
 // @Tags Scale-Lifecycle
@@ -123,14 +123,14 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 	}
 
 	dto := scale.UpdateScaleBasicInfoDTO{
-		Code:          scaleCode,
-		Title:         req.Title,
-		Description:   req.Description,
-		Category:      req.Category,
-		Stage:         req.Stage,
-		ApplicableAge: req.ApplicableAge,
-		Reporters:     req.Reporters,
-		Tags:          req.Tags,
+		Code:           scaleCode,
+		Title:          req.Title,
+		Description:    req.Description,
+		Category:       req.Category,
+		Stages:         req.Stages,
+		ApplicableAges: req.ApplicableAges,
+		Reporters:      req.Reporters,
+		Tags:           req.Tags,
 	}
 
 	result, err := h.lifecycleService.UpdateBasicInfo(c.Request.Context(), dto)
@@ -411,8 +411,8 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 // @Description 根据编码获取量表详情。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
-// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
@@ -445,8 +445,8 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 // @Description 根据关联的问卷编码获取量表。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
-// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
@@ -476,7 +476,7 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 
 // List 获取量表列表
 // @Summary 获取量表列表
-// @Description 分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stage（阶段）、applicable_age（使用年龄）、reporters（填报人列表）、tags（标签列表）。
+// @Description 分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -528,8 +528,8 @@ func (h *ScaleHandler) List(c *gin.Context) {
 // @Description 根据编码获取已发布的量表。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
-// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
@@ -559,7 +559,7 @@ func (h *ScaleHandler) GetPublishedByCode(c *gin.Context) {
 
 // ListPublished 获取已发布量表列表
 // @Summary 获取已发布量表列表
-// @Description 分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stage（阶段）、applicable_age（使用年龄）、reporters（填报人列表）、tags（标签列表）。
+// @Description 分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。
 // @Tags Scale-Query
 // @Accept json
 // @Produce json

@@ -44,7 +44,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, er
 
 // List 获取量表列表（返回摘要，不含因子详情）
 func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListScalesResponse, error) {
-	log.Infof("Listing scales: page=%d, pageSize=%d, category=%s, stage=%s", req.Page, req.PageSize, req.Category, req.Stage)
+	log.Infof("Listing scales: page=%d, pageSize=%d, category=%s", req.Page, req.PageSize, req.Category)
 
 	// 默认分页参数
 	if req.Page <= 0 {
@@ -58,7 +58,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 		req.PageSize = 100
 	}
 
-	result, err := s.scaleClient.ListScales(ctx, req.Page, req.PageSize, req.Status, req.Title, req.Category, req.Stage, req.ApplicableAge, req.Reporters, req.Tags)
+	result, err := s.scaleClient.ListScales(ctx, req.Page, req.PageSize, req.Status, req.Title, req.Category, req.Stages, req.ApplicableAges, req.Reporters, req.Tags)
 	if err != nil {
 		log.Errorf("Failed to list scales via gRPC: %v", err)
 		return nil, err
@@ -72,8 +72,8 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 			Title:                scale.Title,
 			Description:          scale.Description,
 			Category:             scale.Category,
-			Stage:                scale.Stage,
-			ApplicableAge:        scale.ApplicableAge,
+			Stages:               scale.Stages,
+			ApplicableAges:       scale.ApplicableAges,
 			Reporters:            scale.Reporters,
 			Tags:                 scale.Tags,
 			QuestionnaireCode:    scale.QuestionnaireCode,
@@ -83,10 +83,10 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 	}
 
 	return &ListScalesResponse{
-		Scales:    scales,
-		Total:     result.Total,
-		Page:      result.Page,
-		PageSize:  result.PageSize,
+		Scales:   scales,
+		Total:    result.Total,
+		Page:     result.Page,
+		PageSize: result.PageSize,
 	}, nil
 }
 
@@ -164,8 +164,8 @@ func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleRespons
 		Title:                scale.Title,
 		Description:          scale.Description,
 		Category:             scale.Category,
-		Stage:                scale.Stage,
-		ApplicableAge:        scale.ApplicableAge,
+		Stages:               scale.Stages,
+		ApplicableAges:       scale.ApplicableAges,
 		Reporters:            scale.Reporters,
 		Tags:                 scale.Tags,
 		QuestionnaireCode:    scale.QuestionnaireCode,
@@ -201,4 +201,3 @@ func (s *QueryService) convertFactor(f *grpcclient.FactorOutput) FactorResponse 
 		InterpretRules:  rules,
 	}
 }
-

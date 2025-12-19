@@ -24,8 +24,8 @@ func NewScaleHandler(queryService *scale.QueryService) *ScaleHandler {
 // @Description 根据量表编码获取量表详情。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
-// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Tags 量表
@@ -62,11 +62,11 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 // @Description 分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。
 // @Description 查询参数说明：
 // @Description - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
-// @Description - stage: 阶段过滤，可选值：screening/deep_assessment/follow_up/outcome
-// @Description - applicable_age: 使用年龄过滤，可选值：infant/preschool/school_child/adolescent/adult
+// @Description - stages: 阶段过滤（数组），可选值：screening/deep_assessment/follow_up/outcome
+// @Description - applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult
 // @Description - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
 // @Description - tags: 标签过滤（数组），动态标签值
-// @Description 响应中包含分类字段：category、stage、applicable_age、reporters（数组）、tags（数组）
+// @Description 响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）
 // @Tags 量表
 // @Produce json
 // @Param page query int false "页码" default(1)
@@ -74,8 +74,8 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 // @Param status query string false "状态过滤"
 // @Param title query string false "标题过滤"
 // @Param category query string false "主类过滤"
-// @Param stage query string false "阶段过滤"
-// @Param applicable_age query string false "使用年龄过滤"
+// @Param stages query []string false "阶段过滤（数组）"
+// @Param applicable_ages query []string false "使用年龄过滤（数组）"
 // @Param reporters query []string false "填报人过滤（数组）"
 // @Param tags query []string false "标签过滤（数组）"
 // @Success 200 {object} core.Response{data=scale.ListScalesResponse}

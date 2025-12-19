@@ -457,8 +457,10 @@ definitions:
     type: object
   scale.ScaleResponse:
     properties:
-      applicable_age:
-        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
       category:
         type: string
       code:
@@ -477,8 +479,10 @@ definitions:
         items:
           type: string
         type: array
-      stage:
-        type: string
+      stages:
+        items:
+          type: string
+        type: array
       status:
         type: string
       tags:
@@ -490,8 +494,10 @@ definitions:
     type: object
   scale.ScaleSummaryResponse:
     properties:
-      applicable_age:
-        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
       category:
         type: string
       code:
@@ -506,8 +512,10 @@ definitions:
         items:
           type: string
         type: array
-      stage:
-        type: string
+      stages:
+        items:
+          type: string
+        type: array
       status:
         type: string
       tags:
@@ -1146,11 +1154,11 @@ paths:
         分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。
         查询参数说明：
         - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
-        - stage: 阶段过滤，可选值：screening/deep_assessment/follow_up/outcome
-        - applicable_age: 使用年龄过滤，可选值：infant/preschool/school_child/adolescent/adult
+        - stages: 阶段过滤（数组），可选值：screening/deep_assessment/follow_up/outcome
+        - applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult
         - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
         - tags: 标签过滤（数组），动态标签值
-        响应中包含分类字段：category、stage、applicable_age、reporters（数组）、tags（数组）
+        响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）
       parameters:
       - default: 1
         description: 页码
@@ -1174,14 +1182,20 @@ paths:
         in: query
         name: category
         type: string
-      - description: 阶段过滤
+      - collectionFormat: csv
+        description: 阶段过滤（数组）
         in: query
-        name: stage
-        type: string
-      - description: 使用年龄过滤
+        items:
+          type: string
+        name: stages
+        type: array
+      - collectionFormat: csv
+        description: 使用年龄过滤（数组）
         in: query
-        name: applicable_age
-        type: string
+        items:
+          type: string
+        name: applicable_ages
+        type: array
       - collectionFormat: csv
         description: 填报人过滤（数组）
         in: query
@@ -1225,8 +1239,8 @@ paths:
         根据量表编码获取量表详情。
         响应字段说明：
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-        - stage: 阶段（screening/deep_assessment/follow_up/outcome）
-        - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
         - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
         - tags: 标签列表（数组，动态输入）
       parameters:

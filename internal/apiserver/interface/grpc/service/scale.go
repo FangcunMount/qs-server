@@ -68,11 +68,14 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 	if req.Category != "" {
 		dto.Conditions["category"] = req.Category
 	}
-	if req.Stage != "" {
-		dto.Conditions["stage"] = req.Stage
+	// 注意：stages 和 applicable_ages 是数组，查询条件暂时不支持多值过滤，后续可以扩展
+	if len(req.Stages) > 0 {
+		// 使用第一个阶段作为过滤条件（或可以扩展为支持多个）
+		dto.Conditions["stage"] = req.Stages[0]
 	}
-	if req.ApplicableAge != "" {
-		dto.Conditions["applicable_age"] = req.ApplicableAge
+	if len(req.ApplicableAges) > 0 {
+		// 使用第一个使用年龄作为过滤条件（或可以扩展为支持多个）
+		dto.Conditions["applicable_age"] = req.ApplicableAges[0]
 	}
 	// 注意：reporters 是数组，查询条件暂时不支持多值过滤，后续可以扩展
 	if len(req.Reporters) > 0 {
@@ -130,13 +133,19 @@ func (s *ScaleService) toProtoScale(result *appScale.ScaleResult) *pb.Scale {
 	// 转换填报人列表
 	reporters := append([]string(nil), result.Reporters...)
 
+	// 转换阶段列表
+	stages := append([]string(nil), result.Stages...)
+
+	// 转换使用年龄列表
+	applicableAges := append([]string(nil), result.ApplicableAges...)
+
 	return &pb.Scale{
 		Code:                 result.Code,
 		Title:                result.Title,
 		Description:          result.Description,
 		Category:             result.Category,
-		Stage:                result.Stage,
-		ApplicableAge:        result.ApplicableAge,
+		Stages:               stages,
+		ApplicableAges:       applicableAges,
 		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
@@ -210,13 +219,19 @@ func (s *ScaleService) toProtoScaleSummary(result *appScale.ScaleSummaryResult) 
 	// 转换填报人列表
 	reporters := append([]string(nil), result.Reporters...)
 
+	// 转换阶段列表
+	stages := append([]string(nil), result.Stages...)
+
+	// 转换使用年龄列表
+	applicableAges := append([]string(nil), result.ApplicableAges...)
+
 	return &pb.ScaleSummary{
 		Code:                 result.Code,
 		Title:                result.Title,
 		Description:          result.Description,
 		Category:             result.Category,
-		Stage:                result.Stage,
-		ApplicableAge:        result.ApplicableAge,
+		Stages:               stages,
+		ApplicableAges:       applicableAges,
 		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,

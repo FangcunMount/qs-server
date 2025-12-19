@@ -12,8 +12,8 @@ type ScaleResponse struct {
 	Title                string           `json:"title"`
 	Description          string           `json:"description"`
 	Category             string           `json:"category,omitempty"`
-	Stage                string           `json:"stage,omitempty"`
-	ApplicableAge        string           `json:"applicable_age,omitempty"`
+	Stages               []string         `json:"stages,omitempty"`
+	ApplicableAges       []string         `json:"applicable_ages,omitempty"`
 	Reporters            []string         `json:"reporters,omitempty"`
 	Tags                 []string         `json:"tags,omitempty"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
@@ -58,8 +58,8 @@ type ScaleSummaryResponse struct {
 	Title             string   `json:"title"`
 	Description       string   `json:"description"`
 	Category          string   `json:"category,omitempty"`
-	Stage             string   `json:"stage,omitempty"`
-	ApplicableAge     string   `json:"applicable_age,omitempty"`
+	Stages            []string `json:"stages,omitempty"`
+	ApplicableAges    []string `json:"applicable_ages,omitempty"`
 	Reporters         []string `json:"reporters,omitempty"`
 	Tags              []string `json:"tags,omitempty"`
 	QuestionnaireCode string   `json:"questionnaire_code"`
@@ -92,8 +92,8 @@ func NewScaleResponse(result *scale.ScaleResult) *ScaleResponse {
 		Title:                result.Title,
 		Description:          result.Description,
 		Category:             result.Category,
-		Stage:                result.Stage,
-		ApplicableAge:        result.ApplicableAge,
+		Stages:               result.Stages,
+		ApplicableAges:       result.ApplicableAges,
 		Reporters:            result.Reporters,
 		Tags:                 result.Tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
@@ -179,8 +179,8 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 			Title:             item.Title,
 			Description:       item.Description,
 			Category:          item.Category,
-			Stage:             item.Stage,
-			ApplicableAge:     item.ApplicableAge,
+			Stages:            item.Stages,
+			ApplicableAges:    item.ApplicableAges,
 			Reporters:         item.Reporters,
 			Tags:              item.Tags,
 			QuestionnaireCode: item.QuestionnaireCode,

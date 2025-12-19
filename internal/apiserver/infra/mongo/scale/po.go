@@ -19,11 +19,11 @@ type ScalePO struct {
 	Description string `bson:"description,omitempty" json:"description,omitempty"`
 
 	// 分类信息
-	Category      string   `bson:"category,omitempty" json:"category,omitempty"`           // 主类
-	Stage         string   `bson:"stage,omitempty" json:"stage,omitempty"`                 // 阶段
-	ApplicableAge string   `bson:"applicable_age,omitempty" json:"applicable_age,omitempty"` // 使用年龄
-	Reporters     []string `bson:"reporters,omitempty" json:"reporters,omitempty"`         // 填报人列表
-	Tags          []string `bson:"tags,omitempty" json:"tags,omitempty"`                  // 标签列表
+	Category       string   `bson:"category,omitempty" json:"category,omitempty"`               // 主类
+	Stages         []string `bson:"stages,omitempty" json:"stages,omitempty"`                   // 阶段列表
+	ApplicableAges []string `bson:"applicable_ages,omitempty" json:"applicable_ages,omitempty"` // 使用年龄列表
+	Reporters      []string `bson:"reporters,omitempty" json:"reporters,omitempty"`             // 填报人列表
+	Tags           []string `bson:"tags,omitempty" json:"tags,omitempty"`                       // 标签列表
 
 	// 关联的问卷
 	QuestionnaireCode    string `bson:"questionnaire_code,omitempty" json:"questionnaire_code,omitempty"`
@@ -109,8 +109,8 @@ type ScaleSummaryPO struct {
 	Title             string   `bson:"title"`
 	Description       string   `bson:"description"`
 	Category          string   `bson:"category"`
-	Stage             string   `bson:"stage"`
-	ApplicableAge     string   `bson:"applicable_age"`
+	Stages            []string `bson:"stages"`
+	ApplicableAges    []string `bson:"applicable_ages"`
 	Reporters         []string `bson:"reporters"`
 	Tags              []string `bson:"tags"`
 	QuestionnaireCode string   `bson:"questionnaire_code"`

@@ -14,8 +14,8 @@ type ScaleOutput struct {
 	Title                string
 	Description          string
 	Category             string
-	Stage                string
-	ApplicableAge        string
+	Stages               []string
+	ApplicableAges       []string
 	Reporters            []string
 	Tags                 []string
 	QuestionnaireCode    string
@@ -52,8 +52,8 @@ type ScaleSummaryOutput struct {
 	Title                string
 	Description          string
 	Category             string
-	Stage                string
-	ApplicableAge        string
+	Stages               []string
+	ApplicableAges       []string
 	Reporters            []string
 	Tags                 []string
 	QuestionnaireCode    string
@@ -63,10 +63,10 @@ type ScaleSummaryOutput struct {
 
 // ListScalesOutput 量表列表输出
 type ListScalesOutput struct {
-	Scales    []ScaleSummaryOutput
-	Total     int64
-	Page      int32
-	PageSize  int32
+	Scales   []ScaleSummaryOutput
+	Total    int64
+	Page     int32
+	PageSize int32
 }
 
 // ScaleCategoriesOutput 量表分类输出
@@ -145,20 +145,20 @@ func (c *ScaleClient) GetScale(ctx context.Context, code string) (*ScaleOutput, 
 }
 
 // ListScales 获取量表列表（摘要）
-func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, status, title, category, stage, applicableAge string, reporters []string, tags []string) (*ListScalesOutput, error) {
+func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, status, title, category string, stages, applicableAges, reporters, tags []string) (*ListScalesOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
 	req := &pb.ListScalesRequest{
-		Page:          page,
-		PageSize:      pageSize,
-		Status:        status,
-		Title:         title,
-		Category:      category,
-		Stage:         stage,
-		ApplicableAge: applicableAge,
-		Reporters:     reporters,
-		Tags:          tags,
+		Page:           page,
+		PageSize:       pageSize,
+		Status:         status,
+		Title:          title,
+		Category:       category,
+		Stages:         stages,
+		ApplicableAges: applicableAges,
+		Reporters:      reporters,
+		Tags:           tags,
 	}
 
 	resp, err := c.grpcClient.ListScales(ctx, req)
@@ -174,8 +174,8 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 			Title:                s.GetTitle(),
 			Description:          s.GetDescription(),
 			Category:             s.GetCategory(),
-			Stage:                s.GetStage(),
-			ApplicableAge:        s.GetApplicableAge(),
+			Stages:               s.GetStages(),
+			ApplicableAges:       s.GetApplicableAges(),
 			Reporters:            s.GetReporters(),
 			Tags:                 s.GetTags(),
 			QuestionnaireCode:    s.GetQuestionnaireCode(),
@@ -185,10 +185,10 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 	}
 
 	return &ListScalesOutput{
-		Scales:    scales,
-		Total:     resp.GetTotal(),
-		Page:      resp.GetPage(),
-		PageSize:  resp.GetPageSize(),
+		Scales:   scales,
+		Total:    resp.GetTotal(),
+		Page:     resp.GetPage(),
+		PageSize: resp.GetPageSize(),
 	}, nil
 }
 
@@ -267,8 +267,8 @@ func (c *ScaleClient) convertScale(s *pb.Scale) *ScaleOutput {
 		Title:                s.GetTitle(),
 		Description:          s.GetDescription(),
 		Category:             s.GetCategory(),
-		Stage:                s.GetStage(),
-		ApplicableAge:        s.GetApplicableAge(),
+		Stages:               s.GetStages(),
+		ApplicableAges:       s.GetApplicableAges(),
 		Reporters:            s.GetReporters(),
 		Tags:                 s.GetTags(),
 		QuestionnaireCode:    s.GetQuestionnaireCode(),
@@ -304,4 +304,3 @@ func (c *ScaleClient) convertFactor(f *pb.Factor) FactorOutput {
 		InterpretRules:  rules,
 	}
 }
-

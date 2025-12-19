@@ -6,8 +6,8 @@ type ScaleResponse struct {
 	Title                string           `json:"title"`
 	Description          string           `json:"description"`
 	Category             string           `json:"category"`
-	Stage                string           `json:"stage"`
-	ApplicableAge        string           `json:"applicable_age"`
+	Stages               []string         `json:"stages"`
+	ApplicableAges       []string         `json:"applicable_ages"`
 	Reporters            []string         `json:"reporters"`
 	Tags                 []string         `json:"tags"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
@@ -44,8 +44,8 @@ type ScaleSummaryResponse struct {
 	Title                string   `json:"title"`
 	Description          string   `json:"description"`
 	Category             string   `json:"category"`
-	Stage                string   `json:"stage"`
-	ApplicableAge        string   `json:"applicable_age"`
+	Stages               []string `json:"stages"`
+	ApplicableAges       []string `json:"applicable_ages"`
 	Reporters            []string `json:"reporters"`
 	Tags                 []string `json:"tags"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
@@ -55,15 +55,15 @@ type ScaleSummaryResponse struct {
 
 // ListScalesRequest 量表列表请求
 type ListScalesRequest struct {
-	Page          int32    `form:"page"`
-	PageSize      int32    `form:"page_size"`
-	Status        string   `form:"status"`
-	Title         string   `form:"title"`
-	Category      string   `form:"category"`
-	Stage         string   `form:"stage"`
-	ApplicableAge string   `form:"applicable_age"`
-	Reporters     []string `form:"reporters"`
-	Tags          []string `form:"tags"`
+	Page           int32    `form:"page"`
+	PageSize       int32    `form:"page_size"`
+	Status         string   `form:"status"`
+	Title          string   `form:"title"`
+	Category       string   `form:"category"`
+	Stages         []string `form:"stages"`
+	ApplicableAges []string `form:"applicable_ages"`
+	Reporters      []string `form:"reporters"`
+	Tags           []string `form:"tags"`
 }
 
 // ListScalesResponse 量表列表响应

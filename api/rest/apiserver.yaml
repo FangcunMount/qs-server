@@ -998,7 +998,7 @@ paths:
       tags:
       - Scale-Query
       summary: 获取量表列表
-      description: 分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stage（阶段）、applicable_age（使用年龄）、reporters（填报人列表）、tags（标签列表）。
+      description: 分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。
       operationId: 获取量表列表
       parameters:
       - type: string
@@ -1046,9 +1046,9 @@ paths:
 
         - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
 
-        - stage: 阶段，可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)
+        - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
 
-        - applicable_age: 使用年龄，可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)
+        - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 
         - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
 
@@ -1089,9 +1089,9 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
 
-        - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
         - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 
@@ -1169,7 +1169,7 @@ paths:
       tags:
       - Scale-Query
       summary: 获取已发布量表列表
-      description: 分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stage（阶段）、applicable_age（使用年龄）、reporters（填报人列表）、tags（标签列表）。
+      description: 分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stages（阶段列表）、applicable_ages（使用年龄列表）、reporters（填报人列表）、tags（标签列表）。
       operationId: 获取已发布量表列表
       parameters:
       - type: string
@@ -1214,9 +1214,9 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
 
-        - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
         - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 
@@ -1261,9 +1261,9 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
 
-        - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+        - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
         - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 
@@ -1362,9 +1362,9 @@ paths:
 
         - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
 
-        - stage: 阶段，可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)
+        - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
 
-        - applicable_age: 使用年龄，可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)
+        - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 
         - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
 
@@ -2001,8 +2001,10 @@ components:
     request.CreateScaleRequest:
       type: object
       properties:
-        applicable_age:
-          type: string
+        applicable_ages:
+          type: array
+          items:
+            type: string
         category:
           type: string
         description:
@@ -2015,8 +2017,10 @@ components:
           type: array
           items:
             type: string
-        stage:
-          type: string
+        stages:
+          type: array
+          items:
+            type: string
         tags:
           type: array
           items:
@@ -2152,8 +2156,10 @@ components:
     request.UpdateScaleBasicInfoRequest:
       type: object
       properties:
-        applicable_age:
-          type: string
+        applicable_ages:
+          type: array
+          items:
+            type: string
         category:
           type: string
         description:
@@ -2162,8 +2168,10 @@ components:
           type: array
           items:
             type: string
-        stage:
-          type: string
+        stages:
+          type: array
+          items:
+            type: string
         tags:
           type: array
           items:
@@ -2778,8 +2786,10 @@ components:
     response.ScaleResponse:
       type: object
       properties:
-        applicable_age:
-          type: string
+        applicable_ages:
+          type: array
+          items:
+            type: string
         category:
           type: string
         code:
@@ -2798,8 +2808,10 @@ components:
           type: array
           items:
             type: string
-        stage:
-          type: string
+        stages:
+          type: array
+          items:
+            type: string
         status:
           type: string
         tags:

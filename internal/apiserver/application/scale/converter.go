@@ -13,8 +13,8 @@ type ScaleResult struct {
 	Title                string         // 量表标题
 	Description          string         // 量表描述
 	Category             string         // 主类
-	Stage                string         // 阶段
-	ApplicableAge        string         // 使用年龄
+	Stages               []string       // 阶段列表
+	ApplicableAges       []string       // 使用年龄列表
 	Reporters            []string       // 填报人列表
 	Tags                 []string       // 标签列表
 	QuestionnaireCode    string         // 关联的问卷编码
@@ -57,8 +57,8 @@ type ScaleSummaryResult struct {
 	Title             string   // 量表标题
 	Description       string   // 量表描述
 	Category          string   // 主类
-	Stage             string   // 阶段
-	ApplicableAge     string   // 使用年龄
+	Stages            []string // 阶段列表
+	ApplicableAges    []string // 使用年龄列表
 	Reporters         []string // 填报人列表
 	Tags              []string // 标签列表
 	QuestionnaireCode string   // 关联的问卷编码
@@ -91,13 +91,25 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		reporters = append(reporters, reporter.String())
 	}
 
+	// 转换阶段列表
+	stages := make([]string, 0, len(m.GetStages()))
+	for _, stage := range m.GetStages() {
+		stages = append(stages, stage.String())
+	}
+
+	// 转换使用年龄列表
+	applicableAges := make([]string, 0, len(m.GetApplicableAges()))
+	for _, age := range m.GetApplicableAges() {
+		applicableAges = append(applicableAges, age.String())
+	}
+
 	result := &ScaleResult{
 		Code:                 m.GetCode().String(),
 		Title:                m.GetTitle(),
 		Description:          m.GetDescription(),
 		Category:             m.GetCategory().String(),
-		Stage:                m.GetStage().String(),
-		ApplicableAge:        m.GetApplicableAge().String(),
+		Stages:               stages,
+		ApplicableAges:       applicableAges,
 		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
@@ -195,13 +207,25 @@ func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummary
 			reporters = append(reporters, reporter.String())
 		}
 
+		// 转换阶段列表
+		stages := make([]string, 0, len(item.Stages))
+		for _, stage := range item.Stages {
+			stages = append(stages, stage.String())
+		}
+
+		// 转换使用年龄列表
+		applicableAges := make([]string, 0, len(item.ApplicableAges))
+		for _, age := range item.ApplicableAges {
+			applicableAges = append(applicableAges, age.String())
+		}
+
 		result.Items = append(result.Items, &ScaleSummaryResult{
 			Code:              item.Code,
 			Title:             item.Title,
 			Description:       item.Description,
 			Category:          item.Category.String(),
-			Stage:             item.Stage.String(),
-			ApplicableAge:     item.ApplicableAge.String(),
+			Stages:            stages,
+			ApplicableAges:    applicableAges,
 			Reporters:         reporters,
 			Tags:              tags,
 			QuestionnaireCode: item.QuestionnaireCode,

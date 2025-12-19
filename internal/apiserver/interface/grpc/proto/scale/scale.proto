@@ -22,8 +22,8 @@ message ScaleSummary {
   string title = 2;
   string description = 3;
   string category = 4;          // 主类
-  string stage = 5;             // 阶段
-  string applicable_age = 6;     // 使用年龄
+  repeated string stages = 5;    // 阶段列表
+  repeated string applicable_ages = 6; // 使用年龄列表
   repeated string reporters = 7; // 填报人列表
   repeated string tags = 8;      // 标签列表
   string questionnaire_code = 9;
@@ -39,8 +39,8 @@ message Scale {
   string title = 2;
   string description = 3;
   string category = 4;          // 主类
-  string stage = 5;             // 阶段
-  string applicable_age = 6;     // 使用年龄
+  repeated string stages = 5;     // 阶段列表
+  repeated string applicable_ages = 6; // 使用年龄列表
   repeated string reporters = 7; // 填报人列表
   repeated string tags = 8;      // 标签列表
   string questionnaire_code = 9;
@@ -90,8 +90,8 @@ message ListScalesRequest {
   string status = 3;
   string title = 4;
   string category = 5;      // 按主类过滤
-  string stage = 6;         // 按阶段过滤
-  string applicable_age = 7; // 按使用年龄过滤
+  repeated string stages = 6; // 按阶段过滤（数组）
+  repeated string applicable_ages = 7; // 按使用年龄过滤（数组）
   repeated string reporters = 8; // 按填报人过滤
   repeated string tags = 9; // 按标签过滤
 }

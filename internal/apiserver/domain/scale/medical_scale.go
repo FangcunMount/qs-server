@@ -21,11 +21,11 @@ type MedicalScale struct {
 	description string
 
 	// 分类信息
-	category      Category      // 主类（每个量表只选1个主类）
-	stage         Stage         // 阶段
-	applicableAge ApplicableAge // 使用年龄
-	reporters     []Reporter    // 填报人列表（可多个）
-	tags          []Tag         // 标签（最多3-5个，用于表达除主类外的其他信息）
+	category       Category        // 主类（每个量表只选1个主类）
+	stages         []Stage         // 阶段列表（可多个）
+	applicableAges []ApplicableAge // 使用年龄列表（可多个）
+	reporters      []Reporter      // 填报人列表（可多个）
+	tags           []Tag           // 标签（最多3-5个，用于表达除主类外的其他信息）
 
 	// 关联的问卷（编码 + 版本）
 	questionnaireCode    meta.Code
@@ -113,17 +113,25 @@ func WithCategory(category Category) MedicalScaleOption {
 	}
 }
 
-// WithStage 设置阶段
-func WithStage(stage Stage) MedicalScaleOption {
+// WithStages 设置阶段列表
+func WithStages(stages []Stage) MedicalScaleOption {
 	return func(m *MedicalScale) {
-		m.stage = stage
+		if stages == nil {
+			m.stages = []Stage{}
+		} else {
+			m.stages = stages
+		}
 	}
 }
 
-// WithApplicableAge 设置使用年龄
-func WithApplicableAge(age ApplicableAge) MedicalScaleOption {
+// WithApplicableAges 设置使用年龄列表
+func WithApplicableAges(ages []ApplicableAge) MedicalScaleOption {
 	return func(m *MedicalScale) {
-		m.applicableAge = age
+		if ages == nil {
+			m.applicableAges = []ApplicableAge{}
+		} else {
+			m.applicableAges = ages
+		}
 	}
 }
 
@@ -196,14 +204,14 @@ func (m *MedicalScale) GetCategory() Category {
 	return m.category
 }
 
-// GetStage 获取阶段
-func (m *MedicalScale) GetStage() Stage {
-	return m.stage
+// GetStages 获取阶段列表
+func (m *MedicalScale) GetStages() []Stage {
+	return m.stages
 }
 
-// GetApplicableAge 获取使用年龄
-func (m *MedicalScale) GetApplicableAge() ApplicableAge {
-	return m.applicableAge
+// GetApplicableAges 获取使用年龄列表
+func (m *MedicalScale) GetApplicableAges() []ApplicableAge {
+	return m.applicableAges
 }
 
 // GetReporters 获取填报人列表
@@ -289,10 +297,18 @@ func (m *MedicalScale) updateBasicInfo(title, description string) error {
 }
 
 // updateClassificationInfo 更新分类信息
-func (m *MedicalScale) updateClassificationInfo(category Category, stage Stage, applicableAge ApplicableAge, reporters []Reporter, tags []Tag) error {
+func (m *MedicalScale) updateClassificationInfo(category Category, stages []Stage, applicableAges []ApplicableAge, reporters []Reporter, tags []Tag) error {
 	m.category = category
-	m.stage = stage
-	m.applicableAge = applicableAge
+	if stages == nil {
+		m.stages = []Stage{}
+	} else {
+		m.stages = stages
+	}
+	if applicableAges == nil {
+		m.applicableAges = []ApplicableAge{}
+	} else {
+		m.applicableAges = applicableAges
+	}
 	if reporters == nil {
 		m.reporters = []Reporter{}
 	} else {

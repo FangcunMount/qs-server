@@ -36,13 +36,25 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 		reporters = append(reporters, reporter.String())
 	}
 
+	// 转换阶段列表
+	stages := make([]string, 0, len(domain.GetStages()))
+	for _, stage := range domain.GetStages() {
+		stages = append(stages, stage.String())
+	}
+
+	// 转换使用年龄列表
+	applicableAges := make([]string, 0, len(domain.GetApplicableAges()))
+	for _, age := range domain.GetApplicableAges() {
+		applicableAges = append(applicableAges, age.String())
+	}
+
 	po := &ScalePO{
 		Code:                 domain.GetCode().String(),
 		Title:                domain.GetTitle(),
 		Description:          domain.GetDescription(),
 		Category:             domain.GetCategory().String(),
-		Stage:                domain.GetStage().String(),
-		ApplicableAge:        domain.GetApplicableAge().String(),
+		Stages:               stages,
+		ApplicableAges:       applicableAges,
 		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    domain.GetQuestionnaireCode().String(),
@@ -130,14 +142,26 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 		reporters = append(reporters, scale.NewReporter(reporterStr))
 	}
 
+	// 转换阶段列表
+	stages := make([]scale.Stage, 0, len(po.Stages))
+	for _, stageStr := range po.Stages {
+		stages = append(stages, scale.NewStage(stageStr))
+	}
+
+	// 转换使用年龄列表
+	applicableAges := make([]scale.ApplicableAge, 0, len(po.ApplicableAges))
+	for _, ageStr := range po.ApplicableAges {
+		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
+	}
+
 	// 创建领域模型
 	domain, err := scale.NewMedicalScale(
 		meta.NewCode(po.Code),
 		po.Title,
 		scale.WithDescription(po.Description),
 		scale.WithCategory(scale.NewCategory(po.Category)),
-		scale.WithStage(scale.NewStage(po.Stage)),
-		scale.WithApplicableAge(scale.NewApplicableAge(po.ApplicableAge)),
+		scale.WithStages(stages),
+		scale.WithApplicableAges(applicableAges),
 		scale.WithReporters(reporters),
 		scale.WithTags(tags),
 		scale.WithQuestionnaire(meta.NewCode(po.QuestionnaireCode), po.QuestionnaireVersion),

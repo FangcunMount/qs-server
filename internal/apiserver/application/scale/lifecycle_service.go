@@ -62,14 +62,26 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 		reporters = append(reporters, scale.NewReporter(reporterStr))
 	}
 
-	// 5. 创建量表领域模型
+	// 5. 转换阶段列表
+	stages := make([]scale.Stage, 0, len(dto.Stages))
+	for _, stageStr := range dto.Stages {
+		stages = append(stages, scale.NewStage(stageStr))
+	}
+
+	// 6. 转换使用年龄列表
+	applicableAges := make([]scale.ApplicableAge, 0, len(dto.ApplicableAges))
+	for _, ageStr := range dto.ApplicableAges {
+		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
+	}
+
+	// 7. 创建量表领域模型
 	m, err := scale.NewMedicalScale(
 		code,
 		dto.Title,
 		scale.WithDescription(dto.Description),
 		scale.WithCategory(scale.NewCategory(dto.Category)),
-		scale.WithStage(scale.NewStage(dto.Stage)),
-		scale.WithApplicableAge(scale.NewApplicableAge(dto.ApplicableAge)),
+		scale.WithStages(stages),
+		scale.WithApplicableAges(applicableAges),
 		scale.WithReporters(reporters),
 		scale.WithTags(tags),
 		scale.WithQuestionnaire(meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion),
@@ -115,8 +127,20 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		reporters = append(reporters, scale.NewReporter(reporterStr))
 	}
 
-	// 5. 更新基本信息和分类信息
-	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, scale.NewCategory(dto.Category), scale.NewStage(dto.Stage), scale.NewApplicableAge(dto.ApplicableAge), reporters, tags); err != nil {
+	// 5. 转换阶段列表
+	stages := make([]scale.Stage, 0, len(dto.Stages))
+	for _, stageStr := range dto.Stages {
+		stages = append(stages, scale.NewStage(stageStr))
+	}
+
+	// 6. 转换使用年龄列表
+	applicableAges := make([]scale.ApplicableAge, 0, len(dto.ApplicableAges))
+	for _, ageStr := range dto.ApplicableAges {
+		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
+	}
+
+	// 7. 更新基本信息和分类信息
+	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, scale.NewCategory(dto.Category), stages, applicableAges, reporters, tags); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新基本信息失败")
 	}
 

@@ -7,8 +7,8 @@ type CreateScaleRequest struct {
 	Title                string   `json:"title" valid:"required~量表标题不能为空"`
 	Description          string   `json:"description"`
 	Category             string   `json:"category"`
-	Stage                string   `json:"stage"`
-	ApplicableAge        string   `json:"applicable_age"`
+	Stages               []string `json:"stages"`
+	ApplicableAges       []string `json:"applicable_ages"`
 	Reporters            []string `json:"reporters"`
 	Tags                 []string `json:"tags"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
@@ -17,13 +17,13 @@ type CreateScaleRequest struct {
 
 // UpdateScaleBasicInfoRequest 更新量表基本信息请求
 type UpdateScaleBasicInfoRequest struct {
-	Title         string   `json:"title" valid:"required~量表标题不能为空"`
-	Description   string   `json:"description"`
-	Category      string   `json:"category"`
-	Stage         string   `json:"stage"`
-	ApplicableAge string   `json:"applicable_age"`
-	Reporters     []string `json:"reporters"`
-	Tags          []string `json:"tags"`
+	Title          string   `json:"title" valid:"required~量表标题不能为空"`
+	Description    string   `json:"description"`
+	Category       string   `json:"category"`
+	Stages         []string `json:"stages"`
+	ApplicableAges []string `json:"applicable_ages"`
+	Reporters      []string `json:"reporters"`
+	Tags           []string `json:"tags"`
 }
 
 // UpdateScaleQuestionnaireRequest 更新量表关联问卷请求

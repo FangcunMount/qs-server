@@ -789,7 +789,7 @@ const docTemplate = `{
         },
         "/api/v1/scales": {
             "get": {
-                "description": "分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。\n查询参数说明：\n- category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol\n- stage: 阶段过滤，可选值：screening/deep_assessment/follow_up/outcome\n- applicable_age: 使用年龄过滤，可选值：infant/preschool/school_child/adolescent/adult\n- reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical\n- tags: 标签过滤（数组），动态标签值\n响应中包含分类字段：category、stage、applicable_age、reporters（数组）、tags（数组）",
+                "description": "分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。\n查询参数说明：\n- category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol\n- stages: 阶段过滤（数组），可选值：screening/deep_assessment/follow_up/outcome\n- applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult\n- reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical\n- tags: 标签过滤（数组），动态标签值\n响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）",
                 "produces": [
                     "application/json"
                 ],
@@ -831,15 +831,23 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "阶段过滤",
-                        "name": "stage",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "阶段过滤（数组）",
+                        "name": "stages",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "使用年龄过滤",
-                        "name": "applicable_age",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "使用年龄过滤（数组）",
+                        "name": "applicable_ages",
                         "in": "query"
                     },
                     {
@@ -937,7 +945,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}": {
             "get": {
-                "description": "根据量表编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stage: 阶段（screening/deep_assessment/follow_up/outcome）\n- applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）",
+                "description": "根据量表编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）",
                 "produces": [
                     "application/json"
                 ],
@@ -2065,8 +2073,11 @@ const docTemplate = `{
         "scale.ScaleResponse": {
             "type": "object",
             "properties": {
-                "applicable_age": {
-                    "type": "string"
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "category": {
                     "type": "string"
@@ -2095,8 +2106,11 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
-                "stage": {
-                    "type": "string"
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "status": {
                     "type": "string"
@@ -2115,8 +2129,11 @@ const docTemplate = `{
         "scale.ScaleSummaryResponse": {
             "type": "object",
             "properties": {
-                "applicable_age": {
-                    "type": "string"
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "category": {
                     "type": "string"
@@ -2139,8 +2156,11 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
-                "stage": {
-                    "type": "string"
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "status": {
                     "type": "string"

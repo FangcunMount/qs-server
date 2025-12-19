@@ -52,16 +52,24 @@ func (BaseInfo) UpdateAll(m *MedicalScale, title, description string) error {
 }
 
 // UpdateClassificationInfo 更新分类信息
-func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, stage Stage, applicableAge ApplicableAge, reporters []Reporter, tags []Tag) error {
+func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, stages []Stage, applicableAges []ApplicableAge, reporters []Reporter, tags []Tag) error {
 	// 验证类型值
 	if !category.IsValid() {
 		return errors.WithCode(code.ErrInvalidArgument, "类别值无效")
 	}
-	if !stage.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "阶段值无效")
+
+	// 验证阶段列表
+	for _, stage := range stages {
+		if !stage.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "阶段值无效: %s", stage.String())
+		}
 	}
-	if !applicableAge.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效")
+
+	// 验证使用年龄列表
+	for _, age := range applicableAges {
+		if !age.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效: %s", age.String())
+		}
 	}
 
 	// 验证填报人列表
@@ -81,11 +89,11 @@ func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, sta
 		}
 	}
 
-	return m.updateClassificationInfo(category, stage, applicableAge, reporters, tags)
+	return m.updateClassificationInfo(category, stages, applicableAges, reporters, tags)
 }
 
 // UpdateAllWithClassification 批量更新基础信息和分类信息
-func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description string, category Category, stage Stage, applicableAge ApplicableAge, reporters []Reporter, tags []Tag) error {
+func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description string, category Category, stages []Stage, applicableAges []ApplicableAge, reporters []Reporter, tags []Tag) error {
 	title = strings.TrimSpace(title)
 	if len(title) == 0 {
 		return errors.WithCode(code.ErrInvalidArgument, "标题不能为空")
@@ -101,11 +109,19 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 	if !category.IsValid() {
 		return errors.WithCode(code.ErrInvalidArgument, "类别值无效")
 	}
-	if !stage.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "阶段值无效")
+
+	// 验证阶段列表
+	for _, stage := range stages {
+		if !stage.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "阶段值无效: %s", stage.String())
+		}
 	}
-	if !applicableAge.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效")
+
+	// 验证使用年龄列表
+	for _, age := range applicableAges {
+		if !age.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效: %s", age.String())
+		}
 	}
 
 	// 验证填报人列表
@@ -129,7 +145,7 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 		return err
 	}
 
-	return m.updateClassificationInfo(category, stage, applicableAge, reporters, tags)
+	return m.updateClassificationInfo(category, stages, applicableAges, reporters, tags)
 }
 
 // UpdateQuestionnaire 更新关联的问卷

@@ -10,8 +10,8 @@ type ScaleSummary struct {
 	Title             string
 	Description       string
 	Category          Category
-	Stage             Stage
-	ApplicableAge     ApplicableAge
+	Stages            []Stage
+	ApplicableAges    []ApplicableAge
 	Reporters         []Reporter
 	Tags              []Tag
 	QuestionnaireCode string
