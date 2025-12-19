@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ===================== 量表状态 =================
@@ -291,26 +292,42 @@ func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, st
 		}
 
 		// 处理数组类型
-		if contentsArray, ok := contents.([]interface{}); ok {
+		// 优先处理 MongoDB 的 primitive.A 类型
+		var contentsArray []interface{}
+		switch v := contents.(type) {
+		case primitive.A:
+			contentsArray = []interface{}(v)
+		case []interface{}:
+			contentsArray = v
+		case []string:
+			// 直接是字符串数组
+			result.CntOptionContents = v
+			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents (direct string array)",
+				"count", len(result.CntOptionContents),
+				"contents", result.CntOptionContents,
+			)
+		default:
+			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents is not array type",
+				"contents_type", getTypeName(contents),
+			)
+		}
+
+		// 处理 interface{} 数组，转换为字符串数组
+		if contentsArray != nil {
 			result.CntOptionContents = make([]string, 0, len(contentsArray))
 			for _, item := range contentsArray {
 				if str, ok := item.(string); ok {
 					result.CntOptionContents = append(result.CntOptionContents, str)
+				} else {
+					logger.L(ctx).Warnw("ScoringParamsFromMap: array item is not string",
+						"item_type", getTypeName(item),
+						"item_value", item,
+					)
 				}
 			}
 			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents",
 				"count", len(result.CntOptionContents),
 				"contents", result.CntOptionContents,
-			)
-		} else if contentsArray, ok := contents.([]string); ok {
-			result.CntOptionContents = contentsArray
-			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents (direct string array)",
-				"count", len(result.CntOptionContents),
-				"contents", result.CntOptionContents,
-			)
-		} else {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents is not array type",
-				"contents_type", getTypeName(contents),
 			)
 		}
 
