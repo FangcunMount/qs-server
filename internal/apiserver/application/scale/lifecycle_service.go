@@ -45,15 +45,9 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 	}
 
 	// 2. 生成量表编码
-	var code meta.Code
-	var err error
-	if dto.Code != "" {
-		code = meta.NewCode(dto.Code)
-	} else {
-		code, err = meta.GenerateCode()
-		if err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "生成量表编码失败")
-		}
+	code, err := s.generateScaleCode(dto.Code)
+	if err != nil {
+		return nil, err
 	}
 
 	// 3. 创建量表领域模型
@@ -86,23 +80,18 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表标题不能为空")
 	}
 
-	// 2. 获取现有量表
-	m, err := s.repo.FindByCode(ctx, dto.Code)
+	// 2. 获取现有量表并验证状态
+	m, err := s.getScaleAndValidateEditable(ctx, dto.Code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 判断量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 更新基本信息
+	// 3. 更新基本信息
 	if err := s.baseInfo.UpdateAll(m, dto.Title, dto.Description); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新基本信息失败")
 	}
 
-	// 5. 持久化
+	// 4. 持久化
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表基本信息失败")
 	}
@@ -123,23 +112,18 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷版本不能为空")
 	}
 
-	// 2. 获取现有量表
-	m, err := s.repo.FindByCode(ctx, dto.Code)
+	// 2. 获取现有量表并验证状态
+	m, err := s.getScaleAndValidateEditable(ctx, dto.Code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 判断量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 更新关联的问卷
+	// 3. 更新关联的问卷
 	if err := s.baseInfo.UpdateQuestionnaire(m, meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新关联问卷失败")
 	}
 
-	// 5. 持久化
+	// 4. 持久化
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表关联问卷失败")
 	}
@@ -155,59 +139,20 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*ScaleResu
 	}
 
 	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, code)
+	m, err := s.getScaleByCode(ctx, code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
-	}
-
-	// 3. 如果问卷版本为空，自动从问卷仓库获取最新版本
-	if m.GetQuestionnaireVersion() == "" && !m.GetQuestionnaireCode().IsEmpty() {
-		questionnaireCode := m.GetQuestionnaireCode().Value()
-		logger.L(ctx).Infow("问卷版本为空，自动获取最新版本",
-			"scale_code", code,
-			"questionnaire_code", questionnaireCode,
-		)
-
-		// 从问卷仓库获取问卷
-		q, err := s.questionnaireRepo.FindByCode(ctx, questionnaireCode)
-		if err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
-		}
-		if q == nil {
-			return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-		}
-
-		// 更新量表的问卷版本
-		latestVersion := q.GetVersion().Value()
-		logger.L(ctx).Infow("自动设置问卷版本",
-			"scale_code", code,
-			"questionnaire_code", questionnaireCode,
-			"version", latestVersion,
-		)
-		if err := s.baseInfo.UpdateQuestionnaire(m, m.GetQuestionnaireCode(), latestVersion); err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新问卷版本失败")
-		}
-
-		// 保存更新后的量表
-		if err := s.repo.Update(ctx, m); err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷版本失败")
-		}
-	}
-
-	// 4. 调用生命周期服务发布量表（包含验证逻辑）
-	if err := s.lifecycle.Publish(ctx, m); err != nil {
 		return nil, err
 	}
 
-	// 5. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
+	// 3. 如果问卷版本为空，自动从问卷仓库获取最新版本
+	if err := s.ensureQuestionnaireVersion(ctx, code, m); err != nil {
+		return nil, err
 	}
 
-	// 6. 发布聚合根收集的领域事件
-	s.publishEvents(ctx, m)
-
-	return toScaleResult(m), nil
+	// 4. 执行生命周期操作并持久化
+	return s.executeLifecycleOperation(ctx, m, func(ctx context.Context, scale *scale.MedicalScale) error {
+		return s.lifecycle.Publish(ctx, scale)
+	})
 }
 
 // Unpublish 下架量表
@@ -218,25 +163,15 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*ScaleRe
 	}
 
 	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, code)
+	m, err := s.getScaleByCode(ctx, code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
-	}
-
-	// 3. 调用生命周期服务下架量表
-	if err := s.lifecycle.Unpublish(ctx, m); err != nil {
 		return nil, err
 	}
 
-	// 4. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
-	}
-
-	// 5. 发布聚合根收集的领域事件
-	s.publishEvents(ctx, m)
-
-	return toScaleResult(m), nil
+	// 3. 执行生命周期操作并持久化
+	return s.executeLifecycleOperation(ctx, m, func(ctx context.Context, scale *scale.MedicalScale) error {
+		return s.lifecycle.Unpublish(ctx, scale)
+	})
 }
 
 // Archive 归档量表
@@ -247,25 +182,15 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*ScaleResu
 	}
 
 	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, code)
+	m, err := s.getScaleByCode(ctx, code)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
-	}
-
-	// 3. 调用生命周期服务归档量表
-	if err := s.lifecycle.Archive(ctx, m); err != nil {
 		return nil, err
 	}
 
-	// 4. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
-	}
-
-	// 5. 发布聚合根收集的领域事件
-	s.publishEvents(ctx, m)
-
-	return toScaleResult(m), nil
+	// 3. 执行生命周期操作并持久化
+	return s.executeLifecycleOperation(ctx, m, func(ctx context.Context, scale *scale.MedicalScale) error {
+		return s.lifecycle.Archive(ctx, scale)
+	})
 }
 
 // Delete 删除量表
@@ -276,9 +201,9 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 	}
 
 	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, code)
+	m, err := s.getScaleByCode(ctx, code)
 	if err != nil {
-		return errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return err
 	}
 
 	// 3. 只能删除草稿状态的量表
@@ -292,6 +217,107 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 	}
 
 	return nil
+}
+
+// ===================== 私有辅助方法 =====================
+
+// generateScaleCode 生成量表编码
+func (s *lifecycleService) generateScaleCode(code string) (meta.Code, error) {
+	if code != "" {
+		return meta.NewCode(code), nil
+	}
+	return meta.GenerateCode()
+}
+
+// getScaleByCode 根据编码获取量表
+func (s *lifecycleService) getScaleByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	m, err := s.repo.FindByCode(ctx, code)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	}
+	return m, nil
+}
+
+// getScaleAndValidateEditable 获取量表并验证是否可编辑
+func (s *lifecycleService) getScaleAndValidateEditable(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	m, err := s.getScaleByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	// 判断量表状态
+	if m.IsArchived() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
+	}
+
+	return m, nil
+}
+
+// ensureQuestionnaireVersion 确保量表有关联的问卷版本
+// 如果版本为空，自动从问卷仓库获取最新版本
+func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scaleCode string, m *scale.MedicalScale) error {
+	if m.GetQuestionnaireVersion() != "" || m.GetQuestionnaireCode().IsEmpty() {
+		return nil
+	}
+
+	questionnaireCode := m.GetQuestionnaireCode().Value()
+	logger.L(ctx).Infow("问卷版本为空，自动获取最新版本",
+		"scale_code", scaleCode,
+		"questionnaire_code", questionnaireCode,
+	)
+
+	// 从问卷仓库获取问卷
+	q, err := s.questionnaireRepo.FindByCode(ctx, questionnaireCode)
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
+	}
+	if q == nil {
+		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
+	}
+
+	// 更新量表的问卷版本
+	latestVersion := q.GetVersion().Value()
+	logger.L(ctx).Infow("自动设置问卷版本",
+		"scale_code", scaleCode,
+		"questionnaire_code", questionnaireCode,
+		"version", latestVersion,
+	)
+	if err := s.baseInfo.UpdateQuestionnaire(m, m.GetQuestionnaireCode(), latestVersion); err != nil {
+		return errors.WrapC(err, errorCode.ErrInvalidArgument, "更新问卷版本失败")
+	}
+
+	// 保存更新后的量表
+	if err := s.repo.Update(ctx, m); err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷版本失败")
+	}
+
+	return nil
+}
+
+// lifecycleOperation 生命周期操作函数类型
+type lifecycleOperation func(ctx context.Context, scale *scale.MedicalScale) error
+
+// executeLifecycleOperation 执行生命周期操作并持久化
+// 统一的处理流程：执行操作 -> 持久化 -> 发布事件 -> 返回结果
+func (s *lifecycleService) executeLifecycleOperation(
+	ctx context.Context,
+	m *scale.MedicalScale,
+	operation lifecycleOperation,
+) (*ScaleResult, error) {
+	// 1. 执行生命周期操作
+	if err := operation(ctx, m); err != nil {
+		return nil, err
+	}
+
+	// 2. 持久化
+	if err := s.repo.Update(ctx, m); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表状态失败")
+	}
+
+	// 3. 发布聚合根收集的领域事件
+	s.publishEvents(ctx, m)
+
+	return toScaleResult(m), nil
 }
 
 // publishEvents 发布聚合根收集的领域事件
