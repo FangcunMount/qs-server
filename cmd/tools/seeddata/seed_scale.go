@@ -36,7 +36,7 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 
 	// 量表服务
 	scaleRepo := scaleInfra.NewRepository(deps.MongoDB)
-	scaleLifecycle := scaleApp.NewLifecycleService(scaleRepo, nil)
+	scaleLifecycle := scaleApp.NewLifecycleService(scaleRepo, qRepo, nil)
 	factorSvc := scaleApp.NewFactorService(scaleRepo)
 	scaleQuery := scaleApp.NewQueryService(scaleRepo)
 
