@@ -408,7 +408,7 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param questionnaireCode query string true "问卷编码"
+// @Param questionnaire_code query string true "问卷编码"
 // @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/by-questionnaire [get]
 func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
