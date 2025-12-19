@@ -73,7 +73,7 @@ func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, sta
 	}
 	for _, tag := range tags {
 		if !tag.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "标签值无效: "+tag.String())
+			return errors.WithCode(code.ErrInvalidArgument, "%s", "标签值无效: "+tag.String())
 		}
 	}
 
@@ -113,7 +113,7 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 	}
 	for _, tag := range tags {
 		if !tag.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "标签值无效: "+tag.String())
+			return errors.WithCode(code.ErrInvalidArgument, "%s", "标签值无效: "+tag.String())
 		}
 	}
 
