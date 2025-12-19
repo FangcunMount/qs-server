@@ -142,7 +142,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	}
 
 	// 转换解读规则
-	interpretRules := m.mapInterpretRulesToDomain(po.InterpretRules)
+	interpretRules := m.mapInterpretRulesToDomain(ctx, po.InterpretRules)
 
 	// 从 map[string]interface{} 恢复计分参数
 	// 添加日志：记录 PO 层的 scoring_params
@@ -210,16 +210,38 @@ func getTypeName(v interface{}) string {
 }
 
 // mapInterpretRulesToDomain 将解读规则持久化对象列表转换为领域模型
-func (m *ScaleMapper) mapInterpretRulesToDomain(rules []InterpretRulePO) []scale.InterpretationRule {
+func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []InterpretRulePO) []scale.InterpretationRule {
 	if rules == nil {
 		return []scale.InterpretationRule{}
 	}
 
 	result := make([]scale.InterpretationRule, 0, len(rules))
-	for _, r := range rules {
+	for i, r := range rules {
+		// 创建分数区间
+		scoreRange := scale.NewScoreRange(r.MinScore, r.MaxScore)
+		riskLevel := scale.RiskLevel(r.RiskLevel)
+
+		// 验证并记录日志
+		if !scoreRange.IsValid() {
+			logger.L(ctx).Warnw("mapInterpretRulesToDomain: invalid score range",
+				"rule_index", i,
+				"min_score", r.MinScore,
+				"max_score", r.MaxScore,
+				"risk_level", r.RiskLevel,
+			)
+		}
+		if !riskLevel.IsValid() {
+			logger.L(ctx).Warnw("mapInterpretRulesToDomain: invalid risk level",
+				"rule_index", i,
+				"min_score", r.MinScore,
+				"max_score", r.MaxScore,
+				"risk_level", r.RiskLevel,
+			)
+		}
+
 		rule := scale.NewInterpretationRule(
-			scale.NewScoreRange(r.MinScore, r.MaxScore),
-			scale.RiskLevel(r.RiskLevel),
+			scoreRange,
+			riskLevel,
 			r.Conclusion,
 			r.Suggestion,
 		)

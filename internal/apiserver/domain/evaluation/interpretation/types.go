@@ -45,7 +45,7 @@ const (
 // InterpretRule 解读规则
 // 定义得分区间与解读结果的映射
 type InterpretRule struct {
-	// 区间范围 [Min, Max]
+	// 区间范围 [Min, Max) - 左闭右开区间
 	Min float64
 	Max float64
 
@@ -56,9 +56,10 @@ type InterpretRule struct {
 	Suggestion  string // 建议
 }
 
-// Contains 判断得分是否在规则区间内
+// Contains 判断得分是否在规则区间内 [Min, Max)
+// 使用左闭右开区间，避免边界值重叠
 func (r InterpretRule) Contains(score float64) bool {
-	return score >= r.Min && score <= r.Max
+	return score >= r.Min && score < r.Max
 }
 
 // ==================== 解读配置 ====================

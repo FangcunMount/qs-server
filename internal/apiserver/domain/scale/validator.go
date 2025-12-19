@@ -116,9 +116,23 @@ func validateFactor(f *Factor) []ValidationError {
 	// 验证解读规则的有效性
 	for i, rule := range f.GetInterpretRules() {
 		if !rule.IsValid() {
+			// 获取更详细的错误信息
+			scoreRange := rule.GetScoreRange()
+			riskLevel := rule.GetRiskLevel()
+			var details []string
+			if !scoreRange.IsValid() {
+				details = append(details, fmt.Sprintf("分数区间无效: [%.2f, %.2f) (要求 min < max)", scoreRange.Min(), scoreRange.Max()))
+			}
+			if !riskLevel.IsValid() {
+				details = append(details, fmt.Sprintf("风险等级无效: %s (有效值: none, low, medium, high, severe)", riskLevel))
+			}
+			message := "解读规则无效（分数区间或风险等级不正确）"
+			if len(details) > 0 {
+				message = fmt.Sprintf("%s: %s", message, strings.Join(details, "; "))
+			}
 			errs = append(errs, ValidationError{
 				Field:   fmt.Sprintf("factor[%s].interpretRules[%d]", factorCode, i),
-				Message: "解读规则无效（分数区间或风险等级不正确）",
+				Message: message,
 			})
 		}
 	}

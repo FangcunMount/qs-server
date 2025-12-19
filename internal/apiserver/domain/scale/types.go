@@ -161,9 +161,10 @@ func (r RiskLevel) IsValid() bool {
 
 // ===================== 分数区间 =================
 
-// ScoreRange 分数区间 [Min, Max]
-// 注意：医学量表的解读规则通常使用闭区间，即包含边界值
-// 例如：[0, 10] 表示 0 到 10 分（包括 10 分）都适用该规则
+// ScoreRange 分数区间 [Min, Max)
+// 采用左闭右开区间，避免边界值重叠问题
+// 例如：[0, 10) 表示 0 到 10 分（不包括 10 分）都适用该规则
+// 对于 float 值如 29.52，可以设置 [20, 30) 和 [30, 40)，避免边界值重叠
 type ScoreRange struct {
 	min float64
 	max float64
@@ -184,16 +185,17 @@ func (r ScoreRange) Max() float64 {
 	return r.max
 }
 
-// Contains 判断分数是否在区间内 [min, max]
-// 使用左闭右闭区间，符合医学量表的实际使用场景
-// 例如：ScoreRange{0, 10}.Contains(10) 返回 true
+// Contains 判断分数是否在区间内 [min, max)
+// 使用左闭右开区间，避免边界值重叠
+// 例如：ScoreRange{0, 10}.Contains(10) 返回 false，ScoreRange{0, 10}.Contains(9.99) 返回 true
 func (r ScoreRange) Contains(score float64) bool {
-	return score >= r.min && score <= r.max
+	return score >= r.min && score < r.max
 }
 
 // IsValid 检查区间是否有效
+// 左闭右开区间要求 min < max
 func (r ScoreRange) IsValid() bool {
-	return r.min <= r.max
+	return r.min < r.max
 }
 
 // ===================== 计分参数 =================
