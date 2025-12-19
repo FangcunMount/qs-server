@@ -241,16 +241,13 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]interface
 	// 根据策略类型处理参数
 	switch strategy {
 	case ScoringStrategyCnt:
-		// 计数策略：构建 raw_calc_rule 结构化对象
+		// 计数策略：直接存储 cnt_option_contents
+		// 注意：在应用层已经验证了 cnt 策略必须提供非空的 CntOptionContents
+		// 所以这里应该总是有值，但为了防御性编程，仍然检查
 		if len(p.CntOptionContents) > 0 {
-			rawCalcRule := map[string]interface{}{
-				"formula": "cnt",
-				"AppendParams": map[string]interface{}{
-					"cnt_option_contents": p.CntOptionContents,
-				},
-			}
-			result["raw_calc_rule"] = rawCalcRule
+			result["cnt_option_contents"] = p.CntOptionContents
 		}
+		// 如果为空数组，不存储该字段（读取时会返回空数组作为默认值）
 
 	case ScoringStrategySum, ScoringStrategyAvg:
 		// 求和和平均策略：当前不需要额外参数
@@ -283,61 +280,15 @@ func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, st
 	// 根据策略类型解析参数
 	switch strategy {
 	case ScoringStrategyCnt:
-		// 从 raw_calc_rule 中提取 cnt_option_contents
-		rawRule, exists := params["raw_calc_rule"]
-		logger.L(ctx).Infow("ScoringParamsFromMap: checking raw_calc_rule",
-			"exists", exists,
-			"raw_rule_type", getTypeName(rawRule),
-		)
-
-		if !exists || rawRule == nil {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: raw_calc_rule not found or nil")
+		// 从 cnt_option_contents 字段读取
+		contents, ok := params["cnt_option_contents"]
+		if !ok || contents == nil {
+			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents not found",
+				"strategy", strategy,
+				"params_keys", getMapKeys(params),
+			)
 			break
 		}
-
-		// 使用 convertToMap 处理 MongoDB 返回的各种类型
-		ruleMap := convertToMap(ctx, rawRule)
-		if ruleMap == nil {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: convertToMap(rawRule) returned nil")
-			break
-		}
-
-		ruleMapJSON, _ := json.Marshal(ruleMap)
-		logger.L(ctx).Infow("ScoringParamsFromMap: ruleMap converted",
-			"rule_map", string(ruleMapJSON),
-		)
-
-		appendParamsRaw, ok := ruleMap["AppendParams"]
-		if !ok {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: AppendParams not found in ruleMap")
-			break
-		}
-
-		logger.L(ctx).Infow("ScoringParamsFromMap: AppendParams found",
-			"append_params_type", getTypeName(appendParamsRaw),
-		)
-
-		appendParams := convertToMap(ctx, appendParamsRaw)
-
-		if appendParams == nil {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: convertToMap(appendParamsRaw) returned nil")
-			break
-		}
-
-		appendParamsJSON, _ := json.Marshal(appendParams)
-		logger.L(ctx).Infow("ScoringParamsFromMap: appendParams converted",
-			"append_params", string(appendParamsJSON),
-		)
-
-		contents, ok := appendParams["cnt_option_contents"]
-		if !ok {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents not found in appendParams")
-			break
-		}
-
-		logger.L(ctx).Infow("ScoringParamsFromMap: cnt_option_contents found",
-			"contents_type", getTypeName(contents),
-		)
 
 		// 处理数组类型
 		if contentsArray, ok := contents.([]interface{}); ok {
@@ -386,57 +337,14 @@ func getTypeName(v interface{}) string {
 	return reflect.TypeOf(v).String()
 }
 
-// convertToMap 将 interface{} 转换为 map[string]interface{}
-// 用于处理 MongoDB 返回的 bson.M 等类型
-func convertToMap(ctx context.Context, v interface{}) map[string]interface{} {
-	if v == nil {
-		logger.L(ctx).Debugw("convertToMap: input is nil")
-		return nil
+// getMapKeys 获取 map 的键列表（用于日志记录）
+func getMapKeys(m map[string]interface{}) []string {
+	if m == nil {
+		return []string{}
 	}
-
-	// 使用反射检查类型
-	rv := reflect.ValueOf(v)
-	logger.L(ctx).Debugw("convertToMap: input type",
-		"type", rv.Type().String(),
-		"kind", rv.Kind().String(),
-	)
-
-	if rv.Kind() == reflect.Map {
-		// 检查 key 类型是否为 string
-		if rv.Type().Key().Kind() == reflect.String {
-			result := make(map[string]interface{})
-			for _, key := range rv.MapKeys() {
-				result[key.String()] = rv.MapIndex(key).Interface()
-			}
-			resultJSON, _ := json.Marshal(result)
-			logger.L(ctx).Debugw("convertToMap: converted via reflection",
-				"result", string(resultJSON),
-			)
-			return result
-		}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
 	}
-
-	// 如果反射失败，尝试 JSON 转换
-	jsonBytes, err := json.Marshal(v)
-	if err != nil {
-		logger.L(ctx).Warnw("convertToMap: JSON marshal failed",
-			"error", err.Error(),
-		)
-		return nil
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(jsonBytes, &result); err != nil {
-		logger.L(ctx).Warnw("convertToMap: JSON unmarshal failed",
-			"error", err.Error(),
-		)
-		return nil
-	}
-
-	resultJSON, _ := json.Marshal(result)
-	logger.L(ctx).Debugw("convertToMap: converted via JSON",
-		"result", string(resultJSON),
-	)
-
-	return result
+	return keys
 }

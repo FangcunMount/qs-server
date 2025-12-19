@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -146,16 +147,19 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]Fact
 
 	// 2. 从仓储获取量表
 	m, err := s.repo.FindByCode(ctx, scaleCode)
+	logger.L(ctx).Infow("GetFactors: 获取量表", "scaleCode", scaleCode, "err", err)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
 
 	// 3. 转换因子列表
 	factors := m.GetFactors()
+	logger.L(ctx).Infow("GetFactors: 获取因子列表", "factors", factors)
 	result := make([]FactorResult, 0, len(factors))
 	for _, factor := range factors {
 		result = append(result, toFactorResult(factor))
+		logger.L(ctx).Infow("GetFactors: 转换因子列表", "factor", factor, "result", result)
 	}
-
+	logger.L(ctx).Infow("GetFactors: 转换因子列表", "result", result)
 	return result, nil
 }

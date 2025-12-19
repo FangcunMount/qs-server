@@ -165,6 +165,20 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 		)
 	}
 
+	// 验证：cnt 策略必须提供非空的 CntOptionContents
+	strategy := scale.ScoringStrategyCode(po.ScoringStrategy)
+	if strategy == scale.ScoringStrategyCnt {
+		if scoringParams == nil || len(scoringParams.GetCntOptionContents()) == 0 {
+			logger.L(ctx).Errorw("mapFactorToDomain: cnt strategy requires non-empty cnt_option_contents",
+				"factor_code", po.Code,
+				"scoring_params", po.ScoringParams,
+			)
+			// 返回 nil，让上层知道转换失败
+			// 注意：这里不直接报错，因为可能是历史数据问题，让上层决定如何处理
+			return nil
+		}
+	}
+
 	// 创建因子
 	factor, err := scale.NewFactor(
 		scale.NewFactorCode(po.Code),
@@ -172,11 +186,15 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 		scale.WithFactorType(scale.FactorType(po.FactorType)),
 		scale.WithIsTotalScore(po.IsTotalScore),
 		scale.WithQuestionCodes(questionCodes),
-		scale.WithScoringStrategy(scale.ScoringStrategyCode(po.ScoringStrategy)),
+		scale.WithScoringStrategy(strategy),
 		scale.WithScoringParams(scoringParams),
 		scale.WithInterpretRules(interpretRules),
 	)
 	if err != nil {
+		logger.L(ctx).Errorw("mapFactorToDomain: failed to create factor",
+			"factor_code", po.Code,
+			"error", err.Error(),
+		)
 		return nil
 	}
 

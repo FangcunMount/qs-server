@@ -337,6 +337,13 @@ func toFactorDomain(
 		scoringParamsDomain = scale.NewScoringParams()
 	}
 
+	// 验证：cnt 策略必须提供非空的 CntOptionContents
+	if strategy == scale.ScoringStrategyCnt {
+		if scoringParamsDomain == nil || len(scoringParamsDomain.GetCntOptionContents()) == 0 {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "cnt 计分策略必须提供 cnt_option_contents 参数")
+		}
+	}
+
 	// 创建因子
 	factor, err := scale.NewFactor(
 		scale.NewFactorCode(code),
