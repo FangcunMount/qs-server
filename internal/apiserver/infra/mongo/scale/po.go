@@ -22,7 +22,7 @@ type ScalePO struct {
 	Category      string   `bson:"category,omitempty" json:"category,omitempty"`           // 主类
 	Stage         string   `bson:"stage,omitempty" json:"stage,omitempty"`                 // 阶段
 	ApplicableAge string   `bson:"applicable_age,omitempty" json:"applicable_age,omitempty"` // 使用年龄
-	Reporter      string   `bson:"reporter,omitempty" json:"reporter,omitempty"`            // 填报人
+	Reporters     []string `bson:"reporters,omitempty" json:"reporters,omitempty"`         // 填报人列表
 	Tags          []string `bson:"tags,omitempty" json:"tags,omitempty"`                  // 标签列表
 
 	// 关联的问卷
@@ -111,7 +111,7 @@ type ScaleSummaryPO struct {
 	Category          string   `bson:"category"`
 	Stage             string   `bson:"stage"`
 	ApplicableAge     string   `bson:"applicable_age"`
-	Reporter          string   `bson:"reporter"`
+	Reporters         []string `bson:"reporters"`
 	Tags              []string `bson:"tags"`
 	QuestionnaireCode string   `bson:"questionnaire_code"`
 	Status            uint8    `bson:"status"`

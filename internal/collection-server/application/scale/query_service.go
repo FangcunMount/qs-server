@@ -58,7 +58,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 		req.PageSize = 100
 	}
 
-	result, err := s.scaleClient.ListScales(ctx, req.Page, req.PageSize, req.Status, req.Title, req.Category, req.Stage, req.ApplicableAge, req.Reporter, req.Tags)
+	result, err := s.scaleClient.ListScales(ctx, req.Page, req.PageSize, req.Status, req.Title, req.Category, req.Stage, req.ApplicableAge, req.Reporters, req.Tags)
 	if err != nil {
 		log.Errorf("Failed to list scales via gRPC: %v", err)
 		return nil, err
@@ -74,7 +74,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 			Category:             scale.Category,
 			Stage:                scale.Stage,
 			ApplicableAge:        scale.ApplicableAge,
-			Reporter:             scale.Reporter,
+			Reporters:            scale.Reporters,
 			Tags:                 scale.Tags,
 			QuestionnaireCode:    scale.QuestionnaireCode,
 			QuestionnaireVersion: scale.QuestionnaireVersion,
@@ -166,7 +166,7 @@ func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleRespons
 		Category:             scale.Category,
 		Stage:                scale.Stage,
 		ApplicableAge:        scale.ApplicableAge,
-		Reporter:             scale.Reporter,
+		Reporters:            scale.Reporters,
 		Tags:                 scale.Tags,
 		QuestionnaireCode:    scale.QuestionnaireCode,
 		QuestionnaireVersion: scale.QuestionnaireVersion,

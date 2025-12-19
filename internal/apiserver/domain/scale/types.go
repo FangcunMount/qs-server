@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"regexp"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -378,19 +381,19 @@ const (
 	// CategoryADHD ADHD
 	CategoryADHD Category = "adhd"
 	// CategoryTicDisorder 抽动障碍
-	CategoryTicDisorder Category = "tic_disorder"
+	CategoryTicDisorder Category = "tic"
 	// CategorySensoryIntegration 感统
-	CategorySensoryIntegration Category = "sensory_integration"
+	CategorySensoryIntegration Category = "sensory"
 	// CategoryExecutiveFunction 执行功能
-	CategoryExecutiveFunction Category = "executive_function"
+	CategoryExecutiveFunction Category = "executive"
 	// CategoryMentalHealth 心理健康
-	CategoryMentalHealth Category = "mental_health"
-	// CategoryNeurodevelopmentalScreening 神经发育筛查（原认知筛查）
-	CategoryNeurodevelopmentalScreening Category = "neurodevelopmental_screening"
+	CategoryMentalHealth Category = "mental"
+	// CategoryNeurodevelopmentalScreening 神经发育
+	CategoryNeurodevelopmentalScreening Category = "neurodev"
 	// CategoryChronicDiseaseManagement 慢性病管理
-	CategoryChronicDiseaseManagement Category = "chronic_disease_management"
+	CategoryChronicDiseaseManagement Category = "chronic"
 	// CategoryQualityOfLife 生活质量
-	CategoryQualityOfLife Category = "quality_of_life"
+	CategoryQualityOfLife Category = "qol"
 )
 
 // NewCategory 创建类别
@@ -486,12 +489,14 @@ type ApplicableAge string
 const (
 	// ApplicableAgeInfant 婴幼儿
 	ApplicableAgeInfant ApplicableAge = "infant"
-	// ApplicableAgeSchoolAge 学龄
-	ApplicableAgeSchoolAge ApplicableAge = "school_age"
-	// ApplicableAgeAdolescentAdult 青少年/成人
-	ApplicableAgeAdolescentAdult ApplicableAge = "adolescent_adult"
-	// ApplicableAgeChildAdolescent 儿童/青少年
-	ApplicableAgeChildAdolescent ApplicableAge = "child_adolescent"
+	// ApplicableAgePreschool 学龄前
+	ApplicableAgePreschool ApplicableAge = "preschool"
+	// ApplicableAgeSchoolChild 学龄儿童
+	ApplicableAgeSchoolChild ApplicableAge = "school_child"
+	// ApplicableAgeAdolescent 青少年
+	ApplicableAgeAdolescent ApplicableAge = "adolescent"
+	// ApplicableAgeAdult 成人
+	ApplicableAgeAdult ApplicableAge = "adult"
 )
 
 // NewApplicableAge 创建使用年龄
@@ -520,8 +525,8 @@ func (a ApplicableAge) IsValid() bool {
 		return true // 允许为空（可选字段）
 	}
 	switch a {
-	case ApplicableAgeInfant, ApplicableAgeSchoolAge,
-		ApplicableAgeAdolescentAdult, ApplicableAgeChildAdolescent:
+	case ApplicableAgeInfant, ApplicableAgePreschool,
+		ApplicableAgeSchoolChild, ApplicableAgeAdolescent, ApplicableAgeAdult:
 		return true
 	default:
 		return false
@@ -580,37 +585,8 @@ func (r Reporter) IsValid() bool {
 // ===================== 标签 =================
 
 // Tag 量表标签
-// 用于表达除主类外的其他信息，包括阶段、主题、状态、填报人等
+// 用于表达除主类外的其他信息，标签值通过后台输入设置，不再固定常量
 type Tag string
-
-const (
-	// 阶段标签
-	TagScreening      Tag = "screening"       // 筛查
-	TagDeepAssessment Tag = "deep_assessment" // 深评
-	TagFollowUp       Tag = "follow_up"       // 随访
-	TagOutcome        Tag = "outcome"         // 功能结局
-
-	// 主题标签
-	TagBriefVersion  Tag = "brief_version"  // 简版
-	TagBroadSpectrum Tag = "broad_spectrum" // 广谱
-	TagComorbidity   Tag = "comorbidity"    // 共病
-	TagFunction      Tag = "function"       // 功能
-	TagFamilySystem  Tag = "family_system"  // 家庭系统
-	TagStress        Tag = "stress"         // 压力
-	TagInfant        Tag = "infant"         // 婴幼儿
-	TagSchoolAge     Tag = "school_age"     // 学龄
-	TagAdolescent    Tag = "adolescent"     // 青少年/成人
-
-	// 状态标签
-	TagNeedsVersioning Tag = "needs_versioning" // 需定版
-	TagCustom          Tag = "custom"           // 自定义
-
-	// 填报人标签（与 Reporter 类型对应，但作为标签可以多个）
-	TagParentRating   Tag = "parent_rating"   // 家长评
-	TagTeacherRating  Tag = "teacher_rating"  // 教师评
-	TagSelfRating     Tag = "self_rating"     // 自评
-	TagClinicalRating Tag = "clinical_rating" // 临床评定
-)
 
 // NewTag 创建标签
 func NewTag(value string) Tag {
@@ -627,16 +603,31 @@ func (t Tag) Value() string {
 	return string(t)
 }
 
-// IsValid 检查标签是否有效
-func (t Tag) IsValid() bool {
-	switch t {
-	case TagScreening, TagDeepAssessment, TagFollowUp, TagOutcome,
-		TagBriefVersion, TagBroadSpectrum, TagComorbidity, TagFunction,
-		TagFamilySystem, TagStress, TagInfant, TagSchoolAge, TagAdolescent,
-		TagNeedsVersioning, TagCustom,
-		TagParentRating, TagTeacherRating, TagSelfRating, TagClinicalRating:
-		return true
-	default:
-		return false
+// IsEmpty 判断标签是否为空
+func (t Tag) IsEmpty() bool {
+	return t == ""
+}
+
+// Validate 验证标签格式（只验证格式，不验证固定值）
+// 标签允许：字母、数字、下划线、中文字符，长度1-50
+func (t Tag) Validate() error {
+	if t.IsEmpty() {
+		return nil // 允许为空
 	}
+
+	value := t.String()
+	if len(value) == 0 {
+		return errors.WithCode(code.ErrInvalidArgument, "标签不能为空")
+	}
+	if len(value) > 50 {
+		return errors.WithCode(code.ErrInvalidArgument, "标签长度不能超过50个字符")
+	}
+
+	// 验证字符格式：只允许字母、数字、下划线、中文字符
+	matched, _ := regexp.MatchString(`^[\w\p{Han}]+$`, value)
+	if !matched {
+		return errors.WithCode(code.ErrInvalidArgument, "标签只能包含字母、数字、下划线和中文")
+	}
+
+	return nil
 }

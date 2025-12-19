@@ -546,7 +546,21 @@ paths:
       tags:
       - 量表
       summary: 获取量表列表
-      description: 分页获取量表列表，支持按主类、阶段、使用年龄、填报人、标签等条件过滤
+      description: '分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。
+
+        查询参数说明：
+
+        - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
+
+        - stage: 阶段过滤，可选值：screening/deep_assessment/follow_up/outcome
+
+        - applicable_age: 使用年龄过滤，可选值：infant/preschool/school_child/adolescent/adult
+
+        - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
+
+        - tags: 标签过滤（数组），动态标签值
+
+        响应中包含分类字段：category、stage、applicable_age、reporters（数组）、tags（数组）'
       operationId: 获取量表列表
       parameters:
       - type: integer
@@ -579,15 +593,18 @@ paths:
         description: 使用年龄过滤
         name: applicable_age
         in: query
-      - type: string
-        description: 填报人过滤
-        name: reporter
+      - type: array
+        items:
+          type: string
+        collectionFormat: csv
+        description: 填报人过滤（数组）
+        name: reporters
         in: query
       - type: array
         items:
           type: string
         collectionFormat: csv
-        description: 标签过滤
+        description: 标签过滤（数组）
         name: tags
         in: query
       responses:
@@ -619,7 +636,21 @@ paths:
       tags:
       - 量表
       summary: 获取量表分类列表
-      description: 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表
+      description: '获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
+
+        返回说明：
+
+        - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev,
+        chronic, qol）
+
+        - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+
+        - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent,
+        adult）
+
+        - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
+
+        - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）'
       operationId: 获取量表分类列表
       responses:
         '200':
@@ -644,7 +675,19 @@ paths:
       tags:
       - 量表
       summary: 获取量表详情
-      description: 根据量表编码获取量表详情
+      description: '根据量表编码获取量表详情。
+
+        响应字段说明：
+
+        - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
+
+        - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+
+        - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+
+        - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
+
+        - tags: 标签列表（数组，动态输入）'
       operationId: 获取量表详情
       parameters:
       - type: string
@@ -1410,8 +1453,10 @@ components:
           type: string
         questionnaire_version:
           type: string
-        reporter:
-          type: string
+        reporters:
+          type: array
+          items:
+            type: string
         stage:
           type: string
         status:
@@ -1437,8 +1482,10 @@ components:
           type: string
         questionnaire_version:
           type: string
-        reporter:
-          type: string
+        reporters:
+          type: array
+          items:
+            type: string
         stage:
           type: string
         status:

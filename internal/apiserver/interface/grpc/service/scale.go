@@ -15,13 +15,15 @@ import (
 // 提供量表的查询功能：列表查询、详情查看、分类列表
 type ScaleService struct {
 	pb.UnimplementedScaleServiceServer
-	queryService appScale.ScaleQueryService
+	queryService    appScale.ScaleQueryService
+	categoryService appScale.ScaleCategoryService
 }
 
 // NewScaleService 创建量表 gRPC 服务
-func NewScaleService(queryService appScale.ScaleQueryService) *ScaleService {
+func NewScaleService(queryService appScale.ScaleQueryService, categoryService appScale.ScaleCategoryService) *ScaleService {
 	return &ScaleService{
-		queryService: queryService,
+		queryService:    queryService,
+		categoryService: categoryService,
 	}
 }
 
@@ -72,8 +74,10 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 	if req.ApplicableAge != "" {
 		dto.Conditions["applicable_age"] = req.ApplicableAge
 	}
-	if req.Reporter != "" {
-		dto.Conditions["reporter"] = req.Reporter
+	// 注意：reporters 是数组，查询条件暂时不支持多值过滤，后续可以扩展
+	if len(req.Reporters) > 0 {
+		// 使用第一个填报人作为过滤条件（或可以扩展为支持多个）
+		dto.Conditions["reporters"] = req.Reporters[0]
 	}
 
 	// 调用应用服务 - 使用已发布列表
@@ -98,72 +102,14 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 
 // GetScaleCategories 获取量表分类列表
 func (s *ScaleService) GetScaleCategories(ctx context.Context, req *pb.GetScaleCategoriesRequest) (*pb.GetScaleCategoriesResponse, error) {
-	// 构建分类列表
-	categories := []*pb.ScaleCategory{
-		{Value: "adhd", Label: "ADHD"},
-		{Value: "tic_disorder", Label: "抽动障碍"},
-		{Value: "sensory_integration", Label: "感统"},
-		{Value: "executive_function", Label: "执行功能"},
-		{Value: "mental_health", Label: "心理健康"},
-		{Value: "neurodevelopmental_screening", Label: "神经发育筛查"},
-		{Value: "chronic_disease_management", Label: "慢性病管理"},
-		{Value: "quality_of_life", Label: "生活质量"},
+	// 调用应用层类别服务
+	result, err := s.categoryService.GetCategories(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	stages := []*pb.ScaleStage{
-		{Value: "screening", Label: "筛查"},
-		{Value: "deep_assessment", Label: "深评"},
-		{Value: "follow_up", Label: "随访"},
-		{Value: "outcome", Label: "结局"},
-	}
-
-	applicableAges := []*pb.ApplicableAge{
-		{Value: "infant", Label: "婴幼儿"},
-		{Value: "school_age", Label: "学龄"},
-		{Value: "adolescent_adult", Label: "青少年/成人"},
-		{Value: "child_adolescent", Label: "儿童/青少年"},
-	}
-
-	reporters := []*pb.Reporter{
-		{Value: "parent", Label: "家长评"},
-		{Value: "teacher", Label: "教师评"},
-		{Value: "self", Label: "自评"},
-		{Value: "clinical", Label: "临床评定"},
-	}
-
-	tags := []*pb.Tag{
-		// 阶段标签
-		{Value: "screening", Label: "筛查", Category: "stage"},
-		{Value: "deep_assessment", Label: "深评", Category: "stage"},
-		{Value: "follow_up", Label: "随访", Category: "stage"},
-		{Value: "outcome", Label: "功能结局", Category: "stage"},
-		// 主题标签
-		{Value: "brief_version", Label: "简版", Category: "theme"},
-		{Value: "broad_spectrum", Label: "广谱", Category: "theme"},
-		{Value: "comorbidity", Label: "共病", Category: "theme"},
-		{Value: "function", Label: "功能", Category: "theme"},
-		{Value: "family_system", Label: "家庭系统", Category: "theme"},
-		{Value: "stress", Label: "压力", Category: "theme"},
-		{Value: "infant", Label: "婴幼儿", Category: "theme"},
-		{Value: "school_age", Label: "学龄", Category: "theme"},
-		{Value: "adolescent", Label: "青少年/成人", Category: "theme"},
-		// 状态标签
-		{Value: "needs_versioning", Label: "需定版", Category: "status"},
-		{Value: "custom", Label: "自定义", Category: "status"},
-		// 填报人标签
-		{Value: "parent_rating", Label: "家长评", Category: "reporter"},
-		{Value: "teacher_rating", Label: "教师评", Category: "reporter"},
-		{Value: "self_rating", Label: "自评", Category: "reporter"},
-		{Value: "clinical_rating", Label: "临床评定", Category: "reporter"},
-	}
-
-	return &pb.GetScaleCategoriesResponse{
-		Categories:     categories,
-		Stages:         stages,
-		ApplicableAges: applicableAges,
-		Reporters:      reporters,
-		Tags:           tags,
-	}, nil
+	// 转换为 protobuf 格式
+	return s.toProtoScaleCategories(result), nil
 }
 
 // toProtoScale 转换为 protobuf 量表
@@ -181,6 +127,9 @@ func (s *ScaleService) toProtoScale(result *appScale.ScaleResult) *pb.Scale {
 	// 转换标签列表
 	tags := append([]string(nil), result.Tags...)
 
+	// 转换填报人列表
+	reporters := append([]string(nil), result.Reporters...)
+
 	return &pb.Scale{
 		Code:                 result.Code,
 		Title:                result.Title,
@@ -188,12 +137,64 @@ func (s *ScaleService) toProtoScale(result *appScale.ScaleResult) *pb.Scale {
 		Category:             result.Category,
 		Stage:                result.Stage,
 		ApplicableAge:        result.ApplicableAge,
-		Reporter:             result.Reporter,
+		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		Status:               result.Status,
 		Factors:              protoFactors,
+	}
+}
+
+// toProtoScaleCategories 转换为 protobuf 分类列表
+func (s *ScaleService) toProtoScaleCategories(result *appScale.ScaleCategoriesResult) *pb.GetScaleCategoriesResponse {
+	categories := make([]*pb.ScaleCategory, len(result.Categories))
+	for i, cat := range result.Categories {
+		categories[i] = &pb.ScaleCategory{
+			Value: cat.Value,
+			Label: cat.Label,
+		}
+	}
+
+	stages := make([]*pb.ScaleStage, len(result.Stages))
+	for i, stage := range result.Stages {
+		stages[i] = &pb.ScaleStage{
+			Value: stage.Value,
+			Label: stage.Label,
+		}
+	}
+
+	applicableAges := make([]*pb.ApplicableAge, len(result.ApplicableAges))
+	for i, age := range result.ApplicableAges {
+		applicableAges[i] = &pb.ApplicableAge{
+			Value: age.Value,
+			Label: age.Label,
+		}
+	}
+
+	reporters := make([]*pb.Reporter, len(result.Reporters))
+	for i, rep := range result.Reporters {
+		reporters[i] = &pb.Reporter{
+			Value: rep.Value,
+			Label: rep.Label,
+		}
+	}
+
+	tags := make([]*pb.Tag, len(result.Tags))
+	for i, tag := range result.Tags {
+		tags[i] = &pb.Tag{
+			Value:    tag.Value,
+			Label:    tag.Label,
+			Category: tag.Category,
+		}
+	}
+
+	return &pb.GetScaleCategoriesResponse{
+		Categories:     categories,
+		Stages:         stages,
+		ApplicableAges: applicableAges,
+		Reporters:      reporters,
+		Tags:           tags,
 	}
 }
 
@@ -206,6 +207,9 @@ func (s *ScaleService) toProtoScaleSummary(result *appScale.ScaleSummaryResult) 
 	// 转换标签列表
 	tags := append([]string(nil), result.Tags...)
 
+	// 转换填报人列表
+	reporters := append([]string(nil), result.Reporters...)
+
 	return &pb.ScaleSummary{
 		Code:                 result.Code,
 		Title:                result.Title,
@@ -213,7 +217,7 @@ func (s *ScaleService) toProtoScaleSummary(result *appScale.ScaleSummaryResult) 
 		Category:             result.Category,
 		Stage:                result.Stage,
 		ApplicableAge:        result.ApplicableAge,
-		Reporter:             result.Reporter,
+		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: "", // 摘要中不包含版本

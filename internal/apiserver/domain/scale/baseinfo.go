@@ -52,7 +52,7 @@ func (BaseInfo) UpdateAll(m *MedicalScale, title, description string) error {
 }
 
 // UpdateClassificationInfo 更新分类信息
-func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, stage Stage, applicableAge ApplicableAge, reporter Reporter, tags []Tag) error {
+func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, stage Stage, applicableAge ApplicableAge, reporters []Reporter, tags []Tag) error {
 	// 验证类型值
 	if !category.IsValid() {
 		return errors.WithCode(code.ErrInvalidArgument, "类别值无效")
@@ -63,25 +63,29 @@ func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, sta
 	if !applicableAge.IsValid() {
 		return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效")
 	}
-	if !reporter.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "填报人值无效")
+
+	// 验证填报人列表
+	for _, reporter := range reporters {
+		if !reporter.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "填报人值无效: %s", reporter.String())
+		}
 	}
 
-	// 验证标签（最多3-5个）
+	// 验证标签（最多5个）
 	if len(tags) > 5 {
 		return errors.WithCode(code.ErrInvalidArgument, "标签数量不能超过5个")
 	}
 	for _, tag := range tags {
-		if !tag.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "%s", "标签值无效: "+tag.String())
+		if err := tag.Validate(); err != nil {
+			return err
 		}
 	}
 
-	return m.updateClassificationInfo(category, stage, applicableAge, reporter, tags)
+	return m.updateClassificationInfo(category, stage, applicableAge, reporters, tags)
 }
 
 // UpdateAllWithClassification 批量更新基础信息和分类信息
-func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description string, category Category, stage Stage, applicableAge ApplicableAge, reporter Reporter, tags []Tag) error {
+func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description string, category Category, stage Stage, applicableAge ApplicableAge, reporters []Reporter, tags []Tag) error {
 	title = strings.TrimSpace(title)
 	if len(title) == 0 {
 		return errors.WithCode(code.ErrInvalidArgument, "标题不能为空")
@@ -103,17 +107,21 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 	if !applicableAge.IsValid() {
 		return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效")
 	}
-	if !reporter.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "填报人值无效")
+
+	// 验证填报人列表
+	for _, reporter := range reporters {
+		if !reporter.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "填报人值无效: %s", reporter.String())
+		}
 	}
 
-	// 验证标签（最多3-5个）
+	// 验证标签（最多5个）
 	if len(tags) > 5 {
 		return errors.WithCode(code.ErrInvalidArgument, "标签数量不能超过5个")
 	}
 	for _, tag := range tags {
-		if !tag.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "%s", "标签值无效: "+tag.String())
+		if err := tag.Validate(); err != nil {
+			return err
 		}
 	}
 
@@ -121,7 +129,7 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 		return err
 	}
 
-	return m.updateClassificationInfo(category, stage, applicableAge, reporter, tags)
+	return m.updateClassificationInfo(category, stage, applicableAge, reporters, tags)
 }
 
 // UpdateQuestionnaire 更新关联的问卷

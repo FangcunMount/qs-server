@@ -15,7 +15,7 @@ type ScaleResult struct {
 	Category             string         // 主类
 	Stage                string         // 阶段
 	ApplicableAge        string         // 使用年龄
-	Reporter             string         // 填报人
+	Reporters            []string       // 填报人列表
 	Tags                 []string       // 标签列表
 	QuestionnaireCode    string         // 关联的问卷编码
 	QuestionnaireVersion string         // 关联的问卷版本
@@ -59,7 +59,7 @@ type ScaleSummaryResult struct {
 	Category          string   // 主类
 	Stage             string   // 阶段
 	ApplicableAge     string   // 使用年龄
-	Reporter          string   // 填报人
+	Reporters         []string // 填报人列表
 	Tags              []string // 标签列表
 	QuestionnaireCode string   // 关联的问卷编码
 	Status            string   // 状态
@@ -85,6 +85,12 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		tags = append(tags, tag.String())
 	}
 
+	// 转换填报人列表
+	reporters := make([]string, 0, len(m.GetReporters()))
+	for _, reporter := range m.GetReporters() {
+		reporters = append(reporters, reporter.String())
+	}
+
 	result := &ScaleResult{
 		Code:                 m.GetCode().String(),
 		Title:                m.GetTitle(),
@@ -92,7 +98,7 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		Category:             m.GetCategory().String(),
 		Stage:                m.GetStage().String(),
 		ApplicableAge:        m.GetApplicableAge().String(),
-		Reporter:             m.GetReporter().String(),
+		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: m.GetQuestionnaireVersion(),
@@ -183,6 +189,12 @@ func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummary
 			tags = append(tags, tag.String())
 		}
 
+		// 转换填报人列表
+		reporters := make([]string, 0, len(item.Reporters))
+		for _, reporter := range item.Reporters {
+			reporters = append(reporters, reporter.String())
+		}
+
 		result.Items = append(result.Items, &ScaleSummaryResult{
 			Code:              item.Code,
 			Title:             item.Title,
@@ -190,7 +202,7 @@ func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummary
 			Category:          item.Category.String(),
 			Stage:             item.Stage.String(),
 			ApplicableAge:     item.ApplicableAge.String(),
-			Reporter:          item.Reporter.String(),
+			Reporters:         reporters,
 			Tags:              tags,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status.String(),

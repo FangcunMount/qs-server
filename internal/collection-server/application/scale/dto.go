@@ -8,7 +8,7 @@ type ScaleResponse struct {
 	Category             string           `json:"category"`
 	Stage                string           `json:"stage"`
 	ApplicableAge        string           `json:"applicable_age"`
-	Reporter             string           `json:"reporter"`
+	Reporters            []string         `json:"reporters"`
 	Tags                 []string         `json:"tags"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
 	QuestionnaireVersion string           `json:"questionnaire_version"`
@@ -46,7 +46,7 @@ type ScaleSummaryResponse struct {
 	Category             string   `json:"category"`
 	Stage                string   `json:"stage"`
 	ApplicableAge        string   `json:"applicable_age"`
-	Reporter             string   `json:"reporter"`
+	Reporters            []string `json:"reporters"`
 	Tags                 []string `json:"tags"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
@@ -62,7 +62,7 @@ type ListScalesRequest struct {
 	Category      string   `form:"category"`
 	Stage         string   `form:"stage"`
 	ApplicableAge string   `form:"applicable_age"`
-	Reporter      string   `form:"reporter"`
+	Reporters     []string `form:"reporters"`
 	Tags          []string `form:"tags"`
 }
 

@@ -9,7 +9,7 @@ type CreateScaleRequest struct {
 	Category             string   `json:"category"`
 	Stage                string   `json:"stage"`
 	ApplicableAge        string   `json:"applicable_age"`
-	Reporter             string   `json:"reporter"`
+	Reporters            []string `json:"reporters"`
 	Tags                 []string `json:"tags"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
@@ -22,7 +22,7 @@ type UpdateScaleBasicInfoRequest struct {
 	Category      string   `json:"category"`
 	Stage         string   `json:"stage"`
 	ApplicableAge string   `json:"applicable_age"`
-	Reporter      string   `json:"reporter"`
+	Reporters     []string `json:"reporters"`
 	Tags          []string `json:"tags"`
 }
 

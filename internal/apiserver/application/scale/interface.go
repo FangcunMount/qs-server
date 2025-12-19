@@ -106,3 +106,13 @@ type ScaleQueryService interface {
 	// 场景：查询指定量表的所有因子
 	GetFactors(ctx context.Context, scaleCode string) ([]FactorResult, error)
 }
+
+// ScaleCategoryService 量表分类服务
+// 行为者：所有用户（管理员、编辑者、前端）
+// 职责：提供量表分类选项的统一数据源
+// 变更来源：分类选项的定义变化
+type ScaleCategoryService interface {
+	// GetCategories 获取量表分类列表
+	// 场景：前端需要渲染下拉框、多选框等组件时，获取所有可用的分类选项
+	GetCategories(ctx context.Context) (*ScaleCategoriesResult, error)
+}

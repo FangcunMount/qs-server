@@ -56,7 +56,13 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 		tags = append(tags, scale.NewTag(tagStr))
 	}
 
-	// 4. 创建量表领域模型
+	// 4. 转换填报人列表
+	reporters := make([]scale.Reporter, 0, len(dto.Reporters))
+	for _, reporterStr := range dto.Reporters {
+		reporters = append(reporters, scale.NewReporter(reporterStr))
+	}
+
+	// 5. 创建量表领域模型
 	m, err := scale.NewMedicalScale(
 		code,
 		dto.Title,
@@ -64,7 +70,7 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 		scale.WithCategory(scale.NewCategory(dto.Category)),
 		scale.WithStage(scale.NewStage(dto.Stage)),
 		scale.WithApplicableAge(scale.NewApplicableAge(dto.ApplicableAge)),
-		scale.WithReporter(scale.NewReporter(dto.Reporter)),
+		scale.WithReporters(reporters),
 		scale.WithTags(tags),
 		scale.WithQuestionnaire(meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion),
 		scale.WithStatus(scale.StatusDraft),
@@ -103,8 +109,14 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		tags = append(tags, scale.NewTag(tagStr))
 	}
 
-	// 4. 更新基本信息和分类信息
-	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, scale.NewCategory(dto.Category), scale.NewStage(dto.Stage), scale.NewApplicableAge(dto.ApplicableAge), scale.NewReporter(dto.Reporter), tags); err != nil {
+	// 4. 转换填报人列表
+	reporters := make([]scale.Reporter, 0, len(dto.Reporters))
+	for _, reporterStr := range dto.Reporters {
+		reporters = append(reporters, scale.NewReporter(reporterStr))
+	}
+
+	// 5. 更新基本信息和分类信息
+	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, scale.NewCategory(dto.Category), scale.NewStage(dto.Stage), scale.NewApplicableAge(dto.ApplicableAge), reporters, tags); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新基本信息失败")
 	}
 

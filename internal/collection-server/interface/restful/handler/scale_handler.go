@@ -21,7 +21,13 @@ func NewScaleHandler(queryService *scale.QueryService) *ScaleHandler {
 
 // Get 获取量表详情
 // @Summary 获取量表详情
-// @Description 根据量表编码获取量表详情
+// @Description 根据量表编码获取量表详情。
+// @Description 响应字段说明：
+// @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
+// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
+// @Description - tags: 标签列表（数组，动态输入）
 // @Tags 量表
 // @Produce json
 // @Param code path string true "量表编码"
@@ -53,7 +59,14 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 
 // List 获取量表列表
 // @Summary 获取量表列表
-// @Description 分页获取量表列表，支持按主类、阶段、使用年龄、填报人、标签等条件过滤
+// @Description 分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。
+// @Description 查询参数说明：
+// @Description - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
+// @Description - stage: 阶段过滤，可选值：screening/deep_assessment/follow_up/outcome
+// @Description - applicable_age: 使用年龄过滤，可选值：infant/preschool/school_child/adolescent/adult
+// @Description - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
+// @Description - tags: 标签过滤（数组），动态标签值
+// @Description 响应中包含分类字段：category、stage、applicable_age、reporters（数组）、tags（数组）
 // @Tags 量表
 // @Produce json
 // @Param page query int false "页码" default(1)
@@ -63,8 +76,8 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 // @Param category query string false "主类过滤"
 // @Param stage query string false "阶段过滤"
 // @Param applicable_age query string false "使用年龄过滤"
-// @Param reporter query string false "填报人过滤"
-// @Param tags query []string false "标签过滤"
+// @Param reporters query []string false "填报人过滤（数组）"
+// @Param tags query []string false "标签过滤（数组）"
 // @Success 200 {object} core.Response{data=scale.ListScalesResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -86,7 +99,13 @@ func (h *ScaleHandler) List(c *gin.Context) {
 
 // GetCategories 获取量表分类列表
 // @Summary 获取量表分类列表
-// @Description 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表
+// @Description 获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
+// @Description 返回说明：
+// @Description - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）
+// @Description - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+// @Description - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）
+// @Description - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
+// @Description - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）
 // @Tags 量表
 // @Produce json
 // @Success 200 {object} core.Response{data=scale.ScaleCategoriesResponse}
@@ -101,4 +120,3 @@ func (h *ScaleHandler) GetCategories(c *gin.Context) {
 
 	h.Success(c, result)
 }
-

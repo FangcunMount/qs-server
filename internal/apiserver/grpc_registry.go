@@ -147,9 +147,10 @@ func (r *GRPCRegistry) registerScaleService() error {
 		return nil
 	}
 
-	// 使用 QueryService
+	// 使用 QueryService 和 CategoryService
 	scaleService := service.NewScaleService(
 		r.container.ScaleModule.QueryService,
+		r.container.ScaleModule.CategoryService,
 	)
 
 	r.server.RegisterService(scaleService)

@@ -12,7 +12,7 @@ type ScaleSummary struct {
 	Category          Category
 	Stage             Stage
 	ApplicableAge     ApplicableAge
-	Reporter          Reporter
+	Reporters         []Reporter
 	Tags              []Tag
 	QuestionnaireCode string
 	Status            Status

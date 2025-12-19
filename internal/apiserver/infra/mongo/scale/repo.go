@@ -97,7 +97,7 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			"category":           1,
 			"stage":              1,
 			"applicable_age":     1,
-			"reporter":           1,
+			"reporters":          1,
 			"tags":               1,
 			"questionnaire_code": 1,
 			"status":             1,
@@ -123,6 +123,12 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			tags = append(tags, scale.NewTag(tagStr))
 		}
 
+		// 转换填报人列表
+		reporters := make([]scale.Reporter, 0, len(po.Reporters))
+		for _, reporterStr := range po.Reporters {
+			reporters = append(reporters, scale.NewReporter(reporterStr))
+		}
+
 		result = append(result, &scale.ScaleSummary{
 			Code:              po.Code,
 			Title:             po.Title,
@@ -130,7 +136,7 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			Category:          scale.NewCategory(po.Category),
 			Stage:             scale.NewStage(po.Stage),
 			ApplicableAge:     scale.NewApplicableAge(po.ApplicableAge),
-			Reporter:          scale.NewReporter(po.Reporter),
+			Reporters:         reporters,
 			Tags:              tags,
 			QuestionnaireCode: po.QuestionnaireCode,
 			Status:            scale.Status(po.Status),

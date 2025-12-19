@@ -24,7 +24,7 @@ type MedicalScale struct {
 	category      Category      // 主类（每个量表只选1个主类）
 	stage         Stage         // 阶段
 	applicableAge ApplicableAge // 使用年龄
-	reporter      Reporter      // 填报人
+	reporters     []Reporter    // 填报人列表（可多个）
 	tags          []Tag         // 标签（最多3-5个，用于表达除主类外的其他信息）
 
 	// 关联的问卷（编码 + 版本）
@@ -127,10 +127,14 @@ func WithApplicableAge(age ApplicableAge) MedicalScaleOption {
 	}
 }
 
-// WithReporter 设置填报人
-func WithReporter(reporter Reporter) MedicalScaleOption {
+// WithReporters 设置填报人列表
+func WithReporters(reporters []Reporter) MedicalScaleOption {
 	return func(m *MedicalScale) {
-		m.reporter = reporter
+		if reporters == nil {
+			m.reporters = []Reporter{}
+		} else {
+			m.reporters = reporters
+		}
 	}
 }
 
@@ -202,9 +206,9 @@ func (m *MedicalScale) GetApplicableAge() ApplicableAge {
 	return m.applicableAge
 }
 
-// GetReporter 获取填报人
-func (m *MedicalScale) GetReporter() Reporter {
-	return m.reporter
+// GetReporters 获取填报人列表
+func (m *MedicalScale) GetReporters() []Reporter {
+	return m.reporters
 }
 
 // GetTags 获取标签列表
@@ -285,11 +289,15 @@ func (m *MedicalScale) updateBasicInfo(title, description string) error {
 }
 
 // updateClassificationInfo 更新分类信息
-func (m *MedicalScale) updateClassificationInfo(category Category, stage Stage, applicableAge ApplicableAge, reporter Reporter, tags []Tag) error {
+func (m *MedicalScale) updateClassificationInfo(category Category, stage Stage, applicableAge ApplicableAge, reporters []Reporter, tags []Tag) error {
 	m.category = category
 	m.stage = stage
 	m.applicableAge = applicableAge
-	m.reporter = reporter
+	if reporters == nil {
+		m.reporters = []Reporter{}
+	} else {
+		m.reporters = reporters
+	}
 	if tags == nil {
 		m.tags = []Tag{}
 	} else {

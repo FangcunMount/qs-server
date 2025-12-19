@@ -6,7 +6,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -21,6 +20,7 @@ type ScaleHandler struct {
 	lifecycleService scale.ScaleLifecycleService
 	factorService    scale.ScaleFactorService
 	queryService     scale.ScaleQueryService
+	categoryService  scale.ScaleCategoryService
 }
 
 // NewScaleHandler 创建量表处理器
@@ -28,11 +28,13 @@ func NewScaleHandler(
 	lifecycleService scale.ScaleLifecycleService,
 	factorService scale.ScaleFactorService,
 	queryService scale.ScaleQueryService,
+	categoryService scale.ScaleCategoryService,
 ) *ScaleHandler {
 	return &ScaleHandler{
 		lifecycleService: lifecycleService,
 		factorService:    factorService,
 		queryService:     queryService,
+		categoryService:  categoryService,
 	}
 }
 
@@ -41,11 +43,17 @@ func NewScaleHandler(
 // Create 创建量表
 // @Summary 创建量表
 // @Description 创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
+// @Description 字段说明：
+// @Description - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
+// @Description - stage: 阶段，可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)
+// @Description - applicable_age: 使用年龄，可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)
+// @Description - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
+// @Description - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
 // @Tags Scale-Lifecycle
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreateScaleRequest true "创建量表请求（包含主类、阶段、使用年龄、填报人、标签等字段）"
+// @Param request body request.CreateScaleRequest true "创建量表请求"
 // @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales [post]
 func (h *ScaleHandler) Create(c *gin.Context) {
@@ -65,7 +73,7 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 		Category:             req.Category,
 		Stage:                req.Stage,
 		ApplicableAge:        req.ApplicableAge,
-		Reporter:             req.Reporter,
+		Reporters:            req.Reporters,
 		Tags:                 req.Tags,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
@@ -82,13 +90,19 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 
 // UpdateBasicInfo 更新量表基本信息
 // @Summary 更新量表基本信息
-// @Description 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息
+// @Description 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。
+// @Description 字段说明：
+// @Description - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
+// @Description - stage: 阶段，可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)
+// @Description - applicable_age: 使用年龄，可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)
+// @Description - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
+// @Description - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
 // @Tags Scale-Lifecycle
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Param request body request.UpdateScaleBasicInfoRequest true "更新请求（包含标题、描述、主类、阶段、使用年龄、填报人、标签等字段）"
+// @Param request body request.UpdateScaleBasicInfoRequest true "更新请求"
 // @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/basic-info [put]
 func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
@@ -115,7 +129,7 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 		Category:      req.Category,
 		Stage:         req.Stage,
 		ApplicableAge: req.ApplicableAge,
-		Reporter:      req.Reporter,
+		Reporters:     req.Reporters,
 		Tags:          req.Tags,
 	}
 
@@ -394,8 +408,15 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 
 // GetByCode 根据编码获取量表
 // @Summary 获取量表详情
-// @Description 根据编码获取量表详情。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
+// @Description 根据编码获取量表详情。
+// @Description 响应字段说明：
+// @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
+// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
+// @Description - tags: 标签列表（数组，动态输入）
+// @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -421,8 +442,15 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 
 // GetByQuestionnaireCode 根据问卷编码获取量表
 // @Summary 根据问卷编码获取量表
-// @Description 根据关联的问卷编码获取量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
+// @Description 根据关联的问卷编码获取量表。
+// @Description 响应字段说明：
+// @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
+// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
+// @Description - tags: 标签列表（数组，动态输入）
+// @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -448,13 +476,15 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 
 // List 获取量表列表
 // @Summary 获取量表列表
-// @Description 分页获取量表列表
+// @Description 分页获取量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stage（阶段）、applicable_age（使用年龄）、reporters（填报人列表）、tags（标签列表）。
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
+// @Param status query string false "状态过滤（draft/published/archived）"
+// @Param title query string false "标题模糊搜索"
 // @Success 200 {object} core.Response{data=response.ScaleListResponse}
 // @Router /api/v1/scales [get]
 func (h *ScaleHandler) List(c *gin.Context) {
@@ -495,8 +525,15 @@ func (h *ScaleHandler) List(c *gin.Context) {
 
 // GetPublishedByCode 获取已发布的量表
 // @Summary 获取已发布的量表
-// @Description 根据编码获取已发布的量表。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
-// @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
+// @Description 根据编码获取已发布的量表。
+// @Description 响应字段说明：
+// @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
+// @Description - stage: 阶段（screening/deep_assessment/follow_up/outcome）
+// @Description - applicable_age: 使用年龄（infant/preschool/school_child/adolescent/adult）
+// @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
+// @Description - tags: 标签列表（数组，动态输入）
+// @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -522,13 +559,14 @@ func (h *ScaleHandler) GetPublishedByCode(c *gin.Context) {
 
 // ListPublished 获取已发布量表列表
 // @Summary 获取已发布量表列表
-// @Description 分页获取已发布的量表列表
+// @Description 分页获取已发布的量表列表（摘要信息，不包含因子详情）。响应中包含分类字段：category（主类）、stage（阶段）、applicable_age（使用年龄）、reporters（填报人列表）、tags（标签列表）。
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
+// @Param title query string false "标题模糊搜索"
 // @Success 200 {object} core.Response{data=response.ScaleListResponse}
 // @Router /api/v1/scales/published [get]
 func (h *ScaleHandler) ListPublished(c *gin.Context) {
@@ -588,7 +626,13 @@ func (h *ScaleHandler) GetFactors(c *gin.Context) {
 
 // GetCategories 获取量表分类列表
 // @Summary 获取量表分类列表
-// @Description 获取量表的主类、阶段、使用年龄、填报人和标签等分类选项列表，用于前端渲染和配置量表字段
+// @Description 获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
+// @Description 返回说明：
+// @Description - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）
+// @Description - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+// @Description - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）
+// @Description - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
+// @Description - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）
 // @Tags Scale-Query
 // @Accept json
 // @Produce json
@@ -596,81 +640,71 @@ func (h *ScaleHandler) GetFactors(c *gin.Context) {
 // @Success 200 {object} core.Response{data=response.ScaleCategoriesResponse}
 // @Router /api/v1/scales/categories [get]
 func (h *ScaleHandler) GetCategories(c *gin.Context) {
-	// 构建类别列表
-	categories := []response.CategoryResponse{
-		{Value: string(domainScale.CategoryADHD), Label: "ADHD"},
-		{Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
-		{Value: string(domainScale.CategorySensoryIntegration), Label: "感统"},
-		{Value: string(domainScale.CategoryExecutiveFunction), Label: "执行功能"},
-		{Value: string(domainScale.CategoryMentalHealth), Label: "心理健康"},
-		{Value: string(domainScale.CategoryNeurodevelopmentalScreening), Label: "神经发育筛查"},
-		{Value: string(domainScale.CategoryChronicDiseaseManagement), Label: "慢性病管理"},
-		{Value: string(domainScale.CategoryQualityOfLife), Label: "生活质量"},
+	// 调用应用层类别服务
+	result, err := h.categoryService.GetCategories(c.Request.Context())
+	if err != nil {
+		h.Error(c, err)
+		return
 	}
 
-	// 构建阶段列表
-	stages := []response.StageResponse{
-		{Value: string(domainScale.StageScreening), Label: "筛查"},
-		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
-		{Value: string(domainScale.StageFollowUp), Label: "随访"},
-		{Value: string(domainScale.StageOutcome), Label: "结局"},
+	// 转换为响应格式
+	response := toScaleCategoriesResponse(result)
+	h.Success(c, response)
+}
+
+// ============= Helper Functions =============
+
+// toScaleCategoriesResponse 将应用层分类结果转换为响应格式
+func toScaleCategoriesResponse(result *scale.ScaleCategoriesResult) *response.ScaleCategoriesResponse {
+	categories := make([]response.CategoryResponse, len(result.Categories))
+	for i, cat := range result.Categories {
+		categories[i] = response.CategoryResponse{
+			Value: cat.Value,
+			Label: cat.Label,
+		}
 	}
 
-	// 构建使用年龄列表
-	applicableAges := []response.ApplicableAgeResponse{
-		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿"},
-		{Value: string(domainScale.ApplicableAgeSchoolAge), Label: "学龄"},
-		{Value: string(domainScale.ApplicableAgeAdolescentAdult), Label: "青少年/成人"},
-		{Value: string(domainScale.ApplicableAgeChildAdolescent), Label: "儿童/青少年"},
+	stages := make([]response.StageResponse, len(result.Stages))
+	for i, stage := range result.Stages {
+		stages[i] = response.StageResponse{
+			Value: stage.Value,
+			Label: stage.Label,
+		}
 	}
 
-	// 构建填报人列表
-	reporters := []response.ReporterResponse{
-		{Value: string(domainScale.ReporterParent), Label: "家长评"},
-		{Value: string(domainScale.ReporterTeacher), Label: "教师评"},
-		{Value: string(domainScale.ReporterSelf), Label: "自评"},
-		{Value: string(domainScale.ReporterClinical), Label: "临床评定"},
+	applicableAges := make([]response.ApplicableAgeResponse, len(result.ApplicableAges))
+	for i, age := range result.ApplicableAges {
+		applicableAges[i] = response.ApplicableAgeResponse{
+			Value: age.Value,
+			Label: age.Label,
+		}
 	}
 
-	// 构建标签列表
-	tags := []response.TagResponse{
-		// 阶段标签
-		{Value: string(domainScale.TagScreening), Label: "筛查", Category: "stage"},
-		{Value: string(domainScale.TagDeepAssessment), Label: "深评", Category: "stage"},
-		{Value: string(domainScale.TagFollowUp), Label: "随访", Category: "stage"},
-		{Value: string(domainScale.TagOutcome), Label: "功能结局", Category: "stage"},
-		// 主题标签
-		{Value: string(domainScale.TagBriefVersion), Label: "简版", Category: "theme"},
-		{Value: string(domainScale.TagBroadSpectrum), Label: "广谱", Category: "theme"},
-		{Value: string(domainScale.TagComorbidity), Label: "共病", Category: "theme"},
-		{Value: string(domainScale.TagFunction), Label: "功能", Category: "theme"},
-		{Value: string(domainScale.TagFamilySystem), Label: "家庭系统", Category: "theme"},
-		{Value: string(domainScale.TagStress), Label: "压力", Category: "theme"},
-		{Value: string(domainScale.TagInfant), Label: "婴幼儿", Category: "theme"},
-		{Value: string(domainScale.TagSchoolAge), Label: "学龄", Category: "theme"},
-		{Value: string(domainScale.TagAdolescent), Label: "青少年/成人", Category: "theme"},
-		// 状态标签
-		{Value: string(domainScale.TagNeedsVersioning), Label: "需定版", Category: "status"},
-		{Value: string(domainScale.TagCustom), Label: "自定义", Category: "status"},
-		// 填报人标签
-		{Value: string(domainScale.TagParentRating), Label: "家长评", Category: "reporter"},
-		{Value: string(domainScale.TagTeacherRating), Label: "教师评", Category: "reporter"},
-		{Value: string(domainScale.TagSelfRating), Label: "自评", Category: "reporter"},
-		{Value: string(domainScale.TagClinicalRating), Label: "临床评定", Category: "reporter"},
+	reporters := make([]response.ReporterResponse, len(result.Reporters))
+	for i, rep := range result.Reporters {
+		reporters[i] = response.ReporterResponse{
+			Value: rep.Value,
+			Label: rep.Label,
+		}
 	}
 
-	result := &response.ScaleCategoriesResponse{
+	tags := make([]response.TagResponse, len(result.Tags))
+	for i, tag := range result.Tags {
+		tags[i] = response.TagResponse{
+			Value:    tag.Value,
+			Label:    tag.Label,
+			Category: tag.Category,
+		}
+	}
+
+	return &response.ScaleCategoriesResponse{
 		Categories:     categories,
 		Stages:         stages,
 		ApplicableAges: applicableAges,
 		Reporters:      reporters,
 		Tags:           tags,
 	}
-
-	h.Success(c, result)
 }
-
-// ============= Helper Functions =============
 
 // toInterpretRuleDTOs 转换解读规则请求为 DTO
 // defaultRiskLevel 为因子级别的默认风险等级，如果解读规则中没有指定风险等级，则使用此值

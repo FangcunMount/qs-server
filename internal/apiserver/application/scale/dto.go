@@ -11,7 +11,7 @@ type CreateScaleDTO struct {
 	Category             string   // 主类
 	Stage                string   // 阶段
 	ApplicableAge        string   // 使用年龄
-	Reporter             string   // 填报人
+	Reporters            []string // 填报人列表
 	Tags                 []string // 标签列表
 	QuestionnaireCode    string   // 关联的问卷编码
 	QuestionnaireVersion string   // 关联的问卷版本
@@ -25,7 +25,7 @@ type UpdateScaleBasicInfoDTO struct {
 	Category      string   // 主类
 	Stage         string   // 阶段
 	ApplicableAge string   // 使用年龄
-	Reporter      string   // 填报人
+	Reporters     []string // 填报人列表
 	Tags          []string // 标签列表
 }
 

@@ -14,7 +14,7 @@ type ScaleResponse struct {
 	Category             string           `json:"category,omitempty"`
 	Stage                string           `json:"stage,omitempty"`
 	ApplicableAge        string           `json:"applicable_age,omitempty"`
-	Reporter             string           `json:"reporter,omitempty"`
+	Reporters            []string         `json:"reporters,omitempty"`
 	Tags                 []string         `json:"tags,omitempty"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
 	QuestionnaireVersion string           `json:"questionnaire_version"`
@@ -60,7 +60,7 @@ type ScaleSummaryResponse struct {
 	Category          string   `json:"category,omitempty"`
 	Stage             string   `json:"stage,omitempty"`
 	ApplicableAge     string   `json:"applicable_age,omitempty"`
-	Reporter          string   `json:"reporter,omitempty"`
+	Reporters         []string `json:"reporters,omitempty"`
 	Tags              []string `json:"tags,omitempty"`
 	QuestionnaireCode string   `json:"questionnaire_code"`
 	Status            string   `json:"status"`
@@ -94,7 +94,7 @@ func NewScaleResponse(result *scale.ScaleResult) *ScaleResponse {
 		Category:             result.Category,
 		Stage:                result.Stage,
 		ApplicableAge:        result.ApplicableAge,
-		Reporter:             result.Reporter,
+		Reporters:            result.Reporters,
 		Tags:                 result.Tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
@@ -181,7 +181,7 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 			Category:          item.Category,
 			Stage:             item.Stage,
 			ApplicableAge:     item.ApplicableAge,
-			Reporter:          item.Reporter,
+			Reporters:         item.Reporters,
 			Tags:              item.Tags,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status,

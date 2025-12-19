@@ -26,6 +26,7 @@ type ScaleModule struct {
 	LifecycleService scaleApp.ScaleLifecycleService
 	FactorService    scaleApp.ScaleFactorService
 	QueryService     scaleApp.ScaleQueryService
+	CategoryService  scaleApp.ScaleCategoryService
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher event.EventPublisher
@@ -75,12 +76,14 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher)
 	m.FactorService = scaleApp.NewFactorService(m.Repo)
 	m.QueryService = scaleApp.NewQueryService(m.Repo)
+	m.CategoryService = scaleApp.NewCategoryService()
 
 	// 初始化 handler 层
 	m.Handler = handler.NewScaleHandler(
 		m.LifecycleService,
 		m.FactorService,
 		m.QueryService,
+		m.CategoryService,
 	)
 
 	return nil

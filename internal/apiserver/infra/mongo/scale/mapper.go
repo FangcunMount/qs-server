@@ -30,6 +30,12 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 		tags = append(tags, tag.String())
 	}
 
+	// 转换填报人列表
+	reporters := make([]string, 0, len(domain.GetReporters()))
+	for _, reporter := range domain.GetReporters() {
+		reporters = append(reporters, reporter.String())
+	}
+
 	po := &ScalePO{
 		Code:                 domain.GetCode().String(),
 		Title:                domain.GetTitle(),
@@ -37,7 +43,7 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 		Category:             domain.GetCategory().String(),
 		Stage:                domain.GetStage().String(),
 		ApplicableAge:        domain.GetApplicableAge().String(),
-		Reporter:             domain.GetReporter().String(),
+		Reporters:            reporters,
 		Tags:                 tags,
 		QuestionnaireCode:    domain.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: domain.GetQuestionnaireVersion(),
@@ -118,6 +124,12 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 		tags = append(tags, scale.NewTag(tagStr))
 	}
 
+	// 转换填报人列表
+	reporters := make([]scale.Reporter, 0, len(po.Reporters))
+	for _, reporterStr := range po.Reporters {
+		reporters = append(reporters, scale.NewReporter(reporterStr))
+	}
+
 	// 创建领域模型
 	domain, err := scale.NewMedicalScale(
 		meta.NewCode(po.Code),
@@ -126,7 +138,7 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 		scale.WithCategory(scale.NewCategory(po.Category)),
 		scale.WithStage(scale.NewStage(po.Stage)),
 		scale.WithApplicableAge(scale.NewApplicableAge(po.ApplicableAge)),
-		scale.WithReporter(scale.NewReporter(po.Reporter)),
+		scale.WithReporters(reporters),
 		scale.WithTags(tags),
 		scale.WithQuestionnaire(meta.NewCode(po.QuestionnaireCode), po.QuestionnaireVersion),
 		scale.WithStatus(scale.Status(po.Status)),

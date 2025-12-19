@@ -16,7 +16,7 @@ type ScaleOutput struct {
 	Category             string
 	Stage                string
 	ApplicableAge        string
-	Reporter             string
+	Reporters            []string
 	Tags                 []string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
@@ -54,7 +54,7 @@ type ScaleSummaryOutput struct {
 	Category             string
 	Stage                string
 	ApplicableAge        string
-	Reporter             string
+	Reporters            []string
 	Tags                 []string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
@@ -145,7 +145,7 @@ func (c *ScaleClient) GetScale(ctx context.Context, code string) (*ScaleOutput, 
 }
 
 // ListScales 获取量表列表（摘要）
-func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, status, title, category, stage, applicableAge, reporter string, tags []string) (*ListScalesOutput, error) {
+func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, status, title, category, stage, applicableAge string, reporters []string, tags []string) (*ListScalesOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -157,7 +157,7 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 		Category:      category,
 		Stage:         stage,
 		ApplicableAge: applicableAge,
-		Reporter:      reporter,
+		Reporters:     reporters,
 		Tags:          tags,
 	}
 
@@ -176,7 +176,7 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 			Category:             s.GetCategory(),
 			Stage:                s.GetStage(),
 			ApplicableAge:        s.GetApplicableAge(),
-			Reporter:             s.GetReporter(),
+			Reporters:            s.GetReporters(),
 			Tags:                 s.GetTags(),
 			QuestionnaireCode:    s.GetQuestionnaireCode(),
 			QuestionnaireVersion: s.GetQuestionnaireVersion(),
@@ -269,7 +269,7 @@ func (c *ScaleClient) convertScale(s *pb.Scale) *ScaleOutput {
 		Category:             s.GetCategory(),
 		Stage:                s.GetStage(),
 		ApplicableAge:        s.GetApplicableAge(),
-		Reporter:             s.GetReporter(),
+		Reporters:            s.GetReporters(),
 		Tags:                 s.GetTags(),
 		QuestionnaireCode:    s.GetQuestionnaireCode(),
 		QuestionnaireVersion: s.GetQuestionnaireVersion(),
