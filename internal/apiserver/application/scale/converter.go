@@ -1,9 +1,6 @@
 package scale
 
 import (
-	"encoding/json"
-
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
@@ -91,27 +88,9 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 
 // toFactorResult 将因子领域模型转换为结果对象
 func toFactorResult(f *scale.Factor) FactorResult {
-	// 添加日志：记录领域层的 ScoringParams
-	scoringParams := f.GetScoringParams()
-	if scoringParams != nil {
-		cntContentsJSON, _ := json.Marshal(scoringParams.GetCntOptionContents())
-		logger.L(nil).Infow("toFactorResult: Domain ScoringParams",
-			"factor_code", f.GetCode().String(),
-			"scoring_strategy", f.GetScoringStrategy().String(),
-			"cnt_option_contents", string(cntContentsJSON),
-		)
-	}
-	
 	// 转换计分参数为 map[string]interface{}（用于结果输出）
 	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
-	
-	// 添加日志：记录转换后的 map
-	scoringParamsMapJSON, _ := json.Marshal(scoringParamsMap)
-	logger.L(nil).Infow("toFactorResult: Application ScoringParams",
-		"factor_code", f.GetCode().String(),
-		"scoring_params", string(scoringParamsMapJSON),
-	)
-	
+
 	result := FactorResult{
 		Code:            f.GetCode().String(),
 		Title:           f.GetTitle(),

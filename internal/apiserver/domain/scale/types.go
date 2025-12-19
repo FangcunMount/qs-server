@@ -296,7 +296,7 @@ func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, st
 		}
 
 		// 使用 convertToMap 处理 MongoDB 返回的各种类型
-		ruleMap := convertToMap(rawRule)
+		ruleMap := convertToMap(ctx, rawRule)
 		if ruleMap == nil {
 			logger.L(ctx).Warnw("ScoringParamsFromMap: convertToMap(rawRule) returned nil")
 			break
@@ -317,7 +317,7 @@ func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, st
 			"append_params_type", getTypeName(appendParamsRaw),
 		)
 
-		appendParams := convertToMap(appendParamsRaw)
+		appendParams := convertToMap(ctx, appendParamsRaw)
 
 		if appendParams == nil {
 			logger.L(ctx).Warnw("ScoringParamsFromMap: convertToMap(appendParamsRaw) returned nil")
@@ -388,15 +388,15 @@ func getTypeName(v interface{}) string {
 
 // convertToMap 将 interface{} 转换为 map[string]interface{}
 // 用于处理 MongoDB 返回的 bson.M 等类型
-func convertToMap(v interface{}) map[string]interface{} {
+func convertToMap(ctx context.Context, v interface{}) map[string]interface{} {
 	if v == nil {
-		logger.L(nil).Debugw("convertToMap: input is nil")
+		logger.L(ctx).Debugw("convertToMap: input is nil")
 		return nil
 	}
 
 	// 使用反射检查类型
 	rv := reflect.ValueOf(v)
-	logger.L(nil).Debugw("convertToMap: input type",
+	logger.L(ctx).Debugw("convertToMap: input type",
 		"type", rv.Type().String(),
 		"kind", rv.Kind().String(),
 	)
@@ -409,7 +409,7 @@ func convertToMap(v interface{}) map[string]interface{} {
 				result[key.String()] = rv.MapIndex(key).Interface()
 			}
 			resultJSON, _ := json.Marshal(result)
-			logger.L(nil).Debugw("convertToMap: converted via reflection",
+			logger.L(ctx).Debugw("convertToMap: converted via reflection",
 				"result", string(resultJSON),
 			)
 			return result
@@ -419,7 +419,7 @@ func convertToMap(v interface{}) map[string]interface{} {
 	// 如果反射失败，尝试 JSON 转换
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
-		logger.L(nil).Warnw("convertToMap: JSON marshal failed",
+		logger.L(ctx).Warnw("convertToMap: JSON marshal failed",
 			"error", err.Error(),
 		)
 		return nil
@@ -427,14 +427,14 @@ func convertToMap(v interface{}) map[string]interface{} {
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(jsonBytes, &result); err != nil {
-		logger.L(nil).Warnw("convertToMap: JSON unmarshal failed",
+		logger.L(ctx).Warnw("convertToMap: JSON unmarshal failed",
 			"error", err.Error(),
 		)
 		return nil
 	}
 
 	resultJSON, _ := json.Marshal(result)
-	logger.L(nil).Debugw("convertToMap: converted via JSON",
+	logger.L(ctx).Debugw("convertToMap: converted via JSON",
 		"result", string(resultJSON),
 	)
 
