@@ -143,28 +143,14 @@ func (s *lifecycleService) SaveDraft(ctx context.Context, code string) (*Questio
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "save_draft",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "save_draft"); err != nil {
+		return nil, err
 	}
 
 	// 2. 获取现有问卷
-	l.Debugw("查询问卷",
-		"action", "save_draft",
-		"code", code,
-	)
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "save_draft")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"action", "save_draft",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+		return nil, err
 	}
 
 	// 3. 只能保存草稿状态的问卷
@@ -197,27 +183,12 @@ func (s *lifecycleService) SaveDraft(ctx context.Context, code string) (*Questio
 	}
 
 	// 5. 持久化
-	l.Debugw("保存问卷草稿",
-		"action", "save_draft",
-		"code", code,
-		"new_version", q.GetVersion().String(),
-	)
-	if err := s.repo.Update(ctx, q); err != nil {
-		l.Errorw("保存问卷草稿失败",
-			"action", "save_draft",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷草稿失败")
+	if err := s.persistQuestionnaire(ctx, q, code, "save_draft", "草稿"); err != nil {
+		return nil, err
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("保存草稿成功",
-		"action", "save_draft",
-		"code", code,
+	s.logSuccess(ctx, "save_draft", code, startTime,
 		"version", q.GetVersion().String(),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireResult(q), nil
@@ -236,12 +207,8 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateQuesti
 	)
 
 	// 1. 验证输入参数
-	if dto.Code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "update_basic_info",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, dto.Code, "update_basic_info"); err != nil {
+		return nil, err
 	}
 	if dto.Title == "" {
 		l.Warnw("问卷标题为空",
@@ -253,30 +220,14 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateQuesti
 	}
 
 	// 2. 获取现有问卷
-	l.Debugw("查询问卷",
-		"action", "update_basic_info",
-		"code", dto.Code,
-	)
-	q, err := s.repo.FindByCode(ctx, dto.Code)
+	q, err := s.findQuestionnaireByCode(ctx, dto.Code, "update_basic_info")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"action", "update_basic_info",
-			"code", dto.Code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+		return nil, err
 	}
 
 	// 3. 判断问卷状态
-	if q.IsArchived() {
-		l.Warnw("问卷已归档，不能编辑",
-			"action", "update_basic_info",
-			"code", dto.Code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能编辑")
+	if err := s.checkArchivedStatus(ctx, q, dto.Code, "update_basic_info", "编辑"); err != nil {
+		return nil, err
 	}
 
 	// 4. 更新基本信息
@@ -296,26 +247,11 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateQuesti
 	}
 
 	// 5. 持久化
-	l.Debugw("保存问卷基本信息",
-		"action", "update_basic_info",
-		"code", dto.Code,
-	)
-	if err := s.repo.Update(ctx, q); err != nil {
-		l.Errorw("保存问卷基本信息失败",
-			"action", "update_basic_info",
-			"code", dto.Code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷基本信息失败")
+	if err := s.persistQuestionnaire(ctx, q, dto.Code, "update_basic_info", "基本信息"); err != nil {
+		return nil, err
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("更新基本信息成功",
-		"action", "update_basic_info",
-		"code", dto.Code,
-		"duration_ms", duration.Milliseconds(),
-	)
+	s.logSuccess(ctx, "update_basic_info", dto.Code, startTime)
 
 	return toQuestionnaireResult(q), nil
 }
@@ -331,39 +267,19 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "publish",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "publish"); err != nil {
+		return nil, err
 	}
 
 	// 2. 获取问卷
-	l.Debugw("查询问卷",
-		"action", "publish",
-		"code", code,
-	)
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "publish")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"action", "publish",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+		return nil, err
 	}
 
 	// 3. 检查问卷状态
-	if q.IsArchived() {
-		l.Warnw("问卷已归档，不能发布",
-			"action", "publish",
-			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能发布")
+	if err := s.checkArchivedStatus(ctx, q, code, "publish", "发布"); err != nil {
+		return nil, err
 	}
 	if q.IsPublished() {
 		l.Warnw("问卷已发布，不能重复发布",
@@ -408,32 +324,16 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	}
 
 	// 6. 持久化
-	l.Debugw("保存问卷状态",
-		"action", "publish",
-		"code", code,
-		"new_version", q.GetVersion().String(),
-		"new_status", q.GetStatus().String(),
-	)
-	if err := s.repo.Update(ctx, q); err != nil {
-		l.Errorw("保存问卷状态失败",
-			"action", "publish",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
+	if err := s.persistQuestionnaire(ctx, q, code, "publish", "状态"); err != nil {
+		return nil, err
 	}
 
 	// 7. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, q)
 
-	duration := time.Since(startTime)
-	l.Debugw("发布问卷成功",
-		"action", "publish",
-		"code", code,
+	s.logSuccess(ctx, "publish", code, startTime,
 		"version", q.GetVersion().String(),
 		"status", q.GetStatus().String(),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireResult(q), nil
@@ -450,39 +350,19 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "unpublish",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "unpublish"); err != nil {
+		return nil, err
 	}
 
 	// 2. 获取问卷
-	l.Debugw("查询问卷",
-		"action", "unpublish",
-		"code", code,
-	)
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "unpublish")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"action", "unpublish",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+		return nil, err
 	}
 
 	// 3. 检查问卷状态
-	if q.IsArchived() {
-		l.Warnw("问卷已归档，不能下架",
-			"action", "unpublish",
-			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能下架")
+	if err := s.checkArchivedStatus(ctx, q, code, "unpublish", "下架"); err != nil {
+		return nil, err
 	}
 	if q.IsDraft() {
 		l.Warnw("问卷是草稿状态，不需要下架",
@@ -511,30 +391,15 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 	}
 
 	// 5. 持久化
-	l.Debugw("保存问卷状态",
-		"action", "unpublish",
-		"code", code,
-		"new_status", q.GetStatus().String(),
-	)
-	if err := s.repo.Update(ctx, q); err != nil {
-		l.Errorw("保存问卷状态失败",
-			"action", "unpublish",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
+	if err := s.persistQuestionnaire(ctx, q, code, "unpublish", "状态"); err != nil {
+		return nil, err
 	}
 
 	// 6. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, q)
 
-	duration := time.Since(startTime)
-	l.Debugw("下架问卷成功",
-		"action", "unpublish",
-		"code", code,
+	s.logSuccess(ctx, "unpublish", code, startTime,
 		"status", q.GetStatus().String(),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireResult(q), nil
@@ -551,28 +416,14 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "archive",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "archive"); err != nil {
+		return nil, err
 	}
 
 	// 2. 获取问卷
-	l.Debugw("查询问卷",
-		"action", "archive",
-		"code", code,
-	)
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "archive")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"action", "archive",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+		return nil, err
 	}
 
 	// 3. 检查问卷状态
@@ -603,30 +454,15 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 	}
 
 	// 5. 持久化
-	l.Debugw("保存问卷状态",
-		"action", "archive",
-		"code", code,
-		"new_status", q.GetStatus().String(),
-	)
-	if err := s.repo.Update(ctx, q); err != nil {
-		l.Errorw("保存问卷状态失败",
-			"action", "archive",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷状态失败")
+	if err := s.persistQuestionnaire(ctx, q, code, "archive", "状态"); err != nil {
+		return nil, err
 	}
 
 	// 6. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, q)
 
-	duration := time.Since(startTime)
-	l.Debugw("归档问卷成功",
-		"action", "archive",
-		"code", code,
+	s.logSuccess(ctx, "archive", code, startTime,
 		"status", q.GetStatus().String(),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireResult(q), nil
@@ -643,28 +479,14 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "delete",
-			"result", "invalid_params",
-		)
-		return errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "delete"); err != nil {
+		return err
 	}
 
 	// 2. 获取问卷
-	l.Debugw("查询问卷",
-		"action", "delete",
-		"code", code,
-	)
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "delete")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"action", "delete",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+		return err
 	}
 
 	// 3. 只能删除草稿状态的问卷
@@ -693,14 +515,87 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 		return errors.WrapC(err, errorCode.ErrDatabase, "删除问卷失败")
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("删除问卷成功",
-		"action", "delete",
-		"code", code,
-		"duration_ms", duration.Milliseconds(),
-	)
+	s.logSuccess(ctx, "delete", code, startTime)
 
 	return nil
+}
+
+// validateCode 验证问卷编码
+func (s *lifecycleService) validateCode(ctx context.Context, code string, action string) error {
+	if code == "" {
+		logger.L(ctx).Warnw("问卷编码为空",
+			"action", action,
+			"result", "invalid_params",
+		)
+		return errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	}
+	return nil
+}
+
+// findQuestionnaireByCode 根据编码查找问卷
+func (s *lifecycleService) findQuestionnaireByCode(ctx context.Context, code string, action string) (*questionnaire.Questionnaire, error) {
+	logger.L(ctx).Debugw("查询问卷",
+		"action", action,
+		"code", code,
+	)
+	q, err := s.repo.FindByCode(ctx, code)
+	if err != nil {
+		logger.L(ctx).Errorw("获取问卷失败",
+			"action", action,
+			"code", code,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+	}
+	return q, nil
+}
+
+// checkArchivedStatus 检查问卷是否已归档
+func (s *lifecycleService) checkArchivedStatus(ctx context.Context, q *questionnaire.Questionnaire, code string, action string, operation string) error {
+	if q.IsArchived() {
+		logger.L(ctx).Warnw("问卷已归档，不能执行操作",
+			"action", action,
+			"code", code,
+			"operation", operation,
+			"status", q.GetStatus().String(),
+			"result", "invalid_status",
+		)
+		return errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能执行该操作")
+	}
+	return nil
+}
+
+// persistQuestionnaire 持久化问卷
+func (s *lifecycleService) persistQuestionnaire(ctx context.Context, q *questionnaire.Questionnaire, code string, action string, operation string) error {
+	logger.L(ctx).Debugw("保存问卷",
+		"action", action,
+		"code", code,
+		"operation", operation,
+	)
+	if err := s.repo.Update(ctx, q); err != nil {
+		logger.L(ctx).Errorw("保存问卷失败",
+			"action", action,
+			"code", code,
+			"operation", operation,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
+	}
+	return nil
+}
+
+// logSuccess 记录成功日志
+func (s *lifecycleService) logSuccess(ctx context.Context, action string, code string, startTime time.Time, extraFields ...interface{}) {
+	duration := time.Since(startTime)
+	fields := []interface{}{
+		"action", action,
+		"code", code,
+		"duration_ms", duration.Milliseconds(),
+	}
+	fields = append(fields, extraFields...)
+	logger.L(ctx).Debugw("操作成功", fields...)
 }
 
 // publishEvents 发布聚合根收集的领域事件

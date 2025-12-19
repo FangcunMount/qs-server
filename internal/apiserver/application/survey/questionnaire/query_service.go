@@ -37,44 +37,19 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "get_by_code",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "get_by_code"); err != nil {
+		return nil, err
 	}
 
 	// 2. 从 MongoDB 获取问卷
-	l.Debugw("查询问卷数据库",
-		"code", code,
-		"action", "read",
-	)
-
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "get_by_code")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"code", code,
-			"action", "get_by_code",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
-	}
-	if q == nil {
-		l.Warnw("问卷不存在",
-			"code", code,
-			"action", "get_by_code",
-			"result", "not_found",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+		return nil, err
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("获取问卷成功",
+	s.logSuccess(ctx, "get_by_code", startTime,
 		"code", code,
 		"status", q.GetStatus().String(),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireResult(q), nil
@@ -93,20 +68,11 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	)
 
 	// 1. 验证分页参数
-	if dto.Page <= 0 {
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "页码必须大于0")
+	pageSize, err := s.validatePaginationParams(ctx, dto.Page, dto.PageSize, "list")
+	if err != nil {
+		return nil, err
 	}
-	if dto.PageSize <= 0 {
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量必须大于0")
-	}
-	// 限制最大分页大小为 50
-	if dto.PageSize > 50 {
-		dto.PageSize = 50
-		l.Debugw("分页大小超限，已调整为最大值",
-			"action", "list",
-			"max_page_size", 50,
-		)
-	}
+	dto.PageSize = pageSize
 
 	// 2. 获取问卷摘要列表（轻量级查询，不包含 questions 字段）
 	if t, ok := dto.Conditions["type"].(string); ok && t != "" {
@@ -134,13 +100,9 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("查询问卷摘要列表成功",
-		"action", "list",
-		"result", "success",
+	s.logSuccess(ctx, "list", startTime,
 		"total_count", total,
 		"page_count", len(summaries),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireSummaryListResult(summaries, total), nil
@@ -158,45 +120,17 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	)
 
 	// 1. 验证输入参数
-	if code == "" {
-		l.Warnw("问卷编码为空",
-			"action", "get_published_by_code",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	if err := s.validateCode(ctx, code, "get_published_by_code"); err != nil {
+		return nil, err
 	}
 
 	// 2. 获取问卷
-	l.Debugw("从数据库查询问卷",
-		"code", code,
-		"action", "read",
-	)
-
-	q, err := s.repo.FindByCode(ctx, code)
+	q, err := s.findQuestionnaireByCode(ctx, code, "get_published_by_code")
 	if err != nil {
-		l.Errorw("获取问卷失败",
-			"code", code,
-			"action", "get_published_by_code",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
-	}
-	if q == nil {
-		l.Warnw("问卷不存在",
-			"code", code,
-			"action", "get_published_by_code",
-			"result", "not_found",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+		return nil, err
 	}
 
 	// 3. 检查问卷状态
-	l.Debugw("检查问卷发布状态",
-		"code", code,
-		"status", q.GetStatus().String(),
-	)
-
 	if !q.IsPublished() {
 		l.Warnw("问卷未发布",
 			"code", code,
@@ -206,10 +140,8 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷未发布")
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("获取已发布问卷成功",
+	s.logSuccess(ctx, "get_published_by_code", startTime,
 		"code", code,
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireResult(q), nil
@@ -227,20 +159,11 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	)
 
 	// 1. 验证分页参数
-	if dto.Page <= 0 {
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "页码必须大于0")
+	pageSize, err := s.validatePaginationParams(ctx, dto.Page, dto.PageSize, "list_published")
+	if err != nil {
+		return nil, err
 	}
-	if dto.PageSize <= 0 {
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量必须大于0")
-	}
-	// 限制最大分页大小为 50
-	if dto.PageSize > 50 {
-		dto.PageSize = 50
-		l.Debugw("分页大小超限，已调整为最大值",
-			"action", "list_published",
-			"max_page_size", 50,
-		)
-	}
+	dto.PageSize = pageSize
 
 	// 2. 添加状态过滤条件
 	if dto.Conditions == nil {
@@ -273,14 +196,75 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
 
-	duration := time.Since(startTime)
-	l.Debugw("查询已发布问卷摘要列表成功",
-		"action", "list_published",
-		"result", "success",
+	s.logSuccess(ctx, "list_published", startTime,
 		"total_count", total,
 		"page_count", len(summaries),
-		"duration_ms", duration.Milliseconds(),
 	)
 
 	return toQuestionnaireSummaryListResult(summaries, total), nil
+}
+
+// validateCode 验证问卷编码
+func (s *queryService) validateCode(ctx context.Context, code string, action string) error {
+	if code == "" {
+		logger.L(ctx).Warnw("问卷编码为空",
+			"action", action,
+			"result", "invalid_params",
+		)
+		return errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
+	}
+	return nil
+}
+
+// findQuestionnaireByCode 根据编码查找问卷
+func (s *queryService) findQuestionnaireByCode(ctx context.Context, code string, action string) (*questionnaire.Questionnaire, error) {
+	q, err := s.repo.FindByCode(ctx, code)
+	if err != nil {
+		logger.L(ctx).Errorw("获取问卷失败",
+			"action", action,
+			"code", code,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
+	}
+	if q == nil {
+		logger.L(ctx).Warnw("问卷不存在",
+			"action", action,
+			"code", code,
+			"result", "not_found",
+		)
+		return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+	}
+	return q, nil
+}
+
+// validatePaginationParams 验证分页参数
+func (s *queryService) validatePaginationParams(ctx context.Context, page, pageSize int, action string) (int, error) {
+	if page <= 0 {
+		return 0, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "页码必须大于0")
+	}
+	if pageSize <= 0 {
+		return 0, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "每页数量必须大于0")
+	}
+	// 限制最大分页大小为 50
+	if pageSize > 50 {
+		pageSize = 50
+		logger.L(ctx).Debugw("分页大小超限，已调整为最大值",
+			"action", action,
+			"max_page_size", 50,
+		)
+	}
+	return pageSize, nil
+}
+
+// logSuccess 记录成功日志
+func (s *queryService) logSuccess(ctx context.Context, action string, startTime time.Time, extraFields ...interface{}) {
+	duration := time.Since(startTime)
+	fields := []interface{}{
+		"action", action,
+		"duration_ms", duration.Milliseconds(),
+	}
+	fields = append(fields, extraFields...)
+	logger.L(ctx).Debugw("操作成功", fields...)
 }
