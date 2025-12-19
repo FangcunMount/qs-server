@@ -169,7 +169,12 @@ func (c *Container) initSurveyModule() error {
 // initScaleModule 初始化 Scale 模块
 func (c *Container) initScaleModule() error {
 	scaleModule := assembler.NewScaleModule()
-	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher); err != nil {
+	// 传入问卷仓库（如果 SurveyModule 已初始化）
+	var questionnaireRepo interface{}
+	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
+		questionnaireRepo = c.SurveyModule.Questionnaire.Repo
+	}
+	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher, questionnaireRepo); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 

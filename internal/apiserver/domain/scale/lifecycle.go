@@ -39,9 +39,6 @@ func (l *lifecycle) Publish(ctx context.Context, scale *MedicalScale) error {
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be published")
 	}
-	if scale.IsPublished() {
-		return errors.WithCode(code.ErrInvalidArgument, "scale is already published")
-	}
 
 	// 2. 业务规则验证
 	validator := Validator{}

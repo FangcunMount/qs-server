@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -38,6 +39,7 @@ func NewScaleModule() *ScaleModule {
 // Initialize 初始化 Scale 模块
 // params[0]: *mongo.Database
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
+// params[2]: questionnaire.Repository (可选，用于自动获取问卷版本)
 func (m *ScaleModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -58,11 +60,19 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 		m.eventPublisher = event.NewNopEventPublisher()
 	}
 
+	// 获取问卷仓库（可选参数）
+	var questionnaireRepo domainQuestionnaire.Repository
+	if len(params) > 2 {
+		if qr, ok := params[2].(domainQuestionnaire.Repository); ok && qr != nil {
+			questionnaireRepo = qr
+		}
+	}
+
 	// 初始化 repository 层
 	m.Repo = scaleInfra.NewRepository(mongoDB)
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, m.eventPublisher)
+	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher)
 	m.FactorService = scaleApp.NewFactorService(m.Repo)
 	m.QueryService = scaleApp.NewQueryService(m.Repo)
 
