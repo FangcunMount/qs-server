@@ -12,6 +12,11 @@ type ScaleResult struct {
 	Code                 string         // 量表编码
 	Title                string         // 量表标题
 	Description          string         // 量表描述
+	Category             string         // 主类
+	Stage                string         // 阶段
+	ApplicableAge        string         // 使用年龄
+	Reporter             string         // 填报人
+	Tags                 []string       // 标签列表
 	QuestionnaireCode    string         // 关联的问卷编码
 	QuestionnaireVersion string         // 关联的问卷版本
 	Status               string         // 状态
@@ -69,10 +74,21 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		return nil
 	}
 
+	// 转换标签列表
+	tags := make([]string, 0, len(m.GetTags()))
+	for _, tag := range m.GetTags() {
+		tags = append(tags, tag.String())
+	}
+
 	result := &ScaleResult{
 		Code:                 m.GetCode().String(),
 		Title:                m.GetTitle(),
 		Description:          m.GetDescription(),
+		Category:             m.GetCategory().String(),
+		Stage:                m.GetStage().String(),
+		ApplicableAge:        m.GetApplicableAge().String(),
+		Reporter:             m.GetReporter().String(),
+		Tags:                 tags,
 		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: m.GetQuestionnaireVersion(),
 		Status:               m.GetStatus().String(),

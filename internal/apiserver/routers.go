@@ -138,13 +138,13 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 	questionnaires := apiV1.Group("/questionnaires")
 	{
 		// 生命周期管理
-		questionnaires.POST("", quesHandler.Create)                    // 创建问卷
-		questionnaires.PUT("/:code", quesHandler.UpdateBasicInfo)      // 更新基本信息
-		questionnaires.POST("/:code/draft", quesHandler.SaveDraft)     // 保存草稿
-		questionnaires.POST("/:code/publish", quesHandler.Publish)     // 发布问卷
-		questionnaires.POST("/:code/unpublish", quesHandler.Unpublish) // 取消发布
-		questionnaires.POST("/:code/archive", quesHandler.Archive)     // 归档问卷
-		questionnaires.DELETE("/:code", quesHandler.Delete)            // 删除问卷
+		questionnaires.POST("", quesHandler.Create)                          // 创建问卷
+		questionnaires.PUT("/:code/basic-info", quesHandler.UpdateBasicInfo) // 更新基本信息
+		questionnaires.POST("/:code/draft", quesHandler.SaveDraft)           // 保存草稿
+		questionnaires.POST("/:code/publish", quesHandler.Publish)           // 发布问卷
+		questionnaires.POST("/:code/unpublish", quesHandler.Unpublish)       // 取消发布
+		questionnaires.POST("/:code/archive", quesHandler.Archive)           // 归档问卷
+		questionnaires.DELETE("/:code", quesHandler.Delete)                  // 删除问卷
 
 		// 问题内容管理
 		questionnaires.POST("/:code/questions", quesHandler.AddQuestion)               // 添加问题

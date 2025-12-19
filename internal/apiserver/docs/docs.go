@@ -1652,7 +1652,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "创建新量表，初始状态为草稿",
+                "description": "创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1672,7 +1672,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "创建量表请求",
+                        "description": "创建量表请求（包含主类、阶段、使用年龄、填报人、标签等字段）",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -2001,7 +2001,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/basic-info": {
             "put": {
-                "description": "更新量表的标题、描述",
+                "description": "更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息",
                 "consumes": [
                     "application/json"
                 ],
@@ -2028,7 +2028,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "更新请求",
+                        "description": "更新请求（包含标题、描述、主类、阶段、使用年龄、填报人、标签等字段）",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -2987,6 +2987,12 @@ const docTemplate = `{
         "request.CreateScaleRequest": {
             "type": "object",
             "properties": {
+                "applicable_age": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -2995,6 +3001,18 @@ const docTemplate = `{
                 },
                 "questionnaire_version": {
                     "type": "string"
+                },
+                "reporter": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "title": {
                     "type": "string"
@@ -3192,8 +3210,26 @@ const docTemplate = `{
         "request.UpdateScaleBasicInfoRequest": {
             "type": "object",
             "properties": {
+                "applicable_age": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
+                },
+                "reporter": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "title": {
                     "type": "string"
@@ -4009,6 +4045,12 @@ const docTemplate = `{
         "response.ScaleResponse": {
             "type": "object",
             "properties": {
+                "applicable_age": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -4027,8 +4069,20 @@ const docTemplate = `{
                 "questionnaire_version": {
                     "type": "string"
                 },
+                "reporter": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
                 "status": {
                     "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "title": {
                     "type": "string"

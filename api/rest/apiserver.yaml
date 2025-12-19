@@ -1032,7 +1032,7 @@ paths:
       tags:
       - Scale-Lifecycle
       summary: 创建量表
-      description: 创建新量表，初始状态为草稿
+      description: 创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
       operationId: 创建量表
       parameters:
       - type: string
@@ -1251,7 +1251,7 @@ paths:
       tags:
       - Scale-Lifecycle
       summary: 更新量表基本信息
-      description: 更新量表的标题、描述
+      description: 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息
       operationId: 更新量表基本信息
       parameters:
       - type: string
@@ -1884,12 +1884,24 @@ components:
     request.CreateScaleRequest:
       type: object
       properties:
+        applicable_age:
+          type: string
+        category:
+          type: string
         description:
           type: string
         questionnaire_code:
           type: string
         questionnaire_version:
           type: string
+        reporter:
+          type: string
+        stage:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
         title:
           type: string
     request.CreateStaffRequest:
@@ -2021,8 +2033,20 @@ components:
     request.UpdateScaleBasicInfoRequest:
       type: object
       properties:
+        applicable_age:
+          type: string
+        category:
+          type: string
         description:
           type: string
+        reporter:
+          type: string
+        stage:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
         title:
           type: string
     request.UpdateScaleQuestionnaireRequest:
@@ -2589,6 +2613,10 @@ components:
     response.ScaleResponse:
       type: object
       properties:
+        applicable_age:
+          type: string
+        category:
+          type: string
         code:
           type: string
         description:
@@ -2601,8 +2629,16 @@ components:
           type: string
         questionnaire_version:
           type: string
+        reporter:
+          type: string
+        stage:
+          type: string
         status:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
         title:
           type: string
     response.ScaleStatResponse:

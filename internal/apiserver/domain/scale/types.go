@@ -367,3 +367,276 @@ func getMapKeys(m map[string]interface{}) []string {
 	}
 	return keys
 }
+
+// ===================== 量表类别（主类）=================
+
+// Category 量表主类
+// 每个量表只选1个主类；其余信息用标签表达
+type Category string
+
+const (
+	// CategoryADHD ADHD
+	CategoryADHD Category = "adhd"
+	// CategoryTicDisorder 抽动障碍
+	CategoryTicDisorder Category = "tic_disorder"
+	// CategorySensoryIntegration 感统
+	CategorySensoryIntegration Category = "sensory_integration"
+	// CategoryExecutiveFunction 执行功能
+	CategoryExecutiveFunction Category = "executive_function"
+	// CategoryMentalHealth 心理健康
+	CategoryMentalHealth Category = "mental_health"
+	// CategoryNeurodevelopmentalScreening 神经发育筛查（原认知筛查）
+	CategoryNeurodevelopmentalScreening Category = "neurodevelopmental_screening"
+	// CategoryChronicDiseaseManagement 慢性病管理
+	CategoryChronicDiseaseManagement Category = "chronic_disease_management"
+	// CategoryQualityOfLife 生活质量
+	CategoryQualityOfLife Category = "quality_of_life"
+)
+
+// NewCategory 创建类别
+func NewCategory(value string) Category {
+	return Category(value)
+}
+
+// String 返回类别的字符串表示
+func (c Category) String() string {
+	return string(c)
+}
+
+// Value 获取类别值
+func (c Category) Value() string {
+	return string(c)
+}
+
+// IsEmpty 判断类别是否为空
+func (c Category) IsEmpty() bool {
+	return c == ""
+}
+
+// IsValid 检查类别是否有效
+func (c Category) IsValid() bool {
+	if c.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch c {
+	case CategoryADHD, CategoryTicDisorder, CategorySensoryIntegration,
+		CategoryExecutiveFunction, CategoryMentalHealth,
+		CategoryNeurodevelopmentalScreening, CategoryChronicDiseaseManagement,
+		CategoryQualityOfLife:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 量表阶段 =================
+
+// Stage 量表阶段
+type Stage string
+
+const (
+	// StageScreening 筛查
+	StageScreening Stage = "screening"
+	// StageDeepAssessment 深评
+	StageDeepAssessment Stage = "deep_assessment"
+	// StageFollowUp 随访
+	StageFollowUp Stage = "follow_up"
+	// StageOutcome 结局
+	StageOutcome Stage = "outcome"
+)
+
+// NewStage 创建阶段
+func NewStage(value string) Stage {
+	return Stage(value)
+}
+
+// String 返回阶段的字符串表示
+func (s Stage) String() string {
+	return string(s)
+}
+
+// Value 获取阶段值
+func (s Stage) Value() string {
+	return string(s)
+}
+
+// IsEmpty 判断阶段是否为空
+func (s Stage) IsEmpty() bool {
+	return s == ""
+}
+
+// IsValid 检查阶段是否有效
+func (s Stage) IsValid() bool {
+	if s.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch s {
+	case StageScreening, StageDeepAssessment, StageFollowUp, StageOutcome:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 使用年龄 =================
+
+// ApplicableAge 使用年龄
+type ApplicableAge string
+
+const (
+	// ApplicableAgeInfant 婴幼儿
+	ApplicableAgeInfant ApplicableAge = "infant"
+	// ApplicableAgeSchoolAge 学龄
+	ApplicableAgeSchoolAge ApplicableAge = "school_age"
+	// ApplicableAgeAdolescentAdult 青少年/成人
+	ApplicableAgeAdolescentAdult ApplicableAge = "adolescent_adult"
+	// ApplicableAgeChildAdolescent 儿童/青少年
+	ApplicableAgeChildAdolescent ApplicableAge = "child_adolescent"
+)
+
+// NewApplicableAge 创建使用年龄
+func NewApplicableAge(value string) ApplicableAge {
+	return ApplicableAge(value)
+}
+
+// String 返回使用年龄的字符串表示
+func (a ApplicableAge) String() string {
+	return string(a)
+}
+
+// Value 获取使用年龄值
+func (a ApplicableAge) Value() string {
+	return string(a)
+}
+
+// IsEmpty 判断使用年龄是否为空
+func (a ApplicableAge) IsEmpty() bool {
+	return a == ""
+}
+
+// IsValid 检查使用年龄是否有效
+func (a ApplicableAge) IsValid() bool {
+	if a.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch a {
+	case ApplicableAgeInfant, ApplicableAgeSchoolAge,
+		ApplicableAgeAdolescentAdult, ApplicableAgeChildAdolescent:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 填报人 =================
+
+// Reporter 填报人
+type Reporter string
+
+const (
+	// ReporterParent 家长评
+	ReporterParent Reporter = "parent"
+	// ReporterTeacher 教师评
+	ReporterTeacher Reporter = "teacher"
+	// ReporterSelf 自评
+	ReporterSelf Reporter = "self"
+	// ReporterClinical 临床评定
+	ReporterClinical Reporter = "clinical"
+)
+
+// NewReporter 创建填报人
+func NewReporter(value string) Reporter {
+	return Reporter(value)
+}
+
+// String 返回填报人的字符串表示
+func (r Reporter) String() string {
+	return string(r)
+}
+
+// Value 获取填报人值
+func (r Reporter) Value() string {
+	return string(r)
+}
+
+// IsEmpty 判断填报人是否为空
+func (r Reporter) IsEmpty() bool {
+	return r == ""
+}
+
+// IsValid 检查填报人是否有效
+func (r Reporter) IsValid() bool {
+	if r.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch r {
+	case ReporterParent, ReporterTeacher, ReporterSelf, ReporterClinical:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 标签 =================
+
+// Tag 量表标签
+// 用于表达除主类外的其他信息，包括阶段、主题、状态、填报人等
+type Tag string
+
+const (
+	// 阶段标签
+	TagScreening      Tag = "screening"       // 筛查
+	TagDeepAssessment Tag = "deep_assessment" // 深评
+	TagFollowUp       Tag = "follow_up"       // 随访
+	TagOutcome        Tag = "outcome"         // 功能结局
+
+	// 主题标签
+	TagBriefVersion  Tag = "brief_version"  // 简版
+	TagBroadSpectrum Tag = "broad_spectrum" // 广谱
+	TagComorbidity   Tag = "comorbidity"    // 共病
+	TagFunction      Tag = "function"       // 功能
+	TagFamilySystem  Tag = "family_system"  // 家庭系统
+	TagStress        Tag = "stress"         // 压力
+	TagInfant        Tag = "infant"         // 婴幼儿
+	TagSchoolAge     Tag = "school_age"     // 学龄
+	TagAdolescent    Tag = "adolescent"     // 青少年/成人
+
+	// 状态标签
+	TagNeedsVersioning Tag = "needs_versioning" // 需定版
+	TagCustom          Tag = "custom"           // 自定义
+
+	// 填报人标签（与 Reporter 类型对应，但作为标签可以多个）
+	TagParentRating   Tag = "parent_rating"   // 家长评
+	TagTeacherRating  Tag = "teacher_rating"  // 教师评
+	TagSelfRating     Tag = "self_rating"     // 自评
+	TagClinicalRating Tag = "clinical_rating" // 临床评定
+)
+
+// NewTag 创建标签
+func NewTag(value string) Tag {
+	return Tag(value)
+}
+
+// String 返回标签的字符串表示
+func (t Tag) String() string {
+	return string(t)
+}
+
+// Value 获取标签值
+func (t Tag) Value() string {
+	return string(t)
+}
+
+// IsValid 检查标签是否有效
+func (t Tag) IsValid() bool {
+	switch t {
+	case TagScreening, TagDeepAssessment, TagFollowUp, TagOutcome,
+		TagBriefVersion, TagBroadSpectrum, TagComorbidity, TagFunction,
+		TagFamilySystem, TagStress, TagInfant, TagSchoolAge, TagAdolescent,
+		TagNeedsVersioning, TagCustom,
+		TagParentRating, TagTeacherRating, TagSelfRating, TagClinicalRating:
+		return true
+	default:
+		return false
+	}
+}

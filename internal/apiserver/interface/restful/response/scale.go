@@ -11,6 +11,11 @@ type ScaleResponse struct {
 	Code                 string           `json:"code"`
 	Title                string           `json:"title"`
 	Description          string           `json:"description"`
+	Category             string           `json:"category,omitempty"`
+	Stage                string           `json:"stage,omitempty"`
+	ApplicableAge        string           `json:"applicable_age,omitempty"`
+	Reporter             string           `json:"reporter,omitempty"`
+	Tags                 []string         `json:"tags,omitempty"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
 	QuestionnaireVersion string           `json:"questionnaire_version"`
 	Status               string           `json:"status"`
@@ -81,6 +86,11 @@ func NewScaleResponse(result *scale.ScaleResult) *ScaleResponse {
 		Code:                 result.Code,
 		Title:                result.Title,
 		Description:          result.Description,
+		Category:             result.Category,
+		Stage:                result.Stage,
+		ApplicableAge:        result.ApplicableAge,
+		Reporter:             result.Reporter,
+		Tags:                 result.Tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		Status:               result.Status,

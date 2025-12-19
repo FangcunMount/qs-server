@@ -5,18 +5,28 @@ package scale
 
 // CreateScaleDTO 创建量表 DTO
 type CreateScaleDTO struct {
-	Code                 string // 量表编码（可选，用于导入/种子）
-	Title                string // 量表标题
-	Description          string // 量表描述
-	QuestionnaireCode    string // 关联的问卷编码
-	QuestionnaireVersion string // 关联的问卷版本
+	Code                 string   // 量表编码（可选，用于导入/种子）
+	Title                string   // 量表标题
+	Description          string   // 量表描述
+	Category             string   // 主类
+	Stage                string   // 阶段
+	ApplicableAge        string   // 使用年龄
+	Reporter             string   // 填报人
+	Tags                 []string // 标签列表
+	QuestionnaireCode    string   // 关联的问卷编码
+	QuestionnaireVersion string   // 关联的问卷版本
 }
 
 // UpdateScaleBasicInfoDTO 更新量表基本信息 DTO
 type UpdateScaleBasicInfoDTO struct {
-	Code        string // 量表编码
-	Title       string // 量表标题
-	Description string // 量表描述
+	Code          string   // 量表编码
+	Title         string   // 量表标题
+	Description   string   // 量表描述
+	Category      string   // 主类
+	Stage         string   // 阶段
+	ApplicableAge string   // 使用年龄
+	Reporter      string   // 填报人
+	Tags          []string // 标签列表
 }
 
 // UpdateScaleQuestionnaireDTO 更新量表关联问卷 DTO

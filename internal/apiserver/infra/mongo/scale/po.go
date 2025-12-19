@@ -18,6 +18,13 @@ type ScalePO struct {
 	Title       string `bson:"title" json:"title"`
 	Description string `bson:"description,omitempty" json:"description,omitempty"`
 
+	// 分类信息
+	Category      string   `bson:"category,omitempty" json:"category,omitempty"`           // 主类
+	Stage         string   `bson:"stage,omitempty" json:"stage,omitempty"`                 // 阶段
+	ApplicableAge string   `bson:"applicable_age,omitempty" json:"applicable_age,omitempty"` // 使用年龄
+	Reporter      string   `bson:"reporter,omitempty" json:"reporter,omitempty"`            // 填报人
+	Tags          []string `bson:"tags,omitempty" json:"tags,omitempty"`                  // 标签列表
+
 	// 关联的问卷
 	QuestionnaireCode    string `bson:"questionnaire_code,omitempty" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string `bson:"questionnaire_version,omitempty" json:"questionnaire_version,omitempty"`

@@ -85,12 +85,24 @@ definitions:
     type: object
   request.CreateScaleRequest:
     properties:
+      applicable_age:
+        type: string
+      category:
+        type: string
       description:
         type: string
       questionnaire_code:
         type: string
       questionnaire_version:
         type: string
+      reporter:
+        type: string
+      stage:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
       title:
         type: string
     type: object
@@ -222,8 +234,20 @@ definitions:
     type: object
   request.UpdateScaleBasicInfoRequest:
     properties:
+      applicable_age:
+        type: string
+      category:
+        type: string
       description:
         type: string
+      reporter:
+        type: string
+      stage:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
       title:
         type: string
     type: object
@@ -790,6 +814,10 @@ definitions:
     type: object
   response.ScaleResponse:
     properties:
+      applicable_age:
+        type: string
+      category:
+        type: string
       code:
         type: string
       description:
@@ -802,8 +830,16 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+      reporter:
+        type: string
+      stage:
+        type: string
       status:
         type: string
+      tags:
+        items:
+          type: string
+        type: array
       title:
         type: string
     type: object
@@ -2120,14 +2156,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: 创建新量表，初始状态为草稿
+      description: 创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
       parameters:
       - description: Bearer 用户令牌
         in: header
         name: Authorization
         required: true
         type: string
-      - description: 创建量表请求
+      - description: 创建量表请求（包含主类、阶段、使用年龄、填报人、标签等字段）
         in: body
         name: request
         required: true
@@ -2239,7 +2275,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: 更新量表的标题、描述
+      description: 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -2251,7 +2287,7 @@ paths:
         name: code
         required: true
         type: string
-      - description: 更新请求
+      - description: 更新请求（包含标题、描述、主类、阶段、使用年龄、填报人、标签等字段）
         in: body
         name: request
         required: true

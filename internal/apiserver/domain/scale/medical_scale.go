@@ -20,6 +20,13 @@ type MedicalScale struct {
 	title       string
 	description string
 
+	// 分类信息
+	category      Category      // 主类（每个量表只选1个主类）
+	stage         Stage         // 阶段
+	applicableAge ApplicableAge // 使用年龄
+	reporter      Reporter      // 填报人
+	tags          []Tag         // 标签（最多3-5个，用于表达除主类外的其他信息）
+
 	// 关联的问卷（编码 + 版本）
 	questionnaireCode    meta.Code
 	questionnaireVersion string
@@ -99,6 +106,45 @@ func WithFactors(factors []*Factor) MedicalScaleOption {
 	}
 }
 
+// WithCategory 设置类别
+func WithCategory(category Category) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.category = category
+	}
+}
+
+// WithStage 设置阶段
+func WithStage(stage Stage) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.stage = stage
+	}
+}
+
+// WithApplicableAge 设置使用年龄
+func WithApplicableAge(age ApplicableAge) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.applicableAge = age
+	}
+}
+
+// WithReporter 设置填报人
+func WithReporter(reporter Reporter) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.reporter = reporter
+	}
+}
+
+// WithTags 设置标签列表
+func WithTags(tags []Tag) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		if tags == nil {
+			m.tags = []Tag{}
+		} else {
+			m.tags = tags
+		}
+	}
+}
+
 // ===================== Getter 方法 =================
 
 // GetID 获取ID
@@ -139,6 +185,31 @@ func (m *MedicalScale) GetStatus() Status {
 // GetFactors 获取因子列表
 func (m *MedicalScale) GetFactors() []*Factor {
 	return m.factors
+}
+
+// GetCategory 获取类别
+func (m *MedicalScale) GetCategory() Category {
+	return m.category
+}
+
+// GetStage 获取阶段
+func (m *MedicalScale) GetStage() Stage {
+	return m.stage
+}
+
+// GetApplicableAge 获取使用年龄
+func (m *MedicalScale) GetApplicableAge() ApplicableAge {
+	return m.applicableAge
+}
+
+// GetReporter 获取填报人
+func (m *MedicalScale) GetReporter() Reporter {
+	return m.reporter
+}
+
+// GetTags 获取标签列表
+func (m *MedicalScale) GetTags() []Tag {
+	return m.tags
 }
 
 // ===================== 状态判断方法 =================
@@ -210,6 +281,20 @@ func (m *MedicalScale) updateBasicInfo(title, description string) error {
 	}
 	m.title = title
 	m.description = description
+	return nil
+}
+
+// updateClassificationInfo 更新分类信息
+func (m *MedicalScale) updateClassificationInfo(category Category, stage Stage, applicableAge ApplicableAge, reporter Reporter, tags []Tag) error {
+	m.category = category
+	m.stage = stage
+	m.applicableAge = applicableAge
+	m.reporter = reporter
+	if tags == nil {
+		m.tags = []Tag{}
+	} else {
+		m.tags = tags
+	}
 	return nil
 }
 

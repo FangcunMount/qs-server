@@ -4,16 +4,26 @@ package request
 
 // CreateScaleRequest 创建量表请求
 type CreateScaleRequest struct {
-	Title                string `json:"title" valid:"required~量表标题不能为空"`
-	Description          string `json:"description"`
-	QuestionnaireCode    string `json:"questionnaire_code"`
-	QuestionnaireVersion string `json:"questionnaire_version"`
+	Title                string   `json:"title" valid:"required~量表标题不能为空"`
+	Description          string   `json:"description"`
+	Category             string   `json:"category"`
+	Stage                string   `json:"stage"`
+	ApplicableAge        string   `json:"applicable_age"`
+	Reporter             string   `json:"reporter"`
+	Tags                 []string `json:"tags"`
+	QuestionnaireCode    string   `json:"questionnaire_code"`
+	QuestionnaireVersion string   `json:"questionnaire_version"`
 }
 
 // UpdateScaleBasicInfoRequest 更新量表基本信息请求
 type UpdateScaleBasicInfoRequest struct {
-	Title       string `json:"title" valid:"required~量表标题不能为空"`
-	Description string `json:"description"`
+	Title         string   `json:"title" valid:"required~量表标题不能为空"`
+	Description   string   `json:"description"`
+	Category      string   `json:"category"`
+	Stage         string   `json:"stage"`
+	ApplicableAge string   `json:"applicable_age"`
+	Reporter      string   `json:"reporter"`
+	Tags          []string `json:"tags"`
 }
 
 // UpdateScaleQuestionnaireRequest 更新量表关联问卷请求

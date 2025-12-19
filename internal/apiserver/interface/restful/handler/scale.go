@@ -39,12 +39,12 @@ func NewScaleHandler(
 
 // Create 创建量表
 // @Summary 创建量表
-// @Description 创建新量表，初始状态为草稿
+// @Description 创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
 // @Tags Scale-Lifecycle
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreateScaleRequest true "创建量表请求"
+// @Param request body request.CreateScaleRequest true "创建量表请求（包含主类、阶段、使用年龄、填报人、标签等字段）"
 // @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales [post]
 func (h *ScaleHandler) Create(c *gin.Context) {
@@ -61,6 +61,11 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 	dto := scale.CreateScaleDTO{
 		Title:                req.Title,
 		Description:          req.Description,
+		Category:             req.Category,
+		Stage:                req.Stage,
+		ApplicableAge:        req.ApplicableAge,
+		Reporter:             req.Reporter,
+		Tags:                 req.Tags,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 	}
@@ -76,13 +81,13 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 
 // UpdateBasicInfo 更新量表基本信息
 // @Summary 更新量表基本信息
-// @Description 更新量表的标题、描述
+// @Description 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息
 // @Tags Scale-Lifecycle
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "量表编码"
-// @Param request body request.UpdateScaleBasicInfoRequest true "更新请求"
+// @Param request body request.UpdateScaleBasicInfoRequest true "更新请求（包含标题、描述、主类、阶段、使用年龄、填报人、标签等字段）"
 // @Success 200 {object} core.Response{data=response.ScaleResponse}
 // @Router /api/v1/scales/{code}/basic-info [put]
 func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
@@ -103,9 +108,14 @@ func (h *ScaleHandler) UpdateBasicInfo(c *gin.Context) {
 	}
 
 	dto := scale.UpdateScaleBasicInfoDTO{
-		Code:        scaleCode,
-		Title:       req.Title,
-		Description: req.Description,
+		Code:          scaleCode,
+		Title:         req.Title,
+		Description:   req.Description,
+		Category:      req.Category,
+		Stage:         req.Stage,
+		ApplicableAge: req.ApplicableAge,
+		Reporter:      req.Reporter,
+		Tags:          req.Tags,
 	}
 
 	result, err := h.lifecycleService.UpdateBasicInfo(c.Request.Context(), dto)
