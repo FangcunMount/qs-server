@@ -1458,7 +1458,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/plans/{plan_id}/tasks": {
+        "/api/v1/plans/{id}/tasks": {
             "get": {
                 "description": "查看某个计划的所有任务",
                 "produces": [
@@ -1479,7 +1479,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "计划ID",
-                        "name": "plan_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -1506,7 +1506,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/plans/{plan_id}/testees/{testee_id}/terminate": {
+        "/api/v1/plans/{id}/testees/{testee_id}/terminate": {
             "post": {
                 "description": "受试者退出计划，取消所有待处理任务",
                 "produces": [
@@ -1527,7 +1527,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "计划ID",
-                        "name": "plan_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     },

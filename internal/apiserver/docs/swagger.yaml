@@ -1993,7 +1993,7 @@ paths:
       summary: 恢复计划
       tags:
       - Plan-Lifecycle
-  /api/v1/plans/{plan_id}/tasks:
+  /api/v1/plans/{id}/tasks:
     get:
       description: 查看某个计划的所有任务
       parameters:
@@ -2004,7 +2004,7 @@ paths:
         type: string
       - description: 计划ID
         in: path
-        name: plan_id
+        name: id
         required: true
         type: string
       produces:
@@ -2022,7 +2022,7 @@ paths:
       summary: 查询计划下的所有任务
       tags:
       - Plan-Query
-  /api/v1/plans/{plan_id}/testees/{testee_id}/terminate:
+  /api/v1/plans/{id}/testees/{testee_id}/terminate:
     post:
       description: 受试者退出计划，取消所有待处理任务
       parameters:
@@ -2033,7 +2033,7 @@ paths:
         type: string
       - description: 计划ID
         in: path
-        name: plan_id
+        name: id
         required: true
         type: string
       - description: 受试者ID

@@ -249,12 +249,12 @@ func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 // @Tags Plan-Enrollment
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param plan_id path string true "计划ID"
+// @Param id path string true "计划ID"
 // @Param testee_id path string true "受试者ID"
 // @Success 200 {object} core.Response
-// @Router /api/v1/plans/{plan_id}/testees/{testee_id}/terminate [post]
+// @Router /api/v1/plans/{id}/testees/{testee_id}/terminate [post]
 func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
-	planID := c.Param("plan_id")
+	planID := c.Param("id")
 	testeeID := c.Param("testee_id")
 
 	if planID == "" || testeeID == "" {
@@ -602,11 +602,11 @@ func (h *PlanHandler) ListTasks(c *gin.Context) {
 // @Tags Plan-Query
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param plan_id path string true "计划ID"
+// @Param id path string true "计划ID"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
-// @Router /api/v1/plans/{plan_id}/tasks [get]
+// @Router /api/v1/plans/{id}/tasks [get]
 func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
-	planID := c.Param("plan_id")
+	planID := c.Param("id")
 	if planID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
 		return

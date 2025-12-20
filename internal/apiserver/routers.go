@@ -293,19 +293,19 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	plans := apiV1.Group("/plans")
 	{
 		// ==================== Plan 生命周期管理 ====================
-		plans.POST("", planHandler.CreatePlan)                    // 创建计划
-		plans.POST("/:id/pause", planHandler.PausePlan)           // 暂停计划
-		plans.POST("/:id/resume", planHandler.ResumePlan)        // 恢复计划
-		plans.POST("/:id/cancel", planHandler.CancelPlan)       // 取消计划
+		plans.POST("", planHandler.CreatePlan)            // 创建计划
+		plans.POST("/:id/pause", planHandler.PausePlan)   // 暂停计划
+		plans.POST("/:id/resume", planHandler.ResumePlan) // 恢复计划
+		plans.POST("/:id/cancel", planHandler.CancelPlan) // 取消计划
 
 		// ==================== Plan 查询 ====================
-		plans.GET("", planHandler.ListPlans)                      // 查询计划列表
-		plans.GET("/:id", planHandler.GetPlan)                   // 获取计划详情
-		plans.GET("/:plan_id/tasks", planHandler.ListTasksByPlan) // 查询计划下的所有任务
+		plans.GET("", planHandler.ListPlans)                 // 查询计划列表
+		plans.GET("/:id/tasks", planHandler.ListTasksByPlan) // 查询计划下的所有任务（必须在 /:id 之前注册）
+		plans.GET("/:id", planHandler.GetPlan)               // 获取计划详情
 
 		// ==================== Plan 受试者管理 ====================
-		plans.POST("/enroll", planHandler.EnrollTestee)                              // 受试者加入计划
-		plans.POST("/:plan_id/testees/:testee_id/terminate", planHandler.TerminateEnrollment) // 终止受试者的计划参与
+		plans.POST("/enroll", planHandler.EnrollTestee)                                  // 受试者加入计划
+		plans.POST("/:id/testees/:testee_id/terminate", planHandler.TerminateEnrollment) // 终止受试者的计划参与
 	}
 
 	// ==================== Task 管理 ====================
@@ -314,8 +314,8 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 		tasks.POST("/schedule", planHandler.SchedulePendingTasks) // 调度待推送任务
 		tasks.GET("", planHandler.ListTasks)                      // 查询任务列表
 		tasks.GET("/:id", planHandler.GetTask)                    // 获取任务详情
-		tasks.POST("/:id/open", planHandler.OpenTask)            // 开放任务
-		tasks.POST("/:id/complete", planHandler.CompleteTask)    // 完成任务
+		tasks.POST("/:id/open", planHandler.OpenTask)             // 开放任务
+		tasks.POST("/:id/complete", planHandler.CompleteTask)     // 完成任务
 		tasks.POST("/:id/expire", planHandler.ExpireTask)         // 过期任务
 		tasks.POST("/:id/cancel", planHandler.CancelTask)         // 取消任务
 	}
@@ -323,8 +323,8 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	// ==================== Testee 相关的 Plan 查询 ====================
 	testees := apiV1.Group("/testees")
 	{
-		testees.GET("/:testee_id/plans", planHandler.ListPlansByTestee)                    // 查询受试者参与的所有计划
-		testees.GET("/:testee_id/tasks", planHandler.ListTasksByTestee)                    // 查询受试者的所有任务
+		testees.GET("/:testee_id/plans", planHandler.ListPlansByTestee)                       // 查询受试者参与的所有计划
+		testees.GET("/:testee_id/tasks", planHandler.ListTasksByTestee)                       // 查询受试者的所有任务
 		testees.GET("/:testee_id/plans/:plan_id/tasks", planHandler.ListTasksByTesteeAndPlan) // 查询受试者在某个计划下的所有任务
 	}
 }

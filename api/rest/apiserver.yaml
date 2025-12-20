@@ -943,7 +943,7 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanResponse'
-  /plans/{plan_id}/tasks:
+  /plans/{id}/tasks:
     get:
       tags:
       - Plan-Query
@@ -958,7 +958,7 @@ paths:
         required: true
       - type: string
         description: 计划ID
-        name: plan_id
+        name: id
         in: path
         required: true
       responses:
@@ -973,7 +973,7 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskListResponse'
-  /plans/{plan_id}/testees/{testee_id}/terminate:
+  /plans/{id}/testees/{testee_id}/terminate:
     post:
       tags:
       - Plan-Enrollment
@@ -988,7 +988,7 @@ paths:
         required: true
       - type: string
         description: 计划ID
-        name: plan_id
+        name: id
         in: path
         required: true
       - type: string
