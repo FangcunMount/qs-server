@@ -126,6 +126,11 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
 
+	// 初始化 Plan 模块
+	if err := c.initPlanModule(); err != nil {
+		return fmt.Errorf("failed to initialize plan module: %w", err)
+	}
+
 	// 初始化 CodesService（基于 redisStore）
 	c.initCodesService()
 
@@ -230,6 +235,20 @@ func (c *Container) initEvaluationModule() error {
 	modulePool["evaluation"] = evaluationModule
 
 	fmt.Printf("📦 Evaluation module initialized\n")
+	return nil
+}
+
+// initPlanModule 初始化 Plan 模块
+func (c *Container) initPlanModule() error {
+	planModule := assembler.NewPlanModule()
+	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher); err != nil {
+		return fmt.Errorf("failed to initialize plan module: %w", err)
+	}
+
+	c.PlanModule = planModule
+	modulePool["plan"] = planModule
+
+	fmt.Printf("📦 Plan module initialized\n")
 	return nil
 }
 
