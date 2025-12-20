@@ -71,7 +71,9 @@ func NewAssessmentPlan(
 	if interval <= 0 && (scheduleType == PlanScheduleByWeek || scheduleType == PlanScheduleByDay) {
 		return nil, ErrInvalidInterval
 	}
-	if totalTimes <= 0 {
+	// totalTimes 的验证：只有 by_week 和 by_day 类型需要验证
+	// custom 和 fixed_date 类型的 totalTimes 由 relative_weeks 或 fixed_dates 的长度决定
+	if totalTimes <= 0 && (scheduleType == PlanScheduleByWeek || scheduleType == PlanScheduleByDay) {
 		return nil, ErrInvalidTotalTimes
 	}
 

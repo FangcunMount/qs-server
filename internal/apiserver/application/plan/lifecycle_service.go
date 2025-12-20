@@ -78,8 +78,22 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		}
 	}
 
-	// 2. 验证参数
-	if errs := s.validator.ValidateForCreation(dto.OrgID, scaleID, scheduleType, dto.Interval, dto.TotalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
+	// 2. 根据 schedule_type 确定 totalTimes
+	// 对于 custom 和 fixed_date 类型，totalTimes 应该从对应的数组长度推导
+	totalTimes := dto.TotalTimes
+	switch scheduleType {
+	case plan.PlanScheduleCustom:
+		if len(dto.RelativeWeeks) > 0 {
+			totalTimes = len(dto.RelativeWeeks)
+		}
+	case plan.PlanScheduleFixedDate:
+		if len(fixedDates) > 0 {
+			totalTimes = len(fixedDates)
+		}
+	}
+
+	// 3. 验证参数（使用计算后的 totalTimes）
+	if errs := s.validator.ValidateForCreation(dto.OrgID, scaleID, scheduleType, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
 		logger.L(ctx).Errorw("Validation failed for plan creation",
 			"action", "create_plan",
 			"org_id", dto.OrgID,
@@ -88,7 +102,7 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		return nil, plan.ToError(errs)
 	}
 
-	// 3. 创建计划选项
+	// 4. 创建计划选项
 	var opts []plan.PlanOption
 	if len(fixedDates) > 0 {
 		opts = append(opts, plan.WithFixedDates(fixedDates))
@@ -97,8 +111,8 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		opts = append(opts, plan.WithRelativeWeeks(dto.RelativeWeeks))
 	}
 
-	// 4. 创建计划领域对象
-	p, err := plan.NewAssessmentPlan(dto.OrgID, scaleID, scheduleType, dto.Interval, dto.TotalTimes, opts...)
+	// 5. 创建计划领域对象
+	p, err := plan.NewAssessmentPlan(dto.OrgID, scaleID, scheduleType, dto.Interval, totalTimes, opts...)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to create plan domain object",
 			"action", "create_plan",
