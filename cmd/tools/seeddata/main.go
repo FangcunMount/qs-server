@@ -47,7 +47,6 @@ type seedStep string
 
 // All available seed steps.
 const (
-	stepTestee        seedStep = "testee"        // 创建受试者
 	stepQuestionnaire seedStep = "questionnaire" // 创建问卷
 	stepScale         seedStep = "scale"         // 创建量表
 )
@@ -60,10 +59,11 @@ var defaultSteps = []seedStep{
 
 // dependencies holds all external dependencies required by seed functions.
 type dependencies struct {
-	MySQLDB *gorm.DB        // MySQL数据库连接
-	MongoDB *mongo.Database // MongoDB数据库连接
-	Logger  log.Logger      // 日志记录器
-	Config  *SeedConfig     // 种子数据配置
+	MySQLDB   *gorm.DB        // MySQL数据库连接（可选，用于旧代码兼容）
+	MongoDB   *mongo.Database // MongoDB数据库连接（可选，用于旧代码兼容）
+	Logger    log.Logger      // 日志记录器
+	Config    *SeedConfig     // 种子数据配置
+	APIClient *APIClient      // HTTP API 客户端
 }
 
 // seedContext holds the state and references created during seeding.
@@ -93,9 +93,11 @@ func newSeedContext() *seedContext {
 func main() {
 	// 解析命令行参数
 	var (
-		mysqlDSN               = flag.String("mysql-dsn", os.Getenv("MYSQL_DSN"), "MySQL DSN")
-		mongoURI               = flag.String("mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI")
-		mongoDatabase          = flag.String("mongo-database", os.Getenv("MONGO_DATABASE"), "MongoDB Database")
+		apiBaseURL             = flag.String("api-base-url", os.Getenv("API_BASE_URL"), "API base URL (e.g., http://localhost:18082)")
+		apiToken               = flag.String("api-token", os.Getenv("API_TOKEN"), "API authentication token")
+		mysqlDSN               = flag.String("mysql-dsn", os.Getenv("MYSQL_DSN"), "MySQL DSN (deprecated, not used when using API)")
+		mongoURI               = flag.String("mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI (deprecated, not used when using API)")
+		mongoDatabase          = flag.String("mongo-database", os.Getenv("MONGO_DATABASE"), "MongoDB Database (deprecated, not used when using API)")
 		configFile             = flag.String("config", "", "Base seed data config file (testees, legacy data)")
 		questionnaireFile      = flag.String("questionnaire-config", "cmd/tools/seeddata/data/survey_questionnaires.yaml", "Questionnaire config file")
 		scaleQuestionnaireFile = flag.String("scale-questionnaire-config", "cmd/tools/seeddata/data/medical_scales.yaml", "Medical scale questionnaire config file")
@@ -160,29 +162,46 @@ func main() {
 		}
 	}
 
-	// 连接 MySQL
-	logger.Infow("Connecting to MySQL", "dsn", maskDSN(*mysqlDSN))
-	mysqlDB, err := gorm.Open(mysql.Open(*mysqlDSN), &gorm.Config{})
-	if err != nil {
-		logger.Fatalw("Failed to connect to MySQL", "error", err)
+	// 初始化 API 客户端
+	if strings.TrimSpace(*apiBaseURL) == "" {
+		logger.Fatalw("API base URL is required, set via --api-base-url or API_BASE_URL env var")
+	}
+	if strings.TrimSpace(*apiToken) == "" {
+		logger.Fatalw("API token is required, set via --api-token or API_TOKEN env var")
 	}
 
-	// 连接 MongoDB
-	logger.Infow("Connecting to MongoDB", "uri", maskURI(*mongoURI), "database", *mongoDatabase)
-	mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(*mongoURI))
-	if err != nil {
-		logger.Fatalw("Failed to connect to MongoDB", "error", err)
-	}
-	defer mongoClient.Disconnect(context.Background())
+	apiClient := NewAPIClient(*apiBaseURL, *apiToken, logger)
+	logger.Infow("Initialized API client", "base_url", *apiBaseURL)
 
-	mongoDB := mongoClient.Database(*mongoDatabase)
+	// 可选：连接数据库（用于兼容旧代码，但新代码应使用 API）
+	var mysqlDB *gorm.DB
+	var mongoDB *mongo.Database
+	if strings.TrimSpace(*mysqlDSN) != "" && strings.TrimSpace(*mongoURI) != "" {
+		logger.Infow("Connecting to databases (for compatibility)", "mysql_dsn", maskDSN(*mysqlDSN))
+		db, err := gorm.Open(mysql.Open(*mysqlDSN), &gorm.Config{})
+		if err != nil {
+			logger.Warnw("Failed to connect to MySQL (optional)", "error", err)
+		} else {
+			mysqlDB = db
+		}
+
+		logger.Infow("Connecting to MongoDB (for compatibility)", "uri", maskURI(*mongoURI), "database", *mongoDatabase)
+		mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(*mongoURI))
+		if err != nil {
+			logger.Warnw("Failed to connect to MongoDB (optional)", "error", err)
+		} else {
+			defer mongoClient.Disconnect(context.Background())
+			mongoDB = mongoClient.Database(*mongoDatabase)
+		}
+	}
 
 	// 构建依赖
 	deps := &dependencies{
-		MySQLDB: mysqlDB,
-		MongoDB: mongoDB,
-		Logger:  logger,
-		Config:  config,
+		MySQLDB:   mysqlDB,
+		MongoDB:   mongoDB,
+		Logger:    logger,
+		Config:    config,
+		APIClient: apiClient,
 	}
 
 	// 解析要执行的步骤
@@ -199,8 +218,6 @@ func main() {
 
 		var err error
 		switch step {
-		case stepTestee:
-			err = seedTesteeCenter(ctx, deps, state)
 		case stepQuestionnaire:
 			err = seedQuestionnaires(ctx, deps, state)
 		case stepScale:

@@ -4,41 +4,30 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	qApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	scaleDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	qDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	qInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// seedScales 创建完整的医学量表（问卷 + 因子）并发布
+// seedScales 通过 API 创建完整的医学量表（问卷 + 因子）并发布
 func seedScales(ctx context.Context, deps *dependencies, state *seedContext) error {
 	logger := deps.Logger
 	config := deps.Config
+	apiClient := deps.APIClient
 
 	if len(config.Scales) == 0 {
 		logger.Infow("No scales to seed")
 		return nil
 	}
 
-	logger.Infow("Seeding scales via application services", "count", len(config.Scales))
+	if apiClient == nil {
+		return fmt.Errorf("API client is required")
+	}
 
-	// 问卷服务（复用问卷逻辑）
-	qRepo := qInfra.NewRepository(deps.MongoDB)
-	qContentSvc := qApp.NewContentService(qRepo, qDomain.QuestionManager{})
-	qLifecycleSvc := qApp.NewLifecycleService(qRepo, qDomain.Validator{}, qDomain.NewLifecycle(), nil)
-	qQuerySvc := qApp.NewQueryService(qRepo)
+	logger.Infow("Seeding scales via API", "count", len(config.Scales))
 
-	// 量表服务
-	scaleRepo := scaleInfra.NewRepository(deps.MongoDB)
-	scaleLifecycle := scaleApp.NewLifecycleService(scaleRepo, qRepo, nil)
-	factorSvc := scaleApp.NewFactorService(scaleRepo)
-	scaleQuery := scaleApp.NewQueryService(scaleRepo)
+	// 初始化分类映射器
+	categoryMapper := NewScaleCategoryMapper()
 
 	for i, sc := range config.Scales {
 		scaleCode := sc.Code
@@ -51,70 +40,93 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 			qCode = scaleCode
 		}
 
+		scaleTitle := firstNonEmpty(sc.Title, sc.Name)
+		if scaleTitle == "" {
+			scaleTitle = scaleCode
+		}
+
+		// 1. 创建或更新问卷
 		qc := QuestionnaireConfig{
 			Code:        qCode,
-			Name:        firstNonEmpty(sc.Name, sc.Title),
+			Name:        scaleTitle,
 			Description: sc.Description,
 			ImgUrl:      sc.Icon,
 			Version:     sc.QuestionnaireVersion,
 			Questions:   sc.Questions,
 		}
 
-		qVersion, err := ensureQuestionnaire(ctx, qc, qContentSvc, qLifecycleSvc, qQuerySvc, logger)
+		qVersion, err := ensureQuestionnaireViaAPI(ctx, apiClient, qc, logger)
 		if err != nil {
 			return fmt.Errorf("scale[%s] questionnaire upsert failed: %w", scaleCode, err)
 		}
 
-		scaleTitle := firstNonEmpty(sc.Title, sc.Name)
-		if scaleTitle == "" {
-			scaleTitle = qCode
+		// 2. 获取量表分类信息
+		categoryInfo := categoryMapper.MapScaleCategory(scaleTitle)
+
+		// 3. 创建或更新量表
+		existingScale, err := apiClient.GetScale(ctx, scaleCode)
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			logger.Warnw("Failed to check existing scale", "code", scaleCode, "error", err)
 		}
 
-		existing, _ := scaleQuery.GetByCode(ctx, scaleCode)
-		if existing == nil {
-			if _, err := scaleLifecycle.Create(ctx, scaleApp.CreateScaleDTO{
-				Code:                 scaleCode,
-				Title:                scaleTitle,
-				Description:          sc.Description,
-				QuestionnaireCode:    qCode,
-				QuestionnaireVersion: qVersion,
-			}); err != nil {
+		createScaleReq := CreateScaleRequest{
+			Title:                scaleTitle,
+			Description:          sc.Description,
+			Category:             categoryInfo.Category,
+			Stages:               categoryInfo.Stages,
+			ApplicableAges:       categoryInfo.ApplicableAges,
+			Reporters:            categoryInfo.Reporters,
+			Tags:                 categoryInfo.Tags,
+			QuestionnaireCode:    qCode,
+			QuestionnaireVersion: qVersion,
+		}
+
+		if existingScale == nil {
+			logger.Debugw("Creating scale", "code", scaleCode, "title", scaleTitle)
+			_, err := apiClient.CreateScale(ctx, createScaleReq)
+			if err != nil {
 				return fmt.Errorf("create scale %s failed: %w", scaleCode, err)
 			}
 		} else {
-			if _, err := scaleLifecycle.UpdateBasicInfo(ctx, scaleApp.UpdateScaleBasicInfoDTO{
-				Code:        scaleCode,
-				Title:       scaleTitle,
-				Description: sc.Description,
-			}); err != nil {
+			logger.Debugw("Scale exists, updating", "code", scaleCode, "title", scaleTitle)
+			// 更新基本信息
+			_, err := apiClient.UpdateScaleBasicInfo(ctx, scaleCode, createScaleReq)
+			if err != nil {
 				return fmt.Errorf("update scale %s basic info failed: %w", scaleCode, err)
 			}
-			if _, err := scaleLifecycle.UpdateQuestionnaire(ctx, scaleApp.UpdateScaleQuestionnaireDTO{
-				Code:                 scaleCode,
-				QuestionnaireCode:    qCode,
-				QuestionnaireVersion: qVersion,
-			}); err != nil {
+			// 更新关联问卷
+			_, err = apiClient.UpdateScaleQuestionnaire(ctx, scaleCode, qCode, qVersion)
+			if err != nil {
 				return fmt.Errorf("update scale %s questionnaire failed: %w", scaleCode, err)
 			}
 		}
 
-		factorDTOs := buildFactorDTOs(sc, logger)
+		// 4. 批量更新因子
+		factorDTOs := buildFactorDTOsForAPI(sc, logger)
 		if len(factorDTOs) == 0 {
 			logger.Warnw("Scale has no factors", "code", scaleCode)
 		} else {
-			if _, err := factorSvc.ReplaceFactors(ctx, scaleCode, factorDTOs); err != nil {
+			batchReq := BatchUpdateFactorsRequest{
+				Factors: factorDTOs,
+			}
+			if err := apiClient.BatchUpdateFactors(ctx, scaleCode, batchReq); err != nil {
 				return fmt.Errorf("update scale %s factors failed: %w", scaleCode, err)
 			}
 		}
 
-		// 发布量表：先检查状态，若已发布或已归档则跳过
-		latestScale, err := scaleQuery.GetByCode(ctx, scaleCode)
+		// 5. 发布量表
+		latestScale, err := apiClient.GetScale(ctx, scaleCode)
 		if err != nil {
 			return fmt.Errorf("get scale %s for publish check failed: %w", scaleCode, err)
 		}
 		if latestScale.Status != "已发布" && latestScale.Status != "已归档" {
-			if _, err := scaleLifecycle.Publish(ctx, scaleCode); err != nil {
-				return fmt.Errorf("publish scale %s failed: %w", scaleCode, err)
+			_, err := apiClient.PublishScale(ctx, scaleCode)
+			if err != nil {
+				if strings.Contains(err.Error(), "already published") || strings.Contains(err.Error(), "invalid status") {
+					logger.Debugw("Scale already published/archived, skipping publish", "code", scaleCode, "status", latestScale.Status)
+				} else {
+					return fmt.Errorf("publish scale %s failed: %w", scaleCode, err)
+				}
 			}
 		} else {
 			logger.Debugw("Scale already published/archived, skipping publish", "code", scaleCode, "status", latestScale.Status)
@@ -128,13 +140,11 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 	return nil
 }
 
-// ensureQuestionnaire 复用问卷种子逻辑，返回发布后的版本号
-func ensureQuestionnaire(
+// ensureQuestionnaireViaAPI 通过 API 确保问卷存在并发布，返回发布后的版本号
+func ensureQuestionnaireViaAPI(
 	ctx context.Context,
+	apiClient *APIClient,
 	qc QuestionnaireConfig,
-	contentSvc qApp.QuestionnaireContentService,
-	lifecycleSvc qApp.QuestionnaireLifecycleService,
-	querySvc qApp.QuestionnaireQueryService,
 	logger log.Logger,
 ) (string, error) {
 	code := qc.Code
@@ -146,55 +156,55 @@ func ensureQuestionnaire(
 		return "", fmt.Errorf("questionnaire[%s] title is empty", code)
 	}
 	qImg := firstNonEmpty(qc.ImgUrl, qc.Icon)
-	version := qc.Version
-	if version == "" {
-		version = desiredQuestionnaireVersion
+
+	// 检查是否已存在
+	existing, err := apiClient.GetQuestionnaire(ctx, code)
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		logger.Warnw("Failed to check existing questionnaire", "code", code, "error", err)
 	}
 
-	existing, _ := querySvc.GetByCode(ctx, code)
+	createReq := CreateQuestionnaireRequest{
+		Title:       title,
+		Description: qc.Description,
+		ImgUrl:      qImg,
+		Type:        "MedicalScale", // 医学量表类型
+	}
+
 	if existing == nil {
-		if _, err := lifecycleSvc.Create(ctx, qApp.CreateQuestionnaireDTO{
-			Code:        code,
-			Title:       title,
-			Description: qc.Description,
-			ImgUrl:      qImg,
-			Version:     version,
-			Type:        string(qDomain.TypeMedicalScale),
-		}); err != nil {
+		logger.Debugw("Creating questionnaire", "code", code, "title", title)
+		_, err := apiClient.CreateQuestionnaire(ctx, createReq)
+		if err != nil {
 			return "", fmt.Errorf("create questionnaire %s failed: %w", code, err)
 		}
 	} else {
-		if _, err := lifecycleSvc.UpdateBasicInfo(ctx, qApp.UpdateQuestionnaireBasicInfoDTO{
-			Code:        code,
-			Title:       title,
-			Description: qc.Description,
-			ImgUrl:      qImg,
-			Type:        string(qDomain.TypeMedicalScale),
-		}); err != nil {
+		logger.Debugw("Questionnaire exists, updating", "code", code, "title", title)
+		_, err := apiClient.UpdateQuestionnaireBasicInfo(ctx, code, createReq)
+		if err != nil {
 			return "", fmt.Errorf("update questionnaire %s basic info failed: %w", code, err)
 		}
 	}
 
-	questionDTOs := buildQuestionDTOs(qc.Questions)
+	// 批量更新问题
+	questionDTOs := buildQuestionDTOsForAPI(qc.Questions)
 	if len(questionDTOs) == 0 {
 		logger.Warnw("Questionnaire has no questions", "code", code)
 	} else {
-		if _, err := contentSvc.BatchUpdateQuestions(ctx, code, questionDTOs); err != nil {
+		batchReq := BatchUpdateQuestionsRequest{
+			Questions: questionDTOs,
+		}
+		if err := apiClient.BatchUpdateQuestions(ctx, code, batchReq); err != nil {
 			return "", fmt.Errorf("update questionnaire %s questions failed: %w", code, err)
 		}
 	}
 
-	// 发布问卷：先检查状态，若已发布或已归档则跳过
-	latestQ, err := querySvc.GetByCode(ctx, code)
-	if err != nil {
-		return "", fmt.Errorf("get questionnaire %s for publish check failed: %w", code, err)
-	}
+	// 发布问卷
 	if len(questionDTOs) == 0 {
 		logger.Warnw("Skip publish questionnaire with no questions", "code", code)
 	} else {
-		if _, err := lifecycleSvc.Publish(ctx, code); err != nil {
-			if errors.IsCode(err, errorCode.ErrQuestionnaireInvalidStatus) {
-				logger.Debugw("Questionnaire already published/archived, skipping publish", "code", code, "status", latestQ.Status)
+		_, err := apiClient.PublishQuestionnaire(ctx, code)
+		if err != nil {
+			if strings.Contains(err.Error(), "already published") || strings.Contains(err.Error(), "invalid status") {
+				logger.Debugw("Questionnaire already published, skipping publish", "code", code)
 			} else {
 				return "", fmt.Errorf("publish questionnaire %s failed: %w", code, err)
 			}
@@ -204,9 +214,9 @@ func ensureQuestionnaire(
 	return publishedVersion, nil
 }
 
-// buildFactorDTOs 将配置转换为因子 DTO，尽量保留原始配置
-func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
-	dtos := make([]scaleApp.FactorDTO, 0, len(sc.Factors))
+// buildFactorDTOsForAPI 将配置转换为 API 请求的因子 DTO
+func buildFactorDTOsForAPI(sc ScaleConfig, logger log.Logger) []FactorDTO {
+	dtos := make([]FactorDTO, 0, len(sc.Factors))
 	groupInterp := mergeInterpretationGroup(sc.Interpretation)
 	hasTotal := false
 
@@ -216,15 +226,14 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 			hasTotal = true
 		}
 		factorGroup := mergeInterpretationGroupWithFallback(f.InterpretRule, f.Interpretations)
-		interpretRules := toInterpretRules(factorGroup, groupInterp, logger)
+		interpretRules := toInterpretRulesForAPI(factorGroup, groupInterp, logger)
 
-		scoringStrategy := scaleDomain.ScoringStrategySum
+		scoringStrategy := "sum"
 		if f.CalcRule.Formula == "avg" {
-			scoringStrategy = scaleDomain.ScoringStrategyAvg
+			scoringStrategy = "avg"
 		} else if f.CalcRule.Formula == "cnt" {
-			scoringStrategy = scaleDomain.ScoringStrategyCnt
+			scoringStrategy = "cnt"
 		} else if f.CalcRule.Formula != "" && f.CalcRule.Formula != "sum" {
-			// 其他未知公式，记录警告并使用默认 sum 策略
 			logger.Warnw("Unknown scoring formula, using sum as fallback",
 				"scale_code", sc.Code,
 				"factor_code", f.Code,
@@ -232,9 +241,8 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 		}
 
 		// 构建 ScoringParamsDTO
-		var scoringParams *scaleApp.ScoringParamsDTO
-		if scoringStrategy == scaleDomain.ScoringStrategyCnt {
-			// 从 CalcRule.AppendParams 中提取 cnt_option_contents
+		var scoringParams *ScoringParamsDTO
+		if scoringStrategy == "cnt" {
 			cntOptionContents := make([]string, 0)
 			if f.CalcRule.AppendParams != nil {
 				if contents, ok := f.CalcRule.AppendParams["cnt_option_contents"]; ok {
@@ -249,39 +257,36 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 					}
 				}
 			}
-			scoringParams = &scaleApp.ScoringParamsDTO{
+			scoringParams = &ScoringParamsDTO{
 				CntOptionContents: cntOptionContents,
 			}
-		} else {
-			// sum 和 avg 策略不需要参数
-			scoringParams = nil
 		}
 
-		dtos = append(dtos, scaleApp.FactorDTO{
+		dtos = append(dtos, FactorDTO{
 			Code:            f.Code,
 			Title:           firstNonEmpty(f.Title, f.Name, f.Description),
-			FactorType:      string(scaleDomain.FactorTypePrimary),
+			FactorType:      "primary",
 			IsTotalScore:    isTotal,
 			QuestionCodes:   pickQuestionCodes(f),
-			ScoringStrategy: string(scoringStrategy),
+			ScoringStrategy: scoringStrategy,
 			ScoringParams:   scoringParams,
 			InterpretRules:  interpretRules,
 		})
 	}
 
-	// 若缺少总分因子，自动补充一个占位总分因子，避免发布校验失败
+	// 若缺少总分因子，自动补充一个占位总分因子
 	if !hasTotal {
 		autoCode := sc.Code + "_total_auto"
-		dtos = append(dtos, scaleApp.FactorDTO{
+		dtos = append(dtos, FactorDTO{
 			Code:            autoCode,
 			Title:           "总分(自动补齐)",
-			FactorType:      string(scaleDomain.FactorTypePrimary),
+			FactorType:      "primary",
 			IsTotalScore:    true,
 			QuestionCodes:   collectQuestionCodes(sc),
-			ScoringStrategy: string(scaleDomain.ScoringStrategySum),
-			ScoringParams:   nil, // sum 策略不需要参数
-			InterpretRules: []scaleApp.InterpretRuleDTO{
-				{MinScore: 0, MaxScore: 9999, RiskLevel: string(scaleDomain.RiskLevelNone), Conclusion: "暂无解读", Suggestion: ""},
+			ScoringStrategy: "sum",
+			ScoringParams:   nil,
+			InterpretRules: []InterpretRuleDTO{
+				{MinScore: 0, MaxScore: 9999, RiskLevel: "none", Conclusion: "暂无解读", Suggestion: ""},
 			},
 		})
 		logger.Warnw("Added auto total factor", "scale", sc.Code, "factor", autoCode)
@@ -289,7 +294,7 @@ func buildFactorDTOs(sc ScaleConfig, logger log.Logger) []scaleApp.FactorDTO {
 	return dtos
 }
 
-// pickQuestionCodes 返回因子关联的题目编码（兼容旧字段）
+// pickQuestionCodes 返回因子关联的题目编码
 func pickQuestionCodes(f FactorConfig) []string {
 	if len(f.QuestionCodes) > 0 {
 		return f.QuestionCodes
@@ -317,14 +322,14 @@ func mergeInterpretationGroupWithFallback(group InterpretationGroupConfig, fallb
 	return group
 }
 
-// toInterpretRules 将配置转换为应用层 DTO
-func toInterpretRules(factorGroup InterpretationGroupConfig, scaleGroup InterpretationGroupConfig, logger log.Logger) []scaleApp.InterpretRuleDTO {
+// toInterpretRulesForAPI 将配置转换为 API 请求的解读规则 DTO
+func toInterpretRulesForAPI(factorGroup InterpretationGroupConfig, scaleGroup InterpretationGroupConfig, logger log.Logger) []InterpretRuleDTO {
 	items := factorGroup.Items
 	if len(items) == 0 {
 		items = scaleGroup.Items
 	}
 
-	rules := make([]scaleApp.InterpretRuleDTO, 0, len(items))
+	rules := make([]InterpretRuleDTO, 0, len(items))
 	for _, interp := range items {
 		min := parseFloat(interp.MinScore, interp.Start)
 		max := parseFloat(interp.MaxScore, interp.End)
@@ -336,7 +341,7 @@ func toInterpretRules(factorGroup InterpretationGroupConfig, scaleGroup Interpre
 		// 解析风险等级
 		riskLevel := parseRiskLevel(interp.RiskLevel, interp.Level)
 
-		rules = append(rules, scaleApp.InterpretRuleDTO{
+		rules = append(rules, InterpretRuleDTO{
 			MinScore:   min,
 			MaxScore:   max,
 			RiskLevel:  riskLevel,
@@ -346,10 +351,10 @@ func toInterpretRules(factorGroup InterpretationGroupConfig, scaleGroup Interpre
 	}
 	if len(rules) == 0 {
 		logger.Warnw("Interpretation rules missing, inserting default placeholder")
-		rules = append(rules, scaleApp.InterpretRuleDTO{
+		rules = append(rules, InterpretRuleDTO{
 			MinScore:   0,
 			MaxScore:   9999,
-			RiskLevel:  string(scaleDomain.RiskLevelNone),
+			RiskLevel:  "none",
 			Conclusion: "暂无解读",
 			Suggestion: "",
 		})
@@ -359,7 +364,6 @@ func toInterpretRules(factorGroup InterpretationGroupConfig, scaleGroup Interpre
 
 // parseRiskLevel 解析风险等级
 func parseRiskLevel(riskLevel, level string) string {
-	// 优先使用 risk_level 字段
 	if riskLevel != "" {
 		normalized := normalizeRiskLevel(riskLevel)
 		if normalized != "" {
@@ -367,7 +371,6 @@ func parseRiskLevel(riskLevel, level string) string {
 		}
 	}
 
-	// 兼容旧的 level 字段
 	if level != "" {
 		normalized := normalizeRiskLevel(level)
 		if normalized != "" {
@@ -375,23 +378,22 @@ func parseRiskLevel(riskLevel, level string) string {
 		}
 	}
 
-	// 默认为 none
-	return string(scaleDomain.RiskLevelNone)
+	return "none"
 }
 
 // normalizeRiskLevel 规范化风险等级字符串
 func normalizeRiskLevel(raw string) string {
 	switch raw {
 	case "none", "正常", "无风险":
-		return string(scaleDomain.RiskLevelNone)
+		return "none"
 	case "low", "轻度", "低风险":
-		return string(scaleDomain.RiskLevelLow)
+		return "low"
 	case "medium", "中度", "中风险":
-		return string(scaleDomain.RiskLevelMedium)
+		return "medium"
 	case "high", "重度", "高风险":
-		return string(scaleDomain.RiskLevelHigh)
+		return "high"
 	case "severe", "严重", "极高风险":
-		return string(scaleDomain.RiskLevelSevere)
+		return "severe"
 	default:
 		return ""
 	}

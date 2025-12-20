@@ -8,7 +8,6 @@ coverage/
 *.xlsx
 *.parquet
 tmp/
-data/
 testdata/
 test/
 test-*.sh
