@@ -95,14 +95,14 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册量表相关的受保护路由
 	r.registerScaleProtectedRoutes(apiV1)
 
-	// 注册 Actor 模块相关的受保护路由
-	r.registerActorProtectedRoutes(apiV1)
-
 	// 注册 Evaluation 模块相关的受保护路由
 	r.registerEvaluationProtectedRoutes(apiV1)
 
-	// 注册 Plan 模块相关的受保护路由
+	// 注册 Plan 模块相关的受保护路由（必须在 registerActorProtectedRoutes 之前，确保更具体的路由先注册）
 	r.registerPlanProtectedRoutes(apiV1)
+
+	// 注册 Actor 模块相关的受保护路由
+	r.registerActorProtectedRoutes(apiV1)
 
 	// 注册 Codes 申请路由
 	r.registerCodesRoutes(apiV1)
@@ -321,11 +321,12 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	}
 
 	// ==================== Testee 相关的 Plan 查询 ====================
+	// 注意：这些路由必须在 registerActorProtectedRoutes 之后注册，且更具体的路由要放在前面
 	testees := apiV1.Group("/testees")
 	{
-		testees.GET("/:testee_id/plans", planHandler.ListPlansByTestee)                       // 查询受试者参与的所有计划
-		testees.GET("/:testee_id/tasks", planHandler.ListTasksByTestee)                       // 查询受试者的所有任务
-		testees.GET("/:testee_id/plans/:plan_id/tasks", planHandler.ListTasksByTesteeAndPlan) // 查询受试者在某个计划下的所有任务
+		testees.GET("/:id/plans/:plan_id/tasks", planHandler.ListTasksByTesteeAndPlan) // 查询受试者在某个计划下的所有任务（最具体，最先匹配）
+		testees.GET("/:id/plans", planHandler.ListPlansByTestee)                       // 查询受试者参与的所有计划
+		testees.GET("/:id/tasks", planHandler.ListTasksByTestee)                       // 查询受试者的所有任务
 	}
 }
 

@@ -627,11 +627,11 @@ func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
 // @Tags Plan-Query
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param testee_id path string true "受试者ID"
+// @Param id path string true "受试者ID"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
-// @Router /api/v1/testees/{testee_id}/tasks [get]
+// @Router /api/v1/testees/{id}/tasks [get]
 func (h *PlanHandler) ListTasksByTestee(c *gin.Context) {
-	testeeID := c.Param("testee_id")
+	testeeID := c.Param("id")
 	if testeeID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID不能为空"))
 		return
@@ -652,11 +652,11 @@ func (h *PlanHandler) ListTasksByTestee(c *gin.Context) {
 // @Tags Plan-Query
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param testee_id path string true "受试者ID"
+// @Param id path string true "受试者ID"
 // @Success 200 {object} core.Response{data=response.PlanListResponse}
-// @Router /api/v1/testees/{testee_id}/plans [get]
+// @Router /api/v1/testees/{id}/plans [get]
 func (h *PlanHandler) ListPlansByTestee(c *gin.Context) {
-	testeeID := c.Param("testee_id")
+	testeeID := c.Param("id")
 	if testeeID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID不能为空"))
 		return
@@ -690,12 +690,12 @@ func (h *PlanHandler) ListPlansByTestee(c *gin.Context) {
 // @Tags Plan-Query
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param testee_id path string true "受试者ID"
+// @Param id path string true "受试者ID"
 // @Param plan_id path string true "计划ID"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
-// @Router /api/v1/testees/{testee_id}/plans/{plan_id}/tasks [get]
+// @Router /api/v1/testees/{id}/plans/{plan_id}/tasks [get]
 func (h *PlanHandler) ListTasksByTesteeAndPlan(c *gin.Context) {
-	testeeID := c.Param("testee_id")
+	testeeID := c.Param("id")
 	planID := c.Param("plan_id")
 
 	if testeeID == "" || planID == "" {
