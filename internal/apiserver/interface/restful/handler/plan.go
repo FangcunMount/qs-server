@@ -69,6 +69,32 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		return
 	}
 
+	// 根据 schedule_type 验证必需的参数
+	switch req.ScheduleType {
+	case "by_week", "by_day":
+		if req.Interval <= 0 {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "by_week/by_day 类型需要 interval 参数且必须大于0"))
+			return
+		}
+		if req.TotalTimes <= 0 {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "by_week/by_day 类型需要 total_times 参数且必须大于0"))
+			return
+		}
+	case "fixed_date":
+		if len(req.FixedDates) == 0 {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "fixed_date 类型需要 fixed_dates 参数且不能为空"))
+			return
+		}
+	case "custom":
+		if len(req.RelativeWeeks) == 0 {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "custom 类型需要 relative_weeks 参数且不能为空"))
+			return
+		}
+	default:
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "无效的 schedule_type: %s，支持的类型: by_week, by_day, fixed_date, custom", req.ScheduleType))
+		return
+	}
+
 	dto := planApp.CreatePlanDTO{
 		OrgID:         orgID,
 		ScaleID:       req.ScaleID,

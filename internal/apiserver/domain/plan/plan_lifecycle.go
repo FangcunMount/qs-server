@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -60,6 +61,13 @@ func (l *PlanLifecycle) Activate(ctx context.Context, plan *AssessmentPlan) erro
 // Pause 暂停计划（将活跃状态的计划变更为暂停状态）
 // 业务规则：暂停时，取消所有未执行的任务（pending 和 opened 状态）
 func (l *PlanLifecycle) Pause(ctx context.Context, plan *AssessmentPlan) ([]*AssessmentTask, error) {
+	planID := plan.GetID().String()
+	logger.L(ctx).Infow("Pausing plan in domain service",
+		"domain_action", "pause_plan",
+		"plan_id", planID,
+		"current_status", plan.GetStatus().String(),
+	)
+
 	// 1. 前置状态检查
 	if plan.IsFinished() {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能暂停")
@@ -74,20 +82,42 @@ func (l *PlanLifecycle) Pause(ctx context.Context, plan *AssessmentPlan) ([]*Ass
 	// 2. 查询该计划的所有任务
 	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
 	if err != nil {
+		logger.L(ctx).Errorw("Failed to find tasks for plan",
+			"domain_action", "pause_plan",
+			"plan_id", planID,
+			"error", err.Error(),
+		)
 		return nil, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
 	}
+
+	logger.L(ctx).Infow("Found tasks for plan",
+		"domain_action", "pause_plan",
+		"plan_id", planID,
+		"total_tasks", len(allTasks),
+	)
 
 	// 3. 取消所有未执行的任务（pending 和 opened 状态）
 	var canceledTasks []*AssessmentTask
 	for _, task := range allTasks {
 		if task.IsPending() || task.IsOpened() {
 			if err := l.taskLifecycle.Cancel(ctx, task); err != nil {
-				// 记录错误但继续处理其他任务
+				logger.L(ctx).Errorw("Failed to cancel task",
+					"domain_action", "pause_plan",
+					"plan_id", planID,
+					"task_id", task.GetID().String(),
+					"error", err.Error(),
+				)
 				continue
 			}
 			canceledTasks = append(canceledTasks, task)
 		}
 	}
+
+	logger.L(ctx).Infow("Tasks canceled for paused plan",
+		"domain_action", "pause_plan",
+		"plan_id", planID,
+		"canceled_tasks_count", len(canceledTasks),
+	)
 
 	// 4. 调用聚合根的包内方法（状态变更）
 	if err := plan.pause(); err != nil {
@@ -108,6 +138,14 @@ func (l *PlanLifecycle) Resume(
 	plan *AssessmentPlan,
 	testeeStartDates map[testee.ID]time.Time,
 ) ([]*AssessmentTask, error) {
+	planID := plan.GetID().String()
+	logger.L(ctx).Infow("Resuming plan in domain service",
+		"domain_action", "resume_plan",
+		"plan_id", planID,
+		"current_status", plan.GetStatus().String(),
+		"testee_count", len(testeeStartDates),
+	)
+
 	// 1. 前置状态检查
 	if plan.IsFinished() {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能恢复")
@@ -122,8 +160,19 @@ func (l *PlanLifecycle) Resume(
 	// 2. 查询该计划的所有任务
 	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
 	if err != nil {
+		logger.L(ctx).Errorw("Failed to find tasks for plan",
+			"domain_action", "resume_plan",
+			"plan_id", planID,
+			"error", err.Error(),
+		)
 		return nil, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
 	}
+
+	logger.L(ctx).Infow("Found tasks for plan",
+		"domain_action", "resume_plan",
+		"plan_id", planID,
+		"total_tasks", len(allTasks),
+	)
 
 	// 3. 按受试者分组，找出每个受试者已完成的最大序号和开始日期
 	testeeMaxSeq := make(map[testee.ID]int)
@@ -163,7 +212,11 @@ func (l *PlanLifecycle) Resume(
 	var newTasks []*AssessmentTask
 	for testeeID, startDate := range testeeStartDateMap {
 		if startDate.IsZero() {
-			// 如果没有开始日期，跳过该受试者
+			logger.L(ctx).Warnw("Skipping testee with zero start date",
+				"domain_action", "resume_plan",
+				"plan_id", planID,
+				"testee_id", testeeID.String(),
+			)
 			continue
 		}
 
@@ -177,7 +230,21 @@ func (l *PlanLifecycle) Resume(
 				newTasks = append(newTasks, task)
 			}
 		}
+
+		logger.L(ctx).Infow("Generated tasks for testee",
+			"domain_action", "resume_plan",
+			"plan_id", planID,
+			"testee_id", testeeID.String(),
+			"max_completed_seq", maxCompletedSeq,
+			"new_tasks_count", len(allGeneratedTasks)-maxCompletedSeq,
+		)
 	}
+
+	logger.L(ctx).Infow("New tasks generated for resumed plan",
+		"domain_action", "resume_plan",
+		"plan_id", planID,
+		"new_tasks_count", len(newTasks),
+	)
 
 	// 5. 调用聚合根的包内方法（状态变更）
 	if err := plan.resume(); err != nil {

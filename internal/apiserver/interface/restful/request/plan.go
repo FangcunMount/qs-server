@@ -3,13 +3,17 @@ package request
 // ============= Plan Lifecycle Requests =============
 
 // CreatePlanRequest 创建计划请求
+// 注意：不同 schedule_type 需要的参数不同：
+//   - by_week/by_day: 需要 interval 和 total_times
+//   - fixed_date: 需要 fixed_dates（不需要 interval 和 total_times）
+//   - custom: 需要 relative_weeks（不需要 interval 和 total_times）
 type CreatePlanRequest struct {
 	ScaleID       string   `json:"scale_id" valid:"required~量表ID不能为空"`
 	ScheduleType  string   `json:"schedule_type" valid:"required~周期类型不能为空"`
-	Interval      int      `json:"interval" valid:"required~间隔不能为空"`
-	TotalTimes    int      `json:"total_times" valid:"required~总次数不能为空"`
-	FixedDates    []string `json:"fixed_dates,omitempty"`    // 固定日期列表（格式：YYYY-MM-DD）
-	RelativeWeeks []int    `json:"relative_weeks,omitempty"` // 相对周次列表
+	Interval      int      `json:"interval,omitempty"`       // 间隔（用于 by_week/by_day）
+	TotalTimes    int      `json:"total_times,omitempty"`    // 总次数（用于 by_week/by_day）
+	FixedDates    []string `json:"fixed_dates,omitempty"`    // 固定日期列表（用于 fixed_date，格式：YYYY-MM-DD）
+	RelativeWeeks []int    `json:"relative_weeks,omitempty"` // 相对周次列表（用于 custom，如 [2,4,8,12]）
 }
 
 // PausePlanRequest 暂停计划请求（无请求体，使用路径参数）

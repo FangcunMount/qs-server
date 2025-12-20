@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -21,8 +22,21 @@ func NewTaskLifecycle() *TaskLifecycle {
 // Open 开放任务（生成入口）
 // 将待推送状态的任务变更为已推送状态，并设置入口信息
 func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, expireAt time.Time) error {
+	taskID := task.GetID().String()
+	logger.L(ctx).Infow("Opening task in domain service",
+		"domain_action", "open_task",
+		"task_id", taskID,
+		"current_status", task.GetStatus().String(),
+		"expire_at", expireAt,
+	)
+
 	// 1. 前置状态检查
 	if !task.IsPending() {
+		logger.L(ctx).Errorw("Task not in pending status",
+			"domain_action", "open_task",
+			"task_id", taskID,
+			"current_status", task.GetStatus().String(),
+		)
 		return errors.WithCode(code.ErrInvalidArgument, "任务未处于待推送状态，无法开放")
 	}
 
@@ -34,18 +48,50 @@ func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryTok
 		return errors.WithCode(code.ErrInvalidArgument, "入口URL不能为空")
 	}
 	if expireAt.Before(time.Now()) {
+		logger.L(ctx).Errorw("Expire time is in the past",
+			"domain_action", "open_task",
+			"task_id", taskID,
+			"expire_at", expireAt,
+		)
 		return errors.WithCode(code.ErrInvalidArgument, "过期时间必须在未来")
 	}
 
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
-	return task.open(entryToken, entryURL, expireAt)
+	if err := task.open(entryToken, entryURL, expireAt); err != nil {
+		logger.L(ctx).Errorw("Failed to open task",
+			"domain_action", "open_task",
+			"task_id", taskID,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	logger.L(ctx).Infow("Task opened successfully",
+		"domain_action", "open_task",
+		"task_id", taskID,
+	)
+
+	return nil
 }
 
 // Complete 完成任务
 // 将已推送状态的任务变更为已完成状态，并关联测评记录
 func (l *TaskLifecycle) Complete(ctx context.Context, task *AssessmentTask, assessmentID assessment.ID) error {
+	taskID := task.GetID().String()
+	logger.L(ctx).Infow("Completing task in domain service",
+		"domain_action", "complete_task",
+		"task_id", taskID,
+		"assessment_id", assessmentID.String(),
+		"current_status", task.GetStatus().String(),
+	)
+
 	// 1. 前置状态检查
 	if !task.IsOpened() {
+		logger.L(ctx).Errorw("Task not in opened status",
+			"domain_action", "complete_task",
+			"task_id", taskID,
+			"current_status", task.GetStatus().String(),
+		)
 		return errors.WithCode(code.ErrInvalidArgument, "任务未处于已推送状态，无法完成")
 	}
 
@@ -55,7 +101,22 @@ func (l *TaskLifecycle) Complete(ctx context.Context, task *AssessmentTask, asse
 	}
 
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
-	return task.complete(assessmentID)
+	if err := task.complete(assessmentID); err != nil {
+		logger.L(ctx).Errorw("Failed to complete task",
+			"domain_action", "complete_task",
+			"task_id", taskID,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	logger.L(ctx).Infow("Task completed successfully",
+		"domain_action", "complete_task",
+		"task_id", taskID,
+		"assessment_id", assessmentID.String(),
+	)
+
+	return nil
 }
 
 // Expire 过期任务

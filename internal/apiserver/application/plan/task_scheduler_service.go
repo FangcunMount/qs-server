@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -41,37 +42,74 @@ func NewTaskSchedulerService(
 
 // SchedulePendingTasks 调度待推送的任务
 func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, before string) ([]*TaskResult, error) {
+	logger.L(ctx).Infow("Scheduling pending tasks",
+		"action", "schedule_pending_tasks",
+		"before", before,
+	)
+
 	// 1. 解析时间参数
 	beforeTime, err := parseTime(before)
 	if err != nil {
+		logger.L(ctx).Errorw("Invalid time format",
+			"action", "schedule_pending_tasks",
+			"before", before,
+			"error", err.Error(),
+		)
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的时间格式: %v", err)
 	}
 
 	// 2. 查询待推送任务
 	tasks, err := s.taskRepo.FindPendingTasks(ctx, beforeTime)
 	if err != nil {
+		logger.L(ctx).Errorw("Failed to find pending tasks",
+			"action", "schedule_pending_tasks",
+			"before", before,
+			"error", err.Error(),
+		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询待推送任务失败")
 	}
 
+	logger.L(ctx).Infow("Found pending tasks",
+		"action", "schedule_pending_tasks",
+		"before", before,
+		"pending_tasks_count", len(tasks),
+	)
+
 	// 3. 为每个任务生成入口并开放
 	var openedTasks []*plan.AssessmentTask
+	failedCount := 0
 	for _, task := range tasks {
 		// 生成入口
 		token, url, expireAt, err := s.entryGenerator.GenerateEntry(ctx, task)
 		if err != nil {
-			// 记录错误但继续处理其他任务
+			logger.L(ctx).Errorw("Failed to generate entry",
+				"action", "schedule_pending_tasks",
+				"task_id", task.GetID().String(),
+				"error", err.Error(),
+			)
+			failedCount++
 			continue
 		}
 
 		// 开放任务
 		if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt); err != nil {
-			// 记录错误但继续处理其他任务
+			logger.L(ctx).Errorw("Failed to open task",
+				"action", "schedule_pending_tasks",
+				"task_id", task.GetID().String(),
+				"error", err.Error(),
+			)
+			failedCount++
 			continue
 		}
 
 		// 持久化任务
 		if err := s.taskRepo.Save(ctx, task); err != nil {
-			// 记录错误但继续处理其他任务
+			logger.L(ctx).Errorw("Failed to save opened task",
+				"action", "schedule_pending_tasks",
+				"task_id", task.GetID().String(),
+				"error", err.Error(),
+			)
+			failedCount++
 			continue
 		}
 
@@ -79,13 +117,26 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, before 
 		events := task.Events()
 		for _, evt := range events {
 			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				// 记录错误但继续执行
+				logger.L(ctx).Errorw("Failed to publish task event",
+					"action", "schedule_pending_tasks",
+					"task_id", task.GetID().String(),
+					"event_type", evt.EventType(),
+					"error", err.Error(),
+				)
 			}
 		}
 		task.ClearEvents()
 
 		openedTasks = append(openedTasks, task)
 	}
+
+	logger.L(ctx).Infow("Tasks scheduled",
+		"action", "schedule_pending_tasks",
+		"before", before,
+		"total_pending", len(tasks),
+		"opened_count", len(openedTasks),
+		"failed_count", failedCount,
+	)
 
 	return toTaskResults(openedTasks), nil
 }
