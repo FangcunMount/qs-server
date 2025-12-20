@@ -2378,6 +2378,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+  /testees/{id}/plans:
+    get:
+      tags:
+      - Plan-Query
+      summary: 查询受试者参与的所有计划
+      description: 查看某个受试者参与的所有计划
+      operationId: 查询受试者参与的所有计划
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 受试者ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.PlanListResponse'
+  /testees/{id}/plans/{plan_id}/tasks:
+    get:
+      tags:
+      - Plan-Query
+      summary: 查询受试者在某个计划下的所有任务
+      description: 查看某个受试者在某个计划下的所有任务
+      operationId: 查询受试者在某个计划下的所有任务
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 受试者ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: 计划ID
+        name: plan_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TaskListResponse'
   /testees/{id}/scale-analysis:
     get:
       tags:
@@ -2414,72 +2479,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
-  /testees/{testee_id}/plans:
-    get:
-      tags:
-      - Plan-Query
-      summary: 查询受试者参与的所有计划
-      description: 查看某个受试者参与的所有计划
-      operationId: 查询受试者参与的所有计划
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: string
-        description: 受试者ID
-        name: testee_id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.PlanListResponse'
-  /testees/{testee_id}/plans/{plan_id}/tasks:
-    get:
-      tags:
-      - Plan-Query
-      summary: 查询受试者在某个计划下的所有任务
-      description: 查看某个受试者在某个计划下的所有任务
-      operationId: 查询受试者在某个计划下的所有任务
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: string
-        description: 受试者ID
-        name: testee_id
-        in: path
-        required: true
-      - type: string
-        description: 计划ID
-        name: plan_id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.TaskListResponse'
-  /testees/{testee_id}/tasks:
+  /testees/{id}/tasks:
     get:
       tags:
       - Plan-Query
@@ -2494,7 +2494,7 @@ paths:
         required: true
       - type: string
         description: 受试者ID
-        name: testee_id
+        name: id
         in: path
         required: true
       responses:
@@ -2617,14 +2617,15 @@ components:
       type: object
       properties:
         fixed_dates:
-          description: 固定日期列表（格式：YYYY-MM-DD）
+          description: 固定日期列表（用于 fixed_date，格式：YYYY-MM-DD）
           type: array
           items:
             type: string
         interval:
+          description: 间隔（用于 by_week/by_day）
           type: integer
         relative_weeks:
-          description: 相对周次列表
+          description: 相对周次列表（用于 custom，如 [2,4,8,12]）
           type: array
           items:
             type: integer
@@ -2633,6 +2634,7 @@ components:
         schedule_type:
           type: string
         total_times:
+          description: 总次数（用于 by_week/by_day）
           type: integer
     request.CreateQuestionnaireRequest:
       type: object

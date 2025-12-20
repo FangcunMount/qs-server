@@ -3651,6 +3651,109 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/testees/{id}/plans": {
+            "get": {
+                "description": "查看某个受试者参与的所有计划",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plan-Query"
+                ],
+                "summary": "查询受试者参与的所有计划",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.PlanListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/{id}/plans/{plan_id}/tasks": {
+            "get": {
+                "description": "查看某个受试者在某个计划下的所有任务",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plan-Query"
+                ],
+                "summary": "查询受试者在某个计划下的所有任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "计划ID",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TaskListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/testees/{id}/scale-analysis": {
             "get": {
                 "produces": [
@@ -3703,110 +3806,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/testees/{testee_id}/plans": {
-            "get": {
-                "description": "查看某个受试者参与的所有计划",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Plan-Query"
-                ],
-                "summary": "查询受试者参与的所有计划",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.PlanListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/testees/{testee_id}/plans/{plan_id}/tasks": {
-            "get": {
-                "description": "查看某个受试者在某个计划下的所有任务",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Plan-Query"
-                ],
-                "summary": "查询受试者在某个计划下的所有任务",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "计划ID",
-                        "name": "plan_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TaskListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/testees/{testee_id}/tasks": {
+        "/api/v1/testees/{id}/tasks": {
             "get": {
                 "description": "查看某个受试者的所有任务",
                 "produces": [
@@ -3827,7 +3827,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "受试者ID",
-                        "name": "testee_id",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -4010,17 +4010,18 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "fixed_dates": {
-                    "description": "固定日期列表（格式：YYYY-MM-DD）",
+                    "description": "固定日期列表（用于 fixed_date，格式：YYYY-MM-DD）",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "interval": {
+                    "description": "间隔（用于 by_week/by_day）",
                     "type": "integer"
                 },
                 "relative_weeks": {
-                    "description": "相对周次列表",
+                    "description": "相对周次列表（用于 custom，如 [2,4,8,12]）",
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -4033,6 +4034,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "total_times": {
+                    "description": "总次数（用于 by_week/by_day）",
                     "type": "integer"
                 }
             }

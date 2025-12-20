@@ -75,14 +75,15 @@ definitions:
   request.CreatePlanRequest:
     properties:
       fixed_dates:
-        description: 固定日期列表（格式：YYYY-MM-DD）
+        description: 固定日期列表（用于 fixed_date，格式：YYYY-MM-DD）
         items:
           type: string
         type: array
       interval:
+        description: 间隔（用于 by_week/by_day）
         type: integer
       relative_weeks:
-        description: 相对周次列表
+        description: 相对周次列表（用于 custom，如 [2,4,8,12]）
         items:
           type: integer
         type: array
@@ -91,6 +92,7 @@ definitions:
       schedule_type:
         type: string
       total_times:
+        description: 总次数（用于 by_week/by_day）
         type: integer
     type: object
   request.CreateQuestionnaireRequest:
@@ -3657,6 +3659,69 @@ paths:
       summary: 获取受试者周期统计
       tags:
       - Testee
+  /api/v1/testees/{id}/plans:
+    get:
+      description: 查看某个受试者参与的所有计划
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanListResponse'
+              type: object
+      summary: 查询受试者参与的所有计划
+      tags:
+      - Plan-Query
+  /api/v1/testees/{id}/plans/{plan_id}/tasks:
+    get:
+      description: 查看某个受试者在某个计划下的所有任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskListResponse'
+              type: object
+      summary: 查询受试者在某个计划下的所有任务
+      tags:
+      - Plan-Query
   /api/v1/testees/{id}/scale-analysis:
     get:
       parameters:
@@ -3688,70 +3753,7 @@ paths:
       summary: 获取受试者量表分析结果
       tags:
       - Testee
-  /api/v1/testees/{testee_id}/plans:
-    get:
-      description: 查看某个受试者参与的所有计划
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 受试者ID
-        in: path
-        name: testee_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.PlanListResponse'
-              type: object
-      summary: 查询受试者参与的所有计划
-      tags:
-      - Plan-Query
-  /api/v1/testees/{testee_id}/plans/{plan_id}/tasks:
-    get:
-      description: 查看某个受试者在某个计划下的所有任务
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 受试者ID
-        in: path
-        name: testee_id
-        required: true
-        type: string
-      - description: 计划ID
-        in: path
-        name: plan_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TaskListResponse'
-              type: object
-      summary: 查询受试者在某个计划下的所有任务
-      tags:
-      - Plan-Query
-  /api/v1/testees/{testee_id}/tasks:
+  /api/v1/testees/{id}/tasks:
     get:
       description: 查看某个受试者的所有任务
       parameters:
@@ -3762,7 +3764,7 @@ paths:
         type: string
       - description: 受试者ID
         in: path
-        name: testee_id
+        name: id
         required: true
         type: string
       produces:
