@@ -154,6 +154,11 @@ type ScaleConfig struct {
 	Title                string                    `yaml:"title"`
 	Description          string                    `yaml:"description"`
 	Icon                 string                    `yaml:"icon"`
+	Category             string                    `yaml:"category"`              // 主类
+	Stages               []string                  `yaml:"stages"`               // 阶段列表
+	ApplicableAges       []string                  `yaml:"applicableAges"`       // 使用年龄列表（注意：YAML中是驼峰命名）
+	Reporters            []string                  `yaml:"reporters"`            // 填报人列表
+	Tags                 []string                  `yaml:"tags"`                // 标签列表
 	QuestionnaireCode    string                    `yaml:"questionnaireCode"`
 	QuestionnaireVersion string                    `yaml:"questionnaireVersion"`
 	Status               string                    `yaml:"status"` // "draft", "published", "archived"

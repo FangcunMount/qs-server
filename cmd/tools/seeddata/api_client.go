@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -22,6 +23,9 @@ type APIClient struct {
 
 // NewAPIClient 创建 API 客户端
 func NewAPIClient(baseURL, token string, logger log.Logger) *APIClient {
+	// 确保 baseURL 不以斜杠结尾
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
 	return &APIClient{
 		baseURL: baseURL,
 		token:   token,
@@ -76,21 +80,25 @@ type CreateScaleRequest struct {
 	QuestionnaireVersion string   `json:"questionnaire_version"`
 }
 
-// QuestionDTO 问题 DTO
+// QuestionDTO 问题 DTO（匹配 viewmodel.QuestionDTO）
 type QuestionDTO struct {
 	Code        string      `json:"code"`
+	Type        string      `json:"question_type"` // API 期望的字段名
 	Stem        string      `json:"stem"`
-	Type        string      `json:"type"`
-	Options     []OptionDTO `json:"options"`
-	Required    bool        `json:"required"`
-	Description string      `json:"description"`
+	Tips        string      `json:"tips,omitempty"` // API 期望的字段名
+	Options     []OptionDTO `json:"options,omitempty"`
+	Placeholder string      `json:"placeholder,omitempty"`
+	// 以下字段可选，暂时不设置
+	// ValidationRules []ValidationRuleDTO `json:"validation_rules,omitempty"`
+	// CalculationRule *CalculationRuleDTO `json:"calculation_rule,omitempty"`
+	// ShowController  *ShowControllerDTO  `json:"show_controller,omitempty"`
 }
 
-// OptionDTO 选项 DTO
+// OptionDTO 选项 DTO（匹配 viewmodel.OptionDTO）
 type OptionDTO struct {
-	Label string `json:"label"`
-	Value string `json:"value"`
-	Score int    `json:"score"`
+	Code    string  `json:"code"`    // API 期望的字段名
+	Content string  `json:"content"` // API 期望的字段名
+	Score   float64 `json:"score"`   // API 期望是 float64
 }
 
 // BatchUpdateQuestionsRequest 批量更新问题请求
@@ -162,12 +170,41 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body int
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
-	var apiResp Response
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w, body: %s", err, string(respBody))
+	// 如果状态码不是 200，先尝试解析 JSON（可能是 API 的错误响应）
+	if resp.StatusCode != http.StatusOK {
+		var apiResp Response
+		if err := json.Unmarshal(respBody, &apiResp); err == nil {
+			// 成功解析为 JSON，返回 API 错误信息
+			// 特殊处理 401 错误
+			if resp.StatusCode == http.StatusUnauthorized {
+				return nil, fmt.Errorf("authentication failed (401): please check your API token. message=%s", apiResp.Message)
+			}
+			return nil, fmt.Errorf("api error: http_status=%d, code=%d, message=%s", resp.StatusCode, apiResp.Code, apiResp.Message)
+		}
+		// 无法解析为 JSON（可能是 HTML 错误页面），返回原始响应
+		bodyStr := string(respBody)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "..."
+		}
+		// 特殊处理 401 错误
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("authentication failed (401): please check your API token. url=%s", url)
+		}
+		return nil, fmt.Errorf("http error: status=%d, url=%s, body=%s", resp.StatusCode, url, bodyStr)
 	}
 
-	if resp.StatusCode != http.StatusOK || apiResp.Code != 0 {
+	// 状态码是 200，尝试解析 JSON
+	var apiResp Response
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		bodyStr := string(respBody)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "..."
+		}
+		return nil, fmt.Errorf("unmarshal response: %w, url=%s, body=%s", err, url, bodyStr)
+	}
+
+	// 检查 API 业务错误码
+	if apiResp.Code != 0 {
 		return nil, fmt.Errorf("api error: code=%d, message=%s, http_status=%d", apiResp.Code, apiResp.Message, resp.StatusCode)
 	}
 
@@ -216,8 +253,48 @@ func (c *APIClient) UpdateQuestionnaireBasicInfo(ctx context.Context, code strin
 
 // BatchUpdateQuestions 批量更新问题
 func (c *APIClient) BatchUpdateQuestions(ctx context.Context, code string, req BatchUpdateQuestionsRequest) error {
-	_, err := c.doRequest(ctx, "PUT", fmt.Sprintf("/api/v1/questionnaires/%s/questions", code), req)
+	_, err := c.doRequest(ctx, "PUT", fmt.Sprintf("/api/v1/questionnaires/%s/questions/batch", code), req)
 	return err
+}
+
+// SaveDraftQuestionnaire 保存草稿
+func (c *APIClient) SaveDraftQuestionnaire(ctx context.Context, code string) (*QuestionnaireResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/questionnaires/%s/draft", code), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var qResp QuestionnaireResponse
+	if err := json.Unmarshal(dataBytes, &qResp); err != nil {
+		return nil, fmt.Errorf("unmarshal questionnaire response: %w", err)
+	}
+
+	return &qResp, nil
+}
+
+// UnpublishQuestionnaire 下架问卷（将已发布的问卷变为草稿状态）
+func (c *APIClient) UnpublishQuestionnaire(ctx context.Context, code string) (*QuestionnaireResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/questionnaires/%s/unpublish", code), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var qResp QuestionnaireResponse
+	if err := json.Unmarshal(dataBytes, &qResp); err != nil {
+		return nil, fmt.Errorf("unmarshal questionnaire response: %w", err)
+	}
+
+	return &qResp, nil
 }
 
 // PublishQuestionnaire 发布问卷
@@ -337,7 +414,7 @@ func (c *APIClient) UpdateScaleQuestionnaire(ctx context.Context, code string, q
 
 // BatchUpdateFactors 批量更新因子
 func (c *APIClient) BatchUpdateFactors(ctx context.Context, code string, req BatchUpdateFactorsRequest) error {
-	_, err := c.doRequest(ctx, "PUT", fmt.Sprintf("/api/v1/scales/%s/factors", code), req)
+	_, err := c.doRequest(ctx, "PUT", fmt.Sprintf("/api/v1/scales/%s/factors/batch", code), req)
 	return err
 }
 

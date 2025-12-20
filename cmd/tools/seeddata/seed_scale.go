@@ -26,9 +26,6 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 
 	logger.Infow("Seeding scales via API", "count", len(config.Scales))
 
-	// 初始化分类映射器
-	categoryMapper := NewScaleCategoryMapper()
-
 	for i, sc := range config.Scales {
 		scaleCode := sc.Code
 		if scaleCode == "" {
@@ -60,8 +57,50 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 			return fmt.Errorf("scale[%s] questionnaire upsert failed: %w", scaleCode, err)
 		}
 
-		// 2. 获取量表分类信息
-		categoryInfo := categoryMapper.MapScaleCategory(scaleTitle)
+		// 2. 从配置读取分类信息（如果配置中没有，使用默认值）
+		category := sc.Category
+		if category == "" {
+			category = "mental" // 默认心理健康
+		}
+		stages := sc.Stages
+		if len(stages) == 0 {
+			stages = []string{"screening"} // 默认筛查
+		}
+		applicableAges := sc.ApplicableAges
+		if len(applicableAges) == 0 {
+			applicableAges = []string{"school_child", "adolescent"} // 默认
+		}
+		reporters := sc.Reporters
+		if len(reporters) == 0 {
+			reporters = []string{"parent"} // 默认家长
+		}
+		tags := sc.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+		// 处理标签：将包含 "/" 的标签拆分成多个标签
+		processedTags := []string{}
+		for _, tag := range tags {
+			if strings.Contains(tag, "/") {
+				// 按 "/" 拆分
+				parts := strings.Split(tag, "/")
+				for _, part := range parts {
+					part = strings.TrimSpace(part)
+					if part != "" {
+						processedTags = append(processedTags, part)
+					}
+				}
+			} else {
+				processedTags = append(processedTags, tag)
+			}
+		}
+		// API 限制：标签数量最多5个
+		if len(processedTags) > 5 {
+			logger.Warnw("Tags count exceeds limit, truncating to 5", "code", scaleCode,
+				"original_count", len(processedTags), "original_tags", processedTags)
+			processedTags = processedTags[:5]
+		}
+		tags = processedTags
 
 		// 3. 创建或更新量表
 		existingScale, err := apiClient.GetScale(ctx, scaleCode)
@@ -72,11 +111,11 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 		createScaleReq := CreateScaleRequest{
 			Title:                scaleTitle,
 			Description:          sc.Description,
-			Category:             categoryInfo.Category,
-			Stages:               categoryInfo.Stages,
-			ApplicableAges:       categoryInfo.ApplicableAges,
-			Reporters:            categoryInfo.Reporters,
-			Tags:                 categoryInfo.Tags,
+			Category:             category,
+			Stages:               stages,
+			ApplicableAges:       applicableAges,
+			Reporters:            reporters,
+			Tags:                 tags,
 			QuestionnaireCode:    qCode,
 			QuestionnaireVersion: qVersion,
 		}
@@ -88,10 +127,15 @@ func seedScales(ctx context.Context, deps *dependencies, state *seedContext) err
 				return fmt.Errorf("create scale %s failed: %w", scaleCode, err)
 			}
 		} else {
-			logger.Debugw("Scale exists, updating", "code", scaleCode, "title", scaleTitle)
+			logger.Debugw("Scale exists, updating", "code", scaleCode, "title", scaleTitle,
+				"category", category, "stages", stages, "applicable_ages", applicableAges,
+				"reporters", reporters, "tags", tags)
 			// 更新基本信息
 			_, err := apiClient.UpdateScaleBasicInfo(ctx, scaleCode, createScaleReq)
 			if err != nil {
+				logger.Errorw("Update scale basic info failed", "code", scaleCode,
+					"category", category, "stages", stages, "applicable_ages", applicableAges,
+					"reporters", reporters, "tags", tags, "error", err)
 				return fmt.Errorf("update scale %s basic info failed: %w", scaleCode, err)
 			}
 			// 更新关联问卷
@@ -201,7 +245,35 @@ func ensureQuestionnaireViaAPI(
 	if len(questionDTOs) == 0 {
 		logger.Warnw("Skip publish questionnaire with no questions", "code", code)
 	} else {
-		_, err := apiClient.PublishQuestionnaire(ctx, code)
+		// 先确保问卷是草稿状态
+		latestQ, err := apiClient.GetQuestionnaire(ctx, code)
+		if err != nil {
+			return "", fmt.Errorf("get questionnaire %s for publish check failed: %w", code, err)
+		}
+
+		// 如果问卷是已发布状态，先下架（变为草稿）
+		if latestQ.Status == "已发布" {
+			logger.Debugw("Questionnaire is published, unpublishing first", "code", code)
+			_, err := apiClient.UnpublishQuestionnaire(ctx, code)
+			if err != nil {
+				return "", fmt.Errorf("unpublish questionnaire %s failed: %w", code, err)
+			}
+		}
+
+		// 保存草稿（确保状态为草稿）
+		if latestQ.Status != "草稿" {
+			logger.Debugw("Saving questionnaire as draft", "code", code)
+			_, err := apiClient.SaveDraftQuestionnaire(ctx, code)
+			if err != nil {
+				// 如果已经是草稿状态，SaveDraft 可能会失败，忽略错误
+				if !strings.Contains(err.Error(), "只能保存草稿状态的问卷") {
+					logger.Warnw("Save draft failed, continuing", "code", code, "error", err)
+				}
+			}
+		}
+
+		// 发布问卷
+		_, err = apiClient.PublishQuestionnaire(ctx, code)
 		if err != nil {
 			if strings.Contains(err.Error(), "already published") || strings.Contains(err.Error(), "invalid status") {
 				logger.Debugw("Questionnaire already published, skipping publish", "code", code)

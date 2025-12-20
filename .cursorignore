@@ -4,8 +4,6 @@ build/
 vendor/
 coverage/
 *.log
-*.csv
-*.xlsx
 *.parquet
 tmp/
 testdata/
