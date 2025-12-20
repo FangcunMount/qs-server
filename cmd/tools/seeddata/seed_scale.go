@@ -336,17 +336,32 @@ func toInterpretRulesForAPI(factorGroup InterpretationGroupConfig, scaleGroup In
 		if max <= min {
 			max = min + 0.0001
 		}
-		text := firstNonEmpty(interp.Description, interp.Content)
 
-		// 解析风险等级
-		riskLevel := parseRiskLevel(interp.RiskLevel, interp.Level)
+		// 解析新的 content 格式：风险等级、结论、建议
+		conclusion, suggestion, riskLevelFromContent := parseStructuredContent(interp.Content)
+
+		// 优先使用解析出的结论，否则使用 Description 或 Content
+		if conclusion == "" {
+			conclusion = firstNonEmpty(interp.Description, interp.Content)
+		}
+
+		// 优先使用解析出的建议，否则为空
+		if suggestion == "" {
+			suggestion = ""
+		}
+
+		// 解析风险等级：优先使用解析出的，其次使用字段中的
+		riskLevel := riskLevelFromContent
+		if riskLevel == "" {
+			riskLevel = parseRiskLevel(interp.RiskLevel, interp.Level)
+		}
 
 		rules = append(rules, InterpretRuleDTO{
 			MinScore:   min,
 			MaxScore:   max,
 			RiskLevel:  riskLevel,
-			Conclusion: text,
-			Suggestion: text,
+			Conclusion: conclusion,
+			Suggestion: suggestion,
 		})
 	}
 	if len(rules) == 0 {
@@ -360,6 +375,82 @@ func toInterpretRulesForAPI(factorGroup InterpretationGroupConfig, scaleGroup In
 		})
 	}
 	return rules
+}
+
+// parseStructuredContent 解析结构化的 content 文本
+// 格式：风险等级：xxx\n\n结论：xxx\n\n建议：xxx
+// 返回：结论、建议、风险等级
+func parseStructuredContent(content string) (conclusion, suggestion, riskLevel string) {
+	if content == "" {
+		return "", "", ""
+	}
+
+	// 按行分割
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// 解析风险等级
+		if strings.HasPrefix(line, "风险等级：") {
+			riskLevelStr := strings.TrimPrefix(line, "风险等级：")
+			riskLevelStr = strings.TrimSpace(riskLevelStr)
+			if riskLevelStr != "nan" && riskLevelStr != "" {
+				// 尝试规范化风险等级
+				riskLevel = normalizeRiskLevel(riskLevelStr)
+				if riskLevel == "" {
+					riskLevel = riskLevelStr // 如果无法规范化，保留原值
+				}
+			}
+		}
+
+		// 解析结论
+		if strings.HasPrefix(line, "结论：") {
+			conclusion = strings.TrimPrefix(line, "结论：")
+			conclusion = strings.TrimSpace(conclusion)
+		}
+
+		// 解析建议
+		if strings.HasPrefix(line, "建议：") {
+			suggestion = strings.TrimPrefix(line, "建议：")
+			suggestion = strings.TrimSpace(suggestion)
+			if suggestion == "nan" {
+				suggestion = ""
+			}
+		}
+	}
+
+	// 如果没有找到结构化的结论，尝试从整个 content 中提取
+	if conclusion == "" && strings.Contains(content, "结论：") {
+		// 提取结论部分（从"结论："到下一个"建议："或结尾）
+		conclusionStart := strings.Index(content, "结论：")
+		if conclusionStart >= 0 {
+			conclusionPart := content[conclusionStart+len("结论："):]
+			// 找到建议的开始位置
+			suggestionStart := strings.Index(conclusionPart, "\n\n建议：")
+			if suggestionStart >= 0 {
+				conclusion = strings.TrimSpace(conclusionPart[:suggestionStart])
+			} else {
+				conclusion = strings.TrimSpace(conclusionPart)
+			}
+		}
+	}
+
+	// 如果没有找到结构化的建议，尝试从整个 content 中提取
+	if suggestion == "" && strings.Contains(content, "建议：") {
+		suggestionStart := strings.Index(content, "建议：")
+		if suggestionStart >= 0 {
+			suggestion = strings.TrimSpace(content[suggestionStart+len("建议："):])
+			if suggestion == "nan" {
+				suggestion = ""
+			}
+		}
+	}
+
+	return conclusion, suggestion, riskLevel
 }
 
 // parseRiskLevel 解析风险等级

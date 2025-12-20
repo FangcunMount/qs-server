@@ -27,51 +27,31 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '0.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力属于正常范畴
-
-          建议：nan'
-      - start: '1.0'
+        content: 本次评估结果提示注意力属于正常范畴
+      - start: '1'
         end: '5.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在一些问题，建议定期评估。
-
-          建议：nan'
-      - start: '6.0'
+        content: 本次评估结果提示注意力存在一些问题，建议定期评估。
+      - start: '6'
         end: '6.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在一些异常项，建议定期评估。
-
-          建议：nan'
+        content: 本次评估结果提示注意力存在一些异常项，建议定期评估。
       - start: '6.1'
-        end: '8.0'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在较多异常项，建议及时干预。
+        end: '8'
+        content: '本次评估结果提示注意力存在较多异常项，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
       - start: '8.1'
         end: '9.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在非常多异常项目数，建议及时干预。
+        content: '本次评估结果提示注意力存在非常多异常项目数，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
   - code: CDknpDHy
     type: first_grade
     title: 多动冲动
@@ -96,51 +76,31 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '0.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动冲动的控制，属于正常范畴
-
-          建议：nan'
-      - start: '1.0'
+        content: 本次评估结果提示多动冲动的控制，属于正常范畴
+      - start: '1'
         end: '5.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动控制存在一些问题，建议定期评估。
-
-          建议：nan'
-      - start: '6.0'
+        content: 本次评估结果提示多动、冲动控制存在一些问题，建议定期评估。
+      - start: '6'
         end: '6.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动存在一些异常项，建议定期评估。
-
-          建议：nan'
+        content: 本次评估结果提示多动、冲动存在一些异常项，建议定期评估。
       - start: '6.1'
         end: '8.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动控制存在较多异常项，建议及时干预。
+        content: '本次评估结果提示多动、冲动控制存在较多异常项，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
       - start: '8.1'
         end: '9.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动控制存在非常多异常项目数，建议及时干预。
+        content: '本次评估结果提示多动、冲动控制存在非常多异常项目数，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
   - code: fnDsCTWa
     type: first_grade
     title: 总和分
@@ -171,6 +131,36 @@
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '18'
+      content: '孩子基本没有多动症表现，家长可以遵照医生建议，继续观察孩子情况。 给予您一些建议希望可以帮助家长创造良好亲子关系
+
+        1、父母和孩子之间通过彼此的尊重、合作和理解改善亲子关系，使家庭充满关爱和友善
+
+        2、建立家庭代币方案，把家庭规则细化，运用积分等代币方案帮助孩子学习遵守规则和服从指令。运用扣分来改变不良行为，并在家庭内形成制度。
+
+        3、父母要注意情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式。'
+    - start: '19'
+      end: '36'
+      content: '孩子有一些多动症的症状表现，可以就诊后，与医生沟通孩子在学校和生活中的行为表现，听取医生建议。分享您一些关于照顾多动症孩子的建议。
+
+        1、改变心态。多动症就像一个陪伴孩子长大的坏朋友，总是喜欢捣乱，让这些孩子的每一步进步都更艰难。建立良好的行为需要一个过程，父母保持积极的心态，才能看到孩子每一天的微小改变。
+
+        2、多渠道了解多动症以及教养技巧，便于家长理解孩子当前行为问题，多给予孩子耐心和包容，同时应用教养技巧，可以高效解决问题。
+
+        3、遵医嘱治疗方案，观察孩子情况。'
+    - start: '37'
+      end: '55'
+      content: '孩子有明显的多动症的症状表现，建议及时就诊，与医生沟通孩子在学校和生活中的行为表现，听取医生建议。为了缓解您的压力，保持身心健康，可以参考一下建议
+
+        1、转变态度和观念。多动症的父母需要认识到；我的孩子除了要面对其他孩子一样的压力外，还在和一个很困难的发育性障碍作斗争，他很不容易，非常需要父母的帮助，我们要给予孩子更多的耐心去支持他应对学校和生活中所面临的困难
+
+        2、尝试父母共同照顾孩子。每个人的精力有限，父母双方要共同商量如何分担照顾孩子的责任，互帮互助，彼此理解
+
+        3、改变认知角度，父母不要盯着眼前的一次作业，一次成绩，也不要只看重孩子是否听话。健康的成长是身心的全面发展的过程，是能力、情绪管理、社交等多方面的发展。父母要相信自己孩子是有能力的，才能挖掘出孩子的闪光点，让他们有更加长远的发展'
   questions:
   - code: AWlaJ5Iu
     type: Section
@@ -1000,17 +990,6 @@
     max_score: '3'
     validate_rules:
       required: '0'
-  category: adhd
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  tags: []
 - code: mTy1oK
   name: 耶鲁抽动症整体严重程度量表（YGTSS）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -1034,10 +1013,28 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '100'
+    max_score: 100
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '25'
+      content: '量表分别评估运动性抽动和发声性抽动，且对每类抽动进行5个方面的评价：即抽动的数量频度、强度、复杂性、干扰，每项分6级做0~5分判分。并独立评估抽动障碍所导致的损害，加入抽动总分中，最后得出量表总分。
+
+        本次儿童抽动严重程度评价为：轻度。'
+    - start: '25'
+      end: '51'
+      content: '量表分别评估运动性抽动和发声性抽动，且对每类抽动进行5个方面的评价：即抽动的数量频度、强度、复杂性、干扰，每项分6级做0~5分判分。并独立评估抽动障碍所导致的损害，加入抽动总分中，最后得出量表总分。
+
+        本次儿童抽动严重程度评价为：中度。'
+    - start: '51'
+      end: '101'
+      content: '量表分别评估运动性抽动和发声性抽动，且对每类抽动进行5个方面的评价：即抽动的数量频度、强度、复杂性、干扰，每项分6级做0~5分判分。并独立评估抽动障碍所导致的损害，加入抽动总分中，最后得出量表总分。
+
+        本次儿童抽动严重程度评价为：重度。'
   questions:
   - code: 2V4SeE8D
     type: Section
@@ -1746,17 +1743,6 @@
     max_score: '50'
     validate_rules:
       required: '0'
-  category: tic
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - clinical
-  tags:
-  - 功能结局/生活质量
 - code: zOO4eG
   name: 儿童困难问卷（QCD）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -1789,10 +1775,34 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '60'
+    max_score: 60
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '60'
+      content: 儿童困难问卷(QCD)，用于ADHD儿童的社会功能评定，内容涉及早晨/上学前、在学校、放学后、晚上、夜晚、总体行为共6个方面。问卷采用4级评分法：0为完全不相符，1为部分相符，2为大部分相符，3为完全相符。得分越高意味着孩子一天中某个特定时段越少遭遇困难，其学习及日常生活状态越好。
+    - start: '0'
+      end: '35'
+      content: '孩子存在一些困难行为表现，可将结果反馈医生，详细咨询听取建议。为了帮助孩子培养良好行为习惯，给予您一些建议
+
+        1、言传身教：父母，其实是孩子最直接的榜样。想要孩子按照你设定好的方向前行，你自己就要先成为孩子的榜样。因为孩子最初的行为习惯，都是从模仿父母而来的。你的行为举止是孩子在这个世界上行动的指南，你做了什么往往比你说了什么更加重要。
+
+        2、对于孩子良好行为，及时给予正向反馈。
+
+        3、多去尝试理解孩子的感受，耐心倾听孩子的心声。面对孩子问题行为，不要急于指责或者否定，先去和孩子交流，从孩子的角度去理解做出这个行为的原因以及孩子的情绪，让孩子感受到父母发自内心的尊重和关注，这样父母再进一步和孩子沟通解决问题的办法时，孩子会更乐意接受父母的建议。
+
+        4、信守你和孩子的约定。无论是家中制定的规则还是父母许给孩子的承诺，双方都应遵守。所以对孩子许诺，父母正确的做法应该是：许承诺之前，想清楚是否该许。一旦许下，请尽量做到。当你兑现了给孩子的承诺时，需要训练孩子也遵守她的承诺。'
+    - start: '35'
+      end: '61'
+      content: '孩子行为情况正常，家长可遵照医生建议，继续观察孩子情况。分享一些亲子沟通技巧，希望可帮助您增进亲子关系
+
+        1、学会积极倾听，才能与孩子有效沟通：首先，父母不要以自己的评价作为准则，让孩子多表达她的想法和感受，不轻易对孩子的想法和行为做评判。其次，听孩子说话时，要集中注意力，保持关注。最后，给予孩子积极的反馈。孩子在表达时，我们要给予一些语言或者肢体语言的回应，显示出我们在专注的倾听。
+
+        2、和孩子交流时，建议父母就事论事，阐述您发现的问题，感受以及您的需求，而不是主观评价，直接下达命令要求孩子，例如，你最近每天都玩很长时间手机，马上关掉电视，按照上述方法，我观察你最近回家后就去玩手机了，都没有和我聊天，我觉得很孤独，我希望你可以和我聊聊学校有意思的事情'
   questions:
   - code: n4Mb7jKD
     type: Section
@@ -2730,17 +2740,6 @@
     max_score: '3'
     validate_rules:
       required: '0'
-  category: qol
-  stages:
-  - follow_up
-  - outcome
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 功能结局/生活质量
 - code: HRq9uP
   name: Conners父母症状问卷（PSQ）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -2765,26 +2764,18 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '0.84'
-        content: '风险等级：nan
-
-          结论：本次评估结果，提示品行问题属于正常范畴。
-
-          建议：nan'
+        content: 本次评估结果，提示品行问题属于正常范畴。
       - start: '0.85'
         end: '3.1'
-        content: '风险等级：nan
+        content: '本次评估结果，提示品行问题已超出正常范畴。
 
-          结论：本次评估结果，提示品行问题已超出正常范畴。
-
-          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预
-
-          建议：nan'
+          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预'
   - code: jlCJuRCi
     type: first_grade
     title: 学习问题
@@ -2797,26 +2788,18 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.25'
-        content: '风险等级：nan
-
-          结论：本次评估结果，提示学习问题属于正常范畴。
-
-          建议：nan'
+        content: 本次评估结果，提示学习问题属于正常范畴。
       - start: '1.26'
         end: '3.1'
-        content: '风险等级：nan
+        content: '本次评估结果，提示学习问题已超出正常范畴。
 
-          结论：本次评估结果，提示学习问题已超出正常范畴。
-
-          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预
-
-          建议：nan'
+          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预'
   - code: w4Ys30Rm
     type: first_grade
     title: 心身问题
@@ -2830,26 +2813,18 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '0.4'
-        content: '风险等级：nan
-
-          结论：本次评估结果，提示心身问题属于正常范畴。
-
-          建议：nan'
+        content: 本次评估结果，提示心身问题属于正常范畴。
       - start: '0.5'
         end: '3.1'
-        content: '风险等级：nan
+        content: '本次评估结果，提示心身问题已超出正常范畴。
 
-          结论：本次评估结果，提示心身问题已超出正常范畴。
-
-          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预
-
-          建议：nan'
+          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预'
   - code: 3vWwRHNk
     type: first_grade
     title: 冲动—多动
@@ -2862,26 +2837,18 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '2.0'
-        content: '风险等级：nan
-
-          结论：本次评估结果，提示冲动/多动问题属于正常范畴。
-
-          建议：nan'
+      - start: '0'
+        end: '2'
+        content: 本次评估结果，提示冲动/多动问题属于正常范畴。
       - start: '2.1'
         end: '3.1'
-        content: '风险等级：nan
+        content: '本次评估结果，提示冲动/多动问题已超出正常范畴。
 
-          结论：本次评估结果，提示冲动/多动问题已超出正常范畴。
-
-          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预
-
-          建议：nan'
+          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预'
   - code: 6aaETvmi
     type: first_grade
     title: 焦虑
@@ -2894,26 +2861,18 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：本次评估结果，提示焦虑问题属于正常范畴。
-
-          建议：nan'
+        content: 本次评估结果，提示焦虑问题属于正常范畴。
       - start: '1.6'
         end: '3.1'
-        content: '风险等级：nan
+        content: '本次评估结果，提示焦虑问题已超出正常范畴。
 
-          结论：本次评估结果，提示焦虑问题已超出正常范畴。
-
-          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预
-
-          建议：nan'
+          如已对日常表现造成明显影响，建议去相关科室就诊，进一步评估、干预'
   - code: VbMqNoYE
     type: first_grade
     title: 多动指数（又称为简明症状问卷）
@@ -2932,36 +2891,28 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：孩子无明显异常情况，家长可以遵照医生建议，继续观察孩子情况。 给予您一些建议，希望可以帮助家长创造良好亲子关系
+        content: '孩子无明显异常情况，家长可以遵照医生建议，继续观察孩子情况。 给予您一些建议，希望可以帮助家长创造良好亲子关系
 
           1、父母和孩子之间通过彼此的尊重、合作和理解改善亲子关系，使家庭充满关爱和友善
 
           2、建立家庭代币方案，把家庭规则细化，运用积分等代币方案帮助孩子学习遵守规则和服从指令。运用扣分来改变不良行为，并在家庭内形成制度。
 
-          3、父母要注意情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式
-
-          建议：nan'
+          3、父母要注意情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式'
       - start: '1.6'
         end: '3.1'
-        content: '风险等级：nan
-
-          结论：孩子存在一些多动症的症状表现，可以就诊后，与医生沟通孩子在学校和生活中的行为表现，听取医生建议。分享您一些关于照顾孩子的建议。
+        content: '孩子存在一些多动症的症状表现，可以就诊后，与医生沟通孩子在学校和生活中的行为表现，听取医生建议。分享您一些关于照顾孩子的建议。
 
           1、改变心态，多给予孩子耐心和包容，建立良好的沟通关系，让孩子感受到父母无条件的爱。
 
           2、多给予孩子正向反馈，仔细观察孩子每一天细微的进步，及时给予鼓励或者奖励，让孩子在学习、生活中收获成就感，提升孩子做事情的主观能动性。
 
-          3、增加亲子互动，营造温馨和谐亲子关系。父母尽量安排时间，和孩子一起放松娱乐，例如做游戏，看书，运动等，建立积极的亲子关系。
-
-          建议：nan'
+          3、增加亲子互动，营造温馨和谐亲子关系。父母尽量安排时间，和孩子一起放松娱乐，例如做游戏，看书，运动等，建立积极的亲子关系。'
   - code: nMNL3YYO
     type: first_grade
     title: 总分因子
@@ -3018,10 +2969,19 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '144'
+    max_score: 144
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '200'
+      content: 'Conners是一个评估儿童常见行为问题的量表，主要用于评估ADHD（全称：注意缺陷多动障碍，简称：多动症），适用于3-17岁儿童。
+
+
+        不同的问题组合，可汇总形成对个因子的评估结果。这6个因子分别是：品行问题，学习问题，心身问题，冲动/多动，焦虑，多动指数（又称为简明症状）'
   questions:
   - code: BiQnz5yH
     type: Section
@@ -5189,17 +5149,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: adhd
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 共病/对立外化
 - code: gXkk9W
   name: Brief-2
   description: 执行功能行为评定量表第二版
@@ -5221,17 +5170,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '24'
+    max_score: 24
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：抑制冲动的能力，并在适当的时候能停止自己行为的能力。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 抑制冲动的能力，并在适当的时候能停止自己行为的能力。
   - code: Aa7IbYHN
     type: first_grade
     title: 自我监控（Self-Monitor）
@@ -5244,17 +5189,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '12'
+    max_score: 12
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：能够评估个人行为对他人和结果的影响程度，以及个人行为与行为标准或期望的比较。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 能够评估个人行为对他人和结果的影响程度，以及个人行为与行为标准或期望的比较。
   - code: nJkTU8bM
     type: first_grade
     title: 情景转换（Shift）
@@ -5271,17 +5212,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '24'
+    max_score: 24
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：根据情景需求从一个情况、活动或问题的一个方面自由移动到另一个方面的能力。转换的关键包括转换能力、容忍变化、灵活地解决问题、在任务之间切换或交替注意、从一个任务或主题转换焦点的能力。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 根据情景需求从一个情况、活动或问题的一个方面自由移动到另一个方面的能力。转换的关键包括转换能力、容忍变化、灵活地解决问题、在任务之间切换或交替注意、从一个任务或主题转换焦点的能力。
   - code: AyvItzpm
     type: first_grade
     title: 情绪控制（Emotional Control）
@@ -5298,17 +5235,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '24'
+    max_score: 24
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：合理进行情绪表达和调节情绪反应的能力。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 合理进行情绪表达和调节情绪反应的能力。
   - code: Tox3nsdt
     type: first_grade
     title: 任务启动（Initate）
@@ -5322,17 +5255,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '15'
+    max_score: 15
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：开启一项任务或活动的能力，以及独立产生想法、反应或解决问题的策略的能力。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 开启一项任务或活动的能力，以及独立产生想法、反应或解决问题的策略的能力。
   - code: CI01dlwX
     type: first_grade
     title: 工作记忆（Working Memory）
@@ -5349,17 +5278,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '24'
+    max_score: 24
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：为了完成一项任务而在脑海中储存信息、编码信息或者生成目标、计划和实现目标的连续步骤的能力。工作记忆对进行多步骤活动，或遵循复杂指令都是至关重要的。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 为了完成一项任务而在脑海中储存信息、编码信息或者生成目标、计划和实现目标的连续步骤的能力。工作记忆对进行多步骤活动，或遵循复杂指令都是至关重要的。
   - code: N279wV33
     type: first_grade
     title: 计划/组织（Plan/Organize）
@@ -5376,17 +5301,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '24'
+    max_score: 24
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：指的是管理当前和未来任务需求的能力。其中计划包括制定一个目标或最终状态，然后战略性地确定实现该目标的最有效的方法或步骤；组织指的是在学习或交流信息时，能够理清信息，领会主要思想或关键概念的能力。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 指的是管理当前和未来任务需求的能力。其中计划包括制定一个目标或最终状态，然后战略性地确定实现该目标的最有效的方法或步骤；组织指的是在学习或交流信息时，能够理清信息，领会主要思想或关键概念的能力。
   - code: WJI5vCPX
     type: first_grade
     title: 任务监控（Task Monitor）
@@ -5400,17 +5321,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '15'
+    max_score: 15
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：对任务的监控或工作检查习惯。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 对任务的监控或工作检查习惯。
   - code: C5T60lQa
     type: first_grade
     title: 材料组织（Orgainization of Materials）
@@ -5425,17 +5342,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '18'
+    max_score: 18
     interpret_rule:
       is_show: '0'
       interpretation:
-      - start: '0.0'
-        end: '25.0'
-        content: '风险等级：nan
-
-          结论：指在学习、娱乐、生活等场所，对其个人物品整理的有序度（包括卧室、课桌、书包、储物柜等）。
-
-          建议：nan'
+      - start: '0'
+        end: '25'
+        content: 指在学习、娱乐、生活等场所，对其个人物品整理的有序度（包括卧室、课桌、书包、储物柜等）。
   - code: CY73vuWV
     type: multi_grade
     title: 行为调节总分（BRI）
@@ -5446,7 +5359,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '36'
+    max_score: 36
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -5460,7 +5373,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '48'
+    max_score: 48
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -5477,7 +5390,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '96'
+    max_score: 96
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -5492,7 +5405,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '0'
+    max_score: 0
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -5511,7 +5424,7 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -5532,7 +5445,7 @@
       append_params:
         cnt_option_contents:
         - 经常
-    max_score: '7'
+    max_score: 7
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -5553,10 +5466,13 @@
       append_params:
         cnt_option_contents:
         - 总是或频繁
-    max_score: '7'
+    max_score: 7
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: enrpLcBu
     type: Section
@@ -8272,19 +8188,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: executive
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  - self
-  tags:
-  - 情绪调节
 - code: bJFKi3
   name: SPM
   description: 感觉处理测量
@@ -9053,6 +8956,9 @@
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: b9B0JQRD
     type: Radio
@@ -12433,19 +12339,6 @@
     max_score: '4'
     validate_rules:
       required: '1'
-  category: sensory
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - preschool
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  tags:
-  - 社会能力/同伴
 - code: zGnmOk
   name: 儿童执行功能的行为评定量表--他评问卷
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -12548,6 +12441,9 @@
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: PRZ3vXhU
     type: Text
@@ -15765,18 +15661,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: executive
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  tags:
-  - 情绪调节
 - code: Eo4Shg
   name: Weiss功能缺陷量表父母版
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -15865,20 +15749,12 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：结果显示家庭氛围良好，建议继续保持父母和孩子之间彼此尊重，互相理解，耐心沟通，使家庭充满关爱和友善。
-
-          建议：nan'
+        content: 结果显示家庭氛围良好，建议继续保持父母和孩子之间彼此尊重，互相理解，耐心沟通，使家庭充满关爱和友善。
       - start: '1.6'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：结果显示家庭氛围存在一些问题，可将情况反馈医生，听取建议。日常生活中，建议家长留意自身情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式。在父母和孩子双方情绪稳定的情况下，双反进行沟通，就事论事，和孩子耐心交流，商讨解决问题的办法。
-
-          建议：nan'
+        end: '3'
+        content: 结果显示家庭氛围存在一些问题，可将情况反馈医生，听取建议。日常生活中，建议家长留意自身情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式。在父母和孩子双方情绪稳定的情况下，双反进行沟通，就事论事，和孩子耐心交流，商讨解决问题的办法。
   - code: r1TlxxCs
     type: first_grade
     title: 学习和学校
@@ -15901,20 +15777,12 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：结果显示孩子学习状态良好，建议父母多给予孩子正向反馈，仔细观察孩子每一天细微的进步，及时给予鼓励或者奖励，让孩子在学习中收获成就感，提升学习兴趣
-
-          建议：nan'
+        content: 结果显示孩子学习状态良好，建议父母多给予孩子正向反馈，仔细观察孩子每一天细微的进步，及时给予鼓励或者奖励，让孩子在学习中收获成就感，提升学习兴趣
       - start: '1.6'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：结果显示孩子学习状态存在一些问题，可将情况反馈医生，听取建议。建议父母多给予孩子正向反馈，仔细观察孩子每一天细微的进步，及时给予鼓励或者奖励，让孩子在学习中收获成就感，提升学习兴趣
-
-          建议：nan'
+        end: '3'
+        content: 结果显示孩子学习状态存在一些问题，可将情况反馈医生，听取建议。建议父母多给予孩子正向反馈，仔细观察孩子每一天细微的进步，及时给予鼓励或者奖励，让孩子在学习中收获成就感，提升学习兴趣
   - code: GDY41Xca
     type: first_grade
     title: 生活技能
@@ -15937,26 +15805,18 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：结果显示孩子生活技能情况良好，家长可积极巩固孩子已经拥有的良好习惯，对孩子的有点适当表扬，使其感受到来自父母的肯定，从而达到激励孩子继续保持这一好习惯的目的。
-
-          建议：nan'
+        content: 结果显示孩子生活技能情况良好，家长可积极巩固孩子已经拥有的良好习惯，对孩子的有点适当表扬，使其感受到来自父母的肯定，从而达到激励孩子继续保持这一好习惯的目的。
       - start: '1.6'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：结果显示孩子生活技能存在一些问题，可将情况反馈医生，听取建议。给予您一些建议，希望可以帮助家长培养孩子良好习惯。
+        end: '3'
+        content: '结果显示孩子生活技能存在一些问题，可将情况反馈医生，听取建议。给予您一些建议，希望可以帮助家长培养孩子良好习惯。
 
           1、营造良好的家庭教育环境。孩子第一任教师是家长，为了使孩子有良好的行为习惯，父母应首先注意自身行为举止，言教不如身教。
 
           2、家长鼓励孩子做自己力所能及的事情，给孩子一些表现自己的机会
 
-          3、及时鼓励，耐心引导。孩子的良好习惯养成需要循序渐进，家长要付出一定的耐心与时间，不要急于求成，过程中也需要家长的鼓励，只要孩子做的好，父母可以及时给予肯定与赞赏，夸奖孩子具体的努力过程，避免笼统的“你真棒”等空话。
-
-          建议：nan'
+          3、及时鼓励，耐心引导。孩子的良好习惯养成需要循序渐进，家长要付出一定的耐心与时间，不要急于求成，过程中也需要家长的鼓励，只要孩子做的好，父母可以及时给予肯定与赞赏，夸奖孩子具体的努力过程，避免笼统的“你真棒”等空话。'
   - code: qCRu8tTW
     type: first_grade
     title: 自我管理
@@ -15991,18 +15851,12 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：结果显示孩子社交活动良好，生活中父母可以适当交给孩子一些交往技巧，但要少干涉孩子们的相处过程，尤其是当孩子之间出现矛盾时，尽量不要代为解决，可以了解具体情况后，和孩子共同商讨，适当给予建议，让孩子自己思考解决问题的办法。
-
-          建议：nan'
+        content: 结果显示孩子社交活动良好，生活中父母可以适当交给孩子一些交往技巧，但要少干涉孩子们的相处过程，尤其是当孩子之间出现矛盾时，尽量不要代为解决，可以了解具体情况后，和孩子共同商讨，适当给予建议，让孩子自己思考解决问题的办法。
       - start: '1.6'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：结果显示孩子社交活动存在一些问题，可将情况反馈医生，听取建议。给予您一些建议，希望可以帮助孩子提升社交能力
+        end: '3'
+        content: '结果显示孩子社交活动存在一些问题，可将情况反馈医生，听取建议。给予您一些建议，希望可以帮助孩子提升社交能力
 
           1、通过家庭游戏来提升孩子的社交技巧。家长和孩子之间可以通过角色扮演，玩游戏的方式，帮助孩子体验别人的感受，学会如何跟比人交流
 
@@ -16010,9 +15864,7 @@
 
           3、培养孩子同理心。帮助孩子在解决问题时，考虑他人感受的习惯，让孩子建立同理心，理解他人的情绪，相应调整自己的行为，为朋友提供钢
 
-          4、让孩子思考解决问题的办法。当孩子们发生冲突时，不要急于评判对错，让孩子承认错误，可以先询问孩子事情经过以及对问题的看法，适当给予建议，引导孩子自己思考解决问题的办法。
-
-          建议：nan'
+          4、让孩子思考解决问题的办法。当孩子们发生冲突时，不要急于评判对错，让孩子承认错误，可以先询问孩子事情经过以及对问题的看法，适当给予建议，引导孩子自己思考解决问题的办法。'
   - code: O6Lnm45J
     type: first_grade
     title: 冒险活动
@@ -16035,26 +15887,24 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：结果显示孩子行为习惯良好。生活中多给予孩子关心，维持良好的亲子互动，温馨和谐的家庭氛围对培养孩子良好行为是有帮助的。
-
-          建议：nan'
+        content: 结果显示孩子行为习惯良好。生活中多给予孩子关心，维持良好的亲子互动，温馨和谐的家庭氛围对培养孩子良好行为是有帮助的。
       - start: '1.6'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：结果显示孩子存在某些不良行为，可将情况反馈医生，听取建议。给予您一些建议，希望可以帮助纠正孩子不良行为
+        end: '3'
+        content: '结果显示孩子存在某些不良行为，可将情况反馈医生，听取建议。给予您一些建议，希望可以帮助纠正孩子不良行为
 
           1、冷静处理。当孩子犯错误后，家长如果一个劲地打骂惩罚，可能导致孩子不但不能认识自己的错误，反而加剧亲子间的奇对立情绪。这时候家长要保持冷静，对事情要全面了解，听取孩子的心声，允许他进行申辩。
 
           2、明确需要纠正孩子的行为目标。家长要理智分析孩子有哪些不良行为表现，哪些应该纠正，要明确指出具体要改变的行为，一定时间内解决一个问题。
 
-          3、注意孩子的细微进步。孩子的不良习惯不可能一下子改掉，父母不能操之过急，逐渐地实现改变孩子的行为。当孩子的不良行为有所进步，要及时表扬，用肯定态度爱护和关心孩子。
-
-          建议：nan'
+          3、注意孩子的细微进步。孩子的不良习惯不可能一下子改掉，父母不能操之过急，逐渐地实现改变孩子的行为。当孩子的不良行为有所进步，要及时表扬，用肯定态度爱护和关心孩子。'
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '200'
+      content: WFIRS-P主要评估ADHD症状、儿童行为或情绪对其相关功能（生活技能、自我管理等）的影响程度。各条目根据“从不” “有时” “经常”“总是或频繁”分别计分，评分越低表明儿童功能越优。
   questions:
   - code: omp99iHC
     type: Section
@@ -18748,18 +18598,6 @@
     max_score: '4'
     validate_rules:
       required: '1'
-  category: qol
-  stages:
-  - follow_up
-  - outcome
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 功能结局/生活质量
-  - 社会能力/同伴
 - code: mbdoeV
   name: 焦虑自评量表（SAS）
   icon: https://photo.fangcunyisheng.com/1/f2/1f26b49522c1e3a563d6dffe7c4704df.100_100.png
@@ -18796,36 +18634,23 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '50.0'
-        content: '风险等级：nan
+      - start: '0'
+        end: '50'
+        content: 你的结果显示正常，建议继续保持。
+      - start: '51'
+        end: '59'
+        content: '你可能有轻度的焦虑，要注意调节。给自己一个休整期和冷却期，让情绪有自然的出口。
 
-          结论：你的结果显示正常，建议继续保持。
-
-          建议：nan'
-      - start: '51.0'
-        end: '59.0'
-        content: '风险等级：nan
-
-          结论：你可能有轻度的焦虑，要注意调节。给自己一个休整期和冷却期，让情绪有自然的出口。
-
-          主要表现为情绪低落、消极、兴趣匮乏、自责、有一段时间工作的乐趣消失，建议进行自我调节；
-
-          建议：nan'
-      - start: '60.0'
-        end: '69.0'
-        content: '风险等级：nan
-
-          结论：你可能存在中度焦虑，可能表现心慌、气短、口干、出汗、颤抖、面色潮红等，有时还会有濒死感，建议自我调整或就医；
-
-          建议：nan'
-      - start: '70.0'
-        end: '80.0'
-        content: '风险等级：nan
-
-          结论：你可能存在重度焦虑，建议立即就医。
-
-          建议：nan'
+          主要表现为情绪低落、消极、兴趣匮乏、自责、有一段时间工作的乐趣消失，建议进行自我调节；'
+      - start: '60'
+        end: '69'
+        content: 你可能存在中度焦虑，可能表现心慌、气短、口干、出汗、颤抖、面色潮红等，有时还会有濒死感，建议自我调整或就医；
+      - start: '70'
+        end: '80'
+        content: 你可能存在重度焦虑，建议立即就医。
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: XauThuP3
     type: Section
@@ -19733,17 +19558,6 @@
     max_score: '4'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - adolescent
-  - adult
-  reporters:
-  - self
-  tags:
-  - 焦虑
 - code: D6ZvjC
   name: 抑郁自评量表（SDS）
   icon: https://photo.fangcunyisheng.com/c/ce/cce9c66c2908cabd0d61a35541b2be25.100_100.png
@@ -19776,10 +19590,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '80'
+    max_score: 80
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: 61As1bKe
     type: Section
@@ -20687,17 +20504,6 @@
     max_score: '4'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - adolescent
-  - adult
-  reporters:
-  - self
-  tags:
-  - 抑郁
 - code: fthN56
   name: 症状自评量表SCL-90
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -20800,10 +20606,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '215'
+    max_score: 215
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: WGLQkTkr
     type: Section
@@ -25581,16 +25390,6 @@
     max_score: '0'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - adult
-  reporters:
-  - self
-  tags:
-  - 广谱心理症状
 - code: tuixuu
   name: 广泛性焦虑障碍量表（GAD-7）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -25610,10 +25409,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '21'
+    max_score: 21
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: 7ybgPI2C
     type: Section
@@ -25936,17 +25738,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - adolescent
-  - adult
-  reporters:
-  - self
-  tags:
-  - 焦虑
 - code: 0yGW40
   name: 耶鲁抽动症整体严重程度量表（家长版）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -25971,10 +25762,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '100'
+    max_score: 100
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: 6jxaYuJs
     type: Section
@@ -26726,16 +26520,6 @@
     tips: ''
     router: null
     show_controller: null
-  category: tic
-  stages:
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 功能结局/生活质量
 - code: iuTdAh
   name: Conners教师用量表
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -26819,11 +26603,9 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.4'
-        content: '风险等级：nan
-
-          结论：阴性
+        content: '阴性
 
           孩子在学校中没有明显的多动症状，可以遵照医生建议，继续观察孩子情况
 
@@ -26839,14 +26621,10 @@
 
           2、建立家庭代币方案，把家庭规则细化，运用积分等代币方案帮助孩子学习遵守规则和服从指令。运用扣分来改变不良行为，并在家庭内形成制度。
 
-          3、父母要注意情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式
-
-          建议：nan'
+          3、父母要注意情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式'
       - start: '1.5'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：阳性
+        end: '3'
+        content: '阳性
 
           孩子在学校中存在一些多动症状的表现。建议教师与家长进行沟通，并协助家长寻求专业的帮助。以下是一些建议，帮助处理孩子的行为问题：
 
@@ -26868,9 +26646,7 @@
 
           2、多给予孩子正向反馈，仔细观察孩子每一天细微的进步，及时给予鼓励或奖励，让孩子在学习、生活中收获成就感，提升孩子做事情的主观能动性。
 
-          3、增加亲子互动，营造温馨和谐亲子关系。父母尽量安排时间，和孩子一起放松娱乐，例如做游戏，看书，运动等，建立积极的亲子关系。
-
-          建议：nan'
+          3、增加亲子互动，营造温馨和谐亲子关系。父母尽量安排时间，和孩子一起放松娱乐，例如做游戏，看书，运动等，建立积极的亲子关系。'
   questions:
   - code: i4PBsA2i
     type: Radio
@@ -28132,17 +27908,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: adhd
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - teacher
-  tags:
-  - 共病/对立外化
 - code: sJFa2R
   name: 儿童感觉统合能力发展评定量表
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -28243,27 +28008,16 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '19.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的前庭功能严重失常，请尽快寻求专业训练师，进行专业系统的前庭功能训练。前庭功能是脑干过滤感觉信息、输入大脑形成学习信息的一种功能。感觉信息中有些矛盾、错误的信息有赖于脑干的前庭网膜来进行统合和整理。 前庭平衡觉训练可调整前庭信息及平衡神经体系自动反应机能，促进语言神经组织健全、前庭平衡觉及视听能力完整能力。
-
-          建议：nan'
-      - start: '20.0'
-        end: '39.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的前庭功能存在一些问题，建议可以咨询专业训练师，进行专业系统的前庭功能训练。前庭功能是脑干过滤感觉信息、输入大脑形成学习信息的一种功能。感觉信息中有些矛盾、错误的信息有赖于脑干的前庭网膜来进行统合和整理。前庭平衡觉训练可调整前庭信息及平衡神经体系自动反应机能，促进语言神经组织健全、前庭平衡觉及视听能力完整能力。
-
-          建议：nan'
-      - start: '40.0'
-        end: '70.0'
-        content: '风险等级：nan
-
-          结论：目前孩子的前庭功能处于正常范围，必要时，家长也可以查阅相关资料了解相关的前庭功能家庭训练方法。有利于孩子更好的发展。
-
-          建议：nan'
+      - start: '0'
+        end: '19'
+        content: 根据测试结果，你的前庭功能严重失常，请尽快寻求专业训练师，进行专业系统的前庭功能训练。前庭功能是脑干过滤感觉信息、输入大脑形成学习信息的一种功能。感觉信息中有些矛盾、错误的信息有赖于脑干的前庭网膜来进行统合和整理。
+          前庭平衡觉训练可调整前庭信息及平衡神经体系自动反应机能，促进语言神经组织健全、前庭平衡觉及视听能力完整能力。
+      - start: '20'
+        end: '39'
+        content: 根据测试结果，你的前庭功能存在一些问题，建议可以咨询专业训练师，进行专业系统的前庭功能训练。前庭功能是脑干过滤感觉信息、输入大脑形成学习信息的一种功能。感觉信息中有些矛盾、错误的信息有赖于脑干的前庭网膜来进行统合和整理。前庭平衡觉训练可调整前庭信息及平衡神经体系自动反应机能，促进语言神经组织健全、前庭平衡觉及视听能力完整能力。
+      - start: '40'
+        end: '70'
+        content: 目前孩子的前庭功能处于正常范围，必要时，家长也可以查阅相关资料了解相关的前庭功能家庭训练方法。有利于孩子更好的发展。
   - code: mq8GS2qc
     type: first_grade
     title: 触觉功能不良
@@ -28297,27 +28051,15 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '19.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的触觉功能严重失常，请尽快寻求专业训练师，进行专业系统的触觉功能训练。触觉是指分布于全身皮肤上的神经细胞接受来自外界的温度、湿度、疼痛、压力及震动的感觉。触觉过分防御是指触觉敏感，这些孩子对外界刺激适应性较差，害怕陌生，不喜欢他人触摸等，而且常常会喜欢某些特殊的感觉，如偏食、吸允手指、触摸生殖器等。触觉迟钝的孩子反映慢，动作不灵活，分辨能力差。触觉训练主要是强化皮肤、大小肌肉关节神经感应，辨识感觉层次，调整大脑感觉神经的灵敏度。
-
-          建议：nan'
-      - start: '20.0'
-        end: '39.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的触觉功能存在一些问题，建议可以咨询专业训练师，进行专业系统的触觉功能训练。触觉是指分布于全身皮肤上的神经细胞接受来自外界的温度、湿度、疼痛、压力及震动的感觉。触觉过分防御是指触觉敏感，这些孩子对外界刺激适应性较差，害怕陌生，不喜欢他人触摸等，而且常常会喜欢某些特殊的感觉，如偏食、吸允手指、触摸生殖器等。触觉迟钝的孩子反映慢，动作不灵活，分辨能力差。触觉训练主要是强化皮肤、大小肌肉关节神经感应，辨识感觉层次，调整大脑感觉神经的灵敏度。
-
-          建议：nan'
-      - start: '40.0'
-        end: '105.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，目前孩子的触觉功能处于正常范围，必要时，家长也可以查阅相关资料了解相关的触觉功能家庭训练方法。有利于孩子更好的发展。
-
-          建议：nan'
+      - start: '0'
+        end: '19'
+        content: 根据测试结果，你的触觉功能严重失常，请尽快寻求专业训练师，进行专业系统的触觉功能训练。触觉是指分布于全身皮肤上的神经细胞接受来自外界的温度、湿度、疼痛、压力及震动的感觉。触觉过分防御是指触觉敏感，这些孩子对外界刺激适应性较差，害怕陌生，不喜欢他人触摸等，而且常常会喜欢某些特殊的感觉，如偏食、吸允手指、触摸生殖器等。触觉迟钝的孩子反映慢，动作不灵活，分辨能力差。触觉训练主要是强化皮肤、大小肌肉关节神经感应，辨识感觉层次，调整大脑感觉神经的灵敏度。
+      - start: '20'
+        end: '39'
+        content: 根据测试结果，你的触觉功能存在一些问题，建议可以咨询专业训练师，进行专业系统的触觉功能训练。触觉是指分布于全身皮肤上的神经细胞接受来自外界的温度、湿度、疼痛、压力及震动的感觉。触觉过分防御是指触觉敏感，这些孩子对外界刺激适应性较差，害怕陌生，不喜欢他人触摸等，而且常常会喜欢某些特殊的感觉，如偏食、吸允手指、触摸生殖器等。触觉迟钝的孩子反映慢，动作不灵活，分辨能力差。触觉训练主要是强化皮肤、大小肌肉关节神经感应，辨识感觉层次，调整大脑感觉神经的灵敏度。
+      - start: '40'
+        end: '105'
+        content: 根据测试结果，目前孩子的触觉功能处于正常范围，必要时，家长也可以查阅相关资料了解相关的触觉功能家庭训练方法。有利于孩子更好的发展。
   - code: caTSlRwc
     type: first_grade
     title: 本体感失调
@@ -28342,27 +28084,15 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '19.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的本体感严重失常，请尽快寻求专业训练师，进行专业系统的本体感功能训练。本体感又称为身体地图或身体形象，是肌肉、关节运动神经组织、身体神经组织和大脑长期互动联系过程中，协调出来的自动自发的能力。本体感训练主要是强化固有平衡、前庭平衡、触觉、大小肌肉双侧协调，灵活身体运动能力、健全左右脑均衡发展。
-
-          建议：nan'
-      - start: '20.0'
-        end: '39.0'
-        content: '风险等级：nan
-
-          结论：据测试结果，你的本体感存在一些问题，请尽快寻求专业训练师，进行专业系统的本体感功能训练。本体感又称为身体地图或身体形象，是肌肉、关节运动神经组织、身体神经组织和大脑长期互动联系过程中，协调出来的自动自发的能力。本体感训练主要是强化固有平衡、前庭平衡、触觉、大小肌肉双侧协调，灵活身体运动能力、健全左右脑均衡发展。
-
-          建议：nan'
-      - start: '40.0'
-        end: '60.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，目前孩子的本体感功能处于正常范围，必要时，家长也可以查阅相关资料了解相关的本体感功能家庭训练方法。有利于孩子更好的发展。
-
-          建议：nan'
+      - start: '0'
+        end: '19'
+        content: 根据测试结果，你的本体感严重失常，请尽快寻求专业训练师，进行专业系统的本体感功能训练。本体感又称为身体地图或身体形象，是肌肉、关节运动神经组织、身体神经组织和大脑长期互动联系过程中，协调出来的自动自发的能力。本体感训练主要是强化固有平衡、前庭平衡、触觉、大小肌肉双侧协调，灵活身体运动能力、健全左右脑均衡发展。
+      - start: '20'
+        end: '39'
+        content: 据测试结果，你的本体感存在一些问题，请尽快寻求专业训练师，进行专业系统的本体感功能训练。本体感又称为身体地图或身体形象，是肌肉、关节运动神经组织、身体神经组织和大脑长期互动联系过程中，协调出来的自动自发的能力。本体感训练主要是强化固有平衡、前庭平衡、触觉、大小肌肉双侧协调，灵活身体运动能力、健全左右脑均衡发展。
+      - start: '40'
+        end: '60'
+        content: 根据测试结果，目前孩子的本体感功能处于正常范围，必要时，家长也可以查阅相关资料了解相关的本体感功能家庭训练方法。有利于孩子更好的发展。
   - code: LCPxtbCu
     type: first_grade
     title: 学习能力发展不足（6岁以上）
@@ -28383,27 +28113,15 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '19.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的学习能力发展严重失常，请尽快寻求专业训练师，进行专业系统的学习能力训练。学习能力发展不足者阅读、做算术有问题，阅读跳读、漏字、写字笔顺颠倒、偏旁部首错误等.最基本的学习能力就是听、说、读、写、计算、思考等学习课业的能力。家长也查阅一些学习能力训练的方法，从视觉，听觉等方面训练孩子的注意力、记忆力、推理能力等的同时结合感觉统合其他方面的训练，另外家长要尊重孩子的想法，用欣赏的眼光去发现孩子的细小进步，进行具体的表扬，以培养孩子的自信心
-
-          建议：nan'
-      - start: '20.0'
-        end: '39.0'
-        content: '风险等级：nan
-
-          结论：根据测试结果，你的学习能力发展存在一些问题，请尽快寻求专业训练师，进行专业系统的学习能力训练。学习能力发展不足者阅读、做算术有问题，阅读跳读、漏字、写字笔顺颠倒、偏旁部首错误等.最基本的学习能力就是听、说、读、写、计算、思考等学习课业的能力。家长也查阅一些学习能力训练的方法，从视觉，听觉等方面训练孩子的注意力、记忆力、推理能力等的同时结合感觉统合其他方面的训练，另外家长要尊重孩子的想法，用欣赏的眼光去发现孩子的细小进步，进行具体的表扬，以培养孩子的自信心
-
-          建议：nan'
-      - start: '40.0'
-        end: '41.0'
-        content: '风险等级：nan
-
-          结论：目前孩子的学习能力处于正常范围，必要时，家长也可以查阅相关资料了解相关的学习能力训练方法。有利于孩子更好的发展。
-
-          建议：nan'
+      - start: '0'
+        end: '19'
+        content: 根据测试结果，你的学习能力发展严重失常，请尽快寻求专业训练师，进行专业系统的学习能力训练。学习能力发展不足者阅读、做算术有问题，阅读跳读、漏字、写字笔顺颠倒、偏旁部首错误等.最基本的学习能力就是听、说、读、写、计算、思考等学习课业的能力。家长也查阅一些学习能力训练的方法，从视觉，听觉等方面训练孩子的注意力、记忆力、推理能力等的同时结合感觉统合其他方面的训练，另外家长要尊重孩子的想法，用欣赏的眼光去发现孩子的细小进步，进行具体的表扬，以培养孩子的自信心
+      - start: '20'
+        end: '39'
+        content: 根据测试结果，你的学习能力发展存在一些问题，请尽快寻求专业训练师，进行专业系统的学习能力训练。学习能力发展不足者阅读、做算术有问题，阅读跳读、漏字、写字笔顺颠倒、偏旁部首错误等.最基本的学习能力就是听、说、读、写、计算、思考等学习课业的能力。家长也查阅一些学习能力训练的方法，从视觉，听觉等方面训练孩子的注意力、记忆力、推理能力等的同时结合感觉统合其他方面的训练，另外家长要尊重孩子的想法，用欣赏的眼光去发现孩子的细小进步，进行具体的表扬，以培养孩子的自信心
+      - start: '40'
+        end: '41'
+        content: 目前孩子的学习能力处于正常范围，必要时，家长也可以查阅相关资料了解相关的学习能力训练方法。有利于孩子更好的发展。
   - code: n400kYPP
     type: first_grade
     title: 大年龄儿童的问题
@@ -28419,6 +28137,9 @@
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: Cz9LB1fG
     type: Section
@@ -31442,33 +31163,10 @@
       append_params: []
     max_score: '5'
     validate_rules: []
-  category: sensory
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - preschool
-  - school_child
-  reporters:
-  - parent
-  tags: []
 - code: n4P8Kl
   name: Achenbach儿童行为量表
   description: （家长版，适用于4-16岁儿童）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
-  category: mental
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - preschool
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 广谱行为情绪
-  - 社会能力/同伴
 - code: TMiNB8
   name: 范德比尔特ADHD评定量表（父母版）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -31528,10 +31226,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '141'
+    max_score: 141
     interpret_rule:
       is_show: '1'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation: []
   questions:
   - code: i6hD6fZU
     type: Radio
@@ -33648,21 +33349,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: adhd
-  stages:
-  - deep_assessment
-  - follow_up
-  - outcome
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 功能结局/生活质量
-  - 共病/对立外化
-  - 焦虑
-  - 抑郁
 - code: ErLf6d
   name: 家庭顺应行为量表父母版（FASA）
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.100_100.png
@@ -33688,9 +33374,9 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '48'
+    max_score: 48
     interpret_rule:
-      is_show: '1'
+      is_show: 1
       interpretation: []
   questions:
   - code: QBIoPvdO
@@ -34387,17 +34073,6 @@
       append_params: []
     max_score: '4'
     validate_rules: []
-  category: mental
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 家庭系统/顺应
 - code: eLl0sv
   name: 孤独症谱系障碍筛查性评估（M-CMAT，16-30个月）
   description: 请根据你孩子通常的情况回答下面的每一个问题，如果这个行为很少见（如：你只见过1、2次），请按孩子没有过这种行为回答
@@ -34438,27 +34113,15 @@
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '2.0'
-        content: '风险等级：nan
-
-          结论：无需做电话随访。如果儿童未满24个月，需要在24月龄时再做M-CHAT评估
-
-          建议：nan'
-      - start: '3.0'
-        end: '6.0'
-        content: '风险等级：nan
-
-          结论：需要进一步做M-CHAT/F电话随访。如果评估得分仍然大于等于3分，有必要做诊断评估和适应性评估，进而早期干预。需要注意的是，如果得分是2，可能也需要转诊。
-
-          建议：nan'
-      - start: '7.0'
-        end: '23.0'
-        content: '风险等级：nan
-
-          结论：儿童处于孤独症或其他发展障碍高风险，有必要直接转诊做诊断评估和适合性评估。
-
-          建议：nan'
+      - start: '0'
+        end: '2'
+        content: 无需做电话随访。如果儿童未满24个月，需要在24月龄时再做M-CHAT评估
+      - start: '3'
+        end: '6'
+        content: 需要进一步做M-CHAT/F电话随访。如果评估得分仍然大于等于3分，有必要做诊断评估和适应性评估，进而早期干预。需要注意的是，如果得分是2，可能也需要转诊。
+      - start: '7'
+        end: '23'
+        content: 儿童处于孤独症或其他发展障碍高风险，有必要直接转诊做诊断评估和适合性评估。
   questions:
   - code: aXPVtyUQ
     type: Radio
@@ -35127,15 +34790,6 @@
     max_score: '1'
     validate_rules:
       required: '1'
-  category: neurodev
-  stages:
-  - screening
-  applicableAges:
-  - infant
-  reporters:
-  - parent
-  tags:
-  - ASD筛查/评定
 - code: 9WA2kw
   name: 注意缺陷多动及攻击评定量表（IOWA）
   description: 请按该生实际情况对以下每项问题做出评定，在符合他情况的空格内打钩，注意不要漏项。
@@ -35154,7 +34808,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '15'
+    max_score: 15
     interpret_rule:
       is_show: '1'
       interpretation: []
@@ -35171,7 +34825,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '15'
+    max_score: 15
     interpret_rule:
       is_show: '1'
       interpretation: []
@@ -35626,19 +35280,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: adhd
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  tags:
-  - 攻击/品行
-  - 共病/对立外化
 - code: AMwIzu
   name: 压力知觉量表
   description: 压力知觉量表
@@ -35662,9 +35303,9 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '40'
+    max_score: 40
     interpret_rule:
-      is_show: '1'
+      is_show: 1
       interpretation: []
   questions:
   - code: D1GyenPT
@@ -36203,17 +35844,6 @@
     max_score: '4'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - adolescent
-  - adult
-  reporters:
-  - self
-  tags:
-  - 压力/应激
 - code: bx9Kf6
   name: 儿童焦虑性情绪障碍筛查量表（SCARED）
   description: 请你根据最近3个月的实际感受填写下来，不要考虑怎样忙回答是才“正确”，仅根据你的感知如实回答，在符合你的那一格打“✓“，注意不要漏项
@@ -36268,17 +35898,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '82'
+    max_score: 82
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '23.0'
-        end: '82.0'
-        content: '风险等级：nan
-
-          结论：可能会存在焦虑障碍
-
-          建议：nan'
+      - start: '23'
+        end: '82'
+        content: 可能会存在焦虑障碍
   questions:
   - code: ph6ShIjW
     type: Radio
@@ -37797,18 +37423,6 @@
     max_score: '2'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - self
-  tags:
-  - 焦虑
 - code: DVYcFH
   name: Achenbach儿童行为表（CBCL）——一般项目
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -37933,18 +37547,6 @@
     format: yyyy-MM-DD
     value: ''
     validate_rules: []
-  category: mental
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - preschool
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 广谱行为情绪
 - code: Z1pQEd
   name: Achenbach儿童行为表（CBCL）——社会能力
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -39010,20 +38612,6 @@
     max_score: '1'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - deep_assessment
-  - follow_up
-  - outcome
-  applicableAges:
-  - preschool
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 社会能力/同伴
-  - 功能结局/生活质量
 - code: bQjQnh
   name: Achenbach儿童行为表（CBCL）——行为问题
   description: 以下是描述你孩子的项目.只根据最近半年内的情况描述.每一项目后面都有三个数字（0,1,2）,如你孩子明显有或经常有此项表现,圈2;如轻度有或有时有此项表现,圈1;如无此项表现圈0。
@@ -43530,18 +43118,6 @@
     max_score: '2'
     validate_rules:
       required: '1'
-  category: mental
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - preschool
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 广谱行为情绪
 - code: 4L15Nu
   name: 执行功能行为评定量表（BRIEF）第二版
   description: 请根据您孩子最近的行为来回答，并选择相应的选项。为了得到充分的信息，请务必回答每一道题目。
@@ -43618,17 +43194,13 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '189'
+    max_score: 189
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '190.0'
-        content: '风险等级：nan
-
-          结论：执行功能行为评定量表（BRIEF）可评估6-18岁的儿童的执行功能，共86条目，各条目按照1-3级评分，（1=从不，2=有时，3=经常）评分越高，所反映的执行功能受损越严重。
-
-          建议：nan'
+      - start: '0'
+        end: '190'
+        content: 执行功能行为评定量表（BRIEF）可评估6-18岁的儿童的执行功能，共86条目，各条目按照1-3级评分，（1=从不，2=有时，3=经常）评分越高，所反映的执行功能受损越严重。
   questions:
   - code: tvOEvlyU
     type: Radio
@@ -45961,19 +45533,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: executive
-  stages:
-  - deep_assessment
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  - self
-  tags:
-  - 情绪调节
 - code: kTC43z
   name: SNAP-IV量表（26项）
   description: 请您根据孩子最近一段时间的情况作答
@@ -45999,55 +45558,35 @@
         cnt_option_contents:
         - 还不算少
         - 非常的多
-    max_score: '9'
+    max_score: 9
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '0.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力属于正常范畴
-
-          建议：nan'
-      - start: '1.0'
+        content: 本次评估结果提示注意力属于正常范畴
+      - start: '1'
         end: '5.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在一些问题，建议定期评估。
-
-          建议：nan'
-      - start: '6.0'
+        content: 本次评估结果提示注意力存在一些问题，建议定期评估。
+      - start: '6'
         end: '6.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在一些异常项，建议定期评估。
-
-          建议：nan'
+        content: 本次评估结果提示注意力存在一些异常项，建议定期评估。
       - start: '6.1'
-        end: '8.0'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在较多异常项，建议及时干预。
+        end: '8'
+        content: '本次评估结果提示注意力存在较多异常项，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
       - start: '8.1'
         end: '9.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示注意力存在非常多异常项目数，建议及时干预。
+        content: '本次评估结果提示注意力存在非常多异常项目数，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
   - code: bZLeKlmA
     type: first_grade
     title: 多动-冲动
@@ -46068,55 +45607,35 @@
         cnt_option_contents:
         - 还不算少
         - 非常的多
-    max_score: '9'
+    max_score: 9
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '0.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动冲动的控制，属于正常范畴
-
-          建议：nan'
-      - start: '1.0'
+        content: 本次评估结果提示多动冲动的控制，属于正常范畴
+      - start: '1'
         end: '5.9'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动控制存在一些问题，建议定期评估。
-
-          建议：nan'
-      - start: '6.0'
+        content: 本次评估结果提示多动、冲动控制存在一些问题，建议定期评估。
+      - start: '6'
         end: '6.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动存在一些异常项，建议定期评估。
-
-          建议：nan'
+        content: 本次评估结果提示多动、冲动存在一些异常项，建议定期评估。
       - start: '6.1'
         end: '8.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动控制存在较多异常项，建议及时干预。
+        content: '本次评估结果提示多动、冲动控制存在较多异常项，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
       - start: '8.1'
         end: '9.1'
-        content: '风险等级：nan
-
-          结论：本次评估结果提示多动、冲动控制存在非常多异常项目数，建议及时干预。
+        content: '本次评估结果提示多动、冲动控制存在非常多异常项目数，建议及时干预。
 
 
           如还未就诊，建议去相关科室就诊，进一步评估
 
-          如已就诊，请按照临床医生的建议进行干预
-
-          建议：nan'
+          如已就诊，请按照临床医生的建议进行干预'
   - code: abmI7QQs
     type: first_grade
     title: 对立违抗
@@ -46136,7 +45655,7 @@
         cnt_option_contents:
         - 还算不少
         - 非常的多
-    max_score: '8'
+    max_score: 8
     interpret_rule:
       is_show: '1'
       interpretation: []
@@ -46177,10 +45696,50 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '78'
+    max_score: 78
     interpret_rule:
       is_show: '0'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '26'
+      content: '孩子基本没有多动症表现，家长可以遵照医生建议，继续观察孩子情况。 给予您一些建议希望可以帮助家长创造良好亲子关系
+
+        1、父母和孩子之间通过彼此的尊重、合作和理解改善亲子关系，使家庭充满关爱和友善
+
+        2、建立家庭代币方案，把家庭规则细化，运用积分等代币方案帮助孩子学习遵守规则和服从指令。运用扣分来改变不良行为，并在家庭内形成制度。
+
+        3、父母要注意情绪稳定，减少家庭生活中常见的冲突、争执以及动辄发怒的行为模式。'
+    - start: '27'
+      end: '52'
+      content: '孩子有一些多动症的症状表现，可以就诊后，与医生沟通孩子在学校和生活中的行为表现，听取医生建议。分享您一些关于照顾多动症孩子的建议。
+
+        1、改变心态。
+
+        多动症就像一个陪伴孩子长大的坏朋友，总是喜欢捣乱，让这些孩子的每一步进步都更艰难。建立良好的行为需要一个过程，父母保持积极的心态，才能看到孩子每一天的微小改变。
+
+        2、多渠道了解多动症以及教养技巧
+
+        便于家长理解孩子当前行为问题，多给予孩子耐心和包容，同时应用教养技巧，可以高效解决问题。
+
+        3、遵医嘱治疗方案，观察孩子情况。'
+    - start: '53'
+      end: '78'
+      content: '孩子有明显的多动症的症状表现，建议及时就诊，与医生沟通孩子在学校和生活中的行为表现，听取医生建议。为了缓解您的压力，保持身心健康，可以参考一下建议
+
+        1、转变态度和观念。
+
+        多动症的父母需要认识到；我的孩子除了要面对其他孩子一样的压力外，还在和一个很困难的发育性障碍作斗争，他很不容易，非常需要父母的帮助，我们要给予孩子更多的耐心去支持他应对学校和生活中所面临的困难
+
+        2、尝试父母共同照顾孩子。
+
+        每个人的精力有限，父母双方要共同商量如何分担照顾孩子的责任，互帮互助，彼此理解
+
+        3、改变认知角度。
+
+        父母不要盯着眼前的一次作业，一次成绩，也不要只看重孩子是否听话。健康的成长是身心的全面发展的过程，是能力、情绪管理、社交等多方面的发展。父母要相信自己孩子是有能力的，才能挖掘出孩子的闪光点，让他们有更加长远的发展'
   questions:
   - code: kd9UfMbE
     type: Section
@@ -47370,18 +46929,6 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: adhd
-  stages:
-  - screening
-  - follow_up
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  - teacher
-  tags:
-  - 共病/对立外化
 - code: nafIy4
   name: 范德比尔特ADHD评定量表（父母版）+表现
   icon: https://photo.fangcunyisheng.com/9/14/9148646174418ab27b6aab0d99d7f6ee.150_150.png
@@ -49925,251 +49472,6 @@
     max_score: '5'
     validate_rules:
       required: '1'
-  category: adhd
-  stages:
-  - deep_assessment
-  - follow_up
-  - outcome
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 功能结局/生活质量
-  - 共病/对立外化
-  - 焦虑
-  - 抑郁
-  factors:
-  - code: auto-aa5e8da33a
-    type: first_grade
-    title: 注意缺陷症状计数
-    is_total_score: '0'
-    source_codes:
-    - Rj2YRumH
-    - r2ryz01U
-    - tAMtbKiy
-    - I0bSId6O
-    - WkxDBwT9
-    - nU80n0h6
-    - v7gM7E1P
-    - 1sgqnYOL
-    - 1teovNnm
-    calc_rule:
-      formula: cnt
-      append_params:
-        cnt_option_contents:
-        - 经常
-        - 总是
-    max_score: '9'
-    interpret_rule:
-      is_show: '1'
-      interpretation:
-      - start: '0.0'
-        end: '5.0'
-        content: '风险等级：none
-
-          结论：注意缺陷症状计数未达到常用筛查阈值（< 6）。
-
-          建议：如家长/老师仍观察到明显困扰，建议结合功能受损情况与专业评估。'
-      - start: '6.0'
-        end: '9.0'
-        content: '风险等级：medium
-
-          结论：注意缺陷症状计数达到常用筛查阈值（≥ 6）。
-
-          建议：建议进一步专业评估（临床访谈/多信息源），并关注学校与家庭功能受损。'
-  - code: auto-1b34b86bb7
-    type: first_grade
-    title: 多动冲动症状计数
-    is_total_score: '0'
-    source_codes:
-    - khoR5Pm2
-    - fyEIkNC5
-    - 8zEdM3KE
-    - 66Dwj3Pf
-    - PbNw26nv
-    - AjvgnUaM
-    - OKAAXgeu
-    - ACe00sPo
-    - WgZfuyUm
-    calc_rule:
-      formula: cnt
-      append_params:
-        cnt_option_contents:
-        - 经常
-        - 总是
-    max_score: '9'
-    interpret_rule:
-      is_show: '1'
-      interpretation:
-      - start: '0.0'
-        end: '5.0'
-        content: '风险等级：none
-
-          结论：多动/冲动症状计数未达到常用筛查阈值（< 6）。
-
-          建议：如家长/老师仍观察到明显困扰，建议结合功能受损情况与专业评估。'
-      - start: '6.0'
-        end: '9.0'
-        content: '风险等级：medium
-
-          结论：多动/冲动症状计数达到常用筛查阈值（≥ 6）。
-
-          建议：建议进一步专业评估（临床访谈/多信息源），并关注学校与家庭功能受损。'
-  - code: auto-40383e09dc
-    type: first_grade
-    title: 对立违抗问题计数（ODD）
-    is_total_score: '0'
-    source_codes:
-    - Rec9o6Oh
-    - EmwNEaRi
-    - fFR22XgJ
-    - o02L4BtC
-    - FGokzuV0
-    - vJzodpb4
-    - LLj5uPNy
-    - Aro9Ob7H
-    calc_rule:
-      formula: cnt
-      append_params:
-        cnt_option_contents:
-        - 经常
-        - 总是
-    max_score: '8'
-    interpret_rule:
-      is_show: '1'
-      interpretation:
-      - start: '0.0'
-        end: '3.0'
-        content: '风险等级：none
-
-          结论：对立违抗症状计数未达到常用筛查阈值（< 4）。
-
-          建议：如家长/老师仍观察到明显困扰，建议结合功能受损情况与专业评估。'
-      - start: '4.0'
-        end: '8.0'
-        content: '风险等级：medium
-
-          结论：对立违抗症状计数达到常用筛查阈值（≥ 4）。
-
-          建议：建议进一步专业评估（临床访谈/多信息源），并关注学校与家庭功能受损。'
-  - code: auto-35a3b7a750
-    type: first_grade
-    title: 品行问题计数（CD）
-    is_total_score: '0'
-    source_codes:
-    - GEjA9PpG
-    - 5runyiUC
-    - oVJpxqKX
-    - 9CezbHn9
-    - AObIMG2F
-    - A6DVo8fV
-    - zqqEWb8e
-    - ytcnygJX
-    - UwM3km4D
-    - 5ETNh0CY
-    - 9OmoNDnT
-    - jWmQi7LT
-    - DqOq40Hs
-    - eTj69coD
-    calc_rule:
-      formula: cnt
-      append_params:
-        cnt_option_contents:
-        - 经常
-        - 总是
-    max_score: '14'
-    interpret_rule:
-      is_show: '1'
-      interpretation:
-      - start: '0.0'
-        end: '2.0'
-        content: '风险等级：none
-
-          结论：品行问题症状计数未达到常用筛查阈值（< 3）。
-
-          建议：如家长/老师仍观察到明显困扰，建议结合功能受损情况与专业评估。'
-      - start: '3.0'
-        end: '14.0'
-        content: '风险等级：medium
-
-          结论：品行问题症状计数达到常用筛查阈值（≥ 3）。
-
-          建议：建议进一步专业评估（临床访谈/多信息源），并关注学校与家庭功能受损。'
-  - code: auto-c89a486a9f
-    type: first_grade
-    title: 焦虑/抑郁问题计数
-    is_total_score: '0'
-    source_codes:
-    - nF4LxlgP
-    - Hw6LjaRX
-    - I9CFQvZQ
-    - bxZsUHE3
-    - DPH6MUTc
-    - 4SoWrkIV
-    - 1Kj5TsEB
-    calc_rule:
-      formula: cnt
-      append_params:
-        cnt_option_contents:
-        - 经常
-        - 总是
-    max_score: '7'
-    interpret_rule:
-      is_show: '1'
-      interpretation:
-      - start: '0.0'
-        end: '2.0'
-        content: '风险等级：none
-
-          结论：焦虑/抑郁症状计数未达到常用筛查阈值（< 3）。
-
-          建议：如家长/老师仍观察到明显困扰，建议结合功能受损情况与专业评估。'
-      - start: '3.0'
-        end: '7.0'
-        content: '风险等级：medium
-
-          结论：焦虑/抑郁症状计数达到常用筛查阈值（≥ 3）。
-
-          建议：建议进一步专业评估（临床访谈/多信息源），并关注学校与家庭功能受损。'
-  - code: auto-0f42a93b65
-    type: first_grade
-    title: 功能受损/表现问题计数
-    is_total_score: '0'
-    source_codes:
-    - rdaHUMSZ
-    - pAXisZCH
-    - mHEat0S2
-    - 0snkVEO7
-    - ukMbkugs
-    - PNnTFbJI
-    - 3dLD0T94
-    - tso1ie4L
-    calc_rule:
-      formula: cnt
-      append_params:
-        cnt_option_contents:
-        - 有点问题
-        - 有问题
-    max_score: '8'
-    interpret_rule:
-      is_show: '1'
-      interpretation:
-      - start: '0.0'
-        end: '0.0'
-        content: '风险等级：none
-
-          结论：未提示明显功能受损（表现问题计数=0）。
-
-          建议：可结合家校观察随访；如仍有学习/社交困扰，建议进一步评估。'
-      - start: '1.0'
-        end: '8.0'
-        content: '风险等级：high
-
-          结论：提示存在功能受损（至少1项表现为“有点问题/有问题”）。
-
-          建议：建议结合症状计数与功能受损，尽快专业评估并制定干预计划。'
 - code: pzmDuS
   name: Weiss功能缺陷量表父母版-社会活动
   description: 主要针对社会活动进行测评
@@ -50190,7 +49492,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '21'
+    max_score: 21
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -50211,24 +49513,16 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '21'
+    max_score: 21
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：结果显示孩子社交活动良好，生活中父母可以适当交给孩子一些交往技巧，但要少干涉孩子们的相处过程，尤其是当孩子之间出现矛盾时，尽量不要代为解决，可以了解具体情况后，和孩子共同商讨，适当给予建议，让孩子自己思考解决问题的办法。
-
-          建议：nan'
-      - start: '3.0'
-        end: '21.0'
-        content: '风险等级：nan
-
-          结论：结果显示孩子社交活动存在一些问题，可将情况反馈医生，听取建议，或及时寻求专业机构帮助，避免问题进一步加剧。
-
-          建议：nan'
+      - start: '3'
+        end: '21'
+        content: 结果显示孩子社交活动存在一些问题，可将情况反馈医生，听取建议，或及时寻求专业机构帮助，避免问题进一步加剧。
+      - start: '0'
+        end: '3'
+        content: 结果显示孩子社交活动良好，生活中父母可以适当交给孩子一些交往技巧，但要少干涉孩子们的相处过程，尤其是当孩子之间出现矛盾时，尽量不要代为解决，可以了解具体情况后，和孩子共同商讨，适当给予建议，让孩子自己思考解决问题的办法。
   - code: 7FYi8wDn
     type: first_grade
     title: 平均分
@@ -50244,24 +49538,16 @@
     calc_rule:
       formula: avg
       append_params: []
-    max_score: '3'
+    max_score: 3
     interpret_rule:
       is_show: '1'
       interpretation:
-      - start: '0.0'
+      - start: '0'
         end: '1.5'
-        content: '风险等级：nan
-
-          结论：暂无
-
-          建议：nan'
+        content: 暂无
       - start: '1.5'
-        end: '3.0'
-        content: '风险等级：nan
-
-          结论：孩子社交活动存在一些问题，可将情况反馈医生，听取建议，或及时寻求专业机构帮助，避免问题进一步加剧。
-
-          建议：nan'
+        end: '3'
+        content: 孩子社交活动存在一些问题，可将情况反馈医生，听取建议，或及时寻求专业机构帮助，避免问题进一步加剧。
   - code: 5iyiACLV
     type: first_grade
     title: 题目1~3+5~7：中度异常个数
@@ -50279,7 +49565,7 @@
       append_params:
         cnt_option_contents:
         - 经常
-    max_score: '6'
+    max_score: 6
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -50294,7 +49580,7 @@
       append_params:
         cnt_option_contents:
         - 有时候
-    max_score: '1'
+    max_score: 1
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -50308,7 +49594,7 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '7'
+    max_score: 7
     interpret_rule:
       is_show: '1'
       interpretation: []
@@ -50328,7 +49614,7 @@
       append_params:
         cnt_option_contents:
         - 总是或频繁
-    max_score: '6'
+    max_score: 6
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -50343,7 +49629,7 @@
       append_params:
         cnt_option_contents:
         - 从不
-    max_score: '1'
+    max_score: 1
     interpret_rule:
       is_show: '0'
       interpretation: []
@@ -50357,10 +49643,16 @@
     calc_rule:
       formula: sum
       append_params: []
-    max_score: '7'
+    max_score: 7
     interpret_rule:
       is_show: '1'
       interpretation: []
+  interpretation:
+    is_show: '1'
+    interpretation:
+    - start: '0'
+      end: '30'
+      content: Weiss-社会活动量表主要评估ADHD症状、儿童行为或情绪对其社会活动的影响程度。各条目根据“从不” “有时” “经常”“总是或频繁”分别计为 0,1,2,3分，评分越低表明儿童社会活动功能越优。
   questions:
   - code: DAyC9ay6
     type: Radio
@@ -50677,15 +49969,3 @@
     max_score: '3'
     validate_rules:
       required: '1'
-  category: qol
-  stages:
-  - follow_up
-  - outcome
-  applicableAges:
-  - school_child
-  - adolescent
-  reporters:
-  - parent
-  tags:
-  - 功能结局/生活质量
-  - 社会能力/同伴

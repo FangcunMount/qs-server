@@ -165,7 +165,9 @@ func pickQuestionnaireTitle(qc QuestionnaireConfig) string {
 
 func pickQuestionTypeForAPI(typ string, opts []OptionDTO) string {
 	if typ != "" {
-		switch strings.ToLower(strings.TrimSpace(typ)) {
+		// 统一转换为小写处理，兼容大小写
+		typLower := strings.ToLower(strings.TrimSpace(typ))
+		switch typLower {
 		case "radio":
 			return "radio"
 		case "scoreradio":
@@ -183,7 +185,8 @@ func pickQuestionTypeForAPI(typ string, opts []OptionDTO) string {
 		case "number":
 			return "number"
 		default:
-			return typ
+			// 如果无法识别，尝试直接返回小写版本
+			return typLower
 		}
 	}
 	if len(opts) == 0 {
