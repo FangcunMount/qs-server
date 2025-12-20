@@ -41,6 +41,7 @@ type Container struct {
 	ScaleModule      *assembler.ScaleModule      // Scale 模块
 	ActorModule      *assembler.ActorModule      // Actor 模块
 	EvaluationModule *assembler.EvaluationModule // Evaluation 模块（测评、得分、报告）
+	PlanModule       *assembler.PlanModule       // Plan 模块（测评计划）
 	IAMModule        *IAMModule                  // IAM 集成模块
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 

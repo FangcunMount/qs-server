@@ -72,6 +72,27 @@ definitions:
           $ref: '#/definitions/viewmodel.QuestionDTO'
         type: array
     type: object
+  request.CreatePlanRequest:
+    properties:
+      fixed_dates:
+        description: 固定日期列表（格式：YYYY-MM-DD）
+        items:
+          type: string
+        type: array
+      interval:
+        type: integer
+      relative_weeks:
+        description: 相对周次列表
+        items:
+          type: integer
+        type: array
+      scale_id:
+        type: string
+      schedule_type:
+        type: string
+      total_times:
+        type: integer
+    type: object
   request.CreateQuestionnaireRequest:
     properties:
       description:
@@ -140,6 +161,16 @@ definitions:
     - org_id
     - roles
     type: object
+  request.EnrollTesteeRequest:
+    properties:
+      plan_id:
+        type: string
+      start_date:
+        description: 格式：YYYY-MM-DD
+        type: string
+      testee_id:
+        type: string
+    type: object
   request.FactorInterpretRulesModel:
     properties:
       factor_code:
@@ -188,6 +219,16 @@ definitions:
       suggestion:
         type: string
     type: object
+  request.OpenTaskRequest:
+    properties:
+      entry_token:
+        type: string
+      entry_url:
+        type: string
+      expire_at:
+        description: 格式：YYYY-MM-DD HH:mm:ss
+        type: string
+    type: object
   request.ReorderQuestionsRequest:
     properties:
       question_codes:
@@ -201,6 +242,14 @@ definitions:
         items:
           $ref: '#/definitions/request.FactorInterpretRulesModel'
         type: array
+    type: object
+  request.ResumePlanRequest:
+    properties:
+      testee_start_dates:
+        additionalProperties:
+          type: string
+        description: 受试者ID -> 开始日期（格式：YYYY-MM-DD）
+        type: object
     type: object
   request.ScoringParamsModel:
     properties:
@@ -527,6 +576,15 @@ definitions:
         description: 风险等级
         type: string
     type: object
+  response.EnrollmentResponse:
+    properties:
+      plan_id:
+        type: string
+      tasks:
+        items:
+          $ref: '#/definitions/response.TaskResponse'
+        type: array
+    type: object
   response.FactorListResponse:
     properties:
       factors:
@@ -706,6 +764,44 @@ definitions:
         type: string
       week:
         description: 第几周（从1开始）
+        type: integer
+    type: object
+  response.PlanListResponse:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      plans:
+        items:
+          $ref: '#/definitions/response.PlanResponse'
+        type: array
+      total_count:
+        type: integer
+    type: object
+  response.PlanResponse:
+    properties:
+      fixed_dates:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      interval:
+        type: integer
+      org_id:
+        type: integer
+      relative_weeks:
+        items:
+          type: integer
+        type: array
+      scale_id:
+        type: string
+      schedule_type:
+        type: string
+      status:
+        type: string
+      total_times:
         type: integer
     type: object
   response.QuestionnaireListResponse:
@@ -1046,6 +1142,50 @@ definitions:
       label:
         type: string
       value:
+        type: string
+    type: object
+  response.TaskListResponse:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/response.TaskResponse'
+        type: array
+      total_count:
+        type: integer
+    type: object
+  response.TaskResponse:
+    properties:
+      assessment_id:
+        type: string
+      completed_at:
+        type: string
+      entry_token:
+        type: string
+      entry_url:
+        type: string
+      expire_at:
+        type: string
+      id:
+        type: string
+      open_at:
+        type: string
+      org_id:
+        type: integer
+      plan_id:
+        type: string
+      planned_at:
+        type: string
+      scale_id:
+        type: string
+      seq:
+        type: integer
+      status:
+        type: string
+      testee_id:
         type: string
     type: object
   response.TesteeListResponse:
@@ -1658,6 +1798,518 @@ paths:
       summary: 获取因子趋势
       tags:
       - Evaluation-Score
+  /api/v1/plans:
+    get:
+      description: 分页查询计划列表，支持条件筛选
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 机构ID
+        in: query
+        name: org_id
+        type: integer
+      - description: 量表ID
+        in: query
+        name: scale_id
+        type: string
+      - description: 状态
+        in: query
+        name: status
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        required: true
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanListResponse'
+              type: object
+      summary: 查询计划列表
+      tags:
+      - Plan-Query
+    post:
+      consumes:
+      - application/json
+      description: 创建新的测评计划模板，定义周期策略
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建计划请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanResponse'
+              type: object
+      summary: 创建测评计划模板
+      tags:
+      - Plan-Lifecycle
+  /api/v1/plans/{id}:
+    get:
+      description: 查询指定计划的完整信息
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanResponse'
+              type: object
+      summary: 获取计划详情
+      tags:
+      - Plan-Query
+  /api/v1/plans/{id}/cancel:
+    post:
+      description: 取消计划，不可恢复
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 取消计划
+      tags:
+      - Plan-Lifecycle
+  /api/v1/plans/{id}/pause:
+    post:
+      description: 暂停计划，取消所有未执行的任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanResponse'
+              type: object
+      summary: 暂停计划
+      tags:
+      - Plan-Lifecycle
+  /api/v1/plans/{id}/resume:
+    post:
+      consumes:
+      - application/json
+      description: 恢复计划，重新生成未完成的任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 恢复计划请求（可选）
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/request.ResumePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanResponse'
+              type: object
+      summary: 恢复计划
+      tags:
+      - Plan-Lifecycle
+  /api/v1/plans/{plan_id}/tasks:
+    get:
+      description: 查看某个计划的所有任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskListResponse'
+              type: object
+      summary: 查询计划下的所有任务
+      tags:
+      - Plan-Query
+  /api/v1/plans/{plan_id}/testees/{testee_id}/terminate:
+    post:
+      description: 受试者退出计划，取消所有待处理任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 终止受试者的计划参与
+      tags:
+      - Plan-Enrollment
+  /api/v1/plans/enroll:
+    post:
+      consumes:
+      - application/json
+      description: 将受试者加入计划，生成所有任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 加入计划请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.EnrollTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.EnrollmentResponse'
+              type: object
+      summary: 受试者加入计划
+      tags:
+      - Plan-Enrollment
+  /api/v1/plans/tasks:
+    get:
+      description: 分页查询任务列表，支持条件筛选
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 计划ID
+        in: query
+        name: plan_id
+        type: string
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        type: string
+      - description: 状态
+        in: query
+        name: status
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        required: true
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskListResponse'
+              type: object
+      summary: 查询任务列表
+      tags:
+      - Plan-Query
+  /api/v1/plans/tasks/{id}:
+    get:
+      description: 查询指定任务的完整信息
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskResponse'
+              type: object
+      summary: 获取任务详情
+      tags:
+      - Plan-Query
+  /api/v1/plans/tasks/{id}/cancel:
+    post:
+      description: 手动取消任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 取消任务
+      tags:
+      - Task-Management
+  /api/v1/plans/tasks/{id}/complete:
+    post:
+      description: 用户完成测评后，更新任务状态
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 测评ID
+        in: query
+        name: assessment_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskResponse'
+              type: object
+      summary: 完成任务
+      tags:
+      - Task-Management
+  /api/v1/plans/tasks/{id}/expire:
+    post:
+      description: 定时任务调用，标记已过期的任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskResponse'
+              type: object
+      summary: 过期任务
+      tags:
+      - Task-Management
+  /api/v1/plans/tasks/{id}/open:
+    post:
+      consumes:
+      - application/json
+      description: 手动开放任务，生成入口
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 开放任务请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.OpenTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskResponse'
+              type: object
+      summary: 开放任务
+      tags:
+      - Task-Management
+  /api/v1/plans/tasks/schedule:
+    post:
+      description: 定时任务调用，扫描待推送任务，生成入口并开放
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间
+        in: query
+        name: before
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskListResponse'
+              type: object
+      summary: 调度待推送任务
+      tags:
+      - Task-Scheduler
   /api/v1/public/questionnaires:
     get:
       consumes:
@@ -3036,6 +3688,98 @@ paths:
       summary: 获取受试者量表分析结果
       tags:
       - Testee
+  /api/v1/testees/{testee_id}/plans:
+    get:
+      description: 查看某个受试者参与的所有计划
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.PlanListResponse'
+              type: object
+      summary: 查询受试者参与的所有计划
+      tags:
+      - Plan-Query
+  /api/v1/testees/{testee_id}/plans/{plan_id}/tasks:
+    get:
+      description: 查看某个受试者在某个计划下的所有任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: testee_id
+        required: true
+        type: string
+      - description: 计划ID
+        in: path
+        name: plan_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskListResponse'
+              type: object
+      summary: 查询受试者在某个计划下的所有任务
+      tags:
+      - Plan-Query
+  /api/v1/testees/{testee_id}/tasks:
+    get:
+      description: 查看某个受试者的所有任务
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: testee_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskListResponse'
+              type: object
+      summary: 查询受试者的所有任务
+      tags:
+      - Plan-Query
   /health:
     get:
       description: 检查 API Server 健康状态

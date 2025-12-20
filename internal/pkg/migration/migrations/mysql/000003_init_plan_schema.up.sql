@@ -1,0 +1,65 @@
+-- 创建测评计划表
+CREATE TABLE IF NOT EXISTS `assessment_plan` (
+  `id` BIGINT UNSIGNED NOT NULL PRIMARY KEY COMMENT '计划ID',
+  `org_id` BIGINT NOT NULL COMMENT '组织ID',
+  `scale_id` BIGINT UNSIGNED NOT NULL COMMENT '量表ID',
+  `schedule_type` VARCHAR(50) NOT NULL COMMENT '周期类型：by_week/by_day/fixed_date/custom',
+  `interval` INT NOT NULL DEFAULT 0 COMMENT '间隔（周/天）',
+  `total_times` INT NOT NULL COMMENT '总次数',
+  `fixed_dates` JSON COMMENT '固定日期列表（JSON数组，格式：["YYYY-MM-DD"]）',
+  `relative_weeks` JSON COMMENT '相对周次列表（JSON数组，格式：[2,4,8,12]）',
+  `status` VARCHAR(50) NOT NULL DEFAULT 'active' COMMENT '状态：active/paused/finished/canceled',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+  `deleted_at` DATETIME(3) NULL DEFAULT NULL COMMENT '删除时间（软删除）',
+  `created_by` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
+  `updated_by` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
+  `deleted_by` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
+  `version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '乐观锁版本号',
+  INDEX `idx_org_id` (`org_id`),
+  INDEX `idx_scale_id` (`scale_id`),
+  INDEX `idx_schedule_type` (`schedule_type`),
+  INDEX `idx_status` (`status`),
+  INDEX `idx_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测评计划表';
+
+-- 创建测评任务表
+CREATE TABLE IF NOT EXISTS `assessment_task` (
+  `id` BIGINT UNSIGNED NOT NULL PRIMARY KEY COMMENT '任务ID',
+  `plan_id` BIGINT UNSIGNED NOT NULL COMMENT '计划ID',
+  `seq` INT NOT NULL COMMENT '序号（计划内的第N次测评）',
+  `org_id` BIGINT NOT NULL COMMENT '组织ID（冗余，用于查询优化和权限控制）',
+  `testee_id` BIGINT UNSIGNED NOT NULL COMMENT '受试者ID',
+  `scale_id` BIGINT UNSIGNED NOT NULL COMMENT '量表ID（冗余，用于查询优化）',
+  `planned_at` DATETIME(3) NOT NULL COMMENT '计划时间点',
+  `open_at` DATETIME(3) NULL DEFAULT NULL COMMENT '实际开放时间',
+  `expire_at` DATETIME(3) NULL DEFAULT NULL COMMENT '截止时间',
+  `completed_at` DATETIME(3) NULL DEFAULT NULL COMMENT '完成时间',
+  `status` VARCHAR(50) NOT NULL DEFAULT 'pending' COMMENT '状态：pending/opened/completed/expired/canceled',
+  `assessment_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '关联的测评ID',
+  `entry_token` VARCHAR(255) NULL DEFAULT NULL COMMENT '入口令牌',
+  `entry_url` VARCHAR(500) NULL DEFAULT NULL COMMENT '入口URL',
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+  `deleted_at` DATETIME(3) NULL DEFAULT NULL COMMENT '删除时间（软删除）',
+  `created_by` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人ID',
+  `updated_by` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '更新人ID',
+  `deleted_by` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '删除人ID',
+  `version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '乐观锁版本号',
+  INDEX `idx_plan_id` (`plan_id`),
+  INDEX `idx_plan_seq` (`plan_id`, `seq`),
+  INDEX `idx_org_id` (`org_id`),
+  INDEX `idx_testee_id` (`testee_id`),
+  INDEX `idx_scale_id` (`scale_id`),
+  INDEX `idx_planned_at` (`planned_at`),
+  INDEX `idx_open_at` (`open_at`),
+  INDEX `idx_expire_at` (`expire_at`),
+  INDEX `idx_status` (`status`),
+  INDEX `idx_assessment_id` (`assessment_id`),
+  INDEX `idx_deleted_at` (`deleted_at`),
+  -- 复合索引：计划ID + 受试者ID + 序号（用于查询某个受试者在某个计划下的任务）
+  INDEX `idx_plan_testee_seq` (`plan_id`, `testee_id`, `seq`),
+  -- 唯一索引：确保 assessment_id 唯一（一个测评只能关联一个任务）
+  UNIQUE KEY `uk_assessment_id` (`assessment_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测评任务表';
+

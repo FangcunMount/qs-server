@@ -179,6 +179,50 @@ events:
     consumers:
       - statistics-service
 
+  # --------------------------------------------------------------------------
+  # Plan 领域
+  # --------------------------------------------------------------------------
+  plan.created:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "计划已创建"
+    handler: plan_created_handler
+    consumers:
+      - qs-worker
+      - statistics-service
+
+  task.opened:
+    topic: task-lifecycle
+    aggregate: AssessmentTask
+    domain: plan
+    description: "任务已开放"
+    handler: task_opened_handler
+    consumers:
+      - qs-worker  # 发送通知
+      - statistics-service  # 更新统计
+
+  task.completed:
+    topic: task-lifecycle
+    aggregate: AssessmentTask
+    domain: plan
+    description: "任务已完成"
+    handler: task_completed_handler
+    consumers:
+      - qs-worker  # 发送通知、触发报告生成
+      - statistics-service  # 更新统计
+      - alert-service  # 检查风险等级
+
+  task.expired:
+    topic: task-lifecycle
+    aggregate: AssessmentTask
+    domain: plan
+    description: "任务已过期"
+    handler: task_expired_handler
+    consumers:
+      - qs-worker  # 发送通知
+      - statistics-service  # 更新统计
+
 # ============================================================================
 # 处理器定义
 # ============================================================================
@@ -235,3 +279,19 @@ handlers:
   report_exported_handler:
     package: report
     description: "处理报告导出事件"
+
+  plan_created_handler:
+    package: plan
+    description: "处理计划创建事件，更新统计指标"
+
+  task_opened_handler:
+    package: plan
+    description: "处理任务开放事件，发送通知给受试者"
+
+  task_completed_handler:
+    package: plan
+    description: "处理任务完成事件，更新统计、发送通知、触发报告生成"
+
+  task_expired_handler:
+    package: plan
+    description: "处理任务过期事件，更新统计、发送通知"
