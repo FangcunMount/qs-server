@@ -35,6 +35,28 @@ topics:
         initial_interval: 500ms
         max_interval: 1m
 
+  plan-lifecycle:
+    name: "plan.lifecycle"
+    description: "测评计划生命周期事件"
+    consumer:
+      group: "qs-worker"
+      concurrency: 2
+      retry:
+        max_attempts: 3
+        initial_interval: 1s
+        max_interval: 30s
+
+  task-lifecycle:
+    name: "task.lifecycle"
+    description: "测评任务生命周期事件"
+    consumer:
+      group: "qs-worker"
+      concurrency: 4
+      retry:
+        max_attempts: 5
+        initial_interval: 500ms
+        max_interval: 1m
+
 # ============================================================================
 # 事件定义
 # ============================================================================
