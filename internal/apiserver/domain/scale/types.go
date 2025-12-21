@@ -276,8 +276,11 @@ func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, st
 		"params_type", getTypeName(params),
 	)
 
-	if params == nil {
-		logger.L(ctx).Warnw("ScoringParamsFromMap: params is nil")
+	// 处理 nil 或空 map 的情况
+	if params == nil || len(params) == 0 {
+		logger.L(ctx).Debugw("ScoringParamsFromMap: params is nil or empty",
+			"strategy", strategy,
+		)
 		return NewScoringParams()
 	}
 

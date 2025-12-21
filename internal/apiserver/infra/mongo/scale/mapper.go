@@ -227,7 +227,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	strategy := scale.ScoringStrategyCode(po.ScoringStrategy)
 	if strategy == scale.ScoringStrategyCnt {
 		if scoringParams == nil || len(scoringParams.GetCntOptionContents()) == 0 {
-			logger.L(ctx).Errorw("mapFactorToDomain: cnt strategy requires non-empty cnt_option_contents",
+			logger.L(ctx).Warnw("mapFactorToDomain: cnt strategy requires non-empty cnt_option_contents, skipping factor",
 				"factor_code", po.Code,
 				"scoring_params", po.ScoringParams,
 			)
