@@ -4743,6 +4743,10 @@ const docTemplate = `{
                     "description": "因子名称",
                     "type": "string"
                 },
+                "max_score": {
+                    "description": "最大分",
+                    "type": "number"
+                },
                 "raw_score": {
                     "description": "原始分",
                     "type": "number"

@@ -1658,6 +1658,9 @@ const docTemplate = `{
                 "factor_name": {
                     "type": "string"
                 },
+                "max_score": {
+                    "type": "number"
+                },
                 "raw_score": {
                     "type": "number"
                 },

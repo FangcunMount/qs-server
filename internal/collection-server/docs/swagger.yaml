@@ -185,6 +185,8 @@ definitions:
         type: string
       factor_name:
         type: string
+      max_score:
+        type: number
       raw_score:
         type: number
       risk_level:
