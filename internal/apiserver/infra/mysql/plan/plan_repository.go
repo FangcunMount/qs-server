@@ -75,11 +75,12 @@ func (r *planRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID)
 	var pos []*AssessmentPlanPO
 
 	// 使用 JOIN 查询，通过 Task 表关联 Plan 表
+	// 明确选择 assessment_plan 的所有字段，并使用 DISTINCT 去重
 	err := r.WithContext(ctx).
 		Table("assessment_plan").
+		Select("DISTINCT assessment_plan.*").
 		Joins("INNER JOIN assessment_task ON assessment_plan.id = assessment_task.plan_id").
 		Where("assessment_task.testee_id = ? AND assessment_plan.deleted_at IS NULL AND assessment_task.deleted_at IS NULL", testeeID.Uint64()).
-		Distinct("assessment_plan.id").
 		Find(&pos).Error
 
 	if err != nil {
