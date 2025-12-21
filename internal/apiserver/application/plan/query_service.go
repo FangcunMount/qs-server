@@ -45,11 +45,32 @@ func (s *queryService) GetPlan(ctx context.Context, planID string) (*PlanResult,
 
 // ListPlans 查询计划列表
 func (s *queryService) ListPlans(ctx context.Context, dto ListPlansDTO) (*PlanListResult, error) {
-	// TODO: 实现分页查询逻辑
-	// 目前先返回空列表，等待仓储层实现分页查询方法
+	// 1. 验证分页参数
+	if dto.Page <= 0 {
+		dto.Page = 1
+	}
+	if dto.PageSize <= 0 {
+		dto.PageSize = 10
+	}
+	if dto.PageSize > 100 {
+		dto.PageSize = 100 // 限制最大每页数量
+	}
+
+	// 2. 查询计划列表
+	plans, total, err := s.planRepo.FindList(ctx, dto.OrgID, dto.ScaleCode, dto.Status, dto.Page, dto.PageSize)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询计划列表失败")
+	}
+
+	// 3. 转换为结果
+	items := make([]*PlanResult, 0, len(plans))
+	for _, plan := range plans {
+		items = append(items, toPlanResult(plan))
+	}
+
 	return &PlanListResult{
-		Items:    []*PlanResult{},
-		Total:    0,
+		Items:    items,
+		Total:    total,
 		Page:     dto.Page,
 		PageSize: dto.PageSize,
 	}, nil

@@ -22,6 +22,9 @@ type AssessmentPlanRepository interface {
 	// 实现方式：通过 Task 反查 Plan，返回去重后的 Plan 列表
 	FindByTesteeID(ctx context.Context, testeeID testee.ID) ([]*AssessmentPlan, error)
 
+	// FindList 分页查询计划列表（支持条件筛选）
+	FindList(ctx context.Context, orgID int64, scaleCode string, status string, page, pageSize int) ([]*AssessmentPlan, int64, error)
+
 	// Save 保存计划
 	Save(ctx context.Context, plan *AssessmentPlan) error
 }
