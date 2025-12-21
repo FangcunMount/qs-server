@@ -2,10 +2,12 @@ package assessment
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -64,28 +66,103 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 
 	l.Debugw("查询测评列表",
 		"action", "list_assessments",
+		"org_id", dto.OrgID,
 		"page", dto.Page,
 		"page_size", dto.PageSize,
+		"conditions", dto.Conditions,
 	)
 
-	// TODO: 实现复杂的条件查询
-	// 当前先返回空列表，等仓储实现完善后再补充
+	var assessments []*assessment.Assessment
+	var total int64
+	var err error
+
+	// 构建分页参数
+	pagination := assessment.NewPagination(dto.Page, dto.PageSize)
+
+	// 如果有 testee_id 条件，使用 FindByTesteeID 查询
+	if testeeIDStr, ok := dto.Conditions["testee_id"]; ok && testeeIDStr != "" {
+		testeeIDUint, parseErr := strconv.ParseUint(testeeIDStr, 10, 64)
+		if parseErr != nil {
+			l.Errorw("解析受试者ID失败",
+				"testee_id", testeeIDStr,
+				"error", parseErr.Error(),
+			)
+			return nil, errors.WrapC(parseErr, errorCode.ErrAssessmentNotFound, "无效的受试者ID")
+		}
+
+		testeeID := testee.NewID(testeeIDUint)
+		assessments, total, err = s.repo.FindByTesteeID(ctx, testeeID, pagination)
+		if err != nil {
+			l.Errorw("查询受试者测评列表失败",
+				"testee_id", testeeIDStr,
+				"error", err.Error(),
+			)
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
+		}
+	} else {
+		// 如果没有 testee_id，暂时返回空列表
+		l.Warnw("未提供 testee_id，暂不支持按 orgID 查询",
+			"org_id", dto.OrgID,
+		)
+		assessments = make([]*assessment.Assessment, 0)
+		total = 0
+	}
+
+	// 过滤结果：按 orgID 和 status 过滤
+	filteredAssessments := make([]*assessment.Assessment, 0)
+	for _, a := range assessments {
+		// 过滤 orgID
+		if dto.OrgID > 0 && uint64(a.OrgID()) != dto.OrgID {
+			continue
+		}
+
+		// 过滤 status
+		if statusStr, ok := dto.Conditions["status"]; ok && statusStr != "" {
+			expectedStatus := assessment.Status(statusStr)
+			if !expectedStatus.IsValid() {
+				l.Warnw("无效的状态值",
+					"status", statusStr,
+				)
+				continue
+			}
+			if a.Status() != expectedStatus {
+				continue
+			}
+		}
+
+		filteredAssessments = append(filteredAssessments, a)
+	}
+
+	// 转换结果
+	results := make([]*AssessmentResult, 0, len(filteredAssessments))
+	for _, a := range filteredAssessments {
+		results = append(results, toAssessmentResult(a))
+	}
+
+	// 计算总页数
+	totalPages := int((total + int64(dto.PageSize) - 1) / int64(dto.PageSize))
+	if totalPages == 0 && total > 0 {
+		totalPages = 1
+	}
+
 	duration := time.Since(startTime)
 	l.Debugw("查询测评列表成功",
 		"action", "list_assessments",
 		"result", "success",
+		"org_id", dto.OrgID,
 		"page", dto.Page,
 		"page_size", dto.PageSize,
-		"total_count", 0,
+		"total_count", len(results),
+		"total", total,
 		"duration_ms", duration.Milliseconds(),
 	)
 
 	return &AssessmentListResult{
-		Items:      make([]*AssessmentResult, 0),
-		Total:      0,
+		Items:      results,
+		Total:      int(total),
 		Page:       dto.Page,
 		PageSize:   dto.PageSize,
-		TotalPages: 0,
+		TotalPages: totalPages,
 	}, nil
 }
 
