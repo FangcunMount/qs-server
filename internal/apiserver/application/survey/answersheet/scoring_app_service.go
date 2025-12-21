@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -78,7 +79,7 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 	}
 
 	l.Debugw("分数计算完成", "answersheet_id", answerSheetID, "total_score", scoredSheet.TotalScore, "scored_answer_count", len(scoredSheet.ScoredAnswers))
-	
+
 	// 调试：如果总分为0，记录每个答案的分数详情
 	if scoredSheet.TotalScore == 0 && len(scoredSheet.ScoredAnswers) > 0 {
 		for _, scoredAns := range scoredSheet.ScoredAnswers {
@@ -103,10 +104,19 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 						break
 					}
 				}
+				// 检查答案值是否在选项分数映射中
+				answerValueStr, isString := answerValue.(string)
+				matched := false
+				if isString && answerValueStr != "" {
+					_, matched = optionScores[answerValueStr]
+				}
+
 				l.Debugw("答案分数为0的详情",
 					"question_code", scoredAns.QuestionCode,
 					"answer_value", answerValue,
+					"answer_value_type", fmt.Sprintf("%T", answerValue),
 					"option_scores", optionScores,
+					"matched", matched,
 					"score", scoredAns.Score)
 			}
 		}

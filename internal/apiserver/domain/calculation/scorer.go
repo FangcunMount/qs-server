@@ -26,14 +26,10 @@ func (s *OptionScorer) Score(value ScorableValue, optionScores map[string]float6
 		if score, found := optionScores[selected]; found {
 			return score
 		}
-		// 调试：记录未找到选项的情况
-		if len(optionScores) > 0 {
-			// 只在开发/调试模式下记录，避免生产环境日志过多
-			// 这里暂时注释掉，如果需要调试可以取消注释
-			// logger.L(context.Background()).Debugw("Option not found in score map",
-			// 	"selected_option", selected,
-			// 	"available_options", getKeys(optionScores))
-		}
+		// 未找到匹配的选项编码，返回0
+		// 注意：这通常意味着答案值（选项ID）与选项编码不匹配
+		// 可能原因：前端提交的是选项ID而非选项编码，或选项编码已变更
+		return 0
 	}
 
 	// 尝试作为多选计分（累加所有选中选项的分数）
