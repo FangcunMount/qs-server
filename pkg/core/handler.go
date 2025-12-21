@@ -135,6 +135,13 @@ func (h *BaseHandler) ConflictResponse(c *gin.Context, message string, err error
 // BindJSON 绑定JSON参数
 func (h *BaseHandler) BindJSON(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindJSON(obj); err != nil {
+		logger.L(c.Request.Context()).Errorw("BindJSON failed",
+			"action", "bind_json",
+			"path", c.Request.URL.Path,
+			"method", c.Request.Method,
+			"content_type", c.ContentType(),
+			"error", err.Error(),
+		)
 		h.BadRequestResponse(c, "JSON参数绑定失败", err)
 		return err
 	}

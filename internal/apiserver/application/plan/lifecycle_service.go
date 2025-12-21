@@ -43,111 +43,255 @@ func NewLifecycleService(
 
 // CreatePlan 创建测评计划模板
 func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*PlanResult, error) {
-	logger.L(ctx).Infow("Creating assessment plan",
+	logger.L(ctx).Infow("CreatePlan service started",
 		"action", "create_plan",
 		"org_id", dto.OrgID,
 		"scale_id", dto.ScaleID,
 		"schedule_type", dto.ScheduleType,
 		"interval", dto.Interval,
 		"total_times", dto.TotalTimes,
+		"fixed_dates", dto.FixedDates,
+		"relative_weeks", dto.RelativeWeeks,
 	)
 
 	// 1. 转换参数
+	logger.L(ctx).Infow("CreatePlan converting scale_id",
+		"action", "create_plan",
+		"scale_id", dto.ScaleID,
+	)
 	scaleID, err := toScaleID(dto.ScaleID)
 	if err != nil {
-		logger.L(ctx).Errorw("Invalid scale ID",
+		logger.L(ctx).Errorw("CreatePlan invalid scale ID",
 			"action", "create_plan",
 			"scale_id", dto.ScaleID,
 			"error", err.Error(),
 		)
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的量表ID: %v", err)
 	}
+	logger.L(ctx).Infow("CreatePlan scale_id converted",
+		"action", "create_plan",
+		"scale_id_parsed", scaleID.String(),
+	)
 
+	logger.L(ctx).Infow("CreatePlan converting schedule_type",
+		"action", "create_plan",
+		"schedule_type", dto.ScheduleType,
+	)
 	scheduleType := toPlanScheduleType(dto.ScheduleType)
+	logger.L(ctx).Infow("CreatePlan schedule_type converted",
+		"action", "create_plan",
+		"schedule_type_parsed", string(scheduleType),
+	)
 
 	// 转换固定日期列表
 	var fixedDates []time.Time
 	if len(dto.FixedDates) > 0 {
+		logger.L(ctx).Infow("CreatePlan parsing fixed_dates",
+			"action", "create_plan",
+			"fixed_dates_count", len(dto.FixedDates),
+			"fixed_dates", dto.FixedDates,
+		)
 		fixedDates = make([]time.Time, 0, len(dto.FixedDates))
-		for _, dateStr := range dto.FixedDates {
+		for i, dateStr := range dto.FixedDates {
+			logger.L(ctx).Infow("CreatePlan parsing fixed_date",
+				"action", "create_plan",
+				"index", i,
+				"date_str", dateStr,
+			)
 			date, err := parseDate(dateStr)
 			if err != nil {
+				logger.L(ctx).Errorw("CreatePlan invalid date format",
+					"action", "create_plan",
+					"index", i,
+					"date_str", dateStr,
+					"error", err.Error(),
+				)
 				return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的日期格式: %s", dateStr)
 			}
 			fixedDates = append(fixedDates, date)
+			logger.L(ctx).Infow("CreatePlan fixed_date parsed",
+				"action", "create_plan",
+				"index", i,
+				"date", date.Format("2006-01-02"),
+			)
 		}
+		logger.L(ctx).Infow("CreatePlan all fixed_dates parsed",
+			"action", "create_plan",
+			"fixed_dates_count", len(fixedDates),
+		)
 	}
 
 	// 2. 根据 schedule_type 确定 totalTimes
 	// 对于 custom 和 fixed_date 类型，totalTimes 应该从对应的数组长度推导
 	totalTimes := dto.TotalTimes
+	logger.L(ctx).Infow("CreatePlan calculating total_times",
+		"action", "create_plan",
+		"initial_total_times", totalTimes,
+		"schedule_type", scheduleType,
+	)
 	switch scheduleType {
 	case plan.PlanScheduleCustom:
 		if len(dto.RelativeWeeks) > 0 {
 			totalTimes = len(dto.RelativeWeeks)
+			logger.L(ctx).Infow("CreatePlan total_times from relative_weeks",
+				"action", "create_plan",
+				"total_times", totalTimes,
+				"relative_weeks_count", len(dto.RelativeWeeks),
+			)
 		}
 	case plan.PlanScheduleFixedDate:
 		if len(fixedDates) > 0 {
 			totalTimes = len(fixedDates)
+			logger.L(ctx).Infow("CreatePlan total_times from fixed_dates",
+				"action", "create_plan",
+				"total_times", totalTimes,
+				"fixed_dates_count", len(fixedDates),
+			)
 		}
 	}
+	logger.L(ctx).Infow("CreatePlan total_times calculated",
+		"action", "create_plan",
+		"final_total_times", totalTimes,
+	)
 
 	// 3. 验证参数（使用计算后的 totalTimes）
+	logger.L(ctx).Infow("CreatePlan validating parameters",
+		"action", "create_plan",
+		"org_id", dto.OrgID,
+		"scale_id", scaleID.String(),
+		"schedule_type", string(scheduleType),
+		"interval", dto.Interval,
+		"total_times", totalTimes,
+		"fixed_dates_count", len(fixedDates),
+		"relative_weeks_count", len(dto.RelativeWeeks),
+	)
 	if errs := s.validator.ValidateForCreation(dto.OrgID, scaleID, scheduleType, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
-		logger.L(ctx).Errorw("Validation failed for plan creation",
+		logger.L(ctx).Errorw("CreatePlan validation failed",
 			"action", "create_plan",
 			"org_id", dto.OrgID,
-			"errors", errs,
+			"validation_errors", errs,
+			"errors_count", len(errs),
 		)
+		for i, err := range errs {
+			logger.L(ctx).Errorw("CreatePlan validation error detail",
+				"action", "create_plan",
+				"error_index", i,
+				"field", err.Field,
+				"message", err.Message,
+			)
+		}
 		return nil, plan.ToError(errs)
 	}
+	logger.L(ctx).Infow("CreatePlan validation passed",
+		"action", "create_plan",
+	)
 
 	// 4. 创建计划选项
+	logger.L(ctx).Infow("CreatePlan building plan options",
+		"action", "create_plan",
+		"has_fixed_dates", len(fixedDates) > 0,
+		"has_relative_weeks", len(dto.RelativeWeeks) > 0,
+	)
 	var opts []plan.PlanOption
 	if len(fixedDates) > 0 {
 		opts = append(opts, plan.WithFixedDates(fixedDates))
+		logger.L(ctx).Infow("CreatePlan added fixed_dates option",
+			"action", "create_plan",
+			"fixed_dates_count", len(fixedDates),
+		)
 	}
 	if len(dto.RelativeWeeks) > 0 {
 		opts = append(opts, plan.WithRelativeWeeks(dto.RelativeWeeks))
+		logger.L(ctx).Infow("CreatePlan added relative_weeks option",
+			"action", "create_plan",
+			"relative_weeks_count", len(dto.RelativeWeeks),
+		)
 	}
+	logger.L(ctx).Infow("CreatePlan plan options built",
+		"action", "create_plan",
+		"options_count", len(opts),
+	)
 
 	// 5. 创建计划领域对象
+	logger.L(ctx).Infow("CreatePlan creating domain object",
+		"action", "create_plan",
+		"org_id", dto.OrgID,
+		"scale_id", scaleID.String(),
+		"schedule_type", string(scheduleType),
+		"interval", dto.Interval,
+		"total_times", totalTimes,
+	)
 	p, err := plan.NewAssessmentPlan(dto.OrgID, scaleID, scheduleType, dto.Interval, totalTimes, opts...)
 	if err != nil {
-		logger.L(ctx).Errorw("Failed to create plan domain object",
+		logger.L(ctx).Errorw("CreatePlan failed to create domain object",
 			"action", "create_plan",
 			"org_id", dto.OrgID,
+			"scale_id", scaleID.String(),
+			"schedule_type", string(scheduleType),
+			"interval", dto.Interval,
+			"total_times", totalTimes,
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建计划失败")
 	}
+	logger.L(ctx).Infow("CreatePlan domain object created",
+		"action", "create_plan",
+		"plan_id", p.GetID().String(),
+	)
 
-	// 5. 持久化
+	// 6. 持久化
+	logger.L(ctx).Infow("CreatePlan saving to repository",
+		"action", "create_plan",
+		"plan_id", p.GetID().String(),
+	)
 	if err := s.planRepo.Save(ctx, p); err != nil {
-		logger.L(ctx).Errorw("Failed to save plan",
+		logger.L(ctx).Errorw("CreatePlan failed to save plan",
 			"action", "create_plan",
 			"plan_id", p.GetID().String(),
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
 	}
+	logger.L(ctx).Infow("CreatePlan plan saved",
+		"action", "create_plan",
+		"plan_id", p.GetID().String(),
+	)
 
-	// 6. 发布领域事件
+	// 7. 发布领域事件
 	events := p.Events()
 	eventCount := len(events)
-	for _, evt := range events {
+	logger.L(ctx).Infow("CreatePlan publishing events",
+		"action", "create_plan",
+		"plan_id", p.GetID().String(),
+		"events_count", eventCount,
+	)
+	for i, evt := range events {
+		logger.L(ctx).Infow("CreatePlan publishing event",
+			"action", "create_plan",
+			"plan_id", p.GetID().String(),
+			"event_index", i,
+			"event_type", evt.EventType(),
+		)
 		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish plan event",
+			logger.L(ctx).Errorw("CreatePlan failed to publish event",
 				"action", "create_plan",
 				"plan_id", p.GetID().String(),
+				"event_index", i,
 				"event_type", evt.EventType(),
 				"error", err.Error(),
+			)
+		} else {
+			logger.L(ctx).Infow("CreatePlan event published",
+				"action", "create_plan",
+				"plan_id", p.GetID().String(),
+				"event_index", i,
+				"event_type", evt.EventType(),
 			)
 		}
 	}
 	p.ClearEvents()
 
-	logger.L(ctx).Infow("Plan created successfully",
+	logger.L(ctx).Infow("CreatePlan completed successfully",
 		"action", "create_plan",
 		"plan_id", p.GetID().String(),
 		"org_id", dto.OrgID,

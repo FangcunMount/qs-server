@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"bytes"
+	"io"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -52,45 +55,142 @@ func NewPlanHandler(
 // @Success 200 {object} core.Response{data=response.PlanResponse}
 // @Router /api/v1/plans [post]
 func (h *PlanHandler) CreatePlan(c *gin.Context) {
-	var req request.CreatePlanRequest
-	if err := h.BindJSON(c, &req); err != nil {
-		h.Error(c, err)
-		return
+	ctx := c.Request.Context()
+	logger.L(ctx).Infow("CreatePlan handler started",
+		"action", "create_plan",
+		"method", c.Request.Method,
+		"path", c.Request.URL.Path,
+		"content_type", c.ContentType(),
+		"content_length", c.Request.ContentLength,
+	)
+
+	// 记录原始请求体（用于调试）
+	if c.Request.Body != nil {
+		rawBody, _ := io.ReadAll(c.Request.Body)
+		if len(rawBody) > 0 {
+			logger.L(ctx).Infow("CreatePlan raw request body",
+				"action", "create_plan",
+				"raw_body", string(rawBody),
+			)
+			// 重新设置 Body，因为 ReadAll 会消费掉
+			c.Request.Body = io.NopCloser(bytes.NewReader(rawBody))
+		}
 	}
-	if ok, err := govalidator.ValidateStruct(req); !ok {
+
+	var req request.CreatePlanRequest
+	logger.L(ctx).Infow("CreatePlan binding JSON",
+		"action", "create_plan",
+	)
+	if err := h.BindJSON(c, &req); err != nil {
+		logger.L(ctx).Errorw("CreatePlan BindJSON failed",
+			"action", "create_plan",
+			"error", err.Error(),
+		)
 		h.Error(c, err)
 		return
 	}
 
+	logger.L(ctx).Infow("CreatePlan request parsed",
+		"action", "create_plan",
+		"scale_id", req.ScaleID,
+		"schedule_type", req.ScheduleType,
+		"interval", req.Interval,
+		"total_times", req.TotalTimes,
+		"fixed_dates", req.FixedDates,
+		"relative_weeks", req.RelativeWeeks,
+	)
+
+	logger.L(ctx).Infow("CreatePlan validating struct",
+		"action", "create_plan",
+	)
+	if ok, err := govalidator.ValidateStruct(req); !ok {
+		logger.L(ctx).Errorw("CreatePlan validation failed",
+			"action", "create_plan",
+			"validation_error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	logger.L(ctx).Infow("CreatePlan validation passed",
+		"action", "create_plan",
+	)
+
 	// 获取组织ID（从 JWT 中提取）
-	orgID := int64(h.GetOrgID(c))
+	orgIDUint64 := h.GetOrgID(c)
+	orgID := int64(orgIDUint64)
+	logger.L(ctx).Infow("CreatePlan got orgID",
+		"action", "create_plan",
+		"org_id_uint64", orgIDUint64,
+		"org_id_int64", orgID,
+	)
 	if orgID == 0 {
+		logger.L(ctx).Errorw("CreatePlan orgID is empty",
+			"action", "create_plan",
+		)
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "组织ID不能为空"))
 		return
 	}
 
 	// 根据 schedule_type 验证必需的参数
+	logger.L(ctx).Infow("CreatePlan validating schedule_type",
+		"action", "create_plan",
+		"schedule_type", req.ScheduleType,
+	)
 	switch req.ScheduleType {
 	case "by_week", "by_day":
+		logger.L(ctx).Infow("CreatePlan validating by_week/by_day params",
+			"action", "create_plan",
+			"interval", req.Interval,
+			"total_times", req.TotalTimes,
+		)
 		if req.Interval <= 0 {
+			logger.L(ctx).Errorw("CreatePlan interval invalid",
+				"action", "create_plan",
+				"interval", req.Interval,
+			)
 			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "by_week/by_day 类型需要 interval 参数且必须大于0"))
 			return
 		}
 		if req.TotalTimes <= 0 {
+			logger.L(ctx).Errorw("CreatePlan total_times invalid",
+				"action", "create_plan",
+				"total_times", req.TotalTimes,
+			)
 			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "by_week/by_day 类型需要 total_times 参数且必须大于0"))
 			return
 		}
 	case "fixed_date":
+		logger.L(ctx).Infow("CreatePlan validating fixed_date params",
+			"action", "create_plan",
+			"fixed_dates_count", len(req.FixedDates),
+			"fixed_dates", req.FixedDates,
+		)
 		if len(req.FixedDates) == 0 {
+			logger.L(ctx).Errorw("CreatePlan fixed_dates empty",
+				"action", "create_plan",
+			)
 			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "fixed_date 类型需要 fixed_dates 参数且不能为空"))
 			return
 		}
 	case "custom":
+		logger.L(ctx).Infow("CreatePlan validating custom params",
+			"action", "create_plan",
+			"relative_weeks_count", len(req.RelativeWeeks),
+			"relative_weeks", req.RelativeWeeks,
+		)
 		if len(req.RelativeWeeks) == 0 {
+			logger.L(ctx).Errorw("CreatePlan relative_weeks empty",
+				"action", "create_plan",
+			)
 			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "custom 类型需要 relative_weeks 参数且不能为空"))
 			return
 		}
 	default:
+		logger.L(ctx).Errorw("CreatePlan invalid schedule_type",
+			"action", "create_plan",
+			"schedule_type", req.ScheduleType,
+		)
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "无效的 schedule_type: %s，支持的类型: by_week, by_day, fixed_date, custom", req.ScheduleType))
 		return
 	}
@@ -105,17 +205,29 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		RelativeWeeks: req.RelativeWeeks,
 	}
 
-	result, err := h.lifecycleService.CreatePlan(c.Request.Context(), dto)
+	logger.L(ctx).Infow("CreatePlan calling lifecycle service",
+		"action", "create_plan",
+		"dto", dto,
+	)
+
+	result, err := h.lifecycleService.CreatePlan(ctx, dto)
 	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to create plan",
+		logger.L(ctx).Errorw("CreatePlan lifecycle service failed",
 			"action", "create_plan",
 			"resource", "plan",
 			"org_id", orgID,
+			"dto", dto,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
 		return
 	}
+
+	logger.L(ctx).Infow("CreatePlan success",
+		"action", "create_plan",
+		"plan_id", result.ID,
+		"org_id", orgID,
+	)
 
 	h.Success(c, response.NewPlanResponse(result))
 }
