@@ -34,6 +34,7 @@ func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dt
 			domainReport.FactorCode(d.FactorCode),
 			d.FactorName,
 			d.RawScore,
+			d.MaxScore,
 			domainReport.RiskLevel(d.RiskLevel),
 			d.Description,
 		)

@@ -8,6 +8,7 @@ type DimensionInterpret struct {
 	factorCode  FactorCode
 	factorName  string
 	rawScore    float64
+	maxScore    *float64
 	riskLevel   RiskLevel
 	description string
 }
@@ -17,6 +18,7 @@ func NewDimensionInterpret(
 	factorCode FactorCode,
 	factorName string,
 	rawScore float64,
+	maxScore *float64,
 	riskLevel RiskLevel,
 	description string,
 ) DimensionInterpret {
@@ -24,6 +26,7 @@ func NewDimensionInterpret(
 		factorCode:  factorCode,
 		factorName:  factorName,
 		rawScore:    rawScore,
+		maxScore:    maxScore,
 		riskLevel:   riskLevel,
 		description: description,
 	}
@@ -52,6 +55,11 @@ func (d DimensionInterpret) RiskLevel() RiskLevel {
 // Description 获取解读描述
 func (d DimensionInterpret) Description() string {
 	return d.description
+}
+
+// MaxScore 获取最大分
+func (d DimensionInterpret) MaxScore() *float64 {
+	return d.maxScore
 }
 
 // IsHighRisk 是否高风险

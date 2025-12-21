@@ -91,6 +91,7 @@ type DimensionDTO struct {
 	FactorCode  string
 	FactorName  string
 	RawScore    float64
+	MaxScore    *float64
 	RiskLevel   string
 	Description string
 }
@@ -122,11 +123,12 @@ type ReportResult struct {
 
 // DimensionResult 维度查询结果
 type DimensionResult struct {
-	FactorCode  string  `json:"factorCode"`
-	FactorName  string  `json:"factorName"`
-	RawScore    float64 `json:"rawScore"`
-	RiskLevel   string  `json:"riskLevel"`
-	Description string  `json:"description"`
+	FactorCode  string   `json:"factorCode"`
+	FactorName  string   `json:"factorName"`
+	RawScore    float64  `json:"rawScore"`
+	MaxScore    *float64 `json:"maxScore,omitempty"`
+	RiskLevel   string   `json:"riskLevel"`
+	Description string   `json:"description"`
 }
 
 // ReportListResult 报告列表查询结果
@@ -153,6 +155,7 @@ func ToReportResult(r *domainReport.InterpretReport) *ReportResult {
 			FactorCode:  string(d.FactorCode()),
 			FactorName:  d.FactorName(),
 			RawScore:    d.RawScore(),
+			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
 		}

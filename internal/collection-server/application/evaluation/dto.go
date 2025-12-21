@@ -52,11 +52,12 @@ type FactorScoreResponse struct {
 
 // DimensionInterpretResponse 维度解读响应
 type DimensionInterpretResponse struct {
-	FactorCode  string  `json:"factor_code"`
-	FactorName  string  `json:"factor_name"`
-	RawScore    float64 `json:"raw_score"`
-	RiskLevel   string  `json:"risk_level"`
-	Description string  `json:"description"`
+	FactorCode  string   `json:"factor_code"`
+	FactorName  string   `json:"factor_name"`
+	RawScore    float64  `json:"raw_score"`
+	MaxScore    *float64 `json:"max_score,omitempty"`
+	RiskLevel   string   `json:"risk_level"`
+	Description string   `json:"description"`
 }
 
 // AssessmentReportResponse 测评报告响应

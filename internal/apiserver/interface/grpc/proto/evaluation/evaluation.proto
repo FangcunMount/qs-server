@@ -103,6 +103,7 @@ message DimensionInterpret {
   string factor_code = 1;     // 因子编码
   string factor_name = 2;     // 因子名称
   double raw_score = 3;       // 原始分
+  double max_score = 6;       // 最大分（可选）
   string risk_level = 4;      // 风险等级
   string description = 5;     // 解读描述
 }

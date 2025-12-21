@@ -130,10 +130,20 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 		// 不使用默认文案兜底，如果没有生成解读则为空
 		description := fs.Conclusion
 
+		// 从量表中获取因子的 maxScore
+		var maxScore *float64
+		for _, f := range factors {
+			if string(f.GetCode()) == string(fs.FactorCode) {
+				maxScore = f.GetMaxScore()
+				break
+			}
+		}
+
 		dim := NewDimensionInterpret(
 			FactorCode(fs.FactorCode),
 			factorName,
 			fs.RawScore,
+			maxScore,
 			RiskLevel(fs.RiskLevel),
 			description,
 		)
@@ -187,6 +197,7 @@ func (b *DefaultReportBuilder) buildSuggestions(
 }
 
 // collectInitialSuggestions 收集评估结果中的初始建议
+// 从因子解读配置中收集 suggestion 数据
 func (b *DefaultReportBuilder) collectInitialSuggestions(result *assessment.EvaluationResult) []string {
 	var suggestions []string
 
@@ -195,9 +206,19 @@ func (b *DefaultReportBuilder) collectInitialSuggestions(result *assessment.Eval
 		suggestions = append(suggestions, result.Suggestion)
 	}
 
-	// 收集总分因子的建议
+	// 收集所有因子的建议（来自因子解读规则配置）
+	// 优先收集总分因子的建议，然后收集其他因子的建议
 	for _, fs := range result.FactorScores {
-		if fs.IsTotalScore && fs.Suggestion != "" && fs.Suggestion != result.Suggestion {
+		if fs.Suggestion == "" {
+			continue
+		}
+		// 如果是总分因子，且与总体建议不同，则添加
+		if fs.IsTotalScore {
+			if fs.Suggestion != result.Suggestion {
+				suggestions = append(suggestions, fs.Suggestion)
+			}
+		} else {
+			// 非总分因子的建议也收集
 			suggestions = append(suggestions, fs.Suggestion)
 		}
 	}

@@ -320,6 +320,7 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 			FactorCode:  dim.FactorCode,
 			FactorName:  dim.FactorName,
 			RawScore:    dim.RawScore,
+			MaxScore:    dim.MaxScore,
 			RiskLevel:   dim.RiskLevel,
 			Description: dim.Description,
 		}

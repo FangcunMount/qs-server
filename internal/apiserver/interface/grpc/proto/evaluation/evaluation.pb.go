@@ -511,6 +511,7 @@ type DimensionInterpret struct {
 	FactorCode    string                 `protobuf:"bytes,1,opt,name=factor_code,json=factorCode,proto3" json:"factor_code,omitempty"` // 因子编码
 	FactorName    string                 `protobuf:"bytes,2,opt,name=factor_name,json=factorName,proto3" json:"factor_name,omitempty"` // 因子名称
 	RawScore      float64                `protobuf:"fixed64,3,opt,name=raw_score,json=rawScore,proto3" json:"raw_score,omitempty"`     // 原始分
+	MaxScore      float64                `protobuf:"fixed64,6,opt,name=max_score,json=maxScore,proto3" json:"max_score,omitempty"`     // 最大分（可选）
 	RiskLevel     string                 `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`    // 风险等级
 	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`                 // 解读描述
 	unknownFields protoimpl.UnknownFields
@@ -564,6 +565,13 @@ func (x *DimensionInterpret) GetFactorName() string {
 func (x *DimensionInterpret) GetRawScore() float64 {
 	if x != nil {
 		return x.RawScore
+	}
+	return 0
+}
+
+func (x *DimensionInterpret) GetMaxScore() float64 {
+	if x != nil {
+		return x.MaxScore
 	}
 	return 0
 }
@@ -1702,13 +1710,14 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"risk_level\x18\x03 \x01(\tR\triskLevel\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\tR\tcreatedAt\"\xb4\x01\n" +
+	"created_at\x18\x04 \x01(\tR\tcreatedAt\"\xd1\x01\n" +
 	"\x12DimensionInterpret\x12\x1f\n" +
 	"\vfactor_code\x18\x01 \x01(\tR\n" +
 	"factorCode\x12\x1f\n" +
 	"\vfactor_name\x18\x02 \x01(\tR\n" +
 	"factorName\x12\x1b\n" +
-	"\traw_score\x18\x03 \x01(\x01R\brawScore\x12\x1d\n" +
+	"\traw_score\x18\x03 \x01(\x01R\brawScore\x12\x1b\n" +
+	"\tmax_score\x18\x06 \x01(\x01R\bmaxScore\x12\x1d\n" +
 	"\n" +
 	"risk_level\x18\x04 \x01(\tR\triskLevel\x12 \n" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\"\xd6\x02\n" +

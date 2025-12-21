@@ -30,6 +30,7 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 			FactorCode:  d.FactorCode().String(),
 			FactorName:  d.FactorName(),
 			RawScore:    d.RawScore(),
+			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
 		}
@@ -67,6 +68,7 @@ func (m *ReportMapper) ToDomain(po *InterpretReportPO) *report.InterpretReport {
 			report.NewFactorCode(d.FactorCode),
 			d.FactorName,
 			d.RawScore,
+			d.MaxScore,
 			report.RiskLevel(d.RiskLevel),
 			d.Description,
 		)

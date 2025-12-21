@@ -63,6 +63,7 @@ type DimensionInterpretOutput struct {
 	FactorCode  string
 	FactorName  string
 	RawScore    float64
+	MaxScore    *float64
 	RiskLevel   string
 	Description string
 }
@@ -241,10 +242,16 @@ func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, assessmentID
 
 	dimensions := make([]DimensionInterpretOutput, len(report.GetDimensions()))
 	for i, dim := range report.GetDimensions() {
+		var maxScore *float64
+		if dim.GetMaxScore() != 0 {
+			score := dim.GetMaxScore()
+			maxScore = &score
+		}
 		dimensions[i] = DimensionInterpretOutput{
 			FactorCode:  dim.GetFactorCode(),
 			FactorName:  dim.GetFactorName(),
 			RawScore:    dim.GetRawScore(),
+			MaxScore:    maxScore,
 			RiskLevel:   dim.GetRiskLevel(),
 			Description: dim.GetDescription(),
 		}

@@ -428,10 +428,15 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 
 	dimensions := make([]*pb.DimensionInterpret, 0, len(result.Dimensions))
 	for _, d := range result.Dimensions {
+		var maxScore float64
+		if d.MaxScore != nil {
+			maxScore = *d.MaxScore
+		}
 		dimensions = append(dimensions, &pb.DimensionInterpret{
 			FactorCode:  d.FactorCode,
 			FactorName:  d.FactorName,
 			RawScore:    d.RawScore,
+			MaxScore:    maxScore,
 			RiskLevel:   d.RiskLevel,
 			Description: d.Description,
 		})

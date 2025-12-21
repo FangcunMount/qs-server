@@ -80,6 +80,7 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 			FactorCode:  string(d.FactorCode()),
 			FactorName:  d.FactorName(),
 			RawScore:    d.RawScore(),
+			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
 		}
