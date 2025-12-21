@@ -22,6 +22,7 @@ const (
 	InternalService_CalculateAnswerSheetScore_FullMethodName       = "/internalapi.InternalService/CalculateAnswerSheetScore"
 	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
 	InternalService_EvaluateAssessment_FullMethodName              = "/internalapi.InternalService/EvaluateAssessment"
+	InternalService_TagTestee_FullMethodName                       = "/internalapi.InternalService/TagTestee"
 )
 
 // InternalServiceClient is the client API for InternalService service.
@@ -43,6 +44,10 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 assessment.submitted 事件后调用
 	// 流程：加载测评和量表，执行计分和解读，保存结果
 	EvaluateAssessment(ctx context.Context, in *EvaluateAssessmentRequest, opts ...grpc.CallOption) (*EvaluateAssessmentResponse, error)
+	// 给受试者打标签
+	// 场景：worker 处理 report.generated 事件后调用
+	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
+	TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error)
 }
 
 type internalServiceClient struct {
@@ -83,6 +88,16 @@ func (c *internalServiceClient) EvaluateAssessment(ctx context.Context, in *Eval
 	return out, nil
 }
 
+func (c *internalServiceClient) TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TagTesteeResponse)
+	err := c.cc.Invoke(ctx, InternalService_TagTestee_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InternalServiceServer is the server API for InternalService service.
 // All implementations must embed UnimplementedInternalServiceServer
 // for forward compatibility.
@@ -102,6 +117,10 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 assessment.submitted 事件后调用
 	// 流程：加载测评和量表，执行计分和解读，保存结果
 	EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error)
+	// 给受试者打标签
+	// 场景：worker 处理 report.generated 事件后调用
+	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
+	TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error)
 	mustEmbedUnimplementedInternalServiceServer()
 }
 
@@ -120,6 +139,9 @@ func (UnimplementedInternalServiceServer) CreateAssessmentFromAnswerSheet(contex
 }
 func (UnimplementedInternalServiceServer) EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EvaluateAssessment not implemented")
+}
+func (UnimplementedInternalServiceServer) TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TagTestee not implemented")
 }
 func (UnimplementedInternalServiceServer) mustEmbedUnimplementedInternalServiceServer() {}
 func (UnimplementedInternalServiceServer) testEmbeddedByValue()                         {}
@@ -196,6 +218,24 @@ func _InternalService_EvaluateAssessment_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_TagTestee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TagTesteeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).TagTestee(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_TagTestee_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).TagTestee(ctx, req.(*TagTesteeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InternalService_ServiceDesc is the grpc.ServiceDesc for InternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -214,6 +254,10 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EvaluateAssessment",
 			Handler:    _InternalService_EvaluateAssessment_Handler,
+		},
+		{
+			MethodName: "TagTestee",
+			Handler:    _InternalService_TagTestee_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

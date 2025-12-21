@@ -61,6 +61,29 @@ type TesteeManagementService interface {
 	UnmarkKeyFocus(ctx context.Context, testeeID uint64) error
 }
 
+// TesteeTaggingService 受试者标签服务
+// 行为者：系统自动（事件驱动）
+// 职责：根据测评结果自动给受试者打标签
+// 变更来源：标签规则变化、测评结果格式变化
+type TesteeTaggingService interface {
+	// TagByAssessmentResult 根据测评结果给受试者打标签
+	TagByAssessmentResult(
+		ctx context.Context,
+		testeeID uint64,
+		riskLevel string,
+		scaleCode string,
+		highRiskFactors []string,
+		markKeyFocus bool,
+	) (*TaggingResult, error)
+}
+
+// TaggingResult 标签更新结果
+type TaggingResult struct {
+	TagsAdded      []string // 已添加的标签列表
+	TagsRemoved    []string // 已移除的标签列表
+	KeyFocusMarked bool     // 是否标记为重点关注
+}
+
 // TesteeQueryService 受试者查询服务（只读）
 // 行为者：所有需要查询受试者信息的用户（小程序、C端等）
 // 职责：提供受试者基础信息查询能力（不包含家长信息）

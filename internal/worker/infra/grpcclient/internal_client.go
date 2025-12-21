@@ -71,3 +71,29 @@ func (c *InternalClient) CalculateAnswerSheetScore(
 
 	return resp, nil
 }
+
+// TagTestee 给受试者打标签
+func (c *InternalClient) TagTestee(
+	ctx context.Context,
+	testeeID uint64,
+	riskLevel string,
+	scaleCode string,
+	markKeyFocus bool,
+	highRiskFactors []string,
+) (*pb.TagTesteeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.TagTestee(ctx, &pb.TagTesteeRequest{
+		TesteeId:        testeeID,
+		RiskLevel:       riskLevel,
+		ScaleCode:       scaleCode,
+		MarkKeyFocus:    markKeyFocus,
+		HighRiskFactors: highRiskFactors,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to tag testee: %w", err)
+	}
+
+	return resp, nil
+}

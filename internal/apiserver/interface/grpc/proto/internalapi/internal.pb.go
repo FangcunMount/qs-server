@@ -427,6 +427,152 @@ func (x *EvaluateAssessmentResponse) GetRiskLevel() string {
 	return ""
 }
 
+// 给受试者打标签请求
+type TagTesteeRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId        uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`                       // 受试者ID
+	RiskLevel       string                 `protobuf:"bytes,2,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`                     // 风险等级：none/low/medium/high/severe
+	ScaleCode       string                 `protobuf:"bytes,3,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`                     // 量表编码（可选）
+	MarkKeyFocus    bool                   `protobuf:"varint,4,opt,name=mark_key_focus,json=markKeyFocus,proto3" json:"mark_key_focus,omitempty"`         // 是否标记为重点关注（高风险时）
+	HighRiskFactors []string               `protobuf:"bytes,5,rep,name=high_risk_factors,json=highRiskFactors,proto3" json:"high_risk_factors,omitempty"` // 高风险因子编码列表（可选）
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TagTesteeRequest) Reset() {
+	*x = TagTesteeRequest{}
+	mi := &file_internalapi_internal_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TagTesteeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TagTesteeRequest) ProtoMessage() {}
+
+func (x *TagTesteeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TagTesteeRequest.ProtoReflect.Descriptor instead.
+func (*TagTesteeRequest) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TagTesteeRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *TagTesteeRequest) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *TagTesteeRequest) GetScaleCode() string {
+	if x != nil {
+		return x.ScaleCode
+	}
+	return ""
+}
+
+func (x *TagTesteeRequest) GetMarkKeyFocus() bool {
+	if x != nil {
+		return x.MarkKeyFocus
+	}
+	return false
+}
+
+func (x *TagTesteeRequest) GetHighRiskFactors() []string {
+	if x != nil {
+		return x.HighRiskFactors
+	}
+	return nil
+}
+
+// 给受试者打标签响应
+type TagTesteeResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Success        bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                                       // 是否成功
+	TagsAdded      []string               `protobuf:"bytes,2,rep,name=tags_added,json=tagsAdded,proto3" json:"tags_added,omitempty"`                   // 已添加的标签列表
+	KeyFocusMarked bool                   `protobuf:"varint,3,opt,name=key_focus_marked,json=keyFocusMarked,proto3" json:"key_focus_marked,omitempty"` // 是否标记为重点关注
+	Message        string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`                                        // 描述信息
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TagTesteeResponse) Reset() {
+	*x = TagTesteeResponse{}
+	mi := &file_internalapi_internal_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TagTesteeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TagTesteeResponse) ProtoMessage() {}
+
+func (x *TagTesteeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TagTesteeResponse.ProtoReflect.Descriptor instead.
+func (*TagTesteeResponse) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TagTesteeResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *TagTesteeResponse) GetTagsAdded() []string {
+	if x != nil {
+		return x.TagsAdded
+	}
+	return nil
+}
+
+func (x *TagTesteeResponse) GetKeyFocusMarked() bool {
+	if x != nil {
+		return x.KeyFocusMarked
+	}
+	return false
+}
+
+func (x *TagTesteeResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_internalapi_internal_proto protoreflect.FileDescriptor
 
 const file_internalapi_internal_proto_rawDesc = "" +
@@ -465,11 +611,26 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\vtotal_score\x18\x04 \x01(\x01R\n" +
 	"totalScore\x12\x1d\n" +
 	"\n" +
-	"risk_level\x18\x05 \x01(\tR\triskLevel2\x83\x03\n" +
+	"risk_level\x18\x05 \x01(\tR\triskLevel\"\xbf\x01\n" +
+	"\x10TagTesteeRequest\x12\x1b\n" +
+	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\x02 \x01(\tR\triskLevel\x12\x1d\n" +
+	"\n" +
+	"scale_code\x18\x03 \x01(\tR\tscaleCode\x12$\n" +
+	"\x0emark_key_focus\x18\x04 \x01(\bR\fmarkKeyFocus\x12*\n" +
+	"\x11high_risk_factors\x18\x05 \x03(\tR\x0fhighRiskFactors\"\x90\x01\n" +
+	"\x11TagTesteeResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1d\n" +
+	"\n" +
+	"tags_added\x18\x02 \x03(\tR\ttagsAdded\x12(\n" +
+	"\x10key_focus_marked\x18\x03 \x01(\bR\x0ekeyFocusMarked\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage2\xcf\x03\n" +
 	"\x0fInternalService\x12z\n" +
 	"\x19CalculateAnswerSheetScore\x12-.internalapi.CalculateAnswerSheetScoreRequest\x1a..internalapi.CalculateAnswerSheetScoreResponse\x12\x8c\x01\n" +
 	"\x1fCreateAssessmentFromAnswerSheet\x123.internalapi.CreateAssessmentFromAnswerSheetRequest\x1a4.internalapi.CreateAssessmentFromAnswerSheetResponse\x12e\n" +
-	"\x12EvaluateAssessment\x12&.internalapi.EvaluateAssessmentRequest\x1a'.internalapi.EvaluateAssessmentResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
+	"\x12EvaluateAssessment\x12&.internalapi.EvaluateAssessmentRequest\x1a'.internalapi.EvaluateAssessmentResponse\x12J\n" +
+	"\tTagTestee\x12\x1d.internalapi.TagTesteeRequest\x1a\x1e.internalapi.TagTesteeResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
 
 var (
 	file_internalapi_internal_proto_rawDescOnce sync.Once
@@ -483,7 +644,7 @@ func file_internalapi_internal_proto_rawDescGZIP() []byte {
 	return file_internalapi_internal_proto_rawDescData
 }
 
-var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_internalapi_internal_proto_goTypes = []any{
 	(*CalculateAnswerSheetScoreRequest)(nil),        // 0: internalapi.CalculateAnswerSheetScoreRequest
 	(*CalculateAnswerSheetScoreResponse)(nil),       // 1: internalapi.CalculateAnswerSheetScoreResponse
@@ -491,16 +652,20 @@ var file_internalapi_internal_proto_goTypes = []any{
 	(*CreateAssessmentFromAnswerSheetResponse)(nil), // 3: internalapi.CreateAssessmentFromAnswerSheetResponse
 	(*EvaluateAssessmentRequest)(nil),               // 4: internalapi.EvaluateAssessmentRequest
 	(*EvaluateAssessmentResponse)(nil),              // 5: internalapi.EvaluateAssessmentResponse
+	(*TagTesteeRequest)(nil),                        // 6: internalapi.TagTesteeRequest
+	(*TagTesteeResponse)(nil),                       // 7: internalapi.TagTesteeResponse
 }
 var file_internalapi_internal_proto_depIdxs = []int32{
 	0, // 0: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
 	2, // 1: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
 	4, // 2: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
-	1, // 3: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
-	3, // 4: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
-	5, // 5: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
+	6, // 3: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
+	1, // 4: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
+	3, // 5: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
+	5, // 6: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
+	7, // 7: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -517,7 +682,7 @@ func file_internalapi_internal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

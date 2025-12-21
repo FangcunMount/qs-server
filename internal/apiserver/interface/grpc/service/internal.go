@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -24,6 +26,7 @@ type InternalService struct {
 	managementService         assessmentApp.AssessmentManagementService
 	engineService             engine.Service
 	scaleRepo                 scale.Repository
+	testeeTaggingService      testeeApp.TesteeTaggingService
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -33,6 +36,7 @@ func NewInternalService(
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
 	scaleRepo scale.Repository,
+	testeeTaggingService testeeApp.TesteeTaggingService,
 ) *InternalService {
 	return &InternalService{
 		answerSheetScoringService: answerSheetScoringService,
@@ -40,6 +44,7 @@ func NewInternalService(
 		managementService:         managementService,
 		engineService:             engineService,
 		scaleRepo:                 scaleRepo,
+		testeeTaggingService:      testeeTaggingService,
 	}
 }
 
@@ -284,5 +289,65 @@ func (s *InternalService) EvaluateAssessment(
 		Message:    "评估完成",
 		TotalScore: totalScore,
 		RiskLevel:  riskLevel,
+	}, nil
+}
+
+// TagTestee 给受试者打标签
+// 场景：worker 处理 report.generated 事件后调用
+// 职责：协议转换，将 gRPC 请求转换为应用服务调用
+// 业务逻辑：由 TesteeTaggingService 处理
+func (s *InternalService) TagTestee(
+	ctx context.Context,
+	req *pb.TagTesteeRequest,
+) (*pb.TagTesteeResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到给受试者打标签请求",
+		"action", "tag_testee",
+		"testee_id", req.TesteeId,
+		"risk_level", req.RiskLevel,
+		"scale_code", req.ScaleCode,
+		"high_risk_factors_count", len(req.HighRiskFactors),
+		"mark_key_focus", req.MarkKeyFocus,
+	)
+
+	// 参数验证
+	if req.TesteeId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
+
+	// 调用应用服务层处理业务逻辑
+	// 所有标签更新策略、风险等级判断等业务规则都在应用服务层
+	result, err := s.testeeTaggingService.TagByAssessmentResult(
+		ctx,
+		req.TesteeId,
+		req.RiskLevel,
+		req.ScaleCode,
+		req.HighRiskFactors,
+		req.MarkKeyFocus,
+	)
+	if err != nil {
+		l.Errorw("给受试者打标签失败",
+			"testee_id", req.TesteeId,
+			"risk_level", req.RiskLevel,
+			"scale_code", req.ScaleCode,
+			"error", err.Error(),
+		)
+		return nil, status.Errorf(codes.Internal, "给受试者打标签失败: %v", err)
+	}
+
+	l.Infow("给受试者打标签成功",
+		"action", "tag_testee",
+		"testee_id", req.TesteeId,
+		"tags_added_count", len(result.TagsAdded),
+		"tags_removed_count", len(result.TagsRemoved),
+		"key_focus_marked", result.KeyFocusMarked,
+	)
+
+	return &pb.TagTesteeResponse{
+		Success:        true,
+		TagsAdded:      result.TagsAdded,
+		KeyFocusMarked: result.KeyFocusMarked,
+		Message:        fmt.Sprintf("标签更新成功：添加 %d 个，移除 %d 个", len(result.TagsAdded), len(result.TagsRemoved)),
 	}, nil
 }

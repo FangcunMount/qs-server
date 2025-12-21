@@ -28,6 +28,14 @@ service InternalService {
   // 流程：加载测评和量表，执行计分和解读，保存结果
   rpc EvaluateAssessment(EvaluateAssessmentRequest) 
       returns (EvaluateAssessmentResponse);
+  
+  // ==================== Testee 操作 ====================
+  
+  // 给受试者打标签
+  // 场景：worker 处理 report.generated 事件后调用
+  // 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
+  rpc TagTestee(TagTesteeRequest) 
+      returns (TagTesteeResponse);
 }
 
 // ==================== CalculateAnswerSheetScore ====================
@@ -81,4 +89,23 @@ message EvaluateAssessmentResponse {
   string message = 3;                // 描述信息
   double total_score = 4;            // 总分（成功时）
   string risk_level = 5;             // 风险等级（成功时）
+}
+
+// ==================== TagTestee ====================
+
+// 给受试者打标签请求
+message TagTesteeRequest {
+  uint64 testee_id = 1;              // 受试者ID
+  string risk_level = 2;             // 风险等级：none/low/medium/high/severe
+  string scale_code = 3;             // 量表编码（可选）
+  bool mark_key_focus = 4;           // 是否标记为重点关注（高风险时）
+  repeated string high_risk_factors = 5; // 高风险因子编码列表（可选）
+}
+
+// 给受试者打标签响应
+message TagTesteeResponse {
+  bool success = 1;                  // 是否成功
+  repeated string tags_added = 2;    // 已添加的标签列表
+  bool key_focus_marked = 3;         // 是否标记为重点关注
+  string message = 4;                // 描述信息
 }
