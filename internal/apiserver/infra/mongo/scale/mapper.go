@@ -98,6 +98,7 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 		QuestionCodes:   questionCodes,
 		ScoringStrategy: f.GetScoringStrategy().String(),
 		ScoringParams:   scoringParamsMap,
+		MaxScore:        f.GetMaxScore(),
 		InterpretRules:  m.mapInterpretRulesToPO(f.GetInterpretRules()),
 	}
 }
@@ -246,6 +247,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 		scale.WithQuestionCodes(questionCodes),
 		scale.WithScoringStrategy(strategy),
 		scale.WithScoringParams(scoringParams),
+		scale.WithMaxScore(po.MaxScore),
 		scale.WithInterpretRules(interpretRules),
 	)
 	if err != nil {

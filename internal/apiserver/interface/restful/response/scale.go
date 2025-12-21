@@ -31,6 +31,7 @@ type FactorResponse struct {
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
 	ScoringParams   map[string]interface{}  `json:"scoring_params"`
+	MaxScore        *float64                `json:"max_score,omitempty"` // 最大分
 	RiskLevel       string                  `json:"risk_level,omitempty"` // 因子级别的风险等级（从解读规则中提取）
 	InterpretRules  []InterpretRuleResponse `json:"interpret_rules,omitempty"`
 }
@@ -130,6 +131,7 @@ func newFactorResponse(result scale.FactorResult) FactorResponse {
 		QuestionCodes:   result.QuestionCodes,
 		ScoringStrategy: result.ScoringStrategy,
 		ScoringParams:   scoringParams,
+		MaxScore:        result.MaxScore,
 		RiskLevel:       result.RiskLevel,
 		InterpretRules:  rules,
 	}

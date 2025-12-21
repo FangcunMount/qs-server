@@ -34,6 +34,7 @@ type FactorOutput struct {
 	QuestionCodes   []string
 	ScoringStrategy string
 	ScoringParams   map[string]string
+	MaxScore        *float64
 	RiskLevel       string
 	InterpretRules  []InterpretRuleOutput
 }
@@ -296,6 +297,12 @@ func (c *ScaleClient) convertFactor(f *pb.Factor) FactorOutput {
 		}
 	}
 
+	var maxScore *float64
+	if f.GetMaxScore() != 0 {
+		score := f.GetMaxScore()
+		maxScore = &score
+	}
+
 	return FactorOutput{
 		Code:            f.GetCode(),
 		Title:           f.GetTitle(),
@@ -304,6 +311,7 @@ func (c *ScaleClient) convertFactor(f *pb.Factor) FactorOutput {
 		QuestionCodes:   f.GetQuestionCodes(),
 		ScoringStrategy: f.GetScoringStrategy(),
 		ScoringParams:   f.GetScoringParams(),
+		MaxScore:        maxScore,
 		RiskLevel:       f.GetRiskLevel(),
 		InterpretRules:  rules,
 	}

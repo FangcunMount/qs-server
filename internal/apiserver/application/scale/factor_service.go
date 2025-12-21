@@ -50,7 +50,7 @@ func (s *factorService) AddFactor(ctx context.Context, dto AddFactorDTO) (*Scale
 
 	// 4. 创建因子
 	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore,
-		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.InterpretRules)
+		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (
 
 	// 4. 创建更新后的因子
 	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore,
-		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.InterpretRules)
+		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 
 	for _, dto := range factorDTOs {
 		factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore,
-			dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.InterpretRules)
+			dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 		if err != nil {
 			return nil, err
 		}
@@ -310,6 +310,7 @@ func toFactorDomain(
 	questionCodes []string,
 	scoringStrategy string,
 	scoringParams *ScoringParamsDTO,
+	maxScore *float64,
 	interpretRules []InterpretRuleDTO,
 ) (*scale.Factor, error) {
 	// 转换题目编码
@@ -367,6 +368,7 @@ func toFactorDomain(
 		scale.WithQuestionCodes(qCodes),
 		scale.WithScoringStrategy(strategy),
 		scale.WithScoringParams(scoringParamsDomain),
+		scale.WithMaxScore(maxScore),
 		scale.WithInterpretRules(rules),
 	)
 	if err != nil {

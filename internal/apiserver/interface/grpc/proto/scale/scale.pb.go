@@ -337,6 +337,7 @@ type Factor struct {
 	QuestionCodes   []string               `protobuf:"bytes,5,rep,name=question_codes,json=questionCodes,proto3" json:"question_codes,omitempty"`
 	ScoringStrategy string                 `protobuf:"bytes,6,opt,name=scoring_strategy,json=scoringStrategy,proto3" json:"scoring_strategy,omitempty"`
 	ScoringParams   map[string]string      `protobuf:"bytes,7,rep,name=scoring_params,json=scoringParams,proto3" json:"scoring_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MaxScore        float64                `protobuf:"fixed64,10,opt,name=max_score,json=maxScore,proto3" json:"max_score,omitempty"` // 最大分（可选）
 	RiskLevel       string                 `protobuf:"bytes,8,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
 	InterpretRules  []*InterpretRule       `protobuf:"bytes,9,rep,name=interpret_rules,json=interpretRules,proto3" json:"interpret_rules,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -420,6 +421,13 @@ func (x *Factor) GetScoringParams() map[string]string {
 		return x.ScoringParams
 	}
 	return nil
+}
+
+func (x *Factor) GetMaxScore() float64 {
+	if x != nil {
+		return x.MaxScore
+	}
+	return 0
 }
 
 func (x *Factor) GetRiskLevel() string {
@@ -1209,7 +1217,7 @@ const file_scale_scale_proto_rawDesc = "" +
 	"created_at\x18\r \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\x0e \x01(\tR\tupdatedAt\x12%\n" +
-	"\x0equestion_count\x18\x0f \x01(\x05R\rquestionCount\"\xb4\x03\n" +
+	"\x0equestion_count\x18\x0f \x01(\x05R\rquestionCount\"\xd1\x03\n" +
 	"\x06Factor\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1f\n" +
@@ -1218,7 +1226,9 @@ const file_scale_scale_proto_rawDesc = "" +
 	"\x0eis_total_score\x18\x04 \x01(\bR\fisTotalScore\x12%\n" +
 	"\x0equestion_codes\x18\x05 \x03(\tR\rquestionCodes\x12)\n" +
 	"\x10scoring_strategy\x18\x06 \x01(\tR\x0fscoringStrategy\x12G\n" +
-	"\x0escoring_params\x18\a \x03(\v2 .scale.Factor.ScoringParamsEntryR\rscoringParams\x12\x1d\n" +
+	"\x0escoring_params\x18\a \x03(\v2 .scale.Factor.ScoringParamsEntryR\rscoringParams\x12\x1b\n" +
+	"\tmax_score\x18\n" +
+	" \x01(\x01R\bmaxScore\x12\x1d\n" +
 	"\n" +
 	"risk_level\x18\b \x01(\tR\triskLevel\x12=\n" +
 	"\x0finterpret_rules\x18\t \x03(\v2\x14.scale.InterpretRuleR\x0einterpretRules\x1a@\n" +

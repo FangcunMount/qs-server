@@ -1981,6 +1981,10 @@ const docTemplate = `{
                 "is_total_score": {
                     "type": "boolean"
                 },
+                "max_score": {
+                    "description": "最大分",
+                    "type": "number"
+                },
                 "question_codes": {
                     "type": "array",
                     "items": {

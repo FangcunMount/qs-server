@@ -2543,7 +2543,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/by-questionnaire": {
             "get": {
-                "description": "根据关联的问卷编码获取量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据关联的问卷编码获取量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -2702,7 +2702,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/published/{code}": {
             "get": {
-                "description": "根据编码获取已发布的量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据编码获取已发布的量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -2753,7 +2753,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}": {
             "get": {
-                "description": "根据编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -2949,7 +2949,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/factors": {
             "get": {
-                "description": "根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 max_score 为因子的最大分（可选）\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -3000,7 +3000,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/factors/batch": {
             "put": {
-                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空\n- risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe\n响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）",
+                "description": "批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：\n- sum/avg 策略：scoring_params 可为空或省略\n- cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空\n- max_score：最大分（可选），用于设置因子的最大分数\n- risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe\n响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n响应中的 max_score 为因子的最大分（可选）\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）",
                 "consumes": [
                     "application/json"
                 ],
@@ -3060,7 +3060,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/interpret-rules": {
             "put": {
-                "description": "批量设置量表所有因子的解读规则\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "批量设置量表所有因子的解读规则\n响应中的 max_score 为因子的最大分（可选）\n响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -4185,6 +4185,10 @@ const docTemplate = `{
                 "is_total_score": {
                     "type": "boolean"
                 },
+                "max_score": {
+                    "description": "最大分",
+                    "type": "number"
+                },
                 "question_codes": {
                     "type": "array",
                     "items": {
@@ -4791,6 +4795,10 @@ const docTemplate = `{
                 },
                 "is_total_score": {
                     "type": "boolean"
+                },
+                "max_score": {
+                    "description": "最大分",
+                    "type": "number"
                 },
                 "question_codes": {
                     "type": "array",

@@ -199,6 +199,7 @@ func (s *QueryService) convertFactor(f *grpcclient.FactorOutput) FactorResponse 
 		QuestionCodes:   f.QuestionCodes,
 		ScoringStrategy: f.ScoringStrategy,
 		ScoringParams:   f.ScoringParams,
+		MaxScore:        f.MaxScore,
 		RiskLevel:       f.RiskLevel,
 		InterpretRules:  rules,
 	}

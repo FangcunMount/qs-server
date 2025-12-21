@@ -26,6 +26,7 @@ type FactorResponse struct {
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
 	ScoringParams   map[string]string       `json:"scoring_params"`
+	MaxScore        *float64                `json:"max_score,omitempty"` // 最大分
 	RiskLevel       string                  `json:"risk_level"`
 	InterpretRules  []InterpretRuleResponse `json:"interpret_rules"`
 }

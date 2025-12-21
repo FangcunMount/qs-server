@@ -90,6 +90,9 @@ type FactorPO struct {
 	ScoringStrategy string                 `bson:"scoring_strategy" json:"scoring_strategy"`
 	ScoringParams   map[string]interface{} `bson:"scoring_params,omitempty" json:"scoring_params,omitempty"`
 
+	// 最大分
+	MaxScore *float64 `bson:"max_score,omitempty" json:"max_score,omitempty"`
+
 	// 解读规则
 	InterpretRules []InterpretRulePO `bson:"interpret_rules,omitempty" json:"interpret_rules,omitempty"`
 }

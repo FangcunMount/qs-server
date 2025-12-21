@@ -302,6 +302,11 @@ func (s *ScaleService) toProtoFactor(f *appScale.FactorResult) *pb.Factor {
 		})
 	}
 
+	var maxScore float64
+	if f.MaxScore != nil {
+		maxScore = *f.MaxScore
+	}
+
 	return &pb.Factor{
 		Code:            f.Code,
 		Title:           f.Title,
@@ -310,6 +315,7 @@ func (s *ScaleService) toProtoFactor(f *appScale.FactorResult) *pb.Factor {
 		QuestionCodes:   f.QuestionCodes,
 		ScoringStrategy: f.ScoringStrategy,
 		ScoringParams:   scoringParams,
+		MaxScore:        maxScore,
 		RiskLevel:       f.RiskLevel,
 		InterpretRules:  protoRules,
 	}

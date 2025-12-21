@@ -24,6 +24,9 @@ type Factor struct {
 	scoringStrategy ScoringStrategyCode
 	scoringParams   *ScoringParams
 
+	// 最大分
+	maxScore *float64
+
 	// 解读规则
 	interpretRules []InterpretationRule
 }
@@ -105,6 +108,13 @@ func WithInterpretRules(rules []InterpretationRule) FactorOption {
 	}
 }
 
+// WithMaxScore 设置最大分
+func WithMaxScore(maxScore *float64) FactorOption {
+	return func(f *Factor) {
+		f.maxScore = maxScore
+	}
+}
+
 // ===================== Getter 方法 =================
 
 // GetCode 获取因子编码
@@ -148,6 +158,11 @@ func (f *Factor) GetScoringParams() *ScoringParams {
 // GetInterpretRules 获取解读规则
 func (f *Factor) GetInterpretRules() []InterpretationRule {
 	return f.interpretRules
+}
+
+// GetMaxScore 获取最大分
+func (f *Factor) GetMaxScore() *float64 {
+	return f.maxScore
 }
 
 // ===================== 业务方法 =================

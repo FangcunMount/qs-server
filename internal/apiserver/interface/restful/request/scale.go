@@ -61,6 +61,7 @@ type FactorModel struct {
 	QuestionCodes   []string             `json:"question_codes"`
 	ScoringStrategy string               `json:"scoring_strategy"`
 	ScoringParams   *ScoringParamsModel  `json:"scoring_params,omitempty"`
+	MaxScore        *float64             `json:"max_score,omitempty"` // 最大分
 	RiskLevel       string               `json:"risk_level,omitempty"` // 因子级别的风险等级（用于批量设置，如果解读规则未指定则使用此值）
 	InterpretRules  []InterpretRuleModel `json:"interpret_rules"`
 }

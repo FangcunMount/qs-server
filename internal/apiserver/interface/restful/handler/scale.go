@@ -293,8 +293,10 @@ func (h *ScaleHandler) Delete(c *gin.Context) {
 // @Description 批量更新量表的所有因子（前端保存时使用）。计分参数根据策略类型使用不同字段：
 // @Description - sum/avg 策略：scoring_params 可为空或省略
 // @Description - cnt 策略：scoring_params 必须包含 cnt_option_contents（选项内容数组，字符串数组），且不能为空
+// @Description - max_score：最大分（可选），用于设置因子的最大分数
 // @Description - risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe
 // @Description 响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 max_score 为因子的最大分（可选）
 // @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）
 // @Tags Scale-Factor
 // @Accept json
@@ -342,6 +344,7 @@ func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 			QuestionCodes:   f.QuestionCodes,
 			ScoringStrategy: f.ScoringStrategy,
 			ScoringParams:   scoringParamsDTO,
+			MaxScore:        f.MaxScore,
 			RiskLevel:       f.RiskLevel,
 			InterpretRules:  interpretRules,
 		})
@@ -359,6 +362,7 @@ func (h *ScaleHandler) BatchUpdateFactors(c *gin.Context) {
 // ReplaceInterpretRules 批量设置解读规则
 // @Summary 批量设置解读规则
 // @Description 批量设置量表所有因子的解读规则
+// @Description 响应中的 max_score 为因子的最大分（可选）
 // @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Factor
 // @Accept json
@@ -416,6 +420,7 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description - max_score: 因子的最大分（可选）
 // @Description - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
@@ -450,6 +455,7 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description - max_score: 因子的最大分（可选）
 // @Description - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
@@ -533,6 +539,7 @@ func (h *ScaleHandler) List(c *gin.Context) {
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description - max_score: 因子的最大分（可选）
 // @Description - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json
@@ -600,6 +607,7 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 // GetFactors 获取量表的因子列表
 // @Summary 获取量表的因子列表
 // @Description 根据量表编码获取该量表的所有因子。响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段
+// @Description 响应中的 max_score 为因子的最大分（可选）
 // @Description 响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe
 // @Tags Scale-Query
 // @Accept json

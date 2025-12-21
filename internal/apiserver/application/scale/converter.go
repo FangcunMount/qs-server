@@ -32,6 +32,7 @@ type FactorResult struct {
 	QuestionCodes   []string               // 关联的题目编码列表
 	ScoringStrategy string                 // 计分策略
 	ScoringParams   map[string]interface{} // 计分参数
+	MaxScore        *float64               // 最大分
 	RiskLevel       string                 // 因子级别的风险等级（从解读规则中提取，如果有多个规则则使用第一个规则的风险等级）
 	InterpretRules  []InterpretRuleResult  // 解读规则列表
 }
@@ -139,6 +140,7 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		QuestionCodes:   make([]string, 0),
 		ScoringStrategy: f.GetScoringStrategy().String(),
 		ScoringParams:   scoringParamsMap,
+		MaxScore:        f.GetMaxScore(),
 		RiskLevel:       "", // 默认值，将从解读规则中提取
 		InterpretRules:  make([]InterpretRuleResult, 0),
 	}

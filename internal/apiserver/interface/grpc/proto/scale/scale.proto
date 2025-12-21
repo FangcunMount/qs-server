@@ -62,6 +62,7 @@ message Factor {
   repeated string question_codes = 5;
   string scoring_strategy = 6;
   map<string, string> scoring_params = 7;
+  double max_score = 10;  // 最大分（可选）
   string risk_level = 8;
   repeated InterpretRule interpret_rules = 9;
 }
