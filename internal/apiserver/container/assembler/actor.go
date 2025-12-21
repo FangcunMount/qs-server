@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -138,7 +139,8 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	// 查询服务 - 服务于所有需要查询的用户
 	m.StaffQueryService = staffApp.NewQueryService(m.StaffRepo)
 
-	// 初始化 handler 层 - 直接使用按行为者划分的服务，无需 CompositeService
+	// 初始化 handler 层 - 先不注入评估服务（评估模块还未初始化）
+	// 评估服务将在容器初始化完成后通过 SetEvaluationServices 方法注入
 	m.ActorHandler = handler.NewActorHandler(
 		m.TesteeRegistrationService,
 		m.TesteeManagementService,
@@ -148,9 +150,21 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.StaffAuthorizationService,
 		m.StaffQueryService,
 		guardianshipSvc,
+		nil, // assessmentManagementService - 稍后注入
+		nil, // scoreQueryService - 稍后注入
 	)
 
 	return nil
+}
+
+// SetEvaluationServices 设置评估服务（用于延迟注入）
+func (m *ActorModule) SetEvaluationServices(
+	assessmentManagementService assessmentApp.AssessmentManagementService,
+	scoreQueryService assessmentApp.ScoreQueryService,
+) {
+	if m.ActorHandler != nil {
+		m.ActorHandler.SetEvaluationServices(assessmentManagementService, scoreQueryService)
+	}
 }
 
 // Cleanup 清理模块资源

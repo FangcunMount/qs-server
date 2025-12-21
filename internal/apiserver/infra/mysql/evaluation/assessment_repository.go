@@ -286,6 +286,38 @@ func (r *assessmentRepository) FindPendingSubmission(ctx context.Context, pagina
 	return r.mapper.ToDomainList(pos), total, nil
 }
 
+// FindByOrgID 按组织ID查询测评列表（支持分页和条件筛选）
+func (r *assessmentRepository) FindByOrgID(ctx context.Context, orgID int64, status *assessment.Status, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
+	var pos []*AssessmentPO
+	var total int64
+
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
+
+	// 状态筛选
+	if status != nil {
+		query = query.Where("status = ?", status.String())
+	}
+
+	// 统计总数
+	if err := query.Model(&AssessmentPO{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 分页查询
+	err := query.
+		Order("created_at DESC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit()).
+		Find(&pos).Error
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return r.mapper.ToDomainList(pos), total, nil
+}
+
 // ==================== 辅助方法 ====================
 
 // translateAssessmentError 将数据库错误转换为领域错误

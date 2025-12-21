@@ -49,6 +49,9 @@ type AssessmentTaskRepository interface {
 	// FindExpiredTasks 查询已过期的任务（状态为 opened，截止时间 <= now）
 	FindExpiredTasks(ctx context.Context) ([]*AssessmentTask, error)
 
+	// FindList 分页查询任务列表（支持条件筛选）
+	FindList(ctx context.Context, planID *AssessmentPlanID, testeeID *testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
+
 	// Save 保存任务
 	Save(ctx context.Context, task *AssessmentTask) error
 

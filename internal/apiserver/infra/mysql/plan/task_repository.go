@@ -120,6 +120,44 @@ func (r *taskRepository) FindExpiredTasks(ctx context.Context) ([]*domainPlan.As
 	return r.mapper.ToDomainList(pos), nil
 }
 
+// FindList 分页查询任务列表（支持条件筛选）
+func (r *taskRepository) FindList(ctx context.Context, planID *domainPlan.AssessmentPlanID, testeeID *testee.ID, status *domainPlan.TaskStatus, page, pageSize int) ([]*domainPlan.AssessmentTask, int64, error) {
+	var pos []*AssessmentTaskPO
+	var total int64
+
+	query := r.WithContext(ctx).Where("deleted_at IS NULL")
+
+	// 条件筛选
+	if planID != nil {
+		query = query.Where("plan_id = ?", planID.Uint64())
+	}
+	if testeeID != nil {
+		query = query.Where("testee_id = ?", testeeID.Uint64())
+	}
+	if status != nil {
+		query = query.Where("status = ?", status.String())
+	}
+
+	// 统计总数
+	if err := query.Model(&AssessmentTaskPO{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 分页查询
+	offset := (page - 1) * pageSize
+	err := query.
+		Order("planned_at DESC"). // 按计划时间降序
+		Offset(offset).
+		Limit(pageSize).
+		Find(&pos).Error
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return r.mapper.ToDomainList(pos), total, nil
+}
+
 // Save 保存任务（新增或更新）
 func (r *taskRepository) Save(ctx context.Context, task *domainPlan.AssessmentTask) error {
 	po := r.mapper.ToPO(task)

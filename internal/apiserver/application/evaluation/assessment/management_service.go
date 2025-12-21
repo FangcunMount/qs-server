@@ -100,37 +100,66 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
 		}
 	} else {
-		// 如果没有 testee_id，暂时返回空列表
-		l.Warnw("未提供 testee_id，暂不支持按 orgID 查询",
-			"org_id", dto.OrgID,
-		)
-		assessments = make([]*assessment.Assessment, 0)
-		total = 0
+		// 如果没有 testee_id，使用 orgID 查询
+		if dto.OrgID == 0 {
+			l.Warnw("未提供 testee_id 和 org_id，无法查询",
+				"org_id", dto.OrgID,
+			)
+			assessments = make([]*assessment.Assessment, 0)
+			total = 0
+		} else {
+			// 解析 status 条件
+			var statusFilter *assessment.Status
+			if statusStr, ok := dto.Conditions["status"]; ok && statusStr != "" {
+				status := assessment.Status(statusStr)
+				if status.IsValid() {
+					statusFilter = &status
+				} else {
+					l.Warnw("无效的状态值",
+						"status", statusStr,
+					)
+				}
+			}
+
+			// 使用 orgID 查询
+			pagination := assessment.NewPagination(dto.Page, dto.PageSize)
+			assessments, total, err = s.repo.FindByOrgID(ctx, int64(dto.OrgID), statusFilter, pagination)
+			if err != nil {
+				l.Errorw("查询组织测评列表失败",
+					"org_id", dto.OrgID,
+					"error", err.Error(),
+				)
+				return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
+			}
+		}
 	}
 
-	// 过滤结果：按 orgID 和 status 过滤
-	filteredAssessments := make([]*assessment.Assessment, 0)
-	for _, a := range assessments {
-		// 过滤 orgID
-		if dto.OrgID > 0 && uint64(a.OrgID()) != dto.OrgID {
-			continue
-		}
-
-		// 过滤 status
-		if statusStr, ok := dto.Conditions["status"]; ok && statusStr != "" {
-			expectedStatus := assessment.Status(statusStr)
-			if !expectedStatus.IsValid() {
-				l.Warnw("无效的状态值",
-					"status", statusStr,
-				)
+	// 如果通过 testee_id 查询，需要过滤 orgID 和 status
+	filteredAssessments := assessments
+	if testeeIDStr, ok := dto.Conditions["testee_id"]; ok && testeeIDStr != "" {
+		filteredAssessments = make([]*assessment.Assessment, 0)
+		for _, a := range assessments {
+			// 过滤 orgID（如果提供了）
+			if dto.OrgID > 0 && uint64(a.OrgID()) != dto.OrgID {
 				continue
 			}
-			if a.Status() != expectedStatus {
-				continue
-			}
-		}
 
-		filteredAssessments = append(filteredAssessments, a)
+			// 过滤 status（如果提供了）
+			if statusStr, ok := dto.Conditions["status"]; ok && statusStr != "" {
+				expectedStatus := assessment.Status(statusStr)
+				if !expectedStatus.IsValid() {
+					l.Warnw("无效的状态值",
+						"status", statusStr,
+					)
+					continue
+				}
+				if a.Status() != expectedStatus {
+					continue
+				}
+			}
+
+			filteredAssessments = append(filteredAssessments, a)
+		}
 	}
 
 	// 转换结果

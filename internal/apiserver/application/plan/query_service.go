@@ -4,21 +4,22 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 计划查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	planRepo plan.AssessmentPlanRepository
-	taskRepo plan.AssessmentTaskRepository
+	planRepo domainPlan.AssessmentPlanRepository
+	taskRepo domainPlan.AssessmentTaskRepository
 }
 
 // NewQueryService 创建计划查询服务
 func NewQueryService(
-	planRepo plan.AssessmentPlanRepository,
-	taskRepo plan.AssessmentTaskRepository,
+	planRepo domainPlan.AssessmentPlanRepository,
+	taskRepo domainPlan.AssessmentTaskRepository,
 ) PlanQueryService {
 	return &queryService{
 		planRepo: planRepo,
@@ -95,11 +96,60 @@ func (s *queryService) GetTask(ctx context.Context, taskID string) (*TaskResult,
 
 // ListTasks 查询任务列表
 func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskListResult, error) {
-	// TODO: 实现分页查询逻辑
-	// 目前先返回空列表，等待仓储层实现分页查询方法
+	// 1. 验证分页参数
+	if dto.Page <= 0 {
+		dto.Page = 1
+	}
+	if dto.PageSize <= 0 {
+		dto.PageSize = 10
+	}
+	if dto.PageSize > 100 {
+		dto.PageSize = 100 // 限制最大每页数量
+	}
+
+	// 2. 转换查询条件
+	var planID *domainPlan.AssessmentPlanID
+	if dto.PlanID != "" {
+		id, err := toPlanID(dto.PlanID)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+		}
+		planID = &id
+	}
+
+	var testeeID *testee.ID
+	if dto.TesteeID != "" {
+		id, err := toTesteeID(dto.TesteeID)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+		}
+		testeeID = &id
+	}
+
+	var status *domainPlan.TaskStatus
+	if dto.Status != "" {
+		statusVal := domainPlan.TaskStatus(dto.Status)
+		if !statusVal.IsValid() {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务状态: %s", dto.Status)
+		}
+		status = &statusVal
+	}
+
+	// 3. 查询任务列表
+	tasks, total, err := s.taskRepo.FindList(ctx, planID, testeeID, status, dto.Page, dto.PageSize)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务列表失败")
+	}
+
+	// 4. 转换为结果
+	items := make([]*TaskResult, 0, len(tasks))
+	for _, task := range tasks {
+		items = append(items, toTaskResult(task))
+	}
+
 	return &TaskListResult{
-		Items:    []*TaskResult{},
-		Total:    0,
+		Items:    items,
+		Total:    total,
 		Page:     dto.Page,
 		PageSize: dto.PageSize,
 	}, nil

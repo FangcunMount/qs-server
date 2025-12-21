@@ -58,6 +58,9 @@ type Repository interface {
 
 	// FindPendingSubmission 查找待提交的测评
 	FindPendingSubmission(ctx context.Context, pagination Pagination) ([]*Assessment, int64, error)
+
+	// FindByOrgID 按组织ID查询测评列表（支持分页和条件筛选）
+	FindByOrgID(ctx context.Context, orgID int64, status *Status, pagination Pagination) ([]*Assessment, int64, error)
 }
 
 // ==================== AssessmentScore Repository ====================

@@ -3,10 +3,12 @@ package handler
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -27,6 +29,9 @@ type ActorHandler struct {
 	staffQueryService         staffApp.StaffQueryService
 	// IAM 服务（可选）
 	guardianshipService *iam.GuardianshipService
+	// Evaluation 服务（用于查询测评记录）
+	assessmentManagementService assessmentApp.AssessmentManagementService
+	scoreQueryService           assessmentApp.ScoreQueryService
 }
 
 // NewActorHandler 创建 Actor Handler
@@ -39,17 +44,21 @@ func NewActorHandler(
 	staffAuthorizationService staffApp.StaffAuthorizationService,
 	staffQueryService staffApp.StaffQueryService,
 	guardianshipService *iam.GuardianshipService,
+	assessmentManagementService assessmentApp.AssessmentManagementService,
+	scoreQueryService assessmentApp.ScoreQueryService,
 ) *ActorHandler {
 	return &ActorHandler{
-		BaseHandler:               NewBaseHandler(),
-		testeeRegistrationService: testeeRegistrationService,
-		testeeManagementService:   testeeManagementService,
-		testeeQueryService:        testeeQueryService,
-		testeeBackendQueryService: testeeBackendQueryService,
-		staffLifecycleService:     staffLifecycleService,
-		staffAuthorizationService: staffAuthorizationService,
-		staffQueryService:         staffQueryService,
-		guardianshipService:       guardianshipService,
+		BaseHandler:                 NewBaseHandler(),
+		testeeRegistrationService:   testeeRegistrationService,
+		testeeManagementService:     testeeManagementService,
+		testeeQueryService:          testeeQueryService,
+		testeeBackendQueryService:   testeeBackendQueryService,
+		staffLifecycleService:       staffLifecycleService,
+		staffAuthorizationService:   staffAuthorizationService,
+		staffQueryService:           staffQueryService,
+		guardianshipService:         guardianshipService,
+		assessmentManagementService: assessmentManagementService,
+		scoreQueryService:           scoreQueryService,
 	}
 }
 
@@ -128,10 +137,115 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 		return
 	}
 
-	// TODO: 查询该受试者的所有测评记录，按量表分组
-	// 当前返回空数据结构
+	// 查询该受试者的所有测评记录
+	listDTO := assessmentApp.ListAssessmentsDTO{
+		OrgID:    0, // 不限制组织
+		Page:     1,
+		PageSize: 1000, // 获取所有记录
+		Conditions: map[string]string{
+			"testee_id": strconv.FormatUint(id, 10),
+		},
+	}
+
+	assessmentList, err := h.assessmentManagementService.List(c.Request.Context(), listDTO)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to list assessments",
+			"action", "get_scale_analysis",
+			"testee_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	// 按量表分组
+	scaleMap := make(map[string]*response.ScaleTrendResponse)
+	for _, assessment := range assessmentList.Items {
+		// 只处理已解读的测评
+		if assessment.Status != "interpreted" || assessment.MedicalScaleCode == nil {
+			continue
+		}
+
+		scaleCode := *assessment.MedicalScaleCode
+		scaleName := ""
+		if assessment.MedicalScaleName != nil {
+			scaleName = *assessment.MedicalScaleName
+		}
+
+		// 获取或创建量表趋势
+		scaleTrend, exists := scaleMap[scaleCode]
+		if !exists {
+			scaleTrend = &response.ScaleTrendResponse{
+				ScaleID:   "",
+				ScaleCode: scaleCode,
+				ScaleName: scaleName,
+				Tests:     []response.ScaleTestResponse{},
+			}
+			if assessment.MedicalScaleID != nil {
+				scaleTrend.ScaleID = strconv.FormatUint(*assessment.MedicalScaleID, 10)
+			}
+			scaleMap[scaleCode] = scaleTrend
+		}
+
+		// 获取测评得分
+		var totalScore float64
+		var riskLevel string
+		var testDate time.Time
+		if assessment.TotalScore != nil {
+			totalScore = *assessment.TotalScore
+		}
+		if assessment.RiskLevel != nil {
+			riskLevel = *assessment.RiskLevel
+		}
+		if assessment.InterpretedAt != nil {
+			testDate = *assessment.InterpretedAt
+		} else if assessment.SubmittedAt != nil {
+			testDate = *assessment.SubmittedAt
+		}
+
+		// 查询因子得分
+		factors := []response.ScaleFactorResponse{}
+		scoreResult, err := h.scoreQueryService.GetByAssessmentID(c.Request.Context(), assessment.ID)
+		if err == nil && scoreResult != nil {
+			for _, factorScore := range scoreResult.FactorScores {
+				factors = append(factors, response.ScaleFactorResponse{
+					FactorCode: factorScore.FactorCode,
+					FactorName: factorScore.FactorName,
+					RawScore:   factorScore.RawScore,
+					RiskLevel:  factorScore.RiskLevel,
+				})
+			}
+		}
+
+		// 构建测评记录
+		testRecord := response.ScaleTestResponse{
+			AssessmentID: strconv.FormatUint(assessment.ID, 10),
+			TestDate:     testDate,
+			TotalScore:   totalScore,
+			RiskLevel:    riskLevel,
+			Result:       "", // TODO: 从报告中获取结果描述
+			Factors:      factors,
+		}
+
+		scaleTrend.Tests = append(scaleTrend.Tests, testRecord)
+	}
+
+	// 转换为列表并按时间排序
+	scales := make([]response.ScaleTrendResponse, 0, len(scaleMap))
+	for _, scaleTrend := range scaleMap {
+		// 按测试日期升序排序
+		for i := 0; i < len(scaleTrend.Tests)-1; i++ {
+			for j := i + 1; j < len(scaleTrend.Tests); j++ {
+				if scaleTrend.Tests[i].TestDate.After(scaleTrend.Tests[j].TestDate) {
+					scaleTrend.Tests[i], scaleTrend.Tests[j] = scaleTrend.Tests[j], scaleTrend.Tests[i]
+				}
+			}
+		}
+		scales = append(scales, *scaleTrend)
+	}
+
 	resp := &response.ScaleAnalysisResponse{
-		Scales: []response.ScaleTrendResponse{},
+		Scales: scales,
 	}
 
 	h.Success(c, resp)
@@ -667,4 +781,13 @@ func toStaffListResponse(results []*staffApp.StaffResult, total int64, page, pag
 		PageSize:   pageSize,
 		TotalPages: totalPages,
 	}
+}
+
+// SetEvaluationServices 设置评估服务（用于延迟注入）
+func (h *ActorHandler) SetEvaluationServices(
+	assessmentManagementService assessmentApp.AssessmentManagementService,
+	scoreQueryService assessmentApp.ScoreQueryService,
+) {
+	h.assessmentManagementService = assessmentManagementService
+	h.scoreQueryService = scoreQueryService
 }
