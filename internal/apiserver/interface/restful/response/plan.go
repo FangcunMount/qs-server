@@ -10,7 +10,7 @@ import (
 type PlanResponse struct {
 	ID            string   `json:"id"`
 	OrgID         int64    `json:"org_id"`
-	ScaleID       string   `json:"scale_id"`
+	ScaleCode     string   `json:"scale_code"`
 	ScheduleType  string   `json:"schedule_type"`
 	Interval      int      `json:"interval"`
 	TotalTimes    int      `json:"total_times"`
@@ -26,7 +26,7 @@ type TaskResponse struct {
 	Seq          int     `json:"seq"`
 	OrgID        int64   `json:"org_id"`
 	TesteeID     string  `json:"testee_id"`
-	ScaleID      string  `json:"scale_id"`
+	ScaleCode    string  `json:"scale_code"`
 	PlannedAt    string  `json:"planned_at"`
 	OpenAt       *string `json:"open_at,omitempty"`
 	ExpireAt     *string `json:"expire_at,omitempty"`
@@ -70,7 +70,7 @@ func NewPlanResponse(result *plan.PlanResult) *PlanResponse {
 	return &PlanResponse{
 		ID:            result.ID,
 		OrgID:         result.OrgID,
-		ScaleID:       result.ScaleID,
+		ScaleCode:     result.ScaleCode,
 		ScheduleType:  result.ScheduleType,
 		Interval:      result.Interval,
 		TotalTimes:    result.TotalTimes,
@@ -92,7 +92,7 @@ func NewTaskResponse(result *plan.TaskResult) *TaskResponse {
 		Seq:          result.Seq,
 		OrgID:        result.OrgID,
 		TesteeID:     result.TesteeID,
-		ScaleID:      result.ScaleID,
+		ScaleCode:    result.ScaleCode,
 		PlannedAt:    result.PlannedAt,
 		OpenAt:       result.OpenAt,
 		ExpireAt:     result.ExpireAt,

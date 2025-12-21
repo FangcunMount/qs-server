@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -17,6 +18,7 @@ import (
 type lifecycleService struct {
 	planRepo       plan.AssessmentPlanRepository
 	taskRepo       plan.AssessmentTaskRepository
+	scaleRepo      scale.Repository
 	validator      *plan.PlanValidator
 	lifecycle      *plan.PlanLifecycle
 	eventPublisher event.EventPublisher
@@ -26,6 +28,7 @@ type lifecycleService struct {
 func NewLifecycleService(
 	planRepo plan.AssessmentPlanRepository,
 	taskRepo plan.AssessmentTaskRepository,
+	scaleRepo scale.Repository,
 	eventPublisher event.EventPublisher,
 ) PlanLifecycleService {
 	taskGenerator := plan.NewTaskGenerator()
@@ -35,6 +38,7 @@ func NewLifecycleService(
 	return &lifecycleService{
 		planRepo:       planRepo,
 		taskRepo:       taskRepo,
+		scaleRepo:      scaleRepo,
 		validator:      plan.NewPlanValidator(),
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
@@ -46,7 +50,7 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 	logger.L(ctx).Infow("CreatePlan service started",
 		"action", "create_plan",
 		"org_id", dto.OrgID,
-		"scale_id", dto.ScaleID,
+		"scale_code", dto.ScaleCode,
 		"schedule_type", dto.ScheduleType,
 		"interval", dto.Interval,
 		"total_times", dto.TotalTimes,
@@ -54,24 +58,33 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"relative_weeks", dto.RelativeWeeks,
 	)
 
-	// 1. 转换参数
-	logger.L(ctx).Infow("CreatePlan converting scale_id",
+	// 1. 验证 scale code 是否存在
+	logger.L(ctx).Infow("CreatePlan validating scale_code",
 		"action", "create_plan",
-		"scale_id", dto.ScaleID,
+		"scale_code", dto.ScaleCode,
 	)
-	scaleID, err := toScaleID(dto.ScaleID)
-	if err != nil {
-		logger.L(ctx).Errorw("CreatePlan invalid scale ID",
+	if s.scaleRepo != nil {
+		exists, err := s.scaleRepo.ExistsByCode(ctx, dto.ScaleCode)
+		if err != nil {
+			logger.L(ctx).Errorw("CreatePlan scale validation error",
+				"action", "create_plan",
+				"scale_code", dto.ScaleCode,
+				"error", err.Error(),
+			)
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "验证量表编码失败: %s", dto.ScaleCode)
+		}
+		if !exists {
+			logger.L(ctx).Errorw("CreatePlan scale not found",
+				"action", "create_plan",
+				"scale_code", dto.ScaleCode,
+			)
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的量表编码: %s", dto.ScaleCode)
+		}
+		logger.L(ctx).Infow("CreatePlan scale_code validated",
 			"action", "create_plan",
-			"scale_id", dto.ScaleID,
-			"error", err.Error(),
+			"scale_code", dto.ScaleCode,
 		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的量表ID: %v", err)
 	}
-	logger.L(ctx).Infow("CreatePlan scale_id converted",
-		"action", "create_plan",
-		"scale_id_parsed", scaleID.String(),
-	)
 
 	logger.L(ctx).Infow("CreatePlan converting schedule_type",
 		"action", "create_plan",
@@ -158,14 +171,14 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 	logger.L(ctx).Infow("CreatePlan validating parameters",
 		"action", "create_plan",
 		"org_id", dto.OrgID,
-		"scale_id", scaleID.String(),
+		"scale_code", dto.ScaleCode,
 		"schedule_type", string(scheduleType),
 		"interval", dto.Interval,
 		"total_times", totalTimes,
 		"fixed_dates_count", len(fixedDates),
 		"relative_weeks_count", len(dto.RelativeWeeks),
 	)
-	if errs := s.validator.ValidateForCreation(dto.OrgID, scaleID, scheduleType, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
+	if errs := s.validator.ValidateForCreation(dto.OrgID, dto.ScaleCode, scheduleType, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
 		logger.L(ctx).Errorw("CreatePlan validation failed",
 			"action", "create_plan",
 			"org_id", dto.OrgID,
@@ -216,17 +229,17 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 	logger.L(ctx).Infow("CreatePlan creating domain object",
 		"action", "create_plan",
 		"org_id", dto.OrgID,
-		"scale_id", scaleID.String(),
+		"scale_code", dto.ScaleCode,
 		"schedule_type", string(scheduleType),
 		"interval", dto.Interval,
 		"total_times", totalTimes,
 	)
-	p, err := plan.NewAssessmentPlan(dto.OrgID, scaleID, scheduleType, dto.Interval, totalTimes, opts...)
+	p, err := plan.NewAssessmentPlan(dto.OrgID, dto.ScaleCode, scheduleType, dto.Interval, totalTimes, opts...)
 	if err != nil {
 		logger.L(ctx).Errorw("CreatePlan failed to create domain object",
 			"action", "create_plan",
 			"org_id", dto.OrgID,
-			"scale_id", scaleID.String(),
+			"scale_code", dto.ScaleCode,
 			"schedule_type", string(scheduleType),
 			"interval", dto.Interval,
 			"total_times", totalTimes,

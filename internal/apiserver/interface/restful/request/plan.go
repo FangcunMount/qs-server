@@ -8,7 +8,7 @@ package request
 //   - fixed_date: 需要 fixed_dates（不需要 interval 和 total_times）
 //   - custom: 需要 relative_weeks（不需要 interval 和 total_times）
 type CreatePlanRequest struct {
-	ScaleID       string   `json:"scale_id" valid:"required~量表ID不能为空"`
+	ScaleCode     string   `json:"scale_code" valid:"required~量表编码不能为空"`
 	ScheduleType  string   `json:"schedule_type" valid:"required~周期类型不能为空"`
 	Interval      int      `json:"interval,omitempty"`       // 间隔（用于 by_week/by_day）
 	TotalTimes    int      `json:"total_times,omitempty"`    // 总次数（用于 by_week/by_day）
@@ -44,11 +44,11 @@ type OpenTaskRequest struct {
 
 // ListPlansRequest 查询计划列表请求
 type ListPlansRequest struct {
-	OrgID    int64  `form:"org_id"`
-	ScaleID  string `form:"scale_id"`
-	Status   string `form:"status"`
-	Page     int    `form:"page" valid:"required~页码不能为空"`
-	PageSize int    `form:"page_size" valid:"required~每页数量不能为空"`
+	OrgID     int64  `form:"org_id"`
+	ScaleCode string `form:"scale_code"`
+	Status    string `form:"status"`
+	Page      int    `form:"page" valid:"required~页码不能为空"`
+	PageSize  int    `form:"page_size" valid:"required~每页数量不能为空"`
 }
 
 // ListTasksRequest 查询任务列表请求

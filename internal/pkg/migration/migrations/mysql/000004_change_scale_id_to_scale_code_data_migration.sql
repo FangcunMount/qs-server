@@ -1,0 +1,46 @@
+-- 数据迁移脚本：将 scale_id 转换为 scale_code
+-- 注意：此脚本需要手动执行，因为需要从 MongoDB 的 scale 表查询数据
+-- 执行时机：在运行 000004_change_scale_id_to_scale_code.up.sql 之前
+-- 
+-- 使用说明：
+-- 1. 此脚本假设你已经有一个临时表存储了 scale_id 到 scale_code 的映射
+-- 2. 或者你需要先查询 MongoDB 的 scale 表，获取所有 scale 的 id 和 code 映射
+-- 3. 然后执行此脚本更新数据
+--
+-- 示例：创建临时映射表
+-- CREATE TEMPORARY TABLE scale_id_to_code_mapping (
+--   scale_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+--   scale_code VARCHAR(100) NOT NULL
+-- );
+--
+-- 然后从 MongoDB 查询并插入映射数据（需要手动执行）
+-- INSERT INTO scale_id_to_code_mapping (scale_id, scale_code) VALUES
+--   (1, '3adyDE'),
+--   (2, 'another_code'),
+--   ...;
+--
+-- 执行数据迁移
+-- UPDATE assessment_plan ap
+-- INNER JOIN scale_id_to_code_mapping m ON ap.scale_id = m.scale_id
+-- SET ap.scale_code = m.scale_code
+-- WHERE ap.deleted_at IS NULL;
+--
+-- UPDATE assessment_task at
+-- INNER JOIN scale_id_to_code_mapping m ON at.scale_id = m.scale_id
+-- SET at.scale_code = m.scale_code
+-- WHERE at.deleted_at IS NULL;
+--
+-- 验证数据迁移结果
+-- SELECT COUNT(*) as total_plans, 
+--        COUNT(CASE WHEN scale_code = '' THEN 1 END) as empty_codes
+-- FROM assessment_plan 
+-- WHERE deleted_at IS NULL;
+--
+-- SELECT COUNT(*) as total_tasks, 
+--        COUNT(CASE WHEN scale_code = '' THEN 1 END) as empty_codes
+-- FROM assessment_task 
+-- WHERE deleted_at IS NULL;
+
+-- 注意：如果 scale_id 在 scale 表中不存在，scale_code 将保持为空字符串
+-- 这些记录需要在迁移后手动处理或删除
+

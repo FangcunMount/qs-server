@@ -6,7 +6,7 @@ package plan
 // CreatePlanDTO 创建计划 DTO
 type CreatePlanDTO struct {
 	OrgID         int64    // 机构ID
-	ScaleID       string   // 量表ID
+	ScaleCode     string   // 量表编码
 	ScheduleType  string   // 周期类型：by_week, by_day, custom, fixed_date
 	Interval      int      // 间隔（用于 by_week/by_day）
 	TotalTimes    int      // 总次数
@@ -30,11 +30,11 @@ type OpenTaskDTO struct {
 
 // ListPlansDTO 查询计划列表 DTO
 type ListPlansDTO struct {
-	OrgID    int64  // 机构ID（可选）
-	ScaleID  string // 量表ID（可选）
-	Status   string // 状态（可选）
-	Page     int    // 页码（从1开始）
-	PageSize int    // 每页数量
+	OrgID     int64  // 机构ID（可选）
+	ScaleCode string // 量表编码（可选）
+	Status    string // 状态（可选）
+	Page      int    // 页码（从1开始）
+	PageSize  int    // 每页数量
 }
 
 // ListTasksDTO 查询任务列表 DTO

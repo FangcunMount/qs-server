@@ -92,7 +92,7 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 
 	logger.L(ctx).Infow("CreatePlan request parsed",
 		"action", "create_plan",
-		"scale_id", req.ScaleID,
+		"scale_code", req.ScaleCode,
 		"schedule_type", req.ScheduleType,
 		"interval", req.Interval,
 		"total_times", req.TotalTimes,
@@ -191,7 +191,7 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 
 	dto := planApp.CreatePlanDTO{
 		OrgID:         orgID,
-		ScaleID:       req.ScaleID,
+		ScaleCode:     req.ScaleCode,
 		ScheduleType:  req.ScheduleType,
 		Interval:      req.Interval,
 		TotalTimes:    req.TotalTimes,
@@ -623,7 +623,7 @@ func (h *PlanHandler) GetPlan(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param org_id query int false "机构ID"
-// @Param scale_id query string false "量表ID"
+// @Param scale_code query string false "量表编码"
 // @Param status query string false "状态"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
@@ -646,11 +646,11 @@ func (h *PlanHandler) ListPlans(c *gin.Context) {
 	}
 
 	dto := planApp.ListPlansDTO{
-		OrgID:    req.OrgID,
-		ScaleID:  req.ScaleID,
-		Status:   req.Status,
-		Page:     req.Page,
-		PageSize: req.PageSize,
+		OrgID:     req.OrgID,
+		ScaleCode: req.ScaleCode,
+		Status:    req.Status,
+		Page:      req.Page,
+		PageSize:  req.PageSize,
 	}
 
 	result, err := h.queryService.ListPlans(c.Request.Context(), dto)

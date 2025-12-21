@@ -19,7 +19,7 @@ type AssessmentPlanPO struct {
 	OrgID int64 `gorm:"column:org_id;not null;index:idx_org_id"`
 
 	// 量表引用
-	ScaleID uint64 `gorm:"column:scale_id;not null;index:idx_scale_id"`
+	ScaleCode string `gorm:"column:scale_code;size:100;not null;index:idx_scale_code"`
 
 	// 周期策略
 	ScheduleType  string      `gorm:"column:schedule_type;size:50;not null;index:idx_schedule_type"`
@@ -69,7 +69,7 @@ type AssessmentTaskPO struct {
 	TesteeID uint64 `gorm:"column:testee_id;not null;index:idx_testee_id"`
 
 	// 量表引用（冗余，用于查询优化）
-	ScaleID uint64 `gorm:"column:scale_id;not null;index:idx_scale_id"`
+	ScaleCode string `gorm:"column:scale_code;size:100;not null;index:idx_scale_code"`
 
 	// 时间点
 	PlannedAt   time.Time  `gorm:"column:planned_at;not null;index:idx_planned_at"`

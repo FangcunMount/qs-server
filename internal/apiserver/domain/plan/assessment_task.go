@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -18,7 +17,7 @@ import (
 // 3. 与 Assessment 关联（1:0..1 关系）
 //
 // 设计说明：
-// - orgID 和 scaleID 保留在 Task 中，用于查询优化和权限控制，避免 JOIN Plan 表
+// - orgID 和 scaleCode 保留在 Task 中，用于查询优化和权限控制，避免 JOIN Plan 表
 // - 审计字段（createdAt, updatedAt, version 等）由基础设施层处理，领域层不关心
 type AssessmentTask struct {
 	// === 核心标识 ===
@@ -27,9 +26,9 @@ type AssessmentTask struct {
 	seq    int // 第 N 次测评
 
 	// === 关联实体引用 ===
-	orgID    int64 // 机构ID（用于查询优化和权限控制）
-	testeeID testee.ID
-	scaleID  meta.ID
+	orgID     int64 // 机构ID（用于查询优化和权限控制）
+	testeeID  testee.ID
+	scaleCode string // 量表编码（用于查询优化）
 
 	// === 时间点 ===
 	plannedAt   time.Time  // 计划时间点
@@ -57,7 +56,7 @@ func NewAssessmentTask(
 	seq int,
 	orgID int64,
 	testeeID testee.ID,
-	scaleID meta.ID,
+	scaleCode string,
 	plannedAt time.Time,
 ) *AssessmentTask {
 	return &AssessmentTask{
@@ -66,7 +65,7 @@ func NewAssessmentTask(
 		seq:       seq,
 		orgID:     orgID,
 		testeeID:  testeeID,
-		scaleID:   scaleID,
+		scaleCode: scaleCode,
 		plannedAt: plannedAt,
 		status:    TaskStatusPending,
 		events:    make([]event.DomainEvent, 0),
@@ -100,9 +99,9 @@ func (t *AssessmentTask) GetTesteeID() testee.ID {
 	return t.testeeID
 }
 
-// GetScaleID 获取量表ID
-func (t *AssessmentTask) GetScaleID() meta.ID {
-	return t.scaleID
+// GetScaleCode 获取量表编码
+func (t *AssessmentTask) GetScaleCode() string {
+	return t.scaleCode
 }
 
 // GetPlannedAt 获取计划时间点

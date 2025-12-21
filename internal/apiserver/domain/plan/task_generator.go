@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // TaskGenerator 任务生成器
@@ -38,7 +37,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
-				plan.GetScaleID(),
+				plan.GetScaleCode(),
 				plannedAt,
 			)
 			tasks = append(tasks, task)
@@ -53,7 +52,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
-				plan.GetScaleID(),
+				plan.GetScaleCode(),
 				plannedAt,
 			)
 			tasks = append(tasks, task)
@@ -70,7 +69,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
-				plan.GetScaleID(),
+				plan.GetScaleCode(),
 				plannedAt,
 			)
 			tasks = append(tasks, task)
@@ -85,7 +84,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
-				plan.GetScaleID(),
+				plan.GetScaleCode(),
 				date,
 			)
 			tasks = append(tasks, task)
@@ -119,7 +118,7 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 				seq,
 				plan.GetOrgID(),
 				testeeID,
-				plan.GetScaleID(),
+				plan.GetScaleCode(),
 				currentDate,
 			)
 			tasks = append(tasks, task)
@@ -136,7 +135,7 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 				seq,
 				plan.GetOrgID(),
 				testeeID,
-				plan.GetScaleID(),
+				plan.GetScaleCode(),
 				currentDate,
 			)
 			tasks = append(tasks, task)
@@ -156,7 +155,7 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 					seq,
 					plan.GetOrgID(),
 					testeeID,
-					plan.GetScaleID(),
+					plan.GetScaleCode(),
 					plannedAt,
 				)
 				tasks = append(tasks, task)
@@ -174,7 +173,7 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 					seq,
 					plan.GetOrgID(),
 					testeeID,
-					plan.GetScaleID(),
+					plan.GetScaleCode(),
 					date,
 				)
 				tasks = append(tasks, task)
@@ -211,13 +210,13 @@ func FilterNewTasks(newTasks []*AssessmentTask, existingTasks []*AssessmentTask)
 	return result
 }
 
-// Helper function for creating tasks with testee and scale IDs
-// This is a convenience function that can be used when you have the IDs directly
+// Helper function for creating tasks with testee and scale code
+// This is a convenience function that can be used when you have the code directly
 func GenerateTasksWithIDs(
 	planID AssessmentPlanID,
 	orgID int64,
 	testeeID testee.ID,
-	scaleID meta.ID,
+	scaleCode string,
 	scheduleType PlanScheduleType,
 	interval int,
 	totalTimes int,
@@ -233,14 +232,14 @@ func GenerateTasksWithIDs(
 	case PlanScheduleByWeek:
 		for i := 0; i < totalTimes; i++ {
 			plannedAt := startDate.AddDate(0, 0, i*interval*7)
-			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleID, plannedAt)
+			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, plannedAt)
 			tasks = append(tasks, task)
 		}
 
 	case PlanScheduleByDay:
 		for i := 0; i < totalTimes; i++ {
 			plannedAt := startDate.AddDate(0, 0, i*interval)
-			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleID, plannedAt)
+			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, plannedAt)
 			tasks = append(tasks, task)
 		}
 
@@ -248,13 +247,13 @@ func GenerateTasksWithIDs(
 		for i, week := range customWeeks {
 			// 相对周次：相对于 startDate 的偏移
 			plannedAt := startDate.AddDate(0, 0, week*7)
-			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleID, plannedAt)
+			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, plannedAt)
 			tasks = append(tasks, task)
 		}
 
 	case PlanScheduleFixedDate:
 		for i, date := range fixedDates {
-			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleID, date)
+			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, date)
 			tasks = append(tasks, task)
 		}
 	}

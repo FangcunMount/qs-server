@@ -8,7 +8,6 @@ import (
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"gorm.io/gorm"
 )
 
@@ -42,11 +41,11 @@ func (r *planRepository) FindByID(ctx context.Context, id domainPlan.AssessmentP
 	return r.mapper.ToDomain(po), nil
 }
 
-// FindByScaleID 查询某个量表的所有计划
-func (r *planRepository) FindByScaleID(ctx context.Context, scaleID meta.ID) ([]*domainPlan.AssessmentPlan, error) {
+// FindByScaleCode 查询某个量表的所有计划
+func (r *planRepository) FindByScaleCode(ctx context.Context, scaleCode string) ([]*domainPlan.AssessmentPlan, error) {
 	var pos []*AssessmentPlanPO
 	err := r.WithContext(ctx).
-		Where("scale_id = ? AND deleted_at IS NULL", scaleID.Uint64()).
+		Where("scale_code = ? AND deleted_at IS NULL", scaleCode).
 		Find(&pos).Error
 
 	if err != nil {

@@ -3,7 +3,6 @@ package plan
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -25,7 +24,7 @@ type AssessmentPlan struct {
 	orgID int64
 
 	// === 关联实体引用 ===
-	scaleID meta.ID
+	scaleCode string
 
 	// === 周期策略 ===
 	// 所有周期策略都是相对时间窗口，不是绝对日期
@@ -52,7 +51,7 @@ type AssessmentPlan struct {
 // - 审计字段（createdAt, updatedAt, version 等）由基础设施层处理，领域层不关心
 func NewAssessmentPlan(
 	orgID int64,
-	scaleID meta.ID,
+	scaleCode string,
 	scheduleType PlanScheduleType,
 	interval int,
 	totalTimes int,
@@ -62,7 +61,7 @@ func NewAssessmentPlan(
 	if orgID <= 0 {
 		return nil, ErrInvalidInterval
 	}
-	if scaleID.IsZero() {
+	if scaleCode == "" {
 		return nil, ErrPlanNotFound
 	}
 	if !scheduleType.IsValid() {
@@ -80,7 +79,7 @@ func NewAssessmentPlan(
 	plan := &AssessmentPlan{
 		id:           NewAssessmentPlanID(),
 		orgID:        orgID,
-		scaleID:      scaleID,
+		scaleCode:    scaleCode,
 		scheduleType: scheduleType,
 		interval:     interval,
 		totalTimes:   totalTimes,
@@ -96,7 +95,7 @@ func NewAssessmentPlan(
 	// 发布计划创建事件
 	plan.addEvent(NewPlanCreatedEvent(
 		plan.id,
-		plan.scaleID,
+		plan.scaleCode,
 		time.Now(),
 	))
 
@@ -133,9 +132,9 @@ func (p *AssessmentPlan) GetOrgID() int64 {
 	return p.orgID
 }
 
-// GetScaleID 获取量表ID
-func (p *AssessmentPlan) GetScaleID() meta.ID {
-	return p.scaleID
+// GetScaleCode 获取量表编码
+func (p *AssessmentPlan) GetScaleCode() string {
+	return p.scaleCode
 }
 
 // GetScheduleType 获取周期类型

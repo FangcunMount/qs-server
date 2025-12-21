@@ -27,7 +27,7 @@ func (m *PlanMapper) ToPO(domain *domainPlan.AssessmentPlan) *AssessmentPlanPO {
 
 	po := &AssessmentPlanPO{
 		OrgID:        domain.GetOrgID(),
-		ScaleID:      domain.GetScaleID().Uint64(),
+		ScaleCode:    domain.GetScaleCode(),
 		ScheduleType: string(domain.GetScheduleType()),
 		Interval:     domain.GetInterval(),
 		TotalTimes:   domain.GetTotalTimes(),
@@ -93,7 +93,7 @@ func (m *PlanMapper) ToDomain(po *AssessmentPlanPO) *domainPlan.AssessmentPlan {
 	// 创建领域对象
 	plan, err := domainPlan.NewAssessmentPlan(
 		po.OrgID,
-		meta.FromUint64(po.ScaleID),
+		po.ScaleCode,
 		domainPlan.PlanScheduleType(po.ScheduleType),
 		po.Interval,
 		po.TotalTimes,
@@ -159,7 +159,7 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 		Seq:        domain.GetSeq(),
 		OrgID:      domain.GetOrgID(),
 		TesteeID:   domain.GetTesteeID().Uint64(),
-		ScaleID:    domain.GetScaleID().Uint64(),
+		ScaleCode:  domain.GetScaleCode(),
 		PlannedAt:  domain.GetPlannedAt(),
 		Status:     string(domain.GetStatus()),
 		EntryToken: domain.GetEntryToken(),
@@ -201,7 +201,7 @@ func (m *TaskMapper) ToDomain(po *AssessmentTaskPO) *domainPlan.AssessmentTask {
 		po.Seq,
 		po.OrgID,
 		testee.ID(meta.FromUint64(po.TesteeID)),
-		meta.FromUint64(po.ScaleID),
+		po.ScaleCode,
 		po.PlannedAt,
 	)
 

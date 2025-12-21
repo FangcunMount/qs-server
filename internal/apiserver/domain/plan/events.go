@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -36,7 +35,7 @@ const (
 // PlanCreatedData 计划创建事件数据
 type PlanCreatedData struct {
 	PlanID    string    `json:"plan_id"`
-	ScaleID   string    `json:"scale_id"`
+	ScaleCode string    `json:"scale_code"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -83,7 +82,7 @@ type TaskExpiredEvent = event.Event[TaskExpiredData]
 // NewPlanCreatedEvent 创建计划创建事件
 func NewPlanCreatedEvent(
 	planID AssessmentPlanID,
-	scaleID meta.ID,
+	scaleCode string,
 	createdAt time.Time,
 ) PlanCreatedEvent {
 	return event.New(
@@ -92,7 +91,7 @@ func NewPlanCreatedEvent(
 		planID.String(),
 		PlanCreatedData{
 			PlanID:    planID.String(),
-			ScaleID:   scaleID.String(),
+			ScaleCode: scaleCode,
 			CreatedAt: createdAt,
 		},
 	)

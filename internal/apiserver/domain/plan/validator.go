@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ValidationError 验证错误
@@ -34,7 +33,7 @@ func NewPlanValidator() *PlanValidator {
 // ValidateForCreation 验证计划创建参数
 func (v *PlanValidator) ValidateForCreation(
 	orgID int64,
-	scaleID meta.ID,
+	scaleCode string,
 	scheduleType PlanScheduleType,
 	interval int,
 	totalTimes int,
@@ -46,8 +45,8 @@ func (v *PlanValidator) ValidateForCreation(
 	if orgID <= 0 {
 		errs = append(errs, ValidationError{Field: "orgID", Message: "机构ID不能为空"})
 	}
-	if scaleID.IsZero() {
-		errs = append(errs, ValidationError{Field: "scaleID", Message: "量表ID不能为空"})
+	if scaleCode == "" {
+		errs = append(errs, ValidationError{Field: "scaleCode", Message: "量表编码不能为空"})
 	}
 	if !scheduleType.IsValid() {
 		errs = append(errs, ValidationError{Field: "scheduleType", Message: "无效的周期类型"})

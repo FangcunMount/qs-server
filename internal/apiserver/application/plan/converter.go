@@ -15,7 +15,7 @@ import (
 type PlanResult struct {
 	ID            string   // 计划ID
 	OrgID         int64    // 机构ID
-	ScaleID       string   // 量表ID
+	ScaleCode     string   // 量表编码
 	ScheduleType  string   // 周期类型
 	Interval      int      // 间隔
 	TotalTimes    int      // 总次数
@@ -31,7 +31,7 @@ type TaskResult struct {
 	Seq          int     // 序号
 	OrgID        int64   // 机构ID
 	TesteeID     string  // 受试者ID
-	ScaleID      string  // 量表ID
+	ScaleCode    string  // 量表编码
 	PlannedAt    string  // 计划时间点
 	OpenAt       *string // 开放时间
 	ExpireAt     *string // 截止时间
@@ -80,7 +80,7 @@ func toPlanResult(p *plan.AssessmentPlan) *PlanResult {
 	return &PlanResult{
 		ID:            p.GetID().String(),
 		OrgID:         p.GetOrgID(),
-		ScaleID:       p.GetScaleID().String(),
+		ScaleCode:     p.GetScaleCode(),
 		ScheduleType:  string(p.GetScheduleType()),
 		Interval:      p.GetInterval(),
 		TotalTimes:    p.GetTotalTimes(),
@@ -102,7 +102,7 @@ func toTaskResult(t *plan.AssessmentTask) *TaskResult {
 		Seq:        t.GetSeq(),
 		OrgID:      t.GetOrgID(),
 		TesteeID:   t.GetTesteeID().String(),
-		ScaleID:    t.GetScaleID().String(),
+		ScaleCode:  t.GetScaleCode(),
 		PlannedAt:  t.GetPlannedAt().Format("2006-01-02 15:04:05"),
 		Status:     string(t.GetStatus()),
 		EntryToken: t.GetEntryToken(),
@@ -191,11 +191,6 @@ func toTesteeID(s string) (testee.ID, error) {
 		return meta.ID(0), nil
 	}
 	return testee.ID(id), nil
-}
-
-// toScaleID 转换为量表ID
-func toScaleID(s string) (meta.ID, error) {
-	return meta.ParseID(s)
 }
 
 // toPlanID 转换为计划ID

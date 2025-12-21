@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -69,8 +70,16 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 	// TODO: 从配置中读取 baseURL，默认使用占位符
 	entryGenerator := planEntryInfra.NewEntryGenerator("https://collect.yangshujie.com/entry")
 
+	// 获取 scale repository（可选参数，用于通过 code 查找 scale）
+	var scaleRepo scale.Repository
+	if len(params) > 2 {
+		if sr, ok := params[2].(scale.Repository); ok && sr != nil {
+			scaleRepo = sr
+		}
+	}
+
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	m.LifecycleService = planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, m.eventPublisher)
+	m.LifecycleService = planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, scaleRepo, m.eventPublisher)
 	m.EnrollmentService = planApp.NewEnrollmentService(m.PlanRepo, m.TaskRepo, m.eventPublisher)
 	m.TaskSchedulerService = planApp.NewTaskSchedulerService(m.TaskRepo, entryGenerator, m.eventPublisher)
 	m.TaskManagementService = planApp.NewTaskManagementService(m.TaskRepo, m.eventPublisher)

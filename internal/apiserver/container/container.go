@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -241,7 +242,12 @@ func (c *Container) initEvaluationModule() error {
 // initPlanModule 初始化 Plan 模块
 func (c *Container) initPlanModule() error {
 	planModule := assembler.NewPlanModule()
-	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher); err != nil {
+	// 传入 ScaleRepo 用于通过 code 查找 scale
+	var scaleRepo scale.Repository
+	if c.ScaleModule != nil {
+		scaleRepo = c.ScaleModule.Repo
+	}
+	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher, scaleRepo); err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
 	}
 

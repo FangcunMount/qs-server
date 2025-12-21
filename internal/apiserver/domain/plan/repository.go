@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AssessmentPlanRepository 测评计划仓储接口
@@ -13,8 +12,8 @@ type AssessmentPlanRepository interface {
 	// FindByID 根据 ID 查询计划
 	FindByID(ctx context.Context, id AssessmentPlanID) (*AssessmentPlan, error)
 
-	// FindByScaleID 查询某个量表的所有计划
-	FindByScaleID(ctx context.Context, scaleID meta.ID) ([]*AssessmentPlan, error)
+	// FindByScaleCode 查询某个量表的所有计划
+	FindByScaleCode(ctx context.Context, scaleCode string) ([]*AssessmentPlan, error)
 
 	// FindActivePlans 查询所有活跃的计划
 	FindActivePlans(ctx context.Context) ([]*AssessmentPlan, error)
