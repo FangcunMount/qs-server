@@ -259,7 +259,8 @@ func (s *defaultScoringService) collectQuestionScores(factor *Factor, sheet *ans
 
 	for _, qCode := range factor.GetQuestionCodes() {
 		if answer, found := answerMap[qCode.String()]; found {
-			scores = append(scores, answer.Score())
+			score := answer.Score()
+			scores = append(scores, score)
 		}
 	}
 

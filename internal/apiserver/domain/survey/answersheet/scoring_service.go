@@ -3,8 +3,8 @@ package answersheet
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -152,10 +152,12 @@ func (s *scoringService) buildScoreTasks(answers []Answer, questionMap map[strin
 			continue // 跳过找不到问题定义的答案
 		}
 
+		optionScoreMap := buildOptionScoreMap(question.GetOptions())
+
 		tasks = append(tasks, calculation.ScoreTask{
 			ID:           ans.QuestionCode(),
 			Value:        NewScorableValue(ans.Value()),
-			OptionScores: buildOptionScoreMap(question.GetOptions()),
+			OptionScores: optionScoreMap,
 		})
 	}
 
@@ -209,7 +211,13 @@ func buildQuestionMap(questions []questionnaire.Question) map[string]questionnai
 func buildOptionScoreMap(options []questionnaire.Option) map[string]float64 {
 	optionScoreMap := make(map[string]float64, len(options))
 	for _, opt := range options {
-		optionScoreMap[opt.GetCode().Value()] = opt.GetScore()
+		code := opt.GetCode().Value()
+		score := opt.GetScore()
+		optionScoreMap[code] = score
+		// 调试日志：记录选项分数映射（仅在分数为0时记录，避免日志过多）
+		if score == 0 {
+			// 注意：这里没有 context，无法记录日志，但可以通过其他方式调试
+		}
 	}
 	return optionScoreMap
 }
