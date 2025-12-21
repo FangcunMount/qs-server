@@ -116,21 +116,15 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		"action", "create_plan",
 	)
 
-	// 获取组织ID（从 JWT 中提取）
-	orgIDUint64 := h.GetOrgID(c)
+	// 获取组织ID（从 JWT 中提取，如果为空则使用默认值）
+	orgIDUint64 := h.GetOrgIDWithDefault(c)
 	orgID := int64(orgIDUint64)
 	logger.L(ctx).Infow("CreatePlan got orgID",
 		"action", "create_plan",
 		"org_id_uint64", orgIDUint64,
 		"org_id_int64", orgID,
+		"is_default", orgIDUint64 == DefaultOrgID,
 	)
-	if orgID == 0 {
-		logger.L(ctx).Errorw("CreatePlan orgID is empty",
-			"action", "create_plan",
-		)
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "组织ID不能为空"))
-		return
-	}
 
 	// 根据 schedule_type 验证必需的参数
 	logger.L(ctx).Infow("CreatePlan validating schedule_type",
@@ -646,9 +640,9 @@ func (h *PlanHandler) ListPlans(c *gin.Context) {
 		return
 	}
 
-	// 如果没有指定 org_id，从 JWT 中获取
+	// 如果没有指定 org_id，从 JWT 中获取，如果为空则使用默认值
 	if req.OrgID == 0 {
-		req.OrgID = int64(h.GetOrgID(c))
+		req.OrgID = int64(h.GetOrgIDWithDefault(c))
 	}
 
 	dto := planApp.ListPlansDTO{

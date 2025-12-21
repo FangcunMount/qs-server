@@ -6,6 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	// DefaultOrgID 默认机构ID（单租户场景）
+	DefaultOrgID uint64 = 1
+)
+
 // BaseHandler 基础Handler结构
 // 继承 core.BaseHandler 并添加 apiserver 特定的方法
 type BaseHandler struct {
@@ -41,6 +46,15 @@ func (h *BaseHandler) GetUserIDUint64(c *gin.Context) (uint64, bool) {
 // GetOrgID 从上下文获取组织ID（从 JWT TenantID 解析）
 func (h *BaseHandler) GetOrgID(c *gin.Context) uint64 {
 	return middleware.GetOrgID(c)
+}
+
+// GetOrgIDWithDefault 从上下文获取组织ID，如果为空则返回默认值
+func (h *BaseHandler) GetOrgIDWithDefault(c *gin.Context) uint64 {
+	orgID := h.GetOrgID(c)
+	if orgID == 0 {
+		return DefaultOrgID
+	}
+	return orgID
 }
 
 // GetRoles 从上下文获取用户角色列表
