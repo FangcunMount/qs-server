@@ -560,7 +560,8 @@ paths:
 
         - tags: 标签过滤（数组），动态标签值
 
-        响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）'
+        响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）、question_count（题目数量，不包含
+        Section 题型）'
       operationId: 获取量表列表
       parameters:
       - type: integer
@@ -693,7 +694,9 @@ paths:
 
         - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 
-        - tags: 标签列表（数组，动态输入）'
+        - tags: 标签列表（数组，动态输入）
+
+        - question_count: 题目数量（不包含 Section 题型）'
       operationId: 获取量表详情
       parameters:
       - type: string
@@ -1457,6 +1460,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/scale.FactorResponse'
+        question_count:
+          type: integer
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -1490,6 +1495,8 @@ components:
           type: string
         description:
           type: string
+        question_count:
+          type: integer
         questionnaire_code:
           type: string
         questionnaire_version:

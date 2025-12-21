@@ -22,6 +22,7 @@ type ScaleOutput struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorOutput
+	QuestionCount        int32
 }
 
 // FactorOutput 因子输出
@@ -59,6 +60,7 @@ type ScaleSummaryOutput struct {
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	Status               string
+	QuestionCount        int32
 }
 
 // ListScalesOutput 量表列表输出
@@ -181,6 +183,7 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 			QuestionnaireCode:    s.GetQuestionnaireCode(),
 			QuestionnaireVersion: s.GetQuestionnaireVersion(),
 			Status:               s.GetStatus(),
+			QuestionCount:        s.GetQuestionCount(),
 		}
 	}
 
@@ -275,6 +278,7 @@ func (c *ScaleClient) convertScale(s *pb.Scale) *ScaleOutput {
 		QuestionnaireVersion: s.GetQuestionnaireVersion(),
 		Status:               s.GetStatus(),
 		Factors:              factors,
+		QuestionCount:        s.GetQuestionCount(),
 	}
 }
 

@@ -37,6 +37,7 @@ type ScaleSummary struct {
 	Status               string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt            string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	QuestionCount        int32                  `protobuf:"varint,14,opt,name=question_count,json=questionCount,proto3" json:"question_count,omitempty"` // 题目数量
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -162,6 +163,13 @@ func (x *ScaleSummary) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *ScaleSummary) GetQuestionCount() int32 {
+	if x != nil {
+		return x.QuestionCount
+	}
+	return 0
+}
+
 // 量表完整信息（用于详情查询）
 type Scale struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -179,6 +187,7 @@ type Scale struct {
 	Factors              []*Factor              `protobuf:"bytes,12,rep,name=factors,proto3" json:"factors,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt            string                 `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	QuestionCount        int32                  `protobuf:"varint,15,opt,name=question_count,json=questionCount,proto3" json:"question_count,omitempty"` // 题目数量
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -309,6 +318,13 @@ func (x *Scale) GetUpdatedAt() string {
 		return x.UpdatedAt
 	}
 	return ""
+}
+
+func (x *Scale) GetQuestionCount() int32 {
+	if x != nil {
+		return x.QuestionCount
+	}
+	return 0
 }
 
 // 因子信息
@@ -1156,7 +1172,7 @@ var File_scale_scale_proto protoreflect.FileDescriptor
 
 const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
-	"\x11scale/scale.proto\x12\x05scale\"\xa3\x03\n" +
+	"\x11scale/scale.proto\x12\x05scale\"\xca\x03\n" +
 	"\fScaleSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1173,7 +1189,8 @@ const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\tR\tupdatedAt\"\xc5\x03\n" +
+	"updated_at\x18\r \x01(\tR\tupdatedAt\x12%\n" +
+	"\x0equestion_count\x18\x0e \x01(\x05R\rquestionCount\"\xec\x03\n" +
 	"\x05Scale\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1191,7 +1208,8 @@ const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\r \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\tR\tupdatedAt\"\xb4\x03\n" +
+	"updated_at\x18\x0e \x01(\tR\tupdatedAt\x12%\n" +
+	"\x0equestion_count\x18\x0f \x01(\x05R\rquestionCount\"\xb4\x03\n" +
 	"\x06Factor\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1f\n" +

@@ -14,6 +14,7 @@ type ScaleResponse struct {
 	QuestionnaireVersion string           `json:"questionnaire_version"`
 	Status               string           `json:"status"`
 	Factors              []FactorResponse `json:"factors"`
+	QuestionCount        int32            `json:"question_count"`
 }
 
 // FactorResponse 因子响应
@@ -51,6 +52,7 @@ type ScaleSummaryResponse struct {
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
 	Status               string   `json:"status"`
+	QuestionCount        int32    `json:"question_count"`
 }
 
 // ListScalesRequest 量表列表请求

@@ -31,6 +31,7 @@ message ScaleSummary {
   string status = 11;
   string created_at = 12;
   string updated_at = 13;
+  int32 question_count = 14;    // 题目数量
 }
 
 // 量表完整信息（用于详情查询）
@@ -49,6 +50,7 @@ message Scale {
   repeated Factor factors = 12;
   string created_at = 13;
   string updated_at = 14;
+  int32 question_count = 15;    // 题目数量
 }
 
 // 因子信息

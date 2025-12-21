@@ -28,6 +28,7 @@ func NewScaleHandler(queryService *scale.QueryService) *ScaleHandler {
 // @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
+// @Description - question_count: 题目数量（不包含 Section 题型）
 // @Tags 量表
 // @Produce json
 // @Param code path string true "量表编码"
@@ -66,7 +67,7 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 // @Description - applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult
 // @Description - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
 // @Description - tags: 标签过滤（数组），动态标签值
-// @Description 响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）
+// @Description 响应中包含分类字段：category、stages（数组）、applicable_ages（数组）、reporters（数组）、tags（数组）、question_count（题目数量，不包含 Section 题型）
 // @Tags 量表
 // @Produce json
 // @Param page query int false "页码" default(1)

@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 )
@@ -147,10 +148,17 @@ func (r *GRPCRegistry) registerScaleService() error {
 		return nil
 	}
 
-	// 使用 QueryService 和 CategoryService
+	// 获取问卷查询服务（如果 SurveyModule 已初始化）
+	var questionnaireQueryService appQuestionnaire.QuestionnaireQueryService
+	if r.container.SurveyModule != nil && r.container.SurveyModule.Questionnaire != nil {
+		questionnaireQueryService = r.container.SurveyModule.Questionnaire.QueryService
+	}
+
+	// 使用 QueryService、CategoryService 和 QuestionnaireQueryService
 	scaleService := service.NewScaleService(
 		r.container.ScaleModule.QueryService,
 		r.container.ScaleModule.CategoryService,
+		questionnaireQueryService,
 	)
 
 	r.server.RegisterService(scaleService)

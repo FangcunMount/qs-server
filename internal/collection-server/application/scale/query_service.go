@@ -79,6 +79,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 			QuestionnaireCode:    scale.QuestionnaireCode,
 			QuestionnaireVersion: scale.QuestionnaireVersion,
 			Status:               scale.Status,
+			QuestionCount:        scale.QuestionCount,
 		}
 	}
 
@@ -172,6 +173,7 @@ func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleRespons
 		QuestionnaireVersion: scale.QuestionnaireVersion,
 		Status:               scale.Status,
 		Factors:              factors,
+		QuestionCount:        scale.QuestionCount,
 	}
 }
 
