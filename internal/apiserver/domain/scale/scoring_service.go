@@ -261,6 +261,18 @@ func (s *defaultScoringService) collectQuestionScores(factor *Factor, sheet *ans
 		if answer, found := answerMap[qCode.String()]; found {
 			score := answer.Score()
 			scores = append(scores, score)
+			// 调试：如果分数为0，记录答案值信息
+			if score == 0 {
+				logger.L(context.Background()).Debugw("Answer score is 0 in factor calculation",
+					"factor_code", factor.GetCode().Value(),
+					"question_code", qCode.String(),
+					"answer_value", answer.Value().Raw(),
+					"answer_score", score)
+			}
+		} else {
+			logger.L(context.Background()).Debugw("Question not found in answer map for factor",
+				"factor_code", factor.GetCode().Value(),
+				"question_code", qCode.String())
 		}
 	}
 

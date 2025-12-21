@@ -211,13 +211,7 @@ func buildQuestionMap(questions []questionnaire.Question) map[string]questionnai
 func buildOptionScoreMap(options []questionnaire.Option) map[string]float64 {
 	optionScoreMap := make(map[string]float64, len(options))
 	for _, opt := range options {
-		code := opt.GetCode().Value()
-		score := opt.GetScore()
-		optionScoreMap[code] = score
-		// 调试日志：记录选项分数映射（仅在分数为0时记录，避免日志过多）
-		if score == 0 {
-			// 注意：这里没有 context，无法记录日志，但可以通过其他方式调试
-		}
+		optionScoreMap[opt.GetCode().Value()] = opt.GetScore()
 	}
 	return optionScoreMap
 }
