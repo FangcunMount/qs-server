@@ -46,12 +46,15 @@ func NewPlanHandler(
 
 // CreatePlan 创建计划
 // @Summary 创建测评计划模板
-// @Description 创建新的测评计划模板，定义周期策略
+// @Description 创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。不同周期类型需要不同的参数：
+// @Description - by_week/by_day: 需要 interval（间隔）和 total_times（总次数）
+// @Description - fixed_date: 需要 fixed_dates（固定日期列表）
+// @Description - custom: 需要 relative_weeks（相对周次列表）
 // @Tags Plan-Lifecycle
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreatePlanRequest true "创建计划请求"
+// @Param request body request.CreatePlanRequest true "创建计划请求（scale_code: 量表编码，如 '3adyDE'）"
 // @Success 200 {object} core.Response{data=response.PlanResponse}
 // @Router /api/v1/plans [post]
 func (h *PlanHandler) CreatePlan(c *gin.Context) {
@@ -618,14 +621,14 @@ func (h *PlanHandler) GetPlan(c *gin.Context) {
 
 // ListPlans 查询计划列表
 // @Summary 查询计划列表
-// @Description 分页查询计划列表，支持条件筛选
+// @Description 分页查询计划列表，支持条件筛选。可通过量表编码（scale_code）筛选特定量表的计划
 // @Tags Plan-Query
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param org_id query int false "机构ID"
-// @Param scale_code query string false "量表编码"
-// @Param status query string false "状态"
-// @Param page query int true "页码"
+// @Param scale_code query string false "量表编码（如 '3adyDE'）"
+// @Param status query string false "状态（active/paused/finished/canceled）"
+// @Param page query int true "页码（从1开始）"
 // @Param page_size query int true "每页数量"
 // @Success 200 {object} core.Response{data=response.PlanListResponse}
 // @Router /api/v1/plans [get]

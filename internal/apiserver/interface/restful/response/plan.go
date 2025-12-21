@@ -8,33 +8,33 @@ import (
 
 // PlanResponse 计划响应
 type PlanResponse struct {
-	ID            string   `json:"id"`
-	OrgID         int64    `json:"org_id"`
-	ScaleCode     string   `json:"scale_code"`
-	ScheduleType  string   `json:"schedule_type"`
-	Interval      int      `json:"interval"`
-	TotalTimes    int      `json:"total_times"`
-	FixedDates    []string `json:"fixed_dates,omitempty"`
-	RelativeWeeks []int    `json:"relative_weeks,omitempty"`
-	Status        string   `json:"status"`
+	ID            string   `json:"id"`                       // 计划ID
+	OrgID         int64    `json:"org_id"`                   // 机构ID
+	ScaleCode     string   `json:"scale_code"`               // 量表编码（如 "3adyDE"）
+	ScheduleType  string   `json:"schedule_type"`            // 周期类型：by_week/by_day/fixed_date/custom
+	Interval      int      `json:"interval"`                 // 间隔（周/天，用于 by_week/by_day）
+	TotalTimes    int      `json:"total_times"`              // 总次数（用于 by_week/by_day）
+	FixedDates    []string `json:"fixed_dates,omitempty"`    // 固定日期列表（用于 fixed_date）
+	RelativeWeeks []int    `json:"relative_weeks,omitempty"` // 相对周次列表（用于 custom）
+	Status        string   `json:"status"`                   // 状态：active/paused/finished/canceled
 }
 
 // TaskResponse 任务响应
 type TaskResponse struct {
-	ID           string  `json:"id"`
-	PlanID       string  `json:"plan_id"`
-	Seq          int     `json:"seq"`
-	OrgID        int64   `json:"org_id"`
-	TesteeID     string  `json:"testee_id"`
-	ScaleCode    string  `json:"scale_code"`
-	PlannedAt    string  `json:"planned_at"`
-	OpenAt       *string `json:"open_at,omitempty"`
-	ExpireAt     *string `json:"expire_at,omitempty"`
-	CompletedAt  *string `json:"completed_at,omitempty"`
-	Status       string  `json:"status"`
-	AssessmentID *string `json:"assessment_id,omitempty"`
-	EntryToken   string  `json:"entry_token,omitempty"`
-	EntryURL     string  `json:"entry_url,omitempty"`
+	ID           string  `json:"id"`                      // 任务ID
+	PlanID       string  `json:"plan_id"`                 // 计划ID
+	Seq          int     `json:"seq"`                     // 序号（计划内的第N次测评）
+	OrgID        int64   `json:"org_id"`                  // 机构ID
+	TesteeID     string  `json:"testee_id"`               // 受试者ID
+	ScaleCode    string  `json:"scale_code"`              // 量表编码（如 "3adyDE"）
+	PlannedAt    string  `json:"planned_at"`              // 计划时间点
+	OpenAt       *string `json:"open_at,omitempty"`       // 实际开放时间
+	ExpireAt     *string `json:"expire_at,omitempty"`     // 截止时间
+	CompletedAt  *string `json:"completed_at,omitempty"`  // 完成时间
+	Status       string  `json:"status"`                  // 状态：pending/opened/completed/expired/canceled
+	AssessmentID *string `json:"assessment_id,omitempty"` // 关联的测评ID
+	EntryToken   string  `json:"entry_token,omitempty"`   // 入口令牌
+	EntryURL     string  `json:"entry_url,omitempty"`     // 入口URL
 }
 
 // EnrollmentResponse 加入计划响应

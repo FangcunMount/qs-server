@@ -725,7 +725,7 @@ const docTemplate = `{
         },
         "/api/v1/plans": {
             "get": {
-                "description": "分页查询计划列表，支持条件筛选",
+                "description": "分页查询计划列表，支持条件筛选。可通过量表编码（scale_code）筛选特定量表的计划",
                 "produces": [
                     "application/json"
                 ],
@@ -749,19 +749,19 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "量表ID",
-                        "name": "scale_id",
+                        "description": "量表编码（如 '3adyDE'）",
+                        "name": "scale_code",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "状态",
+                        "description": "状态（active/paused/finished/canceled）",
                         "name": "status",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "页码",
+                        "description": "页码（从1开始）",
                         "name": "page",
                         "in": "query",
                         "required": true
@@ -796,7 +796,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "创建新的测评计划模板，定义周期策略",
+                "description": "创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。不同周期类型需要不同的参数：\n- by_week/by_day: 需要 interval（间隔）和 total_times（总次数）\n- fixed_date: 需要 fixed_dates（固定日期列表）\n- custom: 需要 relative_weeks（相对周次列表）",
                 "consumes": [
                     "application/json"
                 ],
@@ -816,7 +816,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "创建计划请求",
+                        "description": "创建计划请求（scale_code: 量表编码，如 '3adyDE'）",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -4027,7 +4027,7 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "scale_id": {
+                "scale_code": {
                     "type": "string"
                 },
                 "schedule_type": {
@@ -5046,36 +5046,45 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "fixed_dates": {
+                    "description": "固定日期列表（用于 fixed_date）",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "id": {
+                    "description": "计划ID",
                     "type": "string"
                 },
                 "interval": {
+                    "description": "间隔（周/天，用于 by_week/by_day）",
                     "type": "integer"
                 },
                 "org_id": {
+                    "description": "机构ID",
                     "type": "integer"
                 },
                 "relative_weeks": {
+                    "description": "相对周次列表（用于 custom）",
                     "type": "array",
                     "items": {
                         "type": "integer"
                     }
                 },
-                "scale_id": {
+                "scale_code": {
+                    "description": "量表编码（如 \"3adyDE\"）",
                     "type": "string"
                 },
                 "schedule_type": {
+                    "description": "周期类型：by_week/by_day/fixed_date/custom",
                     "type": "string"
                 },
                 "status": {
+                    "description": "状态：active/paused/finished/canceled",
                     "type": "string"
                 },
                 "total_times": {
+                    "description": "总次数（用于 by_week/by_day）",
                     "type": "integer"
                 }
             }
@@ -5596,45 +5605,59 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "assessment_id": {
+                    "description": "关联的测评ID",
                     "type": "string"
                 },
                 "completed_at": {
+                    "description": "完成时间",
                     "type": "string"
                 },
                 "entry_token": {
+                    "description": "入口令牌",
                     "type": "string"
                 },
                 "entry_url": {
+                    "description": "入口URL",
                     "type": "string"
                 },
                 "expire_at": {
+                    "description": "截止时间",
                     "type": "string"
                 },
                 "id": {
+                    "description": "任务ID",
                     "type": "string"
                 },
                 "open_at": {
+                    "description": "实际开放时间",
                     "type": "string"
                 },
                 "org_id": {
+                    "description": "机构ID",
                     "type": "integer"
                 },
                 "plan_id": {
+                    "description": "计划ID",
                     "type": "string"
                 },
                 "planned_at": {
+                    "description": "计划时间点",
                     "type": "string"
                 },
-                "scale_id": {
+                "scale_code": {
+                    "description": "量表编码（如 \"3adyDE\"）",
                     "type": "string"
                 },
                 "seq": {
+                    "description": "序号（计划内的第N次测评）",
                     "type": "integer"
                 },
                 "status": {
+                    "description": "状态：pending/opened/completed/expired/canceled",
                     "type": "string"
                 },
                 "testee_id": {
+                    "description": "受试者ID",
                     "type": "string"
                 }
             }
