@@ -6,8 +6,9 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                   ReportBuilder                             │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  1. 收集评估结果中的初始建议                           │  │
-│  │  2. 调用 SuggestionGenerator 生成额外建议             │  │
+│  │  1. 使用 FactorInterpretationSuggestionStrategy      │  │
+│  │     收集因子解读配置中的建议                           │  │
+│  │  2. 调用 SuggestionGenerator 生成额外建议（可选）    │  │
 │  │  3. 合并去重返回                                       │  │
 │  └───────────────────────────────────────────────────────┘  │
 └────────────────────────┬────────────────────────────────────┘
@@ -35,27 +36,17 @@
 
 ## 内置策略
 
-### 1. HighRiskSuggestionStrategy
+### FactorInterpretationSuggestionStrategy
 
-- **触发条件**：`report.IsHighRisk() == true`
-- **建议类型**：专业干预建议
-- **示例**：
-  - "建议尽快与专业心理咨询师进行一对一沟通"
-  - "建议学校心理健康中心进行跟进关注"
-
-### 2. GeneralWellbeingSuggestionStrategy
-
-- **触发条件**：`!report.IsHighRisk()`
-- **建议类型**：日常健康维护建议
-- **示例**：
-  - "继续保持良好的心理状态"
-  - "建议定期参加学校组织的心理健康活动"
-
-### 3. DimensionSpecificSuggestionStrategy
-
-- **触发条件**：有高风险维度
-- **建议类型**：针对特定维度的建议
-- **配置化**：支持通过 map 配置维度建议
+- **触发条件**：有评估结果且包含因子得分
+- **建议类型**：从因子解读规则配置中收集的建议
+- **数据来源**：
+  - 评估结果的总体建议 (`EvaluationResult.Suggestion`)
+  - 所有因子的建议 (`FactorScoreResult.Suggestion`)，来自因子解读规则配置
+- **特点**：
+  - 完全依赖因子解读配置中的建议数据
+  - 自动收集所有因子的建议（包括总分因子和其他因子）
+  - 自动去重（总分因子建议如果与总体建议相同则不重复添加）
 
 ## 扩展方式
 
@@ -89,9 +80,9 @@ func (s *CustomSuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt 
 }
 
 // 3. 在容器中注册
+// 注意：FactorInterpretationSuggestionStrategy 需要在构建报告时动态创建
+// 因为它需要访问 EvaluationResult
 suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
-    &report.HighRiskSuggestionStrategy{},
-    &report.GeneralWellbeingSuggestionStrategy{},
     &CustomSuggestionStrategy{config: cfg}, // 添加自定义策略
 )
 ```
@@ -220,10 +211,9 @@ suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
 
 **建议顺序**：
 
-1. 特定量表策略（优先级最高）
-2. 风险等级策略（高风险 > 中风险 > 低风险）
+1. FactorInterpretationSuggestionStrategy（自动收集因子解读配置中的建议）
+2. 自定义策略（按注册顺序执行）
 3. AI 增强策略（可选）
-4. 通用健康策略（兜底）
 
 ## 配置示例
 
@@ -233,8 +223,7 @@ suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
 suggestion:
   # 启用的策略列表
   enabled_strategies:
-    - high_risk
-    - general_wellbeing
+    - factor_interpretation  # 自动启用，从因子解读配置收集建议
     - ai_enhancement  # 可选
   
   # AI 配置（如果启用）
@@ -246,16 +235,6 @@ suggestion:
     temperature: 0.7
     timeout: 5s
     max_retries: 2
-    
-  # 策略特定配置
-  strategies:
-    high_risk:
-      enable_professional_referral: true
-      enable_school_notification: true
-    
-    dimension_specific:
-      enabled: true
-      suggestions_path: configs/dimension_suggestions.yaml
 ```
 
 ## 测试示例

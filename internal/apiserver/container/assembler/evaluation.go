@@ -138,11 +138,10 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	assessmentCreator := assessment.NewDefaultAssessmentCreator()
 
 	// 创建 SuggestionGenerator（领域服务）
-	// 注册内置策略：高风险策略、一般健康策略
-	suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
-		&report.HighRiskSuggestionStrategy{},
-		&report.GeneralWellbeingSuggestionStrategy{},
-	)
+	// 注意：因子解读配置中的建议已通过 FactorInterpretationSuggestionStrategy 收集
+	// 如果需要额外的建议生成策略，可以在这里注册
+	// 当前不注册任何策略，完全依赖因子解读配置中的建议
+	var suggestionGenerator report.SuggestionGenerator = nil
 
 	// 创建 ReportExporter（领域服务）- 暂使用 nil，后续在 infra 层实现
 	// TODO: 在 infra 层实现真正的 ReportExporter
@@ -226,10 +225,9 @@ func (m *EvaluationModule) SetScaleRepository(
 		return
 	}
 	// 使用默认策略创建 SuggestionGenerator
-	suggestionGenerator := report.NewRuleBasedSuggestionGenerator(
-		&report.HighRiskSuggestionStrategy{},
-		&report.GeneralWellbeingSuggestionStrategy{},
-	)
+	// 注意：因子解读配置中的建议已通过 FactorInterpretationSuggestionStrategy 收集
+	// 当前不注册任何策略，完全依赖因子解读配置中的建议
+	var suggestionGenerator report.SuggestionGenerator = nil
 	reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,

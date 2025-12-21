@@ -155,8 +155,8 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 
 // buildSuggestions 构建建议
 // 策略：
-// 1. 优先使用评估结果中的建议（来自解读规则）
-// 2. 使用 SuggestionGenerator 生成额外建议（多策略模式）
+// 1. 首先使用 FactorInterpretationSuggestionStrategy 收集因子解读配置中的建议
+// 2. 如果配置了 SuggestionGenerator，使用策略生成器生成额外建议
 // 3. 合并去重
 func (b *DefaultReportBuilder) buildSuggestions(
 	ctx context.Context,
@@ -167,9 +167,14 @@ func (b *DefaultReportBuilder) buildSuggestions(
 ) []string {
 	var allSuggestions []string
 
-	// 1. 收集评估结果中的建议
-	initialSuggestions := b.collectInitialSuggestions(result)
-	allSuggestions = append(allSuggestions, initialSuggestions...)
+	// 1. 首先收集因子解读配置中的建议（通过 FactorInterpretationSuggestionStrategy）
+	factorStrategy := NewFactorInterpretationSuggestionStrategy(result)
+	if factorStrategy.CanHandle(nil) {
+		factorSuggestions, err := factorStrategy.GenerateSuggestions(ctx, nil)
+		if err == nil {
+			allSuggestions = append(allSuggestions, factorSuggestions...)
+		}
+	}
 
 	// 2. 如果配置了 SuggestionGenerator，使用策略生成器生成额外建议
 	if b.suggestionGenerator != nil {
@@ -194,36 +199,6 @@ func (b *DefaultReportBuilder) buildSuggestions(
 
 	// 3. 去重
 	return uniqueStrings(allSuggestions)
-}
-
-// collectInitialSuggestions 收集评估结果中的初始建议
-// 从因子解读配置中收集 suggestion 数据
-func (b *DefaultReportBuilder) collectInitialSuggestions(result *assessment.EvaluationResult) []string {
-	var suggestions []string
-
-	// 收集总体建议
-	if result.Suggestion != "" {
-		suggestions = append(suggestions, result.Suggestion)
-	}
-
-	// 收集所有因子的建议（来自因子解读规则配置）
-	// 优先收集总分因子的建议，然后收集其他因子的建议
-	for _, fs := range result.FactorScores {
-		if fs.Suggestion == "" {
-			continue
-		}
-		// 如果是总分因子，且与总体建议不同，则添加
-		if fs.IsTotalScore {
-			if fs.Suggestion != result.Suggestion {
-				suggestions = append(suggestions, fs.Suggestion)
-			}
-		} else {
-			// 非总分因子的建议也收集
-			suggestions = append(suggestions, fs.Suggestion)
-		}
-	}
-
-	return suggestions
 }
 
 // uniqueStrings 去除重复字符串
