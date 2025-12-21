@@ -95,11 +95,26 @@ func (r *planRepository) Save(ctx context.Context, plan *domainPlan.AssessmentPl
 
 	// 判断是新增还是更新
 	if plan.GetID().IsZero() {
+		// ID 为零，直接创建
 		return r.CreateAndSync(ctx, po, func(po *AssessmentPlanPO) {
 			r.mapper.SyncID(po, plan)
 		})
 	}
 
+	// ID 不为零，先检查记录是否存在
+	exists, err := r.ExistsByID(ctx, plan.GetID().Uint64())
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		// 记录不存在，执行 INSERT（使用指定的 ID）
+		return r.CreateAndSync(ctx, po, func(po *AssessmentPlanPO) {
+			r.mapper.SyncID(po, plan)
+		})
+	}
+
+	// 记录存在，执行 UPDATE
 	return r.UpdateAndSync(ctx, po, func(po *AssessmentPlanPO) {
 		r.mapper.SyncID(po, plan)
 	})

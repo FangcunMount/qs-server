@@ -126,11 +126,26 @@ func (r *taskRepository) Save(ctx context.Context, task *domainPlan.AssessmentTa
 
 	// 判断是新增还是更新
 	if task.GetID().IsZero() {
+		// ID 为零，直接创建
 		return r.CreateAndSync(ctx, po, func(po *AssessmentTaskPO) {
 			r.mapper.SyncID(po, task)
 		})
 	}
 
+	// ID 不为零，先检查记录是否存在
+	exists, err := r.ExistsByID(ctx, task.GetID().Uint64())
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		// 记录不存在，执行 INSERT（使用指定的 ID）
+		return r.CreateAndSync(ctx, po, func(po *AssessmentTaskPO) {
+			r.mapper.SyncID(po, task)
+		})
+	}
+
+	// 记录存在，执行 UPDATE
 	return r.UpdateAndSync(ctx, po, func(po *AssessmentTaskPO) {
 		r.mapper.SyncID(po, task)
 	})
