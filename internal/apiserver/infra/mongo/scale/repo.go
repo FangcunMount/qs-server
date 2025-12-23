@@ -268,5 +268,10 @@ func (r *Repository) buildFilter(conditions map[string]string) bson.M {
 		filter["questionnaire_code"] = qCode
 	}
 
+	// 主类过滤
+	if category, ok := conditions["category"]; ok && category != "" {
+		filter["category"] = category
+	}
+
 	return filter
 }
