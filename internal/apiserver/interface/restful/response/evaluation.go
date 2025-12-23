@@ -81,13 +81,14 @@ type ScoreResponse struct {
 
 // FactorScoreItem 因子得分项
 type FactorScoreItem struct {
-	FactorCode   string  `json:"factor_code"`    // 因子编码
-	FactorName   string  `json:"factor_name"`    // 因子名称
-	RawScore     float64 `json:"raw_score"`      // 原始分
-	RiskLevel    string  `json:"risk_level"`     // 风险等级
-	Conclusion   string  `json:"conclusion"`     // 结论
-	Suggestion   string  `json:"suggestion"`     // 建议
-	IsTotalScore bool    `json:"is_total_score"` // 是否为总分因子
+	FactorCode   string   `json:"factor_code"`    // 因子编码
+	FactorName   string   `json:"factor_name"`    // 因子名称
+	RawScore     float64  `json:"raw_score"`      // 原始分
+	MaxScore     *float64 `json:"max_score,omitempty"` // 最大分
+	RiskLevel    string   `json:"risk_level"`     // 风险等级
+	Conclusion   string   `json:"conclusion"`     // 结论
+	Suggestion   string   `json:"suggestion"`     // 建议
+	IsTotalScore bool     `json:"is_total_score"` // 是否为总分因子
 }
 
 // FactorTrendResponse 因子趋势响应
@@ -289,6 +290,7 @@ func NewScoreResponse(result *assessment.ScoreResult) *ScoreResponse {
 			FactorCode:   f.FactorCode,
 			FactorName:   f.FactorName,
 			RawScore:     f.RawScore,
+			MaxScore:     f.MaxScore,
 			RiskLevel:    f.RiskLevel,
 			Conclusion:   f.Conclusion,
 			Suggestion:   f.Suggestion,

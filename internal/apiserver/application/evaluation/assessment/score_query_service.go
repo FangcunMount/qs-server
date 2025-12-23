@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -15,16 +16,19 @@ import (
 type scoreQueryService struct {
 	scoreRepo      assessment.ScoreRepository
 	assessmentRepo assessment.Repository
+	scaleRepo      scale.Repository
 }
 
 // NewScoreQueryService 创建得分查询服务
 func NewScoreQueryService(
 	scoreRepo assessment.ScoreRepository,
 	assessmentRepo assessment.Repository,
+	scaleRepo scale.Repository,
 ) ScoreQueryService {
 	return &scoreQueryService{
 		scoreRepo:      scoreRepo,
 		assessmentRepo: assessmentRepo,
+		scaleRepo:      scaleRepo,
 	}
 }
 
@@ -42,8 +46,25 @@ func (s *scoreQueryService) GetByAssessmentID(ctx context.Context, assessmentID 
 		return nil, errors.WithCode(errorCode.ErrAssessmentScoreNotFound, "得分不存在")
 	}
 
+	// 获取测评信息以获取量表引用
+	assessmentDomain, err := s.assessmentRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+	}
+
+	// 获取量表信息（如果存在）
+	var medicalScale *scale.MedicalScale
+	if scaleRef := assessmentDomain.MedicalScaleRef(); scaleRef != nil {
+		scaleCode := scaleRef.Code().String()
+		medicalScale, err = s.scaleRepo.FindByCode(ctx, scaleCode)
+		if err != nil {
+			// 量表不存在时，不返回错误，只是没有 max_score 信息
+			medicalScale = nil
+		}
+	}
+
 	// 使用第一个得分（假设一个测评只有一个 AssessmentScore）
-	return toScoreResult(scores[0]), nil
+	return toScoreResult(scores[0], medicalScale), nil
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -116,5 +137,22 @@ func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID
 		}, nil
 	}
 
-	return toHighRiskFactorsResult(assessmentID, scores[0]), nil
+	// 获取测评信息以获取量表引用
+	assessmentDomain, err := s.assessmentRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+	}
+
+	// 获取量表信息（如果存在）
+	var medicalScale *scale.MedicalScale
+	if scaleRef := assessmentDomain.MedicalScaleRef(); scaleRef != nil {
+		scaleCode := scaleRef.Code().String()
+		medicalScale, err = s.scaleRepo.FindByCode(ctx, scaleCode)
+		if err != nil {
+			// 量表不存在时，不返回错误，只是没有 max_score 信息
+			medicalScale = nil
+		}
+	}
+
+	return toHighRiskFactorsResult(assessmentID, scores[0], medicalScale), nil
 }

@@ -153,13 +153,14 @@ type ScoreResult struct {
 
 // FactorScoreResult 因子得分结果
 type FactorScoreResult struct {
-	FactorCode   string  // 因子编码
-	FactorName   string  // 因子名称
-	RawScore     float64 // 原始分
-	RiskLevel    string  // 风险等级
-	Conclusion   string  // 结论
-	Suggestion   string  // 建议
-	IsTotalScore bool    // 是否为总分因子
+	FactorCode   string   // 因子编码
+	FactorName   string   // 因子名称
+	RawScore     float64  // 原始分
+	MaxScore     *float64 // 最大分
+	RiskLevel    string   // 风险等级
+	Conclusion   string   // 结论
+	Suggestion   string   // 建议
+	IsTotalScore bool     // 是否为总分因子
 }
 
 // FactorTrendResult 因子趋势结果

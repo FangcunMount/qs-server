@@ -3,6 +3,7 @@ package assessment
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
 // ============= 领域模型到 DTO 的转换器 =============
@@ -99,18 +100,29 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 }
 
 // toScoreResult 将领域模型转换为 ScoreResult
-func toScoreResult(s *assessment.AssessmentScore) *ScoreResult {
+func toScoreResult(s *assessment.AssessmentScore, medicalScale *scale.MedicalScale) *ScoreResult {
 	if s == nil {
 		return nil
+	}
+
+	// 构建因子 max_score 映射
+	factorMaxScoreMap := make(map[string]*float64)
+	if medicalScale != nil {
+		factors := medicalScale.GetFactors()
+		for _, f := range factors {
+			factorMaxScoreMap[string(f.GetCode())] = f.GetMaxScore()
+		}
 	}
 
 	// 转换因子得分列表
 	factorScores := make([]FactorScoreResult, len(s.FactorScores()))
 	for i, fs := range s.FactorScores() {
+		factorCode := string(fs.FactorCode())
 		factorScores[i] = FactorScoreResult{
-			FactorCode:   string(fs.FactorCode()),
+			FactorCode:   factorCode,
 			FactorName:   fs.FactorName(),
 			RawScore:     fs.RawScore(),
+			MaxScore:     factorMaxScoreMap[factorCode],
 			RiskLevel:    string(fs.RiskLevel()),
 			IsTotalScore: fs.IsTotalScore(),
 		}
@@ -125,7 +137,7 @@ func toScoreResult(s *assessment.AssessmentScore) *ScoreResult {
 }
 
 // toHighRiskFactorsResult 转换高风险因子结果
-func toHighRiskFactorsResult(assessmentID uint64, s *assessment.AssessmentScore) *HighRiskFactorsResult {
+func toHighRiskFactorsResult(assessmentID uint64, s *assessment.AssessmentScore, medicalScale *scale.MedicalScale) *HighRiskFactorsResult {
 	if s == nil {
 		return &HighRiskFactorsResult{
 			AssessmentID:    assessmentID,
@@ -135,14 +147,25 @@ func toHighRiskFactorsResult(assessmentID uint64, s *assessment.AssessmentScore)
 		}
 	}
 
+	// 构建因子 max_score 映射
+	factorMaxScoreMap := make(map[string]*float64)
+	if medicalScale != nil {
+		factors := medicalScale.GetFactors()
+		for _, f := range factors {
+			factorMaxScoreMap[string(f.GetCode())] = f.GetMaxScore()
+		}
+	}
+
 	// 获取高风险因子
 	highRiskFactors := s.GetHighRiskFactors()
 	factorResults := make([]FactorScoreResult, len(highRiskFactors))
 	for i, fs := range highRiskFactors {
+		factorCode := string(fs.FactorCode())
 		factorResults[i] = FactorScoreResult{
-			FactorCode:   string(fs.FactorCode()),
+			FactorCode:   factorCode,
 			FactorName:   fs.FactorName(),
 			RawScore:     fs.RawScore(),
+			MaxScore:     factorMaxScoreMap[factorCode],
 			RiskLevel:    string(fs.RiskLevel()),
 			IsTotalScore: fs.IsTotalScore(),
 		}

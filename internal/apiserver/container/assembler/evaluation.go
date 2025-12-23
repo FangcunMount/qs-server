@@ -200,6 +200,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		m.ScoreRepo,
 		m.AssessmentRepo,
+		scaleRepo, // 传入 scaleRepo（可能为 nil，但会在 SetScaleRepository 中更新）
 	)
 
 	// ==================== 初始化 Interface 层 ====================
@@ -238,6 +239,22 @@ func (m *EvaluationModule) SetScaleRepository(
 		questionnaireRepo,
 		reportBuilder,
 	)
+
+	// 重新创建 ScoreQueryService，传入 scaleRepo
+	if scaleRepo != nil {
+		m.ScoreQueryService = assessmentApp.NewScoreQueryService(
+			m.ScoreRepo,
+			m.AssessmentRepo,
+			scaleRepo,
+		)
+		// 重新创建 Handler，因为 ScoreQueryService 已更新
+		m.Handler = handler.NewEvaluationHandler(
+			m.ManagementService,
+			m.ReportQueryService,
+			m.ScoreQueryService,
+			m.EvaluationService,
+		)
+	}
 }
 
 // Cleanup 清理模块资源

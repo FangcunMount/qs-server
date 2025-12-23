@@ -4845,6 +4845,10 @@ const docTemplate = `{
                     "description": "是否为总分因子",
                     "type": "boolean"
                 },
+                "max_score": {
+                    "description": "最大分",
+                    "type": "number"
+                },
                 "raw_score": {
                     "description": "原始分",
                     "type": "number"
