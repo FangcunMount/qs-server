@@ -439,6 +439,7 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 			MaxScore:    maxScore,
 			RiskLevel:   d.RiskLevel,
 			Description: d.Description,
+			Suggestions: toProtoSuggestions(d.Suggestions),
 		})
 	}
 
@@ -450,7 +451,26 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 		RiskLevel:    result.RiskLevel,
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
-		Suggestions:  result.Suggestions,
+		Suggestions:  toProtoSuggestions(result.Suggestions),
 		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
+}
+
+// toProtoSuggestions 转换为 proto 建议列表
+func toProtoSuggestions(dtos []assessmentApp.SuggestionDTO) []*pb.Suggestion {
+	if len(dtos) == 0 {
+		return nil
+	}
+	result := make([]*pb.Suggestion, len(dtos))
+	for i, dto := range dtos {
+		suggestion := &pb.Suggestion{
+			Category: dto.Category,
+			Content:  dto.Content,
+		}
+		if dto.FactorCode != nil {
+			suggestion.FactorCode = *dto.FactorCode
+		}
+		result[i] = suggestion
+	}
+	return result
 }

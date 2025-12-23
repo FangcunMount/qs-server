@@ -37,6 +37,7 @@ func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dt
 			d.MaxScore,
 			domainReport.RiskLevel(d.RiskLevel),
 			d.Description,
+			toDomainSuggestions(d.Suggestions),
 		)
 	}
 
@@ -50,7 +51,7 @@ func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dt
 		domainReport.RiskLevel(dto.RiskLevel),
 		dto.Conclusion,
 		dimensions,
-		dto.Suggestions,
+		toDomainSuggestions(dto.Suggestions),
 	)
 
 	// 保存报告
@@ -59,4 +60,24 @@ func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dt
 	}
 
 	return ToReportResult(report), nil
+}
+
+func toDomainSuggestions(items []SuggestionDTO) []domainReport.Suggestion {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]domainReport.Suggestion, len(items))
+	for i, s := range items {
+		var fc *domainReport.FactorCode
+		if s.FactorCode != nil {
+			code := domainReport.NewFactorCode(*s.FactorCode)
+			fc = &code
+		}
+		result[i] = domainReport.Suggestion{
+			Category:   domainReport.SuggestionCategory(s.Category),
+			Content:    s.Content,
+			FactorCode: fc,
+		}
+	}
+	return result
 }

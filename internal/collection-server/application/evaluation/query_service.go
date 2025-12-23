@@ -340,6 +340,7 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 				MaxScore:    dim.MaxScore,
 				RiskLevel:   dim.RiskLevel,
 				Description: dim.Description,
+				Suggestions: toSuggestionResponses(dim.Suggestions),
 			})
 		}
 	}
@@ -352,9 +353,25 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 		RiskLevel:    result.RiskLevel,
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
-		Suggestions:  result.Suggestions,
+		Suggestions:  toSuggestionResponses(result.Suggestions),
 		CreatedAt:    result.CreatedAt,
 	}, nil
+}
+
+// toSuggestionResponses 转换为建议响应列表
+func toSuggestionResponses(outputs []grpcclient.SuggestionOutput) []SuggestionResponse {
+	if len(outputs) == 0 {
+		return nil
+	}
+	result := make([]SuggestionResponse, len(outputs))
+	for i, s := range outputs {
+		result[i] = SuggestionResponse{
+			Category:   s.Category,
+			Content:    s.Content,
+			FactorCode: s.FactorCode,
+		}
+	}
+	return result
 }
 
 // GetFactorTrend 获取因子得分趋势

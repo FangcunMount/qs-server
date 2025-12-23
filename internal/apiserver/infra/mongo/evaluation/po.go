@@ -33,17 +33,25 @@ type InterpretReportPO struct {
 	Dimensions []DimensionInterpretPO `bson:"dimensions" json:"dimensions"`
 
 	// 建议列表
-	Suggestions []string `bson:"suggestions" json:"suggestions"`
+	Suggestions []SuggestionPO `bson:"suggestions" json:"suggestions"`
 }
 
 // DimensionInterpretPO 维度解读持久化对象
 type DimensionInterpretPO struct {
-	FactorCode  string   `bson:"factor_code" json:"factor_code"`
-	FactorName  string   `bson:"factor_name" json:"factor_name"`
-	RawScore    float64  `bson:"raw_score" json:"raw_score"`
-	MaxScore    *float64 `bson:"max_score,omitempty" json:"max_score,omitempty"`
-	RiskLevel   string   `bson:"risk_level" json:"risk_level"`
-	Description string   `bson:"description" json:"description"`
+	FactorCode  string         `bson:"factor_code" json:"factor_code"`
+	FactorName  string         `bson:"factor_name" json:"factor_name"`
+	RawScore    float64        `bson:"raw_score" json:"raw_score"`
+	MaxScore    *float64       `bson:"max_score,omitempty" json:"max_score,omitempty"`
+	RiskLevel   string         `bson:"risk_level" json:"risk_level"`
+	Description string         `bson:"description" json:"description"`
+	Suggestions []SuggestionPO `bson:"suggestions,omitempty" json:"suggestions,omitempty"`
+}
+
+// SuggestionPO 结构化建议持久化对象
+type SuggestionPO struct {
+	Category   string  `bson:"category" json:"category"`
+	Content    string  `bson:"content" json:"content"`
+	FactorCode *string `bson:"factor_code,omitempty" json:"factor_code,omitempty"`
 }
 
 // CollectionName 集合名称

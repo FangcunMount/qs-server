@@ -81,14 +81,14 @@ type ScoreResponse struct {
 
 // FactorScoreItem 因子得分项
 type FactorScoreItem struct {
-	FactorCode   string   `json:"factor_code"`    // 因子编码
-	FactorName   string   `json:"factor_name"`    // 因子名称
-	RawScore     float64  `json:"raw_score"`      // 原始分
+	FactorCode   string   `json:"factor_code"`         // 因子编码
+	FactorName   string   `json:"factor_name"`         // 因子名称
+	RawScore     float64  `json:"raw_score"`           // 原始分
 	MaxScore     *float64 `json:"max_score,omitempty"` // 最大分
-	RiskLevel    string   `json:"risk_level"`     // 风险等级
-	Conclusion   string   `json:"conclusion"`     // 结论
-	Suggestion   string   `json:"suggestion"`     // 建议
-	IsTotalScore bool     `json:"is_total_score"` // 是否为总分因子
+	RiskLevel    string   `json:"risk_level"`          // 风险等级
+	Conclusion   string   `json:"conclusion"`          // 结论
+	Suggestion   string   `json:"suggestion"`          // 建议
+	IsTotalScore bool     `json:"is_total_score"`      // 是否为总分因子
 }
 
 // FactorTrendResponse 因子趋势响应
@@ -125,18 +125,26 @@ type ReportResponse struct {
 	RiskLevel    string           `json:"risk_level"`    // 风险等级
 	Conclusion   string           `json:"conclusion"`    // 总结论
 	Dimensions   []*DimensionItem `json:"dimensions"`    // 维度解读列表
-	Suggestions  []string         `json:"suggestions"`   // 建议列表
+	Suggestions  []SuggestionItem `json:"suggestions"`   // 建议列表
 	CreatedAt    string           `json:"created_at"`    // 创建时间
 }
 
 // DimensionItem 维度解读项
 type DimensionItem struct {
-	FactorCode  string   `json:"factor_code"`         // 因子编码
-	FactorName  string   `json:"factor_name"`         // 因子名称
-	RawScore    float64  `json:"raw_score"`           // 原始分
-	MaxScore    *float64 `json:"max_score,omitempty"` // 最大分
-	RiskLevel   string   `json:"risk_level"`          // 风险等级
-	Description string   `json:"description"`         // 解读描述
+	FactorCode  string           `json:"factor_code"`           // 因子编码
+	FactorName  string           `json:"factor_name"`           // 因子名称
+	RawScore    float64          `json:"raw_score"`             // 原始分
+	MaxScore    *float64         `json:"max_score,omitempty"`   // 最大分
+	RiskLevel   string           `json:"risk_level"`            // 风险等级
+	Description string           `json:"description"`           // 解读描述
+	Suggestions []SuggestionItem `json:"suggestions,omitempty"` // 维度建议
+}
+
+// SuggestionItem 建议项
+type SuggestionItem struct {
+	Category   string  `json:"category"`              // 建议分类
+	Content    string  `json:"content"`               // 建议内容
+	FactorCode *string `json:"factor_code,omitempty"` // 关联因子编码
 }
 
 // ReportListResponse 报告列表响应
@@ -371,6 +379,7 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 			MaxScore:    d.MaxScore,
 			RiskLevel:   d.RiskLevel,
 			Description: d.Description,
+			Suggestions: toSuggestionItems(d.Suggestions),
 		})
 	}
 
@@ -382,9 +391,24 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 		RiskLevel:    result.RiskLevel,
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
-		Suggestions:  result.Suggestions,
+		Suggestions:  toSuggestionItems(result.Suggestions),
 		CreatedAt:    result.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+func toSuggestionItems(items []assessment.SuggestionDTO) []SuggestionItem {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]SuggestionItem, len(items))
+	for i, s := range items {
+		result[i] = SuggestionItem{
+			Category:   s.Category,
+			Content:    s.Content,
+			FactorCode: s.FactorCode,
+		}
+	}
+	return result
 }
 
 // NewReportListResponse 从应用层 Result 创建报告列表响应

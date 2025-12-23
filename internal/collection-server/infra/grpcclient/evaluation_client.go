@@ -58,6 +58,13 @@ type FactorScoreOutput struct {
 	IsTotalScore bool
 }
 
+// SuggestionOutput 建议输出
+type SuggestionOutput struct {
+	Category   string
+	Content    string
+	FactorCode *string
+}
+
 // DimensionInterpretOutput 维度解读输出
 type DimensionInterpretOutput struct {
 	FactorCode  string
@@ -66,6 +73,7 @@ type DimensionInterpretOutput struct {
 	MaxScore    *float64
 	RiskLevel   string
 	Description string
+	Suggestions []SuggestionOutput
 }
 
 // AssessmentReportOutput 测评报告输出
@@ -77,7 +85,7 @@ type AssessmentReportOutput struct {
 	RiskLevel    string
 	Conclusion   string
 	Dimensions   []DimensionInterpretOutput
-	Suggestions  []string
+	Suggestions  []SuggestionOutput
 	CreatedAt    string
 }
 
@@ -254,6 +262,7 @@ func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, assessmentID
 			MaxScore:    maxScore,
 			RiskLevel:   dim.GetRiskLevel(),
 			Description: dim.GetDescription(),
+			Suggestions: fromProtoSuggestions(dim.GetSuggestions()),
 		}
 	}
 
@@ -265,9 +274,29 @@ func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, assessmentID
 		RiskLevel:    report.GetRiskLevel(),
 		Conclusion:   report.GetConclusion(),
 		Dimensions:   dimensions,
-		Suggestions:  report.GetSuggestions(),
+		Suggestions:  fromProtoSuggestions(report.GetSuggestions()),
 		CreatedAt:    report.GetCreatedAt(),
 	}, nil
+}
+
+// fromProtoSuggestions 从 proto 建议列表转换
+func fromProtoSuggestions(protoSuggestions []*pb.Suggestion) []SuggestionOutput {
+	if len(protoSuggestions) == 0 {
+		return nil
+	}
+	result := make([]SuggestionOutput, len(protoSuggestions))
+	for i, s := range protoSuggestions {
+		suggestion := SuggestionOutput{
+			Category: s.GetCategory(),
+			Content:  s.GetContent(),
+		}
+		if s.GetFactorCode() != "" {
+			fc := s.GetFactorCode()
+			suggestion.FactorCode = &fc
+		}
+		result[i] = suggestion
+	}
+	return result
 }
 
 // GetFactorTrend 获取因子得分趋势

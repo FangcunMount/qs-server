@@ -29,7 +29,7 @@ type InterpretReport struct {
 	dimensions []DimensionInterpret
 
 	// 建议列表
-	suggestions []string
+	suggestions []Suggestion
 
 	// 时间戳
 	createdAt time.Time
@@ -45,7 +45,7 @@ func NewInterpretReport(
 	riskLevel RiskLevel,
 	conclusion string,
 	dimensions []DimensionInterpret,
-	suggestions []string,
+	suggestions []Suggestion,
 ) *InterpretReport {
 	return &InterpretReport{
 		id:          id,
@@ -69,7 +69,7 @@ func ReconstructInterpretReport(
 	riskLevel RiskLevel,
 	conclusion string,
 	dimensions []DimensionInterpret,
-	suggestions []string,
+	suggestions []Suggestion,
 	createdAt time.Time,
 	updatedAt *time.Time,
 ) *InterpretReport {
@@ -90,15 +90,15 @@ func ReconstructInterpretReport(
 // ==================== 报告更新方法 ====================
 
 // UpdateSuggestions 更新建议列表
-func (r *InterpretReport) UpdateSuggestions(suggestions []string) {
+func (r *InterpretReport) UpdateSuggestions(suggestions []Suggestion) {
 	r.suggestions = suggestions
 	now := time.Now()
 	r.updatedAt = &now
 }
 
 // AppendSuggestion 追加建议
-func (r *InterpretReport) AppendSuggestion(suggestion string) {
-	if suggestion != "" {
+func (r *InterpretReport) AppendSuggestion(suggestion Suggestion) {
+	if suggestion.Content != "" {
 		r.suggestions = append(r.suggestions, suggestion)
 		now := time.Now()
 		r.updatedAt = &now
@@ -143,7 +143,7 @@ func (r *InterpretReport) Dimensions() []DimensionInterpret {
 }
 
 // Suggestions 获取建议列表
-func (r *InterpretReport) Suggestions() []string {
+func (r *InterpretReport) Suggestions() []Suggestion {
 	return r.suggestions
 }
 

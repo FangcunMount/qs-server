@@ -143,7 +143,7 @@ definitions:
         type: string
       suggestions:
         items:
-          type: string
+          $ref: '#/definitions/evaluation.SuggestionResponse'
         type: array
       total_score:
         type: number
@@ -191,6 +191,10 @@ definitions:
         type: number
       risk_level:
         type: string
+      suggestions:
+        items:
+          $ref: '#/definitions/evaluation.SuggestionResponse'
+        type: array
     type: object
   evaluation.FactorScoreResponse:
     properties:
@@ -223,6 +227,15 @@ definitions:
         type: integer
       total_pages:
         type: integer
+    type: object
+  evaluation.SuggestionResponse:
+    properties:
+      category:
+        type: string
+      content:
+        type: string
+      factor_code:
+        type: string
     type: object
   evaluation.TrendPointResponse:
     properties:

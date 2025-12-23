@@ -98,14 +98,22 @@ message TrendPoint {
   string created_at = 4;      // 时间
 }
 
+// 建议
+message Suggestion {
+  string category = 1;        // 建议分类：general/family/study/social/health/dimension
+  string content = 2;         // 建议内容
+  string factor_code = 3;    // 关联因子编码（可选）
+}
+
 // 维度解读
 message DimensionInterpret {
   string factor_code = 1;     // 因子编码
   string factor_name = 2;     // 因子名称
-  double raw_score = 3;       // 原始分
+  double raw_score = 3;        // 原始分
   double max_score = 6;       // 最大分（可选）
   string risk_level = 4;      // 风险等级
   string description = 5;     // 解读描述
+  repeated Suggestion suggestions = 7;  // 维度建议列表
 }
 
 // 测评报告
@@ -117,7 +125,7 @@ message AssessmentReport {
   string risk_level = 5;                // 风险等级
   string conclusion = 6;                // 总结论
   repeated DimensionInterpret dimensions = 7;  // 维度解读列表
-  repeated string suggestions = 8;      // 建议列表
+  repeated Suggestion suggestions = 8;  // 建议列表
   string created_at = 9;                // 创建时间
 }
 

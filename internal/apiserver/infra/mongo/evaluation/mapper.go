@@ -33,6 +33,7 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
+			Suggestions: toSuggestionPOs(d.Suggestions()),
 		}
 	}
 
@@ -44,7 +45,7 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 		RiskLevel:   string(domain.RiskLevel()),
 		Conclusion:  domain.Conclusion(),
 		Dimensions:  dimensions,
-		Suggestions: domain.Suggestions(),
+		Suggestions: toSuggestionPOs(domain.Suggestions()),
 	}
 
 	// 设置 DomainID（与 AssessmentID 一致）
@@ -71,6 +72,7 @@ func (m *ReportMapper) ToDomain(po *InterpretReportPO) *report.InterpretReport {
 			d.MaxScore,
 			report.RiskLevel(d.RiskLevel),
 			d.Description,
+			toDomainSuggestions(d.Suggestions),
 		)
 	}
 
@@ -88,10 +90,50 @@ func (m *ReportMapper) ToDomain(po *InterpretReportPO) *report.InterpretReport {
 		report.RiskLevel(po.RiskLevel),
 		po.Conclusion,
 		dimensions,
-		po.Suggestions,
+		toDomainSuggestions(po.Suggestions),
 		po.CreatedAt,
 		updatedAt,
 	)
+}
+
+func toSuggestionPOs(items []report.Suggestion) []SuggestionPO {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]SuggestionPO, len(items))
+	for i, s := range items {
+		var fc *string
+		if s.FactorCode != nil {
+			code := s.FactorCode.String()
+			fc = &code
+		}
+		result[i] = SuggestionPO{
+			Category:   string(s.Category),
+			Content:    s.Content,
+			FactorCode: fc,
+		}
+	}
+	return result
+}
+
+func toDomainSuggestions(items []SuggestionPO) []report.Suggestion {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]report.Suggestion, len(items))
+	for i, s := range items {
+		var fc *report.FactorCode
+		if s.FactorCode != nil {
+			code := report.NewFactorCode(*s.FactorCode)
+			fc = &code
+		}
+		result[i] = report.Suggestion{
+			Category:   report.SuggestionCategory(s.Category),
+			Content:    s.Content,
+			FactorCode: fc,
+		}
+	}
+	return result
 }
 
 // ToDomainList 批量转换持久化对象为领域对象

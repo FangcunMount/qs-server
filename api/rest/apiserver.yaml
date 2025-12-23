@@ -3162,6 +3162,11 @@ components:
         risk_level:
           description: 风险等级
           type: string
+        suggestions:
+          description: 维度建议
+          type: array
+          items:
+            $ref: '#/components/schemas/response.SuggestionItem'
     response.EnrollmentResponse:
       type: object
       properties:
@@ -3492,7 +3497,7 @@ components:
           description: 建议列表
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/response.SuggestionItem'
         total_score:
           description: 总分
           type: number
@@ -3738,6 +3743,18 @@ components:
         label:
           type: string
         value:
+          type: string
+    response.SuggestionItem:
+      type: object
+      properties:
+        category:
+          description: 建议分类
+          type: string
+        content:
+          description: 建议内容
+          type: string
+        factor_code:
+          description: 关联因子编码
           type: string
     response.TagResponse:
       type: object

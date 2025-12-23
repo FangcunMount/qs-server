@@ -1136,7 +1136,7 @@ components:
         suggestions:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/evaluation.SuggestionResponse'
         total_score:
           type: number
     evaluation.AssessmentSummaryResponse:
@@ -1183,6 +1183,10 @@ components:
           type: number
         risk_level:
           type: string
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.SuggestionResponse'
     evaluation.FactorScoreResponse:
       type: object
       properties:
@@ -1215,6 +1219,15 @@ components:
           type: integer
         total_pages:
           type: integer
+    evaluation.SuggestionResponse:
+      type: object
+      properties:
+        category:
+          type: string
+        content:
+          type: string
+        factor_code:
+          type: string
     evaluation.TrendPointResponse:
       type: object
       properties:

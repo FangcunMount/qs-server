@@ -4758,6 +4758,13 @@ const docTemplate = `{
                 "risk_level": {
                     "description": "风险等级",
                     "type": "string"
+                },
+                "suggestions": {
+                    "description": "维度建议",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.SuggestionItem"
+                    }
                 }
             }
         },
@@ -5231,7 +5238,7 @@ const docTemplate = `{
                     "description": "建议列表",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/response.SuggestionItem"
                     }
                 },
                 "total_score": {
@@ -5587,6 +5594,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.SuggestionItem": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "description": "建议分类",
+                    "type": "string"
+                },
+                "content": {
+                    "description": "建议内容",
+                    "type": "string"
+                },
+                "factor_code": {
+                    "description": "关联因子编码",
                     "type": "string"
                 }
             }

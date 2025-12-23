@@ -146,11 +146,27 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 			maxScore,
 			RiskLevel(fs.RiskLevel),
 			description,
+			buildDimensionSuggestions(fs),
 		)
 		dimensions = append(dimensions, dim)
 	}
 
 	return dimensions
+}
+
+// buildDimensionSuggestions 将因子解读建议聚合到维度
+func buildDimensionSuggestions(fs assessment.FactorScoreResult) []Suggestion {
+	if fs.Suggestion == "" {
+		return nil
+	}
+	factorCode := fs.FactorCode
+	return []Suggestion{
+		{
+			Category:   SuggestionCategoryDimension,
+			Content:    fs.Suggestion,
+			FactorCode: &factorCode,
+		},
+	}
 }
 
 // buildSuggestions 构建建议
@@ -164,8 +180,8 @@ func (b *DefaultReportBuilder) buildSuggestions(
 	reportID ID,
 	medicalScale *scale.MedicalScale,
 	dimensions []DimensionInterpret,
-) []string {
-	var allSuggestions []string
+) []Suggestion {
+	var allSuggestions []Suggestion
 
 	// 1. 首先收集因子解读配置中的建议（通过 FactorInterpretationSuggestionStrategy）
 	factorStrategy := NewFactorInterpretationSuggestionStrategy(result)
@@ -198,18 +214,5 @@ func (b *DefaultReportBuilder) buildSuggestions(
 	}
 
 	// 3. 去重
-	return uniqueStrings(allSuggestions)
-}
-
-// uniqueStrings 去除重复字符串
-func uniqueStrings(items []string) []string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, item := range items {
-		if item != "" && !seen[item] {
-			seen[item] = true
-			result = append(result, item)
-		}
-	}
-	return result
+	return uniqueSuggestions(allSuggestions)
 }

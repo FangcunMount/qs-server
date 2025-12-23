@@ -3,7 +3,7 @@ package report
 // ==================== DimensionInterpret 值对象 ====================
 
 // DimensionInterpret 维度解读值对象
-// 记录单个因子/维度的解读信息
+// 记录单个因子/维度的解读信息（含解读与建议）
 type DimensionInterpret struct {
 	factorCode  FactorCode
 	factorName  string
@@ -11,6 +11,7 @@ type DimensionInterpret struct {
 	maxScore    *float64
 	riskLevel   RiskLevel
 	description string
+	suggestions []Suggestion
 }
 
 // NewDimensionInterpret 创建维度解读
@@ -21,6 +22,7 @@ func NewDimensionInterpret(
 	maxScore *float64,
 	riskLevel RiskLevel,
 	description string,
+	suggestions []Suggestion,
 ) DimensionInterpret {
 	return DimensionInterpret{
 		factorCode:  factorCode,
@@ -29,6 +31,7 @@ func NewDimensionInterpret(
 		maxScore:    maxScore,
 		riskLevel:   riskLevel,
 		description: description,
+		suggestions: suggestions,
 	}
 }
 
@@ -55,6 +58,11 @@ func (d DimensionInterpret) RiskLevel() RiskLevel {
 // Description 获取解读描述
 func (d DimensionInterpret) Description() string {
 	return d.description
+}
+
+// Suggestions 获取维度建议列表
+func (d DimensionInterpret) Suggestions() []Suggestion {
+	return d.suggestions
 }
 
 // MaxScore 获取最大分

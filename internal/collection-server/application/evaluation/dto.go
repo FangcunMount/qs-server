@@ -50,14 +50,22 @@ type FactorScoreResponse struct {
 	IsTotalScore bool    `json:"is_total_score"`
 }
 
+// SuggestionResponse 建议响应
+type SuggestionResponse struct {
+	Category   string  `json:"category"`
+	Content    string  `json:"content"`
+	FactorCode *string `json:"factor_code,omitempty"`
+}
+
 // DimensionInterpretResponse 维度解读响应
 type DimensionInterpretResponse struct {
-	FactorCode  string   `json:"factor_code"`
-	FactorName  string   `json:"factor_name"`
-	RawScore    float64  `json:"raw_score"`
-	MaxScore    *float64 `json:"max_score,omitempty"`
-	RiskLevel   string   `json:"risk_level"`
-	Description string   `json:"description"`
+	FactorCode  string               `json:"factor_code"`
+	FactorName  string               `json:"factor_name"`
+	RawScore    float64              `json:"raw_score"`
+	MaxScore    *float64             `json:"max_score,omitempty"`
+	RiskLevel   string               `json:"risk_level"`
+	Description string               `json:"description"`
+	Suggestions []SuggestionResponse `json:"suggestions,omitempty"`
 }
 
 // AssessmentReportResponse 测评报告响应
@@ -69,7 +77,7 @@ type AssessmentReportResponse struct {
 	RiskLevel    string                       `json:"risk_level"`
 	Conclusion   string                       `json:"conclusion"`
 	Dimensions   []DimensionInterpretResponse `json:"dimensions"`
-	Suggestions  []string                     `json:"suggestions"`
+	Suggestions  []SuggestionResponse         `json:"suggestions"`
 	CreatedAt    string                       `json:"created_at"`
 }
 

@@ -586,6 +586,11 @@ definitions:
       risk_level:
         description: 风险等级
         type: string
+      suggestions:
+        description: 维度建议
+        items:
+          $ref: '#/definitions/response.SuggestionItem'
+        type: array
     type: object
   response.EnrollmentResponse:
     properties:
@@ -915,7 +920,7 @@ definitions:
       suggestions:
         description: 建议列表
         items:
-          type: string
+          $ref: '#/definitions/response.SuggestionItem'
         type: array
       total_score:
         description: 总分
@@ -1162,6 +1167,18 @@ definitions:
       label:
         type: string
       value:
+        type: string
+    type: object
+  response.SuggestionItem:
+    properties:
+      category:
+        description: 建议分类
+        type: string
+      content:
+        description: 建议内容
+        type: string
+      factor_code:
+        description: 关联因子编码
         type: string
     type: object
   response.TagResponse:

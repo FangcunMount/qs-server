@@ -39,10 +39,10 @@ type ReportGenerationService interface {
 // 职责：为报告生成个性化建议
 type SuggestionService interface {
 	// GenerateSuggestions 生成建议
-	GenerateSuggestions(ctx context.Context, reportID uint64) ([]string, error)
+	GenerateSuggestions(ctx context.Context, reportID uint64) ([]SuggestionDTO, error)
 
 	// UpdateSuggestions 更新报告的建议
-	UpdateSuggestions(ctx context.Context, reportID uint64, suggestions []string) error
+	UpdateSuggestions(ctx context.Context, reportID uint64, suggestions []SuggestionDTO) error
 }
 
 // ReportExportService 报告导出服务接口
@@ -83,7 +83,7 @@ type GenerateReportDTO struct {
 	RiskLevel    string
 	Conclusion   string
 	Dimensions   []DimensionDTO
-	Suggestions  []string
+	Suggestions  []SuggestionDTO
 }
 
 // DimensionDTO 维度输入
@@ -94,6 +94,14 @@ type DimensionDTO struct {
 	MaxScore    *float64
 	RiskLevel   string
 	Description string
+	Suggestions []SuggestionDTO
+}
+
+// SuggestionDTO 建议输入/输出 DTO
+type SuggestionDTO struct {
+	Category   string  `json:"category"`
+	Content    string  `json:"content"`
+	FactorCode *string `json:"factorCode,omitempty"`
 }
 
 // ExportOptionsDTO 导出选项
@@ -117,18 +125,19 @@ type ReportResult struct {
 	RiskLevel   string            `json:"riskLevel"`
 	Conclusion  string            `json:"conclusion"`
 	Dimensions  []DimensionResult `json:"dimensions"`
-	Suggestions []string          `json:"suggestions"`
+	Suggestions []SuggestionDTO   `json:"suggestions"`
 	CreatedAt   string            `json:"createdAt"`
 }
 
 // DimensionResult 维度查询结果
 type DimensionResult struct {
-	FactorCode  string   `json:"factorCode"`
-	FactorName  string   `json:"factorName"`
-	RawScore    float64  `json:"rawScore"`
-	MaxScore    *float64 `json:"maxScore,omitempty"`
-	RiskLevel   string   `json:"riskLevel"`
-	Description string   `json:"description"`
+	FactorCode  string          `json:"factorCode"`
+	FactorName  string          `json:"factorName"`
+	RawScore    float64         `json:"rawScore"`
+	MaxScore    *float64        `json:"maxScore,omitempty"`
+	RiskLevel   string          `json:"riskLevel"`
+	Description string          `json:"description"`
+	Suggestions []SuggestionDTO `json:"suggestions,omitempty"`
 }
 
 // ReportListResult 报告列表查询结果
@@ -158,6 +167,7 @@ func ToReportResult(r *domainReport.InterpretReport) *ReportResult {
 			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
+			Suggestions: toSuggestionDTOs(d.Suggestions()),
 		}
 	}
 
@@ -169,7 +179,27 @@ func ToReportResult(r *domainReport.InterpretReport) *ReportResult {
 		RiskLevel:   string(r.RiskLevel()),
 		Conclusion:  r.Conclusion(),
 		Dimensions:  dimensions,
-		Suggestions: r.Suggestions(),
+		Suggestions: toSuggestionDTOs(r.Suggestions()),
 		CreatedAt:   r.CreatedAt().Format("2006-01-02 15:04:05"),
 	}
+}
+
+func toSuggestionDTOs(items []domainReport.Suggestion) []SuggestionDTO {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]SuggestionDTO, len(items))
+	for i, s := range items {
+		var fc *string
+		if s.FactorCode != nil {
+			code := s.FactorCode.String()
+			fc = &code
+		}
+		result[i] = SuggestionDTO{
+			Category:   string(s.Category),
+			Content:    s.Content,
+			FactorCode: fc,
+		}
+	}
+	return result
 }

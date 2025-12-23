@@ -84,6 +84,7 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
+			Suggestions: toSuggestionDTOs(d.Suggestions()),
 		}
 	}
 
@@ -95,8 +96,28 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 		RiskLevel:    string(r.RiskLevel()),
 		Conclusion:   r.Conclusion(),
 		Dimensions:   dimensions,
-		Suggestions:  r.Suggestions(),
+		Suggestions:  toSuggestionDTOs(r.Suggestions()),
 	}
+}
+
+func toSuggestionDTOs(items []report.Suggestion) []SuggestionDTO {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]SuggestionDTO, len(items))
+	for i, s := range items {
+		var fc *string
+		if s.FactorCode != nil {
+			code := s.FactorCode.String()
+			fc = &code
+		}
+		result[i] = SuggestionDTO{
+			Category:   string(s.Category),
+			Content:    s.Content,
+			FactorCode: fc,
+		}
+	}
+	return result
 }
 
 // toScoreResult 将领域模型转换为 ScoreResult

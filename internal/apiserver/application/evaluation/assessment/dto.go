@@ -120,18 +120,26 @@ type ReportResult struct {
 	RiskLevel    string            // 风险等级
 	Conclusion   string            // 总结论
 	Dimensions   []DimensionResult // 维度解读列表
-	Suggestions  []string          // 建议列表
+	Suggestions  []SuggestionDTO   // 建议列表
 	CreatedAt    time.Time         // 创建时间
 }
 
 // DimensionResult 维度解读结果
 type DimensionResult struct {
-	FactorCode  string   // 因子编码
-	FactorName  string   // 因子名称
-	RawScore    float64  // 原始分
-	MaxScore    *float64 // 最大分
-	RiskLevel   string   // 风险等级
-	Description string   // 解读描述
+	FactorCode  string          // 因子编码
+	FactorName  string          // 因子名称
+	RawScore    float64         // 原始分
+	MaxScore    *float64        // 最大分
+	RiskLevel   string          // 风险等级
+	Description string          // 解读描述
+	Suggestions []SuggestionDTO // 维度建议
+}
+
+// SuggestionDTO 结构化建议
+type SuggestionDTO struct {
+	Category   string  // 建议分类
+	Content    string  // 文本
+	FactorCode *string // 关联因子编码（可选）
 }
 
 // ReportListResult 报告列表结果

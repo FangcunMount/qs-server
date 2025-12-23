@@ -34,19 +34,36 @@
 └──────────────────┘          └──────────────────┘
 ```
 
+## 建议分类
+
+建议采用结构化设计，包含以下分类：
+
+- `general`: 总体/默认建议
+- `family`: 家庭维度建议
+- `study`: 学习/学校维度建议
+- `social`: 社交维度建议
+- `health`: 健康维度建议
+- `dimension`: 按因子维度建议（默认，关联具体因子）
+
+每个建议包含：
+- `Category`: 建议分类
+- `Content`: 建议内容
+- `FactorCode`: 可选的因子编码（用于关联具体因子）
+
 ## 内置策略
 
 ### FactorInterpretationSuggestionStrategy
 
 - **触发条件**：有评估结果且包含因子得分
-- **建议类型**：从因子解读规则配置中收集的建议
+- **建议类型**：从因子解读规则配置中收集的结构化建议
 - **数据来源**：
-  - 评估结果的总体建议 (`EvaluationResult.Suggestion`)
-  - 所有因子的建议 (`FactorScoreResult.Suggestion`)，来自因子解读规则配置
+  - 评估结果的总体建议 (`EvaluationResult.Suggestion`) → 分类为 `general`
+  - 所有因子的建议 (`FactorScoreResult.Suggestion`)，来自因子解读规则配置 → 分类为 `dimension`，关联对应因子
 - **特点**：
   - 完全依赖因子解读配置中的建议数据
   - 自动收集所有因子的建议（包括总分因子和其他因子）
   - 自动去重（总分因子建议如果与总体建议相同则不重复添加）
+  - 建议包含分类信息（`Category`）和可选的因子关联（`FactorCode`）
 
 ## 扩展方式
 
@@ -68,12 +85,15 @@ func (s *CustomSuggestionStrategy) CanHandle(report *report.InterpretReport) boo
     return report.ScaleCode() == "YOUR_SCALE_CODE"
 }
 
-func (s *CustomSuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]string, error) {
-    var suggestions []string
+func (s *CustomSuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]report.Suggestion, error) {
+    var suggestions []report.Suggestion
     
     // 实现建议生成逻辑
     if rpt.TotalScore() > 50 {
-        suggestions = append(suggestions, "建议A")
+        suggestions = append(suggestions, report.Suggestion{
+            Category: report.SuggestionCategoryGeneral,
+            Content:  "建议A",
+        })
     }
     
     return suggestions, nil
@@ -119,7 +139,7 @@ func (s *AISuggestionStrategy) CanHandle(rpt *report.InterpretReport) bool {
     return true
 }
 
-func (s *AISuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]string, error) {
+func (s *AISuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]report.Suggestion, error) {
     // 构建提示词
     prompt := s.buildPrompt(rpt)
     
@@ -127,23 +147,35 @@ func (s *AISuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *rep
     ctx, cancel := context.WithTimeout(ctx, s.timeout)
     defer cancel()
     
-    // 调用 AI 生成
-    var suggestions []string
+    // 调用 AI 生成（假设 AI 客户端返回字符串列表，需要转换为 Suggestion）
+    var aiSuggestions []string
     var err error
     for i := 0; i < s.maxRetries; i++ {
-        suggestions, err = s.client.GenerateSuggestions(ctx, prompt)
+        aiSuggestions, err = s.client.GenerateSuggestions(ctx, prompt)
         if err == nil {
-            return suggestions, nil
+            break
         }
         time.Sleep(time.Duration(i+1) * 100 * time.Millisecond)
     }
     
-    // 降级到规则策略
-    if s.fallback != nil && s.fallback.CanHandle(rpt) {
-        return s.fallback.GenerateSuggestions(ctx, rpt)
+    if err != nil {
+        // 降级到规则策略
+        if s.fallback != nil && s.fallback.CanHandle(rpt) {
+            return s.fallback.GenerateSuggestions(ctx, rpt)
+        }
+        return nil, err
     }
     
-    return nil, err
+    // 转换为结构化建议
+    suggestions := make([]report.Suggestion, len(aiSuggestions))
+    for i, content := range aiSuggestions {
+        suggestions[i] = report.Suggestion{
+            Category: report.SuggestionCategoryGeneral,
+            Content:  content,
+        }
+    }
+    
+    return suggestions, nil
 }
 
 func (s *AISuggestionStrategy) buildPrompt(rpt *report.InterpretReport) string {
@@ -175,7 +207,7 @@ type DatabaseSuggestionStrategy struct {
     repo SuggestionRepository
 }
 
-func (s *DatabaseSuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]string, error) {
+func (s *DatabaseSuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]report.Suggestion, error) {
     // 从数据库查询建议模板
     templates, err := s.repo.FindTemplatesByScaleAndRisk(
         ctx,
@@ -187,10 +219,13 @@ func (s *DatabaseSuggestionStrategy) GenerateSuggestions(ctx context.Context, rp
     }
     
     // 根据模板渲染建议
-    var suggestions []string
+    var suggestions []report.Suggestion
     for _, tmpl := range templates {
-        suggestion := s.renderTemplate(tmpl, rpt)
-        suggestions = append(suggestions, suggestion)
+        content := s.renderTemplate(tmpl, rpt)
+        suggestions = append(suggestions, report.Suggestion{
+            Category: report.SuggestionCategory(tmpl.Category), // 假设模板有分类字段
+            Content:  content,
+        })
     }
     
     return suggestions, nil

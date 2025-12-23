@@ -1594,7 +1594,7 @@ const docTemplate = `{
                 "suggestions": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
                     }
                 },
                 "total_score": {
@@ -1666,6 +1666,12 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "type": "string"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
                 }
             }
         },
@@ -1715,6 +1721,20 @@ const docTemplate = `{
                 },
                 "total_pages": {
                     "type": "integer"
+                }
+            }
+        },
+        "evaluation.SuggestionResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "factor_code": {
+                    "type": "string"
                 }
             }
         },
