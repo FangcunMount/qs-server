@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -23,6 +24,7 @@ type Context struct {
 	Conclusion       string                         // 总结论
 	Suggestion       string                         // 总建议
 	EvaluationResult *assessment.EvaluationResult   // 完整评估结果
+	Report           *domainReport.InterpretReport // 生成的报告（由 InterpretationHandler 填充）
 
 	// 错误信息
 	Error error

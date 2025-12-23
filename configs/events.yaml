@@ -186,9 +186,10 @@ events:
     topic: assessment-lifecycle
     aggregate: Report
     domain: evaluation/report
-    description: "报告已生成"
+    description: "报告已生成（在 assessment.interpreted 之后发布）"
     handler: report_generated_handler
     consumers:
+      - qs-worker  # 给受试者打标签、提取高风险因子
       - notification-service
       - alert-service
 
@@ -296,7 +297,7 @@ handlers:
 
   report_generated_handler:
     package: report
-    description: "处理报告生成事件"
+    description: "处理报告生成事件：给受试者打标签、提取高风险因子、发送预警"
 
   report_exported_handler:
     package: report

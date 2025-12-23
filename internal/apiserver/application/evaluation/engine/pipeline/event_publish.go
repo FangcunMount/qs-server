@@ -2,18 +2,24 @@ package pipeline
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // EventPublishHandler 事件发布处理器
-// 职责：发布 AssessmentInterpretedEvent 领域事件
+// 职责：发布评估相关的领域事件
 // 位置：链尾，在所有处理器之后执行
-// 输入：Context（包含完整的评估结果）
+// 输入：Context（包含完整的评估结果和报告）
 // 输出：发布事件到消息队列
+//
+// 发布的事件：
+// - AssessmentInterpretedEvent：测评已解读事件
+// - ReportGeneratedEvent：报告已生成事件（如果报告已生成）
 //
 // 事件消费方：
 // - 通知服务：发送"报告已生成"通知给受试者
@@ -49,44 +55,25 @@ func (h *EventPublishHandler) Handle(ctx context.Context, evalCtx *Context) erro
 		return evalCtx.Error
 	}
 
-	// 构建领域事件
-	domainEvent := h.buildEvent(evalCtx)
+	// 发布 assessment.interpreted 事件
+	h.publishAssessmentInterpretedEvent(ctx, evalCtx)
 
-	// 发布事件
-	l := logger.L(ctx)
-	if h.publisher != nil {
-		if err := h.publisher.Publish(ctx, domainEvent); err != nil {
-			// 事件发布失败不应该中断整个流程
-			// 记录错误但继续执行（可以通过重试机制补偿）
-			l.Warnw("failed to publish AssessmentInterpretedEvent",
-				"action", "publish_event",
-				"assessment_id", evalCtx.Assessment.ID(),
-				"result", "failed",
-				"error", err.Error(),
-			)
-		} else {
-			l.Infow("AssessmentInterpretedEvent published",
-				"action", "publish_event",
-				"assessment_id", evalCtx.Assessment.ID(),
-				"risk_level", evalCtx.RiskLevel,
-				"result", "success",
-			)
-		}
-	} else {
-		l.Debugw("publisher is nil, skip event publishing",
-			"assessment_id", evalCtx.Assessment.ID(),
-		)
+	// 发布 report.generated 事件（如果报告已生成）
+	if evalCtx.Report != nil {
+		h.publishReportGeneratedEvent(ctx, evalCtx)
 	}
-
-	// 同时将事件添加到 Assessment 的事件列表中（供仓储层使用）
-	// 领域事件已在 Assessment.ApplyEvaluation 中添加
 
 	// 继续下一个处理器
 	return h.Next(ctx, evalCtx)
 }
 
-// buildEvent 构建评估完成事件
-func (h *EventPublishHandler) buildEvent(evalCtx *Context) assessment.AssessmentInterpretedEvent {
+// publishAssessmentInterpretedEvent 发布测评已解读事件
+func (h *EventPublishHandler) publishAssessmentInterpretedEvent(ctx context.Context, evalCtx *Context) {
+	if h.publisher == nil {
+		return
+	}
+
+	l := logger.L(ctx)
 	a := evalCtx.Assessment
 	result := evalCtx.EvaluationResult
 
@@ -96,7 +83,8 @@ func (h *EventPublishHandler) buildEvent(evalCtx *Context) assessment.Assessment
 		scaleRef = *a.MedicalScaleRef()
 	}
 
-	return assessment.NewAssessmentInterpretedEvent(
+	// 构建事件
+	domainEvent := assessment.NewAssessmentInterpretedEvent(
 		a.ID(),
 		a.TesteeID(),
 		scaleRef,
@@ -104,4 +92,80 @@ func (h *EventPublishHandler) buildEvent(evalCtx *Context) assessment.Assessment
 		result.RiskLevel,
 		time.Now(),
 	)
+
+	// 发布事件
+	if err := h.publisher.Publish(ctx, domainEvent); err != nil {
+		l.Warnw("failed to publish AssessmentInterpretedEvent",
+			"action", "publish_event",
+			"assessment_id", evalCtx.Assessment.ID(),
+			"result", "failed",
+			"error", err.Error(),
+		)
+	} else {
+		l.Infow("AssessmentInterpretedEvent published",
+			"action", "publish_event",
+			"assessment_id", evalCtx.Assessment.ID(),
+			"risk_level", evalCtx.RiskLevel,
+			"result", "success",
+		)
+	}
+}
+
+// publishReportGeneratedEvent 发布报告生成事件
+func (h *EventPublishHandler) publishReportGeneratedEvent(ctx context.Context, evalCtx *Context) {
+	if h.publisher == nil {
+		return
+	}
+
+	l := logger.L(ctx)
+	rpt := evalCtx.Report
+	reportID := rpt.ID().Uint64()
+	assessmentID := evalCtx.Assessment.ID().Uint64()
+	testeeID := uint64(evalCtx.Assessment.TesteeID())
+
+	// 获取量表信息
+	var scaleCode, scaleVersion string
+	if evalCtx.MedicalScale != nil {
+		scaleCode = evalCtx.MedicalScale.GetCode().String()
+		scaleVersion = evalCtx.MedicalScale.GetQuestionnaireVersion()
+	} else if evalCtx.Assessment.MedicalScaleRef() != nil {
+		scaleCode = evalCtx.Assessment.MedicalScaleRef().Code().String()
+		// MedicalScaleRef 没有版本信息，使用问卷版本
+		questionnaireRef := evalCtx.Assessment.QuestionnaireRef()
+		if !questionnaireRef.IsEmpty() {
+			scaleVersion = questionnaireRef.Version()
+		}
+	}
+
+	// 构建事件
+	domainEvent := domainReport.NewReportGeneratedEvent(
+		strconv.FormatUint(reportID, 10),
+		strconv.FormatUint(assessmentID, 10),
+		testeeID,
+		scaleCode,
+		scaleVersion,
+		evalCtx.TotalScore,
+		string(evalCtx.RiskLevel),
+		time.Now(),
+	)
+
+	// 发布事件
+	if err := h.publisher.Publish(ctx, domainEvent); err != nil {
+		l.Warnw("failed to publish ReportGeneratedEvent",
+			"action", "publish_event",
+			"report_id", reportID,
+			"assessment_id", assessmentID,
+			"result", "failed",
+			"error", err.Error(),
+		)
+	} else {
+		l.Infow("ReportGeneratedEvent published",
+			"action", "publish_event",
+			"report_id", reportID,
+			"assessment_id", assessmentID,
+			"testee_id", testeeID,
+			"risk_level", evalCtx.RiskLevel,
+			"result", "success",
+		)
+	}
 }

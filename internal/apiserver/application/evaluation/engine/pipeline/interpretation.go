@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -22,8 +22,8 @@ import (
 type InterpretationHandler struct {
 	*BaseHandler
 	assessmentRepo  assessment.Repository
-	reportRepo      report.ReportRepository
-	reportBuilder   report.ReportBuilder
+	reportRepo      domainReport.ReportRepository
+	reportBuilder   domainReport.ReportBuilder
 	interpreter     interpretation.Interpreter                    // 解读服务
 	defaultProvider *interpretation.DefaultInterpretationProvider // 默认解读提供者
 }
@@ -31,8 +31,8 @@ type InterpretationHandler struct {
 // NewInterpretationHandler 创建测评分析解读处理器
 func NewInterpretationHandler(
 	assessmentRepo assessment.Repository,
-	reportRepo report.ReportRepository,
-	reportBuilder report.ReportBuilder,
+	reportRepo domainReport.ReportRepository,
+	reportBuilder domainReport.ReportBuilder,
 ) *InterpretationHandler {
 	return &InterpretationHandler{
 		BaseHandler:     NewBaseHandler("InterpretationHandler"),
@@ -374,6 +374,9 @@ func (h *InterpretationHandler) generateAndSaveReport(ctx context.Context, evalC
 	reportID, _ = rpt.ID().Value()
 	assessmentID, _ = evalCtx.Assessment.ID().Value()
 	l.Infow("Report saved successfully", "report_id", reportID, "assessment_id", assessmentID)
+
+	// 将报告添加到 Context，供后续处理器使用
+	evalCtx.Report = rpt
 
 	return nil
 }

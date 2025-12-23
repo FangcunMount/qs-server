@@ -54,98 +54,131 @@ func handleReportGenerated(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse report generated event: %w", err)
 		}
 
-		deps.Logger.Info("processing report generated",
-			slog.String("event_id", env.ID),
-			slog.String("report_id", data.ReportID),
-			slog.String("assessment_id", data.AssessmentID),
-			slog.Uint64("testee_id", data.TesteeID),
-			slog.Float64("total_score", data.TotalScore),
-			slog.String("risk_level", data.RiskLevel),
-		)
+		// 记录报告生成日志
+		logReportGenerated(deps, env, data)
 
-		// 高风险预警
-		if data.IsHighRisk() {
-			deps.Logger.Warn("HIGH RISK REPORT GENERATED",
-				slog.String("report_id", data.ReportID),
-				slog.Uint64("testee_id", data.TesteeID),
-				slog.String("risk_level", data.RiskLevel),
-				slog.Float64("total_score", data.TotalScore),
-			)
-			// TODO: 发送预警通知
-		}
+		// 处理高风险预警
+		handleHighRiskAlert(deps, data)
 
-		// 给受试者打标签
+		// 提取高风险因子并给受试者打标签
 		if deps.InternalClient != nil {
-			markKeyFocus := data.IsHighRisk() // 高风险时自动标记为重点关注
-
-			// 查询报告详情，提取高风险因子
-			var highRiskFactors []string
-			if deps.EvaluationClient != nil {
-				// 解析 assessmentID（字符串格式）
-				assessmentID, err := strconv.ParseUint(data.AssessmentID, 10, 64)
-				if err == nil {
-					reportResp, err := deps.EvaluationClient.GetAssessmentReport(ctx, assessmentID)
-					if err == nil && reportResp != nil && reportResp.Report != nil {
-						// 提取高风险因子编码
-						for _, dim := range reportResp.Report.Dimensions {
-							// 判断是否为高风险（high 或 severe）
-							riskLevel := dim.RiskLevel
-							if riskLevel == "high" || riskLevel == "severe" {
-								if dim.FactorCode != "" {
-									highRiskFactors = append(highRiskFactors, dim.FactorCode)
-								}
-							}
-						}
-						deps.Logger.Info("extracted high risk factors from report",
-							slog.String("report_id", data.ReportID),
-							slog.Int("factor_count", len(highRiskFactors)),
-							slog.Any("factors", highRiskFactors),
-						)
-					} else if err != nil {
-						deps.Logger.Warn("failed to get report for factor extraction",
-							slog.String("report_id", data.ReportID),
-							slog.String("assessment_id", data.AssessmentID),
-							slog.String("error", err.Error()),
-						)
-					}
-				} else {
-					deps.Logger.Warn("failed to parse assessment_id",
-						slog.String("report_id", data.ReportID),
-						slog.String("assessment_id", data.AssessmentID),
-						slog.String("error", err.Error()),
-					)
-				}
-			}
-
-			resp, err := deps.InternalClient.TagTestee(
-				ctx,
-				data.TesteeID,
-				data.RiskLevel,
-				data.ScaleCode,
-				markKeyFocus,
-				highRiskFactors,
-			)
-			if err != nil {
-				deps.Logger.Warn("failed to tag testee",
-					slog.String("report_id", data.ReportID),
-					slog.Uint64("testee_id", data.TesteeID),
-					slog.String("error", err.Error()),
-				)
-				// 不影响主流程，继续执行
-			} else {
-				deps.Logger.Info("testee tagged successfully",
-					slog.String("report_id", data.ReportID),
-					slog.Uint64("testee_id", data.TesteeID),
-					slog.Any("tags_added", resp.TagsAdded),
-					slog.Bool("key_focus_marked", resp.KeyFocusMarked),
-				)
-			}
+			highRiskFactors := extractHighRiskFactors(ctx, deps, data)
+			tagTesteeWithReportData(ctx, deps, data, highRiskFactors)
 		}
 
 		// TODO: 发送报告生成通知
 
 		return nil
 	}
+}
+
+// logReportGenerated 记录报告生成日志
+func logReportGenerated(deps *Dependencies, env *EventEnvelope, data ReportGeneratedPayload) {
+	deps.Logger.Info("processing report generated",
+		slog.String("event_id", env.ID),
+		slog.String("report_id", data.ReportID),
+		slog.String("assessment_id", data.AssessmentID),
+		slog.Uint64("testee_id", data.TesteeID),
+		slog.Float64("total_score", data.TotalScore),
+		slog.String("risk_level", data.RiskLevel),
+	)
+}
+
+// handleHighRiskAlert 处理高风险预警
+func handleHighRiskAlert(deps *Dependencies, data ReportGeneratedPayload) {
+	if !data.IsHighRisk() {
+		return
+	}
+
+	deps.Logger.Warn("HIGH RISK REPORT GENERATED",
+		slog.String("report_id", data.ReportID),
+		slog.Uint64("testee_id", data.TesteeID),
+		slog.String("risk_level", data.RiskLevel),
+		slog.Float64("total_score", data.TotalScore),
+	)
+	// TODO: 发送预警通知
+}
+
+// extractHighRiskFactors 从报告中提取高风险因子
+func extractHighRiskFactors(ctx context.Context, deps *Dependencies, data ReportGeneratedPayload) []string {
+	if deps.EvaluationClient == nil {
+		return nil
+	}
+
+	assessmentID, err := strconv.ParseUint(data.AssessmentID, 10, 64)
+	if err != nil {
+		deps.Logger.Warn("failed to parse assessment_id",
+			slog.String("report_id", data.ReportID),
+			slog.String("assessment_id", data.AssessmentID),
+			slog.String("error", err.Error()),
+		)
+		return nil
+	}
+
+	reportResp, err := deps.EvaluationClient.GetAssessmentReport(ctx, assessmentID)
+	if err != nil {
+		deps.Logger.Warn("failed to get report for factor extraction",
+			slog.String("report_id", data.ReportID),
+			slog.String("assessment_id", data.AssessmentID),
+			slog.String("error", err.Error()),
+		)
+		return nil
+	}
+
+	if reportResp == nil || reportResp.Report == nil {
+		return nil
+	}
+
+	var highRiskFactors []string
+	for _, dim := range reportResp.Report.Dimensions {
+		if isHighRiskDimension(dim.RiskLevel) && dim.FactorCode != "" {
+			highRiskFactors = append(highRiskFactors, dim.FactorCode)
+		}
+	}
+
+	if len(highRiskFactors) > 0 {
+		deps.Logger.Info("extracted high risk factors from report",
+			slog.String("report_id", data.ReportID),
+			slog.Int("factor_count", len(highRiskFactors)),
+			slog.Any("factors", highRiskFactors),
+		)
+	}
+
+	return highRiskFactors
+}
+
+// isHighRiskDimension 判断维度风险等级是否为高风险
+func isHighRiskDimension(riskLevel string) bool {
+	return riskLevel == "high" || riskLevel == "severe"
+}
+
+// tagTesteeWithReportData 根据报告数据给受试者打标签
+func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data ReportGeneratedPayload, highRiskFactors []string) {
+	markKeyFocus := data.IsHighRisk()
+
+	resp, err := deps.InternalClient.TagTestee(
+		ctx,
+		data.TesteeID,
+		data.RiskLevel,
+		data.ScaleCode,
+		markKeyFocus,
+		highRiskFactors,
+	)
+	if err != nil {
+		deps.Logger.Warn("failed to tag testee",
+			slog.String("report_id", data.ReportID),
+			slog.Uint64("testee_id", data.TesteeID),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	deps.Logger.Info("testee tagged successfully",
+		slog.String("report_id", data.ReportID),
+		slog.Uint64("testee_id", data.TesteeID),
+		slog.Any("tags_added", resp.TagsAdded),
+		slog.Bool("key_focus_marked", resp.KeyFocusMarked),
+	)
 }
 
 func handleReportExported(deps *Dependencies) HandlerFunc {
