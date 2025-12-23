@@ -84,7 +84,7 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
-			Suggestions: toSuggestionDTOs(d.Suggestions()),
+			Suggestion:  d.Suggestion(),
 		}
 	}
 

@@ -575,7 +575,7 @@ type DimensionInterpret struct {
 	MaxScore      float64                `protobuf:"fixed64,6,opt,name=max_score,json=maxScore,proto3" json:"max_score,omitempty"`     // 最大分（可选）
 	RiskLevel     string                 `protobuf:"bytes,4,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`    // 风险等级
 	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`                 // 解读描述
-	Suggestions   []*Suggestion          `protobuf:"bytes,7,rep,name=suggestions,proto3" json:"suggestions,omitempty"`                 // 维度建议列表
+	Suggestion    string                 `protobuf:"bytes,7,opt,name=suggestion,proto3" json:"suggestion,omitempty"`                   // 维度建议
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -652,11 +652,11 @@ func (x *DimensionInterpret) GetDescription() string {
 	return ""
 }
 
-func (x *DimensionInterpret) GetSuggestions() []*Suggestion {
+func (x *DimensionInterpret) GetSuggestion() string {
 	if x != nil {
-		return x.Suggestions
+		return x.Suggestion
 	}
-	return nil
+	return ""
 }
 
 // 测评报告
@@ -1785,7 +1785,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x1f\n" +
 	"\vfactor_code\x18\x03 \x01(\tR\n" +
-	"factorCode\"\x8b\x02\n" +
+	"factorCode\"\xf1\x01\n" +
 	"\x12DimensionInterpret\x12\x1f\n" +
 	"\vfactor_code\x18\x01 \x01(\tR\n" +
 	"factorCode\x12\x1f\n" +
@@ -1795,8 +1795,10 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\tmax_score\x18\x06 \x01(\x01R\bmaxScore\x12\x1d\n" +
 	"\n" +
 	"risk_level\x18\x04 \x01(\tR\triskLevel\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\x128\n" +
-	"\vsuggestions\x18\a \x03(\v2\x16.evaluation.SuggestionR\vsuggestions\"\xee\x02\n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x1e\n" +
+	"\n" +
+	"suggestion\x18\a \x01(\tR\n" +
+	"suggestion\"\xee\x02\n" +
 	"\x10AssessmentReport\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
@@ -1936,38 +1938,37 @@ var file_evaluation_evaluation_proto_goTypes = []any{
 	(*ListMyReportsResponse)(nil),                  // 22: evaluation.ListMyReportsResponse
 }
 var file_evaluation_evaluation_proto_depIdxs = []int32{
-	4,  // 0: evaluation.DimensionInterpret.suggestions:type_name -> evaluation.Suggestion
-	5,  // 1: evaluation.AssessmentReport.dimensions:type_name -> evaluation.DimensionInterpret
-	4,  // 2: evaluation.AssessmentReport.suggestions:type_name -> evaluation.Suggestion
-	1,  // 3: evaluation.GetMyAssessmentResponse.assessment:type_name -> evaluation.AssessmentDetail
-	1,  // 4: evaluation.GetMyAssessmentByAnswerSheetIDResponse.assessment:type_name -> evaluation.AssessmentDetail
-	0,  // 5: evaluation.ListMyAssessmentsResponse.items:type_name -> evaluation.AssessmentSummary
-	2,  // 6: evaluation.GetAssessmentScoresResponse.factor_scores:type_name -> evaluation.FactorScore
-	3,  // 7: evaluation.GetFactorTrendResponse.data_points:type_name -> evaluation.TrendPoint
-	2,  // 8: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
-	6,  // 9: evaluation.GetAssessmentReportResponse.report:type_name -> evaluation.AssessmentReport
-	6,  // 10: evaluation.ListMyReportsResponse.items:type_name -> evaluation.AssessmentReport
-	7,  // 11: evaluation.EvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
-	9,  // 12: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:input_type -> evaluation.GetMyAssessmentByAnswerSheetIDRequest
-	11, // 13: evaluation.EvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
-	13, // 14: evaluation.EvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
-	15, // 15: evaluation.EvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
-	17, // 16: evaluation.EvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
-	19, // 17: evaluation.EvaluationService.GetAssessmentReport:input_type -> evaluation.GetAssessmentReportRequest
-	21, // 18: evaluation.EvaluationService.ListMyReports:input_type -> evaluation.ListMyReportsRequest
-	8,  // 19: evaluation.EvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
-	10, // 20: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:output_type -> evaluation.GetMyAssessmentByAnswerSheetIDResponse
-	12, // 21: evaluation.EvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
-	14, // 22: evaluation.EvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
-	16, // 23: evaluation.EvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
-	18, // 24: evaluation.EvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
-	20, // 25: evaluation.EvaluationService.GetAssessmentReport:output_type -> evaluation.GetAssessmentReportResponse
-	22, // 26: evaluation.EvaluationService.ListMyReports:output_type -> evaluation.ListMyReportsResponse
-	19, // [19:27] is the sub-list for method output_type
-	11, // [11:19] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	5,  // 0: evaluation.AssessmentReport.dimensions:type_name -> evaluation.DimensionInterpret
+	4,  // 1: evaluation.AssessmentReport.suggestions:type_name -> evaluation.Suggestion
+	1,  // 2: evaluation.GetMyAssessmentResponse.assessment:type_name -> evaluation.AssessmentDetail
+	1,  // 3: evaluation.GetMyAssessmentByAnswerSheetIDResponse.assessment:type_name -> evaluation.AssessmentDetail
+	0,  // 4: evaluation.ListMyAssessmentsResponse.items:type_name -> evaluation.AssessmentSummary
+	2,  // 5: evaluation.GetAssessmentScoresResponse.factor_scores:type_name -> evaluation.FactorScore
+	3,  // 6: evaluation.GetFactorTrendResponse.data_points:type_name -> evaluation.TrendPoint
+	2,  // 7: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
+	6,  // 8: evaluation.GetAssessmentReportResponse.report:type_name -> evaluation.AssessmentReport
+	6,  // 9: evaluation.ListMyReportsResponse.items:type_name -> evaluation.AssessmentReport
+	7,  // 10: evaluation.EvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
+	9,  // 11: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:input_type -> evaluation.GetMyAssessmentByAnswerSheetIDRequest
+	11, // 12: evaluation.EvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
+	13, // 13: evaluation.EvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
+	15, // 14: evaluation.EvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
+	17, // 15: evaluation.EvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
+	19, // 16: evaluation.EvaluationService.GetAssessmentReport:input_type -> evaluation.GetAssessmentReportRequest
+	21, // 17: evaluation.EvaluationService.ListMyReports:input_type -> evaluation.ListMyReportsRequest
+	8,  // 18: evaluation.EvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
+	10, // 19: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:output_type -> evaluation.GetMyAssessmentByAnswerSheetIDResponse
+	12, // 20: evaluation.EvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
+	14, // 21: evaluation.EvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
+	16, // 22: evaluation.EvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
+	18, // 23: evaluation.EvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
+	20, // 24: evaluation.EvaluationService.GetAssessmentReport:output_type -> evaluation.GetAssessmentReportResponse
+	22, // 25: evaluation.EvaluationService.ListMyReports:output_type -> evaluation.ListMyReportsResponse
+	18, // [18:26] is the sub-list for method output_type
+	10, // [10:18] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_evaluation_evaluation_proto_init() }

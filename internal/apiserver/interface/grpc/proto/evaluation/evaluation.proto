@@ -113,7 +113,7 @@ message DimensionInterpret {
   double max_score = 6;       // 最大分（可选）
   string risk_level = 4;      // 风险等级
   string description = 5;     // 解读描述
-  repeated Suggestion suggestions = 7;  // 维度建议列表
+  string suggestion = 7;      // 维度建议
 }
 
 // 测评报告

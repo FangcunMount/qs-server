@@ -33,7 +33,7 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
-			Suggestions: toSuggestionPOs(d.Suggestions()),
+			Suggestion:  d.Suggestion(),
 		}
 	}
 
@@ -72,7 +72,7 @@ func (m *ReportMapper) ToDomain(po *InterpretReportPO) *report.InterpretReport {
 			d.MaxScore,
 			report.RiskLevel(d.RiskLevel),
 			d.Description,
-			toDomainSuggestions(d.Suggestions),
+			d.Suggestion,
 		)
 	}
 

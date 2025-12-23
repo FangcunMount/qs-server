@@ -11,7 +11,7 @@ type DimensionInterpret struct {
 	maxScore    *float64
 	riskLevel   RiskLevel
 	description string
-	suggestions []Suggestion
+	suggestion  string
 }
 
 // NewDimensionInterpret 创建维度解读
@@ -22,7 +22,7 @@ func NewDimensionInterpret(
 	maxScore *float64,
 	riskLevel RiskLevel,
 	description string,
-	suggestions []Suggestion,
+	suggestion string,
 ) DimensionInterpret {
 	return DimensionInterpret{
 		factorCode:  factorCode,
@@ -31,7 +31,7 @@ func NewDimensionInterpret(
 		maxScore:    maxScore,
 		riskLevel:   riskLevel,
 		description: description,
-		suggestions: suggestions,
+		suggestion:  suggestion,
 	}
 }
 
@@ -60,9 +60,9 @@ func (d DimensionInterpret) Description() string {
 	return d.description
 }
 
-// Suggestions 获取维度建议列表
-func (d DimensionInterpret) Suggestions() []Suggestion {
-	return d.suggestions
+// Suggestion 获取维度建议
+func (d DimensionInterpret) Suggestion() string {
+	return d.suggestion
 }
 
 // MaxScore 获取最大分

@@ -59,13 +59,13 @@ type SuggestionResponse struct {
 
 // DimensionInterpretResponse 维度解读响应
 type DimensionInterpretResponse struct {
-	FactorCode  string               `json:"factor_code"`
-	FactorName  string               `json:"factor_name"`
-	RawScore    float64              `json:"raw_score"`
-	MaxScore    *float64             `json:"max_score,omitempty"`
-	RiskLevel   string               `json:"risk_level"`
-	Description string               `json:"description"`
-	Suggestions []SuggestionResponse `json:"suggestions,omitempty"`
+	FactorCode  string   `json:"factor_code"`
+	FactorName  string   `json:"factor_name"`
+	RawScore    float64  `json:"raw_score"`
+	MaxScore    *float64 `json:"max_score,omitempty"`
+	RiskLevel   string   `json:"risk_level"`
+	Description string   `json:"description"`
+	Suggestion  string   `json:"suggestion,omitempty"`
 }
 
 // AssessmentReportResponse 测评报告响应

@@ -38,13 +38,13 @@ type InterpretReportPO struct {
 
 // DimensionInterpretPO 维度解读持久化对象
 type DimensionInterpretPO struct {
-	FactorCode  string         `bson:"factor_code" json:"factor_code"`
-	FactorName  string         `bson:"factor_name" json:"factor_name"`
-	RawScore    float64        `bson:"raw_score" json:"raw_score"`
-	MaxScore    *float64       `bson:"max_score,omitempty" json:"max_score,omitempty"`
-	RiskLevel   string         `bson:"risk_level" json:"risk_level"`
-	Description string         `bson:"description" json:"description"`
-	Suggestions []SuggestionPO `bson:"suggestions,omitempty" json:"suggestions,omitempty"`
+	FactorCode  string   `bson:"factor_code" json:"factor_code"`
+	FactorName  string   `bson:"factor_name" json:"factor_name"`
+	RawScore    float64  `bson:"raw_score" json:"raw_score"`
+	MaxScore    *float64 `bson:"max_score,omitempty" json:"max_score,omitempty"`
+	RiskLevel   string   `bson:"risk_level" json:"risk_level"`
+	Description string   `bson:"description" json:"description"`
+	Suggestion  string   `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
 }
 
 // SuggestionPO 结构化建议持久化对象

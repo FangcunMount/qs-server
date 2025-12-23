@@ -439,7 +439,7 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 			MaxScore:    maxScore,
 			RiskLevel:   d.RiskLevel,
 			Description: d.Description,
-			Suggestions: toProtoSuggestions(d.Suggestions),
+			Suggestion:  d.Suggestion,
 		})
 	}
 

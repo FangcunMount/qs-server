@@ -259,7 +259,9 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 
 // GetReport 获取测评报告
 // @Summary 获取测评报告
-// @Description 获取指定测评的解读报告。响应中的 dimensions（维度列表）每个维度包含 max_score（最大分，可选）字段
+// @Description 获取指定测评的解读报告。响应字段说明：
+// @Description - dimensions（维度列表）：每个维度包含 factor_code（因子编码）、factor_name（因子名称）、raw_score（原始分）、max_score（最大分，可选）、risk_level（风险等级）、description（解读描述）、suggestion（维度建议，字符串）字段
+// @Description - suggestions（建议列表）：报告级别的建议列表，每个建议包含 category（分类）、content（内容）、factor_code（关联因子编码，可选）字段
 // @Tags Evaluation-Report
 // @Produce json
 // @Param id path string true "测评ID"
@@ -284,7 +286,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 
 // ListReports 查询报告列表
 // @Summary 查询报告列表
-// @Description 查询指定受试者的报告列表
+// @Description 查询指定受试者的报告列表。每个报告包含 dimensions（维度列表）和 suggestions（建议列表），维度中的 suggestion 字段为字符串类型
 // @Tags Evaluation-Report
 // @Produce json
 // @Param testee_id query string true "受试者ID"

@@ -508,7 +508,7 @@
                         "Bearer": []
                     }
                 ],
-                "description": "获取测评的解读报告。响应中的 dimensions（维度列表）只包含 is_show = true 的因子维度，每个维度包含 max_score（最大分，可选）字段",
+                "description": "获取测评的解读报告。响应字段说明：\n- dimensions（维度列表）：只包含 is_show = true 的因子维度，每个维度包含 factor_code（因子编码）、factor_name（因子名称）、raw_score（原始分）、max_score（最大分，可选）、risk_level（风险等级）、description（解读描述）、suggestion（维度建议，字符串）字段\n- suggestions（建议列表）：报告级别的建议列表，每个建议包含 category（分类）、content（内容）、factor_code（关联因子编码，可选）字段",
                 "produces": [
                     "application/json"
                 ],
@@ -1664,11 +1664,8 @@
                 "risk_level": {
                     "type": "string"
                 },
-                "suggestions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/evaluation.SuggestionResponse"
-                    }
+                "suggestion": {
+                    "type": "string"
                 }
             }
         },

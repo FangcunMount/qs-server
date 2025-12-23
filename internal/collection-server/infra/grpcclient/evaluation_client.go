@@ -73,7 +73,7 @@ type DimensionInterpretOutput struct {
 	MaxScore    *float64
 	RiskLevel   string
 	Description string
-	Suggestions []SuggestionOutput
+	Suggestion  string
 }
 
 // AssessmentReportOutput 测评报告输出
@@ -262,7 +262,7 @@ func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, assessmentID
 			MaxScore:    maxScore,
 			RiskLevel:   dim.GetRiskLevel(),
 			Description: dim.GetDescription(),
-			Suggestions: fromProtoSuggestions(dim.GetSuggestions()),
+			Suggestion:  dim.GetSuggestion(),
 		}
 	}
 

@@ -94,7 +94,7 @@ type DimensionDTO struct {
 	MaxScore    *float64
 	RiskLevel   string
 	Description string
-	Suggestions []SuggestionDTO
+	Suggestion  string
 }
 
 // SuggestionDTO 建议输入/输出 DTO
@@ -131,13 +131,13 @@ type ReportResult struct {
 
 // DimensionResult 维度查询结果
 type DimensionResult struct {
-	FactorCode  string          `json:"factorCode"`
-	FactorName  string          `json:"factorName"`
-	RawScore    float64         `json:"rawScore"`
-	MaxScore    *float64        `json:"maxScore,omitempty"`
-	RiskLevel   string          `json:"riskLevel"`
-	Description string          `json:"description"`
-	Suggestions []SuggestionDTO `json:"suggestions,omitempty"`
+	FactorCode  string  `json:"factorCode"`
+	FactorName  string  `json:"factorName"`
+	RawScore    float64 `json:"rawScore"`
+	MaxScore    *float64 `json:"maxScore,omitempty"`
+	RiskLevel   string  `json:"riskLevel"`
+	Description string  `json:"description"`
+	Suggestion  string  `json:"suggestion,omitempty"`
 }
 
 // ReportListResult 报告列表查询结果
@@ -167,7 +167,7 @@ func ToReportResult(r *domainReport.InterpretReport) *ReportResult {
 			MaxScore:    d.MaxScore(),
 			RiskLevel:   string(d.RiskLevel()),
 			Description: d.Description(),
-			Suggestions: toSuggestionDTOs(d.Suggestions()),
+			Suggestion:  d.Suggestion(),
 		}
 	}
 

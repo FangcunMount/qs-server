@@ -37,7 +37,7 @@ func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dt
 			d.MaxScore,
 			domainReport.RiskLevel(d.RiskLevel),
 			d.Description,
-			toDomainSuggestions(d.Suggestions),
+			d.Suggestion,
 		)
 	}
 

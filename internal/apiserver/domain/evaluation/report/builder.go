@@ -146,27 +146,12 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 			maxScore,
 			RiskLevel(fs.RiskLevel),
 			description,
-			buildDimensionSuggestions(fs),
+			fs.Suggestion,
 		)
 		dimensions = append(dimensions, dim)
 	}
 
 	return dimensions
-}
-
-// buildDimensionSuggestions 将因子解读建议聚合到维度
-func buildDimensionSuggestions(fs assessment.FactorScoreResult) []Suggestion {
-	if fs.Suggestion == "" {
-		return nil
-	}
-	factorCode := fs.FactorCode
-	return []Suggestion{
-		{
-			Category:   SuggestionCategoryDimension,
-			Content:    fs.Suggestion,
-			FactorCode: &factorCode,
-		},
-	}
 }
 
 // buildSuggestions 构建建议
