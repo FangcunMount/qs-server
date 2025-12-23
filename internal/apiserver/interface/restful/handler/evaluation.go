@@ -170,7 +170,7 @@ func (h *EvaluationHandler) GetStatistics(c *gin.Context) {
 
 // GetScores 获取测评得分
 // @Summary 获取测评得分
-// @Description 获取指定测评的得分详情
+// @Description 获取指定测评的得分详情。响应中的 factor_scores 包含每个因子的得分信息，其中 max_score 为因子的最大分（可选）
 // @Tags Evaluation-Score
 // @Produce json
 // @Param id path string true "测评ID"
@@ -259,7 +259,7 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 
 // GetReport 获取测评报告
 // @Summary 获取测评报告
-// @Description 获取指定测评的解读报告
+// @Description 获取指定测评的解读报告。响应中的 dimensions（维度列表）每个维度包含 max_score（最大分，可选）字段
 // @Tags Evaluation-Report
 // @Produce json
 // @Param id path string true "测评ID"

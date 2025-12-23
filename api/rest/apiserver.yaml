@@ -317,7 +317,7 @@ paths:
       tags:
       - Evaluation-Report
       summary: 获取测评报告
-      description: 获取指定测评的解读报告
+      description: 获取指定测评的解读报告。响应中的 dimensions（维度列表）每个维度包含 max_score（最大分，可选）字段
       operationId: 获取测评报告
       parameters:
       - type: string
@@ -367,7 +367,7 @@ paths:
       tags:
       - Evaluation-Score
       summary: 获取测评得分
-      description: 获取指定测评的得分详情
+      description: 获取指定测评的得分详情。响应中的 factor_scores 包含每个因子的得分信息，其中 max_score 为因子的最大分（可选）
       operationId: 获取测评得分
       parameters:
       - type: string
@@ -1639,6 +1639,8 @@ paths:
 
         - max_score: 因子的最大分（可选）
 
+        - is_show: 是否显示（用于报告中的维度展示）
+
         - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe'
       operationId: 根据问卷编码获取量表
       parameters:
@@ -1766,6 +1768,8 @@ paths:
 
         - max_score: 因子的最大分（可选）
 
+        - is_show: 是否显示（用于报告中的维度展示）
+
         - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe'
       operationId: 获取已发布的量表
       parameters:
@@ -1814,6 +1818,8 @@ paths:
         字段
 
         - max_score: 因子的最大分（可选）
+
+        - is_show: 是否显示（用于报告中的维度展示）
 
         - risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe'
       operationId: 获取量表详情
@@ -1952,6 +1958,8 @@ paths:
 
         响应中的 max_score 为因子的最大分（可选）
 
+        响应中的 is_show 为是否显示（用于报告中的维度展示）
+
         响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe'
       operationId: 获取量表的因子列表
       parameters:
@@ -1990,12 +1998,16 @@ paths:
 
         - max_score：最大分（可选），用于设置因子的最大分数
 
+        - is_show：是否显示（用于报告中的维度展示），默认为 true
+
         - risk_level：因子级别的风险等级（可选），如果解读规则中未指定风险等级，则使用此值；有效值：none/low/medium/high/severe
 
         响应中的 scoring_params 为 map[string]interface{}，cnt 策略直接包含 cnt_option_contents
         字段
 
         响应中的 max_score 为因子的最大分（可选）
+
+        响应中的 is_show 为是否显示字段
 
         响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级）'
       operationId: 批量更新因子
@@ -2036,6 +2048,8 @@ paths:
       description: '批量设置量表所有因子的解读规则
 
         响应中的 max_score 为因子的最大分（可选）
+
+        响应中的 is_show 为是否显示字段
 
         响应中的 risk_level 为因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe'
       operationId: 批量设置解读规则
@@ -2754,6 +2768,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/request.InterpretRuleModel'
+        is_show:
+          description: 是否显示（用于报告中的维度展示）
+          type: boolean
         is_total_score:
           type: boolean
         max_score:
@@ -3172,6 +3189,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/response.InterpretRuleResponse'
+        is_show:
+          description: 是否显示（用于报告中的维度展示）
+          type: boolean
         is_total_score:
           type: boolean
         max_score:

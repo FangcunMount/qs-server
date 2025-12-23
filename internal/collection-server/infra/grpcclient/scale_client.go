@@ -31,6 +31,7 @@ type FactorOutput struct {
 	Title           string
 	FactorType      string
 	IsTotalScore    bool
+	IsShow          bool
 	QuestionCodes   []string
 	ScoringStrategy string
 	ScoringParams   map[string]string
@@ -260,10 +261,13 @@ func (c *ScaleClient) GetScaleCategories(ctx context.Context) (*ScaleCategoriesO
 
 // convertScale 转换 protobuf 量表到输出类型
 func (c *ScaleClient) convertScale(s *pb.Scale) *ScaleOutput {
-	// 转换因子列表
-	factors := make([]FactorOutput, len(s.GetFactors()))
-	for i, f := range s.GetFactors() {
-		factors[i] = c.convertFactor(f)
+	// 转换因子列表，只保留 isShow = true 的因子
+	factors := make([]FactorOutput, 0)
+	for _, f := range s.GetFactors() {
+		// 只转换 isShow = true 的因子
+		if f.GetIsShow() {
+			factors = append(factors, c.convertFactor(f))
+		}
 	}
 
 	return &ScaleOutput{
@@ -308,6 +312,7 @@ func (c *ScaleClient) convertFactor(f *pb.Factor) FactorOutput {
 		Title:           f.GetTitle(),
 		FactorType:      f.GetFactorType(),
 		IsTotalScore:    f.GetIsTotalScore(),
+		IsShow:          f.GetIsShow(),
 		QuestionCodes:   f.GetQuestionCodes(),
 		ScoringStrategy: f.GetScoringStrategy(),
 		ScoringParams:   f.GetScoringParams(),

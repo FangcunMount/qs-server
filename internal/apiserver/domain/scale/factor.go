@@ -17,6 +17,9 @@ type Factor struct {
 	// 是否为总分因子
 	isTotalScore bool
 
+	// 是否显示（用于报告中的维度展示）
+	isShow bool
+
 	// 关联的题目编码列表
 	questionCodes []meta.Code
 
@@ -51,6 +54,7 @@ func NewFactor(factorCode FactorCode, title string, opts ...FactorOption) (*Fact
 		factorType:      FactorTypePrimary,
 		scoringStrategy: ScoringStrategySum,
 		scoringParams:   NewScoringParams(),
+		isShow:          true, // 默认显示
 	}
 
 	for _, opt := range opts {
@@ -73,6 +77,13 @@ func WithFactorType(ft FactorType) FactorOption {
 func WithIsTotalScore(isTotalScore bool) FactorOption {
 	return func(f *Factor) {
 		f.isTotalScore = isTotalScore
+	}
+}
+
+// WithIsShow 设置是否显示
+func WithIsShow(isShow bool) FactorOption {
+	return func(f *Factor) {
+		f.isShow = isShow
 	}
 }
 
@@ -135,6 +146,11 @@ func (f *Factor) GetFactorType() FactorType {
 // IsTotalScore 是否为总分因子
 func (f *Factor) IsTotalScore() bool {
 	return f.isTotalScore
+}
+
+// IsShow 是否显示
+func (f *Factor) IsShow() bool {
+	return f.isShow
 }
 
 // GetQuestionCodes 获取关联的题目编码

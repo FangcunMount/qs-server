@@ -312,6 +312,7 @@ func (s *ScaleService) toProtoFactor(f *appScale.FactorResult) *pb.Factor {
 		Title:           f.Title,
 		FactorType:      f.FactorType,
 		IsTotalScore:    f.IsTotalScore,
+		IsShow:          f.IsShow,
 		QuestionCodes:   f.QuestionCodes,
 		ScoringStrategy: f.ScoringStrategy,
 		ScoringParams:   scoringParams,

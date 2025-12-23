@@ -940,7 +940,8 @@ paths:
       - 测评
   /api/v1/assessments/{id}/report:
     get:
-      description: 获取测评的解读报告
+      description: 获取测评的解读报告。响应中的 dimensions（维度列表）只包含 is_show = true 的因子维度，每个维度包含
+        max_score（最大分，可选）字段
       parameters:
       - description: 测评ID
         in: path
@@ -978,7 +979,7 @@ paths:
       - 测评
   /api/v1/assessments/{id}/scores:
     get:
-      description: 获取测评的因子得分详情
+      description: 获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段
       parameters:
       - description: 测评ID
         in: path
@@ -1245,7 +1246,7 @@ paths:
   /api/v1/scales/{code}:
     get:
       description: |-
-        根据量表编码获取量表详情。
+        根据量表编码获取量表详情。注意：返回的因子列表只包含 is_show = true 的因子。
         响应字段说明：
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
         - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
@@ -1253,6 +1254,7 @@ paths:
         - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
         - tags: 标签列表（数组，动态输入）
         - question_count: 题目数量（不包含 Section 题型）
+        - factors: 因子列表（只包含 is_show = true 的因子），每个因子包含 max_score（最大分，可选）和 is_show（是否显示）字段
       parameters:
       - description: 量表编码
         in: path

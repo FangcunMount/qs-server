@@ -28,6 +28,7 @@ type FactorResponse struct {
 	Title           string                  `json:"title"`
 	FactorType      string                  `json:"factor_type"`
 	IsTotalScore    bool                    `json:"is_total_score"`
+	IsShow          bool                    `json:"is_show"` // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
 	ScoringParams   map[string]interface{}  `json:"scoring_params"`
@@ -128,6 +129,7 @@ func newFactorResponse(result scale.FactorResult) FactorResponse {
 		Title:           result.Title,
 		FactorType:      result.FactorType,
 		IsTotalScore:    result.IsTotalScore,
+		IsShow:          result.IsShow,
 		QuestionCodes:   result.QuestionCodes,
 		ScoringStrategy: result.ScoringStrategy,
 		ScoringParams:   scoringParams,

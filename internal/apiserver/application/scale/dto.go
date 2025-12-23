@@ -50,6 +50,7 @@ type AddFactorDTO struct {
 	Title           string             // 因子标题
 	FactorType      string             // 因子类型：primary/multilevel
 	IsTotalScore    bool               // 是否为总分因子
+	IsShow          bool               // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string           // 关联的题目编码列表
 	ScoringStrategy string             // 计分策略：sum/avg/cnt
 	ScoringParams   *ScoringParamsDTO  // 计分参数
@@ -64,6 +65,7 @@ type UpdateFactorDTO struct {
 	Title           string             // 因子标题
 	FactorType      string             // 因子类型
 	IsTotalScore    bool               // 是否为总分因子
+	IsShow          bool               // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string           // 关联的题目编码列表
 	ScoringStrategy string             // 计分策略
 	ScoringParams   *ScoringParamsDTO  // 计分参数
@@ -77,6 +79,7 @@ type FactorDTO struct {
 	Title           string             // 因子标题
 	FactorType      string             // 因子类型
 	IsTotalScore    bool               // 是否为总分因子
+	IsShow          bool               // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string           // 关联的题目编码列表
 	ScoringStrategy string             // 计分策略
 	ScoringParams   *ScoringParamsDTO  // 计分参数

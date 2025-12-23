@@ -29,6 +29,7 @@ type FactorResult struct {
 	Title           string                 // 因子标题
 	FactorType      string                 // 因子类型
 	IsTotalScore    bool                   // 是否为总分因子
+	IsShow          bool                   // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string               // 关联的题目编码列表
 	ScoringStrategy string                 // 计分策略
 	ScoringParams   map[string]interface{} // 计分参数
@@ -137,6 +138,7 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		Title:           f.GetTitle(),
 		FactorType:      f.GetFactorType().String(),
 		IsTotalScore:    f.IsTotalScore(),
+		IsShow:          f.IsShow(),
 		QuestionCodes:   make([]string, 0),
 		ScoringStrategy: f.GetScoringStrategy().String(),
 		ScoringParams:   scoringParamsMap,

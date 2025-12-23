@@ -508,7 +508,7 @@
                         "Bearer": []
                     }
                 ],
-                "description": "获取测评的解读报告",
+                "description": "获取测评的解读报告。响应中的 dimensions（维度列表）只包含 is_show = true 的因子维度，每个维度包含 max_score（最大分，可选）字段",
                 "produces": [
                     "application/json"
                 ],
@@ -572,7 +572,7 @@
                         "Bearer": []
                     }
                 ],
-                "description": "获取测评的因子得分详情",
+                "description": "获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段",
                 "produces": [
                     "application/json"
                 ],
@@ -942,7 +942,7 @@
         },
         "/api/v1/scales/{code}": {
             "get": {
-                "description": "根据量表编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- question_count: 题目数量（不包含 Section 题型）",
+                "description": "根据量表编码获取量表详情。注意：返回的因子列表只包含 is_show = true 的因子。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- question_count: 题目数量（不包含 Section 题型）\n- factors: 因子列表（只包含 is_show = true 的因子），每个因子包含 max_score（最大分，可选）和 is_show（是否显示）字段",
                 "produces": [
                     "application/json"
                 ],

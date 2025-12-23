@@ -114,7 +114,7 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 
 // GetAssessmentScores 获取测评得分详情
 // @Summary 获取测评得分详情
-// @Description 获取测评的因子得分详情
+// @Description 获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"
@@ -155,7 +155,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 
 // GetAssessmentReport 获取测评报告
 // @Summary 获取测评报告
-// @Description 获取测评的解读报告
+// @Description 获取测评的解读报告。响应中的 dimensions（维度列表）只包含 is_show = true 的因子维度，每个维度包含 max_score（最大分，可选）字段
 // @Tags 测评
 // @Produce json
 // @Param id path int true "测评ID"

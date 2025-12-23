@@ -89,7 +89,7 @@ func (c *Container) initApplicationServices() {
 
 	c.submissionService = answersheet.NewSubmissionService(c.answerSheetClient, c.actorClient, guardianshipService)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
-	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient)
+	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
 	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
 	c.testeeService = testee.NewService(c.actorClient, guardianshipService)
 

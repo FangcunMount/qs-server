@@ -58,6 +58,7 @@ type FactorModel struct {
 	Title           string               `json:"title" valid:"required~因子标题不能为空"`
 	FactorType      string               `json:"factor_type"`
 	IsTotalScore    bool                 `json:"is_total_score"`
+	IsShow          bool                 `json:"is_show"` // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string             `json:"question_codes"`
 	ScoringStrategy string               `json:"scoring_strategy"`
 	ScoringParams   *ScoringParamsModel  `json:"scoring_params,omitempty"`

@@ -334,6 +334,7 @@ type Factor struct {
 	Title           string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	FactorType      string                 `protobuf:"bytes,3,opt,name=factor_type,json=factorType,proto3" json:"factor_type,omitempty"`
 	IsTotalScore    bool                   `protobuf:"varint,4,opt,name=is_total_score,json=isTotalScore,proto3" json:"is_total_score,omitempty"`
+	IsShow          bool                   `protobuf:"varint,11,opt,name=is_show,json=isShow,proto3" json:"is_show,omitempty"` // 是否显示（用于报告中的维度展示）
 	QuestionCodes   []string               `protobuf:"bytes,5,rep,name=question_codes,json=questionCodes,proto3" json:"question_codes,omitempty"`
 	ScoringStrategy string                 `protobuf:"bytes,6,opt,name=scoring_strategy,json=scoringStrategy,proto3" json:"scoring_strategy,omitempty"`
 	ScoringParams   map[string]string      `protobuf:"bytes,7,rep,name=scoring_params,json=scoringParams,proto3" json:"scoring_params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -398,6 +399,13 @@ func (x *Factor) GetFactorType() string {
 func (x *Factor) GetIsTotalScore() bool {
 	if x != nil {
 		return x.IsTotalScore
+	}
+	return false
+}
+
+func (x *Factor) GetIsShow() bool {
+	if x != nil {
+		return x.IsShow
 	}
 	return false
 }
@@ -1217,13 +1225,14 @@ const file_scale_scale_proto_rawDesc = "" +
 	"created_at\x18\r \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\x0e \x01(\tR\tupdatedAt\x12%\n" +
-	"\x0equestion_count\x18\x0f \x01(\x05R\rquestionCount\"\xd1\x03\n" +
+	"\x0equestion_count\x18\x0f \x01(\x05R\rquestionCount\"\xea\x03\n" +
 	"\x06Factor\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1f\n" +
 	"\vfactor_type\x18\x03 \x01(\tR\n" +
 	"factorType\x12$\n" +
-	"\x0eis_total_score\x18\x04 \x01(\bR\fisTotalScore\x12%\n" +
+	"\x0eis_total_score\x18\x04 \x01(\bR\fisTotalScore\x12\x17\n" +
+	"\ais_show\x18\v \x01(\bR\x06isShow\x12%\n" +
 	"\x0equestion_codes\x18\x05 \x03(\tR\rquestionCodes\x12)\n" +
 	"\x10scoring_strategy\x18\x06 \x01(\tR\x0fscoringStrategy\x12G\n" +
 	"\x0escoring_params\x18\a \x03(\v2 .scale.Factor.ScoringParamsEntryR\rscoringParams\x12\x1b\n" +

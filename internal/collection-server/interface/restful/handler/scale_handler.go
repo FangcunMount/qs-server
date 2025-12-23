@@ -21,7 +21,7 @@ func NewScaleHandler(queryService *scale.QueryService) *ScaleHandler {
 
 // Get 获取量表详情
 // @Summary 获取量表详情
-// @Description 根据量表编码获取量表详情。
+// @Description 根据量表编码获取量表详情。注意：返回的因子列表只包含 is_show = true 的因子。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 // @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
@@ -29,6 +29,7 @@ func NewScaleHandler(queryService *scale.QueryService) *ScaleHandler {
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
 // @Description - question_count: 题目数量（不包含 Section 题型）
+// @Description - factors: 因子列表（只包含 is_show = true 的因子），每个因子包含 max_score（最大分，可选）和 is_show（是否显示）字段
 // @Tags 量表
 // @Produce json
 // @Param code path string true "量表编码"

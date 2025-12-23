@@ -59,6 +59,7 @@ message Factor {
   string title = 2;
   string factor_type = 3;
   bool is_total_score = 4;
+  bool is_show = 11;  // 是否显示（用于报告中的维度展示）
   repeated string question_codes = 5;
   string scoring_strategy = 6;
   map<string, string> scoring_params = 7;

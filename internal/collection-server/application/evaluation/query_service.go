@@ -16,14 +16,17 @@ import (
 // 2. 转换 gRPC 响应到 REST DTO
 type QueryService struct {
 	evaluationClient *grpcclient.EvaluationClient
+	scaleClient      *grpcclient.ScaleClient
 }
 
 // NewQueryService 创建测评查询服务
 func NewQueryService(
 	evaluationClient *grpcclient.EvaluationClient,
+	scaleClient *grpcclient.ScaleClient,
 ) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
+		scaleClient:      scaleClient,
 	}
 }
 
@@ -314,15 +317,30 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 		return nil, nil
 	}
 
-	dimensions := make([]DimensionInterpretResponse, len(result.Dimensions))
-	for i, dim := range result.Dimensions {
-		dimensions[i] = DimensionInterpretResponse{
-			FactorCode:  dim.FactorCode,
-			FactorName:  dim.FactorName,
-			RawScore:    dim.RawScore,
-			MaxScore:    dim.MaxScore,
-			RiskLevel:   dim.RiskLevel,
-			Description: dim.Description,
+	// 过滤维度：只保留 is_show = true 的因子
+	// 注意：scaleClient.GetScale 已经过滤了 isShow = false 的因子
+	var visibleFactorCodes map[string]bool
+	if result.ScaleCode != "" && s.scaleClient != nil {
+		if scale, err := s.scaleClient.GetScale(ctx, result.ScaleCode); err == nil && scale != nil {
+			visibleFactorCodes = make(map[string]bool, len(scale.Factors))
+			for _, factor := range scale.Factors {
+				visibleFactorCodes[factor.Code] = true
+			}
+		}
+	}
+
+	// 转换维度，只保留可见因子（如果量表信息可用）
+	dimensions := make([]DimensionInterpretResponse, 0, len(result.Dimensions))
+	for _, dim := range result.Dimensions {
+		if visibleFactorCodes == nil || visibleFactorCodes[dim.FactorCode] {
+			dimensions = append(dimensions, DimensionInterpretResponse{
+				FactorCode:  dim.FactorCode,
+				FactorName:  dim.FactorName,
+				RawScore:    dim.RawScore,
+				MaxScore:    dim.MaxScore,
+				RiskLevel:   dim.RiskLevel,
+				Description: dim.Description,
+			})
 		}
 	}
 

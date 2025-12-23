@@ -83,6 +83,9 @@ type FactorPO struct {
 	// 是否为总分因子
 	IsTotalScore bool `bson:"is_total_score" json:"is_total_score"`
 
+	// 是否显示（用于报告中的维度展示）
+	IsShow bool `bson:"is_show" json:"is_show"`
+
 	// 关联的题目编码列表
 	QuestionCodes []string `bson:"question_codes,omitempty" json:"question_codes,omitempty"`
 
