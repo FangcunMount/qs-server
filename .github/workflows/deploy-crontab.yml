@@ -304,6 +304,14 @@ jobs:
           script: |
             set -euo pipefail
             
+            # 从 GitHub Actions 环境变量或 secrets 设置环境变量
+            export SUDO_PASSWORD="${{ secrets.SVRA_SUDO_PASSWORD }}"
+            export SCRIPTS_DIR="${{ env.SCRIPTS_DIR }}"
+            export CONFIG_DIR="${{ env.CONFIG_DIR }}"
+            export CRON_DIR="${{ env.CRON_DIR }}"
+            export LOG_DIR="${{ env.LOG_DIR }}"
+            export LOGROTATE_DIR="${{ env.LOGROTATE_DIR }}"
+            
             # 定义环境变量（使用环境变量或默认值）
             SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
             CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
@@ -430,15 +438,20 @@ jobs:
           script: |
             set -euo pipefail
             
+            # 从 GitHub Actions secrets 设置环境变量
+            export SUDO_PASSWORD="${{ secrets.SVRA_SUDO_PASSWORD }}"
+            
             # 定义 sudo 辅助函数（支持密码）
             if [ -n "${SUDO_PASSWORD:-}" ]; then
               SUDO_CMD() {
                 echo "${SUDO_PASSWORD}" | sudo -S "$@"
               }
+              echo "🔐 Using sudo with password authentication"
             else
               SUDO_CMD() {
                 sudo "$@"
               }
+              echo "🔓 Using sudo without password (NOPASSWD configured)"
             fi
             
             echo "🔍 Verifying deployment..."
