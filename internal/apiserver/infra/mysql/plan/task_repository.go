@@ -164,7 +164,11 @@ func (r *taskRepository) Save(ctx context.Context, task *domainPlan.AssessmentTa
 
 	// 判断是新增还是更新
 	if task.GetID().IsZero() {
-		// ID 为零，直接创建
+		// ID 为零，确保 BeforeCreate 被调用以生成 ID
+		if err := po.BeforeCreate(); err != nil {
+			return err
+		}
+		// 直接创建
 		return r.CreateAndSync(ctx, po, func(po *AssessmentTaskPO) {
 			r.mapper.SyncID(po, task)
 		})
@@ -177,7 +181,11 @@ func (r *taskRepository) Save(ctx context.Context, task *domainPlan.AssessmentTa
 	}
 
 	if !exists {
-		// 记录不存在，执行 INSERT（使用指定的 ID）
+		// 记录不存在，确保 BeforeCreate 被调用（虽然已有 ID，但需要设置版本号）
+		if err := po.BeforeCreate(); err != nil {
+			return err
+		}
+		// 执行 INSERT（使用指定的 ID）
 		return r.CreateAndSync(ctx, po, func(po *AssessmentTaskPO) {
 			r.mapper.SyncID(po, task)
 		})
@@ -199,6 +207,13 @@ func (r *taskRepository) SaveBatch(ctx context.Context, tasks []*domainPlan.Asse
 	pos := make([]*AssessmentTaskPO, 0, len(tasks))
 	for _, task := range tasks {
 		pos = append(pos, r.mapper.ToPO(task))
+	}
+
+	// 确保每个 PO 都调用 BeforeCreate 生成 ID
+	for _, po := range pos {
+		if err := po.BeforeCreate(); err != nil {
+			return err
+		}
 	}
 
 	// 批量插入

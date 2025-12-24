@@ -67,6 +67,13 @@ func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentD
 		return nil
 	}
 
+	// 确保每个 PO 都调用 BeforeCreate 生成 ID
+	for _, po := range pos {
+		if err := po.BeforeCreate(); err != nil {
+			return err
+		}
+	}
+
 	// 批量创建
 	return r.WithContext(ctx).Create(&pos).Error
 }

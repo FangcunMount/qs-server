@@ -31,6 +31,11 @@ func NewStaffRepository(db *gorm.DB) staff.Repository {
 func (r *staffRepository) Save(ctx context.Context, s *staff.Staff) error {
 	po := r.mapper.ToPO(s)
 
+	// 确保 BeforeCreate 被调用以生成 ID
+	if err := po.BeforeCreate(); err != nil {
+		return err
+	}
+
 	return r.CreateAndSync(ctx, po, func(po *StaffPO) {
 		r.mapper.SyncID(po, s)
 	})

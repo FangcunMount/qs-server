@@ -31,6 +31,11 @@ func NewTesteeRepository(db *gorm.DB) testee.Repository {
 func (r *testeeRepository) Save(ctx context.Context, t *testee.Testee) error {
 	po := r.mapper.ToPO(t)
 
+	// 确保 BeforeCreate 被调用以生成 ID
+	if err := po.BeforeCreate(); err != nil {
+		return err
+	}
+
 	return r.CreateAndSync(ctx, po, func(po *TesteePO) {
 		r.mapper.SyncID(po, t)
 	})
