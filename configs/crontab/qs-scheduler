@@ -21,9 +21,12 @@
 # 格式：环境变量定义后，任务行需要包含用户（如 root）
 
 # IAM 登录配置（用于自动获取 Token）
-IAM_LOGIN_URL="https://iam.example.com/api/v1/auth/login"
+# IAM API 基础 URL（不包含路径，例如：https://iam.yangshujie.com/api/v1）
+IAM_BASE_URL="https://iam.yangshujie.com/api/v1"
 IAM_USERNAME="qs-scheduler@example.com"
 IAM_PASSWORD="your-password-here"
+# 设备 ID（可选，用于标识登录设备）
+DEVICE_ID="qs-scheduler-$(hostname)"
 
 # Token 存储路径（由 refresh-token.sh 脚本自动更新）
 TOKEN_FILE="/etc/qs-server/internal-token"

@@ -9,7 +9,7 @@ name: Deploy Crontab Configuration
 #
 # Repository Secrets (仓库级别，敏感信息):
 #   IAM_USERNAME, IAM_PASSWORD (IAM 登录凭证)
-#   IAM_LOGIN_URL (可选，默认: https://iam.example.com/api/v1/auth/login)
+#   IAM_BASE_URL (可选，默认: https://iam.yangshujie.com/api/v1)
 #   API_BASE_URL (可选，默认: http://localhost:8080)
 # ============================================================================
 
@@ -106,10 +106,10 @@ jobs:
           fi
           
           # 可选的 IAM 配置
-          if [ -z "${{ secrets.IAM_LOGIN_URL }}" ]; then
-            echo "⚠️  IAM_LOGIN_URL is not set, will use default: https://iam.example.com/api/v1/auth/login"
+          if [ -z "${{ secrets.IAM_BASE_URL }}" ]; then
+            echo "⚠️  IAM_BASE_URL is not set, will use default: https://iam.yangshujie.com/api/v1"
           else
-            echo "✅ IAM_LOGIN_URL is set"
+            echo "✅ IAM_BASE_URL is set"
           fi
           
           if [ -z "${{ secrets.API_BASE_URL }}" ]; then
@@ -244,32 +244,32 @@ jobs:
           # 从 secrets 读取配置（如果设置了）
           IAM_USERNAME="${{ secrets.IAM_USERNAME }}"
           IAM_PASSWORD="${{ secrets.IAM_PASSWORD }}"
-          IAM_LOGIN_URL="${{ secrets.IAM_LOGIN_URL }}"
+          IAM_BASE_URL="${{ secrets.IAM_BASE_URL }}"
           API_BASE_URL="${{ secrets.API_BASE_URL }}"
           
           # 使用默认值（如果 secrets 未设置）
           IAM_USERNAME="${IAM_USERNAME:-qs-scheduler@example.com}"
           IAM_PASSWORD="${IAM_PASSWORD:-your-password-here}"
-          IAM_LOGIN_URL="${IAM_LOGIN_URL:-https://iam.example.com/api/v1/auth/login}"
+          IAM_BASE_URL="${IAM_BASE_URL:-https://iam.yangshujie.com/api/v1}"
           API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
           
           # 转义特殊字符（用于 sed）
           IAM_USERNAME_ESC=$(echo "${IAM_USERNAME}" | sed 's/[[\.*^$()+?{|]/\\&/g')
           IAM_PASSWORD_ESC=$(echo "${IAM_PASSWORD}" | sed 's/[[\.*^$()+?{|]/\\&/g')
-          IAM_LOGIN_URL_ESC=$(echo "${IAM_LOGIN_URL}" | sed 's/[[\.*^$()+?{|]/\\&/g')
+          IAM_BASE_URL_ESC=$(echo "${IAM_BASE_URL}" | sed 's/[[\.*^$()+?{|]/\\&/g')
           API_BASE_URL_ESC=$(echo "${API_BASE_URL}" | sed 's/[[\.*^$()+?{|]/\\&/g')
           
           # 替换配置文件中的占位符
           # 使用 | 作为分隔符，避免与 URL 中的 / 冲突
           sed -i "s|IAM_USERNAME=\"qs-scheduler@example.com\"|IAM_USERNAME=\"${IAM_USERNAME_ESC}\"|g" deploy-crontab/qs-scheduler
           sed -i "s|IAM_PASSWORD=\"your-password-here\"|IAM_PASSWORD=\"${IAM_PASSWORD_ESC}\"|g" deploy-crontab/qs-scheduler
-          sed -i "s|IAM_LOGIN_URL=\"https://iam.example.com/api/v1/auth/login\"|IAM_LOGIN_URL=\"${IAM_LOGIN_URL_ESC}\"|g" deploy-crontab/qs-scheduler
+          sed -i "s|IAM_BASE_URL=\"https://iam.yangshujie.com/api/v1\"|IAM_BASE_URL=\"${IAM_BASE_URL_ESC}\"|g" deploy-crontab/qs-scheduler
           sed -i "s|API_BASE_URL=\"http://localhost:8080\"|API_BASE_URL=\"${API_BASE_URL_ESC}\"|g" deploy-crontab/qs-scheduler
           
           # 验证替换结果（不显示敏感信息）
           echo "✅ Environment variables replaced:"
           echo "   - IAM_USERNAME: ${IAM_USERNAME}"
-          echo "   - IAM_LOGIN_URL: ${IAM_LOGIN_URL}"
+          echo "   - IAM_BASE_URL: ${IAM_BASE_URL}"
           echo "   - API_BASE_URL: ${API_BASE_URL}"
           
           # 重新打包

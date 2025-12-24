@@ -19,12 +19,18 @@ set -euo pipefail
 # 配置变量（从环境变量或配置文件读取）
 # ============================================================
 
-# IAM 登录接口地址
-IAM_LOGIN_URL="${IAM_LOGIN_URL:-https://iam.example.com/api/v1/auth/login}"
+# IAM API 基础 URL（不包含路径）
+IAM_BASE_URL="${IAM_BASE_URL:-https://iam.yangshujie.com/api/v1}"
+
+# IAM 登录接口路径
+IAM_LOGIN_ENDPOINT="/authn/login"
 
 # IAM 用户名和密码（从环境变量或配置文件读取）
 IAM_USERNAME="${IAM_USERNAME:-}"
 IAM_PASSWORD="${IAM_PASSWORD:-}"
+
+# 设备 ID（可选，用于标识登录设备）
+DEVICE_ID="${DEVICE_ID:-qs-scheduler-$(hostname)}"
 
 # Token 存储路径
 TOKEN_FILE="${TOKEN_FILE:-/etc/qs-server/internal-token}"
@@ -79,30 +85,62 @@ fi
 
 log "Starting token refresh for user: ${IAM_USERNAME}"
 
+# 构建完整的登录 URL
+IAM_LOGIN_URL="${IAM_BASE_URL}${IAM_LOGIN_ENDPOINT}"
+
+# 构建请求体
+# 根据 API 文档，LoginRequest 格式为：
+# {
+#   "method": "password",
+#   "credentials": [数组],
+#   "device_id": "可选"
+# }
+# 注意：API 文档中 credentials 定义为 array of integer，但实际实现可能接受字符串数组
+# 如果实际 API 需要 credential ID（整数），可能需要：
+# 1. 先通过其他接口查询 credential ID
+# 2. 或者使用不同的请求格式
+# 当前实现使用用户名和密码字符串，如果 API 不接受，请根据实际情况调整
+REQUEST_BODY=$(cat <<EOF
+{
+  "method": "password",
+  "credentials": ["${IAM_USERNAME}", "${IAM_PASSWORD}"],
+  "device_id": "${DEVICE_ID}"
+}
+EOF
+)
+
 # 调用登录接口
 HTTP_CODE=$(curl -s -w "%{http_code}" -o "${TMP_RESPONSE}" \
     -X POST \
     -H "Content-Type: application/json" \
     --max-time 30 \
-    -d "{
-        \"username\": \"${IAM_USERNAME}\",
-        \"password\": \"${IAM_PASSWORD}\"
-    }" \
+    -d "${REQUEST_BODY}" \
     "${IAM_LOGIN_URL}" || echo "000")
 
 # 检查 HTTP 状态码
 if [ "${HTTP_CODE}" != "200" ]; then
-    error_exit "IAM login failed with HTTP code: ${HTTP_CODE}, response: $(cat ${TMP_RESPONSE} 2>/dev/null || echo 'N/A')"
+    ERROR_RESPONSE=$(cat "${TMP_RESPONSE}" 2>/dev/null || echo "N/A")
+    error_exit "IAM login failed with HTTP code: ${HTTP_CODE}, response: ${ERROR_RESPONSE}"
 fi
 
-# 解析响应，提取 token
-# 假设响应格式为：{"token": "xxx", "expires_at": "xxx"} 或 {"access_token": "xxx"}
-TOKEN=$(cat "${TMP_RESPONSE}" | grep -o '"token"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || \
-        cat "${TMP_RESPONSE}" | grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || \
-        jq -r '.token // .access_token // empty' "${TMP_RESPONSE}" 2>/dev/null || echo "")
+# 解析响应，提取 access_token
+# 根据 API 文档，响应格式为 TokenPair：
+# {
+#   "access_token": "xxx",
+#   "refresh_token": "xxx",
+#   "token_type": "Bearer",
+#   "expires_in": 3600
+# }
+if command -v jq >/dev/null 2>&1; then
+    TOKEN=$(jq -r '.access_token // empty' "${TMP_RESPONSE}" 2>/dev/null || echo "")
+else
+    # 如果没有 jq，使用 grep 和 cut 提取
+    TOKEN=$(grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' "${TMP_RESPONSE}" | cut -d'"' -f4 || echo "")
+fi
 
 if [ -z "${TOKEN}" ]; then
-    error_exit "Failed to extract token from response: $(cat ${TMP_RESPONSE})"
+    ERROR_RESPONSE=$(cat "${TMP_RESPONSE}" 2>/dev/null || echo "N/A")
+    error_exit "Failed to extract access_token from response: ${ERROR_RESPONSE}"
 fi
 
 # ============================================================
@@ -121,11 +159,12 @@ chown root:root "${TOKEN_FILE}"
 
 log "Token refreshed successfully, saved to ${TOKEN_FILE}"
 
-# 可选：记录 token 过期时间（如果响应中包含）
+# 记录 token 信息（如果响应中包含）
 if command -v jq >/dev/null 2>&1; then
-    EXPIRES_AT=$(jq -r '.expires_at // .expires_in // empty' "${TMP_RESPONSE}" 2>/dev/null || echo "")
-    if [ -n "${EXPIRES_AT}" ]; then
-        log "Token expires at: ${EXPIRES_AT}"
+    EXPIRES_IN=$(jq -r '.expires_in // empty' "${TMP_RESPONSE}" 2>/dev/null || echo "")
+    TOKEN_TYPE=$(jq -r '.token_type // empty' "${TMP_RESPONSE}" 2>/dev/null || echo "")
+    if [ -n "${EXPIRES_IN}" ]; then
+        log "Token type: ${TOKEN_TYPE:-Bearer}, expires in: ${EXPIRES_IN} seconds"
     fi
 fi
 
