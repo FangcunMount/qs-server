@@ -301,10 +301,10 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: SUDO_PASSWORD,SCRIPTS_DIR,CONFIG_DIR,CRON_DIR,LOG_DIR,LOGROTATE_DIR
           script: |
-            set -eo pipefail
+            set -Eeuo pipefail
             
-            # 环境变量已通过 env 参数传递，直接使用
             # 定义环境变量（使用环境变量或默认值）
             SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
             CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
@@ -312,19 +312,19 @@ jobs:
             LOG_DIR="${LOG_DIR:-/var/log/qs-scheduler}"
             LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
             
-            # 定义 sudo 辅助函数（支持密码）
-            if [ -n "${SUDO_PASSWORD:-}" ]; then
-              # 如果提供了密码，使用 -S 选项从标准输入读取
-              SUDO_CMD() {
-                printf '%s\n' "${SUDO_PASSWORD}" | sudo -S "$@"
-              }
-              echo "🔐 Using sudo with password authentication"
+            # SUDO 助手
+            if sudo -n true 2>/dev/null; then
+              SUDO_CMD() { sudo "$@"; }
+              echo "ℹ️ Using passwordless sudo."
             else
-              # 如果没有密码，直接使用 sudo（假设配置了 NOPASSWD）
-              SUDO_CMD() {
-                sudo "$@"
-              }
-              echo "🔓 Using sudo without password (NOPASSWD configured)"
+              if [ -z "${SUDO_PASSWORD:-}" ]; then
+                echo "❌ sudo needs password. Provide SVRA_SUDO_PASSWORD or configure NOPASSWD." >&2
+                exit 1
+              fi
+              SUDO_CMD() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
+              export -f SUDO_CMD
+              SUDO_CMD -v || true
+              echo "ℹ️ Using sudo with password."
             fi
             
             echo "🚀 Starting crontab deployment on $(hostname)..."
@@ -428,21 +428,23 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: SUDO_PASSWORD
           script: |
-            set -eo pipefail
+            set -Eeuo pipefail
             
-            # 环境变量已通过 env 参数传递，直接使用
-            # 定义 sudo 辅助函数（支持密码）
-            if [ -n "${SUDO_PASSWORD:-}" ]; then
-              SUDO_CMD() {
-                printf '%s\n' "${SUDO_PASSWORD}" | sudo -S "$@"
-              }
-              echo "🔐 Using sudo with password authentication"
+            # SUDO 助手
+            if sudo -n true 2>/dev/null; then
+              SUDO_CMD() { sudo "$@"; }
+              echo "ℹ️ Using passwordless sudo."
             else
-              SUDO_CMD() {
-                sudo "$@"
-              }
-              echo "🔓 Using sudo without password (NOPASSWD configured)"
+              if [ -z "${SUDO_PASSWORD:-}" ]; then
+                echo "❌ sudo needs password. Provide SVRA_SUDO_PASSWORD or configure NOPASSWD." >&2
+                exit 1
+              fi
+              SUDO_CMD() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
+              export -f SUDO_CMD
+              SUDO_CMD -v || true
+              echo "ℹ️ Using sudo with password."
             fi
             
             echo "🔍 Verifying deployment..."
