@@ -60,9 +60,9 @@ sudo chmod +x /usr/local/bin/qs-api-call.sh
 
 # 2. 创建必要目录
 sudo mkdir -p /etc/qs-server
-sudo mkdir -p /var/log/qs-scheduler
+sudo mkdir -p /data/logs/crontab
 sudo chmod 755 /etc/qs-server
-sudo chmod 755 /var/log/qs-scheduler
+sudo chmod 755 /data/logs/crontab
 
 # 3. 配置 Crontab
 sudo cp configs/crontab/qs-scheduler /etc/cron.d/qs-scheduler
@@ -157,7 +157,7 @@ qs-api-call.sh <endpoint> [log_file]
 
 # 示例
 qs-api-call.sh /api/v1/statistics/sync/daily
-qs-api-call.sh /api/v1/statistics/sync/daily /var/log/qs-scheduler/sync-daily.log
+qs-api-call.sh /api/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
 ```
 
 **环境变量**：
@@ -181,7 +181,7 @@ Token 刷新脚本，功能：
 - `IAM_PASSWORD`：IAM 密码（必需）
 - `IAM_LOGIN_URL`：IAM 登录接口地址（默认：`https://iam.example.com/api/v1/auth/login`）
 - `TOKEN_FILE`：Token 文件路径（默认：`/etc/qs-server/internal-token`）
-- `LOG_FILE`：日志文件路径（默认：`/var/log/qs-scheduler/refresh-token.log`）
+- `LOG_FILE`：日志文件路径（默认：`/data/logs/crontab/refresh-token.log`）
 
 ## 定时任务列表
 
@@ -201,16 +201,16 @@ Token 刷新脚本，功能：
 
 ```bash
 # 查看所有日志
-ls -lh /var/log/qs-scheduler/
+ls -lh /data/logs/crontab/
 
 # 查看最近的任务执行日志
-tail -f /var/log/qs-scheduler/sync-daily.log
+tail -f /data/logs/crontab/sync-daily.log
 
 # 查看错误日志
-grep -i error /var/log/qs-scheduler/*.log
+grep -i error /data/logs/crontab/*.log
 
 # 检查任务执行频率
-grep -c "$(date +%Y-%m-%d)" /var/log/qs-scheduler/sync-daily.log
+grep -c "$(date +%Y-%m-%d)" /data/logs/crontab/sync-daily.log
 ```
 
 ### 手动执行任务
@@ -303,7 +303,7 @@ sudo grep CRON /var/log/syslog
 3. **查看详细错误日志**
 
    ```bash
-   tail -f /var/log/qs-scheduler/sync-daily.log
+   tail -f /data/logs/crontab/sync-daily.log
    ```
 
 ### 任务未执行
@@ -333,7 +333,7 @@ sudo grep CRON /var/log/syslog
    ls -l /usr/local/bin/qs-*.sh
    
    # 确保日志目录可写
-   ls -ld /var/log/qs-scheduler
+   ls -ld /data/logs/crontab
    ```
 
 4. **查看系统日志**
@@ -375,15 +375,15 @@ sudo chown root:root /usr/local/bin/qs-*.sh
 # 权限：600，所有者：root:root
 
 # 日志目录
-sudo chmod 755 /var/log/qs-scheduler
-sudo chown root:root /var/log/qs-scheduler
+sudo chmod 755 /data/logs/crontab
+sudo chown root:root /data/logs/crontab
 ```
 
 ## 日志管理
 
 ### 日志文件位置
 
-所有日志文件位于 `/var/log/qs-scheduler/` 目录：
+所有日志文件位于 `/data/logs/crontab/` 目录：
 
 - `sync-daily.log` - 每日统计同步日志
 - `sync-accumulated.log` - 累计统计同步日志
@@ -404,7 +404,7 @@ sudo chown root:root /var/log/qs-scheduler
 
 ```bash
 # 清理 30 天前的压缩日志
-find /var/log/qs-scheduler/ -name "*.log.*" -mtime +30 -delete
+find /data/logs/crontab/ -name "*.log.*" -mtime +30 -delete
 
 # 手动执行日志轮转
 sudo logrotate -f /etc/logrotate.d/qs-scheduler
@@ -422,7 +422,7 @@ sudo logrotate -f /etc/logrotate.d/qs-scheduler
 
 ```bash
 # 每小时执行新任务（每小时的第 25 分）
-25 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/your/new/endpoint /var/log/qs-scheduler/your-task.log
+25 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/your/new/endpoint /data/logs/crontab/your-task.log
 ```
 
 ### Q3: 如何修改任务执行时间？
@@ -440,10 +440,10 @@ sudo logrotate -f /etc/logrotate.d/qs-scheduler
 
 ```bash
 # 查看最近 100 行日志
-tail -n 100 /var/log/qs-scheduler/sync-daily.log
+tail -n 100 /data/logs/crontab/sync-daily.log
 
 # 查看今天的执行记录
-grep "$(date +%Y-%m-%d)" /var/log/qs-scheduler/sync-daily.log
+grep "$(date +%Y-%m-%d)" /data/logs/crontab/sync-daily.log
 ```
 
 ### Q5: 如何临时禁用某个任务？

@@ -10,7 +10,7 @@
 # 1. 复制此文件到 /etc/cron.d/qs-scheduler
 # 2. 修改 IAM 登录信息和 API_BASE_URL 为实际值
 # 3. 设置文件权限：chmod 644 /etc/cron.d/qs-scheduler
-# 4. 确保日志目录存在：mkdir -p /var/log/qs-scheduler
+# 4. 确保日志目录存在：mkdir -p /data/logs/crontab
 # 5. 配置日志轮转（logrotate）
 # ============================================================
 
@@ -43,19 +43,19 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 # 每小时同步每日统计（每小时的第 0 分执行）
 # 说明：将 Redis 中的每日统计数据同步到 MySQL
-0 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/daily /var/log/qs-scheduler/sync-daily.log
+0 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
 
 # 每小时同步累计统计（每小时的第 5 分执行，避免与 daily 同时执行）
 # 说明：将 Redis 中的累计统计数据同步到 MySQL
-5 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/accumulated /var/log/qs-scheduler/sync-accumulated.log
+5 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/accumulated /data/logs/crontab/sync-accumulated.log
 
 # 每小时同步计划统计（每小时的第 10 分执行）
 # 说明：同步计划统计数据到 MySQL
-10 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/plan /var/log/qs-scheduler/sync-plan.log
+10 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/plan /data/logs/crontab/sync-plan.log
 
 # 每小时校验数据一致性（每小时的第 15 分执行）
 # 说明：校验 Redis 和 MySQL 统计数据的一致性
-15 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/validate /var/log/qs-scheduler/validate.log
+15 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/validate /data/logs/crontab/validate.log
 
 # ============================================================
 # Plan 模块定时任务
@@ -63,14 +63,14 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 # 每小时调度待推送任务（每小时的第 20 分执行）
 # 说明：扫描待推送任务，生成入口并开放
-20 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/plans/tasks/schedule /var/log/qs-scheduler/schedule-tasks.log
+20 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/plans/tasks/schedule /data/logs/crontab/schedule-tasks.log
 
 # ============================================================
 # 日志轮转配置说明
 # ============================================================
 # 创建 /etc/logrotate.d/qs-scheduler 文件：
 #
-# /var/log/qs-scheduler/*.log {
+# /data/logs/crontab/*.log {
 #     daily
 #     rotate 30
 #     compress

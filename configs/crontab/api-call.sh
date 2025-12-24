@@ -13,7 +13,7 @@
 # 
 # 示例：
 #   qs-api-call.sh /api/v1/statistics/sync/daily
-#   qs-api-call.sh /api/v1/statistics/sync/daily /var/log/qs-scheduler/sync-daily.log
+#   qs-api-call.sh /api/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
 # ============================================================
 
 set -euo pipefail
@@ -32,7 +32,7 @@ REFRESH_TOKEN_SCRIPT="${REFRESH_TOKEN_SCRIPT:-/usr/local/bin/qs-refresh-token.sh
 API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
 
 # 默认日志文件
-DEFAULT_LOG_DIR="/var/log/qs-scheduler"
+DEFAULT_LOG_DIR="/data/logs/crontab"
 
 # 超时时间（秒）
 TIMEOUT="${TIMEOUT:-300}"

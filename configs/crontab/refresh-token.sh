@@ -30,7 +30,7 @@ IAM_PASSWORD="${IAM_PASSWORD:-}"
 TOKEN_FILE="${TOKEN_FILE:-/etc/qs-server/internal-token}"
 
 # 日志文件
-LOG_FILE="${LOG_FILE:-/var/log/qs-scheduler/refresh-token.log}"
+LOG_FILE="${LOG_FILE:-/data/logs/crontab/refresh-token.log}"
 
 # 确保日志目录存在
 LOG_DIR=$(dirname "${LOG_FILE}")

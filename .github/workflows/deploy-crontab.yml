@@ -32,7 +32,7 @@ env:
   SCRIPTS_DIR: /usr/local/bin
   CONFIG_DIR: /etc/qs-server
   CRON_DIR: /etc/cron.d
-  LOG_DIR: /var/log/qs-scheduler
+  LOG_DIR: /data/logs/crontab
   LOGROTATE_DIR: /etc/logrotate.d
 
 jobs:
@@ -156,7 +156,7 @@ jobs:
           SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
           CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
           CRON_DIR="${CRON_DIR:-/etc/cron.d}"
-          LOG_DIR="${LOG_DIR:-/var/log/qs-scheduler}"
+          LOG_DIR="${LOG_DIR:-/data/logs/crontab}"
           LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
           
           echo "🚀 Starting crontab deployment..."
@@ -309,7 +309,7 @@ jobs:
             SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
             CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
             CRON_DIR="${CRON_DIR:-/etc/cron.d}"
-            LOG_DIR="${LOG_DIR:-/var/log/qs-scheduler}"
+            LOG_DIR="${LOG_DIR:-/data/logs/crontab}"
             LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
             
             # SUDO 助手
