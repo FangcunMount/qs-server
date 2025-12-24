@@ -302,16 +302,9 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           script: |
-            set -euo pipefail
+            set -eo pipefail
             
-            # 从 GitHub Actions 环境变量或 secrets 设置环境变量
-            export SUDO_PASSWORD="${{ secrets.SVRA_SUDO_PASSWORD }}"
-            export SCRIPTS_DIR="${{ env.SCRIPTS_DIR }}"
-            export CONFIG_DIR="${{ env.CONFIG_DIR }}"
-            export CRON_DIR="${{ env.CRON_DIR }}"
-            export LOG_DIR="${{ env.LOG_DIR }}"
-            export LOGROTATE_DIR="${{ env.LOGROTATE_DIR }}"
-            
+            # 环境变量已通过 env 参数传递，直接使用
             # 定义环境变量（使用环境变量或默认值）
             SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
             CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
@@ -323,7 +316,7 @@ jobs:
             if [ -n "${SUDO_PASSWORD:-}" ]; then
               # 如果提供了密码，使用 -S 选项从标准输入读取
               SUDO_CMD() {
-                echo "${SUDO_PASSWORD}" | sudo -S "$@"
+                printf '%s\n' "${SUDO_PASSWORD}" | sudo -S "$@"
               }
               echo "🔐 Using sudo with password authentication"
             else
@@ -436,15 +429,13 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           script: |
-            set -euo pipefail
+            set -eo pipefail
             
-            # 从 GitHub Actions secrets 设置环境变量
-            export SUDO_PASSWORD="${{ secrets.SVRA_SUDO_PASSWORD }}"
-            
+            # 环境变量已通过 env 参数传递，直接使用
             # 定义 sudo 辅助函数（支持密码）
             if [ -n "${SUDO_PASSWORD:-}" ]; then
               SUDO_CMD() {
-                echo "${SUDO_PASSWORD}" | sudo -S "$@"
+                printf '%s\n' "${SUDO_PASSWORD}" | sudo -S "$@"
               }
               echo "🔐 Using sudo with password authentication"
             else
