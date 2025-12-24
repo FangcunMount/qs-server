@@ -170,7 +170,7 @@ events:
     consumers:
       - notification-service
       - alert-service
-      - statistics-service
+      - qs-worker  # 统计服务在worker中处理
 
   assessment.failed:
     topic: assessment-lifecycle

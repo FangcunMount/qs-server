@@ -36,6 +36,42 @@ service InternalService {
   // 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
   rpc TagTestee(TagTesteeRequest) 
       returns (TagTesteeResponse);
+  
+  // ==================== Statistics 同步操作（备用接口）====================
+  // 注意：这些接口已通过 REST API 提供，主要用于 Crontab 调用
+  // 保留 gRPC 接口作为备用，但推荐使用 REST API + Crontab 方案
+  
+  // 同步每日统计
+  // 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/daily）
+  // 流程：将Redis中的每日统计数据同步到MySQL
+  rpc SyncDailyStatistics(SyncDailyStatisticsRequest) 
+      returns (SyncDailyStatisticsResponse);
+  
+  // 同步累计统计
+  // 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/accumulated）
+  // 流程：将Redis中的累计统计数据同步到MySQL
+  rpc SyncAccumulatedStatistics(SyncAccumulatedStatisticsRequest) 
+      returns (SyncAccumulatedStatisticsResponse);
+  
+  // 同步计划统计
+  // 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/plan）
+  // 流程：同步计划统计数据
+  rpc SyncPlanStatistics(SyncPlanStatisticsRequest) 
+      returns (SyncPlanStatisticsResponse);
+  
+  // 校验统计数据一致性
+  // 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/validate）
+  // 流程：校验Redis和MySQL的数据一致性
+  rpc ValidateStatistics(ValidateStatisticsRequest) 
+      returns (ValidateStatisticsResponse);
+  
+  // ==================== Plan 调度操作（备用接口）====================
+  
+  // 调度待推送任务
+  // 场景：定时任务调用（推荐使用 REST API: POST /api/v1/plans/tasks/schedule）
+  // 流程：扫描待推送任务，生成入口并开放
+  rpc SchedulePendingTasks(SchedulePendingTasksRequest) 
+      returns (SchedulePendingTasksResponse);
 }
 
 // ==================== CalculateAnswerSheetScore ====================
@@ -108,4 +144,75 @@ message TagTesteeResponse {
   repeated string tags_added = 2;    // 已添加的标签列表
   bool key_focus_marked = 3;         // 是否标记为重点关注
   string message = 4;                // 描述信息
+}
+
+// ==================== SyncDailyStatistics ====================
+
+// 同步每日统计请求
+message SyncDailyStatisticsRequest {
+  // 空请求
+}
+
+// 同步每日统计响应
+message SyncDailyStatisticsResponse {
+  bool success = 1;                  // 是否成功
+  int64 synced_count = 2;            // 同步的记录数
+  string message = 3;                // 描述信息
+}
+
+// ==================== SyncAccumulatedStatistics ====================
+
+// 同步累计统计请求
+message SyncAccumulatedStatisticsRequest {
+  // 空请求
+}
+
+// 同步累计统计响应
+message SyncAccumulatedStatisticsResponse {
+  bool success = 1;                  // 是否成功
+  int64 synced_count = 2;            // 同步的记录数
+  string message = 3;                // 描述信息
+}
+
+// ==================== SyncPlanStatistics ====================
+
+// 同步计划统计请求
+message SyncPlanStatisticsRequest {
+  // 空请求
+}
+
+// 同步计划统计响应
+message SyncPlanStatisticsResponse {
+  bool success = 1;                  // 是否成功
+  int64 synced_count = 2;            // 同步的计划数
+  string message = 3;                // 描述信息
+}
+
+// ==================== ValidateStatistics ====================
+
+// 校验统计数据一致性请求
+message ValidateStatisticsRequest {
+  // 空请求
+}
+
+// 校验统计数据一致性响应
+message ValidateStatisticsResponse {
+  bool success = 1;                  // 是否成功
+  bool consistent = 2;               // 数据是否一致
+  int64 inconsistent_count = 3;      // 不一致的记录数
+  string message = 4;                // 描述信息
+}
+
+// ==================== SchedulePendingTasks ====================
+
+// 调度待推送任务请求
+message SchedulePendingTasksRequest {
+  string before = 1;                 // 截止时间（格式：YYYY-MM-DD HH:mm:ss），可选，默认当前时间
+}
+
+// 调度待推送任务响应
+message SchedulePendingTasksResponse {
+  bool success = 1;                  // 是否成功
+  int64 scheduled_count = 2;         // 调度的任务数
+  string message = 3;                // 描述信息
 }

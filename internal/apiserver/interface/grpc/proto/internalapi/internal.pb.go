@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: internalapi/internal.proto
+// source: internal.proto
 
 package internalapi
 
@@ -31,7 +31,7 @@ type CalculateAnswerSheetScoreRequest struct {
 
 func (x *CalculateAnswerSheetScoreRequest) Reset() {
 	*x = CalculateAnswerSheetScoreRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[0]
+	mi := &file_internal_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *CalculateAnswerSheetScoreRequest) String() string {
 func (*CalculateAnswerSheetScoreRequest) ProtoMessage() {}
 
 func (x *CalculateAnswerSheetScoreRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[0]
+	mi := &file_internal_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *CalculateAnswerSheetScoreRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculateAnswerSheetScoreRequest.ProtoReflect.Descriptor instead.
 func (*CalculateAnswerSheetScoreRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{0}
+	return file_internal_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CalculateAnswerSheetScoreRequest) GetAnswersheetId() uint64 {
@@ -78,7 +78,7 @@ type CalculateAnswerSheetScoreResponse struct {
 
 func (x *CalculateAnswerSheetScoreResponse) Reset() {
 	*x = CalculateAnswerSheetScoreResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[1]
+	mi := &file_internal_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -90,7 +90,7 @@ func (x *CalculateAnswerSheetScoreResponse) String() string {
 func (*CalculateAnswerSheetScoreResponse) ProtoMessage() {}
 
 func (x *CalculateAnswerSheetScoreResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[1]
+	mi := &file_internal_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -103,7 +103,7 @@ func (x *CalculateAnswerSheetScoreResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CalculateAnswerSheetScoreResponse.ProtoReflect.Descriptor instead.
 func (*CalculateAnswerSheetScoreResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{1}
+	return file_internal_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CalculateAnswerSheetScoreResponse) GetSuccess() bool {
@@ -145,7 +145,7 @@ type CreateAssessmentFromAnswerSheetRequest struct {
 
 func (x *CreateAssessmentFromAnswerSheetRequest) Reset() {
 	*x = CreateAssessmentFromAnswerSheetRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[2]
+	mi := &file_internal_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -157,7 +157,7 @@ func (x *CreateAssessmentFromAnswerSheetRequest) String() string {
 func (*CreateAssessmentFromAnswerSheetRequest) ProtoMessage() {}
 
 func (x *CreateAssessmentFromAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[2]
+	mi := &file_internal_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +170,7 @@ func (x *CreateAssessmentFromAnswerSheetRequest) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use CreateAssessmentFromAnswerSheetRequest.ProtoReflect.Descriptor instead.
 func (*CreateAssessmentFromAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{2}
+	return file_internal_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateAssessmentFromAnswerSheetRequest) GetAnswersheetId() uint64 {
@@ -249,7 +249,7 @@ type CreateAssessmentFromAnswerSheetResponse struct {
 
 func (x *CreateAssessmentFromAnswerSheetResponse) Reset() {
 	*x = CreateAssessmentFromAnswerSheetResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[3]
+	mi := &file_internal_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +261,7 @@ func (x *CreateAssessmentFromAnswerSheetResponse) String() string {
 func (*CreateAssessmentFromAnswerSheetResponse) ProtoMessage() {}
 
 func (x *CreateAssessmentFromAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[3]
+	mi := &file_internal_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +274,7 @@ func (x *CreateAssessmentFromAnswerSheetResponse) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use CreateAssessmentFromAnswerSheetResponse.ProtoReflect.Descriptor instead.
 func (*CreateAssessmentFromAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{3}
+	return file_internal_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateAssessmentFromAnswerSheetResponse) GetAssessmentId() uint64 {
@@ -315,7 +315,7 @@ type EvaluateAssessmentRequest struct {
 
 func (x *EvaluateAssessmentRequest) Reset() {
 	*x = EvaluateAssessmentRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[4]
+	mi := &file_internal_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +327,7 @@ func (x *EvaluateAssessmentRequest) String() string {
 func (*EvaluateAssessmentRequest) ProtoMessage() {}
 
 func (x *EvaluateAssessmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[4]
+	mi := &file_internal_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +340,7 @@ func (x *EvaluateAssessmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateAssessmentRequest.ProtoReflect.Descriptor instead.
 func (*EvaluateAssessmentRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{4}
+	return file_internal_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *EvaluateAssessmentRequest) GetAssessmentId() uint64 {
@@ -364,7 +364,7 @@ type EvaluateAssessmentResponse struct {
 
 func (x *EvaluateAssessmentResponse) Reset() {
 	*x = EvaluateAssessmentResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[5]
+	mi := &file_internal_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -376,7 +376,7 @@ func (x *EvaluateAssessmentResponse) String() string {
 func (*EvaluateAssessmentResponse) ProtoMessage() {}
 
 func (x *EvaluateAssessmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[5]
+	mi := &file_internal_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +389,7 @@ func (x *EvaluateAssessmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvaluateAssessmentResponse.ProtoReflect.Descriptor instead.
 func (*EvaluateAssessmentResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{5}
+	return file_internal_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *EvaluateAssessmentResponse) GetSuccess() bool {
@@ -441,7 +441,7 @@ type TagTesteeRequest struct {
 
 func (x *TagTesteeRequest) Reset() {
 	*x = TagTesteeRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[6]
+	mi := &file_internal_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -453,7 +453,7 @@ func (x *TagTesteeRequest) String() string {
 func (*TagTesteeRequest) ProtoMessage() {}
 
 func (x *TagTesteeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[6]
+	mi := &file_internal_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -466,7 +466,7 @@ func (x *TagTesteeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TagTesteeRequest.ProtoReflect.Descriptor instead.
 func (*TagTesteeRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{6}
+	return file_internal_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TagTesteeRequest) GetTesteeId() uint64 {
@@ -517,7 +517,7 @@ type TagTesteeResponse struct {
 
 func (x *TagTesteeResponse) Reset() {
 	*x = TagTesteeResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[7]
+	mi := &file_internal_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -529,7 +529,7 @@ func (x *TagTesteeResponse) String() string {
 func (*TagTesteeResponse) ProtoMessage() {}
 
 func (x *TagTesteeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[7]
+	mi := &file_internal_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -542,7 +542,7 @@ func (x *TagTesteeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TagTesteeResponse.ProtoReflect.Descriptor instead.
 func (*TagTesteeResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{7}
+	return file_internal_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TagTesteeResponse) GetSuccess() bool {
@@ -573,11 +573,517 @@ func (x *TagTesteeResponse) GetMessage() string {
 	return ""
 }
 
-var File_internalapi_internal_proto protoreflect.FileDescriptor
+// 同步每日统计请求
+type SyncDailyStatisticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
 
-const file_internalapi_internal_proto_rawDesc = "" +
+func (x *SyncDailyStatisticsRequest) Reset() {
+	*x = SyncDailyStatisticsRequest{}
+	mi := &file_internal_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncDailyStatisticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncDailyStatisticsRequest) ProtoMessage() {}
+
+func (x *SyncDailyStatisticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncDailyStatisticsRequest.ProtoReflect.Descriptor instead.
+func (*SyncDailyStatisticsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{8}
+}
+
+// 同步每日统计响应
+type SyncDailyStatisticsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                            // 是否成功
+	SyncedCount   int64                  `protobuf:"varint,2,opt,name=synced_count,json=syncedCount,proto3" json:"synced_count,omitempty"` // 同步的记录数
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                             // 描述信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncDailyStatisticsResponse) Reset() {
+	*x = SyncDailyStatisticsResponse{}
+	mi := &file_internal_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncDailyStatisticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncDailyStatisticsResponse) ProtoMessage() {}
+
+func (x *SyncDailyStatisticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncDailyStatisticsResponse.ProtoReflect.Descriptor instead.
+func (*SyncDailyStatisticsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SyncDailyStatisticsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SyncDailyStatisticsResponse) GetSyncedCount() int64 {
+	if x != nil {
+		return x.SyncedCount
+	}
+	return 0
+}
+
+func (x *SyncDailyStatisticsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// 同步累计统计请求
+type SyncAccumulatedStatisticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAccumulatedStatisticsRequest) Reset() {
+	*x = SyncAccumulatedStatisticsRequest{}
+	mi := &file_internal_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAccumulatedStatisticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAccumulatedStatisticsRequest) ProtoMessage() {}
+
+func (x *SyncAccumulatedStatisticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAccumulatedStatisticsRequest.ProtoReflect.Descriptor instead.
+func (*SyncAccumulatedStatisticsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{10}
+}
+
+// 同步累计统计响应
+type SyncAccumulatedStatisticsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                            // 是否成功
+	SyncedCount   int64                  `protobuf:"varint,2,opt,name=synced_count,json=syncedCount,proto3" json:"synced_count,omitempty"` // 同步的记录数
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                             // 描述信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncAccumulatedStatisticsResponse) Reset() {
+	*x = SyncAccumulatedStatisticsResponse{}
+	mi := &file_internal_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncAccumulatedStatisticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncAccumulatedStatisticsResponse) ProtoMessage() {}
+
+func (x *SyncAccumulatedStatisticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncAccumulatedStatisticsResponse.ProtoReflect.Descriptor instead.
+func (*SyncAccumulatedStatisticsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SyncAccumulatedStatisticsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SyncAccumulatedStatisticsResponse) GetSyncedCount() int64 {
+	if x != nil {
+		return x.SyncedCount
+	}
+	return 0
+}
+
+func (x *SyncAccumulatedStatisticsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// 同步计划统计请求
+type SyncPlanStatisticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncPlanStatisticsRequest) Reset() {
+	*x = SyncPlanStatisticsRequest{}
+	mi := &file_internal_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncPlanStatisticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncPlanStatisticsRequest) ProtoMessage() {}
+
+func (x *SyncPlanStatisticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncPlanStatisticsRequest.ProtoReflect.Descriptor instead.
+func (*SyncPlanStatisticsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{12}
+}
+
+// 同步计划统计响应
+type SyncPlanStatisticsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                            // 是否成功
+	SyncedCount   int64                  `protobuf:"varint,2,opt,name=synced_count,json=syncedCount,proto3" json:"synced_count,omitempty"` // 同步的计划数
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                             // 描述信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncPlanStatisticsResponse) Reset() {
+	*x = SyncPlanStatisticsResponse{}
+	mi := &file_internal_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncPlanStatisticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncPlanStatisticsResponse) ProtoMessage() {}
+
+func (x *SyncPlanStatisticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncPlanStatisticsResponse.ProtoReflect.Descriptor instead.
+func (*SyncPlanStatisticsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SyncPlanStatisticsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SyncPlanStatisticsResponse) GetSyncedCount() int64 {
+	if x != nil {
+		return x.SyncedCount
+	}
+	return 0
+}
+
+func (x *SyncPlanStatisticsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// 校验统计数据一致性请求
+type ValidateStatisticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateStatisticsRequest) Reset() {
+	*x = ValidateStatisticsRequest{}
+	mi := &file_internal_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateStatisticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateStatisticsRequest) ProtoMessage() {}
+
+func (x *ValidateStatisticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateStatisticsRequest.ProtoReflect.Descriptor instead.
+func (*ValidateStatisticsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{14}
+}
+
+// 校验统计数据一致性响应
+type ValidateStatisticsResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Success           bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                                              // 是否成功
+	Consistent        bool                   `protobuf:"varint,2,opt,name=consistent,proto3" json:"consistent,omitempty"`                                        // 数据是否一致
+	InconsistentCount int64                  `protobuf:"varint,3,opt,name=inconsistent_count,json=inconsistentCount,proto3" json:"inconsistent_count,omitempty"` // 不一致的记录数
+	Message           string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`                                               // 描述信息
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ValidateStatisticsResponse) Reset() {
+	*x = ValidateStatisticsResponse{}
+	mi := &file_internal_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateStatisticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateStatisticsResponse) ProtoMessage() {}
+
+func (x *ValidateStatisticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateStatisticsResponse.ProtoReflect.Descriptor instead.
+func (*ValidateStatisticsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ValidateStatisticsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ValidateStatisticsResponse) GetConsistent() bool {
+	if x != nil {
+		return x.Consistent
+	}
+	return false
+}
+
+func (x *ValidateStatisticsResponse) GetInconsistentCount() int64 {
+	if x != nil {
+		return x.InconsistentCount
+	}
+	return 0
+}
+
+func (x *ValidateStatisticsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// 调度待推送任务请求
+type SchedulePendingTasksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Before        string                 `protobuf:"bytes,1,opt,name=before,proto3" json:"before,omitempty"` // 截止时间（格式：YYYY-MM-DD HH:mm:ss），可选，默认当前时间
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SchedulePendingTasksRequest) Reset() {
+	*x = SchedulePendingTasksRequest{}
+	mi := &file_internal_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SchedulePendingTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SchedulePendingTasksRequest) ProtoMessage() {}
+
+func (x *SchedulePendingTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SchedulePendingTasksRequest.ProtoReflect.Descriptor instead.
+func (*SchedulePendingTasksRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *SchedulePendingTasksRequest) GetBefore() string {
+	if x != nil {
+		return x.Before
+	}
+	return ""
+}
+
+// 调度待推送任务响应
+type SchedulePendingTasksResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Success        bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                                     // 是否成功
+	ScheduledCount int64                  `protobuf:"varint,2,opt,name=scheduled_count,json=scheduledCount,proto3" json:"scheduled_count,omitempty"` // 调度的任务数
+	Message        string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                                      // 描述信息
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SchedulePendingTasksResponse) Reset() {
+	*x = SchedulePendingTasksResponse{}
+	mi := &file_internal_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SchedulePendingTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SchedulePendingTasksResponse) ProtoMessage() {}
+
+func (x *SchedulePendingTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SchedulePendingTasksResponse.ProtoReflect.Descriptor instead.
+func (*SchedulePendingTasksResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *SchedulePendingTasksResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SchedulePendingTasksResponse) GetScheduledCount() int64 {
+	if x != nil {
+		return x.ScheduledCount
+	}
+	return 0
+}
+
+func (x *SchedulePendingTasksResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+var File_internal_proto protoreflect.FileDescriptor
+
+const file_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x1ainternalapi/internal.proto\x12\vinternalapi\"I\n" +
+	"\x0einternal.proto\x12\vinternalapi\"I\n" +
 	" CalculateAnswerSheetScoreRequest\x12%\n" +
 	"\x0eanswersheet_id\x18\x01 \x01(\x04R\ranswersheetId\"x\n" +
 	"!CalculateAnswerSheetScoreResponse\x12\x18\n" +
@@ -625,27 +1131,61 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\n" +
 	"tags_added\x18\x02 \x03(\tR\ttagsAdded\x12(\n" +
 	"\x10key_focus_marked\x18\x03 \x01(\bR\x0ekeyFocusMarked\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage2\xcf\x03\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\x1c\n" +
+	"\x1aSyncDailyStatisticsRequest\"t\n" +
+	"\x1bSyncDailyStatisticsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12!\n" +
+	"\fsynced_count\x18\x02 \x01(\x03R\vsyncedCount\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\"\n" +
+	" SyncAccumulatedStatisticsRequest\"z\n" +
+	"!SyncAccumulatedStatisticsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12!\n" +
+	"\fsynced_count\x18\x02 \x01(\x03R\vsyncedCount\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x1b\n" +
+	"\x19SyncPlanStatisticsRequest\"s\n" +
+	"\x1aSyncPlanStatisticsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12!\n" +
+	"\fsynced_count\x18\x02 \x01(\x03R\vsyncedCount\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x1b\n" +
+	"\x19ValidateStatisticsRequest\"\x9f\x01\n" +
+	"\x1aValidateStatisticsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1e\n" +
+	"\n" +
+	"consistent\x18\x02 \x01(\bR\n" +
+	"consistent\x12-\n" +
+	"\x12inconsistent_count\x18\x03 \x01(\x03R\x11inconsistentCount\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"5\n" +
+	"\x1bSchedulePendingTasksRequest\x12\x16\n" +
+	"\x06before\x18\x01 \x01(\tR\x06before\"{\n" +
+	"\x1cSchedulePendingTasksResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12'\n" +
+	"\x0fscheduled_count\x18\x02 \x01(\x03R\x0escheduledCount\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage2\xf0\a\n" +
 	"\x0fInternalService\x12z\n" +
 	"\x19CalculateAnswerSheetScore\x12-.internalapi.CalculateAnswerSheetScoreRequest\x1a..internalapi.CalculateAnswerSheetScoreResponse\x12\x8c\x01\n" +
 	"\x1fCreateAssessmentFromAnswerSheet\x123.internalapi.CreateAssessmentFromAnswerSheetRequest\x1a4.internalapi.CreateAssessmentFromAnswerSheetResponse\x12e\n" +
 	"\x12EvaluateAssessment\x12&.internalapi.EvaluateAssessmentRequest\x1a'.internalapi.EvaluateAssessmentResponse\x12J\n" +
-	"\tTagTestee\x12\x1d.internalapi.TagTesteeRequest\x1a\x1e.internalapi.TagTesteeResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
+	"\tTagTestee\x12\x1d.internalapi.TagTesteeRequest\x1a\x1e.internalapi.TagTesteeResponse\x12h\n" +
+	"\x13SyncDailyStatistics\x12'.internalapi.SyncDailyStatisticsRequest\x1a(.internalapi.SyncDailyStatisticsResponse\x12z\n" +
+	"\x19SyncAccumulatedStatistics\x12-.internalapi.SyncAccumulatedStatisticsRequest\x1a..internalapi.SyncAccumulatedStatisticsResponse\x12e\n" +
+	"\x12SyncPlanStatistics\x12&.internalapi.SyncPlanStatisticsRequest\x1a'.internalapi.SyncPlanStatisticsResponse\x12e\n" +
+	"\x12ValidateStatistics\x12&.internalapi.ValidateStatisticsRequest\x1a'.internalapi.ValidateStatisticsResponse\x12k\n" +
+	"\x14SchedulePendingTasks\x12(.internalapi.SchedulePendingTasksRequest\x1a).internalapi.SchedulePendingTasksResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
 
 var (
-	file_internalapi_internal_proto_rawDescOnce sync.Once
-	file_internalapi_internal_proto_rawDescData []byte
+	file_internal_proto_rawDescOnce sync.Once
+	file_internal_proto_rawDescData []byte
 )
 
-func file_internalapi_internal_proto_rawDescGZIP() []byte {
-	file_internalapi_internal_proto_rawDescOnce.Do(func() {
-		file_internalapi_internal_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)))
+func file_internal_proto_rawDescGZIP() []byte {
+	file_internal_proto_rawDescOnce.Do(func() {
+		file_internal_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_proto_rawDesc), len(file_internal_proto_rawDesc)))
 	})
-	return file_internalapi_internal_proto_rawDescData
+	return file_internal_proto_rawDescData
 }
 
-var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_internalapi_internal_proto_goTypes = []any{
+var file_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_internal_proto_goTypes = []any{
 	(*CalculateAnswerSheetScoreRequest)(nil),        // 0: internalapi.CalculateAnswerSheetScoreRequest
 	(*CalculateAnswerSheetScoreResponse)(nil),       // 1: internalapi.CalculateAnswerSheetScoreResponse
 	(*CreateAssessmentFromAnswerSheetRequest)(nil),  // 2: internalapi.CreateAssessmentFromAnswerSheetRequest
@@ -654,43 +1194,63 @@ var file_internalapi_internal_proto_goTypes = []any{
 	(*EvaluateAssessmentResponse)(nil),              // 5: internalapi.EvaluateAssessmentResponse
 	(*TagTesteeRequest)(nil),                        // 6: internalapi.TagTesteeRequest
 	(*TagTesteeResponse)(nil),                       // 7: internalapi.TagTesteeResponse
+	(*SyncDailyStatisticsRequest)(nil),              // 8: internalapi.SyncDailyStatisticsRequest
+	(*SyncDailyStatisticsResponse)(nil),             // 9: internalapi.SyncDailyStatisticsResponse
+	(*SyncAccumulatedStatisticsRequest)(nil),        // 10: internalapi.SyncAccumulatedStatisticsRequest
+	(*SyncAccumulatedStatisticsResponse)(nil),       // 11: internalapi.SyncAccumulatedStatisticsResponse
+	(*SyncPlanStatisticsRequest)(nil),               // 12: internalapi.SyncPlanStatisticsRequest
+	(*SyncPlanStatisticsResponse)(nil),              // 13: internalapi.SyncPlanStatisticsResponse
+	(*ValidateStatisticsRequest)(nil),               // 14: internalapi.ValidateStatisticsRequest
+	(*ValidateStatisticsResponse)(nil),              // 15: internalapi.ValidateStatisticsResponse
+	(*SchedulePendingTasksRequest)(nil),             // 16: internalapi.SchedulePendingTasksRequest
+	(*SchedulePendingTasksResponse)(nil),            // 17: internalapi.SchedulePendingTasksResponse
 }
-var file_internalapi_internal_proto_depIdxs = []int32{
-	0, // 0: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
-	2, // 1: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
-	4, // 2: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
-	6, // 3: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
-	1, // 4: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
-	3, // 5: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
-	5, // 6: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
-	7, // 7: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+var file_internal_proto_depIdxs = []int32{
+	0,  // 0: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
+	2,  // 1: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
+	4,  // 2: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
+	6,  // 3: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
+	8,  // 4: internalapi.InternalService.SyncDailyStatistics:input_type -> internalapi.SyncDailyStatisticsRequest
+	10, // 5: internalapi.InternalService.SyncAccumulatedStatistics:input_type -> internalapi.SyncAccumulatedStatisticsRequest
+	12, // 6: internalapi.InternalService.SyncPlanStatistics:input_type -> internalapi.SyncPlanStatisticsRequest
+	14, // 7: internalapi.InternalService.ValidateStatistics:input_type -> internalapi.ValidateStatisticsRequest
+	16, // 8: internalapi.InternalService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
+	1,  // 9: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
+	3,  // 10: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
+	5,  // 11: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
+	7,  // 12: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
+	9,  // 13: internalapi.InternalService.SyncDailyStatistics:output_type -> internalapi.SyncDailyStatisticsResponse
+	11, // 14: internalapi.InternalService.SyncAccumulatedStatistics:output_type -> internalapi.SyncAccumulatedStatisticsResponse
+	13, // 15: internalapi.InternalService.SyncPlanStatistics:output_type -> internalapi.SyncPlanStatisticsResponse
+	15, // 16: internalapi.InternalService.ValidateStatistics:output_type -> internalapi.ValidateStatisticsResponse
+	17, // 17: internalapi.InternalService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
+	9,  // [9:18] is the sub-list for method output_type
+	0,  // [0:9] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_internalapi_internal_proto_init() }
-func file_internalapi_internal_proto_init() {
-	if File_internalapi_internal_proto != nil {
+func init() { file_internal_proto_init() }
+func file_internal_proto_init() {
+	if File_internal_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_rawDesc), len(file_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internalapi_internal_proto_goTypes,
-		DependencyIndexes: file_internalapi_internal_proto_depIdxs,
-		MessageInfos:      file_internalapi_internal_proto_msgTypes,
+		GoTypes:           file_internal_proto_goTypes,
+		DependencyIndexes: file_internal_proto_depIdxs,
+		MessageInfos:      file_internal_proto_msgTypes,
 	}.Build()
-	File_internalapi_internal_proto = out.File
-	file_internalapi_internal_proto_goTypes = nil
-	file_internalapi_internal_proto_depIdxs = nil
+	File_internal_proto = out.File
+	file_internal_proto_goTypes = nil
+	file_internal_proto_depIdxs = nil
 }

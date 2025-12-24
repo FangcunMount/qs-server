@@ -101,6 +101,9 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 注册 Plan 模块相关的受保护路由（必须在 registerActorProtectedRoutes 之前，确保更具体的路由先注册）
 	r.registerPlanProtectedRoutes(apiV1)
 
+	// 注册 Statistics 模块相关的受保护路由
+	r.registerStatisticsProtectedRoutes(apiV1)
+
 	// 注册 Actor 模块相关的受保护路由
 	r.registerActorProtectedRoutes(apiV1)
 
@@ -174,9 +177,9 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 	answersheets := apiV1.Group("/answersheets")
 	{
 		// 管理接口
-		answersheets.GET("/:id", answersheetHandler.GetByID)              // 获取答卷详情
-		answersheets.GET("", answersheetHandler.List)                     // 获取答卷列表
-		answersheets.GET("/statistics", answersheetHandler.GetStatistics) // 获取统计信息
+		answersheets.GET("/:id", answersheetHandler.GetByID) // 获取答卷详情
+		answersheets.GET("", answersheetHandler.List)        // 获取答卷列表
+		// 统计接口已迁移到 /api/v1/statistics/questionnaires/:code
 	}
 }
 
@@ -227,7 +230,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 		testees.GET("/:id", actorHandler.GetTestee)                       // 获取受试者详情
 		testees.PUT("/:id", actorHandler.UpdateTestee)                    // 更新受试者
 		testees.GET("/:id/scale-analysis", actorHandler.GetScaleAnalysis) // 受试者量表分析
-		testees.GET("/:id/periodic-stats", actorHandler.GetPeriodicStats) // 受试者周期统计
+		// 统计接口已迁移到 /api/v1/statistics/testees/:testee_id
 	}
 
 	// 员工路由
@@ -253,9 +256,9 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		assessments := evaluations.Group("/assessments")
 		{
 			// 查询
-			assessments.GET("", evalHandler.ListAssessments)          // 查询测评列表
-			assessments.GET("/statistics", evalHandler.GetStatistics) // 获取统计数据
-			assessments.GET("/:id", evalHandler.GetAssessment)        // 获取测评详情
+			assessments.GET("", evalHandler.ListAssessments)   // 查询测评列表
+			assessments.GET("/:id", evalHandler.GetAssessment) // 获取测评详情
+			// 统计接口已迁移到 /api/v1/statistics/questionnaires/:code 或 /api/v1/statistics/system
 
 			// 得分和报告
 			assessments.GET("/:id/scores", evalHandler.GetScores)                     // 获取测评得分
@@ -327,6 +330,34 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 		testees.GET("/:id/plans/:plan_id/tasks", planHandler.ListTasksByTesteeAndPlan) // 查询受试者在某个计划下的所有任务（最具体，最先匹配）
 		testees.GET("/:id/plans", planHandler.ListPlansByTestee)                       // 查询受试者参与的所有计划
 		testees.GET("/:id/tasks", planHandler.ListTasksByTestee)                       // 查询受试者的所有任务
+	}
+}
+
+// registerStatisticsProtectedRoutes 注册 Statistics 模块相关的受保护路由
+func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
+	statisticsModule := r.container.StatisticsModule
+	if statisticsModule == nil || statisticsModule.Handler == nil {
+		return
+	}
+
+	statistics := apiV1.Group("/statistics")
+	{
+		// ==================== 统计查询 ====================
+		statistics.GET("/system", statisticsModule.Handler.GetSystemStatistics)                      // 获取系统整体统计
+		statistics.GET("/questionnaires/:code", statisticsModule.Handler.GetQuestionnaireStatistics) // 获取问卷/量表统计
+		statistics.GET("/testees/:testee_id", statisticsModule.Handler.GetTesteeStatistics)          // 获取受试者统计
+		statistics.GET("/plans/:plan_id", statisticsModule.Handler.GetPlanStatistics)                // 获取计划统计
+
+		// ==================== 定时任务接口 ====================
+		sync := statistics.Group("/sync")
+		{
+			sync.POST("/daily", statisticsModule.Handler.SyncDailyStatistics)             // 同步每日统计
+			sync.POST("/accumulated", statisticsModule.Handler.SyncAccumulatedStatistics) // 同步累计统计
+			sync.POST("/plan", statisticsModule.Handler.SyncPlanStatistics)               // 同步计划统计
+		}
+
+		// ==================== 数据校验 ====================
+		statistics.POST("/validate", statisticsModule.Handler.ValidateConsistency) // 校验数据一致性
 	}
 }
 

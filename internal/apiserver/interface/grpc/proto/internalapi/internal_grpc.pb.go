@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internalapi/internal.proto
+// source: internal.proto
 
 package internalapi
 
@@ -23,6 +23,11 @@ const (
 	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
 	InternalService_EvaluateAssessment_FullMethodName              = "/internalapi.InternalService/EvaluateAssessment"
 	InternalService_TagTestee_FullMethodName                       = "/internalapi.InternalService/TagTestee"
+	InternalService_SyncDailyStatistics_FullMethodName             = "/internalapi.InternalService/SyncDailyStatistics"
+	InternalService_SyncAccumulatedStatistics_FullMethodName       = "/internalapi.InternalService/SyncAccumulatedStatistics"
+	InternalService_SyncPlanStatistics_FullMethodName              = "/internalapi.InternalService/SyncPlanStatistics"
+	InternalService_ValidateStatistics_FullMethodName              = "/internalapi.InternalService/ValidateStatistics"
+	InternalService_SchedulePendingTasks_FullMethodName            = "/internalapi.InternalService/SchedulePendingTasks"
 )
 
 // InternalServiceClient is the client API for InternalService service.
@@ -48,6 +53,26 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
 	TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error)
+	// 同步每日统计
+	// 场景：sync 服务定时调用
+	// 流程：将Redis中的每日统计数据同步到MySQL
+	SyncDailyStatistics(ctx context.Context, in *SyncDailyStatisticsRequest, opts ...grpc.CallOption) (*SyncDailyStatisticsResponse, error)
+	// 同步累计统计
+	// 场景：sync 服务定时调用
+	// 流程：将Redis中的累计统计数据同步到MySQL
+	SyncAccumulatedStatistics(ctx context.Context, in *SyncAccumulatedStatisticsRequest, opts ...grpc.CallOption) (*SyncAccumulatedStatisticsResponse, error)
+	// 同步计划统计
+	// 场景：sync 服务定时调用
+	// 流程：同步计划统计数据
+	SyncPlanStatistics(ctx context.Context, in *SyncPlanStatisticsRequest, opts ...grpc.CallOption) (*SyncPlanStatisticsResponse, error)
+	// 校验统计数据一致性
+	// 场景：sync 服务定时调用
+	// 流程：校验Redis和MySQL的数据一致性
+	ValidateStatistics(ctx context.Context, in *ValidateStatisticsRequest, opts ...grpc.CallOption) (*ValidateStatisticsResponse, error)
+	// 调度待推送任务
+	// 场景：sync 服务定时调用
+	// 流程：扫描待推送任务，生成入口并开放
+	SchedulePendingTasks(ctx context.Context, in *SchedulePendingTasksRequest, opts ...grpc.CallOption) (*SchedulePendingTasksResponse, error)
 }
 
 type internalServiceClient struct {
@@ -98,6 +123,56 @@ func (c *internalServiceClient) TagTestee(ctx context.Context, in *TagTesteeRequ
 	return out, nil
 }
 
+func (c *internalServiceClient) SyncDailyStatistics(ctx context.Context, in *SyncDailyStatisticsRequest, opts ...grpc.CallOption) (*SyncDailyStatisticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncDailyStatisticsResponse)
+	err := c.cc.Invoke(ctx, InternalService_SyncDailyStatistics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) SyncAccumulatedStatistics(ctx context.Context, in *SyncAccumulatedStatisticsRequest, opts ...grpc.CallOption) (*SyncAccumulatedStatisticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncAccumulatedStatisticsResponse)
+	err := c.cc.Invoke(ctx, InternalService_SyncAccumulatedStatistics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) SyncPlanStatistics(ctx context.Context, in *SyncPlanStatisticsRequest, opts ...grpc.CallOption) (*SyncPlanStatisticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncPlanStatisticsResponse)
+	err := c.cc.Invoke(ctx, InternalService_SyncPlanStatistics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) ValidateStatistics(ctx context.Context, in *ValidateStatisticsRequest, opts ...grpc.CallOption) (*ValidateStatisticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateStatisticsResponse)
+	err := c.cc.Invoke(ctx, InternalService_ValidateStatistics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) SchedulePendingTasks(ctx context.Context, in *SchedulePendingTasksRequest, opts ...grpc.CallOption) (*SchedulePendingTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SchedulePendingTasksResponse)
+	err := c.cc.Invoke(ctx, InternalService_SchedulePendingTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InternalServiceServer is the server API for InternalService service.
 // All implementations must embed UnimplementedInternalServiceServer
 // for forward compatibility.
@@ -121,6 +196,26 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
 	TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error)
+	// 同步每日统计
+	// 场景：sync 服务定时调用
+	// 流程：将Redis中的每日统计数据同步到MySQL
+	SyncDailyStatistics(context.Context, *SyncDailyStatisticsRequest) (*SyncDailyStatisticsResponse, error)
+	// 同步累计统计
+	// 场景：sync 服务定时调用
+	// 流程：将Redis中的累计统计数据同步到MySQL
+	SyncAccumulatedStatistics(context.Context, *SyncAccumulatedStatisticsRequest) (*SyncAccumulatedStatisticsResponse, error)
+	// 同步计划统计
+	// 场景：sync 服务定时调用
+	// 流程：同步计划统计数据
+	SyncPlanStatistics(context.Context, *SyncPlanStatisticsRequest) (*SyncPlanStatisticsResponse, error)
+	// 校验统计数据一致性
+	// 场景：sync 服务定时调用
+	// 流程：校验Redis和MySQL的数据一致性
+	ValidateStatistics(context.Context, *ValidateStatisticsRequest) (*ValidateStatisticsResponse, error)
+	// 调度待推送任务
+	// 场景：sync 服务定时调用
+	// 流程：扫描待推送任务，生成入口并开放
+	SchedulePendingTasks(context.Context, *SchedulePendingTasksRequest) (*SchedulePendingTasksResponse, error)
 	mustEmbedUnimplementedInternalServiceServer()
 }
 
@@ -142,6 +237,21 @@ func (UnimplementedInternalServiceServer) EvaluateAssessment(context.Context, *E
 }
 func (UnimplementedInternalServiceServer) TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TagTestee not implemented")
+}
+func (UnimplementedInternalServiceServer) SyncDailyStatistics(context.Context, *SyncDailyStatisticsRequest) (*SyncDailyStatisticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncDailyStatistics not implemented")
+}
+func (UnimplementedInternalServiceServer) SyncAccumulatedStatistics(context.Context, *SyncAccumulatedStatisticsRequest) (*SyncAccumulatedStatisticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncAccumulatedStatistics not implemented")
+}
+func (UnimplementedInternalServiceServer) SyncPlanStatistics(context.Context, *SyncPlanStatisticsRequest) (*SyncPlanStatisticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncPlanStatistics not implemented")
+}
+func (UnimplementedInternalServiceServer) ValidateStatistics(context.Context, *ValidateStatisticsRequest) (*ValidateStatisticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValidateStatistics not implemented")
+}
+func (UnimplementedInternalServiceServer) SchedulePendingTasks(context.Context, *SchedulePendingTasksRequest) (*SchedulePendingTasksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SchedulePendingTasks not implemented")
 }
 func (UnimplementedInternalServiceServer) mustEmbedUnimplementedInternalServiceServer() {}
 func (UnimplementedInternalServiceServer) testEmbeddedByValue()                         {}
@@ -236,6 +346,96 @@ func _InternalService_TagTestee_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_SyncDailyStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncDailyStatisticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).SyncDailyStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_SyncDailyStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).SyncDailyStatistics(ctx, req.(*SyncDailyStatisticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_SyncAccumulatedStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncAccumulatedStatisticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).SyncAccumulatedStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_SyncAccumulatedStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).SyncAccumulatedStatistics(ctx, req.(*SyncAccumulatedStatisticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_SyncPlanStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncPlanStatisticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).SyncPlanStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_SyncPlanStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).SyncPlanStatistics(ctx, req.(*SyncPlanStatisticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_ValidateStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateStatisticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).ValidateStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_ValidateStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).ValidateStatistics(ctx, req.(*ValidateStatisticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_SchedulePendingTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SchedulePendingTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).SchedulePendingTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_SchedulePendingTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).SchedulePendingTasks(ctx, req.(*SchedulePendingTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InternalService_ServiceDesc is the grpc.ServiceDesc for InternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -259,7 +459,27 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "TagTestee",
 			Handler:    _InternalService_TagTestee_Handler,
 		},
+		{
+			MethodName: "SyncDailyStatistics",
+			Handler:    _InternalService_SyncDailyStatistics_Handler,
+		},
+		{
+			MethodName: "SyncAccumulatedStatistics",
+			Handler:    _InternalService_SyncAccumulatedStatistics_Handler,
+		},
+		{
+			MethodName: "SyncPlanStatistics",
+			Handler:    _InternalService_SyncPlanStatistics_Handler,
+		},
+		{
+			MethodName: "ValidateStatistics",
+			Handler:    _InternalService_ValidateStatistics_Handler,
+		},
+		{
+			MethodName: "SchedulePendingTasks",
+			Handler:    _InternalService_SchedulePendingTasks_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internalapi/internal.proto",
+	Metadata: "internal.proto",
 }

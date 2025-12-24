@@ -12,13 +12,15 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
-// InternalService 内部 gRPC 服务 - 供 Worker 调用
-// 用于事件处理后的业务逻辑调用
+// InternalService 内部 gRPC 服务 - 供 Worker 和 Sync 调用
+// 用于事件处理后的业务逻辑调用和定时任务调用
 type InternalService struct {
 	pb.UnimplementedInternalServiceServer
 	answerSheetScoringService answerSheetApp.AnswerSheetScoringService
@@ -27,6 +29,11 @@ type InternalService struct {
 	engineService             engine.Service
 	scaleRepo                 scale.Repository
 	testeeTaggingService      testeeApp.TesteeTaggingService
+	// Statistics 服务（备用接口，推荐使用 REST API + Crontab）
+	statisticsSyncService      statisticsApp.StatisticsSyncService
+	statisticsValidatorService statisticsApp.StatisticsValidatorService
+	// Plan 服务（备用接口，推荐使用 REST API + Crontab）
+	taskSchedulerService planApp.TaskSchedulerService
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -37,14 +44,36 @@ func NewInternalService(
 	engineService engine.Service,
 	scaleRepo scale.Repository,
 	testeeTaggingService testeeApp.TesteeTaggingService,
+	statisticsSyncService interface{}, // statisticsApp.StatisticsSyncService，可能为 nil
+	statisticsValidatorService interface{}, // statisticsApp.StatisticsValidatorService，可能为 nil
+	taskSchedulerService interface{}, // planApp.TaskSchedulerService，可能为 nil
 ) *InternalService {
+	// 类型转换（如果提供了服务）
+	var syncService statisticsApp.StatisticsSyncService
+	if s, ok := statisticsSyncService.(statisticsApp.StatisticsSyncService); ok {
+		syncService = s
+	}
+
+	var validatorService statisticsApp.StatisticsValidatorService
+	if v, ok := statisticsValidatorService.(statisticsApp.StatisticsValidatorService); ok {
+		validatorService = v
+	}
+
+	var schedulerService planApp.TaskSchedulerService
+	if t, ok := taskSchedulerService.(planApp.TaskSchedulerService); ok {
+		schedulerService = t
+	}
+
 	return &InternalService{
-		answerSheetScoringService: answerSheetScoringService,
-		submissionService:         submissionService,
-		managementService:         managementService,
-		engineService:             engineService,
-		scaleRepo:                 scaleRepo,
-		testeeTaggingService:      testeeTaggingService,
+		answerSheetScoringService:  answerSheetScoringService,
+		submissionService:          submissionService,
+		managementService:          managementService,
+		engineService:              engineService,
+		scaleRepo:                  scaleRepo,
+		testeeTaggingService:       testeeTaggingService,
+		statisticsSyncService:      syncService,
+		statisticsValidatorService: validatorService,
+		taskSchedulerService:       schedulerService,
 	}
 }
 
@@ -349,5 +378,209 @@ func (s *InternalService) TagTestee(
 		TagsAdded:      result.TagsAdded,
 		KeyFocusMarked: result.KeyFocusMarked,
 		Message:        fmt.Sprintf("标签更新成功：添加 %d 个，移除 %d 个", len(result.TagsAdded), len(result.TagsRemoved)),
+	}, nil
+}
+
+// ==================== Statistics 同步操作 ====================
+
+// SyncDailyStatistics 同步每日统计
+// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/daily）
+// 保留此接口作为备用，但推荐使用 Crontab + HTTP 接口方案
+func (s *InternalService) SyncDailyStatistics(
+	ctx context.Context,
+	req *pb.SyncDailyStatisticsRequest,
+) (*pb.SyncDailyStatisticsResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到同步每日统计请求",
+		"action", "sync_daily_statistics",
+	)
+
+	if s.statisticsSyncService == nil {
+		return nil, status.Error(codes.Unimplemented, "statistics sync service not available")
+	}
+
+	err := s.statisticsSyncService.SyncDailyStatistics(ctx)
+	if err != nil {
+		l.Errorw("同步每日统计失败",
+			"error", err.Error(),
+		)
+		return &pb.SyncDailyStatisticsResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("同步每日统计成功",
+		"action", "sync_daily_statistics",
+	)
+
+	return &pb.SyncDailyStatisticsResponse{
+		Success: true,
+		Message: "同步完成",
+	}, nil
+}
+
+// SyncAccumulatedStatistics 同步累计统计
+// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/accumulated）
+// 保留此接口作为备用，但推荐使用 Crontab + HTTP 接口方案
+func (s *InternalService) SyncAccumulatedStatistics(
+	ctx context.Context,
+	req *pb.SyncAccumulatedStatisticsRequest,
+) (*pb.SyncAccumulatedStatisticsResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到同步累计统计请求",
+		"action", "sync_accumulated_statistics",
+	)
+
+	if s.statisticsSyncService == nil {
+		return nil, status.Error(codes.Unimplemented, "statistics sync service not available")
+	}
+
+	err := s.statisticsSyncService.SyncAccumulatedStatistics(ctx)
+	if err != nil {
+		l.Errorw("同步累计统计失败",
+			"error", err.Error(),
+		)
+		return &pb.SyncAccumulatedStatisticsResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("同步累计统计成功",
+		"action", "sync_accumulated_statistics",
+	)
+
+	return &pb.SyncAccumulatedStatisticsResponse{
+		Success: true,
+		Message: "同步完成",
+	}, nil
+}
+
+// SyncPlanStatistics 同步计划统计
+// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/plan）
+// 保留此接口作为备用，但推荐使用 Crontab + HTTP 接口方案
+func (s *InternalService) SyncPlanStatistics(
+	ctx context.Context,
+	req *pb.SyncPlanStatisticsRequest,
+) (*pb.SyncPlanStatisticsResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到同步计划统计请求",
+		"action", "sync_plan_statistics",
+	)
+
+	if s.statisticsSyncService == nil {
+		return nil, status.Error(codes.Unimplemented, "statistics sync service not available")
+	}
+
+	err := s.statisticsSyncService.SyncPlanStatistics(ctx)
+	if err != nil {
+		l.Errorw("同步计划统计失败",
+			"error", err.Error(),
+		)
+		return &pb.SyncPlanStatisticsResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("同步计划统计成功",
+		"action", "sync_plan_statistics",
+	)
+
+	return &pb.SyncPlanStatisticsResponse{
+		Success: true,
+		Message: "同步完成",
+	}, nil
+}
+
+// ValidateStatistics 校验统计数据一致性
+// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/validate）
+// 保留此接口作为备用，但推荐使用 Crontab + HTTP 接口方案
+func (s *InternalService) ValidateStatistics(
+	ctx context.Context,
+	req *pb.ValidateStatisticsRequest,
+) (*pb.ValidateStatisticsResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到校验统计数据一致性请求",
+		"action", "validate_statistics",
+	)
+
+	if s.statisticsValidatorService == nil {
+		return nil, status.Error(codes.Unimplemented, "statistics validator service not available")
+	}
+
+	err := s.statisticsValidatorService.ValidateConsistency(ctx)
+	if err != nil {
+		l.Errorw("校验统计数据一致性失败",
+			"error", err.Error(),
+		)
+		return &pb.ValidateStatisticsResponse{
+			Success:    false,
+			Consistent: false,
+			Message:    err.Error(),
+		}, nil
+	}
+
+	l.Infow("校验统计数据一致性成功",
+		"action", "validate_statistics",
+	)
+
+	return &pb.ValidateStatisticsResponse{
+		Success:    true,
+		Consistent: true,
+		Message:    "数据一致",
+	}, nil
+}
+
+// ==================== Plan 调度操作 ====================
+
+// SchedulePendingTasks 调度待推送任务
+// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/plans/tasks/schedule）
+// 保留此接口作为备用，但推荐使用 Crontab + HTTP 接口方案
+func (s *InternalService) SchedulePendingTasks(
+	ctx context.Context,
+	req *pb.SchedulePendingTasksRequest,
+) (*pb.SchedulePendingTasksResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到调度待推送任务请求",
+		"action", "schedule_pending_tasks",
+		"before", req.Before,
+	)
+
+	if s.taskSchedulerService == nil {
+		return nil, status.Error(codes.Unimplemented, "task scheduler service not available")
+	}
+
+	before := req.Before
+	if before == "" {
+		before = "" // 使用默认值（当前时间）
+	}
+
+	tasks, err := s.taskSchedulerService.SchedulePendingTasks(ctx, before)
+	if err != nil {
+		l.Errorw("调度待推送任务失败",
+			"error", err.Error(),
+		)
+		return &pb.SchedulePendingTasksResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("调度待推送任务成功",
+		"action", "schedule_pending_tasks",
+		"scheduled_count", len(tasks),
+	)
+
+	return &pb.SchedulePendingTasksResponse{
+		Success:        true,
+		ScheduledCount: int64(len(tasks)),
+		Message:        fmt.Sprintf("成功调度 %d 个任务", len(tasks)),
 	}, nil
 }

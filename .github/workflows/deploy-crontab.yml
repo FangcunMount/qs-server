@@ -1,0 +1,359 @@
+name: Deploy Crontab Configuration
+
+# ============================================================================
+# 必需的 Secrets 配置
+# ============================================================================
+# Organization Secrets (组织级别，共享配置):
+#   SVRA_HOST, SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
+#   SVRA_SUDO_PASSWORD (可选，如果 sudo 需要密码)
+#
+# Repository Secrets (仓库级别，敏感信息):
+#   IAM_USERNAME, IAM_PASSWORD (IAM 登录凭证)
+#   IAM_LOGIN_URL (可选，默认: https://iam.example.com/api/v1/auth/login)
+#   API_BASE_URL (可选，默认: http://localhost:8080)
+# ============================================================================
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'configs/crontab/**'
+      - '.github/workflows/deploy-crontab.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '强制部署（即使文件未变更）'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DEPLOY_USER: root
+  SCRIPTS_DIR: /usr/local/bin
+  CONFIG_DIR: /etc/qs-server
+  CRON_DIR: /etc/cron.d
+  LOG_DIR: /var/log/qs-scheduler
+  LOGROTATE_DIR: /etc/logrotate.d
+
+jobs:
+  deploy:
+    name: Deploy Crontab Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.SVRA_HOST }}" ]; then
+            echo "❌ SVRA_HOST is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SVRA_USERNAME }}" ]; then
+            echo "❌ SVRA_USERNAME is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SVRA_SSH_KEY }}" ]; then
+            echo "❌ SVRA_SSH_KEY is not set"
+            exit 1
+          fi
+          echo "✅ Required secrets are set"
+
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy-crontab
+          
+          # 复制脚本文件
+          cp configs/crontab/refresh-token.sh deploy-crontab/
+          cp configs/crontab/api-call.sh deploy-crontab/
+          
+          # 复制配置文件
+          cp configs/crontab/qs-scheduler deploy-crontab/
+          cp configs/crontab/logrotate.conf deploy-crontab/
+          
+          # 创建部署脚本
+          cat > deploy-crontab/deploy.sh << 'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -euo pipefail
+          
+          SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
+          CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
+          CRON_DIR="${CRON_DIR:-/etc/cron.d}"
+          LOG_DIR="${LOG_DIR:-/var/log/qs-scheduler}"
+          LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
+          
+          echo "🚀 Starting crontab deployment..."
+          
+          # 1. 创建必要目录
+          echo "📁 Creating directories..."
+          mkdir -p "${SCRIPTS_DIR}"
+          mkdir -p "${CONFIG_DIR}"
+          mkdir -p "${CRON_DIR}"
+          mkdir -p "${LOG_DIR}"
+          mkdir -p "${LOGROTATE_DIR}"
+          
+          chmod 755 "${SCRIPTS_DIR}"
+          chmod 755 "${CONFIG_DIR}"
+          chmod 755 "${CRON_DIR}"
+          chmod 755 "${LOG_DIR}"
+          
+          # 2. 部署脚本文件
+          echo "📝 Deploying scripts..."
+          cp "${SCRIPT_DIR}/refresh-token.sh" "${SCRIPTS_DIR}/qs-refresh-token.sh"
+          cp "${SCRIPT_DIR}/api-call.sh" "${SCRIPTS_DIR}/qs-api-call.sh"
+          
+          chmod +x "${SCRIPTS_DIR}/qs-refresh-token.sh"
+          chmod +x "${SCRIPTS_DIR}/qs-api-call.sh"
+          chown root:root "${SCRIPTS_DIR}/qs-refresh-token.sh"
+          chown root:root "${SCRIPTS_DIR}/qs-api-call.sh"
+          
+          # 3. 部署 crontab 配置文件（需要替换环境变量）
+          echo "⚙️  Deploying crontab configuration..."
+          # 注意：环境变量替换在 GitHub Actions 中完成
+          cp "${SCRIPT_DIR}/qs-scheduler" "${CRON_DIR}/qs-scheduler"
+          chmod 644 "${CRON_DIR}/qs-scheduler"
+          chown root:root "${CRON_DIR}/qs-scheduler"
+          
+          # 4. 部署日志轮转配置
+          echo "📋 Deploying logrotate configuration..."
+          cp "${SCRIPT_DIR}/logrotate.conf" "${LOGROTATE_DIR}/qs-scheduler"
+          chmod 644 "${LOGROTATE_DIR}/qs-scheduler"
+          chown root:root "${LOGROTATE_DIR}/qs-scheduler"
+          
+          # 5. 验证部署
+          echo "✅ Verifying deployment..."
+          if [ ! -f "${SCRIPTS_DIR}/qs-refresh-token.sh" ]; then
+            echo "❌ qs-refresh-token.sh not found"
+            exit 1
+          fi
+          if [ ! -f "${SCRIPTS_DIR}/qs-api-call.sh" ]; then
+            echo "❌ qs-api-call.sh not found"
+            exit 1
+          fi
+          if [ ! -f "${CRON_DIR}/qs-scheduler" ]; then
+            echo "❌ qs-scheduler not found"
+            exit 1
+          fi
+          
+          # 6. 验证 crontab 配置格式
+          echo "🔍 Validating crontab format..."
+          if ! crontab -l -u root 2>/dev/null | grep -q "qs-scheduler" || [ -f "${CRON_DIR}/qs-scheduler" ]; then
+            # 检查配置文件格式
+            if ! grep -q "^[0-9*]" "${CRON_DIR}/qs-scheduler" 2>/dev/null; then
+              echo "⚠️  Warning: No cron jobs found in qs-scheduler, but file exists"
+            fi
+          fi
+          
+          # 7. 测试脚本可执行性（仅检查语法，不实际执行）
+          echo "🧪 Testing scripts..."
+          # 注意：这里只是检查语法，不实际执行脚本（因为需要环境变量）
+          # 实际部署后会在服务器上进行语法检查
+          
+          echo "✅ Deployment completed successfully!"
+          echo ""
+          echo "📋 Deployment summary:"
+          echo "   - Scripts: ${SCRIPTS_DIR}/qs-*.sh"
+          echo "   - Crontab: ${CRON_DIR}/qs-scheduler"
+          echo "   - Logrotate: ${LOGROTATE_DIR}/qs-scheduler"
+          echo "   - Log directory: ${LOG_DIR}"
+          DEPLOY_SCRIPT
+          
+          chmod +x deploy-crontab/deploy.sh
+          
+          echo "✅ Deployment package prepared"
+
+      - name: Replace environment variables in crontab config
+        run: |
+          # 从 secrets 读取配置（如果设置了）
+          IAM_USERNAME="${{ secrets.IAM_USERNAME }}"
+          IAM_PASSWORD="${{ secrets.IAM_PASSWORD }}"
+          IAM_LOGIN_URL="${{ secrets.IAM_LOGIN_URL }}"
+          API_BASE_URL="${{ secrets.API_BASE_URL }}"
+          
+          # 使用默认值（如果 secrets 未设置）
+          IAM_USERNAME="${IAM_USERNAME:-qs-scheduler@example.com}"
+          IAM_PASSWORD="${IAM_PASSWORD:-your-password-here}"
+          IAM_LOGIN_URL="${IAM_LOGIN_URL:-https://iam.example.com/api/v1/auth/login}"
+          API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
+          
+          # 转义特殊字符（用于 sed）
+          IAM_USERNAME_ESC=$(echo "${IAM_USERNAME}" | sed 's/[[\.*^$()+?{|]/\\&/g')
+          IAM_PASSWORD_ESC=$(echo "${IAM_PASSWORD}" | sed 's/[[\.*^$()+?{|]/\\&/g')
+          IAM_LOGIN_URL_ESC=$(echo "${IAM_LOGIN_URL}" | sed 's/[[\.*^$()+?{|]/\\&/g')
+          API_BASE_URL_ESC=$(echo "${API_BASE_URL}" | sed 's/[[\.*^$()+?{|]/\\&/g')
+          
+          # 替换配置文件中的占位符
+          # 使用 | 作为分隔符，避免与 URL 中的 / 冲突
+          sed -i "s|IAM_USERNAME=\"qs-scheduler@example.com\"|IAM_USERNAME=\"${IAM_USERNAME_ESC}\"|g" deploy-crontab/qs-scheduler
+          sed -i "s|IAM_PASSWORD=\"your-password-here\"|IAM_PASSWORD=\"${IAM_PASSWORD_ESC}\"|g" deploy-crontab/qs-scheduler
+          sed -i "s|IAM_LOGIN_URL=\"https://iam.example.com/api/v1/auth/login\"|IAM_LOGIN_URL=\"${IAM_LOGIN_URL_ESC}\"|g" deploy-crontab/qs-scheduler
+          sed -i "s|API_BASE_URL=\"http://localhost:8080\"|API_BASE_URL=\"${API_BASE_URL_ESC}\"|g" deploy-crontab/qs-scheduler
+          
+          # 验证替换结果（不显示敏感信息）
+          echo "✅ Environment variables replaced:"
+          echo "   - IAM_USERNAME: ${IAM_USERNAME}"
+          echo "   - IAM_LOGIN_URL: ${IAM_LOGIN_URL}"
+          echo "   - API_BASE_URL: ${API_BASE_URL}"
+          
+          # 重新打包
+          tar -czf deploy-crontab.tar.gz -C deploy-crontab .
+          
+          echo "✅ Deployment package updated"
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-crontab.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          SCRIPTS_DIR: ${{ env.SCRIPTS_DIR }}
+          CONFIG_DIR: ${{ env.CONFIG_DIR }}
+          CRON_DIR: ${{ env.CRON_DIR }}
+          LOG_DIR: ${{ env.LOG_DIR }}
+          LOGROTATE_DIR: ${{ env.LOGROTATE_DIR }}
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            
+            echo "🚀 Starting crontab deployment on $(hostname)..."
+            
+            # 解压部署包
+            DEPLOY_DIR="/tmp/crontab-deploy-$$"
+            mkdir -p "${DEPLOY_DIR}"
+            cd "${DEPLOY_DIR}"
+            tar -xzf /tmp/deploy-crontab.tar.gz
+            
+            # 创建必要目录
+            echo "📁 Creating directories..."
+            sudo mkdir -p "${SCRIPTS_DIR}"
+            sudo mkdir -p "${CONFIG_DIR}"
+            sudo mkdir -p "${CRON_DIR}"
+            sudo mkdir -p "${LOG_DIR}"
+            sudo mkdir -p "${LOGROTATE_DIR}"
+            
+            sudo chmod 755 "${SCRIPTS_DIR}"
+            sudo chmod 755 "${CONFIG_DIR}"
+            sudo chmod 755 "${CRON_DIR}"
+            sudo chmod 755 "${LOG_DIR}"
+            
+            # 部署脚本文件
+            echo "📝 Deploying scripts..."
+            sudo cp "${DEPLOY_DIR}/refresh-token.sh" "${SCRIPTS_DIR}/qs-refresh-token.sh"
+            sudo cp "${DEPLOY_DIR}/api-call.sh" "${SCRIPTS_DIR}/qs-api-call.sh"
+            
+            sudo chmod +x "${SCRIPTS_DIR}/qs-refresh-token.sh"
+            sudo chmod +x "${SCRIPTS_DIR}/qs-api-call.sh"
+            sudo chown root:root "${SCRIPTS_DIR}/qs-refresh-token.sh"
+            sudo chown root:root "${SCRIPTS_DIR}/qs-api-call.sh"
+            
+            # 部署 crontab 配置文件
+            echo "⚙️  Deploying crontab configuration..."
+            sudo cp "${DEPLOY_DIR}/qs-scheduler" "${CRON_DIR}/qs-scheduler"
+            sudo chmod 644 "${CRON_DIR}/qs-scheduler"
+            sudo chown root:root "${CRON_DIR}/qs-scheduler"
+            
+            # 部署日志轮转配置
+            echo "📋 Deploying logrotate configuration..."
+            sudo cp "${DEPLOY_DIR}/logrotate.conf" "${LOGROTATE_DIR}/qs-scheduler"
+            sudo chmod 644 "${LOGROTATE_DIR}/qs-scheduler"
+            sudo chown root:root "${LOGROTATE_DIR}/qs-scheduler"
+            
+            # 验证部署
+            echo "✅ Verifying deployment..."
+            if [ ! -f "${SCRIPTS_DIR}/qs-refresh-token.sh" ]; then
+              echo "❌ qs-refresh-token.sh not found"
+              exit 1
+            fi
+            if [ ! -f "${SCRIPTS_DIR}/qs-api-call.sh" ]; then
+              echo "❌ qs-api-call.sh not found"
+              exit 1
+            fi
+            if [ ! -f "${CRON_DIR}/qs-scheduler" ]; then
+              echo "❌ qs-scheduler not found"
+              exit 1
+            fi
+            
+            # 验证 crontab 配置格式
+            echo "🔍 Validating crontab format..."
+            if ! grep -qE "^[0-9*]+.*root.*qs-api-call.sh" "${CRON_DIR}/qs-scheduler" 2>/dev/null; then
+              echo "⚠️  Warning: No cron jobs found in qs-scheduler"
+            fi
+            
+            # 测试脚本可执行性（仅检查语法，不实际执行）
+            echo "🧪 Testing scripts..."
+            if ! sudo bash -n "${SCRIPTS_DIR}/qs-refresh-token.sh" 2>/dev/null; then
+              echo "⚠️  Warning: qs-refresh-token.sh has syntax errors"
+            fi
+            if ! sudo bash -n "${SCRIPTS_DIR}/qs-api-call.sh" 2>/dev/null; then
+              echo "⚠️  Warning: qs-api-call.sh has syntax errors"
+            fi
+            
+            # 清理临时文件
+            rm -rf "${DEPLOY_DIR}"
+            rm -f /tmp/deploy-crontab.tar.gz
+            
+            echo ""
+            echo "✅ Deployment completed successfully!"
+            echo ""
+            echo "📋 Deployment summary:"
+            echo "   - Scripts: ${SCRIPTS_DIR}/qs-*.sh"
+            echo "   - Crontab: ${CRON_DIR}/qs-scheduler"
+            echo "   - Logrotate: ${LOGROTATE_DIR}/qs-scheduler"
+            echo "   - Log directory: ${LOG_DIR}"
+            echo ""
+            echo "📝 Next steps:"
+            echo "   1. Verify crontab config: cat ${CRON_DIR}/qs-scheduler"
+            echo "   2. Check cron service: sudo systemctl status cron"
+            echo "   3. Test token refresh: sudo ${SCRIPTS_DIR}/qs-refresh-token.sh"
+            echo "   4. Test API call: sudo ${SCRIPTS_DIR}/qs-api-call.sh /api/v1/statistics/sync/daily"
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script: |
+            echo "🔍 Verifying deployment..."
+            
+            # 检查文件是否存在
+            echo "📁 Checking files..."
+            sudo test -f /usr/local/bin/qs-refresh-token.sh && echo "✅ qs-refresh-token.sh exists" || echo "❌ qs-refresh-token.sh missing"
+            sudo test -f /usr/local/bin/qs-api-call.sh && echo "✅ qs-api-call.sh exists" || echo "❌ qs-api-call.sh missing"
+            sudo test -f /etc/cron.d/qs-scheduler && echo "✅ qs-scheduler exists" || echo "❌ qs-scheduler missing"
+            sudo test -f /etc/logrotate.d/qs-scheduler && echo "✅ logrotate config exists" || echo "❌ logrotate config missing"
+            
+            # 检查文件权限
+            echo ""
+            echo "🔐 Checking permissions..."
+            ls -l /usr/local/bin/qs-*.sh | head -2
+            ls -l /etc/cron.d/qs-scheduler
+            ls -l /etc/logrotate.d/qs-scheduler
+            
+            # 检查 cron 服务状态
+            echo ""
+            echo "⚙️  Checking cron service..."
+            sudo systemctl status cron --no-pager -l || sudo systemctl status crond --no-pager -l || echo "⚠️  Cron service status check failed"
+            
+            # 显示 crontab 配置摘要（不显示敏感信息）
+            echo ""
+            echo "📋 Crontab configuration summary:"
+            sudo grep -E "^[0-9*]+.*root.*qs-api-call.sh" /etc/cron.d/qs-scheduler | sed 's/.*qs-api-call.sh/  - Task: qs-api-call.sh/' || echo "  No tasks found"
+            
+            echo ""
+            echo "✅ Verification completed"
+

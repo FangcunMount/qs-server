@@ -43,6 +43,7 @@ type Container struct {
 	ActorModule      *assembler.ActorModule      // Actor 模块
 	EvaluationModule *assembler.EvaluationModule // Evaluation 模块（测评、得分、报告）
 	PlanModule       *assembler.PlanModule       // Plan 模块（测评计划）
+	StatisticsModule *assembler.StatisticsModule // Statistics 模块（统计）
 	IAMModule        *IAMModule                  // IAM 集成模块
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 
@@ -263,6 +264,21 @@ func (c *Container) initPlanModule() error {
 	modulePool["plan"] = planModule
 
 	fmt.Printf("📦 Plan module initialized\n")
+	return nil
+}
+
+// initStatisticsModule 初始化 Statistics 模块
+func (c *Container) initStatisticsModule() error {
+	statisticsModule := assembler.NewStatisticsModule()
+	// 传入 MySQL 和 Redis 客户端
+	if err := statisticsModule.Initialize(c.mysqlDB, c.redisCache); err != nil {
+		return fmt.Errorf("failed to initialize statistics module: %w", err)
+	}
+
+	c.StatisticsModule = statisticsModule
+	modulePool["statistics"] = statisticsModule
+
+	fmt.Printf("📦 Statistics module initialized\n")
 	return nil
 }
 
