@@ -45,19 +45,95 @@ jobs:
 
       - name: Validate required secrets
         run: |
+          echo "🔍 Validating GitHub Secrets..."
+          echo ""
+          
+          # 必需的组织级别 Secrets (Organization Secrets)
+          echo "📋 Checking Organization Secrets..."
+          MISSING_SECRETS=0
+          
           if [ -z "${{ secrets.SVRA_HOST }}" ]; then
-            echo "❌ SVRA_HOST is not set"
-            exit 1
+            echo "❌ SVRA_HOST is not set (Organization Secret)"
+            MISSING_SECRETS=$((MISSING_SECRETS + 1))
+          else
+            echo "✅ SVRA_HOST is set"
           fi
+          
           if [ -z "${{ secrets.SVRA_USERNAME }}" ]; then
-            echo "❌ SVRA_USERNAME is not set"
-            exit 1
+            echo "❌ SVRA_USERNAME is not set (Organization Secret)"
+            MISSING_SECRETS=$((MISSING_SECRETS + 1))
+          else
+            echo "✅ SVRA_USERNAME is set"
           fi
+          
           if [ -z "${{ secrets.SVRA_SSH_KEY }}" ]; then
-            echo "❌ SVRA_SSH_KEY is not set"
+            echo "❌ SVRA_SSH_KEY is not set (Organization Secret)"
+            MISSING_SECRETS=$((MISSING_SECRETS + 1))
+          else
+            echo "✅ SVRA_SSH_KEY is set"
+          fi
+          
+          # 可选的 SSH 端口
+          if [ -z "${{ secrets.SVRA_SSH_PORT }}" ]; then
+            echo "⚠️  SVRA_SSH_PORT is not set, will use default: 22"
+          else
+            echo "✅ SVRA_SSH_PORT is set: ${{ secrets.SVRA_SSH_PORT }}"
+          fi
+          
+          # 可选的 sudo 密码
+          if [ -z "${{ secrets.SVRA_SUDO_PASSWORD }}" ]; then
+            echo "⚠️  SVRA_SUDO_PASSWORD is not set (optional, required if sudo needs password)"
+          else
+            echo "✅ SVRA_SUDO_PASSWORD is set"
+          fi
+          
+          echo ""
+          echo "📋 Checking Repository Secrets..."
+          
+          # 必需的仓库级别 Secrets (Repository Secrets)
+          if [ -z "${{ secrets.IAM_USERNAME }}" ]; then
+            echo "❌ IAM_USERNAME is not set (Repository Secret)"
+            MISSING_SECRETS=$((MISSING_SECRETS + 1))
+          else
+            echo "✅ IAM_USERNAME is set"
+          fi
+          
+          if [ -z "${{ secrets.IAM_PASSWORD }}" ]; then
+            echo "❌ IAM_PASSWORD is not set (Repository Secret)"
+            MISSING_SECRETS=$((MISSING_SECRETS + 1))
+          else
+            echo "✅ IAM_PASSWORD is set"
+          fi
+          
+          # 可选的 IAM 配置
+          if [ -z "${{ secrets.IAM_LOGIN_URL }}" ]; then
+            echo "⚠️  IAM_LOGIN_URL is not set, will use default: https://iam.example.com/api/v1/auth/login"
+          else
+            echo "✅ IAM_LOGIN_URL is set"
+          fi
+          
+          if [ -z "${{ secrets.API_BASE_URL }}" ]; then
+            echo "⚠️  API_BASE_URL is not set, will use default: http://localhost:8080"
+          else
+            echo "✅ API_BASE_URL is set"
+          fi
+          
+          echo ""
+          if [ $MISSING_SECRETS -gt 0 ]; then
+            echo "❌ Validation failed: $MISSING_SECRETS required secret(s) are missing"
+            echo ""
+            echo "Please configure the following secrets:"
+            echo "  Organization Secrets:"
+            echo "    - SVRA_HOST"
+            echo "    - SVRA_USERNAME"
+            echo "    - SVRA_SSH_KEY"
+            echo "  Repository Secrets:"
+            echo "    - IAM_USERNAME"
+            echo "    - IAM_PASSWORD"
             exit 1
           fi
-          echo "✅ Required secrets are set"
+          
+          echo "✅ All required secrets are configured"
 
       - name: Prepare deployment package
         run: |
@@ -227,6 +303,13 @@ jobs:
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           script: |
             set -euo pipefail
+            
+            # 定义环境变量（使用环境变量或默认值）
+            SCRIPTS_DIR="${SCRIPTS_DIR:-/usr/local/bin}"
+            CONFIG_DIR="${CONFIG_DIR:-/etc/qs-server}"
+            CRON_DIR="${CRON_DIR:-/etc/cron.d}"
+            LOG_DIR="${LOG_DIR:-/var/log/qs-scheduler}"
+            LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
             
             echo "🚀 Starting crontab deployment on $(hostname)..."
             
