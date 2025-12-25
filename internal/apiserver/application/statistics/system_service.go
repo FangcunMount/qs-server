@@ -57,8 +57,23 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	if s.repo != nil {
 		po, err := s.repo.GetAccumulatedStatistics(ctx, orgID, statistics.StatisticTypeSystem, "system")
 		if err == nil && po != nil {
-			// 系统统计需要从多个表聚合，暂时降级到原始表聚合
-			// TODO: 完善系统统计的预聚合逻辑
+			// 转换为领域对象
+			stats := s.convertAccumulatedPOToSystemStatistics(po, orgID)
+
+			// 缓存结果（TTL=5分钟）
+			if s.cache != nil {
+				if data, err := json.Marshal(stats); err == nil {
+					cacheKey := fmt.Sprintf("system:%d", orgID)
+					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+						l.Warnw("写入系统统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+					}
+				} else {
+					l.Warnw("序列化系统统计结果失败", "error", err)
+				}
+			}
+
+			l.Debugw("从MySQL统计表获取系统统计")
+			return stats, nil
 		}
 	}
 
@@ -70,18 +85,30 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 		AssessmentTrend:              []statistics.DailyCount{},
 	}
 
-	// 从 assessments 表聚合
+	// 从 assessments 表聚合测评总数
 	var assessmentCount int64
 	if err := s.db.WithContext(ctx).
-		Model(&struct {
-			ID uint64 `gorm:"column:id"`
-		}{}).
 		Table("assessment").
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Count(&assessmentCount).Error; err != nil {
 		return nil, err
 	}
 	result.AssessmentCount = assessmentCount
+
+	// 从 testees 表聚合受试者总数
+	var testeeCount int64
+	if err := s.db.WithContext(ctx).
+		Table("testee").
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&testeeCount).Error; err != nil {
+		return nil, err
+	}
+	result.TesteeCount = testeeCount
+
+	// 问卷和答卷数量需要从 MongoDB 查询，暂时设为 0
+	// TODO: 如果系统统计服务需要包含问卷和答卷数量，需要注入 MongoDB Repository
+	result.QuestionnaireCount = 0
+	result.AnswerSheetCount = 0
 
 	// 按状态统计
 	var statusCounts []struct {
@@ -112,8 +139,107 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	}
 	result.TodayNewAssessments = todayCount
 
-	// 近30天趋势（简化实现，实际应该从 statistics_daily 表查询）
-	result.AssessmentTrend = []statistics.DailyCount{}
+	// 今日新增受试者
+	var todayNewTestees int64
+	if err := s.db.WithContext(ctx).
+		Table("testee").
+		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Count(&todayNewTestees).Error; err != nil {
+		return nil, err
+	}
+	result.TodayNewTestees = todayNewTestees
+
+	// 今日新增答卷（MongoDB，暂时设为 0）
+	result.TodayNewAnswerSheets = 0
+
+	// 近30天趋势（从 statistics_daily 表查询）
+	result.AssessmentTrend = s.getDailyTrend(ctx, orgID)
+
+	// 缓存结果（TTL=5分钟）
+	if s.cache != nil {
+		if data, err := json.Marshal(result); err == nil {
+			cacheKey := fmt.Sprintf("system:%d", orgID)
+			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+				l.Warnw("写入系统统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+			}
+		} else {
+			l.Warnw("序列化系统统计结果失败", "error", err)
+		}
+	}
 
 	return result, nil
+}
+
+// convertAccumulatedPOToSystemStatistics 转换累计统计PO为系统统计领域对象
+func (s *systemStatisticsService) convertAccumulatedPOToSystemStatistics(
+	po *statisticsInfra.StatisticsAccumulatedPO,
+	orgID int64,
+) *statistics.SystemStatistics {
+	result := &statistics.SystemStatistics{
+		OrgID:                        orgID,
+		AssessmentCount:              po.TotalSubmissions,
+		AssessmentStatusDistribution: make(map[string]int64),
+		AssessmentTrend:              []statistics.DailyCount{},
+	}
+
+	// 解析分布数据（状态分布等）
+	if po.Distribution != nil {
+		if statusDist, ok := po.Distribution["status"].(map[string]interface{}); ok {
+			for k, v := range statusDist {
+				if count, ok := v.(float64); ok {
+					result.AssessmentStatusDistribution[k] = int64(count)
+				}
+			}
+		}
+		// 解析其他统计字段
+		if questionnaireCount, ok := po.Distribution["questionnaire_count"].(float64); ok {
+			result.QuestionnaireCount = int64(questionnaireCount)
+		}
+		if answerSheetCount, ok := po.Distribution["answer_sheet_count"].(float64); ok {
+			result.AnswerSheetCount = int64(answerSheetCount)
+		}
+		if testeeCount, ok := po.Distribution["testee_count"].(float64); ok {
+			result.TesteeCount = int64(testeeCount)
+		}
+		if todayNewAssessments, ok := po.Distribution["today_new_assessments"].(float64); ok {
+			result.TodayNewAssessments = int64(todayNewAssessments)
+		}
+		if todayNewAnswerSheets, ok := po.Distribution["today_new_answer_sheets"].(float64); ok {
+			result.TodayNewAnswerSheets = int64(todayNewAnswerSheets)
+		}
+		if todayNewTestees, ok := po.Distribution["today_new_testees"].(float64); ok {
+			result.TodayNewTestees = int64(todayNewTestees)
+		}
+	}
+
+	// 趋势数据需要从 statistics_daily 表查询
+	result.AssessmentTrend = s.getDailyTrend(context.Background(), orgID)
+
+	return result
+}
+
+// getDailyTrend 获取每日趋势数据（近30天）
+func (s *systemStatisticsService) getDailyTrend(ctx context.Context, orgID int64) []statistics.DailyCount {
+	if s.repo == nil {
+		return []statistics.DailyCount{}
+	}
+
+	// 查询近30天的每日统计
+	endDate := time.Now()
+	startDate := endDate.AddDate(0, 0, -30)
+
+	dailyPOs, err := s.repo.GetDailyStatistics(ctx, orgID, statistics.StatisticTypeSystem, "system", startDate, endDate)
+	if err != nil || len(dailyPOs) == 0 {
+		return []statistics.DailyCount{}
+	}
+
+	trend := make([]statistics.DailyCount, 0, len(dailyPOs))
+	for _, po := range dailyPOs {
+		trend = append(trend, statistics.DailyCount{
+			Date:  po.StatDate,
+			Count: po.SubmissionCount,
+		})
+	}
+
+	return trend
 }

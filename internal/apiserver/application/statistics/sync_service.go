@@ -187,6 +187,15 @@ func (s *syncService) SyncAccumulatedStatistics(ctx context.Context) error {
 				}
 			}
 		}
+
+		// 同步系统统计（从原始表直接聚合）
+		if err := s.syncSystemStatistics(ctx, orgID); err != nil {
+			l.Errorw("同步系统统计失败",
+				"org_id", orgID,
+				"error", err.Error(),
+			)
+			// 继续处理其他组织，不中断
+		}
 	}
 
 	l.Infow("累计统计同步完成", "action", "sync_accumulated_statistics")
@@ -266,5 +275,110 @@ func (s *syncService) SyncPlanStatistics(ctx context.Context) error {
 	}
 
 	l.Infow("计划统计同步完成", "action", "sync_plan_statistics", "plan_count", len(plans))
+	return nil
+}
+
+// syncSystemStatistics 同步系统统计（从原始表聚合）
+func (s *syncService) syncSystemStatistics(ctx context.Context, orgID int64) error {
+	l := logger.L(ctx)
+	l.Debugw("开始同步系统统计", "org_id", orgID)
+
+	// 从 assessments 表聚合
+	var assessmentCount int64
+	if err := s.db.WithContext(ctx).
+		Table("assessment").
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&assessmentCount).Error; err != nil {
+		return err
+	}
+
+	// 从 testees 表聚合
+	var testeeCount int64
+	if err := s.db.WithContext(ctx).
+		Table("testee").
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&testeeCount).Error; err != nil {
+		return err
+	}
+
+	// 按状态统计
+	var statusCounts []struct {
+		Status string
+		Count  int64
+	}
+	if err := s.db.WithContext(ctx).
+		Table("assessment").
+		Select("status, COUNT(*) as count").
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Group("status").
+		Scan(&statusCounts).Error; err != nil {
+		return err
+	}
+
+	// 构建状态分布
+	statusDistribution := make(map[string]interface{})
+	for _, sc := range statusCounts {
+		statusDistribution[sc.Status] = sc.Count
+	}
+
+	// 今日新增
+	today := time.Now().Format("2006-01-02")
+	var todayNewAssessments int64
+	if err := s.db.WithContext(ctx).
+		Table("assessment").
+		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Count(&todayNewAssessments).Error; err != nil {
+		return err
+	}
+
+	var todayNewTestees int64
+	if err := s.db.WithContext(ctx).
+		Table("testee").
+		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Count(&todayNewTestees).Error; err != nil {
+		return err
+	}
+
+	// 构建 Distribution JSON 字段
+	distribution := statisticsInfra.JSONField{
+		"status":                statusDistribution,
+		"testee_count":          testeeCount,
+		"today_new_assessments": todayNewAssessments,
+		"today_new_testees":     todayNewTestees,
+		// 问卷和答卷数量需要从 MongoDB 查询，暂时不包含
+		// "questionnaire_count":     0,
+		// "answer_sheet_count":       0,
+		// "today_new_answer_sheets":  0,
+	}
+
+	// 同步到 MySQL
+	po := &statisticsInfra.StatisticsAccumulatedPO{
+		OrgID:            orgID,
+		StatisticType:    string(statistics.StatisticTypeSystem),
+		StatisticKey:     "system",
+		TotalSubmissions: assessmentCount,
+		TotalCompletions: 0, // 系统统计不区分提交和完成
+		Distribution:     distribution,
+	}
+
+	// 获取首次和最后发生时间
+	var timeInfo struct {
+		FirstOccurredAt *time.Time
+		LastOccurredAt  *time.Time
+	}
+	if err := s.db.WithContext(ctx).
+		Table("assessment").
+		Select("MIN(created_at) as first_occurred_at, MAX(created_at) as last_occurred_at").
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Scan(&timeInfo).Error; err == nil {
+		po.FirstOccurredAt = timeInfo.FirstOccurredAt
+		po.LastOccurredAt = timeInfo.LastOccurredAt
+	}
+
+	if err := s.repo.UpsertAccumulatedStatistics(ctx, po); err != nil {
+		return err
+	}
+
+	l.Debugw("系统统计同步完成", "org_id", orgID)
 	return nil
 }

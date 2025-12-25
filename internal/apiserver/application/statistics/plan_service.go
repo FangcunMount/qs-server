@@ -67,7 +67,11 @@ func (s *planStatisticsService) GetPlanStatistics(
 			if s.cache != nil {
 				if data, err := json.Marshal(stats); err == nil {
 					cacheKey := fmt.Sprintf("plan:%d:%d", orgID, planID)
-					s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute)
+					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+						l.Warnw("写入计划统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+					}
+				} else {
+					l.Warnw("序列化计划统计结果失败", "error", err)
 				}
 			}
 
@@ -134,7 +138,11 @@ func (s *planStatisticsService) GetPlanStatistics(
 	if s.cache != nil {
 		if data, err := json.Marshal(result); err == nil {
 			cacheKey := fmt.Sprintf("plan:%d:%d", orgID, planID)
-			s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute)
+			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+				l.Warnw("写入计划统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+			}
+		} else {
+			l.Warnw("序列化计划统计结果失败", "error", err)
 		}
 	}
 

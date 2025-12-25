@@ -68,7 +68,11 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 			if s.cache != nil {
 				if data, err := json.Marshal(stats); err == nil {
 					cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-					s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute)
+					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+						l.Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+					}
+				} else {
+					l.Warnw("序列化问卷统计结果失败", "error", err)
 				}
 			}
 
@@ -169,7 +173,11 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 	if s.cache != nil {
 		if data, err := json.Marshal(result); err == nil {
 			cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-			s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute)
+			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+				l.Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+			}
+		} else {
+			l.Warnw("序列化问卷统计结果失败", "error", err)
 		}
 	}
 
