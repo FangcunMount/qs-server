@@ -187,6 +187,16 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Info("   🗄️  Storage Mode: MySQL Only")
 	}
 
+	// 异步预热缓存（不阻塞服务启动）
+	go func() {
+		ctx := context.Background()
+		if err := s.container.WarmupCache(ctx); err != nil {
+			logger.L(ctx).Warnw("Cache warmup failed", "error", err)
+		} else {
+			logger.L(ctx).Infow("Cache warmup completed")
+		}
+	}()
+
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 		// 清理容器资源

@@ -11,6 +11,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -150,6 +151,24 @@ func (c *Container) Initialize() error {
 	return nil
 }
 
+// WarmupCache 预热缓存（异步执行，不阻塞）
+func (c *Container) WarmupCache(ctx context.Context) error {
+	if !c.initialized {
+		return fmt.Errorf("container not initialized")
+	}
+
+	// 预热量表缓存
+	if c.ScaleModule != nil && c.ScaleModule.Repo != nil {
+		warmupSvc := scaleCache.NewWarmupService(c.ScaleModule.Repo)
+		if err := warmupSvc.WarmupDefaultScales(ctx); err != nil {
+			// 预热失败不影响服务启动，仅记录日志
+			return fmt.Errorf("scale cache warmup failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // initEventPublisher 初始化事件发布器
 func (c *Container) initEventPublisher() {
 	c.eventPublisher = eventconfig.NewRoutingPublisher(eventconfig.RoutingPublisherOptions{
@@ -190,7 +209,8 @@ func (c *Container) initScaleModule() error {
 	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
 		questionnaireRepo = c.SurveyModule.Questionnaire.Repo
 	}
-	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher, questionnaireRepo); err != nil {
+	// 传入 Redis 客户端（用于缓存装饰器）
+	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher, questionnaireRepo, c.redisCache); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 

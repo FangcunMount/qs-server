@@ -3,10 +3,13 @@ package assembler
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
+	redis "github.com/redis/go-redis/v9"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -41,6 +44,7 @@ func NewScaleModule() *ScaleModule {
 // params[0]: *mongo.Database
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: questionnaire.Repository (可选，用于自动获取问卷版本)
+// params[3]: redis.UniversalClient (可选，用于缓存装饰器)
 func (m *ScaleModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -69,8 +73,23 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 		}
 	}
 
-	// 初始化 repository 层
-	m.Repo = scaleInfra.NewRepository(mongoDB)
+	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
+	var redisClient redis.UniversalClient
+	if len(params) > 3 {
+		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
+			redisClient = rc
+		}
+	}
+
+	// 初始化 repository 层（基础实现）
+	baseRepo := scaleInfra.NewRepository(mongoDB)
+
+	// 如果提供了 Redis 客户端，使用缓存装饰器
+	if redisClient != nil {
+		m.Repo = scaleCache.NewCachedScaleRepository(baseRepo, redisClient)
+	} else {
+		m.Repo = baseRepo
+	}
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
 	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher)
