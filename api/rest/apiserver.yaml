@@ -137,6 +137,38 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AnswerSheetResponse'
+  /assessments/{id}/wait-report:
+    get:
+      tags:
+      - Evaluation-Assessment
+      summary: 长轮询等待报告生成
+      description: 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
+      operationId: 长轮询等待报告生成
+      parameters:
+      - type: string
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - maximum: 60
+        minimum: 5
+        type: integer
+        default: 15
+        description: 超时时间（秒）
+        name: timeout
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/waiter.StatusSummary'
   /codes/apply:
     post:
       tags:
@@ -4219,3 +4251,16 @@ components:
         target_value:
           description: 目标值
           type: string
+    waiter.StatusSummary:
+      type: object
+      properties:
+        risk_level:
+          type: string
+        status:
+          description: pending/submitted/interpreted/failed
+          type: string
+        total_score:
+          type: number
+        updated_at:
+          description: Unix timestamp
+          type: integer

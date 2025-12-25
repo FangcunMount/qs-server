@@ -438,6 +438,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /assessments/{id}/wait-report:
+    get:
+      tags:
+      - 测评
+      summary: 长轮询等待报告生成
+      description: 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
+      operationId: 长轮询等待报告生成
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      - maximum: 60
+        minimum: 5
+        type: integer
+        default: 15
+        description: 超时时间（秒）
+        name: timeout
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentStatusResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /public/info:
     get:
       tags:
@@ -1142,6 +1191,19 @@ components:
             $ref: '#/components/schemas/evaluation.SuggestionResponse'
         total_score:
           type: number
+    evaluation.AssessmentStatusResponse:
+      type: object
+      properties:
+        risk_level:
+          type: string
+        status:
+          description: pending/submitted/interpreted/failed
+          type: string
+        total_score:
+          type: number
+        updated_at:
+          description: Unix timestamp
+          type: integer
     evaluation.AssessmentSummaryResponse:
       type: object
       properties:

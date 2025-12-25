@@ -148,6 +148,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/assessments/{id}/wait-report": {
+            "get": {
+                "description": "等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Assessment"
+                ],
+                "summary": "长轮询等待报告生成",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "maximum": 60,
+                        "minimum": 5,
+                        "type": "integer",
+                        "default": 15,
+                        "description": "超时时间（秒）",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/waiter.StatusSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/codes/apply": {
             "post": {
                 "consumes": [
@@ -6291,6 +6341,25 @@ const docTemplate = `{
                 "target_value": {
                     "description": "目标值",
                     "type": "string"
+                }
+            }
+        },
+        "waiter.StatusSummary": {
+            "type": "object",
+            "properties": {
+                "risk_level": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "pending/submitted/interpreted/failed",
+                    "type": "string"
+                },
+                "total_score": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "description": "Unix timestamp",
+                    "type": "integer"
                 }
             }
         }

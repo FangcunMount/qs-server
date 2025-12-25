@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"strconv"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -187,6 +189,117 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 	}
 
 	h.Success(c, result)
+}
+
+// WaitReport 长轮询等待报告生成
+// @Summary 长轮询等待报告生成
+// @Description 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
+// @Tags 测评
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Param timeout query int false "超时时间（秒）" default(15) minimum(5) maximum(60)
+// @Success 200 {object} core.Response{data=evaluation.AssessmentStatusResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/assessments/{id}/wait-report [get]
+func (h *EvaluationHandler) WaitReport(c *gin.Context) {
+	// 从 query 参数获取 testee_id
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
+	if testeeIDStr == "" {
+		h.BadRequestResponse(c, "testee_id is required", nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid testee_id format", err)
+		return
+	}
+
+	idStr := h.GetPathParam(c, "id")
+	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid assessment id", err)
+		return
+	}
+
+	// 解析超时参数
+	timeoutStr := c.DefaultQuery("timeout", "15")
+	timeoutSeconds, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
+		timeoutSeconds = 15
+	}
+	timeout := time.Duration(timeoutSeconds) * time.Second
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	defer cancel()
+
+	// 1. 快速检查一次状态
+	result, err := h.queryService.GetMyAssessment(ctx, testeeID, assessmentID)
+	if err == nil && result != nil {
+		// 如果已经完成，立即返回
+		if result.Status == "interpreted" || result.Status == "failed" {
+			var totalScore *float64
+			var riskLevel *string
+			if result.TotalScore != 0 {
+				ts := result.TotalScore
+				totalScore = &ts
+			}
+			if result.RiskLevel != "" {
+				rl := result.RiskLevel
+				riskLevel = &rl
+			}
+			h.Success(c, &evaluation.AssessmentStatusResponse{
+				Status:     result.Status,
+				TotalScore: totalScore,
+				RiskLevel:  riskLevel,
+				UpdatedAt:  time.Now().Unix(),
+			})
+			return
+		}
+	}
+
+	// 2. 短轮询：每1秒检查一次状态
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// 超时或客户端断开
+			h.Success(c, &evaluation.AssessmentStatusResponse{
+				Status:    "pending",
+				UpdatedAt: time.Now().Unix(),
+			})
+			return
+
+		case <-ticker.C:
+			// 定期轮询状态
+			result, err := h.queryService.GetMyAssessment(ctx, testeeID, assessmentID)
+			if err == nil && result != nil {
+				if result.Status == "interpreted" || result.Status == "failed" {
+					var totalScore *float64
+					var riskLevel *string
+					if result.TotalScore != 0 {
+						ts := result.TotalScore
+						totalScore = &ts
+					}
+					if result.RiskLevel != "" {
+						rl := result.RiskLevel
+						riskLevel = &rl
+					}
+					h.Success(c, &evaluation.AssessmentStatusResponse{
+						Status:     result.Status,
+						TotalScore: totalScore,
+						RiskLevel:  riskLevel,
+						UpdatedAt:  time.Now().Unix(),
+					})
+					return
+				}
+			}
+		}
+	}
 }
 
 // GetFactorTrend 获取因子得分趋势

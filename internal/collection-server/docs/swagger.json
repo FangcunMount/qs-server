@@ -633,6 +633,80 @@
                 }
             }
         },
+        "/api/v1/assessments/{id}/wait-report": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评"
+                ],
+                "summary": "长轮询等待报告生成",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maximum": 60,
+                        "minimum": 5,
+                        "type": "integer",
+                        "default": 15,
+                        "description": "超时时间（秒）",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/info": {
             "get": {
                 "description": "获取服务基本信息",
@@ -1596,6 +1670,25 @@
                 },
                 "total_score": {
                     "type": "number"
+                }
+            }
+        },
+        "evaluation.AssessmentStatusResponse": {
+            "type": "object",
+            "properties": {
+                "risk_level": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "pending/submitted/interpreted/failed",
+                    "type": "string"
+                },
+                "total_score": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "description": "Unix timestamp",
+                    "type": "integer"
                 }
             }
         },

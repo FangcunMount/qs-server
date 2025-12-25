@@ -17,6 +17,14 @@ type AssessmentSummaryResponse struct {
 	InterpretedAt        string  `json:"interpreted_at,omitempty"`
 }
 
+// AssessmentStatusResponse 测评状态响应（用于长轮询）
+type AssessmentStatusResponse struct {
+	Status     string   `json:"status"`              // pending/submitted/interpreted/failed
+	TotalScore *float64 `json:"total_score,omitempty"`
+	RiskLevel  *string  `json:"risk_level,omitempty"`
+	UpdatedAt  int64    `json:"updated_at"`          // Unix timestamp
+}
+
 // AssessmentDetailResponse 测评详情响应
 type AssessmentDetailResponse struct {
 	ID                   string  `json:"id"`

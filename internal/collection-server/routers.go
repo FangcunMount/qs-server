@@ -156,6 +156,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		assessments.GET("/:id/scores", evaluationHandler.GetAssessmentScores)
 		// 测评报告
 		assessments.GET("/:id/report", evaluationHandler.GetAssessmentReport)
+		// 长轮询等待报告生成
+		assessments.GET("/:id/wait-report", evaluationHandler.WaitReport)
 	}
 }
 

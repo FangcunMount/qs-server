@@ -1500,6 +1500,19 @@ definitions:
         description: 目标值
         type: string
     type: object
+  waiter.StatusSummary:
+    properties:
+      risk_level:
+        type: string
+      status:
+        description: pending/submitted/interpreted/failed
+        type: string
+      total_score:
+        type: number
+      updated_at:
+        description: Unix timestamp
+        type: integer
+    type: object
 info:
   contact: {}
   description: Questionnaire Scale API server (REST & gRPC)
@@ -1589,6 +1602,37 @@ paths:
       summary: 获取答卷详情
       tags:
       - AnswerSheet-Management
+  /api/v1/assessments/{id}/wait-report:
+    get:
+      description: 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 15
+        description: 超时时间（秒）
+        in: query
+        maximum: 60
+        minimum: 5
+        name: timeout
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/waiter.StatusSummary'
+              type: object
+      summary: 长轮询等待报告生成
+      tags:
+      - Evaluation-Assessment
   /api/v1/codes/apply:
     post:
       consumes:
