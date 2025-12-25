@@ -41,26 +41,6 @@ type AssessmentListResponse struct {
 	TotalPages int                   `json:"total_pages"` // 总页数
 }
 
-// AssessmentStatisticsResponse 测评统计响应
-type AssessmentStatisticsResponse struct {
-	TotalCount       int                  `json:"total_count"`       // 总测评数
-	PendingCount     int                  `json:"pending_count"`     // 待提交数
-	SubmittedCount   int                  `json:"submitted_count"`   // 已提交数
-	InterpretedCount int                  `json:"interpreted_count"` // 已解读数
-	FailedCount      int                  `json:"failed_count"`      // 失败数
-	AverageScore     *float64             `json:"average_score"`     // 平均分
-	RiskDistribution map[string]int       `json:"risk_distribution"` // 风险等级分布
-	ScaleStats       []*ScaleStatResponse `json:"scale_stats"`       // 按量表统计
-}
-
-// ScaleStatResponse 量表统计响应
-type ScaleStatResponse struct {
-	ScaleCode    string   `json:"scale_code"`    // 量表编码
-	ScaleName    string   `json:"scale_name"`    // 量表名称
-	Count        int      `json:"count"`         // 测评数
-	AverageScore *float64 `json:"average_score"` // 平均分
-}
-
 // BatchEvaluationResponse 批量评估响应
 type BatchEvaluationResponse struct {
 	TotalCount   int      `json:"total_count"`   // 总数
@@ -235,34 +215,6 @@ func NewAssessmentListResponse(result *assessment.AssessmentListResult) *Assessm
 		Page:       result.Page,
 		PageSize:   result.PageSize,
 		TotalPages: result.TotalPages,
-	}
-}
-
-// NewAssessmentStatisticsResponse 从应用层 Result 创建统计响应
-func NewAssessmentStatisticsResponse(result *assessment.AssessmentStatistics) *AssessmentStatisticsResponse {
-	if result == nil {
-		return nil
-	}
-
-	scaleStats := make([]*ScaleStatResponse, 0, len(result.ScaleStats))
-	for _, s := range result.ScaleStats {
-		scaleStats = append(scaleStats, &ScaleStatResponse{
-			ScaleCode:    s.ScaleCode,
-			ScaleName:    s.ScaleName,
-			Count:        s.Count,
-			AverageScore: s.AverageScore,
-		})
-	}
-
-	return &AssessmentStatisticsResponse{
-		TotalCount:       result.TotalCount,
-		PendingCount:     result.PendingCount,
-		SubmittedCount:   result.SubmittedCount,
-		InterpretedCount: result.InterpretedCount,
-		FailedCount:      result.FailedCount,
-		AverageScore:     result.AverageScore,
-		RiskDistribution: result.RiskDistribution,
-		ScaleStats:       scaleStats,
 	}
 }
 

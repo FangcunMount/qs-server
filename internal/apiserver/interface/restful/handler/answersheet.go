@@ -126,29 +126,3 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 
 	h.Success(c, response.NewAnswerSheetSummaryListResponse(result))
 }
-
-// GetStatistics 获取答卷统计
-// @Summary 获取答卷统计
-// @Description 管理员查看某问卷的答卷统计数据
-// @Tags AnswerSheet-Management
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param code query string true "问卷编码"
-// @Success 200 {object} core.Response{data=response.AnswerSheetStatisticsResponse}
-// @Router /api/v1/answersheets/statistics [get]
-func (h *AnswerSheetHandler) GetStatistics(c *gin.Context) {
-	questionnaireCode := c.Query("code")
-	if questionnaireCode == "" {
-		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "问卷编码不能为空"))
-		return
-	}
-
-	result, err := h.managementService.GetStatistics(c.Request.Context(), questionnaireCode)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, response.NewAnswerSheetStatisticsResponse(result))
-}

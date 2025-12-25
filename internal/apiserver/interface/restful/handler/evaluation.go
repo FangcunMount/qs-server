@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -117,53 +116,6 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewAssessmentListResponse(result))
-}
-
-// GetStatistics 获取统计数据
-// @Summary 获取测评统计数据
-// @Description 获取指定时间范围内的测评统计数据
-// @Tags Evaluation-Assessment
-// @Produce json
-// @Param start_time query string false "开始时间（格式：2006-01-02）"
-// @Param end_time query string false "结束时间（格式：2006-01-02）"
-// @Param scale_code query string false "量表编码筛选"
-// @Success 200 {object} core.Response{data=response.AssessmentStatisticsResponse}
-// @Router /api/v1/evaluations/assessments/statistics [get]
-func (h *EvaluationHandler) GetStatistics(c *gin.Context) {
-	var req request.GetStatisticsRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		h.BadRequestResponse(c, "请求参数无效", err)
-		return
-	}
-
-	orgID := h.getOrgIDFromContext(c)
-	dto := assessmentApp.GetStatisticsDTO{
-		OrgID:     orgID,
-		ScaleCode: req.ScaleCode,
-	}
-
-	// 解析时间
-	if req.StartTime != nil && *req.StartTime != "" {
-		t, err := time.Parse("2006-01-02", *req.StartTime)
-		if err == nil {
-			dto.StartTime = &t
-		}
-	}
-	if req.EndTime != nil && *req.EndTime != "" {
-		t, err := time.Parse("2006-01-02", *req.EndTime)
-		if err == nil {
-			dto.EndTime = &t
-		}
-	}
-
-	ctx := context.Background()
-	result, err := h.managementService.GetStatistics(ctx, dto)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, response.NewAssessmentStatisticsResponse(result))
 }
 
 // ============= Score 相关接口 =============

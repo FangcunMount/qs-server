@@ -142,6 +142,11 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
 	}
 
+	// 初始化 Statistics 模块
+	if err := c.initStatisticsModule(); err != nil {
+		return fmt.Errorf("failed to initialize statistics module: %w", err)
+	}
+
 	// 初始化 CodesService（基于 redisStore）
 	c.initCodesService()
 

@@ -38,15 +38,6 @@ type AnswerSheetSummaryItem struct {
 	FilledAt          string  `json:"filled_at"`
 }
 
-// AnswerSheetStatisticsResponse 答卷统计响应
-type AnswerSheetStatisticsResponse struct {
-	QuestionnaireCode string  `json:"questionnaire_code"`
-	TotalCount        int64   `json:"total_count"`
-	AverageScore      float64 `json:"average_score"`
-	MaxScore          float64 `json:"max_score"`
-	MinScore          float64 `json:"min_score"`
-}
-
 // ============= 转换函数 =============
 
 // NewAnswerSheetResponse 从应用层 Result 创建响应
@@ -130,21 +121,6 @@ func NewAnswerSheetSummaryListResponse(result *answersheet.AnswerSheetSummaryLis
 	return &AnswerSheetListResponse{
 		Total: result.Total,
 		Items: items,
-	}
-}
-
-// NewAnswerSheetStatisticsResponse 从应用层 Statistics 创建响应
-func NewAnswerSheetStatisticsResponse(stats *answersheet.AnswerSheetStatistics) *AnswerSheetStatisticsResponse {
-	if stats == nil {
-		return nil
-	}
-
-	return &AnswerSheetStatisticsResponse{
-		QuestionnaireCode: stats.QuestionnaireCode,
-		TotalCount:        stats.TotalCount,
-		AverageScore:      stats.AverageScore,
-		MaxScore:          stats.MaxScore,
-		MinScore:          stats.MinScore,
 	}
 }
 

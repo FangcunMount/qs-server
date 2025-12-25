@@ -97,57 +97,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/answersheets/statistics": {
-            "get": {
-                "description": "管理员查看某问卷的答卷统计数据",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AnswerSheet-Management"
-                ],
-                "summary": "获取答卷统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "问卷编码",
-                        "name": "code",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.AnswerSheetStatisticsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/answersheets/{id}": {
             "get": {
                 "description": "管理员查看答卷的完整信息",
@@ -301,58 +250,6 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/response.AssessmentListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/evaluations/assessments/statistics": {
-            "get": {
-                "description": "获取指定时间范围内的测评统计数据",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Evaluation-Assessment"
-                ],
-                "summary": "获取测评统计数据",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "开始时间（格式：2006-01-02）",
-                        "name": "start_time",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "结束时间（格式：2006-01-02）",
-                        "name": "end_time",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "量表编码筛选",
-                        "name": "scale_code",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.AssessmentStatisticsResponse"
                                         }
                                     }
                                 }
@@ -4791,26 +4688,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.AnswerSheetStatisticsResponse": {
-            "type": "object",
-            "properties": {
-                "average_score": {
-                    "type": "number"
-                },
-                "max_score": {
-                    "type": "number"
-                },
-                "min_score": {
-                    "type": "number"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "total_count": {
-                    "type": "integer"
-                }
-            }
-        },
         "response.AnswerSheetSummaryItem": {
             "type": "object",
             "properties": {
@@ -4961,49 +4838,6 @@ const docTemplate = `{
                 "total_score": {
                     "description": "总分",
                     "type": "number"
-                }
-            }
-        },
-        "response.AssessmentStatisticsResponse": {
-            "type": "object",
-            "properties": {
-                "average_score": {
-                    "description": "平均分",
-                    "type": "number"
-                },
-                "failed_count": {
-                    "description": "失败数",
-                    "type": "integer"
-                },
-                "interpreted_count": {
-                    "description": "已解读数",
-                    "type": "integer"
-                },
-                "pending_count": {
-                    "description": "待提交数",
-                    "type": "integer"
-                },
-                "risk_distribution": {
-                    "description": "风险等级分布",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "scale_stats": {
-                    "description": "按量表统计",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.ScaleStatResponse"
-                    }
-                },
-                "submitted_count": {
-                    "description": "已提交数",
-                    "type": "integer"
-                },
-                "total_count": {
-                    "description": "总测评数",
-                    "type": "integer"
                 }
             }
         },
@@ -5730,27 +5564,6 @@ const docTemplate = `{
                     }
                 },
                 "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "response.ScaleStatResponse": {
-            "type": "object",
-            "properties": {
-                "average_score": {
-                    "description": "平均分",
-                    "type": "number"
-                },
-                "count": {
-                    "description": "测评数",
-                    "type": "integer"
-                },
-                "scale_code": {
-                    "description": "量表编码",
-                    "type": "string"
-                },
-                "scale_name": {
-                    "description": "量表名称",
                     "type": "string"
                 }
             }

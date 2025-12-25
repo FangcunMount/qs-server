@@ -379,19 +379,6 @@ definitions:
       title:
         type: string
     type: object
-  response.AnswerSheetStatisticsResponse:
-    properties:
-      average_score:
-        type: number
-      max_score:
-        type: number
-      min_score:
-        type: number
-      questionnaire_code:
-        type: string
-      total_count:
-        type: integer
-    type: object
   response.AnswerSheetSummaryItem:
     properties:
       filled_at:
@@ -498,37 +485,6 @@ definitions:
       total_score:
         description: 总分
         type: number
-    type: object
-  response.AssessmentStatisticsResponse:
-    properties:
-      average_score:
-        description: 平均分
-        type: number
-      failed_count:
-        description: 失败数
-        type: integer
-      interpreted_count:
-        description: 已解读数
-        type: integer
-      pending_count:
-        description: 待提交数
-        type: integer
-      risk_distribution:
-        additionalProperties:
-          type: integer
-        description: 风险等级分布
-        type: object
-      scale_stats:
-        description: 按量表统计
-        items:
-          $ref: '#/definitions/response.ScaleStatResponse'
-        type: array
-      submitted_count:
-        description: 已提交数
-        type: integer
-      total_count:
-        description: 总测评数
-        type: integer
     type: object
   response.AssessmentStatsResponse:
     properties:
@@ -1031,21 +987,6 @@ definitions:
           type: string
         type: array
       title:
-        type: string
-    type: object
-  response.ScaleStatResponse:
-    properties:
-      average_score:
-        description: 平均分
-        type: number
-      count:
-        description: 测评数
-        type: integer
-      scale_code:
-        description: 量表编码
-        type: string
-      scale_name:
-        description: 量表名称
         type: string
     type: object
   response.ScaleTestResponse:
@@ -1648,37 +1589,6 @@ paths:
       summary: 获取答卷详情
       tags:
       - AnswerSheet-Management
-  /api/v1/answersheets/statistics:
-    get:
-      consumes:
-      - application/json
-      description: 管理员查看某问卷的答卷统计数据
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 问卷编码
-        in: query
-        name: code
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AnswerSheetStatisticsResponse'
-              type: object
-      summary: 获取答卷统计
-      tags:
-      - AnswerSheet-Management
   /api/v1/codes/apply:
     post:
       consumes:
@@ -1869,37 +1779,6 @@ paths:
       summary: 获取测评得分
       tags:
       - Evaluation-Score
-  /api/v1/evaluations/assessments/statistics:
-    get:
-      description: 获取指定时间范围内的测评统计数据
-      parameters:
-      - description: 开始时间（格式：2006-01-02）
-        in: query
-        name: start_time
-        type: string
-      - description: 结束时间（格式：2006-01-02）
-        in: query
-        name: end_time
-        type: string
-      - description: 量表编码筛选
-        in: query
-        name: scale_code
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentStatisticsResponse'
-              type: object
-      summary: 获取测评统计数据
-      tags:
-      - Evaluation-Assessment
   /api/v1/evaluations/batch-evaluate:
     post:
       consumes:
