@@ -3443,6 +3443,333 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/statistics/plans/{plan_id}": {
+            "get": {
+                "description": "获取指定测评计划的统计数据，包括任务数、完成率等",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "获取计划统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "计划ID",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.PlanStatistics"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/questionnaires/{code}": {
+            "get": {
+                "description": "获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "获取问卷/量表统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "问卷编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.QuestionnaireStatistics"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/sync/accumulated": {
+            "post": {
+                "description": "将Redis中的累计统计数据同步到MySQL（定时任务调用）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "同步累计统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/sync/daily": {
+            "post": {
+                "description": "将Redis中的每日统计数据同步到MySQL（定时任务调用）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "同步每日统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/sync/plan": {
+            "post": {
+                "description": "同步计划统计数据到MySQL（定时任务调用）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "同步计划统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/system": {
+            "get": {
+                "description": "获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "获取系统整体统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.SystemStatistics"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/testees/{testee_id}": {
+            "get": {
+                "description": "获取指定受试者的统计数据，包括测评数、完成数、风险分布等",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "获取受试者统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statistics.TesteeStatistics"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/statistics/validate": {
+            "post": {
+                "description": "校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "校验数据一致性",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/testees": {
             "get": {
                 "produces": [
@@ -5820,6 +6147,196 @@ const docTemplate = `{
                 "risk_level": {
                     "description": "风险等级",
                     "type": "string"
+                }
+            }
+        },
+        "statistics.DailyCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "date": {
+                    "type": "string"
+                }
+            }
+        },
+        "statistics.PlanStatistics": {
+            "type": "object",
+            "properties": {
+                "active_testees": {
+                    "description": "活跃受试者数（有完成任务的）",
+                    "type": "integer"
+                },
+                "completed_tasks": {
+                    "description": "已完成任务数",
+                    "type": "integer"
+                },
+                "completion_rate": {
+                    "description": "完成率",
+                    "type": "number"
+                },
+                "enrolled_testees": {
+                    "description": "受试者统计",
+                    "type": "integer"
+                },
+                "expired_tasks": {
+                    "description": "已过期任务数",
+                    "type": "integer"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "pending_tasks": {
+                    "description": "待完成任务数",
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "integer"
+                },
+                "total_tasks": {
+                    "description": "任务统计",
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.QuestionnaireStatistics": {
+            "type": "object",
+            "properties": {
+                "completion_rate": {
+                    "description": "完成率 = TotalCompletions / TotalSubmissions",
+                    "type": "number"
+                },
+                "daily_trend": {
+                    "description": "趋势数据（近30天）",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "last_15_days_count": {
+                    "description": "近15天提交数",
+                    "type": "integer"
+                },
+                "last_30_days_count": {
+                    "description": "近30天提交数",
+                    "type": "integer"
+                },
+                "last_7_days_count": {
+                    "description": "时间维度统计",
+                    "type": "integer"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "origin_distribution": {
+                    "description": "来源分布",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "total_completions": {
+                    "description": "总完成数（已解读）",
+                    "type": "integer"
+                },
+                "total_submissions": {
+                    "description": "基础统计",
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.SystemStatistics": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_count": {
+                    "description": "答卷总数",
+                    "type": "integer"
+                },
+                "assessment_count": {
+                    "description": "测评总数",
+                    "type": "integer"
+                },
+                "assessment_status_distribution": {
+                    "description": "状态分布",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "assessment_trend": {
+                    "description": "趋势数据（近30天）",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "questionnaire_count": {
+                    "description": "基础数量统计",
+                    "type": "integer"
+                },
+                "testee_count": {
+                    "description": "受试者总数",
+                    "type": "integer"
+                },
+                "today_new_answer_sheets": {
+                    "description": "今日新增答卷",
+                    "type": "integer"
+                },
+                "today_new_assessments": {
+                    "description": "今日新增（每日凌晨清零）",
+                    "type": "integer"
+                },
+                "today_new_testees": {
+                    "description": "今日新增受试者",
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.TesteeStatistics": {
+            "type": "object",
+            "properties": {
+                "completed_assessments": {
+                    "description": "已完成测评数",
+                    "type": "integer"
+                },
+                "first_assessment_date": {
+                    "description": "首次测评日期",
+                    "type": "string"
+                },
+                "last_assessment_date": {
+                    "description": "时间维度",
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "pending_assessments": {
+                    "description": "待完成测评数",
+                    "type": "integer"
+                },
+                "risk_distribution": {
+                    "description": "风险分布",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "testee_id": {
+                    "type": "integer"
+                },
+                "total_assessments": {
+                    "description": "测评统计",
+                    "type": "integer"
                 }
             }
         },
