@@ -3,11 +3,14 @@ package handler
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 )
@@ -21,6 +24,8 @@ type EvaluationHandler struct {
 	reportQueryService assessmentApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
 	evaluationService  engine.Service
+	statusCache        *cache.AssessmentStatusCache
+	waiterRegistry     *waiter.WaiterRegistry
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
@@ -37,6 +42,16 @@ func NewEvaluationHandler(
 		scoreQueryService:  scoreQueryService,
 		evaluationService:  evaluationService,
 	}
+}
+
+// SetStatusCache 设置状态缓存（可选）
+func (h *EvaluationHandler) SetStatusCache(statusCache *cache.AssessmentStatusCache) {
+	h.statusCache = statusCache
+}
+
+// SetWaiterRegistry 设置等待队列注册表（可选）
+func (h *EvaluationHandler) SetWaiterRegistry(waiterRegistry *waiter.WaiterRegistry) {
+	h.waiterRegistry = waiterRegistry
 }
 
 // ============= Assessment 查询接口（后台管理）=============
@@ -327,6 +342,158 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewAssessmentResponse(result))
+}
+
+// WaitReport 长轮询等待报告生成
+// @Summary 长轮询等待报告生成
+// @Description 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
+// @Tags Evaluation-Assessment
+// @Produce json
+// @Param id path string true "测评ID"
+// @Param timeout query int false "超时时间（秒）" default(15) minimum(5) maximum(60)
+// @Success 200 {object} core.Response{data=waiter.StatusSummary}
+// @Router /api/v1/assessments/{id}/wait-report [get]
+func (h *EvaluationHandler) WaitReport(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "无效的测评ID", err)
+		return
+	}
+
+	// 解析超时参数
+	timeoutStr := c.DefaultQuery("timeout", "15")
+	timeoutSeconds, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
+		timeoutSeconds = 15
+	}
+	timeout := time.Duration(timeoutSeconds) * time.Second
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	defer cancel()
+
+	// 1. 快速检查一次缓存或数据库
+	result, err := h.managementService.GetByID(ctx, id)
+	if err == nil && result != nil {
+		if result.Status == "interpreted" || result.Status == "failed" {
+			var totalScore *float64
+			var riskLevel *string
+			if result.TotalScore != nil {
+				ts := *result.TotalScore
+				totalScore = &ts
+			}
+			if result.RiskLevel != nil {
+				rl := string(*result.RiskLevel)
+				riskLevel = &rl
+			}
+			summary := waiter.StatusSummary{
+				Status:     result.Status,
+				TotalScore: totalScore,
+				RiskLevel:  riskLevel,
+				UpdatedAt:  time.Now().Unix(),
+			}
+			h.Success(c, summary)
+			return
+		}
+	}
+
+	// 2. 如果没有等待队列注册表，降级为短轮询
+	if h.waiterRegistry == nil {
+		// 降级为短轮询：每1秒检查一次
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				// 超时或客户端断开
+				summary := waiter.StatusSummary{
+					Status:    "pending",
+					UpdatedAt: time.Now().Unix(),
+				}
+				h.Success(c, summary)
+				return
+
+			case <-ticker.C:
+				// 定期轮询缓存或数据库
+				result, err := h.managementService.GetByID(ctx, id)
+				if err == nil && result != nil {
+					var totalScore *float64
+					var riskLevel *string
+					if result.TotalScore != nil {
+						ts := *result.TotalScore
+						totalScore = &ts
+					}
+					if result.RiskLevel != nil {
+						rl := string(*result.RiskLevel)
+						riskLevel = &rl
+					}
+					summary := waiter.StatusSummary{
+						Status:     result.Status,
+						TotalScore: totalScore,
+						RiskLevel:  riskLevel,
+						UpdatedAt:  time.Now().Unix(),
+					}
+					if result.Status == "interpreted" || result.Status == "failed" {
+						h.Success(c, summary)
+						return
+					}
+				}
+			}
+		}
+	}
+
+	// 3. 注册到等待队列
+	ch := make(chan waiter.StatusSummary, 1)
+	h.waiterRegistry.Add(id, ch)
+	defer h.waiterRegistry.Remove(id, ch)
+
+	// 4. 等待三种情况
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// 超时或客户端断开
+			summary := waiter.StatusSummary{
+				Status:    "pending",
+				UpdatedAt: time.Now().Unix(),
+			}
+			h.Success(c, summary)
+			return
+
+		case summary := <-ch:
+			// 收到解读完成通知（由 worker 推送）
+			h.Success(c, summary)
+			return
+
+		case <-ticker.C:
+			// 定期轮询缓存（兜底，防止通知丢失）
+			result, err := h.managementService.GetByID(ctx, id)
+			if err == nil && result != nil {
+				var totalScore *float64
+				var riskLevel *string
+				if result.TotalScore != nil {
+					ts := *result.TotalScore
+					totalScore = &ts
+				}
+				if result.RiskLevel != nil {
+					rl := string(*result.RiskLevel)
+					riskLevel = &rl
+				}
+				summary := waiter.StatusSummary{
+					Status:     result.Status,
+					TotalScore: totalScore,
+					RiskLevel:  riskLevel,
+					UpdatedAt:  time.Now().Unix(),
+				}
+				if result.Status == "interpreted" || result.Status == "failed" {
+					h.Success(c, summary)
+					return
+				}
+			}
+		}
+	}
 }
 
 // ============= 辅助方法 =============

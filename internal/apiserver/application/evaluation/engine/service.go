@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -33,6 +34,9 @@ type service struct {
 	// 事件发布器（可选）
 	eventPublisher event.EventPublisher
 
+	// 等待队列注册表（可选，用于长轮询）
+	waiterRegistry *waiter.WaiterRegistry
+
 	// 处理器链
 	pipeline *pipeline.Chain
 }
@@ -44,6 +48,13 @@ type ServiceOption func(*service)
 func WithEventPublisher(publisher event.EventPublisher) ServiceOption {
 	return func(s *service) {
 		s.eventPublisher = publisher
+	}
+}
+
+// WithWaiterRegistry 设置等待队列注册表
+func WithWaiterRegistry(waiterRegistry *waiter.WaiterRegistry) ServiceOption {
+	return func(s *service) {
+		s.waiterRegistry = waiterRegistry
 	}
 }
 
@@ -99,7 +110,11 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	// 5. 事件发布处理器
 	// 注意：如果未设置 eventPublisher，则不会发布 assessment.interpreted 事件到消息队列
 	// 但领域事件仍会添加到聚合根，供仓储层使用
-	chain.AddHandler(pipeline.NewEventPublishHandler(s.eventPublisher))
+	eventPublishOpts := []pipeline.EventPublishHandlerOption{}
+	if s.waiterRegistry != nil {
+		eventPublishOpts = append(eventPublishOpts, pipeline.WithWaiterRegistry(s.waiterRegistry))
+	}
+	chain.AddHandler(pipeline.NewEventPublishHandler(s.eventPublisher, eventPublishOpts...))
 
 	return chain
 }

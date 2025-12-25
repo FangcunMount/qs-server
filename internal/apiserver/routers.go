@@ -264,6 +264,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 			assessments.GET("/:id/scores", evalHandler.GetScores)                     // 获取测评得分
 			assessments.GET("/:id/report", evalHandler.GetReport)                     // 获取测评报告
 			assessments.GET("/:id/high-risk-factors", evalHandler.GetHighRiskFactors) // 获取高风险因子
+			assessments.GET("/:id/wait-report", evalHandler.WaitReport)               // 长轮询等待报告生成
 
 			// 管理操作
 			assessments.POST("/:id/retry", evalHandler.RetryFailed) // 重试失败的测评

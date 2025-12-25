@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -27,11 +28,19 @@ import (
 // - 统计服务：更新实时统计数据
 type EventPublishHandler struct {
 	*BaseHandler
-	publisher event.EventPublisher
+	publisher     event.EventPublisher
+	waiterRegistry *waiter.WaiterRegistry
 }
 
 // EventPublishHandlerOption 事件发布处理器选项
 type EventPublishHandlerOption func(*EventPublishHandler)
+
+// WithWaiterRegistry 设置等待队列注册表
+func WithWaiterRegistry(waiterRegistry *waiter.WaiterRegistry) EventPublishHandlerOption {
+	return func(h *EventPublishHandler) {
+		h.waiterRegistry = waiterRegistry
+	}
+}
 
 // NewEventPublishHandler 创建事件发布处理器
 func NewEventPublishHandler(publisher event.EventPublisher, opts ...EventPublishHandlerOption) *EventPublishHandler {
@@ -107,6 +116,23 @@ func (h *EventPublishHandler) publishAssessmentInterpretedEvent(ctx context.Cont
 			"assessment_id", evalCtx.Assessment.ID(),
 			"risk_level", evalCtx.RiskLevel,
 			"result", "success",
+		)
+	}
+
+	// 通知等待队列（长轮询机制）
+	if h.waiterRegistry != nil {
+		assessmentID := a.ID().Uint64()
+		riskLevelStr := string(result.RiskLevel)
+		summary := waiter.StatusSummary{
+			Status:     "interpreted",
+			TotalScore: &result.TotalScore,
+			RiskLevel:  &riskLevelStr,
+			UpdatedAt:  time.Now().Unix(),
+		}
+		h.waiterRegistry.Notify(ctx, assessmentID, summary)
+		l.Debugw("notified waiters for assessment",
+			"assessment_id", assessmentID,
+			"waiter_count", h.waiterRegistry.GetWaiterCount(assessmentID),
 		)
 	}
 }

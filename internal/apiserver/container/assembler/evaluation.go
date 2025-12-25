@@ -1,12 +1,15 @@
 package assembler
 
 import (
+	"context"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
@@ -18,6 +21,7 @@ import (
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -169,10 +173,24 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	var reportExporter report.ReportExporter = nil
 
 	// ====================  初始化评估引擎 ====================
+	// 创建等待队列注册表（用于长轮询，在创建 EvaluationService 和 Handler 时使用）
+	var waiterRegistry *waiter.WaiterRegistry
+	if scaleRepo != nil && answerSheetRepo != nil && questionnaireRepo != nil {
+		waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
+	}
+
 	// 注意：如果有 scaleRepo、answerSheetRepo 和 questionnaireRepo，则初始化 EvaluationService
 	if scaleRepo != nil && answerSheetRepo != nil && questionnaireRepo != nil {
 		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
+
+		serviceOpts := []engine.ServiceOption{
+			engine.WithEventPublisher(m.eventPublisher), // 传递事件发布器
+		}
+		if waiterRegistry != nil {
+			serviceOpts = append(serviceOpts, engine.WithWaiterRegistry(waiterRegistry))
+		}
+
 		m.EvaluationService = engine.NewService(
 			m.AssessmentRepo,
 			m.ScoreRepo,
@@ -181,7 +199,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			answerSheetRepo,
 			questionnaireRepo,
 			reportBuilder,
-			engine.WithEventPublisher(m.eventPublisher), // 传递事件发布器
+			serviceOpts...,
 		)
 	}
 
@@ -255,6 +273,16 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		m.ScoreQueryService,
 		m.EvaluationService,
 	)
+
+	// 注入状态缓存（如果可用）
+	if statusCache != nil {
+		m.Handler.SetStatusCache(statusCache)
+	}
+
+	// 注入等待队列注册表（如果可用，用于长轮询接口）
+	if waiterRegistry != nil {
+		m.Handler.SetWaiterRegistry(waiterRegistry)
+	}
 
 	return nil
 }
