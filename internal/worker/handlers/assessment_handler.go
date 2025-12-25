@@ -67,8 +67,9 @@ type AssessmentFailedPayload struct {
 // handleAssessmentSubmitted 处理测评提交事件
 // 业务逻辑：
 // 1. 解析测评提交事件
-// 2. 检查是否需要评估（有关联量表）
-// 3. 调用 InternalClient 执行评估
+// 2. 更新统计（调用统计 handler）
+// 3. 检查是否需要评估（有关联量表）
+// 4. 调用 InternalClient 执行评估
 func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
 		var data AssessmentSubmittedPayload
@@ -87,7 +88,23 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			slog.Bool("needs_evaluation", data.NeedsEvaluation()),
 		)
 
-		// 如果没有关联量表，无需评估
+		// 1. 更新统计（调用统计 handler）
+		if statsHandlerFactory, ok := GetFactory("statistics_assessment_submitted_handler"); ok {
+			statsHandler := statsHandlerFactory(deps)
+			if err := statsHandler(ctx, eventType, payload); err != nil {
+				deps.Logger.Warn("failed to update statistics, continuing",
+					slog.String("event_id", env.ID),
+					slog.String("error", err.Error()),
+				)
+				// 统计更新失败不影响主流程，继续执行
+			}
+		} else {
+			deps.Logger.Warn("statistics handler not found, skipping statistics update",
+				slog.String("event_id", env.ID),
+			)
+		}
+
+		// 2. 如果没有关联量表，无需评估
 		if !data.NeedsEvaluation() {
 			deps.Logger.Info("assessment does not need evaluation (no scale)",
 				slog.Int64("assessment_id", data.AssessmentID),
@@ -95,7 +112,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 
-		// 检查 InternalClient 是否可用
+		// 3. 检查 InternalClient 是否可用
 		if deps.InternalClient == nil {
 			deps.Logger.Warn("InternalClient is not available, skipping evaluation",
 				slog.Int64("assessment_id", data.AssessmentID),
@@ -103,7 +120,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 
-		// 调用 InternalClient 执行评估
+		// 4. 调用 InternalClient 执行评估
 		resp, err := deps.InternalClient.EvaluateAssessment(ctx, uint64(data.AssessmentID))
 		if err != nil {
 			deps.Logger.Error("failed to evaluate assessment",
@@ -128,8 +145,9 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 
 // handleAssessmentInterpreted 处理测评解读完成事件
 // 业务逻辑：
-// 1. 检查是否高风险
-// 2. 发送预警通知（如有必要）
+// 1. 更新统计（调用统计 handler）
+// 2. 检查是否高风险
+// 3. 发送预警通知（如有必要）
 func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
 		var data AssessmentInterpretedPayload
@@ -146,7 +164,23 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 			slog.Bool("is_high_risk", data.IsHighRisk()),
 		)
 
-		// 高风险预警
+		// 1. 更新统计（调用统计 handler）
+		if statsHandlerFactory, ok := GetFactory("statistics_assessment_interpreted_handler"); ok {
+			statsHandler := statsHandlerFactory(deps)
+			if err := statsHandler(ctx, eventType, payload); err != nil {
+				deps.Logger.Warn("failed to update statistics, continuing",
+					slog.String("event_id", env.ID),
+					slog.String("error", err.Error()),
+				)
+				// 统计更新失败不影响主流程，继续执行
+			}
+		} else {
+			deps.Logger.Warn("statistics handler not found, skipping statistics update",
+				slog.String("event_id", env.ID),
+			)
+		}
+
+		// 2. 高风险预警
 		if data.IsHighRisk() {
 			deps.Logger.Warn("HIGH RISK ALERT",
 				slog.Int64("assessment_id", data.AssessmentID),

@@ -197,10 +197,8 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 		// 使用全局常量：org_id 固定为 1（单租户场景）
 		// 注意：worker 模块无法直接引用 apiserver 包，使用硬编码值
 		orgID := int64(1)
-		questionnaireCode := "" // 需要从assessment表查询
-
-		// TODO: 从事件数据中提取questionnaire_code
-		// 当前暂时跳过，后续可以在事件数据中添加QuestionnaireCode字段（已存在但需要确认）
+		// ScaleCode 通常等同于 QuestionnaireCode（量表就是问卷）
+		questionnaireCode := data.ScaleCode
 
 		// 获取当前日期
 		now := time.Now()
