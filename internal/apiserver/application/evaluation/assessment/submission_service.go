@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -19,6 +20,7 @@ type submissionService struct {
 	repo           assessment.Repository
 	creator        assessment.AssessmentCreator
 	eventPublisher event.EventPublisher
+	statusCache    *cache.AssessmentStatusCache
 }
 
 // NewSubmissionService 创建测评提交服务
@@ -31,6 +33,22 @@ func NewSubmissionService(
 		repo:           repo,
 		creator:        creator,
 		eventPublisher: eventPublisher,
+		statusCache:    nil, // 可选，通过 SetStatusCache 设置
+	}
+}
+
+// NewSubmissionServiceWithCache 创建带缓存的测评提交服务
+func NewSubmissionServiceWithCache(
+	repo assessment.Repository,
+	creator assessment.AssessmentCreator,
+	eventPublisher event.EventPublisher,
+	statusCache *cache.AssessmentStatusCache,
+) AssessmentSubmissionService {
+	return &submissionService{
+		repo:           repo,
+		creator:        creator,
+		eventPublisher: eventPublisher,
+		statusCache:    statusCache,
 	}
 }
 
@@ -107,6 +125,17 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
 	}
 
+	// 5. 更新状态缓存（Write-Through）
+	if s.statusCache != nil {
+		if err := s.statusCache.Update(ctx, a); err != nil {
+			l.Warnw("更新状态缓存失败",
+				"assessment_id", a.ID().Uint64(),
+				"error", err.Error(),
+			)
+			// 缓存失败不影响业务，仅记录警告
+		}
+	}
+
 	duration := time.Since(startTime)
 	l.Infow("创建测评成功",
 		"action", "create_assessment",
@@ -177,7 +206,18 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
 	}
 
-	// 4. 发布领域事件
+	// 4. 更新状态缓存（Write-Through）
+	if s.statusCache != nil {
+		if err := s.statusCache.Update(ctx, a); err != nil {
+			l.Warnw("更新状态缓存失败",
+				"assessment_id", assessmentID,
+				"error", err.Error(),
+			)
+			// 缓存失败不影响业务，仅记录警告
+		}
+	}
+
+	// 5. 发布领域事件
 	// 说明：领域事件已在 Submit() 内部添加到聚合根，这里统一发布
 	s.publishEvents(ctx, a, l)
 

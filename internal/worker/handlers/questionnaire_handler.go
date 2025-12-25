@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
-
-	redis "github.com/redis/go-redis/v9"
 )
 
 func init() {
@@ -43,46 +41,6 @@ type QuestionnaireArchivedPayload struct {
 	Code       string    `json:"code"`
 	Version    string    `json:"version"`
 	ArchivedAt time.Time `json:"archived_at"`
-}
-
-// ==================== 辅助函数 ====================
-
-const questionnaireCachePrefix = "questionnaire:"
-
-func deleteQuestionnaireCache(ctx context.Context, redisCache redis.UniversalClient, logger *slog.Logger, code, version string) {
-	if redisCache == nil {
-		return
-	}
-
-	cacheKey := fmt.Sprintf("%s%s:%s", questionnaireCachePrefix, code, version)
-	if err := redisCache.Del(ctx, cacheKey).Err(); err != nil {
-		logger.Warn("failed to delete questionnaire cache",
-			slog.String("cache_key", cacheKey),
-			slog.String("error", err.Error()),
-		)
-	} else {
-		logger.Info("questionnaire cache deleted", slog.String("cache_key", cacheKey))
-	}
-}
-
-func clearQuestionnaireCachesByCode(ctx context.Context, redisCache redis.UniversalClient, logger *slog.Logger, code string) {
-	if redisCache == nil {
-		return
-	}
-
-	pattern := fmt.Sprintf("%s%s:*", questionnaireCachePrefix, code)
-	iter := redisCache.Scan(ctx, 0, pattern, 100).Iterator()
-	for iter.Next(ctx) {
-		key := iter.Val()
-		if err := redisCache.Del(ctx, key).Err(); err != nil {
-			logger.Warn("failed to delete cache key", slog.String("key", key), slog.String("error", err.Error()))
-		}
-	}
-	if err := iter.Err(); err != nil {
-		logger.Warn("cache scan error", slog.String("pattern", pattern), slog.String("error", err.Error()))
-	} else {
-		logger.Info("questionnaire caches cleared", slog.String("pattern", pattern))
-	}
 }
 
 // ==================== Handler 实现 ====================
@@ -131,7 +89,8 @@ func handleQuestionnaireUnpublished(deps *Dependencies) HandlerFunc {
 			slog.String("version", data.Version),
 		)
 
-		deleteQuestionnaireCache(ctx, deps.RedisCache, deps.Logger, data.Code, data.Version)
+		// 缓存失效已由 Repository 层自动处理，此处无需重复失效
+		// 事件主要用于通知其他服务（如 collection-server、search-service）
 
 		return nil
 	}
@@ -151,7 +110,8 @@ func handleQuestionnaireArchived(deps *Dependencies) HandlerFunc {
 			slog.String("version", data.Version),
 		)
 
-		clearQuestionnaireCachesByCode(ctx, deps.RedisCache, deps.Logger, data.Code)
+		// 缓存失效已由 Repository 层自动处理，此处无需重复失效
+		// 事件主要用于通知其他服务（如 collection-server、search-service）
 
 		return nil
 	}

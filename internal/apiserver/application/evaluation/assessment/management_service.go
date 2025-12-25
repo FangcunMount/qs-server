@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -16,13 +17,26 @@ import (
 // managementService 测评管理服务实现
 // 行为者：管理员 (Staff/Admin)
 type managementService struct {
-	repo assessment.Repository
+	repo        assessment.Repository
+	statusCache *cache.AssessmentStatusCache
 }
 
 // NewManagementService 创建测评管理服务
 func NewManagementService(repo assessment.Repository) AssessmentManagementService {
 	return &managementService{
-		repo: repo,
+		repo:        repo,
+		statusCache: nil, // 可选，通过 SetStatusCache 设置
+	}
+}
+
+// NewManagementServiceWithCache 创建带缓存的测评管理服务
+func NewManagementServiceWithCache(
+	repo assessment.Repository,
+	statusCache *cache.AssessmentStatusCache,
+) AssessmentManagementService {
+	return &managementService{
+		repo:        repo,
+		statusCache: statusCache,
 	}
 }
 
@@ -263,6 +277,17 @@ func (s *managementService) Retry(ctx context.Context, assessmentID uint64) (*As
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+	}
+
+	// 更新状态缓存（Write-Through）
+	if s.statusCache != nil {
+		if err := s.statusCache.Update(ctx, a); err != nil {
+			l.Warnw("更新状态缓存失败",
+				"assessment_id", assessmentID,
+				"error", err.Error(),
+			)
+			// 缓存失败不影响业务，仅记录警告
+		}
 	}
 
 	duration := time.Since(startTime)

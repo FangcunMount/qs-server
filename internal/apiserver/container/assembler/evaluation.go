@@ -4,6 +4,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	redis "github.com/redis/go-redis/v9"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
@@ -13,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -78,6 +81,7 @@ func NewEvaluationModule() *EvaluationModule {
 // params[3]: answersheet.Repository (可选，用于 EvaluationService)
 // params[4]: questionnaire.Repository (可选，用于 EvaluationService 的 cnt 计分规则)
 // params[5]: event.EventPublisher (可选，用于事件发布)
+// params[6]: redis.UniversalClient (可选，用于缓存装饰器)
 func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if len(params) < 2 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
@@ -127,8 +131,25 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		m.eventPublisher = event.NewNopEventPublisher()
 	}
 
+	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
+	var redisClient redis.UniversalClient
+	if len(params) > 6 {
+		if rc, ok := params[6].(redis.UniversalClient); ok && rc != nil {
+			redisClient = rc
+		}
+	}
+
 	// ==================== 初始化 Repository 层 ====================
-	m.AssessmentRepo = mysqlEval.NewAssessmentRepository(mysqlDB)
+	// 初始化基础 Repository
+	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(mysqlDB)
+
+	// 如果提供了 Redis 客户端，使用缓存装饰器
+	if redisClient != nil {
+		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepository(baseAssessmentRepo, redisClient)
+	} else {
+		m.AssessmentRepo = baseAssessmentRepo
+	}
+
 	m.ScoreRepo = mysqlEval.NewScoreRepository(mysqlDB)
 	m.ReportRepo = mongoEval.NewReportRepository(mongoDB)
 
@@ -183,15 +204,39 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 
 	// ==================== 初始化 Assessment 应用服务 ====================
 
+	// 创建状态缓存（如果 Redis 可用）
+	var statusCache *assessmentCache.AssessmentStatusCache
+	if redisClient != nil {
+		// 创建 RedisCache 实例（实现 Cache 接口）
+		redisCache := assessmentCache.NewRedisCache(redisClient)
+		statusCache = assessmentCache.NewAssessmentStatusCache(redisCache)
+	}
+
 	// 提交服务 - 服务于答题者 (Testee)
-	m.SubmissionService = assessmentApp.NewSubmissionService(
-		m.AssessmentRepo,
-		assessmentCreator,
-		m.eventPublisher,
-	)
+	if statusCache != nil {
+		m.SubmissionService = assessmentApp.NewSubmissionServiceWithCache(
+			m.AssessmentRepo,
+			assessmentCreator,
+			m.eventPublisher,
+			statusCache,
+		)
+	} else {
+		m.SubmissionService = assessmentApp.NewSubmissionService(
+			m.AssessmentRepo,
+			assessmentCreator,
+			m.eventPublisher,
+		)
+	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
-	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo)
+	if statusCache != nil {
+		m.ManagementService = assessmentApp.NewManagementServiceWithCache(
+			m.AssessmentRepo,
+			statusCache,
+		)
+	} else {
+		m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo)
+	}
 
 	// 报告查询服务 - 服务于报告查询者
 	m.ReportQueryService = assessmentApp.NewReportQueryService(m.ReportRepo)

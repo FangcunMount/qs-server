@@ -3,12 +3,15 @@ package assembler
 import (
 	"gorm.io/gorm"
 
+	redis "github.com/redis/go-redis/v9"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -62,7 +65,20 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	uow := mysql.NewUnitOfWork(mysqlDB)
 
 	// 初始化 repository 层
-	m.TesteeRepo = actorInfra.NewTesteeRepository(mysqlDB)
+	// 初始化基础 Repository
+	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB)
+
+	// 如果提供了 Redis 客户端，使用缓存装饰器
+	if len(params) > 3 {
+		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
+			m.TesteeRepo = testeeCache.NewCachedTesteeRepository(baseTesteeRepo, rc)
+		} else {
+			m.TesteeRepo = baseTesteeRepo
+		}
+	} else {
+		m.TesteeRepo = baseTesteeRepo
+	}
+
 	m.StaffRepo = actorInfra.NewStaffRepository(mysqlDB)
 
 	// 初始化 testee domain services

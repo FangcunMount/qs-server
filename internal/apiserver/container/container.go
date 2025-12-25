@@ -164,12 +164,40 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 
 	// 预热量表缓存
 	if c.ScaleModule != nil && c.ScaleModule.Repo != nil {
-		warmupSvc := scaleCache.NewWarmupService(c.ScaleModule.Repo)
+		var warmupSvc *scaleCache.WarmupService
+		// 如果问卷 Repository 可用，创建包含问卷的预热服务
+		if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil && c.SurveyModule.Questionnaire.Repo != nil {
+			warmupSvc = scaleCache.NewWarmupServiceWithQuestionnaire(
+				c.ScaleModule.Repo,
+				c.SurveyModule.Questionnaire.Repo,
+			)
+		} else {
+			warmupSvc = scaleCache.NewWarmupService(c.ScaleModule.Repo)
+		}
+
 		if err := warmupSvc.WarmupDefaultScales(ctx); err != nil {
 			// 预热失败不影响服务启动，仅记录日志
 			return fmt.Errorf("scale cache warmup failed: %w", err)
 		}
 	}
+
+	// 统计查询结果缓存预热（可选）
+	// 注意：统计查询结果缓存 TTL 较短（5分钟），预热主要用于减少首次查询延迟
+	// 建议：只在有明确需求时使用（如已知活跃组织、常用问卷等）
+	// 可以通过配置或环境变量控制是否启用
+	// if c.StatisticsModule != nil {
+	// 	config := scaleCache.StatisticsWarmupConfig{
+	// 		OrgIDs: []int64{1}, // 从配置读取
+	// 		QuestionnaireCodes: []string{"QS001", "QS002"}, // 从配置读取
+	// 	}
+	// 	if err := scaleCache.WarmupStatisticsCache(ctx, config,
+	// 		c.StatisticsModule.SystemStatisticsService,
+	// 		c.StatisticsModule.QuestionnaireStatisticsService,
+	// 		c.StatisticsModule.PlanStatisticsService,
+	// 	); err != nil {
+	// 		// 预热失败不影响服务启动
+	// 	}
+	// }
 
 	return nil
 }
@@ -195,7 +223,8 @@ func (c *Container) GetEventPublisher() event.EventPublisher {
 // initSurveyModule 初始化 Survey 模块（包含问卷和答卷子模块）
 func (c *Container) initSurveyModule() error {
 	surveyModule := assembler.NewSurveyModule()
-	if err := surveyModule.Initialize(c.mongoDB, c.eventPublisher); err != nil {
+	// 传入 Redis 客户端（用于问卷缓存装饰器）
+	if err := surveyModule.Initialize(c.mongoDB, c.eventPublisher, c.redisCache); err != nil {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
@@ -238,7 +267,7 @@ func (c *Container) initActorModule() error {
 		identitySvc = c.IAMModule.IdentityService()
 	}
 
-	if err := actorModule.Initialize(c.mysqlDB, guardianshipSvc, identitySvc); err != nil {
+	if err := actorModule.Initialize(c.mysqlDB, guardianshipSvc, identitySvc, c.redisCache); err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
 	}
 
@@ -252,9 +281,9 @@ func (c *Container) initActorModule() error {
 // initEvaluationModule 初始化 Evaluation 模块
 func (c *Container) initEvaluationModule() error {
 	evaluationModule := assembler.NewEvaluationModule()
-	// 传入 ScaleRepo、AnswerSheetRepo、QuestionnaireRepo 和 EventPublisher
+	// 传入 ScaleRepo、AnswerSheetRepo、QuestionnaireRepo、EventPublisher 和 Redis 客户端
 	// 注意：参数顺序必须与 EvaluationModule.Initialize 中的 params 索引一致
-	// params[0]: MySQL, params[1]: MongoDB, params[2]: ScaleRepo, params[3]: AnswerSheetRepo, params[4]: QuestionnaireRepo, params[5]: EventPublisher
+	// params[0]: MySQL, params[1]: MongoDB, params[2]: ScaleRepo, params[3]: AnswerSheetRepo, params[4]: QuestionnaireRepo, params[5]: EventPublisher, params[6]: Redis
 	if err := evaluationModule.Initialize(
 		c.mysqlDB,
 		c.mongoDB,
@@ -262,6 +291,7 @@ func (c *Container) initEvaluationModule() error {
 		c.SurveyModule.AnswerSheet.Repo,
 		c.SurveyModule.Questionnaire.Repo, // params[4]: QuestionnaireRepo
 		c.eventPublisher,                  // params[5]: EventPublisher
+		c.redisCache,                      // params[6]: Redis 客户端（用于缓存）
 	); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
@@ -276,12 +306,12 @@ func (c *Container) initEvaluationModule() error {
 // initPlanModule 初始化 Plan 模块
 func (c *Container) initPlanModule() error {
 	planModule := assembler.NewPlanModule()
-	// 传入 ScaleRepo 用于通过 code 查找 scale
+	// 传入 ScaleRepo 用于通过 code 查找 scale，以及 Redis 客户端用于缓存
 	var scaleRepo scale.Repository
 	if c.ScaleModule != nil {
 		scaleRepo = c.ScaleModule.Repo
 	}
-	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher, scaleRepo); err != nil {
+	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher, scaleRepo, c.redisCache); err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
 	}
 

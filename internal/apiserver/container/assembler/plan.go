@@ -1,16 +1,20 @@
 package assembler
 
 import (
+	"gorm.io/gorm"
+
+	redis "github.com/redis/go-redis/v9"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	planCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	"gorm.io/gorm"
 )
 
 // PlanModule Plan 模块（测评计划子域）
@@ -42,6 +46,8 @@ func NewPlanModule() *PlanModule {
 // Initialize 初始化 Plan 模块
 // params[0]: *gorm.DB
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
+// params[2]: scale.Repository (可选，用于通过 code 查找 scale)
+// params[3]: redis.UniversalClient (可选，用于缓存装饰器)
 func (m *PlanModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -63,7 +69,24 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 	}
 
 	// 初始化 repository 层
-	m.PlanRepo = planInfra.NewPlanRepository(mysqlDB)
+	// 初始化基础 Repository
+	basePlanRepo := planInfra.NewPlanRepository(mysqlDB)
+	
+	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
+	var redisClient redis.UniversalClient
+	if len(params) > 3 {
+		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
+			redisClient = rc
+		}
+	}
+	
+	// 如果提供了 Redis 客户端，使用缓存装饰器
+	if redisClient != nil {
+		m.PlanRepo = planCache.NewCachedPlanRepository(basePlanRepo, redisClient)
+	} else {
+		m.PlanRepo = basePlanRepo
+	}
+	
 	m.TaskRepo = planInfra.NewTaskRepository(mysqlDB)
 
 	// 初始化基础设施层（入口生成器）
@@ -77,6 +100,8 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 			scaleRepo = sr
 		}
 	}
+	
+	// Redis 客户端已在上面处理（params[3]）
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
 	m.LifecycleService = planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, scaleRepo, m.eventPublisher)

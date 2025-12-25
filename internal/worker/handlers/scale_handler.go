@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
-
-	redis "github.com/redis/go-redis/v9"
 )
 
 func init() {
@@ -59,53 +57,6 @@ type ScaleArchivedPayload struct {
 	ArchivedAt time.Time `json:"archived_at"`
 }
 
-// ==================== 辅助函数 ====================
-
-const (
-	scaleCachePrefix = "scale:"
-	scaleRulePrefix  = "scale:rule:"
-)
-
-func deleteScaleCache(ctx context.Context, redisCache redis.UniversalClient, logger *slog.Logger, code, version string) {
-	if redisCache == nil {
-		return
-	}
-
-	cacheKey := fmt.Sprintf("%s%s:%s", scaleCachePrefix, code, version)
-	if err := redisCache.Del(ctx, cacheKey).Err(); err != nil {
-		logger.Warn("failed to delete scale cache",
-			slog.String("cache_key", cacheKey),
-			slog.String("error", err.Error()),
-		)
-	}
-}
-
-func clearScaleCachesByCode(ctx context.Context, redisCache redis.UniversalClient, logger *slog.Logger, code string) {
-	if redisCache == nil {
-		return
-	}
-
-	patterns := []string{
-		fmt.Sprintf("%s%s:*", scaleCachePrefix, code),
-		fmt.Sprintf("%s%s:*", scaleRulePrefix, code),
-	}
-
-	for _, pattern := range patterns {
-		iter := redisCache.Scan(ctx, 0, pattern, 100).Iterator()
-		for iter.Next(ctx) {
-			key := iter.Val()
-			if err := redisCache.Del(ctx, key).Err(); err != nil {
-				logger.Warn("failed to delete cache key", slog.String("key", key), slog.String("error", err.Error()))
-			}
-		}
-		if err := iter.Err(); err != nil {
-			logger.Warn("cache scan error", slog.String("pattern", pattern), slog.String("error", err.Error()))
-		}
-	}
-
-	logger.Info("scale caches cleared", slog.String("code", code))
-}
-
 // ==================== Handler 实现 ====================
 
 func handleScalePublished(deps *Dependencies) HandlerFunc {
@@ -126,8 +77,8 @@ func handleScalePublished(deps *Dependencies) HandlerFunc {
 
 		// 缓存策略说明：
 		// 当前采用 Lazy Loading（懒加载）+ Cache-Aside 模式：
-		// 1. apiserver repository 层在 FindByCode 时负责缓存读写
-		// 2. worker 只负责缓存失效（unpublish时删除）
+		// 1. apiserver repository 层在 FindByCode 时负责缓存读写和失效
+		// 2. worker 事件处理主要用于通知其他服务（如 collection-server、search-service）
 		// 3. 首次访问时自动加载到缓存，无需预热
 		//
 		// 如需实现缓存预热（Eager Loading），需要：
@@ -157,7 +108,8 @@ func handleScaleUnpublished(deps *Dependencies) HandlerFunc {
 			slog.String("version", data.Version),
 		)
 
-		deleteScaleCache(ctx, deps.RedisCache, deps.Logger, data.Code, data.Version)
+		// 缓存失效已由 Repository 层自动处理，此处无需重复失效
+		// 事件主要用于通知其他服务（如 collection-server、search-service）
 
 		return nil
 	}
@@ -178,17 +130,8 @@ func handleScaleUpdated(deps *Dependencies) HandlerFunc {
 			slog.String("version", data.Version),
 		)
 
-		// 缓存更新策略：
-		// 量表更新时需要使缓存失效，否则会读取到旧数据。
-		// 如果缓存key包含版本号（如 scale:{code}:{version}），
-		// 则更新版本号时自动隔离，无需删除旧缓存。
-		//
-		// 当前实现：删除该版本的缓存，下次访问时重新加载
-		if deps.RedisCache != nil {
-			deleteScaleCache(ctx, deps.RedisCache, deps.Logger, data.Code, data.Version)
-		}
-
-		// 可选优化：删除后立即预热新数据（参考 handleScalePublished 注释）
+		// 缓存失效已由 Repository 层自动处理，此处无需重复失效
+		// 事件主要用于通知其他服务（如 collection-server、search-service）
 
 		return nil
 	}
@@ -209,7 +152,8 @@ func handleScaleArchived(deps *Dependencies) HandlerFunc {
 			slog.String("version", data.Version),
 		)
 
-		clearScaleCachesByCode(ctx, deps.RedisCache, deps.Logger, data.Code)
+		// 缓存失效已由 Repository 层自动处理，此处无需重复失效
+		// 事件主要用于通知其他服务（如 collection-server、search-service）
 
 		return nil
 	}

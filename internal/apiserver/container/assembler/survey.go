@@ -3,16 +3,19 @@ package assembler
 import (
 	"go.mongodb.org/mongo-driver/mongo"
 
+	redis "github.com/redis/go-redis/v9"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
+	questionnaireCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -68,6 +71,7 @@ func NewSurveyModule() *SurveyModule {
 // Initialize 初始化 Survey 模块
 // params[0]: *mongo.Database
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
+// params[2]: redis.UniversalClient (可选，用于缓存装饰器)
 func (m *SurveyModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -88,8 +92,16 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 		m.eventPublisher = event.NewNopEventPublisher()
 	}
 
+	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
+	var redisClient redis.UniversalClient
+	if len(params) > 2 {
+		if rc, ok := params[2].(redis.UniversalClient); ok && rc != nil {
+			redisClient = rc
+		}
+	}
+
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(mongoDB); err != nil {
+	if err := m.initQuestionnaireSubModule(mongoDB, redisClient); err != nil {
 		return err
 	}
 
@@ -102,11 +114,18 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient) error {
 	sub := m.Questionnaire
 
-	// 初始化 repository 层
-	sub.Repo = quesMongoInfra.NewRepository(mongoDB)
+	// 初始化 repository 层（基础实现）
+	baseRepo := quesMongoInfra.NewRepository(mongoDB)
+
+	// 如果提供了 Redis 客户端，使用缓存装饰器
+	if redisClient != nil {
+		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepository(baseRepo, redisClient)
+	} else {
+		sub.Repo = baseRepo
+	}
 
 	// 初始化领域服务
 	validator := questionnaire.Validator{}
