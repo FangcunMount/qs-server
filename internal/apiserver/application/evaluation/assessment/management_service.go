@@ -195,53 +195,6 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 	}, nil
 }
 
-// GetStatistics 获取测评统计
-func (s *managementService) GetStatistics(ctx context.Context, dto GetStatisticsDTO) (*AssessmentStatistics, error) {
-	l := logger.L(ctx)
-	startTime := time.Now()
-
-	l.Debugw("查询测评统计",
-		"action", "get_statistics",
-		"org_id", dto.OrgID,
-	)
-
-	// 统计各状态数量
-	l.Debugw("开始统计各状态数量",
-		"org_id", dto.OrgID,
-	)
-
-	pendingCount, _ := s.repo.CountByOrgIDAndStatus(ctx, int64(dto.OrgID), assessment.StatusPending)
-	submittedCount, _ := s.repo.CountByOrgIDAndStatus(ctx, int64(dto.OrgID), assessment.StatusSubmitted)
-	interpretedCount, _ := s.repo.CountByOrgIDAndStatus(ctx, int64(dto.OrgID), assessment.StatusInterpreted)
-	failedCount, _ := s.repo.CountByOrgIDAndStatus(ctx, int64(dto.OrgID), assessment.StatusFailed)
-
-	totalCount := int(pendingCount + submittedCount + interpretedCount + failedCount)
-
-	duration := time.Since(startTime)
-	l.Debugw("测评统计完成",
-		"action", "get_statistics",
-		"result", "success",
-		"org_id", dto.OrgID,
-		"total_count", totalCount,
-		"pending_count", pendingCount,
-		"submitted_count", submittedCount,
-		"interpreted_count", interpretedCount,
-		"failed_count", failedCount,
-		"duration_ms", duration.Milliseconds(),
-	)
-
-	return &AssessmentStatistics{
-		TotalCount:       totalCount,
-		PendingCount:     int(pendingCount),
-		SubmittedCount:   int(submittedCount),
-		InterpretedCount: int(interpretedCount),
-		FailedCount:      int(failedCount),
-		AverageScore:     nil, // TODO: 计算平均分
-		RiskDistribution: make(map[string]int),
-		ScaleStats:       make([]ScaleStatistics, 0),
-	}, nil
-}
-
 // Retry 重试失败的测评
 func (s *managementService) Retry(ctx context.Context, assessmentID uint64) (*AssessmentResult, error) {
 	l := logger.L(ctx)

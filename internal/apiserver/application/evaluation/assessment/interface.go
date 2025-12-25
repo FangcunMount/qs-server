@@ -58,10 +58,6 @@ type AssessmentManagementService interface {
 	// 场景：管理员查询测评列表，支持按状态、受试者、时间等条件筛选
 	List(ctx context.Context, dto ListAssessmentsDTO) (*AssessmentListResult, error)
 
-	// GetStatistics 获取测评统计
-	// 场景：管理员查看测评统计数据（完成数、平均分、风险分布等）
-	GetStatistics(ctx context.Context, dto GetStatisticsDTO) (*AssessmentStatistics, error)
-
 	// Retry 重试失败的测评
 	// 场景：管理员对评估失败的测评进行重试
 	Retry(ctx context.Context, assessmentID uint64) (*AssessmentResult, error)

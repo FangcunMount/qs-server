@@ -54,15 +54,6 @@ type AnswerSheetSummaryListResult struct {
 	Total int64                       // 总数
 }
 
-// AnswerSheetStatistics 答卷统计结果
-type AnswerSheetStatistics struct {
-	QuestionnaireCode string  // 问卷编码
-	TotalCount        int64   // 答卷总数
-	AverageScore      float64 // 平均分
-	MaxScore          float64 // 最高分
-	MinScore          float64 // 最低分
-}
-
 // ============= Converter 转换器 =============
 
 // toAnswerSheetResult 将领域模型转换为结果对象

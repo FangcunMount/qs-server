@@ -35,14 +35,6 @@ type ListAssessmentsDTO struct {
 	Conditions map[string]string // 查询条件
 }
 
-// GetStatisticsDTO 获取统计数据 DTO
-type GetStatisticsDTO struct {
-	OrgID     uint64     // 组织ID
-	StartTime *time.Time // 开始时间（可选）
-	EndTime   *time.Time // 结束时间（可选）
-	ScaleCode *string    // 量表编码筛选（可选）
-}
-
 // ListReportsDTO 查询报告列表 DTO
 type ListReportsDTO struct {
 	TesteeID uint64 // 受试者ID
@@ -89,26 +81,6 @@ type AssessmentListResult struct {
 	Page       int                 // 当前页
 	PageSize   int                 // 每页数量
 	TotalPages int                 // 总页数
-}
-
-// AssessmentStatistics 测评统计
-type AssessmentStatistics struct {
-	TotalCount       int               // 总测评数
-	PendingCount     int               // 待提交数
-	SubmittedCount   int               // 已提交数
-	InterpretedCount int               // 已解读数
-	FailedCount      int               // 失败数
-	AverageScore     *float64          // 平均分（仅已解读）
-	RiskDistribution map[string]int    // 风险等级分布
-	ScaleStats       []ScaleStatistics // 按量表统计
-}
-
-// ScaleStatistics 量表统计
-type ScaleStatistics struct {
-	ScaleCode    string   // 量表编码
-	ScaleName    string   // 量表名称
-	Count        int      // 测评数
-	AverageScore *float64 // 平均分
 }
 
 // ReportResult 报告结果

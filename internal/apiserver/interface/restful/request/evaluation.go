@@ -28,13 +28,6 @@ type ListAssessmentsRequest struct {
 	TesteeID uint64 `form:"testee_id" json:"testee_id"` // 受试者ID筛选
 }
 
-// GetStatisticsRequest 获取统计数据请求
-type GetStatisticsRequest struct {
-	StartTime *string `form:"start_time" json:"start_time"` // 开始时间（可选，格式：2006-01-02）
-	EndTime   *string `form:"end_time" json:"end_time"`     // 结束时间（可选，格式：2006-01-02）
-	ScaleCode *string `form:"scale_code" json:"scale_code"` // 量表编码筛选（可选）
-}
-
 // ============= Score 相关请求 =============
 
 // GetFactorTrendRequest 获取因子趋势请求

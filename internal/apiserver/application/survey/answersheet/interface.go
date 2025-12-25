@@ -46,8 +46,4 @@ type AnswerSheetManagementService interface {
 	// Delete 删除答卷
 	// 场景：管理员删除无效或测试的答卷
 	Delete(ctx context.Context, id uint64) error
-
-	// GetStatistics 获取答卷统计
-	// 场景：管理员查看某问卷的答卷统计数据（提交数、平均分等）
-	GetStatistics(ctx context.Context, questionnaireCode string) (*AnswerSheetStatistics, error)
 }
