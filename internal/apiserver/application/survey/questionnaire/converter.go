@@ -1,7 +1,7 @@
 package questionnaire
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
 
 // ============= Result 定义 =============
@@ -9,14 +9,14 @@ import (
 
 // QuestionnaireResult 问卷结果
 type QuestionnaireResult struct {
-	Code        string           // 问卷编码
-	Version     string           // 版本号
-	Title       string           // 问卷标题
-	Description string           // 问卷描述
-	ImgUrl      string           // 封面图URL
-	Status      string           // 状态
-	Type        string           // 问卷分类
-	Questions   []QuestionResult // 问题列表
+	Code        string                      // 问卷编码
+	Version     string                      // 版本号
+	Title       string                      // 问卷标题
+	Description string                      // 问卷描述
+	ImgUrl      string                      // 封面图URL
+	Status      domainQuestionnaire.Status  // 状态：0=草稿, 1=已发布, 2=已归档
+	Type        string                      // 问卷分类
+	Questions   []QuestionResult            // 问题列表
 }
 
 // QuestionResult 问题结果
@@ -27,7 +27,7 @@ type QuestionResult struct {
 	Options        []OptionResult                // 选项列表
 	Required       bool                          // 是否必填
 	Description    string                        // 问题描述
-	ShowController *questionnaire.ShowController // 显示控制器
+	ShowController *domainQuestionnaire.ShowController // 显示控制器
 }
 
 // OptionResult 选项结果
@@ -45,14 +45,14 @@ type QuestionnaireListResult struct {
 
 // QuestionnaireSummaryResult 问卷摘要结果（轻量级，不包含问题详情）
 type QuestionnaireSummaryResult struct {
-	Code          string // 问卷编码
-	Version       string // 版本号
-	Title         string // 问卷标题
-	Description   string // 问卷描述
-	ImgUrl        string // 封面图URL
-	Status        string // 状态
-	Type          string // 问卷分类
-	QuestionCount int    // 问题数量
+	Code          string                     // 问卷编码
+	Version       string                     // 版本号
+	Title         string                     // 问卷标题
+	Description   string                     // 问卷描述
+	ImgUrl        string                     // 封面图URL
+	Status        domainQuestionnaire.Status // 状态：0=草稿, 1=已发布, 2=已归档
+	Type          string                     // 问卷分类
+	QuestionCount int                        // 问题数量
 }
 
 // QuestionnaireSummaryListResult 问卷摘要列表结果
@@ -64,7 +64,7 @@ type QuestionnaireSummaryListResult struct {
 // ============= Converter 转换器 =============
 
 // toQuestionnaireResult 将领域模型转换为结果对象
-func toQuestionnaireResult(q *questionnaire.Questionnaire) *QuestionnaireResult {
+func toQuestionnaireResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireResult {
 	if q == nil {
 		return nil
 	}
@@ -75,7 +75,7 @@ func toQuestionnaireResult(q *questionnaire.Questionnaire) *QuestionnaireResult 
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
 		ImgUrl:      q.GetImgUrl(),
-		Status:      q.GetStatus().String(),
+		Status:      q.GetStatus(), // 直接使用 Status 类型，JSON 序列化为数字
 		Type:        q.GetType().String(),
 		Questions:   make([]QuestionResult, 0),
 	}
@@ -89,7 +89,7 @@ func toQuestionnaireResult(q *questionnaire.Questionnaire) *QuestionnaireResult 
 }
 
 // toQuestionResult 将问题领域模型转换为结果对象
-func toQuestionResult(q questionnaire.Question) QuestionResult {
+func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 	result := QuestionResult{
 		Code:        q.GetCode().String(),
 		Stem:        q.GetStem(),
@@ -125,7 +125,7 @@ func toQuestionResult(q questionnaire.Question) QuestionResult {
 }
 
 // toQuestionnaireListResult 将问卷列表转换为结果对象
-func toQuestionnaireListResult(items []*questionnaire.Questionnaire, total int64) *QuestionnaireListResult {
+func toQuestionnaireListResult(items []*domainQuestionnaire.Questionnaire, total int64) *QuestionnaireListResult {
 	result := &QuestionnaireListResult{
 		Items: make([]*QuestionnaireResult, 0, len(items)),
 		Total: total,
@@ -139,7 +139,7 @@ func toQuestionnaireListResult(items []*questionnaire.Questionnaire, total int64
 }
 
 // toQuestionnaireSummaryResult 将问卷摘要领域模型转换为结果对象
-func toQuestionnaireSummaryResult(s *questionnaire.QuestionnaireSummary) *QuestionnaireSummaryResult {
+func toQuestionnaireSummaryResult(s *domainQuestionnaire.QuestionnaireSummary) *QuestionnaireSummaryResult {
 	if s == nil {
 		return nil
 	}
@@ -150,14 +150,14 @@ func toQuestionnaireSummaryResult(s *questionnaire.QuestionnaireSummary) *Questi
 		Title:         s.Title,
 		Description:   s.Description,
 		ImgUrl:        s.ImgUrl,
-		Status:        s.Status.String(),
+		Status:        s.Status, // 直接使用 Status 类型，JSON 序列化为数字
 		Type:          s.Type.String(),
 		QuestionCount: s.QuestionCount,
 	}
 }
 
 // toQuestionnaireSummaryListResult 将问卷摘要列表转换为结果对象
-func toQuestionnaireSummaryListResult(items []*questionnaire.QuestionnaireSummary, total int64) *QuestionnaireSummaryListResult {
+func toQuestionnaireSummaryListResult(items []*domainQuestionnaire.QuestionnaireSummary, total int64) *QuestionnaireSummaryListResult {
 	result := &QuestionnaireSummaryListResult{
 		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
 		Total: total,
