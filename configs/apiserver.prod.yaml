@@ -269,7 +269,7 @@ iam:
 # ----------------------------------------------------------------------------
 wechat:
   # IAM 中的 wechatappId，用于查询微信应用信息（AppID、AppSecret 等）
-  wechat-app-id: "597792321089581614"
+  wechat-app-id: "wx72ade250b619a649"
   
   # 小程序页面路径，例如 "pages/questionnaire/index"
   page-path: "pages/questionnaire/index"
