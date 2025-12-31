@@ -2013,6 +2013,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/questionnaires/{code}/qrcode": {
+            "get": {
+                "description": "根据问卷编码和版本获取小程序码",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questionnaire-Query"
+                ],
+                "summary": "获取问卷小程序码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "问卷编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "问卷版本（可选，默认使用最新版本）",
+                        "name": "version",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.QRCodeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/questionnaires/{code}/questions": {
             "post": {
                 "description": "向问卷添加新问题",
@@ -3113,6 +3160,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/scales/{code}/qrcode": {
+            "get": {
+                "description": "根据量表编码获取小程序码",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Scale-Query"
+                ],
+                "summary": "获取量表小程序码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "量表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.QRCodeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/scales/{code}/questionnaire": {
             "put": {
                 "description": "更新量表关联的问卷编码和版本",
@@ -4200,6 +4288,30 @@ const docTemplate = `{
             ],
             "x-enum-varnames": [
                 "ZeroID"
+            ]
+        },
+        "questionnaire.Status": {
+            "type": "integer",
+            "format": "int32",
+            "enum": [
+                0,
+                1,
+                2
+            ],
+            "x-enum-comments": {
+                "STATUS_ARCHIVED": "已归档",
+                "STATUS_DRAFT": "草稿",
+                "STATUS_PUBLISHED": "已发布"
+            },
+            "x-enum-descriptions": [
+                "草稿",
+                "已发布",
+                "已归档"
+            ],
+            "x-enum-varnames": [
+                "STATUS_DRAFT",
+                "STATUS_PUBLISHED",
+                "STATUS_ARCHIVED"
             ]
         },
         "request.AddQuestionRequest": {
@@ -5328,6 +5440,15 @@ const docTemplate = `{
                 }
             }
         },
+        "response.QRCodeResponse": {
+            "type": "object",
+            "properties": {
+                "qrcode_url": {
+                    "description": "二维码 URL",
+                    "type": "string"
+                }
+            }
+        },
         "response.QuestionnaireListResponse": {
             "type": "object",
             "properties": {
@@ -5367,7 +5488,12 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "string"
+                    "description": "状态值：0=草稿, 1=已发布, 2=已归档",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/questionnaire.Status"
+                        }
+                    ]
                 },
                 "title": {
                     "type": "string"

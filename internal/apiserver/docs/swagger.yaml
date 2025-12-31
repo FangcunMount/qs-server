@@ -21,6 +21,25 @@ definitions:
     type: integer
     x-enum-varnames:
     - ZeroID
+  questionnaire.Status:
+    enum:
+    - 0
+    - 1
+    - 2
+    format: int32
+    type: integer
+    x-enum-comments:
+      STATUS_ARCHIVED: 已归档
+      STATUS_DRAFT: 草稿
+      STATUS_PUBLISHED: 已发布
+    x-enum-descriptions:
+    - 草稿
+    - 已发布
+    - 已归档
+    x-enum-varnames:
+    - STATUS_DRAFT
+    - STATUS_PUBLISHED
+    - STATUS_ARCHIVED
   request.AddQuestionRequest:
     properties:
       code:
@@ -792,6 +811,12 @@ definitions:
         description: 总次数（用于 by_week/by_day）
         type: integer
     type: object
+  response.QRCodeResponse:
+    properties:
+      qrcode_url:
+        description: 二维码 URL
+        type: string
+    type: object
   response.QuestionnaireListResponse:
     properties:
       page:
@@ -818,7 +843,9 @@ definitions:
           $ref: '#/definitions/viewmodel.QuestionDTO'
         type: array
       status:
-        type: string
+        allOf:
+        - $ref: '#/definitions/questionnaire.Status'
+        description: 状态值：0=草稿, 1=已发布, 2=已归档
       title:
         type: string
       type:
@@ -2753,6 +2780,34 @@ paths:
       summary: 发布问卷
       tags:
       - Questionnaire-Lifecycle
+  /api/v1/questionnaires/{code}/qrcode:
+    get:
+      description: 根据问卷编码和版本获取小程序码
+      parameters:
+      - description: 问卷编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 问卷版本（可选，默认使用最新版本）
+        in: query
+        name: version
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.QRCodeResponse'
+              type: object
+      summary: 获取问卷小程序码
+      tags:
+      - Questionnaire-Query
   /api/v1/questionnaires/{code}/questions:
     post:
       consumes:
@@ -3346,6 +3401,30 @@ paths:
       summary: 发布量表
       tags:
       - Scale-Lifecycle
+  /api/v1/scales/{code}/qrcode:
+    get:
+      description: 根据量表编码获取小程序码
+      parameters:
+      - description: 量表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.QRCodeResponse'
+              type: object
+      summary: 获取量表小程序码
+      tags:
+      - Scale-Query
   /api/v1/scales/{code}/questionnaire:
     put:
       consumes:

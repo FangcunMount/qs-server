@@ -1296,6 +1296,35 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /questionnaires/{code}/qrcode:
+    get:
+      tags:
+      - Questionnaire-Query
+      summary: 获取问卷小程序码
+      description: 根据问卷编码和版本获取小程序码
+      operationId: 获取问卷小程序码
+      parameters:
+      - type: string
+        description: 问卷编码
+        name: code
+        in: path
+        required: true
+      - type: string
+        description: 问卷版本（可选，默认使用最新版本）
+        name: version
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QRCodeResponse'
   /questionnaires/{code}/questions:
     post:
       tags:
@@ -2091,6 +2120,31 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.ScaleResponse'
+  /scales/{code}/qrcode:
+    get:
+      tags:
+      - Scale-Query
+      summary: 获取量表小程序码
+      description: 根据量表编码获取小程序码
+      operationId: 获取量表小程序码
+      parameters:
+      - type: string
+        description: 量表编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.QRCodeResponse'
   /scales/{code}/questionnaire:
     put:
       tags:
@@ -2772,6 +2826,25 @@ components:
       - 0
       x-enum-varnames:
       - ZeroID
+    questionnaire.Status:
+      type: integer
+      format: int32
+      enum:
+      - 0
+      - 1
+      - 2
+      x-enum-comments:
+        STATUS_ARCHIVED: 已归档
+        STATUS_DRAFT: 草稿
+        STATUS_PUBLISHED: 已发布
+      x-enum-descriptions:
+      - 草稿
+      - 已发布
+      - 已归档
+      x-enum-varnames:
+      - STATUS_DRAFT
+      - STATUS_PUBLISHED
+      - STATUS_ARCHIVED
     request.AddQuestionRequest:
       type: object
       properties:
@@ -3543,6 +3616,12 @@ components:
         total_times:
           description: 总次数（用于 by_week/by_day）
           type: integer
+    response.QRCodeResponse:
+      type: object
+      properties:
+        qrcode_url:
+          description: 二维码 URL
+          type: string
     response.QuestionnaireListResponse:
       type: object
       properties:
@@ -3570,7 +3649,9 @@ components:
           items:
             $ref: '#/components/schemas/viewmodel.QuestionDTO'
         status:
-          type: string
+          description: 状态值：0=草稿, 1=已发布, 2=已归档
+          allOf:
+          - $ref: '#/components/schemas/questionnaire.Status'
         title:
           type: string
         type:
