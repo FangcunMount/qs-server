@@ -61,6 +61,10 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 			})
 		})
 	}
+
+	// 二维码图片访问路由（公开，不需要认证）
+	qrcodeHandler := codesHandler.NewQRCodeHandler()
+	engine.GET("/api/v1/qrcodes/:filename", qrcodeHandler.GetQRCodeImage)
 }
 
 // registerProtectedRoutes 注册需要认证的路由

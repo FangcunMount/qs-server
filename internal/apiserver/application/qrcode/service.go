@@ -4,10 +4,17 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+)
+
+const (
+	// QRCodeStorageDir 二维码存储目录
+	QRCodeStorageDir = "/data/image/qrcode"
 )
 
 // Config 小程序码服务配置
@@ -161,22 +168,28 @@ func (s *service) GenerateQuestionnaireQRCode(ctx context.Context, code, version
 		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
 	}
 
-	// TODO: 将二维码保存到文件系统或对象存储（OSS/S3等）
-	// 这里返回占位符，实际需要根据存储方案实现
-	_ = qrCodeData
-
-	// 临时返回：实际应该保存到对象存储并返回 URL
-	qrCodeURL := fmt.Sprintf("/qrcodes/questionnaire_%s_%s.png", code, version)
+	// 保存二维码到文件系统
+	fileName := fmt.Sprintf("questionnaire_%s_%s.png", code, version)
+	filePath, err := s.saveQRCodeFile(ctx, fileName, qrCodeData)
+	if err != nil {
+		l.Errorw("保存小程序码文件失败",
+			"action", "generate_questionnaire_qrcode",
+			"code", code,
+			"version", version,
+			"error", err.Error(),
+		)
+		return "", fmt.Errorf("保存小程序码文件失败: %w", err)
+	}
 
 	l.Infow("问卷小程序码生成成功",
 		"action", "generate_questionnaire_qrcode",
 		"code", code,
 		"version", version,
-		"qrcode_url", qrCodeURL,
+		"file_path", filePath,
 		"size", len(qrCodeData),
 	)
 
-	return qrCodeURL, nil
+	return filePath, nil
 }
 
 // GenerateScaleQRCode 生成量表小程序码
@@ -248,19 +261,50 @@ func (s *service) GenerateScaleQRCode(ctx context.Context, code string) (string,
 		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
 	}
 
-	// TODO: 将二维码保存到文件系统或对象存储（OSS/S3等）
-	// 这里返回占位符，实际需要根据存储方案实现
-	_ = qrCodeData
-
-	// 临时返回：实际应该保存到对象存储并返回 URL
-	qrCodeURL := fmt.Sprintf("/qrcodes/scale_%s.png", code)
+	// 保存二维码到文件系统
+	fileName := fmt.Sprintf("scale_%s.png", code)
+	filePath, err := s.saveQRCodeFile(ctx, fileName, qrCodeData)
+	if err != nil {
+		l.Errorw("保存小程序码文件失败",
+			"action", "generate_scale_qrcode",
+			"code", code,
+			"error", err.Error(),
+		)
+		return "", fmt.Errorf("保存小程序码文件失败: %w", err)
+	}
 
 	l.Infow("量表小程序码生成成功",
 		"action", "generate_scale_qrcode",
 		"code", code,
-		"qrcode_url", qrCodeURL,
+		"file_path", filePath,
 		"size", len(qrCodeData),
 	)
 
-	return qrCodeURL, nil
+	return filePath, nil
+}
+
+// saveQRCodeFile 保存二维码文件到指定目录
+func (s *service) saveQRCodeFile(ctx context.Context, fileName string, data []byte) (string, error) {
+	l := logger.L(ctx)
+
+	// 确保存储目录存在
+	if err := os.MkdirAll(QRCodeStorageDir, 0755); err != nil {
+		return "", fmt.Errorf("创建二维码存储目录失败: %w", err)
+	}
+
+	// 构建完整文件路径
+	filePath := filepath.Join(QRCodeStorageDir, fileName)
+
+	// 写入文件
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return "", fmt.Errorf("写入二维码文件失败: %w", err)
+	}
+
+	l.Infow("二维码文件保存成功",
+		"action", "save_qrcode_file",
+		"file_path", filePath,
+		"size", len(data),
+	)
+
+	return filePath, nil
 }
