@@ -66,6 +66,9 @@ COPY --chown=appuser:appuser web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/
 RUN mkdir -p /etc/qs-server/ssl/ca /etc/qs-server/ssl/server && \
     chown -R appuser:appuser /etc/qs-server/ssl
 
+# 预创建二维码存储目录
+RUN mkdir -p /data/image/qrcode && chown -R appuser:appuser /data/image/qrcode
+
 # 切换到非 root 用户
 USER appuser
 

@@ -22,6 +22,8 @@ services:
       - /data/ssl/private:/etc/qs-server/ssl/private:ro
       # gRPC mTLS 证书目录
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
+      # 二维码存储目录
+      - /data/image/qrcode:/data/image/qrcode:rw
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
   qs-collection-server:
