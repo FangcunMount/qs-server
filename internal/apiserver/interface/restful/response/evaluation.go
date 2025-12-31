@@ -382,3 +382,17 @@ func NewReportListResponse(result *assessment.ReportListResult) *ReportListRespo
 		TotalPages: result.TotalPages,
 	}
 }
+
+// ============= QRCode 相关响应 =============
+
+// QRCodeResponse 二维码响应
+type QRCodeResponse struct {
+	QRCodeURL string `json:"qrcode_url"` // 二维码 URL
+}
+
+// NewQRCodeResponse 创建二维码响应
+func NewQRCodeResponse(qrCodeURL string) *QRCodeResponse {
+	return &QRCodeResponse{
+		QRCodeURL: qrCodeURL,
+	}
+}

@@ -161,6 +161,26 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to initialize hexagonal architecture container: %v", err)
 	}
 
+	// 初始化小程序码生成服务（从配置读取 wechat_app_id，然后从 IAM 查询）
+	if s.config.WeChatOptions != nil {
+		s.container.InitQRCodeService(s.config.WeChatOptions)
+		// 将 QRCodeService 注入到各个模块
+		if s.container.QRCodeService != nil {
+			// 注入到 EvaluationModule
+			if s.container.EvaluationModule != nil {
+				s.container.EvaluationModule.SetQRCodeService(s.container.QRCodeService)
+			}
+			// 注入到 SurveyModule（问卷）
+			if s.container.SurveyModule != nil {
+				s.container.SurveyModule.SetQRCodeService(s.container.QRCodeService)
+			}
+			// 注入到 ScaleModule（量表）
+			if s.container.ScaleModule != nil {
+				s.container.ScaleModule.SetQRCodeService(s.container.QRCodeService)
+			}
+		}
+	}
+
 	// 现在创建 GRPC 服务器（IAM Module 已初始化）
 	s.grpcServer, err = buildGRPCServer(s.config, s.container)
 	if err != nil {

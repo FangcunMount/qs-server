@@ -13,6 +13,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -34,6 +35,8 @@ type InternalService struct {
 	statisticsValidatorService statisticsApp.StatisticsValidatorService
 	// Plan 服务（备用接口，推荐使用 REST API + Crontab）
 	taskSchedulerService planApp.TaskSchedulerService
+	// 小程序码生成服务（可选）
+	qrCodeService qrcodeApp.QRCodeService
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -47,6 +50,7 @@ func NewInternalService(
 	statisticsSyncService interface{}, // statisticsApp.StatisticsSyncService，可能为 nil
 	statisticsValidatorService interface{}, // statisticsApp.StatisticsValidatorService，可能为 nil
 	taskSchedulerService interface{}, // planApp.TaskSchedulerService，可能为 nil
+	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
 ) *InternalService {
 	// 类型转换（如果提供了服务）
 	var syncService statisticsApp.StatisticsSyncService
@@ -64,6 +68,11 @@ func NewInternalService(
 		schedulerService = t
 	}
 
+	var qrService qrcodeApp.QRCodeService
+	if q, ok := qrCodeService.(qrcodeApp.QRCodeService); ok {
+		qrService = q
+	}
+
 	return &InternalService{
 		answerSheetScoringService:  answerSheetScoringService,
 		submissionService:          submissionService,
@@ -74,6 +83,7 @@ func NewInternalService(
 		statisticsSyncService:      syncService,
 		statisticsValidatorService: validatorService,
 		taskSchedulerService:       schedulerService,
+		qrCodeService:              qrService,
 	}
 }
 
@@ -582,5 +592,125 @@ func (s *InternalService) SchedulePendingTasks(
 		Success:        true,
 		ScheduledCount: int64(len(tasks)),
 		Message:        fmt.Sprintf("成功调度 %d 个任务", len(tasks)),
+	}, nil
+}
+
+// ==================== 小程序码生成操作 ====================
+
+// GenerateQuestionnaireQRCode 生成问卷小程序码
+// 场景：worker 处理 questionnaire.published 事件后调用
+func (s *InternalService) GenerateQuestionnaireQRCode(
+	ctx context.Context,
+	req *pb.GenerateQuestionnaireQRCodeRequest,
+) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到生成问卷小程序码请求",
+		"action", "generate_questionnaire_qrcode",
+		"code", req.Code,
+		"version", req.Version,
+	)
+
+	// 验证参数
+	if req.Code == "" {
+		return nil, status.Error(codes.InvalidArgument, "code 不能为空")
+	}
+	if req.Version == "" {
+		return nil, status.Error(codes.InvalidArgument, "version 不能为空")
+	}
+
+	// 检查小程序码生成服务是否配置
+	if s.qrCodeService == nil {
+		l.Warnw("小程序码生成服务未配置",
+			"action", "generate_questionnaire_qrcode",
+		)
+		return &pb.GenerateQuestionnaireQRCodeResponse{
+			Success: false,
+			Message: "小程序码生成功能未配置",
+		}, nil
+	}
+
+	// 调用应用层服务生成小程序码
+	qrCodeURL, err := s.qrCodeService.GenerateQuestionnaireQRCode(ctx, req.Code, req.Version)
+	if err != nil {
+		l.Errorw("生成问卷小程序码失败",
+			"action", "generate_questionnaire_qrcode",
+			"code", req.Code,
+			"version", req.Version,
+			"error", err.Error(),
+		)
+		return &pb.GenerateQuestionnaireQRCodeResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("问卷小程序码生成成功",
+		"action", "generate_questionnaire_qrcode",
+		"code", req.Code,
+		"version", req.Version,
+		"qrcode_url", qrCodeURL,
+	)
+
+	return &pb.GenerateQuestionnaireQRCodeResponse{
+		Success:   true,
+		QrcodeUrl: qrCodeURL,
+		Message:   "小程序码生成成功",
+	}, nil
+}
+
+// GenerateScaleQRCode 生成量表小程序码
+// 场景：worker 处理 scale.published 事件后调用
+func (s *InternalService) GenerateScaleQRCode(
+	ctx context.Context,
+	req *pb.GenerateScaleQRCodeRequest,
+) (*pb.GenerateScaleQRCodeResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到生成量表小程序码请求",
+		"action", "generate_scale_qrcode",
+		"code", req.Code,
+	)
+
+	// 验证参数
+	if req.Code == "" {
+		return nil, status.Error(codes.InvalidArgument, "code 不能为空")
+	}
+
+	// 检查小程序码生成服务是否配置
+	if s.qrCodeService == nil {
+		l.Warnw("小程序码生成服务未配置",
+			"action", "generate_scale_qrcode",
+		)
+		return &pb.GenerateScaleQRCodeResponse{
+			Success: false,
+			Message: "小程序码生成功能未配置",
+		}, nil
+	}
+
+	// 调用应用层服务生成小程序码
+	qrCodeURL, err := s.qrCodeService.GenerateScaleQRCode(ctx, req.Code)
+	if err != nil {
+		l.Errorw("生成量表小程序码失败",
+			"action", "generate_scale_qrcode",
+			"code", req.Code,
+			"error", err.Error(),
+		)
+		return &pb.GenerateScaleQRCodeResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	l.Infow("量表小程序码生成成功",
+		"action", "generate_scale_qrcode",
+		"code", req.Code,
+		"qrcode_url", qrCodeURL,
+	)
+
+	return &pb.GenerateScaleQRCodeResponse{
+		Success:   true,
+		QrcodeUrl: qrCodeURL,
+		Message:   "小程序码生成成功",
 	}, nil
 }

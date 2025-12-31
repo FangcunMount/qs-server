@@ -21,6 +21,7 @@ type ScaleResult struct {
 	QuestionnaireVersion string         // 关联的问卷版本
 	Status               string         // 状态
 	Factors              []FactorResult // 因子列表
+	QRCodeURL            string         // 小程序码URL（仅已发布状态时返回）
 }
 
 // FactorResult 因子结果

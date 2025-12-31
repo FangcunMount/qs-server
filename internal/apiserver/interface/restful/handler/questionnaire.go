@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -23,6 +25,7 @@ type QuestionnaireHandler struct {
 	lifecycleService questionnaire.QuestionnaireLifecycleService
 	contentService   questionnaire.QuestionnaireContentService
 	queryService     questionnaire.QuestionnaireQueryService
+	qrCodeService    qrcode.QRCodeService // 小程序码生成服务（可选）
 }
 
 // NewQuestionnaireHandler 创建问卷处理器
@@ -30,11 +33,13 @@ func NewQuestionnaireHandler(
 	lifecycleService questionnaire.QuestionnaireLifecycleService,
 	contentService questionnaire.QuestionnaireContentService,
 	queryService questionnaire.QuestionnaireQueryService,
+	qrCodeService qrcode.QRCodeService, // 小程序码生成服务（可选）
 ) *QuestionnaireHandler {
 	return &QuestionnaireHandler{
 		lifecycleService: lifecycleService,
 		contentService:   contentService,
 		queryService:     queryService,
+		qrCodeService:    qrCodeService,
 	}
 }
 
@@ -665,4 +670,54 @@ func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewQuestionnaireSummaryListResponse(result))
+}
+
+// ============= QRCode 相关接口 =============
+
+// GetQRCode 获取问卷小程序码
+// @Summary 获取问卷小程序码
+// @Description 根据问卷编码和版本获取小程序码
+// @Tags Questionnaire-Query
+// @Produce json
+// @Param code path string true "问卷编码"
+// @Param version query string false "问卷版本（可选，默认使用最新版本）"
+// @Success 200 {object} core.Response{data=response.QRCodeResponse}
+// @Router /api/v1/questionnaires/{code}/qrcode [get]
+func (h *QuestionnaireHandler) GetQRCode(c *gin.Context) {
+	questionnaireCode := c.Param("code")
+	if questionnaireCode == "" {
+		h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "问卷编码不能为空"))
+		return
+	}
+
+	// 检查二维码服务是否可用
+	if h.qrCodeService == nil {
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "小程序码生成服务未配置"))
+		return
+	}
+
+	// 获取版本（可选）
+	version := c.Query("version")
+	if version == "" {
+		// 如果没有指定版本，查询已发布的最新版本
+		result, err := h.queryService.GetPublishedByCode(c.Request.Context(), questionnaireCode)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if result == nil {
+			h.Error(c, errors.WithCode(code.ErrQuestionnaireNotFound, "问卷不存在或未发布"))
+			return
+		}
+		version = result.Version
+	}
+
+	ctx := context.Background()
+	qrCodeURL, err := h.qrCodeService.GenerateQuestionnaireQRCode(ctx, questionnaireCode, version)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, response.NewQRCodeResponse(qrCodeURL))
 }

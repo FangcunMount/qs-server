@@ -13,10 +13,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi"
+	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 )
 
 // modulePool 模块池
@@ -47,6 +51,12 @@ type Container struct {
 	StatisticsModule *assembler.StatisticsModule // Statistics 模块（统计）
 	IAMModule        *IAMModule                  // IAM 集成模块
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
+
+	// 基础设施服务
+	QRCodeGenerator wechatPort.QRCodeGenerator // 小程序码生成器（可选）
+
+	// 应用层服务
+	QRCodeService qrcodeApp.QRCodeService // 小程序码生成服务（可选）
 
 	// 容器状态
 	initialized bool
@@ -149,6 +159,9 @@ func (c *Container) Initialize() error {
 
 	// 初始化 CodesService（基于 redisStore）
 	c.initCodesService()
+
+	// 初始化小程序码生成器（基础设施层）
+	c.initQRCodeGenerator()
 
 	c.initialized = true
 	fmt.Printf("🏗️  Container initialized successfully\n")
@@ -356,6 +369,71 @@ func (c *Container) initCodesService() {
 	// 无 redis 时使用 nil 或者 NewService 会回退到时间戳实现
 	c.CodesService = codesapp.NewService(nil)
 	fmt.Printf("🔑 CodesService initialized using fallback (no redis)\n")
+}
+
+// initQRCodeGenerator 初始化小程序码生成器（基础设施层）
+func (c *Container) initQRCodeGenerator() {
+	// 创建小程序码生成器（使用 nil 缓存，SDK 会使用内存缓存）
+	// TODO: 如果需要使用 Redis 缓存，需要创建 cache.Cache 适配器
+	c.QRCodeGenerator = wechatapi.NewQRCodeGenerator(nil)
+	fmt.Printf("📱 QRCode generator initialized (infrastructure layer)\n")
+}
+
+// InitQRCodeService 初始化小程序码生成服务（应用层）
+// 从配置中读取 wechat_app_id，然后从 IAM 查询微信应用信息
+func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
+	// 如果基础设施层未初始化，则应用层服务也不初始化
+	if c.QRCodeGenerator == nil {
+		fmt.Printf("⚠️  QRCode service not initialized (generator not available)\n")
+		return
+	}
+
+	// 如果未提供配置，则不初始化
+	if wechatOptions == nil {
+		fmt.Printf("⚠️  QRCode service not initialized (wechat options not provided)\n")
+		return
+	}
+
+	// 检查是否有配置
+	if wechatOptions.WeChatAppID == "" && (wechatOptions.AppID == "" || wechatOptions.AppSecret == "") {
+		fmt.Printf("⚠️  QRCode service not initialized (missing config: wechat-app-id or app-id/app-secret)\n")
+		return
+	}
+
+	if wechatOptions.PagePath == "" {
+		fmt.Printf("⚠️  QRCode service not initialized (missing page-path)\n")
+		return
+	}
+
+	// 获取 WeChatAppService（如果 IAM 模块已初始化）
+	var wechatAppService *iam.WeChatAppService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		wechatAppService = c.IAMModule.WeChatAppService()
+	}
+
+	// 创建应用层服务配置
+	config := &qrcodeApp.Config{
+		PagePath: wechatOptions.PagePath,
+	}
+
+	// 优先使用 IAM 查询（通过 WeChatAppID）
+	if wechatOptions.WeChatAppID != "" {
+		config.WeChatAppID = wechatOptions.WeChatAppID
+		fmt.Printf("📱 QRCode service will use IAM to query wechat app (wechat_app_id: %s)\n", wechatOptions.WeChatAppID)
+	} else {
+		// 降级：使用直接配置
+		config.AppID = wechatOptions.AppID
+		config.AppSecret = wechatOptions.AppSecret
+		fmt.Printf("📱 QRCode service will use direct config (app_id: %s)\n", wechatOptions.AppID)
+	}
+
+	// 创建应用层服务，封装基础设施层调用
+	c.QRCodeService = qrcodeApp.NewService(
+		c.QRCodeGenerator,
+		config,
+		wechatAppService,
+	)
+	fmt.Printf("📱 QRCode service initialized (application layer, page_path: %s)\n", wechatOptions.PagePath)
 }
 
 // HealthCheck 健康检查

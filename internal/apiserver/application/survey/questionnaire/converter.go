@@ -9,24 +9,25 @@ import (
 
 // QuestionnaireResult 问卷结果
 type QuestionnaireResult struct {
-	Code        string                      // 问卷编码
-	Version     string                      // 版本号
-	Title       string                      // 问卷标题
-	Description string                      // 问卷描述
-	ImgUrl      string                      // 封面图URL
-	Status      domainQuestionnaire.Status  // 状态：0=草稿, 1=已发布, 2=已归档
-	Type        string                      // 问卷分类
-	Questions   []QuestionResult            // 问题列表
+	Code        string                     // 问卷编码
+	Version     string                     // 版本号
+	Title       string                     // 问卷标题
+	Description string                     // 问卷描述
+	ImgUrl      string                     // 封面图URL
+	Status      domainQuestionnaire.Status // 状态：0=草稿, 1=已发布, 2=已归档
+	Type        string                     // 问卷分类
+	Questions   []QuestionResult           // 问题列表
+	QRCodeURL   string                     // 小程序码URL（仅已发布状态时返回）
 }
 
 // QuestionResult 问题结果
 type QuestionResult struct {
-	Code           string                        // 问题编码
-	Stem           string                        // 题干
-	Type           string                        // 问题类型
-	Options        []OptionResult                // 选项列表
-	Required       bool                          // 是否必填
-	Description    string                        // 问题描述
+	Code           string                              // 问题编码
+	Stem           string                              // 题干
+	Type           string                              // 问题类型
+	Options        []OptionResult                      // 选项列表
+	Required       bool                                // 是否必填
+	Description    string                              // 问题描述
 	ShowController *domainQuestionnaire.ShowController // 显示控制器
 }
 

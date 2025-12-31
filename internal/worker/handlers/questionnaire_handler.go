@@ -71,6 +71,31 @@ func handleQuestionnairePublished(deps *Dependencies) HandlerFunc {
 		// 实现参考 handleScalePublished 的注释，实施方案相同。
 		// 缓存key建议格式：questionnaire:{code}:{version}
 
+		// 生成小程序码（通过 gRPC 调用 apiserver）
+		if deps.InternalClient != nil {
+			resp, err := deps.InternalClient.GenerateQuestionnaireQRCode(ctx, data.Code, data.Version)
+			if err != nil {
+				deps.Logger.Warn("failed to generate questionnaire QR code",
+					slog.String("event_id", env.ID),
+					slog.String("code", data.Code),
+					slog.String("error", err.Error()),
+				)
+				// 生成二维码失败不影响事件处理，只记录警告
+			} else if resp.Success {
+				deps.Logger.Info("questionnaire QR code generated",
+					slog.String("event_id", env.ID),
+					slog.String("code", data.Code),
+					slog.String("qrcode_url", resp.QrcodeUrl),
+				)
+			} else {
+				deps.Logger.Warn("questionnaire QR code generation failed",
+					slog.String("event_id", env.ID),
+					slog.String("code", data.Code),
+					slog.String("message", resp.Message),
+				)
+			}
+		}
+
 		return nil
 	}
 }

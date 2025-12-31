@@ -164,6 +164,7 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 		questionnaires.GET("", quesHandler.List)                               // 获取问卷列表
 		questionnaires.GET("/published/:code", quesHandler.GetPublishedByCode) // 获取已发布问卷
 		questionnaires.GET("/published", quesHandler.ListPublished)            // 获取已发布列表
+		questionnaires.GET("/:code/qrcode", quesHandler.GetQRCode)             // 获取问卷小程序码
 	}
 }
 
@@ -211,6 +212,7 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 		scales.GET("/published/:code", scaleHandler.GetPublishedByCode)      // 获取已发布量表
 		scales.GET("/published", scaleHandler.ListPublished)                 // 获取已发布列表
 		scales.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
+		scales.GET("/:code/qrcode", scaleHandler.GetQRCode)                  // 获取量表小程序码
 		scales.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
 		scales.GET("", scaleHandler.List)                                    // 获取量表列表
 	}

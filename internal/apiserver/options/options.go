@@ -21,6 +21,7 @@ type Options struct {
 	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"   mapstructure:"mongodb"`
 	MessagingOptions        *genericoptions.MessagingOptions       `json:"messaging" mapstructure:"messaging"`
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
+	WeChatOptions           *genericoptions.WeChatOptions          `json:"wechat"    mapstructure:"wechat"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -37,6 +38,7 @@ func NewOptions() *Options {
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
 		MessagingOptions:        genericoptions.NewMessagingOptions(),
 		IAMOptions:              genericoptions.NewIAMOptions(),
+		WeChatOptions:           genericoptions.NewWeChatOptions(),
 	}
 }
 
@@ -53,6 +55,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
 	o.MessagingOptions.AddFlags(fss.FlagSet("messaging"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
+	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 
 	return fss
 }

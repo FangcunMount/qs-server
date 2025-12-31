@@ -3,8 +3,11 @@ package handler
 import (
 	"strconv"
 
+	"context"
+
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -21,6 +24,7 @@ type ScaleHandler struct {
 	factorService    scale.ScaleFactorService
 	queryService     scale.ScaleQueryService
 	categoryService  scale.ScaleCategoryService
+	qrCodeService    qrcode.QRCodeService // 小程序码生成服务（可选）
 }
 
 // NewScaleHandler 创建量表处理器
@@ -29,12 +33,14 @@ func NewScaleHandler(
 	factorService scale.ScaleFactorService,
 	queryService scale.ScaleQueryService,
 	categoryService scale.ScaleCategoryService,
+	qrCodeService qrcode.QRCodeService, // 小程序码生成服务（可选）
 ) *ScaleHandler {
 	return &ScaleHandler{
 		lifecycleService: lifecycleService,
 		factorService:    factorService,
 		queryService:     queryService,
 		categoryService:  categoryService,
+		qrCodeService:    qrCodeService,
 	}
 }
 
@@ -746,4 +752,37 @@ func toInterpretRuleDTOs(rules []request.InterpretRuleModel, defaultRiskLevel st
 		})
 	}
 	return result
+}
+
+// ============= QRCode 相关接口 =============
+
+// GetQRCode 获取量表小程序码
+// @Summary 获取量表小程序码
+// @Description 根据量表编码获取小程序码
+// @Tags Scale-Query
+// @Produce json
+// @Param code path string true "量表编码"
+// @Success 200 {object} core.Response{data=response.QRCodeResponse}
+// @Router /api/v1/scales/{code}/qrcode [get]
+func (h *ScaleHandler) GetQRCode(c *gin.Context) {
+	scaleCode := c.Param("code")
+	if scaleCode == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "量表编码不能为空"))
+		return
+	}
+
+	// 检查二维码服务是否可用
+	if h.qrCodeService == nil {
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "小程序码生成服务未配置"))
+		return
+	}
+
+	ctx := context.Background()
+	qrCodeURL, err := h.qrCodeService.GenerateScaleQRCode(ctx, scaleCode)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, response.NewQRCodeResponse(qrCodeURL))
 }

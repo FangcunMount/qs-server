@@ -19,6 +19,7 @@ type IAMModule struct {
 	serviceAuthHelper *iam.ServiceAuthHelper
 	identityService   *iam.IdentityService
 	guardianshipSvc   *iam.GuardianshipService
+	wechatAppService  *iam.WeChatAppService
 }
 
 // NewIAMModule 创建 IAM 模块
@@ -103,6 +104,18 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
+	// 创建 WeChatApp 服务
+	var wechatAppService *iam.WeChatAppService
+	if client.IsEnabled() {
+		wechatAppService, err = iam.NewWeChatAppService(client)
+		if err != nil {
+			logger.L(context.Background()).Warnw("Failed to create wechat app service",
+				"component", "iam_module",
+				"error", err.Error(),
+			)
+		}
+	}
+
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
 		"component", "iam_module",
 		"result", "success",
@@ -114,6 +127,7 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		serviceAuthHelper: serviceAuthHelper,
 		identityService:   identityService,
 		guardianshipSvc:   guardianshipSvc,
+		wechatAppService:  wechatAppService,
 	}, nil
 }
 
@@ -151,6 +165,12 @@ func (m *IAMModule) IdentityService() *iam.IdentityService {
 // 用于监护关系验证和查询
 func (m *IAMModule) GuardianshipService() *iam.GuardianshipService {
 	return m.guardianshipSvc
+}
+
+// WeChatAppService 返回微信应用服务
+// 用于查询微信应用信息（AppID、AppSecret 等）
+func (m *IAMModule) WeChatAppService() *iam.WeChatAppService {
+	return m.wechatAppService
 }
 
 // IsEnabled 检查 IAM 模块是否启用

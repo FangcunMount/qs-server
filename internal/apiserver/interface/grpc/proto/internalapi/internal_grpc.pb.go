@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal.proto
+// source: internalapi/internal.proto
 
 package internalapi
 
@@ -28,6 +28,8 @@ const (
 	InternalService_SyncPlanStatistics_FullMethodName              = "/internalapi.InternalService/SyncPlanStatistics"
 	InternalService_ValidateStatistics_FullMethodName              = "/internalapi.InternalService/ValidateStatistics"
 	InternalService_SchedulePendingTasks_FullMethodName            = "/internalapi.InternalService/SchedulePendingTasks"
+	InternalService_GenerateQuestionnaireQRCode_FullMethodName     = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
+	InternalService_GenerateScaleQRCode_FullMethodName             = "/internalapi.InternalService/GenerateScaleQRCode"
 )
 
 // InternalServiceClient is the client API for InternalService service.
@@ -54,25 +56,33 @@ type InternalServiceClient interface {
 	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
 	TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error)
 	// 同步每日统计
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/daily）
 	// 流程：将Redis中的每日统计数据同步到MySQL
 	SyncDailyStatistics(ctx context.Context, in *SyncDailyStatisticsRequest, opts ...grpc.CallOption) (*SyncDailyStatisticsResponse, error)
 	// 同步累计统计
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/accumulated）
 	// 流程：将Redis中的累计统计数据同步到MySQL
 	SyncAccumulatedStatistics(ctx context.Context, in *SyncAccumulatedStatisticsRequest, opts ...grpc.CallOption) (*SyncAccumulatedStatisticsResponse, error)
 	// 同步计划统计
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/plan）
 	// 流程：同步计划统计数据
 	SyncPlanStatistics(ctx context.Context, in *SyncPlanStatisticsRequest, opts ...grpc.CallOption) (*SyncPlanStatisticsResponse, error)
 	// 校验统计数据一致性
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/validate）
 	// 流程：校验Redis和MySQL的数据一致性
 	ValidateStatistics(ctx context.Context, in *ValidateStatisticsRequest, opts ...grpc.CallOption) (*ValidateStatisticsResponse, error)
 	// 调度待推送任务
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/plans/tasks/schedule）
 	// 流程：扫描待推送任务，生成入口并开放
 	SchedulePendingTasks(ctx context.Context, in *SchedulePendingTasksRequest, opts ...grpc.CallOption) (*SchedulePendingTasksResponse, error)
+	// 生成问卷小程序码
+	// 场景：worker 处理 questionnaire.published 事件后调用
+	// 流程：生成小程序码并保存，返回二维码 URL
+	GenerateQuestionnaireQRCode(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error)
+	// 生成量表小程序码
+	// 场景：worker 处理 scale.published 事件后调用
+	// 流程：生成小程序码并保存，返回二维码 URL
+	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
 }
 
 type internalServiceClient struct {
@@ -173,6 +183,26 @@ func (c *internalServiceClient) SchedulePendingTasks(ctx context.Context, in *Sc
 	return out, nil
 }
 
+func (c *internalServiceClient) GenerateQuestionnaireQRCode(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateQuestionnaireQRCodeResponse)
+	err := c.cc.Invoke(ctx, InternalService_GenerateQuestionnaireQRCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateScaleQRCodeResponse)
+	err := c.cc.Invoke(ctx, InternalService_GenerateScaleQRCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InternalServiceServer is the server API for InternalService service.
 // All implementations must embed UnimplementedInternalServiceServer
 // for forward compatibility.
@@ -197,25 +227,33 @@ type InternalServiceServer interface {
 	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
 	TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error)
 	// 同步每日统计
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/daily）
 	// 流程：将Redis中的每日统计数据同步到MySQL
 	SyncDailyStatistics(context.Context, *SyncDailyStatisticsRequest) (*SyncDailyStatisticsResponse, error)
 	// 同步累计统计
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/accumulated）
 	// 流程：将Redis中的累计统计数据同步到MySQL
 	SyncAccumulatedStatistics(context.Context, *SyncAccumulatedStatisticsRequest) (*SyncAccumulatedStatisticsResponse, error)
 	// 同步计划统计
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/sync/plan）
 	// 流程：同步计划统计数据
 	SyncPlanStatistics(context.Context, *SyncPlanStatisticsRequest) (*SyncPlanStatisticsResponse, error)
 	// 校验统计数据一致性
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/statistics/validate）
 	// 流程：校验Redis和MySQL的数据一致性
 	ValidateStatistics(context.Context, *ValidateStatisticsRequest) (*ValidateStatisticsResponse, error)
 	// 调度待推送任务
-	// 场景：sync 服务定时调用
+	// 场景：定时任务调用（推荐使用 REST API: POST /api/v1/plans/tasks/schedule）
 	// 流程：扫描待推送任务，生成入口并开放
 	SchedulePendingTasks(context.Context, *SchedulePendingTasksRequest) (*SchedulePendingTasksResponse, error)
+	// 生成问卷小程序码
+	// 场景：worker 处理 questionnaire.published 事件后调用
+	// 流程：生成小程序码并保存，返回二维码 URL
+	GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error)
+	// 生成量表小程序码
+	// 场景：worker 处理 scale.published 事件后调用
+	// 流程：生成小程序码并保存，返回二维码 URL
+	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
 	mustEmbedUnimplementedInternalServiceServer()
 }
 
@@ -252,6 +290,12 @@ func (UnimplementedInternalServiceServer) ValidateStatistics(context.Context, *V
 }
 func (UnimplementedInternalServiceServer) SchedulePendingTasks(context.Context, *SchedulePendingTasksRequest) (*SchedulePendingTasksResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SchedulePendingTasks not implemented")
+}
+func (UnimplementedInternalServiceServer) GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GenerateQuestionnaireQRCode not implemented")
+}
+func (UnimplementedInternalServiceServer) GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GenerateScaleQRCode not implemented")
 }
 func (UnimplementedInternalServiceServer) mustEmbedUnimplementedInternalServiceServer() {}
 func (UnimplementedInternalServiceServer) testEmbeddedByValue()                         {}
@@ -436,6 +480,42 @@ func _InternalService_SchedulePendingTasks_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_GenerateQuestionnaireQRCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateQuestionnaireQRCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).GenerateQuestionnaireQRCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_GenerateQuestionnaireQRCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).GenerateQuestionnaireQRCode(ctx, req.(*GenerateQuestionnaireQRCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_GenerateScaleQRCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateScaleQRCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).GenerateScaleQRCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_GenerateScaleQRCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).GenerateScaleQRCode(ctx, req.(*GenerateScaleQRCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InternalService_ServiceDesc is the grpc.ServiceDesc for InternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -479,7 +559,15 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "SchedulePendingTasks",
 			Handler:    _InternalService_SchedulePendingTasks_Handler,
 		},
+		{
+			MethodName: "GenerateQuestionnaireQRCode",
+			Handler:    _InternalService_GenerateQuestionnaireQRCode_Handler,
+		},
+		{
+			MethodName: "GenerateScaleQRCode",
+			Handler:    _InternalService_GenerateScaleQRCode_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal.proto",
+	Metadata: "internalapi/internal.proto",
 }

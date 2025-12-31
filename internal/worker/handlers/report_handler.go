@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"strconv"
 	"time"
+
+	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
 func init() {
@@ -158,11 +160,13 @@ func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data Repor
 
 	resp, err := deps.InternalClient.TagTestee(
 		ctx,
-		data.TesteeID,
-		data.RiskLevel,
-		data.ScaleCode,
-		markKeyFocus,
-		highRiskFactors,
+		&pb.TagTesteeRequest{
+			TesteeId:        data.TesteeID,
+			RiskLevel:       data.RiskLevel,
+			ScaleCode:       data.ScaleCode,
+			MarkKeyFocus:    markKeyFocus,
+			HighRiskFactors: highRiskFactors,
+		},
 	)
 	if err != nil {
 		deps.Logger.Warn("failed to tag testee",

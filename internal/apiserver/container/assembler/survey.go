@@ -6,6 +6,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -138,13 +139,28 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	sub.QueryService = quesApp.NewQueryService(sub.Repo)
 
 	// 初始化 handler 层
+	// 注意：QRCodeService 在容器初始化后才创建，需要通过 SetQRCodeService 方法单独设置
 	sub.Handler = handler.NewQuestionnaireHandler(
 		sub.LifecycleService,
 		sub.ContentService,
 		sub.QueryService,
+		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
 	)
 
 	return nil
+}
+
+// SetQRCodeService 设置二维码服务（用于跨模块依赖注入）
+func (m *SurveyModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
+	if m.Questionnaire != nil && m.Questionnaire.Handler != nil {
+		// 重新创建 Handler，传入 QRCodeService
+		m.Questionnaire.Handler = handler.NewQuestionnaireHandler(
+			m.Questionnaire.LifecycleService,
+			m.Questionnaire.ContentService,
+			m.Questionnaire.QueryService,
+			qrCodeService,
+		)
+	}
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块

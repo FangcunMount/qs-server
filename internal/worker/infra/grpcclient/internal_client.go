@@ -75,24 +75,51 @@ func (c *InternalClient) CalculateAnswerSheetScore(
 // TagTestee 给受试者打标签
 func (c *InternalClient) TagTestee(
 	ctx context.Context,
-	testeeID uint64,
-	riskLevel string,
-	scaleCode string,
-	markKeyFocus bool,
-	highRiskFactors []string,
+	req *pb.TagTesteeRequest,
 ) (*pb.TagTesteeResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
-	resp, err := c.client.TagTestee(ctx, &pb.TagTesteeRequest{
-		TesteeId:        testeeID,
-		RiskLevel:       riskLevel,
-		ScaleCode:       scaleCode,
-		MarkKeyFocus:    markKeyFocus,
-		HighRiskFactors: highRiskFactors,
-	})
+	resp, err := c.client.TagTestee(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to tag testee: %w", err)
+	}
+
+	return resp, nil
+}
+
+// GenerateQuestionnaireQRCode 生成问卷小程序码
+func (c *InternalClient) GenerateQuestionnaireQRCode(
+	ctx context.Context,
+	code, version string,
+) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.GenerateQuestionnaireQRCode(ctx, &pb.GenerateQuestionnaireQRCodeRequest{
+		Code:    code,
+		Version: version,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate questionnaire QR code: %w", err)
+	}
+
+	return resp, nil
+}
+
+// GenerateScaleQRCode 生成量表小程序码
+func (c *InternalClient) GenerateScaleQRCode(
+	ctx context.Context,
+	code string,
+) (*pb.GenerateScaleQRCodeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.GenerateScaleQRCode(ctx, &pb.GenerateScaleQRCodeRequest{
+		Code: code,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate scale QR code: %w", err)
 	}
 
 	return resp, nil

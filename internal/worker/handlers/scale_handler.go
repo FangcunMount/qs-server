@@ -89,6 +89,31 @@ func handleScalePublished(deps *Dependencies) HandlerFunc {
 		// 权衡：预热能减少首次访问延迟，但增加系统复杂度。
 		// 对于低频访问的量表，懒加载更经济；高频量表可考虑预热。
 
+		// 生成小程序码（通过 gRPC 调用 apiserver）
+		if deps.InternalClient != nil {
+			resp, err := deps.InternalClient.GenerateScaleQRCode(ctx, data.Code)
+			if err != nil {
+				deps.Logger.Warn("failed to generate scale QR code",
+					slog.String("event_id", env.ID),
+					slog.String("code", data.Code),
+					slog.String("error", err.Error()),
+				)
+				// 生成二维码失败不影响事件处理，只记录警告
+			} else if resp.Success {
+				deps.Logger.Info("scale QR code generated",
+					slog.String("event_id", env.ID),
+					slog.String("code", data.Code),
+					slog.String("qrcode_url", resp.QrcodeUrl),
+				)
+			} else {
+				deps.Logger.Warn("scale QR code generation failed",
+					slog.String("event_id", env.ID),
+					slog.String("code", data.Code),
+					slog.String("message", resp.Message),
+				)
+			}
+		}
+
 		return nil
 	}
 }
@@ -158,3 +183,4 @@ func handleScaleArchived(deps *Dependencies) HandlerFunc {
 		return nil
 	}
 }
+

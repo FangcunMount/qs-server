@@ -13,6 +13,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -321,6 +322,8 @@ func (m *EvaluationModule) SetScaleRepository(
 			scaleRepo,
 		)
 		// 重新创建 Handler，因为 ScoreQueryService 已更新
+		// 注意：这里不传入 QRCodeService，因为它在容器初始化后才创建
+		// QRCodeService 需要通过 SetQRCodeService 方法单独设置
 		m.Handler = handler.NewEvaluationHandler(
 			m.ManagementService,
 			m.ReportQueryService,
@@ -328,6 +331,12 @@ func (m *EvaluationModule) SetScaleRepository(
 			m.EvaluationService,
 		)
 	}
+}
+
+// SetQRCodeService 设置二维码服务（用于跨模块依赖注入）
+// 注意：EvaluationHandler 不再需要 QRCodeService，此方法保留以保持接口一致性
+func (m *EvaluationModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
+	// EvaluationHandler 不再需要 QRCodeService，因为二维码查询已移至问卷和量表 Handler
 }
 
 // Cleanup 清理模块资源

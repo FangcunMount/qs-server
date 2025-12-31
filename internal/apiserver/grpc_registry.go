@@ -213,6 +213,7 @@ func (r *GRPCRegistry) registerInternalService() error {
 		statisticsSyncService,      // 可能为 nil
 		statisticsValidatorService, // 可能为 nil
 		taskSchedulerService,       // 可能为 nil
+		r.container.QRCodeService,   // 可能为 nil
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker & Sync)")

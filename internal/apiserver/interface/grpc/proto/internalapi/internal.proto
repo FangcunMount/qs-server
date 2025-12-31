@@ -72,6 +72,20 @@ service InternalService {
   // 流程：扫描待推送任务，生成入口并开放
   rpc SchedulePendingTasks(SchedulePendingTasksRequest) 
       returns (SchedulePendingTasksResponse);
+  
+  // ==================== 小程序码生成操作 ====================
+  
+  // 生成问卷小程序码
+  // 场景：worker 处理 questionnaire.published 事件后调用
+  // 流程：生成小程序码并保存，返回二维码 URL
+  rpc GenerateQuestionnaireQRCode(GenerateQuestionnaireQRCodeRequest) 
+      returns (GenerateQuestionnaireQRCodeResponse);
+  
+  // 生成量表小程序码
+  // 场景：worker 处理 scale.published 事件后调用
+  // 流程：生成小程序码并保存，返回二维码 URL
+  rpc GenerateScaleQRCode(GenerateScaleQRCodeRequest) 
+      returns (GenerateScaleQRCodeResponse);
 }
 
 // ==================== CalculateAnswerSheetScore ====================
@@ -214,5 +228,34 @@ message SchedulePendingTasksRequest {
 message SchedulePendingTasksResponse {
   bool success = 1;                  // 是否成功
   int64 scheduled_count = 2;         // 调度的任务数
+  string message = 3;                // 描述信息
+}
+
+// ==================== GenerateQuestionnaireQRCode ====================
+
+// 生成问卷小程序码请求
+message GenerateQuestionnaireQRCodeRequest {
+  string code = 1;                    // 问卷编码
+  string version = 2;                 // 问卷版本
+}
+
+// 生成问卷小程序码响应
+message GenerateQuestionnaireQRCodeResponse {
+  bool success = 1;                  // 是否成功
+  string qrcode_url = 2;             // 二维码 URL
+  string message = 3;                // 描述信息
+}
+
+// ==================== GenerateScaleQRCode ====================
+
+// 生成量表小程序码请求
+message GenerateScaleQRCodeRequest {
+  string code = 1;                    // 量表编码
+}
+
+// 生成量表小程序码响应
+message GenerateScaleQRCodeResponse {
+  bool success = 1;                  // 是否成功
+  string qrcode_url = 2;             // 二维码 URL
   string message = 3;                // 描述信息
 }
