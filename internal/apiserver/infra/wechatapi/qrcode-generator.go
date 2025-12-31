@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/silenceper/wechat/v2"
@@ -13,6 +14,11 @@ import (
 	miniConfig "github.com/silenceper/wechat/v2/miniprogram/config"
 	"github.com/silenceper/wechat/v2/miniprogram/qrcode"
 )
+
+// contains 检查字符串是否包含子串（不区分大小写）
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
 
 // QRCodeGenerator 小程序码生成器实现
 type QRCodeGenerator struct {
@@ -132,10 +138,21 @@ func (g *QRCodeGenerator) GenerateUnlimitedQRCode(
 	miniProgram := wc.GetMiniProgram(cfg)
 	qr := miniProgram.GetQRCode()
 
+	// 验证并规范化页面路径
+	// 微信要求：页面路径不应以 / 开头
+	normalizedPage := strings.TrimPrefix(page, "/")
+	if normalizedPage != page {
+		logger.L(ctx).Warnw("Page path starts with /, removing it",
+			"infra_action", "generate_unlimited_qrcode",
+			"original_page", page,
+			"normalized_page", normalizedPage,
+		)
+	}
+
 	// 构建二维码参数（无限制版本使用 QRCoder，但需要设置 Scene 和 Page）
 	coderParams := qrcode.QRCoder{
 		Scene:     scene,
-		Page:      page,
+		Page:      normalizedPage,
 		Width:     width,
 		AutoColor: autoColor,
 		IsHyaline: isHyaline,
@@ -154,12 +171,26 @@ func (g *QRCodeGenerator) GenerateUnlimitedQRCode(
 	// 生成小程序码
 	response, err := qr.GetWXACodeUnlimit(coderParams)
 	if err != nil {
+		// 解析错误信息，提供更友好的错误提示
+		errMsg := err.Error()
+		if contains(errMsg, "41030") || contains(errMsg, "invalid page") {
+			logger.L(ctx).Errorw("Failed to generate unlimited miniprogram QR code: invalid page path",
+				"infra_action", "generate_unlimited_qrcode",
+				"app_id", appID,
+				"scene", scene,
+				"page", page,
+				"error", errMsg,
+				"hint", "请检查：1) 页面路径是否在小程序的 app.json 中注册；2) 小程序是否已发布；3) 页面路径格式是否正确（不应以 / 开头）",
+			)
+			return nil, fmt.Errorf("页面路径无效 (errcode=41030): %s。请检查：1) 页面路径是否在小程序的 app.json 中注册；2) 小程序是否已发布；3) 页面路径格式是否正确（不应以 / 开头）", page)
+		}
+
 		logger.L(ctx).Errorw("Failed to generate unlimited miniprogram QR code",
 			"infra_action", "generate_unlimited_qrcode",
 			"app_id", appID,
 			"scene", scene,
 			"page", page,
-			"error", err.Error(),
+			"error", errMsg,
 		)
 		return nil, fmt.Errorf("failed to generate unlimited miniprogram QR code: %w", err)
 	}
