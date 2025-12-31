@@ -55,9 +55,6 @@ func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
 	// API详细日志中间件
 	engine.Use(pkgmiddleware.APILogger())
 
-	// CORS 中间件
-	engine.Use(pkgmiddleware.Cors())
-
 	// 其他中间件
 	engine.Use(pkgmiddleware.NoCache)
 	engine.Use(pkgmiddleware.Options)
