@@ -13,7 +13,6 @@ app:
   name: "qs-apiserver"
   version: "1.0.0"
   mode: "production"  # development, production
-  host: "qs.yangshujie.com"
 
 # ============================================================================
 # 2. 服务端口配置

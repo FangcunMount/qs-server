@@ -10,12 +10,12 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
-	"github.com/spf13/viper"
 )
 
 const (
 	// QRCodeStorageDir 二维码存储目录
 	QRCodeStorageDir = "/data/image/qrcode"
+	QRCodeURLPrefix  = "https://qs.yangshujie.com/api/v1/qrcodes"
 )
 
 // Config 小程序码服务配置
@@ -312,28 +312,16 @@ func (s *service) saveQRCodeFile(ctx context.Context, fileName string, data []by
 
 // GetQRCodeURL 获取二维码URL
 func (s *service) getQRCodeURL(ctx context.Context, filePath string) (string, error) {
-	l := logger.L(ctx)
+	logger.L(ctx).Infow("获取二维码URL", "action", "get_qrcode_url", "file_path", filePath)
 
-	l.Infow("获取二维码URL",
-		"action", "get_qrcode_url",
-		"file_path", filePath,
-	)
+	// 判断 filePaht 是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		logger.L(ctx).Errorw("二维码文件不存在", "action", "get_qrcode_url", "file_path", filePath, "error", err.Error())
+		return "", fmt.Errorf("二维码文件不存在: %w", err)
+	}
 
-	// 拼接 URL
-	host := viper.GetString("app.host")
-	if host == "" {
-		return "", fmt.Errorf("app.host 未配置")
-	}
-	apiRoute := viper.GetString("server.api_route")
-	if apiRoute == "" {
-		return "", fmt.Errorf("server.api_route 未配置")
-	}
 	fileName := filepath.Base(filePath)
-	qrCodeURL := fmt.Sprintf("https://%s/%s/%s", host, apiRoute, fileName)
-	l.Infow("获取二维码URL成功",
-		"action", "get_qrcode_url",
-		"file_path", filePath,
-		"qrcode_url", qrCodeURL,
-	)
+	qrCodeURL := fmt.Sprintf("%s/%s", QRCodeURLPrefix, fileName)
+	logger.L(ctx).Infow("获取二维码URL成功", "action", "get_qrcode_url", "file_path", filePath, "qrcode_url", qrCodeURL)
 	return qrCodeURL, nil
 }
