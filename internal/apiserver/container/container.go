@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	redis "github.com/redis/go-redis/v9"
+	"github.com/silenceper/wechat/v2/cache"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
@@ -373,9 +374,17 @@ func (c *Container) initCodesService() {
 
 // initQRCodeGenerator 初始化小程序码生成器（基础设施层）
 func (c *Container) initQRCodeGenerator() {
-	// 创建小程序码生成器（使用 nil 缓存，SDK 会使用内存缓存）
-	// TODO: 如果需要使用 Redis 缓存，需要创建 cache.Cache 适配器
-	c.QRCodeGenerator = wechatapi.NewQRCodeGenerator(nil)
+	// 创建微信 SDK 缓存适配器（使用 Redis，如果 Redis 不可用则使用内存缓存）
+	var wechatCache cache.Cache
+	if c.redisCache != nil {
+		// 使用 Redis 缓存适配器
+		wechatCache = wechatapi.NewRedisCacheAdapter(c.redisCache)
+	} else {
+		// 降级使用内存缓存
+		wechatCache = cache.NewMemory()
+	}
+
+	c.QRCodeGenerator = wechatapi.NewQRCodeGenerator(wechatCache)
 	fmt.Printf("📱 QRCode generator initialized (infrastructure layer)\n")
 }
 
