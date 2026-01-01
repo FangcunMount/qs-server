@@ -35,9 +35,9 @@ type QuestionnaireSummaryResponse struct {
 	Version     string                     `json:"version"`
 	Status      domainQuestionnaire.Status `json:"status"` // 状态值：0=草稿, 1=已发布, 2=已归档
 	Type        string                     `json:"type"`
-	CreatedBy   string                     `json:"created_by"`
+	CreatedBy   string                     `json:"created_by"` // 创建人
 	CreatedAt   string                     `json:"created_at"`
-	UpdatedBy   string                     `json:"updated_by"`
+	UpdatedBy   string                     `json:"updated_by"` // 更新人
 	UpdatedAt   string                     `json:"updated_at"`
 }
 

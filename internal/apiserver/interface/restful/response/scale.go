@@ -20,8 +20,8 @@ type ScaleResponse struct {
 	QuestionnaireVersion string           `json:"questionnaire_version"`
 	Status               string           `json:"status"`
 	Factors              []FactorResponse `json:"factors,omitempty"`
-	CreatedBy            string           `json:"created_by"`
-	UpdatedBy            string           `json:"updated_by"`
+	CreatedBy            string           `json:"created_by"` // 创建人
+	UpdatedBy            string           `json:"updated_by"` // 更新人
 }
 
 // FactorResponse 因子响应
@@ -68,8 +68,8 @@ type ScaleSummaryResponse struct {
 	Tags              []string `json:"tags,omitempty"`
 	QuestionnaireCode string   `json:"questionnaire_code"`
 	Status            string   `json:"status"`
-	CreatedBy         string   `json:"created_by"`
-	UpdatedBy         string   `json:"updated_by"`
+	CreatedBy         string   `json:"created_by"` // 创建人
+	UpdatedBy         string   `json:"updated_by"` // 更新人
 }
 
 // ScaleSummaryListResponse 量表摘要列表响应

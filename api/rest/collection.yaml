@@ -1414,9 +1414,6 @@ components:
       properties:
         code:
           type: string
-        created_by:
-          description: 创建人姓名
-          type: string
         created_at:
           type: string
         description:
@@ -1431,9 +1428,6 @@ components:
           type: string
         type:
           description: 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
-          type: string
-        updated_by:
-          description: 更新人姓名
           type: string
         updated_at:
           type: string

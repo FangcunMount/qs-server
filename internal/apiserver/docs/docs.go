@@ -1591,6 +1591,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/qrcodes/{filename}": {
+            "get": {
+                "description": "根据文件名获取二维码图片",
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "QRCode"
+                ],
+                "summary": "获取二维码图片",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件名，例如 questionnaire_3adyDE_v1.png 或 scale_3adyDE.png",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/questionnaires": {
             "get": {
                 "description": "分页查询问卷列表，支持条件筛选（管理端使用）",
@@ -5703,6 +5744,10 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "created_by": {
+                    "description": "创建人",
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -5740,6 +5785,10 @@ const docTemplate = `{
                     }
                 },
                 "title": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "description": "更新人",
                     "type": "string"
                 }
             }

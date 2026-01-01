@@ -989,6 +989,9 @@ definitions:
         type: string
       code:
         type: string
+      created_by:
+        description: 创建人
+        type: string
       description:
         type: string
       factors:
@@ -1014,6 +1017,9 @@ definitions:
           type: string
         type: array
       title:
+        type: string
+      updated_by:
+        description: 更新人
         type: string
     type: object
   response.ScaleTestResponse:
@@ -2519,6 +2525,33 @@ paths:
       summary: 获取已发布问卷
       tags:
       - Questionnaire-Query
+  /api/v1/qrcodes/{filename}:
+    get:
+      description: 根据文件名获取二维码图片
+      parameters:
+      - description: 文件名，例如 questionnaire_3adyDE_v1.png 或 scale_3adyDE.png
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - image/png
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取二维码图片
+      tags:
+      - QRCode
   /api/v1/questionnaires:
     get:
       consumes:

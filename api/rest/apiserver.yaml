@@ -31,6 +31,8 @@ tags:
   description: Plan-Lifecycle
 - name: Plan-Query
   description: Plan-Query
+- name: QRCode
+  description: QRCode
 - name: Questionnaire-Content
   description: 问卷内容
 - name: Questionnaire-Lifecycle
@@ -1043,6 +1045,38 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.QuestionnaireResponse'
+  /qrcodes/{filename}:
+    get:
+      tags:
+      - QRCode
+      summary: 获取二维码图片
+      description: 根据文件名获取二维码图片
+      operationId: 获取二维码图片
+      parameters:
+      - type: string
+        description: 文件名，例如 questionnaire_3adyDE_v1.png 或 scale_3adyDE.png
+        name: filename
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: file
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
   /questionnaires:
     get:
       tags:
@@ -3795,6 +3829,9 @@ components:
           type: string
         code:
           type: string
+        created_by:
+          description: 创建人
+          type: string
         description:
           type: string
         factors:
@@ -3820,6 +3857,9 @@ components:
           items:
             type: string
         title:
+          type: string
+        updated_by:
+          description: 更新人
           type: string
     response.ScaleTestResponse:
       type: object
