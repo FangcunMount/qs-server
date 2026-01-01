@@ -8,14 +8,14 @@ import (
 
 // QuestionnaireResponse 问卷响应
 type QuestionnaireResponse struct {
-	Code        string                           `json:"code"`
-	Title       string                           `json:"title"`
-	Description string                           `json:"description"`
-	ImgUrl      string                           `json:"img_url"`
-	Version     string                           `json:"version"`
-	Status      domainQuestionnaire.Status       `json:"status"` // 状态值：0=草稿, 1=已发布, 2=已归档
-	Type        string                           `json:"type"`
-	Questions   []viewmodel.QuestionDTO          `json:"questions,omitempty"`
+	Code        string                     `json:"code"`
+	Title       string                     `json:"title"`
+	Description string                     `json:"description"`
+	ImgUrl      string                     `json:"img_url"`
+	Version     string                     `json:"version"`
+	Status      domainQuestionnaire.Status `json:"status"` // 状态值：0=草稿, 1=已发布, 2=已归档
+	Type        string                     `json:"type"`
+	Questions   []viewmodel.QuestionDTO    `json:"questions,omitempty"`
 }
 
 // QuestionnaireListResponse 问卷列表响应
@@ -35,6 +35,10 @@ type QuestionnaireSummaryResponse struct {
 	Version     string                     `json:"version"`
 	Status      domainQuestionnaire.Status `json:"status"` // 状态值：0=草稿, 1=已发布, 2=已归档
 	Type        string                     `json:"type"`
+	CreatedBy   string                     `json:"created_by"`
+	CreatedAt   string                     `json:"created_at"`
+	UpdatedBy   string                     `json:"updated_by"`
+	UpdatedAt   string                     `json:"updated_at"`
 }
 
 // QuestionnaireSummaryListResponse 问卷摘要列表响应
@@ -70,12 +74,12 @@ func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResul
 					optionCodes = append(optionCodes, code.Value())
 				}
 				conditions = append(conditions, viewmodel.ShowControllerConditionDTO{
-					Code:             cond.Code.Value(),
+					Code:              cond.Code.Value(),
 					SelectOptionCodes: optionCodes,
 				})
 			}
 			showController = &viewmodel.ShowControllerDTO{
-				Rule:     q.ShowController.GetRule(),
+				Rule:      q.ShowController.GetRule(),
 				Questions: conditions,
 			}
 		}
@@ -143,6 +147,10 @@ func NewQuestionnaireSummaryListResponse(result *questionnaire.QuestionnaireSumm
 			Version:     item.Version,
 			Status:      item.Status,
 			Type:        item.Type,
+			CreatedBy:   item.CreatedBy,
+			CreatedAt:   item.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedBy:   item.UpdatedBy,
+			UpdatedAt:   item.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 

@@ -6,6 +6,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -46,39 +47,83 @@ func (r *Repository) Create(ctx context.Context, qDomain *questionnaire.Question
 
 // FindByCode 根据编码查询问卷
 func (r *Repository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
-	filter := bson.M{
-		"code": code,
+	q, err := r.FindBaseByCode(ctx, code)
+	if err != nil || q == nil {
+		return q, err
 	}
-
-	var po QuestionnairePO
-	err := r.FindOne(ctx, filter, &po)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, nil // 或者返回自定义的NotFound错误
-		}
+	if err := r.LoadQuestions(ctx, q); err != nil {
 		return nil, err
 	}
-
-	return r.mapper.ToBO(&po), nil
+	return q, nil
 }
 
 // FindByCodeVersion 根据编码和版本查询问卷
 func (r *Repository) FindByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
+	q, err := r.FindBaseByCodeVersion(ctx, code, version)
+	if err != nil || q == nil {
+		return q, err
+	}
+	if err := r.LoadQuestions(ctx, q); err != nil {
+		return nil, err
+	}
+	return q, nil
+}
+
+// FindBaseByCode 根据编码查询问卷基础信息（不含问题详情）
+func (r *Repository) FindBaseByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
+	filter := bson.M{
+		"code": code,
+	}
+
+	po, err := r.aggregateBase(ctx, filter)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return r.mapper.ToBO(po), nil
+}
+
+// FindBaseByCodeVersion 根据编码和版本查询问卷基础信息（不含问题详情）
+func (r *Repository) FindBaseByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
 	filter := bson.M{
 		"code":    code,
 		"version": version,
 	}
 
-	var po QuestionnairePO
-	err := r.FindOne(ctx, filter, &po)
+	po, err := r.aggregateBase(ctx, filter)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil // 或者返回自定义的NotFound错误
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	return r.mapper.ToBO(&po), nil
+	return r.mapper.ToBO(po), nil
+}
+
+// LoadQuestions 加载问卷问题详情
+func (r *Repository) LoadQuestions(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
+	filter := bson.M{
+		"code": qDomain.GetCode().Value(),
+	}
+	if qDomain.GetVersion().String() != "" {
+		filter["version"] = qDomain.GetVersion().String()
+	}
+
+	projection := bson.M{"questions": 1}
+	var po QuestionnairePO
+	if err := r.Collection().FindOne(ctx, filter, options.FindOne().SetProjection(projection)).Decode(&po); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil
+		}
+		return err
+	}
+
+	qDomain.SetQuestions(r.mapper.mapQuestions(po.Questions))
+	return nil
 }
 
 // Update 更新问卷
@@ -180,8 +225,8 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 	return r.CountDocuments(ctx, filter)
 }
 
-// FindSummaryList 查询问卷摘要列表（轻量级，使用聚合管道计算 question_count）
-func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.QuestionnaireSummary, error) {
+// FindBaseList 查询问卷基础列表（轻量级，使用聚合管道计算 question_count）
+func (r *Repository) FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.Questionnaire, error) {
 	filter := bson.M{
 		"deleted_at": nil,
 	}
@@ -204,23 +249,7 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 	skip := int64((page - 1) * pageSize)
 	limit := int64(pageSize)
 
-	// 使用聚合管道：计算 question_count 并排除 questions 数组
-	pipeline := []bson.M{
-		{"$match": filter},
-		{"$skip": skip},
-		{"$limit": limit},
-		{"$project": bson.M{
-			"code":           1,
-			"title":          1,
-			"description":    1,
-			"img_url":        1,
-			"version":        1,
-			"status":         1,
-			"type":           1,
-			"question_count": bson.M{"$size": bson.M{"$ifNull": []interface{}{"$questions", []interface{}{}}}},
-			// questions 数组不返回，只返回其长度
-		}},
-	}
+	pipeline := buildBasePipeline(filter, &skip, &limit)
 
 	cursor, err := r.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
@@ -228,27 +257,68 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 	}
 	defer cursor.Close(ctx)
 
-	var summaries []*questionnaire.QuestionnaireSummary
+	var questionnaires []*questionnaire.Questionnaire
 	for cursor.Next(ctx) {
-		var po QuestionnaireSummaryPO
+		var po QuestionnairePO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		summaries = append(summaries, &questionnaire.QuestionnaireSummary{
-			Code:          po.Code,
-			Title:         po.Title,
-			Description:   po.Description,
-			ImgUrl:        po.ImgUrl,
-			Version:       po.Version,
-			Status:        questionnaire.Status(po.Status),
-			Type:          questionnaire.NormalizeQuestionnaireType(po.Type),
-			QuestionCount: po.QuestionCount,
-		})
+		questionnaires = append(questionnaires, r.mapper.ToBO(&po))
 	}
 
 	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 
-	return summaries, nil
+	return questionnaires, nil
+}
+
+func (r *Repository) aggregateBase(ctx context.Context, filter bson.M) (*QuestionnairePO, error) {
+	limit := int64(1)
+	pipeline := buildBasePipeline(filter, nil, &limit)
+	cursor, err := r.Collection().Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if !cursor.Next(ctx) {
+		if err := cursor.Err(); err != nil {
+			return nil, err
+		}
+		return nil, mongo.ErrNoDocuments
+	}
+
+	var po QuestionnairePO
+	if err := cursor.Decode(&po); err != nil {
+		return nil, err
+	}
+	return &po, nil
+}
+
+func buildBasePipeline(filter bson.M, skip, limit *int64) []bson.M {
+	pipeline := []bson.M{
+		{"$match": filter},
+	}
+	if skip != nil {
+		pipeline = append(pipeline, bson.M{"$skip": *skip})
+	}
+	if limit != nil {
+		pipeline = append(pipeline, bson.M{"$limit": *limit})
+	}
+	pipeline = append(pipeline, bson.M{"$project": bson.M{
+		"code":           1,
+		"title":          1,
+		"description":    1,
+		"img_url":        1,
+		"version":        1,
+		"status":         1,
+		"type":           1,
+		"question_count": bson.M{"$size": bson.M{"$ifNull": []interface{}{"$questions", []interface{}{}}}},
+		"created_by":     1,
+		"created_at":     1,
+		"updated_by":     1,
+		"updated_at":     1,
+	}})
+	return pipeline
 }

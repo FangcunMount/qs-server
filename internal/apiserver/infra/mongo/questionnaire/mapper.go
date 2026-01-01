@@ -1,6 +1,7 @@
 package questionnaire
 
 import (
+	staff "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
@@ -26,6 +27,10 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		Status:      bo.GetStatus().Value(),
 		Type:        bo.GetType().String(),
 	}
+	po.CreatedAt = bo.GetCreatedAt()
+	po.CreatedBy = staffID(bo.GetCreatedBy())
+	po.UpdatedAt = bo.GetUpdatedAt()
+	po.UpdatedBy = staffID(bo.GetUpdatedBy())
 
 	for _, questionBO := range bo.GetQuestions() {
 		questionPO := QuestionPO{
@@ -92,15 +97,26 @@ func (m *QuestionnaireMapper) mapCalculationRule(rule *calculation.CalculationRu
 // ToBO 将MongoDB持久化对象转换为业务对象
 func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionnaire {
 	// 创建问卷对象（code 是唯一标识，不再使用 ID）
-	q, _ := questionnaire.NewQuestionnaire(
-		meta.NewCode(po.Code),
-		po.Title,
+	opts := []questionnaire.QuestionnaireOption{
 		questionnaire.WithDesc(po.Description),
 		questionnaire.WithImgUrl(po.ImgUrl),
 		questionnaire.WithVersion(questionnaire.NewVersion(po.Version)),
 		questionnaire.WithStatus(questionnaire.Status(po.Status)),
 		questionnaire.WithType(questionnaire.NormalizeQuestionnaireType(po.Type)),
-		questionnaire.WithQuestions(m.mapQuestions(po.Questions)),
+		questionnaire.WithQuestionCount(po.QuestionCount),
+		questionnaire.WithCreatedBy(buildStaff(po.CreatedBy)),
+		questionnaire.WithCreatedAt(po.CreatedAt),
+		questionnaire.WithUpdatedBy(buildStaff(po.UpdatedBy)),
+		questionnaire.WithUpdatedAt(po.UpdatedAt),
+	}
+	if po.Questions != nil {
+		opts = append(opts, questionnaire.WithQuestions(m.mapQuestions(po.Questions)))
+	}
+
+	q, _ := questionnaire.NewQuestionnaire(
+		meta.NewCode(po.Code),
+		po.Title,
+		opts...,
 	)
 
 	return q
@@ -145,6 +161,22 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []questionn
 	}
 
 	return questions
+}
+
+func buildStaff(id uint64) *staff.Staff {
+	if id == 0 {
+		return nil
+	}
+	st := &staff.Staff{}
+	st.SetID(staff.NewID(id))
+	return st
+}
+
+func staffID(st *staff.Staff) uint64 {
+	if st == nil {
+		return 0
+	}
+	return st.ID().Uint64()
 }
 
 // mapOptionsPOToBO 将选项PO转换为选项BO

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
@@ -21,20 +20,7 @@ type QuestionnairePO struct {
 	Status            uint8        `bson:"status" json:"status"`
 	Type              string       `bson:"type" json:"type"`
 	Questions         []QuestionPO `bson:"questions,omitempty" json:"questions,omitempty"`
-}
-
-// QuestionnaireSummaryPO 问卷摘要持久化对象（轻量级，不包含问题详情）
-// 用于列表查询时减少内存占用
-type QuestionnaireSummaryPO struct {
-	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	Code          string             `bson:"code" json:"code"`
-	Title         string             `bson:"title" json:"title"`
-	Description   string             `bson:"description,omitempty" json:"description,omitempty"`
-	ImgUrl        string             `bson:"img_url,omitempty" json:"img_url,omitempty"`
-	Version       string             `bson:"version" json:"version"`
-	Status        uint8              `bson:"status" json:"status"`
-	Type          string             `bson:"type" json:"type"`
-	QuestionCount int                `bson:"question_count" json:"question_count"` // 由聚合管道计算
+	QuestionCount     int          `bson:"question_count,omitempty" json:"question_count,omitempty"`
 }
 
 // CollectionName 集合名称
@@ -44,9 +30,6 @@ func (QuestionnairePO) CollectionName() string {
 
 // BeforeInsert 插入前设置字段
 func (p *QuestionnairePO) BeforeInsert() {
-	if p.ID.IsZero() {
-		p.ID = primitive.NewObjectID()
-	}
 	now := time.Now()
 	p.CreatedAt = now
 	p.UpdatedAt = now

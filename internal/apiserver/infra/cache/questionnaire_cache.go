@@ -127,10 +127,25 @@ func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, c
 	return qDomain, nil
 }
 
-// FindSummaryList 查询问卷摘要列表
-func (r *CachedQuestionnaireRepository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.QuestionnaireSummary, error) {
+// FindBaseByCode 根据编码查询问卷基础信息
+func (r *CachedQuestionnaireRepository) FindBaseByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
+	return r.repo.FindBaseByCode(ctx, code)
+}
+
+// FindBaseByCodeVersion 根据编码和版本查询问卷基础信息
+func (r *CachedQuestionnaireRepository) FindBaseByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
+	return r.repo.FindBaseByCodeVersion(ctx, code, version)
+}
+
+// LoadQuestions 加载问卷问题详情
+func (r *CachedQuestionnaireRepository) LoadQuestions(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
+	return r.repo.LoadQuestions(ctx, qDomain)
+}
+
+// FindBaseList 查询问卷基础列表
+func (r *CachedQuestionnaireRepository) FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.Questionnaire, error) {
 	// 列表查询不缓存（条件多样，缓存命中率低）
-	return r.repo.FindSummaryList(ctx, page, pageSize, conditions)
+	return r.repo.FindBaseList(ctx, page, pageSize, conditions)
 }
 
 // CountWithConditions 统计问卷数量
@@ -289,4 +304,3 @@ func (r *CachedQuestionnaireRepository) WarmupCache(ctx context.Context, codes [
 
 	return nil
 }
-

@@ -1,6 +1,9 @@
 package questionnaire
 
 import (
+	"time"
+
+	staff "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
 
@@ -54,6 +57,10 @@ type QuestionnaireSummaryResult struct {
 	Status        domainQuestionnaire.Status // 状态：0=草稿, 1=已发布, 2=已归档
 	Type          string                     // 问卷分类
 	QuestionCount int                        // 问题数量
+	CreatedBy     string                     // 创建人
+	CreatedAt     time.Time                  // 创建时间
+	UpdatedBy     string                     // 更新人
+	UpdatedAt     time.Time                  // 更新时间
 }
 
 // QuestionnaireSummaryListResult 问卷摘要列表结果
@@ -125,40 +132,30 @@ func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 	return result
 }
 
-// toQuestionnaireListResult 将问卷列表转换为结果对象
-func toQuestionnaireListResult(items []*domainQuestionnaire.Questionnaire, total int64) *QuestionnaireListResult {
-	result := &QuestionnaireListResult{
-		Items: make([]*QuestionnaireResult, 0, len(items)),
-		Total: total,
-	}
-
-	for _, item := range items {
-		result.Items = append(result.Items, toQuestionnaireResult(item))
-	}
-
-	return result
-}
-
-// toQuestionnaireSummaryResult 将问卷摘要领域模型转换为结果对象
-func toQuestionnaireSummaryResult(s *domainQuestionnaire.QuestionnaireSummary) *QuestionnaireSummaryResult {
-	if s == nil {
+// toQuestionnaireSummaryResult 将问卷领域模型转换为摘要结果对象
+func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireSummaryResult {
+	if q == nil {
 		return nil
 	}
 
 	return &QuestionnaireSummaryResult{
-		Code:          s.Code,
-		Version:       s.Version,
-		Title:         s.Title,
-		Description:   s.Description,
-		ImgUrl:        s.ImgUrl,
-		Status:        s.Status, // 直接使用 Status 类型，JSON 序列化为数字
-		Type:          s.Type.String(),
-		QuestionCount: s.QuestionCount,
+		Code:          q.GetCode().String(),
+		Version:       q.GetVersion().String(),
+		Title:         q.GetTitle(),
+		Description:   q.GetDescription(),
+		ImgUrl:        q.GetImgUrl(),
+		Status:        q.GetStatus(), // 直接使用 Status 类型，JSON 序列化为数字
+		Type:          q.GetType().String(),
+		QuestionCount: q.GetQuestionCnt(),
+		CreatedBy:     staffName(q.GetCreatedBy()),
+		CreatedAt:     q.GetCreatedAt(),
+		UpdatedBy:     staffName(q.GetUpdatedBy()),
+		UpdatedAt:     q.GetUpdatedAt(),
 	}
 }
 
 // toQuestionnaireSummaryListResult 将问卷摘要列表转换为结果对象
-func toQuestionnaireSummaryListResult(items []*domainQuestionnaire.QuestionnaireSummary, total int64) *QuestionnaireSummaryListResult {
+func toQuestionnaireSummaryListResult(items []*domainQuestionnaire.Questionnaire, total int64) *QuestionnaireSummaryListResult {
 	result := &QuestionnaireSummaryListResult{
 		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
 		Total: total,
@@ -169,4 +166,11 @@ func toQuestionnaireSummaryListResult(items []*domainQuestionnaire.Questionnaire
 	}
 
 	return result
+}
+
+func staffName(st *staff.Staff) string {
+	if st == nil {
+		return ""
+	}
+	return st.Name()
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	staff "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -25,7 +26,14 @@ type Questionnaire struct {
 	status  Status  // 问卷状态： 草稿/已发布/已归档
 
 	// —— 问题列表
-	questions []Question // 问卷中的所有问题
+	questions   []Question // 问卷中的所有问题
+	questionCnt int        // 问题数量（可从聚合查询获得）
+
+	// —— 审计信息
+	createdBy *staff.Staff
+	createdAt time.Time
+	updatedBy *staff.Staff
+	updatedAt time.Time
 
 	// —— 领域事件收集器
 	events []event.DomainEvent
@@ -75,7 +83,25 @@ func WithType(t QuestionnaireType) QuestionnaireOption {
 	return func(q *Questionnaire) { q.typ = t }
 }
 func WithQuestions(ques []Question) QuestionnaireOption {
-	return func(q *Questionnaire) { q.questions = ques }
+	return func(q *Questionnaire) {
+		q.questions = ques
+		q.questionCnt = len(ques)
+	}
+}
+func WithQuestionCount(cnt int) QuestionnaireOption {
+	return func(q *Questionnaire) { q.questionCnt = cnt }
+}
+func WithCreatedBy(s *staff.Staff) QuestionnaireOption {
+	return func(q *Questionnaire) { q.createdBy = s }
+}
+func WithCreatedAt(t time.Time) QuestionnaireOption {
+	return func(q *Questionnaire) { q.createdAt = t }
+}
+func WithUpdatedBy(s *staff.Staff) QuestionnaireOption {
+	return func(q *Questionnaire) { q.updatedBy = s }
+}
+func WithUpdatedAt(t time.Time) QuestionnaireOption {
+	return func(q *Questionnaire) { q.updatedAt = t }
 }
 
 // ===================== 对外暴露方法，供外部调用 =====================
@@ -91,11 +117,15 @@ func (q *Questionnaire) GetType() QuestionnaireType {
 	}
 	return q.typ
 }
-func (q *Questionnaire) GetTitle() string       { return q.title }
-func (q *Questionnaire) GetDescription() string { return q.desc }
-func (q *Questionnaire) GetImgUrl() string      { return q.imgUrl }
-func (q *Questionnaire) GetVersion() Version    { return q.version }
-func (q *Questionnaire) GetStatus() Status      { return q.status }
+func (q *Questionnaire) GetTitle() string           { return q.title }
+func (q *Questionnaire) GetDescription() string     { return q.desc }
+func (q *Questionnaire) GetImgUrl() string          { return q.imgUrl }
+func (q *Questionnaire) GetVersion() Version        { return q.version }
+func (q *Questionnaire) GetStatus() Status          { return q.status }
+func (q *Questionnaire) GetCreatedBy() *staff.Staff { return q.createdBy }
+func (q *Questionnaire) GetCreatedAt() time.Time    { return q.createdAt }
+func (q *Questionnaire) GetUpdatedBy() *staff.Staff { return q.updatedBy }
+func (q *Questionnaire) GetUpdatedAt() time.Time    { return q.updatedAt }
 
 // Status 问卷状态判断
 func (q *Questionnaire) IsDraft() bool     { return q.status == STATUS_DRAFT }
@@ -123,6 +153,20 @@ func (q *Questionnaire) GetQuestions() []Question {
 	return q.questions
 }
 
+// SetQuestions 设置问题列表（仓储层重建使用）
+func (q *Questionnaire) SetQuestions(questions []Question) {
+	q.questions = questions
+	q.questionCnt = len(questions)
+}
+
+func (q *Questionnaire) SetCreatedBy(st *staff.Staff) {
+	q.createdBy = st
+}
+
+func (q *Questionnaire) SetUpdatedBy(st *staff.Staff) {
+	q.updatedBy = st
+}
+
 // GetQuestionByCode 根据问题编码获取问题
 func (q *Questionnaire) GetQuestionByCode(c meta.Code) (Question, bool) {
 	for _, que := range q.GetQuestions() {
@@ -135,6 +179,14 @@ func (q *Questionnaire) GetQuestionByCode(c meta.Code) (Question, bool) {
 
 // QuestionCount 获取问卷中的问题个数
 func (q *Questionnaire) QuestionCount() int {
+	return q.GetQuestionCnt()
+}
+
+// GetQuestionCnt 获取问题数量（优先使用聚合查询结果）
+func (q *Questionnaire) GetQuestionCnt() int {
+	if q.questionCnt > 0 {
+		return q.questionCnt
+	}
 	return len(q.questions)
 }
 
@@ -181,6 +233,7 @@ func (q *Questionnaire) addQuestion(que Question) error {
 
 	// 向问题列表尾部追加
 	q.questions = append(q.questions, que)
+	q.questionCnt = len(q.questions)
 	return nil
 }
 
@@ -189,6 +242,7 @@ func (q *Questionnaire) removeQuestion(c meta.Code) error {
 	for i, que := range q.questions {
 		if que.GetCode() == c {
 			q.questions = append(q.questions[:i], q.questions[i+1:]...)
+			q.questionCnt = len(q.questions)
 			return nil
 		}
 	}

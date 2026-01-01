@@ -79,7 +79,7 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 		dto.Conditions["type"] = questionnaire.NormalizeQuestionnaireType(t).String()
 	}
 
-	summaries, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	questionnaires, err := s.repo.FindBaseList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
 		l.Errorw("查询问卷摘要列表失败",
 			"action", "list",
@@ -100,12 +100,14 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
 
+	// 4. 转换为结果对象
+	result := toQuestionnaireSummaryListResult(questionnaires, total)
 	s.logSuccess(ctx, "list", startTime,
 		"total_count", total,
-		"page_count", len(summaries),
+		"page_count", len(questionnaires),
 	)
 
-	return toQuestionnaireSummaryListResult(summaries, total), nil
+	return result, nil
 }
 
 // GetPublishedByCode 获取已发布的问卷
@@ -175,7 +177,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	// 3. 获取问卷摘要列表（轻量级查询）
-	summaries, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	questionnaires, err := s.repo.FindBaseList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
 		l.Errorw("查询已发布问卷摘要列表失败",
 			"action", "list_published",
@@ -196,12 +198,13 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
 
+	result := toQuestionnaireSummaryListResult(questionnaires, total)
 	s.logSuccess(ctx, "list_published", startTime,
 		"total_count", total,
-		"page_count", len(summaries),
+		"page_count", len(questionnaires),
 	)
 
-	return toQuestionnaireSummaryListResult(summaries, total), nil
+	return result, nil
 }
 
 // validateCode 验证问卷编码
