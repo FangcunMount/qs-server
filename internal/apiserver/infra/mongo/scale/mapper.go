@@ -62,6 +62,10 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 		Status:               domain.GetStatus().Value(),
 		Factors:              m.mapFactorsToPO(domain.GetFactors()),
 	}
+	po.CreatedAt = domain.GetCreatedAt()
+	po.CreatedBy = domain.GetCreatedBy().Uint64()
+	po.UpdatedAt = domain.GetUpdatedAt()
+	po.UpdatedBy = domain.GetUpdatedBy().Uint64()
 
 	return po
 }
@@ -169,6 +173,10 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 		scale.WithQuestionnaire(meta.NewCode(po.QuestionnaireCode), po.QuestionnaireVersion),
 		scale.WithStatus(scale.Status(po.Status)),
 		scale.WithFactors(factors),
+		scale.WithCreatedBy(meta.FromUint64(po.CreatedBy)),
+		scale.WithCreatedAt(po.CreatedAt),
+		scale.WithUpdatedBy(meta.FromUint64(po.UpdatedBy)),
+		scale.WithUpdatedAt(po.UpdatedAt),
 	)
 	if err != nil {
 		// 如果创建失败，返回 nil（理论上不应该发生，因为 PO 数据应该是有效的）

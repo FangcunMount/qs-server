@@ -2,6 +2,8 @@ package scale
 
 import (
 	"context"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ScaleSummary 量表摘要（用于列表查询，不包含 factors 详情）
@@ -16,6 +18,8 @@ type ScaleSummary struct {
 	Tags              []Tag
 	QuestionnaireCode string
 	Status            Status
+	CreatedBy         meta.ID
+	UpdatedBy         meta.ID
 }
 
 // Repository 医学量表存储库接口（出站端口）

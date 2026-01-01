@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -46,6 +47,7 @@ func NewScaleModule() *ScaleModule {
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: questionnaire.Repository (可选，用于自动获取问卷版本)
 // params[3]: redis.UniversalClient (可选，用于缓存装饰器)
+// params[4]: *iam.IdentityService (可选，用于姓名补全)
 func (m *ScaleModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -81,6 +83,13 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
+	// 获取 IAM IdentityService（可选参数，用于姓名补全）
+	var identitySvc *iam.IdentityService
+	if len(params) > 4 {
+		if svc, ok := params[4].(*iam.IdentityService); ok {
+			identitySvc = svc
+		}
+	}
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := scaleInfra.NewRepository(mongoDB)
@@ -95,7 +104,7 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
 	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher)
 	m.FactorService = scaleApp.NewFactorService(m.Repo)
-	m.QueryService = scaleApp.NewQueryService(m.Repo)
+	m.QueryService = scaleApp.NewQueryService(m.Repo, identitySvc)
 	m.CategoryService = scaleApp.NewCategoryService()
 
 	// 初始化 handler 层

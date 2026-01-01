@@ -37,6 +37,12 @@ type MedicalScale struct {
 	// 因子列表（包含解读规则）
 	factors []*Factor
 
+	// —— 审计信息
+	createdBy meta.ID
+	createdAt time.Time
+	updatedBy meta.ID
+	updatedAt time.Time
+
 	// 领域事件收集器
 	events []event.DomainEvent
 }
@@ -103,6 +109,34 @@ func WithStatus(s Status) MedicalScaleOption {
 func WithFactors(factors []*Factor) MedicalScaleOption {
 	return func(m *MedicalScale) {
 		m.factors = factors
+	}
+}
+
+// WithCreatedBy 设置创建人
+func WithCreatedBy(id meta.ID) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.createdBy = id
+	}
+}
+
+// WithCreatedAt 设置创建时间
+func WithCreatedAt(t time.Time) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.createdAt = t
+	}
+}
+
+// WithUpdatedBy 设置更新人
+func WithUpdatedBy(id meta.ID) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.updatedBy = id
+	}
+}
+
+// WithUpdatedAt 设置更新时间
+func WithUpdatedAt(t time.Time) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.updatedAt = t
 	}
 }
 
@@ -197,6 +231,36 @@ func (m *MedicalScale) GetStatus() Status {
 // GetFactors 获取因子列表
 func (m *MedicalScale) GetFactors() []*Factor {
 	return m.factors
+}
+
+// GetCreatedBy 获取创建人
+func (m *MedicalScale) GetCreatedBy() meta.ID {
+	return m.createdBy
+}
+
+// GetCreatedAt 获取创建时间
+func (m *MedicalScale) GetCreatedAt() time.Time {
+	return m.createdAt
+}
+
+// GetUpdatedBy 获取更新人
+func (m *MedicalScale) GetUpdatedBy() meta.ID {
+	return m.updatedBy
+}
+
+// GetUpdatedAt 获取更新时间
+func (m *MedicalScale) GetUpdatedAt() time.Time {
+	return m.updatedAt
+}
+
+// SetCreatedBy 设置创建人（仓储层重建使用）
+func (m *MedicalScale) SetCreatedBy(id meta.ID) {
+	m.createdBy = id
+}
+
+// SetUpdatedBy 设置更新人（仓储层重建使用）
+func (m *MedicalScale) SetUpdatedBy(id meta.ID) {
+	m.updatedBy = id
 }
 
 // GetCategory 获取类别

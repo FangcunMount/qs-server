@@ -10,6 +10,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Repository Scale MongoDB 存储库
@@ -102,6 +103,8 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			"tags":               1,
 			"questionnaire_code": 1,
 			"status":             1,
+			"created_by":         1,
+			"updated_by":         1,
 		})
 
 	cursor, err := r.Collection().Find(ctx, filter, opts)
@@ -153,6 +156,8 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			Tags:              tags,
 			QuestionnaireCode: po.QuestionnaireCode,
 			Status:            scale.Status(po.Status),
+			CreatedBy:         meta.FromUint64(po.CreatedBy),
+			UpdatedBy:         meta.FromUint64(po.UpdatedBy),
 		})
 	}
 

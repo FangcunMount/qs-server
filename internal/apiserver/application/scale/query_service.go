@@ -6,19 +6,22 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 量表查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	repo scale.Repository
+	repo        scale.Repository
+	identitySvc *iam.IdentityService
 }
 
 // NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository) ScaleQueryService {
+func NewQueryService(repo scale.Repository, identitySvc *iam.IdentityService) ScaleQueryService {
 	return &queryService{
-		repo: repo,
+		repo:        repo,
+		identitySvc: identitySvc,
 	}
 }
 
@@ -35,7 +38,7 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*ScaleResult
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
 
-	return toScaleResult(m), nil
+	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
 
 // GetByQuestionnaireCode 根据问卷编码获取量表
@@ -51,7 +54,7 @@ func (s *queryService) GetByQuestionnaireCode(ctx context.Context, questionnaire
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
 
-	return toScaleResult(m), nil
+	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
 
 // List 查询量表摘要列表
@@ -79,7 +82,7 @@ func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleSumma
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	return toSummaryListResult(items, total), nil
+	return toSummaryListResult(ctx, items, total, s.identitySvc), nil
 }
 
 // GetPublishedByCode 获取已发布的量表
@@ -100,7 +103,7 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Sc
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表未发布")
 	}
 
-	return toScaleResult(m), nil
+	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
 
 // ListPublished 查询已发布量表摘要列表
@@ -135,7 +138,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	return toSummaryListResult(items, total), nil
+	return toSummaryListResult(ctx, items, total, s.identitySvc), nil
 }
 
 // GetFactors 获取量表的因子列表

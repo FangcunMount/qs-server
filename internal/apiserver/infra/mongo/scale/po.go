@@ -121,4 +121,6 @@ type ScaleSummaryPO struct {
 	Tags              []string `bson:"tags"`
 	QuestionnaireCode string   `bson:"questionnaire_code"`
 	Status            uint8    `bson:"status"`
+	CreatedBy         uint64   `bson:"created_by"`
+	UpdatedBy         uint64   `bson:"updated_by"`
 }

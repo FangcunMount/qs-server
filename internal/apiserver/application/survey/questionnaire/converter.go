@@ -149,9 +149,9 @@ func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire, userName
 		Status:        q.GetStatus(), // 直接使用 Status 类型，JSON 序列化为数字
 		Type:          q.GetType().String(),
 		QuestionCount: q.GetQuestionCnt(),
-		CreatedBy:     userDisplayName(q.GetCreatedBy(), userNames),
+		CreatedBy:     iam.DisplayName(q.GetCreatedBy(), userNames),
 		CreatedAt:     q.GetCreatedAt(),
-		UpdatedBy:     userDisplayName(q.GetUpdatedBy(), userNames),
+		UpdatedBy:     iam.DisplayName(q.GetUpdatedBy(), userNames),
 		UpdatedAt:     q.GetUpdatedAt(),
 	}
 }
@@ -171,59 +171,13 @@ func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuesti
 	return result
 }
 
-func userDisplayName(id meta.ID, userNames map[string]string) string {
-	if id.IsZero() {
-		return ""
-	}
-	if userNames != nil {
-		if name, ok := userNames[id.String()]; ok && name != "" {
-			return name
-		}
-	}
-	return id.String()
-}
-
 func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Questionnaire, identitySvc *iam.IdentityService) map[string]string {
-	if identitySvc == nil || !identitySvc.IsEnabled() {
-		return nil
-	}
-
-	userIDs := make(map[string]struct{})
+	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		if id := item.GetCreatedBy(); !id.IsZero() {
-			userIDs[id.String()] = struct{}{}
-		}
-		if id := item.GetUpdatedBy(); !id.IsZero() {
-			userIDs[id.String()] = struct{}{}
-		}
+		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
 	}
-
-	if len(userIDs) == 0 {
-		return nil
-	}
-
-	ids := make([]string, 0, len(userIDs))
-	for id := range userIDs {
-		ids = append(ids, id)
-	}
-
-	resp, err := identitySvc.BatchGetUsers(ctx, ids)
-	if err != nil {
-		return nil
-	}
-
-	userNames := make(map[string]string)
-	for _, user := range resp.GetUsers() {
-		if user == nil {
-			continue
-		}
-		if name := user.GetNickname(); name != "" {
-			userNames[user.GetId()] = name
-		}
-	}
-
-	return userNames
+	return iam.ResolveUserNames(ctx, identitySvc, userIDs)
 }

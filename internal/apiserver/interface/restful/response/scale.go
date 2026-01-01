@@ -20,6 +20,8 @@ type ScaleResponse struct {
 	QuestionnaireVersion string           `json:"questionnaire_version"`
 	Status               string           `json:"status"`
 	Factors              []FactorResponse `json:"factors,omitempty"`
+	CreatedBy            string           `json:"created_by"`
+	UpdatedBy            string           `json:"updated_by"`
 }
 
 // FactorResponse 因子响应
@@ -32,7 +34,7 @@ type FactorResponse struct {
 	QuestionCodes   []string                `json:"question_codes"`
 	ScoringStrategy string                  `json:"scoring_strategy"`
 	ScoringParams   map[string]interface{}  `json:"scoring_params"`
-	MaxScore        *float64                `json:"max_score,omitempty"` // 最大分
+	MaxScore        *float64                `json:"max_score,omitempty"`  // 最大分
 	RiskLevel       string                  `json:"risk_level,omitempty"` // 因子级别的风险等级（从解读规则中提取）
 	InterpretRules  []InterpretRuleResponse `json:"interpret_rules,omitempty"`
 }
@@ -66,6 +68,8 @@ type ScaleSummaryResponse struct {
 	Tags              []string `json:"tags,omitempty"`
 	QuestionnaireCode string   `json:"questionnaire_code"`
 	Status            string   `json:"status"`
+	CreatedBy         string   `json:"created_by"`
+	UpdatedBy         string   `json:"updated_by"`
 }
 
 // ScaleSummaryListResponse 量表摘要列表响应
@@ -102,6 +106,8 @@ func NewScaleResponse(result *scale.ScaleResult) *ScaleResponse {
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		Status:               result.Status,
 		Factors:              factors,
+		CreatedBy:            result.CreatedBy,
+		UpdatedBy:            result.UpdatedBy,
 	}
 }
 
@@ -189,6 +195,8 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 			Tags:              item.Tags,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status,
+			CreatedBy:         item.CreatedBy,
+			UpdatedBy:         item.UpdatedBy,
 		})
 	}
 

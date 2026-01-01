@@ -256,13 +256,17 @@ func (c *Container) initSurveyModule() error {
 // initScaleModule 初始化 Scale 模块
 func (c *Container) initScaleModule() error {
 	scaleModule := assembler.NewScaleModule()
+	var identitySvc *iam.IdentityService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		identitySvc = c.IAMModule.IdentityService()
+	}
 	// 传入问卷仓库（如果 SurveyModule 已初始化）
 	var questionnaireRepo interface{}
 	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
 		questionnaireRepo = c.SurveyModule.Questionnaire.Repo
 	}
 	// 传入 Redis 客户端（用于缓存装饰器）
-	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher, questionnaireRepo, c.redisCache); err != nil {
+	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher, questionnaireRepo, c.redisCache, identitySvc); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 

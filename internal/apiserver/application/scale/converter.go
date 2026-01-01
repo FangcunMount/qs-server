@@ -1,7 +1,11 @@
 package scale
 
 import (
+	"context"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ============= Result 定义 =============
@@ -22,6 +26,8 @@ type ScaleResult struct {
 	Status               string         // 状态
 	Factors              []FactorResult // 因子列表
 	QRCodeURL            string         // 小程序码URL（仅已发布状态时返回）
+	CreatedBy            string         // 创建人
+	UpdatedBy            string         // 更新人
 }
 
 // FactorResult 因子结果
@@ -66,6 +72,8 @@ type ScaleSummaryResult struct {
 	Tags              []string // 标签列表
 	QuestionnaireCode string   // 关联的问卷编码
 	Status            string   // 状态
+	CreatedBy         string   // 创建人
+	UpdatedBy         string   // 更新人
 }
 
 // ScaleSummaryListResult 量表摘要列表结果
@@ -119,6 +127,8 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		QuestionnaireVersion: m.GetQuestionnaireVersion(),
 		Status:               m.GetStatus().String(),
 		Factors:              make([]FactorResult, 0),
+		CreatedBy:            m.GetCreatedBy().String(),
+		UpdatedBy:            m.GetUpdatedBy().String(),
 	}
 
 	// 转换因子列表
@@ -126,6 +136,18 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		result.Factors = append(result.Factors, toFactorResult(factor))
 	}
 
+	return result
+}
+
+func toScaleResultWithUsers(ctx context.Context, m *scale.MedicalScale, identitySvc *iam.IdentityService) *ScaleResult {
+	if m == nil {
+		return nil
+	}
+
+	userNames := iam.ResolveUserNames(ctx, identitySvc, []meta.ID{m.GetCreatedBy(), m.GetUpdatedBy()})
+	result := toScaleResult(m)
+	result.CreatedBy = iam.DisplayName(m.GetCreatedBy(), userNames)
+	result.UpdatedBy = iam.DisplayName(m.GetUpdatedBy(), userNames)
 	return result
 }
 
@@ -193,7 +215,8 @@ func toScaleListResult(items []*scale.MedicalScale, total int64) *ScaleListResul
 }
 
 // toSummaryListResult 将量表摘要列表转换为结果对象
-func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummaryListResult {
+func toSummaryListResult(ctx context.Context, items []*scale.ScaleSummary, total int64, identitySvc *iam.IdentityService) *ScaleSummaryListResult {
+	userNames := resolveSummaryUserNames(ctx, items, identitySvc)
 	result := &ScaleSummaryListResult{
 		Items: make([]*ScaleSummaryResult, 0, len(items)),
 		Total: total,
@@ -235,8 +258,21 @@ func toSummaryListResult(items []*scale.ScaleSummary, total int64) *ScaleSummary
 			Tags:              tags,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status.String(),
+			CreatedBy:         iam.DisplayName(item.CreatedBy, userNames),
+			UpdatedBy:         iam.DisplayName(item.UpdatedBy, userNames),
 		})
 	}
 
 	return result
+}
+
+func resolveSummaryUserNames(ctx context.Context, items []*scale.ScaleSummary, identitySvc *iam.IdentityService) map[string]string {
+	userIDs := make([]meta.ID, 0, len(items)*2)
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		userIDs = append(userIDs, item.CreatedBy, item.UpdatedBy)
+	}
+	return iam.ResolveUserNames(ctx, identitySvc, userIDs)
 }
