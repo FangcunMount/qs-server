@@ -82,7 +82,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 }
 
 // FindSummaryList 分页查询量表摘要列表（不包含 factors）
-func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.ScaleSummary, error) {
+func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.MedicalScale, error) {
 	filter := r.buildFilter(conditions)
 
 	// 设置分页选项和投影（排除 factors 字段）
@@ -104,7 +104,9 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 			"questionnaire_code": 1,
 			"status":             1,
 			"created_by":         1,
+			"created_at":         1,
 			"updated_by":         1,
+			"updated_at":         1,
 		})
 
 	cursor, err := r.Collection().Find(ctx, filter, opts)
@@ -113,52 +115,21 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 	}
 	defer cursor.Close(ctx)
 
-	var poList []ScaleSummaryPO
+	var poList []ScalePO
 	if err := cursor.All(ctx, &poList); err != nil {
 		return nil, err
 	}
 
 	// 转换为领域摘要对象
-	result := make([]*scale.ScaleSummary, 0, len(poList))
+	result := make([]*scale.MedicalScale, 0, len(poList))
 	for _, po := range poList {
-		// 转换标签列表
-		tags := make([]scale.Tag, 0, len(po.Tags))
-		for _, tagStr := range po.Tags {
-			tags = append(tags, scale.NewTag(tagStr))
+		domain := r.mapper.ToDomain(ctx, &po)
+		if domain == nil {
+			continue
 		}
-
-		// 转换填报人列表
-		reporters := make([]scale.Reporter, 0, len(po.Reporters))
-		for _, reporterStr := range po.Reporters {
-			reporters = append(reporters, scale.NewReporter(reporterStr))
-		}
-
-		// 转换阶段列表
-		stages := make([]scale.Stage, 0, len(po.Stages))
-		for _, stageStr := range po.Stages {
-			stages = append(stages, scale.NewStage(stageStr))
-		}
-
-		// 转换使用年龄列表
-		applicableAges := make([]scale.ApplicableAge, 0, len(po.ApplicableAges))
-		for _, ageStr := range po.ApplicableAges {
-			applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
-		}
-
-		result = append(result, &scale.ScaleSummary{
-			Code:              po.Code,
-			Title:             po.Title,
-			Description:       po.Description,
-			Category:          scale.NewCategory(po.Category),
-			Stages:            stages,
-			ApplicableAges:    applicableAges,
-			Reporters:         reporters,
-			Tags:              tags,
-			QuestionnaireCode: po.QuestionnaireCode,
-			Status:            scale.Status(po.Status),
-			CreatedBy:         meta.FromUint64(po.CreatedBy),
-			UpdatedBy:         meta.FromUint64(po.UpdatedBy),
-		})
+		domain.SetCreatedBy(meta.FromUint64(po.CreatedBy))
+		domain.SetUpdatedBy(meta.FromUint64(po.UpdatedBy))
+		result = append(result, domain)
 	}
 
 	return result, nil

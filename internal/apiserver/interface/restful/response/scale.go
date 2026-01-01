@@ -21,7 +21,9 @@ type ScaleResponse struct {
 	Status               string           `json:"status"`
 	Factors              []FactorResponse `json:"factors,omitempty"`
 	CreatedBy            string           `json:"created_by"` // 创建人
+	CreatedAt            string           `json:"created_at"` // 创建时间
 	UpdatedBy            string           `json:"updated_by"` // 更新人
+	UpdatedAt            string           `json:"updated_at"` // 更新时间
 }
 
 // FactorResponse 因子响应
@@ -69,7 +71,9 @@ type ScaleSummaryResponse struct {
 	QuestionnaireCode string   `json:"questionnaire_code"`
 	Status            string   `json:"status"`
 	CreatedBy         string   `json:"created_by"` // 创建人
+	CreatedAt         string   `json:"created_at"` // 创建时间
 	UpdatedBy         string   `json:"updated_by"` // 更新人
+	UpdatedAt         string   `json:"updated_at"` // 更新时间
 }
 
 // ScaleSummaryListResponse 量表摘要列表响应
@@ -107,7 +111,9 @@ func NewScaleResponse(result *scale.ScaleResult) *ScaleResponse {
 		Status:               result.Status,
 		Factors:              factors,
 		CreatedBy:            result.CreatedBy,
+		CreatedAt:            result.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedBy:            result.UpdatedBy,
+		UpdatedAt:            result.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}
 }
 
@@ -196,7 +202,9 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status,
 			CreatedBy:         item.CreatedBy,
+			CreatedAt:         item.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedBy:         item.UpdatedBy,
+			UpdatedAt:         item.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 

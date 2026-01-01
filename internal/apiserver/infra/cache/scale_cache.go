@@ -99,7 +99,7 @@ func (r *CachedScaleRepository) FindByQuestionnaireCode(ctx context.Context, que
 }
 
 // FindSummaryList 查询量表摘要列表
-func (r *CachedScaleRepository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.ScaleSummary, error) {
+func (r *CachedScaleRepository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.MedicalScale, error) {
 	// 列表查询不缓存（条件多样，缓存命中率低）
 	return r.repo.FindSummaryList(ctx, page, pageSize, conditions)
 }

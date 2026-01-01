@@ -3832,6 +3832,9 @@ components:
         created_by:
           description: 创建人
           type: string
+        created_at:
+          description: 创建时间
+          type: string
         description:
           type: string
         factors:
@@ -3860,6 +3863,9 @@ components:
           type: string
         updated_by:
           description: 更新人
+          type: string
+        updated_at:
+          description: 更新时间
           type: string
     response.ScaleTestResponse:
       type: object

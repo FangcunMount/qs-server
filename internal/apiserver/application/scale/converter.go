@@ -2,6 +2,7 @@ package scale
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -27,7 +28,9 @@ type ScaleResult struct {
 	Factors              []FactorResult // 因子列表
 	QRCodeURL            string         // 小程序码URL（仅已发布状态时返回）
 	CreatedBy            string         // 创建人
+	CreatedAt            time.Time      // 创建时间
 	UpdatedBy            string         // 更新人
+	UpdatedAt            time.Time      // 更新时间
 }
 
 // FactorResult 因子结果
@@ -62,18 +65,20 @@ type ScaleListResult struct {
 
 // ScaleSummaryResult 量表摘要结果（不包含因子列表，用于列表展示）
 type ScaleSummaryResult struct {
-	Code              string   // 量表编码
-	Title             string   // 量表标题
-	Description       string   // 量表描述
-	Category          string   // 主类
-	Stages            []string // 阶段列表
-	ApplicableAges    []string // 使用年龄列表
-	Reporters         []string // 填报人列表
-	Tags              []string // 标签列表
-	QuestionnaireCode string   // 关联的问卷编码
-	Status            string   // 状态
-	CreatedBy         string   // 创建人
-	UpdatedBy         string   // 更新人
+	Code              string    // 量表编码
+	Title             string    // 量表标题
+	Description       string    // 量表描述
+	Category          string    // 主类
+	Stages            []string  // 阶段列表
+	ApplicableAges    []string  // 使用年龄列表
+	Reporters         []string  // 填报人列表
+	Tags              []string  // 标签列表
+	QuestionnaireCode string    // 关联的问卷编码
+	Status            string    // 状态
+	CreatedBy         string    // 创建人
+	CreatedAt         time.Time // 创建时间
+	UpdatedBy         string    // 更新人
+	UpdatedAt         time.Time // 更新时间
 }
 
 // ScaleSummaryListResult 量表摘要列表结果
@@ -128,7 +133,9 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		Status:               m.GetStatus().String(),
 		Factors:              make([]FactorResult, 0),
 		CreatedBy:            m.GetCreatedBy().String(),
+		CreatedAt:            m.GetCreatedAt(),
 		UpdatedBy:            m.GetUpdatedBy().String(),
+		UpdatedAt:            m.GetUpdatedAt(),
 	}
 
 	// 转换因子列表
@@ -215,7 +222,7 @@ func toScaleListResult(items []*scale.MedicalScale, total int64) *ScaleListResul
 }
 
 // toSummaryListResult 将量表摘要列表转换为结果对象
-func toSummaryListResult(ctx context.Context, items []*scale.ScaleSummary, total int64, identitySvc *iam.IdentityService) *ScaleSummaryListResult {
+func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total int64, identitySvc *iam.IdentityService) *ScaleSummaryListResult {
 	userNames := resolveSummaryUserNames(ctx, items, identitySvc)
 	result := &ScaleSummaryListResult{
 		Items: make([]*ScaleSummaryResult, 0, len(items)),
@@ -224,55 +231,57 @@ func toSummaryListResult(ctx context.Context, items []*scale.ScaleSummary, total
 
 	for _, item := range items {
 		// 转换标签列表
-		tags := make([]string, 0, len(item.Tags))
-		for _, tag := range item.Tags {
+		tags := make([]string, 0, len(item.GetTags()))
+		for _, tag := range item.GetTags() {
 			tags = append(tags, tag.String())
 		}
 
 		// 转换填报人列表
-		reporters := make([]string, 0, len(item.Reporters))
-		for _, reporter := range item.Reporters {
+		reporters := make([]string, 0, len(item.GetReporters()))
+		for _, reporter := range item.GetReporters() {
 			reporters = append(reporters, reporter.String())
 		}
 
 		// 转换阶段列表
-		stages := make([]string, 0, len(item.Stages))
-		for _, stage := range item.Stages {
+		stages := make([]string, 0, len(item.GetStages()))
+		for _, stage := range item.GetStages() {
 			stages = append(stages, stage.String())
 		}
 
 		// 转换使用年龄列表
-		applicableAges := make([]string, 0, len(item.ApplicableAges))
-		for _, age := range item.ApplicableAges {
+		applicableAges := make([]string, 0, len(item.GetApplicableAges()))
+		for _, age := range item.GetApplicableAges() {
 			applicableAges = append(applicableAges, age.String())
 		}
 
 		result.Items = append(result.Items, &ScaleSummaryResult{
-			Code:              item.Code,
-			Title:             item.Title,
-			Description:       item.Description,
-			Category:          item.Category.String(),
+			Code:              item.GetCode().String(),
+			Title:             item.GetTitle(),
+			Description:       item.GetDescription(),
+			Category:          item.GetCategory().String(),
 			Stages:            stages,
 			ApplicableAges:    applicableAges,
 			Reporters:         reporters,
 			Tags:              tags,
-			QuestionnaireCode: item.QuestionnaireCode,
-			Status:            item.Status.String(),
-			CreatedBy:         iam.DisplayName(item.CreatedBy, userNames),
-			UpdatedBy:         iam.DisplayName(item.UpdatedBy, userNames),
+			QuestionnaireCode: item.GetQuestionnaireCode().String(),
+			Status:            item.GetStatus().String(),
+			CreatedBy:         iam.DisplayName(item.GetCreatedBy(), userNames),
+			CreatedAt:         item.GetCreatedAt(),
+			UpdatedBy:         iam.DisplayName(item.GetUpdatedBy(), userNames),
+			UpdatedAt:         item.GetUpdatedAt(),
 		})
 	}
 
 	return result
 }
 
-func resolveSummaryUserNames(ctx context.Context, items []*scale.ScaleSummary, identitySvc *iam.IdentityService) map[string]string {
+func resolveSummaryUserNames(ctx context.Context, items []*scale.MedicalScale, identitySvc *iam.IdentityService) map[string]string {
 	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		userIDs = append(userIDs, item.CreatedBy, item.UpdatedBy)
+		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
 	}
 	return iam.ResolveUserNames(ctx, identitySvc, userIDs)
 }
