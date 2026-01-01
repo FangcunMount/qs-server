@@ -30,6 +30,7 @@ func NewRepository(db *mongo.Database) questionnaire.Repository {
 // Create 创建问卷
 func (r *Repository) Create(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	po := r.mapper.ToPO(qDomain)
+	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 
 	insertData, err := po.ToBsonM()
@@ -129,6 +130,7 @@ func (r *Repository) LoadQuestions(ctx context.Context, qDomain *questionnaire.Q
 // Update 更新问卷
 func (r *Repository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
 	po := r.mapper.ToPO(qDomain)
+	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
 
 	// 根据领域ID查找文档
@@ -156,11 +158,13 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 	filter := bson.M{"code": code}
 
 	now := time.Now()
+	userID := mongoBase.AuditUserID(ctx)
 	update := bson.M{
 		"$set": bson.M{
 			"deleted_at": now,
-			"deleted_by": 0, // 这里应该从上下文中获取当前用户ID
+			"deleted_by": userID,
 			"updated_at": now,
+			"updated_by": userID,
 		},
 	}
 

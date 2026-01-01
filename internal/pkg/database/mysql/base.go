@@ -3,6 +3,8 @@ package mysql
 import (
 	"context"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"gorm.io/gorm"
 )
 
@@ -47,6 +49,11 @@ func (r *BaseRepository[T]) WithContext(ctx context.Context) *gorm.DB {
 
 // CreateAndSync persists an entity and lets the caller sync generated fields back.
 func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync func(T)) error {
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID > 0 {
+		entity.SetCreatedBy(meta.FromUint64(userID))
+		entity.SetUpdatedBy(meta.FromUint64(userID))
+	}
 	result := r.db.WithContext(ctx).Create(entity)
 	if result.Error != nil {
 		if r.errTranslator != nil {
@@ -60,6 +67,10 @@ func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync fu
 
 // UpdateAndSync updates an entity and triggers the sync callback.
 func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync func(T)) error {
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID > 0 {
+		entity.SetUpdatedBy(meta.FromUint64(userID))
+	}
 	result := r.db.WithContext(ctx).Updates(entity)
 	if result.Error != nil {
 		if r.errTranslator != nil {

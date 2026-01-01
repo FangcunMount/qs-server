@@ -1,10 +1,12 @@
 package questionnaire
 
 import (
+	"context"
 	"time"
 
-	staff "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ============= Result 定义 =============
@@ -133,7 +135,7 @@ func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 }
 
 // toQuestionnaireSummaryResult 将问卷领域模型转换为摘要结果对象
-func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireSummaryResult {
+func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire, userNames map[string]string) *QuestionnaireSummaryResult {
 	if q == nil {
 		return nil
 	}
@@ -147,30 +149,81 @@ func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire) *Questio
 		Status:        q.GetStatus(), // 直接使用 Status 类型，JSON 序列化为数字
 		Type:          q.GetType().String(),
 		QuestionCount: q.GetQuestionCnt(),
-		CreatedBy:     staffName(q.GetCreatedBy()),
+		CreatedBy:     userDisplayName(q.GetCreatedBy(), userNames),
 		CreatedAt:     q.GetCreatedAt(),
-		UpdatedBy:     staffName(q.GetUpdatedBy()),
+		UpdatedBy:     userDisplayName(q.GetUpdatedBy(), userNames),
 		UpdatedAt:     q.GetUpdatedAt(),
 	}
 }
 
 // toQuestionnaireSummaryListResult 将问卷摘要列表转换为结果对象
-func toQuestionnaireSummaryListResult(items []*domainQuestionnaire.Questionnaire, total int64) *QuestionnaireSummaryListResult {
+func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuestionnaire.Questionnaire, total int64, identitySvc *iam.IdentityService) *QuestionnaireSummaryListResult {
+	userNames := resolveUserNames(ctx, items, identitySvc)
 	result := &QuestionnaireSummaryListResult{
 		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
 		Total: total,
 	}
 
 	for _, item := range items {
-		result.Items = append(result.Items, toQuestionnaireSummaryResult(item))
+		result.Items = append(result.Items, toQuestionnaireSummaryResult(item, userNames))
 	}
 
 	return result
 }
 
-func staffName(st *staff.Staff) string {
-	if st == nil {
+func userDisplayName(id meta.ID, userNames map[string]string) string {
+	if id.IsZero() {
 		return ""
 	}
-	return st.Name()
+	if userNames != nil {
+		if name, ok := userNames[id.String()]; ok && name != "" {
+			return name
+		}
+	}
+	return id.String()
+}
+
+func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Questionnaire, identitySvc *iam.IdentityService) map[string]string {
+	if identitySvc == nil || !identitySvc.IsEnabled() {
+		return nil
+	}
+
+	userIDs := make(map[string]struct{})
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if id := item.GetCreatedBy(); !id.IsZero() {
+			userIDs[id.String()] = struct{}{}
+		}
+		if id := item.GetUpdatedBy(); !id.IsZero() {
+			userIDs[id.String()] = struct{}{}
+		}
+	}
+
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	ids := make([]string, 0, len(userIDs))
+	for id := range userIDs {
+		ids = append(ids, id)
+	}
+
+	resp, err := identitySvc.BatchGetUsers(ctx, ids)
+	if err != nil {
+		return nil
+	}
+
+	userNames := make(map[string]string)
+	for _, user := range resp.GetUsers() {
+		if user == nil {
+			continue
+		}
+		if name := user.GetNickname(); name != "" {
+			userNames[user.GetId()] = name
+		}
+	}
+
+	return userNames
 }

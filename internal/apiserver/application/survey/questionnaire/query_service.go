@@ -7,21 +7,25 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 问卷查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	repo questionnaire.Repository
+	repo        questionnaire.Repository
+	identitySvc *iam.IdentityService
 }
 
 // NewQueryService 创建问卷查询服务
 func NewQueryService(
 	repo questionnaire.Repository,
+	identitySvc *iam.IdentityService,
 ) QuestionnaireQueryService {
 	return &queryService{
-		repo: repo,
+		repo:        repo,
+		identitySvc: identitySvc,
 	}
 }
 
@@ -101,7 +105,7 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	}
 
 	// 4. 转换为结果对象
-	result := toQuestionnaireSummaryListResult(questionnaires, total)
+	result := toQuestionnaireSummaryListResult(ctx, questionnaires, total, s.identitySvc)
 	s.logSuccess(ctx, "list", startTime,
 		"total_count", total,
 		"page_count", len(questionnaires),
@@ -198,7 +202,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
 
-	result := toQuestionnaireSummaryListResult(questionnaires, total)
+	result := toQuestionnaireSummaryListResult(ctx, questionnaires, total, s.identitySvc)
 	s.logSuccess(ctx, "list_published", startTime,
 		"total_count", total,
 		"page_count", len(questionnaires),

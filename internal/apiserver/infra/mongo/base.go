@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -103,6 +104,43 @@ type BaseDocument struct {
 	CreatedBy uint64             `bson:"created_by" json:"created_by"`
 	UpdatedBy uint64             `bson:"updated_by" json:"updated_by"`
 	DeletedBy uint64             `bson:"deleted_by" json:"deleted_by"`
+}
+
+type auditCreateSetter interface {
+	SetCreatedBy(uint64)
+	SetUpdatedBy(uint64)
+}
+
+type auditUpdateSetter interface {
+	SetUpdatedBy(uint64)
+}
+
+// ApplyAuditCreate sets CreatedBy/UpdatedBy from JWT user ID when available.
+func ApplyAuditCreate(ctx context.Context, target interface{}) {
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == 0 {
+		return
+	}
+	if setter, ok := target.(auditCreateSetter); ok {
+		setter.SetCreatedBy(userID)
+		setter.SetUpdatedBy(userID)
+	}
+}
+
+// ApplyAuditUpdate sets UpdatedBy from JWT user ID when available.
+func ApplyAuditUpdate(ctx context.Context, target interface{}) {
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID == 0 {
+		return
+	}
+	if setter, ok := target.(auditUpdateSetter); ok {
+		setter.SetUpdatedBy(userID)
+	}
+}
+
+// AuditUserID returns the JWT user ID from context when available.
+func AuditUserID(ctx context.Context) uint64 {
+	return middleware.GetUserIDFromContext(ctx)
 }
 
 // SetDomainID 设置领域ID

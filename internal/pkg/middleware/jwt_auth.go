@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -218,6 +219,22 @@ func GetUserClaims(c *gin.Context) *UserClaims {
 		}
 	}
 	return nil
+}
+
+// GetUserIDFromContext 从标准 context.Context 获取用户 ID（uint64）
+func GetUserIDFromContext(ctx context.Context) uint64 {
+	if ctx == nil {
+		return 0
+	}
+	claims, ok := ctx.Value(UserClaimsContextKey{}).(*UserClaims)
+	if !ok || claims == nil || claims.UserID == "" {
+		return 0
+	}
+	userID, err := strconv.ParseUint(claims.UserID, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return userID
 }
 
 // GetUserID 从上下文获取用户 ID

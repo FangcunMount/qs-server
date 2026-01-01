@@ -237,8 +237,12 @@ func (c *Container) GetEventPublisher() event.EventPublisher {
 // initSurveyModule 初始化 Survey 模块（包含问卷和答卷子模块）
 func (c *Container) initSurveyModule() error {
 	surveyModule := assembler.NewSurveyModule()
+	var identitySvc *iam.IdentityService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		identitySvc = c.IAMModule.IdentityService()
+	}
 	// 传入 Redis 客户端（用于问卷缓存装饰器）
-	if err := surveyModule.Initialize(c.mongoDB, c.eventPublisher, c.redisCache); err != nil {
+	if err := surveyModule.Initialize(c.mongoDB, c.eventPublisher, c.redisCache, identitySvc); err != nil {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 

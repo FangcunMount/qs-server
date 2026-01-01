@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	questionnaireCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -73,6 +74,7 @@ func NewSurveyModule() *SurveyModule {
 // params[0]: *mongo.Database
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: redis.UniversalClient (可选，用于缓存装饰器)
+// params[3]: *iam.IdentityService (可选，用于姓名补全)
 func (m *SurveyModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -100,9 +102,16 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
+	// 获取 IAM IdentityService（可选参数，用于姓名补全）
+	var identitySvc *iam.IdentityService
+	if len(params) > 3 {
+		if svc, ok := params[3].(*iam.IdentityService); ok {
+			identitySvc = svc
+		}
+	}
 
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(mongoDB, redisClient); err != nil {
+	if err := m.initQuestionnaireSubModule(mongoDB, redisClient, identitySvc); err != nil {
 		return err
 	}
 
@@ -115,7 +124,7 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, identitySvc *iam.IdentityService) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）
@@ -136,7 +145,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, m.eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
-	sub.QueryService = quesApp.NewQueryService(sub.Repo)
+	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc)
 
 	// 初始化 handler 层
 	// 注意：QRCodeService 在容器初始化后才创建，需要通过 SetQRCodeService 方法单独设置

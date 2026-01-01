@@ -49,6 +49,7 @@ func (r *ReportRepository) Save(ctx context.Context, rpt *report.InterpretReport
 	// 需要从外部传入或通过其他方式获取
 	// 暂时使用 0，后续需要优化
 	po := r.mapper.ToPO(rpt, 0)
+	base.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 
 	// 确保 DomainID 与报告 ID 一致
@@ -76,6 +77,7 @@ func (r *ReportRepository) SaveWithTestee(ctx context.Context, rpt *report.Inter
 
 	// 创建新报告
 	po := r.mapper.ToPO(rpt, uint64(testeeID))
+	base.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 
 	// 确保 DomainID 与报告 ID 一致
@@ -166,6 +168,7 @@ func (r *ReportRepository) Update(ctx context.Context, rpt *report.InterpretRepo
 	_ = existing // 暂时未使用
 
 	po := r.mapper.ToPO(rpt, 0) // testeeID 在更新时不修改
+	base.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
 
 	filter := bson.M{
@@ -184,6 +187,7 @@ func (r *ReportRepository) Update(ctx context.Context, rpt *report.InterpretRepo
 			"dimensions":  po.Dimensions,
 			"suggestions": po.Suggestions,
 			"updated_at":  po.UpdatedAt,
+			"updated_by":  po.UpdatedBy,
 		},
 	}
 
@@ -206,9 +210,13 @@ func (r *ReportRepository) Delete(ctx context.Context, id report.ID) error {
 		"deleted_at": nil,
 	}
 
+	userID := base.AuditUserID(ctx)
 	update := bson.M{
 		"$set": bson.M{
 			"deleted_at": r.nowTime(),
+			"updated_at": r.nowTime(),
+			"updated_by": userID,
+			"deleted_by": userID,
 		},
 	}
 

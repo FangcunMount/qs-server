@@ -8,6 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"gorm.io/gorm"
 )
 
@@ -71,6 +73,15 @@ func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentD
 	for _, po := range pos {
 		if err := po.BeforeCreate(); err != nil {
 			return err
+		}
+	}
+
+	userID := middleware.GetUserIDFromContext(ctx)
+	if userID > 0 {
+		auditID := meta.FromUint64(userID)
+		for _, po := range pos {
+			po.SetCreatedBy(auditID)
+			po.SetUpdatedBy(auditID)
 		}
 	}
 

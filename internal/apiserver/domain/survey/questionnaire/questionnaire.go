@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	staff "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -30,9 +29,9 @@ type Questionnaire struct {
 	questionCnt int        // 问题数量（可从聚合查询获得）
 
 	// —— 审计信息
-	createdBy *staff.Staff
+	createdBy meta.ID
 	createdAt time.Time
-	updatedBy *staff.Staff
+	updatedBy meta.ID
 	updatedAt time.Time
 
 	// —— 领域事件收集器
@@ -91,14 +90,14 @@ func WithQuestions(ques []Question) QuestionnaireOption {
 func WithQuestionCount(cnt int) QuestionnaireOption {
 	return func(q *Questionnaire) { q.questionCnt = cnt }
 }
-func WithCreatedBy(s *staff.Staff) QuestionnaireOption {
-	return func(q *Questionnaire) { q.createdBy = s }
+func WithCreatedBy(id meta.ID) QuestionnaireOption {
+	return func(q *Questionnaire) { q.createdBy = id }
 }
 func WithCreatedAt(t time.Time) QuestionnaireOption {
 	return func(q *Questionnaire) { q.createdAt = t }
 }
-func WithUpdatedBy(s *staff.Staff) QuestionnaireOption {
-	return func(q *Questionnaire) { q.updatedBy = s }
+func WithUpdatedBy(id meta.ID) QuestionnaireOption {
+	return func(q *Questionnaire) { q.updatedBy = id }
 }
 func WithUpdatedAt(t time.Time) QuestionnaireOption {
 	return func(q *Questionnaire) { q.updatedAt = t }
@@ -117,15 +116,15 @@ func (q *Questionnaire) GetType() QuestionnaireType {
 	}
 	return q.typ
 }
-func (q *Questionnaire) GetTitle() string           { return q.title }
-func (q *Questionnaire) GetDescription() string     { return q.desc }
-func (q *Questionnaire) GetImgUrl() string          { return q.imgUrl }
-func (q *Questionnaire) GetVersion() Version        { return q.version }
-func (q *Questionnaire) GetStatus() Status          { return q.status }
-func (q *Questionnaire) GetCreatedBy() *staff.Staff { return q.createdBy }
-func (q *Questionnaire) GetCreatedAt() time.Time    { return q.createdAt }
-func (q *Questionnaire) GetUpdatedBy() *staff.Staff { return q.updatedBy }
-func (q *Questionnaire) GetUpdatedAt() time.Time    { return q.updatedAt }
+func (q *Questionnaire) GetTitle() string        { return q.title }
+func (q *Questionnaire) GetDescription() string  { return q.desc }
+func (q *Questionnaire) GetImgUrl() string       { return q.imgUrl }
+func (q *Questionnaire) GetVersion() Version     { return q.version }
+func (q *Questionnaire) GetStatus() Status       { return q.status }
+func (q *Questionnaire) GetCreatedBy() meta.ID   { return q.createdBy }
+func (q *Questionnaire) GetCreatedAt() time.Time { return q.createdAt }
+func (q *Questionnaire) GetUpdatedBy() meta.ID   { return q.updatedBy }
+func (q *Questionnaire) GetUpdatedAt() time.Time { return q.updatedAt }
 
 // Status 问卷状态判断
 func (q *Questionnaire) IsDraft() bool     { return q.status == STATUS_DRAFT }
@@ -159,12 +158,12 @@ func (q *Questionnaire) SetQuestions(questions []Question) {
 	q.questionCnt = len(questions)
 }
 
-func (q *Questionnaire) SetCreatedBy(st *staff.Staff) {
-	q.createdBy = st
+func (q *Questionnaire) SetCreatedBy(id meta.ID) {
+	q.createdBy = id
 }
 
-func (q *Questionnaire) SetUpdatedBy(st *staff.Staff) {
-	q.updatedBy = st
+func (q *Questionnaire) SetUpdatedBy(id meta.ID) {
+	q.updatedBy = id
 }
 
 // GetQuestionByCode 根据问题编码获取问题

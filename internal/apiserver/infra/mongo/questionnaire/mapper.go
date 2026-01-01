@@ -1,7 +1,6 @@
 package questionnaire
 
 import (
-	staff "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
@@ -28,9 +27,9 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		Type:        bo.GetType().String(),
 	}
 	po.CreatedAt = bo.GetCreatedAt()
-	po.CreatedBy = staffID(bo.GetCreatedBy())
+	po.CreatedBy = bo.GetCreatedBy().Uint64()
 	po.UpdatedAt = bo.GetUpdatedAt()
-	po.UpdatedBy = staffID(bo.GetUpdatedBy())
+	po.UpdatedBy = bo.GetUpdatedBy().Uint64()
 
 	for _, questionBO := range bo.GetQuestions() {
 		questionPO := QuestionPO{
@@ -104,9 +103,9 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 		questionnaire.WithStatus(questionnaire.Status(po.Status)),
 		questionnaire.WithType(questionnaire.NormalizeQuestionnaireType(po.Type)),
 		questionnaire.WithQuestionCount(po.QuestionCount),
-		questionnaire.WithCreatedBy(buildStaff(po.CreatedBy)),
+		questionnaire.WithCreatedBy(meta.FromUint64(po.CreatedBy)),
 		questionnaire.WithCreatedAt(po.CreatedAt),
-		questionnaire.WithUpdatedBy(buildStaff(po.UpdatedBy)),
+		questionnaire.WithUpdatedBy(meta.FromUint64(po.UpdatedBy)),
 		questionnaire.WithUpdatedAt(po.UpdatedAt),
 	}
 	if po.Questions != nil {
@@ -161,22 +160,6 @@ func (m *QuestionnaireMapper) mapQuestions(questionsPO []QuestionPO) []questionn
 	}
 
 	return questions
-}
-
-func buildStaff(id uint64) *staff.Staff {
-	if id == 0 {
-		return nil
-	}
-	st := &staff.Staff{}
-	st.SetID(staff.NewID(id))
-	return st
-}
-
-func staffID(st *staff.Staff) uint64 {
-	if st == nil {
-		return 0
-	}
-	return st.ID().Uint64()
 }
 
 // mapOptionsPOToBO 将选项PO转换为选项BO

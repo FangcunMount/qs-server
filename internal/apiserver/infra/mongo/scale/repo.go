@@ -30,6 +30,7 @@ func NewRepository(db *mongo.Database) scale.Repository {
 // Create 创建量表
 func (r *Repository) Create(ctx context.Context, domain *scale.MedicalScale) error {
 	po := r.mapper.ToPO(domain)
+	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 
 	insertData, err := po.ToBsonM()
@@ -167,6 +168,7 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 // Update 更新量表
 func (r *Repository) Update(ctx context.Context, domain *scale.MedicalScale) error {
 	po := r.mapper.ToPO(domain)
+	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
 
 	filter := bson.M{
@@ -201,10 +203,13 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 	}
 
 	now := time.Now()
+	userID := mongoBase.AuditUserID(ctx)
 	update := bson.M{
 		"$set": bson.M{
 			"deleted_at": now,
 			"updated_at": now,
+			"updated_by": userID,
+			"deleted_by": userID,
 		},
 	}
 

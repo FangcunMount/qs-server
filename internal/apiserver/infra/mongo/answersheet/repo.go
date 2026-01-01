@@ -34,6 +34,7 @@ func (r *Repository) Create(ctx context.Context, sheet *answersheet.AnswerSheet)
 		return nil
 	}
 
+	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 
 	insertData, err := po.ToBsonM()
@@ -59,6 +60,7 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 		return nil
 	}
 
+	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
 
 	updateData, err := po.ToBsonM()
