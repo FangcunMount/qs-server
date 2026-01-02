@@ -73,7 +73,7 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Param status query string false "状态过滤"
+// @Param status query int false "状态过滤（0=草稿, 1=已发布, 2=已归档）"
 // @Param title query string false "标题过滤"
 // @Param category query string false "主类过滤"
 // @Param stages query []string false "阶段过滤（数组）"

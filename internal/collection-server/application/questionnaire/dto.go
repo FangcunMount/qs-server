@@ -6,7 +6,7 @@ type QuestionnaireResponse struct {
 	Title       string             `json:"title"`
 	Description string             `json:"description"`
 	ImgURL      string             `json:"img_url"`
-	Status      string             `json:"status"`
+	Status      int32              `json:"status"`
 	Version     string             `json:"version"`
 	Type        string             `json:"type"` // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 	Questions   []QuestionResponse `json:"questions"`
@@ -48,7 +48,7 @@ type CalculationRuleResponse struct {
 type ListQuestionnairesRequest struct {
 	Page     int32  `form:"page"`
 	PageSize int32  `form:"page_size"`
-	Status   string `form:"status"`
+	Status   int32  `form:"status"`
 	Title    string `form:"title"`
 }
 
@@ -58,7 +58,7 @@ type QuestionnaireSummaryResponse struct {
 	Title         string `json:"title"`
 	Description   string `json:"description"`
 	ImgURL        string `json:"img_url"`
-	Status        string `json:"status"`
+	Status        int32  `json:"status"`
 	Version       string `json:"version"`
 	Type          string `json:"type"` // 问卷类型：Survey(调查问卷) / MedicalScale(医学量表)
 	QuestionCount int32  `json:"question_count"`

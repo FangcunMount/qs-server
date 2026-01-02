@@ -519,8 +519,8 @@ paths:
         description: 每页数量
         name: page_size
         in: query
-      - type: string
-        description: 状态过滤
+      - type: integer
+        description: 状态过滤（0=草稿, 1=已发布, 2=已归档）
         name: status
         in: query
       - type: string
@@ -627,8 +627,8 @@ paths:
         description: 每页数量
         name: page_size
         in: query
-      - type: string
-        description: 状态过滤
+      - type: integer
+        description: 状态过滤（0=草稿, 1=已发布, 2=已归档）
         name: status
         in: query
       - type: string
@@ -1399,7 +1399,7 @@ components:
           items:
             $ref: '#/components/schemas/questionnaire.QuestionResponse'
         status:
-          type: string
+          type: integer
         title:
           type: string
         type:
@@ -1423,7 +1423,7 @@ components:
         question_count:
           type: integer
         status:
-          type: string
+          type: integer
         title:
           type: string
         type:
@@ -1559,7 +1559,7 @@ components:
           items:
             type: string
         status:
-          type: string
+          type: integer
         tags:
           type: array
           items:
@@ -1594,7 +1594,7 @@ components:
           items:
             type: string
         status:
-          type: string
+          type: integer
         tags:
           type: array
           items:

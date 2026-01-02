@@ -753,8 +753,8 @@
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "状态过滤",
+                        "type": "integer",
+                        "description": "状态过滤（0=草稿, 1=已发布, 2=已归档）",
                         "name": "status",
                         "in": "query"
                     },
@@ -884,8 +884,8 @@
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "状态过滤",
+                        "type": "integer",
+                        "description": "状态过滤（0=草稿, 1=已发布, 2=已归档）",
                         "name": "status",
                         "in": "query"
                     },
@@ -1987,7 +1987,7 @@
                     }
                 },
                 "status": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -2023,7 +2023,7 @@
                     "type": "integer"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -2230,7 +2230,7 @@
                     }
                 },
                 "status": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "tags": {
                     "type": "array",
@@ -2283,7 +2283,7 @@
                     }
                 },
                 "status": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "tags": {
                     "type": "array",

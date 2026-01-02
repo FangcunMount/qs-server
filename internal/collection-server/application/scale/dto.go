@@ -12,7 +12,7 @@ type ScaleResponse struct {
 	Tags                 []string         `json:"tags"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
 	QuestionnaireVersion string           `json:"questionnaire_version"`
-	Status               string           `json:"status"`
+	Status               int32            `json:"status"`
 	Factors              []FactorResponse `json:"factors"`
 	QuestionCount        int32            `json:"question_count"`
 }
@@ -52,7 +52,7 @@ type ScaleSummaryResponse struct {
 	Tags                 []string `json:"tags"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
-	Status               string   `json:"status"`
+	Status               int32    `json:"status"`
 	QuestionCount        int32    `json:"question_count"`
 }
 
@@ -60,7 +60,7 @@ type ScaleSummaryResponse struct {
 type ListScalesRequest struct {
 	Page           int32    `form:"page"`
 	PageSize       int32    `form:"page_size"`
-	Status         string   `form:"status"`
+	Status         int32    `form:"status"`
 	Title          string   `form:"title"`
 	Category       string   `form:"category"`
 	Stages         []string `form:"stages"`
@@ -116,4 +116,3 @@ type TagResponse struct {
 	Label    string `json:"label"`
 	Category string `json:"category"`
 }
-

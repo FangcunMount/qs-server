@@ -14,7 +14,7 @@ type QuestionnaireOutput struct {
 	Title       string
 	Description string
 	ImgURL      string
-	Status      string
+	Status      int32
 	Version     string
 	Type        string
 	Questions   []QuestionOutput
@@ -66,7 +66,7 @@ type QuestionnaireSummaryOutput struct {
 	Title         string
 	Description   string
 	ImgURL        string
-	Status        string
+	Status        int32
 	Version       string
 	Type          string
 	QuestionCount int32
@@ -110,7 +110,7 @@ func (c *QuestionnaireClient) GetQuestionnaire(ctx context.Context, code string)
 }
 
 // ListQuestionnaires 获取问卷列表（摘要）
-func (c *QuestionnaireClient) ListQuestionnaires(ctx context.Context, page, pageSize int32, status, title string) (*ListQuestionnairesOutput, error) {
+func (c *QuestionnaireClient) ListQuestionnaires(ctx context.Context, page, pageSize int32, status int32, title string) (*ListQuestionnairesOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 

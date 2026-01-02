@@ -355,7 +355,7 @@ definitions:
           $ref: '#/definitions/questionnaire.QuestionResponse'
         type: array
       status:
-        type: string
+        type: integer
       title:
         type: string
       type:
@@ -379,7 +379,7 @@ definitions:
       question_count:
         type: integer
       status:
-        type: string
+        type: integer
       title:
         type: string
       type:
@@ -515,7 +515,7 @@ definitions:
           type: string
         type: array
       status:
-        type: string
+        type: integer
       tags:
         items:
           type: string
@@ -550,7 +550,7 @@ definitions:
           type: string
         type: array
       status:
-        type: string
+        type: integer
       tags:
         items:
           type: string
@@ -1163,10 +1163,10 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: 状态过滤
+      - description: 状态过滤（0=草稿, 1=已发布, 2=已归档）
         in: query
         name: status
-        type: string
+        type: integer
       - description: 标题过滤
         in: query
         name: title
@@ -1252,10 +1252,10 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: 状态过滤
+      - description: 状态过滤（0=草稿, 1=已发布, 2=已归档）
         in: query
         name: status
-        type: string
+        type: integer
       - description: 标题过滤
         in: query
         name: title
