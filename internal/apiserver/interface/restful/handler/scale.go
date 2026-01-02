@@ -503,6 +503,7 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 // @Param page_size query int true "每页数量"
 // @Param status query int false "状态过滤（0=草稿, 1=已发布, 2=已归档）"
 // @Param title query string false "标题模糊搜索"
+// @Param category query string false "主类过滤"
 // @Success 200 {object} core.Response{data=response.ScaleListResponse}
 // @Router /api/v1/scales [get]
 func (h *ScaleHandler) List(c *gin.Context) {
@@ -539,6 +540,9 @@ func (h *ScaleHandler) List(c *gin.Context) {
 	}
 	if title := c.Query("title"); title != "" {
 		dto.Conditions["title"] = title
+	}
+	if category := c.Query("category"); category != "" {
+		dto.Conditions["category"] = category
 	}
 
 	result, err := h.queryService.List(c.Request.Context(), dto)
