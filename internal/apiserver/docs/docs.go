@@ -1668,8 +1668,8 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "状态筛选",
+                        "type": "integer",
+                        "description": "状态筛选（0=草稿, 1=已发布, 2=已归档）",
                         "name": "status",
                         "in": "query"
                     },
@@ -2491,8 +2491,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "description": "状态过滤（draft/published/archived）",
+                        "type": "integer",
+                        "description": "状态过滤（0=草稿, 1=已发布, 2=已归档）",
                         "name": "status",
                         "in": "query"
                     },
@@ -5744,6 +5744,10 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "created_at": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
                 "created_by": {
                     "description": "创建人",
                     "type": "string"
@@ -5776,7 +5780,7 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "tags": {
                     "type": "array",
@@ -5785,6 +5789,10 @@ const docTemplate = `{
                     }
                 },
                 "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "更新时间",
                     "type": "string"
                 },
                 "updated_by": {

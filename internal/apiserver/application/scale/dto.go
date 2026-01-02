@@ -106,7 +106,7 @@ type UpdateFactorInterpretRulesDTO struct {
 
 // ListScalesDTO 查询量表列表 DTO
 type ListScalesDTO struct {
-	Page       int               // 页码
-	PageSize   int               // 每页数量
-	Conditions map[string]string // 查询条件
+	Page       int                    // 页码
+	PageSize   int                    // 每页数量
+	Conditions map[string]interface{} // 查询条件
 }

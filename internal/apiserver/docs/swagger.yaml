@@ -989,6 +989,9 @@ definitions:
         type: string
       code:
         type: string
+      created_at:
+        description: 创建时间
+        type: string
       created_by:
         description: 创建人
         type: string
@@ -1011,12 +1014,15 @@ definitions:
           type: string
         type: array
       status:
-        type: string
+        type: integer
       tags:
         items:
           type: string
         type: array
       title:
+        type: string
+      updated_at:
+        description: 更新时间
         type: string
       updated_by:
         description: 更新人
@@ -2573,10 +2579,10 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: 状态筛选
+      - description: 状态筛选（0=草稿, 1=已发布, 2=已归档）
         in: query
         name: status
-        type: string
+        type: integer
       - description: 标题筛选
         in: query
         name: title
@@ -3081,10 +3087,10 @@ paths:
         name: page_size
         required: true
         type: integer
-      - description: 状态过滤（draft/published/archived）
+      - description: 状态过滤（0=草稿, 1=已发布, 2=已归档）
         in: query
         name: status
-        type: string
+        type: integer
       - description: 标题模糊搜索
         in: query
         name: title

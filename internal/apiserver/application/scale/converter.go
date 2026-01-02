@@ -24,7 +24,7 @@ type ScaleResult struct {
 	Tags                 []string       // 标签列表
 	QuestionnaireCode    string         // 关联的问卷编码
 	QuestionnaireVersion string         // 关联的问卷版本
-	Status               string         // 状态
+	Status               uint8          // 状态
 	Factors              []FactorResult // 因子列表
 	QRCodeURL            string         // 小程序码URL（仅已发布状态时返回）
 	CreatedBy            string         // 创建人
@@ -74,7 +74,7 @@ type ScaleSummaryResult struct {
 	Reporters         []string  // 填报人列表
 	Tags              []string  // 标签列表
 	QuestionnaireCode string    // 关联的问卷编码
-	Status            string    // 状态
+	Status            uint8     // 状态
 	CreatedBy         string    // 创建人
 	CreatedAt         time.Time // 创建时间
 	UpdatedBy         string    // 更新人
@@ -130,7 +130,7 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		Tags:                 tags,
 		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: m.GetQuestionnaireVersion(),
-		Status:               m.GetStatus().String(),
+		Status:               m.GetStatus().Value(),
 		Factors:              make([]FactorResult, 0),
 		CreatedBy:            m.GetCreatedBy().String(),
 		CreatedAt:            m.GetCreatedAt(),
@@ -264,7 +264,7 @@ func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total
 			Reporters:         reporters,
 			Tags:              tags,
 			QuestionnaireCode: item.GetQuestionnaireCode().String(),
-			Status:            item.GetStatus().String(),
+			Status:            item.GetStatus().Value(),
 			CreatedBy:         iam.DisplayName(item.GetCreatedBy(), userNames),
 			CreatedAt:         item.GetCreatedAt(),
 			UpdatedBy:         iam.DisplayName(item.GetUpdatedBy(), userNames),

@@ -82,7 +82,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 }
 
 // FindSummaryList 分页查询量表摘要列表（不包含 factors）
-func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]string) ([]*scale.MedicalScale, error) {
+func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*scale.MedicalScale, error) {
 	filter := r.buildFilter(conditions)
 
 	// 设置分页选项和投影（排除 factors 字段）
@@ -136,7 +136,7 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 }
 
 // CountWithConditions 根据条件统计量表数量
-func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]string) (int64, error) {
+func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
 	filter := r.buildFilter(conditions)
 	return r.Collection().CountDocuments(ctx, filter)
 }
@@ -217,7 +217,7 @@ func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error
 }
 
 // buildFilter 构建查询过滤条件
-func (r *Repository) buildFilter(conditions map[string]string) bson.M {
+func (r *Repository) buildFilter(conditions map[string]interface{}) bson.M {
 	filter := bson.M{
 		"deleted_at": nil, // 排除已软删除的记录
 	}
@@ -227,30 +227,33 @@ func (r *Repository) buildFilter(conditions map[string]string) bson.M {
 	}
 
 	// 状态过滤
-	if status, ok := conditions["status"]; ok && status != "" {
-		// 将状态字符串转换为对应的数值
-		switch status {
-		case "草稿", "draft":
-			filter["status"] = uint8(0)
-		case "已发布", "published":
-			filter["status"] = uint8(1)
-		case "已归档", "archived":
-			filter["status"] = uint8(2)
+	if status, ok := conditions["status"]; ok && status != nil {
+		switch value := status.(type) {
+		case uint8:
+			filter["status"] = value
+		case int:
+			filter["status"] = uint8(value)
+		case int32:
+			filter["status"] = uint8(value)
+		case int64:
+			filter["status"] = uint8(value)
+		case float64:
+			filter["status"] = uint8(value)
 		}
 	}
 
 	// 标题模糊搜索
-	if title, ok := conditions["title"]; ok && title != "" {
+	if title, ok := conditions["title"].(string); ok && title != "" {
 		filter["title"] = bson.M{"$regex": title, "$options": "i"}
 	}
 
 	// 问卷编码过滤
-	if qCode, ok := conditions["questionnaire_code"]; ok && qCode != "" {
+	if qCode, ok := conditions["questionnaire_code"].(string); ok && qCode != "" {
 		filter["questionnaire_code"] = qCode
 	}
 
 	// 主类过滤
-	if category, ok := conditions["category"]; ok && category != "" {
+	if category, ok := conditions["category"].(string); ok && category != "" {
 		filter["category"] = category
 	}
 

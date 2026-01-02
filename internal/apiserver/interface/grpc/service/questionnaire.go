@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -116,7 +115,7 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 		Title:       result.Title,
 		Description: result.Description,
 		ImgUrl:      result.ImgUrl,
-		Status:      strconv.Itoa(int(result.Status.Value())), // 将 Status 转换为字符串（数字）
+		Status:      int32(result.Status.Value()),
 		Type:        result.Type,
 		Questions:   protoQuestions,
 	}
@@ -147,7 +146,7 @@ func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire
 		Title:         result.Title,
 		Description:   result.Description,
 		ImgUrl:        result.ImgUrl,
-		Status:        string(rune(result.Status.Value())), // 将 Status 转换为字符串（数字）
+		Status:        int32(result.Status.Value()),
 		Type:          result.Type,
 		QuestionCount: int32(result.QuestionCount),
 	}

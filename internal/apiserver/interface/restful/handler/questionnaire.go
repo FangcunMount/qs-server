@@ -563,7 +563,7 @@ func (h *QuestionnaireHandler) GetByCode(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
-// @Param status query string false "状态筛选"
+// @Param status query int false "状态筛选（0=草稿, 1=已发布, 2=已归档）"
 // @Param title query string false "标题筛选"
 // @Success 200 {object} core.Response{data=response.QuestionnaireListResponse}
 // @Router /api/v1/questionnaires [get]
@@ -582,7 +582,12 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 
 	conditions := make(map[string]interface{})
 	if status := c.Query("status"); status != "" {
-		conditions["status"] = status
+		value, err := strconv.Atoi(status)
+		if err != nil || value < 0 || value > 2 {
+			h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "状态无效"))
+			return
+		}
+		conditions["status"] = uint8(value)
 	}
 	if title := c.Query("title"); title != "" {
 		conditions["title"] = title

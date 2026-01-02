@@ -122,9 +122,9 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 	// 2. 添加状态过滤条件
 	conditions := dto.Conditions
 	if conditions == nil {
-		conditions = make(map[string]string)
+		conditions = make(map[string]interface{})
 	}
-	conditions["status"] = scale.StatusPublished.String()
+	conditions["status"] = scale.StatusPublished.Value()
 
 	// 3. 获取量表摘要列表
 	items, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, conditions)

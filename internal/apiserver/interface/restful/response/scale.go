@@ -18,7 +18,7 @@ type ScaleResponse struct {
 	Tags                 []string         `json:"tags,omitempty"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
 	QuestionnaireVersion string           `json:"questionnaire_version"`
-	Status               string           `json:"status"`
+	Status               uint8            `json:"status"`
 	Factors              []FactorResponse `json:"factors,omitempty"`
 	CreatedBy            string           `json:"created_by"` // 创建人
 	CreatedAt            string           `json:"created_at"` // 创建时间
@@ -69,7 +69,7 @@ type ScaleSummaryResponse struct {
 	Reporters         []string `json:"reporters,omitempty"`
 	Tags              []string `json:"tags,omitempty"`
 	QuestionnaireCode string   `json:"questionnaire_code"`
-	Status            string   `json:"status"`
+	Status            uint8    `json:"status"`
 	CreatedBy         string   `json:"created_by"` // 创建人
 	CreatedAt         string   `json:"created_at"` // 创建时间
 	UpdatedBy         string   `json:"updated_by"` // 更新人

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: questionnaire/questionnaire.proto
+// source: internal/apiserver/interface/grpc/proto/questionnaire/questionnaire.proto
 
 package questionnaire
 
@@ -28,7 +28,7 @@ type QuestionnaireSummary struct {
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	ImgUrl        string                 `protobuf:"bytes,4,opt,name=img_url,json=imgUrl,proto3" json:"img_url,omitempty"`
-	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	Status        int32                  `protobuf:"varint,5,opt,name=status,proto3" json:"status,omitempty"`
 	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
 	QuestionCount int32                  `protobuf:"varint,7,opt,name=question_count,json=questionCount,proto3" json:"question_count,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -40,7 +40,7 @@ type QuestionnaireSummary struct {
 
 func (x *QuestionnaireSummary) Reset() {
 	*x = QuestionnaireSummary{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[0]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -52,7 +52,7 @@ func (x *QuestionnaireSummary) String() string {
 func (*QuestionnaireSummary) ProtoMessage() {}
 
 func (x *QuestionnaireSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[0]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -65,7 +65,7 @@ func (x *QuestionnaireSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuestionnaireSummary.ProtoReflect.Descriptor instead.
 func (*QuestionnaireSummary) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{0}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *QuestionnaireSummary) GetCode() string {
@@ -96,11 +96,11 @@ func (x *QuestionnaireSummary) GetImgUrl() string {
 	return ""
 }
 
-func (x *QuestionnaireSummary) GetStatus() string {
+func (x *QuestionnaireSummary) GetStatus() int32 {
 	if x != nil {
 		return x.Status
 	}
-	return ""
+	return 0
 }
 
 func (x *QuestionnaireSummary) GetVersion() string {
@@ -145,7 +145,7 @@ type Questionnaire struct {
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	ImgUrl        string                 `protobuf:"bytes,4,opt,name=img_url,json=imgUrl,proto3" json:"img_url,omitempty"`
-	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	Status        int32                  `protobuf:"varint,5,opt,name=status,proto3" json:"status,omitempty"`
 	Version       string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
 	Questions     []*Question            `protobuf:"bytes,7,rep,name=questions,proto3" json:"questions,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -157,7 +157,7 @@ type Questionnaire struct {
 
 func (x *Questionnaire) Reset() {
 	*x = Questionnaire{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[1]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -169,7 +169,7 @@ func (x *Questionnaire) String() string {
 func (*Questionnaire) ProtoMessage() {}
 
 func (x *Questionnaire) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[1]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -182,7 +182,7 @@ func (x *Questionnaire) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Questionnaire.ProtoReflect.Descriptor instead.
 func (*Questionnaire) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{1}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Questionnaire) GetCode() string {
@@ -213,11 +213,11 @@ func (x *Questionnaire) GetImgUrl() string {
 	return ""
 }
 
-func (x *Questionnaire) GetStatus() string {
+func (x *Questionnaire) GetStatus() int32 {
 	if x != nil {
 		return x.Status
 	}
-	return ""
+	return 0
 }
 
 func (x *Questionnaire) GetVersion() string {
@@ -272,7 +272,7 @@ type Question struct {
 
 func (x *Question) Reset() {
 	*x = Question{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[2]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -284,7 +284,7 @@ func (x *Question) String() string {
 func (*Question) ProtoMessage() {}
 
 func (x *Question) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[2]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -297,7 +297,7 @@ func (x *Question) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Question.ProtoReflect.Descriptor instead.
 func (*Question) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{2}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Question) GetCode() string {
@@ -368,7 +368,7 @@ type Option struct {
 
 func (x *Option) Reset() {
 	*x = Option{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[3]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -380,7 +380,7 @@ func (x *Option) String() string {
 func (*Option) ProtoMessage() {}
 
 func (x *Option) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[3]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -393,7 +393,7 @@ func (x *Option) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Option.ProtoReflect.Descriptor instead.
 func (*Option) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{3}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Option) GetCode() string {
@@ -428,7 +428,7 @@ type ValidationRule struct {
 
 func (x *ValidationRule) Reset() {
 	*x = ValidationRule{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[4]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -440,7 +440,7 @@ func (x *ValidationRule) String() string {
 func (*ValidationRule) ProtoMessage() {}
 
 func (x *ValidationRule) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[4]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -453,7 +453,7 @@ func (x *ValidationRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationRule.ProtoReflect.Descriptor instead.
 func (*ValidationRule) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{4}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ValidationRule) GetRuleType() string {
@@ -480,7 +480,7 @@ type CalculationRule struct {
 
 func (x *CalculationRule) Reset() {
 	*x = CalculationRule{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[5]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +492,7 @@ func (x *CalculationRule) String() string {
 func (*CalculationRule) ProtoMessage() {}
 
 func (x *CalculationRule) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[5]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +505,7 @@ func (x *CalculationRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculationRule.ProtoReflect.Descriptor instead.
 func (*CalculationRule) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{5}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CalculationRule) GetFormulaType() string {
@@ -525,7 +525,7 @@ type GetQuestionnaireRequest struct {
 
 func (x *GetQuestionnaireRequest) Reset() {
 	*x = GetQuestionnaireRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[6]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +537,7 @@ func (x *GetQuestionnaireRequest) String() string {
 func (*GetQuestionnaireRequest) ProtoMessage() {}
 
 func (x *GetQuestionnaireRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[6]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +550,7 @@ func (x *GetQuestionnaireRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetQuestionnaireRequest.ProtoReflect.Descriptor instead.
 func (*GetQuestionnaireRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{6}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetQuestionnaireRequest) GetCode() string {
@@ -570,7 +570,7 @@ type GetQuestionnaireResponse struct {
 
 func (x *GetQuestionnaireResponse) Reset() {
 	*x = GetQuestionnaireResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[7]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -582,7 +582,7 @@ func (x *GetQuestionnaireResponse) String() string {
 func (*GetQuestionnaireResponse) ProtoMessage() {}
 
 func (x *GetQuestionnaireResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[7]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -595,7 +595,7 @@ func (x *GetQuestionnaireResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetQuestionnaireResponse.ProtoReflect.Descriptor instead.
 func (*GetQuestionnaireResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{7}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetQuestionnaireResponse) GetQuestionnaire() *Questionnaire {
@@ -610,7 +610,7 @@ type ListQuestionnairesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Page          int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Status        int32                  `protobuf:"varint,3,opt,name=status,proto3" json:"status,omitempty"`
 	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -618,7 +618,7 @@ type ListQuestionnairesRequest struct {
 
 func (x *ListQuestionnairesRequest) Reset() {
 	*x = ListQuestionnairesRequest{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[8]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -630,7 +630,7 @@ func (x *ListQuestionnairesRequest) String() string {
 func (*ListQuestionnairesRequest) ProtoMessage() {}
 
 func (x *ListQuestionnairesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[8]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -643,7 +643,7 @@ func (x *ListQuestionnairesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListQuestionnairesRequest.ProtoReflect.Descriptor instead.
 func (*ListQuestionnairesRequest) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{8}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListQuestionnairesRequest) GetPage() int32 {
@@ -660,11 +660,11 @@ func (x *ListQuestionnairesRequest) GetPageSize() int32 {
 	return 0
 }
 
-func (x *ListQuestionnairesRequest) GetStatus() string {
+func (x *ListQuestionnairesRequest) GetStatus() int32 {
 	if x != nil {
 		return x.Status
 	}
-	return ""
+	return 0
 }
 
 func (x *ListQuestionnairesRequest) GetTitle() string {
@@ -685,7 +685,7 @@ type ListQuestionnairesResponse struct {
 
 func (x *ListQuestionnairesResponse) Reset() {
 	*x = ListQuestionnairesResponse{}
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[9]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +697,7 @@ func (x *ListQuestionnairesResponse) String() string {
 func (*ListQuestionnairesResponse) ProtoMessage() {}
 
 func (x *ListQuestionnairesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_questionnaire_questionnaire_proto_msgTypes[9]
+	mi := &file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +710,7 @@ func (x *ListQuestionnairesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListQuestionnairesResponse.ProtoReflect.Descriptor instead.
 func (*ListQuestionnairesResponse) Descriptor() ([]byte, []int) {
-	return file_questionnaire_questionnaire_proto_rawDescGZIP(), []int{9}
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListQuestionnairesResponse) GetQuestionnaires() []*QuestionnaireSummary {
@@ -727,17 +727,17 @@ func (x *ListQuestionnairesResponse) GetTotal() int64 {
 	return 0
 }
 
-var File_questionnaire_questionnaire_proto protoreflect.FileDescriptor
+var File_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto protoreflect.FileDescriptor
 
-const file_questionnaire_questionnaire_proto_rawDesc = "" +
+const file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\n" +
-	"!questionnaire/questionnaire.proto\x12\rquestionnaire\"\xa6\x02\n" +
+	"Iinternal/apiserver/interface/grpc/proto/questionnaire/questionnaire.proto\x12\rquestionnaire\"\xa6\x02\n" +
 	"\x14QuestionnaireSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x17\n" +
 	"\aimg_url\x18\x04 \x01(\tR\x06imgUrl\x12\x16\n" +
-	"\x06status\x18\x05 \x01(\tR\x06status\x12\x18\n" +
+	"\x06status\x18\x05 \x01(\x05R\x06status\x12\x18\n" +
 	"\aversion\x18\x06 \x01(\tR\aversion\x12%\n" +
 	"\x0equestion_count\x18\a \x01(\x05R\rquestionCount\x12\x1d\n" +
 	"\n" +
@@ -751,7 +751,7 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x17\n" +
 	"\aimg_url\x18\x04 \x01(\tR\x06imgUrl\x12\x16\n" +
-	"\x06status\x18\x05 \x01(\tR\x06status\x12\x18\n" +
+	"\x06status\x18\x05 \x01(\x05R\x06status\x12\x18\n" +
 	"\aversion\x18\x06 \x01(\tR\aversion\x125\n" +
 	"\tquestions\x18\a \x03(\v2\x17.questionnaire.QuestionR\tquestions\x12\x1d\n" +
 	"\n" +
@@ -785,7 +785,7 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\x19ListQuestionnairesRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
+	"\x06status\x18\x03 \x01(\x05R\x06status\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\"\x7f\n" +
 	"\x1aListQuestionnairesResponse\x12K\n" +
 	"\x0equestionnaires\x18\x01 \x03(\v2#.questionnaire.QuestionnaireSummaryR\x0equestionnaires\x12\x14\n" +
@@ -795,19 +795,19 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\x12ListQuestionnaires\x12(.questionnaire.ListQuestionnairesRequest\x1a).questionnaire.ListQuestionnairesResponseB^Z\\github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaireb\x06proto3"
 
 var (
-	file_questionnaire_questionnaire_proto_rawDescOnce sync.Once
-	file_questionnaire_questionnaire_proto_rawDescData []byte
+	file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescOnce sync.Once
+	file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescData []byte
 )
 
-func file_questionnaire_questionnaire_proto_rawDescGZIP() []byte {
-	file_questionnaire_questionnaire_proto_rawDescOnce.Do(func() {
-		file_questionnaire_questionnaire_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_questionnaire_questionnaire_proto_rawDesc), len(file_questionnaire_questionnaire_proto_rawDesc)))
+func file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescGZIP() []byte {
+	file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescOnce.Do(func() {
+		file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDesc)))
 	})
-	return file_questionnaire_questionnaire_proto_rawDescData
+	return file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDescData
 }
 
-var file_questionnaire_questionnaire_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_questionnaire_questionnaire_proto_goTypes = []any{
+var file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_goTypes = []any{
 	(*QuestionnaireSummary)(nil),       // 0: questionnaire.QuestionnaireSummary
 	(*Questionnaire)(nil),              // 1: questionnaire.Questionnaire
 	(*Question)(nil),                   // 2: questionnaire.Question
@@ -819,7 +819,7 @@ var file_questionnaire_questionnaire_proto_goTypes = []any{
 	(*ListQuestionnairesRequest)(nil),  // 8: questionnaire.ListQuestionnairesRequest
 	(*ListQuestionnairesResponse)(nil), // 9: questionnaire.ListQuestionnairesResponse
 }
-var file_questionnaire_questionnaire_proto_depIdxs = []int32{
+var file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_depIdxs = []int32{
 	2, // 0: questionnaire.Questionnaire.questions:type_name -> questionnaire.Question
 	3, // 1: questionnaire.Question.options:type_name -> questionnaire.Option
 	4, // 2: questionnaire.Question.validation_rules:type_name -> questionnaire.ValidationRule
@@ -837,26 +837,26 @@ var file_questionnaire_questionnaire_proto_depIdxs = []int32{
 	0, // [0:6] is the sub-list for field type_name
 }
 
-func init() { file_questionnaire_questionnaire_proto_init() }
-func file_questionnaire_questionnaire_proto_init() {
-	if File_questionnaire_questionnaire_proto != nil {
+func init() { file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_init() }
+func file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_init() {
+	if File_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_questionnaire_questionnaire_proto_rawDesc), len(file_questionnaire_questionnaire_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_questionnaire_questionnaire_proto_goTypes,
-		DependencyIndexes: file_questionnaire_questionnaire_proto_depIdxs,
-		MessageInfos:      file_questionnaire_questionnaire_proto_msgTypes,
+		GoTypes:           file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_goTypes,
+		DependencyIndexes: file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_depIdxs,
+		MessageInfos:      file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_msgTypes,
 	}.Build()
-	File_questionnaire_questionnaire_proto = out.File
-	file_questionnaire_questionnaire_proto_goTypes = nil
-	file_questionnaire_questionnaire_proto_depIdxs = nil
+	File_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto = out.File
+	file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_goTypes = nil
+	file_internal_apiserver_interface_grpc_proto_questionnaire_questionnaire_proto_depIdxs = nil
 }

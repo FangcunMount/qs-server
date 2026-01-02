@@ -501,7 +501,7 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
-// @Param status query string false "状态过滤（draft/published/archived）"
+// @Param status query int false "状态过滤（0=草稿, 1=已发布, 2=已归档）"
 // @Param title query string false "标题模糊搜索"
 // @Success 200 {object} core.Response{data=response.ScaleListResponse}
 // @Router /api/v1/scales [get]
@@ -521,12 +521,21 @@ func (h *ScaleHandler) List(c *gin.Context) {
 	dto := scale.ListScalesDTO{
 		Page:       page,
 		PageSize:   pageSize,
-		Conditions: make(map[string]string),
+		Conditions: make(map[string]interface{}),
 	}
 
 	// 解析查询条件
 	if status := c.Query("status"); status != "" {
-		dto.Conditions["status"] = status
+		value, err := strconv.Atoi(status)
+		if err != nil {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "状态无效"))
+			return
+		}
+		if value < 0 || value > 2 {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "状态无效"))
+			return
+		}
+		dto.Conditions["status"] = uint8(value)
 	}
 	if title := c.Query("title"); title != "" {
 		dto.Conditions["title"] = title
@@ -605,7 +614,7 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 	dto := scale.ListScalesDTO{
 		Page:       page,
 		PageSize:   pageSize,
-		Conditions: make(map[string]string),
+		Conditions: make(map[string]interface{}),
 	}
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)

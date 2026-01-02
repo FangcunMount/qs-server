@@ -164,8 +164,8 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 		questionnaires.PUT("/:code/questions/batch", quesHandler.BatchUpdateQuestions) // 批量更新
 
 		// 查询接口
-		questionnaires.GET("/:code", quesHandler.GetByCode)                    // 获取问卷详情
 		questionnaires.GET("", quesHandler.List)                               // 获取问卷列表
+		questionnaires.GET("/:code", quesHandler.GetByCode)                    // 获取问卷详情
 		questionnaires.GET("/published/:code", quesHandler.GetPublishedByCode) // 获取已发布问卷
 		questionnaires.GET("/published", quesHandler.ListPublished)            // 获取已发布列表
 		questionnaires.GET("/:code/qrcode", quesHandler.GetQRCode)             // 获取问卷小程序码

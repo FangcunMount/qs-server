@@ -63,11 +63,11 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 	dto := appScale.ListScalesDTO{
 		Page:       int(req.Page),
 		PageSize:   int(req.PageSize),
-		Conditions: make(map[string]string),
+		Conditions: make(map[string]interface{}),
 	}
 
-	if req.Status != "" {
-		dto.Conditions["status"] = req.Status
+	if req.Status != 0 {
+		dto.Conditions["status"] = uint8(req.Status)
 	}
 	if req.Title != "" {
 		dto.Conditions["title"] = req.Title
@@ -160,7 +160,7 @@ func (s *ScaleService) toProtoScale(ctx context.Context, result *appScale.ScaleR
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
-		Status:               result.Status,
+		Status:               int32(result.Status),
 		Factors:              protoFactors,
 		QuestionCount:        questionCount,
 	}
@@ -250,7 +250,7 @@ func (s *ScaleService) toProtoScaleSummary(ctx context.Context, result *appScale
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: "", // 摘要中不包含版本
-		Status:               result.Status,
+		Status:               int32(result.Status),
 		QuestionCount:        questionCount,
 	}
 }
