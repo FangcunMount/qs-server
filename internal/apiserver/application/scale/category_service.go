@@ -8,7 +8,7 @@ import (
 
 // ScaleCategoriesResult 量表分类结果
 type ScaleCategoriesResult struct {
-	Categories     []CategoryOption     `json:"categories"`
+	Categories     []CategoryOption      `json:"categories"`
 	Stages         []StageOption         `json:"stages"`
 	ApplicableAges []ApplicableAgeOption `json:"applicable_ages"`
 	Reporters      []ReporterOption      `json:"reporters"`
@@ -58,14 +58,14 @@ func NewCategoryService() ScaleCategoryService {
 func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesResult, error) {
 	// 构建类别列表
 	categories := []CategoryOption{
-		{Value: string(domainScale.CategoryADHD), Label: "ADHD"},
+		{Value: string(domainScale.CategoryADHD), Label: "多动障碍"},
 		{Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
-		{Value: string(domainScale.CategorySensoryIntegration), Label: "感统"},
+		{Value: string(domainScale.CategoryASD), Label: "自闭症"},
+		{Value: string(domainScale.CategoryOCD), Label: "强迫症"},
+		{Value: string(domainScale.CategorySensoryIntegration), Label: "感觉统合"},
 		{Value: string(domainScale.CategoryExecutiveFunction), Label: "执行功能"},
-		{Value: string(domainScale.CategoryMentalHealth), Label: "心理健康"},
-		{Value: string(domainScale.CategoryNeurodevelopmentalScreening), Label: "神经发育"},
-		{Value: string(domainScale.CategoryChronicDiseaseManagement), Label: "慢性病管理"},
-		{Value: string(domainScale.CategoryQualityOfLife), Label: "生活质量"},
+		{Value: string(domainScale.CategoryEmotion), Label: "情绪/抑郁"},
+		{Value: string(domainScale.CategorySleep), Label: "失眠/睡眠"},
 	}
 
 	// 构建阶段列表
@@ -78,11 +78,11 @@ func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesRe
 
 	// 构建使用年龄列表
 	applicableAges := []ApplicableAgeOption{
-		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿"},
-		{Value: string(domainScale.ApplicableAgePreschool), Label: "学龄前"},
-		{Value: string(domainScale.ApplicableAgeSchoolChild), Label: "学龄儿童"},
-		{Value: string(domainScale.ApplicableAgeAdolescent), Label: "青少年"},
-		{Value: string(domainScale.ApplicableAgeAdult), Label: "成人"},
+		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿（0-3岁）"},
+		{Value: string(domainScale.ApplicableAgePreschool), Label: "学龄前（3-6岁）"},
+		{Value: string(domainScale.ApplicableAgeSchoolChild), Label: "学龄儿童（6-12岁）"},
+		{Value: string(domainScale.ApplicableAgeAdolescent), Label: "青少年（12-18岁）"},
+		{Value: string(domainScale.ApplicableAgeAdult), Label: "成人（18岁以上）"},
 	}
 
 	// 构建填报人列表
@@ -104,4 +104,3 @@ func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesRe
 		Tags:           tags,
 	}, nil
 }
-

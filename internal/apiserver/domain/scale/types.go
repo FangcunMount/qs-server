@@ -384,19 +384,19 @@ const (
 	// CategoryADHD ADHD
 	CategoryADHD Category = "adhd"
 	// CategoryTicDisorder 抽动障碍
-	CategoryTicDisorder Category = "tic"
+	CategoryTicDisorder Category = "td"
+	// CategoryASD 自闭症
+	CategoryASD Category = "asd"
+	// CategoryOCD 强迫症
+	CategoryOCD Category = "ocd"
 	// CategorySensoryIntegration 感统
-	CategorySensoryIntegration Category = "sensory"
+	CategorySensoryIntegration Category = "sii"
 	// CategoryExecutiveFunction 执行功能
-	CategoryExecutiveFunction Category = "executive"
-	// CategoryMentalHealth 心理健康
-	CategoryMentalHealth Category = "mental"
-	// CategoryNeurodevelopmentalScreening 神经发育
-	CategoryNeurodevelopmentalScreening Category = "neurodev"
-	// CategoryChronicDiseaseManagement 慢性病管理
-	CategoryChronicDiseaseManagement Category = "chronic"
-	// CategoryQualityOfLife 生活质量
-	CategoryQualityOfLife Category = "qol"
+	CategoryExecutiveFunction Category = "efn"
+	// CategoryEmotion 情绪
+	CategoryEmotion Category = "emt"
+	// CategorySleep 睡眠
+	CategorySleep Category = "slp"
 )
 
 // NewCategory 创建类别
@@ -426,9 +426,8 @@ func (c Category) IsValid() bool {
 	}
 	switch c {
 	case CategoryADHD, CategoryTicDisorder, CategorySensoryIntegration,
-		CategoryExecutiveFunction, CategoryMentalHealth,
-		CategoryNeurodevelopmentalScreening, CategoryChronicDiseaseManagement,
-		CategoryQualityOfLife:
+		CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
+		CategoryASD, CategoryOCD:
 		return true
 	default:
 		return false
