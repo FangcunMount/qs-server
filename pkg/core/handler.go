@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -44,9 +45,16 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 	}
 
 	// 记录错误日志
+	cause := errors.Cause(err)
+	causeMsg := ""
+	if cause != nil {
+		causeMsg = cause.Error()
+	}
 	logger.L(c.Request.Context()).Errorw("HTTP Handler Error",
 		"action", "http_error",
 		"error", err.Error(),
+		"error_detail", fmt.Sprintf("%+v", err),
+		"error_cause", causeMsg,
 	)
 
 	var httpStatus int
