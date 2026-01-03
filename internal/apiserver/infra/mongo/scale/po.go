@@ -1,9 +1,13 @@
 package scale
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -30,10 +34,62 @@ type ScalePO struct {
 	QuestionnaireVersion string `bson:"questionnaire_version,omitempty" json:"questionnaire_version,omitempty"`
 
 	// 状态
-	Status uint8 `bson:"status" json:"status"`
+	Status StatusField `bson:"status" json:"status"`
 
 	// 因子列表
 	Factors []FactorPO `bson:"factors,omitempty" json:"factors,omitempty"`
+}
+
+// StatusField 兼容旧数据：允许 status 从字符串解码到数值
+type StatusField uint8
+
+// UnmarshalBSONValue implements bson.ValueUnmarshaler.
+func (s *StatusField) UnmarshalBSONValue(t bsontype.Type, data []byte) error {
+	if s == nil {
+		return nil
+	}
+
+	switch t {
+	case bsontype.Int32:
+		var v int32
+		if err := bson.UnmarshalValue(t, data, &v); err != nil {
+			return err
+		}
+		*s = StatusField(v)
+		return nil
+	case bsontype.Int64:
+		var v int64
+		if err := bson.UnmarshalValue(t, data, &v); err != nil {
+			return err
+		}
+		*s = StatusField(v)
+		return nil
+	case bsontype.Double:
+		var v float64
+		if err := bson.UnmarshalValue(t, data, &v); err != nil {
+			return err
+		}
+		*s = StatusField(v)
+		return nil
+	case bsontype.String:
+		var v string
+		if err := bson.UnmarshalValue(t, data, &v); err != nil {
+			return err
+		}
+		v = strings.TrimSpace(v)
+		if v == "" {
+			*s = 0
+			return nil
+		}
+		parsed, err := strconv.ParseUint(v, 10, 8)
+		if err != nil {
+			return fmt.Errorf("invalid status string: %q", v)
+		}
+		*s = StatusField(parsed)
+		return nil
+	default:
+		return fmt.Errorf("unsupported bson type for status: %v", t)
+	}
 }
 
 // CollectionName 返回集合名称
