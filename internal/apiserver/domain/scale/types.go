@@ -417,7 +417,17 @@ var AllCategories = []Category{
 
 // String 返回类别的字符串表示
 func (c Category) String() string {
-	return string(c)
+	categoryMap := map[Category]string{
+		CategoryADHD:               "多动",
+		CategoryTicDisorder:        "抽动",
+		CategoryASD:                "自闭",
+		CategoryOCD:                "强迫",
+		CategorySensoryIntegration: "感觉统合",
+		CategoryExecutiveFunction:  "执行功能",
+		CategoryEmotion:            "情绪",
+		CategorySleep:              "睡眠",
+	}
+	return categoryMap[c]
 }
 
 // Value 获取类别值
