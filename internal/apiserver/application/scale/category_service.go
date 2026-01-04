@@ -60,12 +60,12 @@ func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesRe
 	categories := []CategoryOption{
 		{Value: string(domainScale.CategoryADHD), Label: "多动障碍"},
 		{Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
-		{Value: string(domainScale.CategoryASD), Label: "自闭症"},
-		{Value: string(domainScale.CategoryOCD), Label: "强迫症"},
+		{Value: string(domainScale.CategoryASD), Label: "自闭"},
+		{Value: string(domainScale.CategoryOCD), Label: "强迫"},
 		{Value: string(domainScale.CategorySensoryIntegration), Label: "感觉统合"},
 		{Value: string(domainScale.CategoryExecutiveFunction), Label: "执行功能"},
-		{Value: string(domainScale.CategoryEmotion), Label: "情绪/抑郁"},
-		{Value: string(domainScale.CategorySleep), Label: "失眠/睡眠"},
+		{Value: string(domainScale.CategoryEmotion), Label: "情绪"},
+		{Value: string(domainScale.CategorySleep), Label: "睡眠"},
 	}
 
 	// 构建阶段列表
