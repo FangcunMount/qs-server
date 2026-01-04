@@ -430,9 +430,22 @@ func (c Category) IsValid() bool {
 		return true // 允许为空（可选字段）
 	}
 	switch c {
-	case CategoryADHD, CategoryTicDisorder, CategorySensoryIntegration,
-		CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
-		CategoryASD, CategoryOCD:
+	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryOCD,
+		CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsOpen 检查类别是否开放
+func (c Category) IsOpen() bool {
+	if c.IsEmpty() {
+		return false
+	}
+	// 开放的类别
+	switch c {
+	case CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep:
 		return true
 	default:
 		return false

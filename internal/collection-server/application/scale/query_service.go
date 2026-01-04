@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
 
@@ -64,10 +65,13 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 		return nil, err
 	}
 
-	// 转换摘要列表
-	scales := make([]ScaleSummaryResponse, len(result.Scales))
-	for i, scale := range result.Scales {
-		scales[i] = ScaleSummaryResponse{
+	// 转换摘要列表（仅保留有效分类）
+	scales := make([]ScaleSummaryResponse, 0, len(result.Scales))
+	for _, scale := range result.Scales {
+		if !domainScale.NewCategory(scale.Category).IsOpen() {
+			continue
+		}
+		scales = append(scales, ScaleSummaryResponse{
 			Code:                 scale.Code,
 			Title:                scale.Title,
 			Description:          scale.Description,
@@ -80,7 +84,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 			QuestionnaireVersion: scale.QuestionnaireVersion,
 			Status:               scale.Status,
 			QuestionCount:        scale.QuestionCount,
-		}
+		})
 	}
 
 	return &ListScalesResponse{
