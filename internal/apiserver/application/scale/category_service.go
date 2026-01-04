@@ -114,7 +114,7 @@ func (s *categoryService) GetOpenCategories(ctx context.Context) (*ScaleCategori
 		if category.IsOpen() {
 			categories = append(categories, CategoryOption{
 				Value: string(category),
-				Label: category.String(),
+				Label: category.Label(),
 			})
 		}
 	}

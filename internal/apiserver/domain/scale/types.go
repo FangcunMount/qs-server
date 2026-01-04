@@ -415,8 +415,8 @@ var AllCategories = []Category{
 	CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
 }
 
-// String 返回类别的字符串表示
-func (c Category) String() string {
+// Value 获取类别文案
+func (c Category) Label() string {
 	categoryMap := map[Category]string{
 		CategoryADHD:               "多动",
 		CategoryTicDisorder:        "抽动",
@@ -430,8 +430,8 @@ func (c Category) String() string {
 	return categoryMap[c]
 }
 
-// Value 获取类别值
-func (c Category) Value() string {
+// String 返回类别的字符串表示
+func (c Category) String() string {
 	return string(c)
 }
 
