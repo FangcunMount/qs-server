@@ -392,8 +392,8 @@ const (
 	CategoryTicDisorder Category = "td"
 	// CategoryASD 自闭症
 	CategoryASD Category = "asd"
-	// CategoryOCD 强迫症
-	CategoryOCD Category = "ocd"
+	// CategoryPressure 压力
+	CategoryPressure Category = "pressure"
 	// CategorySensoryIntegration 感统
 	CategorySensoryIntegration Category = "sii"
 	// CategoryExecutiveFunction 执行功能
@@ -411,7 +411,7 @@ func NewCategory(value string) Category {
 
 // AllCategories 所有类别
 var AllCategories = []Category{
-	CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryOCD,
+	CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
 	CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
 }
 
@@ -421,7 +421,7 @@ func (c Category) Label() string {
 		CategoryADHD:               "多动",
 		CategoryTicDisorder:        "抽动",
 		CategoryASD:                "自闭",
-		CategoryOCD:                "强迫",
+		CategoryPressure:           "压力",
 		CategorySensoryIntegration: "感觉统合",
 		CategoryExecutiveFunction:  "执行功能",
 		CategoryEmotion:            "情绪",
@@ -446,7 +446,7 @@ func (c Category) IsValid() bool {
 		return true // 允许为空（可选字段）
 	}
 	switch c {
-	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryOCD,
+	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
 		CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep:
 		return true
 	default:
@@ -461,7 +461,7 @@ func (c Category) IsOpen() bool {
 	}
 	// 开放的类别
 	switch c {
-	case CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep:
+	case CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategoryPressure:
 		return true
 	default:
 		return false
