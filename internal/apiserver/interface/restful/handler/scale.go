@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -501,7 +502,7 @@ func (h *ScaleHandler) GetByQuestionnaireCode(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
-// @Param status query int false "状态过滤（0=草稿, 1=已发布, 2=已归档）"
+// @Param status query string false "状态过滤（draft/published/archived）"
 // @Param title query string false "标题模糊搜索"
 // @Param category query string false "主类过滤"
 // @Success 200 {object} core.Response{data=response.ScaleListResponse}
@@ -527,16 +528,12 @@ func (h *ScaleHandler) List(c *gin.Context) {
 
 	// 解析查询条件
 	if status := c.Query("status"); status != "" {
-		value, err := strconv.Atoi(status)
-		if err != nil {
+		if parsed, ok := domainScale.ParseStatus(status); ok {
+			dto.Conditions["status"] = parsed.String()
+		} else {
 			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "状态无效"))
 			return
 		}
-		if value < 0 || value > 2 {
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "状态无效"))
-			return
-		}
-		dto.Conditions["status"] = uint8(value)
 	}
 	if title := c.Query("title"); title != "" {
 		dto.Conditions["title"] = title

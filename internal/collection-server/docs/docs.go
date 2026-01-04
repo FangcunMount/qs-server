@@ -756,8 +756,8 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "description": "状态过滤（0=草稿, 1=已发布, 2=已归档）",
+                        "type": "string",
+                        "description": "状态过滤（draft/published/archived）",
                         "name": "status",
                         "in": "query"
                     },
@@ -887,8 +887,8 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "description": "状态过滤（0=草稿, 1=已发布, 2=已归档）",
+                        "type": "string",
+                        "description": "状态过滤（draft/published/archived）",
                         "name": "status",
                         "in": "query"
                     },
@@ -1990,7 +1990,7 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "title": {
                     "type": "string"
@@ -2026,7 +2026,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "status": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "title": {
                     "type": "string"
@@ -2233,7 +2233,7 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "tags": {
                     "type": "array",
@@ -2286,7 +2286,7 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "tags": {
                     "type": "array",

@@ -220,7 +220,12 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 		filter["title"] = bson.M{"$regex": title, "$options": "i"}
 	}
 	if status, ok := conditions["status"]; ok && status != nil {
-		filter["status"] = status // 直接使用，支持 uint8 或其他类型
+		switch value := status.(type) {
+		case string:
+			if parsed, ok := questionnaire.ParseStatus(value); ok {
+				filter["status"] = parsed.String()
+			}
+		}
 	}
 	if typ, ok := conditions["type"].(string); ok && typ != "" {
 		filter["type"] = typ
@@ -243,7 +248,12 @@ func (r *Repository) FindBaseList(ctx context.Context, page, pageSize int, condi
 		filter["title"] = bson.M{"$regex": title, "$options": "i"} // 模糊查询，不区分大小写
 	}
 	if status, ok := conditions["status"]; ok && status != nil {
-		filter["status"] = status // 直接使用，支持 uint8 或其他类型
+		switch value := status.(type) {
+		case string:
+			if parsed, ok := questionnaire.ParseStatus(value); ok {
+				filter["status"] = parsed.String()
+			}
+		}
 	}
 	if typ, ok := conditions["type"].(string); ok && typ != "" {
 		filter["type"] = typ

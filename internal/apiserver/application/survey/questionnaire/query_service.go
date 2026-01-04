@@ -175,7 +175,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	if dto.Conditions == nil {
 		dto.Conditions = make(map[string]interface{})
 	}
-	dto.Conditions["status"] = uint8(questionnaire.STATUS_PUBLISHED)
+	dto.Conditions["status"] = questionnaire.STATUS_PUBLISHED.String()
 	if t, ok := dto.Conditions["type"].(string); ok && t != "" {
 		dto.Conditions["type"] = questionnaire.NormalizeQuestionnaireType(t).String()
 	}

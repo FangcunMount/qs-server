@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal/apiserver/interface/grpc/proto/questionnaire/questionnaire.proto
+// source: questionnaire/questionnaire.proto
 
 package questionnaire
 
@@ -163,5 +163,5 @@ var QuestionnaireService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/apiserver/interface/grpc/proto/questionnaire/questionnaire.proto",
+	Metadata: "questionnaire/questionnaire.proto",
 }

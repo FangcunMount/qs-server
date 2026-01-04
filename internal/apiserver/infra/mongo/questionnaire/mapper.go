@@ -23,7 +23,7 @@ func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *Questionnai
 		Description: bo.GetDescription(),
 		ImgUrl:      bo.GetImgUrl(),
 		Version:     bo.GetVersion().Value(),
-		Status:      bo.GetStatus().Value(),
+		Status:      bo.GetStatus().String(),
 		Type:        bo.GetType().String(),
 	}
 	po.CreatedAt = bo.GetCreatedAt()

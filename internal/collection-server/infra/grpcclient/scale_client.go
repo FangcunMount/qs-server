@@ -20,7 +20,7 @@ type ScaleOutput struct {
 	Tags                 []string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
-	Status               int32
+	Status               string
 	Factors              []FactorOutput
 	QuestionCount        int32
 }
@@ -61,7 +61,7 @@ type ScaleSummaryOutput struct {
 	Tags                 []string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
-	Status               int32
+	Status               string
 	QuestionCount        int32
 }
 
@@ -149,7 +149,7 @@ func (c *ScaleClient) GetScale(ctx context.Context, code string) (*ScaleOutput, 
 }
 
 // ListScales 获取量表列表（摘要）
-func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, status int32, title, category string, stages, applicableAges, reporters, tags []string) (*ListScalesOutput, error) {
+func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, status, title, category string, stages, applicableAges, reporters, tags []string) (*ListScalesOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 

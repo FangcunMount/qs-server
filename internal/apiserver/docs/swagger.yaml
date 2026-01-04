@@ -21,25 +21,6 @@ definitions:
     type: integer
     x-enum-varnames:
     - ZeroID
-  questionnaire.Status:
-    enum:
-    - 0
-    - 1
-    - 2
-    format: int32
-    type: integer
-    x-enum-comments:
-      STATUS_ARCHIVED: 已归档
-      STATUS_DRAFT: 草稿
-      STATUS_PUBLISHED: 已发布
-    x-enum-descriptions:
-    - 草稿
-    - 已发布
-    - 已归档
-    x-enum-varnames:
-    - STATUS_DRAFT
-    - STATUS_PUBLISHED
-    - STATUS_ARCHIVED
   request.AddQuestionRequest:
     properties:
       code:
@@ -843,9 +824,7 @@ definitions:
           $ref: '#/definitions/viewmodel.QuestionDTO'
         type: array
       status:
-        allOf:
-        - $ref: '#/definitions/questionnaire.Status'
-        description: 状态值：0=草稿, 1=已发布, 2=已归档
+        type: string
       title:
         type: string
       type:
@@ -1014,7 +993,7 @@ definitions:
           type: string
         type: array
       status:
-        type: integer
+        type: string
       tags:
         items:
           type: string
@@ -2579,10 +2558,10 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: 状态筛选（0=草稿, 1=已发布, 2=已归档）
+      - description: 状态筛选（draft/published/archived）
         in: query
         name: status
-        type: integer
+        type: string
       - description: 标题筛选
         in: query
         name: title
@@ -3087,13 +3066,17 @@ paths:
         name: page_size
         required: true
         type: integer
-      - description: 状态过滤（0=草稿, 1=已发布, 2=已归档）
+      - description: 状态过滤（draft/published/archived）
         in: query
         name: status
-        type: integer
+        type: string
       - description: 标题模糊搜索
         in: query
         name: title
+        type: string
+      - description: 主类过滤
+        in: query
+        name: category
         type: string
       produces:
       - application/json

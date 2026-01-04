@@ -15,27 +15,22 @@ import (
 // ===================== 量表状态 =================
 
 // Status 量表状态
-type Status uint8
+type Status string
 
 const (
-	StatusDraft     Status = 0 // 草稿
-	StatusPublished Status = 1 // 已发布
-	StatusArchived  Status = 2 // 已归档
+	StatusDraft     Status = "draft"     // 草稿
+	StatusPublished Status = "published" // 已发布
+	StatusArchived  Status = "archived"  // 已归档
 )
 
 // Value 获取状态值
-func (s Status) Value() uint8 {
-	return uint8(s)
+func (s Status) Value() string {
+	return string(s)
 }
 
 // String 获取状态字符串
 func (s Status) String() string {
-	statusMap := map[uint8]string{
-		0: "草稿",
-		1: "已发布",
-		2: "已归档",
-	}
-	return statusMap[s.Value()]
+	return string(s)
 }
 
 // IsDraft 是否草稿状态
@@ -51,6 +46,16 @@ func (s Status) IsPublished() bool {
 // IsArchived 是否已归档状态
 func (s Status) IsArchived() bool {
 	return s == StatusArchived
+}
+
+// ParseStatus 解析状态字符串
+func ParseStatus(value string) (Status, bool) {
+	switch Status(value) {
+	case StatusDraft, StatusPublished, StatusArchived:
+		return Status(value), true
+	default:
+		return "", false
+	}
 }
 
 // ===================== 因子编码 =================

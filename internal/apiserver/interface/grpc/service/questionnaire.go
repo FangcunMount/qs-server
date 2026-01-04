@@ -115,7 +115,7 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 		Title:       result.Title,
 		Description: result.Description,
 		ImgUrl:      result.ImgUrl,
-		Status:      int32(result.Status.Value()),
+		Status:      result.Status,
 		Type:        result.Type,
 		Questions:   protoQuestions,
 	}
@@ -146,7 +146,7 @@ func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire
 		Title:         result.Title,
 		Description:   result.Description,
 		ImgUrl:        result.ImgUrl,
-		Status:        int32(result.Status.Value()),
+		Status:        result.Status,
 		Type:          result.Type,
 		QuestionCount: int32(result.QuestionCount),
 	}

@@ -9,6 +9,7 @@ import (
 
 	appScale "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scale"
 )
 
@@ -66,8 +67,12 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 		Conditions: make(map[string]interface{}),
 	}
 
-	if req.Status != 0 {
-		dto.Conditions["status"] = uint8(req.Status)
+	if req.Status != "" {
+		if parsed, ok := domainScale.ParseStatus(req.Status); ok {
+			dto.Conditions["status"] = parsed.String()
+		} else {
+			return nil, status.Error(codes.InvalidArgument, "invalid status")
+		}
 	}
 	if req.Title != "" {
 		dto.Conditions["title"] = req.Title
@@ -160,7 +165,7 @@ func (s *ScaleService) toProtoScale(ctx context.Context, result *appScale.ScaleR
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
-		Status:               int32(result.Status),
+		Status:               result.Status,
 		Factors:              protoFactors,
 		QuestionCount:        questionCount,
 	}
@@ -250,7 +255,7 @@ func (s *ScaleService) toProtoScaleSummary(ctx context.Context, result *appScale
 		Tags:                 tags,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: "", // 摘要中不包含版本
-		Status:               int32(result.Status),
+		Status:               result.Status,
 		QuestionCount:        questionCount,
 	}
 }

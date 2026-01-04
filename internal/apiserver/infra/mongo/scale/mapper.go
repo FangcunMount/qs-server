@@ -59,7 +59,7 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 		Tags:                 tags,
 		QuestionnaireCode:    domain.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: domain.GetQuestionnaireVersion(),
-		Status:               StatusField(domain.GetStatus().Value()),
+		Status:               domain.GetStatus().String(),
 		Factors:              m.mapFactorsToPO(domain.GetFactors()),
 	}
 	po.CreatedAt = domain.GetCreatedAt()

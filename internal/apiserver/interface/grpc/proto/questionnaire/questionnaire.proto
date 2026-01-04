@@ -19,7 +19,7 @@ message QuestionnaireSummary {
   string title = 2;
   string description = 3;
   string img_url = 4;
-  int32 status = 5;
+  string status = 5;
   string version = 6;
   int32 question_count = 7;
   string created_at = 8;
@@ -33,7 +33,7 @@ message Questionnaire {
   string title = 2;
   string description = 3;
   string img_url = 4;
-  int32 status = 5;
+  string status = 5;
   string version = 6;
   repeated Question questions = 7;
   string created_at = 8;
@@ -85,7 +85,7 @@ message GetQuestionnaireResponse {
 message ListQuestionnairesRequest {
   int32 page = 1;
   int32 page_size = 2;
-  int32 status = 3;
+  string status = 3;
   string title = 4;
 }
 

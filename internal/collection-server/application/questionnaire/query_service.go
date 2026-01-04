@@ -44,7 +44,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*QuestionnaireResp
 
 // List 获取问卷列表（返回摘要，不含问题详情）
 func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest) (*ListQuestionnairesResponse, error) {
-	log.Infof("Listing questionnaires: page=%d, pageSize=%d, status=%d", req.Page, req.PageSize, req.Status)
+	log.Infof("Listing questionnaires: page=%d, pageSize=%d, status=%s", req.Page, req.PageSize, req.Status)
 
 	// 默认分页参数
 	if req.Page <= 0 {

@@ -44,7 +44,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, er
 
 // List 获取量表列表（返回摘要，不含因子详情）
 func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListScalesResponse, error) {
-	log.Infof("Listing scales: page=%d, pageSize=%d, category=%s", req.Page, req.PageSize, req.Category)
+	log.Infof("Listing scales: page=%d, pageSize=%d, category=%s, status=%s", req.Page, req.PageSize, req.Category, req.Status)
 
 	// 默认分页参数
 	if req.Page <= 0 {

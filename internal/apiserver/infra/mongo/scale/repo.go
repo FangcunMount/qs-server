@@ -229,16 +229,10 @@ func (r *Repository) buildFilter(conditions map[string]interface{}) bson.M {
 	// 状态过滤
 	if status, ok := conditions["status"]; ok && status != nil {
 		switch value := status.(type) {
-		case uint8:
-			filter["status"] = value
-		case int:
-			filter["status"] = uint8(value)
-		case int32:
-			filter["status"] = uint8(value)
-		case int64:
-			filter["status"] = uint8(value)
-		case float64:
-			filter["status"] = uint8(value)
+		case string:
+			if parsed, ok := scale.ParseStatus(value); ok {
+				filter["status"] = parsed.String()
+			}
 		}
 	}
 

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal/apiserver/interface/grpc/proto/scale/scale.proto
+// source: scale/scale.proto
 
 package scale
 
@@ -203,5 +203,5 @@ var ScaleService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/apiserver/interface/grpc/proto/scale/scale.proto",
+	Metadata: "scale/scale.proto",
 }

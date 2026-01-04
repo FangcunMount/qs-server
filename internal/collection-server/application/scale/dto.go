@@ -12,7 +12,7 @@ type ScaleResponse struct {
 	Tags                 []string         `json:"tags"`
 	QuestionnaireCode    string           `json:"questionnaire_code"`
 	QuestionnaireVersion string           `json:"questionnaire_version"`
-	Status               int32            `json:"status"`
+	Status               string           `json:"status"`
 	Factors              []FactorResponse `json:"factors"`
 	QuestionCount        int32            `json:"question_count"`
 }
@@ -52,7 +52,7 @@ type ScaleSummaryResponse struct {
 	Tags                 []string `json:"tags"`
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
-	Status               int32    `json:"status"`
+	Status               string   `json:"status"`
 	QuestionCount        int32    `json:"question_count"`
 }
 
@@ -60,7 +60,7 @@ type ScaleSummaryResponse struct {
 type ListScalesRequest struct {
 	Page           int32    `form:"page"`
 	PageSize       int32    `form:"page_size"`
-	Status         int32    `form:"status"`
+	Status         string   `form:"status"`
 	Title          string   `form:"title"`
 	Category       string   `form:"category"`
 	Stages         []string `form:"stages"`
@@ -71,15 +71,15 @@ type ListScalesRequest struct {
 
 // ListScalesResponse 量表列表响应
 type ListScalesResponse struct {
-	Scales    []ScaleSummaryResponse `json:"scales"`
-	Total     int64                  `json:"total"`
-	Page      int32                  `json:"page"`
-	PageSize  int32                  `json:"page_size"`
+	Scales   []ScaleSummaryResponse `json:"scales"`
+	Total    int64                  `json:"total"`
+	Page     int32                  `json:"page"`
+	PageSize int32                  `json:"page_size"`
 }
 
 // ScaleCategoriesResponse 量表分类响应
 type ScaleCategoriesResponse struct {
-	Categories     []CategoryResponse     `json:"categories"`
+	Categories     []CategoryResponse      `json:"categories"`
 	Stages         []StageResponse         `json:"stages"`
 	ApplicableAges []ApplicableAgeResponse `json:"applicable_ages"`
 	Reporters      []ReporterResponse      `json:"reporters"`

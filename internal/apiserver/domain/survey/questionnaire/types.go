@@ -6,27 +6,32 @@ import (
 )
 
 // Status 问卷状态
-type Status uint8
+type Status string
 
 const (
-	STATUS_DRAFT     Status = 0 // 草稿
-	STATUS_PUBLISHED Status = 1 // 已发布
-	STATUS_ARCHIVED  Status = 2 // 已归档
+	STATUS_DRAFT     Status = "draft"     // 草稿
+	STATUS_PUBLISHED Status = "published" // 已发布
+	STATUS_ARCHIVED  Status = "archived"  // 已归档
 )
 
 // Value 获取状态值
-func (s Status) Value() uint8 {
-	return uint8(s)
+func (s Status) Value() string {
+	return string(s)
 }
 
 // String 获取状态字符串
 func (s Status) String() string {
-	statusMap := map[uint8]string{
-		0: "草稿",
-		1: "已发布",
-		2: "已归档",
+	return string(s)
+}
+
+// ParseStatus 解析状态字符串
+func ParseStatus(value string) (Status, bool) {
+	switch Status(value) {
+	case STATUS_DRAFT, STATUS_PUBLISHED, STATUS_ARCHIVED:
+		return Status(value), true
+	default:
+		return "", false
 	}
-	return statusMap[s.Value()]
 }
 
 // QuestionnaireType 问卷分类

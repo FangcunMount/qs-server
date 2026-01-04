@@ -58,7 +58,7 @@ func (h *QuestionnaireHandler) Get(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Param status query int false "状态过滤（0=草稿, 1=已发布, 2=已归档）"
+// @Param status query string false "状态过滤（draft/published/archived）"
 // @Param title query string false "标题过滤"
 // @Success 200 {object} core.Response{data=questionnaire.ListQuestionnairesResponse}
 // @Failure 400 {object} core.ErrResponse

@@ -2,20 +2,19 @@ package response
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
 )
 
 // QuestionnaireResponse 问卷响应
 type QuestionnaireResponse struct {
-	Code        string                     `json:"code"`
-	Title       string                     `json:"title"`
-	Description string                     `json:"description"`
-	ImgUrl      string                     `json:"img_url"`
-	Version     string                     `json:"version"`
-	Status      domainQuestionnaire.Status `json:"status"` // 状态值：0=草稿, 1=已发布, 2=已归档
-	Type        string                     `json:"type"`
-	Questions   []viewmodel.QuestionDTO    `json:"questions,omitempty"`
+	Code        string                  `json:"code"`
+	Title       string                  `json:"title"`
+	Description string                  `json:"description"`
+	ImgUrl      string                  `json:"img_url"`
+	Version     string                  `json:"version"`
+	Status      string                  `json:"status"`
+	Type        string                  `json:"type"`
+	Questions   []viewmodel.QuestionDTO `json:"questions,omitempty"`
 }
 
 // QuestionnaireListResponse 问卷列表响应
@@ -28,17 +27,17 @@ type QuestionnaireListResponse struct {
 
 // QuestionnaireSummaryResponse 问卷摘要响应（不包含问题详情）
 type QuestionnaireSummaryResponse struct {
-	Code        string                     `json:"code"`
-	Title       string                     `json:"title"`
-	Description string                     `json:"description"`
-	ImgUrl      string                     `json:"img_url"`
-	Version     string                     `json:"version"`
-	Status      domainQuestionnaire.Status `json:"status"` // 状态值：0=草稿, 1=已发布, 2=已归档
-	Type        string                     `json:"type"`
-	CreatedBy   string                     `json:"created_by"` // 创建人
-	CreatedAt   string                     `json:"created_at"`
-	UpdatedBy   string                     `json:"updated_by"` // 更新人
-	UpdatedAt   string                     `json:"updated_at"`
+	Code        string `json:"code"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ImgUrl      string `json:"img_url"`
+	Version     string `json:"version"`
+	Status      string `json:"status"`
+	Type        string `json:"type"`
+	CreatedBy   string `json:"created_by"` // 创建人
+	CreatedAt   string `json:"created_at"`
+	UpdatedBy   string `json:"updated_by"` // 更新人
+	UpdatedAt   string `json:"updated_at"`
 }
 
 // QuestionnaireSummaryListResponse 问卷摘要列表响应

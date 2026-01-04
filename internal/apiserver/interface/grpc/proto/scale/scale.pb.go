@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: internal/apiserver/interface/grpc/proto/scale/scale.proto
+// source: scale/scale.proto
 
 package scale
 
@@ -34,7 +34,7 @@ type ScaleSummary struct {
 	Tags                 []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                           // 标签列表
 	QuestionnaireCode    string                 `protobuf:"bytes,9,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,10,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	Status               int32                  `protobuf:"varint,11,opt,name=status,proto3" json:"status,omitempty"`
+	Status               string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt            string                 `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	QuestionCount        int32                  `protobuf:"varint,14,opt,name=question_count,json=questionCount,proto3" json:"question_count,omitempty"` // 题目数量
@@ -44,7 +44,7 @@ type ScaleSummary struct {
 
 func (x *ScaleSummary) Reset() {
 	*x = ScaleSummary{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[0]
+	mi := &file_scale_scale_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -56,7 +56,7 @@ func (x *ScaleSummary) String() string {
 func (*ScaleSummary) ProtoMessage() {}
 
 func (x *ScaleSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[0]
+	mi := &file_scale_scale_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -69,7 +69,7 @@ func (x *ScaleSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScaleSummary.ProtoReflect.Descriptor instead.
 func (*ScaleSummary) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{0}
+	return file_scale_scale_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ScaleSummary) GetCode() string {
@@ -142,11 +142,11 @@ func (x *ScaleSummary) GetQuestionnaireVersion() string {
 	return ""
 }
 
-func (x *ScaleSummary) GetStatus() int32 {
+func (x *ScaleSummary) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
-	return 0
+	return ""
 }
 
 func (x *ScaleSummary) GetCreatedAt() string {
@@ -183,7 +183,7 @@ type Scale struct {
 	Tags                 []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                           // 标签列表
 	QuestionnaireCode    string                 `protobuf:"bytes,9,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,10,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	Status               int32                  `protobuf:"varint,11,opt,name=status,proto3" json:"status,omitempty"`
+	Status               string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
 	Factors              []*Factor              `protobuf:"bytes,12,rep,name=factors,proto3" json:"factors,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt            string                 `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -194,7 +194,7 @@ type Scale struct {
 
 func (x *Scale) Reset() {
 	*x = Scale{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[1]
+	mi := &file_scale_scale_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -206,7 +206,7 @@ func (x *Scale) String() string {
 func (*Scale) ProtoMessage() {}
 
 func (x *Scale) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[1]
+	mi := &file_scale_scale_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -219,7 +219,7 @@ func (x *Scale) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Scale.ProtoReflect.Descriptor instead.
 func (*Scale) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{1}
+	return file_scale_scale_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Scale) GetCode() string {
@@ -292,11 +292,11 @@ func (x *Scale) GetQuestionnaireVersion() string {
 	return ""
 }
 
-func (x *Scale) GetStatus() int32 {
+func (x *Scale) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
-	return 0
+	return ""
 }
 
 func (x *Scale) GetFactors() []*Factor {
@@ -347,7 +347,7 @@ type Factor struct {
 
 func (x *Factor) Reset() {
 	*x = Factor{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[2]
+	mi := &file_scale_scale_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +359,7 @@ func (x *Factor) String() string {
 func (*Factor) ProtoMessage() {}
 
 func (x *Factor) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[2]
+	mi := &file_scale_scale_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +372,7 @@ func (x *Factor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Factor.ProtoReflect.Descriptor instead.
 func (*Factor) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{2}
+	return file_scale_scale_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Factor) GetCode() string {
@@ -466,7 +466,7 @@ type InterpretRule struct {
 
 func (x *InterpretRule) Reset() {
 	*x = InterpretRule{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[3]
+	mi := &file_scale_scale_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -478,7 +478,7 @@ func (x *InterpretRule) String() string {
 func (*InterpretRule) ProtoMessage() {}
 
 func (x *InterpretRule) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[3]
+	mi := &file_scale_scale_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -491,7 +491,7 @@ func (x *InterpretRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterpretRule.ProtoReflect.Descriptor instead.
 func (*InterpretRule) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{3}
+	return file_scale_scale_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *InterpretRule) GetMinScore() float64 {
@@ -539,7 +539,7 @@ type GetScaleRequest struct {
 
 func (x *GetScaleRequest) Reset() {
 	*x = GetScaleRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[4]
+	mi := &file_scale_scale_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +551,7 @@ func (x *GetScaleRequest) String() string {
 func (*GetScaleRequest) ProtoMessage() {}
 
 func (x *GetScaleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[4]
+	mi := &file_scale_scale_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +564,7 @@ func (x *GetScaleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScaleRequest.ProtoReflect.Descriptor instead.
 func (*GetScaleRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{4}
+	return file_scale_scale_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetScaleRequest) GetCode() string {
@@ -584,7 +584,7 @@ type GetScaleResponse struct {
 
 func (x *GetScaleResponse) Reset() {
 	*x = GetScaleResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[5]
+	mi := &file_scale_scale_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -596,7 +596,7 @@ func (x *GetScaleResponse) String() string {
 func (*GetScaleResponse) ProtoMessage() {}
 
 func (x *GetScaleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[5]
+	mi := &file_scale_scale_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -609,7 +609,7 @@ func (x *GetScaleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScaleResponse.ProtoReflect.Descriptor instead.
 func (*GetScaleResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{5}
+	return file_scale_scale_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetScaleResponse) GetScale() *Scale {
@@ -624,7 +624,7 @@ type ListScalesRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Page           int32                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize       int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Status         int32                  `protobuf:"varint,3,opt,name=status,proto3" json:"status,omitempty"`
+	Status         string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	Title          string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	Category       string                 `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`                                   // 按主类过滤
 	Stages         []string               `protobuf:"bytes,6,rep,name=stages,proto3" json:"stages,omitempty"`                                       // 按阶段过滤（数组）
@@ -637,7 +637,7 @@ type ListScalesRequest struct {
 
 func (x *ListScalesRequest) Reset() {
 	*x = ListScalesRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[6]
+	mi := &file_scale_scale_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -649,7 +649,7 @@ func (x *ListScalesRequest) String() string {
 func (*ListScalesRequest) ProtoMessage() {}
 
 func (x *ListScalesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[6]
+	mi := &file_scale_scale_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -662,7 +662,7 @@ func (x *ListScalesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScalesRequest.ProtoReflect.Descriptor instead.
 func (*ListScalesRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{6}
+	return file_scale_scale_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListScalesRequest) GetPage() int32 {
@@ -679,11 +679,11 @@ func (x *ListScalesRequest) GetPageSize() int32 {
 	return 0
 }
 
-func (x *ListScalesRequest) GetStatus() int32 {
+func (x *ListScalesRequest) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
-	return 0
+	return ""
 }
 
 func (x *ListScalesRequest) GetTitle() string {
@@ -741,7 +741,7 @@ type ListScalesResponse struct {
 
 func (x *ListScalesResponse) Reset() {
 	*x = ListScalesResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[7]
+	mi := &file_scale_scale_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -753,7 +753,7 @@ func (x *ListScalesResponse) String() string {
 func (*ListScalesResponse) ProtoMessage() {}
 
 func (x *ListScalesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[7]
+	mi := &file_scale_scale_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -766,7 +766,7 @@ func (x *ListScalesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScalesResponse.ProtoReflect.Descriptor instead.
 func (*ListScalesResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{7}
+	return file_scale_scale_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListScalesResponse) GetScales() []*ScaleSummary {
@@ -806,7 +806,7 @@ type GetScaleCategoriesRequest struct {
 
 func (x *GetScaleCategoriesRequest) Reset() {
 	*x = GetScaleCategoriesRequest{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[8]
+	mi := &file_scale_scale_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -818,7 +818,7 @@ func (x *GetScaleCategoriesRequest) String() string {
 func (*GetScaleCategoriesRequest) ProtoMessage() {}
 
 func (x *GetScaleCategoriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[8]
+	mi := &file_scale_scale_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +831,7 @@ func (x *GetScaleCategoriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScaleCategoriesRequest.ProtoReflect.Descriptor instead.
 func (*GetScaleCategoriesRequest) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{8}
+	return file_scale_scale_proto_rawDescGZIP(), []int{8}
 }
 
 // 量表分类信息
@@ -845,7 +845,7 @@ type ScaleCategory struct {
 
 func (x *ScaleCategory) Reset() {
 	*x = ScaleCategory{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[9]
+	mi := &file_scale_scale_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -857,7 +857,7 @@ func (x *ScaleCategory) String() string {
 func (*ScaleCategory) ProtoMessage() {}
 
 func (x *ScaleCategory) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[9]
+	mi := &file_scale_scale_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -870,7 +870,7 @@ func (x *ScaleCategory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScaleCategory.ProtoReflect.Descriptor instead.
 func (*ScaleCategory) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{9}
+	return file_scale_scale_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ScaleCategory) GetValue() string {
@@ -898,7 +898,7 @@ type ScaleStage struct {
 
 func (x *ScaleStage) Reset() {
 	*x = ScaleStage{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[10]
+	mi := &file_scale_scale_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -910,7 +910,7 @@ func (x *ScaleStage) String() string {
 func (*ScaleStage) ProtoMessage() {}
 
 func (x *ScaleStage) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[10]
+	mi := &file_scale_scale_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -923,7 +923,7 @@ func (x *ScaleStage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScaleStage.ProtoReflect.Descriptor instead.
 func (*ScaleStage) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{10}
+	return file_scale_scale_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ScaleStage) GetValue() string {
@@ -951,7 +951,7 @@ type ApplicableAge struct {
 
 func (x *ApplicableAge) Reset() {
 	*x = ApplicableAge{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[11]
+	mi := &file_scale_scale_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -963,7 +963,7 @@ func (x *ApplicableAge) String() string {
 func (*ApplicableAge) ProtoMessage() {}
 
 func (x *ApplicableAge) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[11]
+	mi := &file_scale_scale_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -976,7 +976,7 @@ func (x *ApplicableAge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplicableAge.ProtoReflect.Descriptor instead.
 func (*ApplicableAge) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{11}
+	return file_scale_scale_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ApplicableAge) GetValue() string {
@@ -1004,7 +1004,7 @@ type Reporter struct {
 
 func (x *Reporter) Reset() {
 	*x = Reporter{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[12]
+	mi := &file_scale_scale_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1016,7 +1016,7 @@ func (x *Reporter) String() string {
 func (*Reporter) ProtoMessage() {}
 
 func (x *Reporter) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[12]
+	mi := &file_scale_scale_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1029,7 +1029,7 @@ func (x *Reporter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reporter.ProtoReflect.Descriptor instead.
 func (*Reporter) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{12}
+	return file_scale_scale_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Reporter) GetValue() string {
@@ -1058,7 +1058,7 @@ type Tag struct {
 
 func (x *Tag) Reset() {
 	*x = Tag{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[13]
+	mi := &file_scale_scale_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1070,7 +1070,7 @@ func (x *Tag) String() string {
 func (*Tag) ProtoMessage() {}
 
 func (x *Tag) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[13]
+	mi := &file_scale_scale_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1083,7 +1083,7 @@ func (x *Tag) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tag.ProtoReflect.Descriptor instead.
 func (*Tag) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{13}
+	return file_scale_scale_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Tag) GetValue() string {
@@ -1121,7 +1121,7 @@ type GetScaleCategoriesResponse struct {
 
 func (x *GetScaleCategoriesResponse) Reset() {
 	*x = GetScaleCategoriesResponse{}
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[14]
+	mi := &file_scale_scale_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1133,7 +1133,7 @@ func (x *GetScaleCategoriesResponse) String() string {
 func (*GetScaleCategoriesResponse) ProtoMessage() {}
 
 func (x *GetScaleCategoriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes[14]
+	mi := &file_scale_scale_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1146,7 +1146,7 @@ func (x *GetScaleCategoriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetScaleCategoriesResponse.ProtoReflect.Descriptor instead.
 func (*GetScaleCategoriesResponse) Descriptor() ([]byte, []int) {
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP(), []int{14}
+	return file_scale_scale_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetScaleCategoriesResponse) GetCategories() []*ScaleCategory {
@@ -1184,11 +1184,11 @@ func (x *GetScaleCategoriesResponse) GetTags() []*Tag {
 	return nil
 }
 
-var File_internal_apiserver_interface_grpc_proto_scale_scale_proto protoreflect.FileDescriptor
+var File_scale_scale_proto protoreflect.FileDescriptor
 
-const file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc = "" +
+const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
-	"9internal/apiserver/interface/grpc/proto/scale/scale.proto\x12\x05scale\"\xca\x03\n" +
+	"\x11scale/scale.proto\x12\x05scale\"\xca\x03\n" +
 	"\fScaleSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -1201,7 +1201,7 @@ const file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc = "
 	"\x12questionnaire_code\x18\t \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\n" +
 	" \x01(\tR\x14questionnaireVersion\x12\x16\n" +
-	"\x06status\x18\v \x01(\x05R\x06status\x12\x1d\n" +
+	"\x06status\x18\v \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\f \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
@@ -1219,7 +1219,7 @@ const file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc = "
 	"\x12questionnaire_code\x18\t \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\n" +
 	" \x01(\tR\x14questionnaireVersion\x12\x16\n" +
-	"\x06status\x18\v \x01(\x05R\x06status\x12'\n" +
+	"\x06status\x18\v \x01(\tR\x06status\x12'\n" +
 	"\afactors\x18\f \x03(\v2\r.scale.FactorR\afactors\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\r \x01(\tR\tcreatedAt\x12\x1d\n" +
@@ -1262,7 +1262,7 @@ const file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc = "
 	"\x11ListScalesRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\x05R\x06status\x12\x14\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12\x1a\n" +
 	"\bcategory\x18\x05 \x01(\tR\bcategory\x12\x16\n" +
 	"\x06stages\x18\x06 \x03(\tR\x06stages\x12'\n" +
@@ -1308,19 +1308,19 @@ const file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc = "
 	"\x12GetScaleCategories\x12 .scale.GetScaleCategoriesRequest\x1a!.scale.GetScaleCategoriesResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scaleb\x06proto3"
 
 var (
-	file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescOnce sync.Once
-	file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescData []byte
+	file_scale_scale_proto_rawDescOnce sync.Once
+	file_scale_scale_proto_rawDescData []byte
 )
 
-func file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescGZIP() []byte {
-	file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescOnce.Do(func() {
-		file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc)))
+func file_scale_scale_proto_rawDescGZIP() []byte {
+	file_scale_scale_proto_rawDescOnce.Do(func() {
+		file_scale_scale_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_scale_scale_proto_rawDesc), len(file_scale_scale_proto_rawDesc)))
 	})
-	return file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDescData
+	return file_scale_scale_proto_rawDescData
 }
 
-var file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
-var file_internal_apiserver_interface_grpc_proto_scale_scale_proto_goTypes = []any{
+var file_scale_scale_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_scale_scale_proto_goTypes = []any{
 	(*ScaleSummary)(nil),               // 0: scale.ScaleSummary
 	(*Scale)(nil),                      // 1: scale.Scale
 	(*Factor)(nil),                     // 2: scale.Factor
@@ -1338,7 +1338,7 @@ var file_internal_apiserver_interface_grpc_proto_scale_scale_proto_goTypes = []a
 	(*GetScaleCategoriesResponse)(nil), // 14: scale.GetScaleCategoriesResponse
 	nil,                                // 15: scale.Factor.ScoringParamsEntry
 }
-var file_internal_apiserver_interface_grpc_proto_scale_scale_proto_depIdxs = []int32{
+var file_scale_scale_proto_depIdxs = []int32{
 	2,  // 0: scale.Scale.factors:type_name -> scale.Factor
 	15, // 1: scale.Factor.scoring_params:type_name -> scale.Factor.ScoringParamsEntry
 	3,  // 2: scale.Factor.interpret_rules:type_name -> scale.InterpretRule
@@ -1362,26 +1362,26 @@ var file_internal_apiserver_interface_grpc_proto_scale_scale_proto_depIdxs = []i
 	0,  // [0:10] is the sub-list for field type_name
 }
 
-func init() { file_internal_apiserver_interface_grpc_proto_scale_scale_proto_init() }
-func file_internal_apiserver_interface_grpc_proto_scale_scale_proto_init() {
-	if File_internal_apiserver_interface_grpc_proto_scale_scale_proto != nil {
+func init() { file_scale_scale_proto_init() }
+func file_scale_scale_proto_init() {
+	if File_scale_scale_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc), len(file_internal_apiserver_interface_grpc_proto_scale_scale_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_scale_scale_proto_rawDesc), len(file_scale_scale_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_apiserver_interface_grpc_proto_scale_scale_proto_goTypes,
-		DependencyIndexes: file_internal_apiserver_interface_grpc_proto_scale_scale_proto_depIdxs,
-		MessageInfos:      file_internal_apiserver_interface_grpc_proto_scale_scale_proto_msgTypes,
+		GoTypes:           file_scale_scale_proto_goTypes,
+		DependencyIndexes: file_scale_scale_proto_depIdxs,
+		MessageInfos:      file_scale_scale_proto_msgTypes,
 	}.Build()
-	File_internal_apiserver_interface_grpc_proto_scale_scale_proto = out.File
-	file_internal_apiserver_interface_grpc_proto_scale_scale_proto_goTypes = nil
-	file_internal_apiserver_interface_grpc_proto_scale_scale_proto_depIdxs = nil
+	File_scale_scale_proto = out.File
+	file_scale_scale_proto_goTypes = nil
+	file_scale_scale_proto_depIdxs = nil
 }

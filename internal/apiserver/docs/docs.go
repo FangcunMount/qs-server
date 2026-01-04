@@ -1668,8 +1668,8 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "description": "状态筛选（0=草稿, 1=已发布, 2=已归档）",
+                        "type": "string",
+                        "description": "状态筛选（draft/published/archived）",
                         "name": "status",
                         "in": "query"
                     },
@@ -2491,8 +2491,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "状态过滤（0=草稿, 1=已发布, 2=已归档）",
+                        "type": "string",
+                        "description": "状态过滤（draft/published/archived）",
                         "name": "status",
                         "in": "query"
                     },
@@ -2500,6 +2500,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "标题模糊搜索",
                         "name": "title",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "主类过滤",
+                        "name": "category",
                         "in": "query"
                     }
                 ],
@@ -4331,30 +4337,6 @@ const docTemplate = `{
                 "ZeroID"
             ]
         },
-        "questionnaire.Status": {
-            "type": "integer",
-            "format": "int32",
-            "enum": [
-                0,
-                1,
-                2
-            ],
-            "x-enum-comments": {
-                "STATUS_ARCHIVED": "已归档",
-                "STATUS_DRAFT": "草稿",
-                "STATUS_PUBLISHED": "已发布"
-            },
-            "x-enum-descriptions": [
-                "草稿",
-                "已发布",
-                "已归档"
-            ],
-            "x-enum-varnames": [
-                "STATUS_DRAFT",
-                "STATUS_PUBLISHED",
-                "STATUS_ARCHIVED"
-            ]
-        },
         "request.AddQuestionRequest": {
             "type": "object",
             "properties": {
@@ -5529,12 +5511,7 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "description": "状态值：0=草稿, 1=已发布, 2=已归档",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/questionnaire.Status"
-                        }
-                    ]
+                    "type": "string"
                 },
                 "title": {
                     "type": "string"
@@ -5780,7 +5757,7 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "tags": {
                     "type": "array",

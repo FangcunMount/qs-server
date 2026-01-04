@@ -17,7 +17,7 @@ type QuestionnairePO struct {
 	Description       string       `bson:"description,omitempty" json:"description,omitempty"`
 	ImgUrl            string       `bson:"img_url,omitempty" json:"img_url,omitempty"`
 	Version           string       `bson:"version" json:"version"`
-	Status            uint8        `bson:"status" json:"status"`
+	Status            string       `bson:"status" json:"status"`
 	Type              string       `bson:"type" json:"type"`
 	Questions         []QuestionPO `bson:"questions,omitempty" json:"questions,omitempty"`
 	QuestionCount     int          `bson:"question_count,omitempty" json:"question_count,omitempty"`

@@ -14,15 +14,15 @@ import (
 
 // QuestionnaireResult 问卷结果
 type QuestionnaireResult struct {
-	Code        string                     // 问卷编码
-	Version     string                     // 版本号
-	Title       string                     // 问卷标题
-	Description string                     // 问卷描述
-	ImgUrl      string                     // 封面图URL
-	Status      domainQuestionnaire.Status // 状态：0=草稿, 1=已发布, 2=已归档
-	Type        string                     // 问卷分类
-	Questions   []QuestionResult           // 问题列表
-	QRCodeURL   string                     // 小程序码URL（仅已发布状态时返回）
+	Code        string           // 问卷编码
+	Version     string           // 版本号
+	Title       string           // 问卷标题
+	Description string           // 问卷描述
+	ImgUrl      string           // 封面图URL
+	Status      string           // 状态
+	Type        string           // 问卷分类
+	Questions   []QuestionResult // 问题列表
+	QRCodeURL   string           // 小程序码URL（仅已发布状态时返回）
 }
 
 // QuestionResult 问题结果
@@ -51,18 +51,18 @@ type QuestionnaireListResult struct {
 
 // QuestionnaireSummaryResult 问卷摘要结果（轻量级，不包含问题详情）
 type QuestionnaireSummaryResult struct {
-	Code          string                     // 问卷编码
-	Version       string                     // 版本号
-	Title         string                     // 问卷标题
-	Description   string                     // 问卷描述
-	ImgUrl        string                     // 封面图URL
-	Status        domainQuestionnaire.Status // 状态：0=草稿, 1=已发布, 2=已归档
-	Type          string                     // 问卷分类
-	QuestionCount int                        // 问题数量
-	CreatedBy     string                     // 创建人
-	CreatedAt     time.Time                  // 创建时间
-	UpdatedBy     string                     // 更新人
-	UpdatedAt     time.Time                  // 更新时间
+	Code          string    // 问卷编码
+	Version       string    // 版本号
+	Title         string    // 问卷标题
+	Description   string    // 问卷描述
+	ImgUrl        string    // 封面图URL
+	Status        string    // 状态
+	Type          string    // 问卷分类
+	QuestionCount int       // 问题数量
+	CreatedBy     string    // 创建人
+	CreatedAt     time.Time // 创建时间
+	UpdatedBy     string    // 更新人
+	UpdatedAt     time.Time // 更新时间
 }
 
 // QuestionnaireSummaryListResult 问卷摘要列表结果
@@ -85,7 +85,7 @@ func toQuestionnaireResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireR
 		Title:       q.GetTitle(),
 		Description: q.GetDescription(),
 		ImgUrl:      q.GetImgUrl(),
-		Status:      q.GetStatus(), // 直接使用 Status 类型，JSON 序列化为数字
+		Status:      q.GetStatus().String(),
 		Type:        q.GetType().String(),
 		Questions:   make([]QuestionResult, 0),
 	}
@@ -146,7 +146,7 @@ func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire, userName
 		Title:         q.GetTitle(),
 		Description:   q.GetDescription(),
 		ImgUrl:        q.GetImgUrl(),
-		Status:        q.GetStatus(), // 直接使用 Status 类型，JSON 序列化为数字
+		Status:        q.GetStatus().String(),
 		Type:          q.GetType().String(),
 		QuestionCount: q.GetQuestionCnt(),
 		CreatedBy:     iam.DisplayName(q.GetCreatedBy(), userNames),
