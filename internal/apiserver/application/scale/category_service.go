@@ -57,15 +57,15 @@ func NewCategoryService() ScaleCategoryService {
 // GetCategories 获取量表分类列表
 func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesResult, error) {
 	// 构建类别列表
-	categories := []CategoryOption{
-		{Value: string(domainScale.CategoryADHD), Label: "多动障碍"},
-		{Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
-		{Value: string(domainScale.CategoryASD), Label: "自闭"},
-		{Value: string(domainScale.CategoryOCD), Label: "强迫"},
-		{Value: string(domainScale.CategorySensoryIntegration), Label: "感觉统合"},
-		{Value: string(domainScale.CategoryExecutiveFunction), Label: "执行功能"},
-		{Value: string(domainScale.CategoryEmotion), Label: "情绪"},
-		{Value: string(domainScale.CategorySleep), Label: "睡眠"},
+	// 根据 Category.isOpen() 判断
+	categories := []CategoryOption{}
+	for _, category := range domainScale.AllCategories {
+		if !category.IsEmpty() {
+			categories = append(categories, CategoryOption{
+				Value: category.String(),
+				Label: category.Label(),
+			})
+		}
 	}
 
 	// 构建阶段列表
@@ -113,7 +113,7 @@ func (s *categoryService) GetOpenCategories(ctx context.Context) (*ScaleCategori
 	for _, category := range domainScale.AllCategories {
 		if category.IsOpen() {
 			categories = append(categories, CategoryOption{
-				Value: string(category),
+				Value: category.String(),
 				Label: category.Label(),
 			})
 		}
