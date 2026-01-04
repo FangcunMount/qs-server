@@ -118,7 +118,7 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 // GetScaleCategories 获取量表分类列表
 func (s *ScaleService) GetScaleCategories(ctx context.Context, req *pb.GetScaleCategoriesRequest) (*pb.GetScaleCategoriesResponse, error) {
 	// 调用应用层类别服务
-	result, err := s.categoryService.GetCategories(ctx)
+	result, err := s.categoryService.GetOpenCategories(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

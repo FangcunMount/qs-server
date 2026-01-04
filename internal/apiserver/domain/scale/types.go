@@ -409,6 +409,12 @@ func NewCategory(value string) Category {
 	return Category(value)
 }
 
+// AllCategories 所有类别
+var AllCategories = []Category{
+	CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryOCD,
+	CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
+}
+
 // String 返回类别的字符串表示
 func (c Category) String() string {
 	return string(c)

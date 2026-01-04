@@ -58,14 +58,65 @@ func NewCategoryService() ScaleCategoryService {
 func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesResult, error) {
 	// 构建类别列表
 	categories := []CategoryOption{
-		// {Value: string(domainScale.CategoryADHD), Label: "多动障碍"},
-		// {Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
-		// {Value: string(domainScale.CategoryASD), Label: "自闭"},
-		// {Value: string(domainScale.CategoryOCD), Label: "强迫"},
+		{Value: string(domainScale.CategoryADHD), Label: "多动障碍"},
+		{Value: string(domainScale.CategoryTicDisorder), Label: "抽动障碍"},
+		{Value: string(domainScale.CategoryASD), Label: "自闭"},
+		{Value: string(domainScale.CategoryOCD), Label: "强迫"},
 		{Value: string(domainScale.CategorySensoryIntegration), Label: "感觉统合"},
 		{Value: string(domainScale.CategoryExecutiveFunction), Label: "执行功能"},
 		{Value: string(domainScale.CategoryEmotion), Label: "情绪"},
 		{Value: string(domainScale.CategorySleep), Label: "睡眠"},
+	}
+
+	// 构建阶段列表
+	stages := []StageOption{
+		{Value: string(domainScale.StageScreening), Label: "筛查"},
+		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
+		{Value: string(domainScale.StageFollowUp), Label: "随访"},
+		{Value: string(domainScale.StageOutcome), Label: "结局"},
+	}
+
+	// 构建使用年龄列表
+	applicableAges := []ApplicableAgeOption{
+		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿（0-3岁）"},
+		{Value: string(domainScale.ApplicableAgePreschool), Label: "学龄前（3-6岁）"},
+		{Value: string(domainScale.ApplicableAgeSchoolChild), Label: "学龄儿童（6-12岁）"},
+		{Value: string(domainScale.ApplicableAgeAdolescent), Label: "青少年（12-18岁）"},
+		{Value: string(domainScale.ApplicableAgeAdult), Label: "成人（18岁以上）"},
+	}
+
+	// 构建填报人列表
+	reporters := []ReporterOption{
+		{Value: string(domainScale.ReporterParent), Label: "家长评"},
+		{Value: string(domainScale.ReporterTeacher), Label: "教师评"},
+		{Value: string(domainScale.ReporterSelf), Label: "自评"},
+		{Value: string(domainScale.ReporterClinical), Label: "临床评定"},
+	}
+
+	// 标签已改为动态输入，不再返回固定列表
+	tags := []TagOption{}
+
+	return &ScaleCategoriesResult{
+		Categories:     categories,
+		Stages:         stages,
+		ApplicableAges: applicableAges,
+		Reporters:      reporters,
+		Tags:           tags,
+	}, nil
+}
+
+// GetOpenCategories 获取开放的量表分类列表
+func (s *categoryService) GetOpenCategories(ctx context.Context) (*ScaleCategoriesResult, error) {
+	// 构建类别列表
+	// 根据 Category.isOpen() 判断
+	categories := []CategoryOption{}
+	for _, category := range domainScale.AllCategories {
+		if category.IsOpen() {
+			categories = append(categories, CategoryOption{
+				Value: string(category),
+				Label: category.String(),
+			})
+		}
 	}
 
 	// 构建阶段列表

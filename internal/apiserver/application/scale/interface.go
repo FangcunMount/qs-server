@@ -115,4 +115,8 @@ type ScaleCategoryService interface {
 	// GetCategories 获取量表分类列表
 	// 场景：前端需要渲染下拉框、多选框等组件时，获取所有可用的分类选项
 	GetCategories(ctx context.Context) (*ScaleCategoriesResult, error)
+
+	// GetOpenCategories 获取开放的量表分类列表
+	// 场景：前端需要渲染下拉框、多选框等组件时，获取所有可用的分类选项
+	GetOpenCategories(ctx context.Context) (*ScaleCategoriesResult, error)
 }
