@@ -469,7 +469,8 @@ func (c Category) IsOpen() bool {
 	}
 	// 开放的类别
 	switch c {
-	case CategoryEmotion, CategoryPressure, CategoryMBTI, CategoryPersonality:
+	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
+		CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep:
 		return true
 	default:
 		return false
