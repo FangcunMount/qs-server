@@ -804,7 +804,7 @@ const docTemplate = `{
         },
         "/api/v1/questionnaires/{code}": {
             "get": {
-                "description": "根据问卷编码获取问卷详情",
+                "description": "根据问卷编码获取问卷详情，问题包含校验规则",
                 "produces": [
                     "application/json"
                 ],

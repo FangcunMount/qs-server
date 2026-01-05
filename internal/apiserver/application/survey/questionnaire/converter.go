@@ -27,13 +27,20 @@ type QuestionnaireResult struct {
 
 // QuestionResult 问题结果
 type QuestionResult struct {
-	Code           string                              // 问题编码
-	Stem           string                              // 题干
-	Type           string                              // 问题类型
-	Options        []OptionResult                      // 选项列表
-	Required       bool                                // 是否必填
-	Description    string                              // 问题描述
-	ShowController *domainQuestionnaire.ShowController // 显示控制器
+	Code            string                              // 问题编码
+	Stem            string                              // 题干
+	Type            string                              // 问题类型
+	Options         []OptionResult                      // 选项列表
+	ValidationRules []ValidationRuleResult              // 校验规则
+	Required        bool                                // 是否必填
+	Description     string                              // 问题描述
+	ShowController  *domainQuestionnaire.ShowController // 显示控制器
+}
+
+// ValidationRuleResult 校验规则结果
+type ValidationRuleResult struct {
+	RuleType    string // 规则类型
+	TargetValue string // 目标值
 }
 
 // OptionResult 选项结果
@@ -101,12 +108,13 @@ func toQuestionnaireResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireR
 // toQuestionResult 将问题领域模型转换为结果对象
 func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 	result := QuestionResult{
-		Code:        q.GetCode().String(),
-		Stem:        q.GetStem(),
-		Type:        string(q.GetType()),
-		Required:    false, // 从验证规则中推断
-		Description: q.GetTips(),
-		Options:     make([]OptionResult, 0),
+		Code:            q.GetCode().String(),
+		Stem:            q.GetStem(),
+		Type:            string(q.GetType()),
+		Required:        false, // 从验证规则中推断
+		Description:     q.GetTips(),
+		Options:         make([]OptionResult, 0),
+		ValidationRules: make([]ValidationRuleResult, 0),
 	}
 
 	// 检查是否有必填验证规则
@@ -115,6 +123,13 @@ func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 			result.Required = true
 			break
 		}
+	}
+
+	for _, rule := range q.GetValidationRules() {
+		result.ValidationRules = append(result.ValidationRules, ValidationRuleResult{
+			RuleType:    string(rule.GetRuleType()),
+			TargetValue: rule.GetTargetValue(),
+		})
 	}
 
 	// 转换选项列表（如果有）

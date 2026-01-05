@@ -101,11 +101,12 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 	protoQuestions := make([]*pb.Question, 0, len(result.Questions))
 	for _, q := range result.Questions {
 		protoQuestions = append(protoQuestions, &pb.Question{
-			Code:    q.Code,
-			Title:   q.Stem,
-			Type:    q.Type,
-			Tips:    q.Description,
-			Options: s.toProtoOptions(q.Options),
+			Code:            q.Code,
+			Title:           q.Stem,
+			Type:            q.Type,
+			Tips:            q.Description,
+			Options:         s.toProtoOptions(q.Options),
+			ValidationRules: s.toProtoValidationRules(q.ValidationRules),
 		})
 	}
 
@@ -132,6 +133,18 @@ func (s *QuestionnaireService) toProtoOptions(options []questionnaire.OptionResu
 		})
 	}
 	return protoOptions
+}
+
+// toProtoValidationRules 转换校验规则
+func (s *QuestionnaireService) toProtoValidationRules(rules []questionnaire.ValidationRuleResult) []*pb.ValidationRule {
+	protoRules := make([]*pb.ValidationRule, 0, len(rules))
+	for _, rule := range rules {
+		protoRules = append(protoRules, &pb.ValidationRule{
+			RuleType:    rule.RuleType,
+			TargetValue: rule.TargetValue,
+		})
+	}
+	return protoRules
 }
 
 // toProtoQuestionnaireSummary 转换为 protobuf 问卷摘要（不包含问题详情）

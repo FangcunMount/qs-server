@@ -21,7 +21,7 @@ func NewQuestionnaireHandler(queryService *questionnaire.QueryService) *Question
 
 // Get 获取问卷详情
 // @Summary 获取问卷详情
-// @Description 根据问卷编码获取问卷详情
+// @Description 根据问卷编码获取问卷详情，问题包含校验规则
 // @Tags 问卷
 // @Produce json
 // @Param code path string true "问卷编码"
