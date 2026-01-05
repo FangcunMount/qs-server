@@ -3,6 +3,8 @@ package collection
 import (
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
@@ -80,19 +82,7 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	api := engine.Group("/api/v1")
 
 	// 应用 IAM JWT 认证中间件（如果启用，使用 SDK TokenVerifier 本地验签）
-	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
-		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
-		if tokenVerifier != nil {
-			api.Use(pkgmiddleware.JWTAuthMiddleware(tokenVerifier))
-			// 添加用户身份解析中间件：将 JWT claims 中的 UserID 转换为 uint64
-			api.Use(middleware.UserIdentityMiddleware())
-			fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1 (local JWKS verification)\n")
-		} else {
-			fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled!\n")
-		}
-	} else {
-		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
-	}
+	r.applyIAMAuth(api, isPublicScaleReadOnly)
 
 	// 问卷相关路由
 	r.registerQuestionnaireRoutes(api)
@@ -108,6 +98,49 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
+}
+
+func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool) {
+	if r.container.IAMModule == nil || !r.container.IAMModule.IsEnabled() {
+		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
+		return
+	}
+
+	tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
+	if tokenVerifier == nil {
+		fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled!\n")
+		return
+	}
+
+	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddleware(tokenVerifier)))
+	api.Use(withAuthSkip(skip, middleware.UserIdentityMiddleware()))
+	fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1 (local JWKS verification)\n")
+}
+
+// withAuthSkip
+func withAuthSkip(skip func(*gin.Context) bool, next gin.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if skip != nil && skip(c) {
+			c.Next()
+			return
+		}
+		next(c)
+	}
+}
+
+// isPublicScaleReadOnly 是否开放接口
+func isPublicScaleReadOnly(c *gin.Context) bool {
+	if c.Request.Method != http.MethodGet {
+		return false
+	}
+
+	// path 白名单
+	whitelist := []string{
+		"/api/v1/scales",
+		"/api/v1/scales/categories",
+	}
+
+	return slices.Contains(whitelist, strings.TrimRight(c.Request.URL.Path, "/"))
 }
 
 // registerQuestionnaireRoutes 注册问卷相关路由
