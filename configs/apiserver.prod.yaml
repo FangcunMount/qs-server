@@ -272,7 +272,7 @@ wechat:
   wechat-app-id: "wx72ade250b619a649"
   
   # 小程序页面路径，例如 "pages/home/index"
-  page-path: "pages/home/index"
+  page-path: "pages/questionnaire/fill/index"
   
   # 降级配置（如果 IAM 未启用时使用，可选）
   # app-id: ""      # 小程序 AppID（直接配置）

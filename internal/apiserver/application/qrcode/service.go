@@ -220,7 +220,7 @@ func (s *service) GenerateScaleQRCode(ctx context.Context, code string) (string,
 
 	// 构建 scene 参数：包含量表编码
 	// scene 最大 32 个字符，只能包含字母、数字、下划线
-	scene := fmt.Sprintf("scale=%s", code)
+	scene := fmt.Sprintf("q=%s", code)
 	if len(scene) > 32 {
 		// 如果超过 32 字符，只使用编码
 		scene = code
