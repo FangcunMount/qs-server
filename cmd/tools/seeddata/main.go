@@ -8,21 +8,13 @@
 // - Assessments (测评)
 //
 // The tool is modularized into separate files:
-// - seed_testee.go: Testee data seeding
-// - seed_questionnaire.go: Questionnaire data seeding
-// - seed_scale.go: Medical scale data seeding
-// - seed_answersheet.go: Answer sheet data seeding
 // - seed_assessment.go: Assessment data seeding
 //
 // Usage:
 //
 //	go run ./cmd/tools/seeddata \
-//	  --mysql-dsn "user:pass@tcp(host:port)/qs_apiserver" \
-//	  --mongo-uri "mongodb://host:port" \
-//	  --mongo-database "qs_apiserver" \
-//	  --config cmd/tools/seeddata/data/seeddata.yaml \
-//	  --questionnaire-config cmd/tools/seeddata/data/survey_questionnaires.yaml \
-//	  --scale-questionnaire-config cmd/tools/seeddata/data/medical_scales.yaml
+//	  --config configs/seeddata.yaml \
+//	  --steps assessment
 //
 // See README.md for detailed documentation.
 package main
@@ -30,14 +22,9 @@ package main
 import (
 	"context"
 	"flag"
-	"os"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
 // ==================== 核心类型定义 ====================
@@ -47,23 +34,20 @@ type seedStep string
 
 // All available seed steps.
 const (
-	stepQuestionnaire seedStep = "questionnaire" // 创建问卷
-	stepScale         seedStep = "scale"         // 创建量表
+	stepAssessment seedStep = "assessment" // 提交答卷并生成测评
 )
 
 // defaultSteps defines the default execution order of all seed steps.
 var defaultSteps = []seedStep{
-	stepQuestionnaire,
-	stepScale,
+	stepAssessment,
 }
 
 // dependencies holds all external dependencies required by seed functions.
 type dependencies struct {
-	MySQLDB   *gorm.DB        // MySQL数据库连接（可选，用于旧代码兼容）
-	MongoDB   *mongo.Database // MongoDB数据库连接（可选，用于旧代码兼容）
-	Logger    log.Logger      // 日志记录器
-	Config    *SeedConfig     // 种子数据配置
-	APIClient *APIClient      // HTTP API 客户端
+	Logger           log.Logger  // 日志记录器
+	Config           *SeedConfig // 种子数据配置
+	APIClient        *APIClient  // 管理端 HTTP API 客户端
+	CollectionClient *APIClient  // 采集端 HTTP API 客户端
 }
 
 // seedContext holds the state and references created during seeding.
@@ -93,18 +77,22 @@ func newSeedContext() *seedContext {
 func main() {
 	// 解析命令行参数
 	var (
-		apiBaseURL             = flag.String("api-base-url", os.Getenv("API_BASE_URL"), "API base URL (e.g., http://localhost:18082)")
-		apiToken               = flag.String("api-token", os.Getenv("API_TOKEN"), "API authentication token")
-		mysqlDSN               = flag.String("mysql-dsn", os.Getenv("MYSQL_DSN"), "MySQL DSN (deprecated, not used when using API)")
-		mongoURI               = flag.String("mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI (deprecated, not used when using API)")
-		mongoDatabase          = flag.String("mongo-database", os.Getenv("MONGO_DATABASE"), "MongoDB Database (deprecated, not used when using API)")
-		configFile             = flag.String("config", "", "Base seed data config file (testees, legacy data)")
-		questionnaireFile      = flag.String("questionnaire-config", "cmd/tools/seeddata/data/survey_questionnaires.yaml", "Questionnaire config file")
-		scaleQuestionnaireFile = flag.String("scale-questionnaire-config", "cmd/tools/seeddata/data/medical_scales.yaml", "Medical scale questionnaire config file")
-		stepsRaw               = flag.String("steps", "", "Comma-separated steps to run (default: all)")
-		verbose                = flag.Bool("verbose", false, "Enable verbose logging")
+		apiBaseURL           = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
+		collectionBaseURL    = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
+		apiToken             = flag.String("api-token", "", "API authentication token")
+		configFile           = flag.String("config", "", "Base seed data config file (testees, legacy data)")
+		stepsRaw             = flag.String("steps", "", "Comma-separated steps to run (default: all)")
+		assessmentMin        = flag.Int("assessment-min", 3, "Minimum assessments per testee")
+		assessmentMax        = flag.Int("assessment-max", 10, "Maximum assessments per testee")
+		assessmentWorkers    = flag.Int("assessment-workers", 8, "Concurrent workers for assessment seeding")
+		testeePageSize       = flag.Int("testee-page-size", 200, "Page size when listing testees for assessment seeding")
+		testeeOffset         = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
+		testeeLimit          = flag.Int("testee-limit", 0, "Maximum number of testees to process for assessment seeding (0 = no limit)")
+		assessmentCategories = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
+		verbose              = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
+	steps := parseSteps(*stepsRaw)
 
 	// 初始化日志
 	logOpts := log.NewOptions()
@@ -129,37 +117,25 @@ func main() {
 		config = &SeedConfig{}
 	}
 
-	// 加载问卷配置（覆盖/补充问卷数据，保持原始内容）
-	if strings.TrimSpace(*questionnaireFile) != "" {
-		logger.Infow("Loading questionnaire config", "file", *questionnaireFile)
-		qCfg, err := LoadSeedConfig(*questionnaireFile)
-		if err != nil {
-			logger.Fatalw("Failed to load questionnaire config", "error", err)
-		}
-
-		if qCfg.Global.OrgID != 0 || qCfg.Global.DefaultTag != "" {
-			config.Global = qCfg.Global
-		}
-		config.Questionnaires = append([]QuestionnaireConfig{}, qCfg.Questionnaires...)
+	// 从配置补全 API 参数（命令行优先）
+	if strings.TrimSpace(*apiBaseURL) == "" {
+		*apiBaseURL = strings.TrimSpace(config.API.BaseURL)
+	}
+	if strings.TrimSpace(*collectionBaseURL) == "" {
+		*collectionBaseURL = strings.TrimSpace(config.API.CollectionBaseURL)
+	}
+	if strings.TrimSpace(*apiToken) == "" {
+		*apiToken = strings.TrimSpace(config.API.Token)
 	}
 
-	// 加载量表问卷配置（追加到问卷列表）
-	if strings.TrimSpace(*scaleQuestionnaireFile) != "" {
-		logger.Infow("Loading medical scale questionnaire config", "file", *scaleQuestionnaireFile)
-		scaleCfg, err := LoadSeedConfigWithPreference(*scaleQuestionnaireFile, true)
+	// 如果 API token 为空，尝试从 IAM 获取
+	if strings.TrimSpace(*apiToken) == "" && (config.IAM != IAMConfig{}) {
+		logger.Infow("Fetching API token from IAM", "login_url", config.IAM.LoginURL, "username", config.IAM.Username)
+		token, err := fetchTokenFromIAM(context.Background(), config.IAM, logger)
 		if err != nil {
-			logger.Fatalw("Failed to load medical scale questionnaire config", "error", err)
+			logger.Fatalw("Failed to fetch token from IAM", "error", err)
 		}
-
-		if (config.Global == GlobalConfig{}) && (scaleCfg.Global.OrgID != 0 || scaleCfg.Global.DefaultTag != "") {
-			config.Global = scaleCfg.Global
-		}
-		config.Scales = scaleCfg.Scales
-		config.Questionnaires = append(config.Questionnaires, scaleCfg.Questionnaires...)
-
-		if len(scaleCfg.Scales) == 0 {
-			logger.Warnw("No scale definitions found in medical scale config; scale seeding will be skipped unless provided elsewhere", "file", *scaleQuestionnaireFile)
-		}
+		*apiToken = token
 	}
 
 	// 初始化 API 客户端
@@ -167,71 +143,54 @@ func main() {
 		logger.Fatalw("API base URL is required, set via --api-base-url or API_BASE_URL env var")
 	}
 	if strings.TrimSpace(*apiToken) == "" {
-		logger.Fatalw("API token is required, set via --api-token or API_TOKEN env var")
+		logger.Fatalw("API token is required, set via --api-token or seeddata config")
 	}
 
 	apiClient := NewAPIClient(*apiBaseURL, *apiToken, logger)
 	logger.Infow("Initialized API client", "base_url", *apiBaseURL)
 
-	// 可选：连接数据库（用于兼容旧代码，但新代码应使用 API）
-	var mysqlDB *gorm.DB
-	var mongoDB *mongo.Database
-	if strings.TrimSpace(*mysqlDSN) != "" && strings.TrimSpace(*mongoURI) != "" {
-		logger.Infow("Connecting to databases (for compatibility)", "mysql_dsn", maskDSN(*mysqlDSN))
-		db, err := gorm.Open(mysql.Open(*mysqlDSN), &gorm.Config{})
-		if err != nil {
-			logger.Warnw("Failed to connect to MySQL (optional)", "error", err)
-		} else {
-			mysqlDB = db
-		}
+	collectionURL := strings.TrimSpace(*collectionBaseURL)
+	if collectionURL == "" {
+		collectionURL = *apiBaseURL
+	}
+	collectionClient := NewAPIClient(collectionURL, *apiToken, logger)
+	logger.Infow("Initialized collection client", "base_url", collectionURL)
 
-		logger.Infow("Connecting to MongoDB (for compatibility)", "uri", maskURI(*mongoURI), "database", *mongoDatabase)
-		mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(*mongoURI))
-		if err != nil {
-			logger.Warnw("Failed to connect to MongoDB (optional)", "error", err)
-		} else {
-			defer mongoClient.Disconnect(context.Background())
-			mongoDB = mongoClient.Database(*mongoDatabase)
+	if (config.IAM != IAMConfig{}) {
+		refresher := func(ctx context.Context) (string, error) {
+			return fetchTokenFromIAM(ctx, config.IAM, logger)
 		}
+		apiClient.SetTokenRefresher(refresher)
+		collectionClient.SetTokenRefresher(refresher)
 	}
 
 	// 构建依赖
 	deps := &dependencies{
-		MySQLDB:   mysqlDB,
-		MongoDB:   mongoDB,
-		Logger:    logger,
-		Config:    config,
-		APIClient: apiClient,
+		Logger:           logger,
+		Config:           config,
+		APIClient:        apiClient,
+		CollectionClient: collectionClient,
 	}
 
-	// 解析要执行的步骤
-	steps := parseSteps(*stepsRaw)
 	logger.Infow("Starting seed process", "steps", stepListToStrings(steps))
 
 	// 创建上下文
-	state := newSeedContext()
-	ctx := context.Background()
+	seedCtx := newSeedContext()
+	runCtx := context.Background()
 
-	// 依次执行各个步骤
+	if *assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin {
+		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
+	}
+
 	for _, step := range steps {
-		logger.Infow("Executing step", "step", step)
-
-		var err error
 		switch step {
-		case stepQuestionnaire:
-			err = seedQuestionnaires(ctx, deps, state)
-		case stepScale:
-			err = seedScales(ctx, deps, state)
+		case stepAssessment:
+			if err := seedAssessments(runCtx, deps, seedCtx, *assessmentMin, *assessmentMax, *assessmentWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *assessmentCategories); err != nil {
+				logger.Fatalw("Assessment seeding failed", "error", err)
+			}
 		default:
-			logger.Warnw("Unknown step", "step", step)
-			continue
+			logger.Warnw("Skipping unimplemented step", "step", step)
 		}
-
-		if err != nil {
-			logger.Fatalw("Step failed", "step", step, "error", err)
-		}
-
-		logger.Infow("Step completed", "step", step)
 	}
 
 	logger.Infow("Seed process completed successfully")
@@ -263,27 +222,4 @@ func stepListToStrings(steps []seedStep) []string {
 		out = append(out, string(s))
 	}
 	return out
-}
-
-// maskDSN 遮蔽 DSN 中的密码
-func maskDSN(dsn string) string {
-	if idx := strings.Index(dsn, "@"); idx > 0 {
-		if colonIdx := strings.Index(dsn[:idx], ":"); colonIdx > 0 {
-			return dsn[:colonIdx+1] + "***" + dsn[idx:]
-		}
-	}
-	return dsn
-}
-
-// maskURI 遮蔽 URI 中的密码
-func maskURI(uri string) string {
-	if idx := strings.Index(uri, "@"); idx > 0 {
-		if colonIdx := strings.Index(uri, "://"); colonIdx > 0 {
-			userPassStart := colonIdx + 3
-			if colonInUserPass := strings.Index(uri[userPassStart:idx], ":"); colonInUserPass > 0 {
-				return uri[:userPassStart+colonInUserPass+1] + "***" + uri[idx:]
-			}
-		}
-	}
-	return uri
 }

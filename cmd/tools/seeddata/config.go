@@ -70,6 +70,10 @@ func (b *BoolString) UnmarshalYAML(node *yaml.Node) error {
 type SeedConfig struct {
 	// 全局配置
 	Global GlobalConfig `yaml:"global"`
+	// API 配置
+	API APIConfig `yaml:"api"`
+	// IAM 配置
+	IAM IAMConfig `yaml:"iam"`
 
 	// 各个领域的种子数据配置
 	Testees        []TesteeConfig        `yaml:"testees"`
@@ -81,6 +85,20 @@ type SeedConfig struct {
 type GlobalConfig struct {
 	OrgID      int64  `yaml:"orgId"`      // 默认机构ID
 	DefaultTag string `yaml:"defaultTag"` // 默认标签前缀
+}
+
+// APIConfig API 配置
+type APIConfig struct {
+	BaseURL           string `yaml:"baseUrl"`
+	CollectionBaseURL string `yaml:"collectionBaseUrl"`
+	Token             string `yaml:"token"`
+}
+
+// IAMConfig IAM 登录配置
+type IAMConfig struct {
+	LoginURL string `yaml:"loginUrl"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 }
 
 // TesteeConfig 受试者配置
@@ -154,11 +172,11 @@ type ScaleConfig struct {
 	Title                string                    `yaml:"title"`
 	Description          string                    `yaml:"description"`
 	Icon                 string                    `yaml:"icon"`
-	Category             string                    `yaml:"category"`              // 主类
-	Stages               []string                  `yaml:"stages"`               // 阶段列表
-	ApplicableAges       []string                  `yaml:"applicableAges"`       // 使用年龄列表（注意：YAML中是驼峰命名）
-	Reporters            []string                  `yaml:"reporters"`            // 填报人列表
-	Tags                 []string                  `yaml:"tags"`                // 标签列表
+	Category             string                    `yaml:"category"`       // 主类
+	Stages               []string                  `yaml:"stages"`         // 阶段列表
+	ApplicableAges       []string                  `yaml:"applicableAges"` // 使用年龄列表（注意：YAML中是驼峰命名）
+	Reporters            []string                  `yaml:"reporters"`      // 填报人列表
+	Tags                 []string                  `yaml:"tags"`           // 标签列表
 	QuestionnaireCode    string                    `yaml:"questionnaireCode"`
 	QuestionnaireVersion string                    `yaml:"questionnaireVersion"`
 	Status               string                    `yaml:"status"` // "draft", "published", "archived"

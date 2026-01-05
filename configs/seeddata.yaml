@@ -1,0 +1,17 @@
+api:
+  baseUrl: "https://qs.yangshujie.com"
+  collectionBaseUrl: "https://collect.yangshujie.com"
+  token: ""
+
+iam:
+  loginUrl: "https://iam.yangshujie.com/api/v1/authn/login"
+  username: "+8613112345671"
+  password: "Admin@123"
+
+global:
+  orgId: 1
+  defaultTag: ""
+
+testees: []
+questionnaires: []
+scales: []
