@@ -81,6 +81,70 @@
                 }
             }
         },
+        "/api/v1/answersheets/submit-status": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "根据 request_id 查询提交处理状态",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "答卷"
+                ],
+                "summary": "查询提交状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "请求ID",
+                        "name": "request_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/answersheet.SubmitStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/answersheets/{id}": {
             "get": {
                 "security": [
@@ -1536,6 +1600,20 @@
                 },
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "answersheet.SubmitStatusResponse": {
+            "type": "object",
+            "properties": {
+                "answersheet_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer"
                 }
             }
         },

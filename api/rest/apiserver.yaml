@@ -109,6 +109,61 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AnswerSheetListResponse'
+  /answersheets/admin-submit:
+    post:
+      tags:
+      - AnswerSheet-Management
+      summary: 管理员提交答卷
+      description: 管理员绕过监护关系校验提交答卷
+      operationId: 管理员提交答卷
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.AdminSubmitAnswerSheetRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AnswerSheetResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /answersheets/{id}:
     get:
       tags:
@@ -2843,6 +2898,20 @@ paths:
                 additionalProperties: true
 components:
   schemas:
+    core.ErrResponse:
+      type: object
+      properties:
+        code:
+          description: Code 定义了业务错误代码
+          type: integer
+        message:
+          description: 'Message 包含此消息的详细信息
+
+            此消息适合暴露给外部'
+          type: string
+        reference:
+          description: Reference 返回参考文档，可能有助于解决此错误
+          type: string
     core.Response:
       type: object
       properties:
@@ -2881,6 +2950,41 @@ components:
           type: string
         type:
           type: string
+    request.AdminAnswerSubmit:
+      type: object
+      required:
+      - question_code
+      - question_type
+      - value
+      properties:
+        question_code:
+          type: string
+        question_type:
+          type: string
+        value: {}
+    request.AdminSubmitAnswerSheetRequest:
+      type: object
+      required:
+      - answers
+      - questionnaire_code
+      - testee_id
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/request.AdminAnswerSubmit'
+        filler_id:
+          type: integer
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        testee_id:
+          type: integer
+        title:
+          type: string
+        writer_id:
+          type: integer
     request.ApplyCodeRequest:
       type: object
       properties:

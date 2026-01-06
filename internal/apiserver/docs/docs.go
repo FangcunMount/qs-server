@@ -97,6 +97,83 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/answersheets/admin-submit": {
+            "post": {
+                "description": "管理员绕过监护关系校验提交答卷",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AnswerSheet-Management"
+                ],
+                "summary": "管理员提交答卷",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "答卷数据",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.AdminSubmitAnswerSheetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AnswerSheetResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/answersheets/{id}": {
             "get": {
                 "description": "管理员查看答卷的完整信息",
@@ -4307,6 +4384,23 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "core.ErrResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Code 定义了业务错误代码",
+                    "type": "integer"
+                },
+                "message": {
+                    "description": "Message 包含此消息的详细信息\n此消息适合暴露给外部",
+                    "type": "string"
+                },
+                "reference": {
+                    "description": "Reference 返回参考文档，可能有助于解决此错误",
+                    "type": "string"
+                }
+            }
+        },
         "core.Response": {
             "type": "object",
             "properties": {
@@ -4360,6 +4454,57 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "request.AdminAnswerSubmit": {
+            "type": "object",
+            "required": [
+                "question_code",
+                "question_type",
+                "value"
+            ],
+            "properties": {
+                "question_code": {
+                    "type": "string"
+                },
+                "question_type": {
+                    "type": "string"
+                },
+                "value": {}
+            }
+        },
+        "request.AdminSubmitAnswerSheetRequest": {
+            "type": "object",
+            "required": [
+                "answers",
+                "questionnaire_code",
+                "testee_id"
+            ],
+            "properties": {
+                "answers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.AdminAnswerSubmit"
+                    }
+                },
+                "filler_id": {
+                    "type": "integer"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "writer_id": {
+                    "type": "integer"
                 }
             }
         },

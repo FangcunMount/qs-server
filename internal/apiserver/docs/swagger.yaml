@@ -1,5 +1,19 @@
 basePath: /api/v1
 definitions:
+  core.ErrResponse:
+    properties:
+      code:
+        description: Code 定义了业务错误代码
+        type: integer
+      message:
+        description: |-
+          Message 包含此消息的详细信息
+          此消息适合暴露给外部
+        type: string
+      reference:
+        description: Reference 返回参考文档，可能有助于解决此错误
+        type: string
+    type: object
   core.Response:
     properties:
       code:
@@ -37,6 +51,41 @@ definitions:
         type: string
       type:
         type: string
+    type: object
+  request.AdminAnswerSubmit:
+    properties:
+      question_code:
+        type: string
+      question_type:
+        type: string
+      value: {}
+    required:
+    - question_code
+    - question_type
+    - value
+    type: object
+  request.AdminSubmitAnswerSheetRequest:
+    properties:
+      answers:
+        items:
+          $ref: '#/definitions/request.AdminAnswerSubmit'
+        type: array
+      filler_id:
+        type: integer
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      testee_id:
+        type: integer
+      title:
+        type: string
+      writer_id:
+        type: integer
+    required:
+    - answers
+    - questionnaire_code
+    - testee_id
     type: object
   request.ApplyCodeRequest:
     properties:
@@ -1618,6 +1667,54 @@ paths:
                   $ref: '#/definitions/response.AnswerSheetResponse'
               type: object
       summary: 获取答卷详情
+      tags:
+      - AnswerSheet-Management
+  /api/v1/answersheets/admin-submit:
+    post:
+      consumes:
+      - application/json
+      description: 管理员绕过监护关系校验提交答卷
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 答卷数据
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AdminSubmitAnswerSheetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AnswerSheetResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 管理员提交答卷
       tags:
       - AnswerSheet-Management
   /api/v1/assessments/{id}/wait-report:

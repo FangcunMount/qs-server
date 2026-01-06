@@ -56,6 +56,15 @@ definitions:
       message:
         type: string
     type: object
+  answersheet.SubmitStatusResponse:
+    properties:
+      answersheet_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: integer
+    type: object
   core.ErrResponse:
     properties:
       code:
@@ -828,6 +837,44 @@ paths:
       security:
       - Bearer: []
       summary: 通过答卷ID获取测评详情
+      tags:
+      - 答卷
+  /api/v1/answersheets/submit-status:
+    get:
+      description: 根据 request_id 查询提交处理状态
+      parameters:
+      - description: 请求ID
+        in: query
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/answersheet.SubmitStatusResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 查询提交状态
       tags:
       - 答卷
   /api/v1/assessments:
