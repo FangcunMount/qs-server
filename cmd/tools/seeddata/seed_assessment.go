@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -10,8 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 const (
@@ -23,9 +20,234 @@ const (
 	questionTypeSection  = "Section"
 
 	questionnaireTypeMedicalScale = "MedicalScale"
+
+	submitMaxRetry     = 3
+	submitRetryBackoff = 200 * time.Millisecond
+
+	testeeQueueSize = 100
+	submitQueueSize = 200
 )
 
-func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedContext, minPerTestee, maxPerTestee, workerCount, testeePageSize, testeeOffset, testeeLimit int, categoryFilter string) error {
+type taskOutcome int
+
+const (
+	taskReady taskOutcome = iota
+	taskSkipped
+	taskFailed
+)
+
+type assessmentCounters struct {
+	errorCount           int64
+	submittedCount       int64
+	skippedCount         int64
+	processedTesteeCount int64
+	successTesteeCount   int64
+	failedTesteeCount    int64
+	enqueuedTesteeCount  int64
+	submitInFlight       int64
+	submitMaxInFlight    int64
+	errorLogCount        int64
+}
+
+type assessmentSnapshot struct {
+	errorCount           int64
+	submittedCount       int64
+	skippedCount         int64
+	processedTesteeCount int64
+	successTesteeCount   int64
+	failedTesteeCount    int64
+	enqueuedTesteeCount  int64
+	submitMaxInFlight    int64
+}
+
+func newAssessmentCounters() *assessmentCounters {
+	return &assessmentCounters{}
+}
+
+func (c *assessmentCounters) Snapshot() assessmentSnapshot {
+	return assessmentSnapshot{
+		errorCount:           atomic.LoadInt64(&c.errorCount),
+		submittedCount:       atomic.LoadInt64(&c.submittedCount),
+		skippedCount:         atomic.LoadInt64(&c.skippedCount),
+		processedTesteeCount: atomic.LoadInt64(&c.processedTesteeCount),
+		successTesteeCount:   atomic.LoadInt64(&c.successTesteeCount),
+		failedTesteeCount:    atomic.LoadInt64(&c.failedTesteeCount),
+		enqueuedTesteeCount:  atomic.LoadInt64(&c.enqueuedTesteeCount),
+		submitMaxInFlight:    atomic.LoadInt64(&c.submitMaxInFlight),
+	}
+}
+
+func (c *assessmentCounters) AddErrors(count int64) {
+	atomic.AddInt64(&c.errorCount, count)
+}
+
+func (c *assessmentCounters) AddSkipped(count int64) {
+	atomic.AddInt64(&c.skippedCount, count)
+}
+
+func (c *assessmentCounters) AddSubmitted(count int64) {
+	atomic.AddInt64(&c.submittedCount, count)
+}
+
+func (c *assessmentCounters) AddEnqueued(count int64) {
+	atomic.AddInt64(&c.enqueuedTesteeCount, count)
+}
+
+func (c *assessmentCounters) MarkTesteeProcessed(failed bool) {
+	atomic.AddInt64(&c.processedTesteeCount, 1)
+	if failed {
+		atomic.AddInt64(&c.failedTesteeCount, 1)
+	} else {
+		atomic.AddInt64(&c.successTesteeCount, 1)
+	}
+}
+
+func (c *assessmentCounters) StartSubmit() int64 {
+	inFlight := atomic.AddInt64(&c.submitInFlight, 1)
+	updateMaxInFlight(&c.submitMaxInFlight, inFlight)
+	return inFlight
+}
+
+func (c *assessmentCounters) EndSubmit() {
+	atomic.AddInt64(&c.submitInFlight, -1)
+}
+
+func (c *assessmentCounters) NextErrorLogIndex() int64 {
+	return atomic.AddInt64(&c.errorLogCount, 1)
+}
+
+func (c *assessmentCounters) ErrorCount() int64 {
+	return atomic.LoadInt64(&c.errorCount)
+}
+
+type failureSamples struct {
+	mu      sync.Mutex
+	limit   int
+	samples []string
+}
+
+func newFailureSamples(limit int) *failureSamples {
+	return &failureSamples{limit: limit, samples: make([]string, 0, 16)}
+}
+
+func (f *failureSamples) Add(testeeID, questionnaireCode string, err error) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.samples) >= f.limit {
+		return
+	}
+	entry := fmt.Sprintf("testee_id=%s questionnaire=%s error=%v", testeeID, questionnaireCode, err)
+	f.samples = append(f.samples, entry)
+}
+
+func (f *failureSamples) Log(logger interface{ Warnw(string, ...interface{}) }) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.samples) == 0 {
+		return
+	}
+	logger.Warnw("Assessment seeding failed samples",
+		"sample_count", len(f.samples),
+		"samples", f.samples,
+	)
+}
+
+type assessmentDiagnostics struct {
+	logger interface {
+		Debugw(string, ...interface{})
+		Infow(string, ...interface{})
+		Warnw(string, ...interface{})
+	}
+	verbose bool
+}
+
+type submitLogPayload struct {
+	testeeID      string
+	questionnaire string
+	attempts      int
+	duration      time.Duration
+	inFlight      int64
+	maxInFlight   int64
+	answerCount   int
+}
+
+type testeeLogPayload struct {
+	testeeID           string
+	questionnaireCount int
+	duration           time.Duration
+	success            bool
+}
+
+func newAssessmentDiagnostics(logger interface {
+	Debugw(string, ...interface{})
+	Infow(string, ...interface{})
+	Warnw(string, ...interface{})
+}, verbose bool) *assessmentDiagnostics {
+	return &assessmentDiagnostics{logger: logger, verbose: verbose}
+}
+
+func (d *assessmentDiagnostics) LogScaleTargetsLoaded(count int, duration time.Duration) {
+	d.logger.Infow("Loaded scale targets",
+		"count", count,
+		"duration_ms", duration.Milliseconds(),
+	)
+}
+
+func (d *assessmentDiagnostics) LogNoScaleTargets(categories []string) {
+	d.logger.Warnw("No medical scales found for assessment seeding", "categories", categories)
+}
+
+func (d *assessmentDiagnostics) LogProducerFinished(enqueued int64, duration time.Duration) {
+	d.logger.Infow("Testee producer finished",
+		"enqueued_testees", enqueued,
+		"duration_ms", duration.Milliseconds(),
+	)
+}
+
+func (d *assessmentDiagnostics) LogTesteeStart(testeeID string, count int) {
+	if !d.verbose {
+		return
+	}
+	d.logger.Debugw("Seeding assessments for testee", "testee_id", testeeID, "count", count)
+}
+
+func (d *assessmentDiagnostics) LogTesteeProcessed(payload testeeLogPayload) {
+	if !d.verbose {
+		return
+	}
+	d.logger.Infow("Testee processed",
+		"testee_id", payload.testeeID,
+		"questionnaire_count", payload.questionnaireCount,
+		"duration_ms", payload.duration.Milliseconds(),
+		"success", payload.success,
+	)
+}
+
+func (d *assessmentDiagnostics) LogSubmitCompleted(payload submitLogPayload) {
+	if !d.verbose {
+		return
+	}
+	d.logger.Infow("Submit answersheet completed",
+		"testee_id", payload.testeeID,
+		"questionnaire", payload.questionnaire,
+		"attempts", payload.attempts,
+		"duration_ms", payload.duration.Milliseconds(),
+		"in_flight", payload.inFlight,
+		"max_in_flight", payload.maxInFlight,
+		"answer_count", payload.answerCount,
+	)
+}
+
+// seedAssessments runs a two-stage pipeline:
+// 1) load testees -> build answersheets
+// 2) submit answersheets -> write assessments
+func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedContext, minPerTestee, maxPerTestee, workerCount, submitWorkerCount, testeePageSize, testeeOffset, testeeLimit int, categoryFilter string, verbose bool) error {
 	logger := deps.Logger
 	client := deps.CollectionClient
 	if client == nil {
@@ -39,36 +261,41 @@ func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedConte
 		return fmt.Errorf("global.orgId must be set in seeddata config")
 	}
 
+	diag := newAssessmentDiagnostics(logger, verbose)
 	categories := parseCategories(categoryFilter)
-	targets, err := listAllScaleTargets(ctx, client, categories)
+	targets, err := loadScaleTargets(ctx, client, categories, diag)
 	if err != nil {
 		return err
 	}
 	if len(targets) == 0 {
-		logger.Warnw("No medical scales found for assessment seeding", "categories", categories)
 		return nil
 	}
 
 	workerCount = normalizeWorkerCount(workerCount)
+	submitWorkerCount = normalizeSubmitWorkerCount(submitWorkerCount)
 	testeePageSize = normalizeTesteePageSize(testeePageSize)
 	testeeOffset = normalizeTesteeOffset(testeeOffset)
 	testeeLimit = normalizeTesteeLimit(testeeLimit)
 
 	questionnaireCache := make(map[string]*QuestionnaireDetailResponse)
 	var cacheMu sync.RWMutex
-	var errorCount int64
-	var submittedCount int64
-	var skippedCount int64
-	var processedTesteeCount int64
-	var errorLogCount int64
+	var targetTestees int64
+	counters := newAssessmentCounters()
+	failures := newFailureSamples(100)
 
-	taskCh := make(chan *TesteeResponse, workerCount*4)
+	// Two-stage pipeline:
+	// 1) testee -> assessment task
+	// 2) answersheet -> submit task
+	taskCh := make(chan *TesteeResponse, testeeQueueSize)
+	submitCh := make(chan submissionTask, submitQueueSize)
 	var wg sync.WaitGroup
+	var submitWG sync.WaitGroup
 
 	logger.Infow("Assessment seeding started",
 		"categories", categories,
 		"scale_count", len(targets),
 		"worker_count", workerCount,
+		"submit_worker_count", submitWorkerCount,
 		"testee_page_size", testeePageSize,
 		"testee_offset", testeeOffset,
 		"testee_limit", testeeLimit,
@@ -77,38 +304,78 @@ func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedConte
 		"max_per_testee", maxPerTestee,
 	)
 
+	if testeeLimit > 0 {
+		targetTestees = int64(testeeLimit)
+	}
+
+	prewarmAPIToken(ctx, deps.APIClient, orgID, logger)
+	seedStart := time.Now()
+
+	startSubmitWorkers(ctx, &submitWG, submitCh, submitWorkerCount, submitWorkerConfig{
+		logger:      logger,
+		diagnostics: diag,
+		client:      deps.APIClient,
+		counters:    counters,
+		failures:    failures,
+	})
+
 	startAssessmentWorkers(ctx, &wg, taskCh, workerCount, assessmentWorkerConfig{
 		logger:             logger,
+		diagnostics:        diag,
 		client:             deps.APIClient,
 		minPerTestee:       minPerTestee,
 		maxPerTestee:       maxPerTestee,
 		targets:            targets,
 		questionnaireCache: questionnaireCache,
 		cacheMu:            &cacheMu,
-		errorCount:         &errorCount,
-		submittedCount:     &submittedCount,
-		skippedCount:       &skippedCount,
-		errorLogCount:      &errorLogCount,
+		submitCh:           submitCh,
+		counters:           counters,
+		totalTestees:       targetTestees,
+		failures:           failures,
 	})
 
-	err = iterateTesteesFromApiserver(ctx, deps.APIClient, orgID, testeePageSize, testeeOffset, testeeLimit, func(testees []*TesteeResponse) error {
-		atomic.AddInt64(&processedTesteeCount, int64(len(testees)))
-		return enqueueTestees(ctx, taskCh, testees)
-	})
-	close(taskCh)
+	if targetTestees > 0 {
+		printAssessmentProgress(0, targetTestees, 0)
+	}
+
+	producerErrCh := startTesteeProducer(
+		ctx,
+		deps.APIClient,
+		taskCh,
+		diag,
+		orgID,
+		testeePageSize,
+		testeeOffset,
+		testeeLimit,
+		counters,
+	)
+
 	wg.Wait()
-	if err != nil {
+	close(submitCh)
+	submitWG.Wait()
+	if err := <-producerErrCh; err != nil {
 		return err
 	}
-
-	if errorCount > 0 {
-		return fmt.Errorf("assessment seeding completed with %d errors", errorCount)
+	snapshot := counters.Snapshot()
+	if snapshot.successTesteeCount+snapshot.failedTesteeCount > 0 {
+		fmt.Println()
 	}
 
+	if counters.ErrorCount() > 0 {
+		failures.Log(logger)
+		return fmt.Errorf("assessment seeding completed with %d errors", counters.ErrorCount())
+	}
+
+	snapshot = counters.Snapshot()
 	logger.Infow("Assessment seeding completed",
-		"processed_testees", processedTesteeCount,
-		"submitted_answersheets", submittedCount,
-		"skipped_items", skippedCount,
+		"processed_testees", snapshot.processedTesteeCount,
+		"success_testees", snapshot.successTesteeCount,
+		"failed_testees", snapshot.failedTesteeCount,
+		"submitted_answersheets", snapshot.submittedCount,
+		"skipped_items", snapshot.skippedCount,
+		"enqueued_testees", snapshot.enqueuedTesteeCount,
+		"submit_peak_in_flight", snapshot.submitMaxInFlight,
+		"duration_ms", time.Since(seedStart).Milliseconds(),
 	)
 	return nil
 }
@@ -119,16 +386,36 @@ type assessmentWorkerConfig struct {
 		Warnw(string, ...interface{})
 		Infow(string, ...interface{})
 	}
+	diagnostics        *assessmentDiagnostics
 	client             *APIClient
 	minPerTestee       int
 	maxPerTestee       int
 	targets            []scaleTarget
 	questionnaireCache map[string]*QuestionnaireDetailResponse
 	cacheMu            *sync.RWMutex
-	errorCount         *int64
-	submittedCount     *int64
-	skippedCount       *int64
-	errorLogCount      *int64
+	submitCh           chan<- submissionTask
+	counters           *assessmentCounters
+	totalTestees       int64
+	failures           *failureSamples
+}
+
+type submissionTask struct {
+	testeeID          string
+	questionnaireCode string
+	req               SubmitAnswerSheetRequest
+	resultCh          chan error
+}
+
+type submitWorkerConfig struct {
+	logger interface {
+		Debugw(string, ...interface{})
+		Warnw(string, ...interface{})
+		Infow(string, ...interface{})
+	}
+	diagnostics *assessmentDiagnostics
+	client      *APIClient
+	counters    *assessmentCounters
+	failures    *failureSamples
 }
 
 func startAssessmentWorkers(
@@ -154,102 +441,208 @@ func startAssessmentWorkers(
 	}
 }
 
+func startSubmitWorkers(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	taskCh <-chan submissionTask,
+	workerCount int,
+	cfg submitWorkerConfig,
+) {
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for task := range taskCh {
+				if ctx.Err() != nil {
+					task.resultCh <- ctx.Err()
+					close(task.resultCh)
+					continue
+				}
+				submitStart := time.Now()
+				inFlight := cfg.counters.StartSubmit()
+				attempts, err := submitAnswerSheetWithRetry(ctx, cfg.client, task.req, submitMaxRetry)
+				cfg.counters.EndSubmit()
+				duration := time.Since(submitStart)
+				if err != nil {
+					cfg.logger.Warnw("Submit answersheet failed",
+						"testee_id", task.testeeID,
+						"questionnaire", task.questionnaireCode,
+						"attempts", attempts,
+						"duration_ms", duration.Milliseconds(),
+						"in_flight", inFlight,
+						"max_in_flight", cfg.counters.Snapshot().submitMaxInFlight,
+						"error", err,
+					)
+					if cfg.counters.NextErrorLogIndex() <= 3 {
+						cfg.logger.Warnw("Submit payload preview",
+							"testee_id", task.testeeID,
+							"questionnaire", task.questionnaireCode,
+							"questionnaire_version", task.req.QuestionnaireVersion,
+							"answer_count", len(task.req.Answers),
+							"answers", previewAnswers(task.req.Answers),
+						)
+					}
+					cfg.counters.AddErrors(1)
+					cfg.failures.Add(task.testeeID, task.questionnaireCode, err)
+				} else {
+					cfg.diagnostics.LogSubmitCompleted(submitLogPayload{
+						testeeID:      task.testeeID,
+						questionnaire: task.questionnaireCode,
+						attempts:      attempts,
+						duration:      duration,
+						inFlight:      inFlight,
+						maxInFlight:   cfg.counters.Snapshot().submitMaxInFlight,
+						answerCount:   len(task.req.Answers),
+					})
+					cfg.counters.AddSubmitted(1)
+				}
+				task.resultCh <- err
+				close(task.resultCh)
+			}
+		}()
+	}
+}
+
 func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *TesteeResponse, rng *rand.Rand) {
 	perTestee := rng.Intn(cfg.maxPerTestee-cfg.minPerTestee+1) + cfg.minPerTestee
-	cfg.logger.Debugw("Seeding assessments for testee", "testee_id", testee.ID, "count", perTestee)
+	testeeStart := time.Now()
+	cfg.diagnostics.LogTesteeStart(testee.ID, perTestee)
 
 	picks := pickScaleTargets(cfg.targets, perTestee, rng)
+	var testeeFailed int32
+	resultChans := make([]chan error, 0, len(picks))
 	for _, target := range picks {
-		detail := getQuestionnaireDetail(ctx, cfg.client, target.QuestionnaireCode, cfg.questionnaireCache, cfg.cacheMu, cfg.logger)
-		if detail == nil {
-			atomic.AddInt64(cfg.errorCount, 1)
-			atomic.AddInt64(cfg.skippedCount, 1)
+		if ctx.Err() != nil {
+			atomic.StoreInt32(&testeeFailed, 1)
+			break
+		}
+
+		task, outcome := buildSubmissionTask(ctx, cfg, testee, target, rng)
+		if outcome == taskFailed {
+			atomic.StoreInt32(&testeeFailed, 1)
 			continue
 		}
-		debugLogQuestionnaire(detail, cfg.logger)
-		if detail.Type != questionnaireTypeMedicalScale {
-			cfg.logger.Warnw("Questionnaire is not medical scale, skipping", "code", target.QuestionnaireCode, "type", detail.Type)
-			atomic.AddInt64(cfg.skippedCount, 1)
-			continue
-		}
-		if target.QuestionnaireVersion != "" && detail.Version != target.QuestionnaireVersion {
-			cfg.logger.Warnw("Questionnaire version mismatch, skipping",
-				"code", target.QuestionnaireCode,
-				"expected", target.QuestionnaireVersion,
-				"actual", detail.Version,
-			)
-			atomic.AddInt64(cfg.skippedCount, 1)
+		if outcome != taskReady || task == nil {
 			continue
 		}
 
-		// 打印问卷详细信息
-		// logQuestionnaireDetail(cfg.logger, detail, target)
-
-		answers := buildAnswers(detail, rng)
-		if len(answers) == 0 {
-			cfg.logger.Warnw("No supported answers generated, skipping questionnaire",
-				"code", target.QuestionnaireCode,
-				"testee_id", testee.ID,
-				"question_types", collectQuestionTypes(detail),
-			)
-			atomic.AddInt64(cfg.skippedCount, 1)
-			continue
+		resultCh := make(chan error, 1)
+		select {
+		case <-ctx.Done():
+			atomic.StoreInt32(&testeeFailed, 1)
+			return
+		case cfg.submitCh <- submissionTask{
+			testeeID:          task.testeeID,
+			questionnaireCode: task.questionnaireCode,
+			req:               task.req,
+			resultCh:          resultCh,
+		}:
+			resultChans = append(resultChans, resultCh)
 		}
-
-		// 打印组织好的答卷信息
-		logBuiltAnswers(cfg.logger, answers, target.QuestionnaireCode, testee.ID)
-
-		// 验证答案是否有效
-		if invalidAnswers := validateAnswers(detail, answers); len(invalidAnswers) > 0 {
-			cfg.logger.Warnw("Invalid answers detected",
-				"questionnaire_code", target.QuestionnaireCode,
-				"testee_id", testee.ID,
-				"invalid_count", len(invalidAnswers),
-				"invalid_answers", invalidAnswers,
-			)
-		}
-
-		testeeID := parseID(testee.ID)
-		if testeeID == 0 {
-			cfg.logger.Warnw("Invalid testee ID, skipping", "testee_id", testee.ID)
-			atomic.AddInt64(cfg.errorCount, 1)
-			atomic.AddInt64(cfg.skippedCount, 1)
-			continue
-		}
-
-		version := detail.Version
-		if target.QuestionnaireVersion != "" {
-			version = target.QuestionnaireVersion
-		}
-
-		req := SubmitAnswerSheetRequest{
-			QuestionnaireCode:    target.QuestionnaireCode,
-			QuestionnaireVersion: version,
-			Title:                detail.Title,
-			TesteeID:             testeeID,
-			Answers:              answers,
-		}
-
-		// 打印提交的答卷信息
-		logSubmitRequest(cfg.logger, req, testee.ID)
-
-		if err := submitAnswerSheet(ctx, cfg.client, req); err != nil {
-			cfg.logger.Warnw("Failed to submit answer sheet", "testee_id", testee.ID, "questionnaire", target.QuestionnaireCode, "error", err)
-			if atomic.AddInt64(cfg.errorLogCount, 1) <= 3 {
-				cfg.logger.Warnw("Submit payload preview",
-					"testee_id", testee.ID,
-					"questionnaire", target.QuestionnaireCode,
-					"questionnaire_version", req.QuestionnaireVersion,
-					"answer_count", len(req.Answers),
-					"answers", previewAnswers(req.Answers),
-				)
-			}
-			atomic.AddInt64(cfg.errorCount, 1)
-			continue
-		}
-		// 提交成功后，系统会自动通过事件创建 Assessment
-		atomic.AddInt64(cfg.submittedCount, 1)
 	}
+
+	for _, ch := range resultChans {
+		select {
+		case <-ctx.Done():
+			atomic.StoreInt32(&testeeFailed, 1)
+			return
+		case err := <-ch:
+			if err != nil {
+				atomic.StoreInt32(&testeeFailed, 1)
+			}
+		}
+	}
+	cfg.counters.MarkTesteeProcessed(atomic.LoadInt32(&testeeFailed) == 1)
+	snapshot := cfg.counters.Snapshot()
+	printAssessmentProgress(
+		snapshot.successTesteeCount+snapshot.failedTesteeCount,
+		cfg.totalTestees,
+		snapshot.failedTesteeCount,
+	)
+	cfg.diagnostics.LogTesteeProcessed(testeeLogPayload{
+		testeeID:           testee.ID,
+		questionnaireCount: len(picks),
+		duration:           time.Since(testeeStart),
+		success:            atomic.LoadInt32(&testeeFailed) == 0,
+	})
+}
+
+// buildSubmissionTask prepares one answersheet submission task for a testee.
+func buildSubmissionTask(ctx context.Context, cfg assessmentWorkerConfig, testee *TesteeResponse, target scaleTarget, rng *rand.Rand) (*submissionTask, taskOutcome) {
+	if ctx.Err() != nil {
+		return nil, taskFailed
+	}
+
+	detail := getQuestionnaireDetail(ctx, cfg.client, target.QuestionnaireCode, cfg.questionnaireCache, cfg.cacheMu, cfg.logger)
+	if detail == nil {
+		cfg.counters.AddErrors(1)
+		cfg.counters.AddSkipped(1)
+		cfg.failures.Add(testee.ID, target.QuestionnaireCode, fmt.Errorf("questionnaire detail missing"))
+		return nil, taskFailed
+	}
+	debugLogQuestionnaire(detail, cfg.logger)
+	if detail.Type != questionnaireTypeMedicalScale {
+		cfg.logger.Warnw("Questionnaire is not medical scale, skipping", "code", target.QuestionnaireCode, "type", detail.Type)
+		cfg.counters.AddSkipped(1)
+		return nil, taskSkipped
+	}
+	if target.QuestionnaireVersion != "" && detail.Version != target.QuestionnaireVersion {
+		cfg.logger.Warnw("Questionnaire version mismatch, skipping",
+			"code", target.QuestionnaireCode,
+			"expected", target.QuestionnaireVersion,
+			"actual", detail.Version,
+		)
+		cfg.counters.AddSkipped(1)
+		return nil, taskSkipped
+	}
+
+	answers := buildAnswers(detail, rng)
+	if len(answers) == 0 {
+		cfg.logger.Warnw("No supported answers generated, skipping questionnaire",
+			"code", target.QuestionnaireCode,
+			"testee_id", testee.ID,
+			"question_types", collectQuestionTypes(detail),
+		)
+		cfg.counters.AddSkipped(1)
+		return nil, taskSkipped
+	}
+
+	if invalidAnswers := validateAnswers(detail, answers); len(invalidAnswers) > 0 {
+		cfg.logger.Warnw("Invalid answers detected",
+			"questionnaire_code", target.QuestionnaireCode,
+			"testee_id", testee.ID,
+			"invalid_count", len(invalidAnswers),
+			"invalid_answers", invalidAnswers,
+		)
+	}
+
+	testeeID := parseID(testee.ID)
+	if testeeID == 0 {
+		cfg.logger.Warnw("Invalid testee ID, skipping", "testee_id", testee.ID)
+		cfg.counters.AddErrors(1)
+		cfg.counters.AddSkipped(1)
+		cfg.failures.Add(testee.ID, target.QuestionnaireCode, fmt.Errorf("invalid testee id"))
+		return nil, taskFailed
+	}
+
+	version := detail.Version
+	if target.QuestionnaireVersion != "" {
+		version = target.QuestionnaireVersion
+	}
+
+	req := SubmitAnswerSheetRequest{
+		QuestionnaireCode:    target.QuestionnaireCode,
+		QuestionnaireVersion: version,
+		Title:                detail.Title,
+		TesteeID:             testeeID,
+		Answers:              answers,
+	}
+
+	return &submissionTask{
+		testeeID:          testee.ID,
+		questionnaireCode: target.QuestionnaireCode,
+		req:               req,
+	}, taskReady
 }
 
 func submitAnswerSheet(ctx context.Context, client *APIClient, req SubmitAnswerSheetRequest) error {
@@ -261,17 +654,32 @@ func submitAnswerSheet(ctx context.Context, client *APIClient, req SubmitAnswerS
 		Answers:              req.Answers,
 	}
 
-	// 打印实际发送的 JSON 数据用于调试
-	if jsonData, err := json.Marshal(adminReq); err == nil {
-		logger := log.L(ctx)
-		logger.Infow("Actual JSON payload being sent",
-			"questionnaire_code", req.QuestionnaireCode,
-			"json_payload", string(jsonData),
-		)
-	}
-
 	_, err := client.SubmitAnswerSheetAdmin(ctx, adminReq)
 	return err
+}
+
+func submitAnswerSheetWithRetry(ctx context.Context, client *APIClient, req SubmitAnswerSheetRequest, maxRetry int) (int, error) {
+	if maxRetry <= 0 {
+		return 1, submitAnswerSheet(ctx, client, req)
+	}
+
+	var lastErr error
+	attempts := 0
+	for attempt := 0; attempt < maxRetry; attempt++ {
+		if ctx.Err() != nil {
+			return attempts, ctx.Err()
+		}
+		attempts++
+		if err := submitAnswerSheet(ctx, client, req); err == nil {
+			return attempts, nil
+		} else {
+			lastErr = err
+		}
+		if attempt < maxRetry-1 {
+			time.Sleep(submitRetryBackoff * time.Duration(attempt+1))
+		}
+	}
+	return attempts, lastErr
 }
 
 // logQuestionnaireDetail 打印问卷详细信息
@@ -470,6 +878,13 @@ func normalizeWorkerCount(workerCount int) int {
 	return workerCount
 }
 
+func normalizeSubmitWorkerCount(workerCount int) int {
+	if workerCount <= 0 {
+		return 10
+	}
+	return workerCount
+}
+
 func normalizeTesteePageSize(pageSize int) int {
 	if pageSize <= 0 {
 		return 100
@@ -492,6 +907,43 @@ func normalizeTesteeLimit(limit int) int {
 		return 0
 	}
 	return limit
+}
+
+func loadScaleTargets(ctx context.Context, client *APIClient, categories []string, diag *assessmentDiagnostics) ([]scaleTarget, error) {
+	start := time.Now()
+	targets, err := listAllScaleTargets(ctx, client, categories)
+	if err != nil {
+		return nil, err
+	}
+	if len(targets) == 0 {
+		diag.LogNoScaleTargets(categories)
+		return nil, nil
+	}
+	diag.LogScaleTargetsLoaded(len(targets), time.Since(start))
+	return targets, nil
+}
+
+func startTesteeProducer(
+	ctx context.Context,
+	client *APIClient,
+	taskCh chan<- *TesteeResponse,
+	diag *assessmentDiagnostics,
+	orgID int64,
+	pageSize, offset, limit int,
+	counters *assessmentCounters,
+) <-chan error {
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(taskCh)
+		start := time.Now()
+		err := iterateTesteesFromApiserver(ctx, client, orgID, pageSize, offset, limit, func(testees []*TesteeResponse) error {
+			counters.AddEnqueued(int64(len(testees)))
+			return enqueueTestees(ctx, taskCh, testees)
+		})
+		diag.LogProducerFinished(counters.Snapshot().enqueuedTesteeCount, time.Since(start))
+		errCh <- err
+	}()
+	return errCh
 }
 
 func iterateTesteesFromApiserver(
@@ -928,4 +1380,53 @@ func truncateString(value string, max int) string {
 		return value
 	}
 	return string(runes[:max]) + "..."
+}
+
+func printAssessmentProgress(current, total, failed int64) {
+	const barWidth = 40
+	if total > 0 {
+		percent := float64(current) / float64(total)
+		if percent > 1 {
+			percent = 1
+		}
+		filled := int(percent * barWidth)
+		bar := strings.Repeat("#", filled) + strings.Repeat("-", barWidth-filled)
+		if failed > 0 {
+			fmt.Printf("\rAssessment: [%s] %d/%d (%.1f%%) failed:%d", bar, current, total, percent*100, failed)
+		} else {
+			fmt.Printf("\rAssessment: [%s] %d/%d (%.1f%%)", bar, current, total, percent*100)
+		}
+		return
+	}
+
+	if failed > 0 {
+		fmt.Printf("\rAssessment: processed %d failed:%d", current, failed)
+	} else {
+		fmt.Printf("\rAssessment: processed %d", current)
+	}
+}
+
+func updateMaxInFlight(max *int64, current int64) {
+	if max == nil {
+		return
+	}
+	for {
+		prev := atomic.LoadInt64(max)
+		if current <= prev {
+			return
+		}
+		if atomic.CompareAndSwapInt64(max, prev, current) {
+			return
+		}
+	}
+}
+
+func prewarmAPIToken(ctx context.Context, client *APIClient, orgID int64, logger interface{ Warnw(string, ...interface{}) }) {
+	if client == nil || orgID <= 0 {
+		return
+	}
+	_, err := client.ListTesteesByOrg(ctx, orgID, 1, 1)
+	if err != nil {
+		logger.Warnw("Prewarm API token failed", "error", err)
+	}
 }

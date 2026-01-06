@@ -77,19 +77,20 @@ func newSeedContext() *seedContext {
 func main() {
 	// 解析命令行参数
 	var (
-		apiBaseURL           = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
-		collectionBaseURL    = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
-		apiToken             = flag.String("api-token", "", "API authentication token")
-		configFile           = flag.String("config", "", "Base seed data config file (testees, legacy data)")
-		stepsRaw             = flag.String("steps", "", "Comma-separated steps to run (default: all)")
-		assessmentMin        = flag.Int("assessment-min", 1, "Minimum assessments per testee")
-		assessmentMax        = flag.Int("assessment-max", 1, "Maximum assessments per testee")
-		assessmentWorkers    = flag.Int("assessment-workers", 1, "Concurrent workers for assessment seeding")
-		testeePageSize       = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
-		testeeOffset         = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
-		testeeLimit          = flag.Int("testee-limit", 0, "Maximum number of testees to process for assessment seeding (0 = no limit)")
-		assessmentCategories = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
-		verbose              = flag.Bool("verbose", false, "Enable verbose logging")
+		apiBaseURL              = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
+		collectionBaseURL       = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
+		apiToken                = flag.String("api-token", "", "API authentication token")
+		configFile              = flag.String("config", "", "Base seed data config file (testees, legacy data)")
+		stepsRaw                = flag.String("steps", "", "Comma-separated steps to run (default: all)")
+		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
+		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
+		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
+		assessmentSubmitWorkers = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
+		testeePageSize          = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
+		testeeOffset            = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
+		testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to process for assessment seeding (0 = no limit)")
+		assessmentCategories    = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
+		verbose                 = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
 	steps := parseSteps(*stepsRaw)
@@ -185,7 +186,7 @@ func main() {
 	for _, step := range steps {
 		switch step {
 		case stepAssessment:
-			if err := seedAssessments(runCtx, deps, seedCtx, *assessmentMin, *assessmentMax, *assessmentWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *assessmentCategories); err != nil {
+			if err := seedAssessments(runCtx, deps, seedCtx, *assessmentMin, *assessmentMax, *assessmentWorkers, *assessmentSubmitWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *assessmentCategories, *verbose); err != nil {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
 		default:
