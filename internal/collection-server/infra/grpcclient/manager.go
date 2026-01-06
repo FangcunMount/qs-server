@@ -1,6 +1,7 @@
 package grpcclient
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -17,11 +18,12 @@ import (
 
 // ManagerConfig gRPC 客户端管理器配置
 type ManagerConfig struct {
-	Endpoint   string        // apiserver 地址，如 "localhost:9090"
-	Timeout    time.Duration // 请求超时时间
-	Insecure   bool          // 是否使用不安全连接（开发环境）
-	PoolSize   int           // 连接池大小（默认 1）
-	MaxRetries int           // 最大重试次数
+	Endpoint    string        // apiserver 地址，如 "localhost:9090"
+	Timeout     time.Duration // 请求超时时间
+	Insecure    bool          // 是否使用不安全连接（开发环境）
+	PoolSize    int           // 连接池大小（默认 1）
+	MaxRetries  int           // 最大重试次数
+	MaxInflight int           // 最大并发调用数
 
 	// TLS 配置
 	TLSCertFile   string // 客户端证书文件
@@ -32,9 +34,10 @@ type ManagerConfig struct {
 
 // Manager gRPC 客户端管理器，负责连接池管理和客户端缓存
 type Manager struct {
-	config *ManagerConfig
-	conn   *grpc.ClientConn
-	mu     sync.RWMutex
+	config   *ManagerConfig
+	conn     *grpc.ClientConn
+	mu       sync.RWMutex
+	inflight chan struct{}
 
 	// 客户端缓存
 	clients map[string]interface{}
@@ -55,10 +58,14 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 30 * time.Second
 	}
+	if cfg.MaxInflight <= 0 {
+		cfg.MaxInflight = 200
+	}
 
 	m := &Manager{
-		config:  cfg,
-		clients: make(map[string]interface{}),
+		config:   cfg,
+		clients:  make(map[string]interface{}),
+		inflight: make(chan struct{}, cfg.MaxInflight),
 	}
 
 	// 初始化连接
@@ -76,6 +83,7 @@ func (m *Manager) connect() error {
 			grpc.MaxCallRecvMsgSize(10*1024*1024), // 10MB
 			grpc.MaxCallSendMsgSize(10*1024*1024), // 10MB
 		),
+		grpc.WithUnaryInterceptor(m.unaryInterceptor),
 		// Keepalive 参数配置，避免 "too_many_pings" 错误
 		// 服务端通常要求客户端 ping 间隔 >= 服务端 MinTime（默认 5 分钟）
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
@@ -106,6 +114,47 @@ func (m *Manager) connect() error {
 
 	m.conn = conn
 	return nil
+}
+
+// unaryInterceptor 拦截器，用于限制并发调用数
+func (m *Manager) unaryInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply interface{},
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+	// 创建带超时的 context
+	ctx = m.withTimeout(ctx)
+
+	if m.inflight != nil {
+		select {
+		case m.inflight <- struct{}{}:
+			defer func() { <-m.inflight }()
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+// withTimeout 创建带超时的 context
+func (m *Manager) withTimeout(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if m.config.Timeout <= 0 {
+		return ctx
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		if time.Until(deadline) <= m.config.Timeout {
+			return ctx
+		}
+	}
+	newCtx, _ := context.WithTimeout(ctx, m.config.Timeout)
+	return newCtx
 }
 
 // loadTLSCredentials 加载 TLS 凭证（支持 mTLS）

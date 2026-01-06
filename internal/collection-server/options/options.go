@@ -28,9 +28,10 @@ type Options struct {
 
 // GRPCClientOptions GRPC 客户端配置
 type GRPCClientOptions struct {
-	Endpoint string `json:"endpoint" mapstructure:"endpoint"`
-	Timeout  int    `json:"timeout"  mapstructure:"timeout"`  // 超时时间（秒）
-	Insecure bool   `json:"insecure" mapstructure:"insecure"` // 是否使用不安全连接
+	Endpoint    string `json:"endpoint" mapstructure:"endpoint"`
+	Timeout     int    `json:"timeout"  mapstructure:"timeout"`          // 超时时间（秒）
+	Insecure    bool   `json:"insecure" mapstructure:"insecure"`         // 是否使用不安全连接
+	MaxInflight int    `json:"max_inflight" mapstructure:"max_inflight"` // 最大并发调用数
 
 	// TLS 配置
 	TLSCertFile   string `json:"tls_cert_file"   mapstructure:"tls-cert-file"`   // 客户端证书文件
@@ -118,9 +119,10 @@ func NewOptions() *Options {
 		InsecureServing:         genericoptions.NewInsecureServingOptions(),
 		SecureServing:           genericoptions.NewSecureServingOptions(),
 		GRPCClient: &GRPCClientOptions{
-			Endpoint: "localhost:9090", // apiserver 的 GRPC 端口
-			Timeout:  30,
-			Insecure: true,
+			Endpoint:    "localhost:9090", // apiserver 的 GRPC 端口
+			Timeout:     30,
+			Insecure:    true,
+			MaxInflight: 200,
 		},
 		RedisDualOptions: genericoptions.NewRedisDualOptions(),
 		Concurrency: &ConcurrencyOptions{
@@ -200,6 +202,8 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 		"The timeout for gRPC client requests in seconds.")
 	fs.BoolVar(&g.Insecure, "grpc_client.insecure", g.Insecure,
 		"Whether to use insecure gRPC connection.")
+	fs.IntVar(&g.MaxInflight, "grpc_client.max-inflight", g.MaxInflight,
+		"The maximum number of in-flight gRPC calls.")
 }
 
 // AddFlags 添加并发处理相关的命令行参数
@@ -273,6 +277,9 @@ func (o *Options) Validate() []error {
 	}
 	if o.GRPCClient.Timeout <= 0 {
 		errs = append(errs, fmt.Errorf("grpc_client.timeout must be greater than 0"))
+	}
+	if o.GRPCClient.MaxInflight <= 0 {
+		errs = append(errs, fmt.Errorf("grpc_client.max_inflight must be greater than 0"))
 	}
 
 	// 验证 Redis 配置（cache/store 至少需要配置主机和端口）

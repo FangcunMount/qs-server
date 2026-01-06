@@ -85,6 +85,7 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		s.config.GRPCClient.TLSKeyFile,
 		s.config.GRPCClient.TLSCAFile,
 		s.config.GRPCClient.TLSServerName,
+		s.config.GRPCClient.MaxInflight,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create gRPC client manager: %v", err)

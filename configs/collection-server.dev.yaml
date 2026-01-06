@@ -41,6 +41,7 @@ grpc_client:
   endpoint: "127.0.0.1:9090"
   timeout: 30
   insecure: false  # 启用 TLS 进行 mTLS 测试（insecure=false 表示启用 TLS）
+  max_inflight: 200
   
   # mTLS 客户端配置（使用 infra 项目生成的证书）
   tls-cert-file: "/data/infra/ssl/grpc/server/qs-collection-server.crt"

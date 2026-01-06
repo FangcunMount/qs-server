@@ -42,6 +42,7 @@ grpc_client:
   endpoint: "qs-apiserver:9090"  # Docker 容器服务名
   timeout: 30
   insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
+  max_inflight: 200
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
