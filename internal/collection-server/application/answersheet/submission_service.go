@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 )
 
 // SubmissionService 答卷提交服务
@@ -21,6 +22,7 @@ type SubmissionService struct {
 	answerSheetClient   *grpcclient.AnswerSheetClient
 	actorClient         *grpcclient.ActorClient
 	guardianshipService *iam.GuardianshipService
+	queue               *SubmitQueue
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -28,17 +30,56 @@ func NewSubmissionService(
 	answerSheetClient *grpcclient.AnswerSheetClient,
 	actorClient *grpcclient.ActorClient,
 	guardianshipService *iam.GuardianshipService,
+	queueOptions *options.SubmitQueueOptions,
 ) *SubmissionService {
-	return &SubmissionService{
+	service := &SubmissionService{
 		answerSheetClient:   answerSheetClient,
 		actorClient:         actorClient,
 		guardianshipService: guardianshipService,
 	}
+
+	if queueOptions != nil && queueOptions.Enabled {
+		service.queue = NewSubmitQueue(
+			queueOptions.WorkerCount,
+			queueOptions.QueueSize,
+			time.Duration(queueOptions.WaitTimeoutMs)*time.Millisecond,
+			service.submitSync,
+		)
+	}
+
+	return service
 }
 
 // Submit 提交答卷
 // writerID 来自认证中间件解析的当前用户
 func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+	return s.submitSync(ctx, writerID, req)
+}
+
+// SubmitQueued 提交答卷（带排队）
+func (s *SubmissionService) SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, bool, error) {
+	if s.queue == nil {
+		resp, err := s.submitSync(ctx, writerID, req)
+		return resp, false, err
+	}
+
+	return s.queue.Enqueue(ctx, requestID, writerID, req)
+}
+
+// GetSubmitStatus 获取提交状态
+func (s *SubmissionService) GetSubmitStatus(requestID string) (*SubmitStatusResponse, bool) {
+	if s.queue == nil {
+		return nil, false
+	}
+
+	status, ok := s.queue.GetStatus(requestID)
+	if !ok {
+		return nil, false
+	}
+	return &status, true
+}
+
+func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 

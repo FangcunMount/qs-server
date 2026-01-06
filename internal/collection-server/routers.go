@@ -205,6 +205,14 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.SubmitUserBurst,
 			answerSheetHandler.Submit,
 		)...)
+		answersheets.GET("/submit-status", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			answerSheetHandler.SubmitStatus,
+		)...)
 		answersheets.GET("/:id", rateLimitedHandlers(
 			rateCfg,
 			rateCfg.QueryGlobalQPS,

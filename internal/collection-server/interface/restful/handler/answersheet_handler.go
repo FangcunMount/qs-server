@@ -1,10 +1,15 @@
 package handler
 
 import (
+	"errors"
+	"net/http"
 	"strconv"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
+	uuid "github.com/satori/go.uuid"
 )
 
 // AnswerSheetHandler 答卷处理器
@@ -47,13 +52,68 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		return
 	}
 
-	result, err := h.submissionService.Submit(c.Request.Context(), writerID, &req)
+	requestID := pkgmiddleware.GetRequestIDFromContext(c)
+	if requestID == "" {
+		requestID = pkgmiddleware.GetRequestIDFromHeaders(c)
+	}
+	if requestID == "" {
+		requestID = uuid.Must(uuid.NewV4(), nil).String()
+	}
+
+	result, queued, err := h.submissionService.SubmitQueued(c.Request.Context(), requestID, writerID, &req)
 	if err != nil {
+		if errors.Is(err, answersheet.ErrQueueFull) {
+			c.JSON(http.StatusTooManyRequests, core.ErrResponse{
+				Code:    http.StatusTooManyRequests,
+				Message: "submit queue full",
+			})
+			return
+		}
 		h.InternalErrorResponse(c, "save answer sheet failed", err)
 		return
 	}
 
+	if queued {
+		c.JSON(http.StatusAccepted, core.Response{
+			Code:    0,
+			Message: "accepted",
+			Data: gin.H{
+				"status":     "queued",
+				"request_id": requestID,
+			},
+		})
+		return
+	}
+
 	h.Success(c, result)
+}
+
+// SubmitStatus 查询提交状态
+// @Summary 查询提交状态
+// @Description 根据 request_id 查询提交处理状态
+// @Tags 答卷
+// @Produce json
+// @Param request_id query string true "请求ID"
+// @Success 200 {object} core.Response{data=answersheet.SubmitStatusResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/answersheets/submit-status [get]
+func (h *AnswerSheetHandler) SubmitStatus(c *gin.Context) {
+	requestID := h.GetQueryParam(c, "request_id")
+	if requestID == "" {
+		h.BadRequestResponse(c, "request_id is required", nil)
+		return
+	}
+
+	status, ok := h.submissionService.GetSubmitStatus(requestID)
+	if !ok {
+		h.NotFoundResponse(c, "submit status not found", nil)
+		return
+	}
+
+	h.Success(c, status)
 }
 
 // Get 获取答卷详情

@@ -62,6 +62,13 @@ type SubmitAnswerSheetResponse struct {
 	Message string `json:"message"`
 }
 
+// SubmitStatusResponse 提交状态响应
+type SubmitStatusResponse struct {
+	Status        string `json:"status"`
+	AnswerSheetID string `json:"answersheet_id,omitempty"`
+	UpdatedAt     int64  `json:"updated_at"`
+}
+
 // GetAnswerSheetRequest 获取答卷请求
 type GetAnswerSheetRequest struct {
 	ID uint64 `uri:"id" binding:"required"`
