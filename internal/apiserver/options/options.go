@@ -84,37 +84,45 @@ func NewBackpressureOptions() *BackpressureOptions {
 
 // RateLimitOptions 限流配置
 type RateLimitOptions struct {
-	Enabled               bool    `json:"enabled" mapstructure:"enabled"`
-	SubmitGlobalQPS       float64 `json:"submit_global_qps" mapstructure:"submit_global_qps"`
-	SubmitGlobalBurst     int     `json:"submit_global_burst" mapstructure:"submit_global_burst"`
-	SubmitUserQPS         float64 `json:"submit_user_qps" mapstructure:"submit_user_qps"`
-	SubmitUserBurst       int     `json:"submit_user_burst" mapstructure:"submit_user_burst"`
-	QueryGlobalQPS        float64 `json:"query_global_qps" mapstructure:"query_global_qps"`
-	QueryGlobalBurst      int     `json:"query_global_burst" mapstructure:"query_global_burst"`
-	QueryUserQPS          float64 `json:"query_user_qps" mapstructure:"query_user_qps"`
-	QueryUserBurst        int     `json:"query_user_burst" mapstructure:"query_user_burst"`
-	WaitReportGlobalQPS   float64 `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
-	WaitReportGlobalBurst int     `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
-	WaitReportUserQPS     float64 `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
-	WaitReportUserBurst   int     `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
+	Enabled                bool    `json:"enabled" mapstructure:"enabled"`
+	SubmitGlobalQPS        float64 `json:"submit_global_qps" mapstructure:"submit_global_qps"`
+	SubmitGlobalBurst      int     `json:"submit_global_burst" mapstructure:"submit_global_burst"`
+	SubmitUserQPS          float64 `json:"submit_user_qps" mapstructure:"submit_user_qps"`
+	SubmitUserBurst        int     `json:"submit_user_burst" mapstructure:"submit_user_burst"`
+	AdminSubmitGlobalQPS   float64 `json:"admin_submit_global_qps" mapstructure:"admin_submit_global_qps"`
+	AdminSubmitGlobalBurst int     `json:"admin_submit_global_burst" mapstructure:"admin_submit_global_burst"`
+	AdminSubmitUserQPS     float64 `json:"admin_submit_user_qps" mapstructure:"admin_submit_user_qps"`
+	AdminSubmitUserBurst   int     `json:"admin_submit_user_burst" mapstructure:"admin_submit_user_burst"`
+	QueryGlobalQPS         float64 `json:"query_global_qps" mapstructure:"query_global_qps"`
+	QueryGlobalBurst       int     `json:"query_global_burst" mapstructure:"query_global_burst"`
+	QueryUserQPS           float64 `json:"query_user_qps" mapstructure:"query_user_qps"`
+	QueryUserBurst         int     `json:"query_user_burst" mapstructure:"query_user_burst"`
+	WaitReportGlobalQPS    float64 `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
+	WaitReportGlobalBurst  int     `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
+	WaitReportUserQPS      float64 `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
+	WaitReportUserBurst    int     `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
 }
 
 // NewRateLimitOptions 创建默认限流配置
 func NewRateLimitOptions() *RateLimitOptions {
 	return &RateLimitOptions{
-		Enabled:               true,
-		SubmitGlobalQPS:       200,
-		SubmitGlobalBurst:     300,
-		SubmitUserQPS:         5,
-		SubmitUserBurst:       10,
-		QueryGlobalQPS:        200,
-		QueryGlobalBurst:      300,
-		QueryUserQPS:          10,
-		QueryUserBurst:        20,
-		WaitReportGlobalQPS:   80,
-		WaitReportGlobalBurst: 120,
-		WaitReportUserQPS:     2,
-		WaitReportUserBurst:   5,
+		Enabled:                true,
+		SubmitGlobalQPS:        200,
+		SubmitGlobalBurst:      300,
+		SubmitUserQPS:          5,
+		SubmitUserBurst:        10,
+		AdminSubmitGlobalQPS:   400,
+		AdminSubmitGlobalBurst: 600,
+		AdminSubmitUserQPS:     20,
+		AdminSubmitUserBurst:   40,
+		QueryGlobalQPS:         200,
+		QueryGlobalBurst:       300,
+		QueryUserQPS:           10,
+		QueryUserBurst:         20,
+		WaitReportGlobalQPS:    80,
+		WaitReportGlobalBurst:  120,
+		WaitReportUserQPS:      2,
+		WaitReportUserBurst:    5,
 	}
 }
 
@@ -145,6 +153,10 @@ func (r *RateLimitOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&r.SubmitGlobalBurst, "rate_limit.submit-global-burst", r.SubmitGlobalBurst, "Global burst for submit.")
 	fs.Float64Var(&r.SubmitUserQPS, "rate_limit.submit-user-qps", r.SubmitUserQPS, "Per-user QPS limit for submit.")
 	fs.IntVar(&r.SubmitUserBurst, "rate_limit.submit-user-burst", r.SubmitUserBurst, "Per-user burst for submit.")
+	fs.Float64Var(&r.AdminSubmitGlobalQPS, "rate_limit.admin-submit-global-qps", r.AdminSubmitGlobalQPS, "Global QPS limit for admin submit.")
+	fs.IntVar(&r.AdminSubmitGlobalBurst, "rate_limit.admin-submit-global-burst", r.AdminSubmitGlobalBurst, "Global burst for admin submit.")
+	fs.Float64Var(&r.AdminSubmitUserQPS, "rate_limit.admin-submit-user-qps", r.AdminSubmitUserQPS, "Per-user QPS limit for admin submit.")
+	fs.IntVar(&r.AdminSubmitUserBurst, "rate_limit.admin-submit-user-burst", r.AdminSubmitUserBurst, "Per-user burst for admin submit.")
 	fs.Float64Var(&r.QueryGlobalQPS, "rate_limit.query-global-qps", r.QueryGlobalQPS, "Global QPS limit for queries.")
 	fs.IntVar(&r.QueryGlobalBurst, "rate_limit.query-global-burst", r.QueryGlobalBurst, "Global burst for queries.")
 	fs.Float64Var(&r.QueryUserQPS, "rate_limit.query-user-qps", r.QueryUserQPS, "Per-user QPS limit for queries.")

@@ -169,6 +169,10 @@ rate_limit:
   submit_global_burst: 300
   submit_user_qps: 5
   submit_user_burst: 10
+  admin_submit_global_qps: 400
+  admin_submit_global_burst: 600
+  admin_submit_user_qps: 20
+  admin_submit_user_burst: 40
   query_global_qps: 200
   query_global_burst: 300
   query_user_qps: 10

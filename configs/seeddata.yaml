@@ -2,6 +2,10 @@ api:
   baseUrl: "https://qs.yangshujie.com"
   collectionBaseUrl: "https://collect.yangshujie.com"
   token: ""
+  retry:
+    maxRetries: 3
+    minDelay: "200ms"
+    maxDelay: "5s"
 
 iam:
   loginUrl: "https://iam.yangshujie.com/api/v1/authn/login"

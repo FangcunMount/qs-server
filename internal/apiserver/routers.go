@@ -191,10 +191,10 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 		// 管理接口
 		answersheets.POST("/admin-submit", r.rateLimitedHandlers(
 			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
+			r.rateCfg.AdminSubmitGlobalQPS,
+			r.rateCfg.AdminSubmitGlobalBurst,
+			r.rateCfg.AdminSubmitUserQPS,
+			r.rateCfg.AdminSubmitUserBurst,
 			answersheetHandler.AdminSubmit,
 		)...)
 		answersheets.GET("/:id", r.rateLimitedHandlers(
