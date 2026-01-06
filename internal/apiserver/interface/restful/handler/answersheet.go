@@ -146,11 +146,6 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 // @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/answersheets/admin-submit [post]
 func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
-	if !h.HasRole(c, "admin") {
-		h.ForbiddenResponse(c, "admin role required")
-		return
-	}
-
 	var req request.AdminSubmitAnswerSheetRequest
 	if err := h.BindJSON(c, &req); err != nil {
 		return
