@@ -196,6 +196,7 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	// 初始化 handler 层
 	sub.Handler = handler.NewAnswerSheetHandler(
 		sub.ManagementService,
+		sub.SubmissionService,
 	)
 
 	return nil

@@ -67,6 +67,7 @@ go run ./cmd/tools/seeddata \
 - 仅对 **医学量表** 对应的问卷提交答卷。
 - 仅支持 `Section` 与 `Radio` 题型自动填充。
 - 使用 apiserver 的测试者列表接口，需要在 `seeddata.yaml` 中配置 `global.orgId`。
+- `testee-page-size` 最大为 100（受 apiserver 参数校验限制）。
 - token 为空时会使用 `iam` 配置登录并自动刷新 token。
 
 ## 配置文件示例

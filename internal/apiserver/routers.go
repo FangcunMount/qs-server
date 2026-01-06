@@ -182,8 +182,9 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 	answersheets := apiV1.Group("/answersheets")
 	{
 		// 管理接口
-		answersheets.GET("/:id", answersheetHandler.GetByID) // 获取答卷详情
-		answersheets.GET("", answersheetHandler.List)        // 获取答卷列表
+		answersheets.POST("/admin-submit", answersheetHandler.AdminSubmit) // 管理员提交答卷
+		answersheets.GET("/:id", answersheetHandler.GetByID)               // 获取答卷详情
+		answersheets.GET("", answersheetHandler.List)                      // 获取答卷列表
 		// 统计接口已迁移到 /api/v1/statistics/questionnaires/:code
 	}
 }

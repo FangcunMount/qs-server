@@ -85,7 +85,7 @@ func main() {
 		assessmentMin        = flag.Int("assessment-min", 3, "Minimum assessments per testee")
 		assessmentMax        = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers    = flag.Int("assessment-workers", 8, "Concurrent workers for assessment seeding")
-		testeePageSize       = flag.Int("testee-page-size", 200, "Page size when listing testees for assessment seeding")
+		testeePageSize       = flag.Int("testee-page-size", 100, "Page size when listing testees for assessment seeding")
 		testeeOffset         = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
 		testeeLimit          = flag.Int("testee-limit", 0, "Maximum number of testees to process for assessment seeding (0 = no limit)")
 		assessmentCategories = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")

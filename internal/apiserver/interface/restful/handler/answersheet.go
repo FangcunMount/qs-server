@@ -20,14 +20,17 @@ import (
 type AnswerSheetHandler struct {
 	BaseHandler
 	managementService answersheet.AnswerSheetManagementService
+	submissionService answersheet.AnswerSheetSubmissionService
 }
 
 // NewAnswerSheetHandler 创建答卷处理器
 func NewAnswerSheetHandler(
 	managementService answersheet.AnswerSheetManagementService,
+	submissionService answersheet.AnswerSheetSubmissionService,
 ) *AnswerSheetHandler {
 	return &AnswerSheetHandler{
 		managementService: managementService,
+		submissionService: submissionService,
 	}
 }
 
@@ -125,4 +128,69 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewAnswerSheetSummaryListResponse(result))
+}
+
+// AdminSubmit 管理员提交答卷
+// @Summary 管理员提交答卷
+// @Description 管理员绕过监护关系校验提交答卷
+// @Tags AnswerSheet-Management
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.AdminSubmitAnswerSheetRequest true "答卷数据"
+// @Success 200 {object} core.Response{data=response.AnswerSheetResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /api/v1/answersheets/admin-submit [post]
+func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
+	if !h.HasRole(c, "admin") {
+		h.ForbiddenResponse(c, "admin role required")
+		return
+	}
+
+	var req request.AdminSubmitAnswerSheetRequest
+	if err := h.BindJSON(c, &req); err != nil {
+		return
+	}
+
+	fillerID := req.FillerID
+	if fillerID == 0 {
+		fillerID = req.WriterID
+	}
+	if fillerID == 0 {
+		userID, ok := h.GetUserIDUint64(c)
+		if !ok || userID == 0 {
+			h.UnauthorizedResponse(c, "user not authenticated")
+			return
+		}
+		fillerID = userID
+	}
+
+	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
+	for _, a := range req.Answers {
+		answers = append(answers, answersheet.AnswerDTO{
+			QuestionCode: a.QuestionCode,
+			QuestionType: a.QuestionType,
+			Value:        a.Value,
+		})
+	}
+
+	dto := answersheet.SubmitAnswerSheetDTO{
+		QuestionnaireCode: req.QuestionnaireCode,
+		QuestionnaireVer:  req.QuestionnaireVersion,
+		TesteeID:          req.TesteeID,
+		OrgID:             h.GetOrgIDWithDefault(c),
+		FillerID:          fillerID,
+		Answers:           answers,
+	}
+
+	result, err := h.submissionService.Submit(c.Request.Context(), dto)
+	if err != nil {
+		h.InternalErrorResponse(c, "submit answer sheet failed", err)
+		return
+	}
+
+	h.Success(c, response.NewAnswerSheetResponse(result))
 }

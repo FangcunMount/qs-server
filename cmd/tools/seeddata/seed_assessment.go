@@ -53,6 +53,7 @@ func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedConte
 	var submittedCount int64
 	var skippedCount int64
 	var processedTesteeCount int64
+	var errorLogCount int64
 
 	taskCh := make(chan *TesteeResponse, workerCount*4)
 	var wg sync.WaitGroup
@@ -71,7 +72,7 @@ func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedConte
 
 	startAssessmentWorkers(ctx, &wg, taskCh, workerCount, assessmentWorkerConfig{
 		logger:             logger,
-		client:             client,
+		client:             deps.APIClient,
 		minPerTestee:       minPerTestee,
 		maxPerTestee:       maxPerTestee,
 		targets:            targets,
@@ -80,6 +81,7 @@ func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedConte
 		errorCount:         &errorCount,
 		submittedCount:     &submittedCount,
 		skippedCount:       &skippedCount,
+		errorLogCount:      &errorLogCount,
 	})
 
 	err = iterateTesteesFromApiserver(ctx, deps.APIClient, orgID, testeePageSize, testeeOffset, testeeLimit, func(testees []*TesteeResponse) error {
@@ -118,6 +120,7 @@ type assessmentWorkerConfig struct {
 	errorCount         *int64
 	submittedCount     *int64
 	skippedCount       *int64
+	errorLogCount      *int64
 }
 
 func startAssessmentWorkers(
@@ -200,6 +203,15 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 
 		if err := submitAnswerSheet(ctx, cfg.client, req); err != nil {
 			cfg.logger.Warnw("Failed to submit answer sheet", "testee_id", testee.ID, "questionnaire", target.QuestionnaireCode, "error", err)
+			if atomic.AddInt64(cfg.errorLogCount, 1) <= 3 {
+				cfg.logger.Warnw("Submit payload preview",
+					"testee_id", testee.ID,
+					"questionnaire", target.QuestionnaireCode,
+					"questionnaire_version", req.QuestionnaireVersion,
+					"answer_count", len(req.Answers),
+					"answers", previewAnswers(req.Answers),
+				)
+			}
 			atomic.AddInt64(cfg.errorCount, 1)
 			continue
 		}
@@ -208,7 +220,14 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 }
 
 func submitAnswerSheet(ctx context.Context, client *APIClient, req SubmitAnswerSheetRequest) error {
-	_, err := client.SubmitAnswerSheet(ctx, req)
+	adminReq := AdminSubmitAnswerSheetRequest{
+		QuestionnaireCode:    req.QuestionnaireCode,
+		QuestionnaireVersion: req.QuestionnaireVersion,
+		Title:                req.Title,
+		TesteeID:             req.TesteeID,
+		Answers:              req.Answers,
+	}
+	_, err := client.SubmitAnswerSheetAdmin(ctx, adminReq)
 	return err
 }
 
@@ -232,7 +251,10 @@ func normalizeWorkerCount(workerCount int) int {
 
 func normalizeTesteePageSize(pageSize int) int {
 	if pageSize <= 0 {
-		return 200
+		return 100
+	}
+	if pageSize > 100 {
+		return 100
 	}
 	return pageSize
 }
@@ -510,4 +532,23 @@ func parseCategories(raw string) []string {
 		items = append(items, val)
 	}
 	return items
+}
+
+func previewAnswers(answers []Answer) []map[string]string {
+	const maxPreview = 3
+	if len(answers) == 0 {
+		return nil
+	}
+	n := len(answers)
+	if n > maxPreview {
+		n = maxPreview
+	}
+	out := make([]map[string]string, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, map[string]string{
+			"question_code": answers[i].QuestionCode,
+			"value":         answers[i].Value,
+		})
+	}
+	return out
 }

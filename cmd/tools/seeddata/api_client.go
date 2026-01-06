@@ -257,6 +257,17 @@ type SubmitAnswerSheetRequest struct {
 	Answers              []Answer `json:"answers"`
 }
 
+// AdminSubmitAnswerSheetRequest 管理员提交答卷请求（apiserver）
+type AdminSubmitAnswerSheetRequest struct {
+	QuestionnaireCode    string   `json:"questionnaire_code"`
+	QuestionnaireVersion string   `json:"questionnaire_version"`
+	Title                string   `json:"title"`
+	TesteeID             uint64   `json:"testee_id"`
+	WriterID             uint64   `json:"writer_id,omitempty"`
+	FillerID             uint64   `json:"filler_id,omitempty"`
+	Answers              []Answer `json:"answers"`
+}
+
 // Answer 提交答案（collection-server）
 type Answer struct {
 	QuestionCode string `json:"question_code"`
@@ -322,7 +333,11 @@ func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string,
 				}
 				return nil, fmt.Errorf("authentication failed (401): please check your API token. message=%s", apiResp.Message)
 			}
-			return nil, fmt.Errorf("api error: http_status=%d, code=%d, message=%s", resp.StatusCode, apiResp.Code, apiResp.Message)
+			bodyStr := string(respBody)
+			if len(bodyStr) > 200 {
+				bodyStr = bodyStr[:200] + "..."
+			}
+			return nil, fmt.Errorf("api error: http_status=%d, code=%d, message=%s, body=%s", resp.StatusCode, apiResp.Code, apiResp.Message, bodyStr)
 		}
 		// 无法解析为 JSON（可能是 HTML 错误页面），返回原始响应
 		bodyStr := string(respBody)
@@ -728,6 +743,26 @@ func (c *APIClient) GetQuestionnaireDetail(ctx context.Context, code string) (*Q
 // SubmitAnswerSheet 提交答卷（collection-server）
 func (c *APIClient) SubmitAnswerSheet(ctx context.Context, req SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	resp, err := c.doRequest(ctx, "POST", "/api/v1/answersheets", req)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var submitResp SubmitAnswerSheetResponse
+	if err := json.Unmarshal(dataBytes, &submitResp); err != nil {
+		return nil, fmt.Errorf("unmarshal submit response: %w", err)
+	}
+
+	return &submitResp, nil
+}
+
+// SubmitAnswerSheetAdmin 管理员提交答卷（apiserver）
+func (c *APIClient) SubmitAnswerSheetAdmin(ctx context.Context, req AdminSubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/answersheets/admin-submit", req)
 	if err != nil {
 		return nil, err
 	}
