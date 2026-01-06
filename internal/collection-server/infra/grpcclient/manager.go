@@ -126,7 +126,10 @@ func (m *Manager) unaryInterceptor(
 	opts ...grpc.CallOption,
 ) error {
 	// 创建带超时的 context
-	ctx = m.withTimeout(ctx)
+	ctx, cancel := m.withTimeout(ctx)
+	if cancel != nil {
+		defer cancel()
+	}
 
 	if m.inflight != nil {
 		select {
@@ -141,20 +144,20 @@ func (m *Manager) unaryInterceptor(
 }
 
 // withTimeout 创建带超时的 context
-func (m *Manager) withTimeout(ctx context.Context) context.Context {
+func (m *Manager) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if m.config.Timeout <= 0 {
-		return ctx
+		return ctx, nil
 	}
 	if deadline, ok := ctx.Deadline(); ok {
 		if time.Until(deadline) <= m.config.Timeout {
-			return ctx
+			return ctx, nil
 		}
 	}
-	newCtx, _ := context.WithTimeout(ctx, m.config.Timeout)
-	return newCtx
+	newCtx, cancel := context.WithTimeout(ctx, m.config.Timeout)
+	return newCtx, cancel
 }
 
 // loadTLSCredentials 加载 TLS 凭证（支持 mTLS）

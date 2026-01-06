@@ -160,7 +160,7 @@ func (r *BaseRepository[T]) ExistsByID(ctx context.Context, id uint64) (bool, er
 
 	var count int64
 	var entity T
-	err := r.db.WithContext(ctx).Model(&entity).Where("id = ?", id).Count(&count).Error
+	err = r.db.WithContext(ctx).Model(&entity).Where("id = ?", id).Count(&count).Error
 	if err != nil {
 		return false, err
 	}
