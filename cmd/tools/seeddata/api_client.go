@@ -268,12 +268,18 @@ type AdminSubmitAnswerSheetRequest struct {
 	Answers              []Answer `json:"answers"`
 }
 
-// Answer 提交答案（collection-server）
+// Answer 提交答案
+// 注意：Value 使用 interface{} 类型，以支持不同类型的问题答案：
+// - Radio: string (选项 code)
+// - Checkbox: []string (选项 code 数组)
+// - Text/Textarea: string
+// - Number: number (float64)
+// 注意：Score 字段在 admin-submit 接口中会被忽略，但保留以兼容其他接口
 type Answer struct {
-	QuestionCode string `json:"question_code"`
-	QuestionType string `json:"question_type"`
-	Score        uint32 `json:"score"`
-	Value        string `json:"value"`
+	QuestionCode string      `json:"question_code"`
+	QuestionType string      `json:"question_type"`
+	Score        uint32      `json:"score,omitempty"` // 使用 omitempty，避免发送不必要的字段
+	Value        interface{} `json:"value"`
 }
 
 // SubmitAnswerSheetResponse 提交答卷响应（collection-server）
@@ -333,9 +339,19 @@ func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string,
 				}
 				return nil, fmt.Errorf("authentication failed (401): please check your API token. message=%s", apiResp.Message)
 			}
+			// 对于 500 错误，打印完整的响应体以便调试
 			bodyStr := string(respBody)
-			if len(bodyStr) > 200 {
-				bodyStr = bodyStr[:200] + "..."
+			if resp.StatusCode == http.StatusInternalServerError {
+				// 500 错误时打印完整响应
+				c.logger.Warnw("API returned 500 error",
+					"url", url,
+					"code", apiResp.Code,
+					"message", apiResp.Message,
+					"full_response", bodyStr,
+				)
+			}
+			if len(bodyStr) > 500 {
+				bodyStr = bodyStr[:500] + "..."
 			}
 			return nil, fmt.Errorf("api error: http_status=%d, code=%d, message=%s, body=%s", resp.StatusCode, apiResp.Code, apiResp.Message, bodyStr)
 		}
@@ -778,4 +794,74 @@ func (c *APIClient) SubmitAnswerSheetAdmin(ctx context.Context, req AdminSubmitA
 	}
 
 	return &submitResp, nil
+}
+
+// ============= Assessment 相关类型和接口 =============
+
+// CreateAssessmentRequest 创建测评请求（apiserver）
+type CreateAssessmentRequest struct {
+	TesteeID             uint64  `json:"testee_id"`
+	QuestionnaireCode    string  `json:"questionnaire_code"`
+	QuestionnaireVersion string  `json:"questionnaire_version"`
+	AnswerSheetID        uint64  `json:"answer_sheet_id"`
+	MedicalScaleID       *uint64 `json:"medical_scale_id,omitempty"`
+	MedicalScaleCode     *string `json:"medical_scale_code,omitempty"`
+	MedicalScaleName     *string `json:"medical_scale_name,omitempty"`
+	OriginType           string  `json:"origin_type"`
+	OriginID             *string `json:"origin_id,omitempty"`
+}
+
+// SubmitAssessmentRequest 提交测评请求（apiserver）
+type SubmitAssessmentRequest struct {
+	AssessmentID uint64 `json:"assessment_id"`
+}
+
+// AssessmentResponse 测评响应（apiserver）
+type AssessmentResponse struct {
+	ID                string   `json:"id"`
+	TesteeID          string   `json:"testee_id"`
+	QuestionnaireCode string   `json:"questionnaire_code"`
+	Status            string   `json:"status"`
+	TotalScore        *float64 `json:"total_score,omitempty"`
+	RiskLevel         *string  `json:"risk_level,omitempty"`
+}
+
+// CreateAssessment 创建测评（apiserver）
+func (c *APIClient) CreateAssessment(ctx context.Context, req CreateAssessmentRequest) (*AssessmentResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/evaluations/assessments", req)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var assessmentResp AssessmentResponse
+	if err := json.Unmarshal(dataBytes, &assessmentResp); err != nil {
+		return nil, fmt.Errorf("unmarshal assessment response: %w", err)
+	}
+
+	return &assessmentResp, nil
+}
+
+// SubmitAssessment 提交测评（apiserver）
+func (c *APIClient) SubmitAssessment(ctx context.Context, req SubmitAssessmentRequest) (*AssessmentResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/evaluations/assessments/submit", req)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var assessmentResp AssessmentResponse
+	if err := json.Unmarshal(dataBytes, &assessmentResp); err != nil {
+		return nil, fmt.Errorf("unmarshal assessment response: %w", err)
+	}
+
+	return &assessmentResp, nil
 }

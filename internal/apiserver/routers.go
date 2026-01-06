@@ -259,7 +259,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	evaluations := apiV1.Group("/evaluations")
 	{
-		// ==================== Assessment 查询路由（后台管理）====================
+		// ==================== Assessment 路由 =====================
 		assessments := evaluations.Group("/assessments")
 		{
 			// 查询

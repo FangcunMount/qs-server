@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -9,11 +10,17 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/FangcunMount/component-base/pkg/log"
 )
 
 const (
-	questionTypeRadio   = "Radio"
-	questionTypeSection = "Section"
+	questionTypeRadio    = "Radio"
+	questionTypeCheckbox = "Checkbox"
+	questionTypeText     = "Text"
+	questionTypeTextarea = "Textarea"
+	questionTypeNumber   = "Number"
+	questionTypeSection  = "Section"
 
 	questionnaireTypeMedicalScale = "MedicalScale"
 )
@@ -110,6 +117,7 @@ type assessmentWorkerConfig struct {
 	logger interface {
 		Debugw(string, ...interface{})
 		Warnw(string, ...interface{})
+		Infow(string, ...interface{})
 	}
 	client             *APIClient
 	minPerTestee       int
@@ -158,6 +166,7 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 			atomic.AddInt64(cfg.skippedCount, 1)
 			continue
 		}
+		debugLogQuestionnaire(detail, cfg.logger)
 		if detail.Type != questionnaireTypeMedicalScale {
 			cfg.logger.Warnw("Questionnaire is not medical scale, skipping", "code", target.QuestionnaireCode, "type", detail.Type)
 			atomic.AddInt64(cfg.skippedCount, 1)
@@ -173,11 +182,31 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 			continue
 		}
 
+		// 打印问卷详细信息
+		// logQuestionnaireDetail(cfg.logger, detail, target)
+
 		answers := buildAnswers(detail, rng)
 		if len(answers) == 0 {
-			cfg.logger.Warnw("No supported answers generated, skipping questionnaire", "code", target.QuestionnaireCode, "testee_id", testee.ID)
+			cfg.logger.Warnw("No supported answers generated, skipping questionnaire",
+				"code", target.QuestionnaireCode,
+				"testee_id", testee.ID,
+				"question_types", collectQuestionTypes(detail),
+			)
 			atomic.AddInt64(cfg.skippedCount, 1)
 			continue
+		}
+
+		// 打印组织好的答卷信息
+		logBuiltAnswers(cfg.logger, answers, target.QuestionnaireCode, testee.ID)
+
+		// 验证答案是否有效
+		if invalidAnswers := validateAnswers(detail, answers); len(invalidAnswers) > 0 {
+			cfg.logger.Warnw("Invalid answers detected",
+				"questionnaire_code", target.QuestionnaireCode,
+				"testee_id", testee.ID,
+				"invalid_count", len(invalidAnswers),
+				"invalid_answers", invalidAnswers,
+			)
 		}
 
 		testeeID := parseID(testee.ID)
@@ -201,6 +230,9 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 			Answers:              answers,
 		}
 
+		// 打印提交的答卷信息
+		logSubmitRequest(cfg.logger, req, testee.ID)
+
 		if err := submitAnswerSheet(ctx, cfg.client, req); err != nil {
 			cfg.logger.Warnw("Failed to submit answer sheet", "testee_id", testee.ID, "questionnaire", target.QuestionnaireCode, "error", err)
 			if atomic.AddInt64(cfg.errorLogCount, 1) <= 3 {
@@ -215,6 +247,7 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 			atomic.AddInt64(cfg.errorCount, 1)
 			continue
 		}
+		// 提交成功后，系统会自动通过事件创建 Assessment
 		atomic.AddInt64(cfg.submittedCount, 1)
 	}
 }
@@ -227,8 +260,196 @@ func submitAnswerSheet(ctx context.Context, client *APIClient, req SubmitAnswerS
 		TesteeID:             req.TesteeID,
 		Answers:              req.Answers,
 	}
+
+	// 打印实际发送的 JSON 数据用于调试
+	if jsonData, err := json.Marshal(adminReq); err == nil {
+		logger := log.L(ctx)
+		logger.Infow("Actual JSON payload being sent",
+			"questionnaire_code", req.QuestionnaireCode,
+			"json_payload", string(jsonData),
+		)
+	}
+
 	_, err := client.SubmitAnswerSheetAdmin(ctx, adminReq)
 	return err
+}
+
+// logQuestionnaireDetail 打印问卷详细信息
+func logQuestionnaireDetail(logger interface{ Infow(string, ...interface{}) }, detail *QuestionnaireDetailResponse, target scaleTarget) {
+	questions := make([]map[string]interface{}, 0, len(detail.Questions))
+	for _, q := range detail.Questions {
+		options := make([]map[string]string, 0, len(q.Options))
+		for _, opt := range q.Options {
+			options = append(options, map[string]string{
+				"code":    opt.Code,
+				"content": opt.Content,
+				"score":   fmt.Sprintf("%d", opt.Score),
+			})
+		}
+		questions = append(questions, map[string]interface{}{
+			"code":    q.Code,
+			"type":    q.Type,
+			"title":   truncateString(q.Title, 50),
+			"options": options,
+		})
+	}
+
+	logger.Infow("Questionnaire detail",
+		"questionnaire_code", detail.Code,
+		"questionnaire_version", detail.Version,
+		"title", detail.Title,
+		"type", detail.Type,
+		"question_count", len(detail.Questions),
+		"questions", questions,
+	)
+}
+
+// logBuiltAnswers 打印组织好的答卷信息
+func logBuiltAnswers(logger interface{ Infow(string, ...interface{}) }, answers []Answer, questionnaireCode, testeeID string) {
+	answerDetails := make([]map[string]interface{}, 0, len(answers))
+	for _, a := range answers {
+		valueStr := formatAnswerValue(a.Value)
+		answerDetails = append(answerDetails, map[string]interface{}{
+			"question_code": a.QuestionCode,
+			"question_type": a.QuestionType,
+			"value":         valueStr,
+			"value_type":    fmt.Sprintf("%T", a.Value),
+			"score":         a.Score,
+		})
+	}
+
+	logger.Infow("Built answers",
+		"questionnaire_code", questionnaireCode,
+		"testee_id", testeeID,
+		"answer_count", len(answers),
+		"answers", answerDetails,
+	)
+}
+
+// logSubmitRequest 打印提交的答卷信息
+func logSubmitRequest(logger interface{ Infow(string, ...interface{}) }, req SubmitAnswerSheetRequest, testeeIDStr string) {
+	answerDetails := make([]map[string]interface{}, 0, len(req.Answers))
+	for _, a := range req.Answers {
+		valueStr := formatAnswerValue(a.Value)
+		answerDetails = append(answerDetails, map[string]interface{}{
+			"question_code": a.QuestionCode,
+			"question_type": a.QuestionType,
+			"value":         valueStr,
+			"value_type":    fmt.Sprintf("%T", a.Value),
+			"score":         a.Score,
+		})
+	}
+
+	logger.Infow("Submit answer sheet request",
+		"testee_id", testeeIDStr,
+		"testee_id_uint64", req.TesteeID,
+		"questionnaire_code", req.QuestionnaireCode,
+		"questionnaire_version", req.QuestionnaireVersion,
+		"title", req.Title,
+		"answer_count", len(req.Answers),
+		"answers", answerDetails,
+	)
+}
+
+// validateAnswers 验证答案是否在问卷的选项中存在
+func validateAnswers(detail *QuestionnaireDetailResponse, answers []Answer) []map[string]interface{} {
+	// 构建问题编码到选项的映射
+	questionMap := make(map[string]map[string]bool) // question_code -> {option_code: true, ...}
+	for _, q := range detail.Questions {
+		optionSet := make(map[string]bool)
+		for _, opt := range q.Options {
+			if opt.Code != "" {
+				optionSet[opt.Code] = true
+			}
+			if opt.Content != "" {
+				optionSet[opt.Content] = true
+			}
+		}
+		questionMap[q.Code] = optionSet
+	}
+
+	invalidAnswers := make([]map[string]interface{}, 0)
+	for _, answer := range answers {
+		optionSet, exists := questionMap[answer.QuestionCode]
+		if !exists {
+			invalidAnswers = append(invalidAnswers, map[string]interface{}{
+				"question_code": answer.QuestionCode,
+				"reason":        "question not found in questionnaire",
+			})
+			continue
+		}
+
+		// 检查答案值是否在选项中
+		var valueStr string
+		switch v := answer.Value.(type) {
+		case string:
+			valueStr = v
+		case []string:
+			// 对于多选题，检查所有选项
+			for _, val := range v {
+				if !optionSet[val] {
+					invalidAnswers = append(invalidAnswers, map[string]interface{}{
+						"question_code": answer.QuestionCode,
+						"value":         val,
+						"reason":        "option not found in question",
+					})
+				}
+			}
+			continue
+		default:
+			valueStr = formatAnswerValue(v)
+		}
+
+		if !optionSet[valueStr] {
+			invalidAnswers = append(invalidAnswers, map[string]interface{}{
+				"question_code":     answer.QuestionCode,
+				"value":             valueStr,
+				"reason":            "option not found in question",
+				"available_options": getQuestionOptions(detail, answer.QuestionCode),
+			})
+		}
+	}
+
+	return invalidAnswers
+}
+
+// getQuestionOptions 获取问题的所有选项
+func getQuestionOptions(detail *QuestionnaireDetailResponse, questionCode string) []string {
+	for _, q := range detail.Questions {
+		if q.Code == questionCode {
+			options := make([]string, 0, len(q.Options))
+			for _, opt := range q.Options {
+				if opt.Code != "" {
+					options = append(options, opt.Code)
+				} else if opt.Content != "" {
+					options = append(options, opt.Content)
+				}
+			}
+			return options
+		}
+	}
+	return nil
+}
+
+// formatAnswerValue 格式化答案值用于日志输出
+func formatAnswerValue(value interface{}) string {
+	if value == nil {
+		return "<nil>"
+	}
+	switch v := value.(type) {
+	case string:
+		return v
+	case []string:
+		return fmt.Sprintf("%v", v)
+	case float64:
+		return fmt.Sprintf("%.0f", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	default:
+		return fmt.Sprintf("%v (type: %T)", v, v)
+	}
 }
 
 func enqueueTestees(ctx context.Context, taskCh chan<- *TesteeResponse, testees []*TesteeResponse) error {
@@ -480,8 +701,12 @@ func buildAnswers(q *QuestionnaireDetailResponse, rng *rand.Rand) []Answer {
 }
 
 func buildAnswerForQuestion(question QuestionResponse, rng *rand.Rand) (Answer, bool) {
-	switch question.Type {
-	case questionTypeRadio:
+	resolvedType := resolveQuestionType(question)
+	normalizedType := normalizeQuestionType(resolvedType)
+
+	switch normalizedType {
+	case strings.ToLower(questionTypeRadio):
+		// 单选题：随机选择一个选项
 		if len(question.Options) == 0 {
 			return Answer{}, false
 		}
@@ -495,18 +720,85 @@ func buildAnswerForQuestion(question QuestionResponse, rng *rand.Rand) (Answer, 
 		}
 		return Answer{
 			QuestionCode: question.Code,
-			QuestionType: question.Type,
+			QuestionType: questionTypeRadio,
 			Score:        0,
 			Value:        value,
 		}, true
-	case questionTypeSection:
+
+	case strings.ToLower(questionTypeCheckbox):
+		// 多选题：随机选择 1-3 个选项
+		if len(question.Options) == 0 {
+			return Answer{}, false
+		}
+		count := rng.Intn(3) + 1 // 1-3 个选项
+		if count > len(question.Options) {
+			count = len(question.Options)
+		}
+
+		// 随机选择选项
+		selectedIndices := make(map[int]bool)
+		selectedValues := make([]string, 0, count)
+		for len(selectedValues) < count {
+			idx := rng.Intn(len(question.Options))
+			if !selectedIndices[idx] {
+				selectedIndices[idx] = true
+				opt := question.Options[idx]
+				value := opt.Code
+				if value == "" {
+					value = opt.Content
+				}
+				if value != "" {
+					selectedValues = append(selectedValues, value)
+				}
+			}
+		}
+
+		if len(selectedValues) == 0 {
+			return Answer{}, false
+		}
+
+		// 直接使用数组，JSON 序列化时会自动处理
 		return Answer{
 			QuestionCode: question.Code,
-			QuestionType: question.Type,
+			QuestionType: questionTypeCheckbox,
 			Score:        0,
-			Value:        fmt.Sprintf("section-%s", question.Code),
+			Value:        selectedValues, // []string 类型
 		}, true
+
+	case strings.ToLower(questionTypeText), strings.ToLower(questionTypeTextarea):
+		// 文本题：生成随机文本
+		texts := []string{
+			"正常",
+			"良好",
+			"一般",
+			"需要关注",
+			"测试答案",
+		}
+		value := texts[rng.Intn(len(texts))]
+		return Answer{
+			QuestionCode: question.Code,
+			QuestionType: resolvedType, // 保持原始类型
+			Score:        0,
+			Value:        value,
+		}, true
+
+	case strings.ToLower(questionTypeNumber):
+		// 数字题：生成 1-100 的随机数字
+		// 使用 float64 类型，因为 JSON 中的数字会被解析为 float64
+		value := float64(rng.Intn(100) + 1)
+		return Answer{
+			QuestionCode: question.Code,
+			QuestionType: questionTypeNumber,
+			Score:        0,
+			Value:        value, // float64 类型
+		}, true
+
+	case strings.ToLower(questionTypeSection):
+		// 段落题：不需要答案，跳过
+		return Answer{}, false
+
 	default:
+		// 不支持的类型，跳过
 		return Answer{}, false
 	}
 }
@@ -534,6 +826,54 @@ func parseCategories(raw string) []string {
 	return items
 }
 
+func normalizeQuestionType(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func collectQuestionTypes(q *QuestionnaireDetailResponse) []string {
+	if q == nil || len(q.Questions) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(q.Questions))
+	out := make([]string, 0, len(q.Questions))
+	for _, question := range q.Questions {
+		typ := strings.TrimSpace(question.Type)
+		if typ == "" {
+			typ = fmt.Sprintf("<empty:%s>", resolveQuestionType(question))
+		}
+		if _, exists := seen[typ]; exists {
+			continue
+		}
+		seen[typ] = struct{}{}
+		out = append(out, typ)
+	}
+	return out
+}
+
+func resolveQuestionType(question QuestionResponse) string {
+	raw := normalizeQuestionType(question.Type)
+	switch raw {
+	case strings.ToLower(questionTypeRadio):
+		return questionTypeRadio
+	case strings.ToLower(questionTypeCheckbox):
+		return questionTypeCheckbox
+	case strings.ToLower(questionTypeText):
+		return questionTypeText
+	case strings.ToLower(questionTypeTextarea):
+		return questionTypeTextarea
+	case strings.ToLower(questionTypeNumber):
+		return questionTypeNumber
+	case strings.ToLower(questionTypeSection):
+		return questionTypeSection
+	}
+	// 如果没有明确类型，根据是否有选项推断
+	if len(question.Options) > 0 {
+		// 有选项，默认为单选题
+		return questionTypeRadio
+	}
+	// 无选项，默认为段落题
+	return questionTypeSection
+}
 func previewAnswers(answers []Answer) []map[string]string {
 	const maxPreview = 3
 	if len(answers) == 0 {
@@ -547,8 +887,45 @@ func previewAnswers(answers []Answer) []map[string]string {
 	for i := 0; i < n; i++ {
 		out = append(out, map[string]string{
 			"question_code": answers[i].QuestionCode,
-			"value":         answers[i].Value,
+			"value":         formatAnswerValue(answers[i].Value),
 		})
 	}
 	return out
+}
+
+func debugLogQuestionnaire(q *QuestionnaireDetailResponse, logger interface{ Debugw(string, ...interface{}) }) {
+	if q == nil || len(q.Questions) == 0 {
+		return
+	}
+	preview := make([]map[string]string, 0, 3)
+	for i, question := range q.Questions {
+		if i >= 3 {
+			break
+		}
+		preview = append(preview, map[string]string{
+			"code":          question.Code,
+			"type":          question.Type,
+			"resolved_type": resolveQuestionType(question),
+			"option_count":  strconv.Itoa(len(question.Options)),
+			"title_preview": truncateString(question.Title, 30),
+		})
+	}
+	logger.Debugw("Questionnaire detail preview",
+		"code", q.Code,
+		"title", q.Title,
+		"type", q.Type,
+		"question_count", len(q.Questions),
+		"questions", preview,
+	)
+}
+
+func truncateString(value string, max int) string {
+	if max <= 0 || value == "" {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max]) + "..."
 }

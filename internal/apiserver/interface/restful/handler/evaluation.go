@@ -17,7 +17,6 @@ import (
 
 // EvaluationHandler 评估模块 Handler
 // 提供测评管理、得分查询、报告查询等 RESTful API
-// 注意：此 Handler 服务于后台管理系统，不提供创建和提交测评接口
 type EvaluationHandler struct {
 	*BaseHandler
 	managementService  assessmentApp.AssessmentManagementService

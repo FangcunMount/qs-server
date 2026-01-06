@@ -189,7 +189,7 @@ func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 
 	result, err := h.submissionService.Submit(c.Request.Context(), dto)
 	if err != nil {
-		h.InternalErrorResponse(c, "submit answer sheet failed", err)
+		h.Error(c, err)
 		return
 	}
 
