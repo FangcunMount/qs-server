@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +25,10 @@ type APIClient struct {
 	logger     log.Logger
 	tokenMu    sync.RWMutex
 	refresher  func(context.Context) (string, error)
+
+	retryMax      int
+	retryMinDelay time.Duration
+	retryMaxDelay time.Duration
 }
 
 // NewAPIClient 创建 API 客户端
@@ -29,19 +36,54 @@ func NewAPIClient(baseURL, token string, logger log.Logger) *APIClient {
 	// 确保 baseURL 不以斜杠结尾
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
+	retryMax, retryMinDelay, retryMaxDelay := defaultRetryConfig()
+
 	return &APIClient{
 		baseURL: baseURL,
 		token:   token,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		logger: logger,
+		logger:        logger,
+		retryMax:      retryMax,
+		retryMinDelay: retryMinDelay,
+		retryMaxDelay: retryMaxDelay,
 	}
 }
 
 // SetTokenRefresher sets a callback to refresh token when needed.
 func (c *APIClient) SetTokenRefresher(fn func(context.Context) (string, error)) {
 	c.refresher = fn
+}
+
+// SetRetryConfig updates retry settings for the client.
+func (c *APIClient) SetRetryConfig(cfg RetryConfig) {
+	retryMax, retryMinDelay, retryMaxDelay := defaultRetryConfig()
+	if cfg.MaxRetries >= 0 {
+		retryMax = cfg.MaxRetries
+	}
+	if strings.TrimSpace(cfg.MinDelay) != "" {
+		if d, err := time.ParseDuration(strings.TrimSpace(cfg.MinDelay)); err == nil {
+			retryMinDelay = d
+		}
+	}
+	if strings.TrimSpace(cfg.MaxDelay) != "" {
+		if d, err := time.ParseDuration(strings.TrimSpace(cfg.MaxDelay)); err == nil {
+			retryMaxDelay = d
+		}
+	}
+	if retryMinDelay <= 0 {
+		retryMinDelay = 200 * time.Millisecond
+	}
+	if retryMaxDelay <= 0 {
+		retryMaxDelay = 5 * time.Second
+	}
+	if retryMax < 0 {
+		retryMax = 0
+	}
+	c.retryMax = retryMax
+	c.retryMinDelay = retryMinDelay
+	c.retryMaxDelay = retryMaxDelay
 }
 
 // SetToken updates the client token safely.
@@ -294,44 +336,72 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body int
 }
 
 func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string, body interface{}, allowRefresh bool) (*Response, error) {
-	var reqBody io.Reader
-	if body != nil {
-		jsonData, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("marshal request body: %w", err)
-		}
-		reqBody = bytes.NewBuffer(jsonData)
-	}
-
 	url := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
+	for attempt := 0; attempt <= c.retryMax; attempt++ {
+		var reqBody io.Reader
+		if body != nil {
+			jsonData, err := json.Marshal(body)
+			if err != nil {
+				return nil, fmt.Errorf("marshal request body: %w", err)
+			}
+			reqBody = bytes.NewBuffer(jsonData)
+		}
 
-	req.Header.Set("Content-Type", "application/json")
-	if token := c.getToken(); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
+		if err != nil {
+			return nil, fmt.Errorf("create request: %w", err)
+		}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
+		req.Header.Set("Content-Type", "application/json")
+		if token := c.getToken(); token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if shouldRetryNetErr(err) && attempt < c.retryMax {
+				delay := backoffDelay(attempt, c.retryMinDelay, c.retryMaxDelay)
+				c.logger.Warnw("seeddata request failed, retrying",
+					"url", url,
+					"attempt", attempt+1,
+					"delay_ms", delay.Milliseconds(),
+					"error", err.Error(),
+				)
+				if err := sleepWithContext(ctx, delay); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			return nil, fmt.Errorf("do request: %w", err)
+		}
 
-	// 如果状态码不是 200，先尝试解析 JSON（可能是 API 的错误响应）
-	if resp.StatusCode != http.StatusOK {
-		var apiResp Response
-		if err := json.Unmarshal(respBody, &apiResp); err == nil {
-			// 成功解析为 JSON，返回 API 错误信息
-			// 特殊处理 401 错误
-			if resp.StatusCode == http.StatusUnauthorized {
+		respBody, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("read response: %w", readErr)
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var apiResp Response
+			if err := json.Unmarshal(respBody, &apiResp); err != nil {
+				bodyStr := string(respBody)
+				if len(bodyStr) > 200 {
+					bodyStr = bodyStr[:200] + "..."
+				}
+				return nil, fmt.Errorf("unmarshal response: %w, url=%s, body=%s", err, url, bodyStr)
+			}
+			if apiResp.Code != 0 {
+				return nil, fmt.Errorf("api error: code=%d, message=%s, http_status=%d", apiResp.Code, apiResp.Message, resp.StatusCode)
+			}
+			return &apiResp, nil
+		}
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			var apiResp Response
+			if err := json.Unmarshal(respBody, &apiResp); err == nil {
 				if allowRefresh && c.refresher != nil {
 					if err := c.refreshToken(ctx); err == nil {
 						return c.doRequestWithRetry(ctx, method, path, body, false)
@@ -339,10 +409,38 @@ func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string,
 				}
 				return nil, fmt.Errorf("authentication failed (401): please check your API token. message=%s", apiResp.Message)
 			}
-			// 对于 500 错误，打印完整的响应体以便调试
+			if allowRefresh && c.refresher != nil {
+				if err := c.refreshToken(ctx); err == nil {
+					return c.doRequestWithRetry(ctx, method, path, body, false)
+				}
+			}
+			return nil, fmt.Errorf("authentication failed (401): please check your API token. url=%s", url)
+		}
+
+		if isRetryableStatus(resp.StatusCode) && attempt < c.retryMax {
+			delay, ok := parseRetryAfter(resp.Header.Get("Retry-After"))
+			if !ok {
+				delay = backoffDelay(attempt, c.retryMinDelay, c.retryMaxDelay)
+			}
+			if delay > c.retryMaxDelay {
+				delay = c.retryMaxDelay
+			}
+			c.logger.Warnw("seeddata request throttled, retrying",
+				"url", url,
+				"status", resp.StatusCode,
+				"attempt", attempt+1,
+				"delay_ms", delay.Milliseconds(),
+			)
+			if err := sleepWithContext(ctx, delay); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		var apiResp Response
+		if err := json.Unmarshal(respBody, &apiResp); err == nil {
 			bodyStr := string(respBody)
 			if resp.StatusCode == http.StatusInternalServerError {
-				// 500 错误时打印完整响应
 				c.logger.Warnw("API returned 500 error",
 					"url", url,
 					"code", apiResp.Code,
@@ -355,39 +453,80 @@ func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string,
 			}
 			return nil, fmt.Errorf("api error: http_status=%d, code=%d, message=%s, body=%s", resp.StatusCode, apiResp.Code, apiResp.Message, bodyStr)
 		}
-		// 无法解析为 JSON（可能是 HTML 错误页面），返回原始响应
+
 		bodyStr := string(respBody)
 		if len(bodyStr) > 200 {
 			bodyStr = bodyStr[:200] + "..."
-		}
-		// 特殊处理 401 错误
-		if resp.StatusCode == http.StatusUnauthorized {
-			if allowRefresh && c.refresher != nil {
-				if err := c.refreshToken(ctx); err == nil {
-					return c.doRequestWithRetry(ctx, method, path, body, false)
-				}
-			}
-			return nil, fmt.Errorf("authentication failed (401): please check your API token. url=%s", url)
 		}
 		return nil, fmt.Errorf("http error: status=%d, url=%s, body=%s", resp.StatusCode, url, bodyStr)
 	}
 
-	// 状态码是 200，尝试解析 JSON
-	var apiResp Response
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		bodyStr := string(respBody)
-		if len(bodyStr) > 200 {
-			bodyStr = bodyStr[:200] + "..."
+	return nil, fmt.Errorf("request failed after retries: url=%s", url)
+}
+
+func defaultRetryConfig() (int, time.Duration, time.Duration) {
+	return 3, 200 * time.Millisecond, 5 * time.Second
+}
+
+func shouldRetryNetErr(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr.Timeout() || netErr.Temporary()
+	}
+	return false
+}
+
+func isRetryableStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable, http.StatusBadGateway, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+func parseRetryAfter(value string) (time.Duration, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	if secs, err := strconv.Atoi(value); err == nil && secs >= 0 {
+		return time.Duration(secs) * time.Second, true
+	}
+	if t, err := http.ParseTime(value); err == nil {
+		delay := time.Until(t)
+		if delay < 0 {
+			return 0, false
 		}
-		return nil, fmt.Errorf("unmarshal response: %w, url=%s, body=%s", err, url, bodyStr)
+		return delay, true
 	}
+	return 0, false
+}
 
-	// 检查 API 业务错误码
-	if apiResp.Code != 0 {
-		return nil, fmt.Errorf("api error: code=%d, message=%s, http_status=%d", apiResp.Code, apiResp.Message, resp.StatusCode)
+func backoffDelay(attempt int, minDelay, maxDelay time.Duration) time.Duration {
+	if attempt < 0 {
+		attempt = 0
 	}
+	delay := minDelay << attempt
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+	jitter := time.Duration(time.Now().UnixNano()%int64(delay/2+1)) - delay/4
+	return delay + jitter
+}
 
-	return &apiResp, nil
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *APIClient) refreshToken(ctx context.Context) error {

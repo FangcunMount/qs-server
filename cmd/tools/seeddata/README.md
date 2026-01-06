@@ -79,6 +79,10 @@ api:
   baseUrl: "http://localhost:18082"
   collectionBaseUrl: "http://localhost:18083"
   token: ""
+  retry:
+    maxRetries: 3
+    minDelay: "200ms"
+    maxDelay: "5s"
 
 iam:
   loginUrl: "https://iam.example.com/api/v1/authn/login"

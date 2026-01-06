@@ -89,9 +89,10 @@ type GlobalConfig struct {
 
 // APIConfig API 配置
 type APIConfig struct {
-	BaseURL           string `yaml:"baseUrl"`
-	CollectionBaseURL string `yaml:"collectionBaseUrl"`
-	Token             string `yaml:"token"`
+	BaseURL           string      `yaml:"baseUrl"`
+	CollectionBaseURL string      `yaml:"collectionBaseUrl"`
+	Token             string      `yaml:"token"`
+	Retry             RetryConfig `yaml:"retry"`
 }
 
 // IAMConfig IAM 登录配置
@@ -99,6 +100,13 @@ type IAMConfig struct {
 	LoginURL string `yaml:"loginUrl"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+// RetryConfig defines retry behavior for API calls.
+type RetryConfig struct {
+	MaxRetries int    `yaml:"maxRetries"` // Max retry attempts (not counting the first request)
+	MinDelay   string `yaml:"minDelay"`   // e.g. "200ms"
+	MaxDelay   string `yaml:"maxDelay"`   // e.g. "5s"
 }
 
 // TesteeConfig 受试者配置

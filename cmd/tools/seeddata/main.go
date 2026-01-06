@@ -148,6 +148,7 @@ func main() {
 	}
 
 	apiClient := NewAPIClient(*apiBaseURL, *apiToken, logger)
+	apiClient.SetRetryConfig(config.API.Retry)
 	logger.Infow("Initialized API client", "base_url", *apiBaseURL)
 
 	collectionURL := strings.TrimSpace(*collectionBaseURL)
@@ -155,6 +156,7 @@ func main() {
 		collectionURL = *apiBaseURL
 	}
 	collectionClient := NewAPIClient(collectionURL, *apiToken, logger)
+	collectionClient.SetRetryConfig(config.API.Retry)
 	logger.Infow("Initialized collection client", "base_url", collectionURL)
 
 	if (config.IAM != IAMConfig{}) {
