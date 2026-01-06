@@ -30,5 +30,22 @@ func (o *Options) Validate() []error {
 		}
 	}
 
+	if o.Backpressure != nil {
+		validateBackpressure := func(name string, dep *DependencyBackpressure) {
+			if dep == nil || !dep.Enabled {
+				return
+			}
+			if dep.MaxInflight <= 0 {
+				errs = append(errs, fmt.Errorf("backpressure.%s.max_inflight must be greater than 0", name))
+			}
+			if dep.TimeoutMs < 0 {
+				errs = append(errs, fmt.Errorf("backpressure.%s.timeout_ms cannot be negative", name))
+			}
+		}
+		validateBackpressure("mysql", o.Backpressure.MySQL)
+		validateBackpressure("mongo", o.Backpressure.Mongo)
+		validateBackpressure("iam", o.Backpressure.IAM)
+	}
+
 	return errs
 }

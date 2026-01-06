@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -10,6 +11,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
@@ -97,6 +102,19 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			"error", err.Error(),
 		)
 		log.Fatalf("Failed to get MongoDB connection: %v", err)
+	}
+
+	// 初始化下游背压（MySQL/Mongo/IAM）
+	if s.config.Backpressure != nil {
+		if bp := s.config.Backpressure.MySQL; bp != nil && bp.Enabled {
+			mysqlbp.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+		}
+		if bp := s.config.Backpressure.Mongo; bp != nil && bp.Enabled {
+			infraMongo.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+		}
+		if bp := s.config.Backpressure.IAM; bp != nil && bp.Enabled {
+			infraIAM.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+		}
 	}
 
 	// 获取 Redis 客户端（cache/store）

@@ -54,6 +54,12 @@ func (s *GuardianshipService) IsGuardian(ctx context.Context, userID, childID st
 		return false, fmt.Errorf("guardianship service not enabled")
 	}
 
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
+
 	resp, err := s.client.IsGuardian(ctx, userID, childID)
 	if err != nil {
 		return false, err
@@ -67,6 +73,11 @@ func (s *GuardianshipService) IsGuardianWithDetails(ctx context.Context, userID,
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.IsGuardian(ctx, userID, childID)
 }
 
@@ -84,6 +95,12 @@ func (s *GuardianshipService) ValidateChildExists(ctx context.Context, childID s
 	}
 
 	// 通过查询监护人列表来验证 child 是否存在
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	resp, err := s.client.ListGuardians(ctx, &identityv1.ListGuardiansRequest{
 		ChildId: childID,
 	})
@@ -114,6 +131,11 @@ func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.ListChildren(ctx, &identityv1.ListChildrenRequest{
 		UserId: userID,
 	})
@@ -124,6 +146,11 @@ func (s *GuardianshipService) ListGuardians(ctx context.Context, childID string)
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.ListGuardians(ctx, &identityv1.ListGuardiansRequest{
 		ChildId: childID,
 	})
@@ -134,6 +161,11 @@ func (s *GuardianshipService) AddGuardian(ctx context.Context, req *identityv1.A
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.AddGuardian(ctx, req)
 }
 
@@ -142,6 +174,11 @@ func (s *GuardianshipService) RevokeGuardian(ctx context.Context, req *identityv
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.RevokeGuardian(ctx, req)
 }
 
@@ -150,6 +187,11 @@ func (s *GuardianshipService) UpdateGuardianRelation(ctx context.Context, req *i
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.UpdateGuardianRelation(ctx, req)
 }
 
@@ -158,6 +200,11 @@ func (s *GuardianshipService) BatchRevokeGuardians(ctx context.Context, req *ide
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.BatchRevokeGuardians(ctx, req)
 }
 
@@ -166,6 +213,11 @@ func (s *GuardianshipService) ImportGuardians(ctx context.Context, req *identity
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.ImportGuardians(ctx, req)
 }
 

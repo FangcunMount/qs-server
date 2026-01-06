@@ -24,6 +24,7 @@ type Options struct {
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
 	WeChatOptions           *genericoptions.WeChatOptions          `json:"wechat"    mapstructure:"wechat"`
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
+	Backpressure            *BackpressureOptions                   `json:"backpressure" mapstructure:"backpressure"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -42,6 +43,42 @@ func NewOptions() *Options {
 		IAMOptions:              genericoptions.NewIAMOptions(),
 		WeChatOptions:           genericoptions.NewWeChatOptions(),
 		RateLimit:               NewRateLimitOptions(),
+		Backpressure:            NewBackpressureOptions(),
+	}
+}
+
+// BackpressureOptions 下游背压配置
+type BackpressureOptions struct {
+	MySQL *DependencyBackpressure `json:"mysql" mapstructure:"mysql"`
+	Mongo *DependencyBackpressure `json:"mongo" mapstructure:"mongo"`
+	IAM   *DependencyBackpressure `json:"iam" mapstructure:"iam"`
+}
+
+// DependencyBackpressure 单个依赖的背压配置
+type DependencyBackpressure struct {
+	Enabled     bool `json:"enabled" mapstructure:"enabled"`
+	MaxInflight int  `json:"max_inflight" mapstructure:"max_inflight"`
+	TimeoutMs   int  `json:"timeout_ms" mapstructure:"timeout_ms"`
+}
+
+// NewBackpressureOptions 创建默认背压配置
+func NewBackpressureOptions() *BackpressureOptions {
+	return &BackpressureOptions{
+		MySQL: &DependencyBackpressure{
+			Enabled:     true,
+			MaxInflight: 200,
+			TimeoutMs:   2000,
+		},
+		Mongo: &DependencyBackpressure{
+			Enabled:     true,
+			MaxInflight: 200,
+			TimeoutMs:   2000,
+		},
+		IAM: &DependencyBackpressure{
+			Enabled:     true,
+			MaxInflight: 100,
+			TimeoutMs:   2000,
+		},
 	}
 }
 
@@ -96,6 +133,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
+	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 
 	return fss
 }
@@ -115,6 +153,30 @@ func (r *RateLimitOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&r.WaitReportGlobalBurst, "rate_limit.wait-report-global-burst", r.WaitReportGlobalBurst, "Global burst for wait-report.")
 	fs.Float64Var(&r.WaitReportUserQPS, "rate_limit.wait-report-user-qps", r.WaitReportUserQPS, "Per-user QPS limit for wait-report.")
 	fs.IntVar(&r.WaitReportUserBurst, "rate_limit.wait-report-user-burst", r.WaitReportUserBurst, "Per-user burst for wait-report.")
+}
+
+// AddFlags 添加背压相关的命令行参数
+func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
+	if b.MySQL == nil {
+		b.MySQL = &DependencyBackpressure{}
+	}
+	if b.Mongo == nil {
+		b.Mongo = &DependencyBackpressure{}
+	}
+	if b.IAM == nil {
+		b.IAM = &DependencyBackpressure{}
+	}
+	fs.BoolVar(&b.MySQL.Enabled, "backpressure.mysql.enabled", b.MySQL.Enabled, "Enable MySQL backpressure.")
+	fs.IntVar(&b.MySQL.MaxInflight, "backpressure.mysql.max-inflight", b.MySQL.MaxInflight, "Max inflight MySQL operations.")
+	fs.IntVar(&b.MySQL.TimeoutMs, "backpressure.mysql.timeout-ms", b.MySQL.TimeoutMs, "MySQL backpressure timeout in ms.")
+
+	fs.BoolVar(&b.Mongo.Enabled, "backpressure.mongo.enabled", b.Mongo.Enabled, "Enable Mongo backpressure.")
+	fs.IntVar(&b.Mongo.MaxInflight, "backpressure.mongo.max-inflight", b.Mongo.MaxInflight, "Max inflight Mongo operations.")
+	fs.IntVar(&b.Mongo.TimeoutMs, "backpressure.mongo.timeout-ms", b.Mongo.TimeoutMs, "Mongo backpressure timeout in ms.")
+
+	fs.BoolVar(&b.IAM.Enabled, "backpressure.iam.enabled", b.IAM.Enabled, "Enable IAM backpressure.")
+	fs.IntVar(&b.IAM.MaxInflight, "backpressure.iam.max-inflight", b.IAM.MaxInflight, "Max inflight IAM calls.")
+	fs.IntVar(&b.IAM.TimeoutMs, "backpressure.iam.timeout-ms", b.IAM.TimeoutMs, "IAM backpressure timeout in ms.")
 }
 
 // Complete 完成配置选项

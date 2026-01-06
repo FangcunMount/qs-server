@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"gorm.io/gorm"
@@ -17,6 +18,20 @@ type BaseRepository[T Syncable] struct {
 	// errTranslator transforms DB-level errors into domain/business errors.
 	// If nil, no translation is performed.
 	errTranslator func(error) error
+}
+
+var limiter *backpressure.Limiter
+
+// SetLimiter configures a global limiter for MySQL operations.
+func SetLimiter(l *backpressure.Limiter) {
+	limiter = l
+}
+
+func acquire(ctx context.Context) (context.Context, func(), error) {
+	if limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return limiter.Acquire(ctx)
 }
 
 // NewBaseRepository constructs a repository wrapper for the provided DB.
@@ -49,6 +64,12 @@ func (r *BaseRepository[T]) WithContext(ctx context.Context) *gorm.DB {
 
 // CreateAndSync persists an entity and lets the caller sync generated fields back.
 func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync func(T)) error {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	userID := middleware.GetUserIDFromContext(ctx)
 	if userID > 0 {
 		entity.SetCreatedBy(meta.FromUint64(userID))
@@ -67,6 +88,12 @@ func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync fu
 
 // UpdateAndSync updates an entity and triggers the sync callback.
 func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync func(T)) error {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	userID := middleware.GetUserIDFromContext(ctx)
 	if userID > 0 {
 		entity.SetUpdatedBy(meta.FromUint64(userID))
@@ -84,6 +111,13 @@ func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync fu
 
 // FindByID retrieves a record by its identifier.
 func (r *BaseRepository[T]) FindByID(ctx context.Context, id uint64) (T, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	defer release()
+
 	var entity T
 	result := r.db.WithContext(ctx).First(&entity, id)
 	if result.Error != nil {
@@ -95,17 +129,35 @@ func (r *BaseRepository[T]) FindByID(ctx context.Context, id uint64) (T, error) 
 
 // FindByField loads the first record matching the provided field condition.
 func (r *BaseRepository[T]) FindByField(ctx context.Context, model interface{}, field string, value interface{}) error {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	return r.db.WithContext(ctx).Where(field+" = ?", value).First(model).Error
 }
 
 // DeleteByID removes records by primary key.
 func (r *BaseRepository[T]) DeleteByID(ctx context.Context, id uint64) error {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	var entity T
 	return r.db.WithContext(ctx).Delete(&entity, id).Error
 }
 
 // ExistsByID checks if a record exists for the given ID.
 func (r *BaseRepository[T]) ExistsByID(ctx context.Context, id uint64) (bool, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
+
 	var count int64
 	var entity T
 	err := r.db.WithContext(ctx).Model(&entity).Where("id = ?", id).Count(&count).Error
@@ -117,6 +169,12 @@ func (r *BaseRepository[T]) ExistsByID(ctx context.Context, id uint64) (bool, er
 
 // ExistsByField checks uniqueness constraints against a field value.
 func (r *BaseRepository[T]) ExistsByField(ctx context.Context, model interface{}, field string, value interface{}) (bool, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
+
 	var count int64
 	if err := r.db.WithContext(ctx).Model(model).Where(field+" = ?", value).Count(&count).Error; err != nil {
 		return false, err
@@ -126,6 +184,12 @@ func (r *BaseRepository[T]) ExistsByField(ctx context.Context, model interface{}
 
 // FindWithConditions loads all matching records from the provided condition map.
 func (r *BaseRepository[T]) FindWithConditions(ctx context.Context, conditions map[string]interface{}) ([]T, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	db := r.db.WithContext(ctx)
 	for field, value := range conditions {
 		db = db.Where(field+" = ?", value)
@@ -139,6 +203,12 @@ func (r *BaseRepository[T]) FindWithConditions(ctx context.Context, conditions m
 
 // FindList queries paginated results while filling the consumer-provided model slice.
 func (r *BaseRepository[T]) FindList(ctx context.Context, models interface{}, conditions map[string]string, page, pageSize int) ([]T, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	db := r.db.WithContext(ctx)
 	for field, value := range conditions {
 		db = db.Where(field+" = ?", value)
@@ -161,6 +231,12 @@ func (r *BaseRepository[T]) FindList(ctx context.Context, models interface{}, co
 
 // CountWithConditions returns the count for the supplied conditions.
 func (r *BaseRepository[T]) CountWithConditions(ctx context.Context, model interface{}, conditions map[string]string) (int64, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+
 	var count int64
 	db := r.db.WithContext(ctx).Model(model)
 	for field, value := range conditions {

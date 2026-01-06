@@ -179,7 +179,24 @@ rate_limit:
   wait_report_user_burst: 5
 
 # -------------------------------------------------------
-# 3.6 MongoDB 数据库
+# 3.6 下游背压配置
+# -------------------------------------------------------
+backpressure:
+  mysql:
+    enabled: true
+    max_inflight: 200
+    timeout_ms: 2000
+  mongo:
+    enabled: true
+    max_inflight: 200
+    timeout_ms: 2000
+  iam:
+    enabled: true
+    max_inflight: 100
+    timeout_ms: 2000
+
+# -------------------------------------------------------
+# 3.7 MongoDB 数据库
 # -------------------------------------------------------
 # 支持两种方式：分离参数（推荐）或直接 URL
 mongodb:

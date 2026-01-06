@@ -53,6 +53,11 @@ func (s *WeChatAppService) GetWechatApp(ctx context.Context, appID string) (*idp
 	if !s.enabled {
 		return nil, fmt.Errorf("wechat app service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.GetWechatApp(ctx, appID)
 }
 
@@ -60,4 +65,3 @@ func (s *WeChatAppService) GetWechatApp(ctx context.Context, appID string) (*idp
 func (s *WeChatAppService) Raw() *idp.Client {
 	return s.client
 }
-

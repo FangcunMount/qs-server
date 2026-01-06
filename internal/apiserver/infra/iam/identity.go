@@ -53,6 +53,11 @@ func (s *IdentityService) GetUser(ctx context.Context, userID string) (*identity
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.GetUser(ctx, userID)
 }
 
@@ -61,6 +66,11 @@ func (s *IdentityService) BatchGetUsers(ctx context.Context, userIDs []string) (
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.BatchGetUsers(ctx, userIDs)
 }
 
@@ -69,6 +79,11 @@ func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv1.Searc
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.SearchUsers(ctx, req)
 }
 
@@ -78,6 +93,11 @@ func (s *IdentityService) LinkExternalIdentity(ctx context.Context, req *identit
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.client.LinkExternalIdentity(ctx, req)
 }
 
@@ -92,6 +112,11 @@ func (s *IdentityService) CreateUser(ctx context.Context, name, email, phone str
 	if !s.enabled {
 		return 0, fmt.Errorf("identity service not enabled")
 	}
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
 	// 构建 SDK 的 CreateUserRequest
 	req := &identityv1.CreateUserRequest{
 		Nickname: name,

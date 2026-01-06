@@ -10,6 +10,7 @@ import (
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 	sdkconfig "github.com/FangcunMount/iam-contracts/pkg/sdk/config"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）
@@ -66,6 +67,20 @@ type Client struct {
 	sdk     *sdk.Client
 	config  *IAMOptions
 	enabled bool
+}
+
+var limiter *backpressure.Limiter
+
+// SetLimiter configures a global limiter for IAM calls.
+func SetLimiter(l *backpressure.Limiter) {
+	limiter = l
+}
+
+func acquire(ctx context.Context) (context.Context, func(), error) {
+	if limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return limiter.Acquire(ctx)
 }
 
 // NewClient 创建 IAM 客户端

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,6 +18,20 @@ import (
 type BaseRepository struct {
 	db         *mongo.Database
 	collection *mongo.Collection
+}
+
+var limiter *backpressure.Limiter
+
+// SetLimiter configures a global limiter for Mongo operations.
+func SetLimiter(l *backpressure.Limiter) {
+	limiter = l
+}
+
+func acquire(ctx context.Context) (context.Context, func(), error) {
+	if limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return limiter.Acquire(ctx)
 }
 
 // NewBaseRepository 创建基础存储库
@@ -39,54 +54,104 @@ func (r *BaseRepository) Collection() *mongo.Collection {
 
 // InsertOne 插入一条文档
 func (r *BaseRepository) InsertOne(ctx context.Context, document interface{}) (*mongo.InsertOneResult, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return r.collection.InsertOne(ctx, document)
 }
 
 // FindOne 查找一条文档
 func (r *BaseRepository) FindOne(ctx context.Context, filter bson.M, result interface{}) error {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	return r.collection.FindOne(ctx, filter).Decode(result)
 }
 
 // FindByID 根据ObjectID查找文档
 func (r *BaseRepository) FindByID(ctx context.Context, id primitive.ObjectID, result interface{}) error {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	filter := bson.M{"_id": id}
 	return r.collection.FindOne(ctx, filter).Decode(result)
 }
 
 // UpdateOne 更新一条文档
 func (r *BaseRepository) UpdateOne(ctx context.Context, filter bson.M, update bson.M) (*mongo.UpdateResult, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return r.collection.UpdateOne(ctx, filter, update)
 }
 
 // UpdateByID 根据ObjectID更新文档
 func (r *BaseRepository) UpdateByID(ctx context.Context, id primitive.ObjectID, update bson.M) (*mongo.UpdateResult, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	filter := bson.M{"_id": id}
 	return r.collection.UpdateOne(ctx, filter, update)
 }
 
 // DeleteOne 删除一条文档
 func (r *BaseRepository) DeleteOne(ctx context.Context, filter bson.M) (*mongo.DeleteResult, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return r.collection.DeleteOne(ctx, filter)
 }
 
 // DeleteByID 根据ObjectID删除文档
 func (r *BaseRepository) DeleteByID(ctx context.Context, id primitive.ObjectID) (*mongo.DeleteResult, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	filter := bson.M{"_id": id}
 	return r.collection.DeleteOne(ctx, filter)
 }
 
 // Find 查找多条文档
 func (r *BaseRepository) Find(ctx context.Context, filter bson.M, opts ...*options.FindOptions) (*mongo.Cursor, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return r.collection.Find(ctx, filter, opts...)
 }
 
 // CountDocuments 统计文档数量
 func (r *BaseRepository) CountDocuments(ctx context.Context, filter bson.M) (int64, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
 	return r.collection.CountDocuments(ctx, filter)
 }
 
 // ExistsByFilter 检查是否存在符合条件的文档
 func (r *BaseRepository) ExistsByFilter(ctx context.Context, filter bson.M) (bool, error) {
+	ctx, release, err := acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
 	count, err := r.collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return false, err
