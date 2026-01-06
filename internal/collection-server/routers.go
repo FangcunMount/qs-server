@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -143,6 +144,40 @@ func isPublicScaleReadOnly(c *gin.Context) bool {
 	return slices.Contains(whitelist, strings.TrimRight(c.Request.URL.Path, "/"))
 }
 
+func requestLimitKey(c *gin.Context) string {
+	userID := pkgmiddleware.GetUserID(c)
+	if userID != "" {
+		return "user:" + userID
+	}
+	return "ip:" + c.ClientIP()
+}
+
+func rateLimitedHandlers(
+	rateCfg *options.RateLimitOptions,
+	globalQPS float64,
+	globalBurst int,
+	userQPS float64,
+	userBurst int,
+	handler gin.HandlerFunc,
+) []gin.HandlerFunc {
+	if rateCfg == nil || !rateCfg.Enabled {
+		return []gin.HandlerFunc{handler}
+	}
+
+	return []gin.HandlerFunc{
+		pkgmiddleware.Limit(globalQPS, globalBurst),
+		pkgmiddleware.LimitByKey(userQPS, userBurst, requestLimitKey),
+		handler,
+	}
+}
+
+func ensureRateLimitOptions(rateCfg *options.RateLimitOptions) *options.RateLimitOptions {
+	if rateCfg == nil {
+		return options.NewRateLimitOptions()
+	}
+	return rateCfg
+}
+
 // registerQuestionnaireRoutes 注册问卷相关路由
 func (r *Router) registerQuestionnaireRoutes(api *gin.RouterGroup) {
 	questionnaireHandler := r.container.QuestionnaireHandler()
@@ -158,36 +193,108 @@ func (r *Router) registerQuestionnaireRoutes(api *gin.RouterGroup) {
 func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 	answerSheetHandler := r.container.AnswerSheetHandler()
 	evaluationHandler := r.container.EvaluationHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
 	answersheets := api.Group("/answersheets")
 	{
-		answersheets.POST("", answerSheetHandler.Submit)
-		answersheets.GET("/:id", answerSheetHandler.Get)
+		answersheets.POST("", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.SubmitGlobalQPS,
+			rateCfg.SubmitGlobalBurst,
+			rateCfg.SubmitUserQPS,
+			rateCfg.SubmitUserBurst,
+			answerSheetHandler.Submit,
+		)...)
+		answersheets.GET("/:id", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			answerSheetHandler.Get,
+		)...)
 		// 通过答卷ID获取测评详情
-		answersheets.GET("/:id/assessment", evaluationHandler.GetMyAssessmentByAnswerSheetID)
+		answersheets.GET("/:id/assessment", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetMyAssessmentByAnswerSheetID,
+		)...)
 	}
 }
 
 // registerEvaluationRoutes 注册测评相关路由
 func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 	evaluationHandler := r.container.EvaluationHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
 	assessments := api.Group("/assessments")
 	{
 		// 测评列表
-		assessments.GET("", evaluationHandler.ListMyAssessments)
+		assessments.GET("", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.ListMyAssessments,
+		)...)
 		// 因子趋势（放在 :id 前面避免路由冲突）
-		assessments.GET("/trend", evaluationHandler.GetFactorTrend)
+		assessments.GET("/trend", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetFactorTrend,
+		)...)
 		// 高风险因子
-		assessments.GET("/high-risk", evaluationHandler.GetHighRiskFactors)
+		assessments.GET("/high-risk", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetHighRiskFactors,
+		)...)
 		// 测评详情
-		assessments.GET("/:id", evaluationHandler.GetMyAssessment)
+		assessments.GET("/:id", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetMyAssessment,
+		)...)
 		// 测评得分
-		assessments.GET("/:id/scores", evaluationHandler.GetAssessmentScores)
+		assessments.GET("/:id/scores", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetAssessmentScores,
+		)...)
 		// 测评报告
-		assessments.GET("/:id/report", evaluationHandler.GetAssessmentReport)
+		assessments.GET("/:id/report", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetAssessmentReport,
+		)...)
 		// 长轮询等待报告生成
-		assessments.GET("/:id/wait-report", evaluationHandler.WaitReport)
+		assessments.GET("/:id/wait-report", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.WaitReportGlobalQPS,
+			rateCfg.WaitReportGlobalBurst,
+			rateCfg.WaitReportUserQPS,
+			rateCfg.WaitReportUserBurst,
+			evaluationHandler.WaitReport,
+		)...)
 	}
 }
 

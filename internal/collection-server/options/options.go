@@ -19,6 +19,7 @@ type Options struct {
 	GRPCClient              *GRPCClientOptions                     `json:"grpc_client" mapstructure:"grpc_client"`
 	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
 	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
+	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	JWT                     *JWTOptions                            `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                        `json:"runtime" mapstructure:"runtime"`
@@ -40,6 +41,23 @@ type GRPCClientOptions struct {
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
 	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
+}
+
+// RateLimitOptions 限流配置
+type RateLimitOptions struct {
+	Enabled               bool    `json:"enabled" mapstructure:"enabled"`
+	SubmitGlobalQPS       float64 `json:"submit_global_qps" mapstructure:"submit_global_qps"`
+	SubmitGlobalBurst     int     `json:"submit_global_burst" mapstructure:"submit_global_burst"`
+	SubmitUserQPS         float64 `json:"submit_user_qps" mapstructure:"submit_user_qps"`
+	SubmitUserBurst       int     `json:"submit_user_burst" mapstructure:"submit_user_burst"`
+	QueryGlobalQPS        float64 `json:"query_global_qps" mapstructure:"query_global_qps"`
+	QueryGlobalBurst      int     `json:"query_global_burst" mapstructure:"query_global_burst"`
+	QueryUserQPS          float64 `json:"query_user_qps" mapstructure:"query_user_qps"`
+	QueryUserBurst        int     `json:"query_user_burst" mapstructure:"query_user_burst"`
+	WaitReportGlobalQPS   float64 `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
+	WaitReportGlobalBurst int     `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
+	WaitReportUserQPS     float64 `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
+	WaitReportUserBurst   int     `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
 }
 
 // RuntimeOptions 运行时调优（GC/内存）
@@ -99,6 +117,7 @@ func NewOptions() *Options {
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
+		RateLimit: NewRateLimitOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
@@ -116,6 +135,25 @@ func NewRuntimeOptions() *RuntimeOptions {
 	}
 }
 
+// NewRateLimitOptions 创建默认限流配置
+func NewRateLimitOptions() *RateLimitOptions {
+	return &RateLimitOptions{
+		Enabled:               true,
+		SubmitGlobalQPS:       200,
+		SubmitGlobalBurst:     300,
+		SubmitUserQPS:         5,
+		SubmitUserBurst:       10,
+		QueryGlobalQPS:        200,
+		QueryGlobalBurst:      300,
+		QueryUserQPS:          10,
+		QueryUserBurst:        20,
+		WaitReportGlobalQPS:   80,
+		WaitReportGlobalBurst: 120,
+		WaitReportUserQPS:     2,
+		WaitReportUserBurst:   5,
+	}
+}
+
 // Flags 返回一个 NamedFlagSets 对象，包含所有命令行参数
 func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Log.AddFlags(fss.FlagSet("log"))
@@ -126,6 +164,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc_client"))
 	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
+	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
@@ -146,6 +185,23 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
 		"The maximum number of concurrent goroutines for validation.")
+}
+
+// AddFlags 添加限流相关的命令行参数
+func (r *RateLimitOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.BoolVar(&r.Enabled, "rate_limit.enabled", r.Enabled, "Enable rate limiting.")
+	fs.Float64Var(&r.SubmitGlobalQPS, "rate_limit.submit-global-qps", r.SubmitGlobalQPS, "Global QPS limit for submit.")
+	fs.IntVar(&r.SubmitGlobalBurst, "rate_limit.submit-global-burst", r.SubmitGlobalBurst, "Global burst for submit.")
+	fs.Float64Var(&r.SubmitUserQPS, "rate_limit.submit-user-qps", r.SubmitUserQPS, "Per-user QPS limit for submit.")
+	fs.IntVar(&r.SubmitUserBurst, "rate_limit.submit-user-burst", r.SubmitUserBurst, "Per-user burst for submit.")
+	fs.Float64Var(&r.QueryGlobalQPS, "rate_limit.query-global-qps", r.QueryGlobalQPS, "Global QPS limit for queries.")
+	fs.IntVar(&r.QueryGlobalBurst, "rate_limit.query-global-burst", r.QueryGlobalBurst, "Global burst for queries.")
+	fs.Float64Var(&r.QueryUserQPS, "rate_limit.query-user-qps", r.QueryUserQPS, "Per-user QPS limit for queries.")
+	fs.IntVar(&r.QueryUserBurst, "rate_limit.query-user-burst", r.QueryUserBurst, "Per-user burst for queries.")
+	fs.Float64Var(&r.WaitReportGlobalQPS, "rate_limit.wait-report-global-qps", r.WaitReportGlobalQPS, "Global QPS limit for wait-report.")
+	fs.IntVar(&r.WaitReportGlobalBurst, "rate_limit.wait-report-global-burst", r.WaitReportGlobalBurst, "Global burst for wait-report.")
+	fs.Float64Var(&r.WaitReportUserQPS, "rate_limit.wait-report-user-qps", r.WaitReportUserQPS, "Per-user QPS limit for wait-report.")
+	fs.IntVar(&r.WaitReportUserBurst, "rate_limit.wait-report-user-burst", r.WaitReportUserBurst, "Per-user burst for wait-report.")
 }
 
 // AddFlags 添加运行时相关参数
@@ -210,6 +266,27 @@ func (o *Options) Validate() []error {
 	}
 	if o.Concurrency.MaxConcurrency > 100 {
 		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
+	}
+
+	if o.RateLimit != nil && o.RateLimit.Enabled {
+		if o.RateLimit.SubmitGlobalQPS <= 0 || o.RateLimit.SubmitGlobalBurst <= 0 {
+			errs = append(errs, fmt.Errorf("rate_limit.submit_* must be greater than 0"))
+		}
+		if o.RateLimit.SubmitUserQPS <= 0 || o.RateLimit.SubmitUserBurst <= 0 {
+			errs = append(errs, fmt.Errorf("rate_limit.submit_user_* must be greater than 0"))
+		}
+		if o.RateLimit.QueryGlobalQPS <= 0 || o.RateLimit.QueryGlobalBurst <= 0 {
+			errs = append(errs, fmt.Errorf("rate_limit.query_* must be greater than 0"))
+		}
+		if o.RateLimit.QueryUserQPS <= 0 || o.RateLimit.QueryUserBurst <= 0 {
+			errs = append(errs, fmt.Errorf("rate_limit.query_user_* must be greater than 0"))
+		}
+		if o.RateLimit.WaitReportGlobalQPS <= 0 || o.RateLimit.WaitReportGlobalBurst <= 0 {
+			errs = append(errs, fmt.Errorf("rate_limit.wait_report_* must be greater than 0"))
+		}
+		if o.RateLimit.WaitReportUserQPS <= 0 || o.RateLimit.WaitReportUserBurst <= 0 {
+			errs = append(errs, fmt.Errorf("rate_limit.wait_report_user_* must be greater than 0"))
+		}
 	}
 
 	// 验证 JWT 配置

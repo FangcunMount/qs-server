@@ -72,9 +72,9 @@ redis:
     use-ssl: false
     enable-logging: false
 
-  # -------------------------------------------------------
-  # 3.2 Redis 存储（Store Redis）
-  # -------------------------------------------------------
+# -------------------------------------------------------
+# 3.2 Redis 存储（Store Redis）
+# -------------------------------------------------------
   # 用途：持久化存储、队列、发布订阅等
   store:
     host: "127.0.0.1"
@@ -88,6 +88,24 @@ redis:
     enable-cluster: false
     use-ssl: false
     enable-logging: false
+
+# -------------------------------------------------------
+# 3.3 限流配置
+# -------------------------------------------------------
+rate_limit:
+  enabled: true
+  submit_global_qps: 200
+  submit_global_burst: 300
+  submit_user_qps: 5
+  submit_user_burst: 10
+  query_global_qps: 200
+  query_global_burst: 300
+  query_user_qps: 10
+  query_user_burst: 20
+  wait_report_global_qps: 80
+  wait_report_global_burst: 120
+  wait_report_user_qps: 2
+  wait_report_user_burst: 5
 
 # ============================================================
 # 4. 集成配置

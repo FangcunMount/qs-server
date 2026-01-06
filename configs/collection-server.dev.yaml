@@ -89,6 +89,24 @@ redis:
     enable-logging: true  # 开发环境启用日志便于调试
 
 # ============================================================
+# 3.3 限流配置
+# ============================================================
+rate_limit:
+  enabled: true
+  submit_global_qps: 200
+  submit_global_burst: 300
+  submit_user_qps: 5
+  submit_user_burst: 10
+  query_global_qps: 200
+  query_global_burst: 300
+  query_user_qps: 10
+  query_user_burst: 20
+  wait_report_global_qps: 80
+  wait_report_global_burst: 120
+  wait_report_user_qps: 2
+  wait_report_user_burst: 5
+
+# ============================================================
 # 4. 集成配置
 # ============================================================
 # 外部服务集成配置（IAM 等）

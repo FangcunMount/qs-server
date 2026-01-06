@@ -161,7 +161,25 @@ redis:
     enable-logging: true  # 开发环境启用日志便于调试
 
 # -------------------------------------------------------
-# 3.5 MongoDB 数据库
+# 3.5 限流配置
+# -------------------------------------------------------
+rate_limit:
+  enabled: true
+  submit_global_qps: 200
+  submit_global_burst: 300
+  submit_user_qps: 5
+  submit_user_burst: 10
+  query_global_qps: 200
+  query_global_burst: 300
+  query_user_qps: 10
+  query_user_burst: 20
+  wait_report_global_qps: 80
+  wait_report_global_burst: 120
+  wait_report_user_qps: 2
+  wait_report_user_burst: 5
+
+# -------------------------------------------------------
+# 3.6 MongoDB 数据库
 # -------------------------------------------------------
 # 支持两种方式：分离参数（推荐）或直接 URL
 mongodb:

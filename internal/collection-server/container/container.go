@@ -161,6 +161,11 @@ func (c *Container) ScaleHandler() *handler.ScaleHandler {
 	return c.scaleHandler
 }
 
+// RateLimitOptions 获取限流配置
+func (c *Container) RateLimitOptions() *options.RateLimitOptions {
+	return c.opts.RateLimit
+}
+
 // ==================== Setters (用于 GRPCClientRegistry 注入) ====================
 
 // SetAnswerSheetClient 设置答卷客户端

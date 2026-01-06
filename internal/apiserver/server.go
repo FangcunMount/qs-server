@@ -188,7 +188,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}
 
 	// 创建并初始化路由器
-	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
+	NewRouter(s.container, s.config.RateLimit).RegisterRoutes(s.genericAPIServer.Engine)
 
 	// 注册 GRPC 服务
 	if err := NewGRPCRegistry(s.grpcServer, s.container).RegisterServices(); err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -14,12 +15,18 @@ import (
 // Router 集中的路由管理器
 type Router struct {
 	container *container.Container
+	rateCfg   *options.RateLimitOptions
 }
 
 // NewRouter 创建路由管理器
-func NewRouter(c *container.Container) *Router {
+func NewRouter(c *container.Container, rateCfg *options.RateLimitOptions) *Router {
+	if rateCfg == nil {
+		rateCfg = options.NewRateLimitOptions()
+	}
+
 	return &Router{
 		container: c,
+		rateCfg:   rateCfg,
 	}
 }
 
@@ -182,9 +189,30 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 	answersheets := apiV1.Group("/answersheets")
 	{
 		// 管理接口
-		answersheets.POST("/admin-submit", answersheetHandler.AdminSubmit) // 管理员提交答卷
-		answersheets.GET("/:id", answersheetHandler.GetByID)               // 获取答卷详情
-		answersheets.GET("", answersheetHandler.List)                      // 获取答卷列表
+		answersheets.POST("/admin-submit", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			answersheetHandler.AdminSubmit,
+		)...)
+		answersheets.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			answersheetHandler.GetByID,
+		)...)
+		answersheets.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			answersheetHandler.List,
+		)...)
 		// 统计接口已迁移到 /api/v1/statistics/questionnaires/:code
 	}
 }
@@ -233,20 +261,76 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	// 受试者路由
 	testees := apiV1.Group("/testees")
 	{
-		testees.GET("", actorHandler.ListTestees)                         // 查询受试者列表
-		testees.GET("/:id", actorHandler.GetTestee)                       // 获取受试者详情
-		testees.PUT("/:id", actorHandler.UpdateTestee)                    // 更新受试者
-		testees.GET("/:id/scale-analysis", actorHandler.GetScaleAnalysis) // 受试者量表分析
+		testees.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListTestees,
+		)...)
+		testees.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetTestee,
+		)...)
+		testees.PUT("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.UpdateTestee,
+		)...)
+		testees.GET("/:id/scale-analysis", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetScaleAnalysis,
+		)...)
 		// 统计接口已迁移到 /api/v1/statistics/testees/:testee_id
 	}
 
 	// 员工路由
 	staff := apiV1.Group("/staff")
 	{
-		staff.POST("", actorHandler.CreateStaff)       // 创建员工
-		staff.GET("", actorHandler.ListStaff)          // 查询员工列表
-		staff.GET("/:id", actorHandler.GetStaff)       // 获取员工详情
-		staff.DELETE("/:id", actorHandler.DeleteStaff) // 删除员工
+		staff.POST("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.CreateStaff,
+		)...)
+		staff.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListStaff,
+		)...)
+		staff.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetStaff,
+		)...)
+		staff.DELETE("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.DeleteStaff,
+		)...)
 	}
 }
 
@@ -263,34 +347,124 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		assessments := evaluations.Group("/assessments")
 		{
 			// 查询
-			assessments.GET("", evalHandler.ListAssessments)   // 查询测评列表
-			assessments.GET("/:id", evalHandler.GetAssessment) // 获取测评详情
+			assessments.GET("", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.ListAssessments,
+			)...)
+			assessments.GET("/:id", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.GetAssessment,
+			)...)
 			// 统计接口已迁移到 /api/v1/statistics/questionnaires/:code 或 /api/v1/statistics/system
 
 			// 得分和报告
-			assessments.GET("/:id/scores", evalHandler.GetScores)                     // 获取测评得分
-			assessments.GET("/:id/report", evalHandler.GetReport)                     // 获取测评报告
-			assessments.GET("/:id/high-risk-factors", evalHandler.GetHighRiskFactors) // 获取高风险因子
+			assessments.GET("/:id/scores", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.GetScores,
+			)...)
+			assessments.GET("/:id/report", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.GetReport,
+			)...)
+			assessments.GET("/:id/high-risk-factors", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.GetHighRiskFactors,
+			)...)
 
 			// 管理操作
-			assessments.POST("/:id/retry", evalHandler.RetryFailed) // 重试失败的测评
+			assessments.POST("/:id/retry", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.SubmitGlobalQPS,
+				r.rateCfg.SubmitGlobalBurst,
+				r.rateCfg.SubmitUserQPS,
+				r.rateCfg.SubmitUserBurst,
+				evalHandler.RetryFailed,
+			)...)
 		}
 
 		// ==================== Score 相关路由 ====================
 		scores := evaluations.Group("/scores")
 		{
-			scores.GET("/trend", evalHandler.GetFactorTrend) // 获取因子趋势
+			scores.GET("/trend", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.GetFactorTrend,
+			)...)
 		}
 
 		// ==================== Report 相关路由 ====================
 		reports := evaluations.Group("/reports")
 		{
-			reports.GET("", evalHandler.ListReports) // 查询报告列表
+			reports.GET("", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.ListReports,
+			)...)
 		}
 
 		// ==================== 批量操作路由 ====================
-		evaluations.POST("/batch-evaluate", evalHandler.BatchEvaluate) // 批量评估
+		evaluations.POST("/batch-evaluate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			evalHandler.BatchEvaluate,
+		)...)
 	}
+}
+
+func (r *Router) rateLimitedHandlers(
+	rateCfg *options.RateLimitOptions,
+	globalQPS float64,
+	globalBurst int,
+	userQPS float64,
+	userBurst int,
+	handler gin.HandlerFunc,
+) []gin.HandlerFunc {
+	if !rateCfg.Enabled {
+		return []gin.HandlerFunc{handler}
+	}
+
+	return []gin.HandlerFunc{
+		middleware.Limit(globalQPS, globalBurst),
+		middleware.LimitByKey(userQPS, userBurst, requestLimitKey),
+		handler,
+	}
+}
+
+func requestLimitKey(c *gin.Context) string {
+	userID := middleware.GetUserID(c)
+	if userID != "" {
+		return "user:" + userID
+	}
+	return "ip:" + c.ClientIP()
 }
 
 // registerPlanProtectedRoutes 注册 Plan 模块相关的受保护路由
@@ -303,40 +477,173 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	plans := apiV1.Group("/plans")
 	{
 		// ==================== Plan 生命周期管理 ====================
-		plans.POST("", planHandler.CreatePlan)            // 创建计划
-		plans.POST("/:id/pause", planHandler.PausePlan)   // 暂停计划
-		plans.POST("/:id/resume", planHandler.ResumePlan) // 恢复计划
-		plans.POST("/:id/cancel", planHandler.CancelPlan) // 取消计划
+		plans.POST("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.CreatePlan,
+		)...)
+		plans.POST("/:id/pause", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.PausePlan,
+		)...)
+		plans.POST("/:id/resume", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.ResumePlan,
+		)...)
+		plans.POST("/:id/cancel", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.CancelPlan,
+		)...)
 
 		// ==================== Plan 查询 ====================
-		plans.GET("", planHandler.ListPlans)                 // 查询计划列表
-		plans.GET("/:id/tasks", planHandler.ListTasksByPlan) // 查询计划下的所有任务（必须在 /:id 之前注册）
-		plans.GET("/:id", planHandler.GetPlan)               // 获取计划详情
+		plans.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.ListPlans,
+		)...)
+		plans.GET("/:id/tasks", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.ListTasksByPlan,
+		)...)
+		plans.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.GetPlan,
+		)...)
 
 		// ==================== Plan 受试者管理 ====================
-		plans.POST("/enroll", planHandler.EnrollTestee)                                  // 受试者加入计划
-		plans.POST("/:id/testees/:testee_id/terminate", planHandler.TerminateEnrollment) // 终止受试者的计划参与
+		plans.POST("/enroll", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.EnrollTestee,
+		)...)
+		plans.POST("/:id/testees/:testee_id/terminate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.TerminateEnrollment,
+		)...)
 	}
 
 	// ==================== Task 管理 ====================
 	tasks := apiV1.Group("/plans/tasks")
 	{
-		tasks.POST("/schedule", planHandler.SchedulePendingTasks) // 调度待推送任务
-		tasks.GET("", planHandler.ListTasks)                      // 查询任务列表
-		tasks.GET("/:id", planHandler.GetTask)                    // 获取任务详情
-		tasks.POST("/:id/open", planHandler.OpenTask)             // 开放任务
-		tasks.POST("/:id/complete", planHandler.CompleteTask)     // 完成任务
-		tasks.POST("/:id/expire", planHandler.ExpireTask)         // 过期任务
-		tasks.POST("/:id/cancel", planHandler.CancelTask)         // 取消任务
+		tasks.POST("/schedule", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.SchedulePendingTasks,
+		)...)
+		tasks.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.ListTasks,
+		)...)
+		tasks.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.GetTask,
+		)...)
+		tasks.POST("/:id/open", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.OpenTask,
+		)...)
+		tasks.POST("/:id/complete", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.CompleteTask,
+		)...)
+		tasks.POST("/:id/expire", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.ExpireTask,
+		)...)
+		tasks.POST("/:id/cancel", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.CancelTask,
+		)...)
 	}
 
 	// ==================== Testee 相关的 Plan 查询 ====================
 	// 注意：这些路由必须在 registerActorProtectedRoutes 之后注册，且更具体的路由要放在前面
 	testees := apiV1.Group("/testees")
 	{
-		testees.GET("/:id/plans/:plan_id/tasks", planHandler.ListTasksByTesteeAndPlan) // 查询受试者在某个计划下的所有任务（最具体，最先匹配）
-		testees.GET("/:id/plans", planHandler.ListPlansByTestee)                       // 查询受试者参与的所有计划
-		testees.GET("/:id/tasks", planHandler.ListTasksByTestee)                       // 查询受试者的所有任务
+		testees.GET("/:id/plans/:plan_id/tasks", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.ListTasksByTesteeAndPlan,
+		)...)
+		testees.GET("/:id/plans", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.ListPlansByTestee,
+		)...)
+		testees.GET("/:id/tasks", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			planHandler.ListTasksByTestee,
+		)...)
 	}
 }
 
@@ -350,21 +657,77 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 	statistics := apiV1.Group("/statistics")
 	{
 		// ==================== 统计查询 ====================
-		statistics.GET("/system", statisticsModule.Handler.GetSystemStatistics)                      // 获取系统整体统计
-		statistics.GET("/questionnaires/:code", statisticsModule.Handler.GetQuestionnaireStatistics) // 获取问卷/量表统计
-		statistics.GET("/testees/:testee_id", statisticsModule.Handler.GetTesteeStatistics)          // 获取受试者统计
-		statistics.GET("/plans/:plan_id", statisticsModule.Handler.GetPlanStatistics)                // 获取计划统计
+		statistics.GET("/system", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetSystemStatistics,
+		)...)
+		statistics.GET("/questionnaires/:code", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetQuestionnaireStatistics,
+		)...)
+		statistics.GET("/testees/:testee_id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetTesteeStatistics,
+		)...)
+		statistics.GET("/plans/:plan_id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetPlanStatistics,
+		)...)
 
 		// ==================== 定时任务接口 ====================
 		sync := statistics.Group("/sync")
 		{
-			sync.POST("/daily", statisticsModule.Handler.SyncDailyStatistics)             // 同步每日统计
-			sync.POST("/accumulated", statisticsModule.Handler.SyncAccumulatedStatistics) // 同步累计统计
-			sync.POST("/plan", statisticsModule.Handler.SyncPlanStatistics)               // 同步计划统计
+			sync.POST("/daily", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.SubmitGlobalQPS,
+				r.rateCfg.SubmitGlobalBurst,
+				r.rateCfg.SubmitUserQPS,
+				r.rateCfg.SubmitUserBurst,
+				statisticsModule.Handler.SyncDailyStatistics,
+			)...)
+			sync.POST("/accumulated", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.SubmitGlobalQPS,
+				r.rateCfg.SubmitGlobalBurst,
+				r.rateCfg.SubmitUserQPS,
+				r.rateCfg.SubmitUserBurst,
+				statisticsModule.Handler.SyncAccumulatedStatistics,
+			)...)
+			sync.POST("/plan", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.SubmitGlobalQPS,
+				r.rateCfg.SubmitGlobalBurst,
+				r.rateCfg.SubmitUserQPS,
+				r.rateCfg.SubmitUserBurst,
+				statisticsModule.Handler.SyncPlanStatistics,
+			)...)
 		}
 
 		// ==================== 数据校验 ====================
-		statistics.POST("/validate", statisticsModule.Handler.ValidateConsistency) // 校验数据一致性
+		statistics.POST("/validate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			statisticsModule.Handler.ValidateConsistency,
+		)...)
 	}
 }
 
@@ -373,9 +736,30 @@ func (r *Router) registerAdminRoutes(apiV1 *gin.RouterGroup) {
 	admin := apiV1.Group("/admin")
 	// admin.Use(r.requireAdminRole()) // 需要实现管理员权限检查中间件
 	{
-		admin.GET("/users", r.placeholder)      // 管理员获取所有用户
-		admin.GET("/statistics", r.placeholder) // 系统统计信息
-		admin.GET("/logs", r.placeholder)       // 系统日志
+		admin.GET("/users", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			r.placeholder,
+		)...)
+		admin.GET("/statistics", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			r.placeholder,
+		)...)
+		admin.GET("/logs", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			r.placeholder,
+		)...)
 	}
 }
 
