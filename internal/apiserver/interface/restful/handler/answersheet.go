@@ -46,6 +46,7 @@ func NewAnswerSheetHandler(
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "答卷ID"
 // @Success 200 {object} core.Response{data=response.AnswerSheetResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 	answerSheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -77,6 +78,7 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Param start_time query string false "开始时间"
 // @Param end_time query string false "结束时间"
 // @Success 200 {object} core.Response{data=response.AnswerSheetListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/answersheets [get]
 func (h *AnswerSheetHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -140,6 +142,7 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body request.AdminSubmitAnswerSheetRequest true "答卷数据"
 // @Success 200 {object} core.Response{data=response.AnswerSheetResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 403 {object} core.ErrResponse

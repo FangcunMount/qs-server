@@ -53,6 +53,7 @@ func NewStatisticsHandler(
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response{data=statistics.SystemStatistics}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/system [get]
 func (h *StatisticsHandler) GetSystemStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -83,6 +84,7 @@ func (h *StatisticsHandler) GetSystemStatistics(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "问卷编码"
 // @Success 200 {object} core.Response{data=statistics.QuestionnaireStatistics}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/questionnaires/{code} [get]
 func (h *StatisticsHandler) GetQuestionnaireStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -123,6 +125,7 @@ func (h *StatisticsHandler) GetQuestionnaireStatistics(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param testee_id path uint64 true "受试者ID"
 // @Success 200 {object} core.Response{data=statistics.TesteeStatistics}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/testees/{testee_id} [get]
 func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -164,6 +167,7 @@ func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param plan_id path uint64 true "计划ID"
 // @Success 200 {object} core.Response{data=statistics.PlanStatistics}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/plans/{plan_id} [get]
 func (h *StatisticsHandler) GetPlanStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -206,6 +210,7 @@ func (h *StatisticsHandler) GetPlanStatistics(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/sync/daily [post]
 func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -231,6 +236,7 @@ func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/sync/accumulated [post]
 func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -256,6 +262,7 @@ func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/sync/plan [post]
 func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -281,6 +288,7 @@ func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/validate [post]
 func (h *StatisticsHandler) ValidateConsistency(c *gin.Context) {
 	ctx := c.Request.Context()

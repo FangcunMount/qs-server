@@ -70,6 +70,7 @@ func NewActorHandler(
 // @Produce json
 // @Param id path string true "受试者ID"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/{id} [get]
 // GetTestee 获取受试者详情（后台管理接口，包含家长信息）
 func (h *ActorHandler) GetTestee(c *gin.Context) {
@@ -109,6 +110,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Testee ID"
 // @Success 200 {object} core.Response{data=response.ScaleAnalysisResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.Response
 // @Failure 404 {object} core.Response
 // @Router /api/v1/testees/{id}/scale-analysis [get]
@@ -257,6 +259,7 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Testee ID"
 // @Success 200 {object} core.Response{data=response.PeriodicStatsResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.Response
 // @Failure 404 {object} core.Response
 // @Router /api/v1/testees/{id}/periodic-stats [get]
@@ -304,6 +307,7 @@ func (h *ActorHandler) GetPeriodicStats(c *gin.Context) {
 // @Param id path string true "受试者ID"
 // @Param body body request.UpdateTesteeRequest true "更新受试者请求"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/{id} [put]
 // UpdateTestee 更新受试者
 func (h *ActorHandler) UpdateTestee(c *gin.Context) {
@@ -397,6 +401,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} core.Response{data=response.TesteeListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees [get]
 func (h *ActorHandler) ListTestees(c *gin.Context) {
 	var req request.ListTesteeRequest
@@ -452,6 +457,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 // @Produce json
 // @Param body body request.CreateStaffRequest true "创建员工请求"
 // @Success 200 {object} core.Response{data=response.StaffResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/staff [post]
 func (h *ActorHandler) CreateStaff(c *gin.Context) {
 	var req request.CreateStaffRequest
@@ -488,6 +494,7 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 // @Produce json
 // @Param id path string true "员工ID"
 // @Success 200 {object} core.Response{data=response.StaffResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/staff/{id} [get]
 func (h *ActorHandler) GetStaff(c *gin.Context) {
 	idStr := c.Param("id")
@@ -525,6 +532,7 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 // @Produce json
 // @Param id path string true "员工ID"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/staff/{id} [delete]
 func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 	idStr := c.Param("id")
@@ -564,6 +572,7 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} core.Response{data=response.StaffListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/staff [get]
 func (h *ActorHandler) ListStaff(c *gin.Context) {
 	var req request.ListStaffRequest

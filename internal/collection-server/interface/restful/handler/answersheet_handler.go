@@ -34,6 +34,7 @@ func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *An
 // @Produce json
 // @Param request body answersheet.SubmitAnswerSheetRequest true "答卷数据"
 // @Success 200 {object} core.Response{data=answersheet.SubmitAnswerSheetResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -95,6 +96,7 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 // @Produce json
 // @Param request_id query string true "请求ID"
 // @Success 200 {object} core.Response{data=answersheet.SubmitStatusResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -123,6 +125,7 @@ func (h *AnswerSheetHandler) SubmitStatus(c *gin.Context) {
 // @Produce json
 // @Param id path int true "答卷ID"
 // @Success 200 {object} core.Response{data=answersheet.AnswerSheetResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse

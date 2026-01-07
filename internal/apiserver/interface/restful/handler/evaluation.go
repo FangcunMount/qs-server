@@ -62,6 +62,7 @@ func (h *EvaluationHandler) SetWaiterRegistry(waiterRegistry *waiter.WaiterRegis
 // @Produce json
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id} [get]
 func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -90,6 +91,7 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 // @Param status query string false "状态筛选"
 // @Param testee_id query string false "受试者ID筛选"
 // @Success 200 {object} core.Response{data=response.AssessmentListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments [get]
 func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	var req request.ListAssessmentsRequest
@@ -141,6 +143,7 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Produce json
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.ScoreResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetScores(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -168,6 +171,7 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 // @Param factor_code query string true "因子编码"
 // @Param limit query int false "返回记录数限制" default(10)
 // @Success 200 {object} core.Response{data=response.FactorTrendResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/scores/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	var req request.GetFactorTrendRequest
@@ -203,6 +207,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Produce json
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.HighRiskFactorsResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/high-risk-factors [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -232,6 +237,7 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Produce json
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.ReportResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetReport(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -259,6 +265,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
 // @Success 200 {object} core.Response{data=response.ReportListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/reports [get]
 func (h *EvaluationHandler) ListReports(c *gin.Context) {
 	var req request.ListReportsRequest
@@ -300,6 +307,7 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 // @Produce json
 // @Param request body request.BatchEvaluateRequest true "批量评估请求"
 // @Success 200 {object} core.Response{data=response.BatchEvaluationResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/batch-evaluate [post]
 func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 	var req request.BatchEvaluateRequest
@@ -325,6 +333,7 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 // @Produce json
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/retry [post]
 func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -351,6 +360,7 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 // @Param id path string true "测评ID"
 // @Param timeout query int false "超时时间（秒）" default(15) minimum(5) maximum(60)
 // @Success 200 {object} core.Response{data=waiter.StatusSummary}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/assessments/{id}/wait-report [get]
 func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

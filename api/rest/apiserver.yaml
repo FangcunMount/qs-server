@@ -109,6 +109,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AnswerSheetListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /answersheets/admin-submit:
     post:
       tags:
@@ -158,6 +164,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
           content:
@@ -194,6 +206,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AnswerSheetResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /assessments/{id}/wait-report:
     get:
       tags:
@@ -226,6 +244,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/waiter.StatusSummary'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /codes/apply:
     post:
       tags:
@@ -293,6 +317,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AssessmentListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/assessments/{id}:
     get:
       tags:
@@ -318,6 +348,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AssessmentResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/assessments/{id}/high-risk-factors:
     get:
       tags:
@@ -343,6 +379,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.HighRiskFactorsResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/assessments/{id}/report:
     get:
       tags:
@@ -372,6 +414,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.ReportResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/assessments/{id}/retry:
     post:
       tags:
@@ -397,6 +445,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.AssessmentResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/assessments/{id}/scores:
     get:
       tags:
@@ -422,6 +476,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.ScoreResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/batch-evaluate:
     post:
       tags:
@@ -447,6 +507,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.BatchEvaluationResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/reports:
     get:
       tags:
@@ -483,6 +549,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.ReportListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /evaluations/scores/trend:
     get:
       tags:
@@ -518,6 +590,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.FactorTrendResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans:
     get:
       tags:
@@ -565,6 +643,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     post:
       tags:
       - Plan-Lifecycle
@@ -601,6 +685,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/enroll:
     post:
       tags:
@@ -632,6 +722,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.EnrollmentResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks:
     get:
       tags:
@@ -679,6 +775,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/schedule:
     post:
       tags:
@@ -708,6 +810,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}:
     get:
       tags:
@@ -738,6 +846,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}/cancel:
     post:
       tags:
@@ -763,6 +877,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}/complete:
     post:
       tags:
@@ -798,6 +918,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}/expire:
     post:
       tags:
@@ -828,6 +954,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}/open:
     post:
       tags:
@@ -864,6 +996,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}:
     get:
       tags:
@@ -894,6 +1032,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}/cancel:
     post:
       tags:
@@ -919,6 +1063,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}/pause:
     post:
       tags:
@@ -949,6 +1099,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}/resume:
     post:
       tags:
@@ -985,6 +1141,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}/tasks:
     get:
       tags:
@@ -1015,6 +1177,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}/testees/{testee_id}/terminate:
     post:
       tags:
@@ -1045,6 +1213,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /public/questionnaires:
     get:
       tags:
@@ -2342,6 +2516,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.StaffListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     post:
       tags:
       - Actor
@@ -2365,6 +2545,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.StaffResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /staff/{id}:
     get:
       tags:
@@ -2389,6 +2575,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.StaffResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     delete:
       tags:
       - Actor
@@ -2407,6 +2599,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/plans/{plan_id}:
     get:
       tags:
@@ -2438,6 +2636,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.PlanStatistics'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/questionnaires/{code}:
     get:
       tags:
@@ -2468,6 +2672,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.QuestionnaireStatistics'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/sync/accumulated:
     post:
       tags:
@@ -2488,6 +2698,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/sync/daily:
     post:
       tags:
@@ -2508,6 +2724,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/sync/plan:
     post:
       tags:
@@ -2528,6 +2750,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/system:
     get:
       tags:
@@ -2553,6 +2781,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.SystemStatistics'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/testees/{testee_id}:
     get:
       tags:
@@ -2584,6 +2818,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.TesteeStatistics'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/validate:
     post:
       tags:
@@ -2604,6 +2844,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees:
     get:
       tags:
@@ -2646,6 +2892,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TesteeListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees/{id}:
     get:
       tags:
@@ -2670,6 +2922,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TesteeResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     put:
       tags:
       - Actor
@@ -2699,6 +2957,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TesteeResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees/{id}/periodic-stats:
     get:
       tags:
@@ -2735,6 +2999,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees/{id}/plans:
     get:
       tags:
@@ -2765,6 +3035,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PlanListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees/{id}/plans/{plan_id}/tasks:
     get:
       tags:
@@ -2800,6 +3076,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees/{id}/scale-analysis:
     get:
       tags:
@@ -2836,6 +3118,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /testees/{id}/tasks:
     get:
       tags:
@@ -2866,6 +3154,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TaskListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /health:
     get:
       tags:

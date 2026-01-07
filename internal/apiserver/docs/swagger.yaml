@@ -1635,6 +1635,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.AnswerSheetListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询答卷列表
       tags:
       - AnswerSheet-Management
@@ -1666,6 +1670,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.AnswerSheetResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取答卷详情
       tags:
       - AnswerSheet-Management
@@ -1710,6 +1718,10 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1745,6 +1757,10 @@ paths:
                 data:
                   $ref: '#/definitions/waiter.StatusSummary'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 长轮询等待报告生成
       tags:
       - Evaluation-Assessment
@@ -1812,6 +1828,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询测评列表
       tags:
       - Evaluation-Assessment
@@ -1836,6 +1856,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取测评详情
       tags:
       - Evaluation-Assessment
@@ -1860,6 +1884,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.HighRiskFactorsResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取高风险因子
       tags:
       - Evaluation-Score
@@ -1887,6 +1915,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.ReportResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取测评报告
       tags:
       - Evaluation-Report
@@ -1911,6 +1943,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.AssessmentResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 重试失败的测评
       tags:
       - Evaluation-Admin
@@ -1935,6 +1971,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.ScoreResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取测评得分
       tags:
       - Evaluation-Score
@@ -1962,6 +2002,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.BatchEvaluationResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 批量评估
       tags:
       - Evaluation-Admin
@@ -1997,6 +2041,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.ReportListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询报告列表
       tags:
       - Evaluation-Report
@@ -2031,6 +2079,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.FactorTrendResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取因子趋势
       tags:
       - Evaluation-Score
@@ -2077,6 +2129,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.PlanListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询计划列表
       tags:
       - Plan-Query
@@ -2112,6 +2168,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.PlanResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 创建测评计划模板
       tags:
       - Plan-Lifecycle
@@ -2141,6 +2201,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.PlanResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取计划详情
       tags:
       - Plan-Query
@@ -2165,6 +2229,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 取消计划
       tags:
       - Plan-Lifecycle
@@ -2194,6 +2262,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.PlanResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 暂停计划
       tags:
       - Plan-Lifecycle
@@ -2230,6 +2302,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.PlanResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 恢复计划
       tags:
       - Plan-Lifecycle
@@ -2259,6 +2335,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询计划下的所有任务
       tags:
       - Plan-Query
@@ -2288,6 +2368,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 终止受试者的计划参与
       tags:
       - Plan-Enrollment
@@ -2320,6 +2404,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.EnrollmentResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 受试者加入计划
       tags:
       - Plan-Enrollment
@@ -2366,6 +2454,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询任务列表
       tags:
       - Plan-Query
@@ -2395,6 +2487,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取任务详情
       tags:
       - Plan-Query
@@ -2419,6 +2515,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 取消任务
       tags:
       - Task-Management
@@ -2453,6 +2553,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 完成任务
       tags:
       - Task-Management
@@ -2482,6 +2586,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 过期任务
       tags:
       - Task-Management
@@ -2519,6 +2627,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 开放任务
       tags:
       - Task-Management
@@ -2547,6 +2659,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 调度待推送任务
       tags:
       - Task-Scheduler
@@ -3801,6 +3917,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.StaffListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询员工列表
       tags:
       - Actor
@@ -3826,6 +3946,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.StaffResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 创建员工
       tags:
       - Actor
@@ -3844,6 +3968,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 删除员工
       tags:
       - Actor
@@ -3866,6 +3994,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.StaffResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取员工详情
       tags:
       - Actor
@@ -3898,6 +4030,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.PlanStatistics'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取计划统计
       tags:
       - Statistics
@@ -3929,6 +4065,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.QuestionnaireStatistics'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取问卷/量表统计
       tags:
       - Statistics
@@ -3950,6 +4090,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 同步累计统计
       tags:
       - Statistics-Sync
@@ -3971,6 +4115,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 同步每日统计
       tags:
       - Statistics-Sync
@@ -3992,6 +4140,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 同步计划统计
       tags:
       - Statistics-Sync
@@ -4018,6 +4170,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.SystemStatistics'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取系统整体统计
       tags:
       - Statistics
@@ -4050,6 +4206,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.TesteeStatistics'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取受试者统计
       tags:
       - Statistics
@@ -4071,6 +4231,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 校验数据一致性
       tags:
       - Statistics-Sync
@@ -4112,6 +4276,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TesteeListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询受试者列表
       tags:
       - Actor
@@ -4135,6 +4303,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TesteeResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取受试者详情
       tags:
       - Actor
@@ -4165,6 +4337,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TesteeResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 更新受试者
       tags:
       - Actor
@@ -4196,6 +4372,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取受试者周期统计
       tags:
       - Testee
@@ -4225,6 +4405,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.PlanListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询受试者参与的所有计划
       tags:
       - Plan-Query
@@ -4259,6 +4443,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询受试者在某个计划下的所有任务
       tags:
       - Plan-Query
@@ -4290,6 +4478,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取受试者量表分析结果
       tags:
       - Testee
@@ -4319,6 +4511,10 @@ paths:
                 data:
                   $ref: '#/definitions/response.TaskListResponse'
               type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询受试者的所有任务
       tags:
       - Plan-Query

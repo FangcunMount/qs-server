@@ -34,6 +34,7 @@ func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHand
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
 // @Success 200 {object} core.Response{data=evaluation.AssessmentDetailResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -83,6 +84,7 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} core.Response{data=evaluation.ListAssessmentsResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
@@ -122,6 +124,7 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
 // @Success 200 {object} core.Response{data=[]evaluation.FactorScoreResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
@@ -164,6 +167,7 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Produce json
 // @Param id path int true "测评ID"
 // @Success 200 {object} core.Response{data=evaluation.AssessmentReportResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
@@ -200,6 +204,7 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 // @Param testee_id query int true "受试者ID"
 // @Param timeout query int false "超时时间（秒）" default(15) minimum(5) maximum(60)
 // @Success 200 {object} core.Response{data=evaluation.AssessmentStatusResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
@@ -311,6 +316,7 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 // @Param factor_code query string true "因子编码"
 // @Param limit query int false "数据点数量" default(10)
 // @Success 200 {object} core.Response{data=[]evaluation.TrendPointResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
@@ -350,6 +356,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
 // @Success 200 {object} core.Response{data=[]evaluation.FactorScoreResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse
 // @Security Bearer
@@ -390,6 +397,7 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Produce json
 // @Param id path int true "答卷ID"
 // @Success 200 {object} core.Response{data=evaluation.AssessmentDetailResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
 // @Failure 500 {object} core.ErrResponse

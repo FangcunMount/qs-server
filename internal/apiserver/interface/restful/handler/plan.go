@@ -56,6 +56,7 @@ func NewPlanHandler(
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body request.CreatePlanRequest true "创建计划请求（scale_code: 量表编码，如 '3adyDE'）"
 // @Success 200 {object} core.Response{data=response.PlanResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans [post]
 func (h *PlanHandler) CreatePlan(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -237,6 +238,7 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "计划ID"
 // @Success 200 {object} core.Response{data=response.PlanResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/{id}/pause [post]
 func (h *PlanHandler) PausePlan(c *gin.Context) {
 	planID := c.Param("id")
@@ -270,6 +272,7 @@ func (h *PlanHandler) PausePlan(c *gin.Context) {
 // @Param id path string true "计划ID"
 // @Param request body request.ResumePlanRequest false "恢复计划请求（可选）"
 // @Success 200 {object} core.Response{data=response.PlanResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/{id}/resume [post]
 func (h *PlanHandler) ResumePlan(c *gin.Context) {
 	planID := c.Param("id")
@@ -310,6 +313,7 @@ func (h *PlanHandler) ResumePlan(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "计划ID"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/{id}/cancel [post]
 func (h *PlanHandler) CancelPlan(c *gin.Context) {
 	planID := c.Param("id")
@@ -344,6 +348,7 @@ func (h *PlanHandler) CancelPlan(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body request.EnrollTesteeRequest true "加入计划请求"
 // @Success 200 {object} core.Response{data=response.EnrollmentResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/enroll [post]
 func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 	var req request.EnrollTesteeRequest
@@ -387,6 +392,7 @@ func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 // @Param id path string true "计划ID"
 // @Param testee_id path string true "受试者ID"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/{id}/testees/{testee_id}/terminate [post]
 func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 	planID := c.Param("id")
@@ -423,6 +429,7 @@ func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param before query string false "截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/schedule [post]
 func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 	before := c.Query("before")
@@ -457,6 +464,7 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 // @Param id path string true "任务ID"
 // @Param request body request.OpenTaskRequest true "开放任务请求"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/{id}/open [post]
 func (h *PlanHandler) OpenTask(c *gin.Context) {
 	taskID := c.Param("id")
@@ -505,6 +513,7 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 // @Param id path string true "任务ID"
 // @Param assessment_id query string true "测评ID"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/{id}/complete [post]
 func (h *PlanHandler) CompleteTask(c *gin.Context) {
 	taskID := c.Param("id")
@@ -538,6 +547,7 @@ func (h *PlanHandler) CompleteTask(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "任务ID"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/{id}/expire [post]
 func (h *PlanHandler) ExpireTask(c *gin.Context) {
 	taskID := c.Param("id")
@@ -569,6 +579,7 @@ func (h *PlanHandler) ExpireTask(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "任务ID"
 // @Success 200 {object} core.Response
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/{id}/cancel [post]
 func (h *PlanHandler) CancelTask(c *gin.Context) {
 	taskID := c.Param("id")
@@ -602,6 +613,7 @@ func (h *PlanHandler) CancelTask(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "计划ID"
 // @Success 200 {object} core.Response{data=response.PlanResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/{id} [get]
 func (h *PlanHandler) GetPlan(c *gin.Context) {
 	planID := c.Param("id")
@@ -631,6 +643,7 @@ func (h *PlanHandler) GetPlan(c *gin.Context) {
 // @Param page query int true "页码（从1开始）"
 // @Param page_size query int true "每页数量"
 // @Success 200 {object} core.Response{data=response.PlanListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans [get]
 func (h *PlanHandler) ListPlans(c *gin.Context) {
 	var req request.ListPlansRequest
@@ -673,6 +686,7 @@ func (h *PlanHandler) ListPlans(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "任务ID"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/{id} [get]
 func (h *PlanHandler) GetTask(c *gin.Context) {
 	taskID := c.Param("id")
@@ -702,6 +716,7 @@ func (h *PlanHandler) GetTask(c *gin.Context) {
 // @Param page query int true "页码"
 // @Param page_size query int true "每页数量"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks [get]
 func (h *PlanHandler) ListTasks(c *gin.Context) {
 	var req request.ListTasksRequest
@@ -739,6 +754,7 @@ func (h *PlanHandler) ListTasks(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "计划ID"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/{id}/tasks [get]
 func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
 	planID := c.Param("id")
@@ -764,6 +780,7 @@ func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "受试者ID"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/{id}/tasks [get]
 func (h *PlanHandler) ListTasksByTestee(c *gin.Context) {
 	testeeID := c.Param("id")
@@ -789,6 +806,7 @@ func (h *PlanHandler) ListTasksByTestee(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "受试者ID"
 // @Success 200 {object} core.Response{data=response.PlanListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/{id}/plans [get]
 func (h *PlanHandler) ListPlansByTestee(c *gin.Context) {
 	testeeID := c.Param("id")
@@ -828,6 +846,7 @@ func (h *PlanHandler) ListPlansByTestee(c *gin.Context) {
 // @Param id path string true "受试者ID"
 // @Param plan_id path string true "计划ID"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
+// @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/{id}/plans/{plan_id}/tasks [get]
 func (h *PlanHandler) ListTasksByTesteeAndPlan(c *gin.Context) {
 	testeeID := c.Param("id")

@@ -754,6 +754,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -790,6 +794,10 @@ paths:
             $ref: '#/definitions/core.ErrResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "500":
@@ -830,6 +838,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -866,6 +878,10 @@ paths:
             $ref: '#/definitions/core.ErrResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "500":
@@ -916,6 +932,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -959,6 +979,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -998,6 +1022,10 @@ paths:
               type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "500":
@@ -1041,6 +1069,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1080,6 +1112,10 @@ paths:
               type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "500":
@@ -1128,6 +1164,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1172,6 +1212,10 @@ paths:
               type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
         "500":

@@ -63,6 +63,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
           content:
@@ -102,6 +108,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -149,6 +161,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
           content:
@@ -188,6 +206,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -243,6 +267,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
           content:
@@ -288,6 +318,12 @@ paths:
                         $ref: '#/components/schemas/evaluation.TrendPointResponse'
         '400':
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -340,6 +376,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
           content:
@@ -380,6 +422,12 @@ paths:
                         $ref: '#/components/schemas/evaluation.FactorScoreResponse'
         '400':
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -431,6 +479,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
           description: Internal Server Error
           content:
@@ -471,6 +525,12 @@ paths:
                         $ref: '#/components/schemas/evaluation.FactorScoreResponse'
         '400':
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
@@ -520,6 +580,12 @@ paths:
                       $ref: '#/components/schemas/evaluation.AssessmentStatusResponse'
         '400':
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
           content:
             application/json:
               schema:
