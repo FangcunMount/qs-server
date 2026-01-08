@@ -9,7 +9,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
+	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
+	"github.com/nsqio/go-nsq"
 )
 
 // workerServer 定义了 Worker 服务器的基本结构
@@ -126,7 +127,11 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	}
 
 	// 7. 创建消息订阅者
-	s.subscriber, err = createSubscriber(s.config.Messaging, s.logger)
+	maxInFlight := 1
+	if s.config != nil && s.config.Worker != nil && s.config.Worker.Concurrency > 0 {
+		maxInFlight = s.config.Worker.Concurrency
+	}
+	s.subscriber, err = createSubscriber(s.config.Messaging, s.logger, maxInFlight)
 	if err != nil {
 		log.Fatalf("Failed to create subscriber: %v", err)
 	}
@@ -248,7 +253,7 @@ func (s *workerServer) createTopics() error {
 	}
 
 	// 创建 Topic 创建器
-	creator := nsq.NewTopicCreator(s.config.Messaging.NSQAddr, s.logger)
+	creator := cbnsq.NewTopicCreator(s.config.Messaging.NSQAddr, s.logger)
 
 	// 创建所有 topics
 	return creator.EnsureTopics(topics)
@@ -304,16 +309,20 @@ func initLogger(cfg *config.LogConfig) *slog.Logger {
 }
 
 // createSubscriber 创建消息订阅者
-func createSubscriber(cfg *config.MessagingConfig, logger *slog.Logger) (messaging.Subscriber, error) {
+func createSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (messaging.Subscriber, error) {
 	switch cfg.Provider {
 	case "nsq":
-		return nsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nil)
+		nsqCfg := nsq.NewConfig()
+		if maxInFlight > 0 {
+			nsqCfg.MaxInFlight = maxInFlight
+		}
+		return cbnsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nsqCfg)
 	case "rabbitmq":
 		return rabbitmq.NewSubscriber(cfg.RabbitMQURL)
 	default:
 		logger.Warn("unknown messaging provider, using NSQ as default",
 			slog.String("provider", cfg.Provider),
 		)
-		return nsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nil)
+		return cbnsq.NewSubscriber([]string{cfg.NSQLookupdAddr}, nil)
 	}
 }
