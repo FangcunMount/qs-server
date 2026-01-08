@@ -168,8 +168,8 @@ redis:
 # 3.4 缓存控制
 # ----------------------------------------------------------------------------
 cache:
-  disable_evaluation_cache: true
-  disable_statistics_cache: true
+  disable_evaluation_cache: false
+  disable_statistics_cache: false 
 
 # ----------------------------------------------------------------------------
 # 3.4 限流配置
