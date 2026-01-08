@@ -208,6 +208,8 @@ func NewCacheOptions() *CacheOptions {
 	}
 }
 
+// WithDefaultsForProd keeps caching disabled by default so redis writes stop unless explicitly re-enabled.
+
 // AddFlags 注册缓存相关命令行参数
 func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	if c == nil {

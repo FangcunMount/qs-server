@@ -65,6 +65,8 @@ func NewCacheOptions() *CacheOptions {
 	}
 }
 
+// WithDefaultsForProd keeps worker statistics cache disabled until explicitly turned back on.
+
 // GRPCOptions gRPC 客户端配置
 type GRPCOptions struct {
 	// ApiserverAddr apiserver gRPC 服务地址

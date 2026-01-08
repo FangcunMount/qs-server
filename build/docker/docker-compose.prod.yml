@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
     mem_limit: "1g"
-    cpus: "0.5"
+    cpus: "1"
     networks:
       - qs-network
       - infra-network
@@ -24,6 +24,8 @@ services:
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
       # 二维码存储目录
       - /data/image/qrcode:/data/image/qrcode:rw
+    environment:
+      - GOMEMLIMIT=900MiB
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
   qs-collection-server:
@@ -31,8 +33,7 @@ services:
     container_name: qs-collection-server
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
-    # 注意：Go 程序需要足够的内存用于 GC，建议至少 1GB
-    mem_limit: "1g"
+    mem_limit: "512m"
     cpus: "0.5"
     networks:
       - qs-network
@@ -53,7 +54,7 @@ services:
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     # 设置 Go 内存限制，帮助 GC 更积极地回收内存
     environment:
-      - GOMEMLIMIT=900MiB
+      - GOMEMLIMIT=450MiB
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
   qs-worker:
@@ -61,8 +62,8 @@ services:
     container_name: qs-worker
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
-    mem_limit: "384m"
-    cpus: "0.25"
+    mem_limit: "512m"
+    cpus: "0.5"
     networks:
       - qs-network
       - infra-network
@@ -76,6 +77,8 @@ services:
       - /data/ssl/private:/etc/qs-server/ssl/private:ro
       # gRPC mTLS 证书目录（CA + 客户端证书）
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
+    environment:
+      - GOMEMLIMIT=450MiB
     command: ["--config=/app/configs/worker.prod.yaml"]
 
 networks:
