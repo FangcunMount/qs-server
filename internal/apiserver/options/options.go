@@ -203,8 +203,8 @@ type CacheOptions struct {
 // NewCacheOptions 创建默认缓存配置
 func NewCacheOptions() *CacheOptions {
 	return &CacheOptions{
-		DisableEvaluationCache: false,
-		DisableStatisticsCache: false,
+		DisableEvaluationCache: true,
+		DisableStatisticsCache: true,
 	}
 }
 

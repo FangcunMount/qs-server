@@ -61,7 +61,7 @@ type CacheOptions struct {
 // NewCacheOptions 创建缓存控制配置
 func NewCacheOptions() *CacheOptions {
 	return &CacheOptions{
-		DisableStatisticsCache: false,
+		DisableStatisticsCache: true,
 	}
 }
 
