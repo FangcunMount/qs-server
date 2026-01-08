@@ -3,11 +3,12 @@ module github.com/FangcunMount/qs-server
 go 1.24.0
 
 require (
-	github.com/FangcunMount/component-base v0.4.1
+	github.com/FangcunMount/component-base v0.4.2
 	github.com/FangcunMount/iam-contracts v0.0.8
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
+	github.com/nsqio/go-nsq v1.1.0
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
@@ -46,7 +47,6 @@ require (
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/jwx/v2 v2.1.6 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
-	github.com/nsqio/go-nsq v1.1.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.55.0 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
