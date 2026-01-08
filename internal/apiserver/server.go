@@ -160,6 +160,10 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		container.ContainerOptions{
 			MQPublisher:   mqPublisher,
 			PublisherMode: publishMode,
+			Cache: container.ContainerCacheOptions{
+				DisableEvaluationCache: s.config.Cache != nil && s.config.Cache.DisableEvaluationCache,
+				DisableStatisticsCache: s.config.Cache != nil && s.config.Cache.DisableStatisticsCache,
+			},
 		},
 	)
 	// 初始化 IAM 模块（优先）

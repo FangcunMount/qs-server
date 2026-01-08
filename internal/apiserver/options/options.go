@@ -25,6 +25,7 @@ type Options struct {
 	WeChatOptions           *genericoptions.WeChatOptions          `json:"wechat"    mapstructure:"wechat"`
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure            *BackpressureOptions                   `json:"backpressure" mapstructure:"backpressure"`
+	Cache                   *CacheOptions                          `json:"cache"     mapstructure:"cache"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -44,6 +45,7 @@ func NewOptions() *Options {
 		WeChatOptions:           genericoptions.NewWeChatOptions(),
 		RateLimit:               NewRateLimitOptions(),
 		Backpressure:            NewBackpressureOptions(),
+		Cache:                   NewCacheOptions(),
 	}
 }
 
@@ -142,6 +144,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
+	o.Cache.AddFlags(fss.FlagSet("cache"))
 
 	return fss
 }
@@ -189,6 +192,31 @@ func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&b.IAM.Enabled, "backpressure.iam.enabled", b.IAM.Enabled, "Enable IAM backpressure.")
 	fs.IntVar(&b.IAM.MaxInflight, "backpressure.iam.max-inflight", b.IAM.MaxInflight, "Max inflight IAM calls.")
 	fs.IntVar(&b.IAM.TimeoutMs, "backpressure.iam.timeout-ms", b.IAM.TimeoutMs, "IAM backpressure timeout in ms.")
+}
+
+// CacheOptions 缓存控制配置
+type CacheOptions struct {
+	DisableEvaluationCache bool `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
+	DisableStatisticsCache bool `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+}
+
+// NewCacheOptions 创建默认缓存配置
+func NewCacheOptions() *CacheOptions {
+	return &CacheOptions{
+		DisableEvaluationCache: false,
+		DisableStatisticsCache: false,
+	}
+}
+
+// AddFlags 注册缓存相关命令行参数
+func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
+	if c == nil {
+		return
+	}
+	fs.BoolVar(&c.DisableEvaluationCache, "cache.disable-evaluation-cache", c.DisableEvaluationCache,
+		"Disable Redis caching for evaluation details")
+	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
+		"Disable Redis caching for statistics data")
 }
 
 // Complete 完成配置选项

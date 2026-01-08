@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
+	"github.com/spf13/pflag"
 )
 
 // Options 包含 Worker 的所有配置项
@@ -25,6 +26,8 @@ type Options struct {
 	Worker *WorkerOptions `json:"worker" mapstructure:"worker"`
 	// Redis 双实例配置（cache/store）
 	Redis *genericoptions.RedisDualOptions `json:"redis" mapstructure:"redis"`
+	// Cache 控制缓存输出
+	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
 }
 
 // MessagingOptions 消息队列配置
@@ -48,6 +51,18 @@ type WorkerOptions struct {
 	ServiceName string `json:"service_name" mapstructure:"service-name"`
 	// EventConfigPath 事件配置文件路径
 	EventConfigPath string `json:"event_config_path" mapstructure:"event-config-path"`
+}
+
+// CacheOptions 缓存控制配置
+type CacheOptions struct {
+	DisableStatisticsCache bool `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+}
+
+// NewCacheOptions 创建缓存控制配置
+func NewCacheOptions() *CacheOptions {
+	return &CacheOptions{
+		DisableStatisticsCache: false,
+	}
 }
 
 // GRPCOptions gRPC 客户端配置
@@ -85,6 +100,7 @@ func NewOptions() *Options {
 			ServiceName: "qs-worker",
 		},
 		Redis: genericoptions.NewRedisDualOptions(),
+		Cache: NewCacheOptions(),
 	}
 }
 
@@ -132,6 +148,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 
 	// Redis flags
 	o.Redis.AddFlags(fss.FlagSet("redis"))
+	o.Cache.AddFlags(fss.FlagSet("cache"))
 
 	return fss
 }
@@ -171,4 +188,13 @@ func (o *Options) Complete() error {
 func (o *Options) String() string {
 	data, _ := json.Marshal(o)
 	return string(data)
+}
+
+// AddFlags 注册 cache 相关命令行参数
+func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
+	if c == nil {
+		return
+	}
+	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
+		"Disable Redis-based statistics caching in worker event handlers")
 }

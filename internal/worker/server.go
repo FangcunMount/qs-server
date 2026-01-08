@@ -82,6 +82,11 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	if err != nil {
 		log.Warnf("Store Redis not available: %v", err)
 	}
+	// 如果配置要求禁用统计缓存，则不传递 Redis cache 客户端
+	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil && s.config.Options.Cache.DisableStatisticsCache {
+		log.Infof("Statistics cache disabled via configuration, skipping Redis cache client")
+		cacheRedis = nil
+	}
 
 	// 2. 创建 gRPC 客户端管理器
 	s.grpcManager, err = CreateGRPCClientManager(

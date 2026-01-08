@@ -31,10 +31,11 @@ var modulePool = make(map[string]assembler.Module)
 // 组合所有业务模块和基础设施组件
 type Container struct {
 	// 基础设施
-	mysqlDB    *gorm.DB
-	mongoDB    *mongo.Database
-	redisCache redis.UniversalClient
-	redisStore redis.UniversalClient
+	mysqlDB      *gorm.DB
+	mongoDB      *mongo.Database
+	redisCache   redis.UniversalClient
+	redisStore   redis.UniversalClient
+	cacheOptions ContainerCacheOptions
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -71,6 +72,7 @@ func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.Un
 		redisCache:    redisCache,
 		redisStore:    redisStore,
 		publisherMode: eventconfig.PublishModeLogging, // 默认使用日志模式
+		cacheOptions:  ContainerCacheOptions{},
 		initialized:   false,
 	}
 }
@@ -83,6 +85,14 @@ type ContainerOptions struct {
 	PublisherMode eventconfig.PublishMode
 	// Env 环境名称（prod, dev, test），用于自动选择发布器模式
 	Env string
+	// Cache 缓存控制选项
+	Cache ContainerCacheOptions
+}
+
+// ContainerCacheOptions 缓存控制配置
+type ContainerCacheOptions struct {
+	DisableEvaluationCache bool
+	DisableStatisticsCache bool
 }
 
 // NewContainerWithOptions 创建带配置的容器
@@ -96,6 +106,8 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	} else if opts.Env != "" {
 		c.publisherMode = eventconfig.PublishModeFromEnv(opts.Env)
 	}
+
+	c.cacheOptions = opts.Cache
 
 	return c
 }
@@ -306,6 +318,10 @@ func (c *Container) initEvaluationModule() error {
 	// 传入 ScaleRepo、AnswerSheetRepo、QuestionnaireRepo、EventPublisher 和 Redis 客户端
 	// 注意：参数顺序必须与 EvaluationModule.Initialize 中的 params 索引一致
 	// params[0]: MySQL, params[1]: MongoDB, params[2]: ScaleRepo, params[3]: AnswerSheetRepo, params[4]: QuestionnaireRepo, params[5]: EventPublisher, params[6]: Redis
+	redisClient := c.redisCache
+	if c.cacheOptions.DisableEvaluationCache {
+		redisClient = nil
+	}
 	if err := evaluationModule.Initialize(
 		c.mysqlDB,
 		c.mongoDB,
@@ -313,7 +329,7 @@ func (c *Container) initEvaluationModule() error {
 		c.SurveyModule.AnswerSheet.Repo,
 		c.SurveyModule.Questionnaire.Repo, // params[4]: QuestionnaireRepo
 		c.eventPublisher,                  // params[5]: EventPublisher
-		c.redisCache,                      // params[6]: Redis 客户端（用于缓存）
+		redisClient,                       // params[6]: Redis 客户端（用于缓存）
 	); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
@@ -348,7 +364,11 @@ func (c *Container) initPlanModule() error {
 func (c *Container) initStatisticsModule() error {
 	statisticsModule := assembler.NewStatisticsModule()
 	// 传入 MySQL 和 Redis 客户端
-	if err := statisticsModule.Initialize(c.mysqlDB, c.redisCache); err != nil {
+	redisClient := c.redisCache
+	if c.cacheOptions.DisableStatisticsCache {
+		redisClient = nil
+	}
+	if err := statisticsModule.Initialize(c.mysqlDB, redisClient); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 
