@@ -4202,6 +4202,12 @@
                         "in": "query"
                     },
                     {
+                        "type": "string",
+                        "description": "档案ID（等同于IAM儿童ID）",
+                        "name": "profile_id",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 1,
                         "description": "页码",
@@ -4229,6 +4235,65 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/response.TesteeListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/testees/by-profile-id": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor"
+                ],
+                "summary": "根据 profile_id 获取受试者详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "机构ID",
+                        "name": "org_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "用户档案ID（IAM Child ID/ProfileID）",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "兼容字段：IAM儿童ID",
+                        "name": "iam_child_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeResponse"
                                         }
                                     }
                                 }

@@ -4254,6 +4254,10 @@ paths:
         in: query
         name: is_key_focus
         type: boolean
+      - description: 档案ID（等同于IAM儿童ID）
+        in: query
+        name: profile_id
+        type: string
       - default: 1
         description: 页码
         in: query
@@ -4518,6 +4522,42 @@ paths:
       summary: 查询受试者的所有任务
       tags:
       - Plan-Query
+  /api/v1/testees/by-profile-id:
+    get:
+      parameters:
+      - description: 机构ID
+        in: query
+        name: org_id
+        required: true
+        type: string
+      - description: 用户档案ID（IAM Child ID/ProfileID）
+        in: query
+        name: profile_id
+        required: true
+        type: string
+      - description: 兼容字段：IAM儿童ID
+        in: query
+        name: iam_child_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeResponse'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 根据 profile_id 获取受试者详情
+      tags:
+      - Actor
   /health:
     get:
       description: 检查 API Server 健康状态

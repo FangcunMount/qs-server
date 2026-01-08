@@ -30,8 +30,15 @@ type ListTesteeRequest struct {
 	Name       string   `form:"name"`                              // 姓名（模糊匹配）
 	Tags       []string `form:"tags"`                              // 标签筛选
 	IsKeyFocus *bool    `form:"is_key_focus"`                      // 是否重点关注
+	ProfileID  string   `form:"profile_id"`                        // 档案ID（ProfileID）
 	Page       int      `form:"page" binding:"min=1"`              // 页码
 	PageSize   int      `form:"page_size" binding:"min=1,max=100"` // 每页数量
+}
+
+// GetTesteeByProfileIDRequest 根据 profile_id 查询受试者请求
+type GetTesteeByProfileIDRequest struct {
+	OrgID     int64  `form:"org_id" binding:"required"` // 机构ID
+	ProfileID string `form:"profile_id"`                // 用户档案ID（ProfileID）
 }
 
 // CreateStaffRequest 创建员工请求

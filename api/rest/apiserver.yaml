@@ -2870,6 +2870,10 @@ paths:
         description: 是否重点关注
         name: is_key_focus
         in: query
+      - type: string
+        description: 档案ID（等同于IAM儿童ID）
+        name: profile_id
+        in: query
       - type: integer
         default: 1
         description: 页码
@@ -2892,6 +2896,45 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TesteeListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /testees/by-profile-id:
+    get:
+      tags:
+      - Actor
+      summary: 根据 profile_id 获取受试者详情
+      operationId: 根据profile_id获取受试者详情
+      parameters:
+      - type: string
+        description: 机构ID
+        name: org_id
+        in: query
+        required: true
+      - type: string
+        description: 用户档案ID（IAM Child ID/ProfileID）
+        name: profile_id
+        in: query
+        required: true
+      - type: string
+        description: 兼容字段：IAM儿童ID
+        name: iam_child_id
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeResponse'
         '429':
           description: Too Many Requests
           content:

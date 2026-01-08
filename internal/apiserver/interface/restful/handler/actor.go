@@ -104,6 +104,53 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 	h.Success(c, resp)
 }
 
+// GetTesteeByProfileID 根据 profile_id 获取受试者详情
+// @Summary 根据 profile_id 获取受试者详情
+// @Tags Actor
+// @Produce json
+// @Param org_id query string true "机构ID"
+// @Param profile_id query string true "用户档案ID（IAM Child ID/ProfileID）"
+// @Param iam_child_id query string false "兼容字段：IAM儿童ID"
+// @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/testees/by-profile-id [get]
+func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
+	var req request.GetTesteeByProfileIDRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid get testee by profile_id request",
+			"action", "get_testee_by_profile_id",
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	profileIDStr := req.ProfileID
+	if profileIDStr == "" {
+		h.BadRequestResponse(c, "profile_id is required", nil)
+		return
+	}
+
+	testeeResult, err := h.fetchTesteeByProfile(c, req.OrgID, profileIDStr)
+	if err != nil {
+		h.BadRequestResponse(c, err.Error(), nil)
+		return
+	}
+
+	// 使用后台查询服务获取包含监护人的完整信息
+	if h.testeeBackendQueryService != nil {
+		backendResult, backendErr := h.testeeBackendQueryService.GetByIDWithGuardians(c.Request.Context(), testeeResult.ID)
+		if backendErr != nil {
+			h.Error(c, backendErr)
+			return
+		}
+		h.Success(c, toTesteeBackendResponse(backendResult))
+		return
+	}
+
+	h.Success(c, toTesteeResponse(testeeResult))
+}
+
 // GetScaleAnalysis
 // @Summary 获取受试者量表分析结果
 // @Tags Testee
@@ -398,6 +445,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Param org_id query string true "机构ID"
 // @Param name query string false "姓名（模糊匹配）"
 // @Param is_key_focus query bool false "是否重点关注"
+// @Param profile_id query string false "档案ID（等同于IAM儿童ID）"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} core.Response{data=response.TesteeListResponse}
@@ -421,6 +469,18 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 	}
 	if req.PageSize == 0 {
 		req.PageSize = 20
+	}
+
+	// 按 profile_id 精确查询（等同于 IAM child_id）
+	if req.ProfileID != "" {
+		result, err := h.fetchTesteeByProfile(c, req.OrgID, req.ProfileID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+
+		h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{result}, 1, req.Page, req.PageSize))
+		return
 	}
 
 	// 使用查询服务 - 统一通过 ListTestees 方法处理所有查询
@@ -625,6 +685,33 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 	total = listResult.TotalCount
 
 	h.Success(c, toStaffListResponse(results, total, req.Page, req.PageSize))
+}
+
+// fetchTesteeByProfile 提取的 profile_id 查询逻辑
+func (h *ActorHandler) fetchTesteeByProfile(c *gin.Context, orgID int64, profileIDStr string) (*testeeApp.TesteeResult, error) {
+	childID, err := strconv.ParseUint(profileIDStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid profile_id format",
+			"action", "fetch_testee_by_profile",
+			"org_id", orgID,
+			"profile_id", profileIDStr,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	result, err := h.testeeQueryService.FindByProfile(c.Request.Context(), orgID, childID)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to find testee by profile_id",
+			"action", "fetch_testee_by_profile",
+			"org_id", orgID,
+			"profile_id", childID,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // ========== 映射辅助函数 ==========
