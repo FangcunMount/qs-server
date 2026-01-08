@@ -78,14 +78,14 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse assessment submitted event: %w", err)
 		}
 
-		deps.Logger.Info("processing assessment submitted",
-			slog.String("event_id", env.ID),
-			slog.Int64("assessment_id", data.AssessmentID),
-			slog.Uint64("testee_id", data.TesteeID),
-			slog.String("questionnaire_code", data.QuestionnaireCode),
-			slog.String("answersheet_id", data.AnswerSheetID),
-			slog.String("scale_code", data.ScaleCode),
-			slog.Bool("needs_evaluation", data.NeedsEvaluation()),
+		deps.Logger.Debug("assessment submitted detail",
+			"event_id", env.ID,
+			"assessment_id", data.AssessmentID,
+			"testee_id", data.TesteeID,
+			"questionnaire_code", data.QuestionnaireCode,
+			"answersheet_id", data.AnswerSheetID,
+			"scale_code", data.ScaleCode,
+			"needs_evaluation", data.NeedsEvaluation(),
 		)
 
 		// 1. 更新统计（调用统计 handler）
@@ -130,13 +130,13 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to evaluate assessment: %w", err)
 		}
 
-		deps.Logger.Info("assessment evaluation completed",
+		deps.Logger.Debug("assessment evaluation completed",
 			slog.Int64("assessment_id", data.AssessmentID),
-			slog.Bool("success", resp.Success),
-			slog.String("status", resp.Status),
-			slog.Float64("total_score", resp.TotalScore),
-			slog.String("risk_level", resp.RiskLevel),
-			slog.String("message", resp.Message),
+			"success", resp.Success,
+			"status", resp.Status,
+			"total_score", resp.TotalScore,
+			"risk_level", resp.RiskLevel,
+			"message", resp.Message,
 		)
 
 		return nil
@@ -156,12 +156,10 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
 		}
 
-		deps.Logger.Info("processing assessment interpreted",
-			slog.String("event_id", env.ID),
-			slog.Int64("assessment_id", data.AssessmentID),
-			slog.Float64("total_score", data.TotalScore),
-			slog.String("risk_level", data.RiskLevel),
-			slog.Bool("is_high_risk", data.IsHighRisk()),
+		deps.Logger.Debug("assessment interpreted detail",
+			"total_score", data.TotalScore,
+			"risk_level", data.RiskLevel,
+			"is_high_risk", data.IsHighRisk(),
 		)
 
 		// 1. 更新统计（调用统计 handler）
@@ -183,10 +181,10 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 		// 2. 高风险预警
 		if data.IsHighRisk() {
 			deps.Logger.Warn("HIGH RISK ALERT",
-				slog.Int64("assessment_id", data.AssessmentID),
-				slog.Uint64("testee_id", data.TesteeID),
-				slog.String("risk_level", data.RiskLevel),
-				slog.Float64("total_score", data.TotalScore),
+				"assessment_id", data.AssessmentID,
+				"testee_id", data.TesteeID,
+				"risk_level", data.RiskLevel,
+				"total_score", data.TotalScore,
 			)
 			// TODO: 发送预警通知（可以调用通知服务）
 		}

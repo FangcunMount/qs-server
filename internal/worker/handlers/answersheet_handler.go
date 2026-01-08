@@ -47,14 +47,16 @@ func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse answersheet submitted event: %w", err)
 		}
 
-		deps.Logger.Info("processing answersheet submitted",
-			slog.String("event_id", env.ID),
-			slog.String("answersheet_id", data.AnswerSheetID),
-			slog.String("questionnaire_code", data.QuestionnaireCode),
-			slog.String("questionnaire_version", data.QuestionnaireVersion),
-			slog.Uint64("filler_id", data.FillerID),
-			slog.String("filler_type", data.FillerType),
-			slog.Time("submitted_at", data.SubmittedAt),
+		deps.Logger.Debug("answersheet submitted detail",
+			"event_id", env.ID,
+			"answersheet_id", data.AnswerSheetID,
+			"questionnaire_code", data.QuestionnaireCode,
+			"questionnaire_version", data.QuestionnaireVersion,
+			"testee_id", data.TesteeID,
+			"org_id", data.OrgID,
+			"filler_id", data.FillerID,
+			"filler_type", data.FillerType,
+			"submitted_at", data.SubmittedAt,
 		)
 
 		// 检查 InternalClient 是否可用
@@ -86,10 +88,8 @@ func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 				slog.String("answersheet_id", data.AnswerSheetID),
 			)
 		} else {
-			deps.Logger.Info("answersheet scored",
-				slog.String("answersheet_id", data.AnswerSheetID),
-				slog.Float64("total_score", scoreResp.TotalScore),
-				slog.Bool("success", scoreResp.Success),
+			deps.Logger.Debug("answersheet scoring detail",
+				"total_score", scoreResp.TotalScore,
 			)
 		}
 
@@ -114,12 +114,9 @@ func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to create assessment: %w", err)
 		}
 
-		deps.Logger.Info("assessment created from answersheet",
-			slog.String("answersheet_id", data.AnswerSheetID),
-			slog.Uint64("assessment_id", resp.AssessmentId),
-			slog.Bool("created", resp.Created),
-			slog.Bool("auto_submitted", resp.AutoSubmitted),
-			slog.String("message", resp.Message),
+		deps.Logger.Debug("assessment creation detail",
+			"created", resp.Created,
+			"message", resp.Message,
 		)
 
 		return nil

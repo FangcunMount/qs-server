@@ -37,11 +37,11 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse assessment submitted event: %w", err)
 		}
 
-		deps.Logger.Info("processing statistics for assessment submitted",
-			slog.String("event_id", env.ID),
-			slog.Int64("assessment_id", data.AssessmentID),
-			slog.Uint64("testee_id", data.TesteeID),
-			slog.String("questionnaire_code", data.QuestionnaireCode),
+		deps.Logger.Debug("assessment submitted statistics payload",
+			"event_id", env.ID,
+			"assessment_id", data.AssessmentID,
+			"testee_id", data.TesteeID,
+			"questionnaire_code", data.QuestionnaireCode,
 		)
 
 		// 检查Redis是否可用
@@ -161,12 +161,12 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
 		}
 
-		deps.Logger.Info("processing statistics for assessment interpreted",
-			slog.String("event_id", env.ID),
-			slog.Int64("assessment_id", data.AssessmentID),
-			slog.Uint64("testee_id", data.TesteeID),
-			slog.String("scale_code", data.ScaleCode),
-			slog.String("risk_level", data.RiskLevel),
+		deps.Logger.Debug("assessment interpreted statistics payload",
+			"event_id", env.ID,
+			"assessment_id", data.AssessmentID,
+			"testee_id", data.TesteeID,
+			"scale_code", data.ScaleCode,
+			"risk_level", data.RiskLevel,
 		)
 
 		// 检查Redis是否可用
@@ -261,9 +261,9 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 			)
 		}
 
-		deps.Logger.Info("statistics updated for assessment interpreted",
-			slog.String("event_id", env.ID),
-			slog.Int64("assessment_id", data.AssessmentID),
+		deps.Logger.Debug("statistics updated for assessment interpreted",
+			"event_id", env.ID,
+			"assessment_id", data.AssessmentID,
 		)
 
 		return nil
