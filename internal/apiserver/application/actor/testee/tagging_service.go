@@ -49,9 +49,16 @@ func (s *taggingService) TagByAssessmentResult(
 		"testee_id", testeeID,
 		"risk_level", riskLevel,
 		"scale_code", scaleCode,
-		"high_risk_factors_count", len(highRiskFactors),
 		"mark_key_focus", markKeyFocus,
 	)
+
+	if len(highRiskFactors) > 0 {
+		// 因子标签已弃用，保留日志便于排查调用方是否仍在传递
+		l.Debugw("高风险因子标签已弃用，输入参数已忽略",
+			"testee_id", testeeID,
+			"high_risk_factors_count", len(highRiskFactors),
+		)
+	}
 
 	result := &TaggingResult{
 		TagsAdded:   make([]string, 0),
@@ -74,39 +81,14 @@ func (s *taggingService) TagByAssessmentResult(
 		}
 		result.TagsRemoved = append(result.TagsRemoved, removedRiskTags...)
 
-		// 2. 移除旧的因子风险标签
-		removedFactorTags, err := s.removeOldFactorRiskTags(txCtx, testeeID, currentTags)
-		if err != nil {
-			return errors.Wrap(err, "failed to remove old factor risk tags")
-		}
-		result.TagsRemoved = append(result.TagsRemoved, removedFactorTags...)
-
-		// 3. 根据风险等级添加新标签
+		// 2. 根据风险等级添加新标签（高风险/严重风险）
 		addedRiskTags, err := s.addRiskLevelTags(txCtx, testeeID, riskLevel)
 		if err != nil {
 			return errors.Wrap(err, "failed to add risk level tags")
 		}
 		result.TagsAdded = append(result.TagsAdded, addedRiskTags...)
 
-		// 4. 根据量表类型添加标签（历史标签，保留不删除）
-		if scaleCode != "" {
-			addedScaleTag, err := s.addScaleTag(txCtx, testeeID, scaleCode, currentTags)
-			if err != nil {
-				return errors.Wrap(err, "failed to add scale tag")
-			}
-			if addedScaleTag != "" {
-				result.TagsAdded = append(result.TagsAdded, addedScaleTag)
-			}
-		}
-
-		// 5. 根据高风险因子添加标签
-		addedFactorTags, err := s.addFactorRiskTags(txCtx, testeeID, highRiskFactors)
-		if err != nil {
-			return errors.Wrap(err, "failed to add factor risk tags")
-		}
-		result.TagsAdded = append(result.TagsAdded, addedFactorTags...)
-
-		// 6. 更新重点关注状态
+		// 4. 更新重点关注状态
 		keyFocusMarked, err := s.updateKeyFocusStatus(txCtx, testeeID, riskLevel, markKeyFocus, currentTestee.IsKeyFocus)
 		if err != nil {
 			return errors.Wrap(err, "failed to update key focus status")
@@ -254,31 +236,6 @@ func (s *taggingService) addScaleTag(ctx context.Context, testeeID uint64, scale
 	}
 
 	return tag, nil
-}
-
-// addFactorRiskTags 添加因子风险标签
-func (s *taggingService) addFactorRiskTags(ctx context.Context, testeeID uint64, highRiskFactors []string) ([]string, error) {
-	var added []string
-
-	for _, factorCode := range highRiskFactors {
-		if factorCode != "" {
-			// 标签格式：factor_{factor_code}_high
-			tag := "factor_" + strings.ToLower(factorCode) + "_high"
-			if err := s.managementService.AddTag(ctx, testeeID, tag); err != nil {
-				logger.L(ctx).Warnw("添加因子风险标签失败",
-					"testee_id", testeeID,
-					"factor_code", factorCode,
-					"tag", tag,
-					"error", err.Error(),
-				)
-				// 继续处理其他因子，不中断流程
-			} else {
-				added = append(added, tag)
-			}
-		}
-	}
-
-	return added, nil
 }
 
 // updateKeyFocusStatus 更新重点关注状态
