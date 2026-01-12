@@ -52,11 +52,34 @@ func (r *StatisticsRepository) UpsertAccumulatedStatistics(
 	ctx context.Context,
 	po *StatisticsAccumulatedPO,
 ) error {
-	return r.WithContext(ctx).
+	var existing StatisticsAccumulatedPO
+	tx := r.WithContext(ctx).
+		Unscoped().
 		Where("org_id = ? AND statistic_type = ? AND statistic_key = ?",
 			po.OrgID, po.StatisticType, po.StatisticKey).
-		Assign(*po).
-		FirstOrCreate(po).Error
+		First(&existing)
+
+	if tx.Error != nil {
+		if tx.Error == gorm.ErrRecordNotFound {
+			return r.WithContext(ctx).Create(po).Error
+		}
+		return tx.Error
+	}
+
+	updates := map[string]interface{}{
+		"total_submissions":   po.TotalSubmissions,
+		"total_completions":   po.TotalCompletions,
+		"last7d_submissions":  po.Last7dSubmissions,
+		"last15d_submissions": po.Last15dSubmissions,
+		"last30d_submissions": po.Last30dSubmissions,
+		"distribution":        po.Distribution,
+		"first_occurred_at":   po.FirstOccurredAt,
+		"last_occurred_at":    po.LastOccurredAt,
+		"last_updated_at":     po.LastUpdatedAt,
+		"deleted_at":          nil, // 重新激活软删除的数据
+	}
+
+	return r.WithContext(ctx).Model(&existing).Updates(updates).Error
 }
 
 // ==================== 每日统计查询 ====================
@@ -85,12 +108,28 @@ func (r *StatisticsRepository) UpsertDailyStatistics(
 	ctx context.Context,
 	po *StatisticsDailyPO,
 ) error {
-	return r.WithContext(ctx).
-		Model(&StatisticsDailyPO{}).
+	var existing StatisticsDailyPO
+	tx := r.WithContext(ctx).
+		Unscoped().
 		Where("org_id = ? AND statistic_type = ? AND statistic_key = ? AND stat_date = ?",
 			po.OrgID, po.StatisticType, po.StatisticKey, po.StatDate).
-		Assign(*po).
-		FirstOrCreate(po).Error
+		First(&existing)
+
+	if tx.Error != nil {
+		if tx.Error == gorm.ErrRecordNotFound {
+			return r.WithContext(ctx).Create(po).Error
+		}
+		return tx.Error
+	}
+
+	updates := map[string]interface{}{
+		"submission_count": po.SubmissionCount,
+		"completion_count": po.CompletionCount,
+		"extra_metrics":    po.ExtraMetrics,
+		"deleted_at":       nil, // 重新激活软删除的数据
+	}
+
+	return r.WithContext(ctx).Model(&existing).Updates(updates).Error
 }
 
 // ==================== 计划统计查询 ====================
@@ -122,11 +161,30 @@ func (r *StatisticsRepository) UpsertPlanStatistics(
 	ctx context.Context,
 	po *StatisticsPlanPO,
 ) error {
-	return r.WithContext(ctx).
-		Model(&StatisticsPlanPO{}).
+	var existing StatisticsPlanPO
+	tx := r.WithContext(ctx).
+		Unscoped().
 		Where("org_id = ? AND plan_id = ?", po.OrgID, po.PlanID).
-		Assign(*po).
-		FirstOrCreate(po).Error
+		First(&existing)
+
+	if tx.Error != nil {
+		if tx.Error == gorm.ErrRecordNotFound {
+			return r.WithContext(ctx).Create(po).Error
+		}
+		return tx.Error
+	}
+
+	updates := map[string]interface{}{
+		"total_tasks":      po.TotalTasks,
+		"completed_tasks":  po.CompletedTasks,
+		"pending_tasks":    po.PendingTasks,
+		"expired_tasks":    po.ExpiredTasks,
+		"enrolled_testees": po.EnrolledTestees,
+		"active_testees":   po.ActiveTestees,
+		"deleted_at":       nil, // 重新激活软删除的数据
+	}
+
+	return r.WithContext(ctx).Model(&existing).Updates(updates).Error
 }
 
 // ==================== 聚合查询 ====================
