@@ -24,6 +24,8 @@ app:
 server:
     mode: release # 生产环境默认 release
     healthz: true
+    profiling: true # 是否开启 pprof（/debug/pprof），用于生成火焰图
+    metrics: true # 是否开启 Prometheus 指标（/metrics），用于观测 HTTP QPS/延迟
     middlewares: recovery,enhanced_logger,secure,nocache,cors
     max-ping-count: 3
 

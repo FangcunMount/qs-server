@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/FangcunMount/qs-server/pkg/version"
+	ginpprof "github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 	"golang.org/x/sync/errgroup"
@@ -56,10 +57,10 @@ func (s *GenericAPIServer) InstallAPIs() {
 		prometheus.Use(s.Engine)
 	}
 
-	// // 安装pprof路由
-	// if s.enableProfiling {
-	// 	pprof.Register(s.Engine)
-	// }
+	// 安装 pprof 路由用于性能剖析（/debug/pprof/...）
+	if s.enableProfiling {
+		ginpprof.Register(s.Engine, "/debug/pprof")
+	}
 
 	s.GET("/version", func(c *gin.Context) {
 		core.WriteResponse(c, nil, version.Get())

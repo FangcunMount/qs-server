@@ -25,6 +25,8 @@ app:
 server:
     mode: debug # server mode: release, debug, test
     healthz: true # 是否开启健康检查，如果开启会安装 /healthz 路由
+    profiling: true # 是否开启 pprof（/debug/pprof），用于生成火焰图
+    metrics: true # 是否开启 Prometheus 指标（/metrics），用于观测 HTTP QPS/延迟
     middlewares: recovery,enhanced_logger,secure,nocache,cors,dump # Gin 中间件列表
     max-ping-count: 3 # http 服务启动后，自检尝试次数
 

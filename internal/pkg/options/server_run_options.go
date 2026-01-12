@@ -10,6 +10,8 @@ type ServerRunOptions struct {
 	Mode        string   `json:"mode"        mapstructure:"mode"`
 	Healthz     bool     `json:"healthz"     mapstructure:"healthz"`
 	Middlewares []string `json:"middlewares" mapstructure:"middlewares"`
+	Profiling   bool     `json:"profiling"   mapstructure:"profiling"`
+	Metrics     bool     `json:"metrics"     mapstructure:"metrics"`
 }
 
 // NewServerRunOptions 简单工厂方法，创建在运行的服务器选项
@@ -20,6 +22,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		Mode:        defaults.Mode,
 		Healthz:     defaults.Healthz,
 		Middlewares: defaults.Middlewares,
+		Profiling:   defaults.EnableProfiling,
+		Metrics:     defaults.EnableMetrics,
 	}
 }
 
@@ -28,6 +32,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.Mode = s.Mode
 	c.Healthz = s.Healthz
 	c.Middlewares = s.Middlewares
+	c.EnableProfiling = s.Profiling
+	c.EnableMetrics = s.Metrics
 
 	return nil
 }
@@ -51,4 +57,10 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&s.Middlewares, "server.middlewares", s.Middlewares, ""+
 		"List of allowed middlewares for server, comma separated. If this list is empty default middlewares will be used.")
+
+	fs.BoolVar(&s.Profiling, "server.profiling", s.Profiling, ""+
+		"Enable pprof handlers at /debug/pprof for profiling and flame graphs.")
+
+	fs.BoolVar(&s.Metrics, "server.metrics", s.Metrics, ""+
+		"Expose Prometheus metrics at /metrics for QPS/latency observation.")
 }
