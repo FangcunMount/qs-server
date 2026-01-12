@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
