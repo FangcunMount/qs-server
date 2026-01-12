@@ -96,6 +96,7 @@ type ContainerCacheOptions struct {
 	DisableStatisticsCache bool
 	TTL                    ContainerCacheTTLOptions
 	TTLJitterRatio         float64
+	StatisticsWarmup       *scaleCache.StatisticsWarmupConfig
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
@@ -231,23 +232,20 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 		}
 	}
 
-	// 统计查询结果缓存预热（可选）
+	// 统计查询结果缓存预热
 	// 注意：统计查询结果缓存 TTL 较短（5分钟），预热主要用于减少首次查询延迟
 	// 建议：只在有明确需求时使用（如已知活跃组织、常用问卷等）
 	// 可以通过配置或环境变量控制是否启用
-	// if c.StatisticsModule != nil {
-	// 	config := scaleCache.StatisticsWarmupConfig{
-	// 		OrgIDs: []int64{1}, // 从配置读取
-	// 		QuestionnaireCodes: []string{"QS001", "QS002"}, // 从配置读取
-	// 	}
-	// 	if err := scaleCache.WarmupStatisticsCache(ctx, config,
-	// 		c.StatisticsModule.SystemStatisticsService,
-	// 		c.StatisticsModule.QuestionnaireStatisticsService,
-	// 		c.StatisticsModule.PlanStatisticsService,
-	// 	); err != nil {
-	// 		// 预热失败不影响服务启动
-	// 	}
-	// }
+	if c.StatisticsModule != nil && c.cacheOptions.StatisticsWarmup != nil && len(c.cacheOptions.StatisticsWarmup.OrgIDs) > 0 {
+		if err := scaleCache.WarmupStatisticsCache(ctx, *c.cacheOptions.StatisticsWarmup,
+			c.StatisticsModule.SystemStatisticsService,
+			c.StatisticsModule.QuestionnaireStatisticsService,
+			c.StatisticsModule.PlanStatisticsService,
+		); err != nil {
+			// 预热失败不影响服务启动，仅记录日志
+			return fmt.Errorf("statistics cache warmup failed: %w", err)
+		}
+	}
 
 	return nil
 }

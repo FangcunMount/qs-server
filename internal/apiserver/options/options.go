@@ -200,10 +200,11 @@ func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
-	DisableEvaluationCache bool             `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
-	DisableStatisticsCache bool             `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
-	TTL                    *CacheTTLOptions `json:"ttl" mapstructure:"ttl"`
-	TTLJitterRatio         float64          `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	DisableEvaluationCache bool                     `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
+	DisableStatisticsCache bool                     `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	TTL                    *CacheTTLOptions         `json:"ttl" mapstructure:"ttl"`
+	TTLJitterRatio         float64                  `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	StatisticsWarmup       *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -220,6 +221,12 @@ func NewCacheOptions() *CacheOptions {
 			Plan:             2 * time.Hour,
 		},
 		TTLJitterRatio: 0.1,
+		StatisticsWarmup: &StatisticsWarmupOptions{
+			Enable:             false,
+			OrgIDs:             []int64{1},
+			QuestionnaireCodes: []string{},
+			PlanIDs:            []uint64{},
+		},
 	}
 }
 
@@ -251,6 +258,14 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.TTL.Testee, "cache.ttl.testee", c.TTL.Testee, "TTL for testee cache entries.")
 	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
 	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
+	if c.StatisticsWarmup == nil {
+		c.StatisticsWarmup = &StatisticsWarmupOptions{
+			Enable:             false,
+			OrgIDs:             []int64{1},
+			QuestionnaireCodes: []string{},
+			PlanIDs:            []uint64{},
+		}
+	}
 }
 
 // CacheTTLOptions 缓存 TTL 配置
@@ -261,6 +276,14 @@ type CacheTTLOptions struct {
 	AssessmentStatus time.Duration `json:"assessment_status" mapstructure:"assessment_status"`
 	Testee           time.Duration `json:"testee" mapstructure:"testee"`
 	Plan             time.Duration `json:"plan" mapstructure:"plan"`
+}
+
+// StatisticsWarmupOptions 统计查询结果缓存预热配置
+type StatisticsWarmupOptions struct {
+	Enable             bool     `json:"enable" mapstructure:"enable"`
+	OrgIDs             []int64  `json:"org_ids" mapstructure:"org_ids"`
+	QuestionnaireCodes []string `json:"questionnaire_codes" mapstructure:"questionnaire_codes"`
+	PlanIDs            []uint64 `json:"plan_ids" mapstructure:"plan_ids"`
 }
 
 // StatisticsSyncOptions 统计同步定时任务配置

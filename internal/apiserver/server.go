@@ -168,6 +168,14 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		}
 		cacheTTLJitter = s.config.Cache.TTLJitterRatio
 	}
+	var statsWarmupCfg *scaleCache.StatisticsWarmupConfig
+	if s.config.Cache != nil && s.config.Cache.StatisticsWarmup != nil && s.config.Cache.StatisticsWarmup.Enable {
+		statsWarmupCfg = &scaleCache.StatisticsWarmupConfig{
+			OrgIDs:             s.config.Cache.StatisticsWarmup.OrgIDs,
+			QuestionnaireCodes: s.config.Cache.StatisticsWarmup.QuestionnaireCodes,
+			PlanIDs:            s.config.Cache.StatisticsWarmup.PlanIDs,
+		}
+	}
 	s.container = container.NewContainerWithOptions(
 		mysqlDB, mongoDB, redisCache, redisStore,
 		container.ContainerOptions{
@@ -178,6 +186,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 				DisableStatisticsCache: s.config.Cache != nil && s.config.Cache.DisableStatisticsCache,
 				TTL:                    cacheTTLOpts,
 				TTLJitterRatio:         cacheTTLJitter,
+				StatisticsWarmup:       statsWarmupCfg,
 			},
 		},
 	)
