@@ -91,8 +91,8 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 		return nil, err
 	}
 	domain, _ := val.(*scale.MedicalScale)
-	if err != nil {
-		return nil, err
+	if domain == nil {
+		return nil, nil
 	}
 
 	// 3. 写入缓存（异步，不阻塞）

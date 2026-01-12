@@ -71,17 +71,15 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 		return nil, err
 	}
 	domain, _ := val.(*testee.Testee)
-	if err != nil {
-		return nil, err
+	if domain == nil {
+		return nil, nil
 	}
 
 	// 3. 写入缓存（异步，不阻塞）
-	if domain != nil && r.client != nil {
-		if err := r.setCache(ctx, id, domain); err != nil {
-			logger.L(ctx).Warnw("写入受试者缓存失败", "testee_id", uint64(id), "error", err.Error())
-		}
-	} else if domain == nil && r.client != nil {
-		_ = r.setNilCache(ctx, id)
+	if r.client != nil {
+		go func() {
+			_ = r.setCache(context.Background(), id, domain)
+		}()
 	}
 
 	return domain, nil

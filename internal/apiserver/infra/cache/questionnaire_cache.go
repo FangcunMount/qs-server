@@ -96,9 +96,6 @@ func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code str
 		return nil, err
 	}
 	qDomain, _ := val.(*questionnaire.Questionnaire)
-	if err != nil {
-		return nil, err
-	}
 	if qDomain == nil {
 		return nil, nil
 	}
@@ -137,9 +134,6 @@ func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, c
 		return nil, err
 	}
 	qDomain, _ := val.(*questionnaire.Questionnaire)
-	if err != nil {
-		return nil, err
-	}
 	if qDomain == nil {
 		if r.client != nil {
 			_ = r.setNilCache(ctx, code, version)

@@ -51,9 +51,9 @@ func (c *AssessmentStatusCache) Get(ctx context.Context, id assessment.ID, loadF
 				logger.L(ctx).Debugw("从缓存获取测评状态", "assessment_id", id.Uint64())
 				return &value, nil
 			}
-			logger.L(ctx).Warnw("反序列化测评状态缓存失败", "assessment_id", id.Uint64(), "error", err.Error())
+			logger.L(ctx).Warnw("反序列化测评状态缓存失败", "assessment_id", id.Uint64())
 		} else if err != ErrCacheNotFound {
-			logger.L(ctx).Warnw("从缓存获取测评状态失败", "assessment_id", id.Uint64(), "error", err.Error())
+			logger.L(ctx).Warnw("从缓存获取测评状态失败", "assessment_id", id.Uint64())
 		}
 	}
 
