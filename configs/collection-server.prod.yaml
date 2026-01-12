@@ -190,21 +190,21 @@ iam:
 # 5.1 日志配置
 # -------------------------------------------------------
 log:
-  disable-caller: true
-  disable-stacktrace: true
-  level: debug
-  format: console
-  enable-color: true
-  development: true
-  name: "qs-collection-server"
-  max-size: 100
-  max-age: 30
-  max-backups: 10
-  compress: true
-  enable-time-rotation: true
-  time-rotation-format: "2006-01-02"
-  enable-level-output: true
-  level-output-mode: "duplicate"
+  disable-caller: true      # 生产环境禁用调用者信息
+  disable-stacktrace: true  # 生产环境禁用堆栈跟踪
+  level: info               # 生产环境使用 info 级别(debug, info, warn, error, fatal, panic)
+  format: json              # 生产环境使用 json 格式
+  enable-color: false       # 生产环境禁用颜色
+  development: false        # 生产环境使用生产模式
+  name: "qs-collection-server"  # 日志名称
+  max-size: 100                # 单个日志文件最大 100MB
+  max-age: 30                   # 保留 30 天
+  max-backups: 10               # 保留 10 个备份文件
+  compress: true                # 压缩旧文件节省空间
+  enable-time-rotation: true    # 启用按天轮转
+  time-rotation-format: "2006-01-02"  # 按天轮转
+  enable-level-output: true       # 启用分级输出
+  level-output-mode: "duplicate"  # 重复输出模式（推荐）
   level-output-paths:
     all:
       - stdout
