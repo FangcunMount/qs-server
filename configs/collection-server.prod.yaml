@@ -233,4 +233,4 @@ runtime:
 
 # 并发/连接池调优
 concurrency:
-  max-concurrency: 4
+  max-concurrency: 100
