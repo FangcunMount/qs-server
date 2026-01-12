@@ -246,9 +246,6 @@ func (s *ScaleService) toProtoScaleSummary(ctx context.Context, result *appScale
 
 	// 获取题目数量（优先使用预存字段，缺失时降级查询）
 	questionCount := result.QuestionCount
-	if questionCount == 0 {
-		questionCount = s.getQuestionCount(ctx, result.QuestionnaireCode)
-	}
 
 	return &pb.ScaleSummary{
 		Code:                 result.Code,
@@ -264,19 +261,6 @@ func (s *ScaleService) toProtoScaleSummary(ctx context.Context, result *appScale
 		Status:               result.Status,
 		QuestionCount:        questionCount,
 	}
-}
-
-// getQuestionCount 获取问卷题目数量（过滤掉 Section 题型）
-func (s *ScaleService) getQuestionCount(ctx context.Context, questionnaireCode string) int32 {
-	if questionnaireCode == "" || s.questionnaireQueryService == nil {
-		return 0
-	}
-
-	cnt, err := s.questionnaireQueryService.GetQuestionCount(ctx, questionnaireCode)
-	if err != nil {
-		return 0
-	}
-	return cnt
 }
 
 // toProtoFactor 转换为 protobuf 因子
