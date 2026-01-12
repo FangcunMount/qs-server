@@ -100,7 +100,7 @@ func (r *testeeRepository) ListByOrg(ctx context.Context, orgID int64, offset, l
 	var pos []*TesteePO
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error
@@ -126,7 +126,7 @@ func (r *testeeRepository) ListByTags(ctx context.Context, orgID int64, tags []s
 	}
 
 	err := query.
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error
@@ -143,7 +143,7 @@ func (r *testeeRepository) ListKeyFocus(ctx context.Context, orgID int64, offset
 	var pos []*TesteePO
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND is_key_focus = ? AND deleted_at IS NULL", orgID, true).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error
@@ -164,7 +164,7 @@ func (r *testeeRepository) ListByProfileIDs(ctx context.Context, profileIDs []ui
 	var pos []*TesteePO
 	err := r.WithContext(ctx).
 		Where("profile_id IN ? AND deleted_at IS NULL", profileIDs).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error

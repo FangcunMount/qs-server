@@ -121,7 +121,7 @@ func (r *planRepository) FindList(ctx context.Context, orgID int64, scaleCode st
 	}
 
 	// 按创建时间倒序
-	db = db.Order("created_at DESC")
+	db = db.Order("id DESC")
 
 	// 执行查询
 	if err := db.Find(&pos).Error; err != nil {

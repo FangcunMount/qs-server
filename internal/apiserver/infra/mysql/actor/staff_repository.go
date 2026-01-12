@@ -85,7 +85,7 @@ func (r *staffRepository) ListByOrg(ctx context.Context, orgID int64, offset, li
 	var pos []*StaffPO
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error
@@ -105,7 +105,7 @@ func (r *staffRepository) ListByRole(ctx context.Context, orgID int64, role staf
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Where("JSON_CONTAINS(roles, ?)", `"`+string(role)+`"`).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error

@@ -102,7 +102,7 @@ func (r *assessmentRepository) FindByTesteeID(ctx context.Context, testeeID test
 
 	// 分页查询
 	err := query.
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit()).
 		Find(&pos).Error
@@ -130,7 +130,7 @@ func (r *assessmentRepository) FindByTesteeIDAndScaleID(ctx context.Context, tes
 
 	// 分页查询
 	err := query.
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit()).
 		Find(&pos).Error
@@ -160,7 +160,7 @@ func (r *assessmentRepository) FindByPlanID(ctx context.Context, planID string, 
 
 	// 分页查询
 	err := query.
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit()).
 		Find(&pos).Error
@@ -188,7 +188,7 @@ func (r *assessmentRepository) FindByScreeningProjectID(ctx context.Context, scr
 
 	// 分页查询
 	err := query.
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit()).
 		Find(&pos).Error
@@ -253,7 +253,7 @@ func (r *assessmentRepository) FindByIDs(ctx context.Context, ids []assessment.I
 	var pos []*AssessmentPO
 	err := r.WithContext(ctx).
 		Where("id IN ? AND deleted_at IS NULL", idList).
-		Order("created_at DESC").
+		Order("id DESC").
 		Find(&pos).Error
 
 	if err != nil {
@@ -278,7 +278,7 @@ func (r *assessmentRepository) FindPendingSubmission(ctx context.Context, pagina
 
 	// 分页查询
 	err := query.
-		Order("created_at ASC"). // 按创建时间升序，优先处理老的
+		Order("id ASC"). // 按创建时间升序，优先处理老的
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit()).
 		Find(&pos).Error
@@ -310,7 +310,7 @@ func (r *assessmentRepository) FindByOrgID(ctx context.Context, orgID int64, sta
 
 	// 分页查询
 	err := query.
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit()).
 		Find(&pos).Error

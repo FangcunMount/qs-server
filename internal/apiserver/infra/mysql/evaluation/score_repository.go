@@ -115,7 +115,7 @@ func (r *scoreRepository) FindByTesteeIDAndFactorCode(ctx context.Context, teste
 	query := r.WithContext(ctx).
 		Where("testee_id = ? AND factor_code = ? AND deleted_at IS NULL",
 			uint64(testeeID), factorCode.String()).
-		Order("created_at DESC")
+		Order("id DESC")
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -141,7 +141,7 @@ func (r *scoreRepository) FindLatestByTesteeIDAndScaleID(ctx context.Context, te
 		Select("assessment_id").
 		Where("testee_id = ? AND medical_scale_id = ? AND deleted_at IS NULL",
 			uint64(testeeID), scaleRef.ID().Uint64()).
-		Order("created_at DESC").
+		Order("id DESC").
 		Limit(1).
 		Scan(&latestAssessmentID).Error
 
