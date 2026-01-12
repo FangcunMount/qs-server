@@ -1,0 +1,6 @@
+[
+  { "dropIndexes": "questionnaires", "index": "idx_questionnaires_status_type_deleted" },
+  { "dropIndexes": "questionnaires", "index": "idx_questionnaires_status_type_published" },
+  { "dropIndexes": "scales", "index": "idx_scales_status_deleted" },
+  { "dropIndexes": "scales", "index": "idx_scales_status_published" }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "createIndexes": "questionnaires",
+    "indexes": [
+      {
+        "key": { "status": 1, "type": 1, "deleted_at": 1 },
+        "name": "idx_questionnaires_status_type_deleted"
+      },
+      {
+        "key": { "status": 1, "type": 1 },
+        "name": "idx_questionnaires_status_type_published",
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  },
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "status": 1, "deleted_at": 1 },
+        "name": "idx_scales_status_deleted"
+      },
+      {
+        "key": { "status": 1 },
+        "name": "idx_scales_status_published",
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  }
+]
