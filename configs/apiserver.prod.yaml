@@ -370,8 +370,6 @@ log:
     all:
       - stdout                              # 容器/进程标准输出保留完整日志
       - /data/logs/qs/qs-apiserver.log      # 完整日志（所有级别）
-    warn:
-      - /data/logs/qs/qs-apiserver-warn.log # 额外记录 WARN（发现潜在问题）
     error:
       - stderr                              # ERROR 级别写入标准错误，便于监控采集
       - /data/logs/qs/qs-apiserver-error.log # 额外记录 ERROR（快速定位故障）

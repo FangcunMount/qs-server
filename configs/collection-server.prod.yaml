@@ -209,10 +209,8 @@ log:
     all:
       - stdout
       - /data/logs/qs/qs-collection-server.log
-    warn:
-      - /data/logs/qs/qs-collection-server-warn.log
     error:
-      - stderr
+      - stderr                              
       - /data/logs/qs/qs-collection-server-error.log
 
 # -------------------------------------------------------
