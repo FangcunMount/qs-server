@@ -18,6 +18,12 @@ const (
 	DefaultAccumStatsTTL  = 0 // 0 表示不过期，累计类由落库/重建保障
 )
 
+// normalizeDate 将日期统一到本地时区的 00:00:00，避免跨日边界差异
+func normalizeDate(t time.Time) time.Time {
+	d := t.In(time.Local)
+	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, d.Location())
+}
+
 // StatisticsCache 统计缓存（Redis操作封装）
 type StatisticsCache struct {
 	client redis.UniversalClient
@@ -41,6 +47,7 @@ func (c *StatisticsCache) IncrementDailyCount(
 	date time.Time,
 	metric string, // "submission" or "completion"
 ) error {
+	date = normalizeDate(date)
 	key := fmt.Sprintf("stats:daily:%d:%s:%s:%s", orgID, statType, statKey, date.Format("2006-01-02"))
 	field := fmt.Sprintf("%s_count", metric)
 	if err := c.client.HIncrBy(ctx, key, field, 1).Err(); err != nil {
@@ -57,6 +64,7 @@ func (c *StatisticsCache) GetDailyCount(
 	statKey string,
 	date time.Time,
 ) (submissionCount, completionCount int64, err error) {
+	date = normalizeDate(date)
 	key := fmt.Sprintf("stats:daily:%d:%s:%s:%s", orgID, statType, statKey, date.Format("2006-01-02"))
 
 	values, err := c.client.HMGet(ctx, key, "submission_count", "completion_count").Result()
