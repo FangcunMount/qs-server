@@ -76,20 +76,29 @@ func (r *CachedQuestionnaireRepository) Create(ctx context.Context, qDomain *que
 
 // FindByCode 根据编码查询问卷（优先从缓存读取）
 func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
+	l := logger.L(ctx)
+
+	l.Debugw("Questionnaire cache lookup", "action", "find_by_code", "code", code, "cache_enabled", r.client != nil)
+
 	// 1. 尝试从缓存读取（使用 code 作为 key，version 为空）
 	if r.client != nil {
 		if cached, err := r.getCache(ctx, code, ""); err == nil {
 			if cached != nil {
+				l.Debugw("Questionnaire cache hit", "action", "find_by_code", "code", code)
 				return cached, nil
 			}
+			l.Debugw("Questionnaire cache hit nil", "action", "find_by_code", "code", code)
 			return nil, nil
 		} else if err != ErrCacheNotFound {
+			l.Errorw("Questionnaire cache error", "action", "find_by_code", "code", code, "error", err.Error())
 			return nil, err
 		}
+		l.Debugw("Questionnaire cache miss", "action", "find_by_code", "code", code)
 	}
 
 	// 2. 缓存未命中，从数据库查询
 	val, err, _ := Group.Do("questionnaire:"+code, func() (interface{}, error) {
+		l.Debugw("Questionnaire fallback to Mongo", "action", "find_by_code", "code", code)
 		return r.repo.FindByCode(ctx, code)
 	})
 	if err != nil {
@@ -114,20 +123,29 @@ func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code str
 
 // FindByCodeVersion 根据编码和版本查询问卷（优先从缓存读取）
 func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
+	l := logger.L(ctx)
+
+	l.Debugw("Questionnaire cache lookup", "action", "find_by_code_version", "code", code, "version", version, "cache_enabled", r.client != nil)
+
 	// 1. 尝试从缓存读取
 	if r.client != nil {
 		if cached, err := r.getCache(ctx, code, version); err == nil {
 			if cached != nil {
+				l.Debugw("Questionnaire cache hit", "action", "find_by_code_version", "code", code, "version", version)
 				return cached, nil
 			}
+			l.Debugw("Questionnaire cache hit nil", "action", "find_by_code_version", "code", code, "version", version)
 			return nil, nil
 		} else if err != ErrCacheNotFound {
+			l.Errorw("Questionnaire cache error", "action", "find_by_code_version", "code", code, "version", version, "error", err.Error())
 			return nil, err
 		}
+		l.Debugw("Questionnaire cache miss", "action", "find_by_code_version", "code", code, "version", version)
 	}
 
 	// 2. 缓存未命中，从数据库查询
 	val, err, _ := Group.Do("questionnaire:"+code+":"+version, func() (interface{}, error) {
+		l.Debugw("Questionnaire fallback to Mongo", "action", "find_by_code_version", "code", code, "version", version)
 		return r.repo.FindByCodeVersion(ctx, code, version)
 	})
 	if err != nil {

@@ -329,6 +329,10 @@ func (r *Repository) aggregateBase(ctx context.Context, filter bson.M) (*Questio
 			)
 			return nil, err
 		}
+		logger.L(ctx).Debugw("Mongo 查询问卷基础信息无结果",
+			"collection", r.Collection().Name(),
+			"pipeline", pipeline,
+		)
 		return nil, mongo.ErrNoDocuments
 	}
 
