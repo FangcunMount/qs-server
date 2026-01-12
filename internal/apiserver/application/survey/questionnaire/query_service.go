@@ -153,6 +153,23 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	return toQuestionnaireResult(q), nil
 }
 
+// GetQuestionCount 获取问卷题目数量（轻量，不加载 questions）
+func (s *queryService) GetQuestionCount(ctx context.Context, code string) (int32, error) {
+	if err := s.validateCode(ctx, code, "get_question_count"); err != nil {
+		return 0, err
+	}
+
+	q, err := s.repo.FindBaseByCode(ctx, code)
+	if err != nil {
+		return 0, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷题目数量失败")
+	}
+	if q == nil {
+		return 0, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+	}
+
+	return int32(q.GetQuestionCnt()), nil
+}
+
 // ListPublished 查询已发布问卷摘要列表（轻量级）
 func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error) {
 	l := logger.L(ctx)

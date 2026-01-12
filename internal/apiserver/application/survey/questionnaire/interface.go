@@ -90,6 +90,10 @@ type QuestionnaireQueryService interface {
 	// 场景：答题者查询可用的问卷（只返回已发布状态）
 	GetPublishedByCode(ctx context.Context, code string) (*QuestionnaireResult, error)
 
+	// GetQuestionCount 获取问卷题目数量（轻量，不加载 questions）
+	// 场景：列表或关联查询仅需题目数量时使用
+	GetQuestionCount(ctx context.Context, code string) (int32, error)
+
 	// ListPublished 查询已发布问卷摘要列表（轻量级，不包含问题详情）
 	// 场景：答题者浏览可答题的问卷列表
 	ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error)

@@ -152,7 +152,10 @@ func (s *ScaleService) toProtoScale(ctx context.Context, result *appScale.ScaleR
 	applicableAges := append([]string(nil), result.ApplicableAges...)
 
 	// 获取题目数量
-	questionCount := s.getQuestionCount(ctx, result.QuestionnaireCode)
+	questionCount := result.QuestionCount
+	if questionCount == 0 {
+		questionCount = s.getQuestionCount(ctx, result.QuestionnaireCode)
+	}
 
 	return &pb.Scale{
 		Code:                 result.Code,
@@ -241,8 +244,11 @@ func (s *ScaleService) toProtoScaleSummary(ctx context.Context, result *appScale
 	// 转换使用年龄列表
 	applicableAges := append([]string(nil), result.ApplicableAges...)
 
-	// 获取题目数量
-	questionCount := s.getQuestionCount(ctx, result.QuestionnaireCode)
+	// 获取题目数量（优先使用预存字段，缺失时降级查询）
+	questionCount := result.QuestionCount
+	if questionCount == 0 {
+		questionCount = s.getQuestionCount(ctx, result.QuestionnaireCode)
+	}
 
 	return &pb.ScaleSummary{
 		Code:                 result.Code,
@@ -266,21 +272,11 @@ func (s *ScaleService) getQuestionCount(ctx context.Context, questionnaireCode s
 		return 0
 	}
 
-	// 查询问卷获取题目数量
-	questionnaire, err := s.questionnaireQueryService.GetByCode(ctx, questionnaireCode)
-	if err != nil || questionnaire == nil {
+	cnt, err := s.questionnaireQueryService.GetQuestionCount(ctx, questionnaireCode)
+	if err != nil {
 		return 0
 	}
-
-	// 统计题目数量，过滤掉 Section 题型
-	count := 0
-	for _, question := range questionnaire.Questions {
-		if question.Type != "Section" {
-			count++
-		}
-	}
-
-	return int32(count)
+	return cnt
 }
 
 // toProtoFactor 转换为 protobuf 因子

@@ -24,6 +24,7 @@ type ScaleResult struct {
 	Tags                 []string       // 标签列表
 	QuestionnaireCode    string         // 关联的问卷编码
 	QuestionnaireVersion string         // 关联的问卷版本
+	QuestionCount        int32          // 问卷题目数量（摘要/详情显示）
 	Status               string         // 状态
 	Factors              []FactorResult // 因子列表
 	QRCodeURL            string         // 小程序码URL（仅已发布状态时返回）
@@ -74,6 +75,7 @@ type ScaleSummaryResult struct {
 	Reporters         []string  // 填报人列表
 	Tags              []string  // 标签列表
 	QuestionnaireCode string    // 关联的问卷编码
+	QuestionCount     int32     // 问卷题目数量
 	Status            string    // 状态
 	CreatedBy         string    // 创建人
 	CreatedAt         time.Time // 创建时间
@@ -130,12 +132,13 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		Tags:                 tags,
 		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: m.GetQuestionnaireVersion(),
-		Status:               m.GetStatus().String(),
-		Factors:              make([]FactorResult, 0),
-		CreatedBy:            m.GetCreatedBy().String(),
-		CreatedAt:            m.GetCreatedAt(),
-		UpdatedBy:            m.GetUpdatedBy().String(),
-		UpdatedAt:            m.GetUpdatedAt(),
+		// QuestionCount 由问卷预存字段提供，若领域未持有则在上层补齐
+		Status:    m.GetStatus().String(),
+		Factors:   make([]FactorResult, 0),
+		CreatedBy: m.GetCreatedBy().String(),
+		CreatedAt: m.GetCreatedAt(),
+		UpdatedBy: m.GetUpdatedBy().String(),
+		UpdatedAt: m.GetUpdatedAt(),
 	}
 
 	// 转换因子列表
