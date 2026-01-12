@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -48,6 +49,7 @@ func (r *CachedQuestionnaireRepository) WithTTL(ttl time.Duration) *CachedQuesti
 
 // buildCacheKey 构建缓存键
 func (r *CachedQuestionnaireRepository) buildCacheKey(code, version string) string {
+	code = strings.ToLower(code)
 	if version != "" {
 		return addNamespace(fmt.Sprintf("%s%s:%s", QuestionnaireCachePrefix, code, version))
 	}

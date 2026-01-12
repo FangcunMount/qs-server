@@ -2,6 +2,7 @@ package questionnaire
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -118,6 +119,8 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*QuestionnaireResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
+
+	code = strings.ToLower(code)
 
 	l.Debugw("获取已发布问卷",
 		"action", "get_published_by_code",

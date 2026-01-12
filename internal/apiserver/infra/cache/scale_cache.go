@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -48,7 +49,7 @@ func (r *CachedScaleRepository) WithTTL(ttl time.Duration) *CachedScaleRepositor
 
 // buildCacheKey 构建缓存键
 func (r *CachedScaleRepository) buildCacheKey(code string) string {
-	return addNamespace(fmt.Sprintf("%s%s", ScaleCachePrefix, code))
+	return addNamespace(fmt.Sprintf("%s%s", ScaleCachePrefix, strings.ToLower(code)))
 }
 
 // Create 创建量表（同时写入缓存）
