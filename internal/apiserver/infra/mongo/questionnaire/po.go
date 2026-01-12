@@ -34,6 +34,7 @@ func (p *QuestionnairePO) BeforeInsert() {
 	p.CreatedAt = now
 	p.UpdatedAt = now
 	p.DeletedAt = nil
+	p.QuestionCount = len(p.Questions)
 
 	// 设置默认值
 	if p.CreatedBy == 0 {
@@ -46,6 +47,7 @@ func (p *QuestionnairePO) BeforeInsert() {
 // BeforeUpdate 更新前设置字段
 func (p *QuestionnairePO) BeforeUpdate() {
 	p.UpdatedAt = time.Now()
+	p.QuestionCount = len(p.Questions)
 	// UpdatedBy 应该从上下文中获取当前用户ID
 }
 

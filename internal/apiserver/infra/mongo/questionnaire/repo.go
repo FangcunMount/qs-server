@@ -366,7 +366,7 @@ func buildBasePipeline(filter bson.M, skip, limit *int64) []bson.M {
 		"version":        1,
 		"status":         1,
 		"type":           1,
-		"question_count": bson.M{"$size": bson.M{"$ifNull": []interface{}{"$questions", []interface{}{}}}},
+		"question_count": 1,
 		"created_by":     1,
 		"created_at":     1,
 		"updated_by":     1,
