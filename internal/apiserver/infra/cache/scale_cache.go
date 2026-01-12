@@ -183,6 +183,9 @@ func (r *CachedScaleRepository) getCache(ctx context.Context, code string) (*sca
 	if err != nil {
 		return nil, err
 	}
+	if len(dataBytes) == 0 {
+		return nil, nil // 空值缓存，表示不存在
+	}
 	// 4. 反序列化为 PO
 	data := decompressIfNeeded(dataBytes)
 	var po scaleInfra.ScalePO

@@ -248,6 +248,9 @@ func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, code, vers
 	if err != nil {
 		return nil, err
 	}
+	if len(dataBytes) == 0 {
+		return nil, nil // 空值缓存，表示不存在
+	}
 	data := decompressIfNeeded(dataBytes)
 	// 反序列化为 PO
 	var po questionnaireInfra.QuestionnairePO

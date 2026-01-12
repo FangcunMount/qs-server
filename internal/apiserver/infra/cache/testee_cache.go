@@ -127,6 +127,10 @@ func (r *CachedTesteeRepository) getCache(ctx context.Context, id testee.ID) (*t
 		return nil, err
 	}
 
+	if len(cachedData) == 0 {
+		return nil, nil // 空值缓存，表示不存在
+	}
+
 	var po testeeInfra.TesteePO
 	if err := json.Unmarshal(cachedData, &po); err != nil {
 		return nil, err
