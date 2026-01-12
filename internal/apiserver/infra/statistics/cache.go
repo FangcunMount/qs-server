@@ -10,6 +10,14 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
+const (
+	// 统计类键生命周期
+	DefaultDailyStatsTTL  = 90 * 24 * time.Hour
+	DefaultWindowStatsTTL = 90 * 24 * time.Hour
+	DefaultDistStatsTTL   = 90 * 24 * time.Hour
+	DefaultAccumStatsTTL  = 0 // 0 表示不过期，累计类由落库/重建保障
+)
+
 // StatisticsCache 统计缓存（Redis操作封装）
 type StatisticsCache struct {
 	client redis.UniversalClient
@@ -35,7 +43,10 @@ func (c *StatisticsCache) IncrementDailyCount(
 ) error {
 	key := fmt.Sprintf("stats:daily:%d:%s:%s:%s", orgID, statType, statKey, date.Format("2006-01-02"))
 	field := fmt.Sprintf("%s_count", metric)
-	return c.client.HIncrBy(ctx, key, field, 1).Err()
+	if err := c.client.HIncrBy(ctx, key, field, 1).Err(); err != nil {
+		return err
+	}
+	return c.ensureTTL(ctx, key, DefaultDailyStatsTTL)
 }
 
 // GetDailyCount 获取每日计数
@@ -80,7 +91,10 @@ func (c *StatisticsCache) IncrementWindowCount(
 	window string, // "last7d", "last15d", "last30d"
 ) error {
 	key := fmt.Sprintf("stats:window:%d:%s:%s:%s", orgID, statType, statKey, window)
-	return c.client.Incr(ctx, key).Err()
+	if err := c.client.Incr(ctx, key).Err(); err != nil {
+		return err
+	}
+	return c.ensureTTL(ctx, key, DefaultWindowStatsTTL)
 }
 
 // GetWindowCount 获取滑动窗口计数
@@ -110,7 +124,14 @@ func (c *StatisticsCache) IncrementAccumCount(
 	metric string, // "total_submissions", "total_completions"
 ) error {
 	key := fmt.Sprintf("stats:accum:%d:%s:%s:%s", orgID, statType, statKey, metric)
-	return c.client.Incr(ctx, key).Err()
+	if err := c.client.Incr(ctx, key).Err(); err != nil {
+		return err
+	}
+	// 如果需要生命周期，可调整 DefaultAccumStatsTTL
+	if DefaultAccumStatsTTL > 0 {
+		return c.ensureTTL(ctx, key, DefaultAccumStatsTTL)
+	}
+	return nil
 }
 
 // GetAccumCount 获取累计计数
@@ -141,7 +162,10 @@ func (c *StatisticsCache) IncrementDistribution(
 	value string, // 分布值
 ) error {
 	key := fmt.Sprintf("stats:dist:%d:%s:%s:%s", orgID, statType, statKey, dimension)
-	return c.client.HIncrBy(ctx, key, value, 1).Err()
+	if err := c.client.HIncrBy(ctx, key, value, 1).Err(); err != nil {
+		return err
+	}
+	return c.ensureTTL(ctx, key, DefaultDistStatsTTL)
 }
 
 // GetDistribution 获取分布统计
@@ -226,4 +250,13 @@ func (c *StatisticsCache) ScanDailyKeys(ctx context.Context, orgID int64, statTy
 	}
 
 	return keys, nil
+}
+
+// ensureTTL 统一设置 TTL，避免历史键无限增长
+func (c *StatisticsCache) ensureTTL(ctx context.Context, key string, ttl time.Duration) error {
+	if c.client == nil || ttl <= 0 {
+		return nil
+	}
+	// 直接刷新 TTL（滑动窗口），不区分新老键，确保历史无 TTL 键被覆盖
+	return c.client.Expire(ctx, key, ttl).Err()
 }
