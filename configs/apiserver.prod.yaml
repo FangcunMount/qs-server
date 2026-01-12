@@ -345,9 +345,9 @@ wechat:
 # 5.1 日志配置（生产环境 - 使用 component-base duplicate 模式）
 # ----------------------------------------------------------------------------
 log:
-  level: info                   # 日志基本级别：debug, info, warn, error, fatal, panic
-  format: json                  # 日志格式（json 适合生产环境，console 适合开发环境）
-  enable-color: false           # 文件输出禁用颜色
+  level: debug                   # 日志基本级别：debug, info, warn, error, fatal, panic
+  format: console               # 日志格式（json 适合生产环境，console 适合开发环境）
+  enable-color: true            # 文件输出启用颜色
   development: false            # 生产模式
   name: "qs-apiserver"          # 日志名称
   
