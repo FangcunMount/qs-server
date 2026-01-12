@@ -106,6 +106,7 @@ func (r *CachedAssessmentRepository) getCache(ctx context.Context, id assessment
 		return nil, err
 	}
 
+	cachedData = decompressIfNeeded(cachedData)
 	var po assessmentInfra.AssessmentPO
 	if err := json.Unmarshal(cachedData, &po); err != nil {
 		return nil, err
@@ -127,7 +128,7 @@ func (r *CachedAssessmentRepository) setCache(ctx context.Context, id assessment
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
+	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存

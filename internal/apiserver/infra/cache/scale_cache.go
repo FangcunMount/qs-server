@@ -160,24 +160,31 @@ func (r *CachedScaleRepository) ExistsByCode(ctx context.Context, code string) (
 
 // getCache 从缓存获取量表
 func (r *CachedScaleRepository) getCache(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	// 1. 构建缓存键
 	key := r.buildCacheKey(code)
+	// 2. 获取缓存
 	result := r.client.Get(ctx, key)
 	if result.Err() == redis.Nil {
-		return nil, nil // 缓存未命中，返回 nil
+		return nil, ErrCacheNotFound // 缓存未命中，返回 ErrCacheNotFound
 	}
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
 
-	data := result.Val()
-	// 反序列化为 PO
+	// 3. 解压数据
+	dataBytes, err := result.Bytes()
+	if err != nil {
+		return nil, err
+	}
+	// 4. 反序列化为 PO
+	data := decompressIfNeeded(dataBytes)
 	var po scaleInfra.ScalePO
-	if err := json.Unmarshal([]byte(data), &po); err != nil {
+	if err := json.Unmarshal(data, &po); err != nil {
 		logger.L(ctx).Warnw("failed to unmarshal cached scale", "code", code, "error", err)
 		return nil, err
 	}
 
-	// 通过 mapper 转换为 domain
+	// 5. 通过 mapper 转换为 domain
 	domain := r.mapper.ToDomain(ctx, &po)
 	return domain, nil
 }
@@ -193,7 +200,7 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
+	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(r.ttl)).Err()
 }
 
 // setNilCache 设置空值缓存，防止穿透，短 TTL

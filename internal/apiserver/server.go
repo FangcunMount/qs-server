@@ -189,6 +189,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 				TTLJitterRatio:         cacheTTLJitter,
 				StatisticsWarmup:       statsWarmupCfg,
 				Namespace:              s.config.Cache.Namespace,
+				CompressPayload:        s.config.Cache.CompressPayload,
 			},
 		},
 	)

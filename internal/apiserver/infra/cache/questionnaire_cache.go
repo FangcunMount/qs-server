@@ -236,10 +236,14 @@ func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, code, vers
 		return nil, result.Err()
 	}
 
-	data := result.Val()
+	dataBytes, err := result.Bytes()
+	if err != nil {
+		return nil, err
+	}
+	data := decompressIfNeeded(dataBytes)
 	// 反序列化为 PO
 	var po questionnaireInfra.QuestionnairePO
-	if err := json.Unmarshal([]byte(data), &po); err != nil {
+	if err := json.Unmarshal(data, &po); err != nil {
 		logger.L(ctx).Warnw("failed to unmarshal cached questionnaire", "code", code, "version", version, "error", err)
 		return nil, err
 	}
@@ -260,7 +264,7 @@ func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, code, vers
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
+	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(r.ttl)).Err()
 }
 
 // setNilCache 设置空值缓存，防止穿透，短 TTL

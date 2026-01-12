@@ -98,6 +98,7 @@ type ContainerCacheOptions struct {
 	TTLJitterRatio         float64
 	StatisticsWarmup       *scaleCache.StatisticsWarmupConfig
 	Namespace              string
+	CompressPayload        bool
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
@@ -135,6 +136,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	})
 	scaleCache.ApplyTTLJitterRatio(opts.Cache.TTLJitterRatio)
 	scaleCache.ApplyNamespace(opts.Cache.Namespace)
+	scaleCache.ApplyCompressionFlag(opts.Cache.CompressPayload)
 
 	return c
 }
