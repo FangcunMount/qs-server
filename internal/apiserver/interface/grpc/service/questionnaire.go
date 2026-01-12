@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -11,7 +11,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // QuestionnaireService 问卷 gRPC 服务 - C端接口
@@ -75,12 +74,7 @@ func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.Get
 	// 调用应用服务
 	result, err := s.queryService.GetPublishedByCode(ctx, req.Code)
 	if err != nil {
-		switch errors.Code(err) {
-		case code.ErrQuestionnaireNotFound, code.ErrQuestionnaireInvalidStatus:
-			return nil, status.Error(codes.NotFound, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
-		}
+		return nil, status.Error(codes.Internal, pkgerrors.Reduce(err).Error())
 	}
 
 	if result == nil {
