@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
@@ -76,6 +77,11 @@ func (r *Repository) FindBaseByCode(ctx context.Context, code string) (*question
 		"code": code,
 	}
 
+	logger.L(ctx).Debugw("Mongo 查询问卷基础信息",
+		"collection", r.Collection().Name(),
+		"filter", filter,
+	)
+
 	po, err := r.aggregateBase(ctx, filter)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -115,6 +121,13 @@ func (r *Repository) LoadQuestions(ctx context.Context, qDomain *questionnaire.Q
 	}
 
 	projection := bson.M{"questions": 1}
+
+	logger.L(ctx).Debugw("Mongo 查询问卷题目",
+		"collection", r.Collection().Name(),
+		"filter", filter,
+		"projection", projection,
+	)
+
 	var po QuestionnairePO
 	if err := r.Collection().FindOne(ctx, filter, options.FindOne().SetProjection(projection)).Decode(&po); err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -290,14 +303,30 @@ func (r *Repository) FindBaseList(ctx context.Context, page, pageSize int, condi
 func (r *Repository) aggregateBase(ctx context.Context, filter bson.M) (*QuestionnairePO, error) {
 	limit := int64(1)
 	pipeline := buildBasePipeline(filter, nil, &limit)
+
+	logger.L(ctx).Debugw("Mongo 查询问卷基础信息",
+		"collection", r.Collection().Name(),
+		"pipeline", pipeline,
+	)
+
 	cursor, err := r.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
+		logger.L(ctx).Errorw("Mongo 查询问卷基础信息失败",
+			"collection", r.Collection().Name(),
+			"pipeline", pipeline,
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	if !cursor.Next(ctx) {
 		if err := cursor.Err(); err != nil {
+			logger.L(ctx).Errorw("Mongo 查询问卷基础信息失败",
+				"collection", r.Collection().Name(),
+				"pipeline", pipeline,
+				"error", err.Error(),
+			)
 			return nil, err
 		}
 		return nil, mongo.ErrNoDocuments
@@ -305,6 +334,11 @@ func (r *Repository) aggregateBase(ctx context.Context, filter bson.M) (*Questio
 
 	var po QuestionnairePO
 	if err := cursor.Decode(&po); err != nil {
+		logger.L(ctx).Errorw("Mongo 查询问卷基础信息失败",
+			"collection", r.Collection().Name(),
+			"pipeline", pipeline,
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 	return &po, nil
