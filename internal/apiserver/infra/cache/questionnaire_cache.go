@@ -256,17 +256,21 @@ func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, code, vers
 	key := r.buildCacheKey(code, version)
 	result := r.client.Get(ctx, key)
 	if result.Err() == redis.Nil {
-		return nil, nil // 缓存未命中，返回 nil
+		logger.L(ctx).Debugw("Questionnaire cache miss", "action", "get_cache", "code", code, "version", version)
+		return nil, ErrCacheNotFound // 缓存未命中
 	}
 	if result.Err() != nil {
+		logger.L(ctx).Errorw("Questionnaire cache error", "action", "get_cache", "code", code, "version", version, "error", result.Err().Error())
 		return nil, result.Err()
 	}
 
 	dataBytes, err := result.Bytes()
 	if err != nil {
+		logger.L(ctx).Errorw("Questionnaire cache error", "action", "get_cache", "code", code, "version", version, "error", err.Error())
 		return nil, err
 	}
 	if len(dataBytes) == 0 {
+		logger.L(ctx).Debugw("Questionnaire cache hit nil", "action", "get_cache", "code", code, "version", version)
 		return nil, nil // 空值缓存，表示不存在
 	}
 	data := decompressIfNeeded(dataBytes)
