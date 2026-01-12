@@ -76,6 +76,115 @@ func (s *WarmupService) WarmupDefaultScales(ctx context.Context) error {
 	return s.WarmupScaleCache(ctx, defaultHotScales)
 }
 
+// WarmupAllPublished 预热所有已发布的量表及其关联的问卷
+// 注意：需要底层 Repository 支持 FindSummaryList/FindBaseList
+func (s *WarmupService) WarmupAllPublished(ctx context.Context) error {
+	l := logger.L(ctx)
+
+	// 预热量表缓存
+	publishedScaleCodes, questionnaireCodesFromScales, err := s.listAllPublishedScales(ctx)
+	if err != nil {
+		return fmt.Errorf("list published scales failed: %w", err)
+	}
+	if len(publishedScaleCodes) > 0 {
+		if err := s.WarmupScaleCache(ctx, publishedScaleCodes); err != nil {
+			l.Warnw("预热量表缓存失败", "error", err)
+		}
+	}
+
+	// 预热问卷缓存：集合了“量表关联问卷”和“已发布问卷”
+	qCodes := make(map[string]struct{})
+	for _, c := range questionnaireCodesFromScales {
+		if c != "" {
+			qCodes[c] = struct{}{}
+		}
+	}
+	publishedQuestionnaireCodes, err := s.listAllPublishedQuestionnaires(ctx)
+	if err != nil {
+		l.Warnw("列出已发布问卷失败，跳过问卷预热", "error", err)
+	} else {
+		for _, c := range publishedQuestionnaireCodes {
+			if c != "" {
+				qCodes[c] = struct{}{}
+			}
+		}
+	}
+
+	if len(qCodes) > 0 {
+		hot := make([]string, 0, len(qCodes))
+		for code := range qCodes {
+			hot = append(hot, code)
+		}
+		if err := s.WarmupQuestionnaireCache(ctx, hot); err != nil {
+			l.Warnw("预热问卷缓存失败", "error", err)
+		}
+	}
+
+	return nil
+}
+
+// listAllPublishedScales 分页获取已发布量表编码及关联问卷编码
+func (s *WarmupService) listAllPublishedScales(ctx context.Context) (scaleCodes []string, questionnaireCodes []string, err error) {
+	const pageSize = 200
+	page := 1
+	for {
+		items, e := s.scaleRepo.FindSummaryList(ctx, page, pageSize, map[string]interface{}{
+			"status": scale.StatusPublished.Value(),
+		})
+		if e != nil {
+			err = e
+			return
+		}
+		if len(items) == 0 {
+			break
+		}
+		for _, it := range items {
+			if it == nil {
+				continue
+			}
+			scaleCodes = append(scaleCodes, it.GetCode().String())
+			questionnaireCodes = append(questionnaireCodes, it.GetQuestionnaireCode().String())
+		}
+		if len(items) < pageSize {
+			break
+		}
+		page++
+	}
+	return
+}
+
+// listAllPublishedQuestionnaires 获取已发布问卷编码
+func (s *WarmupService) listAllPublishedQuestionnaires(ctx context.Context) ([]string, error) {
+	if s.questionnaireRepo == nil {
+		return nil, nil
+	}
+
+	const pageSize = 200
+	page := 1
+	var codes []string
+	for {
+		items, err := s.questionnaireRepo.FindBaseList(ctx, page, pageSize, map[string]interface{}{
+			"status": questionnaire.STATUS_PUBLISHED.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(items) == 0 {
+			break
+		}
+		for _, it := range items {
+			if it != nil {
+				codes = append(codes, it.GetCode().String())
+			}
+		}
+		if len(items) < pageSize {
+			break
+		}
+		page++
+	}
+	return codes, nil
+}
+
 // WarmupQuestionnaireCache 预热问卷缓存
 // hotQuestionnaireCodes: 热点问卷编码列表
 func (s *WarmupService) WarmupQuestionnaireCache(ctx context.Context, hotQuestionnaireCodes []string) error {

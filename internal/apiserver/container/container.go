@@ -232,7 +232,7 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 			warmupSvc = scaleCache.NewWarmupService(c.ScaleModule.Repo)
 		}
 
-		if err := warmupSvc.WarmupDefaultScales(ctx); err != nil {
+		if err := warmupSvc.WarmupAllPublished(ctx); err != nil {
 			// 预热失败不影响服务启动，仅记录日志
 			return fmt.Errorf("scale cache warmup failed: %w", err)
 		}
