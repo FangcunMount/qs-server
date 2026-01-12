@@ -200,8 +200,10 @@ func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
-	DisableEvaluationCache bool `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
-	DisableStatisticsCache bool `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	DisableEvaluationCache bool             `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
+	DisableStatisticsCache bool             `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	TTL                    *CacheTTLOptions `json:"ttl" mapstructure:"ttl"`
+	TTLJitterRatio         float64          `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -209,6 +211,15 @@ func NewCacheOptions() *CacheOptions {
 	return &CacheOptions{
 		DisableEvaluationCache: false,
 		DisableStatisticsCache: false,
+		TTL: &CacheTTLOptions{
+			Scale:            24 * time.Hour,
+			Questionnaire:    12 * time.Hour,
+			AssessmentDetail: 2 * time.Hour,
+			AssessmentStatus: 30 * time.Minute,
+			Testee:           2 * time.Hour,
+			Plan:             2 * time.Hour,
+		},
+		TTLJitterRatio: 0.1,
 	}
 }
 
@@ -219,10 +230,37 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	if c == nil {
 		return
 	}
+	if c.TTL == nil {
+		c.TTL = &CacheTTLOptions{
+			Scale:            24 * time.Hour,
+			Questionnaire:    12 * time.Hour,
+			AssessmentDetail: 2 * time.Hour,
+			AssessmentStatus: 30 * time.Minute,
+			Testee:           2 * time.Hour,
+			Plan:             2 * time.Hour,
+		}
+	}
 	fs.BoolVar(&c.DisableEvaluationCache, "cache.disable-evaluation-cache", c.DisableEvaluationCache,
 		"Disable Redis caching for evaluation details")
 	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
 		"Disable Redis caching for statistics data")
+	fs.DurationVar(&c.TTL.Scale, "cache.ttl.scale", c.TTL.Scale, "TTL for scale cache entries.")
+	fs.DurationVar(&c.TTL.Questionnaire, "cache.ttl.questionnaire", c.TTL.Questionnaire, "TTL for questionnaire cache entries.")
+	fs.DurationVar(&c.TTL.AssessmentDetail, "cache.ttl.assessment-detail", c.TTL.AssessmentDetail, "TTL for assessment detail cache entries.")
+	fs.DurationVar(&c.TTL.AssessmentStatus, "cache.ttl.assessment-status", c.TTL.AssessmentStatus, "TTL for assessment status cache entries.")
+	fs.DurationVar(&c.TTL.Testee, "cache.ttl.testee", c.TTL.Testee, "TTL for testee cache entries.")
+	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
+	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
+}
+
+// CacheTTLOptions 缓存 TTL 配置
+type CacheTTLOptions struct {
+	Scale            time.Duration `json:"scale" mapstructure:"scale"`
+	Questionnaire    time.Duration `json:"questionnaire" mapstructure:"questionnaire"`
+	AssessmentDetail time.Duration `json:"assessment_detail" mapstructure:"assessment_detail"`
+	AssessmentStatus time.Duration `json:"assessment_status" mapstructure:"assessment_status"`
+	Testee           time.Duration `json:"testee" mapstructure:"testee"`
+	Plan             time.Duration `json:"plan" mapstructure:"plan"`
 }
 
 // StatisticsSyncOptions 统计同步定时任务配置

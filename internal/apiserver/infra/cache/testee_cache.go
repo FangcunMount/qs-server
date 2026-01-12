@@ -15,9 +15,10 @@ import (
 const (
 	// TesteeCachePrefix 受试者缓存键前缀
 	TesteeCachePrefix = "testee:info:"
-	// DefaultTesteeCacheTTL 默认受试者缓存 TTL
-	DefaultTesteeCacheTTL = 2 * time.Hour
 )
+
+// DefaultTesteeCacheTTL 默认受试者缓存 TTL（可被配置覆盖）
+var DefaultTesteeCacheTTL = 2 * time.Hour
 
 // CachedTesteeRepository 带缓存的受试者 Repository 装饰器
 // 实现 testee.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -133,7 +134,7 @@ func (r *CachedTesteeRepository) setCache(ctx context.Context, id testee.ID, dom
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, r.ttl).Err()
+	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存

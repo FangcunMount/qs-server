@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	redis "github.com/redis/go-redis/v9"
@@ -93,6 +94,18 @@ type ContainerOptions struct {
 type ContainerCacheOptions struct {
 	DisableEvaluationCache bool
 	DisableStatisticsCache bool
+	TTL                    ContainerCacheTTLOptions
+	TTLJitterRatio         float64
+}
+
+// ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
+type ContainerCacheTTLOptions struct {
+	Scale            time.Duration
+	Questionnaire    time.Duration
+	AssessmentDetail time.Duration
+	AssessmentStatus time.Duration
+	Testee           time.Duration
+	Plan             time.Duration
 }
 
 // NewContainerWithOptions 创建带配置的容器
@@ -108,6 +121,17 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	}
 
 	c.cacheOptions = opts.Cache
+
+	// 应用缓存 TTL 覆盖（仅在启动时设置一次，全局生效）
+	scaleCache.ApplyTTLOptions(scaleCache.TTLOptions{
+		Scale:            opts.Cache.TTL.Scale,
+		Questionnaire:    opts.Cache.TTL.Questionnaire,
+		AssessmentDetail: opts.Cache.TTL.AssessmentDetail,
+		AssessmentStatus: opts.Cache.TTL.AssessmentStatus,
+		Testee:           opts.Cache.TTL.Testee,
+		Plan:             opts.Cache.TTL.Plan,
+	})
+	scaleCache.ApplyTTLJitterRatio(opts.Cache.TTLJitterRatio)
 
 	return c
 }

@@ -16,9 +16,10 @@ import (
 const (
 	// PlanCachePrefix 计划缓存键前缀
 	PlanCachePrefix = "plan:info:"
-	// DefaultPlanCacheTTL 默认计划缓存 TTL
-	DefaultPlanCacheTTL = 2 * time.Hour
 )
+
+// DefaultPlanCacheTTL 默认计划缓存 TTL（可被配置覆盖）
+var DefaultPlanCacheTTL = 2 * time.Hour
 
 // CachedPlanRepository 带缓存的计划 Repository 装饰器
 // 实现 plan.AssessmentPlanRepository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -116,7 +117,7 @@ func (r *CachedPlanRepository) setCache(ctx context.Context, id plan.AssessmentP
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, r.ttl).Err()
+	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存
@@ -145,4 +146,3 @@ func (r *CachedPlanRepository) FindByTesteeID(ctx context.Context, testeeID test
 func (r *CachedPlanRepository) FindList(ctx context.Context, orgID int64, scaleCode string, status string, page, pageSize int) ([]*plan.AssessmentPlan, int64, error) {
 	return r.repo.FindList(ctx, orgID, scaleCode, status, page, pageSize)
 }
-

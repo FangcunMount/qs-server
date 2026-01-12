@@ -15,9 +15,10 @@ import (
 const (
 	// QuestionnaireCachePrefix 问卷缓存键前缀
 	QuestionnaireCachePrefix = "questionnaire:"
-	// DefaultQuestionnaireCacheTTL 默认问卷缓存 TTL
-	DefaultQuestionnaireCacheTTL = 12 * time.Hour
 )
+
+// DefaultQuestionnaireCacheTTL 默认问卷缓存 TTL（可被配置覆盖）
+var DefaultQuestionnaireCacheTTL = 12 * time.Hour
 
 // CachedQuestionnaireRepository 带缓存的问卷 Repository 装饰器
 // 实现 questionnaire.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -244,7 +245,7 @@ func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, code, vers
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, r.ttl).Err()
+	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
 }
 
 // deleteCacheByCode 删除指定编码的所有版本缓存
@@ -252,7 +253,7 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 	pattern := fmt.Sprintf("%s%s:*", QuestionnaireCachePrefix, code)
 	// 也删除不带版本的 key
 	keyWithoutVersion := r.buildCacheKey(code, "")
-	
+
 	// 删除不带版本的 key
 	if err := r.client.Del(ctx, keyWithoutVersion).Err(); err != nil {
 		logger.L(ctx).Warnw("failed to delete cache key", "key", keyWithoutVersion, "error", err)

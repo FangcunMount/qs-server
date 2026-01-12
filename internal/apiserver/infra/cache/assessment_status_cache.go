@@ -10,9 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-const (
-	AssessmentStatusCacheTTL = 30 * time.Minute
-)
+// AssessmentStatusCacheTTL 默认测评状态缓存 TTL（可被配置覆盖）
+var AssessmentStatusCacheTTL = 30 * time.Minute
 
 // AssessmentStatusCache 测评状态缓存
 // 使用 Write-Through 模式，确保强一致性
@@ -101,7 +100,7 @@ func (c *AssessmentStatusCache) Set(ctx context.Context, id assessment.ID, value
 		return fmt.Errorf("failed to marshal status cache value: %w", err)
 	}
 
-	return c.cache.Set(ctx, key, data, AssessmentStatusCacheTTL)
+	return c.cache.Set(ctx, key, data, JitterTTL(AssessmentStatusCacheTTL))
 }
 
 // Update 更新测评状态（Write-Through）

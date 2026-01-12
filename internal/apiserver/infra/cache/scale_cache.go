@@ -15,9 +15,10 @@ import (
 const (
 	// ScaleCachePrefix 量表缓存键前缀
 	ScaleCachePrefix = "scale:"
-	// DefaultScaleCacheTTL 默认量表缓存 TTL
-	DefaultScaleCacheTTL = 24 * time.Hour
 )
+
+// DefaultScaleCacheTTL 默认量表缓存 TTL（可被配置覆盖）
+var DefaultScaleCacheTTL = 24 * time.Hour
 
 // CachedScaleRepository 带缓存的量表 Repository 装饰器
 // 实现 scale.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -185,7 +186,7 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, r.ttl).Err()
+	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存

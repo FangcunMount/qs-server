@@ -168,8 +168,16 @@ redis:
 # 3.4 缓存控制
 # ----------------------------------------------------------------------------
 cache:
-  disable_evaluation_cache: false
-  disable_statistics_cache: false 
+  disable_evaluation_cache: false # 开启测评结果缓存
+  disable_statistics_cache: false # 开启统计缓存
+  ttl:                        # 缓存时间，可配置
+    scale: "2h"              # 量表缓存时间
+    questionnaire: "2h"      # 问卷缓存时间
+    assessment_detail: "1h"    # 测评详情缓存时间
+    assessment_status: "30m"   # 测评状态缓存时间
+    testee: "12h"              # 受试者缓存时间
+    plan: "12h"                # 计划缓存时间
+  ttl_jitter_ratio: 0.1       # 缓存时间抖动比例
 
 # ----------------------------------------------------------------------------
 # 3.4 限流配置

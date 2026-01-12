@@ -18,6 +18,7 @@
   - 受试者：`testee:info:{id}`，TTL 2h，Cache-Aside（`.../cache/testee_cache.go`）。
   - 计划：`plan:info:{id}`，TTL 2h，Cache-Aside（`.../cache/plan_cache.go`）。
   - 统一封装：底层使用 `RedisCache`（`.../cache/redis_cache.go`），支持 MGet/MSet、模式删除、健康检查。
+  - TTL 可通过配置 `cache.ttl.*` 覆盖，启动时生效；`cache.ttl-jitter-ratio`（默认 0.1）用于给各 TTL 加抖动，避免同一时间批量过期。
 - **统计预聚合与查询缓存（redis-cache）**
   - 事件幂等：`event:processed:{event_id}`，TTL 7d，用于统计事件处理幂等（Worker 写，APIServer 读校验），文件 `internal/apiserver/infra/statistics/cache.go` & `internal/worker/handlers/statistics_handler.go`。
   - 累计/窗口/日报：`stats:accum:{org}:{type}:{key}:{metric}`、`stats:window:{org}:{type}:{key}:{window}`、`stats:daily:{org}:{type}:{key}:{date}`；窗口/日报默认 TTL 90d，累计默认不过期（如需改可调 `DefaultAccumStatsTTL`）；Worker 在消费测评事件时写入，APIServer 统计服务读取、校验、落库（`internal/apiserver/application/statistics/*service.go`、`.../statistics/sync_service.go`）。

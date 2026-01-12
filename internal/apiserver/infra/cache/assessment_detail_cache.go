@@ -16,9 +16,10 @@ import (
 const (
 	// AssessmentDetailCachePrefix 测评详情缓存键前缀
 	AssessmentDetailCachePrefix = "assessment:detail:"
-	// DefaultAssessmentDetailCacheTTL 默认测评详情缓存 TTL
-	DefaultAssessmentDetailCacheTTL = 2 * time.Hour
 )
+
+// DefaultAssessmentDetailCacheTTL 默认测评详情缓存 TTL（可被配置覆盖）
+var DefaultAssessmentDetailCacheTTL = 2 * time.Hour
 
 // CachedAssessmentRepository 带缓存的测评 Repository 装饰器
 // 实现 assessment.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -126,7 +127,7 @@ func (r *CachedAssessmentRepository) setCache(ctx context.Context, id assessment
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, r.ttl).Err()
+	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存

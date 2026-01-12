@@ -155,6 +155,19 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}
 
 	// 创建六边形架构容器（使用 MQ 模式）
+	var cacheTTLOpts container.ContainerCacheTTLOptions
+	var cacheTTLJitter float64
+	if s.config.Cache != nil && s.config.Cache.TTL != nil {
+		cacheTTLOpts = container.ContainerCacheTTLOptions{
+			Scale:            s.config.Cache.TTL.Scale,
+			Questionnaire:    s.config.Cache.TTL.Questionnaire,
+			AssessmentDetail: s.config.Cache.TTL.AssessmentDetail,
+			AssessmentStatus: s.config.Cache.TTL.AssessmentStatus,
+			Testee:           s.config.Cache.TTL.Testee,
+			Plan:             s.config.Cache.TTL.Plan,
+		}
+		cacheTTLJitter = s.config.Cache.TTLJitterRatio
+	}
 	s.container = container.NewContainerWithOptions(
 		mysqlDB, mongoDB, redisCache, redisStore,
 		container.ContainerOptions{
@@ -163,6 +176,8 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			Cache: container.ContainerCacheOptions{
 				DisableEvaluationCache: s.config.Cache != nil && s.config.Cache.DisableEvaluationCache,
 				DisableStatisticsCache: s.config.Cache != nil && s.config.Cache.DisableStatisticsCache,
+				TTL:                    cacheTTLOpts,
+				TTLJitterRatio:         cacheTTLJitter,
 			},
 		},
 	)

@@ -166,6 +166,14 @@ redis:
 cache:
   disable_evaluation_cache: false  # 是否暂停测评结果的 Redis 缓存
   disable_statistics_cache: false  # 是否暂停统计的 Redis 缓存
+  ttl:
+    scale: "6h"
+    questionnaire: "8h"
+    assessment_detail: "1h30m"
+    assessment_status: "20m"
+    testee: "1h"
+    plan: "1h"
+  ttl_jitter_ratio: 0.1
 
 # -------------------------------------------------------
 # 3.5 限流配置
