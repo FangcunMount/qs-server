@@ -153,9 +153,6 @@ func (s *ScaleService) toProtoScale(ctx context.Context, result *appScale.ScaleR
 
 	// 获取题目数量
 	questionCount := result.QuestionCount
-	if questionCount == 0 {
-		questionCount = s.getQuestionCount(ctx, result.QuestionnaireCode)
-	}
 
 	return &pb.Scale{
 		Code:                 result.Code,
