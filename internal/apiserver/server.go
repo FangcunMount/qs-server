@@ -239,6 +239,9 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		}
 	}()
 
+	// 启动统计同步定时任务（Redis -> MySQL），最终一致
+	s.startStatisticsSyncScheduler()
+
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 		// 清理容器资源
@@ -296,6 +299,64 @@ func (s preparedAPIServer) Run() error {
 
 	// 等待任一服务出错
 	return <-errChan
+}
+
+// startStatisticsSyncScheduler 启动统计同步定时任务（Redis -> MySQL）
+func (s *apiServer) startStatisticsSyncScheduler() {
+	opts := s.config.StatisticsSync
+	if opts == nil || !opts.Enable {
+		log.Infof("statistics sync scheduler disabled")
+		return
+	}
+	if s.container == nil || s.container.StatisticsModule == nil || s.container.StatisticsModule.SyncService == nil {
+		log.Warnf("statistics sync scheduler not started (module or sync service unavailable)")
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
+		cancel()
+		return nil
+	}))
+
+	startTicker := func(name string, interval time.Duration, fn func(context.Context) error) {
+		if interval <= 0 {
+			log.Warnf("skip statistics sync %s: interval <= 0", name)
+			return
+		}
+		go func() {
+			// 统一初始延迟
+			if opts.InitialDelay > 0 {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(opts.InitialDelay):
+				}
+			}
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+
+			for {
+				if err := fn(context.Background()); err != nil {
+					log.Warnf("statistics sync %s failed: %v", name, err)
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
+	}
+
+	syncSvc := s.container.StatisticsModule.SyncService
+	startTicker("daily", opts.DailyInterval, syncSvc.SyncDailyStatistics)
+	startTicker("accumulated", opts.AccumulatedInterval, syncSvc.SyncAccumulatedStatistics)
+	startTicker("plan", opts.PlanInterval, syncSvc.SyncPlanStatistics)
+
+	log.Infof("statistics sync scheduler started (daily=%s, accum=%s, plan=%s, initial_delay=%s)",
+		opts.DailyInterval, opts.AccumulatedInterval, opts.PlanInterval, opts.InitialDelay)
 }
 
 // buildGenericServer 构建通用服务器

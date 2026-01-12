@@ -35,6 +35,7 @@
 - 历史无 TTL 键修复工具：`cmd/tools/redis-stats-ttl-fix`，示例：
   - `go run ./cmd/tools/redis-stats-ttl-fix --addr 127.0.0.1:6379 --pass xxx` 补齐 TTL。
   - `--dry-run` 只统计不写，`--ttl-*` 参数可调。
+- 定时落库：APIServer 启动时默认开启统计同步定时任务（最终一致），配置 `statistics_sync.*` 控制启停和间隔；默认延迟 1 分钟启动，daily/accumulated 每 10 分钟，plan 每 30 分钟（见 `internal/apiserver/server.go`）。
 
 ## Worker 使用
 

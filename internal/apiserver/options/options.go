@@ -2,6 +2,7 @@ package options
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -26,6 +27,7 @@ type Options struct {
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure            *BackpressureOptions                   `json:"backpressure" mapstructure:"backpressure"`
 	Cache                   *CacheOptions                          `json:"cache"     mapstructure:"cache"`
+	StatisticsSync          *StatisticsSyncOptions                 `json:"statistics_sync" mapstructure:"statistics_sync"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -46,6 +48,7 @@ func NewOptions() *Options {
 		RateLimit:               NewRateLimitOptions(),
 		Backpressure:            NewBackpressureOptions(),
 		Cache:                   NewCacheOptions(),
+		StatisticsSync:          NewStatisticsSyncOptions(),
 	}
 }
 
@@ -145,6 +148,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))
+	o.StatisticsSync.AddFlags(fss.FlagSet("statistics_sync"))
 
 	return fss
 }
@@ -219,6 +223,38 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 		"Disable Redis caching for evaluation details")
 	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
 		"Disable Redis caching for statistics data")
+}
+
+// StatisticsSyncOptions 统计同步定时任务配置
+type StatisticsSyncOptions struct {
+	Enable              bool          `json:"enable" mapstructure:"enable"`
+	InitialDelay        time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	DailyInterval       time.Duration `json:"daily_interval" mapstructure:"daily_interval"`
+	AccumulatedInterval time.Duration `json:"accumulated_interval" mapstructure:"accumulated_interval"`
+	PlanInterval        time.Duration `json:"plan_interval" mapstructure:"plan_interval"`
+}
+
+// NewStatisticsSyncOptions 默认开启，10 分钟一次
+func NewStatisticsSyncOptions() *StatisticsSyncOptions {
+	return &StatisticsSyncOptions{
+		Enable:              true,
+		InitialDelay:        time.Minute,
+		DailyInterval:       10 * time.Minute,
+		AccumulatedInterval: 10 * time.Minute,
+		PlanInterval:        30 * time.Minute,
+	}
+}
+
+// AddFlags 注册统计同步相关命令行参数
+func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+	fs.BoolVar(&s.Enable, "statistics_sync.enable", s.Enable, "Enable scheduled sync from Redis to MySQL for statistics.")
+	fs.DurationVar(&s.InitialDelay, "statistics_sync.initial-delay", s.InitialDelay, "Initial delay before starting statistics sync schedulers.")
+	fs.DurationVar(&s.DailyInterval, "statistics_sync.daily-interval", s.DailyInterval, "Interval for syncing daily statistics.")
+	fs.DurationVar(&s.AccumulatedInterval, "statistics_sync.accumulated-interval", s.AccumulatedInterval, "Interval for syncing accumulated statistics.")
+	fs.DurationVar(&s.PlanInterval, "statistics_sync.plan-interval", s.PlanInterval, "Interval for syncing plan statistics.")
 }
 
 // Complete 完成配置选项
