@@ -83,7 +83,13 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 	}
 
 	// 2. 缓存未命中，从数据库查询
-	domain, err := r.repo.FindByCode(ctx, code)
+	val, err, _ := Group.Do("scale:"+code, func() (interface{}, error) {
+		return r.repo.FindByCode(ctx, code)
+	})
+	if err != nil {
+		return nil, err
+	}
+	domain, _ := val.(*scale.MedicalScale)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +212,7 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 // setNilCache 设置空值缓存，防止穿透，短 TTL
 func (r *CachedScaleRepository) setNilCache(ctx context.Context, code string) error {
 	key := r.buildCacheKey(code)
-	return r.client.Set(ctx, key, []byte{}, JitterTTL(5*time.Minute)).Err()
+	return r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
 }
 
 // deleteCache 删除缓存

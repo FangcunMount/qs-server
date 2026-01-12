@@ -166,6 +166,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			AssessmentStatus: s.config.Cache.TTL.AssessmentStatus,
 			Testee:           s.config.Cache.TTL.Testee,
 			Plan:             s.config.Cache.TTL.Plan,
+			Negative:         s.config.Cache.TTL.Negative,
 		}
 		cacheTTLJitter = s.config.Cache.TTLJitterRatio
 	}

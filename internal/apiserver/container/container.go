@@ -109,6 +109,7 @@ type ContainerCacheTTLOptions struct {
 	AssessmentStatus time.Duration
 	Testee           time.Duration
 	Plan             time.Duration
+	Negative         time.Duration
 }
 
 // NewContainerWithOptions 创建带配置的容器
@@ -133,6 +134,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 		AssessmentStatus: opts.Cache.TTL.AssessmentStatus,
 		Testee:           opts.Cache.TTL.Testee,
 		Plan:             opts.Cache.TTL.Plan,
+		Negative:         opts.Cache.TTL.Negative,
 	})
 	scaleCache.ApplyTTLJitterRatio(opts.Cache.TTLJitterRatio)
 	scaleCache.ApplyNamespace(opts.Cache.Namespace)

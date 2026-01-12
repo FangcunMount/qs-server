@@ -20,6 +20,9 @@ const (
 // DefaultTesteeCacheTTL 默认受试者缓存 TTL（可被配置覆盖）
 var DefaultTesteeCacheTTL = 2 * time.Hour
 
+// NegativeCacheTTL 空值缓存 TTL（可被配置覆盖）
+var NegativeCacheTTL = 5 * time.Minute
+
 // CachedTesteeRepository 带缓存的受试者 Repository 装饰器
 // 实现 testee.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedTesteeRepository struct {
@@ -61,7 +64,13 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 	}
 
 	// 2. 缓存未命中，从数据库查询
-	domain, err := r.repo.FindByID(ctx, id)
+	val, err, _ := Group.Do(fmt.Sprintf("testee:%d", id), func() (interface{}, error) {
+		return r.repo.FindByID(ctx, id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	domain, _ := val.(*testee.Testee)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +169,7 @@ func (r *CachedTesteeRepository) setNilCache(ctx context.Context, id testee.ID) 
 		return nil
 	}
 	key := r.buildCacheKey(id)
-	return r.client.Set(ctx, key, []byte{}, JitterTTL(5*time.Minute)).Err()
+	return r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
 }
 
 // 实现其他 Repository 方法（透传，不缓存）

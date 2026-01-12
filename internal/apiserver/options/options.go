@@ -221,6 +221,7 @@ func NewCacheOptions() *CacheOptions {
 			AssessmentStatus: 30 * time.Minute,
 			Testee:           2 * time.Hour,
 			Plan:             2 * time.Hour,
+			Negative:         5 * time.Minute,
 		},
 		TTLJitterRatio:  0.1,
 		Namespace:       "",
@@ -261,6 +262,7 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.TTL.AssessmentStatus, "cache.ttl.assessment-status", c.TTL.AssessmentStatus, "TTL for assessment status cache entries.")
 	fs.DurationVar(&c.TTL.Testee, "cache.ttl.testee", c.TTL.Testee, "TTL for testee cache entries.")
 	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
+	fs.DurationVar(&c.TTL.Negative, "cache.ttl.negative", c.TTL.Negative, "TTL for negative cache entries (cache penetration protection).")
 	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
 	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace, "Optional Redis key namespace prefix (e.g., env name).")
 	fs.BoolVar(&c.CompressPayload, "cache.compress-payload", c.CompressPayload, "Compress cache payloads (gzip) to save memory/bandwidth.")
@@ -282,6 +284,7 @@ type CacheTTLOptions struct {
 	AssessmentStatus time.Duration `json:"assessment_status" mapstructure:"assessment_status"`
 	Testee           time.Duration `json:"testee" mapstructure:"testee"`
 	Plan             time.Duration `json:"plan" mapstructure:"plan"`
+	Negative         time.Duration `json:"negative" mapstructure:"negative"`
 }
 
 // StatisticsWarmupOptions 统计查询结果缓存预热配置

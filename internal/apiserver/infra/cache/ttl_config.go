@@ -14,6 +14,7 @@ type TTLOptions struct {
 	AssessmentStatus time.Duration
 	Testee           time.Duration
 	Plan             time.Duration
+	Negative         time.Duration
 }
 
 // TTLJitterRatio 控制 TTL 抖动，默认 10%（0-1）
@@ -43,6 +44,9 @@ func ApplyTTLOptions(opts TTLOptions) {
 	}
 	if opts.Plan > 0 {
 		DefaultPlanCacheTTL = opts.Plan
+	}
+	if opts.Negative > 0 {
+		NegativeCacheTTL = opts.Negative
 	}
 }
 

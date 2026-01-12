@@ -87,7 +87,13 @@ func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code str
 	}
 
 	// 2. 缓存未命中，从数据库查询
-	qDomain, err := r.repo.FindByCode(ctx, code)
+	val, err, _ := Group.Do("questionnaire:"+code, func() (interface{}, error) {
+		return r.repo.FindByCode(ctx, code)
+	})
+	if err != nil {
+		return nil, err
+	}
+	qDomain, _ := val.(*questionnaire.Questionnaire)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +128,13 @@ func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, c
 	}
 
 	// 2. 缓存未命中，从数据库查询
-	qDomain, err := r.repo.FindByCodeVersion(ctx, code, version)
+	val, err, _ := Group.Do("questionnaire:"+code+":"+version, func() (interface{}, error) {
+		return r.repo.FindByCodeVersion(ctx, code, version)
+	})
+	if err != nil {
+		return nil, err
+	}
+	qDomain, _ := val.(*questionnaire.Questionnaire)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +282,7 @@ func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, code, vers
 // setNilCache 设置空值缓存，防止穿透，短 TTL
 func (r *CachedQuestionnaireRepository) setNilCache(ctx context.Context, code, version string) error {
 	key := r.buildCacheKey(code, version)
-	return r.client.Set(ctx, key, []byte{}, JitterTTL(5*time.Minute)).Err()
+	return r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
 }
 
 // deleteCacheByCode 删除指定编码的所有版本缓存
