@@ -72,8 +72,13 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
 	// 1. 尝试从缓存读取
 	if r.client != nil {
-		if cached, err := r.getCache(ctx, code); err == nil && cached != nil {
-			return cached, nil
+		if cached, err := r.getCache(ctx, code); err == nil {
+			if cached != nil {
+				return cached, nil
+			}
+			return nil, nil
+		} else if err != ErrCacheNotFound {
+			return nil, err
 		}
 	}
 
@@ -88,6 +93,8 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 		go func() {
 			_ = r.setCache(context.Background(), code, domain)
 		}()
+	} else if r.client != nil && domain == nil {
+		_ = r.setNilCache(context.Background(), code)
 	}
 
 	return domain, nil
@@ -187,6 +194,12 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 	}
 
 	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
+}
+
+// setNilCache 设置空值缓存，防止穿透，短 TTL
+func (r *CachedScaleRepository) setNilCache(ctx context.Context, code string) error {
+	key := r.buildCacheKey(code)
+	return r.client.Set(ctx, key, []byte{}, JitterTTL(5*time.Minute)).Err()
 }
 
 // deleteCache 删除缓存

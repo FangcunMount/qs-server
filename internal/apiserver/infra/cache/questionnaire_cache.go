@@ -76,8 +76,13 @@ func (r *CachedQuestionnaireRepository) Create(ctx context.Context, qDomain *que
 func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
 	// 1. 尝试从缓存读取（使用 code 作为 key，version 为空）
 	if r.client != nil {
-		if cached, err := r.getCache(ctx, code, ""); err == nil && cached != nil {
-			return cached, nil
+		if cached, err := r.getCache(ctx, code, ""); err == nil {
+			if cached != nil {
+				return cached, nil
+			}
+			return nil, nil
+		} else if err != ErrCacheNotFound {
+			return nil, err
 		}
 	}
 
@@ -95,6 +100,8 @@ func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code str
 		go func() {
 			_ = r.setCache(context.Background(), code, qDomain.GetVersion().Value(), qDomain)
 		}()
+	} else if r.client != nil && qDomain == nil {
+		_ = r.setNilCache(context.Background(), code, "")
 	}
 
 	return qDomain, nil
@@ -104,8 +111,13 @@ func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code str
 func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
 	// 1. 尝试从缓存读取
 	if r.client != nil {
-		if cached, err := r.getCache(ctx, code, version); err == nil && cached != nil {
-			return cached, nil
+		if cached, err := r.getCache(ctx, code, version); err == nil {
+			if cached != nil {
+				return cached, nil
+			}
+			return nil, nil
+		} else if err != ErrCacheNotFound {
+			return nil, err
 		}
 	}
 
@@ -115,6 +127,9 @@ func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, c
 		return nil, err
 	}
 	if qDomain == nil {
+		if r.client != nil {
+			_ = r.setNilCache(ctx, code, version)
+		}
 		return nil, nil
 	}
 
@@ -246,6 +261,12 @@ func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, code, vers
 	}
 
 	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
+}
+
+// setNilCache 设置空值缓存，防止穿透，短 TTL
+func (r *CachedQuestionnaireRepository) setNilCache(ctx context.Context, code, version string) error {
+	key := r.buildCacheKey(code, version)
+	return r.client.Set(ctx, key, []byte{}, JitterTTL(5*time.Minute)).Err()
 }
 
 // deleteCacheByCode 删除指定编码的所有版本缓存

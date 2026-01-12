@@ -49,9 +49,14 @@ func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
 func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.Testee, error) {
 	// 1. 尝试从缓存读取
 	if r.client != nil {
-		if cached, err := r.getCache(ctx, id); err == nil && cached != nil {
-			logger.L(ctx).Debugw("从Redis缓存获取受试者信息", "testee_id", uint64(id))
-			return cached, nil
+		if cached, err := r.getCache(ctx, id); err == nil {
+			if cached != nil {
+				logger.L(ctx).Debugw("从Redis缓存获取受试者信息", "testee_id", uint64(id))
+				return cached, nil
+			}
+			return nil, nil
+		} else if err != ErrCacheNotFound {
+			return nil, err
 		}
 	}
 
@@ -66,6 +71,8 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 		if err := r.setCache(ctx, id, domain); err != nil {
 			logger.L(ctx).Warnw("写入受试者缓存失败", "testee_id", uint64(id), "error", err.Error())
 		}
+	} else if domain == nil && r.client != nil {
+		_ = r.setNilCache(ctx, id)
 	}
 
 	return domain, nil
@@ -145,6 +152,15 @@ func (r *CachedTesteeRepository) deleteCache(ctx context.Context, id testee.ID) 
 
 	key := r.buildCacheKey(id)
 	return r.client.Del(ctx, key).Err()
+}
+
+// setNilCache 设置空值缓存，防止穿透
+func (r *CachedTesteeRepository) setNilCache(ctx context.Context, id testee.ID) error {
+	if r.client == nil {
+		return nil
+	}
+	key := r.buildCacheKey(id)
+	return r.client.Set(ctx, key, []byte{}, JitterTTL(5*time.Minute)).Err()
 }
 
 // 实现其他 Repository 方法（透传，不缓存）
