@@ -193,20 +193,20 @@ rate_limit:
   enabled: true
   submit_global_qps: 200
   submit_global_burst: 300
-  submit_user_qps: 5
-  submit_user_burst: 10
-  admin_submit_global_qps: 400
-  admin_submit_global_burst: 600
-  admin_submit_user_qps: 20
-  admin_submit_user_burst: 40
+  submit_user_qps: 200
+  submit_user_burst: 300
+  admin_submit_global_qps: 200
+  admin_submit_global_burst: 300
+  admin_submit_user_qps: 200
+  admin_submit_user_burst: 300
   query_global_qps: 200
   query_global_burst: 300
-  query_user_qps: 10
-  query_user_burst: 20
-  wait_report_global_qps: 80
-  wait_report_global_burst: 120
-  wait_report_user_qps: 2
-  wait_report_user_burst: 5
+  query_user_qps: 200
+  query_user_burst: 300
+  wait_report_global_qps: 200
+  wait_report_global_burst: 300
+  wait_report_user_qps: 200
+  wait_report_user_burst: 300
 
 # ----------------------------------------------------------------------------
 # 3.5 下游背压配置

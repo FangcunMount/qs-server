@@ -97,16 +97,16 @@ rate_limit:
   enabled: true
   submit_global_qps: 200
   submit_global_burst: 300
-  submit_user_qps: 5
-  submit_user_burst: 10
+  submit_user_qps: 200
+  submit_user_burst: 300
   query_global_qps: 200
   query_global_burst: 300
-  query_user_qps: 10
-  query_user_burst: 20
-  wait_report_global_qps: 80
-  wait_report_global_burst: 120
-  wait_report_user_qps: 2
-  wait_report_user_burst: 5
+  query_user_qps: 200
+  query_user_burst: 300
+  wait_report_global_qps: 200
+  wait_report_global_burst: 300
+  wait_report_user_qps: 200
+  wait_report_user_burst: 300
 
 # -------------------------------------------------------
 # 3.4 提交排队配置
