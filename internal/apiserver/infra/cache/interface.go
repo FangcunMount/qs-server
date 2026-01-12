@@ -52,12 +52,12 @@ type TypedCache[T any] interface {
 
 // CacheMetrics 缓存指标
 type CacheMetrics struct {
-	HitRate     float64 `json:"hit_rate"`      // 命中率（0-1）
-	MissRate    float64 `json:"miss_rate"`     // 未命中率（0-1）
-	AvgLatency  float64 `json:"avg_latency"`   // 平均延迟（ms）
-	ErrorRate   float64 `json:"error_rate"`    // 错误率（0-1）
-	MemoryUsage int64   `json:"memory_usage"`  // 内存使用（bytes）
-	KeyCount    int64   `json:"key_count"`     // 键数量
+	HitRate     float64 `json:"hit_rate"`     // 命中率（0-1）
+	MissRate    float64 `json:"miss_rate"`    // 未命中率（0-1）
+	AvgLatency  float64 `json:"avg_latency"`  // 平均延迟（ms）
+	ErrorRate   float64 `json:"error_rate"`   // 错误率（0-1）
+	MemoryUsage int64   `json:"memory_usage"` // 内存使用（bytes）
+	KeyCount    int64   `json:"key_count"`    // 键数量
 }
 
 // CacheManager 缓存管理器
@@ -87,41 +87,40 @@ func NewCacheKeyBuilder() *CacheKeyBuilder {
 
 // BuildScaleKey 构建量表缓存键
 func (b *CacheKeyBuilder) BuildScaleKey(code string) string {
-	return "scale:" + code
+	return addNamespace("scale:" + code)
 }
 
 // BuildQuestionnaireKey 构建问卷缓存键
 func (b *CacheKeyBuilder) BuildQuestionnaireKey(code, version string) string {
-	return "questionnaire:" + code + ":" + version
+	return addNamespace("questionnaire:" + code + ":" + version)
 }
 
 // BuildAssessmentStatusKey 构建测评状态缓存键
 func (b *CacheKeyBuilder) BuildAssessmentStatusKey(id uint64) string {
-	return fmt.Sprintf("assessment:status:%d", id)
+	return addNamespace(fmt.Sprintf("assessment:status:%d", id))
 }
 
 // BuildAssessmentDetailKey 构建测评详情缓存键
 func (b *CacheKeyBuilder) BuildAssessmentDetailKey(id uint64) string {
-	return fmt.Sprintf("assessment:detail:%d", id)
+	return addNamespace(fmt.Sprintf("assessment:detail:%d", id))
 }
 
 // BuildTesteeInfoKey 构建受试者信息缓存键
 func (b *CacheKeyBuilder) BuildTesteeInfoKey(id uint64) string {
-	return fmt.Sprintf("testee:info:%d", id)
+	return addNamespace(fmt.Sprintf("testee:info:%d", id))
 }
 
 // BuildPlanInfoKey 构建计划信息缓存键
 func (b *CacheKeyBuilder) BuildPlanInfoKey(id uint64) string {
-	return fmt.Sprintf("plan:info:%d", id)
+	return addNamespace(fmt.Sprintf("plan:info:%d", id))
 }
 
 // BuildStatsQueryKey 构建统计查询缓存键
 func (b *CacheKeyBuilder) BuildStatsQueryKey(statType, key string) string {
-	return "stats:query:" + statType + ":" + key
+	return addNamespace("stats:query:" + statType + ":" + key)
 }
 
 // BuildEventProcessedKey 构建事件幂等性缓存键
 func (b *CacheKeyBuilder) BuildEventProcessedKey(eventID string) string {
 	return "event:processed:" + eventID
 }
-

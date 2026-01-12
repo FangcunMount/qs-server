@@ -42,7 +42,7 @@ func NewCachedTesteeRepository(repo testee.Repository, client redis.UniversalCli
 
 // buildCacheKey 构建缓存键
 func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
-	return fmt.Sprintf("%s%d", TesteeCachePrefix, uint64(id))
+	return addNamespace(fmt.Sprintf("%s%d", TesteeCachePrefix, uint64(id)))
 }
 
 // FindByID 根据ID查询受试者（优先从缓存读取）

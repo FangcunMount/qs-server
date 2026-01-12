@@ -97,6 +97,7 @@ type ContainerCacheOptions struct {
 	TTL                    ContainerCacheTTLOptions
 	TTLJitterRatio         float64
 	StatisticsWarmup       *scaleCache.StatisticsWarmupConfig
+	Namespace              string
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
@@ -133,6 +134,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 		Plan:             opts.Cache.TTL.Plan,
 	})
 	scaleCache.ApplyTTLJitterRatio(opts.Cache.TTLJitterRatio)
+	scaleCache.ApplyNamespace(opts.Cache.Namespace)
 
 	return c
 }

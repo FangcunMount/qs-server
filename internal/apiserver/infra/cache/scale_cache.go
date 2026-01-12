@@ -48,7 +48,7 @@ func (r *CachedScaleRepository) WithTTL(ttl time.Duration) *CachedScaleRepositor
 
 // buildCacheKey 构建缓存键
 func (r *CachedScaleRepository) buildCacheKey(code string) string {
-	return fmt.Sprintf("%s%s", ScaleCachePrefix, code)
+	return addNamespace(fmt.Sprintf("%s%s", ScaleCachePrefix, code))
 }
 
 // Create 创建量表（同时写入缓存）

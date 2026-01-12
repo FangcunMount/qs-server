@@ -205,6 +205,7 @@ type CacheOptions struct {
 	TTL                    *CacheTTLOptions         `json:"ttl" mapstructure:"ttl"`
 	TTLJitterRatio         float64                  `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
 	StatisticsWarmup       *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
+	Namespace              string                   `json:"namespace" mapstructure:"namespace"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -221,6 +222,7 @@ func NewCacheOptions() *CacheOptions {
 			Plan:             2 * time.Hour,
 		},
 		TTLJitterRatio: 0.1,
+		Namespace:      "",
 		StatisticsWarmup: &StatisticsWarmupOptions{
 			Enable:             false,
 			OrgIDs:             []int64{1},
@@ -258,6 +260,7 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.TTL.Testee, "cache.ttl.testee", c.TTL.Testee, "TTL for testee cache entries.")
 	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
 	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
+	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace, "Optional Redis key namespace prefix (e.g., env name).")
 	if c.StatisticsWarmup == nil {
 		c.StatisticsWarmup = &StatisticsWarmupOptions{
 			Enable:             false,

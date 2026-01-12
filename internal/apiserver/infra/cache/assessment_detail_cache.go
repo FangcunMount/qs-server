@@ -43,7 +43,7 @@ func NewCachedAssessmentRepository(repo assessment.Repository, client redis.Univ
 
 // buildCacheKey 构建缓存键
 func (r *CachedAssessmentRepository) buildCacheKey(id assessment.ID) string {
-	return fmt.Sprintf("%s%d", AssessmentDetailCachePrefix, id.Uint64())
+	return addNamespace(fmt.Sprintf("%s%d", AssessmentDetailCachePrefix, id.Uint64()))
 }
 
 // FindByID 根据ID查询测评（优先从缓存读取）

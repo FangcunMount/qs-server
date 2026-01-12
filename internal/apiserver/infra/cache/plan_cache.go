@@ -43,7 +43,7 @@ func NewCachedPlanRepository(repo plan.AssessmentPlanRepository, client redis.Un
 
 // buildCacheKey 构建缓存键
 func (r *CachedPlanRepository) buildCacheKey(id plan.AssessmentPlanID) string {
-	return fmt.Sprintf("%s%s", PlanCachePrefix, id.String())
+	return addNamespace(fmt.Sprintf("%s%s", PlanCachePrefix, id.String()))
 }
 
 // FindByID 根据ID查询计划（优先从缓存读取）
