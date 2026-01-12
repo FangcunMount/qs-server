@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
+	"github.com/gin-gonic/gin"
 )
 
 // collectionServer 定义了 Collection 服务器的基本结构
@@ -120,6 +121,12 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	}
 	log.Infof("Router registering with middlewares: %v", s.config.GenericServerRunOptions.Middlewares)
 
+	// 7. 安装全局并发限制中间件（避免过载）
+	if s.config.Concurrency != nil && s.config.Concurrency.MaxConcurrency > 0 {
+		s.genericAPIServer.Engine.Use(concurrencyLimitMiddleware(s.config.Concurrency.MaxConcurrency))
+		log.Infof("Installed concurrency limiter: max=%d", s.config.Concurrency.MaxConcurrency)
+	}
+
 	// 7. 创建并初始化路由器
 	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
 
@@ -164,6 +171,16 @@ func (s preparedCollectionServer) Run() error {
 
 	log.Info("🚀 Starting Collection Server HTTP REST API server...")
 	return s.genericAPIServer.Run()
+}
+
+// concurrencyLimitMiddleware 使用带缓冲通道实现全局并发限制
+func concurrencyLimitMiddleware(max int) gin.HandlerFunc {
+	sem := make(chan struct{}, max)
+	return func(c *gin.Context) {
+		sem <- struct{}{}
+		defer func() { <-sem }()
+		c.Next()
+	}
 }
 
 // buildGenericServer 构建通用服务器
