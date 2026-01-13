@@ -23,22 +23,10 @@ MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-dev_root_123}"
 
 # Redis Cache 实例（端口 6379）
-REDIS_CACHE_HOST="${REDIS_CACHE_HOST:-127.0.0.1}"
-REDIS_CACHE_PORT="${REDIS_CACHE_PORT:-6379}"
-REDIS_CACHE_USER="${REDIS_CACHE_USERNAME:-${REDIS_CACHE_USER:-app}}"
-REDIS_CACHE_PASSWORD="${REDIS_CACHE_PASSWORD:-dev_app_123}"
-
-# Redis Store 实例（端口 6380）
-REDIS_STORE_HOST="${REDIS_STORE_HOST:-127.0.0.1}"
-REDIS_STORE_PORT="${REDIS_STORE_PORT:-6380}"
-REDIS_STORE_USER="${REDIS_STORE_USERNAME:-${REDIS_STORE_USER:-app}}"
-REDIS_STORE_PASSWORD="${REDIS_STORE_PASSWORD:-dev_app_123}"
-
-# Redis 旧版兼容（用于 check-redis 命令）
-REDIS_HOST="${REDIS_HOST:-${REDIS_CACHE_HOST}}"
-REDIS_PORT="${REDIS_PORT:-${REDIS_CACHE_PORT}}"
-REDIS_USER="${REDIS_USERNAME:-${REDIS_USER:-${REDIS_CACHE_USER}}}"
-REDIS_PASSWORD="${REDIS_PASSWORD:-${REDIS_CACHE_PASSWORD}}"
+REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+REDIS_USERNAME="${REDIS_USERNAME:-${REDIS_USERNAME:-app}}"
+REDIS_PASSWORD="${REDIS_PASSWORD:-dev_app_123}"
 
 # MongoDB
 MONGODB_HOST="${MONGO_HOST:-${MONGODB_HOST:-127.0.0.1}}"
@@ -125,39 +113,20 @@ check_redis() {
     
     # 检查 Redis Cache 实例（端口 6379）
     printf "%-15s " "Redis Cache"
-    local cache_cmd="redis-cli -h $REDIS_CACHE_HOST -p $REDIS_CACHE_PORT"
-    if [ -n "$REDIS_CACHE_PASSWORD" ]; then
-        if [ -n "$REDIS_CACHE_USER" ]; then
-            cache_cmd="$cache_cmd --user $REDIS_CACHE_USER --pass $REDIS_CACHE_PASSWORD --no-auth-warning"
+    local cache_cmd="redis-cli -h $REDIS_HOST -p $REDIS_PORT"
+    if [ -n "$REDIS_PASSWORD" ]; then
+        if [ -n "$REDIS_USERNAME" ]; then
+            cache_cmd="$cache_cmd --user $REDIS_USERNAME --pass $REDIS_PASSWORD --no-auth-warning"
         else
-            cache_cmd="$cache_cmd -a $REDIS_CACHE_PASSWORD --no-auth-warning"
+            cache_cmd="$cache_cmd -a $REDIS_PASSWORD --no-auth-warning"
         fi
     fi
     
     # redis-cli 默认有 5 秒超时，不需要额外的 timeout 命令
     if $cache_cmd PING &> /dev/null; then
-        printf "[${GREEN}✓${NC}] 运行正常 (${REDIS_CACHE_HOST}:${REDIS_CACHE_PORT})\n"
+        printf "[${GREEN}✓${NC}] 运行正常 (${REDIS_HOST}:${REDIS_PORT})\n"
     else
-        printf "[${RED}✗${NC}] 连接失败 (${REDIS_CACHE_HOST}:${REDIS_CACHE_PORT})\n"
-        failed=1
-    fi
-    
-    # 检查 Redis Store 实例（端口 6380）
-    printf "%-15s " "Redis Store"
-    local store_cmd="redis-cli -h $REDIS_STORE_HOST -p $REDIS_STORE_PORT"
-    if [ -n "$REDIS_STORE_PASSWORD" ]; then
-        if [ -n "$REDIS_STORE_USER" ]; then
-            store_cmd="$store_cmd --user $REDIS_STORE_USER --pass $REDIS_STORE_PASSWORD --no-auth-warning"
-        else
-            store_cmd="$store_cmd -a $REDIS_STORE_PASSWORD --no-auth-warning"
-        fi
-    fi
-    
-    # redis-cli 默认有 5 秒超时，不需要额外的 timeout 命令
-    if $store_cmd PING &> /dev/null; then
-        printf "[${GREEN}✓${NC}] 运行正常 (${REDIS_STORE_HOST}:${REDIS_STORE_PORT})\n"
-    else
-        printf "[${RED}✗${NC}] 连接失败 (${REDIS_STORE_HOST}:${REDIS_STORE_PORT})\n"
+        printf "[${RED}✗${NC}] 连接失败 (${REDIS_HOST}:${REDIS_PORT})\n"
         failed=1
     fi
     
