@@ -207,6 +207,8 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 
 		// 兼容 CICD 传入的 NSQ 主机/端口环境变量
 		applyLegacyNSQEnvOverrides(envPrefix)
+		// 兼容 REDIS_DB 环境变量（映射到 redis.database）
+		applyLegacyRedisEnvOverrides(envPrefix)
 
 		// 如果选项不为空，则反序列化选项
 		if err := viper.Unmarshal(a.options); err != nil {
@@ -343,6 +345,13 @@ func applyLegacyNSQEnvOverrides(envPrefix string) {
 	}
 	if lookupAddr != "" {
 		viper.Set("messaging.nsq-lookupd-addr", lookupAddr)
+	}
+}
+
+// applyLegacyRedisEnvOverrides 兼容 REDIS_DB 写法，映射到 redis.database
+func applyLegacyRedisEnvOverrides(envPrefix string) {
+	if db := os.Getenv(envPrefix + "_REDIS_DB"); db != "" {
+		viper.Set("redis.database", db)
 	}
 }
 
