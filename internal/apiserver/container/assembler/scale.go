@@ -110,7 +110,7 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
 	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher, listCache)
 	m.FactorService = scaleApp.NewFactorService(m.Repo, listCache)
-	m.QueryService = scaleApp.NewQueryService(m.Repo, identitySvc)
+	m.QueryService = scaleApp.NewQueryService(m.Repo, identitySvc, listCache)
 	m.CategoryService = scaleApp.NewCategoryService()
 
 	// 初始化 handler 层

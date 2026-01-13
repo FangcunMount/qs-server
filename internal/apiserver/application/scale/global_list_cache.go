@@ -12,7 +12,10 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-const defaultScaleListPageSize = 200
+const (
+	defaultScaleListPageSize = 200
+	defaultScaleListCacheTTL = 10 * time.Minute
+)
 
 // ScaleListCache 量表全局列表缓存重建器
 // 用于在数据变更后重建 Redis 中的全局列表键（scale:list:v1）
@@ -78,7 +81,68 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 		return err
 	}
 
-	return c.redis.Set(ctx, key, data, 0).Err()
+	return c.redis.Set(ctx, key, data, cache.JitterTTL(defaultScaleListCacheTTL)).Err()
+}
+
+// GetPage 从缓存读取已发布量表列表并按页切片
+// 命中返回 result 和 true，未命中/解析失败返回 nil 和 false
+func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*ScaleSummaryListResult, bool) {
+	if c == nil || c.redis == nil {
+		return nil, false
+	}
+
+	key := c.keyBuilder.BuildScaleListKey()
+	data, err := c.redis.Get(ctx, key).Bytes()
+	if err != nil {
+		return nil, false
+	}
+
+	var payload scaleSummaryListCache
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, false
+	}
+
+	if page <= 0 || pageSize <= 0 {
+		return nil, false
+	}
+
+	start := (page - 1) * pageSize
+	if start >= len(payload.Scales) {
+		return &ScaleSummaryListResult{
+			Items: []*ScaleSummaryResult{},
+			Total: payload.TotalCount,
+		}, true
+	}
+
+	end := start + pageSize
+	if end > len(payload.Scales) {
+		end = len(payload.Scales)
+	}
+
+	items := make([]*ScaleSummaryResult, 0, end-start)
+	for _, item := range payload.Scales[start:end] {
+		items = append(items, &ScaleSummaryResult{
+			Code:              item.Code,
+			Title:             item.Title,
+			Description:       item.Description,
+			Category:          item.Category,
+			Stages:            item.Stages,
+			ApplicableAges:    item.ApplicableAges,
+			Reporters:         item.Reporters,
+			Tags:              item.Tags,
+			QuestionnaireCode: item.QuestionnaireCode,
+			Status:            item.Status,
+			CreatedBy:         item.CreatedBy,
+			CreatedAt:         parseTime(item.CreatedAt),
+			UpdatedBy:         item.UpdatedBy,
+			UpdatedAt:         parseTime(item.UpdatedAt),
+		})
+	}
+
+	return &ScaleSummaryListResult{
+		Items: items,
+		Total: payload.TotalCount,
+	}, true
 }
 
 func (c *ScaleListCache) fetchAll(ctx context.Context, conditions map[string]interface{}, total int64) ([]*domainScale.MedicalScale, error) {
@@ -158,6 +222,17 @@ func formatTime(t time.Time) string {
 		return ""
 	}
 	return t.Format("2006-01-02 15:04:05")
+}
+
+func parseTime(val string) time.Time {
+	if val == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse("2006-01-02 15:04:05", val)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
 }
 
 func logScaleListCacheError(ctx context.Context, err error) {

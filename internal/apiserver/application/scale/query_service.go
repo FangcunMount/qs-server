@@ -15,13 +15,15 @@ import (
 type queryService struct {
 	repo        scale.Repository
 	identitySvc *iam.IdentityService
+	listCache   *ScaleListCache
 }
 
 // NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository, identitySvc *iam.IdentityService) ScaleQueryService {
+func NewQueryService(repo scale.Repository, identitySvc *iam.IdentityService, listCache *ScaleListCache) ScaleQueryService {
 	return &queryService{
 		repo:        repo,
 		identitySvc: identitySvc,
+		listCache:   listCache,
 	}
 }
 
@@ -125,6 +127,13 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 		conditions = make(map[string]interface{})
 	}
 	conditions["status"] = scale.StatusPublished.Value()
+
+	// 3. 尝试使用全量列表缓存（仅当没有额外筛选条件）
+	if len(conditions) == 1 && s.listCache != nil {
+		if cached, ok := s.listCache.GetPage(ctx, dto.Page, dto.PageSize); ok {
+			return cached, nil
+		}
+	}
 
 	// 3. 获取量表摘要列表
 	items, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, conditions)
