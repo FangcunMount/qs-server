@@ -3,6 +3,8 @@ package scale
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -25,6 +27,10 @@ type ScaleListCache struct {
 	identitySvc *iam.IdentityService
 	keyBuilder  *cache.CacheKeyBuilder
 	pageSize    int
+	// 节点内短 TTL 内存缓存，减少 Redis GET/JSON 解码成本
+	memory      map[string]memoryEntry
+	memoryTTL   time.Duration
+	memoryMutex sync.RWMutex
 }
 
 // NewScaleListCache 创建全局量表列表缓存实例
@@ -39,6 +45,8 @@ func NewScaleListCache(redisClient redis.UniversalClient, repo domainScale.Repos
 		identitySvc: identitySvc,
 		keyBuilder:  cache.NewCacheKeyBuilder(),
 		pageSize:    defaultScaleListPageSize,
+		memory:      make(map[string]memoryEntry),
+		memoryTTL:   30 * time.Second,
 	}
 }
 
@@ -81,6 +89,9 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 		return err
 	}
 
+	// 重建后清空节点内缓存
+	c.resetMemory()
+
 	return c.redis.Set(ctx, key, data, cache.JitterTTL(defaultScaleListCacheTTL)).Err()
 }
 
@@ -89,6 +100,11 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*ScaleSummaryListResult, bool) {
 	if c == nil || c.redis == nil {
 		return nil, false
+	}
+
+	memKey := c.buildMemoryKey(page, pageSize)
+	if result, ok := c.getMemory(memKey); ok {
+		return result, true
 	}
 
 	key := c.keyBuilder.BuildScaleListKey()
@@ -139,10 +155,14 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 		})
 	}
 
-	return &ScaleSummaryListResult{
+	result := &ScaleSummaryListResult{
 		Items: items,
 		Total: payload.TotalCount,
-	}, true
+	}
+
+	c.setMemory(memKey, result)
+
+	return result, true
 }
 
 func (c *ScaleListCache) fetchAll(ctx context.Context, conditions map[string]interface{}, total int64) ([]*domainScale.MedicalScale, error) {
@@ -240,4 +260,46 @@ func logScaleListCacheError(ctx context.Context, err error) {
 		return
 	}
 	logger.L(ctx).Warnw("failed to rebuild scale list cache", "error", err)
+}
+
+// ==================== 节点内缓存 ====================
+
+type memoryEntry struct {
+	result *ScaleSummaryListResult
+	expire time.Time
+}
+
+func (c *ScaleListCache) buildMemoryKey(page, pageSize int) string {
+	return fmt.Sprintf("page=%d:page_size=%d", page, pageSize)
+}
+
+func (c *ScaleListCache) getMemory(key string) (*ScaleSummaryListResult, bool) {
+	c.memoryMutex.RLock()
+	entry, ok := c.memory[key]
+	c.memoryMutex.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	if time.Now().After(entry.expire) {
+		c.memoryMutex.Lock()
+		delete(c.memory, key)
+		c.memoryMutex.Unlock()
+		return nil, false
+	}
+	return entry.result, true
+}
+
+func (c *ScaleListCache) setMemory(key string, result *ScaleSummaryListResult) {
+	c.memoryMutex.Lock()
+	c.memory[key] = memoryEntry{
+		result: result,
+		expire: time.Now().Add(c.memoryTTL),
+	}
+	c.memoryMutex.Unlock()
+}
+
+func (c *ScaleListCache) resetMemory() {
+	c.memoryMutex.Lock()
+	c.memory = make(map[string]memoryEntry)
+	c.memoryMutex.Unlock()
 }
