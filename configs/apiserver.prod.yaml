@@ -146,7 +146,7 @@ redis:
     password: ""
     database: 0
     max-idle: 50
-    max-active: 100
+    max-active: 500
     timeout: 5
     enable-cluster: false
     use-ssl: false
