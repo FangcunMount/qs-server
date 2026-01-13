@@ -137,11 +137,11 @@ redis:
   username: "app"  # Redis 6.0+ ACL 用户名
   password: "dev_app_123"
   database: 0  # 缓存使用 DB 0
-  max-idle: 50
-  max-active: 100
-  timeout: 5
-  min-idle-conns: 0
-  pool-timeout: 5
+  max-idle: 100
+  max-active: 400
+  timeout: 120
+  min-idle-conns: 20
+  pool-timeout: 10
   dial-timeout: 5
   read-timeout: 5
   write-timeout: 5
