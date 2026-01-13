@@ -147,7 +147,16 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	return toSummaryListResult(ctx, items, total, s.identitySvc), nil
+	result := toSummaryListResult(ctx, items, total, s.identitySvc)
+
+	// 6. 缓存回填：仅在纯已发布列表且缓存启用时尝试重建
+	if len(conditions) == 1 && s.listCache != nil {
+		go func() {
+			_ = s.listCache.Rebuild(context.Background())
+		}()
+	}
+
+	return result, nil
 }
 
 // GetFactors 获取量表的因子列表
