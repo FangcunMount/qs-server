@@ -113,10 +113,8 @@ func init() {
 | MySQL | `MYSQL_HOST`, `MYSQL_PORT` | 数据库地址和端口 |
 |  | `MYSQL_USER`, `MYSQL_PASSWORD` | 应用数据库用户 |
 |  | `MYSQL_DATABASE` | 数据库名称 |
-| Redis Cache | `REDIS_CACHE_HOST`, `REDIS_CACHE_PORT` | 缓存实例地址（6379） |
-|  | `REDIS_CACHE_PASSWORD` | 缓存实例密码 |
-| Redis Store | `REDIS_STORE_HOST`, `REDIS_STORE_PORT` | 存储实例地址（6380） |
-|  | `REDIS_STORE_PASSWORD` | 存储实例密码 |
+| Redis | `REDIS_HOST`, `REDIS_PORT` | Redis 实例地址（默认 6379） |
+|  | `REDIS_PASSWORD` | Redis 实例密码 |
 | MongoDB | `MONGO_HOST`, `MONGO_PORT` | MongoDB 地址 |
 |  | `MONGO_USER`, `MONGO_PASSWORD` | 应用数据库用户 |
 |  | `MONGO_URL` | 完整连接字符串 |

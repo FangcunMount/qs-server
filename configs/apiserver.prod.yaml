@@ -135,37 +135,24 @@ migration:
   database: "qs"
 
 # ----------------------------------------------------------------------------
-# 3.3 Redis 配置（双实例架构）
+# 3.3 Redis 配置（单实例）
 # ----------------------------------------------------------------------------
 redis:
-  # Cache Redis - 用于缓存、会话、限流等临时数据
-  cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
-    database: 0
-    max-idle: 50
-    max-active: 500
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
-  
-  # Store Redis - 用于持久化存储、队列、发布订阅等
-  store:
-    host: "127.0.0.1"
-    port: 6380
-    username: ""
-    password: ""
-    database: 1
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
-
+  host: "127.0.0.1"
+  port: 6379
+  username: ""
+  password: ""
+  database: 0
+  max-idle: 50
+  max-active: 500
+  timeout: 5
+  min-idle-conns: 0
+  pool-timeout: 5
+  dial-timeout: 5
+  read-timeout: 5
+  write-timeout: 5
+  enable-cluster: false
+  use-ssl: false
 # ----------------------------------------------------------------------------
 # 3.4 缓存控制
 # ----------------------------------------------------------------------------

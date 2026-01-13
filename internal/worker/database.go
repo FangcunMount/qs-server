@@ -14,7 +14,6 @@ type DatabaseManager struct {
 	registry   *database.Registry
 	config     *config.Config
 	cacheRedis *database.RedisConnection
-	storeRedis *database.RedisConnection
 }
 
 // NewDatabaseManager 创建数据库管理器
@@ -50,51 +49,38 @@ func (m *DatabaseManager) initRedis() error {
 		return nil
 	}
 
-	// 初始化 Cache Redis
-	if m.config.Redis.Cache != nil && m.config.Redis.Cache.Host != "" {
-		cacheConfig := &database.RedisConfig{
-			Host:          m.config.Redis.Cache.Host,
-			Port:          m.config.Redis.Cache.Port,
-			Username:      m.config.Redis.Cache.Username,
-			Password:      m.config.Redis.Cache.Password,
-			Database:      m.config.Redis.Cache.Database,
-			MaxIdle:       m.config.Redis.Cache.MaxIdle,
-			MaxActive:     m.config.Redis.Cache.MaxActive,
-			Timeout:       m.config.Redis.Cache.Timeout,
-			EnableCluster: m.config.Redis.Cache.EnableCluster,
-			UseSSL:        m.config.Redis.Cache.UseSSL,
-		}
-
-		cacheConn := database.NewRedisConnection(cacheConfig)
-		if err := m.registry.Register(database.Redis, cacheConfig, cacheConn); err != nil {
-			return fmt.Errorf("failed to register cache redis: %w", err)
-		}
-		m.cacheRedis = cacheConn
-		log.Info("Cache Redis initialized successfully")
+	redisCfg := m.config.Redis
+	if redisCfg == nil || (redisCfg.Host == "" && len(redisCfg.Addrs) == 0) {
+		log.Warn("Redis not configured, skipping")
+		return nil
 	}
 
-	// 初始化 Store Redis
-	if m.config.Redis.Store != nil && m.config.Redis.Store.Host != "" {
-		storeConfig := &database.RedisConfig{
-			Host:          m.config.Redis.Store.Host,
-			Port:          m.config.Redis.Store.Port,
-			Username:      m.config.Redis.Store.Username,
-			Password:      m.config.Redis.Store.Password,
-			Database:      m.config.Redis.Store.Database,
-			MaxIdle:       m.config.Redis.Store.MaxIdle,
-			MaxActive:     m.config.Redis.Store.MaxActive,
-			Timeout:       m.config.Redis.Store.Timeout,
-			EnableCluster: m.config.Redis.Store.EnableCluster,
-			UseSSL:        m.config.Redis.Store.UseSSL,
-		}
-
-		storeConn := database.NewRedisConnection(storeConfig)
-		if err := storeConn.Connect(); err != nil {
-			return fmt.Errorf("failed to connect store redis: %w", err)
-		}
-		m.storeRedis = storeConn
-		log.Infof("Store Redis connected successfully to %s:%d", storeConfig.Host, storeConfig.Port)
+	cacheConfig := &database.RedisConfig{
+		Host:                  redisCfg.Host,
+		Port:                  redisCfg.Port,
+		Addrs:                 redisCfg.Addrs,
+		Username:              redisCfg.Username,
+		Password:              redisCfg.Password,
+		Database:              redisCfg.Database,
+		MaxIdle:               redisCfg.MaxIdle,
+		MaxActive:             redisCfg.MaxActive,
+		Timeout:               redisCfg.Timeout,
+		MinIdleConns:          redisCfg.MinIdleConns,
+		PoolTimeout:           redisCfg.PoolTimeout,
+		DialTimeout:           redisCfg.DialTimeout,
+		ReadTimeout:           redisCfg.ReadTimeout,
+		WriteTimeout:          redisCfg.WriteTimeout,
+		EnableCluster:         redisCfg.EnableCluster,
+		UseSSL:                redisCfg.UseSSL,
+		SSLInsecureSkipVerify: redisCfg.SSLInsecureSkipVerify,
 	}
+
+	cacheConn := database.NewRedisConnection(cacheConfig)
+	if err := m.registry.Register(database.Redis, cacheConfig, cacheConn); err != nil {
+		return fmt.Errorf("failed to register redis: %w", err)
+	}
+	m.cacheRedis = cacheConn
+	log.Info("Redis initialized successfully")
 
 	return nil
 }
@@ -114,23 +100,9 @@ func (m *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
 	return redisClient, nil
 }
 
-// GetStoreRedisClient 获取存储 Redis 客户端
-func (m *DatabaseManager) GetStoreRedisClient() (redis.UniversalClient, error) {
-	if m.storeRedis == nil {
-		return nil, fmt.Errorf("store redis not initialized")
-	}
-	return m.storeRedis.GetClient().(redis.UniversalClient), nil
-}
-
 // Close 关闭所有数据库连接
 func (m *DatabaseManager) Close() error {
 	log.Info("Closing database connections...")
-
-	if m.storeRedis != nil {
-		if err := m.storeRedis.Close(); err != nil {
-			log.Warnf("Failed to close Store Redis: %v", err)
-		}
-	}
 
 	if err := m.registry.Close(); err != nil {
 		log.Warnf("Failed to close registry: %v", err)

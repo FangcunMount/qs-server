@@ -79,10 +79,6 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	if err != nil {
 		log.Warnf("Cache Redis not available: %v", err)
 	}
-	storeRedis, err := s.dbManager.GetStoreRedisClient()
-	if err != nil {
-		log.Warnf("Store Redis not available: %v", err)
-	}
 	// 如果配置要求禁用统计缓存，则不传递 Redis cache 客户端
 	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil && s.config.Options.Cache.DisableStatisticsCache {
 		log.Infof("Statistics cache disabled via configuration, skipping Redis cache client")
@@ -104,7 +100,6 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		s.config.Options,
 		s.logger,
 		cacheRedis,
-		storeRedis,
 	)
 
 	// 4. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器

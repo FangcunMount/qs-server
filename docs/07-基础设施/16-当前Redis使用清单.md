@@ -1,12 +1,14 @@
 # 当前 Redis 使用清单（qs-server）
 
-目的：梳理现有各服务对 Redis 的实际使用场景、键空间与实例归属，为后续「redis-cache / redis-store」双实例规划提供基线。
+> ⚠️ 2024 Q1 更新：redis-store 已移除，当前仅保留单实例 Redis（原 redis-cache）。本清单中关于 store 的条目保留为历史信息。
+
+目的：梳理现有各服务对 Redis 的实际使用场景、键空间与实例归属，为后续（如有）重新引入多实例时提供基线。
 
 ## 实例与配置入口
 
-- 双实例配置：`redis.cache.*` 与 `redis.store.*`（`internal/pkg/options/redis_dual_options.go`）。APIServer、Worker、Collection Server 三个服务均支持读取。
-- 连接管理：`internal/apiserver/database.go`、`internal/worker/database.go`、`internal/collection-server/database.go` 会分别注册 cache/store 客户端；APIServer/Worker 还支持按配置关闭部分缓存。
-- 运维校验：`make check-redis` / `scripts/check-infra.sh redis` 同时探测 cache 与 store。
+- 配置：`redis.*`（单实例）。APIServer、Worker、Collection Server 三个服务均使用同一套 Redis 连接。
+- 连接管理：`internal/apiserver/database.go`、`internal/worker/database.go`、`internal/collection-server/database.go` 会注册单实例 Redis 客户端；APIServer/Worker 支持按配置关闭部分缓存。
+- 运维校验：`make check-redis` / `scripts/check-infra.sh redis` 仅探测单实例。
 
 ## APIServer 模块使用
 
@@ -26,7 +28,7 @@
   - 查询结果缓存：`stats:query:{...}`，TTL 5m，供统计查询接口快速返回（`.../statistics/*_service.go` 调用 `SetQueryCache`）。
 - **其他**
 - 小程序二维码/AccessToken 缓存：`wechat:cache:{key}`，TTL 由 SDK 传入，使用 redis-cache 作为 `cache.Cache` 适配器（`internal/apiserver/infra/wechatapi/cache_adapter.go`）。
-- CodesService：容器优先使用 redis-store（无则降级 cache，再无则本地），但当前实现未真正写 Redis，仅调用本地 `meta.GenerateCodeWithPrefix`（`internal/apiserver/application/codes/service.go`），存在“用了 store 但未落地”的语义偏差。
+- CodesService：历史曾计划使用 redis-store 计数器，现实现直接调用本地 `meta.GenerateCodeWithPrefix`，未写 Redis。
 - 预热与指标：`WarmupCache` 支持预热量表等缓存；`metrics.go` 统计缓存命中率等（均基于 redis-cache）。
 
 ## 统计键生命周期（新增）

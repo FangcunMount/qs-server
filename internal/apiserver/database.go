@@ -21,7 +21,6 @@ type DatabaseManager struct {
 	registry   *database.Registry
 	config     *config.Config
 	cacheRedis *database.RedisConnection
-	storeRedis *database.RedisConnection
 }
 
 // NewDatabaseManager 创建数据库管理器
@@ -110,86 +109,50 @@ func (dm *DatabaseManager) initMySQL(ctx context.Context) error {
 	return dm.registry.Register(database.MySQL, mysqlConfig, mysqlConn)
 }
 
-// initRedis 初始化Redis连接（双实例架构）
+// initRedis 初始化Redis连接
 func (dm *DatabaseManager) initRedis(ctx context.Context) error {
-	// 初始化 Cache Redis
-	cacheConfig := &database.RedisConfig{
-		Host:                  dm.config.RedisDualOptions.Cache.Host,
-		Port:                  dm.config.RedisDualOptions.Cache.Port,
-		Addrs:                 []string{}, // 双实例模式暂不支持集群
-		Username:              dm.config.RedisDualOptions.Cache.Username,
-		Password:              dm.config.RedisDualOptions.Cache.Password,
-		Database:              dm.config.RedisDualOptions.Cache.Database,
-		MaxIdle:               dm.config.RedisDualOptions.Cache.MaxIdle,
-		MaxActive:             dm.config.RedisDualOptions.Cache.MaxActive,
-		Timeout:               dm.config.RedisDualOptions.Cache.Timeout,
-		EnableCluster:         dm.config.RedisDualOptions.Cache.EnableCluster,
-		UseSSL:                dm.config.RedisDualOptions.Cache.UseSSL,
-		SSLInsecureSkipVerify: false,
+	redisConfig := &database.RedisConfig{
+		Host:                  dm.config.RedisOptions.Host,
+		Port:                  dm.config.RedisOptions.Port,
+		Addrs:                 dm.config.RedisOptions.Addrs,
+		Username:              dm.config.RedisOptions.Username,
+		Password:              dm.config.RedisOptions.Password,
+		Database:              dm.config.RedisOptions.Database,
+		MaxIdle:               dm.config.RedisOptions.MaxIdle,
+		MaxActive:             dm.config.RedisOptions.MaxActive,
+		Timeout:               dm.config.RedisOptions.Timeout,
+		MinIdleConns:          dm.config.RedisOptions.MinIdleConns,
+		PoolTimeout:           dm.config.RedisOptions.PoolTimeout,
+		DialTimeout:           dm.config.RedisOptions.DialTimeout,
+		ReadTimeout:           dm.config.RedisOptions.ReadTimeout,
+		WriteTimeout:          dm.config.RedisOptions.WriteTimeout,
+		EnableCluster:         dm.config.RedisOptions.EnableCluster,
+		UseSSL:                dm.config.RedisOptions.UseSSL,
+		SSLInsecureSkipVerify: dm.config.RedisOptions.SSLInsecureSkipVerify,
 	}
 
-	if cacheConfig.Host == "" {
-		logger.L(ctx).Infow("Cache Redis host not configured, skipping Cache Redis initialization",
-			"component", "CacheRedis",
+	if redisConfig.Host == "" && len(redisConfig.Addrs) == 0 {
+		logger.L(ctx).Infow("Redis host not configured, skipping Redis initialization",
+			"component", "Redis",
 			"action", "initialize",
 			"result", "skipped",
 		)
-	} else {
-		cacheConn := database.NewRedisConnection(cacheConfig)
-		// 注册为主 Redis 实例（保持向后兼容）
-		if err := dm.registry.Register(database.Redis, cacheConfig, cacheConn); err != nil {
-			return fmt.Errorf("failed to register cache redis: %w", err)
-		}
-		dm.cacheRedis = cacheConn
-		logger.L(ctx).Infow("Cache Redis initialized successfully",
-			"component", "CacheRedis",
-			"action", "initialize",
-			"result", "success",
-			"host", cacheConfig.Host,
-			"port", cacheConfig.Port,
-			"database", cacheConfig.Database,
-		)
+		return nil
 	}
 
-	// 初始化 Store Redis
-	storeConfig := &database.RedisConfig{
-		Host:                  dm.config.RedisDualOptions.Store.Host,
-		Port:                  dm.config.RedisDualOptions.Store.Port,
-		Addrs:                 []string{},
-		Username:              dm.config.RedisDualOptions.Store.Username,
-		Password:              dm.config.RedisDualOptions.Store.Password,
-		Database:              dm.config.RedisDualOptions.Store.Database,
-		MaxIdle:               dm.config.RedisDualOptions.Store.MaxIdle,
-		MaxActive:             dm.config.RedisDualOptions.Store.MaxActive,
-		Timeout:               dm.config.RedisDualOptions.Store.Timeout,
-		EnableCluster:         dm.config.RedisDualOptions.Store.EnableCluster,
-		UseSSL:                dm.config.RedisDualOptions.Store.UseSSL,
-		SSLInsecureSkipVerify: false,
+	cacheConn := database.NewRedisConnection(redisConfig)
+	if err := dm.registry.Register(database.Redis, redisConfig, cacheConn); err != nil {
+		return fmt.Errorf("failed to register redis: %w", err)
 	}
-
-	if storeConfig.Host == "" {
-		logger.L(ctx).Infow("Store Redis host not configured, skipping Store Redis initialization",
-			"component", "StoreRedis",
-			"action", "initialize",
-			"result", "skipped",
-		)
-	} else {
-		storeConn := database.NewRedisConnection(storeConfig)
-		if err := storeConn.Connect(); err != nil {
-			return fmt.Errorf("failed to connect store redis (%s:%d): %w", storeConfig.Host, storeConfig.Port, err)
-		}
-		dm.storeRedis = storeConn
-		logger.L(ctx).Infow("Store Redis connected successfully",
-			"component", "StoreRedis",
-			"action", "initialize",
-			"result", "success",
-			"host", storeConfig.Host,
-			"port", storeConfig.Port,
-			"database", storeConfig.Database,
-			"note", "not registered in registry",
-		)
-		_ = storeConn // 暂时不注册到 registry，后续如需复用可扩展注册机制
-	}
+	dm.cacheRedis = cacheConn
+	logger.L(ctx).Infow("Redis initialized successfully",
+		"component", "Redis",
+		"action", "initialize",
+		"result", "success",
+		"host", redisConfig.Host,
+		"port", redisConfig.Port,
+		"database", redisConfig.Database,
+	)
 
 	return nil
 }
@@ -292,14 +255,6 @@ func (dm *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
 	}
 
 	return redisClient, nil
-}
-
-// GetStoreRedisClient 获取 Store Redis 客户端（未注册到 registry）
-func (dm *DatabaseManager) GetStoreRedisClient() (redis.UniversalClient, error) {
-	if dm.storeRedis == nil {
-		return nil, fmt.Errorf("store redis not initialized")
-	}
-	return dm.storeRedis.GetClient().(redis.UniversalClient), nil
 }
 
 // GetMongoClient 获取MongoDB客户端

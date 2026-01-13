@@ -21,8 +21,8 @@ type Config struct {
 	GRPC *GRPCConfig
 	// Worker 配置
 	Worker *WorkerConfig
-	// Redis 双实例配置
-	Redis *genericoptions.RedisDualOptions
+	// Redis 配置
+	Redis *genericoptions.RedisOptions
 }
 
 // LogConfig 日志配置

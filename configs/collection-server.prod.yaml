@@ -56,39 +56,27 @@ grpc_client:
 # 数据库、缓存等存储服务配置
 
 # -------------------------------------------------------
-# 3.1 Redis 缓存（Cache Redis）
+# 3.1 Redis
 # -------------------------------------------------------
 # 用途：缓存、会话、限流等临时数据
 redis:
-  cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
-    database: 0
-    max-idle: 50
-    max-active: 500
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
+  host: "127.0.0.1"
+  port: 6379
+  username: ""
+  password: ""
+  database: 0
+  max-idle: 50
+  max-active: 500
+  timeout: 5
+  min-idle-conns: 0
+  pool-timeout: 5
+  dial-timeout: 5
+  read-timeout: 5
+  write-timeout: 5
+  enable-cluster: false
+  use-ssl: false
 
-# -------------------------------------------------------
-# 3.2 Redis 存储（Store Redis）
-# -------------------------------------------------------
-  # 用途：持久化存储、队列、发布订阅等
-  store:
-    host: "127.0.0.1"
-    port: 6380
-    username: ""
-    password: ""
-    database: 1
-    max-idle: 50
-    max-active: 60
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
+# 3.2 Redis 说明：当前仅保留单实例，不再区分 cache/store
 
 # -------------------------------------------------------
 # 3.3 限流配置

@@ -93,39 +93,25 @@ mongodb:
   log-started: false              # 生产环境禁用命令开始日志
 
 # -------------------------------------------------------
-# 4.3 Redis 缓存（Cache Redis）
+# 4.3 Redis
 # -------------------------------------------------------
 # 用途：缓存、会话、限流等临时数据
 redis:
-  cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
-    database: 0
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
-
-  # -------------------------------------------------------
-  # 4.4 Redis 存储（Store Redis）
-  # -------------------------------------------------------
-  # 用途：持久化存储、队列、发布订阅等
-  store:
-    host: "127.0.0.1"
-    port: 6380
-    username: ""
-    password: ""
-    database: 1
-    max-idle: 50
-    max-active: 100
-    timeout: 5
-    enable-cluster: false
-    use-ssl: false
-    enable-logging: false
+  host: "127.0.0.1"
+  port: 6379
+  username: ""
+  password: ""
+  database: 0
+  max-idle: 50
+  max-active: 100
+  timeout: 5
+  min-idle-conns: 0
+  pool-timeout: 5
+  dial-timeout: 5
+  read-timeout: 5
+  write-timeout: 5
+  enable-cluster: false
+  use-ssl: false
 
 # ============================================================
 # 5. 缓存控制

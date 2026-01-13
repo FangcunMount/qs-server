@@ -18,7 +18,6 @@ type Container struct {
 	opts        *options.Options
 	logger      *slog.Logger
 	redisCache  redis.UniversalClient
-	redisStore  redis.UniversalClient
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient *grpcclient.AnswerSheetClient
@@ -30,12 +29,11 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, redisCache redis.UniversalClient, redisStore redis.UniversalClient) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, redisCache redis.UniversalClient) *Container {
 	return &Container{
 		opts:        opts,
 		logger:      logger,
 		redisCache:  redisCache,
-		redisStore:  redisStore,
 		initialized: false,
 	}
 }
@@ -153,9 +151,4 @@ func (c *Container) Options() *options.Options {
 // RedisCache 获取缓存 Redis 客户端
 func (c *Container) RedisCache() redis.UniversalClient {
 	return c.redisCache
-}
-
-// RedisStore 获取存储 Redis 客户端
-func (c *Container) RedisStore() redis.UniversalClient {
-	return c.redisStore
 }

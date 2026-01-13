@@ -17,7 +17,7 @@ type Options struct {
 	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"   mapstructure:"secure"`
 	GRPCClient              *GRPCClientOptions                     `json:"grpc_client" mapstructure:"grpc_client"`
-	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
+	RedisOptions            *genericoptions.RedisOptions           `json:"redis"     mapstructure:"redis"`
 	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	SubmitQueue             *SubmitQueueOptions                    `json:"submit_queue" mapstructure:"submit_queue"`
@@ -124,7 +124,7 @@ func NewOptions() *Options {
 			Insecure:    true,
 			MaxInflight: 200,
 		},
-		RedisDualOptions: genericoptions.NewRedisDualOptions(),
+		RedisOptions: genericoptions.NewRedisOptions(),
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
@@ -184,7 +184,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc_client"))
-	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
+	o.RedisOptions.AddFlags(fss.FlagSet("redis"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
@@ -282,18 +282,12 @@ func (o *Options) Validate() []error {
 		errs = append(errs, fmt.Errorf("grpc_client.max_inflight must be greater than 0"))
 	}
 
-	// 验证 Redis 配置（cache/store 至少需要配置主机和端口）
-	if o.RedisDualOptions.Cache.Host == "" {
-		errs = append(errs, fmt.Errorf("redis.cache.host cannot be empty"))
+	// 验证 Redis 配置（至少需要配置主机和端口）
+	if o.RedisOptions.Host == "" && len(o.RedisOptions.Addrs) == 0 {
+		errs = append(errs, fmt.Errorf("redis.host cannot be empty"))
 	}
-	if o.RedisDualOptions.Cache.Port <= 0 {
-		errs = append(errs, fmt.Errorf("redis.cache.port must be greater than 0"))
-	}
-	if o.RedisDualOptions.Store.Host == "" {
-		errs = append(errs, fmt.Errorf("redis.store.host cannot be empty"))
-	}
-	if o.RedisDualOptions.Store.Port <= 0 {
-		errs = append(errs, fmt.Errorf("redis.store.port must be greater than 0"))
+	if len(o.RedisOptions.Addrs) == 0 && o.RedisOptions.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
 
 	// 验证并发配置

@@ -126,13 +126,6 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			"error", err.Error(),
 		)
 	}
-	redisStore, err := s.dbManager.GetStoreRedisClient()
-	if err != nil {
-		logger.L(context.Background()).Warnw("Store Redis not available",
-			"component", "apiserver",
-			"error", err.Error(),
-		)
-	}
 
 	// 创建消息队列 publisher（用于事件发布）
 	var mqPublisher messaging.Publisher
@@ -179,7 +172,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		}
 	}
 	s.container = container.NewContainerWithOptions(
-		mysqlDB, mongoDB, redisCache, redisStore,
+		mysqlDB, mongoDB, redisCache,
 		container.ContainerOptions{
 			MQPublisher:   mqPublisher,
 			PublisherMode: publishMode,

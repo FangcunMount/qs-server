@@ -19,7 +19,6 @@ type Container struct {
 	initialized bool
 	opts        *options.Options
 	redisCache  redis.UniversalClient
-	redisStore  redis.UniversalClient
 
 	// IAM 模块
 	IAMModule *IAMModule
@@ -48,11 +47,10 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, redisCache redis.UniversalClient, redisStore redis.UniversalClient) *Container {
+func NewContainer(opts *options.Options, redisCache redis.UniversalClient) *Container {
 	return &Container{
 		opts:        opts,
 		redisCache:  redisCache,
-		redisStore:  redisStore,
 		initialized: false,
 	}
 }

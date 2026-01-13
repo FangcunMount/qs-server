@@ -8,15 +8,14 @@ name: CI/CD Pipeline
 #   SVRA_SUDO_PASSWORD (可选，如果 sudo 需要密码)
 #   MONGODB_HOST, MONGODB_PORT
 #   MYSQL_HOST, MYSQL_PORT (Worker 使用)
-#   REDIS_CACHE_HOST, REDIS_STORE_HOST
+#   REDIS_HOST, REDIS_PORT
 #   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 #
 # Repository Secrets (仓库级别，敏感信息):
 #   MONGODB_USERNAME, MONGODB_PASSWORD, MONGODB_DBNAME
 #   MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DATABASE (Worker 使用)
-#   REDIS_CACHE_PORT/DB/USERNAME/PASSWORD
-#   REDIS_STORE_PORT/DB/USERNAME/PASSWORD
+#   REDIS_PORT/DB/USERNAME/PASSWORD
 #   JWT_SECRET
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
 #   WWW_UID, WWW_GID (可选，默认 1000/1000)
@@ -74,16 +73,11 @@ jobs:
           MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
           # 兼容两种命名：优先 MYSQL_DATABASE，其次 MYSQL_DBNAME
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
-          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
-          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT }}
-          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB }}
-          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
-          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
-          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
-          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT }}
-          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB }}
-          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
-          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_DB: ${{ secrets.REDIS_DB }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT }}
           SVRA_SSH_PORT: ${{ secrets.SVRA_SSH_PORT }}
@@ -105,8 +99,8 @@ jobs:
             echo "ℹ️ Not on main branch – required secrets reported for awareness only."
           fi
 
-          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_CACHE_HOST REDIS_STORE_HOST JWT_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
-          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_CACHE_PORT REDIS_CACHE_DB REDIS_CACHE_USERNAME REDIS_CACHE_PASSWORD REDIS_STORE_PORT REDIS_STORE_DB REDIS_STORE_USERNAME REDIS_STORE_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID)
+          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_HOST JWT_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
+          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID)
 
           for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
             VALUE=${!SECRET_NAME}
@@ -139,29 +133,17 @@ jobs:
                 MONGODB_PORT)
                   echo "⚠️ $SECRET_NAME is not set (defaults to 27017)"
                   ;;
-                REDIS_CACHE_PORT)
-                  echo "⚠️ $SECRET_NAME is not set (cache defaults to 6379)"
+                REDIS_PORT)
+                  echo "⚠️ $SECRET_NAME is not set (redis defaults to 6379)"
                   ;;
-                REDIS_CACHE_DB)
-                  echo "⚠️ $SECRET_NAME is not set (cache defaults to DB 0)"
+                REDIS_DB)
+                  echo "⚠️ $SECRET_NAME is not set (redis defaults to DB 0)"
                   ;;
-                REDIS_CACHE_USERNAME)
-                  echo "⚠️ $SECRET_NAME is not set (cache uses default Redis user)"
+                REDIS_USERNAME)
+                  echo "⚠️ $SECRET_NAME is not set (redis uses default user)"
                   ;;
-                REDIS_CACHE_PASSWORD)
-                  echo "⚠️ $SECRET_NAME is not set (cache auth disabled)"
-                  ;;
-                REDIS_STORE_PORT)
-                  echo "⚠️ $SECRET_NAME is not set (store defaults to 6380)"
-                  ;;
-                REDIS_STORE_DB)
-                  echo "⚠️ $SECRET_NAME is not set (store defaults to DB 1)"
-                  ;;
-                REDIS_STORE_USERNAME)
-                  echo "⚠️ $SECRET_NAME is not set (store uses default Redis user)"
-                  ;;
-                REDIS_STORE_PASSWORD)
-                  echo "⚠️ $SECRET_NAME is not set (store auth disabled)"
+                REDIS_PASSWORD)
+                  echo "⚠️ $SECRET_NAME is not set (redis auth disabled)"
                   ;;
                 NSQ_NSQD_HOST|NSQ_NSQD_PORT)
                   echo "⚠️ $SECRET_NAME is not set (NSQ may be optional)"
@@ -430,16 +412,11 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           # 兼容两种命名：优先 MYSQL_DATABASE，其次 MYSQL_DBNAME
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
-          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
-          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
-          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
-          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
-          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
-          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
-          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT || 6380 }}
-          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB || 1 }}
-          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
-          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
@@ -461,7 +438,7 @@ jobs:
           require_env \
             MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
             MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
-            REDIS_CACHE_HOST REDIS_CACHE_PORT REDIS_STORE_HOST REDIS_STORE_PORT \
+            REDIS_HOST REDIS_PORT \
             JWT_SECRET NSQ_NSQD_HOST NSQ_NSQD_PORT
 
           mkdir -p deploy-package/configs/env
@@ -481,19 +458,12 @@ jobs:
           QS_APISERVER_MYSQL_PASSWORD=__MYSQL_PASSWORD__
           QS_APISERVER_MYSQL_DATABASE=__MYSQL_DATABASE__
 
-          # Redis Cache (ServerA 本地缓存)
-          QS_APISERVER_REDIS_CACHE_HOST=__REDIS_CACHE_HOST__
-          QS_APISERVER_REDIS_CACHE_PORT=__REDIS_CACHE_PORT__
-          QS_APISERVER_REDIS_CACHE_USERNAME=__REDIS_CACHE_USERNAME__
-          QS_APISERVER_REDIS_CACHE_PASSWORD=__REDIS_CACHE_PASSWORD__
-          QS_APISERVER_REDIS_CACHE_DB=__REDIS_CACHE_DB__
-
-          # Redis Store (云持久化 Redis)
-          QS_APISERVER_REDIS_STORE_HOST=__REDIS_STORE_HOST__
-          QS_APISERVER_REDIS_STORE_PORT=__REDIS_STORE_PORT__
-          QS_APISERVER_REDIS_STORE_USERNAME=__REDIS_STORE_USERNAME__
-          QS_APISERVER_REDIS_STORE_PASSWORD=__REDIS_STORE_PASSWORD__
-          QS_APISERVER_REDIS_STORE_DB=__REDIS_STORE_DB__
+          # Redis（单实例）
+          QS_APISERVER_REDIS_HOST=__REDIS_HOST__
+          QS_APISERVER_REDIS_PORT=__REDIS_PORT__
+          QS_APISERVER_REDIS_USERNAME=__REDIS_USERNAME__
+          QS_APISERVER_REDIS_PASSWORD=__REDIS_PASSWORD__
+          QS_APISERVER_REDIS_DB=__REDIS_DB__
 
           QS_APISERVER_JWT_SECRET=__JWT_SECRET__
 
@@ -512,16 +482,11 @@ jobs:
           sed -i "s|__MYSQL_USERNAME__|${MYSQL_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_PASSWORD__|${MYSQL_PASSWORD}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__MYSQL_DATABASE__|${MYSQL_DATABASE}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_HOST__|${REDIS_CACHE_HOST}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_PORT__|${REDIS_CACHE_PORT}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_USERNAME__|${REDIS_CACHE_USERNAME}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_PASSWORD__|${REDIS_CACHE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_DB__|${REDIS_CACHE_DB}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_HOST__|${REDIS_STORE_HOST}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_PORT__|${REDIS_STORE_PORT}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_USERNAME__|${REDIS_STORE_USERNAME}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_PASSWORD__|${REDIS_STORE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_DB__|${REDIS_STORE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_HOST__|${REDIS_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_PORT__|${REDIS_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_USERNAME__|${REDIS_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_DB__|${REDIS_DB}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_NSQD_HOST__|${NSQ_NSQD_HOST}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_NSQD_PORT__|${NSQ_NSQD_PORT}|g" deploy-package/configs/env/config.prod.env
@@ -736,16 +701,11 @@ jobs:
 
       - name: Prepare deployment files
         env:
-          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
-          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
-          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
-          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
-          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
-          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
-          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT || 6380 }}
-          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB || 1 }}
-          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
-          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           require_env() {
@@ -763,7 +723,7 @@ jobs:
           }
 
           require_env \
-            REDIS_CACHE_HOST REDIS_CACHE_PORT REDIS_STORE_HOST REDIS_STORE_PORT JWT_SECRET
+            REDIS_HOST REDIS_PORT JWT_SECRET
 
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
@@ -771,35 +731,23 @@ jobs:
 
           cat > deploy-package/configs/env/config.prod.env <<'ENVEOF'
           # Auto-generated production environment configuration for Collection Server
-          # Redis Cache (ServerA 本地缓存)
-          COLLECTION_SERVER_REDIS_CACHE_HOST=__REDIS_CACHE_HOST__
-          COLLECTION_SERVER_REDIS_CACHE_PORT=__REDIS_CACHE_PORT__
-          COLLECTION_SERVER_REDIS_CACHE_USERNAME=__REDIS_CACHE_USERNAME__
-          COLLECTION_SERVER_REDIS_CACHE_PASSWORD=__REDIS_CACHE_PASSWORD__
-          COLLECTION_SERVER_REDIS_CACHE_DB=__REDIS_CACHE_DB__
-
-          # Redis Store (云持久化 Redis)
-          COLLECTION_SERVER_REDIS_STORE_HOST=__REDIS_STORE_HOST__
-          COLLECTION_SERVER_REDIS_STORE_PORT=__REDIS_STORE_PORT__
-          COLLECTION_SERVER_REDIS_STORE_USERNAME=__REDIS_STORE_USERNAME__
-          COLLECTION_SERVER_REDIS_STORE_PASSWORD=__REDIS_STORE_PASSWORD__
-          COLLECTION_SERVER_REDIS_STORE_DB=__REDIS_STORE_DB__
+          # Redis（单实例）
+          COLLECTION_SERVER_REDIS_HOST=__REDIS_HOST__
+          COLLECTION_SERVER_REDIS_PORT=__REDIS_PORT__
+          COLLECTION_SERVER_REDIS_USERNAME=__REDIS_USERNAME__
+          COLLECTION_SERVER_REDIS_PASSWORD=__REDIS_PASSWORD__
+          COLLECTION_SERVER_REDIS_DB=__REDIS_DB__
 
           COLLECTION_SERVER_JWT_SECRET=__JWT_SECRET__
           ENVEOF
 
           # 去除前导空格并替换占位符为实际值
           sed -i 's/^[[:space:]]*//' deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_HOST__|${REDIS_CACHE_HOST}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_PORT__|${REDIS_CACHE_PORT}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_USERNAME__|${REDIS_CACHE_USERNAME}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_PASSWORD__|${REDIS_CACHE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_DB__|${REDIS_CACHE_DB}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_HOST__|${REDIS_STORE_HOST}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_PORT__|${REDIS_STORE_PORT}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_USERNAME__|${REDIS_STORE_USERNAME}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_PASSWORD__|${REDIS_STORE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_DB__|${REDIS_STORE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_HOST__|${REDIS_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_PORT__|${REDIS_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_USERNAME__|${REDIS_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_DB__|${REDIS_DB}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
@@ -1004,16 +952,11 @@ jobs:
           NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
           NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT || 4161 }}
           GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR || 'qs-apiserver:9090' }}
-          REDIS_CACHE_HOST: ${{ secrets.REDIS_CACHE_HOST }}
-          REDIS_CACHE_PORT: ${{ secrets.REDIS_CACHE_PORT || 6379 }}
-          REDIS_CACHE_DB: ${{ secrets.REDIS_CACHE_DB || 0 }}
-          REDIS_CACHE_USERNAME: ${{ secrets.REDIS_CACHE_USERNAME }}
-          REDIS_CACHE_PASSWORD: ${{ secrets.REDIS_CACHE_PASSWORD }}
-          REDIS_STORE_HOST: ${{ secrets.REDIS_STORE_HOST }}
-          REDIS_STORE_PORT: ${{ secrets.REDIS_STORE_PORT || 6380 }}
-          REDIS_STORE_DB: ${{ secrets.REDIS_STORE_DB || 1 }}
-          REDIS_STORE_USERNAME: ${{ secrets.REDIS_STORE_USERNAME }}
-          REDIS_STORE_PASSWORD: ${{ secrets.REDIS_STORE_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           require_env() {
             local missing=0
@@ -1033,7 +976,7 @@ jobs:
             MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
             MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
             NSQ_NSQD_HOST NSQ_NSQD_PORT NSQ_LOOKUPD_HOST NSQ_LOOKUPD_PORT \
-            REDIS_CACHE_HOST REDIS_CACHE_PORT REDIS_STORE_HOST REDIS_STORE_PORT
+            REDIS_HOST REDIS_PORT
 
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
@@ -1058,19 +1001,12 @@ jobs:
 
           QS_WORKER_GRPC_APISERVER_ADDR=__GRPC_APISERVER_ADDR__
 
-          # Redis Cache (ServerA 本地缓存)
-          QS_WORKER_REDIS_CACHE_HOST=__REDIS_CACHE_HOST__
-          QS_WORKER_REDIS_CACHE_PORT=__REDIS_CACHE_PORT__
-          QS_WORKER_REDIS_CACHE_USERNAME=__REDIS_CACHE_USERNAME__
-          QS_WORKER_REDIS_CACHE_PASSWORD=__REDIS_CACHE_PASSWORD__
-          QS_WORKER_REDIS_CACHE_DB=__REDIS_CACHE_DB__
-
-          # Redis Store (云持久化 Redis)
-          QS_WORKER_REDIS_STORE_HOST=__REDIS_STORE_HOST__
-          QS_WORKER_REDIS_STORE_PORT=__REDIS_STORE_PORT__
-          QS_WORKER_REDIS_STORE_USERNAME=__REDIS_STORE_USERNAME__
-          QS_WORKER_REDIS_STORE_PASSWORD=__REDIS_STORE_PASSWORD__
-          QS_WORKER_REDIS_STORE_DB=__REDIS_STORE_DB__
+          # Redis（单实例）
+          QS_WORKER_REDIS_HOST=__REDIS_HOST__
+          QS_WORKER_REDIS_PORT=__REDIS_PORT__
+          QS_WORKER_REDIS_USERNAME=__REDIS_USERNAME__
+          QS_WORKER_REDIS_PASSWORD=__REDIS_PASSWORD__
+          QS_WORKER_REDIS_DB=__REDIS_DB__
           ENVEOF
 
           # 去除前导空格并替换占位符为实际值
@@ -1087,16 +1023,11 @@ jobs:
           sed -i "s|__NSQ_ADDR__|${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_LOOKUPD_ADDR__|${NSQ_LOOKUPD_HOST}:${NSQ_LOOKUPD_PORT}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__GRPC_APISERVER_ADDR__|${GRPC_APISERVER_ADDR}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_HOST__|${REDIS_CACHE_HOST}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_PORT__|${REDIS_CACHE_PORT}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_USERNAME__|${REDIS_CACHE_USERNAME}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_PASSWORD__|${REDIS_CACHE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_CACHE_DB__|${REDIS_CACHE_DB}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_HOST__|${REDIS_STORE_HOST}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_PORT__|${REDIS_STORE_PORT}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_USERNAME__|${REDIS_STORE_USERNAME}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_PASSWORD__|${REDIS_STORE_PASSWORD}|g" deploy-package/configs/env/config.prod.env
-          sed -i "s|__REDIS_STORE_DB__|${REDIS_STORE_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_HOST__|${REDIS_HOST}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_PORT__|${REDIS_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_USERNAME__|${REDIS_USERNAME}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_DB__|${REDIS_DB}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
           echo "📋 Generated config.prod.env for Worker"

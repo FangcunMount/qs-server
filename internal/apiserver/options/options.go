@@ -19,7 +19,7 @@ type Options struct {
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"    mapstructure:"secure"`
 	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"     mapstructure:"mysql"`
 	MigrationOptions        *genericoptions.MigrationOptions       `json:"migration" mapstructure:"migration"`
-	RedisDualOptions        *genericoptions.RedisDualOptions       `json:"redis"     mapstructure:"redis"`
+	RedisOptions            *genericoptions.RedisOptions           `json:"redis"     mapstructure:"redis"`
 	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"   mapstructure:"mongodb"`
 	MessagingOptions        *genericoptions.MessagingOptions       `json:"messaging" mapstructure:"messaging"`
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
@@ -40,7 +40,7 @@ func NewOptions() *Options {
 		SecureServing:           genericoptions.NewSecureServingOptions(),
 		MySQLOptions:            genericoptions.NewMySQLOptions(),
 		MigrationOptions:        genericoptions.NewMigrationOptions(),
-		RedisDualOptions:        genericoptions.NewRedisDualOptions(),
+		RedisOptions:            genericoptions.NewRedisOptions(),
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
 		MessagingOptions:        genericoptions.NewMessagingOptions(),
 		IAMOptions:              genericoptions.NewIAMOptions(),
@@ -140,7 +140,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.SecureServing.AddFlags(fss.FlagSet("secure"))
 	o.MySQLOptions.AddFlags(fss.FlagSet("mysql"))
 	o.MigrationOptions.AddFlags(fss.FlagSet("migration"))
-	o.RedisDualOptions.AddFlags(fss.FlagSet("redis"))
+	o.RedisOptions.AddFlags(fss.FlagSet("redis"))
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
 	o.MessagingOptions.AddFlags(fss.FlagSet("messaging"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))

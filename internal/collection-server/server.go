@@ -72,10 +72,6 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	if err != nil {
 		log.Warnf("Cache Redis not available: %v", err)
 	}
-	storeRedis, err := s.dbManager.GetStoreRedisClient()
-	if err != nil {
-		log.Warnf("Store Redis not available: %v", err)
-	}
 
 	// 2. 创建 gRPC 客户端管理器
 	s.grpcManager, err = CreateGRPCClientManager(
@@ -97,7 +93,6 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	s.container = container.NewContainer(
 		s.config.Options,
 		cacheRedis,
-		storeRedis,
 	)
 
 	// 4. 初始化 IAM 模块（优先）

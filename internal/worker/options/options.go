@@ -24,8 +24,8 @@ type Options struct {
 	GRPC *GRPCOptions `json:"grpc" mapstructure:"grpc"`
 	// Worker 配置
 	Worker *WorkerOptions `json:"worker" mapstructure:"worker"`
-	// Redis 双实例配置（cache/store）
-	Redis *genericoptions.RedisDualOptions `json:"redis" mapstructure:"redis"`
+	// Redis 配置（单实例）
+	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
 	// Cache 控制缓存输出
 	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
 }
@@ -101,7 +101,7 @@ func NewOptions() *Options {
 			MaxRetries:  3,
 			ServiceName: "qs-worker",
 		},
-		Redis: genericoptions.NewRedisDualOptions(),
+		Redis: genericoptions.NewRedisOptions(),
 		Cache: NewCacheOptions(),
 	}
 }
@@ -164,18 +164,12 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.MySQL.Validate()...)
 	errs = append(errs, o.MongoDB.Validate()...)
 
-	// Redis 校验（cache/store 主机端口）
-	if o.Redis.Cache.Host == "" {
-		errs = append(errs, fmt.Errorf("redis.cache.host cannot be empty"))
+	// Redis 校验（单实例主机端口）
+	if o.Redis.Host == "" && len(o.Redis.Addrs) == 0 {
+		errs = append(errs, fmt.Errorf("redis.host cannot be empty"))
 	}
-	if o.Redis.Cache.Port <= 0 {
-		errs = append(errs, fmt.Errorf("redis.cache.port must be greater than 0"))
-	}
-	if o.Redis.Store.Host == "" {
-		errs = append(errs, fmt.Errorf("redis.store.host cannot be empty"))
-	}
-	if o.Redis.Store.Port <= 0 {
-		errs = append(errs, fmt.Errorf("redis.store.port must be greater than 0"))
+	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {
+		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
 
 	return errs

@@ -35,7 +35,6 @@ type Container struct {
 	mysqlDB      *gorm.DB
 	mongoDB      *mongo.Database
 	redisCache   redis.UniversalClient
-	redisStore   redis.UniversalClient
 	cacheOptions ContainerCacheOptions
 
 	// 消息队列（可选）
@@ -66,12 +65,11 @@ type Container struct {
 }
 
 // NewContainer 创建容器
-func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, redisStore redis.UniversalClient) *Container {
+func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
 	return &Container{
 		mysqlDB:       mysqlDB,
 		mongoDB:       mongoDB,
 		redisCache:    redisCache,
-		redisStore:    redisStore,
 		publisherMode: eventconfig.PublishModeLogging, // 默认使用日志模式
 		cacheOptions:  ContainerCacheOptions{},
 		initialized:   false,
@@ -113,8 +111,8 @@ type ContainerCacheTTLOptions struct {
 }
 
 // NewContainerWithOptions 创建带配置的容器
-func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, redisStore redis.UniversalClient, opts ContainerOptions) *Container {
-	c := NewContainer(mysqlDB, mongoDB, redisCache, redisStore)
+func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, opts ContainerOptions) *Container {
+	c := NewContainer(mysqlDB, mongoDB, redisCache)
 	c.mqPublisher = opts.MQPublisher
 
 	// 根据环境或显式配置确定发布器模式
@@ -201,7 +199,7 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 
-	// 初始化 CodesService（基于 redisStore）
+	// 初始化 CodesService
 	c.initCodesService()
 
 	// 初始化小程序码生成器（基础设施层）
@@ -413,11 +411,6 @@ func (c *Container) initCodesService() {
 	if c.CodesService != nil {
 		return
 	}
-	if c.redisStore != nil {
-		c.CodesService = codesapp.NewService(c.redisStore)
-		fmt.Printf("🔑 CodesService initialized using redisStore\n")
-		return
-	}
 	if c.redisCache != nil {
 		c.CodesService = codesapp.NewService(c.redisCache)
 		fmt.Printf("🔑 CodesService initialized using redisCache\n")
@@ -534,11 +527,6 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 			return fmt.Errorf("redis cache ping failed: %w", err)
 		}
 	}
-	if c.redisStore != nil {
-		if err := c.redisStore.Ping(ctx).Err(); err != nil {
-			return fmt.Errorf("redis store ping failed: %w", err)
-		}
-	}
 
 	// 检查模块健康状态
 	if err := c.checkModulesHealth(ctx); err != nil {
@@ -597,11 +585,11 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"initialized":  c.initialized,
 		"modules":      modules,
 		"infrastructure": map[string]bool{
-			"mysql":   c.mysqlDB != nil,
-			"mongodb": c.mongoDB != nil,
-			"redis":   c.redisCache != nil || c.redisStore != nil,
-		},
-	}
+		"mysql":   c.mysqlDB != nil,
+		"mongodb": c.mongoDB != nil,
+		"redis":   c.redisCache != nil,
+	},
+}
 }
 
 // IsInitialized 检查容器是否已初始化

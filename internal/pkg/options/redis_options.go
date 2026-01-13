@@ -9,11 +9,17 @@ type RedisOptions struct {
 	Host                  string   `json:"host,omitempty"                         mapstructure:"host"`
 	Port                  int      `json:"port,omitempty"                         mapstructure:"port"`
 	Addrs                 []string `json:"addrs,omitempty"                        mapstructure:"addrs"`
+	Username              string   `json:"username,omitempty"                     mapstructure:"username"`
 	Password              string   `json:"-"                                      mapstructure:"password"`
 	Database              int      `json:"database"                               mapstructure:"database"`
 	MaxIdle               int      `json:"max-idle,omitempty"                     mapstructure:"max-idle"`
 	MaxActive             int      `json:"max-active,omitempty"                   mapstructure:"max-active"`
 	Timeout               int      `json:"timeout,omitempty"                      mapstructure:"timeout"`
+	MinIdleConns          int      `json:"min-idle-conns,omitempty"               mapstructure:"min-idle-conns"`
+	PoolTimeout           int      `json:"pool-timeout,omitempty"                 mapstructure:"pool-timeout"`
+	DialTimeout           int      `json:"dial-timeout,omitempty"                 mapstructure:"dial-timeout"`
+	ReadTimeout           int      `json:"read-timeout,omitempty"                 mapstructure:"read-timeout"`
+	WriteTimeout          int      `json:"write-timeout,omitempty"                mapstructure:"write-timeout"`
 	EnableCluster         bool     `json:"enable-cluster,omitempty"               mapstructure:"enable-cluster"`
 	UseSSL                bool     `json:"use-ssl,omitempty"                      mapstructure:"use-ssl"`
 	SSLInsecureSkipVerify bool     `json:"ssl-insecure-skip-verify,omitempty"     mapstructure:"ssl-insecure-skip-verify"`
@@ -25,11 +31,17 @@ func NewRedisOptions() *RedisOptions {
 		Host:                  "127.0.0.1",
 		Port:                  6379,
 		Addrs:                 []string{},
+		Username:              "",
 		Password:              "",
 		Database:              0,
 		MaxIdle:               50,
 		MaxActive:             100,
 		Timeout:               5,
+		MinIdleConns:          0,
+		PoolTimeout:           5,
+		DialTimeout:           5,
+		ReadTimeout:           5,
+		WriteTimeout:          5,
 		EnableCluster:         false,
 		UseSSL:                false,
 		SSLInsecureSkipVerify: false,
@@ -54,6 +66,9 @@ func (o *RedisOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.Addrs, "redis.addrs", o.Addrs, ""+
 		"Redis cluster addresses. If set, host and port will be ignored.")
 
+	fs.StringVar(&o.Username, "redis.username", o.Username, ""+
+		"Redis username (Redis 6.0+ ACL).")
+
 	fs.StringVar(&o.Password, "redis.password", o.Password, ""+
 		"Password for access to redis service.")
 
@@ -67,7 +82,22 @@ func (o *RedisOptions) AddFlags(fs *pflag.FlagSet) {
 		"Maximum active connections allowed to connect to redis.")
 
 	fs.IntVar(&o.Timeout, "redis.timeout", o.Timeout, ""+
-		"Redis connection timeout in seconds.")
+		"Redis connection max idle time in seconds.")
+
+	fs.IntVar(&o.MinIdleConns, "redis.min-idle-conns", o.MinIdleConns, ""+
+		"Minimum number of idle connections to maintain.")
+
+	fs.IntVar(&o.PoolTimeout, "redis.pool-timeout", o.PoolTimeout, ""+
+		"Time in seconds to wait for a connection if the pool is exhausted.")
+
+	fs.IntVar(&o.DialTimeout, "redis.dial-timeout", o.DialTimeout, ""+
+		"Dial timeout in seconds.")
+
+	fs.IntVar(&o.ReadTimeout, "redis.read-timeout", o.ReadTimeout, ""+
+		"Read timeout in seconds.")
+
+	fs.IntVar(&o.WriteTimeout, "redis.write-timeout", o.WriteTimeout, ""+
+		"Write timeout in seconds.")
 
 	fs.BoolVar(&o.EnableCluster, "redis.enable-cluster", o.EnableCluster, ""+
 		"Enable redis cluster mode.")
