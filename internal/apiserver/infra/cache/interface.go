@@ -115,6 +115,16 @@ func (b *CacheKeyBuilder) BuildAssessmentDetailKey(id uint64) string {
 	return addNamespace(fmt.Sprintf("assessment:detail:%d", id))
 }
 
+// BuildAssessmentListKey 构建“我的测评列表”缓存键
+// suffix 可用于携带筛选条件哈希，格式示例：":abc123"
+func (b *CacheKeyBuilder) BuildAssessmentListKey(userID uint64, suffix string) string {
+	key := fmt.Sprintf("assess:list:%d:v1", userID)
+	if suffix != "" {
+		key += suffix
+	}
+	return addNamespace(key)
+}
+
 // BuildTesteeInfoKey 构建受试者信息缓存键
 func (b *CacheKeyBuilder) BuildTesteeInfoKey(id uint64) string {
 	return addNamespace(fmt.Sprintf("testee:info:%d", id))

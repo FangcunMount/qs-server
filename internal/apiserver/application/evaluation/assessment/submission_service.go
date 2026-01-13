@@ -21,6 +21,7 @@ type submissionService struct {
 	creator        assessment.AssessmentCreator
 	eventPublisher event.EventPublisher
 	statusCache    *cache.AssessmentStatusCache
+	listCache      *cache.MyAssessmentListCache
 }
 
 // NewSubmissionService 创建测评提交服务
@@ -34,6 +35,7 @@ func NewSubmissionService(
 		creator:        creator,
 		eventPublisher: eventPublisher,
 		statusCache:    nil, // 可选，通过 SetStatusCache 设置
+		listCache:      nil,
 	}
 }
 
@@ -43,12 +45,14 @@ func NewSubmissionServiceWithCache(
 	creator assessment.AssessmentCreator,
 	eventPublisher event.EventPublisher,
 	statusCache *cache.AssessmentStatusCache,
+	listCache *cache.MyAssessmentListCache,
 ) AssessmentSubmissionService {
 	return &submissionService{
 		repo:           repo,
 		creator:        creator,
 		eventPublisher: eventPublisher,
 		statusCache:    statusCache,
+		listCache:      listCache,
 	}
 }
 
@@ -145,6 +149,8 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 		"duration_ms", duration.Milliseconds(),
 	)
 
+	s.invalidateMyListCache(ctx, dto.TesteeID)
+
 	return toAssessmentResult(a), nil
 }
 
@@ -228,6 +234,8 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		"assessment_id", assessmentID,
 		"duration_ms", duration.Milliseconds(),
 	)
+
+	s.invalidateMyListCache(ctx, a.TesteeID().Uint64())
 
 	return toAssessmentResult(a), nil
 }
@@ -351,6 +359,14 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 	)
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 
+	// 2.1 尝试缓存（按用户+状态+分页）
+	if s.listCache != nil {
+		var cached AssessmentListResult
+		if err := s.listCache.Get(ctx, dto.TesteeID, page, pageSize, dto.Status, &cached); err == nil {
+			return &cached, nil
+		}
+	}
+
 	// 3. 构造查询参数
 	testeeID := testee.NewID(dto.TesteeID)
 	pagination := assessment.NewPagination(page, pageSize)
@@ -389,13 +405,19 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return &AssessmentListResult{
+	result := &AssessmentListResult{
 		Items:      items,
 		Total:      totalInt,
 		Page:       page,
 		PageSize:   pageSize,
 		TotalPages: (totalInt + pageSize - 1) / pageSize,
-	}, nil
+	}
+
+	if s.listCache != nil {
+		s.listCache.Set(ctx, dto.TesteeID, page, pageSize, dto.Status, result)
+	}
+
+	return result, nil
 }
 
 // buildCreateRequest 构造创建请求
@@ -445,6 +467,13 @@ func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) assessme
 	}
 
 	return req
+}
+
+func (s *submissionService) invalidateMyListCache(ctx context.Context, userID uint64) {
+	if s.listCache == nil || userID == 0 {
+		return
+	}
+	s.listCache.Invalidate(ctx, userID)
 }
 
 // normalizePagination 规范化分页参数
