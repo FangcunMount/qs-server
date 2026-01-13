@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
@@ -17,6 +18,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
@@ -215,9 +217,39 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		dto.OriginID = &req.OriginId
 	}
 
+	// 幂等：先查是否已存在
+	if existing, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswersheetId); err == nil && existing != nil {
+		l.Infow("检测到答卷已创建测评，直接返回",
+			"answersheet_id", req.AnswersheetId,
+			"assessment_id", existing.ID,
+		)
+		return &pb.CreateAssessmentFromAnswerSheetResponse{
+			AssessmentId:  existing.ID,
+			Created:       false,
+			AutoSubmitted: false,
+			Message:       "测评已存在",
+		}, nil
+	}
+
 	// 调用应用服务创建测评
 	result, err := s.submissionService.Create(ctx, dto)
 	if err != nil {
+		// 如果是唯一约束冲突，查出已有测评并返回
+		if errors.IsCode(err, errorCode.ErrAssessmentDuplicate) {
+			if existing, findErr := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswersheetId); findErr == nil && existing != nil {
+				l.Infow("测评已存在，返回已有结果",
+					"answersheet_id", req.AnswersheetId,
+					"assessment_id", existing.ID,
+				)
+				return &pb.CreateAssessmentFromAnswerSheetResponse{
+					AssessmentId:  existing.ID,
+					Created:       false,
+					AutoSubmitted: false,
+					Message:       "测评已存在",
+				}, nil
+			}
+		}
+
 		l.Errorw("创建测评失败",
 			"action", "create_assessment_from_answersheet",
 			"result", "failed",
