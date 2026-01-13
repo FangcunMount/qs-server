@@ -19,6 +19,7 @@ type lifecycleService struct {
 	validator      questionnaire.Validator
 	lifecycle      questionnaire.Lifecycle
 	eventPublisher event.EventPublisher
+	listCache      *QuestionnaireListCache
 }
 
 // NewLifecycleService 创建问卷生命周期服务
@@ -27,12 +28,14 @@ func NewLifecycleService(
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
 	eventPublisher event.EventPublisher,
+	listCache *QuestionnaireListCache,
 ) QuestionnaireLifecycleService {
 	return &lifecycleService{
 		repo:           repo,
 		validator:      validator,
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
+		listCache:      listCache,
 	}
 }
 
@@ -120,6 +123,8 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateQuestionnaireDT
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
 	}
+
+	s.refreshListCache(ctx)
 
 	duration := time.Since(startTime)
 	l.Debugw("创建问卷成功",
@@ -566,6 +571,13 @@ func (s *lifecycleService) checkArchivedStatus(ctx context.Context, q *questionn
 	return nil
 }
 
+func (s *lifecycleService) refreshListCache(ctx context.Context) {
+	if s.listCache == nil {
+		return
+	}
+	logQuestionnaireListCacheError(ctx, s.listCache.Rebuild(ctx))
+}
+
 // persistQuestionnaire 持久化问卷
 func (s *lifecycleService) persistQuestionnaire(ctx context.Context, q *questionnaire.Questionnaire, code string, action string, operation string) error {
 	logger.L(ctx).Debugw("保存问卷",
@@ -583,6 +595,7 @@ func (s *lifecycleService) persistQuestionnaire(ctx context.Context, q *question
 		)
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
 	}
+	s.refreshListCache(ctx)
 	return nil
 }
 

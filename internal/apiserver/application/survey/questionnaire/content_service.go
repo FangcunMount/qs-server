@@ -18,16 +18,19 @@ import (
 type contentService struct {
 	repo        questionnaire.Repository
 	questionMgr questionnaire.QuestionManager
+	listCache   *QuestionnaireListCache
 }
 
 // NewContentService 创建问卷内容编辑服务
 func NewContentService(
 	repo questionnaire.Repository,
 	questionMgr questionnaire.QuestionManager,
+	listCache *QuestionnaireListCache,
 ) QuestionnaireContentService {
 	return &contentService{
 		repo:        repo,
 		questionMgr: questionMgr,
+		listCache:   listCache,
 	}
 }
 
@@ -446,6 +449,13 @@ func (s *contentService) checkArchivedStatus(ctx context.Context, q *questionnai
 	return nil
 }
 
+func (s *contentService) refreshListCache(ctx context.Context) {
+	if s.listCache == nil {
+		return
+	}
+	logQuestionnaireListCacheError(ctx, s.listCache.Rebuild(ctx))
+}
+
 // persistQuestionnaire 持久化问卷
 func (s *contentService) persistQuestionnaire(ctx context.Context, q *questionnaire.Questionnaire, code string, action string) error {
 	if err := s.repo.Update(ctx, q); err != nil {
@@ -457,6 +467,7 @@ func (s *contentService) persistQuestionnaire(ctx context.Context, q *questionna
 		)
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
 	}
+	s.refreshListCache(ctx)
 	return nil
 }
 

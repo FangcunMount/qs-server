@@ -20,6 +20,7 @@ type lifecycleService struct {
 	lifecycle         scale.Lifecycle
 	baseInfo          scale.BaseInfo
 	eventPublisher    event.EventPublisher
+	listCache         *ScaleListCache
 }
 
 // NewLifecycleService 创建量表生命周期服务
@@ -27,6 +28,7 @@ func NewLifecycleService(
 	repo scale.Repository,
 	questionnaireRepo domainQuestionnaire.Repository,
 	eventPublisher event.EventPublisher,
+	listCache *ScaleListCache,
 ) ScaleLifecycleService {
 	return &lifecycleService{
 		repo:              repo,
@@ -34,6 +36,7 @@ func NewLifecycleService(
 		lifecycle:         scale.NewLifecycle(),
 		baseInfo:          scale.BaseInfo{},
 		eventPublisher:    eventPublisher,
+		listCache:         listCache,
 	}
 }
 
@@ -96,6 +99,8 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return toScaleResult(m), nil
 }
 
@@ -149,6 +154,8 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表基本信息失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return toScaleResult(m), nil
 }
 
@@ -180,6 +187,8 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表关联问卷失败")
 	}
+
+	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
 }
@@ -269,10 +278,19 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 		return errors.WrapC(err, errorCode.ErrDatabase, "删除量表失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return nil
 }
 
 // ===================== 私有辅助方法 =====================
+
+func (s *lifecycleService) refreshListCache(ctx context.Context) {
+	if s.listCache == nil {
+		return
+	}
+	logScaleListCacheError(ctx, s.listCache.Rebuild(ctx))
+}
 
 // generateScaleCode 生成量表编码
 func (s *lifecycleService) generateScaleCode(code string) (meta.Code, error) {
@@ -369,6 +387,9 @@ func (s *lifecycleService) executeLifecycleOperation(
 
 	// 3. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, m)
+
+	// 4. 重建全局列表缓存
+	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
 }

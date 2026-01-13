@@ -90,9 +90,19 @@ func (b *CacheKeyBuilder) BuildScaleKey(code string) string {
 	return addNamespace("scale:" + code)
 }
 
+// BuildScaleListKey 构建量表全局列表缓存键
+func (b *CacheKeyBuilder) BuildScaleListKey() string {
+	return addNamespace("scale:list:v1")
+}
+
 // BuildQuestionnaireKey 构建问卷缓存键
 func (b *CacheKeyBuilder) BuildQuestionnaireKey(code, version string) string {
 	return addNamespace("questionnaire:" + code + ":" + version)
+}
+
+// BuildQuestionnaireListKey 构建问卷全局列表缓存键
+func (b *CacheKeyBuilder) BuildQuestionnaireListKey() string {
+	return addNamespace("questionnaire:list:v1")
 }
 
 // BuildAssessmentStatusKey 构建测评状态缓存键

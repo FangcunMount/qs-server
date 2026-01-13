@@ -137,14 +137,19 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 		sub.Repo = baseRepo
 	}
 
+	var listCache *quesApp.QuestionnaireListCache
+	if redisClient != nil {
+		listCache = quesApp.NewQuestionnaireListCache(redisClient, sub.Repo, identitySvc)
+	}
+
 	// 初始化领域服务
 	validator := questionnaire.Validator{}
 	lifecycle := questionnaire.NewLifecycle()
 	questionMgr := questionnaire.QuestionManager{}
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, m.eventPublisher)
-	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
+	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, m.eventPublisher, listCache)
+	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr, listCache)
 	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc)
 
 	// 初始化 handler 层

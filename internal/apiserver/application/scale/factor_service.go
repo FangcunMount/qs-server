@@ -14,13 +14,15 @@ import (
 type factorService struct {
 	repo          scale.Repository
 	factorManager scale.FactorManager
+	listCache     *ScaleListCache
 }
 
 // NewFactorService 创建量表因子编辑服务
-func NewFactorService(repo scale.Repository) ScaleFactorService {
+func NewFactorService(repo scale.Repository, listCache *ScaleListCache) ScaleFactorService {
 	return &factorService{
 		repo:          repo,
 		factorManager: scale.FactorManager{},
+		listCache:     listCache,
 	}
 }
 
@@ -65,6 +67,8 @@ func (s *factorService) AddFactor(ctx context.Context, dto AddFactorDTO) (*Scale
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return toScaleResult(m), nil
 }
 
@@ -106,6 +110,8 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return toScaleResult(m), nil
 }
 
@@ -139,6 +145,8 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
+
+	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
 }
@@ -199,6 +207,8 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return toScaleResult(m), nil
 }
 
@@ -244,6 +254,8 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto Upda
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
+
+	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
 }
@@ -298,7 +310,16 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.refreshListCache(ctx)
+
 	return toScaleResult(m), nil
+}
+
+func (s *factorService) refreshListCache(ctx context.Context) {
+	if s.listCache == nil {
+		return
+	}
+	logScaleListCacheError(ctx, s.listCache.Rebuild(ctx))
 }
 
 // ============= 辅助函数 =============

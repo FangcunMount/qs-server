@@ -101,9 +101,15 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 		m.Repo = baseRepo
 	}
 
+	// 初始化量表全局列表缓存
+	var listCache *scaleApp.ScaleListCache
+	if redisClient != nil {
+		listCache = scaleApp.NewScaleListCache(redisClient, m.Repo, identitySvc)
+	}
+
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher)
-	m.FactorService = scaleApp.NewFactorService(m.Repo)
+	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher, listCache)
+	m.FactorService = scaleApp.NewFactorService(m.Repo, listCache)
 	m.QueryService = scaleApp.NewQueryService(m.Repo, identitySvc)
 	m.CategoryService = scaleApp.NewCategoryService()
 
