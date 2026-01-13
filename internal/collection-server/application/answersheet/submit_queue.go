@@ -70,6 +70,24 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 		return nil, false, errors.New("request id is required")
 	}
 
+	// 幂等：若已有状态，直接返回或告知排队中
+	if status, ok := q.getStatus(requestID); ok {
+		switch status.Status {
+		case SubmitStatusDone:
+			// 已完成，直接返回结果
+			return &SubmitAnswerSheetResponse{
+				ID:      status.AnswerSheetID,
+				Message: "already submitted",
+			}, false, nil
+		case SubmitStatusQueued, SubmitStatusProcessing:
+			// 还在队列/处理中，提示客户端等待
+			return nil, true, nil
+		case SubmitStatusFailed:
+			// 已失败，不重复入队，由客户端决定是否换 request_id 重试
+			return nil, false, errors.New("previous request failed, please retry with a new request_id")
+		}
+	}
+
 	respCh := make(chan submitResult, 1)
 	job := submitJob{
 		ctx:       context.WithoutCancel(ctx),
@@ -164,4 +182,11 @@ func (q *SubmitQueue) cleanup() {
 		}
 	}
 	q.lastCleanup = now
+}
+
+func (q *SubmitQueue) getStatus(requestID string) (SubmitStatusResponse, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	status, ok := q.statuses[requestID]
+	return status, ok
 }

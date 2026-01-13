@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/worker/infra/redislock"
 )
 
 func init() {
@@ -41,84 +42,158 @@ type AnswerSheetSubmittedPayload struct {
 // 3. 如果关联量表，Assessment 会自动提交并触发评估
 func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data AnswerSheetSubmittedPayload
-		env, err := ParseEventData(payload, &data)
+		answerSheetID, data, err := parseAnswerSheetData(deps, payload)
 		if err != nil {
 			return fmt.Errorf("failed to parse answersheet submitted event: %w", err)
 		}
 
-		deps.Logger.Debug("answersheet submitted detail",
-			"event_id", env.ID,
-			"answersheet_id", data.AnswerSheetID,
-			"questionnaire_code", data.QuestionnaireCode,
-			"questionnaire_version", data.QuestionnaireVersion,
-			"testee_id", data.TesteeID,
-			"org_id", data.OrgID,
-			"filler_id", data.FillerID,
-			"filler_type", data.FillerType,
-			"submitted_at", data.SubmittedAt,
-		)
-
-		// 检查 InternalClient 是否可用
-		if deps.InternalClient == nil {
-			deps.Logger.Warn("InternalClient is not available, skipping assessment creation",
-				slog.String("answersheet_id", data.AnswerSheetID),
-			)
-			return nil
-		}
-
-		// 解析答卷 ID
-		answerSheetID, err := strconv.ParseUint(data.AnswerSheetID, 10, 64)
+		// 分布式锁，防止同一答卷并发/重放创建测评
+		token, _, err := acquireProcessingLock(ctx, deps, answerSheetID)
 		if err != nil {
-			return fmt.Errorf("invalid answersheet_id format: %w", err)
+			return fmt.Errorf("failed to acquire processing lock: %w", err)
 		}
+		defer func() {
+			if err := releaseProcessingLock(ctx, deps, answerSheetID, token); err != nil {
+				deps.Logger.Warn("failed to release processing lock",
+					slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
+					slog.String("error", err.Error()),
+				)
+			}
+		}()
 
 		// Step 1: 计算答卷分数（在 Survey 域完成）
-		scoreReq := &pb.CalculateAnswerSheetScoreRequest{
-			AnswersheetId: answerSheetID,
-		}
-		scoreResp, err := deps.InternalClient.CalculateAnswerSheetScore(ctx, scoreReq)
-		if err != nil {
+		if err := calculateAnswerSheetScore(ctx, deps, answerSheetID); err != nil {
 			deps.Logger.Error("failed to calculate answersheet score",
-				slog.String("answersheet_id", data.AnswerSheetID),
+				slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
 				slog.String("error", err.Error()),
 			)
-			// 计分失败不阻塞后续流程，只记录警告
-			deps.Logger.Warn("continuing without scoring",
-				slog.String("answersheet_id", data.AnswerSheetID),
-			)
-		} else {
-			deps.Logger.Debug("answersheet scoring detail",
-				"total_score", scoreResp.TotalScore,
-			)
+			return fmt.Errorf("failed to calculate answersheet score: %w", err)
 		}
 
 		// Step 2: 创建 Assessment（在 Evaluation 域完成）
-		req := &pb.CreateAssessmentFromAnswerSheetRequest{
-			AnswersheetId:        answerSheetID,
-			QuestionnaireCode:    data.QuestionnaireCode,
-			QuestionnaireVersion: data.QuestionnaireVersion,
-			TesteeId:             data.TesteeID,
-			OrgId:                data.OrgID,
-			FillerId:             data.FillerID,
-			FillerType:           data.FillerType,
-			OriginType:           "adhoc", // 默认为即时测评
+		if err := createAssessmentFromAnswerSheet(ctx, deps, answerSheetID, data); err != nil {
+			return fmt.Errorf("failed to create assessment from answersheet: %w", err)
 		}
-
-		resp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(ctx, req)
-		if err != nil {
-			deps.Logger.Error("failed to create assessment from answersheet",
-				slog.String("answersheet_id", data.AnswerSheetID),
-				slog.String("error", err.Error()),
-			)
-			return fmt.Errorf("failed to create assessment: %w", err)
-		}
-
-		deps.Logger.Debug("assessment creation detail",
-			"created", resp.Created,
-			"message", resp.Message,
-		)
 
 		return nil
 	}
+}
+
+// 解析答卷数据
+func parseAnswerSheetData(deps *Dependencies, payload []byte) (uint64, *AnswerSheetSubmittedPayload, error) {
+	var data AnswerSheetSubmittedPayload
+	env, err := ParseEventData(payload, &data)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to parse answersheet submitted event: %w", err)
+	}
+
+	// 解析答卷 ID
+	answerSheetID, err := strconv.ParseUint(data.AnswerSheetID, 10, 64)
+	if err != nil || answerSheetID == 0 {
+		return 0, nil, fmt.Errorf("invalid answersheet_id format or value: %w", err)
+	}
+
+	deps.Logger.Debug("answersheet submitted detail",
+		"event_id", env.ID,
+		"answersheet_id", data.AnswerSheetID,
+		"questionnaire_code", data.QuestionnaireCode,
+		"questionnaire_version", data.QuestionnaireVersion,
+		"testee_id", data.TesteeID,
+		"org_id", data.OrgID,
+		"filler_id", data.FillerID,
+		"filler_type", data.FillerType,
+		"submitted_at", data.SubmittedAt,
+	)
+	return answerSheetID, &data, nil
+}
+
+// 分布式锁，防止同一答卷并发/重放创建测评
+func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64) (string, bool, error) {
+	if deps.RedisCache == nil {
+		return "", false, nil
+	}
+	// 锁的key为 answersheet:processing:${answerSheetID}
+	lockKey := fmt.Sprintf("answersheet:processing:%d", answerSheetID)
+	lockTTL := 5 * time.Minute
+
+	// 获取分布式锁
+	token, acquired, err := redislock.Acquire(ctx, deps.RedisCache, lockKey, lockTTL)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to acquire processing lock: %w", err)
+	}
+	// 如果获取失败，则返回false
+	if !acquired {
+		deps.Logger.Info("skip duplicated answersheet processing",
+			slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
+		)
+		return "", false, nil
+	}
+
+	deps.Logger.Debug("acquired processing lock",
+		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
+		"token", token,
+	)
+	return token, true, nil
+}
+
+// 释放分布式锁
+func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64, token string) error {
+	if deps.RedisCache == nil {
+		return nil
+	}
+	lockKey := fmt.Sprintf("answersheet:processing:%d", answerSheetID)
+	if err := redislock.Release(ctx, deps.RedisCache, lockKey, token); err != nil {
+		return fmt.Errorf("failed to release processing lock: %w", err)
+	}
+	return nil
+}
+
+// 计算答卷分数
+func calculateAnswerSheetScore(ctx context.Context, deps *Dependencies, answerSheetID uint64) error {
+	if deps.InternalClient == nil {
+		return fmt.Errorf("internal client is not available")
+	}
+	scoreReq := &pb.CalculateAnswerSheetScoreRequest{
+		AnswersheetId: answerSheetID,
+	}
+	scoreResp, err := deps.InternalClient.CalculateAnswerSheetScore(ctx, scoreReq)
+	if err != nil {
+		return fmt.Errorf("failed to calculate answersheet score: %w", err)
+	}
+	deps.Logger.Debug("answersheet scoring detail",
+		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
+		"total_score", scoreResp.TotalScore,
+		"message", scoreResp.Message,
+	)
+	return nil
+}
+
+// 创建测评
+func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, answerSheetID uint64, data *AnswerSheetSubmittedPayload) error {
+	if deps.InternalClient == nil {
+		return fmt.Errorf("internal client is not available")
+	}
+	// 构建创建测评请求
+	assessmentReq := &pb.CreateAssessmentFromAnswerSheetRequest{
+		AnswersheetId:        answerSheetID,
+		QuestionnaireCode:    data.QuestionnaireCode,
+		QuestionnaireVersion: data.QuestionnaireVersion,
+		TesteeId:             data.TesteeID,
+		OrgId:                data.OrgID,
+		FillerId:             data.FillerID,
+		FillerType:           data.FillerType,
+		OriginType:           "adhoc",
+	}
+	// 创建测评
+	assessmentResp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(ctx, assessmentReq)
+	if err != nil {
+		return fmt.Errorf("failed to create assessment from answersheet: %w", err)
+	}
+	deps.Logger.Debug("assessment creation detail",
+		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
+		"assessment_id", assessmentResp.AssessmentId,
+		"created", assessmentResp.Created,
+		"message", assessmentResp.Message,
+	)
+	return nil
 }
