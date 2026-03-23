@@ -58,7 +58,7 @@ Validation 子域
 **与其他子域的对比**：
 
 | 特性 | Questionnaire | AnswerSheet | Validation |
-|-----|---------------|-------------|------------|
+| ----- | --------------- | ------------- | ------------ |
 | **类型** | 聚合 | 聚合 | 子域 |
 | **核心对象** | Question | Answer | ValidationStrategy |
 | **扩展模式** | 注册器 + 工厂 | 简单工厂 | 注册器 + 策略 |
@@ -725,7 +725,7 @@ question, _ := NewQuestion(
 Validation 子域使用的设计模式：
 
 | 模式 | 应用位置 | 价值 |
-|-----|---------|------|
+| ----- | --------- | ------ |
 | **策略模式** | ValidationStrategy | 每种校验规则独立实现 |
 | **注册器模式** | strategyRegistry | 自动注册所有策略 |
 | **适配器模式** | ValidatableValue + AnswerValueAdapter | 解耦不同聚合 |
@@ -796,7 +796,7 @@ func init() {
 **对比**：如果将校验逻辑放在 Questionnaire 聚合中
 
 | 方面 | 放在 Questionnaire | 独立 Validation 子域 |
-|-----|-------------------|-------------------|
+| ----- | ------------------- | ------------------- |
 | **职责** | Questionnaire 负责校验 | Validation 独立职责 |
 | **复用** | 只能用于 Question | 任何需要校验的地方 |
 | **扩展** | 修改 Questionnaire | 不影响其他聚合 |
@@ -827,7 +827,7 @@ type ValidatableValue interface {
 **为什么不直接使用 AnswerValue？**
 
 | 方案 | 优点 | 缺点 |
-|-----|------|------|
+| ----- | ------ | ------ |
 | **直接使用 AnswerValue** | 简单直接 | ❌ Validation 依赖 AnswerSheet<br>❌ 无法复用到其他场景 |
 | **定义 ValidatableValue** | ✅ 解耦<br>✅ 可复用 | 需要适配器 |
 

@@ -109,30 +109,30 @@ func init() {
 ### 基础设施配置
 
 | 组件 | 配置项 | 说明 |
-|-----|-------|-----|
+| ----- | ------- | ----- |
 | MySQL | `MYSQL_HOST`, `MYSQL_PORT` | 数据库地址和端口 |
-|  | `MYSQL_USER`, `MYSQL_PASSWORD` | 应用数据库用户 |
-|  | `MYSQL_DATABASE` | 数据库名称 |
+| - | `MYSQL_USER`, `MYSQL_PASSWORD` | 应用数据库用户 |
+| - | `MYSQL_DATABASE` | 数据库名称 |
 | Redis | `REDIS_HOST`, `REDIS_PORT` | Redis 实例地址（默认 6379） |
-|  | `REDIS_PASSWORD` | Redis 实例密码 |
+| - | `REDIS_PASSWORD` | Redis 实例密码 |
 | MongoDB | `MONGO_HOST`, `MONGO_PORT` | MongoDB 地址 |
-|  | `MONGO_USER`, `MONGO_PASSWORD` | 应用数据库用户 |
-|  | `MONGO_URL` | 完整连接字符串 |
+| - | `MONGO_USER`, `MONGO_PASSWORD` | 应用数据库用户 |
+| - | `MONGO_URL` | 完整连接字符串 |
 | NSQ | `NSQLOOKUPD_TCP_PORT`, `NSQD_TCP_PORT` | NSQ 端口配置 |
-|  | `NSQLOOKUPD_HTTP_PORT`, `NSQD_HTTP_PORT` | NSQ HTTP 端口 |
+| - | `NSQLOOKUPD_HTTP_PORT`, `NSQD_HTTP_PORT` | NSQ HTTP 端口 |
 
 ### 应用配置
 
 | 类别 | 配置项 | 说明 |
-|-----|-------|-----|
+| ----- | ------- | ----- |
 | 服务端口 | `QS_APISERVER_HTTP_PORT` | API Server HTTP 端口 |
-|  | `COLLECTION_SERVER_HTTP_PORT` | Collection Server HTTP 端口 |
+| - | `COLLECTION_SERVER_HTTP_PORT` | Collection Server HTTP 端口 |
 | JWT | `JWT_SECRET_KEY` | JWT 签名密钥 |
-|  | `JWT_TIMEOUT` | Token 有效期 |
+| - | `JWT_TIMEOUT` | Token 有效期 |
 | 日志 | `LOG_LEVEL` | 日志级别 |
-|  | `LOG_FORMAT` | 日志格式（console/json） |
+| - | `LOG_FORMAT` | 日志格式（console/json） |
 | 迁移 | `MIGRATION_ENABLED` | 是否启用自动迁移 |
-|  | `MIGRATION_AUTOSEED` | 是否自动加载种子数据 |
+| - | `MIGRATION_AUTOSEED` | 是否自动加载种子数据 |
 
 ## 🔍 环境检查
 

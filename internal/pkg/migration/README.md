@@ -66,7 +66,7 @@ type Driver interface {
 ### 支持的数据库
 
 | 数据库 | 驱动类型 | 迁移文件格式 |
-|--------|----------|--------------|
+| -------- | ---------- | -------------- |
 | MySQL  | MySQLDriver | `.sql` |
 | MongoDB | MongoDriver | `.json` |
 
@@ -276,7 +276,7 @@ CMD ["./apiserver"]
 MySQL 和 MongoDB 的迁移版本是**完全独立**的，各自在自己的数据库中维护版本记录：
 
 | 数据库 | 版本存储位置 | 迁移文件目录 |
-|--------|-------------|-------------|
+| -------- | ------------- | ------------- |
 | MySQL | MySQL 的 `schema_migrations` 表 | `migrations/mysql/` |
 | MongoDB | MongoDB 的 `schema_migrations` 集合 | `migrations/mongodb/` |
 

@@ -26,7 +26,7 @@ user, _ := client.Identity().GetUser(ctx, result.Claims.UserID)
 ### SDK vs 手动集成
 
 | 对比项 | 手动集成 | 使用 SDK |
-|-------|---------|----------|
+| ------- | --------- | ---------- |
 | 代码量 | ❌ 500+ 行 | ✅ 10 行 |
 | mTLS 配置 | ❌ 手动处理证书 | ✅ 自动配置 |
 | 重试/超时 | ❌ 自己实现 | ✅ 内置支持 |
@@ -62,7 +62,7 @@ flowchart LR
 ```
 
 | 能力 | 说明 | 调用方式 |
-|------|------|----------|
+| ------ | ------ | ---------- |
 | **Token 验证** | 验证用户的 JWT 是否有效 | gRPC 或本地 JWKS 验签 |
 | **JWKS 获取** | 获取公钥用于本地验签 | gRPC 或 HTTP |
 | **用户查询** | 获取用户基本信息 | gRPC |
@@ -121,7 +121,7 @@ flowchart TB
 QS 作为 IAM gRPC 的客户端，需准备：
 
 | 文件 | 说明 | 存储位置 |
-|------|------|----------|
+| ------ | ------ | ---------- |
 | `ca-chain.crt` | CA 证书链（验证 IAM 服务端） | `/data/infra/ssl/grpc/ca/ca-chain.crt` |
 | `qs-apiserver.crt` / `qs-apiserver.key` | QS API 网关/服务调用 IAM 时的客户端证书与私钥 | `/data/infra/ssl/grpc/server/qs-apiserver.{crt,key}` |
 | `qs-collection-server.crt` / `qs-collection-server.key` | （如采集侧单独调用 IAM）客户端证书与私钥 | `/data/infra/ssl/grpc/server/qs-collection-server.{crt,key}` |
@@ -649,7 +649,7 @@ if result.Valid {
 ### 4.3 核心接口速查
 
 | 服务 | SDK 方法 | 说明 |
-|------|---------|------|
+| ------ | --------- | ------ |
 | **认证** | `Auth().VerifyToken()` | 远程验证 Token |
 | **身份** | `Identity().GetUser()` | 获取用户信息 |
 | **身份** | `Identity().BatchGetUsers()` | 批量获取用户 |
@@ -717,7 +717,7 @@ func handleSDKError(err error) {
 ### 5.2 错误码快速映射
 
 | SDK 错误类别 | gRPC 状态码 | HTTP 状态码 | 建议处理 |
-|-------------|-------------|-------------|---------|
+| ------------- | ------------- | ------------- | --------- |
 | `CategoryAuthentication` | `UNAUTHENTICATED` | 401 | 跳转登录 |
 | `CategoryAuthorization` | `PERMISSION_DENIED` | 403 | 提示无权限 |
 | `CategoryNotFound` | `NOT_FOUND` | 404 | 提示不存在 |
@@ -913,7 +913,7 @@ func startAssessment(c *gin.Context) {
 SDK 自动收集以下指标（通过 Prometheus）：
 
 | 指标 | 类型 | 说明 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `iam_sdk_requests_total` | Counter | SDK 请求总数 |
 | `iam_sdk_request_duration_seconds` | Histogram | 请求延迟 |
 | `iam_sdk_errors_total` | Counter | 错误总数 |
@@ -1124,7 +1124,7 @@ func TestGetUser(t *testing.T) {
 ## 10. SDK vs 手动集成对比
 
 | 项目 | 手动集成 | 使用 SDK | 节省时间 |
-|------|---------|----------|---------|
+| ------ | --------- | ---------- | --------- |
 | mTLS 配置 | ~100 行代码 | 3 行配置 | 2 小时 |
 | JWKS 缓存 | ~200 行代码 | SDK 内置 | 4 小时 |
 | 重试/超时 | ~150 行代码 | 配置项 | 3 小时 |
@@ -1136,7 +1136,7 @@ func TestGetUser(t *testing.T) {
 ## 11. 相关文档
 
 | 文档 | 说明 |
-|------|------|
+| ------ | ------ |
 | [SDK 快速开始](../../pkg/sdk/docs/01-quick-start.md) | SDK 详细使用指南 |
 | [SDK 配置详解](../../pkg/sdk/docs/02-configuration.md) | 完整配置选项 |
 | [JWT 验证机制](../../pkg/sdk/docs/03-jwt-verification.md) | JWKS 管理和降级 |
@@ -1147,7 +1147,7 @@ func TestGetUser(t *testing.T) {
 ## 12. 联系方式
 
 | 事项 | 联系方式 |
-|------|----------|
+| ------ | ---------- |
 | SDK 使用问题 | GitHub Issues / IAM 团队 |
 | 证书申请 | IAM 团队 / 运维团队 |
 | API 问题 | IAM 开发团队 |

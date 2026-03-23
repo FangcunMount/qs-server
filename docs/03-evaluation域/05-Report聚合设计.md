@@ -98,7 +98,7 @@
 ### 1.2 问题拆解与解决方案
 
 | 问题 | 挑战 | Report 的解决方案 |
-|------|------|------------------|
+| ------ | ------ | ------------------ |
 | **结构化呈现** | 数据需要组织成可读格式 | **聚合根模式** - InterpretReport 统一管理 |
 | **维度化展示** | 多因子需要分类展示 | **DimensionInterpret** - 维度值对象 |
 | **个性化建议** | 根据风险生成建议 | **SuggestionGenerator** - 策略模式 |
@@ -665,7 +665,7 @@ func (g *RuleBasedSuggestionGenerator) Generate(ctx context.Context, report *Int
 ### 9.1 核心设计决策
 
 | 设计决策 | 选择 | 理由 |
-|---------|------|------|
+| --------- | ------ | ------ |
 | **聚合根** | InterpretReport | 统一管理维度和建议的生命周期 |
 | **建造者模式** | ReportBuilder | 封装复杂报告的构建过程 |
 | **策略模式** | Exporter/Suggestion | 支持多格式导出、多策略建议 |
@@ -710,7 +710,7 @@ func (g *RuleBasedSuggestionGenerator) Generate(ctx context.Context, report *Int
 ## 十、代码索引
 
 | 文件 | 职责 | 路径 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `report.go` | 聚合根：InterpretReport | `internal/apiserver/domain/evaluation/report/` |
 | `dimension.go` | 值对象：DimensionInterpret | 同上 |
 | `builder.go` | 领域服务：ReportBuilder | 同上 |

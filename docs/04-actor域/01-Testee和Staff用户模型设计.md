@@ -193,7 +193,7 @@ func (t *Testee) AddTag(tag string) {
 **场景示例**：
 
 | 场景 | Testee | Writer | 说明 |
-|------|--------|--------|------|
+| ------ | -------- | -------- | ------ |
 | 成人自己填 | 患者本人 | 患者本人 | Testee 和 Writer 是同一人 |
 | 家长代填 | 儿童 | 家长 | Testee 是孩子，Writer 是家长 |
 | 医生代填 | 患者 | 医生 | Testee 是患者，Writer 是医生（Staff） |

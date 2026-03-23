@@ -108,7 +108,7 @@ func (r *CachedQuestionnaireRepository) Update(ctx context.Context, qDomain *que
 **分析**：
 
 | 场景 | Repository 失效 | Worker 失效 | 必要性 |
-|-----|---------------|------------|--------|
+| ----- | --------------- | ------------ | -------- |
 | **正常情况** | ✅ 已失效 | ⚠️ 冗余 | 不必要 |
 | **Repository 失效失败** | ❌ 失败 | ✅ 兜底 | **必要** |
 | **跨服务缓存** | ❌ 只失效 apiserver | ✅ 失效所有服务 | **必要** |

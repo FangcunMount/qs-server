@@ -676,7 +676,7 @@ func (r *InterpretReport) CreatedAt() time.Time { return r.createdAt }
 ### 5.2 状态转换规则
 
 | 当前状态 | 允许的操作 | 目标状态 | 触发事件 |
-|---------|----------|---------|---------|
+| --------- | ---------- | --------- | --------- |
 | pending | Submit() | submitted | AssessmentSubmittedEvent |
 | submitted | ApplyEvaluation() | interpreted | AssessmentInterpretedEvent |
 | submitted | MarkAsFailed() | failed | AssessmentFailedEvent |
@@ -1130,7 +1130,7 @@ type Assessment struct {
 **表名**：`assessments`
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+| ------ | ------ | ------ |
 | id | VARCHAR(36) PK | AssessmentID |
 | org_id | VARCHAR(36) | 组织 ID |
 | testee_id | VARCHAR(36) | 受试者 ID |
@@ -1163,7 +1163,7 @@ type Assessment struct {
 **表名**：`assessment_scores`
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+| ------ | ------ | ------ |
 | assessment_id | VARCHAR(36) PK | 测评 ID |
 | factor_code | VARCHAR(50) PK | 因子编码 |
 | raw_score | DECIMAL(10,2) | 原始分 |

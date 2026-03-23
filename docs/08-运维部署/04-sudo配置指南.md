@@ -84,7 +84,7 @@ deploy ALL=(root) NOPASSWD: FILE_CMDS, READ_CMDS, SHELL_CMDS, SYSTEM_CMDS
 ### 文件操作命令（FILE_CMDS）
 
 | 命令 | 用途 | 路径 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `mkdir` | 创建目录 | `/usr/bin/mkdir` |
 | `chmod` | 修改文件权限 | `/usr/bin/chmod` |
 | `chown` | 修改文件所有者 | `/usr/bin/chown` |
@@ -94,7 +94,7 @@ deploy ALL=(root) NOPASSWD: FILE_CMDS, READ_CMDS, SHELL_CMDS, SYSTEM_CMDS
 ### 文件读取/诊断命令（READ_CMDS）
 
 | 命令 | 用途 | 路径 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `grep` | 读取文件内容 | `/usr/bin/grep` |
 | `test` | 检查文件是否存在 | `/usr/bin/test` |
 | `ls` | 列出文件 | `/usr/bin/ls` |
@@ -102,13 +102,13 @@ deploy ALL=(root) NOPASSWD: FILE_CMDS, READ_CMDS, SHELL_CMDS, SYSTEM_CMDS
 ### Shell 命令（SHELL_CMDS）
 
 | 命令 | 用途 | 路径 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `bash` | 语法检查脚本 | `/bin/bash`, `/usr/bin/bash` |
 
 ### 系统服务命令（SYSTEM_CMDS）
 
 | 命令 | 用途 | 路径 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `systemctl` | 检查服务状态 | `/bin/systemctl` |
 
 **注意：** 不同 Linux 发行版的命令路径可能不同（如 `/bin/` vs `/usr/bin/`），请根据实际情况调整。可以使用 `which mkdir` 等命令查看实际路径。

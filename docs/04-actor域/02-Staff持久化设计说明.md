@@ -28,7 +28,7 @@ IAM BC (统一身份认证)           问卷&量表 BC (业务领域)
 ### 职责划分
 
 | 方面 | IAM.User/Account | Staff |
-|------|------------------|-------|
+| ------ | ------------------ | ------- |
 | **认证** | ✅ 负责登录、密码、Token | ❌ 不管认证 |
 | **通用权限** | ✅ 能否访问某个模块 | ❌ 不管粗粒度权限 |
 | **业务角色** | ❌ 不管具体业务 | ✅ qs:content_manager, qs:evaluator, qs:evaluation_plan_manager, qs:screening_plan_manager 等 |
@@ -72,7 +72,7 @@ func (s *ScaleService) UpdateScale(ctx context.Context, staffID StaffID, scale *
 **场景**：同一个 IAM.User 可能在不同机构有不同身份。
 
 | IAM.UserID | OrgID | StaffID | Roles |
-|------------|-------|---------|-------|
+| ------------ | ------- | --------- | ------- |
 | 1001 | 医院A | S-001 | qs:evaluator |
 | 1001 | 医院B | S-002 | qs:content_manager, qs:evaluator |
 | 1002 | 医院A | S-003 | qs:admin |
@@ -91,7 +91,7 @@ staff, err := staffRepo.FindByIAMUser(ctx, orgID, iamUserID)
 **方案对比**：
 
 | 方案 | 优点 | 缺点 |
-|------|------|------|
+| ------ | ------ | ------ |
 | 直接用 `IAMUserID` | 简单 | 无业务语义；IAM 用户删除后难以追溯 |
 | 用 `StaffID` | 业务语义清晰；历史记录稳定 | 需要维护 Staff 表 |
 
@@ -176,7 +176,7 @@ func (s *StaffAppService) GetCurrentStaff(ctx context.Context) (*StaffDTO, error
 ## 对比：Testee 必须完整持久化
 
 | 维度 | Staff | Testee |
-|------|-------|--------|
+| ------ | ------- | -------- |
 | **本质** | 技术账号的业务投影 | 独立的业务实体 |
 | **依赖 IAM** | 强依赖（必须绑定 IAM.User） | 弱依赖（可以不绑定） |
 | **核心数据** | 业务角色（roles） | 测评历史、标签、风险等级 |

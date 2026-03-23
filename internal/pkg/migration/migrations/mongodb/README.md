@@ -14,7 +14,7 @@ mongodb/
 ## 📋 集合说明
 
 | 集合名 | 描述 | 主要索引 |
-|--------|------|----------|
+| -------- | ------ | ---------- |
 | `answersheets` | 答卷集合 | domain_id, questionnaire, filler |
 | `questionnaires` | 问卷集合 | domain_id, code+version, status |
 | `scales` | 量表集合 | domain_id, code, questionnaire |

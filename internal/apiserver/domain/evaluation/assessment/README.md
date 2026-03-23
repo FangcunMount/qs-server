@@ -82,7 +82,7 @@ type Assessment struct {
 **领域事件**：
 
 | 事件 | 触发时机 | 用途 |
-|-----|---------|------|
+| ----- | --------- | ------ |
 | AssessmentSubmittedEvent | 答卷提交时 | 触发评估流程 |
 | AssessmentInterpretedEvent | 评估完成时 | 通知、预警、统计 |
 | AssessmentFailedEvent | 评估失败时 | 日志、监控 |
@@ -144,7 +144,7 @@ type ScoringStrategy interface {
 **支持的策略**：
 
 | 策略 | 说明 | 使用场景 |
-|-----|------|---------|
+| ----- | ------ | --------- |
 | sum | 求和 | 总分计算 |
 | average | 平均值 | 均分因子 |
 | weighted_sum | 加权求和 | 不同题目权重不同 |
@@ -175,7 +175,7 @@ type InterpretStrategy interface {
 **支持的策略**：
 
 | 策略 | 说明 | 使用场景 |
-|-----|------|---------|
+| ----- | ------ | --------- |
 | threshold | 阈值解读 | 得分超过阈值则为高风险 |
 | range | 区间解读 | 根据得分区间确定等级 |
 | composite | 组合解读 | 多因子组合判断 |

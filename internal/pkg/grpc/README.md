@@ -36,7 +36,7 @@ google.golang.org/grpc            # gRPC 框架
 ### 职责划分
 
 | 层级 | 位置 | 职责 |
-|------|------|------|
+| ------ | ------ | ------ |
 | **业务代码** | `internal/apiserver` | 服务实现、业务逻辑 |
 | **项目集成** | `internal/apiserver/grpc` | 适配配置、集成日志 |
 | **通用能力** | `component-base/pkg/grpc` | mTLS、拦截器 |
@@ -103,7 +103,7 @@ func (l *componentBaseLogger) LogError(msg string, fields map[string]interface{}
 ## 📊 对比
 
 | 方面 | 之前 | 现在 |
-|-----|------|------|
+| ----- | ------ | ------ |
 | **代码位置** | `internal/pkg/grpcserver` | `internal/apiserver/grpc` |
 | **mTLS 实现** | 自己实现 300+ 行 | 使用 component-base |
 | **拦截器** | 自己实现 150+ 行 | 使用 component-base |

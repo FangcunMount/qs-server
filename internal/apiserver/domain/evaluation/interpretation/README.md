@@ -255,7 +255,7 @@ result, err := interpreter.InterpretFactor(score, config, strategyType)
 ## 与其他领域服务的对比
 
 | 特性 | calculation | validation | interpretation |
-|------|------------|-----------|---------------|
+| ------ | ------------ | ----------- | --------------- |
 | **策略模式** | ✅ Sum/Avg/Count | ✅ Required/Range/Pattern | ✅ Range/Threshold/Composite |
 | **领域服务** | ✅ Scorer | ✅ Validator | ✅ Interpreter |
 | **默认提供者** | ❌ | ❌ | ✅ DefaultProvider |

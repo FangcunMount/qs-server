@@ -72,7 +72,7 @@
 **问题拆解**：
 
 | 问题 | 挑战 | Evaluation 的解决方案 |
-|------|------|---------------------|
+| ------ | ------ | --------------------- |
 | 如何计分？ | 不同量表有不同算法（求和、加权、平均...） | **策略模式** - 8种可扩展计算策略 |
 | 如何解读？ | 分数需要转换为有意义的结论 | **策略模式** - 阈值、组合等解读策略 |
 | 如何管理流程？ | 评估过程复杂（提交→计算→解读→报告） | **聚合模式** - Assessment 管理状态机 |
@@ -224,7 +224,7 @@
 **依赖规则**：
 
 | 被依赖子域 | 依赖内容 | 访问方式 | 防腐策略 |
-|----------|---------|---------|---------|
+| ---------- | --------- | --------- | --------- |
 | Survey | 问卷结构、答卷数据 | 只读查询 | 使用 `QuestionnaireRef` + `AnswerSheetRef` |
 | Scale | 量表定义、计算规则 | 只读查询 | 使用 `MedicalScaleRef` |
 | Actor | 受试者信息 | 只读查询 | 使用 `TesteeRef` (testee.ID) |
@@ -752,7 +752,7 @@ type InterpretReport struct {
 ### 3.2 分层职责说明
 
 | 层级 | 职责 | 关键类 |
-|-----|------|--------|
+| ----- | ------ | -------- |
 | **Interface** | 协议适配（REST/gRPC/Event） | AssessmentHandler、ReportHandler |
 | **Application** | 业务流程编排、事务边界管理 | EvaluationService、QueryService |
 | **Domain** | 核心业务逻辑、领域规则 | Assessment、Calculation、Interpretation、Report |
@@ -1219,7 +1219,7 @@ internal/apiserver/application/evaluation/
 ### 7.1 双存储策略
 
 | 聚合 | 存储 | 原因 | 表结构 |
-|-----|------|------|--------|
+| ----- | ------ | ------ | -------- |
 | **Assessment** | MySQL | 需要复杂查询（按状态、时间、来源等） | `assessments` 表 |
 | **Score** | MySQL | 需要趋势分析（多次测评对比） | `assessment_scores` 表 |
 | **Report** | MongoDB | 灵活的文档结构（维度、建议列表） | `interpret_reports` 集合 |
@@ -1399,7 +1399,7 @@ report.RegisterExporter(&ExcelExporter{})
 ### 9.2 缓存策略
 
 | 缓存对象 | 缓存时间 | 失效策略 |
-|---------|---------|---------|
+| --------- | --------- | --------- |
 | **MedicalScale** | 1 小时 | 量表更新时主动清除 |
 | **Questionnaire** | 30 分钟 | 版本变更时清除 |
 | **InterpretReport** | 永久（除非重新评估） | Assessment 重新评估时清除 |
@@ -1535,7 +1535,7 @@ func TestAssessment_Submit(t *testing.T) {
 ## 12. 后续文档预告
 
 | 文档编号 | 标题 | 核心内容 |
-|---------|------|---------|
+| --------- | ------ | --------- |
 | **11-06-02** | Assessment 聚合设计 | 聚合根、Score 实体、状态机、领域事件 |
 | **11-06-03** | Calculation 计算策略设计 | 7 种内置策略、注册器、扩展示例 |
 | **11-06-04** | Interpretation 解读策略设计 | 阈值策略、复合策略、高危识别 |
@@ -1558,7 +1558,7 @@ func TestAssessment_Submit(t *testing.T) {
 ## 附录：术语表
 
 | 术语 | 英文 | 说明 |
-|-----|------|------|
+| ----- | ------ | ------ |
 | 测评 | Assessment | 一次具体的测评行为（谁、用什么问卷、什么时候做的） |
 | 答卷 | AnswerSheet | 用户填写的答案内容 |
 | 量表 | MedicalScale | 专业评估工具（如 SDS、SAS） |

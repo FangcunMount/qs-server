@@ -821,7 +821,7 @@
 ## 七、代码索引
 
 | 模块 | 文件 | 核心类型/函数 |
-|------|------|--------------|
+| ------ | ------ | -------------- |
 | **聚合根** | `medical_scale.go` | `MedicalScale`, `NewMedicalScale`, `MedicalScaleOption` |
 | **实体** | `factor.go` | `Factor`, `NewFactor`, `FactorOption` |
 | **值对象** | `interpretation_rule.go` | `InterpretationRule`, `Matches()` |
