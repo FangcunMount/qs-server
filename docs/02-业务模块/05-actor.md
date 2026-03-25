@@ -1,48 +1,47 @@
 # actor
 
-本文介绍 `actor` 模块的职责边界、模型组织、输入输出和主链路。
+本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
+
+---
 
 ## 30 秒了解系统
 
-`actor` 是 `qs-apiserver` 里的主体模块，负责回答两个问题：
+### 概览
 
-- “谁是被测的人”。
-- “谁是系统里的后台工作人员”。
+`actor` 是 `qs-apiserver` 里的**主体（Actor）模块**，在问卷/测评限界上下文内回答两件事：**谁是被测的人**（`Testee`）、**谁是机构侧操作者**（`Staff`）。它把 **IAM** 的用户/儿童档案与业务侧 **`testeeID` / `staffID`** 对齐，并承载标签、重点关注、机构内角色等**本 BC 状态**；**不是**统一登录与全局权限中心。
 
-它当前主要由两条子线组成：
+代码主路径：`internal/apiserver/domain/actor`（`testee`、`staff`、引用值对象）、`internal/apiserver/application/actor`；持久化当前主要在 **MySQL**（见「核心存储」）。受试者读路径可经 **Redis** 装饰仓储（见 [assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)）。与 IAM 的交互经 [infra/iam](../../internal/apiserver/infra/iam)（`GuardianshipService`、`IdentityService` 等）。
 
-- `testee`：受试者档案、标签、重点关注状态、与 IAM 档案的绑定
-- `staff`：后台员工、机构内角色、激活状态、与 IAM 用户的绑定
+### 模块边界
 
-它不是统一身份系统，也不是权限中心。运行时里，`actor` 更像“问卷 BC 内的主体投影层”：把 IAM 的用户/儿童档案，转换成当前业务真正关心的 `Testee` 和 `Staff`。
+| | 内容 |
+| -- | ---- |
+| **负责（摘要）** | 受试者/员工档案与查询；与 IAM 的绑定与校验；`testeeID`/`staffID` 及 `TesteeRef`/`StaffRef`；后台 REST + C 端 gRPC（testee）；internal gRPC `TagTestee` |
+| **不负责（摘要）** | 登录与系统级授权（IAM）；问卷与答卷（[survey](./01-survey.md)）；测评与报告（[evaluation](./03-evaluation.md)）；机构聚合全生命周期；`collection-server` BFF 策略 |
+| **关联专题** | 三界与主体引用 [05-专题/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)；异步链路 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md)；读侧 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
 
-核心代码入口：
+#### 负责什么（细项）
 
-- [internal/apiserver/container/assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)
-- [internal/apiserver/domain/actor/testee/testee.go](../../internal/apiserver/domain/actor/testee/testee.go)
-- [internal/apiserver/domain/actor/staff/staff.go](../../internal/apiserver/domain/actor/staff/staff.go)
-- [internal/apiserver/interface/grpc/service/actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)
+维护文档时**以本清单为模块职责真值**之一，与代码不一致时应改代码或改文。
 
-## 模块边界
+- **受试者 `Testee`**：注册/幂等确保存在、基本信息与档案绑定、标签与重点关注、测评相关统计字段（见 [testee.go](../../internal/apiserver/domain/actor/testee/testee.go)）。
+- **员工 `Staff`**：机构内注册、与 IAM 用户绑定、角色分配、激活/停用（见 [staff.go](../../internal/apiserver/domain/actor/staff/staff.go)）。
+- **跨模块引用**：`TesteeRef` / `StaffRef`（[ref.go](../../internal/apiserver/domain/actor/ref.go)）；`FillerRef` 建模「谁填写」与「谁被测」分离（[filler_ref.go](../../internal/apiserver/domain/actor/filler_ref.go)，接入程度见「核心模式」）。
+- **对外协议**：后台 [REST](#核心契约restgrpcinternal-grpc-与领域事件)；C 端 [ActorService gRPC](#核心契约restgrpcinternal-grpc-与领域事件)；worker 等经 **internal** `TagTestee` 打标。
 
-### 负责什么
+#### 不负责什么（细项）
 
-- 管理受试者档案：姓名、性别、生日、来源、标签、重点关注状态
-- 管理受试者与 `profileID` 的绑定关系
-- 管理后台员工：机构内员工记录、业务角色、激活状态
-- 提供后台查询和前台 `testee` 查询能力
-- 通过 IAM 集成补充监护关系和用户详情
-- 为其他模块提供稳定的主体引用基础，如 `testeeID`、`staffID`
+- **JWT / 会话**：由中间件与 Handler 上下文提供 `user_id` / `org_id` 等，**不**作为 `actor` 聚合内持久化状态（见「核心模式」）。
+- **领域事件总线**：当前 **无** 与 `survey`/`plan` 同级的稳定 `actor.*` MQ 事件落地（代码中多为注释占位，见「核心契约」）。
 
-### 不负责什么
+### 契约入口
 
-- 登录、Token、密码、账户认证：在 IAM
-- 系统级权限中心和粗粒度授权：在 IAM / Auth 中间件
-- 问卷填写、答卷保存：在 `survey`
-- 测评创建、报告生成：在 `evaluation`
-- 机构实体本身的完整生命周期：当前模块只有 `orgID` 标量引用，没有独立 `organization` 聚合
+- **REST**：`/api/v1/testees`、`/api/v1/staff` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [actor.go](../../internal/apiserver/interface/restful/handler/actor.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
+- **C 端 / BFF gRPC**：`CreateTestee`、`GetTestee`、`ListTesteesByOrg` 等见 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)、[actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)。
+- **internal gRPC**：`TagTestee` 见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
+- **领域事件**：**N/A（当前无纳入 `configs/events.yaml` 的 actor 领域事件）**；与代码注释占位对照见「核心契约」。
 
-### 运行时位置
+### 运行时示意图
 
 ```mermaid
 flowchart LR
@@ -58,323 +57,391 @@ flowchart LR
         plan[plan]
     end
 
-    admin -->|REST| actor
-    collection -->|gRPC Testee API| actor
+    admin -->|REST testee+staff| actor
+    collection -->|gRPC ActorService| actor
     actor -->|Guardianship / Identity| iam
-    survey -->|testeeID / profileID 引用| actor
-    evaluation -->|testeeID / staff 视角查询| actor
-    plan -->|testeeID / orgID 引用| actor
-    worker -->|internal gRPC TagTestee| actor
+    survey -->|testeeID 引用| actor
+    evaluation -->|testeeID / staff 查询| actor
+    plan -->|testeeID| actor
+    worker -->|internal TagTestee| actor
 ```
 
-## 模型与服务组织
+#### 运行时图说明
 
-### 模型
+后台 REST 管理受试者与员工；小程序经 `collection-server` 只打 **testee** gRPC；`plan`/`survey`/`evaluation` 引用 `testeeID`；异步链路完成后 **worker** 可经 internal gRPC 调 `TagTestee` 更新标签与重点关注。
 
-`actor` 当前不是一个单聚合模块，而是“两个业务主体模型 + 两组跨模块引用值对象”：
+### 主要代码入口（索引）
 
-- `Testee`
-  - 聚合根：
-    [internal/apiserver/domain/actor/testee/testee.go](../../internal/apiserver/domain/actor/testee/testee.go)
-  - 表示“被测的人”在当前 BC 内的业务视图，是历史、趋势、标签和重点关注的主体
-- `Staff`
-  - 聚合根：
-    [internal/apiserver/domain/actor/staff/staff.go](../../internal/apiserver/domain/actor/staff/staff.go)
-  - 表示后台工作人员在当前 BC 内的轻量业务投影，核心是机构内角色
-- `TesteeRef / StaffRef`
-  - 跨聚合引用值对象：
-    [internal/apiserver/domain/actor/ref.go](../../internal/apiserver/domain/actor/ref.go)
-  - 用于其他聚合按 ID 引用主体，而不是直接持有实体
-- `FillerRef`
-  - 填写动作引用值对象：
-    [internal/apiserver/domain/actor/filler_ref.go](../../internal/apiserver/domain/actor/filler_ref.go)
-  - 用于区分“谁被测”和“谁在填”，当前仍属于已设计待全面接入状态
+| 关注点 | 路径 |
+| ------ | ---- |
+| 装配 | [internal/apiserver/container/assembler/actor.go](../../internal/apiserver/container/assembler/actor.go) |
+| 领域 | [internal/apiserver/domain/actor/](../../internal/apiserver/domain/actor/) |
+| 应用服务 | [internal/apiserver/application/actor/](../../internal/apiserver/application/actor/) |
+| 持久化 | [internal/apiserver/infra/mysql/actor/](../../internal/apiserver/infra/mysql/actor/) |
+| IAM 适配 | [internal/apiserver/infra/iam/](../../internal/apiserver/infra/iam/) |
+
+---
+
+## 模型与服务
+
+与 [survey](./01-survey.md)、[plan](./04-plan.md) 一致，本节用 **ER 图**表达租户与 IAM 外键语义，再用 **概念 flowchart** 与 **分层图**对齐 interface → application → domain。
+
+### 模型 ER 图
+
+描述 `actor` 子域内实体与 **租户边界**、**IAM 外部系统** 的关系（**非**与 MySQL 表字段 1:1）。本模块**不**实现 `Organization` 聚合；`org_id` 仅作多租户外键。`Testee` 与 `Staff` **无**彼此直接外键，只可能 **同属** `org_id`。
 
 ```mermaid
-flowchart TD
-    subgraph testeeLine[Testee]
-        testee[Testee]
-        testeeCore[ID / OrgID / ProfileID]
-        testeeInfo[Name / Gender / Birthday / Source]
-        testeeBiz[Tags / IsKeyFocus / AssessmentStats]
-    end
+erDiagram
+    ORG_SCOPE {
+        int64 org_id PK
+    }
 
-    subgraph staffLine[Staff]
-        staff[Staff]
-        staffCore[StaffID / OrgID / UserID]
-        staffBiz[Roles / IsActive]
-        staffCache[Name / Email / Phone]
-    end
+    TESTEE {
+        uint64 id PK
+        int64 org_id FK
+        uint64 profile_id "可选"
+    }
 
-    subgraph refs[Refs]
-        tref[TesteeRef]
-        sref[StaffRef]
-        fref[FillerRef]
-    end
+    STAFF {
+        uint64 id PK
+        int64 org_id FK
+        int64 iam_user_id
+    }
 
-    testee --> testeeCore
-    testee --> testeeInfo
-    testee --> testeeBiz
-    staff --> staffCore
-    staff --> staffBiz
-    staff --> staffCache
-    tref --> testee
-    sref --> staff
-    fref --> testee
+    IAM_CHILD {
+        uint64 id PK
+    }
+
+    IAM_USER {
+        int64 id PK
+    }
+
+    ORG_SCOPE ||--o{ TESTEE : org_id
+    ORG_SCOPE ||--o{ STAFF : org_id
+    TESTEE }o--o| IAM_CHILD : profile_id
+    STAFF }o--|| IAM_USER : user_id
 ```
 
-### 服务
+- **ORG_SCOPE**：仅表达「机构 ID」这一租户维度；权威机构模型不在 `actor`。
+- **IAM_***：落在 IAM 限界上下文；图中为 **逻辑外键**，非 `actor` 表内子表。
+- **Testee.profile_id**：可选，当前语义对应 IAM 儿童档案（见 [testee.go](../../internal/apiserver/domain/actor/testee/testee.go)）；**Staff.user_id** 绑定 IAM 用户（见 [staff.go](../../internal/apiserver/domain/actor/staff/staff.go)）。
 
-`actor` 的应用服务按主体和行为者拆成两组。
+### 模型关系（概念）
 
-`testee` 侧：
+`actor` **不是**单一聚合模块，而是 **两条子线**（`testee` / `staff`）加 **引用值对象**。
 
-- `RegistrationService`
-  - [internal/apiserver/application/actor/testee/registration_service.go](../../internal/apiserver/application/actor/testee/registration_service.go)
-  - 面向 C 端或外部系统，负责注册和幂等确保受试者存在
-- `ManagementService`
-  - [internal/apiserver/application/actor/testee/management_service.go](../../internal/apiserver/application/actor/testee/management_service.go)
-  - 面向后台员工，负责更新基本信息、绑定档案、标签和重点关注状态
-- `QueryService`
-  - [internal/apiserver/application/actor/testee/query_service.go](../../internal/apiserver/application/actor/testee/query_service.go)
-  - 负责基础查询
-- `BackendQueryService`
-  - [internal/apiserver/application/actor/testee/backend_query_service.go](../../internal/apiserver/application/actor/testee/backend_query_service.go)
-  - 在基础查询上补充 IAM 监护人信息
-- `TaggingService`
-  - [internal/apiserver/application/actor/testee/tagging_service.go](../../internal/apiserver/application/actor/testee/tagging_service.go)
-  - 供内部流程按测评结果更新标签和重点关注状态
+```mermaid
+flowchart TB
+    subgraph TE[Testee 线]
+        T[Testee]
+        TID[ID / OrgID / ProfileID]
+        TBIZ[Tags / IsKeyFocus / AssessmentStats]
+    end
 
-`staff` 侧：
+    subgraph ST[Staff 线]
+        S[Staff]
+        SID[StaffID / OrgID / UserID]
+        SROLE[Roles / IsActive]
+    end
 
-- `LifecycleService`
-  - [internal/apiserver/application/actor/staff/lifecycle_service.go](../../internal/apiserver/application/actor/staff/lifecycle_service.go)
-  - 负责注册员工、绑定 IAM 用户、同步联系方式
-- `AuthorizationService`
-  - [internal/apiserver/application/actor/staff/authorization_service.go](../../internal/apiserver/application/actor/staff/authorization_service.go)
-  - 负责角色分配和激活/停用
-- `QueryService`
-  - [internal/apiserver/application/actor/staff/query_service.go](../../internal/apiserver/application/actor/staff/query_service.go)
-  - 负责员工查询
+    subgraph REF[引用]
+        TR[TesteeRef]
+        SR[StaffRef]
+        FR[FillerRef]
+    end
 
-模块装配入口：
+    T --> TID
+    T --> TBIZ
+    S --> SID
+    S --> SROLE
+    TR -.-> T
+    SR -.-> S
+    FR -.->|填写人 vs 被测人| T
+```
 
-- [internal/apiserver/container/assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)
+- 与上图对照：`flowchart` 强调 **子域内职责块**；**租户与 IAM** 以 **ER 图**为准。
 
-这套组织的重点是：
+### 领域模型与领域服务
 
-- `testee` 解决“谁是长期被测主体”
-- `staff` 解决“谁在这个机构里以什么角色管理系统”
-- IAM 只提供身份和关系，不直接替代这两个业务模型
+#### 限界上下文
 
-## 接口输入与事件输出
+- **解决**：本 BC 内「被测主体」与「机构侧操作者」的持久化视图、与 IAM 的绑定、testee 侧标签/重点关注。
+- **不解决**：统一身份认证与全局 RBAC；问卷内容与测评流水线。
 
-### 输入
+#### 核心概念
 
-- 后台 REST
-  - `/api/v1/testees`
-  - `/api/v1/testees/by-profile-id`
-  - `/api/v1/testees/:id`
-  - `/api/v1/testees/:id/scale-analysis`
-  - `/api/v1/staff`
-  - 路由入口：
-    [internal/apiserver/routers.go](../../internal/apiserver/routers.go)
-    [internal/apiserver/interface/restful/handler/actor.go](../../internal/apiserver/interface/restful/handler/actor.go)
-- C 端 / BFF gRPC
-  - `CreateTestee`
-  - `GetTestee`
-  - `UpdateTestee`
-  - `TesteeExists`
-  - `ListTesteesByOrg`
-  - `ListTesteesByUser`
-  - 入口：
-    [internal/apiserver/interface/grpc/service/actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)
-    [internal/apiserver/interface/grpc/proto/actor/actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)
-- internal gRPC
-  - `TagTestee`
-  - 入口：
-    [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)
+| 概念 | 职责 | 与相邻概念的关系 |
+| ---- | ---- | ---------------- |
+| `Testee` | 聚合根：机构内受试者，可绑定 IAM `profileID`（儿童档案） | 被 `plan`、`AnswerSheet` 等引用 `testeeID` |
+| `Staff` | 聚合根：机构内员工，绑定 IAM `userID`，含角色与激活状态 | 后台操作与授权查询的主体之一 |
+| `TesteeRef` / `StaffRef` | 值对象：跨聚合引用 ID（及可选展示字段） | [ref.go](../../internal/apiserver/domain/actor/ref.go) |
+| `FillerRef` | 值对象：区分「谁填写」与「谁被测」 | 设计已完成，**全面接入 AnswerSheet 仍待演进**（见文件头注释） |
 
-### 输出
+#### 主要领域服务（按包）
 
-`actor` 当前没有像 `survey / evaluation / plan` 那样稳定落地的领域事件总线。领域层里能看到的事件发布点大多还停留在注释或预留状态，它们还不是稳定的主运行时能力。
+| 子域 | 类型 | 职责摘要 | 锚点 |
+| ---- | ---- | -------- | ---- |
+| testee | `Factory` / `Editor` / `Binder` / `Validator` / `Tagger` | 创建、编辑、档案绑定、校验、打标 | [testee/](../../internal/apiserver/domain/actor/testee/) |
+| staff | `Factory` / `Editor` / `Binder` / `Validator` / `RoleAllocator` / `Lifecycler` | 注册、绑定用户、角色、生命周期 | [staff/](../../internal/apiserver/domain/actor/staff/) |
 
-当前更真实的“输出”是：
+### 应用服务、领域服务与领域模型
 
-- 直接返回 `testee / staff` 查询结果
-- 通过 internal gRPC 完成 `TagTestee`
-- 通过 `TesteeRef / StaffRef` 供其他模块持有主体引用
+| 应用服务 | 行为者 / 用途 | 目录锚点 |
+| -------- | ------------- | -------- |
+| `TesteeRegistrationService` | C 端：注册、Ensure、与 IAM 儿童档案校验 | `application/actor/testee/registration_service.go` |
+| `TesteeManagementService` | 后台：信息维护、绑定、标签与重点关注 | `application/actor/testee/management_service.go` |
+| `TesteeQueryService` | 通用查询 | `application/actor/testee/query_service.go` |
+| `TesteeBackendQueryService` | 后台：本地 Testee + IAM 监护人等补充 | `application/actor/testee/backend_query_service.go` |
+| `TesteeTaggingService` | 系统：`TagTestee` 内部实现 | `application/actor/testee/tagging_service.go` |
+| `StaffLifecycleService` | 员工注册与绑定、同步联系方式 | `application/actor/staff/lifecycle_service.go` |
+| `StaffAuthorizationService` | 角色分配、激活/停用 | `application/actor/staff/authorization_service.go` |
+| `StaffQueryService` | 员工查询 | `application/actor/staff/query_service.go` |
 
-### 前台只暴露 testee 能力
+```mermaid
+flowchart TB
+    subgraph IF[interface]
+        REST[REST ActorHandler]
+        GRPC[ActorService gRPC]
+        INT[InternalService.TagTestee]
+    end
 
-`actor` 的 gRPC 面当前只覆盖 `testee`，不覆盖 `staff`。这意味着前台和 `collection-server` 复用的是“受试者能力”，而员工管理仍然主要停留在 `apiserver` 后台 REST。
+    subgraph APP[application · testee]
+        REG[RegistrationService]
+        MGT[ManagementService]
+        QRY[QueryService]
+        BQ[BackendQueryService]
+        TAG[TaggingService]
+    end
 
-## 核心业务链路
+    subgraph APS[application · staff]
+        LSV[StaffLifecycleService]
+        AUTHZ[StaffAuthorizationService]
+        SQ[StaffQueryService]
+    end
 
-### 受试者创建与绑定链路
+    subgraph DOM[domain]
+        T[Testee + domain services]
+        ST[Staff + domain services]
+    end
 
-`collection-server` 会把前台的 `testee` 创建、存在性判断和列表查询转成对 `ActorService` 的 gRPC 调用。`apiserver` 侧再进入 `RegistrationService`，校验 IAM `Child` 是否存在、检查是否重复绑定，并最终保存 `Testee`。
+    subgraph IAM[infra · iam]
+        GS[GuardianshipService]
+        ID[IdentityService]
+    end
+
+    REST --> REG
+    REST --> MGT
+    REST --> QRY
+    REST --> BQ
+    REST --> LSV
+    REST --> AUTHZ
+    REST --> SQ
+    GRPC --> REG
+    GRPC --> QRY
+    INT --> TAG
+
+    REG --> T
+    REG --> GS
+    MGT --> T
+    BQ --> QRY
+    BQ --> GS
+    BQ --> ID
+    TAG --> MGT
+    TAG --> T
+
+    LSV --> ST
+    LSV --> ID
+    AUTHZ --> ST
+    SQ --> ST
+```
+
+#### 分层图说明
+
+- **装配注入**：`ActorModule.Initialize` 接收 `*gorm.DB`、可选 `GuardianshipService`、`IdentityService`、可选 **Redis**（装饰 `TesteeRepo`），见 [assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)。
+- **评估跨域查询**：`ActorHandler` 可通过 `SetEvaluationServices` 延迟注入测评查询（用于如量表分析类 REST），见同文件。
+
+---
+
+## 核心设计
+
+### 核心契约：REST、gRPC、internal gRPC 与领域事件
+
+#### 输入
+
+- **后台 REST**：`/api/v1/testees`、`/api/v1/testees/by-profile-id`、`/api/v1/testees/{id}`、`/api/v1/testees/{id}/scale-analysis` 等；`/api/v1/staff` 等——以 [apiserver.yaml](../../api/rest/apiserver.yaml) 为准。
+- **C 端 gRPC（仅 testee）**：`CreateTestee`、`GetTestee`、`UpdateTestee`、`TesteeExists`、`ListTesteesByOrg`、`ListTesteesByUser` 等 — [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)。
+- **internal gRPC**：`TagTestee(TagTesteeRequest{ testee_id, risk_level, scale_code, mark_key_focus, high_risk_factors })` — [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)。
+
+**与 OpenAPI / 路由对读（Verify）**：
+
+以下为 **机器可读契约**（以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准）；路由挂载以 [routers.go](../../internal/apiserver/routers.go)（`registerActorProtectedRoutes` 等）为准，二者不一致时应以代码为准并同步 yaml。
+
+| HTTP | 路径（前缀 `/api/v1`） | 摘要 | 备注 |
+| ---- | ---------------------- | ---- | ---- |
+| `GET` | `/testees` | 受试者列表 | Actor |
+| `GET` | `/testees/by-profile-id` | 按 profile 查受试者 | Actor |
+| `GET` | `/testees/{id}` | 受试者详情 | Actor |
+| `PUT` | `/testees/{id}` | 更新受试者 | Actor |
+| `GET` | `/testees/{id}/scale-analysis` | 量表分析（聚合 evaluation 读模型） | 见「核心模式」§8 |
+| `GET` | `/testees/{id}/periodic-stats` | 周期统计 | yaml / Handler 有；**当前 `routers.go` 未见挂载**——以实际路由为准，未注册则接口不可用 |
+| `GET` | `/testees/{id}/plans` | 受试者参与计划列表 | OpenAPI 标签 Plan-Query，与 [plan](./04-plan.md) 查询衔接 |
+| `GET` | `/testees/{id}/plans/{plan_id}/tasks` | 计划下任务列表 | 同上 |
+| `GET` | `/testees/{id}/tasks` | 受试者任务列表 | 同上 |
+| `POST` | `/staff` | 创建员工 | Actor |
+| `GET` | `/staff` | 员工列表 | Actor |
+| `GET` | `/staff/{id}` | 员工详情 | Actor |
+| `DELETE` | `/staff/{id}` | 删除员工 | Actor |
+
+**gRPC（Verify）**：
+
+| 服务 | RPC | 用途 |
+| ---- | ----- | ---- |
+| `actor.ActorService` | `CreateTestee`、`GetTestee`、`UpdateTestee`、`TesteeExists`、`ListTesteesByOrg`、`ListTesteesByUser` | C 端 / BFF，见 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto) |
+| `internalapi.InternalService` | `TagTestee` | worker 等内部打标，见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto) |
+
+#### 输出（领域事件）
+
+**当前状态**：[`configs/events.yaml`](../../configs/events.yaml) **无** `actor.*` / `testee.*` / `staff.*` 条目；领域代码中 **打标、员工激活** 等处存在 **注释掉的 `events.Publish(...)` 占位**（如 [testee/counter.go](../../internal/apiserver/domain/actor/testee/counter.go)、[staff/lifecycler.go](../../internal/apiserver/domain/actor/staff/lifecycler.go)）。
+
+**Verify**：若未来引入 MQ 事件，须新增 yaml、领域事件类型与发布点，并更新本文。
+
+**当前真实输出形态**：REST/gRPC 直接返回实体或 DTO；`TagTestee` 返回操作结果；其他模块持有 **`testeeID` / `staffID` 引用**。
+
+### 核心链路：受试者注册、后台查询与打标
+
+#### C 端注册与幂等（gRPC）
 
 ```mermaid
 sequenceDiagram
-    participant Client as 小程序 / 前台
-    participant Collection as collection-server
-    participant ActorGRPC as actor.ActorService
-    participant Register as TesteeRegistrationService
+    participant Client as 小程序
+    participant Col as collection-server
+    participant GRPC as ActorService
+    participant Reg as RegistrationService
     participant IAM as GuardianshipService
     participant Repo as Testee Repo
 
-    Client->>Collection: Create / Exists / List testee
-    Collection->>ActorGRPC: gRPC ActorService
-    ActorGRPC->>Register: Register / Ensure / Find
-    Register->>IAM: ValidateChildExists(profileID)
-    Register->>Repo: FindByProfile(orgID, profileID)
-    Register->>Repo: Save Testee
-    ActorGRPC-->>Collection: TesteeResponse
+    Client->>Col: 创建/查询受试者
+    Col->>GRPC: gRPC
+    GRPC->>Reg: Register / Ensure
+    Reg->>IAM: ValidateChildExists 等
+    Reg->>Repo: FindByProfile / Save
+    GRPC-->>Col: 响应
 ```
 
-### 后台查看受试者与监护人链路
+BFF 侧编排示例：[collection-server/application/testee/service.go](../../internal/collection-server/application/testee/service.go)。
 
-后台通过 REST 查询受试者详情时，会先走 `QueryService` 取本地 `Testee`，再由 `BackendQueryService` 按 `profileID` 到 IAM 查询监护关系和监护人资料，拼成后台展示所需的完整结果。
+#### 后台受试者详情（含监护人）
 
-### 测评结果驱动打标链路
+`TesteeBackendQueryService` 在 [backend_query_service.go](../../internal/apiserver/application/actor/testee/backend_query_service.go) 中组合 **本地 Testee** 与 IAM **监护人/身份** 信息；IAM 失败时策略见「边界与注意事项」。
 
-`worker` 在评估流程后，通过 internal gRPC 调 `TagTestee`，`TaggingService` 再根据风险等级更新 `risk_high / risk_severe / risk_medium` 等标签，并按条件把受试者标记为重点关注对象。
+#### 测评后打标（internal）
 
-## 关键设计点
+`InternalService.TagTestee` → `TesteeTaggingService`：按风险等级等更新标签、可选重点关注（实现见 [tagging_service.go](../../internal/apiserver/application/actor/testee/tagging_service.go)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)）。
 
-### 1. Testee 是业务主体，不是 IAM.Child 的别名
+### 核心横切：actor、IAM、collection-server 与业务模块
 
-`Testee` 的设计核心不是“把 IAM 儿童档案搬过来”，而是为问卷 BC 提供一个稳定的“被测人”主体。
+| 侧 | 职责 | 与 `actor` 的衔接 |
+| ---- | ---- | ---------------- |
+| **IAM** | 用户/儿童档案、监护关系 | 注册时校验档案存在；后台查询补监护人 |
+| **collection-server** | BFF、鉴权 | 仅转发 **testee** gRPC，不暴露 `staff` gRPC |
+| **survey / plan / evaluation** | 业务事实与编排 | 引用 `testeeID`（及 staff 查询场景） |
 
-关键代码：
+**结论**：`actor` 是 **BC 内主体投影**；**认证授权**仍以 IAM + 中间件为准。
 
-- [internal/apiserver/domain/actor/testee/testee.go](../../internal/apiserver/domain/actor/testee/testee.go)
-- [internal/apiserver/domain/actor/testee/binder.go](../../internal/apiserver/domain/actor/testee/binder.go)
+### 核心集成：actor 与 IAM（分场景）
 
-这层抽象的价值在于：
+仓库内 IAM 通过 **适配层** [infra/iam](../../internal/apiserver/infra/iam) 封装 IAM SDK（`GuardianshipService`、`IdentityService` 等），**不是**在领域模型里直接依赖 gRPC 协议细节。
 
-- `Testee` 可以承载标签、重点关注状态和测评统计快照
-- 它可以绑定 IAM 档案，也可以作为临时受试者独立存在
-- 其他模块聚合时引用的是 `testeeID`，而不是直接依赖 IAM 主键
+| 场景 | actor 入口 | IAM 侧做什么 | 典型行为（与代码一致） |
+| ---- | ---------- | ------------- | ------------------------ |
+| **受试者注册 / 绑定档案** | [RegistrationService](../../internal/apiserver/application/actor/testee/registration_service.go) | `GuardianshipService.ValidateChildExists` | 当存在 `profileID`（儿童档案）且监护服务 **已启用** 时，先校验 IAM 中儿童存在；未启用则跳过该校验路径 |
+| **后台受试者详情（监护人等）** | [BackendQueryService](../../internal/apiserver/application/actor/testee/backend_query_service.go) | `GuardianshipService.ListGuardians` + `IdentityService` 补全用户资料 | 本地 `Testee` 为主；有 `profileID` 且服务启用时拉监护人与展示信息；IAM 不可用或关闭时仍可返回本地数据，监护人字段可能为空（见「边界与注意事项」） |
+| **员工注册与绑定** | [StaffLifecycleService](../../internal/apiserver/application/actor/staff/lifecycle_service.go) | `IdentityService.SearchUsers` / `CreateUser` 等 | 在 IAM 侧检索或创建用户，再与 `Staff` 绑定；服务未启用时走代码内分支（见该文件） |
 
-这也是为什么当前代码里 `profileID` 是可选引用，而不是 `Testee` 的唯一身份本体。
+**Staff ↔ IAM 方法锚点（补充）**（均在同文件 [lifecycle_service.go](../../internal/apiserver/application/actor/staff/lifecycle_service.go) 的 `resolveOrCreateUser` 内）：
 
-### 2. Staff 是 IAM.User 在本 BC 的轻量业务投影
+- **`IdentityService.SearchUsers`**：`SearchUsers(ctx, &identityv1.SearchUsersRequest{ Phones: []string{dto.Phone} })`，用于注册员工时按**手机号**在 IAM 查是否已有用户（约 186–199 行）。
+- **`IdentityService.CreateUser`**：`CreateUser(ctx, dto.Name, dto.Email, dto.Phone)`，搜索未命中时**创建** IAM 用户并返回 `userID`（约 201–203 行）。
 
-`Staff` 不是完整用户实体，而是“某个 IAM 用户在某个机构内，以什么业务角色参与 QS 系统”的投影。
+**装配与注入**：`ActorModule.Initialize` 将 `GuardianshipService`、`IdentityService` 从容器注入（参数顺序见 [assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)）；未注入或 `IsEnabled()==false` 时，行为以各应用服务内的 **nil / 降级分支** 为准。
 
-关键代码：
+**Verify**：改 IAM 契约或 SDK 时，须同步 `infra/iam`、上述应用服务与本文表。
 
-- [internal/apiserver/domain/actor/staff/staff.go](../../internal/apiserver/domain/actor/staff/staff.go)
-- [internal/apiserver/domain/actor/staff/types.go](../../internal/apiserver/domain/actor/staff/types.go)
+### 核心模式与实现要点
 
-这样设计的价值在于：
+#### 1. Testee 是业务主体，不是 IAM.Child 的别名
 
-- 同一个 IAM 用户可以在不同 `orgID` 下拥有不同 `Staff` 记录和角色
-- 业务角色如 `qs:content_manager`、`qs:evaluation_plan_manager` 可以留在本 BC 内部建模
-- 常用字段可以本地缓存，避免每次都回 IAM 拉取
+本地持久化 `Testee`，可绑定 `profileID`；标签、重点关注、统计字段属于 **本模块**。其他聚合引用 **`testeeID`**，降低对 IAM 主键的直接耦合。
 
-所以 `Staff` 要持久化，但它持久化的是业务角色和机构内状态，不是认证信息。
+#### 2. Staff 是 IAM.User 在机构内的业务投影
 
-### 3. Testee 的创建入口统一，但不同业务场景接入程度不同
+同一 IAM 用户可在不同 `orgID` 下对应不同 `Staff` 与角色（见 [staff/types.go](../../internal/apiserver/domain/actor/staff/types.go)）；认证信息不在此重复造轮子。
 
-`actor` 提供统一的 `Testee` 注册/确保存在入口，不同业务场景只是以不同方式接入这套入口。
+#### 3. gRPC 只暴露 testee，是有意收敛
 
-关键代码：
+`ActorService` **无** staff 方法；员工管理走 **后台 REST**。避免把 BFF 扩成「全用户中心」。
 
-- [internal/apiserver/application/actor/testee/registration_service.go](../../internal/apiserver/application/actor/testee/registration_service.go)
-- [internal/apiserver/interface/grpc/service/actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)
-- [internal/collection-server/application/testee/service.go](../../internal/collection-server/application/testee/service.go)
+#### 4. 请求用户身份在接口层，不进 actor 聚合
 
-运行时可以分成三类接入路径：
+JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/middleware/iam_middleware.go)、[handler/base](../../internal/apiserver/interface/restful/handler/base.go) 等解析；领域对象不持久化「当前会话」。
 
-- 前台 / 一次性测评路径
-  - `collection-server` 通过 gRPC 直接调用 `ActorService.CreateTestee`
-  - `RegistrationService` 负责注册和按 `profileID` 幂等确保存在
-- 测评计划路径
-  - `plan` 当前直接引用 `testeeID`
-  - 也就是说，计划入组前默认假设 `Testee` 已存在，而不是由 `plan` 自动代建
-- 筛查路径
-  - 业务概念仍然存在，但当前仓库里没有稳定落地的 `screening` 运行时模块
-  - 因而“筛查会自动创建 Testee”还不是系统今天的运行时行为
+#### 5. Testee 创建入口统一，接入场景不同
 
-这让“业务上有哪些场景”和“系统今天自动做了什么”保持了清晰分界。
+- **前台路径**：`collection-server` → gRPC → `RegistrationService`。
+- **计划路径**：[plan](./04-plan.md) 入组引用已有 `testeeID`，**不**由 plan 代建 Testee（需前置存在）。
+- **筛查等**：以代码与产品为准；勿假设未在仓库落地的模块会自动建 Testee。
 
-### 4. actor 的核心分界是“谁被测”和“谁在填/谁在管理”
+#### 6. TesteeRef / StaffRef / FillerRef
 
-`Testee`、`Filler`、`Staff` 不能混成一个“用户”概念。
+引用值对象减轻跨聚合依赖；`FillerRef` 表达「填写人 ≠ 被测人」，**主链路全面接入仍以代码为准**。
 
-关键代码：
+#### 7. IAM 集成：绑定 + 补充
 
-- [internal/apiserver/domain/actor/filler_ref.go](../../internal/apiserver/domain/actor/filler_ref.go)
-- [internal/apiserver/domain/actor/ref.go](../../internal/apiserver/domain/actor/ref.go)
+详见上文 **「核心集成：actor 与 IAM（分场景）」**；适配类见 [guardianship.go](../../internal/apiserver/infra/iam/guardianship.go)、[identity.go](../../internal/apiserver/infra/iam/identity.go)。原则：**本地 `testeeID`/`staffID` 仍为业务主键**，IAM 用于档案存在性、监护关系与用户资料补全。
 
-这层分界解决了三个不同问题：
+#### 8. REST 上的「量表分析」类接口
 
-- `Testee`：统计和历史归档按谁聚合
-- `FillerRef`：这份答卷是谁操作填写
-- `Staff`：谁在后台配置和管理系统
+如 `GetScaleAnalysis` 在 Handler 层聚合 **evaluation** 读数据，语义是「以 testee 为维度的查询」，**不是** actor 域原生生成的核心业务对象（见 [actor.go](../../internal/apiserver/interface/restful/handler/actor.go) 与装配注入）。
 
-当前 `FillerRef` 还没有完全接入主链路，但它表达的建模方向是对的，后续文档也不应再把“填写人”和“被测人”混写。
+### 核心存储：MySQL 与可选 Redis
 
-### 5. testee 与 IAM 的关系是“绑定 + 补充”，不是“完全外包”
+| 数据 | 存储 | 实现锚点 |
+| ---- | ---- | -------- |
+| `Testee`、`Staff` | MySQL | [infra/mysql/actor](../../internal/apiserver/infra/mysql/actor) |
+| Testee 读路径缓存（可选） | Redis 装饰仓储 | [testee_cache.go](../../internal/apiserver/infra/cache/testee_cache.go)（`NewCachedTesteeRepository`，装配见 [assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)） |
 
-当前 `testee` 侧和 IAM 的集成主要出现在两个点：
+### 核心代码锚点索引
 
-- 注册时，用 `GuardianshipService.ValidateChildExists` 验证档案存在
-- 后台查询时，用 `GuardianshipService` 和 `IdentityService` 补齐监护人信息
+| 关注点 | 路径 |
+| ------ | ---- |
+| 装配 | [internal/apiserver/container/assembler/actor.go](../../internal/apiserver/container/assembler/actor.go) |
+| 应用服务 | [internal/apiserver/application/actor/](../../internal/apiserver/application/actor/) |
+| 领域 | [internal/apiserver/domain/actor/](../../internal/apiserver/domain/actor/) |
+| REST | [internal/apiserver/interface/restful/handler/actor.go](../../internal/apiserver/interface/restful/handler/actor.go) |
+| gRPC | [internal/apiserver/interface/grpc/service/actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go) |
+| internal gRPC | [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)（`TagTestee`） |
+| MySQL | [internal/apiserver/infra/mysql/actor/](../../internal/apiserver/infra/mysql/actor/) |
 
-关键代码：
-
-- [internal/apiserver/application/actor/testee/registration_service.go](../../internal/apiserver/application/actor/testee/registration_service.go)
-- [internal/apiserver/application/actor/testee/backend_query_service.go](../../internal/apiserver/application/actor/testee/backend_query_service.go)
-- [internal/apiserver/infra/iam/guardianship.go](../../internal/apiserver/infra/iam/guardianship.go)
-- [internal/apiserver/infra/iam/identity.go](../../internal/apiserver/infra/iam/identity.go)
-
-这种设计比“完全依赖 IAM 动态查询”更稳，因为本地仍保留业务主键和业务状态；但它也避免了重复造轮子，把关系验证和用户详情查询交给 IAM。
-
-### 6. 当前请求用户停留在中间件和接口层，不进入 actor 领域模型
-
-请求用户身份停留在中间件和接口层，通过 JWT claims 注入运行时上下文。进入业务模型后，再按需要映射成 `Testee`、`Staff` 或 `FillerRef`。
-
-关键代码：
-
-- [internal/apiserver/interface/restful/middleware/iam_middleware.go](../../internal/apiserver/interface/restful/middleware/iam_middleware.go)
-- [internal/apiserver/interface/restful/handler/base.go](../../internal/apiserver/interface/restful/handler/base.go)
-
-当前代码的真实做法是：
-
-- 中间件从 JWT claims 解析 `user_id / org_id / roles`
-- Handler 通过 `GetUserID / GetOrgID / GetRoles` 读取这些运行时身份信息
-- 进入业务模型后，再按需要映射成 `Testee`、`Staff` 或 `FillerRef`
-
-这意味着：
-
-- “当前是谁在请求”是运行时上下文，不是 `actor` 聚合的一部分
-- `actor` 领域对象关心的是业务主体引用，而不是 Token claims
-- `Principal`、JWT claims 和当前会话态不属于 `actor` 自己维护的数据模型
-
-### 7. actor 的前台能力通过 gRPC 只暴露 testee，这是一种有意收敛
-
-当前 `ActorService` 对外提供的 gRPC 全是 `testee` 相关能力，`collection-server` 也只消费这部分。
-
-关键代码：
-
-- [internal/apiserver/interface/grpc/service/actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)
-- [internal/collection-server/application/testee/service.go](../../internal/collection-server/application/testee/service.go)
-
-这说明当前运行时判断是：
-
-- 前台需要直接操作的是“我的孩子/我的受试者”
-- `staff` 仍然属于后台管理域，不适合暴露给 collection-server
-
-这条边界很重要，后面写接口文档时也不应该把 `actor` 误写成一个对前后台完全对称开放的用户中心。
+---
 
 ## 边界与注意事项
 
-- 当前模块没有独立 `organization` 聚合，`orgID` 只是多租户边界和查询条件。
-- `actor` 当前没有稳定落地的 MQ 事件输出；代码里能看到的事件更多是预留注释，还不是既成事实。
-- `Testee.AssessmentStats` 属于读模型优化快照，不是每次写操作都同步计算的实时领域状态。
-- `BackendQueryService` 拉取监护人信息时，若 IAM 不可用或返回不完整，主查询仍会成功，只是缺少监护人补充信息。
-- `GetScaleAnalysis` 目前放在 `ActorHandler` 下，但本质上它已经跨进了 `evaluation` 数据聚合视角；更适合理解为“以 testee 为主体的聚合查询”，而不是 `actor` 自己生成的原生领域数据。
+### 常见误解
+
+- **`actor` ≠ IAM**：登录、全局权限仍以 IAM 为准；本模块是 **业务主体与机构内角色**。
+- **无独立 organization 聚合**：`orgID` 为租户/查询边界。
+- **`Testee.AssessmentStats` 等**：多为读模型或快照字段，**不是**每次业务写路径都强一致重算（以代码为准）。
+- **领域事件**：当前 **无** 稳定 MQ 事件表；勿把注释占位当运行时行为。
+- **BackendQueryService**：IAM 不可用或数据不全时，可能仅返回本地 Testee，监护人字段为空。
+- **GetScaleAnalysis**：跨 [evaluation](./03-evaluation.md) 聚合查询，勿归类为纯 actor 领域数据。
+
+### 维护时核对
+
+- 变更 REST：同步 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 与 Handler。
+- 变更 C 端 gRPC：同步 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto) 与 `collection-server`。
+- 变更 `TagTestee`：同步 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go) 与 worker 调用方。
+- 若引入 actor 领域事件：新增 [configs/events.yaml](../../configs/events.yaml)、领域事件定义、发布点，并废除本文「N/A」表述。
+
+---
+
+*写作约定见 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)。三界与主体引用见 [05-专题分析/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)。*

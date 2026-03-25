@@ -289,7 +289,7 @@ sequenceDiagram
 | `assessment.interpreted` | `assessment.lifecycle` | `assessment_interpreted_handler` | 引擎 | 多消费者 |
 | `assessment.failed` | `assessment.lifecycle` | `assessment_failed_handler` | 失败路径 | logging 等 |
 | `report.generated` | `assessment.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
-| `report.exported` | `assessment.lifecycle` | `report_exported_handler` | 导出 | 以 yaml 为准 |
+| `report.exported` | `assessment.lifecycle` | `report_exported_handler` | 导出 | `qs-worker` |
 
 主异步闭环以 **`report.generated`** 为报告就绪信号；`report.exported` 存在但非本文主链路重点。
 
@@ -378,4 +378,4 @@ sequenceDiagram
 
 ---
 
-*结构约定见 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)。*
+*写作约定见 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)。*

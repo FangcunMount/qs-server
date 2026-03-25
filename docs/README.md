@@ -95,7 +95,7 @@ flowchart LR
 
 - [00-总览](./00-总览/)：系统地图、代码组织、主链路、本地开发与配置约定
 - [01-运行时](./01-运行时/)：按进程说明 `apiserver`、`collection-server`、`worker`
-- [02-业务模块](./02-业务模块/)：按模块说明 `survey`、`scale`、`evaluation`、`actor`、`plan`、`statistics`（[`03-evaluation.md`](./02-业务模块/03-evaluation.md) 已按 [CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md) 业务模块结构试点）
+- [02-业务模块](./02-业务模块/)：按模块说明 `survey`、`scale`、`evaluation`、`actor`、`plan`、`statistics`；六篇均已按 [CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md) 的**业务模块推荐结构**对齐（文首约定、`30 秒` 分层、`模型与服务`、`核心设计`、`边界`、锚点索引）
 - [03-基础设施](./03-基础设施/)：事件、缓存、存储、IAM、配置
 - [04-接口与运维](./04-接口与运维/)：REST、gRPC、部署、调度
 - [05-专题分析](./05-专题分析/)：从业务模型、异步链路和保护层三个角度解释系统核心设计
