@@ -1,231 +1,165 @@
 # collection-server
 
-本文档说明 `collection-server` 作为前台 BFF 是如何启动、装配和承接收集链路的。
+**组件定位**：**前台 BFF** 进程；**不**直连 MySQL/Mongo 主库；对外 **REST**，对内通过 **gRPC** 调用 **apiserver**；本地 **Redis** + **IAM** 支撑排队、会话类辅助与身份。  
+限流与排队机制见 [03-缓存与限流](../03-基础设施/03-缓存与限流.md)；REST 契约见 [04-REST](../04-接口与运维/01-REST契约.md)。
 
-## 30 秒了解系统
+---
 
-`collection-server` 不是第二套主业务服务，而是面向小程序和收集端的 BFF。它负责：
+## 1. 组件定位（在整体中的位置）
 
-- 对前台暴露更轻量的 REST API
-- 做 JWT 身份解析、监护关系校验、排队和限流
-- 通过 gRPC 调用 `apiserver`
-- 用 Redis 保存提交排队状态和部分运行时辅助数据
+| 维度 | 说明 |
+| ---- | ---- |
+| **角色** | 小程序/收集端入口：**鉴权、限流、排队、监护** 等前置能力 |
+| **上游** | 客户端 **REST** |
+| **下游（兄弟组件）** | **apiserver gRPC**（强依赖） |
+| **下游（数据）** | **Redis**（排队等）；**IAM SDK** |
 
-代码入口：
+---
 
-- [cmd/collection-server/main.go](../../cmd/collection-server/main.go)
-- [internal/collection-server/app.go](../../internal/collection-server/app.go)
-- [internal/collection-server/server.go](../../internal/collection-server/server.go)
+## 2. 内部运行示意图
 
-## 核心架构
+```mermaid
+flowchart LR
+    subgraph Col[collection-server]
+        MW[全局中间件<br/>并发 / JWT / 限流]
+        H[REST Handlers]
+        SVC[Application 服务]
+        Q[SubmitQueue]
+    end
+
+    R[(Redis)]
+    API[apiserver gRPC]
+
+    MW --> H --> SVC
+    SVC --> Q
+    SVC --> API
+    Q --> R
+    Q --> API
+```
+
+**关键点**：**SubmitQueue** 是 **进程内有界队列**（削峰），与 **MQ 跨进程异步** 不同。
+
+---
+
+## 3. 典型请求时序（REST → gRPC）
+
+```mermaid
+sequenceDiagram
+    participant U as 客户端
+    participant G as Gin 中间件链
+    participant H as Handler / Service
+    participant A as apiserver gRPC
+
+    U->>G: HTTP /api/v1/...
+    Note over G: 并发限制 → JWT → 路由限流
+    G->>H: 进入业务
+    alt 需转调主服务
+        H->>A: gRPC
+        A-->>H: 响应
+    end
+    H-->>U: JSON 响应
+```
+
+**提交答卷**入口统一走 **`SubmitQueued`**（见 [answersheet_handler.go](../../internal/collection-server/interface/restful/handler/answersheet_handler.go)），内部再根据 **是否启用队列** 分支，见下节。
+
+---
+
+## 4. 答卷提交：直调 gRPC vs 经 SubmitQueue
+
+**配置**：`submit_queue.enabled` 等为 `true` 且参数合法时，[NewSubmissionService](../../internal/collection-server/application/answersheet/submission_service.go) 会创建 **`SubmitQueue`**，并把 **`submitSync`**（内部即 **AnswerSheet gRPC → apiserver**）作为队列 worker 的 **`submit` 回调**；**未启用队列**时 `queue == nil`，`SubmitQueued` **直接调用 `submitSync`**，与「同步直调」等价。
+
+### 4.1 分支示意（flowchart）
 
 ```mermaid
 flowchart TD
-    main[cmd/collection-server/main]
-    app[collection.NewApp]
-    run[Run cfg]
-    server[createCollectionServer / PrepareRun]
+    H[Handler POST /answersheets]
+    SQ{submit_queue<br/>已创建?}
 
-    subgraph infra[Infra Initialization]
-        redis[Redis]
-        grpcmgr[gRPC Client Manager]
-        iam[IAM Module]
-    end
-
-    subgraph container[Collection Container]
-        submission[AnswerSheet SubmissionService]
-        questionnaire[Questionnaire QueryService]
-        evaluation[Evaluation QueryService]
-        scale[Scale QueryService]
-        testee[Testee Service]
-        handlers[REST Handlers]
-    end
-
-    subgraph serving[Serving Layer]
-        http[GenericAPIServer + Gin Router]
-        auth[IAM JWT Middleware]
-        limit[Concurrency / Rate Limit]
-    end
-
-    subgraph downstream[Downstream gRPC]
-        answerSheetClient[AnswerSheetClient]
-        questionnaireClient[QuestionnaireClient]
-        evaluationClient[EvaluationClient]
-        actorClient[ActorClient]
-        scaleClient[ScaleClient]
-    end
-
-    main --> app --> run --> server
-    server --> redis
-    server --> grpcmgr
-    server --> iam
-    server --> container
-    container --> submission
-    container --> questionnaire
-    container --> evaluation
-    container --> scale
-    container --> testee
-    container --> handlers
-    server --> http
-    http --> auth
-    http --> limit
-    grpcmgr --> answerSheetClient
-    grpcmgr --> questionnaireClient
-    grpcmgr --> evaluationClient
-    grpcmgr --> actorClient
-    grpcmgr --> scaleClient
+    H --> SQ
+    SQ -->|否| SYNC[submitSync<br/>直调 gRPC]
+    SQ -->|是| ENQ[SubmitQueue.Enqueue]
+    ENQ --> W[队列 worker goroutine]
+    W --> SYNC
+    SYNC --> API[apiserver AnswerSheet gRPC]
 ```
 
-## 核心设计原则
+### 4.2 时序对比（sequenceDiagram）
 
-- BFF 而不是主服务：`collection-server` 只做前台适配，不独立持有主业务模块。
-- 前台链路优先短路径：查询直接走 gRPC，下游重任务通过提交排队和后续事件链路消化。
-- 接口与权限前置：JWT、本地 JWKS 验签、监护关系校验、限流都尽量在入口层完成。
-- 尽量轻状态：本进程主要持有 Redis、IAM 和 gRPC 客户端，不维护 MySQL / Mongo 主业务连接。
+```mermaid
+sequenceDiagram
+    participant U as 客户端
+    participant H as Handler
+    participant S as SubmissionService
+    participant Q as SubmitQueue
+    participant A as apiserver gRPC
 
-## 职责
+    alt 未启用队列 queue == nil
+        U->>H: POST + request_id
+        H->>S: SubmitQueued
+        Note over S: 内部直接 submitSync
+        S->>A: gRPC SubmitAnswerSheet…
+        A-->>S: 响应
+        S-->>H: 结果
+        H-->>U: 200 等
+    else 启用队列
+        U->>H: POST + request_id
+        H->>S: SubmitQueued
+        S->>Q: Enqueue（有界 chan + 短等待）
+        alt 在 waitTimeout 内完成
+            Q->>S: worker 调 submitSync
+            S->>A: gRPC
+            A-->>S: 响应
+            Q-->>S: respCh
+            S-->>H: 200 + 结果
+        else 超时或已入队处理中
+            H-->>U: 202 / 轮询 submit-status 等
+        end
+    end
+```
 
-`collection-server` 的运行时职责包括：
+**关键点**：队列路径下 **真正调 apiserver 的仍是 `submitSync`**，只是可能发生在 **队列 worker** 中；**满队** 返回 **429**、**短等待未结束** 可能 **202 + `request_id` 轮询**，语义以 [submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) 为准。
 
-- 读取配置并初始化日志
-- 应用 `GOMEMLIMIT` / `GOGC` 运行时调优
-- 初始化 Redis
-- 建立到 `apiserver` 的 gRPC 客户端连接
-- 初始化 IAM 模块和容器
-- 注册前台 REST 路由
-- 安装全局并发限制、路由级限流和身份中间件
+---
 
-关键代码：
+## 5. 核心功能与关键点
 
-- [internal/collection-server/app.go](../../internal/collection-server/app.go)
-- [internal/collection-server/server.go](../../internal/collection-server/server.go)
-- [internal/collection-server/container/container.go](../../internal/collection-server/container/container.go)
+| 功能 | 关键点 | 代码锚点 |
+| ---- | ------ | -------- |
+| **启动** | 可选 **GOMEMLIMIT/GOGC**、**:6060 pprof** | [app.go](../../internal/collection-server/app.go)、[server.go](../../internal/collection-server/server.go) |
+| **gRPC 客户端** | 五类 client 注入容器 | [grpc_client_registry.go](../../internal/collection-server/grpc_client_registry.go)、[manager.go](../../internal/collection-server/infra/grpcclient/manager.go) |
+| **路由** | 公开路径 vs `/api/v1` 受保护 | [routers.go](../../internal/collection-server/routers.go) |
+| **提交排队** | 200/202/429、有界 | [submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) |
+| **监护与提交** | JWT 之外的业务校验 | [submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go) |
+| **身份中间件** | 与 apiserver **不是**同一套 UserIdentity 实现 | [iam_middleware.go](../../internal/collection-server/interface/restful/middleware/iam_middleware.go) |
 
-## 启动流程
+---
 
-### 1. 入口与运行时调优
+## 6. 与其它组件的交互
 
-入口层除了创建 `App` 之外，还会做两件额外的运行时工作：
+| 对方 | 方式 | 说明 |
+| ---- | ---- | ---- |
+| **apiserver** | gRPC | 主读写与领域逻辑 |
+| **Client** | REST | 唯一对外业务面 |
+| **IAM** | SDK | 验签、监护查询等 |
+| **Redis** | TCP | 排队与辅助状态 |
 
-- 根据配置设置 `GOMEMLIMIT` / `GOGC`
-- 启动 `pprof` 监听 `:6060`
+---
 
-代码入口：
+## 7. 关键代码入口（索引）
 
-- [internal/collection-server/app.go](../../internal/collection-server/app.go)
+| 关注点 | 路径 |
+| ------ | ---- |
+| 进程入口 | [cmd/collection-server/main.go](../../cmd/collection-server/main.go) |
+| 配置 | [options/options.go](../../internal/collection-server/options/options.go) |
 
-### 2. 基础设施准备
+---
 
-`PrepareRun` 的准备顺序是：
+## 8. 边界与注意事项
 
-1. 初始化 Redis
-2. 创建 gRPC 客户端管理器
-3. 创建容器
-4. 初始化 IAM 模块
-5. 把各类 gRPC client 注入容器
-6. 初始化应用服务和 REST handler
+- **无** MySQL/Mongo 主库连接；持久化均在 **apiserver**。  
+- **匿名只读**仅路由白名单（如部分 scales GET）。  
+- **gRPC 不可用**时 REST 可能仍“活着”但业务失败，需看健康检查与下游状态。
 
-代码入口：
+---
 
-- [internal/collection-server/database.go](../../internal/collection-server/database.go)
-- [internal/collection-server/grpc_client_registry.go](../../internal/collection-server/grpc_client_registry.go)
-- [internal/collection-server/container/container.go](../../internal/collection-server/container/container.go)
-- [internal/collection-server/infra/grpcclient/manager.go](../../internal/collection-server/infra/grpcclient/manager.go)
-
-### 3. 路由和保护层
-
-`collection-server` 只提供 HTTP / HTTPS，不提供自己的 gRPC 服务。路由注册完成后，会形成以下运行时能力：
-
-- 全局基础中间件
-- IAM JWT 中间件
-- 并发限制中间件
-- 路由级限流
-
-代码入口：
-
-- [internal/collection-server/routers.go](../../internal/collection-server/routers.go)
-- [internal/pkg/server/genericapiserver.go](../../internal/pkg/server/genericapiserver.go)
-
-## 对外接口面
-
-### 公开路由
-
-主要包括：
-
-- `/health`
-- `/ping`
-- `/api/v1/public/info`
-
-### 业务路由
-
-当前业务面主要是前台读写能力：
-
-- `questionnaires`
-- `answersheets`
-- `assessments`
-- `scales`
-- `testees`
-
-OpenAPI 契约：
-
-- [api/rest/collection.yaml](../../api/rest/collection.yaml)
-
-## 运行时特点
-
-### 提交排队
-
-答卷提交服务支持本地排队：
-
-- 短时间内等待结果
-- 超时则返回“已排队”，前端通过 `request_id` 轮询状态
-- 状态保存在内存与 Redis 辅助链路中
-
-关键代码：
-
-- [internal/collection-server/application/answersheet/submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go)
-- [internal/collection-server/application/answersheet/submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go)
-
-### 并发与限流
-
-当前有两层保护：
-
-- 全局并发限制：`concurrencyLimitMiddleware`
-- 路由级限流：按全局和用户维度限制提交、查询、等待报告接口
-
-关键代码：
-
-- [internal/collection-server/server.go](../../internal/collection-server/server.go)
-- [internal/collection-server/routers.go](../../internal/collection-server/routers.go)
-
-### 身份与监护关系
-
-`collection-server` 除了 JWT 身份识别，还会在应用层校验监护关系。
-
-关键代码：
-
-- [internal/collection-server/interface/restful/middleware/iam_middleware.go](../../internal/collection-server/interface/restful/middleware/iam_middleware.go)
-- [internal/collection-server/application/answersheet/submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go)
-- [internal/collection-server/infra/iam/guardianship.go](../../internal/collection-server/infra/iam/guardianship.go)
-
-## 关键配置项
-
-值得优先关注的配置分组：
-
-- `grpc_client`：下游 `apiserver` 地址、TLS、超时、最大并发调用数
-- `redis`：排队和辅助缓存使用的 Redis
-- `concurrency`：全局并发限制
-- `rate_limit`：提交、查询、等待报告接口限流
-- `submit_queue`：提交排队开关、队列长度、worker 数量、等待超时
-- `iam`：IAM SDK 与本地验签
-- `runtime`：`GOMEMLIMIT` / `GOGC`
-
-代码入口：
-
-- [internal/collection-server/options/options.go](../../internal/collection-server/options/options.go)
-
-## 边界与注意事项
-
-- `collection-server` 不直连 MySQL / Mongo 业务主库，主业务写入仍通过 `apiserver` 完成。
-- 当前放开的匿名读能力很有限，只对白名单量表 GET 接口跳过认证。
-- `pprof` 在 `:6060` 启动，属于运行时诊断能力，部署时要结合网络边界控制访问。
-- 如果 gRPC 下游不可用，`collection-server` 仍能启动，但核心业务接口会实际不可用。
+*说明：写作习惯可对照 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)；本篇按「运行时组件」体裁组织。*

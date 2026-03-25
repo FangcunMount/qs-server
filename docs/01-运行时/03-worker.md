@@ -1,226 +1,142 @@
-# worker
+# worker（qs-worker）
 
-本文档说明 `qs-worker` 作为事件处理运行时是如何启动、订阅和分发后台任务的。
+**组件定位**：**MQ 消费进程**；根据 [`configs/events.yaml`](../../configs/events.yaml) 订阅 Topic；将消息按 **event_type** 分发给 handler；通过 **gRPC** 回调 **apiserver** 完成业务写。**不**暴露业务 HTTP；**不**装配完整领域容器。  
+事件拓扑见 [03-事件系统](../03-基础设施/01-事件系统.md)；gRPC 客户端表见 [04-gRPC](../04-接口与运维/02-gRPC契约.md)。
 
-## 30 秒了解系统
+---
 
-`qs-worker` 是一个事件消费进程，职责不是直接持有主业务模块，而是：
+## 1. 组件定位（在整体中的位置）
 
-- 订阅 `apiserver` 发布的领域事件
-- 把事件分发到对应 handler
-- 通过 gRPC 回调 `apiserver` 的 `InternalService` 和其他服务
-- 执行评估、报告后处理、统计更新、计划相关后台动作
+| 维度 | 说明 |
+| ---- | ---- |
+| **角色** | 异步执行器：把「已发布事件」转成「对 apiserver 的 RPC」 |
+| **上游** | **MQ**（apiserver 发布的 Topic） |
+| **下游（兄弟组件）** | **apiserver gRPC**（AnswerSheet / Evaluation / Internal） |
+| **本地依赖** | **Redis**（锁、统计辅助等，视 handler） |
 
-代码入口：
+---
 
-- [cmd/qs-worker/main.go](../../cmd/qs-worker/main.go)
-- [internal/worker/app.go](../../internal/worker/app.go)
-- [internal/worker/run.go](../../internal/worker/run.go)
-
-## 核心架构
+## 2. 内部运行示意图
 
 ```mermaid
-flowchart TD
-    main[cmd/qs-worker/main]
-    app[worker.NewApp]
-    run[Run cfg]
-    server[createWorkerServer / PrepareRun]
+flowchart LR
+    MQ[(MQ)]
 
-    subgraph infra[Infra Initialization]
-        redis[Redis]
-        grpcmgr[gRPC Client Manager]
-        subscriber[MQ Subscriber]
+    subgraph W[qs-worker]
+        Sub[Subscriber]
+        D[EventDispatcher]
+        Reg[Handler Registry]
+        H[Handlers]
     end
 
-    subgraph container[Worker Container]
-        dispatcher[EventDispatcher]
-        registry[Handler Registry]
-        handlers[Handlers]
-    end
+    API[apiserver gRPC]
 
-    subgraph clients[gRPC Clients]
-        answerSheetClient[AnswerSheetClient]
-        evaluationClient[EvaluationClient]
-        internalClient[InternalClient]
-    end
-
-    subgraph mq[Messaging]
-        events[Topics from configs/events.yaml]
-    end
-
-    main --> app --> run --> server
-    server --> redis
-    server --> grpcmgr
-    server --> subscriber
-    server --> container
-    container --> dispatcher
-    dispatcher --> registry
-    registry --> handlers
-    grpcmgr --> answerSheetClient
-    grpcmgr --> evaluationClient
-    grpcmgr --> internalClient
-    events --> subscriber
-    subscriber --> dispatcher
+    MQ --> Sub --> D
+    D --> Reg
+    Reg --> H
+    H --> API
 ```
 
-## 核心设计原则
+**关键点**：**handler 自注册**（`init()`），绑定关系需与 **events.yaml** 一致。
 
-- 事件消费与业务写入分离：`worker` 负责触发流程，不直接承载主业务持久化。
-- 配置驱动订阅：Topic、事件类型、handler 绑定由 `configs/events.yaml` 决定。
-- 处理器自注册：handler 通过 `init()` 注册，分发器运行时统一装配。
-- 回调主服务：实际评估、答卷计分、创建测评、打标签等操作通过 `apiserver` 内部 gRPC 执行。
+---
 
-## 职责
+## 3. 单条消息处理时序
 
-`worker` 的运行时职责包括：
+```mermaid
+sequenceDiagram
+    participant MQ as MQ
+    participant S as worker server 回调
+    participant D as EventDispatcher
+    participant H as Handler
+    participant A as apiserver gRPC
 
-- 初始化 Redis
-- 建立到 `apiserver` 的 gRPC 客户端连接
-- 初始化事件分发器和处理器注册表
-- 根据配置创建 MQ Subscriber
-- 订阅所有 Topic
-- 将收到的消息按 `event_type` 分发到对应 handler
-- 处理退出信号并优雅关闭连接
+    MQ->>S: 投递消息
+    S->>S: 解析 event_type（metadata 或信封）
+    S->>D: Dispatch
+    D->>H: 执行
+    H->>A: RPC（计分 / Internal 等）
+    A-->>H: 响应
+    H-->>S: 成功 / 失败
+    S->>MQ: Ack 或 Nack
+```
 
-关键代码：
+**Verify**：事件类型字符串与发布端、yaml 配置 **三方一致**。
 
-- [internal/worker/server.go](../../internal/worker/server.go)
-- [internal/worker/container/container.go](../../internal/worker/container/container.go)
-- [internal/worker/application/event_dispatcher.go](../../internal/worker/application/event_dispatcher.go)
+---
 
-## 启动流程
+## 4. 典型 event_type → handler → gRPC（速查）
 
-### 1. 入口与配置
+下表仅列 **主链路上常用事件**与**主要 RPC**，便于从消息追到代码；**完整映射与 handler 键名**以 [`configs/events.yaml`](../../configs/events.yaml) 为准。未写明的分支（如仅打日志、仅 Redis 统计）见各 `*_handler.go`。
 
-入口层负责创建 `Options`、初始化日志并转成运行配置。
+| event_type（节选） | `events.yaml` 中 handler 键 | 主要 gRPC / 侧载（摘要） |
+| ------------------ | ----------------------------- | ------------------------- |
+| `answersheet.submitted` | `answersheet_submitted_handler` | **Internal**：`CalculateAnswerSheetScore` → `CreateAssessmentFromAnswerSheet` |
+| `assessment.submitted` | `assessment_submitted_handler` | 内联 **statistics** handler；需评估时 **Internal**：`EvaluateAssessment` |
+| `assessment.interpreted` | `assessment_interpreted_handler` | 内联 **statistics**；无固定必选 Internal |
+| `report.generated` | `report_generated_handler` | **Evaluation**：`GetAssessmentReport`；**Internal**：`TagTestee` |
+| `questionnaire.published` | `questionnaire_published_handler` | **Internal**：`GenerateQuestionnaireQRCode`（有客户端时） |
+| `scale.published` | `scale_published_handler` | **Internal**：`GenerateScaleQRCode`（有客户端时） |
+| `plan.*` / `task.*` / `report.exported` / `assessment.failed` 等 | 各 `*_handler` | 多为日志、占位或内联统计；**是否调 gRPC 以代码为准** |
 
-代码入口：
+---
 
-- [internal/worker/app.go](../../internal/worker/app.go)
-- [internal/worker/options/options.go](../../internal/worker/options/options.go)
+## 5. Ack/Nack、重试与投递语义（边界）
 
-### 2. 基础设施准备
+**本进程内**（[server.go `createDispatchHandler`](../../internal/worker/server.go)）：
 
-`PrepareRun` 的准备顺序是：
+| 情况 | 行为 |
+| ---- | ---- |
+| 能解析 `event_type` 且 **DispatchEvent 成功** | **`msg.Ack()`** |
+| **DispatchEvent 返回 error** | **`msg.Nack()`**（是否重投由 **MQ 与 messaging 实现**决定） |
+| **既无 metadata `event_type`、payload 也无法解析为信封** | **`msg.Ack()`**（避免毒消息永久堆积） |
 
-1. 初始化 Redis
-2. 创建到 `apiserver` 的 gRPC 客户端管理器
-3. 创建容器
-4. 把 gRPC client 注入容器
-5. 初始化 `EventDispatcher`
-6. 根据消息队列配置创建 Subscriber
-7. 订阅所有 Topic
+**请勿默认「至少一次」**：  
+- 成功路径是 **Ack 一次**；**Nack 后是否再次投递**依赖 **NSQ / RabbitMQ** 及 **component-base** 对 `Nack` 的映射，**本仓库 worker 文档不承诺**全局 **at-least-once** 或固定 **重试次数**。  
+- [`events.yaml`](../../configs/events.yaml) Topic 下的 **`consumer.retry`** 等字段为**配置结构的一部分**；是否在订阅层实现**退避重试**，以实现与部署为准，**勿与业务幂等等价**。  
+- **未见**独立的 **死信队列（DLQ）** 抽象；持久化失败类问题依赖 **日志、MQ 控制台、重放**，而非本文定义的 DLQ。
 
-代码入口：
+**业务侧**：部分 handler 使用 **Redis 幂等键**（如统计去重），与 **MQ 投递语义** 是两层问题；设计幂等仍以 **02 / handler 代码** 为准。
 
-- [internal/worker/database.go](../../internal/worker/database.go)
-- [internal/worker/grpc_client_registry.go](../../internal/worker/grpc_client_registry.go)
-- [internal/worker/infra/grpcclient/manager.go](../../internal/worker/infra/grpcclient/manager.go)
-- [internal/worker/application/event_dispatcher.go](../../internal/worker/application/event_dispatcher.go)
+---
 
-### 3. 订阅与分发
+## 6. 核心功能与关键点
 
-运行期最核心的逻辑在两步：
+| 功能 | 关键点 | 代码锚点 |
+| ---- | ------ | -------- |
+| **订阅** | NSQ / RabbitMQ 等由配置选择；Topic 列表来自 **events.yaml** | [server.go](../../internal/worker/server.go) |
+| **分发** | metadata `event_type` 优先 | [event_dispatcher.go](../../internal/worker/application/event_dispatcher.go) |
+| **注册表** | `init()` 注册，运行时查找 | [handlers/registry.go](../../internal/worker/handlers/registry.go) |
+| **gRPC** | 三类客户端注入容器 | [grpc_client_registry.go](../../internal/worker/grpc_client_registry.go) |
+| **典型链路** | 见 **§4**；答卷/测评/报告主路径 | `handlers/*_handler.go` |
 
-- 先根据 `configs/events.yaml` 生成需要订阅的 Topic 列表
-- 再将消息按 `event_type` 分发到 handler
+---
 
-代码入口：
+## 7. 与其它组件的交互
 
-- [configs/events.yaml](../../configs/events.yaml)
-- [internal/worker/server.go](../../internal/worker/server.go)
-- [internal/worker/handlers/registry.go](../../internal/worker/handlers/registry.go)
+| 对方 | 方式 | 说明 |
+| ---- | ---- | ---- |
+| **apiserver** | gRPC（主动调用） | 业务写回主服务 |
+| **MQ** | Subscribe | 不发布业务事件 |
+| **IAM** | 无直接模块 | gRPC 鉴权策略见 [03-04](../03-基础设施/04-IAM与认证.md) |
 
-## 消息处理模型
+---
 
-### Topic 订阅
+## 8. 关键代码入口（索引）
 
-当前 `worker` 支持的消息提供者包括：
+| 关注点 | 路径 |
+| ------ | ---- |
+| 进程入口 | [cmd/qs-worker/main.go](../../cmd/qs-worker/main.go)、[app.go](../../internal/worker/app.go)、[run.go](../../internal/worker/run.go) |
+| 配置 | [options/options.go](../../internal/worker/options/options.go) |
 
-- NSQ
-- RabbitMQ
+---
 
-创建逻辑：
+## 9. 边界与注意事项
 
-- [internal/worker/server.go](../../internal/worker/server.go)
+- **无 HTTP 业务端口**；排障靠日志、MQ 积压、gRPC 错误。  
+- **信封/metadata 变更**会导致分发失败，需与 apiserver 发布端同步升级。  
+- **退出**：信号关闭 subscriber 与连接（见 server 实现）。
 
-当使用 NSQ 时，还会尝试预创建 Topic，减少启动阶段的 `TOPIC_NOT_FOUND` 噪音。
+---
 
-### Handler 注册
-
-处理器通过 `init()` 自注册，运行时不会手动一条条写死绑定关系。
-
-典型代码：
-
-- [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)
-- [internal/worker/handlers/assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)
-- [internal/worker/handlers/report_handler.go](../../internal/worker/handlers/report_handler.go)
-- [internal/worker/handlers/plan_handler.go](../../internal/worker/handlers/plan_handler.go)
-- [internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)
-
-### 分发规则
-
-分发顺序是：
-
-1. 优先从消息 metadata 读取 `event_type`
-2. 若缺失，则回退到 payload 的事件信封解析
-3. 找到对应 handler 后执行
-4. 成功则 `Ack`，失败则 `Nack`
-
-代码入口：
-
-- [internal/worker/server.go](../../internal/worker/server.go)
-- [internal/worker/handlers/registry.go](../../internal/worker/handlers/registry.go)
-
-## 常见后台链路
-
-### 答卷事件
-
-- 处理 `answersheet.submitted`
-- 先计算答卷分数
-- 再创建 Assessment
-
-代码入口：
-
-- [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)
-
-### 测评事件
-
-- 处理 `assessment.submitted`
-- 如果有关联量表，则执行评估
-- 同步触发统计更新
-
-代码入口：
-
-- [internal/worker/handlers/assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)
-
-### 报告事件
-
-- 处理 `report.generated`
-- 抽取高风险因子
-- 给受试者打标签
-
-代码入口：
-
-- [internal/worker/handlers/report_handler.go](../../internal/worker/handlers/report_handler.go)
-
-## 关键配置项
-
-最重要的配置分组：
-
-- `messaging`：消息队列提供者和地址
-- `grpc`：`apiserver` gRPC 地址、TLS / mTLS
-- `worker`：并发数、服务名、事件配置路径
-- `redis`：分布式锁和统计缓存辅助能力
-- `cache`：是否禁用统计缓存
-
-代码入口：
-
-- [internal/worker/options/options.go](../../internal/worker/options/options.go)
-
-## 边界与注意事项
-
-- `worker` 没有自己的 HTTP 服务，也不直接暴露业务接口。
-- 它虽然消费事件，但很多动作最终还是通过 `InternalClient` 回到 `apiserver` 执行。
-- 如果 `event_type` 不在 metadata 中，分发会依赖 payload 的事件信封格式，因此发布端必须保持事件结构稳定。
-- 当前退出逻辑以进程信号为主，收到退出信号后会停止 subscriber、关闭 gRPC 和 Redis 连接。
+*说明：写作习惯可对照 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)；本篇按「运行时组件」体裁组织。*
