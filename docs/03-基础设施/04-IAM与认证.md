@@ -1,45 +1,43 @@
 # IAM 与认证
 
-本文介绍 `qs-server` 当前的 IAM 接入方式、认证能力和服务间身份机制。
+本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 的讲解维度组织。**端到端身份链路与运行时顺序**见 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md)；本文固定 **IAM 在仓库中的接入形态**、**与用户态/服务态两套语义**及 **Verify 要点**。
+
+---
 
 ## 30 秒了解系统
 
-在当前实现里，IAM 不是仓库内的第四个运行时进程，而是一组被 `apiserver` 和 `collection-server` 引入的外部基础设施能力。
+### 概览
 
-这组能力主要包括：
+**IAM 不是**本仓库第四个进程，而是 **apiserver / collection-server** 引入的**外部能力**：JWT 校验（JWKS 本地优先、gRPC 降级）、服务间 token、`Identity` / `Guardianship` 等业务查询、可选 **gRPC mTLS 与身份一致性**。**qs-worker** 一般不直连 IAM，事件处理经 **internal gRPC**：`apiserver` 侧再验。
 
-- JWT 验证
-- JWKS 本地验签
-- IAM gRPC 远程降级验证
-- 服务间认证 token
-- 监护关系与用户身份查询
-- 可选的 mTLS 身份校验
+### 基础设施边界
 
-`worker` 当前基本不直接对接 IAM；它的主工作是消费事件，再通过 internal gRPC 回调 `apiserver`。
+| | 内容 |
+| -- | ---- |
+| **负责（摘要）** | 模块装配、Token 验证策略、服务间与用户态分界、与 gRPC 拦截器关系 |
+| **不负责（摘要）** | 领域聚合内的 `user_id` 持久化（见 [actor](../02-业务模块/05-actor.md)）；各 REST 的权限矩阵逐条列举 |
+| **关联** | [actor](../02-业务模块/05-actor.md) 业务侧 IAM 引用；[01-运行时/05](../01-运行时/05-IAM认证与身份链路.md) |
 
-核心代码入口：
+### 契约入口
 
-- [../../internal/apiserver/container/iam_module.go](../../internal/apiserver/container/iam_module.go)
-- [../../internal/collection-server/container/iam_module.go](../../internal/collection-server/container/iam_module.go)
-- [../../internal/apiserver/infra/iam](../../internal/apiserver/infra/iam)
-- [../../internal/collection-server/infra/iam](../../internal/collection-server/infra/iam)
-- [../../internal/pkg/grpc/interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go)
-- [../../internal/pkg/middleware/jwt_auth.go](../../internal/pkg/middleware/jwt_auth.go)
+- **apiserver**：[`internal/apiserver/container/iam_module.go`](../../internal/apiserver/container/iam_module.go)、[`internal/apiserver/infra/iam/`](../../internal/apiserver/infra/iam/)。
+- **collection-server**：[`internal/collection-server/container/iam_module.go`](../../internal/collection-server/container/iam_module.go)、[`internal/collection-server/infra/iam/`](../../internal/collection-server/infra/iam/)。
+- **HTTP/gRPC**：[`internal/pkg/middleware/jwt_auth.go`](../../internal/pkg/middleware/jwt_auth.go)、[`internal/pkg/grpc/interceptor_auth.go`](../../internal/pkg/grpc/interceptor_auth.go)。
 
-## 核心架构
+### 运行时示意图
 
 ```mermaid
 flowchart LR
     Client[客户端 JWT]
-    IAM[IAM]
+    IAM[IAM 服务]
 
     subgraph Collection[collection-server]
-        CJWT[JWT 中间件]
+        CJ[JWT 中间件]
         CG[Guardianship / Identity]
     end
 
     subgraph API[qs-apiserver]
-        AJWT[JWT 中间件 / gRPC AuthInterceptor]
+        AJ[JWT / gRPC Interceptor]
         AG[Guardianship / Identity / WeChatApp]
         SA[ServiceAuthHelper]
     end
@@ -48,155 +46,92 @@ flowchart LR
         W[worker]
     end
 
-    Client --> CJWT
-    Client --> AJWT
-    CJWT --> IAM
-    AJWT --> IAM
+    Client --> CJ
+    Client --> AJ
+    CJ --> IAM
+    AJ --> IAM
     CG --> IAM
     AG --> IAM
     SA --> IAM
     W -. internal gRPC .-> API
 ```
 
-## 核心设计原则
+#### 图说明
 
-- IAM 能力通过模块化接入，而不是把 IAM 逻辑直接塞进业务 Handler。
-- Token 验证优先走本地 `JWKS`，远程 IAM 验证作为降级路径。
-- 服务间调用与用户态调用分开建模：前者走 `ServiceAuthHelper`，后者走 JWT claims。
-- `Principal`、JWT claims 和会话态停留在中间件或拦截器层，不进入领域模型。
-- `mTLS` 解决的是服务身份可信性，JWT 解决的是令牌语义和声明验证，两者并不互相替代。
+**collection** 与 **apiserver** 都需验用户 JWT；**collection → apiserver** 的 gRPC 使用 **服务间认证**（`ServiceAuthHelper`）。**worker** 不重复接 IAM 用户态。
 
-## IAM 模块提供什么
+### 主要代码入口（索引）
 
-### apiserver
+| 关注点 | 路径 |
+| ------ | ---- |
+| apiserver IAM 模块 | [internal/apiserver/container/iam_module.go](../../internal/apiserver/container/iam_module.go) |
+| collection IAM 模块 | [internal/collection-server/container/iam_module.go](../../internal/collection-server/container/iam_module.go) |
+| 共享拦截器 | [internal/pkg/grpc/interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go) |
 
-`apiserver` 的 `IAMModule` 当前会按配置初始化这些能力：
+---
 
-- `Client`
-- `TokenVerifier`
-- `ServiceAuthHelper`
-- `IdentityService`
-- `GuardianshipService`
-- `WeChatAppService`
+## 核心设计
 
-因此它既能做用户态认证，也能做服务间认证和业务查询补充。
+### 核心契约：JWT、JWKS 与配置键（Verify）
 
-### collection-server
+| 能力 | 配置面（键名层级） | 行为摘要 |
+| ---- | ------------------ | -------- |
+| IAM gRPC | `iam.grpc.*` | 远程验证、业务查询客户端 |
+| JWT 声明 | `iam.jwt.*` | issuer、audience、algorithms、required claims |
+| JWKS | `iam.jwks.*` | 公钥拉取、刷新、缓存 TTL |
+| 总开关 | `iam.enabled` | 关闭时整体退化路径（以代码为准） |
 
-`collection-server` 的 `IAMModule` 当前会初始化：
+**Verify**：以各进程 **`configs/*.yaml` + `Options` 绑定** 为准；修改后对照 [05-配置体系](./05-配置体系.md) 与运行时日志。
 
-- `Client`
-- `TokenVerifier`
-- `ServiceAuthHelper`
-- `IdentityService`
-- `GuardianshipService`
+**验证顺序**（`TokenVerifier`）：**本地 JWKS 验签优先** → **远程 gRPC 验证降级**，减少 IAM 在线依赖。
 
-它没有 `WeChatAppService`，因为这块能力属于 `apiserver` 侧更靠近业务装配的位置。
+### 核心模式：用户态与服务态
 
-## JWT、JWKS 与远程降级
+| 语义 | 用途 | 典型入口 |
+| ---- | ---- | -------- |
+| **用户态 JWT** | 小程序/后台用户请求 | Gin 中间件、gRPC `authorization` metadata |
+| **服务间认证** | `collection-server → apiserver`、与其它服务 | `ServiceAuthHelper` |
 
-### 本地验签优先
+二者都依赖 IAM SDK，但**解决的问题不同**：「令牌声明是否可信」vs「调用方服务身份」。
 
-`TokenVerifier` 当前统一封装了 IAM SDK 的 `auth.TokenVerifier`。验证策略优先顺序是：
+### 核心模式：gRPC 与可选 mTLS
 
-1. 本地 `JWKS` 验签
-2. 远程 gRPC 验证降级
+`IAMAuthInterceptor`（见 [interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go)）典型步骤：提取 `authorization` → `TokenVerifier` 验 JWT → 若开启 **`RequireIdentityMatch`**，再比对 **JWT 服务身份与 mTLS 证书身份** → 注入 context。**mTLS 不是**所有 gRPC 的默认前提，由配置开启。
 
-这意味着：
+### 核心模式：internal gRPC（apiserver 侧）
 
-- 正常情况下，令牌验证不必每次都打 IAM
-- IAM 仍然保留远程兜底验证通道
+- **拦截器链顺序**（ Unary）：Recovery → RequestID → Logging →（可选）mTLS Identity →（可选）**IAMAuth** →（可选）ACL →（可选）Audit，见 [server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)。
+- **`grpc.auth.enabled`**：为 `true` 且注入了 `TokenVerifier` 时挂载 `IAMAuthInterceptor`；否则跳过认证（或仅打 warn）。
+- **默认跳过认证**：gRPC **Health**、**Reflection**（前缀匹配），见 `NewIAMAuthInterceptor` 内 `skipMethods`；**业务 RPC 不在默认白名单**，需带 JWT 或运行时扩展 `AddSkipMethod`。
+- **worker → apiserver**：[`InternalClient`](../../internal/worker/infra/grpcclient/internal_client.go) 调用 **未**附加 `authorization` metadata；[`Manager`](../../internal/worker/infra/grpcclient/manager.go) 仅 TLS/mTLS 传输凭证。故 **生产若开启 `grpc.auth.enabled`**，需 **PerRPC 注入服务 JWT** 或调整拦截器/白名单；示例 [`configs/apiserver.dev.yaml`](../../configs/apiserver.dev.yaml) 中 **`auth.enabled: false`** 与当前客户端行为一致。
 
-### 背后的配置面
+### 与 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md) 对照
 
-IAM 认证当前主要依赖四类配置：
+| 主题 | 01-运行时/05（运行时顺序） | 本文档（仓库接入与 Verify） |
+| ---- | --------------------------- | --------------------------- |
+| IAM 是否独立进程 | 明确否，横切能力 | 同左；模块装配与配置键 |
+| HTTP JWT | `JWTAuthMiddleware` → 各进程 `UserIdentityMiddleware` | 共享 [`jwt_auth.go`](../../internal/pkg/middleware/jwt_auth.go)；进程差异见 05 |
+| gRPC JWT | metadata `authorization` → `IAMAuthInterceptor` | 同上 + **`grpc.*` 与 mTLS/ACL 开关**、**skip 列表** |
+| collection → apiserver gRPC | 服务间调用、监护与业务查询 | **ServiceAuthHelper**（服务态）；与 HTTP 用户 JWT 区分 |
+| worker | 不持 IAM 模块；依赖 apiserver gRPC 是否鉴权 | **internal 调用当前无 JWT**；与 05「依赖 gRPC 是否开启认证」一致 |
+| 配置 Verify | `iam.*` 影响验签与缓存 | 同左 + 对照 [05-配置体系](./05-配置体系.md) |
 
-- `iam.enabled`
-- `iam.grpc.*`
-- `iam.jwt.*`
-- `iam.jwks.*`
+### 核心代码锚点索引
 
-其中：
+| 关注点 | 路径 | 说明 |
+| ------ | ---- | ---- |
+| Identity / Guardianship | [internal/apiserver/infra/iam](../../internal/apiserver/infra/iam) | 监护关系、用户资料补全 |
+| WeChatApp | apiserver 侧装配 | collection 模块通常不初始化（见原架构说明） |
 
-- `grpc`
-  - 负责对接 IAM gRPC 服务
-- `jwt`
-  - 负责 issuer、audience、algorithms、required claims
-- `jwks`
-  - 负责公钥地址、刷新间隔和缓存 TTL
-
-## gRPC 认证与 mTLS
-
-`internal/pkg/grpc/IAMAuthInterceptor` 当前负责 gRPC 入口认证，它会做这几件事：
-
-1. 从 metadata 提取 `authorization`
-2. 用 IAM SDK 的 `TokenVerifier` 验证 JWT
-3. 如果开启了 `RequireIdentityMatch`，再校验 JWT 中的服务身份与 mTLS 证书身份是否一致
-4. 把用户信息注入 context
-
-这说明 gRPC 认证链当前是“JWT 语义校验 + 可选 mTLS 身份一致性校验”的组合。
-
-## 关键设计点
-
-### 1. IAM 接入是模块化的，不是散落式的
-
-`IAMModule` 把：
-
-- client 初始化
-- token verifier 初始化
-- service auth 初始化
-- identity / guardianship / wechat app service 初始化
-
-统一收进一个容器模块里。这样做的好处是：
-
-- 认证和 IAM 集成有单一装配点
-- 运行时可以按服务差异选择接入哪些 IAM 能力
-- 关闭 IAM 时可以整体退化，而不是到处留判断
-
-### 2. 本地 JWKS 验签是主路径，远程验证是降级路径
-
-这套顺序解决的是两个目标：
-
-- 正常情况下减少 IAM 网络调用开销
-- IAM 或 JWKS 局部波动时，仍保留远程校验兜底
-
-因此 `qs-server` 当前并不是“每个请求都依赖 IAM 在线校验”的设计。
-
-### 3. 服务间认证和用户态认证是两套语义
-
-`ServiceAuthHelper` 面向的是服务身份：
-
-- `collection-server -> apiserver`
-- 其他 QS 服务 -> IAM
-
-JWT claims 面向的是用户或服务令牌本身的声明验证。两者虽然都依赖 IAM，但职责并不相同：
-
-- 一个解决“我是谁这个服务”
-- 一个解决“这个 token 是否可信、带了什么声明”
-
-### 4. 监护关系和用户身份查询是 IAM 集成的重要组成部分
-
-`qs-server` 接 IAM 不只是为了验 Token。当前业务里，`GuardianshipService` 和 `IdentityService` 也很关键：
-
-- `collection-server` 依赖它判断当前用户是否有权替某个孩子填报
-- `apiserver` 依赖它补全后台查看时的监护关系和用户资料
-
-因此 IAM 同时承担了认证层和业务辅助查询层的角色。
-
-### 5. worker 基本不直接接 IAM，是有意收敛
-
-`worker` 当前主工作是：
-
-- 消费 MQ 事件
-- 调 internal gRPC
-- 使用 Redis 做锁和幂等
-
-它没有被设计成“每处理一条消息都自己验 IAM”。这让异步执行层保持更简单，也避免把用户态身份链路带进事件消费者。
+---
 
 ## 边界与注意事项
 
-- `IAM` 是外部依赖，不是本仓库内独立运行时；写文档时不应把它与 `apiserver / collection-server / worker` 并列成第四个进程。
-- JWT claims 和当前请求用户上下文只停留在接口层，不属于 `actor`、`survey` 等领域模型。
-- `mTLS` 只在开启相关配置时参与 gRPC 身份一致性检查，不应默认理解为所有 gRPC 调用都在做双重校验。
-- 即使启用了 IAM 集成，仓库中仍保留了部分降级和兼容逻辑；因此“接了 IAM”不等于所有路径都强依赖 IAM 在线可用。
-- 运行时链路层面的 IAM 参与方式，建议同时参考 [../01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md)。
+- **IAM ≠ 第四进程**；文档与架构图勿与三进程并列。  
+- **Claims / Principal** 停在中间件与 context，**不**当领域聚合内不变量（见 [actor](../02-业务模块/05-actor.md)）。  
+- **启用 IAM ≠ 每条路径强依赖 IAM 在线**（存在降级与兼容分支）。  
+- **worker**：不逐条消息验用户 JWT 是**有意收敛**；身份与授权在 apiserver 内 gRPC 侧处理。
+
+---
+
+*写作约定见 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)。*

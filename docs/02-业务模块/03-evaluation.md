@@ -1,443 +1,381 @@
-# evaluation
+# evaluation（测评 / 评估）
 
-本文介绍 `evaluation` 模块的职责边界、模型组织、输入输出和主链路。
+本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
+
+---
 
 ## 30 秒了解系统
 
-`evaluation` 是 `qs-apiserver` 里的测评模块，负责把“答卷”转成“测评结果”。
+### 概览
 
-它当前包含三类核心能力：
+本模块把「已落库的答卷」与「量表规则」稳定地变成**可追踪的测评结果**（状态、得分、风险、解读、报告），并通过领域事件衔接统计、标签等下游，而不是只做问卷存储。
 
-- `Assessment`：管理一次测评的创建、提交、评估、完成或失败
-- `engine`：执行异步评估流程，产出得分、风险等级和报告
-- `Report / Query`：保存报告并对外提供报告、得分和趋势查询
+代码上主要落在 `internal/apiserver/domain/evaluation`、`application/evaluation`；运行上属于 **`qs-apiserver` 内嵌模块**，非独立进程。契约入口：[api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto)、[configs/events.yaml](../../configs/events.yaml)；下文表格可与之一一对照。
 
-它不是独立进程，而是 `apiserver` 容器中的业务模块。实际主链路通常从 `survey` 的 `answersheet.submitted` 事件开始，经 `worker` 回调进入 `evaluation`。
+### 模块边界
 
-核心代码入口：
+| | 内容 |
+| -- | ---- |
+| **负责** | 测评创建与状态机、评估引擎编排、报告构建与查询、发布 `assessment.*` / `report.*` 等领域事件 |
+| **不负责** | 问卷与答题采集（[survey](./01-survey.md)）；量表定义与计分规则权威源（[scale](./02-scale.md)，本模块消费）；账号主体（[actor](./05-actor.md)）；统计/标签等**消费侧**实现 |
+| **关联专题** | 三界模型 [05-专题/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)；全链路异步 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md) |
 
-- [internal/apiserver/container/assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go)
-- [internal/apiserver/domain/evaluation/assessment](../../internal/apiserver/domain/evaluation/assessment)
-- [internal/apiserver/application/evaluation/engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)
-- [internal/apiserver/domain/evaluation/report](../../internal/apiserver/domain/evaluation/report)
+主链路入口通常不是「用户直接 REST 建测评」，而是 **答卷提交 → `answersheet.submitted` → `qs-worker` → Internal gRPC** 进入本模块；REST/gRPC 更多用于管理与 C 端查询。
 
-## 模块边界
-
-### 负责什么
-
-- 创建测评：根据答卷、问卷、量表和来源信息生成 `Assessment`
-- 管理测评状态：`pending -> submitted -> interpreted / failed`
-- 执行评估：计算因子得分、风险等级、解读结论并生成报告
-- 保存查询结果：提供测评详情、得分详情、趋势、高风险因子和报告查询
-- 发布评估相关事件，驱动后续统计、标签和通知链路
-
-### 不负责什么
-
-- 问卷结构和答卷采集：在 `survey`
-- 量表配置本身：在 `scale`
-- 用户和受试者身份信息：在 `actor`
-- 统计、预警、标签等后续消费动作：由 `worker` 或其他模块处理
-
-### 运行时位置
+### 运行时示意图
 
 ```mermaid
 flowchart LR
     survey[survey]
     worker[qs-worker]
-    client[collection-server / C端查询]
-    admin[后台管理端]
-
+    admin[后台 REST]
+    client[C 端 gRPC]
     subgraph apiserver[qs-apiserver]
         evaluation[evaluation]
         scale[scale]
     end
-
     survey -->|answersheet.submitted| worker
-    worker -->|internal gRPC| evaluation
+    worker -->|InternalService| evaluation
     admin -->|REST| evaluation
-    client -->|gRPC 查询| evaluation
-    evaluation -->|读取规则| scale
-    evaluation -->|publish events| worker
+    client -->|Evaluation gRPC| evaluation
+    evaluation -->|读量表规则| scale
+    evaluation -->|assessment.*/report.*| worker
 ```
 
-## 模型与服务组织
+#### 运行时图说明
 
-### 模型
+`qs-worker` 订阅 MQ 后**回调** `apiserver` 的 gRPC；评估计算与写库在 **apiserver 进程**内完成，worker 不复制一套领域写模型。
 
-`evaluation` 当前可以理解成“一个流程聚合 + 一个结果聚合 + 两组无状态领域能力”：
+---
 
-- `Assessment`
-  - 聚合根：
-    [internal/apiserver/domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)
-  - 管理测评引用、来源、状态、总分、风险等级和领域事件
-- `InterpretReport`
-  - 聚合根：
-    [internal/apiserver/domain/evaluation/report/report.go](../../internal/apiserver/domain/evaluation/report/report.go)
-  - 管理总体结论、维度解读和建议列表
-- `interpretation`
-  - 解读规则与策略：
-    [internal/apiserver/domain/evaluation/interpretation](../../internal/apiserver/domain/evaluation/interpretation)
-- `assessment score`
-  - 因子得分和值对象定义：
-    [internal/apiserver/domain/evaluation/assessment/score.go](../../internal/apiserver/domain/evaluation/assessment/score.go)
+## 模型与服务
+
+本节拆成两块：**模型 ER 图**单独描述数据与跨域引用；**应用服务 + 领域服务 + 领域模型**用一张分层图说明调用与依赖方向（与 ER 正交：前者偏存储与关系，后者偏运行时分层）。
+
+### 模型 ER 图
+
+描述 evaluation 子域内**概念实体**之间的关系，以及 `Assessment` 对外部限界（survey / scale / actor）的**引用**（实现上多为 ID、编码与版本号，**不**表示外域表在本库中的物理外键）。
 
 ```mermaid
-flowchart TD
-    subgraph assessment[Assessment Aggregate]
-        a[Assessment]
-        origin[Origin]
-        refs[QuestionnaireRef / AnswerSheetRef / MedicalScaleRef]
-        testee[TesteeID]
-        result[TotalScore / RiskLevel / Status]
-    end
+erDiagram
+    ASSESSMENT {
+        uint64 id PK
+        int64 org_id
+        string status
+        float total_score
+        string risk_level
+    }
 
-    subgraph score[Assessment Score]
-        ascore[AssessmentScore]
-        fscore[FactorScore]
-    end
+    ASSESSMENT_SCORE {
+        uint64 assessment_id FK
+        float total_score
+        string risk_level
+    }
 
-    subgraph report[Report Aggregate]
-        rpt[InterpretReport]
-        dim[DimensionInterpret]
-        sug[Suggestion]
-    end
+    FACTOR_SCORE {
+        string factor_code
+        string factor_name
+        float raw_score
+        bool is_total_score
+    }
 
-    subgraph interpretation[Interpretation]
-        interpreter[Interpreter]
-        strategy[Threshold / Range / Composite]
-    end
+    INTERPRET_REPORT {
+        string id PK
+        string scale_code
+        float total_score
+        string risk_level
+    }
 
-    a --> refs
-    a --> testee
-    a --> result
-    ascore --> fscore
-    rpt --> dim
-    rpt --> sug
-    interpreter --> strategy
+    TESTEE {
+        uint64 id PK
+    }
+
+    QUESTIONNAIRE {
+        string code
+        string version
+    }
+
+    ANSWER_SHEET {
+        string id PK
+    }
+
+    MEDICAL_SCALE {
+        string code
+        string version
+    }
+
+    ASSESSMENT ||--|| ASSESSMENT_SCORE : one_score
+    ASSESSMENT ||--o| INTERPRET_REPORT : same_id_as_assessment
+    ASSESSMENT_SCORE ||--|{ FACTOR_SCORE : factors
+
+    ASSESSMENT }o--|| TESTEE : testee_ref
+    ASSESSMENT }o--|| QUESTIONNAIRE : questionnaire_ref
+    ASSESSMENT }o--|| ANSWER_SHEET : answersheet_ref
+    ASSESSMENT }o--o| MEDICAL_SCALE : scale_ref_optional
 ```
 
-### 服务
+`InterpretReport` 与 `Assessment` 在领域上 **1:1**，报告主键与测评 ID 对齐（见 [report.go](../../internal/apiserver/domain/evaluation/report/report.go)）。`AssessmentScore` / `FactorScore` 的物理表结构以 [infra/mysql/evaluation](../../internal/apiserver/infra/mysql/evaluation) 为准。
 
-`evaluation` 的服务组织比 `survey` 更偏“流程编排”：
+---
 
-- `Assessment` 应用服务
-  - `SubmissionService`
-    [internal/apiserver/application/evaluation/assessment/submission_service.go](../../internal/apiserver/application/evaluation/assessment/submission_service.go)
-  - `ManagementService`
-    [internal/apiserver/application/evaluation/assessment/management_service.go](../../internal/apiserver/application/evaluation/assessment/management_service.go)
-  - `ReportQueryService`
-    [internal/apiserver/application/evaluation/assessment/report_query_service.go](../../internal/apiserver/application/evaluation/assessment/report_query_service.go)
-  - `ScoreQueryService`
-    [internal/apiserver/application/evaluation/assessment/score_query_service.go](../../internal/apiserver/application/evaluation/assessment/score_query_service.go)
-- `engine`
-  - 入口：
-    [internal/apiserver/application/evaluation/engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)
-  - 负责执行完整评估链
-- `report`
-  - `ReportGenerationService`
-  - `ReportExportService`
-  - `SuggestionService`
-  - 装配入口：
-    [internal/apiserver/container/assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go)
+### 领域模型与领域服务
 
-模块装配入口：
+#### 限界上下文
 
-- [internal/apiserver/container/assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go)
+- **解决**：一次测评的生命周期、异步评估流水线、解读与报告、领域事件。
+- **不解决**：问卷结构、量表元数据权威、账号体系、下游统计实现细节。
 
-这套组织的重点是：
+#### 核心概念
 
-- `Assessment` 管流程状态
-- `engine` 管异步评估编排
-- 查询服务把“测评过程”与“结果读取”分开
-- 报告生成能力虽然属于 `evaluation`，但实际落在引擎处理链里完成
+| 概念 | 职责 | 与相邻概念的关系 |
+| ---- | ---- | ---------------- |
+| `Assessment` | 流程与状态、跨域引用 | 持 `QuestionnaireRef` / `AnswerSheetRef` / `MedicalScaleRef`，不内嵌 survey/scale 聚合 |
+| `AssessmentScore` / `FactorScore` | 结构化得分 | 依附 Assessment，MySQL |
+| `InterpretReport` | 解读与建议视图 | 与测评关联，MongoDB |
+| `interpretation` | 解读规则与策略 | 与量表配置衔接 |
+| `Origin` | adhoc / plan / screening 等 | 业务来源锚点，非装饰字段 |
+| `engine` | 校验→计分→风险→解读→发事件 | 委托 scale / calculation |
 
-## 接口输入与事件输出
+#### 不变量与状态（概要）
 
-### 输入
+- 状态机：`pending → submitted → interpreted` 或 `failed`；存在 `failed → submitted` 重试路径；不应从 `pending` 直跳 `interpreted`。
+- 跨聚合创建规则集中在 `AssessmentCreator`，避免校验散落在 Handler。
 
-- 后台 REST
-  - `/api/v1/evaluations/assessments`
-  - `/api/v1/evaluations/scores/trend`
-  - `/api/v1/evaluations/reports`
-  - 路由入口：
-    [internal/apiserver/routers.go](../../internal/apiserver/routers.go)
-    [internal/apiserver/interface/restful/handler/evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)
-- C 端 gRPC 查询
-  - `GetMyAssessment`
-  - `ListMyAssessments`
-  - `GetAssessmentScores`
-  - `GetAssessmentReport`
-  - 入口：
-    [internal/apiserver/interface/grpc/service/evaluation.go](../../internal/apiserver/interface/grpc/service/evaluation.go)
-- internal gRPC
-  - `CreateAssessmentFromAnswerSheet`
-  - `EvaluateAssessment`
-  - 入口：
-    [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)
-    [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)
-    [internal/worker/handlers/assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)
+#### 主要代码路径
 
-### 输出
+- 聚合与事件：[internal/apiserver/domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)、[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go)
+- 创建规则：[creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go)
+- 报告：[report/report.go](../../internal/apiserver/domain/evaluation/report/report.go)、[builder.go](../../internal/apiserver/domain/evaluation/report/builder.go)
+- 引用类型：[types.go](../../internal/apiserver/domain/evaluation/assessment/types.go)
 
-- `assessment.submitted`
-- `assessment.interpreted`
-- `report.generated`
-  - 事件定义：
-    [internal/apiserver/domain/evaluation/assessment/events.go](../../internal/apiserver/domain/evaluation/assessment/events.go)
-    [internal/apiserver/domain/evaluation/report/events.go](../../internal/apiserver/domain/evaluation/report/events.go)
+---
 
-此外，`assessment.failed` 事件在领域模型中已定义，但当前主运行时链路更应关注 `assessment.submitted -> assessment.interpreted -> report.generated` 这条异步主线。
+### 应用服务、领域服务与领域模型
 
-当前代码里，`report.exported` 事件已定义，但导出链路仍未成为主要运行时路径，不应当写成当前主链路。
+将「命令（提交/管理）」「查询」「引擎编排」「报告」拆开，避免单类膨胀。装配入口：`EvaluationModule` — [assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go)。
 
-### 评估链是事件驱动启动的
+**应用服务（application）**：对外用例编排、事务边界、与 infra 协作；**领域服务（domain）**：跨聚合规则（如 `AssessmentCreator`）、解读策略等无状态或领域专属逻辑；**领域模型**：聚合根与实体，承载不变量与领域事件。评估 **pipeline** 位于 `application/evaluation/engine/pipeline`，通过 Handler 链调用 domain 与外部 scale/calculation。
 
-`evaluation` 的“创建测评”入口通常不是用户直接调用 REST，而是 `worker` 在消费 `answersheet.submitted` 后，通过 internal gRPC 回调 `CreateAssessmentFromAnswerSheet` 进入模块。也就是说，`evaluation` 在真实运行时里更像一个被事件驱动的后台流程模块，而不是单纯的查询接口模块。
+| 类型 | 代表 | 目录锚点 |
+| ---- | ---- | -------- |
+| 应用服务 | Submission / Management、ReportQuery / ScoreQuery | `application/evaluation/assessment/` |
+| 应用服务 | `engine.Service` 与 pipeline Handlers | `application/evaluation/engine/` |
+| 应用服务 | ReportGeneration / Export / Suggestion | `application/evaluation/report/` |
+| 领域服务 | `AssessmentCreator` 等 | `domain/evaluation/assessment/` |
+| 领域模型 | `Assessment`、`InterpretReport`、`AssessmentScore` | `domain/evaluation/` |
 
-## 核心业务链路
+```mermaid
+flowchart TB
+    subgraph IF[interface 接口层]
+        REST[REST EvaluationHandler]
+        GRPC_E[gRPC Evaluation]
+        GRPC_I[gRPC InternalService]
+    end
 
-### 从答卷到测评
+    subgraph APP[application 应用服务]
+        ASVC[Submission / Management / ScoreQuery / ReportQuery]
+        ENG[engine.Service + pipeline]
+        RSVC[ReportGeneration / Export / Suggestion]
+    end
 
-`worker` 消费 `answersheet.submitted` 后，先调用 `CalculateAnswerSheetScore` 回写答卷分数，再调用 `CreateAssessmentFromAnswerSheet` 创建测评。若问卷关联量表，`InternalService` 会自动提交该测评，进而发布 `assessment.submitted`。
+    subgraph DOMS[domain 领域服务与规则]
+        CRE[AssessmentCreator]
+        INT[interpretation 策略与 Interpreter]
+    end
 
-### 从测评到报告
+    subgraph DM[domain 领域模型]
+        AGG_A[Assessment]
+        AGG_R[InterpretReport]
+        SCR[AssessmentScore / FactorScore]
+    end
+
+    REST --> ASVC
+    GRPC_E --> ASVC
+    GRPC_I --> ASVC
+    GRPC_I --> ENG
+    GRPC_I --> RSVC
+
+    ASVC --> CRE
+    ASVC --> AGG_A
+    ASVC --> SCR
+
+    ENG --> INT
+    ENG --> AGG_A
+    ENG --> SCR
+    ENG --> AGG_R
+
+    RSVC --> AGG_R
+
+    CRE --> AGG_A
+    INT --> AGG_R
+```
+
+#### 分层图说明
+
+- **入口**：后台与 Internal 多走 `Submission`/`Management`/`engine`；C 端查询走 `ReportQuery`/`ScoreQuery` 等（以实际 Handler 注册为准）。
+- **engine**：只表示依赖关系；pipeline 内各 Handler 顺序见下文「核心引擎：流水线与模块分工」。
+- **infra / 事件发布**：由应用服务经容器注入仓储与 `EventPublisher`，图中省略，避免与 ER 图混淆。
+
+---
+
+## 核心设计
+
+### 核心异步链路：从答卷到报告
+
+入口请求保持短；重计算与写结果在后台推进。**worker 只负责订阅与触发**，业务写入仍经 `apiserver`。
+
+#### Topic 与通道
+
+Topic 配置键 `assessment-lifecycle`，运行时名称 **`assessment.lifecycle`**（见 [configs/events.yaml](../../configs/events.yaml) `topics.assessment-lifecycle.name`）。
 
 ```mermaid
 sequenceDiagram
-    participant Worker as qs-worker
-    participant Internal as apiserver InternalService
-    participant Submission as AssessmentSubmissionService
-    participant Engine as evaluation.Engine
-    participant Pipeline as Pipeline
-    participant Repo as Assessment/Score/Report Repo
-    participant MQ as MQ
+    participant W as qs-worker
+    participant I as InternalService
+    participant Sub as SubmissionService
+    participant Eng as engine.Service
+    participant P as Pipeline
+    participant MQ as MQ assessment.lifecycle
 
-    Worker->>Internal: CreateAssessmentFromAnswerSheet
-    Internal->>Submission: Create
-    Submission->>Repo: Save Assessment
-    Internal->>Submission: Submit
-    Submission->>MQ: publish assessment.submitted
-    MQ-->>Worker: assessment.submitted
-    Worker->>Internal: EvaluateAssessment
-    Internal->>Engine: Evaluate
-    Engine->>Pipeline: Validation -> FactorScore -> RiskLevel -> Interpretation -> EventPublish
-    Pipeline->>Repo: Save AssessmentScore / Report
-    Pipeline->>MQ: publish assessment.interpreted
-    Pipeline->>MQ: publish report.generated
+    Note over W: answersheet.submitted
+    W->>I: CalculateAnswerSheetScore
+    W->>I: CreateAssessmentFromAnswerSheet
+    I->>Sub: Create / Submit
+    Sub->>MQ: assessment.submitted
+
+    Note over W: assessment.submitted
+    W->>I: EvaluateAssessment
+    I->>Eng: Evaluate
+    Eng->>P: Validation → FactorScore → RiskLevel → Interpretation → EventPublish
+    P->>MQ: assessment.interpreted
+    P->>MQ: report.generated
 ```
 
-这条链路里有两个关键边界：
+| 步骤 | 动作 | RPC / 事件 | 实现锚点 |
+| ---- | ---- | ----------- | -------- |
+| 1 | 计分回写答卷 | `CalculateAnswerSheetScore` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go) |
+| 2 | 建测评并提交 | `CreateAssessmentFromAnswerSheet` → `assessment.submitted` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go) |
+| 3 | 执行评估 | `EvaluateAssessment` | [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)；[engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go) |
+| 4 | 流水线结束 | `assessment.interpreted`、`report.generated` | [pipeline/chain.go](../../internal/apiserver/application/evaluation/engine/pipeline/chain.go)；[report/events.go](../../internal/apiserver/domain/evaluation/report/events.go) |
 
-- `evaluation` 负责“测评流程”和“测评结果”
-- `worker` 负责驱动异步执行，但不直接写 `evaluation` 的核心数据
+#### 分支说明
 
-## 关键设计点
+无量表时 `AssessmentSubmittedData.NeedsEvaluation()` 为 false（[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go)），可能不跑全链；改文档或行为前应对照 payload 与调用方。
 
-### 1. Assessment 是流程聚合，不是结果文档
+---
 
-`Assessment` 的核心职责不是保存完整报告，而是表示“一次测评行为”：
+### 核心契约：REST、gRPC 与领域事件
 
-- 它记录谁做的、基于哪份问卷和答卷、来自哪个业务场景
-- 它管理 `pending -> submitted -> interpreted / failed` 的状态机
-- 它发布 `assessment.submitted / interpreted / failed` 等事件
+#### REST
 
-关键代码：
+`/evaluations/*`、`/assessments/*` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)，路由 [routers.go](../../internal/apiserver/routers.go)。
 
-- [internal/apiserver/domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)
-- [internal/apiserver/domain/evaluation/assessment/events.go](../../internal/apiserver/domain/evaluation/assessment/events.go)
+#### 对外 gRPC（Evaluation）
 
-这样拆的价值在于：
+如 `GetMyAssessment`、`ListMyAssessments`、`GetAssessmentScores`、`GetAssessmentReport` — [evaluation.proto](../../internal/apiserver/interface/grpc/proto/evaluation/evaluation.proto)，实现 [evaluation.go](../../internal/apiserver/interface/grpc/service/evaluation.go)。
 
-- “流程状态”与“报告内容”不会被塞进同一个超大对象
-- 异步链路可以围绕 `Assessment` 状态推进来运转
-- 查询报告和管理测评时，可以明确区分读的是什么对象
+#### 对内 gRPC（InternalService）
 
-### 2. 引用对象把跨聚合依赖压成稳定边界
+[internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto) 中与测评强相关：`CalculateAnswerSheetScore`、`CreateAssessmentFromAnswerSheet`、`EvaluateAssessment`；实现 [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
 
-`Assessment` 需要关联问卷、答卷和量表，但当前代码并没有直接持有这些聚合，而是只保存轻量引用：
+#### 领域事件（须与配置一致）
 
-- `QuestionnaireRef`
-- `AnswerSheetRef`
-- `MedicalScaleRef`
+事件类型字符串与 [`configs/events.yaml`](../../configs/events.yaml)、[eventconfig](../../internal/pkg/eventconfig) 对齐。
 
-关键代码：
+| 事件类型 | Topic（name） | handler（yaml） | 发布侧（概念） | consumers（yaml 节选） |
+| -------- | -------------- | ----------------- | -------------- | ------------------------ |
+| `answersheet.submitted` | `assessment.lifecycle` | `answersheet_submitted_handler` | 答卷提交流程 | `qs-worker` 等 |
+| `assessment.submitted` | `assessment.lifecycle` | `assessment_submitted_handler` | 提交测评 | `qs-worker` 等 |
+| `assessment.interpreted` | `assessment.lifecycle` | `assessment_interpreted_handler` | 引擎 | 多消费者 |
+| `assessment.failed` | `assessment.lifecycle` | `assessment_failed_handler` | 失败路径 | logging 等 |
+| `report.generated` | `assessment.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
+| `report.exported` | `assessment.lifecycle` | `report_exported_handler` | 导出 | `qs-worker` |
 
-- [internal/apiserver/domain/evaluation/assessment/types.go](../../internal/apiserver/domain/evaluation/assessment/types.go)
-- [internal/apiserver/domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)
+主异步闭环以 **`report.generated`** 为报告就绪信号；`report.exported` 存在但非本文主链路重点。
 
-这层设计的价值不只是“少存几个字段”，而是明确了 `evaluation` 和其他模块的边界：
+---
 
-- `evaluation` 只依赖跨聚合最小必要信息，不直接持有 `survey / scale` 的完整对象
-- 引用对象可以独立做存在性和一致性校验，避免把外部聚合生命周期拖进来
-- 持久化和事件载荷更轻，异步链路不需要为了一个测评把整份问卷或量表一起搬运
+### 核心对象与不变量：引用、Origin、状态机
 
-这也是为什么 `Assessment` 里保存的是“问卷编码 + 版本”“答卷 ID”“量表 ID / 编码”这类引用，而不是跨模块对象树。
+流程态与报告内容分离；跨模块只传**引用**以降低耦合与事件体积；`Origin` 支撑回溯与过滤。
 
-### 3. 测评创建通过领域服务做跨聚合编排
+#### 实现位置
 
-`Assessment` 不是直接 `new` 出来就完事。创建测评时，模块需要同时确认：
+- 引用：`QuestionnaireRef`、`AnswerSheetRef`、`MedicalScaleRef` — [types.go](../../internal/apiserver/domain/evaluation/assessment/types.go)
+- 状态与重试：[assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)
+- `AssessmentCreator` 跨聚合校验 — [creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go)
 
-- 受试者是否存在
-- 问卷是否存在且已发布
-- 答卷是否存在且属于该问卷
-- 若有关联量表，量表是否与该问卷匹配
+---
 
-当前代码把这类跨聚合验证封装进 `AssessmentCreator`：
+### 核心引擎：流水线与模块分工
 
-- [internal/apiserver/domain/evaluation/assessment/creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go)
+流水线把评估拆成可替换步骤，顺序在代码中显式可读，避免单函数堆叠。
 
-这使得应用服务能保持清晰：
+#### 处理器顺序
 
-- `SubmissionService` 负责 DTO、持久化和缓存更新
-- `AssessmentCreator` 负责领域级创建规则
+以仓库实现为准：`ValidationHandler` → `FactorScoreHandler` → `RiskLevelHandler` → `InterpretationHandler` → `EventPublishHandler`。
 
-这比把验证逻辑散落在 Handler、Service 和 Repo 里更稳，也更适合后续扩展新的 `Origin` 来源类型。
+#### 入口
 
-### 4. Origin 不是附属字段，而是评估链路的业务来源锚点
+[service.go](../../internal/apiserver/application/evaluation/engine/service.go)、[pipeline/chain.go](../../internal/apiserver/application/evaluation/engine/pipeline/chain.go)
 
-`Origin` 当前支持三种来源：
+#### 与 scale、calculation 的职责边界
 
-- `adhoc`
-  - 后台手动创建的一次性测评
-- `plan`
-  - 来自测评计划，需要保留计划关联
-- `screening`
-  - 为筛查场景预留的来源类型
+- **evaluation**：评估**编排**。
+- **scale**：因子「如何计分」的规则解释 — [scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go)
+- **calculation**：通用数学策略 — [calculation](../../internal/apiserver/domain/calculation)
+- 因子分入口：[pipeline/factor_score.go](../../internal/apiserver/application/evaluation/engine/pipeline/factor_score.go)
 
-关键代码：
+#### 解读链路
 
-- [internal/apiserver/domain/evaluation/assessment/types.go](../../internal/apiserver/domain/evaluation/assessment/types.go)
-- [internal/apiserver/domain/evaluation/assessment/creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go)
+量表规则 → `InterpretConfig` → 策略执行 — [pipeline/interpretation.go](../../internal/apiserver/application/evaluation/engine/pipeline/interpretation.go)、[interpretation/](../../internal/apiserver/domain/evaluation/interpretation/)
 
-`Origin` 的作用不只是“做个枚举”：
+#### 报告构建
 
-- 它决定测评如何回溯到上游业务场景
-- 它为统计、列表过滤和权限判断提供来源语义
-- 它让 `plan` 和 `evaluation` 之间保持“引用关联”，而不是共享生命周期
+计算与展示结构分离 — [report/builder.go](../../internal/apiserver/domain/evaluation/report/builder.go)
 
-这样 `originType` 才不会退化成一个可有可无的标签字段。
+---
 
-### 5. 状态机刻意保持窄口径，但保留显式重试路径
+### 核心存储与缓存：MySQL、MongoDB、Redis
 
-当前 `Assessment` 的主状态机非常收敛：
+事务态与结构化得分适合关系库；报告文档适合文档库；热点读用缓存降载。
 
-- `pending -> submitted`
-- `submitted -> interpreted`
-- `submitted -> failed`
+| 数据 | 存储 | 路径 |
+| ---- | ---- | ---- |
+| Assessment、Score | MySQL | [infra/mysql/evaluation](../../internal/apiserver/infra/mysql/evaluation) |
+| Report | MongoDB | [infra/mongo/evaluation](../../internal/apiserver/infra/mongo/evaluation) |
 
-同时，当前代码还保留了一条显式重试路径：
+#### 相关配置（apiserver）
 
-- `failed -> submitted`
+`cache.disable_evaluation_cache`、`cache.ttl.assessment_detail`、`cache.ttl.assessment_status` — 见 [configs/apiserver.dev.yaml](../../configs/apiserver.dev.yaml)（prod 同理）。
 
-关键代码：
+---
 
-- [internal/apiserver/domain/evaluation/assessment/types.go](../../internal/apiserver/domain/evaluation/assessment/types.go)
-- [internal/apiserver/domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)
-
-这里真正值得写进文档的是两个判断：
-
-- 正常主链路必须先提交再评估，不能从 `pending` 直接跳到 `interpreted`
-- `failed` 在业务上通常表示一次评估失败结束，但在代码上不是绝对不可恢复终态，模块明确提供了 `RetryFromFailed`
-
-这套设计让主流程保持简单，同时给运维性失败留下了受控重试入口。
-
-### 6. 评估引擎采用处理器链，而不是一个巨型函数
-
-当前 `engine.Service` 最重要的设计不是“能算分”，而是它把整个评估过程拆成了一条稳定处理链：
-
-- `ValidationHandler`
-- `FactorScoreHandler`
-- `RiskLevelHandler`
-- `InterpretationHandler`
-- `EventPublishHandler`
-
-关键代码：
-
-- [internal/apiserver/application/evaluation/engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)
-- [internal/apiserver/application/evaluation/engine/pipeline/chain.go](../../internal/apiserver/application/evaluation/engine/pipeline/chain.go)
-
-这种设计的价值是：
-
-- 每一步职责单一，出错点清晰
-- 引擎扩展时通常只需要新增或替换处理器
-- 流程顺序在代码里是显式的，不需要从一个超长函数里反推
-
-### 7. 因子计分由 evaluation 编排，但规则不完全属于 evaluation
-
-在评估链里，因子计分的编排发生在 `evaluation`，但规则来源和底层执行并不都属于 `evaluation`。
-
-当前代码里，`FactorScoreHandler` 负责“从答卷和量表出发，得到因子得分”，但真正的计分规则执行委托给了 `scale.ScoringService`，而底层又会复用 `domain/calculation`：
-
-- 处理器入口：
-  [internal/apiserver/application/evaluation/engine/pipeline/factor_score.go](../../internal/apiserver/application/evaluation/engine/pipeline/factor_score.go)
-- 量表计分服务：
-  [internal/apiserver/domain/scale/scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go)
-- 通用计算策略：
-  [internal/apiserver/domain/calculation](../../internal/apiserver/domain/calculation)
-
-这意味着：
-
-- `evaluation` 负责评估编排
-- `scale` 负责解释“一个因子该怎么计分”
-- `calculation` 负责通用数学策略
-
-只有把这个边界看清，才不会把 `evaluation` 误解成“拥有全部计分规则”的模块。
-
-### 8. 解读层是独立规则系统，并带默认回退
-
-风险等级和文本结论不是在 Handler 里硬编码的。当前实现里，`InterpretationHandler` 会把量表中的解读规则转换成 `interpretation.InterpretConfig`，再交给默认解读器和策略系统执行：
-
-- [internal/apiserver/application/evaluation/engine/pipeline/interpretation.go](../../internal/apiserver/application/evaluation/engine/pipeline/interpretation.go)
-- [internal/apiserver/domain/evaluation/interpretation/interpreter.go](../../internal/apiserver/domain/evaluation/interpretation/interpreter.go)
-- [internal/apiserver/domain/evaluation/interpretation/strategy.go](../../internal/apiserver/domain/evaluation/interpretation/strategy.go)
-
-这里有两个很重要的权衡：
-
-- 优先使用量表配置的解读规则
-- 若规则不存在或匹配失败，则回退到默认解读提供者，而不是直接中断整条链路
-
-所以它既是规则驱动的，又保留了运行时的稳健性。
-
-### 9. 报告生成使用 Builder，把“结果组织”从评估流程中抽出来
-
-报告不是在引擎里随手拼一个结构体，而是通过 `ReportBuilder` 构建：
-
-- [internal/apiserver/domain/evaluation/report/builder.go](../../internal/apiserver/domain/evaluation/report/builder.go)
-
-它负责把这些信息组织成最终报告：
-
-- 总分与总体风险
-- 各因子的维度解读
-- 来自因子解读配置和建议生成器的建议
-
-这种设计的价值在于：
-
-- 评估流程负责产出结果
-- 报告构建负责组织结果的表现形式
-- 后续如果要增强建议策略或调整报告结构，不必把引擎主流程改得很重
-
-### 10. 混合存储反映了流程数据和结果数据的不同特性
-
-`evaluation` 当前不是单库设计，而是按数据特性拆存储：
-
-- `Assessment` 和 `Score`
-  - MySQL
-  - [internal/apiserver/infra/mysql/evaluation](../../internal/apiserver/infra/mysql/evaluation)
-- `Report`
-  - MongoDB
-  - [internal/apiserver/infra/mongo/evaluation](../../internal/apiserver/infra/mongo/evaluation)
-
-这个设计背后的理由很明确：
-
-- 测评状态和得分更适合事务型、结构化存储
-- 报告内容更适合文档型、灵活结构存储
-
-同时，`Assessment` 侧还叠加了状态缓存与“我的测评列表”缓存，这说明当前运行时最重视的是测评状态查询和用户侧列表读取体验。
+### 核心代码锚点索引
+
+| 关注点 | 路径 |
+| ------ | ---- |
+| 模块装配 | [internal/apiserver/container/assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go) |
+| 应用服务 | [internal/apiserver/application/evaluation/](../../internal/apiserver/application/evaluation/) |
+| 领域 | [internal/apiserver/domain/evaluation/](../../internal/apiserver/domain/evaluation/) |
+| 接口 | [handler/evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)、[grpc/service/evaluation.go](../../internal/apiserver/interface/grpc/service/evaluation.go)、[grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go) |
+
+---
 
 ## 边界与注意事项
 
-- `evaluation` 是流程模块，不只是“报告查询模块”。
-- 纯问卷模式下，测评可以存在，但不会进入完整评估链。
-- 当前主链路里真正发布的报告事件是 `report.generated`，`report.exported` 仍不是主要运行时能力。
-- 阅读 `evaluation` 时，需要把 `Calculation` 理解为一组被评估链复用的通用计算能力；当前实现里计分职责已经部分落在 `scale` 和 `domain/calculation`。
-- 阅读 `evaluation` 时，最好把 `survey -> worker -> evaluation -> worker` 当成一条完整链路来看，而不是只看单个 Handler 或 Service。
+### 常见误解
+
+勿把 evaluation 当作「唯一计分中心」——规则在 scale/calculation；勿忽略 **worker 只触发、apiserver 内执行** 的边界。
+
+### 分支行为
+
+无量表时可能缩短或跳过引擎链；以 `NeedsEvaluation()` 与代码为准。
+
+### 维护时核对
+
+改事件名或 handler 须同步 **`configs/events.yaml`**、领域 `events.go`、worker [handlers/registry.go](../../internal/worker/handlers/registry.go)；全链路交叉验证见 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md)。
+
+---
+
+*写作约定见 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)。*

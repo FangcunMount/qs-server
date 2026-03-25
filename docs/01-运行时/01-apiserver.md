@@ -1,263 +1,164 @@
-# apiserver
+# apiserver（qs-apiserver）
 
-本文档说明 `qs-apiserver` 作为主业务服务是如何启动、装配和对外提供能力的。
+**组件定位**：主业务进程，**领域状态与持久化**的权威所在；对外提供 **后台 REST** 与 **gRPC Server**；向 **MQ 发布**领域事件；被 **collection-server**、**qs-worker** 通过 gRPC 调用。  
+领域细节见 [02-业务模块](../02-业务模块/)；契约与端口见 [04-接口与运维](../04-接口与运维/)。
 
-## 30 秒了解系统
+---
 
-`qs-apiserver` 是整个系统的主业务进程，负责三类事情：
+## 1. 组件定位（在整体中的位置）
 
-- 装配业务模块：`survey`、`scale`、`actor`、`evaluation`、`plan`、`statistics`
-- 暴露服务接口：后台 REST API、对内 gRPC、供 `worker` 调用的 internal gRPC
-- 持有基础设施：MySQL、MongoDB、Redis、IAM、消息发布器、缓存预热、统计同步定时任务
+| 维度 | 说明 |
+| ---- | ---- |
+| **角色** | 主服务：装配 survey / scale / actor / evaluation / plan / statistics 等，执行业务写与复杂读 |
+| **上游** | 客户端（REST）、**collection**（gRPC）、**worker**（gRPC） |
+| **下游** | MySQL、MongoDB、Redis、IAM SDK、MQ Broker |
+| **异步边界** | 发布事件由本进程完成；**长耗时后续步骤**由 worker 消费后再 **gRPC 回调** 本进程（见 [04-进程间通信](./04-进程间通信.md)） |
 
-代码入口：
+---
 
-- [cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)
-- [internal/apiserver/app.go](../../internal/apiserver/app.go)
-- [internal/apiserver/run.go](../../internal/apiserver/run.go)
-
-## 核心架构
+## 2. 内部运行示意图
 
 ```mermaid
 flowchart TD
-    main[cmd/qs-apiserver/main]
-    app[apiserver.NewApp]
-    run[Run cfg]
-    server[createAPIServer / PrepareRun]
+    subgraph serve[对外服务面]
+        http[HTTP/HTTPS + Gin]
+        grpc[gRPC Server]
+    end
 
-    subgraph infra[Infra Initialization]
-        db[DatabaseManager]
-        redis[Redis Client]
-        mysql[MySQL DB]
-        mongo[MongoDB]
+    subgraph mod[业务容器 Container]
+        S[Survey]
+        Sc[Scale]
+        A[Actor]
+        E[Evaluation]
+        P[Plan]
+        St[Statistics]
+    end
+
+    subgraph infra[基础设施]
+        db[(MySQL / Mongo / Redis)]
         iam[IAM Module]
         mq[MQ Publisher]
+        bp[Backpressure 包装]
     end
 
-    subgraph container[Business Container]
-        survey[Survey]
-        scale[Scale]
-        actor[Actor]
-        evaluation[Evaluation]
-        plan[Plan]
-        statistics[Statistics]
-        qrcode[QRCode Service]
+    subgraph bg[同进程后台]
+        wu[WarmupCache]
+        tick[statistics_sync tickers]
     end
 
-    subgraph serving[Serving Layer]
-        http[GenericAPIServer + Gin Router]
-        grpc[gRPC Server]
-        internalsvc[InternalService]
-    end
-
-    subgraph background[Background Jobs]
-        warmup[Cache Warmup]
-        sync[Statistics Sync Scheduler]
-    end
-
-    main --> app --> run --> server
-    server --> db
-    db --> mysql
-    db --> mongo
-    db --> redis
-    server --> iam
-    server --> mq
-    server --> container
-
-    container --> survey
-    container --> scale
-    container --> actor
-    container --> evaluation
-    container --> plan
-    container --> statistics
-    container --> qrcode
-
-    server --> http
-    server --> grpc
-    grpc --> internalsvc
-
-    server --> warmup
-    server --> sync
+    serve --> mod
+    mod --> infra
+    bg --> mod
 ```
 
-## 核心设计原则
+**关键点**：**基础设施与背压**先于 **assembler 模块**；**HTTP 与 gRPC 共用**同一业务实现，而非两套逻辑。
 
-- 主业务集中装配：核心业务模块统一在 `apiserver` 容器里初始化，而不是分散到其他进程。
-- HTTP 与 gRPC 双栈并行：REST 面向后台和部分管理能力，gRPC 面向 `collection-server` 与 `worker`。
-- 基础设施先于模块：数据库、Redis、IAM、消息发布器先准备好，再初始化容器和服务注册。
-- 异步能力内聚在主服务：事件由 `apiserver` 发布，`worker` 再通过 internal gRPC 回调主服务执行后台写操作。
+---
 
-## 职责
+## 3. 启动与时序（PrepareRun 示意）
 
-`apiserver` 的运行时职责可以概括为：
+```mermaid
+sequenceDiagram
+    participant M as main / App
+    participant S as server.PrepareRun
+    participant DB as DB / Redis
+    participant C as Container
+    participant R as Router + GRPCRegistry
 
-- 读取配置并初始化日志
-- 初始化 MySQL、MongoDB、Redis 和数据库迁移
-- 初始化下游背压限制
-- 创建消息发布器并决定事件发布模式
-- 构建业务容器并注入 IAM、缓存、二维码服务
-- 注册 Gin 路由和 gRPC 服务
-- 启动 HTTP / HTTPS 与 gRPC 监听
-- 启动缓存预热和统计同步后台任务
-- 统一处理优雅关闭
+    M->>S: Run → createAPIServer
+    S->>DB: 迁移、连接、背压、MQ Publisher
+    S->>C: IAM + assembler 装配模块
+    S->>R: 注册 REST + gRPC
+    S->>S: Listen HTTP(S) + gRPC
+    S->>S: WarmupCache（异步）
+    S->>S: startStatisticsSyncScheduler（可选）
+```
 
-关键代码：
+**Verify**：真实顺序与条件分支以 [internal/apiserver/server.go](../../internal/apiserver/server.go) 为准。
 
-- [internal/apiserver/server.go](../../internal/apiserver/server.go)
-- [internal/apiserver/database.go](../../internal/apiserver/database.go)
-- [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
+---
 
-## 启动流程
+## 4. 优雅关闭（gRPC、HTTP、DB、统计 ticker、容器）
 
-### 1. 入口与配置
+进程使用 `component-base` 的 **`GracefulShutdown`**（POSIX 信号）。**主关闭回调**在 [server.go `PrepareRun`](../../internal/apiserver/server.go) 末尾注册，**大致顺序**为：
 
-命令入口只做一件事：创建 `App` 并执行 `Run`。
+1. **`container.Cleanup()`**：IAM、各业务 **module.Cleanup()** 等（见 [container.go `Cleanup`](../../internal/apiserver/container/container.go)）。  
+2. **`dbManager.Close()`**：MySQL / Mongo / Redis 等连接。  
+3. **`genericAPIServer.Close()`**：HTTP(S)。  
+4. **`grpcServer.Close()`**：gRPC **GracefulStop**（见 [internal/pkg/grpc/server.go](../../internal/pkg/grpc/server.go)）。
 
-- [cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)
-- [internal/apiserver/app.go](../../internal/apiserver/app.go)
-- [internal/apiserver/config/config.go](../../internal/apiserver/config/config.go)
-- [internal/apiserver/options/options.go](../../internal/apiserver/options/options.go)
+**统计同步 ticker**：`startStatisticsSyncScheduler` 内为三轮 `SyncDaily/Accumulated/Plan` **单独注册**一条 `ShutdownCallback`，仅对 ticker 使用的 **context 调用 `cancel()`**，使 goroutine 在 `select` 上退出。**与主回调同属** `GracefulShutdown`；若关心「cancel 与关库的先后」，以 **回调注册顺序** 与 **`github.com/FangcunMount/component-base/pkg/shutdown` 的实际 invocation 顺序**为准（排障时可打日志核对）。
 
-这一层负责：
+**MQ Publisher**：底层 **`messaging.Publisher`** 由 `PrepareRun` 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container `initEventPublisher`](../../internal/apiserver/container/container.go)）。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
 
-- 创建默认 `Options`
-- 初始化日志
-- 将 CLI / 配置文件结果封装成 `config.Config`
+---
 
-### 2. 创建服务骨架
+## 5. 领域事件发布（应用层入口，非仅 events.yaml）
 
-`createAPIServer` 会先创建三个核心运行时对象：
+**配置与 Topic 映射**仍以 [`configs/events.yaml`](../../configs/events.yaml) 与 [03-事件系统](../03-基础设施/01-事件系统.md) 为 **Verify**；**本进程内谁在发**集中在 **应用服务 / 流水线**，经 **`Container.GetEventPublisher()`** 注入的 **`event.EventPublisher`**（内部多为 [RoutingPublisher](../../internal/pkg/eventconfig/publisher.go)）调用 **`Publish`**。
 
-- 优雅关闭管理器
-- `GenericAPIServer`
-- `DatabaseManager`
+| 领域 / 场景 | 典型行为 | 代码锚点（示例） |
+| ----------- | -------- | ---------------- |
+| **答卷** | 聚合根 `Events()` 在提交成功后批量发布 | [survey/answersheet `submission_service.publishEvents`](../../internal/apiserver/application/survey/answersheet/submission_service.go) |
+| **问卷** | 生命周期操作后 `publishEvents` | [questionnaire `lifecycle_service.publishEvents`](../../internal/apiserver/application/survey/questionnaire/lifecycle_service.go) |
+| **量表** | 生命周期 `publishEvents` | [scale `lifecycle_service.publishEvents`](../../internal/apiserver/application/scale/lifecycle_service.go) |
+| **测评** | Assessment 提交后发布聚合事件；评估流水线尾部发 **interpreted / report.generated** | [evaluation/assessment `submission_service.publishEvents`](../../internal/apiserver/application/evaluation/assessment/submission_service.go)、[engine/pipeline `EventPublishHandler`](../../internal/apiserver/application/evaluation/engine/pipeline/event_publish.go) |
+| **计划** | 创建/调度等路径 `Publish` | [plan `lifecycle_service`](../../internal/apiserver/application/plan/lifecycle_service.go)、[`task_scheduler_service`](../../internal/apiserver/application/plan/task_scheduler_service.go) |
 
-代码入口：
+**关键点**：多数路径在 **持久化成功之后** 再发事件；部分实现注明 **发布失败不阻塞主流程**（以各 `Publish` 调用处错误处理为准）。
 
-- [internal/apiserver/server.go](../../internal/apiserver/server.go)
-- [internal/pkg/server/genericapiserver.go](../../internal/pkg/server/genericapiserver.go)
+---
 
-### 3. 准备基础设施
+## 6. 多实例与 MQ / worker 的并发语义（边界说明）
 
-`PrepareRun` 先准备基础设施，再进入业务容器：
+- **多 apiserver 实例**：各自独立 **Publish**；同一业务事件是否重复取决于 **上游是否重复提交** 与 **应用层是否重复调用 Publish**，而非 MQ 本身为 apiserver 去重。  
+- **多 worker 实例**：对 **同一 Topic** 的消费语义由 **NSQ / RabbitMQ 等** 决定（竞争消费、是否 at-least-once 等）；本仓库 **不在应用层统一封装**「全局恰好一次」。  
+- **幂等与乱序**：重复消息、乱序投递的防护依赖 **handler 幂等设计、DB 唯一约束、业务版本** 等，属 **02 / 各 handler** 与运维配置范畴，**不在本文展开**。
 
-1. 初始化数据库连接和迁移
-2. 获取 MySQL、MongoDB、Redis 句柄
-3. 根据配置启用 MySQL / Mongo / IAM 背压
-4. 创建 MQ Publisher 并确定事件发布模式
+---
 
-代码入口：
+## 7. 核心功能与关键点
 
-- [internal/apiserver/database.go](../../internal/apiserver/database.go)
-- [internal/pkg/backpressure/limiter.go](../../internal/pkg/backpressure/limiter.go)
-- [internal/pkg/eventconfig/config.go](../../internal/pkg/eventconfig/config.go)
+| 功能 | 关键点 | 代码锚点 |
+| ---- | ------ | -------- |
+| **配置加载** | `Options` → `config.Config`，与 `configs/*.yaml` 绑定 | [options/options.go](../../internal/apiserver/options/options.go) |
+| **存储接入** | 迁移、连接池、**背压** 包在适配层 | [database.go](../../internal/apiserver/database.go)、[backpressure](../../internal/pkg/backpressure/limiter.go) |
+| **模块装配** | 按 assembler 注入各 BC | [container/assembler/](../../internal/apiserver/container/assembler/) |
+| **REST** | 后台路由、运维接口 | [routers.go](../../internal/apiserver/routers.go) |
+| **gRPC** | 六类服务注册；模块 nil 则跳过 | [grpc_registry.go](../../internal/apiserver/grpc_registry.go) |
+| **发事件** | 应用层见 **§5**；Topic/handler 与 [events.yaml](../../configs/events.yaml) 对齐 | [03-事件系统](../03-基础设施/01-事件系统.md) |
+| **缓存预热** | 启动后异步 | [container.go WarmupCache](../../internal/apiserver/container/container.go) |
+| **统计落库 ticker** | 与 Crontab 可能叠加；关闭见 **§4** | [server.go](../../internal/apiserver/server.go)、[04-调度](../04-接口与运维/04-调度与后台任务.md) |
 
-### 4. 初始化业务容器
+---
 
-容器初始化顺序是当前运行时设计的核心：
+## 8. 与其它组件的交互
 
-1. 创建带缓存和消息配置的 `Container`
-2. 初始化 IAM 模块
-3. 初始化业务模块
-4. 初始化二维码服务并回注入 Survey / Scale / Evaluation
+| 对方 | 方式 | 说明 |
+| ---- | ---- | ---- |
+| **collection-server** | gRPC（被调） | 前台 BFF 转调 |
+| **worker** | gRPC（被调） | Internal / AnswerSheet / Evaluation 等 |
+| **MQ** | 出站 Publish | 不直接消费 |
+| **Client（后台）** | REST | 管理、Crontab |
+| **IAM** | SDK | 验签、身份、服务间 token 等 |
 
-模块装配入口：
+---
 
-- [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
-- [internal/apiserver/container/assembler/survey.go](../../internal/apiserver/container/assembler/survey.go)
-- [internal/apiserver/container/assembler/scale.go](../../internal/apiserver/container/assembler/scale.go)
-- [internal/apiserver/container/assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)
-- [internal/apiserver/container/assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go)
-- [internal/apiserver/container/assembler/plan.go](../../internal/apiserver/container/assembler/plan.go)
-- [internal/apiserver/container/assembler/statistics.go](../../internal/apiserver/container/assembler/statistics.go)
+## 9. 关键代码入口（索引）
 
-### 5. 注册 HTTP 与 gRPC
+| 关注点 | 路径 |
+| ------ | ---- |
+| 进程入口 | [cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)、[app.go](../../internal/apiserver/app.go)、[run.go](../../internal/apiserver/run.go) |
+| 通用 HTTP 栈 | [genericapiserver.go](../../internal/pkg/server/genericapiserver.go) |
 
-准备阶段完成后，`apiserver` 会注册两套对外能力：
+---
 
-- Gin 路由
-- gRPC 服务
+## 10. 边界与注意事项
 
-HTTP 相关：
+- **前台流量**大量经 **collection**，勿假设所有请求直达 apiserver。  
+- **worker 回写**仍经本进程，**领域一致性**以本进程存储为准。  
+- **Redis/MQ 降级**行为随配置与代码分支变化，以日志与配置为准。
 
-- [internal/apiserver/routers.go](../../internal/apiserver/routers.go)
-- [internal/pkg/server/genericapiserver.go](../../internal/pkg/server/genericapiserver.go)
+---
 
-gRPC 相关：
-
-- [internal/apiserver/grpc_registry.go](../../internal/apiserver/grpc_registry.go)
-- [internal/pkg/grpc/server.go](../../internal/pkg/grpc/server.go)
-- [internal/pkg/grpc/config.go](../../internal/pkg/grpc/config.go)
-
-当前注册的 gRPC 服务包括：
-
-- AnswerSheetService
-- QuestionnaireService
-- ActorService
-- EvaluationService
-- ScaleService
-- InternalService
-
-其中 `InternalService` 是 `worker` 和后台任务最关键的回调入口。
-
-## 对外接口面
-
-### HTTP / HTTPS
-
-`GenericAPIServer` 负责：
-
-- 基础中间件安装
-- `/healthz`、`/version`、指标、`pprof`
-- 同时启动 HTTP 和 HTTPS 监听
-
-业务路由由 [internal/apiserver/routers.go](../../internal/apiserver/routers.go) 注册，主要分为：
-
-- 公开路由
-- IAM 保护路由
-- 各业务模块路由
-
-### gRPC
-
-gRPC 服务器负责：
-
-- 对 `collection-server` 暴露读写服务
-- 对 `worker` 暴露 `InternalService`
-- 支持 TLS / mTLS / 认证 / ACL / 审计等能力开关
-
-## 后台任务
-
-`apiserver` 不是纯请求响应服务，它还会启动两类后台任务：
-
-- 缓存预热：容器初始化完成后异步执行
-- 统计同步调度：按配置周期将 Redis 统计结果落回 MySQL
-
-代码入口：
-
-- [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
-- [internal/apiserver/server.go](../../internal/apiserver/server.go)
-- [internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go)
-
-## 关键配置项
-
-`apiserver` 当前最值得关注的配置分组：
-
-- `server`：通用服务模式、中间件、健康检查
-- `secure` / `insecure`：HTTP / HTTPS 监听
-- `grpc`：gRPC 地址、TLS、mTLS、认证、ACL、反射
-- `mysql` / `mongodb` / `redis`：存储连接
-- `messaging`：事件发布器
-- `iam`：IAM SDK 与认证能力
-- `cache`：缓存禁用、TTL、预热和命名空间
-- `backpressure`：MySQL / Mongo / IAM 的背压限制
-- `statistics_sync`：统计同步调度器
-
-代码入口：
-
-- [internal/apiserver/options/options.go](../../internal/apiserver/options/options.go)
-
-## 边界与注意事项
-
-- `apiserver` 是主业务服务，但不是所有流量都直接打到它；前台收集链路仍然优先经过 `collection-server`。
-- `worker` 的很多后台处理最终仍通过 `InternalService` 回调 `apiserver`，因此主业务状态一致性仍在这里收口。
-- 当前运行时里缓存预热和统计同步都在 `apiserver` 进程内完成，不是独立任务服务。
-- 如果 Redis 或 MQ 不可用，部分能力会降级，但降级边界需要结合具体配置和日志判断。
+*说明：具体写作习惯仍可对照 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)；本篇按「运行时组件」体裁组织。*

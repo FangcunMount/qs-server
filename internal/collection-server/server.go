@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/credentials"
 )
 
 // collectionServer 定义了 Collection 服务器的基本结构
@@ -73,7 +74,27 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		log.Warnf("Cache Redis not available: %v", err)
 	}
 
-	// 2. 创建 gRPC 客户端管理器
+	// 2. 创建容器
+	s.container = container.NewContainer(
+		s.config.Options,
+		cacheRedis,
+	)
+
+	// 3. 初始化 IAM 模块（须在 gRPC 连 apiserver 之前，以便挂载 ServiceAuth PerRPC）
+	ctx := context.Background()
+	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
+	if err != nil {
+		log.Fatalf("Failed to initialize IAM module: %v", err)
+	}
+	s.container.IAMModule = iamModule
+	log.Info("✅ IAM module initialized")
+
+	var perRPC credentials.PerRPCCredentials
+	if h := iamModule.ServiceAuthHelper(); h != nil {
+		perRPC = h
+	}
+
+	// 4. 创建 gRPC 客户端管理器（可选 PerRPC 服务 JWT）
 	s.grpcManager, err = CreateGRPCClientManager(
 		s.config.GRPCClient.Endpoint,
 		s.config.GRPCClient.Timeout,
@@ -83,26 +104,12 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		s.config.GRPCClient.TLSCAFile,
 		s.config.GRPCClient.TLSServerName,
 		s.config.GRPCClient.MaxInflight,
+		perRPC,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create gRPC client manager: %v", err)
 	}
 	log.Infof("✅ gRPC client manager initialized (endpoint: %s)", s.config.GRPCClient.Endpoint)
-
-	// 3. 创建容器
-	s.container = container.NewContainer(
-		s.config.Options,
-		cacheRedis,
-	)
-
-	// 4. 初始化 IAM 模块（优先）
-	ctx := context.Background()
-	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
-	if err != nil {
-		log.Fatalf("Failed to initialize IAM module: %v", err)
-	}
-	s.container.IAMModule = iamModule
-	log.Info("✅ IAM module initialized")
 
 	// 5. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
 	grpcRegistry := NewGRPCClientRegistry(s.grpcManager, s.container)

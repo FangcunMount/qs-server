@@ -30,11 +30,15 @@ type ManagerConfig struct {
 	TLSKeyFile    string // 客户端密钥文件
 	TLSCAFile     string // CA 证书文件
 	TLSServerName string // 服务端名称（用于验证）
+
+	// PerRPCCredentials 可选；启用 iam.service_auth 时由 collection 注入，向 apiserver 出站 RPC 附加 authorization（服务 JWT）
+	PerRPCCredentials credentials.PerRPCCredentials
 }
 
 // Manager gRPC 客户端管理器，负责连接池管理和客户端缓存
 type Manager struct {
 	config   *ManagerConfig
+	perRPC   credentials.PerRPCCredentials
 	conn     *grpc.ClientConn
 	mu       sync.RWMutex
 	inflight chan struct{}
@@ -64,6 +68,7 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 
 	m := &Manager{
 		config:   cfg,
+		perRPC:   cfg.PerRPCCredentials,
 		clients:  make(map[string]interface{}),
 		inflight: make(chan struct{}, cfg.MaxInflight),
 	}
@@ -91,6 +96,11 @@ func (m *Manager) connect() error {
 			Timeout:             20 * time.Second, // ping 响应超时时间
 			PermitWithoutStream: false,            // 无活跃流时不发送 ping
 		}),
+	}
+
+	if m.perRPC != nil {
+		opts = append(opts, grpc.WithPerRPCCredentials(m.perRPC))
+		log.Info("gRPC client: PerRPC credentials attached (service auth metadata)")
 	}
 
 	if m.config.Insecure {
