@@ -27,7 +27,7 @@ func init() {
 // PlanCreatedPayload 计划创建事件数据
 type PlanCreatedPayload struct {
 	PlanID    string    `json:"plan_id"`
-	ScaleID   string    `json:"scale_id"`
+	ScaleCode string    `json:"scale_code"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -73,7 +73,7 @@ func handlePlanCreated(deps *Dependencies) HandlerFunc {
 		deps.Logger.Info("processing plan created",
 			slog.String("event_id", env.ID),
 			slog.String("plan_id", data.PlanID),
-			slog.String("scale_id", data.ScaleID),
+			slog.String("scale_code", data.ScaleCode),
 			slog.Time("created_at", data.CreatedAt),
 		)
 
