@@ -88,7 +88,7 @@ sequenceDiagram
 
 ### 3.3 apiserver：gRPC 入站 — 传输层与 Unary 链顺序（mTLS 先于 IAM JWT）
 
-**易混点**：**mTLS** 先在 **TLS 握手** 完成客户端认证；**IAMAuthInterceptor** 再在 **应用层** 读 metadata 里的 **JWT**（可与 **用户态** 或 **服务态** token 对应）。服务端 **Unary 链**（与代码一致）为：**Recovery → RequestID → Logging →（可选）MTLSInterceptor →（可选）IAMAuth →（可选）ACL →（可选）Audit → Handler**。其中 **MTLSInterceptor 在 IAMAuth 之前**（见 [internal/pkg/grpc/server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)）。
+**易混点**：**mTLS** 先在 **TLS 握手** 完成客户端认证；**IAMAuthInterceptor** 再在 **应用层** 读 metadata 里的 **JWT**（可与 **用户态** 或 **服务态** token 对应）。服务端 **Unary 链**（与代码一致）为：**Recovery → RequestID → Logging →（可选）MTLSInterceptor →（可选）IAMAuth →（可选）ACL →（可选）Audit → Handler**。其中 **TLS/mTLS 在连接建立时完成**；**MTLSInterceptor 在 IAMAuth 之前**（见 [internal/pkg/grpc/server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)）。
 
 ```mermaid
 flowchart LR
@@ -102,11 +102,12 @@ flowchart LR
         L[Logging]
         MI[MTLSInterceptor<br/>若 mtls.enabled]
         IA[IAMAuthInterceptor<br/>若 auth.enabled]
-        AC[ACL…]
+        AC[ACL…<br/>若 acl.enabled]
+        AU[Audit…<br/>若 audit.enabled]
         H[Handler]
     end
 
-    TLS --> R --> RID --> L --> MI --> IA --> AC --> H
+    TLS --> R --> RID --> L --> MI --> IA --> AC --> AU --> H
 ```
 
 - **RequireIdentityMatch**：在 **IAMAuth** 内把 **JWT 中的服务身份** 与 **MTLSInterceptor 写入 context 的证书身份** 对齐（见 [interceptor_auth.go `verifyIdentityMatch`](../../internal/pkg/grpc/interceptor_auth.go)）。  
@@ -119,7 +120,7 @@ flowchart LR
 | **用途** | 标识 **collection-server** 服务身份，向 **apiserver gRPC** 附加 **`authorization`（服务 JWT）**，与 **终端用户 JWT**（REST Bearer）区分 |
 | **装配** | [collection `iam_module.go`](../../internal/collection-server/container/iam_module.go) 在 **`iam.service_auth.*`**（含 `ServiceID`、`TargetAudience` 等）合法时创建 **`ServiceAuthHelper`** |
 | **实现** | [infra/iam/service_auth.go](../../internal/collection-server/infra/iam/service_auth.go) 实现 **`credentials.PerRPCCredentials`**（`GetRequestMetadata`），并提供 **`DialWithServiceAuth`**（`grpc.WithPerRPCCredentials`） |
-| **与默认 gRPC Manager** | 当前 [grpcclient `Manager.connect`](../../internal/collection-server/infra/grpcclient/manager.go) 以 **TLS/mTLS 传输**为主；**是否在现有连接上挂载 PerRPC**，以实现与部署为准；扩展时优先沿用 **`DialWithServiceAuth` / PerRPC** 模式 |
+| **与默认 gRPC Manager** | [PrepareRun 先 IAM 后 gRPC](../../internal/collection-server/server.go)；若 **`ServiceAuthHelper` 非空**，[`Manager.connect`](../../internal/collection-server/infra/grpcclient/manager.go) 会 **`grpc.WithPerRPCCredentials`**；与 **`DialWithServiceAuth`** 同属 PerRPC 模式（独立拨号场景仍可用后者） |
 
 **与 apiserver 入站配套**（mTLS + 服务 JWT + 可选身份对齐）：见 [03-基础设施/04-IAM与认证.md](../03-基础设施/04-IAM与认证.md) 中 **「用户态与服务态」「gRPC 与可选 mTLS」「internal gRPC」** 等节；**配置键** 见同文 **`iam.service_auth.*`**。
 
