@@ -97,7 +97,7 @@ flowchart LR
 - [01-运行时](./01-运行时/)：按进程说明 `apiserver`、`collection-server`、`worker`
 - [02-业务模块](./02-业务模块/)：按模块说明 `survey`、`scale`、`evaluation`、`actor`、`plan`、`statistics`；六篇均已按 [CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md) 的**业务模块推荐结构**对齐（文首约定、`30 秒` 分层、`模型与服务`、`核心设计`、`边界`、锚点索引）
 - [03-基础设施](./03-基础设施/)：事件、存储、缓存与限流、IAM、配置；五篇已按 [CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md) 与 [02-业务模块](./02-业务模块/)、[05-专题分析](./05-专题分析/) 对齐（横切机制 + Verify + 与 02/05 分工）
-- [04-接口与运维](./04-接口与运维/)：REST、gRPC、部署、调度
+- [04-接口与运维](./04-接口与运维/)：REST、gRPC、部署端口、调度与后台任务；四篇已按 [CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md) 与 [02](./02-业务模块/)、[03](./03-基础设施/) 对齐（契约入口 + Verify + 与异步/IAM 交叉引用）
 - [05-专题分析](./05-专题分析/)：从业务模型、异步链路和保护层三个角度解释系统核心设计
 - [_archive](./_archive/)：历史设计稿、迁移前文档和零散专题归档，不作为当前实现的默认入口
 
