@@ -1,5 +1,5 @@
 ---
-description: Event-driven & message queue rules (NSQ + Watermill): idempotency, retries, ordering, DLQ, observability.
+description: Event-driven & message queue rules (NSQ / messaging): idempotency, retries, ordering, DLQ, observability.
 alwaysApply: false
 globs:
   - "**/*.go"
@@ -10,7 +10,7 @@ globs:
   - "infra/**"
 ---
 
-# 事件驱动/消息队列专用规则（NSQ/Watermill）
+# 事件驱动/消息队列专用规则（NSQ / 消息基础设施）
 
 - 事件优先（Event-first）：把“发生了什么”当事实描述，不要把命令/动作当事件名。
   - ✅ AnswerSheetSubmitted / ReportGenerated
@@ -45,7 +45,7 @@ globs:
   - 直接进入“死信/失败队列”或记录到失败表，触发告警
   - 不能靠无限重试拖垮系统
 
-## Watermill 实践
+## 消费者 handler 实践
 
 - handler 结构固定：
   1) decode + validate（schema/必填字段）

@@ -70,12 +70,32 @@ flowchart LR
 1. [00-总览/01-系统地图.md](./00-总览/01-系统地图.md)
 2. [00-总览/02-代码组织与边界.md](./00-总览/02-代码组织与边界.md)
 3. [00-总览/03-核心业务链路.md](./00-总览/03-核心业务链路.md)
+4. [00-总览/04-本地开发与配置约定.md](./00-总览/04-本地开发与配置约定.md)（环境变量、端口、`configs` 与 `make`）
+5. 按角色选读：[01-运行时](./01-运行时/) → [02-业务模块](./02-业务模块/) → [03-基础设施](./03-基础设施/) → [04-接口与运维](./04-接口与运维/)
+
+## 本地开发速查
+
+- **环境**：`ENV=dev`（默认）或 `ENV=prod` 控制 `Makefile` 选用的 yaml 与 HTTP 端口；详见 [00-总览/04-本地开发与配置约定.md](./00-总览/04-本地开发与配置约定.md)。
+- **契约**：REST 见 [api/rest/apiserver.yaml](../api/rest/apiserver.yaml)、[api/rest/collection.yaml](../api/rest/collection.yaml)；gRPC proto 见 [internal/apiserver/interface/grpc/proto](../internal/apiserver/interface/grpc/proto)。
+- **事件**：Topic 与 handler 以 [configs/events.yaml](../configs/events.yaml) 为单一事实来源。
+- **根目录 README**：快速开始、常用 `make` 目标见仓库根 [README.md](../README.md)。
+
+## 辅助工具（cmd/tools）
+
+非线上进程，用于运维与联调：
+
+| 路径 | 用途（概要） |
+| ---- | ------------ |
+| [cmd/tools/seeddata](../cmd/tools/seeddata) | 种子数据 / 联调灌数（配置见 [configs/seeddata.yaml](../configs/seeddata.yaml)） |
+| [cmd/tools/redis-stats-ttl-fix](../cmd/tools/redis-stats-ttl-fix) | Redis 统计相关 TTL 修复类工具 |
+
+具体子命令与参数以各 `main.go` 及 `-h` 为准。
 
 ## 当前文档结构
 
-- [00-总览](./00-总览/)：系统地图、代码组织、主链路
+- [00-总览](./00-总览/)：系统地图、代码组织、主链路、本地开发与配置约定
 - [01-运行时](./01-运行时/)：按进程说明 `apiserver`、`collection-server`、`worker`
-- [02-业务模块](./02-业务模块/)：按模块说明 `survey`、`scale`、`evaluation`、`actor`、`plan`、`statistics`
+- [02-业务模块](./02-业务模块/)：按模块说明 `survey`、`scale`、`evaluation`、`actor`、`plan`、`statistics`（[`03-evaluation.md`](./02-业务模块/03-evaluation.md) 已按 [CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md) 业务模块结构试点）
 - [03-基础设施](./03-基础设施/)：事件、缓存、存储、IAM、配置
 - [04-接口与运维](./04-接口与运维/)：REST、gRPC、部署、调度
 - [05-专题分析](./05-专题分析/)：从业务模型、异步链路和保护层三个角度解释系统核心设计
@@ -103,3 +123,4 @@ flowchart LR
 - 文档描述“当前实现”，不是历史设计蓝图。
 - 代码细节尽量通过文件链接锚定，不在文档里重复抄写实现。
 - 历史文档已移动到 [_archive](./_archive/)，阅读现状时默认以新总览、新分组文档和代码为准。
+- **写作规范与业务模块模板**（维护 `docs/` 时必读）：[CONTRIBUTING-DOCS.md](./CONTRIBUTING-DOCS.md)

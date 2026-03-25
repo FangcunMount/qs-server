@@ -92,19 +92,17 @@ qs-server/
 
 ## 📚 文档导航
 
-详细设计文档位于 [`docs/`](./docs/) 目录：
+以**当前实现**为准的文档在 [`docs/`](./docs/)（入口：[docs/README.md](./docs/README.md)）。历史设计稿在 [`docs/_archive/`](./docs/_archive/)。
 
 | 目录 | 内容 |
 | ----- | ------ |
-| [00-概览](./docs/00-概览/) | 系统架构、代码结构 |
-| [01-survey域](./docs/01-survey域/) | 问卷子域设计 |
-| [02-scale域](./docs/02-scale域/) | 量表子域设计 |
-| [03-evaluation域](./docs/03-evaluation域/) | 评估子域设计 |
-| [04-actor域](./docs/04-actor域/) | 用户模型设计 |
-| [05-plan域](./docs/05-plan域/) | 测评计划设计 |
-| [06-screening域](./docs/06-screening域/) | 入校筛查设计 |
-| [07-基础设施](./docs/07-基础设施/) | 高并发架构 |
-| [08-运维部署](./docs/08-运维部署/) | 端口配置 |
+| [docs/00-总览](./docs/00-总览/) | 系统地图、代码边界、核心链路、本地开发/配置 |
+| [docs/01-运行时](./docs/01-运行时/) | apiserver、collection-server、worker、进程间通信 |
+| [docs/02-业务模块](./docs/02-业务模块/) | survey、scale、evaluation、actor、plan、statistics |
+| [docs/03-基础设施](./docs/03-基础设施/) | 事件、存储、缓存、IAM、配置体系 |
+| [docs/04-接口与运维](./docs/04-接口与运维/) | REST/gRPC、部署端口、调度与后台任务 |
+| [docs/05-专题分析](./docs/05-专题分析/) | 业务模型、异步链路、保护层与读侧 |
+| [docs/_archive](./docs/_archive/) | 旧版分域长文与迁移前笔记（非默认入口） |
 
 ## 🔧 常用命令
 
