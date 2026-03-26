@@ -92,6 +92,7 @@ sequenceDiagram
 | **既无 metadata `event_type`、payload 也无法解析为信封** | **`msg.Ack()`**（避免毒消息永久堆积） |
 
 **请勿默认「至少一次」**：  
+
 - 成功路径是 **Ack 一次**；**Nack 后是否再次投递**依赖 **NSQ / RabbitMQ** 及 **component-base** 对 `Nack` 的映射，**本仓库 worker 文档不承诺**全局 **at-least-once** 或固定 **重试次数**。  
 - [`events.yaml`](../../configs/events.yaml) Topic 下的 **`consumer.retry`** 等字段为**配置结构的一部分**；是否在订阅层实现**退避重试**，以实现与部署为准，**勿与业务幂等等价**。  
 - **未见**独立的 **死信队列（DLQ）** 抽象；持久化失败类问题依赖 **日志、MQ 控制台、重放**，而非本文定义的 DLQ。
