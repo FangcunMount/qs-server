@@ -376,7 +376,7 @@ sequenceDiagram
 | 量表（含因子、解读规则等） | MongoDB | [infra/mongo/scale](../../internal/apiserver/infra/mongo/scale) |
 | 量表读路径缓存 | Redis（装饰仓储） | [infra/cache/scale_cache.go](../../internal/apiserver/infra/cache/scale_cache.go) |
 
-问卷缓存 TTL、开关等以各环境 [configs/apiserver.*.yaml](../../internal/apiserver.dev.yaml) 中 `cache` 相关键为准（与 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) 互参）。
+量表缓存 TTL、开关等以各环境 [configs/apiserver.dev.yaml](../../configs/apiserver.dev.yaml)、[configs/apiserver.prod.yaml](../../configs/apiserver.prod.yaml) 中 `cache` 相关键为准（与 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) 互参）。
 
 ### 核心代码锚点索引
 

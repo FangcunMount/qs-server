@@ -85,7 +85,7 @@ COLOR_RED := \033[31m
 .PHONY: install-tools install-air create-dirs
 .PHONY: up down re st log
 .PHONY: quick-start
-.PHONY: docs-swagger docs-rest docs-verify
+.PHONY: docs-swagger docs-rest docs-hygiene docs-verify
 
 # ============================================================================
 # 帮助信息
@@ -115,7 +115,7 @@ help: ## 显示帮助信息
 	@grep -E '^(dev|test|lint|fmt).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(COLOR_BOLD)📚 其他命令:$(COLOR_RESET)"
-	@grep -E '^(deps|install|clean|version|debug|up|down|quick).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
+	@grep -E '^(deps|install|clean|version|debug|up|down|quick|docs).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
 
 docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
@@ -128,7 +128,10 @@ docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
 	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:18082 --server https://qs.yangshujie.com
 	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:18083 --server https://collect.yangshujie.com
 
-docs-verify: docs-rest ## 对比 api/rest 与 swagger，检查是否有漂移
+docs-hygiene: ## 检查现行 docs/ 的链接、锚点与章节编号
+	python scripts/check_docs_hygiene.py
+
+docs-verify: docs-rest docs-hygiene ## 对比 api/rest 与 swagger，并检查现行文档卫生
 	python scripts/compare_api_docs.py
 
 version: ## 显示版本信息

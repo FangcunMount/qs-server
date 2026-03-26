@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare REST docs in api/rest/* (OpenAPI 3.1) against generated Swagger files in api/<service>/swagger.json.
+Compare REST docs in api/rest/* (OpenAPI 3.1) against generated Swagger files.
 Focuses on path/method coverage to spot mismatches quickly.
 
 Usage:
@@ -13,12 +13,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Dict, Iterable, Set, Tuple
 
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
+INTERNAL_SWAGGER_DIRS = {
+    "apiserver": "apiserver",
+    "collection": "collection-server",
+}
 
 
 def load_paths_from_openapi(file_path: Path) -> Set[Tuple[str, str]]:
@@ -51,19 +56,20 @@ def load_paths_from_swagger(file_path: Path) -> Set[Tuple[str, str]]:
     return items
 
 
-def compare(service: str) -> None:
+def compare(service: str) -> bool:
     rest_path = ROOT / "api" / "rest" / f"{service}.yaml"
     # Prefer new internal swagger outputs; fall back to legacy api/<service>/swagger.json if present.
-    swagger_path = ROOT / "internal" / f"{service}" / "docs" / "swagger.json"
+    internal_dir = INTERNAL_SWAGGER_DIRS.get(service, service)
+    swagger_path = ROOT / "internal" / internal_dir / "docs" / "swagger.json"
     legacy_swagger_path = ROOT / "api" / service / "swagger.json"
     if not swagger_path.exists() and legacy_swagger_path.exists():
         swagger_path = legacy_swagger_path
     if not rest_path.exists():
         print(f"[{service}] missing REST doc: {rest_path}")
-        return
+        return False
     if not swagger_path.exists():
         print(f"[{service}] missing swagger json: {swagger_path}")
-        return
+        return False
 
     rest_paths = load_paths_from_openapi(rest_path)
     swagger_paths = load_paths_from_swagger(swagger_path)
@@ -87,6 +93,8 @@ def compare(service: str) -> None:
     else:
         print("→ No rest-only paths.")
 
+    return not missing_in_rest and not missing_in_swagger
+
 
 def main():
     parser = argparse.ArgumentParser(description="Compare REST docs vs swagger outputs")
@@ -98,9 +106,11 @@ def main():
     )
     args = parser.parse_args()
     services: Iterable[str] = args.service or ["apiserver", "collection"]
+    ok = True
     for svc in services:
-        compare(svc)
+        ok = compare(svc) and ok
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
