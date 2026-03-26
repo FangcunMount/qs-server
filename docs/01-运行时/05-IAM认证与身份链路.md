@@ -1,5 +1,27 @@
 # IAM 认证与身份链路（运行时视角）
 
+**本文回答**：这篇文档解释 IAM 能力在 `qs-server` 运行时如何接入三进程、HTTP JWT 和 gRPC 入站各走什么链路、`collection-server` 的监护关系校验和服务间 token 如何工作，以及排障时该从哪些中间件、拦截器和 SDK 入口入手；本文先给结论和速查，再展开三进程视角与时序图。
+
+## 30 秒结论
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| IAM 在系统中的位置 | IAM 不是第四个进程，而是以 SDK / 中间件 / 拦截器形式嵌入 `collection-server` 和 `qs-apiserver` |
+| HTTP 认证主路径 | 两个 HTTP 进程都通过 JWT 中间件验用户 token，再把身份写入业务上下文 |
+| gRPC 入站主路径 | `qs-apiserver` 的 gRPC 先经过 TLS / mTLS，再进入 Unary 拦截器链，可选读取 IAM JWT metadata |
+| `collection -> apiserver` 特点 | 除传输层 mTLS 外，还可能通过 `ServiceAuthHelper` 注入服务间 token；这和前台用户 Bearer 不是一回事 |
+| worker 边界 | `qs-worker` 不嵌入 IAM 用户态链路，它只受 `qs-apiserver` gRPC 服务端的认证策略约束 |
+| 排障入口 | 先区分 HTTP 还是 gRPC，再看对应中间件 / 拦截器、IAM SDK 调用和配置开关 |
+
+## 重点速查（继续往下读前先记这几条）
+
+1. **IAM 是嵌入式能力，不是独立进程**：它通过 SDK、中间件和拦截器进入两个服务进程。  
+2. **用户态 token 和服务态 token 不同**：前台 Bearer JWT、服务间 token、mTLS 客户端证书是三条不同认证材料。  
+3. **gRPC 要先分清传输层和应用层**：mTLS 在握手阶段完成，IAMAuthInterceptor 是后续应用层逻辑。  
+4. **worker 不走用户态 IAM 链**：排查 worker 回调失败时，不要按前台 JWT 的思路去看。  
+
 **组件定位**：**IAM 不是**本仓第四进程；以 **SDK 模块**形式嵌入 **collection-server** 与 **qs-apiserver**，参与 **HTTP JWT**、**gRPC 可选 JWT**、**监护关系**等。**worker** 不嵌入 IAM 用户态链路。  
 配置键、拦截器链、与 worker 的 gRPC 元数据关系见 [03-基础设施/04-IAM与认证.md](../03-基础设施/04-IAM与认证.md)。
 

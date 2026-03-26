@@ -1,5 +1,7 @@
 # gRPC 契约
 
+**本文回答**：这篇文档解释 `qs-server` 的 gRPC 契约由谁提供、哪些进程是服务端或客户端、`.proto` 和注册器落在哪里、`InternalService` 的定位是什么，以及核对 gRPC 调用关系时应从哪些文件入手；本文先给结论和速查，再展开服务矩阵与注册方式。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 的讲解维度组织。**传输安全与 IAM 拦截器链**见 [03-基础设施/04-IAM与认证](../03-基础设施/04-IAM与认证.md)；**进程间调用关系**见 [01-运行时/04-进程间通信](../01-运行时/04-进程间通信.md)。本文补齐 **proto 位置、注册器、调用方矩阵、InternalService 定位、Verify**。
 
 ---
@@ -9,6 +11,19 @@
 ### 概览
 
 仅 **qs-apiserver** 对外提供 **gRPC Server**。**collection-server** 与 **qs-worker** 仅实现 **gRPC 客户端**。对内协作不替代对外 REST；**InternalService** 面向 **worker 回调**及部分与统计/调度重叠的能力，与前台查询类 RPC 区分。
+
+### 重点速查
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 服务端角色 | 只有 `qs-apiserver` 暴露 gRPC Server |
+| 客户端角色 | `collection-server` 和 `qs-worker` 都是 gRPC 客户端，但调用的 Service 集合不同 |
+| 契约真值 | `.proto` 以 [internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/) 为准 |
+| 注册真值 | 服务端注册以 [grpc_registry.go](../../internal/apiserver/grpc_registry.go) 为准，客户端以各自 `grpc_client_registry.go` 为准 |
+| `InternalService` 定位 | 它主要服务 worker 回调和部分内部运维能力，不等价于对外查询型服务 |
+| 排障入口 | 先看 proto 和注册器，再看对应 service 实现与 client 调用点 |
 
 ### 基础设施边界
 

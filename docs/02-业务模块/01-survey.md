@@ -1,5 +1,7 @@
 # survey
 
+**本文回答**：`survey` 模块负责“问卷模板 + 答卷事实”的整个采集侧闭环；这篇文档会先让读者一屏内看清模块职责、主入口、关键事件和边界，再展开模型、链路、题型扩展、校验引擎与存储细节。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -16,6 +18,19 @@
 它不是独立进程，而是 `apiserver` 容器中的一个业务模块。前台提交最终会落到 `survey.AnswerSheet`，后台配置问卷则落到 `survey.Questionnaire`。
 
 代码主路径：`internal/apiserver/domain/survey`（聚合与领域服务）、`internal/apiserver/application/survey`（用例编排）；问卷与答卷持久化当前主要在 **MongoDB**（见下文「核心存储」）。**题型**在问卷侧与答卷侧扩展方式不同；**校验**与**计分计算**分别委托 `domain/validation` 与 `domain/calculation`——见「核心设计」中 **「题型扩展：全局组织与两侧分工」**、**「核心横切」** 两节。
+
+### 重点速查
+
+如果只看一屏，先抓下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 模块职责 | 管问卷生命周期、题目结构、答卷提交、答案校验、`questionnaire.*` / `answersheet.submitted` 事件 |
+| 主入口 | 后台多走 REST 管问卷；前台提交经 `collection-server` gRPC 进入 `SaveAnswerSheet` |
+| 核心对象 | `Questionnaire`、`Question`、`AnswerSheet`、`Answer`、`AnswerValue` |
+| 关键边界 | 认证/监护在 `collection-server`；测评、报告和引擎在 `evaluation`；量表规则权威源在 `scale` |
+| 扩展重点 | 题型扩展在问卷侧和答卷侧是两套接口；校验与计算由 `validation` / `calculation` 独立承接 |
+| 存储分层 | 问卷与答卷主存储在 MongoDB；问卷读侧另有缓存 |
 
 ### 模块边界
 

@@ -1,5 +1,27 @@
 # collection-server
 
+**本文回答**：这篇文档解释 `collection-server` 作为前台 BFF 在运行时承担什么角色、典型请求如何从 REST 转到 gRPC、答卷提交为什么会分成直调与 `SubmitQueue` 两条路径，以及它与 Redis、IAM、`qs-apiserver` 的边界是什么；本文先给结论和速查，再展开时序和代码入口。
+
+## 30 秒结论
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 进程角色 | `collection-server` 是前台 BFF，负责鉴权、限流、排队、监护等入口层能力，不持有主业务写模型 |
+| 最重要的上下游 | 上游是客户端 REST；核心下游是 `qs-apiserver` gRPC，辅以 Redis 和 IAM |
+| 提交答卷的关键认识 | `SubmitQueued` 是统一入口；是否真正进队列由 `submit_queue` 配置决定，关闭时等价于同步直调 gRPC |
+| 与主服务的边界 | 它不直连 MySQL / Mongo 主库，不在本进程内完成问卷、测评等主业务持久化 |
+| 本地状态 | Redis 主要服务于排队、会话类辅助和部分缓存，不改变“主状态在 apiserver”的边界 |
+| 排障入口 | 先看中间件链与 Handler，再看 `SubmissionService` / `SubmitQueue` 与 gRPC client |
+
+## 重点速查（继续往下读前先记这几条）
+
+1. **这是 BFF，不是第二个业务主服务**：它做的是入口层治理和转发收敛，不是领域状态权威。  
+2. **答卷提交要区分两条路径**：启用队列时先入进程内有界队列；未启用时直接同步走 gRPC。  
+3. **Redis 在这里的职责偏辅助**：主要用于排队与前台侧支撑，不代表业务真值落在本进程。  
+4. **排障顺序**：先看路由和中间件，再看 Handler / Service，最后看 gRPC client 和 queue 配置。  
+
 **组件定位**：**前台 BFF** 进程；**不**直连 MySQL/Mongo 主库；对外 **REST**，对内通过 **gRPC** 调用 **apiserver**；本地 **Redis** + **IAM** 支撑排队、会话类辅助与身份。  
 限流与排队机制见 [03-缓存与限流](../03-基础设施/03-缓存与限流.md)；REST 契约见 [04-REST](../04-接口与运维/01-REST契约.md)。
 

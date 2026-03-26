@@ -1,5 +1,7 @@
 # evaluation（测评 / 评估）
 
+**本文回答**：`evaluation` 模块负责把“已落库的答卷 + 量表规则”稳定推进为“测评状态、结构化得分、解读报告与后续事件”；这篇文档会先给出模块边界与重点速查，再展开模型、链路、契约和存储细节。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -11,6 +13,19 @@
 本模块把「已落库的答卷」与「量表规则」稳定地变成**可追踪的测评结果**（状态、得分、风险、解读、报告），并通过领域事件衔接统计、标签等下游，而不是只做问卷存储。
 
 代码上主要落在 `internal/apiserver/domain/evaluation`、`application/evaluation`；运行上属于 **`qs-apiserver` 内嵌模块**，非独立进程。契约入口：[api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto)、[configs/events.yaml](../../configs/events.yaml)；下文表格可与之一一对照。
+
+### 重点速查
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 模块职责 | 管测评创建与状态机、评估引擎编排、得分与报告查询、`assessment.*` / `report.*` 事件 |
+| 主入口 | 主链路入口通常是 `answersheet.submitted -> qs-worker -> InternalService`，不是用户直接 REST 建测评 |
+| 核心对象 | `Assessment`、`AssessmentScore`、`InterpretReport` |
+| 核心事件 | `assessment.submitted`、`assessment.interpreted`、`assessment.failed`、`report.generated` |
+| 存储分层 | `Assessment` / `AssessmentScore` 在 MySQL；`InterpretReport` 在 MongoDB |
+| 运行时边界 | worker 负责订阅和驱动，真正的评估与写库仍在 `qs-apiserver` 内完成 |
 
 ### 模块边界
 
@@ -115,6 +130,16 @@ erDiagram
 ```
 
 `InterpretReport` 与 `Assessment` 在领域上 **1:1**，报告主键与测评 ID 对齐（见 [report.go](../../internal/apiserver/domain/evaluation/report/report.go)）。`AssessmentScore` / `FactorScore` 的物理表结构以 [infra/mysql/evaluation](../../internal/apiserver/infra/mysql/evaluation) 为准。
+
+#### 报告与得分：真实落库位置与查询入口
+
+| 对象 | 当前存储 | 为什么这样存 | 典型查询入口 |
+| ---- | -------- | ------------ | ------------ |
+| `Assessment` | MySQL `assessment` 表 | 流程状态、业务来源、跨域引用适合结构化事务存储；`answer_sheet_id` 还有唯一约束 | [assessment_repository.go](../../internal/apiserver/infra/mysql/evaluation/assessment_repository.go)、[management_service.go](../../internal/apiserver/application/evaluation/assessment/management_service.go) |
+| `AssessmentScore` / `FactorScore` | MySQL `assessment_score` 表 | 需要按 `assessment_id`、`testee_id`、`factor_code` 做查询与趋势分析 | [score_repository.go](../../internal/apiserver/infra/mysql/evaluation/score_repository.go)、[score_query_service.go](../../internal/apiserver/application/evaluation/assessment/score_query_service.go) |
+| `InterpretReport` | Mongo `interpret_reports` 集合 | 维度解读和建议列表是文档型结构，读取更偏报告视图 | [repo.go](../../internal/apiserver/infra/mongo/evaluation/repo.go)、[query_service.go](../../internal/apiserver/application/evaluation/report/query_service.go) |
+
+对外讲解时若被问“报告和得分为什么不合并”，可以直接回答：`AssessmentScore` 偏结构化查询，`InterpretReport` 偏文档视图；它们都围绕 `AssessmentID` 协作，但服务的读取模式不同。
 
 ---
 
@@ -223,6 +248,8 @@ flowchart TB
 ### 核心异步链路：从答卷到报告
 
 入口请求保持短；重计算与写结果在后台推进。**worker 只负责订阅与触发**，业务写入仍经 `apiserver`。
+
+先抓重点：这条链不是“worker 自己做评估”，而是 `worker` 订阅事件后回调 `InternalService`，再由 `apiserver` 内的 `engine.Service + pipeline` 完成真正评估。
 
 #### Topic 与通道
 

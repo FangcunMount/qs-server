@@ -1,5 +1,7 @@
 # plan
 
+**本文回答**：`plan` 模块负责把“周期性测评策略”稳定落成“某个受试者在某个时间点要做的一次任务”，并在计划模板、入组、调度开放、任务终态与 `assessmentID` 回写之间建立闭环；这篇文档会先让读者一屏内看清模块职责、主入口、核心对象和与 `survey` / `evaluation` 的边界，再展开模型、契约、链路与存储细节。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -11,6 +13,19 @@
 `plan` 是 `qs-apiserver` 里的**测评计划模块**：把「周期性测评策略」落成「某受试者在某时间点要做的一次任务」，并负责**入组、任务时间线生成、到期开放入口、任务终态与 `assessmentID` 回写**。它不实现问卷/答卷、量表规则或测评引擎，**不**创建 `Assessment`（由 [evaluation](./03-evaluation.md) 负责）；与测评的衔接主要靠 **任务上 `assessmentID` + 来源标记**。
 
 代码主路径：`internal/apiserver/domain/plan`（`AssessmentPlan`、`AssessmentTask`、`TaskGenerator`、`PlanEnrollment`、`PlanLifecycle`/`TaskLifecycle`）、`internal/apiserver/application/plan`（生命周期、入组、调度、任务管理、查询）；计划与任务持久化当前主要在 **MySQL**（见下文「核心存储」）。可选 **Redis** 装饰计划仓储（见 [assembler/plan.go](../../internal/apiserver/container/assembler/plan.go)）。
+
+### 重点速查
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 模块职责 | 管计划模板、受试者入组、任务时间线生成、到点开放、任务终态和 `assessmentID` 回写 |
+| 主入口 | 后台主要走 REST；调度可走 REST 或 internal gRPC `SchedulePendingTasks` |
+| 核心对象 | `AssessmentPlan`、`AssessmentTask`、`PlanEnrollment`、`TaskGenerator` |
+| 与评估的关系 | `plan` 不创建测评，只通过 `assessmentID` 和来源标记与 `evaluation` 建立弱引用闭环 |
+| 关键边界 | 不负责问卷/答卷、量表规则、测评引擎、IAM；这些分别在 `survey`、`scale`、`evaluation`、`actor` |
+| 存储分层 | 计划与任务主存储在 MySQL；可选 Redis 仅做计划仓储装饰，不是任务真值来源 |
 
 ### 模块边界
 

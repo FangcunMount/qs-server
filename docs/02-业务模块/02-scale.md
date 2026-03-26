@@ -1,5 +1,7 @@
 # scale
 
+**本文回答**：`scale` 模块负责“量表规则”这一层，把因子、计分策略、解读规则和问卷绑定组织成可执行配置；这篇文档会先让读者一屏内看清模块职责、核心对象、运行时边界和存储分层，再展开模型、链路、因子规则与缓存细节。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -11,6 +13,19 @@
 `scale` 是 `qs-apiserver` 里的**医学量表规则模块**：在「问卷 + 答卷事实」之上，定义 **因子、计分策略、解读区间与风险文案**，供 [evaluation](./03-evaluation.md) 在评估流水线中读取并执行。它**不**替代 [survey](./01-survey.md) 的题级粗分，而是消费「题已算好的分」再做 **因子级聚合与解读配置**。
 
 代码主路径：`internal/apiserver/domain/scale`（`MedicalScale` 聚合、`Factor`、`ScoringService` 等）、`internal/apiserver/application/scale`（生命周期、因子编辑、查询）；量表持久化当前主要在 **MongoDB**（见下文「核心存储」）。因子聚合（sum / avg / cnt）委托 **`domain/calculation`** 的 `ScoringStrategy` 注册表；题级选项分仍来自 **答卷侧** `Answer.Score()`（依赖 survey 侧已写入的计分结果），见「核心设计」中 **「核心横切：题分 → 因子分 → 解读」**。
+
+### 重点速查
+
+如果只看一屏，先抓下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 模块职责 | 管量表元数据、问卷绑定、因子与解读规则、发布生命周期、`scale.*` 事件、已发布量表查询 |
+| 核心对象 | `MedicalScale`、`Factor`、`InterpretationRule`、`ScoringParams` |
+| 主入口 | 后台多走 REST 管理量表；C 端查询走 gRPC；评估时由 `evaluation` 读取量表仓储并调用 `scale.ScoringService` |
+| 关键边界 | 问卷结构与答卷提交在 `survey`；测评实例、引擎和报告在 `evaluation`；`scale` 只提供规则与计分服务 |
+| 存储分层 | 量表主存储在 MongoDB；已发布量表列表与详情有查询缓存 |
+| 最易误解点 | `scale` 管规则，不管某次测评结果；题级粗分不在这里产生，而是消费答卷侧已写入的题分 |
 
 ### 模块边界
 
@@ -246,7 +261,7 @@ flowchart TB
 - `scale.unpublished`
 - `scale.updated`
 - `scale.archived`
-   - 定义与事件载荷：[events.go](../../internal/apiserver/domain/scale/events.go)；类型常量来自 [eventconfig](../../internal/pkg/eventconfig/types.go)（与 yaml 字符串一致）。
+  - 定义与事件载荷：[events.go](../../internal/apiserver/domain/scale/events.go)；类型常量来自 [eventconfig](../../internal/pkg/eventconfig/types.go)（与 yaml 字符串一致）。
 
 **与 `configs/events.yaml` 对照（Verify）**：
 
@@ -304,7 +319,7 @@ sequenceDiagram
 | 层级 | 输入 | 做什么 | 代码锚点 |
 | ---- | ---- | ------ | -------- |
 | 题分 | `AnswerSheet` 上每题的 `Answer.Score()` | 已由 survey 侧写入，表示「该题在问卷选项配置下的得分」 | [answersheet](../../internal/apiserver/domain/survey/answersheet/) |
-| 因子分（sum / avg） | `Factor.questionCodes` + 上表题分序列 | `collectQuestionScores` 再 `calculation.GetStrategy(Sum|Average)` | [scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go) |
+| 因子分（sum / avg） | `Factor.questionCodes` + 上表题分序列 | `collectQuestionScores` 再 `calculation.GetStrategy(Sum/Average)` | [scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go) |
 | 因子分（cnt） | 因子指定 `cnt_option_contents` + 问卷选项 **content** + 答案选项 ID | 匹配题数转为 `[]float64`，再 `GetStrategy(Count)`；**必须**传入 `Questionnaire`（`qnr == nil` 会报错） | 同上 |
 | 解读 | 因子得分 + `InterpretationRule` 区间 | `Matches(score)` 左闭右开；执行在 `evaluation` 管道（如 [interpretation.go](../../internal/apiserver/application/evaluation/engine/pipeline/interpretation.go)） | [interpretation_rule.go](../../internal/apiserver/domain/scale/interpretation_rule.go) |
 

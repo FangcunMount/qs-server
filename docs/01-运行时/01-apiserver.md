@@ -1,5 +1,27 @@
 # apiserver（qs-apiserver）
 
+**本文回答**：这篇文档解释 `qs-apiserver` 在运行时到底承担什么角色、内部由哪些组件构成、启动与关闭时序怎样、事件从哪里发布、以及它与 `collection-server` / `qs-worker` / 基础设施如何协作；本文先给结论和速查，再展开内部结构与代码入口。
+
+## 30 秒结论
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 进程角色 | `qs-apiserver` 是主业务进程，持有领域状态与持久化真值，对外提供后台 REST 和 gRPC Server |
+| 上下游关系 | 上游包括后台客户端、`collection-server`、`qs-worker`；下游包括 MySQL、MongoDB、Redis、IAM 和 MQ |
+| 最重要的运行时认识 | 同步请求和异步回调最终都收口到本进程执行业务写；worker 不是第二套主业务容器 |
+| 异步边界 | 事件由本进程发布，长耗时后续由 worker 消费后再通过 gRPC 回调本进程完成 |
+| 同进程后台 | 缓存预热、统计同步 ticker 等后台任务在本进程内运行，但不改变“主状态收口”的事实 |
+| 排障入口 | 先看 `server.go` 的装配与 `PrepareRun`，再看 `container/assembler` 和 Router / GRPCRegistry |
+
+## 重点速查（继续往下读前先记这几条）
+
+1. **主状态只在这里收口**：无论入口来自后台 REST、collection 的 gRPC，还是 worker 的 internal 回调，真正的业务写和持久化都在 `qs-apiserver`。  
+2. **HTTP 与 gRPC 共用同一套业务实现**：它们共享 container 和 application/domain 层，不是两套并行逻辑。  
+3. **异步不是旁路系统**：事件由本进程发布，worker 只是把事件再驱动回本进程执行内部动作。  
+4. **排障顺序**：先看启动装配、依赖初始化和 Router / gRPC 注册，再看具体模块 assembler 与 infra。  
+
 **组件定位**：主业务进程，**领域状态与持久化**的权威所在；对外提供 **后台 REST** 与 **gRPC Server**；向 **MQ 发布**领域事件；被 **collection-server**、**qs-worker** 通过 gRPC 调用。  
 领域细节见 [02-业务模块](../02-业务模块/)；契约与端口见 [04-接口与运维](../04-接口与运维/)。
 

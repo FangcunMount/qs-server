@@ -1,5 +1,27 @@
 # worker（qs-worker）
 
+**本文回答**：这篇文档解释 `qs-worker` 在运行时如何把 MQ 事件转成对 `qs-apiserver` 的 gRPC 回调、消息分发和 Ack/Nack 是怎么工作的、常见 `event_type -> handler -> RPC` 映射是什么、以及它与 Redis、事件配置和主业务容器的边界；本文先给结论和速查，再展开时序与代码入口。
+
+## 30 秒结论
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 进程角色 | `qs-worker` 是异步执行器，负责消费事件、分发给 handler，并通过 gRPC 回调 `qs-apiserver` |
+| 上下游关系 | 上游是 MQ；核心下游是 `qs-apiserver` 的 AnswerSheet / Evaluation / Internal gRPC |
+| 最重要的运行时认识 | worker 不装配完整领域容器，也不持有业务写真值；它只是把事件驱动回主服务 |
+| 事件真值 | `event_type`、topic 和 handler 绑定最终以 `configs/events.yaml` 为准，代码注册必须与之对齐 |
+| 本地依赖 | Redis 只用于锁、统计辅助等 handler 侧能力，不改变业务状态归属 |
+| 排障入口 | 先看 `events.yaml`，再看 `server.go` 分发链、handler 注册和对应 gRPC client |
+
+## 重点速查（继续往下读前先记这几条）
+
+1. **worker 只负责驱动，不负责收口状态**：业务真值仍在 `qs-apiserver`，worker 只是消费事件并发起内部 RPC。  
+2. **`event_type` 是主索引**：排障时先确认消息上的 `event_type`，再对照 yaml 的 handler 键和代码注册。  
+3. **Ack/Nack 取决于 Dispatch 结果**：理解投递语义时，要从 `createDispatchHandler` 这一层看成功、失败和重试。  
+4. **Redis 是侧载能力**：锁、统计和幂等辅助可能用到 Redis，但这不等于 worker 成了独立业务服务。  
+
 **组件定位**：**MQ 消费进程**；根据 [`configs/events.yaml`](../../configs/events.yaml) 订阅 Topic；将消息按 **event_type** 分发给 handler；通过 **gRPC** 回调 **apiserver** 完成业务写。**不**暴露业务 HTTP；**不**装配完整领域容器。  
 事件拓扑见 [03-事件系统](../03-基础设施/01-事件系统.md)；gRPC 客户端表见 [04-gRPC](../04-接口与运维/02-gRPC契约.md)。
 

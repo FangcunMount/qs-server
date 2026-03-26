@@ -1,5 +1,7 @@
 # actor
 
+**本文回答**：`actor` 模块负责回答“业务里的人是谁”，把 `Testee`、`Staff` 以及它们与 IAM 的关系稳定收敛成可引用的业务主体；这篇文档会先让读者一屏内看清模块职责、主入口、关键边界和运行时位置，再展开模型、契约、集成与存储细节。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -11,6 +13,19 @@
 `actor` 是 `qs-apiserver` 里的**主体（Actor）模块**，在问卷/测评限界上下文内回答两件事：**谁是被测的人**（`Testee`）、**谁是机构侧操作者**（`Staff`）。它把 **IAM** 的用户/儿童档案与业务侧 **`testeeID` / `staffID`** 对齐，并承载标签、重点关注、机构内角色等**本 BC 状态**；**不是**统一登录与全局权限中心。
 
 代码主路径：`internal/apiserver/domain/actor`（`testee`、`staff`、引用值对象）、`internal/apiserver/application/actor`；持久化当前主要在 **MySQL**（见「核心存储」）。受试者读路径可经 **Redis** 装饰仓储（见 [assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)）。与 IAM 的交互经 [infra/iam](../../internal/apiserver/infra/iam)（`GuardianshipService`、`IdentityService` 等）。
+
+### 重点速查
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 模块职责 | 统一管理业务里的 `Testee` / `Staff` 主体，承载本域档案、标签、重点关注和机构内角色 |
+| 主入口 | 后台主要走 REST；C 端主要走 `ActorService` gRPC；worker 可通过 internal gRPC `TagTestee` 回写标签 |
+| 核心对象 | `Testee`、`Staff`、`TesteeRef`、`StaffRef`、`FillerRef` |
+| 与 IAM 的关系 | IAM 提供身份与档案源，`actor` 负责在业务域里完成绑定、投影与补充状态，不把 IAM 当聚合本身 |
+| 关键边界 | 不负责登录、JWT、系统级授权，也不负责问卷、测评、计划等业务主流程 |
+| 存储分层 | 主存储在 MySQL；受试者读路径可经 Redis 装饰仓储加速 |
 
 ### 模块边界
 

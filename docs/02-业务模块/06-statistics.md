@@ -1,5 +1,7 @@
 # statistics
 
+**本文回答**：`statistics` 模块负责把分散在测评、计划、主体等域的数据整理成可查询的统计读模型；这篇文档会先让读者一屏内看清模块职责、查询分层、同步入口和运行时边界，再展开模型、服务、事件驱动更新与一致性校验细节。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -11,6 +13,19 @@
 `statistics` 是 `qs-apiserver` 内的**读侧统计模块**：把分散在 [evaluation](./03-evaluation.md)、[actor](./05-actor.md)、[plan](./04-plan.md) 等数据上的指标，收敛成系统级、问卷级、受试者级、计划级等**可查询视图**。实现上采用 **Redis 预聚合 + MySQL 统计表 + 原始表回源** 的分层读取；**不是**主业务写入域，也**不是**通用 BI/实时分析引擎。
 
 代码主路径：`internal/apiserver/domain/statistics`（结果类型与 `Aggregator` / `TrendAnalyzer` 等）、`internal/apiserver/application/statistics`；持久化在 **MySQL**（`statistics_*` 表）与可选 **Redis**（`StatisticsCache`）；**qs-worker** 内消费测评相关事件并写 Redis（见 [statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)）。读侧保护与预聚合总览见 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)。
+
+### 重点速查
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 模块职责 | 提供系统级、问卷级、受试者级、计划级等统计查询视图，并负责同步与校验入口 |
+| 查询分层 | 优先读 Redis 查询缓存，再读 MySQL 统计表，最后必要时回源业务表聚合 |
+| 同步入口 | REST 与 internal gRPC 都支持 `daily`、`accumulated`、`plan` 同步与校验 |
+| 事件驱动 | `assessment.*` 相关事件由 `qs-worker` 消费后写 Redis 预聚合，不在 apiserver 事件路径内直接增量写 |
+| 核心边界 | 不负责测评计分、计划调度、问卷主数据写入，也不发布稳定 `statistics.*` 业务事件 |
+| 存储分层 | MySQL 持久化 `statistics_*` 读模型；Redis 同时承担预聚合键与查询结果缓存，但两类键用途不同 |
 
 ### 模块边界
 

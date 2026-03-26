@@ -1,5 +1,7 @@
 # REST 契约
 
+**本文回答**：这篇文档解释 `qs-server` 的两套 REST 契约分别由谁提供、OpenAPI 文件在哪里、生成与校验链如何工作、公开路径与受保护路径如何区分，以及排障时该从哪些机器文件和路由入口核对；本文先给结论和速查，再展开契约生成链与分工。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 的讲解维度组织。**业务语义与模块边界**见 [02-业务模块](../02-业务模块/) 各篇；**入口限流键与路由覆盖**见 [03-基础设施/03-缓存与限流](../03-基础设施/03-缓存与限流.md)。本文补齐 **What / Where / Verify**：双 REST 面分工、契约生成链、公开路径与自检方式。
 
 ---
@@ -9,6 +11,19 @@
 ### 概览
 
 仓库对外暴露 **两套 REST 进程**：**collection-server**（前台 BFF）与 **qs-apiserver**（后台与运维）。业务前缀均为 **`/api/v1`**；**`/api/rest/*`** 仅用于静态挂载 **OpenAPI 导出文件**，不是业务 API。
+
+### 重点速查
+
+如果只看一屏，先看下面这张表：
+
+| 维度 | 结论 |
+| ---- | ---- |
+| 双 REST 面 | `collection-server` 面向前台 / 小程序，`qs-apiserver` 面向后台、运维和内部管理 |
+| 契约真值 | 最终以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 和 [api/rest/collection.yaml](../../api/rest/collection.yaml) 为准 |
+| 生成链 | `swag` 先生成 swagger，再由脚本转成 REST yaml，最后用 `compare_api_docs.py` 做校验 |
+| 路由真值 | 运行时实际暴露仍以各进程 `routers.go` 为准，导出文件必须与之持续对齐 |
+| 最易混点 | `/api/rest/*` 是静态挂载的导出文档，不是业务 API 前缀 |
+| 排障入口 | 先查 OpenAPI 文件和 `Makefile` 生成链，再回到 `routers.go` 和具体 handler |
 
 ### 基础设施边界
 
