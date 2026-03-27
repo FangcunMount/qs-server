@@ -18,6 +18,7 @@ services:
       - /opt/qs-server/qs-apiserver/configs:/app/configs
       - /data/logs/qs-server/qs-apiserver:/data/logs/qs
       # 证书与密钥目录统一挂载（避免单文件挂载在只读目录内创建 mountpoint 失败）
+      # 私钥须对容器内 appuser（UID/GID 默认 1000）可读：见 Dockerfile USER；宿主机勿仅 root:root/600
       - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
       - /data/ssl/private:/etc/qs-server/ssl/private:ro
       # gRPC mTLS 证书目录
@@ -47,7 +48,7 @@ services:
     volumes:
       - /opt/qs-server/qs-collection-server/configs:/app/configs
       - /data/logs/qs-server/qs-collection-server:/data/logs/qs
-      # 证书与密钥目录统一挂载
+      # 证书与密钥目录统一挂载（私钥须对 UID 1000 可读，同 qs-apiserver）
       - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
       - /data/ssl/private:/etc/qs-server/ssl/private:ro
       # gRPC mTLS 证书目录

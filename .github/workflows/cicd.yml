@@ -612,6 +612,16 @@ jobs:
               echo "❌ Web KEY not readable: $KEY_HOST_PATH"
               exit 1
             fi
+            # 与 Dockerfile USER appuser（默认 UID 1000）一致：root 可读 ≠ 容器内可读
+            if ! $SUDO docker run --rm \
+              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
+              --user "${APP_UID}:${APP_GID}" \
+              alpine:3.21 sh -c "test -r \"${KEY_HOST_PATH}\""; then
+              echo "❌ Web KEY not readable by container UID ${APP_UID}: $KEY_HOST_PATH"
+              echo "   Fix: sudo chown ${APP_UID}:${APP_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
+              echo "   Dirs: sudo chmod 755 /data/ssl /data/ssl/private"
+              exit 1
+            fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
               echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
@@ -860,6 +870,15 @@ jobs:
 
             if ! $SUDO test -r "$CERT_HOST_PATH" || ! $SUDO test -r "$KEY_HOST_PATH"; then
               echo "❌ Web certificates not found"
+              exit 1
+            fi
+            if ! $SUDO docker run --rm \
+              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
+              --user "${APP_UID}:${APP_GID}" \
+              alpine:3.21 sh -c "test -r \"${KEY_HOST_PATH}\""; then
+              echo "❌ Web KEY not readable by container UID ${APP_UID}: $KEY_HOST_PATH"
+              echo "   Fix: sudo chown ${APP_UID}:${APP_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
+              echo "   Dirs: sudo chmod 755 /data/ssl /data/ssl/private"
               exit 1
             fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
