@@ -612,14 +612,27 @@ jobs:
               echo "❌ Web KEY not readable: $KEY_HOST_PATH"
               exit 1
             fi
-            # 与 Dockerfile USER appuser（默认 UID 1000）一致：root 可读 ≠ 容器内可读
-            if ! $SUDO docker run --rm \
-              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
-              --user "${APP_UID}:${APP_GID}" \
-              alpine:3.21 sh -c "test -r \"${KEY_HOST_PATH}\""; then
-              echo "❌ Web KEY not readable by container UID ${APP_UID}: $KEY_HOST_PATH"
-              echo "   Fix: sudo chown ${APP_UID}:${APP_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
+            # 与 Dockerfile USER appuser 一致：固定 UID/GID=1000（勿用 WWW_UID 做此检查，WWW_UID 仅用于宿主机 configs 等目录属主）
+            TLS_UID=1000
+            TLS_GID=1000
+            KEY_OK=0
+            if command -v python3 >/dev/null 2>&1; then
+              if $SUDO env KEY_PATH="$KEY_HOST_PATH" TLS_UID="$TLS_UID" TLS_GID="$TLS_GID" python3 -c 'import os,sys; os.setgid(int(os.environ["TLS_GID"])); os.setuid(int(os.environ["TLS_UID"])); p=os.environ["KEY_PATH"]; sys.exit(0 if os.access(p, os.R_OK) else 1)'; then
+                KEY_OK=1
+              fi
+            fi
+            if [ "$KEY_OK" != 1 ] && command -v setpriv >/dev/null 2>&1; then
+              if $SUDO setpriv --reuid "$TLS_UID" --regid "$TLS_GID" --clear-groups test -r "$KEY_HOST_PATH" 2>/dev/null; then
+                KEY_OK=1
+              fi
+            fi
+            if [ "$KEY_OK" != 1 ]; then
+              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile appuser): $KEY_HOST_PATH"
+              echo "   Fix: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
               echo "   Dirs: sudo chmod 755 /data/ssl /data/ssl/private"
+              echo "   Note: WWW_UID/WWW_GID 与容器内 TLS 无关；若目录为 700 root，请先 chmod 755 父目录"
+              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
+              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
               exit 1
             fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
@@ -872,13 +885,26 @@ jobs:
               echo "❌ Web certificates not found"
               exit 1
             fi
-            if ! $SUDO docker run --rm \
-              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
-              --user "${APP_UID}:${APP_GID}" \
-              alpine:3.21 sh -c "test -r \"${KEY_HOST_PATH}\""; then
-              echo "❌ Web KEY not readable by container UID ${APP_UID}: $KEY_HOST_PATH"
-              echo "   Fix: sudo chown ${APP_UID}:${APP_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
+            TLS_UID=1000
+            TLS_GID=1000
+            KEY_OK=0
+            if command -v python3 >/dev/null 2>&1; then
+              if $SUDO env KEY_PATH="$KEY_HOST_PATH" TLS_UID="$TLS_UID" TLS_GID="$TLS_GID" python3 -c 'import os,sys; os.setgid(int(os.environ["TLS_GID"])); os.setuid(int(os.environ["TLS_UID"])); p=os.environ["KEY_PATH"]; sys.exit(0 if os.access(p, os.R_OK) else 1)'; then
+                KEY_OK=1
+              fi
+            fi
+            if [ "$KEY_OK" != 1 ] && command -v setpriv >/dev/null 2>&1; then
+              if $SUDO setpriv --reuid "$TLS_UID" --regid "$TLS_GID" --clear-groups test -r "$KEY_HOST_PATH" 2>/dev/null; then
+                KEY_OK=1
+              fi
+            fi
+            if [ "$KEY_OK" != 1 ]; then
+              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile appuser): $KEY_HOST_PATH"
+              echo "   Fix: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
               echo "   Dirs: sudo chmod 755 /data/ssl /data/ssl/private"
+              echo "   Note: WWW_UID/WWW_GID 与容器内 TLS 无关；若目录为 700 root，请先 chmod 755 父目录"
+              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
+              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
               exit 1
             fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
