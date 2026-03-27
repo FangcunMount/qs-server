@@ -91,7 +91,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 
 	// 初始化基础设施层（入口生成器）
 	// TODO: 从配置中读取 baseURL，默认使用占位符
-	entryGenerator := planEntryInfra.NewEntryGenerator("https://collect.yangshujie.com/entry")
+	entryGenerator := planEntryInfra.NewEntryGenerator("https://collect.fangcunmount.cn/entry")
 
 	// 获取 scale repository（可选参数，用于通过 code 查找 scale）
 	var scaleRepo scale.Repository

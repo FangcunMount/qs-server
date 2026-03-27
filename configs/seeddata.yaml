@@ -1,6 +1,6 @@
 api:
-  baseUrl: "https://qs.yangshujie.com"
-  collectionBaseUrl: "https://collect.yangshujie.com"
+  baseUrl: "https://qs.fangcunmount.cn"
+  collectionBaseUrl: "https://collect.fangcunmount.cn"
   token: ""
   retry:
     maxRetries: 3
@@ -8,7 +8,7 @@ api:
     maxDelay: "5s"
 
 iam:
-  loginUrl: "https://iam.yangshujie.com/api/v1/authn/login"
+  loginUrl: "https://iam.fangcunmount.cn/api/v1/authn/login"
   username: "+8613112345671"
   password: "Admin@123"
 

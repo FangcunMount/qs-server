@@ -600,8 +600,8 @@ jobs:
             fi
 
             # 证书路径检查（docker-compose 会自动挂载）
-            CERT_HOST_PATH="/data/ssl/certs/yangshujie.com.crt"
-            KEY_HOST_PATH="/data/ssl/private/yangshujie.com.key"
+            CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
+            KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
             if ! $SUDO test -r "$CERT_HOST_PATH"; then
@@ -854,8 +854,8 @@ jobs:
             fi
 
             # 证书路径检查（docker-compose 会自动挂载）
-            CERT_HOST_PATH="/data/ssl/certs/yangshujie.com.crt"
-            KEY_HOST_PATH="/data/ssl/private/yangshujie.com.key"
+            CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
+            KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
             if ! $SUDO test -r "$CERT_HOST_PATH" || ! $SUDO test -r "$KEY_HOST_PATH"; then

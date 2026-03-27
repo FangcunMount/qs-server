@@ -9,7 +9,7 @@ name: Deploy Crontab Configuration
 #
 # Repository Secrets (仓库级别，敏感信息):
 #   IAM_USERNAME, IAM_PASSWORD (IAM 登录凭证)
-#   IAM_BASE_URL (可选，默认: https://iam.yangshujie.com/api/v1)
+#   IAM_BASE_URL (可选，默认: https://iam.fangcunmount.cn/api/v1)
 #   API_BASE_URL (可选，默认: http://localhost:8080)
 # ============================================================================
 
@@ -107,7 +107,7 @@ jobs:
           
           # 可选的 IAM 配置
           if [ -z "${{ secrets.IAM_BASE_URL }}" ]; then
-            echo "⚠️  IAM_BASE_URL is not set, will use default: https://iam.yangshujie.com/api/v1"
+            echo "⚠️  IAM_BASE_URL is not set, will use default: https://iam.fangcunmount.cn/api/v1"
           else
             echo "✅ IAM_BASE_URL is set"
           fi
@@ -250,7 +250,7 @@ jobs:
           # 使用默认值（如果 secrets 未设置）
           IAM_USERNAME="${IAM_USERNAME:-qs-scheduler@example.com}"
           IAM_PASSWORD="${IAM_PASSWORD:-your-password-here}"
-          IAM_BASE_URL="${IAM_BASE_URL:-https://iam.yangshujie.com/api/v1}"
+          IAM_BASE_URL="${IAM_BASE_URL:-https://iam.fangcunmount.cn/api/v1}"
           API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
           
           # 转义特殊字符（用于 sed）
@@ -263,7 +263,7 @@ jobs:
           # 使用 | 作为分隔符，避免与 URL 中的 / 冲突
           sed -i "s|IAM_USERNAME=\"qs-scheduler@example.com\"|IAM_USERNAME=\"${IAM_USERNAME_ESC}\"|g" deploy-crontab/qs-scheduler
           sed -i "s|IAM_PASSWORD=\"your-password-here\"|IAM_PASSWORD=\"${IAM_PASSWORD_ESC}\"|g" deploy-crontab/qs-scheduler
-          sed -i "s|IAM_BASE_URL=\"https://iam.yangshujie.com/api/v1\"|IAM_BASE_URL=\"${IAM_BASE_URL_ESC}\"|g" deploy-crontab/qs-scheduler
+          sed -i "s|IAM_BASE_URL=\"https://iam.fangcunmount.cn/api/v1\"|IAM_BASE_URL=\"${IAM_BASE_URL_ESC}\"|g" deploy-crontab/qs-scheduler
           sed -i "s|API_BASE_URL=\"http://localhost:8080\"|API_BASE_URL=\"${API_BASE_URL_ESC}\"|g" deploy-crontab/qs-scheduler
           
           # 验证替换结果（不显示敏感信息）

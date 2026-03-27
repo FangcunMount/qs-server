@@ -15,7 +15,7 @@ import (
 const (
 	// QRCodeStorageDir 二维码存储目录
 	QRCodeStorageDir = "/data/image/qrcode"
-	QRCodeURLPrefix  = "https://qs.yangshujie.com/api/v1/qrcodes"
+	QRCodeURLPrefix  = "https://qs.fangcunmount.cn/api/v1/qrcodes"
 )
 
 // Config 小程序码服务配置

@@ -44,8 +44,8 @@ secure:
   bind-port: 8443
   tls:
     # Web 证书（容器内路径，由 docker-compose 从宿主机挂载）
-    cert-file: "/etc/qs-server/ssl/certs/yangshujie.com.crt"
-    private-key-file: "/etc/qs-server/ssl/private/yangshujie.com.key"
+    cert-file: "/etc/qs-server/ssl/certs/fangcunmount.cn.crt"
+    private-key-file: "/etc/qs-server/ssl/private/fangcunmount.cn.key"
 
 # ----------------------------------------------------------------------------
 # 2.2 gRPC 服务配置（生产环境 - 安全模式）
@@ -290,7 +290,7 @@ iam:
   
   # JWKS 配置（JWT 公钥管理）
   jwks:
-    url: "https://iam.yangshujie.com/api/v1/.well-known/jwks.json"  # JWKS HTTP 端点
+    url: "https://iam.fangcunmount.cn/api/v1/.well-known/jwks.json"  # JWKS HTTP 端点
     grpc-endpoint: "iam-apiserver:9090"                    # gRPC 降级端点（HTTP 失败时使用，端口 9090）
     refresh-interval: 5m                               # 定时刷新间隔
     cache-ttl: 30m                                     # 缓存有效期

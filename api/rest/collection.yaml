@@ -10,7 +10,7 @@ info:
 servers:
 - url: http://localhost:18083/api/v1
   description: 本地开发
-- url: https://collect.yangshujie.com/api/v1
+- url: https://collect.fangcunmount.cn/api/v1
   description: 生产环境
 tags:
 - name: 受试者

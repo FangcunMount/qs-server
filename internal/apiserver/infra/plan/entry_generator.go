@@ -14,7 +14,7 @@ import (
 // entryGenerator 入口生成器实现
 // 负责生成测评入口（token、URL）
 type entryGenerator struct {
-	baseURL string // 测评入口的基础URL（例如：https://collect.yangshujie.com/entry）
+	baseURL string // 测评入口的基础URL（例如：https://collect.fangcunmount.cn/entry）
 }
 
 // NewEntryGenerator 创建入口生成器

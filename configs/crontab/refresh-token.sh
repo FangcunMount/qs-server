@@ -20,7 +20,7 @@ set -euo pipefail
 # ============================================================
 
 # IAM API 基础 URL（不包含路径）
-IAM_BASE_URL="${IAM_BASE_URL:-https://iam.yangshujie.com/api/v1}"
+IAM_BASE_URL="${IAM_BASE_URL:-https://iam.fangcunmount.cn/api/v1}"
 
 # IAM 登录接口路径
 IAM_LOGIN_ENDPOINT="/authn/login"
