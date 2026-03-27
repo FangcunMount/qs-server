@@ -27,7 +27,9 @@
 
 ---
 
-## 1. 组件定位（在整体中的位置）
+## 这个进程在整体里承担什么
+
+先回答角色、上下游和异步边界，再看内部结构图。
 
 | 维度 | 说明 |
 | ---- | ---- |
@@ -38,7 +40,7 @@
 
 ---
 
-## 2. 内部运行示意图
+### 内部运行示意图
 
 ```mermaid
 flowchart TD
@@ -77,7 +79,9 @@ flowchart TD
 
 ---
 
-## 3. 启动与时序（PrepareRun 示意）
+## 它是怎么启动和关闭的
+
+### 启动与时序（`PrepareRun` 示意）
 
 ```mermaid
 sequenceDiagram
@@ -100,7 +104,7 @@ sequenceDiagram
 
 ---
 
-## 4. 优雅关闭（gRPC、HTTP、DB、统计 ticker、容器）
+### 优雅关闭（gRPC、HTTP、DB、统计 ticker、容器）
 
 进程使用 `component-base` 的 **`GracefulShutdown`**（POSIX 信号）。**主关闭回调**在 [server.go `PrepareRun`](../../internal/apiserver/server.go) 末尾注册，**大致顺序**为：
 
@@ -115,7 +119,9 @@ sequenceDiagram
 
 ---
 
-## 5. 领域事件发布（应用层入口，非仅 events.yaml）
+## 领域事件从哪里发布
+
+这一节只回答“本进程里谁在发事件、发布点落在哪”；Topic 映射和 worker 消费机制回看 [03-事件系统](../03-基础设施/01-事件系统.md)。
 
 **配置与 Topic 映射**仍以 [`configs/events.yaml`](../../configs/events.yaml) 与 [03-事件系统](../03-基础设施/01-事件系统.md) 为 **Verify**；**本进程内谁在发**集中在 **应用服务 / 流水线**，经 **`Container.GetEventPublisher()`** 注入的 **`event.EventPublisher`**（内部多为 [RoutingPublisher](../../internal/pkg/eventconfig/publisher.go)）调用 **`Publish`**。
 
@@ -131,30 +137,15 @@ sequenceDiagram
 
 ---
 
-## 6. 多实例与 MQ / worker 的并发语义（边界说明）
+## 它和其它组件怎么交互
+
+### 多实例与 MQ / worker 的并发语义（边界说明）
 
 - **多 apiserver 实例**：各自独立 **Publish**；同一业务事件是否重复取决于 **上游是否重复提交** 与 **应用层是否重复调用 Publish**，而非 MQ 本身为 apiserver 去重。  
 - **多 worker 实例**：对 **同一 Topic** 的消费语义由 **NSQ / RabbitMQ 等** 决定（竞争消费、是否 at-least-once 等）；本仓库 **不在应用层统一封装**「全局恰好一次」。  
 - **幂等与乱序**：重复消息、乱序投递的防护依赖 **handler 幂等设计、DB 唯一约束、业务版本** 等，属 **02 / 各 handler** 与运维配置范畴，**不在本文展开**。
 
----
-
-## 7. 核心功能与关键点
-
-| 功能 | 关键点 | 代码锚点 |
-| ---- | ------ | -------- |
-| **配置加载** | `Options` → `config.Config`，与 `configs/*.yaml` 绑定 | [options/options.go](../../internal/apiserver/options/options.go) |
-| **存储接入** | 迁移、连接池、**背压** 包在适配层 | [database.go](../../internal/apiserver/database.go)、[backpressure](../../internal/pkg/backpressure/limiter.go) |
-| **模块装配** | 按 assembler 注入各 BC | [container/assembler/](../../internal/apiserver/container/assembler/) |
-| **REST** | 后台路由、运维接口 | [routers.go](../../internal/apiserver/routers.go) |
-| **gRPC** | 六类服务注册；模块 nil 则跳过 | [grpc_registry.go](../../internal/apiserver/grpc_registry.go) |
-| **发事件** | 应用层见 **§5**；Topic/handler 与 [events.yaml](../../configs/events.yaml) 对齐 | [03-事件系统](../03-基础设施/01-事件系统.md) |
-| **缓存预热** | 启动后异步 | [container.go WarmupCache](../../internal/apiserver/container/container.go) |
-| **统计落库 ticker** | 与 Crontab 可能叠加；关闭见 **§4** | [server.go](../../internal/apiserver/server.go)、[04-调度](../04-接口与运维/04-调度与后台任务.md) |
-
----
-
-## 8. 与其它组件的交互
+### 与其它组件的交互
 
 | 对方 | 方式 | 说明 |
 | ---- | ---- | ---- |
@@ -164,18 +155,29 @@ sequenceDiagram
 | **Client（后台）** | REST | 管理、Crontab |
 | **IAM** | SDK | 验签、身份、服务间 token 等 |
 
----
+## 排障时先看什么
 
-## 9. 关键代码入口（索引）
+### 核心功能与关键点
+
+| 功能 | 关键点 | 代码锚点 |
+| ---- | ------ | -------- |
+| **配置加载** | `Options` → `config.Config`，与 `configs/*.yaml` 绑定 | [options/options.go](../../internal/apiserver/options/options.go) |
+| **存储接入** | 迁移、连接池、**背压** 包在适配层 | [database.go](../../internal/apiserver/database.go)、[backpressure](../../internal/pkg/backpressure/limiter.go) |
+| **模块装配** | 按 assembler 注入各 BC | [container/assembler/](../../internal/apiserver/container/assembler/) |
+| **REST** | 后台路由、运维接口 | [routers.go](../../internal/apiserver/routers.go) |
+| **gRPC** | 六类服务注册；模块 nil 则跳过 | [grpc_registry.go](../../internal/apiserver/grpc_registry.go) |
+| **发事件** | 应用层见上文“领域事件从哪里发布”；Topic/handler 与 [events.yaml](../../configs/events.yaml) 对齐 | [03-事件系统](../03-基础设施/01-事件系统.md) |
+| **缓存预热** | 启动后异步 | [container.go WarmupCache](../../internal/apiserver/container/container.go) |
+| **统计落库 ticker** | 与 Crontab 可能叠加；关闭见上文“优雅关闭” | [server.go](../../internal/apiserver/server.go)、[04-调度](../04-接口与运维/04-调度与后台任务.md) |
+
+### 关键代码入口（索引）
 
 | 关注点 | 路径 |
 | ------ | ---- |
 | 进程入口 | [cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)、[app.go](../../internal/apiserver/app.go)、[run.go](../../internal/apiserver/run.go) |
 | 通用 HTTP 栈 | [genericapiserver.go](../../internal/pkg/server/genericapiserver.go) |
 
----
-
-## 10. 边界与注意事项
+## 边界与注意事项
 
 - **前台流量**大量经 **collection**，勿假设所有请求直达 apiserver。  
 - **worker 回写**仍经本进程，**领域一致性**以本进程存储为准。  

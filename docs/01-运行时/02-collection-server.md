@@ -27,7 +27,9 @@
 
 ---
 
-## 1. 组件定位（在整体中的位置）
+## 这个进程在整体里承担什么
+
+先回答角色、上下游和本地依赖，再看内部结构图。
 
 | 维度 | 说明 |
 | ---- | ---- |
@@ -38,7 +40,7 @@
 
 ---
 
-## 2. 内部运行示意图
+### 内部运行示意图
 
 ```mermaid
 flowchart LR
@@ -63,7 +65,9 @@ flowchart LR
 
 ---
 
-## 3. 典型请求时序（REST → gRPC）
+## 典型请求怎么穿过它
+
+### 典型请求时序（REST → gRPC）
 
 ```mermaid
 sequenceDiagram
@@ -86,11 +90,11 @@ sequenceDiagram
 
 ---
 
-## 4. 答卷提交：直调 gRPC vs 经 SubmitQueue
+## 答卷提交为什么分成两条路径
 
 **配置**：`submit_queue.enabled` 等为 `true` 且参数合法时，[NewSubmissionService](../../internal/collection-server/application/answersheet/submission_service.go) 会创建 **`SubmitQueue`**，并把 **`submitSync`**（内部即 **AnswerSheet gRPC → apiserver**）作为队列 worker 的 **`submit` 回调**；**未启用队列**时 `queue == nil`，`SubmitQueued` **直接调用 `submitSync`**，与「同步直调」等价。
 
-### 4.1 分支示意（flowchart）
+### 分支示意（flowchart）
 
 ```mermaid
 flowchart TD
@@ -105,7 +109,7 @@ flowchart TD
     SYNC --> API[apiserver AnswerSheet gRPC]
 ```
 
-### 4.2 时序对比（sequenceDiagram）
+### 时序对比（sequenceDiagram）
 
 ```mermaid
 sequenceDiagram
@@ -143,7 +147,20 @@ sequenceDiagram
 
 ---
 
-## 5. 核心功能与关键点
+## 它和其它组件怎么交互
+
+### 与其它组件的交互
+
+| 对方 | 方式 | 说明 |
+| ---- | ---- | ---- |
+| **apiserver** | gRPC | 主读写与领域逻辑 |
+| **Client** | REST | 唯一对外业务面 |
+| **IAM** | SDK | 验签、监护查询等 |
+| **Redis** | TCP | 排队与辅助状态 |
+
+## 排障时先看什么
+
+### 核心功能与关键点
 
 | 功能 | 关键点 | 代码锚点 |
 | ---- | ------ | -------- |
@@ -154,29 +171,14 @@ sequenceDiagram
 | **监护与提交** | JWT 之外的业务校验 | [submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go) |
 | **身份中间件** | 与 apiserver **不是**同一套 UserIdentity 实现 | [iam_middleware.go](../../internal/collection-server/interface/restful/middleware/iam_middleware.go) |
 
----
-
-## 6. 与其它组件的交互
-
-| 对方 | 方式 | 说明 |
-| ---- | ---- | ---- |
-| **apiserver** | gRPC | 主读写与领域逻辑 |
-| **Client** | REST | 唯一对外业务面 |
-| **IAM** | SDK | 验签、监护查询等 |
-| **Redis** | TCP | 排队与辅助状态 |
-
----
-
-## 7. 关键代码入口（索引）
+### 关键代码入口（索引）
 
 | 关注点 | 路径 |
 | ------ | ---- |
 | 进程入口 | [cmd/collection-server/main.go](../../cmd/collection-server/main.go) |
 | 配置 | [options/options.go](../../internal/collection-server/options/options.go) |
 
----
-
-## 8. 边界与注意事项
+## 边界与注意事项
 
 - **无** MySQL/Mongo 主库连接；持久化均在 **apiserver**。  
 - **匿名只读**仅路由白名单（如部分 scales GET）。  

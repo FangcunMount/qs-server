@@ -1,6 +1,6 @@
 # IAM 与认证
 
-本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 的讲解维度组织。**端到端身份链路与运行时顺序**见 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md)；本文固定 **IAM 在仓库中的接入形态**、**与用户态/服务态两套语义**及 **Verify 要点**。
+**本文回答**：这篇文档解释 IAM 能力在 `qs-server` 仓库里是怎样接进来的：哪些模块和中间件真正依赖 IAM、用户态与服务态 token 各自解决什么问题、gRPC 与 mTLS 在基础设施层如何配合，以及排查认证问题时应从哪些装配点和配置键入手。
 
 ---
 
@@ -70,7 +70,9 @@ flowchart LR
 
 ---
 
-## 核心设计
+## IAM 在仓库里怎样接入
+
+这一节先回答“哪些地方真的接了 IAM、接入点落在哪”，再分别展开 JWT、服务间认证和 gRPC/mTLS。
 
 ### 核心契约：JWT、JWKS 与配置键（Verify）
 
@@ -85,6 +87,8 @@ flowchart LR
 
 **验证顺序**（`TokenVerifier`）：**本地 JWKS 验签优先** → **远程 gRPC 验证降级**，减少 IAM 在线依赖。
 
+## 用户态与服务态为什么要分开
+
 ### 核心模式：用户态与服务态
 
 | 语义 | 用途 | 典型入口 |
@@ -93,6 +97,8 @@ flowchart LR
 | **服务间认证** | `collection-server → apiserver`、与其它服务 | `ServiceAuthHelper` |
 
 二者都依赖 IAM SDK，但**解决的问题不同**：「令牌声明是否可信」vs「调用方服务身份」。
+
+## gRPC、mTLS 和 IAM JWT 是怎么叠起来的
 
 ### 核心模式：gRPC 与可选 mTLS
 
@@ -105,6 +111,8 @@ flowchart LR
 - **默认跳过认证**：gRPC **Health**、**Reflection**（前缀匹配），见 `NewIAMAuthInterceptor` 内 `skipMethods`；**业务 RPC 不在默认白名单**，需带 JWT 或运行时扩展 `AddSkipMethod`。
 - **worker → apiserver**：[`InternalClient`](../../internal/worker/infra/grpcclient/internal_client.go) 调用 **未**附加 `authorization` metadata；[`Manager`](../../internal/worker/infra/grpcclient/manager.go) 仅 TLS/mTLS 传输凭证。故 **生产若开启 `grpc.auth.enabled`**，需 **PerRPC 注入服务 JWT** 或调整拦截器/白名单；示例 [`configs/apiserver.dev.yaml`](../../configs/apiserver.dev.yaml) 中 **`auth.enabled: false`** 与当前客户端行为一致。
 
+## 这篇和运行时文档怎么分工
+
 ### 与 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md) 对照
 
 | 主题 | 01-运行时/05（运行时顺序） | 本文档（仓库接入与 Verify） |
@@ -115,6 +123,8 @@ flowchart LR
 | collection → apiserver gRPC | 服务间调用、监护与业务查询 | **ServiceAuthHelper**（服务态）；与 HTTP 用户 JWT 区分 |
 | worker | 不持 IAM 模块；依赖 apiserver gRPC 是否鉴权 | **internal 调用当前无 JWT**；与 05「依赖 gRPC 是否开启认证」一致 |
 | 配置 Verify | `iam.*` 影响验签与缓存 | 同左 + 对照 [05-配置体系](./05-配置体系.md) |
+
+## 排障和改造时先看什么
 
 ### 核心代码锚点索引
 

@@ -80,9 +80,7 @@ flowchart LR
 
 ---
 
-## 核心设计
-
-### 核心契约：服务矩阵与调用方
+## gRPC 在整体里负责什么
 
 | gRPC 服务 | collection | worker | 作用（摘要） |
 | --------- | ------------ | ------ | ------------ |
@@ -95,19 +93,29 @@ flowchart LR
 
 **Verify**：若某模块未装配，`GRPCRegistry` 会 **跳过** 对应服务（见 [`grpc_registry.go`](../../internal/apiserver/grpc_registry.go) 内 `nil` 判断与日志）。排障需 **proto + 注册器 + 容器装配** 一起看。
 
-### 核心模式：注册器与 InternalService
+## 哪些进程是服务端，哪些进程是客户端
+
+这篇只保留**契约视角**下最需要记住的分工；如果你关心“请求在三个进程之间怎么穿过”，优先回看 [01-运行时/04-进程间通信](../01-运行时/04-进程间通信.md)。
+
+- **服务端只有 `qs-apiserver`**，因此所有 proto 和实现最终都收口在 apiserver 的注册器与 service 实现。
+- **`collection-server` 只消费面向前台的查询/写入 RPC**，不接 `InternalService`。
+- **`qs-worker` 只消费异步回调需要的 RPC**，包括 `AnswerSheetService`、`EvaluationService` 和 `InternalService`。
+
+### `InternalService` 为什么单独存在
 
 - **`.proto`**：方法名与消息类型的契约来源。  
 - **`GRPCRegistry.RegisterServices`**：运行时唯一注册入口；**InternalService** 依赖 `EvaluationModule`、`ScaleModule`、`SurveyModule`、`ActorModule` 等同时满足，且统计/计划相关依赖可为 nil（内部再类型断言）。
 
 **InternalService** 中 **同步统计、校验、计划调度** 与 **REST**（及 Crontab）指向同一套应用服务；proto 注释通常标明 **推荐运维入口为 REST**。详见 [internalapi/internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)。
 
-### 核心模式：安全与元数据
+## gRPC 的安全和元数据该怎么理解
 
-- **TLS / mTLS**：传输层由客户端证书与服务端配置共同决定（见 [03-部署与端口](./03-部署与端口.md)）。  
-- **`grpc.auth.enabled`**：应用层 JWT 拦截器；**worker 的 InternalClient 当前不附加 `authorization`**——与部署配置的关系见 [03-基础设施/04-IAM与认证](../03-基础设施/04-IAM与认证.md)。
+这里只保留契约层需要知道的两点：
 
-### 核心代码锚点索引
+- **TLS / mTLS** 决定“这条 gRPC 连接怎么建立”，监听地址、证书路径和宿主机是否暴露见 [03-部署与端口](./03-部署与端口.md)。
+- **`grpc.auth.enabled`** 决定“建立连接后业务 RPC 是否还要走 IAM JWT 拦截器”，拦截器顺序、`skipMethods`、worker 是否附加 `authorization` metadata 等细节见 [03-基础设施/04-IAM与认证](../03-基础设施/04-IAM与认证.md) 与 [01-运行时/05-IAM认证与身份链路](../01-运行时/05-IAM认证与身份链路.md)。
+
+## 排障和改动时先看什么
 
 | 关注点 | 路径 |
 | ------ | ---- |

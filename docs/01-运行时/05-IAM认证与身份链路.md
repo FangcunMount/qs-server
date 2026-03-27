@@ -27,7 +27,7 @@
 
 ---
 
-## 1. 在整体中的位置（三进程）
+## IAM 在三进程里分别承担什么
 
 | 进程 | IAM 相关职责（运行时） |
 | ---- | ---------------------- |
@@ -37,7 +37,7 @@
 
 ---
 
-## 2. 组件关系示意图
+## 运行时里它们怎样接起来
 
 ```mermaid
 flowchart LR
@@ -68,9 +68,9 @@ flowchart LR
 
 ---
 
-## 3. 时序图
+## HTTP、gRPC 和服务间调用分别怎么走
 
-### 3.1 HTTP：JWT 与身份上下文（两进程共性）
+### HTTP：JWT 与身份上下文（两进程共性）
 
 ```mermaid
 sequenceDiagram
@@ -91,7 +91,7 @@ sequenceDiagram
 
 **差异**：collection 与 apiserver 的 **UserIdentityMiddleware 实现不同**，字段集合不一致，**勿混读 context**。
 
-### 3.2 collection：监护关系（业务层，非纯中间件）
+### collection：监护关系（业务层，非纯中间件）
 
 ```mermaid
 sequenceDiagram
@@ -108,7 +108,7 @@ sequenceDiagram
 
 **锚点**：[submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go)、[guardianship.go](../../internal/collection-server/infra/iam/guardianship.go)。
 
-### 3.3 apiserver：gRPC 入站 — 传输层与 Unary 链顺序（mTLS 先于 IAM JWT）
+### apiserver：gRPC 入站，传输层与 Unary 链顺序（mTLS 先于 IAM JWT）
 
 **易混点**：**mTLS** 先在 **TLS 握手** 完成客户端认证；**IAMAuthInterceptor** 再在 **应用层** 读 metadata 里的 **JWT**（可与 **用户态** 或 **服务态** token 对应）。服务端 **Unary 链**（与代码一致）为：**Recovery → RequestID → Logging →（可选）MTLSInterceptor →（可选）IAMAuth →（可选）ACL →（可选）Audit → Handler**。其中 **TLS/mTLS 在连接建立时完成**；**MTLSInterceptor 在 IAMAuth 之前**（见 [internal/pkg/grpc/server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)）。
 
@@ -135,7 +135,7 @@ flowchart LR
 - **RequireIdentityMatch**：在 **IAMAuth** 内把 **JWT 中的服务身份** 与 **MTLSInterceptor 写入 context 的证书身份** 对齐（见 [interceptor_auth.go `verifyIdentityMatch`](../../internal/pkg/grpc/interceptor_auth.go)）。  
 - **默认跳过**：Health / Reflection（见 [03-04](../03-基础设施/04-IAM与认证.md)）。
 
-### 3.4 collection → apiserver：服务间 token（ServiceAuthHelper）
+### collection → apiserver：服务间 token（ServiceAuthHelper）
 
 | 维度 | 说明 |
 | ---- | ---- |
@@ -148,7 +148,9 @@ flowchart LR
 
 ---
 
-## 4. 核心功能与关键点
+## 排障时先看什么
+
+### 核心功能与关键点
 
 | 能力 | 关键点 | 锚点 |
 | ---- | ------ | ---- |
@@ -160,7 +162,9 @@ flowchart LR
 
 ---
 
-## 5. 与其它组件的交互
+## 它和其它组件怎么交互
+
+### 与其它组件的交互
 
 | 组件 | 与 IAM 的关系 |
 | ---- | ------------- |
@@ -170,7 +174,7 @@ flowchart LR
 
 ---
 
-## 6. 与 03-基础设施/04 的分工
+## 这篇和 03-基础设施/04 怎么分工
 
 | 维度 | 本文（01-运行时/05） | [03-基础设施/04](../03-基础设施/04-IAM与认证.md) |
 | ---- | -------------------- | ----------------------------------------------- |
@@ -178,7 +182,7 @@ flowchart LR
 
 ---
 
-## 7. 边界与注意事项
+## 边界与注意事项
 
 - **IAM 不要画成与三进程并列的第四个运行时方块**（除非指外部 IAM 服务拓扑）。  
 - **Claims ≠ 领域不变量**，领域侧见 [actor](../02-业务模块/05-actor.md)。  

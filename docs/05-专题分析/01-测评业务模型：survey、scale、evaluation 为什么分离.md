@@ -1,10 +1,6 @@
 # 测评业务模型：survey、scale、evaluation 为什么分离
 
-**本文回答**：这篇专题解释 `qs-server` 为什么必须把业务拆成 `survey / scale / evaluation` 三层，以及这种拆分如何在代码里形成“采集事实、定义规则、产出结果”的稳定边界；本文先给结论和阅读导航，再展开引用关系、版本策略和反模式分析。
-
-本文介绍 `qs-server` 最核心的业务设计：为什么系统会把测评拆成 `survey / scale / evaluation` 三段。
-
-**与前后专题互参**：运行时主链路与事件见 [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md)；入口保护、下游背压与读侧缓存见 [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)。evaluation 模块清单与接口边界见 [../02-业务模块/03-evaluation.md](../02-业务模块/03-evaluation.md)；总览见 [../00-总览/01-系统地图.md](../00-总览/01-系统地图.md)、[../00-总览/03-核心业务链路.md](../00-总览/03-核心业务链路.md)。
+**本文回答**：这篇专题解释 `qs-server` 为什么必须把测评业务拆成 `survey / scale / evaluation` 三界，以及这种拆分如何在代码里形成“采集事实、定义规则、产出结果”的稳定边界。
 
 ## 30 秒结论
 
@@ -19,94 +15,13 @@
 | **接口与流程真值** | 问卷/答卷的 API、版本与事件以 **[业务模块 survey](../02-业务模块/01-survey.md)** 为准（见下节）；evaluation 接口以 **[业务模块 evaluation](../02-业务模块/03-evaluation.md)** 为准。 |
 | **还要往下读** | 需要 **代码路径、校验链、版本兼容、反模式** 时，跟目录走「代码锚点索引 → 三界咬合 → 问卷版本专节」。 |
 
-## 阅读导航与真值入口
+## 为什么必须拆成 `survey / scale / evaluation`
 
-- **[../02-业务模块/01-survey.md](../02-业务模块/01-survey.md)** 是 **`survey` 域的单一真值**：问卷生命周期、答卷提交校验、REST/gRPC 面、事件名与配置键、与 `validation` 的衔接等，**以该文 + 代码为准**。  
-- **[../02-业务模块/03-evaluation.md](../02-业务模块/03-evaluation.md)** 是 **`evaluation` 模块的单一真值**：测评/报告相关接口与订阅、与 worker 的边界等，**以该文 + 代码为准**。  
-- **本篇（05-专题/01）**：只承担 **设计理由、对象边界、与 02/03 专题交叉视角**；若与业务模块文档在「接口或步骤」上不一致，**优先改本篇或加互链说明**，不在这里复制一份会过期的接口表。
+这篇专题的核心判断只有一句话：
 
-## 重点速查（继续往下读前先记这几条）
+**采集事实、定义规则、产出结果是三种生命周期完全不同的业务对象，如果不拆开，采集模型会被规则污染，规则模型会被实例结果污染，扩展点也会全部混成一团。**
 
-1. **三界分工**：`survey` 管作答事实，`scale` 管量表/因子/计分/解读规则，`evaluation` 管一次测评实例（`Assessment`）与引擎产出的得分与报告。  
-2. **与异步专题分工**：答卷提交与「建测评、跑引擎」的**时间解耦**在 [02](./02-异步评估链路：从答卷提交到报告生成.md)；本篇只建立**领域对象边界**，不展开 MQ/worker。  
-3. **反模式**：把采集、规则、结果揉成「一个大测评模块」会污染扩展点与生命周期——见下文专节。  
-4. **扩展落点**：题型与校验 → `survey`；因子与计分规则 → `scale`；流水线步骤 → `evaluation` engine。  
-5. **核对**：领域命名与模块装配以代码与 [业务模块 `evaluation`](../02-业务模块/03-evaluation.md) 为准；本篇解释 **Why**，不替代接口表。更深一层的 **包级锚点、引用与校验、引擎 pipeline** 见下文「代码锚点索引」与「三界在代码里如何咬合」。  
-6. **版本与历史答卷**：问卷版本递增规则在 `survey`；**答卷钉死提交时 version**；评估时 **`FindByCodeVersion`** 取历史模板，失败可降级；量表 **`FindByCode` 为当前配置**——见专节「问卷版本演进与已提交答卷的兼容策略」。
-
-## 延伸阅读与互链
-
-| 想核对什么 | 去哪里 |
-| ---------- | ------ |
-| 事件 Topic、`answersheet.submitted` → `EvaluateAssessment` 顺序 | [02](./02-异步评估链路：从答卷提交到报告生成.md) |
-| 限流/缓存/统计预聚合与读路径 | [03](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
-| evaluation 作为模块的 REST/gRPC、事件订阅 | [../02-业务模块/03-evaluation.md](../02-业务模块/03-evaluation.md) |
-| 进程与模块在一页图上的位置 | [../00-总览/01-系统地图.md](../00-总览/01-系统地图.md) |
-| 问卷版本、提交校验、答卷事件 | [../02-业务模块/01-survey.md](../02-业务模块/01-survey.md) |
-| 专题内：版本与历史答卷/评估读路径 | 本篇 [问卷版本演进与已提交答卷的兼容策略](#问卷版本演进与已提交答卷的兼容策略) |
-
----
-
-<!-- markdownlint-disable MD051 -->
-
-## 目录
-
-1. [30 秒结论](#30-秒结论)
-2. [阅读导航与真值入口](#阅读导航与真值入口)
-3. [重点速查（继续往下读前先记这几条）](#重点速查继续往下读前先记这几条)
-4. [延伸阅读与互链](#延伸阅读与互链)
-5. [30 秒了解系统](#30-秒了解系统)
-6. [代码锚点索引（关注点）](#代码锚点索引关注点)
-7. [核心架构](#核心架构)
-8. [核心设计判断](#核心设计判断)
-9. [三段式模型各自管理什么](#三段式模型各自管理什么)
-10. [三界在代码里如何咬合（引用、校验与闭环）](#三界在代码里如何咬合引用校验与闭环)
-11. [问卷版本演进与已提交答卷的兼容策略](#问卷版本演进与已提交答卷的兼容策略)
-12. [为什么不做成一个“大测评模块”](#为什么不做成一个大测评模块)
-13. [这种分离如何支撑扩展](#这种分离如何支撑扩展)
-14. [关键设计点](#关键设计点)
-15. [边界与注意事项](#边界与注意事项)
-
-锚点以常见 Markdown 渲染器（如 GitHub）自动生成规则为准；若本地预览无法跳转，请用编辑器大纲视图导航。
-
-<!-- markdownlint-enable MD051 -->
-
----
-
-## 30 秒了解系统
-
-`qs-server` 的核心不是“做问卷”，而是把一次作答转成一次可解释的测评结果。
-
-为了完成这件事，系统把业务本体拆成三层：
-
-- `survey`
-  - 采集事实，管理问卷和答卷
-- `scale`
-  - 定义规则，管理因子、计分和解读配置
-- `evaluation`
-  - 产出结果，把事实和规则组合成测评、得分、风险等级和报告
-
-这不是简单的目录拆分，而是业务语义上的边界划分；下文用 **代码锚点** 把「概念」落到 **包与类型**，便于与仓库对照。
-
-## 代码锚点索引（关注点）
-
-| 关注点 | 路径（相对 `internal/apiserver/`） | 说明 |
-| ------ | ----------------------------------- | ---- |
-| 问卷结构、题型工厂、版本递增规则 | [domain/survey/questionnaire](../../internal/apiserver/domain/survey/questionnaire)、[versioning.go](../../internal/apiserver/domain/survey/questionnaire/versioning.go) | 模板侧：题目与题型扩展；`Versioning` 约定草稿/发布与版本号 |
-| 答卷聚合、作答事实 | [domain/survey/answersheet](../../internal/apiserver/domain/survey/answersheet) | 实例侧：一次作答 |
-| 提交与校验编排 | [application/survey/answersheet/submission_service.go](../../internal/apiserver/application/survey/answersheet/submission_service.go) | 接入 `validation`、落库、发领域事件等 |
-| 答案校验领域 | [domain/validation](../../internal/apiserver/domain/validation) | 与题型解耦的校验 |
-| 量表聚合、问卷绑定字段 | [domain/scale/medical_scale.go](../../internal/apiserver/domain/scale/medical_scale.go) | `questionnaireCode` + `questionnaireVersion` 与因子列表同构 |
-| 因子与解读规则 | [domain/scale/factor.go](../../internal/apiserver/domain/scale/factor.go) 等 | `questionCodes`、计分策略、规则 |
-| 计分领域服务 | [domain/scale/scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go) | 规则侧计分，与引擎内因子聚合配合 |
-| 量表仓储契约 | [domain/scale/repository.go](../../internal/apiserver/domain/scale/repository.go) | 含 `FindByQuestionnaireCode`（问卷→量表） |
-| 测评聚合根、引用值对象 | [domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)、[types.go](../../internal/apiserver/domain/evaluation/assessment/types.go) | `QuestionnaireRef` / `AnswerSheetRef` / `MedicalScaleRef` |
-| 跨聚合创建 | [domain/evaluation/assessment/creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go) | `AssessmentCreator`：受试者、问卷、答卷、量表一致性 |
-| 报告 | [domain/evaluation/report](../../internal/apiserver/domain/evaluation/report) | 解读结果载体 |
-| 评估引擎与 pipeline | [application/evaluation/engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)、[pipeline/](../../internal/apiserver/application/evaluation/engine/pipeline/) | `buildPipeline` 顺序即运行时步骤 |
-| 从答卷创建测评（worker 回调） | [interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go) | `CreateAssessmentFromAnswerSheet`：解析量表、写 `CreateAssessmentDTO` |
-
-## 核心架构
+把这个判断落到代码里，三界关系大致如下：
 
 ```mermaid
 flowchart LR
@@ -138,41 +53,15 @@ flowchart LR
     Engine --> Report
 ```
 
-上图强调**概念归属**；运行时还有一条「先落事实、再建测评、再跑引擎」的链：**答卷与问卷在 survey 侧持久化** → **按问卷编码解析量表规则（scale）** → **Assessment 只记引用** → **引擎按 assessmentId 拉齐问卷/答卷/量表仓储再算分与解读**。与 MQ/worker 的先后关系见 [02](./02-异步评估链路：从答卷提交到报告生成.md)。
+这张图强调的是**概念归属**，不是运行时时序。真正的运行顺序是：
 
-```mermaid
-flowchart TB
-    subgraph Survey[survey 持久化]
-        Q[Questionnaire 模板]
-        AS[AnswerSheet 作答实例]
-    end
+- 问卷和答卷事实在 `survey` 落库
+- 量表规则在 `scale` 维护
+- `evaluation` 以 `Assessment` 为中心，把事实和规则组合成一次测评结果
 
-    subgraph Scale[scale 持久化]
-        MS[MedicalScale + Factors + Rules]
-    end
+异步顺序、worker 和 MQ 的作用见 [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md)；本篇只回答“为什么要这样拆”以及“拆开后代码怎么咬合”。
 
-    subgraph Eval[evaluation]
-        A[Assessment 聚合根]
-        ENG[Engine pipeline]
-    end
-
-    Q -.->|code+version| MS
-    AS -->|AnswerSheetID + QuestionnaireRef| A
-    MS -.->|MedicalScaleRef 可选| A
-    A --> ENG
-    ENG -.->|读 questionnaire 仓储| Q
-    ENG -.->|读 answersheet 仓储| AS
-    ENG -.->|读 scale 仓储| MS
-```
-
-## 核心设计判断
-
-- 作答事实、评估规则和评估结果不是同一种业务对象，应该由不同模块管理。
-- 问卷和量表之间可以绑定，但不能互相吞并，否则采集模型会被规则模型污染。
-- 评估流程必须围绕 `Assessment` 这种流程对象展开，而不是直接在答卷或量表上生成结果。
-- 可扩展点要分别落在各自边界里：题型扩展放在 `survey`，规则扩展放在 `scale`，评估流水线扩展放在 `evaluation`。
-
-## 三段式模型各自管理什么
+## 三界各自管理什么
 
 ### survey：采集事实
 
@@ -230,7 +119,44 @@ flowchart TB
 
 ## 三界在代码里如何咬合（引用、校验与闭环）
 
-这一节回答：**领域上拆成三界之后，在创建测评与执行引擎时，代码如何把三者对齐**，避免停留在抽象口号。
+回答完“各自管什么”之后，下一步要回答的是：
+
+**拆开之后，三界在运行时如何重新拼回一条可执行的业务链。**
+
+下图先给出这条咬合关系：
+
+```mermaid
+flowchart TB
+    subgraph Survey[survey 持久化]
+        Q[Questionnaire 模板]
+        AS[AnswerSheet 作答实例]
+    end
+
+    subgraph Scale[scale 持久化]
+        MS[MedicalScale + Factors + Rules]
+    end
+
+    subgraph Eval[evaluation]
+        A[Assessment 聚合根]
+        ENG[Engine pipeline]
+    end
+
+    Q -.->|code+version| MS
+    AS -->|AnswerSheetID + QuestionnaireRef| A
+    MS -.->|MedicalScaleRef 可选| A
+    A --> ENG
+    ENG -.->|读 questionnaire 仓储| Q
+    ENG -.->|读 answersheet 仓储| AS
+    ENG -.->|读 scale 仓储| MS
+```
+
+这张图想表达三件事：
+
+1. `Assessment` 不内嵌整份问卷或量表，而是持引用。  
+2. 引擎运行时会组合读取问卷、答卷、量表仓储，拆界不等于禁止跨仓储读取。  
+3. 问卷版本与量表规则的绑定策略并不完全对称，因此兼容策略必须单独说明。  
+
+下面开始逐段看：**领域上拆成三界之后，在创建测评与执行引擎时，代码如何把三者对齐**。
 
 ### 1. 引用模型：Assessment 不内嵌问卷/量表聚合
 
@@ -414,6 +340,35 @@ flowchart TB
 ### 5. 跨聚合校验与「简单创建器」
 
 生产路径应假设 **`DefaultAssessmentCreator` + validate**；`SimpleAssessmentCreator` 是刻意削弱的替身，文档与代码评审时需区分。
+
+## 代码锚点索引（关注点）
+
+| 关注点 | 路径（相对 `internal/apiserver/`） | 说明 |
+| ------ | ----------------------------------- | ---- |
+| 问卷结构、题型工厂、版本递增规则 | [domain/survey/questionnaire](../../internal/apiserver/domain/survey/questionnaire)、[versioning.go](../../internal/apiserver/domain/survey/questionnaire/versioning.go) | 模板侧：题目与题型扩展；`Versioning` 约定草稿/发布与版本号 |
+| 答卷聚合、作答事实 | [domain/survey/answersheet](../../internal/apiserver/domain/survey/answersheet) | 实例侧：一次作答 |
+| 提交与校验编排 | [application/survey/answersheet/submission_service.go](../../internal/apiserver/application/survey/answersheet/submission_service.go) | 接入 `validation`、落库、发领域事件等 |
+| 答案校验领域 | [domain/validation](../../internal/apiserver/domain/validation) | 与题型解耦的校验 |
+| 量表聚合、问卷绑定字段 | [domain/scale/medical_scale.go](../../internal/apiserver/domain/scale/medical_scale.go) | `questionnaireCode` + `questionnaireVersion` 与因子列表同构 |
+| 因子与解读规则 | [domain/scale/factor.go](../../internal/apiserver/domain/scale/factor.go) 等 | `questionCodes`、计分策略、规则 |
+| 计分领域服务 | [domain/scale/scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go) | 规则侧计分，与引擎内因子聚合配合 |
+| 量表仓储契约 | [domain/scale/repository.go](../../internal/apiserver/domain/scale/repository.go) | 含 `FindByQuestionnaireCode`（问卷→量表） |
+| 测评聚合根、引用值对象 | [domain/evaluation/assessment/assessment.go](../../internal/apiserver/domain/evaluation/assessment/assessment.go)、[types.go](../../internal/apiserver/domain/evaluation/assessment/types.go) | `QuestionnaireRef` / `AnswerSheetRef` / `MedicalScaleRef` |
+| 跨聚合创建 | [domain/evaluation/assessment/creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go) | `AssessmentCreator`：受试者、问卷、答卷、量表一致性 |
+| 报告 | [domain/evaluation/report](../../internal/apiserver/domain/evaluation/report) | 解读结果载体 |
+| 评估引擎与 pipeline | [application/evaluation/engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)、[pipeline/](../../internal/apiserver/application/evaluation/engine/pipeline/) | `buildPipeline` 顺序即运行时步骤 |
+| 从答卷创建测评（worker 回调） | [interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go) | `CreateAssessmentFromAnswerSheet`：解析量表、写 `CreateAssessmentDTO` |
+ 
+## 延伸阅读与互链
+
+| 想核对什么 | 去哪里 |
+| ---------- | ------ |
+| 事件 Topic、`answersheet.submitted` → `EvaluateAssessment` 顺序 | [02](./02-异步评估链路：从答卷提交到报告生成.md) |
+| 限流/缓存/统计预聚合与读路径 | [03](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
+| evaluation 作为模块的 REST/gRPC、事件订阅 | [../02-业务模块/03-evaluation.md](../02-业务模块/03-evaluation.md) |
+| 进程与模块在一页图上的位置 | [../00-总览/01-系统地图.md](../00-总览/01-系统地图.md) |
+| 问卷版本、提交校验、答卷事件 | [../02-业务模块/01-survey.md](../02-业务模块/01-survey.md) |
+| 专题内：版本与历史答卷/评估读路径 | 本篇 [问卷版本演进与已提交答卷的兼容策略](#问卷版本演进与已提交答卷的兼容策略) |
 
 ## 边界与注意事项
 

@@ -27,7 +27,9 @@
 
 ---
 
-## 1. 组件定位（在整体中的位置）
+## 这个进程在整体里承担什么
+
+先回答角色、上下游和本地依赖，再看内部结构图。
 
 | 维度 | 说明 |
 | ---- | ---- |
@@ -38,7 +40,7 @@
 
 ---
 
-## 2. 内部运行示意图
+### 内部运行示意图
 
 ```mermaid
 flowchart LR
@@ -63,7 +65,9 @@ flowchart LR
 
 ---
 
-## 3. 单条消息处理时序
+## 单条消息在这里怎么被处理
+
+### 单条消息处理时序
 
 ```mermaid
 sequenceDiagram
@@ -87,7 +91,7 @@ sequenceDiagram
 
 ---
 
-## 4. 典型 event_type → handler → gRPC（速查）
+## 常见事件怎样映射到 handler 和 gRPC
 
 下表仅列 **主链路上常用事件**与**主要 RPC**，便于从消息追到代码；**完整映射与 handler 键名**以 [`configs/events.yaml`](../../configs/events.yaml) 为准。未写明的分支（如仅打日志、仅 Redis 统计）见各 `*_handler.go`。
 
@@ -103,7 +107,7 @@ sequenceDiagram
 
 ---
 
-## 5. Ack/Nack、重试与投递语义（边界）
+## Ack/Nack 与投递语义该怎么理解
 
 **本进程内**（[server.go `createDispatchHandler`](../../internal/worker/server.go)）：
 
@@ -121,21 +125,9 @@ sequenceDiagram
 
 **业务侧**：部分 handler 使用 **Redis 幂等键**（如统计去重），与 **MQ 投递语义** 是两层问题；设计幂等仍以 **02 / handler 代码** 为准。
 
----
+## 它和其它组件怎么交互
 
-## 6. 核心功能与关键点
-
-| 功能 | 关键点 | 代码锚点 |
-| ---- | ------ | -------- |
-| **订阅** | NSQ / RabbitMQ 等由配置选择；Topic 列表来自 **events.yaml** | [server.go](../../internal/worker/server.go) |
-| **分发** | metadata `event_type` 优先 | [event_dispatcher.go](../../internal/worker/application/event_dispatcher.go) |
-| **注册表** | `init()` 注册，运行时查找 | [handlers/registry.go](../../internal/worker/handlers/registry.go) |
-| **gRPC** | 三类客户端注入容器 | [grpc_client_registry.go](../../internal/worker/grpc_client_registry.go) |
-| **典型链路** | 见 **§4**；答卷/测评/报告主路径 | `handlers/*_handler.go` |
-
----
-
-## 7. 与其它组件的交互
+### 与其它组件的交互
 
 | 对方 | 方式 | 说明 |
 | ---- | ---- | ---- |
@@ -143,18 +135,26 @@ sequenceDiagram
 | **MQ** | Subscribe | 不发布业务事件 |
 | **IAM** | 无直接模块 | gRPC 鉴权策略见 [03-04](../03-基础设施/04-IAM与认证.md) |
 
----
+## 排障时先看什么
 
-## 8. 关键代码入口（索引）
+### 核心功能与关键点
+
+| 功能 | 关键点 | 代码锚点 |
+| ---- | ------ | -------- |
+| **订阅** | NSQ / RabbitMQ 等由配置选择；Topic 列表来自 **events.yaml** | [server.go](../../internal/worker/server.go) |
+| **分发** | metadata `event_type` 优先 | [event_dispatcher.go](../../internal/worker/application/event_dispatcher.go) |
+| **注册表** | `init()` 注册，运行时查找 | [handlers/registry.go](../../internal/worker/handlers/registry.go) |
+| **gRPC** | 三类客户端注入容器 | [grpc_client_registry.go](../../internal/worker/grpc_client_registry.go) |
+| **典型链路** | 见上文“常见事件怎样映射到 handler 和 gRPC”；答卷/测评/报告主路径 | `handlers/*_handler.go` |
+
+### 关键代码入口（索引）
 
 | 关注点 | 路径 |
 | ------ | ---- |
 | 进程入口 | [cmd/qs-worker/main.go](../../cmd/qs-worker/main.go)、[app.go](../../internal/worker/app.go)、[run.go](../../internal/worker/run.go) |
 | 配置 | [options/options.go](../../internal/worker/options/options.go) |
 
----
-
-## 9. 边界与注意事项
+## 边界与注意事项
 
 - **无 HTTP 业务端口**；排障靠日志、MQ 积压、gRPC 错误。  
 - **信封/metadata 变更**会导致分发失败，需与 apiserver 发布端同步升级。  

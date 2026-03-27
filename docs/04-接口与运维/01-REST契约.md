@@ -76,9 +76,7 @@ flowchart LR
 
 ---
 
-## 核心设计
-
-### 核心分工：collection-server vs qs-apiserver
+## 为什么要分成两套 REST 面
 
 | 维度 | collection-server | qs-apiserver |
 | ---- | ----------------- | ------------ |
@@ -88,7 +86,7 @@ flowchart LR
 
 **结论**：REST **按调用方拆分**，不在 collection 复制一套后台生命周期实现；详细列表以 **OpenAPI + `routers.go`** 为准。
 
-### 核心契约：契约生成与 Verify
+## OpenAPI 文件从哪里来，怎样和路由保持一致
 
 **链路**：`swag` 注解 → 各进程 `internal/*/docs/swagger.json` → `generate_rest_from_swagger.py` → `api/rest/*.yaml` → `compare_api_docs.py` 防漂移。
 
@@ -100,13 +98,13 @@ flowchart LR
 
 **Verify**：改路由后 **同时** 跑 `make docs-rest`（或 CI 等价）与 `make docs-verify`；**最终是否挂载**以 **`routers.go`** 为准——YAML 为导出物，可能滞后。
 
-### 核心模式：公开路径与认证
+## 公开路径、受保护路径和静态导出应该怎么区分
 
 两进程通常保留 **`/health`、`/ping`、Swagger、`/api/rest/*`** 等；业务在 **`/api/v1`** 下，由 IAM 配置决定是否走 JWT 中间件（见 [03-基础设施/04-IAM与认证](../03-基础设施/04-IAM与认证.md)）。
 
 **collection** 侧存在 **显式匿名只读**（如部分 `GET /scales`），便于拉元数据——以 [collection `routers.go`](../../internal/collection-server/routers.go) 为准。
 
-### 核心代码锚点索引
+## 排障和改动时先看什么
 
 | 关注点 | 路径 |
 | ------ | ---- |
