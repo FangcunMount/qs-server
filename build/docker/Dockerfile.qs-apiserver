@@ -44,33 +44,35 @@ RUN apk add --no-cache ca-certificates tzdata
 # 设置时区
 ENV TZ=Asia/Shanghai
 
-# 创建应用用户
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
+# 运行用户：与宿主机 www（或 Nginx 运行用户）UID/GID 对齐，由 CI build-arg 传入
+ARG RUN_UID=1000
+ARG RUN_GID=1000
+RUN addgroup -g ${RUN_GID} www && \
+    adduser -D -u ${RUN_UID} -G www www
 
 # 设置工作目录
 WORKDIR /app
 
 # 从构建阶段复制二进制文件
-COPY --from=builder --chown=appuser:appuser /build/bin/qs-apiserver /app/qs-apiserver
+COPY --from=builder --chown=www:www /build/bin/qs-apiserver /app/qs-apiserver
 
 # 复制配置文件（包含 dev/prod，镜像内默认使用 prod）
 # 注意：证书文件由 docker-compose 从宿主机挂载，不打包到镜像中
-COPY --chown=appuser:appuser configs/apiserver.dev.yaml /app/configs/apiserver.dev.yaml
-COPY --chown=appuser:appuser configs/apiserver.prod.yaml /app/configs/apiserver.prod.yaml
-COPY --chown=appuser:appuser configs/events.yaml /app/configs/events.yaml
-COPY --chown=appuser:appuser api/rest /app/api/rest
-COPY --chown=appuser:appuser web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/swagger-ui-dist
+COPY --chown=www:www configs/apiserver.dev.yaml /app/configs/apiserver.dev.yaml
+COPY --chown=www:www configs/apiserver.prod.yaml /app/configs/apiserver.prod.yaml
+COPY --chown=www:www configs/events.yaml /app/configs/events.yaml
+COPY --chown=www:www api/rest /app/api/rest
+COPY --chown=www:www web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/swagger-ui-dist
 
 # 预创建 TLS 目录，便于以文件方式挂载证书/私钥
 RUN mkdir -p /etc/qs-server/ssl/ca /etc/qs-server/ssl/server && \
-    chown -R appuser:appuser /etc/qs-server/ssl
+    chown -R www:www /etc/qs-server/ssl
 
 # 预创建二维码存储目录
-RUN mkdir -p /data/image/qrcode && chown -R appuser:appuser /data/image/qrcode
+RUN mkdir -p /data/image/qrcode && chown -R www:www /data/image/qrcode
 
 # 切换到非 root 用户
-USER appuser
+USER www
 
 # 暴露端口（生产配置）
 EXPOSE 8080 8443

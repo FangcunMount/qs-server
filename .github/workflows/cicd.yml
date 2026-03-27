@@ -18,7 +18,7 @@ name: CI/CD Pipeline
 #   REDIS_PORT/DB/USERNAME/PASSWORD
 #   JWT_SECRET
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
-#   WWW_UID, WWW_GID (可选，默认 1000/1000)
+#   WWW_UID, WWW_GID（与宿主机 www 用户 id 一致，用于镜像内 USER www 与部署 chown）
 # ============================================================================
 
 on:
@@ -301,6 +301,9 @@ jobs:
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch')
+    env:
+      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
+      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
     permissions:
       contents: read
       packages: write
@@ -355,6 +358,8 @@ jobs:
             BUILD_TIME=${{ github.event.head_commit.timestamp }}
             GIT_COMMIT=${{ github.sha }}
             GIT_BRANCH=${{ github.ref_name }}
+            RUN_UID=${{ env.WWW_UID }}
+            RUN_GID=${{ env.WWW_GID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
@@ -599,7 +604,7 @@ jobs:
               exit 1
             fi
 
-            # 证书路径检查（docker-compose 会自动挂载）
+            # 证书路径（compose 挂载）；用 docker run 模拟镜像内 USER www（UID=WWW_UID）
             CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
             KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
@@ -612,48 +617,41 @@ jobs:
               echo "❌ Web KEY not readable: $KEY_HOST_PATH"
               exit 1
             fi
-            # 与 Dockerfile USER appuser 一致：固定 UID/GID=1000（勿用 WWW_UID 做此检查，WWW_UID 仅用于宿主机 configs 等目录属主）
-            TLS_UID=1000
-            TLS_GID=1000
-            KEY_OK=0
-            if command -v python3 >/dev/null 2>&1; then
-              if $SUDO env KEY_PATH="$KEY_HOST_PATH" TLS_UID="$TLS_UID" TLS_GID="$TLS_GID" python3 -c 'import os,sys; os.setgid(int(os.environ["TLS_GID"])); os.setuid(int(os.environ["TLS_UID"])); p=os.environ["KEY_PATH"]; sys.exit(0 if os.access(p, os.R_OK) else 1)'; then
-                KEY_OK=1
-              fi
-            fi
-            if [ "$KEY_OK" != 1 ] && command -v setpriv >/dev/null 2>&1; then
-              if $SUDO setpriv --reuid "$TLS_UID" --regid "$TLS_GID" --clear-groups test -r "$KEY_HOST_PATH" 2>/dev/null; then
-                KEY_OK=1
-              fi
-            fi
-            if [ "$KEY_OK" != 1 ]; then
-              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile appuser): $KEY_HOST_PATH"
-              echo "   Fix: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
-              echo "   Dirs: sudo chmod 755 /data/ssl /data/ssl/private"
-              echo "   Note: WWW_UID/WWW_GID 与容器内 TLS 无关；若目录为 700 root，请先 chmod 755 父目录"
-              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
-              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
-              exit 1
-            fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
               echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
 
-            echo "✅ All certificate paths verified"
-
-            # GHCR 登录
             if [ -n "${GHCR_TOKEN:-}" ]; then
               echo "Logging into GitHub Container Registry..."
               echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
             fi
 
-            # 拉取镜像
-            echo "Pulling latest Docker image..."
+            echo "Pulling latest Docker image (for TLS key permission check)..."
             if ! $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"; then
               echo "⚠️ Pull with auth failed, trying anonymous..."
               $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
             fi
+
+            TLS_UID="${APP_UID}"
+            TLS_GID="${APP_GID}"
+            TLS_CHECK_IMG="$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"
+            if ! $SUDO docker run --rm \
+              --user "${TLS_UID}:${TLS_GID}" \
+              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
+              "$TLS_CHECK_IMG" \
+              sh -c "test -r \"${KEY_HOST_PATH}\""; then
+              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile USER www): $KEY_HOST_PATH"
+              echo "   Fix key: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
+              echo "   Fix dir: private 目录须对运行用户可进入（例如 www:www 且 750/755）。示例："
+              echo "          sudo chown www:www /data/ssl/private && sudo chmod 750 /data/ssl/private"
+              echo "   或: sudo chmod 755 /data/ssl /data/ssl/private"
+              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
+              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
+              exit 1
+            fi
+
+            echo "✅ All certificate paths verified"
 
             # 停旧容器
             if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
@@ -876,7 +874,7 @@ jobs:
               exit 1
             fi
 
-            # 证书路径检查（docker-compose 会自动挂载）
+            # 证书路径；docker run 模拟镜像内 USER www（UID=WWW_UID）
             CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
             KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
@@ -885,42 +883,37 @@ jobs:
               echo "❌ Web certificates not found"
               exit 1
             fi
-            TLS_UID=1000
-            TLS_GID=1000
-            KEY_OK=0
-            if command -v python3 >/dev/null 2>&1; then
-              if $SUDO env KEY_PATH="$KEY_HOST_PATH" TLS_UID="$TLS_UID" TLS_GID="$TLS_GID" python3 -c 'import os,sys; os.setgid(int(os.environ["TLS_GID"])); os.setuid(int(os.environ["TLS_UID"])); p=os.environ["KEY_PATH"]; sys.exit(0 if os.access(p, os.R_OK) else 1)'; then
-                KEY_OK=1
-              fi
-            fi
-            if [ "$KEY_OK" != 1 ] && command -v setpriv >/dev/null 2>&1; then
-              if $SUDO setpriv --reuid "$TLS_UID" --regid "$TLS_GID" --clear-groups test -r "$KEY_HOST_PATH" 2>/dev/null; then
-                KEY_OK=1
-              fi
-            fi
-            if [ "$KEY_OK" != 1 ]; then
-              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile appuser): $KEY_HOST_PATH"
-              echo "   Fix: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
-              echo "   Dirs: sudo chmod 755 /data/ssl /data/ssl/private"
-              echo "   Note: WWW_UID/WWW_GID 与容器内 TLS 无关；若目录为 700 root，请先 chmod 755 父目录"
-              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
-              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
-              exit 1
-            fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
               echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
 
-            echo "✅ All certificate paths verified"
-
-            # 登录 GHCR
             if [ -n "${GHCR_TOKEN:-}" ]; then
               echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
             fi
 
-            # 拉取镜像
+            echo "Pulling latest Docker image (for TLS key permission check)..."
             $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
+
+            TLS_UID="${APP_UID}"
+            TLS_GID="${APP_GID}"
+            TLS_CHECK_IMG="$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"
+            if ! $SUDO docker run --rm \
+              --user "${TLS_UID}:${TLS_GID}" \
+              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
+              "$TLS_CHECK_IMG" \
+              sh -c "test -r \"${KEY_HOST_PATH}\""; then
+              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile USER www): $KEY_HOST_PATH"
+              echo "   Fix key: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
+              echo "   Fix dir: private 目录须对运行用户可进入。示例："
+              echo "          sudo chown www:www /data/ssl/private && sudo chmod 750 /data/ssl/private"
+              echo "   或: sudo chmod 755 /data/ssl /data/ssl/private"
+              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
+              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
+              exit 1
+            fi
+
+            echo "✅ All certificate paths verified"
 
             # 停旧容器
             if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
