@@ -18,7 +18,9 @@ name: CI/CD Pipeline
 #   REDIS_PORT/DB/USERNAME/PASSWORD
 #   JWT_SECRET
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
-#   WWW_UID, WWW_GID（与宿主机 www 用户 id 一致，用于镜像内 USER www 与部署 chown）
+#   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
+#   部署拉 ghcr：与 iam-contracts 相同，远端用 GITHUB_TOKEN + github.repository_owner 登录；
+#   sudo 需密码时用 printf 先喂 sudo 密码再喂 token（见 deploy 脚本）。GHCR 失败时可回退 Docker Hub。
 # ============================================================================
 
 on:
@@ -386,6 +388,9 @@ jobs:
     name: Deploy API Server
     needs: [docker]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' &&
@@ -527,8 +532,10 @@ jobs:
           HTTPS_PORT: ${{ env.HTTPS_PORT }}
           INTERNAL_HTTP_PORT: ${{ env.INTERNAL_HTTP_PORT }}
           INTERNAL_HTTPS_PORT: ${{ env.INTERNAL_HTTPS_PORT }}
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
@@ -537,7 +544,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GHCR_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
           script: |
             set -Eeuo pipefail
 
@@ -604,17 +611,19 @@ jobs:
               exit 1
             fi
 
-            # 证书路径（compose 挂载）；用 docker run 模拟镜像内 USER www（UID=WWW_UID）
+            # Web TLS（与 iam-contracts 一致：root 可读校验后 chown 给容器运行 UID）
             CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
             KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
             if ! $SUDO test -r "$CERT_HOST_PATH"; then
               echo "❌ Web CERT not readable: $CERT_HOST_PATH"
+              $SUDO ls -l "$CERT_HOST_PATH" || true
               exit 1
             fi
             if ! $SUDO test -r "$KEY_HOST_PATH"; then
               echo "❌ Web KEY not readable: $KEY_HOST_PATH"
+              $SUDO namei -l "$KEY_HOST_PATH" || true
               exit 1
             fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
@@ -622,36 +631,38 @@ jobs:
               exit 1
             fi
 
-            if [ -n "${GHCR_TOKEN:-}" ]; then
+            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH"
+            $SUDO chmod 0644 "$CERT_HOST_PATH"
+            $SUDO chmod 0640 "$KEY_HOST_PATH"
+
+            export DOCKER_IMAGE_QS_APISERVER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
+
+            echo "------------------------------------------"
+            echo "🔎 GHCR: 若 login 失败，检查 Package 是否授权本仓库读取 ${DOCKER_REPOSITORY}/${IMAGE_NAME}"
+            echo "------------------------------------------"
+            GHCR_LOGIN_OK=0
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
               echo "Logging into GitHub Container Registry..."
-              echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
+              if [ "$SUDO" = "sudo_pw" ]; then
+                printf '%s\n%s' "$SUDO_PASSWORD" "$GITHUB_TOKEN" | sudo -S docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+              else
+                echo "$GITHUB_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+              fi
             fi
 
-            echo "Pulling latest Docker image (for TLS key permission check)..."
-            if ! $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"; then
-              echo "⚠️ Pull with auth failed, trying anonymous..."
-              $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
+            if [ "$GHCR_LOGIN_OK" -ne 1 ]; then
+              if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+                echo "⚠️ GHCR login failed; falling back to Docker Hub..."
+                if [ "$SUDO" = "sudo_pw" ]; then
+                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                else
+                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                fi
+                export DOCKER_IMAGE_QS_APISERVER="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+              else
+                echo "⚠️ GHCR login failed and Docker Hub credentials missing."
+              fi
             fi
-
-            TLS_UID="${APP_UID}"
-            TLS_GID="${APP_GID}"
-            TLS_CHECK_IMG="$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"
-            if ! $SUDO docker run --rm \
-              --user "${TLS_UID}:${TLS_GID}" \
-              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
-              "$TLS_CHECK_IMG" \
-              sh -c "test -r \"${KEY_HOST_PATH}\""; then
-              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile USER www): $KEY_HOST_PATH"
-              echo "   Fix key: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
-              echo "   Fix dir: private 目录须对运行用户可进入（例如 www:www 且 750/755）。示例："
-              echo "          sudo chown www:www /data/ssl/private && sudo chmod 750 /data/ssl/private"
-              echo "   或: sudo chmod 755 /data/ssl /data/ssl/private"
-              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
-              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
-              exit 1
-            fi
-
-            echo "✅ All certificate paths verified"
 
             # 停旧容器
             if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
@@ -702,6 +713,9 @@ jobs:
     name: Deploy Collection Server
     needs: [docker]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' &&
@@ -800,8 +814,10 @@ jobs:
           HTTPS_PORT: ${{ env.HTTPS_PORT }}
           INTERNAL_HTTP_PORT: ${{ env.INTERNAL_HTTP_PORT }}
           INTERNAL_HTTPS_PORT: ${{ env.INTERNAL_HTTPS_PORT }}
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
@@ -810,7 +826,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GHCR_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
           script: |
             set -Eeuo pipefail
 
@@ -874,13 +890,13 @@ jobs:
               exit 1
             fi
 
-            # 证书路径；docker run 模拟镜像内 USER www（UID=WWW_UID）
+            # Web TLS（与 iam-contracts 一致）
             CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
             KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
             if ! $SUDO test -r "$CERT_HOST_PATH" || ! $SUDO test -r "$KEY_HOST_PATH"; then
-              echo "❌ Web certificates not found"
+              echo "❌ Web certificates not found or unreadable by root"
               exit 1
             fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
@@ -888,32 +904,35 @@ jobs:
               exit 1
             fi
 
-            if [ -n "${GHCR_TOKEN:-}" ]; then
-              echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
+            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH"
+            $SUDO chmod 0644 "$CERT_HOST_PATH"
+            $SUDO chmod 0640 "$KEY_HOST_PATH"
+
+            export DOCKER_IMAGE_QS_COLLECTION_SERVER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
+
+            GHCR_LOGIN_OK=0
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              echo "Logging into GitHub Container Registry..."
+              if [ "$SUDO" = "sudo_pw" ]; then
+                printf '%s\n%s' "$SUDO_PASSWORD" "$GITHUB_TOKEN" | sudo -S docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+              else
+                echo "$GITHUB_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+              fi
             fi
 
-            echo "Pulling latest Docker image (for TLS key permission check)..."
-            $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
-
-            TLS_UID="${APP_UID}"
-            TLS_GID="${APP_GID}"
-            TLS_CHECK_IMG="$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest"
-            if ! $SUDO docker run --rm \
-              --user "${TLS_UID}:${TLS_GID}" \
-              -v "${KEY_HOST_PATH}:${KEY_HOST_PATH}:ro" \
-              "$TLS_CHECK_IMG" \
-              sh -c "test -r \"${KEY_HOST_PATH}\""; then
-              echo "❌ Web KEY not readable by container UID ${TLS_UID} (Dockerfile USER www): $KEY_HOST_PATH"
-              echo "   Fix key: sudo chown ${TLS_UID}:${TLS_GID} \"$KEY_HOST_PATH\" && sudo chmod 640 \"$KEY_HOST_PATH\""
-              echo "   Fix dir: private 目录须对运行用户可进入。示例："
-              echo "          sudo chown www:www /data/ssl/private && sudo chmod 750 /data/ssl/private"
-              echo "   或: sudo chmod 755 /data/ssl /data/ssl/private"
-              $SUDO ls -l "$KEY_HOST_PATH" 2>/dev/null || true
-              $SUDO ls -ld /data/ssl /data/ssl/private 2>/dev/null || true
-              exit 1
+            if [ "$GHCR_LOGIN_OK" -ne 1 ]; then
+              if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+                echo "⚠️ GHCR login failed; falling back to Docker Hub..."
+                if [ "$SUDO" = "sudo_pw" ]; then
+                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                else
+                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                fi
+                export DOCKER_IMAGE_QS_COLLECTION_SERVER="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+              else
+                echo "⚠️ GHCR login failed and Docker Hub credentials missing."
+              fi
             fi
-
-            echo "✅ All certificate paths verified"
 
             # 停旧容器
             if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
@@ -959,6 +978,9 @@ jobs:
     name: Deploy Worker
     needs: [docker]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' &&
@@ -1092,8 +1114,10 @@ jobs:
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
@@ -1102,7 +1126,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,GHCR_USERNAME,GHCR_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
           script: |
             set -Eeuo pipefail
 
@@ -1166,13 +1190,45 @@ jobs:
               exit 1
             fi
 
-            # 登录 GHCR
-            if [ -n "${GHCR_TOKEN:-}" ]; then
-              echo "$GHCR_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null || true
+            # Worker compose 挂载 TLS，与 apiserver 对齐属主
+            CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
+            KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
+            GRPC_CERT_DIR="/data/infra/ssl/grpc"
+            if $SUDO test -r "$CERT_HOST_PATH" && $SUDO test -r "$KEY_HOST_PATH"; then
+              $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH"
+              $SUDO chmod 0644 "$CERT_HOST_PATH"
+              $SUDO chmod 0640 "$KEY_HOST_PATH"
+            fi
+            if ! $SUDO test -d "$GRPC_CERT_DIR"; then
+              echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
+              exit 1
             fi
 
-            # 拉取镜像
-            $SUDO docker pull "$DOCKER_REGISTRY/$DOCKER_REPOSITORY/$IMAGE_NAME:latest" || true
+            export DOCKER_IMAGE_QS_WORKER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
+
+            GHCR_LOGIN_OK=0
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              echo "Logging into GitHub Container Registry..."
+              if [ "$SUDO" = "sudo_pw" ]; then
+                printf '%s\n%s' "$SUDO_PASSWORD" "$GITHUB_TOKEN" | sudo -S docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+              else
+                echo "$GITHUB_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+              fi
+            fi
+
+            if [ "$GHCR_LOGIN_OK" -ne 1 ]; then
+              if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+                echo "⚠️ GHCR login failed; falling back to Docker Hub..."
+                if [ "$SUDO" = "sudo_pw" ]; then
+                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                else
+                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                fi
+                export DOCKER_IMAGE_QS_WORKER="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+              else
+                echo "⚠️ GHCR login failed and Docker Hub credentials missing."
+              fi
+            fi
 
             # 停旧容器
             if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
