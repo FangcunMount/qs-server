@@ -66,7 +66,7 @@ type QuestionDTO struct {
 	Required        bool                          // 是否必填
 	Description     string                        // 问题描述
 	ValidationRules []validation.ValidationRule   // 校验规则
-	CalculationRule *calculation.CalculationRule // 计算规则
+	CalculationRule *calculation.CalculationRule  // 计算规则
 	ShowController  *questionnaire.ShowController // 显示控制器
 }
 

@@ -168,10 +168,10 @@ func (s *testeeStatisticsService) convertAccumulatedPOToTesteeStatistics(
 	testeeID uint64,
 ) *statistics.TesteeStatistics {
 	result := &statistics.TesteeStatistics{
-		OrgID:            orgID,
-		TesteeID:         testeeID,
-		TotalAssessments: po.TotalSubmissions,
-		RiskDistribution: make(map[string]int64),
+		OrgID:               orgID,
+		TesteeID:            testeeID,
+		TotalAssessments:    po.TotalSubmissions,
+		RiskDistribution:    make(map[string]int64),
 		FirstAssessmentDate: po.FirstOccurredAt,
 		LastAssessmentDate:  po.LastOccurredAt,
 	}
@@ -193,4 +193,3 @@ func (s *testeeStatisticsService) convertAccumulatedPOToTesteeStatistics(
 
 	return result
 }
-

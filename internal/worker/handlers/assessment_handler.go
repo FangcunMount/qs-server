@@ -23,6 +23,7 @@ func init() {
 
 // AssessmentSubmittedPayload 测评提交事件数据
 type AssessmentSubmittedPayload struct {
+	OrgID             int64     `json:"org_id"`
 	AssessmentID      int64     `json:"assessment_id"`
 	TesteeID          uint64    `json:"testee_id"`
 	QuestionnaireCode string    `json:"questionnaire_code"`
@@ -40,6 +41,7 @@ func (p AssessmentSubmittedPayload) NeedsEvaluation() bool {
 
 // AssessmentInterpretedPayload 测评解读完成事件数据
 type AssessmentInterpretedPayload struct {
+	OrgID          int64     `json:"org_id"`
 	AssessmentID  int64     `json:"assessment_id"`
 	TesteeID      uint64    `json:"testee_id"`
 	ScaleCode     string    `json:"scale_code"`
@@ -56,6 +58,7 @@ func (p AssessmentInterpretedPayload) IsHighRisk() bool {
 
 // AssessmentFailedPayload 测评失败事件数据
 type AssessmentFailedPayload struct {
+	OrgID        int64     `json:"org_id"`
 	AssessmentID int64     `json:"assessment_id"`
 	TesteeID     uint64    `json:"testee_id"`
 	Reason       string    `json:"reason"`
@@ -80,6 +83,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Debug("assessment submitted detail",
 			"event_id", env.ID,
+			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
 			"testee_id", data.TesteeID,
 			"questionnaire_code", data.QuestionnaireCode,
@@ -157,6 +161,7 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 		}
 
 		deps.Logger.Debug("assessment interpreted detail",
+			"org_id", data.OrgID,
 			"total_score", data.TotalScore,
 			"risk_level", data.RiskLevel,
 			"is_high_risk", data.IsHighRisk(),
@@ -204,6 +209,7 @@ func handleAssessmentFailed(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Error("assessment failed",
 			slog.String("event_id", env.ID),
+			slog.Int64("org_id", data.OrgID),
 			slog.Int64("assessment_id", data.AssessmentID),
 			slog.Uint64("testee_id", data.TesteeID),
 			slog.String("reason", data.Reason),

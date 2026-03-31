@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -19,12 +20,13 @@ import (
 // 提供测评管理、得分查询、报告查询等 RESTful API
 type EvaluationHandler struct {
 	*BaseHandler
-	managementService  assessmentApp.AssessmentManagementService
-	reportQueryService assessmentApp.ReportQueryService
-	scoreQueryService  assessmentApp.ScoreQueryService
-	evaluationService  engine.Service
-	statusCache        *cache.AssessmentStatusCache
-	waiterRegistry     *waiter.WaiterRegistry
+	managementService   assessmentApp.AssessmentManagementService
+	reportQueryService  assessmentApp.ReportQueryService
+	scoreQueryService   assessmentApp.ScoreQueryService
+	evaluationService   engine.Service
+	testeeAccessService actorAccessApp.TesteeAccessService
+	statusCache         *cache.AssessmentStatusCache
+	waiterRegistry      *waiter.WaiterRegistry
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
@@ -41,6 +43,11 @@ func NewEvaluationHandler(
 		scoreQueryService:  scoreQueryService,
 		evaluationService:  evaluationService,
 	}
+}
+
+// SetTesteeAccessService 设置 testee 访问控制服务。
+func (h *EvaluationHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+	h.testeeAccessService = testeeAccessService
 }
 
 // SetStatusCache 设置状态缓存（可选）
@@ -71,9 +78,19 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
 	result, err := h.managementService.GetByID(ctx, id)
 	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, result.TesteeID); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -94,6 +111,12 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments [get]
 func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	var req request.ListAssessmentsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.BadRequestResponse(c, "请求参数无效", err)
@@ -108,23 +131,41 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		req.PageSize = 10
 	}
 
-	orgID := h.getOrgIDFromContext(c)
 	conditions := make(map[string]string)
 	if req.Status != "" {
 		conditions["status"] = req.Status
 	}
 	if req.TesteeID > 0 {
+		if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
+			h.Error(c, err)
+			return
+		}
 		conditions["testee_id"] = strconv.FormatUint(req.TesteeID, 10)
 	}
 
 	dto := assessmentApp.ListAssessmentsDTO{
-		OrgID:      orgID,
+		OrgID:      uint64(orgID),
 		Page:       req.Page,
 		PageSize:   req.PageSize,
 		Conditions: conditions,
 	}
 
-	ctx := context.Background()
+	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if !scope.IsAdmin && req.TesteeID == 0 {
+		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		dto.AccessibleTesteeIDs = allowedTesteeIDs
+		dto.RestrictToAccessScope = true
+	}
+
+	ctx := c.Request.Context()
 	result, err := h.managementService.List(ctx, dto)
 	if err != nil {
 		h.Error(c, err)
@@ -152,7 +193,23 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	assessmentResult, err := h.managementService.GetByID(ctx, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	result, err := h.scoreQueryService.GetByAssessmentID(ctx, id)
 	if err != nil {
 		h.Error(c, err)
@@ -174,6 +231,12 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/scores/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	var req request.GetFactorTrendRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.BadRequestResponse(c, "请求参数无效", err)
@@ -183,6 +246,10 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	if req.Limit <= 0 {
 		req.Limit = 10
 	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	dto := assessmentApp.GetFactorTrendDTO{
 		TesteeID:   req.TesteeID,
@@ -190,7 +257,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 		Limit:      req.Limit,
 	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 	result, err := h.scoreQueryService.GetFactorTrend(ctx, dto)
 	if err != nil {
 		h.Error(c, err)
@@ -216,7 +283,23 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	assessmentResult, err := h.managementService.GetByID(ctx, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	result, err := h.scoreQueryService.GetHighRiskFactors(ctx, id)
 	if err != nil {
 		h.Error(c, err)
@@ -246,7 +329,23 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	assessmentResult, err := h.managementService.GetByID(ctx, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	result, err := h.reportQueryService.GetByAssessmentID(ctx, id)
 	if err != nil {
 		h.Error(c, err)
@@ -268,6 +367,12 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/reports [get]
 func (h *EvaluationHandler) ListReports(c *gin.Context) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	var req request.ListReportsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.BadRequestResponse(c, "请求参数无效", err)
@@ -286,8 +391,31 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}
+	if req.TesteeID != 0 {
+		if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
+			h.Error(c, err)
+			return
+		}
+	} else {
+		scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if scope.IsAdmin {
+			h.BadRequestResponse(c, "受试者ID不能为空", nil)
+			return
+		}
+		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		dto.AccessibleTesteeIDs = allowedTesteeIDs
+		dto.RestrictToAccessScope = true
+	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 	result, err := h.reportQueryService.ListByTesteeID(ctx, dto)
 	if err != nil {
 		h.Error(c, err)
@@ -301,10 +429,11 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 
 // BatchEvaluate 批量评估
 // @Summary 批量评估
-// @Description 批量执行测评评估（管理员/Worker使用）
+// @Description 批量执行测评评估；仅 qs:evaluator 或 qs:admin 可访问
 // @Tags Evaluation-Admin
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
 // @Param request body request.BatchEvaluateRequest true "批量评估请求"
 // @Success 200 {object} core.Response{data=response.BatchEvaluationResponse}
 // @Failure 429 {object} core.ErrResponse
@@ -315,9 +444,14 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 		h.BadRequestResponse(c, "请求参数无效", err)
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	ctx := context.Background()
-	result, err := h.evaluationService.EvaluateBatch(ctx, req.AssessmentIDs)
+	ctx := c.Request.Context()
+	result, err := h.evaluationService.EvaluateBatch(ctx, orgID, req.AssessmentIDs)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -328,9 +462,10 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 
 // RetryFailed 重试失败的测评
 // @Summary 重试失败的测评
-// @Description 重试指定测评的评估流程
+// @Description 重试指定测评的评估流程；仅 qs:evaluator 或 qs:admin 可访问
 // @Tags Evaluation-Admin
 // @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Failure 429 {object} core.ErrResponse
@@ -341,9 +476,14 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 		h.BadRequestResponse(c, "无效的测评ID", err)
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	ctx := context.Background()
-	result, err := h.managementService.Retry(ctx, id)
+	ctx := c.Request.Context()
+	result, err := h.managementService.Retry(ctx, orgID, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -368,6 +508,11 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 		h.BadRequestResponse(c, "无效的测评ID", err)
 		return
 	}
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	// 解析超时参数
 	timeoutStr := c.DefaultQuery("timeout", "15")
@@ -380,29 +525,35 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()
 
-	// 1. 快速检查一次缓存或数据库
+	// 1. 先确认 assessment 存在且当前操作者有权访问对应 testee
 	result, err := h.managementService.GetByID(ctx, id)
-	if err == nil && result != nil {
-		if result.Status == "interpreted" || result.Status == "failed" {
-			var totalScore *float64
-			var riskLevel *string
-			if result.TotalScore != nil {
-				ts := *result.TotalScore
-				totalScore = &ts
-			}
-			if result.RiskLevel != nil {
-				rl := string(*result.RiskLevel)
-				riskLevel = &rl
-			}
-			summary := waiter.StatusSummary{
-				Status:     result.Status,
-				TotalScore: totalScore,
-				RiskLevel:  riskLevel,
-				UpdatedAt:  time.Now().Unix(),
-			}
-			h.Success(c, summary)
-			return
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, result.TesteeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result.Status == "interpreted" || result.Status == "failed" {
+		var totalScore *float64
+		var riskLevel *string
+		if result.TotalScore != nil {
+			ts := *result.TotalScore
+			totalScore = &ts
 		}
+		if result.RiskLevel != nil {
+			rl := string(*result.RiskLevel)
+			riskLevel = &rl
+		}
+		summary := waiter.StatusSummary{
+			Status:     result.Status,
+			TotalScore: totalScore,
+			RiskLevel:  riskLevel,
+			UpdatedAt:  time.Now().Unix(),
+		}
+		h.Success(c, summary)
+		return
 	}
 
 	// 2. 如果没有等待队列注册表，降级为短轮询
@@ -506,25 +657,3 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 }
 
 // ============= 辅助方法 =============
-
-// getOrgIDFromContext 从上下文获取组织ID
-// 优先从 JWT claims 的 TenantID 获取，降级到 Header/Query
-func (h *EvaluationHandler) getOrgIDFromContext(c *gin.Context) uint64 {
-	// 优先从 JWT claims 获取（由 UserIdentityMiddleware 设置）
-	orgID := h.GetOrgID(c)
-	if orgID > 0 {
-		return orgID
-	}
-
-	// 降级：从 header 或 query 中获取（兼容旧代码）
-	orgIDStr := c.GetHeader("X-Org-ID")
-	if orgIDStr == "" {
-		orgIDStr = c.Query("org_id")
-	}
-	if orgIDStr == "" {
-		return 0
-	}
-
-	orgID, _ = strconv.ParseUint(orgIDStr, 10, 64)
-	return orgID
-}

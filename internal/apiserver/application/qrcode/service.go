@@ -284,6 +284,60 @@ func (s *service) GenerateScaleQRCode(ctx context.Context, code string) (string,
 	return s.getQRCodeURL(ctx, filePath)
 }
 
+// GenerateAssessmentEntryQRCode 生成测评入口小程序码
+func (s *service) GenerateAssessmentEntryQRCode(ctx context.Context, token string) (string, error) {
+	l := logger.L(ctx)
+
+	if token == "" {
+		return "", fmt.Errorf("测评入口 token 不能为空")
+	}
+	if s.qrCodeGen == nil {
+		return "", fmt.Errorf("小程序码生成器未配置")
+	}
+
+	appID, appSecret, err := s.getWechatAppConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("获取微信应用配置失败: %w", err)
+	}
+
+	scene := token
+	if len(scene) > 32 {
+		return "", fmt.Errorf("测评入口 token 超过 scene 长度限制")
+	}
+
+	reader, err := s.qrCodeGen.GenerateUnlimitedQRCode(
+		ctx,
+		appID,
+		appSecret,
+		scene,
+		s.config.PagePath,
+		430,
+		false,
+		nil,
+		false,
+	)
+	if err != nil {
+		l.Errorw("生成测评入口小程序码失败",
+			"action", "generate_assessment_entry_qrcode",
+			"token", token,
+			"error", err.Error(),
+		)
+		return "", fmt.Errorf("生成小程序码失败: %w", err)
+	}
+
+	qrCodeData, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
+	}
+
+	filePath, err := s.saveQRCodeFile(ctx, fmt.Sprintf("assessment_entry_%s.png", token), qrCodeData)
+	if err != nil {
+		return "", fmt.Errorf("保存小程序码文件失败: %w", err)
+	}
+
+	return s.getQRCodeURL(ctx, filePath)
+}
+
 // saveQRCodeFile 保存二维码文件到指定目录
 func (s *service) saveQRCodeFile(ctx context.Context, fileName string, data []byte) (string, error) {
 	l := logger.L(ctx)

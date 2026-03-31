@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ type StatisticsHandler struct {
 	screeningStatisticsService     statisticsApp.ScreeningStatisticsService
 	syncService                    statisticsApp.StatisticsSyncService
 	validatorService               statisticsApp.StatisticsValidatorService
+	testeeAccessService            actorAccessApp.TesteeAccessService
 }
 
 // NewStatisticsHandler 创建统计处理器
@@ -43,11 +45,16 @@ func NewStatisticsHandler(
 	}
 }
 
+// SetTesteeAccessService 设置 testee 访问控制服务。
+func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+	h.testeeAccessService = testeeAccessService
+}
+
 // ============= 统计查询 API =============
 
 // GetSystemStatistics 获取系统整体统计
 // @Summary 获取系统整体统计
-// @Description 获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等
+// @Description 获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等；仅 qs:admin 可访问
 // @Tags Statistics
 // @Accept json
 // @Produce json
@@ -59,7 +66,11 @@ func (h *StatisticsHandler) GetSystemStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger.L(ctx).Infow("获取系统整体统计", "action", "get_system_statistics")
 
-	orgID := int64(h.GetOrgIDWithDefault(c))
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	stats, err := h.systemStatisticsService.GetSystemStatistics(ctx, orgID)
 	if err != nil {
@@ -77,7 +88,7 @@ func (h *StatisticsHandler) GetSystemStatistics(c *gin.Context) {
 
 // GetQuestionnaireStatistics 获取问卷/量表统计
 // @Summary 获取问卷/量表统计
-// @Description 获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等
+// @Description 获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等；仅 qs:admin 可访问
 // @Tags Statistics
 // @Accept json
 // @Produce json
@@ -99,7 +110,11 @@ func (h *StatisticsHandler) GetQuestionnaireStatistics(c *gin.Context) {
 		return
 	}
 
-	orgID := int64(h.GetOrgIDWithDefault(c))
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	stats, err := h.questionnaireStatisticsService.GetQuestionnaireStatistics(ctx, orgID, questionnaireCode)
 	if err != nil {
@@ -118,7 +133,7 @@ func (h *StatisticsHandler) GetQuestionnaireStatistics(c *gin.Context) {
 
 // GetTesteeStatistics 获取受试者统计
 // @Summary 获取受试者统计
-// @Description 获取指定受试者的统计数据，包括测评数、完成数、风险分布等
+// @Description 获取指定受试者的统计数据，包括测评数、完成数、风险分布等；后台访问范围按 ClinicianTesteeRelation 收口
 // @Tags Statistics
 // @Accept json
 // @Produce json
@@ -141,7 +156,15 @@ func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
 		return
 	}
 
-	orgID := int64(h.GetOrgIDWithDefault(c))
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	stats, err := h.testeeStatisticsService.GetTesteeStatistics(ctx, orgID, testeeID)
 	if err != nil {
@@ -160,7 +183,7 @@ func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
 
 // GetPlanStatistics 获取计划统计
 // @Summary 获取计划统计
-// @Description 获取指定测评计划的统计数据，包括任务数、完成率等
+// @Description 获取指定测评计划的统计数据，包括任务数、完成率等；仅 qs:admin 可访问
 // @Tags Statistics
 // @Accept json
 // @Produce json
@@ -183,7 +206,11 @@ func (h *StatisticsHandler) GetPlanStatistics(c *gin.Context) {
 		"plan_id", planID,
 	)
 
-	orgID := int64(h.GetOrgIDWithDefault(c))
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	stats, err := h.planStatisticsService.GetPlanStatistics(ctx, orgID, planID)
 	if err != nil {
@@ -202,23 +229,29 @@ func (h *StatisticsHandler) GetPlanStatistics(c *gin.Context) {
 
 // ============= 定时任务 API =============
 
-// SyncDailyStatistics 同步每日统计（定时任务调用）
+// SyncDailyStatistics 同步每日统计（内部系统动作）
 // @Summary 同步每日统计
-// @Description 将Redis中的每日统计数据同步到MySQL（定时任务调用）
+// @Description 将Redis中的每日统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/sync/daily [post]
+// @Router /internal/v1/statistics/sync/daily [post]
 func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger.L(ctx).Infow("同步每日统计", "action", "sync_daily_statistics")
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	if err := h.syncService.SyncDailyStatistics(ctx); err != nil {
+	if err := h.syncService.SyncDailyStatistics(ctx, orgID); err != nil {
 		logger.L(ctx).Errorw("同步每日统计失败",
 			"action", "sync_daily_statistics",
+			"org_id", orgID,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
@@ -230,21 +263,27 @@ func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 
 // SyncAccumulatedStatistics 同步累计统计（定时任务调用）
 // @Summary 同步累计统计
-// @Description 将Redis中的累计统计数据同步到MySQL（定时任务调用）
+// @Description 将Redis中的累计统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/sync/accumulated [post]
+// @Router /internal/v1/statistics/sync/accumulated [post]
 func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger.L(ctx).Infow("同步累计统计", "action", "sync_accumulated_statistics")
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	if err := h.syncService.SyncAccumulatedStatistics(ctx); err != nil {
+	if err := h.syncService.SyncAccumulatedStatistics(ctx, orgID); err != nil {
 		logger.L(ctx).Errorw("同步累计统计失败",
 			"action", "sync_accumulated_statistics",
+			"org_id", orgID,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
@@ -256,21 +295,27 @@ func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
 
 // SyncPlanStatistics 同步计划统计（定时任务调用）
 // @Summary 同步计划统计
-// @Description 同步计划统计数据到MySQL（定时任务调用）
+// @Description 同步计划统计数据到MySQL（定时任务调用）；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/sync/plan [post]
+// @Router /internal/v1/statistics/sync/plan [post]
 func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger.L(ctx).Infow("同步计划统计", "action", "sync_plan_statistics")
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	if err := h.syncService.SyncPlanStatistics(ctx); err != nil {
+	if err := h.syncService.SyncPlanStatistics(ctx, orgID); err != nil {
 		logger.L(ctx).Errorw("同步计划统计失败",
 			"action", "sync_plan_statistics",
+			"org_id", orgID,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
@@ -282,21 +327,27 @@ func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 
 // ValidateConsistency 校验数据一致性（定时任务调用）
 // @Summary 校验数据一致性
-// @Description 校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）
+// @Description 校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/validate [post]
+// @Router /internal/v1/statistics/validate [post]
 func (h *StatisticsHandler) ValidateConsistency(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger.L(ctx).Infow("校验数据一致性", "action", "validate_consistency")
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	if err := h.validatorService.ValidateConsistency(ctx); err != nil {
+	if err := h.validatorService.ValidateConsistency(ctx, orgID); err != nil {
 		logger.L(ctx).Errorw("校验数据一致性失败",
 			"action", "validate_consistency",
+			"org_id", orgID,
 			"error", err.Error(),
 		)
 		h.Error(c, err)

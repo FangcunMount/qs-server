@@ -12,10 +12,10 @@ func NewValidator() *Validator {
 // ValidateConsistency 校验数据一致性
 // 比较Redis和MySQL的统计数据，返回差异
 type ConsistencyDiff struct {
-	Field         string
-	RedisValue    int64
-	MySQLValue    int64
-	Difference    int64
+	Field      string
+	RedisValue int64
+	MySQLValue int64
+	Difference int64
 }
 
 // ValidateConsistency 校验一致性
@@ -24,4 +24,3 @@ func (v *Validator) ValidateConsistency(redisStats, mysqlStats interface{}) []Co
 	// 暂时返回空，后续根据实际需求实现
 	return []ConsistencyDiff{}
 }
-

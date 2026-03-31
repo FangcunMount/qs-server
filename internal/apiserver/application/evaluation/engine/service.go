@@ -294,15 +294,31 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 }
 
 // EvaluateBatch 批量评估
-func (s *service) EvaluateBatch(ctx context.Context, assessmentIDs []uint64) (*BatchResult, error) {
+func (s *service) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
 	l.Infow("开始批量评估",
 		"action", "evaluate_batch",
 		"resource", "assessment",
+		"org_id", orgID,
 		"total_count", len(assessmentIDs),
 	)
+
+	if orgID == 0 {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID不能为空")
+	}
+
+	for _, id := range assessmentIDs {
+		if err := s.ensureAssessmentInOrg(ctx, orgID, id); err != nil {
+			l.Warnw("批量评估的机构范围校验失败",
+				"assessment_id", id,
+				"org_id", orgID,
+				"error", err.Error(),
+			)
+			return nil, err
+		}
+	}
 
 	result := &BatchResult{
 		TotalCount:   len(assessmentIDs),
@@ -336,6 +352,20 @@ func (s *service) EvaluateBatch(ctx context.Context, assessmentIDs []uint64) (*B
 	)
 
 	return result, nil
+}
+
+func (s *service) ensureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
+	id := meta.FromUint64(assessmentID)
+	a, err := s.assessmentRepo.FindByID(ctx, id)
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+	}
+
+	if a.OrgID() != orgID {
+		return errors.WithCode(errorCode.ErrPermissionDenied, "测评不属于当前机构")
+	}
+
+	return nil
 }
 
 // markAsFailed 标记测评为失败

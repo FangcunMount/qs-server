@@ -131,13 +131,13 @@ type ReportResult struct {
 
 // DimensionResult 维度查询结果
 type DimensionResult struct {
-	FactorCode  string  `json:"factorCode"`
-	FactorName  string  `json:"factorName"`
-	RawScore    float64 `json:"rawScore"`
+	FactorCode  string   `json:"factorCode"`
+	FactorName  string   `json:"factorName"`
+	RawScore    float64  `json:"rawScore"`
 	MaxScore    *float64 `json:"maxScore,omitempty"`
-	RiskLevel   string  `json:"riskLevel"`
-	Description string  `json:"description"`
-	Suggestion  string  `json:"suggestion,omitempty"`
+	RiskLevel   string   `json:"riskLevel"`
+	Description string   `json:"description"`
+	Suggestion  string   `json:"suggestion,omitempty"`
 }
 
 // ReportListResult 报告列表查询结果

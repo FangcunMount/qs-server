@@ -39,6 +39,7 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Debug("assessment submitted statistics payload",
 			"event_id", env.ID,
+			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
 			"testee_id", data.TesteeID,
 			"questionnaire_code", data.QuestionnaireCode,
@@ -70,9 +71,14 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 
-		// 使用全局常量：org_id 固定为 1（单租户场景）
-		// 注意：worker 模块无法直接引用 apiserver 包，使用硬编码值
-		orgID := int64(1)
+		orgID := data.OrgID
+		if orgID <= 0 {
+			deps.Logger.Warn("missing org_id in assessment submitted event, skipping statistics update",
+				slog.String("event_id", env.ID),
+				slog.Int64("assessment_id", data.AssessmentID),
+			)
+			return nil
+		}
 		originType := ""
 
 		// TODO: 从事件数据中提取origin_type
@@ -163,6 +169,7 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 
 		deps.Logger.Debug("assessment interpreted statistics payload",
 			"event_id", env.ID,
+			"org_id", data.OrgID,
 			"assessment_id", data.AssessmentID,
 			"testee_id", data.TesteeID,
 			"scale_code", data.ScaleCode,
@@ -194,9 +201,14 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 
-		// 使用全局常量：org_id 固定为 1（单租户场景）
-		// 注意：worker 模块无法直接引用 apiserver 包，使用硬编码值
-		orgID := int64(1)
+		orgID := data.OrgID
+		if orgID <= 0 {
+			deps.Logger.Warn("missing org_id in assessment interpreted event, skipping statistics update",
+				slog.String("event_id", env.ID),
+				slog.Int64("assessment_id", data.AssessmentID),
+			)
+			return nil
+		}
 		// ScaleCode 通常等同于 QuestionnaireCode（量表就是问卷）
 		questionnaireCode := data.ScaleCode
 

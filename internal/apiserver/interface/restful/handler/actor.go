@@ -5,13 +5,19 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
+	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,8 +33,14 @@ type ActorHandler struct {
 	operatorLifecycleService     operatorApp.OperatorLifecycleService
 	operatorAuthorizationService operatorApp.OperatorAuthorizationService
 	operatorQueryService         operatorApp.OperatorQueryService
+	clinicianLifecycleService    clinicianApp.ClinicianLifecycleService
+	clinicianQueryService        clinicianApp.ClinicianQueryService
+	clinicianRelationshipService clinicianApp.ClinicianRelationshipService
+	testeeAccessService          actorAccessApp.TesteeAccessService
+	assessmentEntryService       assessmentEntryApp.AssessmentEntryService
 	// IAM 服务（可选）
 	guardianshipService *iam.GuardianshipService
+	qrCodeService       qrcodeApp.QRCodeService
 	// Evaluation 服务（用于查询测评记录）
 	assessmentManagementService assessmentApp.AssessmentManagementService
 	scoreQueryService           assessmentApp.ScoreQueryService
@@ -43,7 +55,13 @@ func NewActorHandler(
 	operatorLifecycleService operatorApp.OperatorLifecycleService,
 	operatorAuthorizationService operatorApp.OperatorAuthorizationService,
 	operatorQueryService operatorApp.OperatorQueryService,
+	clinicianLifecycleService clinicianApp.ClinicianLifecycleService,
+	clinicianQueryService clinicianApp.ClinicianQueryService,
+	clinicianRelationshipService clinicianApp.ClinicianRelationshipService,
+	testeeAccessService actorAccessApp.TesteeAccessService,
+	assessmentEntryService assessmentEntryApp.AssessmentEntryService,
 	guardianshipService *iam.GuardianshipService,
+	qrCodeService qrcodeApp.QRCodeService,
 	assessmentManagementService assessmentApp.AssessmentManagementService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 ) *ActorHandler {
@@ -56,7 +74,13 @@ func NewActorHandler(
 		operatorLifecycleService:     operatorLifecycleService,
 		operatorAuthorizationService: operatorAuthorizationService,
 		operatorQueryService:         operatorQueryService,
+		clinicianLifecycleService:    clinicianLifecycleService,
+		clinicianQueryService:        clinicianQueryService,
+		clinicianRelationshipService: clinicianRelationshipService,
+		testeeAccessService:          testeeAccessService,
+		assessmentEntryService:       assessmentEntryService,
 		guardianshipService:          guardianshipService,
+		qrCodeService:                qrCodeService,
 		assessmentManagementService:  assessmentManagementService,
 		scoreQueryService:            scoreQueryService,
 	}
@@ -86,6 +110,12 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 		return
 	}
 
+	orgID, _, err := h.validateProtectedTesteeAccess(c, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	// 使用后台查询服务（包含家长信息）
 	backendResult, err := h.testeeBackendQueryService.GetByIDWithGuardians(c.Request.Context(), id)
 	if err != nil {
@@ -97,6 +127,10 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	if backendResult.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "testee does not belong to current organization"))
+		return
+	}
 
 	// 转换为响应对象（包含家长信息）
 	resp := toTesteeBackendResponse(backendResult)
@@ -106,21 +140,33 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 
 // GetTesteeByProfileID 根据 profile_id 获取受试者详情
 // @Summary 根据 profile_id 获取受试者详情
+// @Description 以 JWT org_id 为准，根据档案ID查询受试者；org_id 查询参数仅作兼容校验，若传入则必须与 JWT org_id 一致
 // @Tags Actor
 // @Produce json
-// @Param org_id query string true "机构ID"
+// @Param org_id query string false "兼容字段：机构ID，若传入必须与 JWT org_id 一致"
 // @Param profile_id query string true "用户档案ID（IAM Child ID/ProfileID）"
 // @Param iam_child_id query string false "兼容字段：IAM儿童ID"
 // @Success 200 {object} core.Response{data=response.TesteeResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/by-profile-id [get]
 func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	var req request.GetTesteeByProfileIDRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		logger.L(c.Request.Context()).Warnw("Invalid get testee by profile_id request",
 			"action", "get_testee_by_profile_id",
 			"error", err.Error(),
 		)
+		h.Error(c, err)
+		return
+	}
+	orgID, err = h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -131,9 +177,13 @@ func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
 		return
 	}
 
-	testeeResult, err := h.fetchTesteeByProfile(c, req.OrgID, profileIDStr)
+	testeeResult, err := h.fetchTesteeByProfile(c, orgID, profileIDStr)
 	if err != nil {
-		h.BadRequestResponse(c, err.Error(), nil)
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeResult.ID); err != nil {
+		h.Error(c, err)
 		return
 	}
 
@@ -173,6 +223,11 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	orgID, _, err := h.validateProtectedTesteeAccess(c, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	// 验证受试者是否存在
 	_, err = h.testeeQueryService.GetByID(c.Request.Context(), id)
@@ -188,7 +243,7 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 
 	// 查询该受试者的所有测评记录
 	listDTO := assessmentApp.ListAssessmentsDTO{
-		OrgID:    0, // 不限制组织
+		OrgID:    uint64(orgID),
 		Page:     1,
 		PageSize: 1000, // 获取所有记录
 		Conditions: map[string]string{
@@ -300,16 +355,7 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 	h.Success(c, resp)
 }
 
-// GetPeriodicStats
-// @Summary 获取受试者周期统计
-// @Tags Testee
-// @Produce json
-// @Param id path string true "Testee ID"
-// @Success 200 {object} core.Response{data=response.PeriodicStatsResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Failure 400 {object} core.Response
-// @Failure 404 {object} core.Response
-// @Router /api/v1/testees/{id}/periodic-stats [get]
+// GetPeriodicStats 获取受试者周期统计。
 func (h *ActorHandler) GetPeriodicStats(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -319,6 +365,10 @@ func (h *ActorHandler) GetPeriodicStats(c *gin.Context) {
 			"testee_id", idStr,
 			"error", err.Error(),
 		)
+		h.Error(c, err)
+		return
+	}
+	if _, _, err := h.validateProtectedTesteeAccess(c, id); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -366,6 +416,10 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 			"testee_id", idStr,
 			"error", err.Error(),
 		)
+		h.Error(c, err)
+		return
+	}
+	if _, _, err := h.validateProtectedTesteeAccess(c, id); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -440,9 +494,10 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 
 // ListTestees 查询受试者列表
 // @Summary 查询受试者列表
+// @Description 以 JWT org_id 为准查询后台可见受试者。qs:admin 可查看机构全量，其他后台用户按 ClinicianTesteeRelation 自动收口；org_id 查询参数仅作兼容校验
 // @Tags Actor
 // @Produce json
-// @Param org_id query string true "机构ID"
+// @Param org_id query string false "兼容字段：机构ID，若传入必须与 JWT org_id 一致"
 // @Param name query string false "姓名（模糊匹配）"
 // @Param is_key_focus query bool false "是否重点关注"
 // @Param profile_id query string false "档案ID（等同于IAM儿童ID）"
@@ -452,6 +507,12 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees [get]
 func (h *ActorHandler) ListTestees(c *gin.Context) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	var req request.ListTesteeRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		logger.L(c.Request.Context()).Warnw("Invalid list testees request",
@@ -459,6 +520,11 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 			"resource", "testee",
 			"error", err.Error(),
 		)
+		h.Error(c, err)
+		return
+	}
+	orgID, err = h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -473,8 +539,12 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 
 	// 按 profile_id 精确查询（等同于 IAM child_id）
 	if req.ProfileID != "" {
-		result, err := h.fetchTesteeByProfile(c, req.OrgID, req.ProfileID)
+		result, err := h.fetchTesteeByProfile(c, orgID, req.ProfileID)
 		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, result.ID); err != nil {
 			h.Error(c, err)
 			return
 		}
@@ -483,14 +553,29 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		return
 	}
 
+	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	// 使用查询服务 - 统一通过 ListTestees 方法处理所有查询
 	dto := testeeApp.ListTesteeDTO{
-		OrgID:    req.OrgID,
+		OrgID:    orgID,
 		Name:     req.Name,
 		Tags:     req.Tags,
 		KeyFocus: req.IsKeyFocus,
 		Offset:   (req.Page - 1) * req.PageSize,
 		Limit:    req.PageSize,
+	}
+	if !scope.IsAdmin {
+		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		dto.AccessibleTesteeIDs = allowedTesteeIDs
+		dto.RestrictToAccessScope = true
 	}
 
 	listResult, err := h.testeeQueryService.ListTestees(c.Request.Context(), dto)
@@ -530,8 +615,13 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	dto := toRegisterStaffDTO(&req)
+	dto := toRegisterStaffDTO(&req, orgID)
 	// 使用生命周期服务 - 服务于人事/行放部门
 	result, err := h.operatorLifecycleService.Register(c.Request.Context(), dto)
 	if err != nil {
@@ -557,6 +647,12 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/staff/{id} [get]
 func (h *ActorHandler) GetStaff(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -582,6 +678,10 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	if result.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
+		return
+	}
 
 	h.Success(c, toStaffResponse(result))
 }
@@ -595,6 +695,12 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/staff/{id} [delete]
 func (h *ActorHandler) DeleteStaff(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -605,6 +711,15 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 			"error", err.Error(),
 		)
 		h.Error(c, err)
+		return
+	}
+	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
 		return
 	}
 
@@ -625,9 +740,10 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 
 // ListStaff 查询员工列表
 // @Summary 查询员工列表
+// @Description 机构级后台账号列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验
 // @Tags Actor
 // @Produce json
-// @Param org_id query string true "机构ID"
+// @Param org_id query string false "兼容字段：机构ID，若传入必须与 JWT org_id 一致"
 // @Param role query string false "角色筛选"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
@@ -645,6 +761,11 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	// 设置默认值
 	if req.Page == 0 {
@@ -659,11 +780,10 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 	// 根据查询条件调用不同的服务方法
 	var results []*operatorApp.OperatorResult
 	var total int64
-	var err error
 
 	// 使用查询服务
 	listDTO := operatorApp.ListOperatorDTO{
-		OrgID:  req.OrgID,
+		OrgID:  orgID,
 		Role:   req.Role,
 		Offset: offset,
 		Limit:  req.PageSize,
@@ -712,6 +832,17 @@ func (h *ActorHandler) fetchTesteeByProfile(c *gin.Context, orgID int64, profile
 	}
 
 	return result, nil
+}
+
+func (h *ActorHandler) validateProtectedTesteeAccess(c *gin.Context, testeeID uint64) (int64, int64, error) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
+		return 0, 0, err
+	}
+	return orgID, operatorUserID, nil
 }
 
 // ========== 映射辅助函数 ==========
@@ -833,9 +964,9 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 }
 
 // toRegisterStaffDTO 将创建请求转换为应用层 DTO
-func toRegisterStaffDTO(req *request.CreateStaffRequest) operatorApp.RegisterOperatorDTO {
+func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorApp.RegisterOperatorDTO {
 	return operatorApp.RegisterOperatorDTO{
-		OrgID: req.OrgID,
+		OrgID: orgID,
 		// UserID left zero; application service will create/resolve IAM user
 		Roles: req.Roles,
 		Name:  req.Name,
@@ -886,4 +1017,9 @@ func (h *ActorHandler) SetEvaluationServices(
 ) {
 	h.assessmentManagementService = assessmentManagementService
 	h.scoreQueryService = scoreQueryService
+}
+
+// SetQRCodeService 设置二维码服务。
+func (h *ActorHandler) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
+	h.qrCodeService = qrCodeService
 }

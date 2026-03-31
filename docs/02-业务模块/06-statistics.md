@@ -22,7 +22,7 @@
 | ---- | ---- |
 | 模块职责 | 提供系统级、问卷级、受试者级、计划级等统计查询视图，并负责同步与校验入口 |
 | 查询分层 | 优先读 Redis 查询缓存，再读 MySQL 统计表，最后必要时回源业务表聚合 |
-| 同步入口 | REST 与 internal gRPC 都支持 `daily`、`accumulated`、`plan` 同步与校验 |
+| 同步入口 | 外部后台查询走 `/api/v1/statistics/*`；同步/校验走 `/internal/v1/statistics/*` |
 | 事件驱动 | `assessment.*` 相关事件由 `qs-worker` 消费后写 Redis 预聚合，不在 apiserver 事件路径内直接增量写 |
 | 核心边界 | 不负责测评计分、计划调度、问卷主数据写入，也不发布稳定 `statistics.*` 业务事件 |
 | 存储分层 | MySQL 持久化 `statistics_*` 读模型；Redis 同时承担预聚合键与查询结果缓存，但两类键用途不同 |
@@ -31,7 +31,7 @@
 
 | | 内容 |
 | -- | ---- |
-| **负责（摘要）** | 多维度统计查询；Redis/MySQL/原始表分层读；运维向同步与一致性校验（REST + internal gRPC）；测评事件驱动的 Redis 预聚合（在 worker 进程内实现） |
+| **负责（摘要）** | 多维度统计查询；Redis/MySQL/原始表分层读；运维向同步与一致性校验（internal REST）；测评事件驱动的 Redis 预聚合（在 worker 进程内实现） |
 | **不负责（摘要）** | 测评计分与流水线编排；计划调度；问卷/答卷主数据写入（[survey](./01-survey.md)）；筛查全链路（`screening` 多为预留）；**无**独立统计微服务进程（[`events.yaml`](../../configs/events.yaml) 已不与虚构 `statistics-service` consumer 对齐） |
 | **关联专题** | 读侧与缓存策略 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)；横切存储细节 [03-基础设施](../03-基础设施/) |
 
@@ -40,9 +40,8 @@
 维护文档时**以本清单与源码为真值**；与代码不一致时应改代码或改文。
 
 - **查询**：`GET /api/v1/statistics/system|questionnaires/:code|testees/:testee_id|plans/:plan_id` — 统一走「查询结果缓存 → MySQL 统计表 → 原始表聚合」优先级（各 `*_service.go`）。
-- **同步**：`POST /api/v1/statistics/sync/daily|accumulated|plan` — 将 Redis 日/累计写入 `statistics_daily` / `statistics_accumulated`，计划统计从业务表聚合入 `statistics_plan`（[sync_service.go](../../internal/apiserver/application/statistics/sync_service.go)）。
-- **校验**：`POST /api/v1/statistics/validate` — 应用层 `StatisticsValidatorService.ValidateConsistency`（非领域层 `Validator` 全量实现）。
-- **internal gRPC**：`SyncDailyStatistics`、`SyncAccumulatedStatistics`、`SyncPlanStatistics`、`ValidateStatistics`（[internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)）；实现注释推荐**优先用 Crontab + REST**。
+- **同步**：`POST /internal/v1/statistics/sync/daily|accumulated|plan` — 将 Redis 日/累计写入 `statistics_daily` / `statistics_accumulated`，计划统计从业务表聚合入 `statistics_plan`（[sync_service.go](../../internal/apiserver/application/statistics/sync_service.go)）。
+- **校验**：`POST /internal/v1/statistics/validate` — 应用层 `StatisticsValidatorService.ValidateConsistency`（非领域层 `Validator` 全量实现）。
 - **事件侧增量**：`assessment.submitted` / `assessment.interpreted` 在 **qs-worker** 中由主 handler（yaml 登记为 `assessment_*_handler`）**内部再调用** `statistics_assessment_*_handler` 写 Redis（见 [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)）；与 [configs/events.yaml](../../configs/events.yaml) 对读见下「Verify」。
 
 #### 不负责什么（细项）
@@ -55,7 +54,6 @@
 ### 契约入口
 
 - **REST**：以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) `Statistics` / `Statistics-Sync` 为准；[statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go)、[routers.go](../../internal/apiserver/routers.go) `registerStatisticsProtectedRoutes`。
-- **internal gRPC**：`InternalService` 统计相关 RPC — [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)。
 - **领域事件**：[`configs/events.yaml`](../../configs/events.yaml) Topic、handler 名与 consumers；与 worker 注册名对照见下文 **Verify**。
 
 ### 运行时示意图
@@ -231,7 +229,6 @@ flowchart TB
 flowchart TB
     subgraph IF[interface]
         H[StatisticsHandler]
-        IG[InternalService 统计 RPC]
     end
 
     subgraph APP[application/statistics]
@@ -259,8 +256,6 @@ flowchart TB
     H --> PL
     H --> SYNC
     H --> VAL
-    IG --> SYNC
-    IG --> VAL
 
     SYS --> REPO
     SYS --> CACHE
@@ -288,33 +283,22 @@ flowchart TB
 
 ## 核心设计
 
-### 核心契约：REST、internal gRPC 与领域事件
+### 核心契约：REST 与领域事件
 
 #### REST（Verify）
 
 机器可读契约以 [apiserver.yaml](../../api/rest/apiserver.yaml) 为准；路由以 [routers.go](../../internal/apiserver/routers.go) 为准。
 
-| HTTP | 路径（前缀 `/api/v1`） | 摘要 |
-| ---- | ---------------------- | ---- |
-| `GET` | `/statistics/system` | 系统整体统计 |
-| `GET` | `/statistics/questionnaires/{code}` | 问卷/量表统计 |
-| `GET` | `/statistics/testees/{testee_id}` | 受试者统计 |
-| `GET` | `/statistics/plans/{plan_id}` | 计划统计 |
-| `POST` | `/statistics/sync/daily` | 同步每日统计 |
-| `POST` | `/statistics/sync/accumulated` | 同步累计统计 |
-| `POST` | `/statistics/sync/plan` | 同步计划统计 |
-| `POST` | `/statistics/validate` | 一致性校验与修复 |
-
-#### internal gRPC（Verify）
-
-| RPC | 用途 |
-| ----- | ---- |
-| `SyncDailyStatistics` | 同 REST `sync/daily` |
-| `SyncAccumulatedStatistics` | 同 REST `sync/accumulated` |
-| `SyncPlanStatistics` | 同 REST `sync/plan` |
-| `ValidateStatistics` | 同 REST `validate` |
-
-实现见 [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；`statisticsSyncService` / `statisticsValidatorService` 为 nil 时返回 **Unimplemented**。
+| HTTP | 路径 | 摘要 |
+| ---- | ---- | ---- |
+| `GET` | `/api/v1/statistics/system` | 系统整体统计 |
+| `GET` | `/api/v1/statistics/questionnaires/{code}` | 问卷/量表统计 |
+| `GET` | `/api/v1/statistics/testees/{testee_id}` | 受试者统计 |
+| `GET` | `/api/v1/statistics/plans/{plan_id}` | 计划统计 |
+| `POST` | `/internal/v1/statistics/sync/daily` | 同步每日统计 |
+| `POST` | `/internal/v1/statistics/sync/accumulated` | 同步累计统计 |
+| `POST` | `/internal/v1/statistics/sync/plan` | 同步计划统计 |
+| `POST` | `/internal/v1/statistics/validate` | 一致性校验与修复 |
 
 #### 领域事件（Verify）
 
@@ -345,21 +329,21 @@ flowchart TB
 
 #### 定时任务推荐顺序（运维）
 
-以下针对 **REST** `POST /api/v1/statistics/sync/*` 与 `validate`，以及 **internal gRPC** `InternalService` 中等价 RPC（见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)）；实现推荐 **Crontab + REST**。代码为 **upsert**，一般可重复执行，间隔按数据量调整。
+以下针对 **internal REST** `POST /internal/v1/statistics/sync/*` 与 `validate`；实现推荐 **Crontab + internal REST**。代码为 **upsert**，一般可重复执行，间隔按数据量调整。
 
-| 步骤 | REST（`/api/v1/statistics`） | internal gRPC（`InternalService`） | 说明 |
-| ---- | ---------------------------- | ----------------------------------- | ---- |
-| 1 | `POST .../sync/daily` | `SyncDailyStatistics` | 把 worker 写入的 Redis 日统计刷入 `statistics_daily`。**须先于步骤 2**：累计同步从 **MySQL 日表**汇总，而非从 Redis 累计键重算。 |
-| 2 | `POST .../sync/accumulated` | `SyncAccumulatedStatistics` | 日表 → 问卷/受试者 `statistics_accumulated` + 系统行（原始表）。 |
-| 3 | `POST .../sync/plan` | `SyncPlanStatistics` | 与步骤 1～2 **无数据依赖**，可与 2 并行或固定排在 2 后便于统一运维窗口。 |
-| 4（可选） | `POST .../validate` | `ValidateStatistics` | 建议在 **步骤 2 之后**按需执行：用 Redis **累计提交数**覆盖 MySQL 同行。若业务以「日表汇总」为真值，则可能与 worker 侧 **INCR 的 `stats:accum`** 不一致，需明确治理策略（见「一致性校验」小节）。 |
+| 步骤 | internal REST（`/internal/v1/statistics`） | 说明 |
+| ---- | ------------------------------------------ | ---- |
+| 1 | `POST .../sync/daily` | 把 worker 写入的 Redis 日统计刷入 `statistics_daily`。**须先于步骤 2**：累计同步从 **MySQL 日表**汇总，而非从 Redis 累计键重算。 |
+| 2 | `POST .../sync/accumulated` | 日表 → 问卷/受试者 `statistics_accumulated` + 系统行（原始表）。 |
+| 3 | `POST .../sync/plan` | 与步骤 1～2 **无数据依赖**，可与 2 并行或固定排在 2 后便于统一运维窗口。 |
+| 4（可选） | `POST .../validate` | 建议在 **步骤 2 之后**按需执行：用 Redis **累计提交数**覆盖 MySQL 同行。若业务以「日表汇总」为真值，则可能与 worker 侧 **INCR 的 `stats:accum`** 不一致，需明确治理策略（见「一致性校验」小节）。 |
 
 **前置**：若希望日表/累计反映事件增量，须 **worker 启用统计 Redis**（`DisableStatisticsCache=false` 且 Redis 可用）；否则步骤 1～2 仍安全执行，但 Redis 侧多为空，累计主要体现日表已有数据或后续回源。
 
 #### worker 侧
 
 - **`Options.Cache.DisableStatisticsCache`**（默认 `true`，[options.go](../../internal/worker/options/options.go)）：为 true 时 **不向 worker 注入 Redis**，统计 handler 跳过更新（与 [server.go](../../internal/worker/server.go) 一致）。
-- **`org_id`**：handler 内当前硬编码 `1`（单租户假设），与 [constants.go](../../internal/apiserver/application/statistics/constants.go) `DefaultOrgID` 对齐思路一致。
+- **`org_id`**：worker 直接从 `assessment.submitted / interpreted` 事件载荷读取；事件缺少 `org_id` 时会跳过统计增量，避免写入错误租户。
 
 ```mermaid
 sequenceDiagram
@@ -402,11 +386,11 @@ sequenceDiagram
 
 #### 运维同步：输入与落表
 
-| 接口 / RPC | 主要输入 | 写入/更新 |
-| ---------- | -------- | -------- |
-| `POST .../sync/daily` | 扫描 Redis `stats:daily:{org}:{type}:*`（`ScanDailyKeys`），`statTypes` 含 questionnaire / testee / **plan** / screening | `statistics_daily`（[SyncDailyStatistics](../../internal/apiserver/application/statistics/sync_service.go)） |
-| `POST .../sync/accumulated` | 按日键提取 `statKey`，`AggregateDailyToAccumulated`；另对 `org_id` 调 `syncSystemStatistics` | `statistics_accumulated`（问卷/受试者累计 + **system** 行） |
-| `POST .../sync/plan` | 全表 `assessment_plan` 列出计划，再按任务表聚合 | `statistics_plan`（**不依赖** Redis 计划预聚合） |
+| internal REST | 主要输入 | 写入/更新 |
+| ------------- | -------- | -------- |
+| `POST /internal/v1/statistics/sync/daily` | 扫描**当前请求 org** 下的 Redis `stats:daily:{org}:{type}:*`（`ScanDailyKeys`），`statTypes` 含 questionnaire / testee / **plan** / screening | `statistics_daily`（[SyncDailyStatistics](../../internal/apiserver/application/statistics/sync_service.go)） |
+| `POST /internal/v1/statistics/sync/accumulated` | 按**当前请求 org**的日键提取 `statKey`，`AggregateDailyToAccumulated`；另对当前 `org_id` 调 `syncSystemStatistics` | `statistics_accumulated`（问卷/受试者累计 + **system** 行） |
+| `POST /internal/v1/statistics/sync/plan` | 只扫描**当前请求 org** 的 `assessment_plan`，再按任务表聚合 | `statistics_plan`（**不依赖** Redis 计划预聚合） |
 
 说明：`SyncDailyStatistics` 虽扫描 `plan` / `screening` 类型日键，worker 当前**未**对这两类写 `stats:daily`，故常见环境下对应键为空；计划统计以 **sync/plan** 与查询回源为主。
 
@@ -427,7 +411,7 @@ sequenceDiagram
 
 实现见 [validator_service.go](../../internal/apiserver/application/statistics/validator_service.go)：
 
-- **机构**：固定扫描 **`org_id = 1`**（`DefaultOrgID`），与同步逻辑一致。  
+- **机构**：只校验**当前请求 org**。  
 - **类型**：仅 **`questionnaire`**、**`testee`** 的累计维度；**不包含** `system` / `plan`。  
 - **对比字段**：Redis `stats:accum:...:total_submissions` 与 MySQL `statistics_accumulated.total_submissions`。  
 - **修复策略**：不一致时 **以 Redis 为准** 覆盖 MySQL `UpsertAccumulatedStatistics`。  
@@ -437,7 +421,7 @@ sequenceDiagram
 
 1. **CQRS 读模型**：统计表可重建、可重跑同步，不反向驱动业务聚合根状态。  
 2. **三层读**：性能与可用性权衡；结果**可能短暂滞后**，不宜当作强实时账务。  
-3. **单租户优先**：`org_id = 1` 在 worker 与部分应用逻辑中仍占主导；多租户需统一事件载荷、缓存键与同步扫描维度。  
+3. **租户收口**：worker 增量、internal REST 同步/校验、查询缓存键都以 `org_id` 为边界；定时调度器则通过 `statistics_sync.org_ids` 显式指定扫描范围。  
 4. **领域 `Validator` vs 应用校验器**：一致性修复以应用服务为准，勿混淆两层职责。
 
 ### 核心存储与配置锚点
@@ -457,8 +441,7 @@ sequenceDiagram
 | 装配 | [internal/apiserver/container/assembler/statistics.go](../../internal/apiserver/container/assembler/statistics.go) | Redis 缺失时同步/校验为 nil |
 | 应用层 | [internal/apiserver/application/statistics/](../../internal/apiserver/application/statistics/) | 查询与同步主逻辑 |
 | 领域 | [internal/apiserver/domain/statistics/](../../internal/apiserver/domain/statistics/) | 类型与聚合工具 |
-| REST | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) | `GetOrgIDWithDefault` 等 |
-| internal gRPC | [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go) | 统计同步与校验 |
+| REST | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go)、[internal/apiserver/routers.go](../../internal/apiserver/routers.go) | 查询与 internal 同步/校验入口 |
 | worker | [internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go) | 测评事件 → Redis |
 
 ---
@@ -470,7 +453,6 @@ sequenceDiagram
 - **worker 默认关闭统计缓存**：生产若依赖 Redis 增量，需显式打开并保证 Redis 与 apiserver 一致可用。  
 - **Redis 不可用**：同步与校验服务不初始化；查询仍可走 MySQL 与原始表。  
 - **`events.yaml` 与实现**：`consumers` 已与仓库进程对齐（无虚构 `statistics-service`）；**已实现**的测评 Redis 预聚合在 **qs-worker** 的 `assessment_*` → `statistics_assessment_*` 调用链。  
-- **internal gRPC**：代码注释推荐 **Crontab + REST**；gRPC 为备用入口。
 
 ---
 

@@ -41,6 +41,7 @@ func NewEnrollmentService(
 func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDTO) (*EnrollmentResult, error) {
 	logger.L(ctx).Infow("Enrolling testee to plan",
 		"action", "enroll_testee",
+		"org_id", dto.OrgID,
 		"plan_id", dto.PlanID,
 		"testee_id", dto.TesteeID,
 		"start_date", dto.StartDate,
@@ -77,7 +78,12 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的开始日期: %v", err)
 	}
 
-	// 2. 调用领域服务加入计划
+	// 2. 校验计划机构范围
+	if _, err := s.loadPlanInOrg(ctx, dto.OrgID, planID, "enroll_testee"); err != nil {
+		return nil, err
+	}
+
+	// 3. 调用领域服务加入计划
 	tasks, err := s.enrollment.EnrollTestee(ctx, planID, testeeID, startDate)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to enroll testee",
@@ -96,7 +102,7 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		"tasks_count", len(tasks),
 	)
 
-	// 3. 持久化任务
+	// 4. 持久化任务
 	if len(tasks) > 0 {
 		if err := s.taskRepo.SaveBatch(ctx, tasks); err != nil {
 			logger.L(ctx).Errorw("Failed to save tasks",
@@ -110,7 +116,7 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		}
 	}
 
-	// 4. 发布领域事件
+	// 5. 发布领域事件
 	// TODO: 发布 TesteeEnrolledInPlanEvent 事件
 
 	logger.L(ctx).Infow("Testee enrolled successfully",
@@ -127,9 +133,10 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 }
 
 // TerminateEnrollment 终止受试者的计划参与
-func (s *enrollmentService) TerminateEnrollment(ctx context.Context, planID string, testeeID string) error {
+func (s *enrollmentService) TerminateEnrollment(ctx context.Context, orgID int64, planID string, testeeID string) error {
 	logger.L(ctx).Infow("Terminating testee enrollment",
 		"action", "terminate_enrollment",
+		"org_id", orgID,
 		"plan_id", planID,
 		"testee_id", testeeID,
 	)
@@ -155,7 +162,12 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, planID stri
 		return errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
 	}
 
-	// 2. 调用领域服务终止参与
+	// 2. 校验计划机构范围
+	if _, err := s.loadPlanInOrg(ctx, orgID, planIDDomain, "terminate_enrollment"); err != nil {
+		return err
+	}
+
+	// 3. 调用领域服务终止参与
 	canceledTasks, err := s.enrollment.TerminateEnrollment(ctx, planIDDomain, testeeIDDomain)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to terminate enrollment",
@@ -174,7 +186,7 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, planID stri
 		"canceled_tasks_count", len(canceledTasks),
 	)
 
-	// 3. 持久化被取消的任务
+	// 4. 持久化被取消的任务
 	savedTaskCount := 0
 	for _, task := range canceledTasks {
 		if err := s.taskRepo.Save(ctx, task); err != nil {
@@ -215,4 +227,28 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, planID stri
 	)
 
 	return nil
+}
+
+func (s *enrollmentService) loadPlanInOrg(ctx context.Context, orgID int64, planID plan.AssessmentPlanID, action string) (*plan.AssessmentPlan, error) {
+	p, err := s.planRepo.FindByID(ctx, planID)
+	if err != nil {
+		logger.L(ctx).Errorw("Plan not found",
+			"action", action,
+			"plan_id", planID.String(),
+			"error", err.Error(),
+		)
+		return nil, errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
+	}
+
+	if p.GetOrgID() != orgID {
+		logger.L(ctx).Warnw("Plan access denied due to org scope mismatch",
+			"action", action,
+			"plan_id", planID.String(),
+			"request_org_id", orgID,
+			"resource_org_id", p.GetOrgID(),
+		)
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
+	}
+
+	return p, nil
 }

@@ -80,7 +80,7 @@ func (h *QRCodeHandler) GetQRCodeImage(c *gin.Context) {
 }
 
 // isValidQRCodeFilename 验证文件名格式
-// 只允许：questionnaire_{code}_{version}.png 或 scale_{code}.png
+// 只允许：questionnaire_{code}_{version}.png / scale_{code}.png / assessment_entry_{token}.png
 func isValidQRCodeFilename(filename string) bool {
 	// 检查基本格式
 	if !strings.HasSuffix(filename, ".png") {
@@ -108,6 +108,11 @@ func isValidQRCodeFilename(filename string) bool {
 		// scale_xxx 格式
 		parts := strings.Split(name, "_")
 		if len(parts) >= 2 && parts[0] == "scale" {
+			return true
+		}
+	} else if strings.HasPrefix(name, "assessment_entry_") {
+		parts := strings.Split(name, "_")
+		if len(parts) >= 3 && parts[0] == "assessment" && parts[1] == "entry" {
 			return true
 		}
 	}

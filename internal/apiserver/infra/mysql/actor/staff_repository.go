@@ -23,7 +23,7 @@ func NewOperatorRepository(db *gorm.DB) domain.Repository {
 		mapper:         NewOperatorMapper(),
 	}
 	// 设置错误转换器
-	repo.SetErrorTranslator(translateError)
+	repo.SetErrorTranslator(translateOperatorError)
 	return repo
 }
 
@@ -136,4 +136,17 @@ func (r *operatorRepository) Count(ctx context.Context, orgID int64) (int64, err
 		Count(&count).Error
 
 	return count, err
+}
+
+func translateOperatorError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if mysql.IsDuplicateError(err) {
+		return errors.WithCode(code.ErrUserAlreadyExists, "operator already exists in this organization")
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return errors.WithCode(code.ErrUserNotFound, "operator not found")
+	}
+	return err
 }

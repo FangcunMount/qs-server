@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
@@ -85,5 +86,29 @@ func (r *OperatorRef) UserID() int64 {
 
 // Name 获取姓名
 func (r *OperatorRef) Name() string {
+	return r.name
+}
+
+// ClinicianRef 从业者引用（值对象）。
+type ClinicianRef struct {
+	clinicianID clinician.ID
+	name        string
+}
+
+// NewClinicianRef 创建从业者引用。
+func NewClinicianRef(clinicianID clinician.ID, name string) *ClinicianRef {
+	return &ClinicianRef{
+		clinicianID: clinicianID,
+		name:        name,
+	}
+}
+
+// ClinicianID 获取从业者ID。
+func (r *ClinicianRef) ClinicianID() clinician.ID {
+	return r.clinicianID
+}
+
+// Name 获取从业者姓名。
+func (r *ClinicianRef) Name() string {
 	return r.name
 }

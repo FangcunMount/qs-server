@@ -61,6 +61,9 @@ type Repository interface {
 
 	// FindByOrgID 按组织ID查询测评列表（支持分页和条件筛选）
 	FindByOrgID(ctx context.Context, orgID int64, status *Status, pagination Pagination) ([]*Assessment, int64, error)
+
+	// FindByOrgIDAndTesteeIDs 按组织和受试者集合查询测评列表。
+	FindByOrgIDAndTesteeIDs(ctx context.Context, orgID int64, testeeIDs []testee.ID, status *Status, pagination Pagination) ([]*Assessment, int64, error)
 }
 
 // ==================== AssessmentScore Repository ====================

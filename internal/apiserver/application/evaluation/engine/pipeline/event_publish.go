@@ -28,7 +28,7 @@ import (
 // - 统计服务：更新实时统计数据
 type EventPublishHandler struct {
 	*BaseHandler
-	publisher     event.EventPublisher
+	publisher      event.EventPublisher
 	waiterRegistry *waiter.WaiterRegistry
 }
 
@@ -94,6 +94,7 @@ func (h *EventPublishHandler) publishAssessmentInterpretedEvent(ctx context.Cont
 
 	// 构建事件
 	domainEvent := assessment.NewAssessmentInterpretedEvent(
+		a.OrgID(),
 		a.ID(),
 		a.TesteeID(),
 		scaleRef,

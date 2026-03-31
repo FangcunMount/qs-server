@@ -112,6 +112,33 @@ func (r *testeeRepository) ListByOrg(ctx context.Context, orgID int64, offset, l
 	return r.mapper.ToDomains(pos), nil
 }
 
+// ListByOrgAndIDs 在机构范围内按受试者 ID 集合查询。
+func (r *testeeRepository) ListByOrgAndIDs(
+	ctx context.Context,
+	orgID int64,
+	ids []testee.ID,
+	filter testee.ListFilter,
+	offset, limit int,
+) ([]*testee.Testee, error) {
+	if len(ids) == 0 {
+		return []*testee.Testee{}, nil
+	}
+
+	var pos []*TesteePO
+	query := r.filteredByOrgAndIDs(ctx, orgID, ids, filter)
+
+	err := query.
+		Order("id DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return r.mapper.ToDomains(pos), nil
+}
+
 // ListByTags 根据标签查找受试者
 func (r *testeeRepository) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*testee.Testee, error) {
 	var pos []*TesteePO
@@ -190,6 +217,46 @@ func (r *testeeRepository) Count(ctx context.Context, orgID int64) (int64, error
 		Count(&count).Error
 
 	return count, err
+}
+
+// CountByOrgAndIDs 在机构范围内按受试者 ID 集合统计数量。
+func (r *testeeRepository) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []testee.ID, filter testee.ListFilter) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := r.filteredByOrgAndIDs(ctx, orgID, ids, filter).
+		Model(&TesteePO{}).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *testeeRepository) filteredByOrgAndIDs(
+	ctx context.Context,
+	orgID int64,
+	ids []testee.ID,
+	filter testee.ListFilter,
+) *gorm.DB {
+	rawIDs := make([]uint64, 0, len(ids))
+	for _, id := range ids {
+		rawIDs = append(rawIDs, uint64(id))
+	}
+
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND id IN ? AND deleted_at IS NULL", orgID, rawIDs)
+
+	if filter.Name != "" {
+		query = query.Where("name LIKE ?", "%"+filter.Name+"%")
+	}
+	if filter.KeyFocus != nil {
+		query = query.Where("is_key_focus = ?", *filter.KeyFocus)
+	}
+	for _, tag := range filter.Tags {
+		query = query.Where("JSON_CONTAINS(tags, ?)", `"`+tag+`"`)
+	}
+
+	return query
 }
 
 // translateError 将数据库错误转换为领域错误

@@ -26,7 +26,7 @@ type UpdateTesteeRequest struct {
 
 // ListTesteeRequest 查询受试者列表请求
 type ListTesteeRequest struct {
-	OrgID      int64    `form:"org_id" binding:"required"`         // 机构ID
+	OrgID      int64    `form:"org_id"`                            // 兼容字段：机构ID
 	Name       string   `form:"name"`                              // 姓名（模糊匹配）
 	Tags       []string `form:"tags"`                              // 标签筛选
 	IsKeyFocus *bool    `form:"is_key_focus"`                      // 是否重点关注
@@ -37,13 +37,13 @@ type ListTesteeRequest struct {
 
 // GetTesteeByProfileIDRequest 根据 profile_id 查询受试者请求
 type GetTesteeByProfileIDRequest struct {
-	OrgID     int64  `form:"org_id" binding:"required"` // 机构ID
-	ProfileID string `form:"profile_id"`                // 用户档案ID（ProfileID）
+	OrgID     int64  `form:"org_id"`     // 兼容字段：机构ID
+	ProfileID string `form:"profile_id"` // 用户档案ID（ProfileID）
 }
 
 // CreateStaffRequest 创建员工请求
 type CreateStaffRequest struct {
-	OrgID    int64    `json:"org_id" binding:"required"`       // 机构ID
+	OrgID    int64    `json:"org_id"`                          // 兼容字段：机构ID
 	Roles    []string `json:"roles" binding:"required,min=1"`  // 角色列表
 	Name     string   `json:"name" binding:"required"`         // 姓名
 	Email    string   `json:"email" binding:"omitempty,email"` // 邮箱
@@ -62,7 +62,7 @@ type UpdateStaffRequest struct {
 
 // ListStaffRequest 查询员工列表请求
 type ListStaffRequest struct {
-	OrgID    int64  `form:"org_id" binding:"required"`         // 机构ID
+	OrgID    int64  `form:"org_id"`                            // 兼容字段：机构ID
 	Role     string `form:"role"`                              // 角色筛选
 	Page     int    `form:"page" binding:"min=1"`              // 页码
 	PageSize int    `form:"page_size" binding:"min=1,max=100"` // 每页数量

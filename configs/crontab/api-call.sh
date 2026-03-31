@@ -12,8 +12,8 @@
 # 3. 在 crontab 中调用：qs-api-call.sh <endpoint> [log_file]
 # 
 # 示例：
-#   qs-api-call.sh /api/v1/statistics/sync/daily
-#   qs-api-call.sh /api/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
+#   qs-api-call.sh /internal/v1/statistics/sync/daily
+#   qs-api-call.sh /internal/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
 # ============================================================
 
 set -euo pipefail
@@ -43,7 +43,7 @@ TIMEOUT="${TIMEOUT:-300}"
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <endpoint> [log_file]" >&2
-    echo "Example: $0 /api/v1/statistics/sync/daily" >&2
+    echo "Example: $0 /internal/v1/statistics/sync/daily" >&2
     exit 1
 fi
 
@@ -130,4 +130,3 @@ else
     ERROR_RESPONSE=$(cat /tmp/qs-api-response-$$.txt 2>/dev/null || echo "N/A")
     error_exit "API call failed with HTTP code: ${HTTP_CODE}, response: ${ERROR_RESPONSE}"
 fi
-

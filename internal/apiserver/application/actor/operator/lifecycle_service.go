@@ -227,6 +227,9 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 
 	// 持久化
 	if err := s.repo.Save(txCtx, st); err != nil {
+		if errors.IsCode(err, code.ErrUserAlreadyExists) {
+			return nil, err
+		}
 		return nil, errors.Wrap(err, "failed to save operator")
 	}
 

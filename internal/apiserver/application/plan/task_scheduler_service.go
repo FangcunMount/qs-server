@@ -41,11 +41,15 @@ func NewTaskSchedulerService(
 }
 
 // SchedulePendingTasks 调度待推送的任务
-func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, before string) ([]*TaskResult, error) {
+func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID int64, before string) ([]*TaskResult, error) {
 	logger.L(ctx).Infow("Scheduling pending tasks",
 		"action", "schedule_pending_tasks",
+		"org_id", orgID,
 		"before", before,
 	)
+	if orgID <= 0 {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的机构ID")
+	}
 
 	// 1. 解析时间参数
 	beforeTime, err := parseTime(before)
@@ -59,10 +63,11 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, before 
 	}
 
 	// 2. 查询待推送任务
-	tasks, err := s.taskRepo.FindPendingTasks(ctx, beforeTime)
+	tasks, err := s.taskRepo.FindPendingTasks(ctx, orgID, beforeTime)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to find pending tasks",
 			"action", "schedule_pending_tasks",
+			"org_id", orgID,
 			"before", before,
 			"error", err.Error(),
 		)
@@ -71,6 +76,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, before 
 
 	logger.L(ctx).Infow("Found pending tasks",
 		"action", "schedule_pending_tasks",
+		"org_id", orgID,
 		"before", before,
 		"pending_tasks_count", len(tasks),
 	)
@@ -132,6 +138,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, before 
 
 	logger.L(ctx).Infow("Tasks scheduled",
 		"action", "schedule_pending_tasks",
+		"org_id", orgID,
 		"before", before,
 		"total_pending", len(tasks),
 		"opened_count", len(openedTasks),

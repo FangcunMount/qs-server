@@ -18,7 +18,7 @@
 ## 重点速查（继续往下读前先记这几条）
 
 1. **三进程分工**：`collection-server` 面向前台入口，`qs-apiserver` 持有主业务写模型，`qs-worker` 负责消费事件并驱动回调。  
-2. **两类后台机制**：`Crontab/运维 -> REST 或 internal gRPC -> apiserver` 与 `apiserver -> MQ -> worker -> gRPC -> apiserver` 是两条不同链路，不要混读。  
+2. **两类后台机制**：`Crontab/运维 -> internal REST -> apiserver` 与 `apiserver -> MQ -> worker -> gRPC -> apiserver` 是两条不同链路，不要混读。  
 3. **文档边界**：本组优先讲拓扑、时序和组件关系，不替代业务模块的领域说明，也不替代基础设施对事件、存储和配置的机制细节。  
 4. **阅读建议**：第一次读先看整体运行图和主链路时序；排障或改造某进程时，再进入本组分册。  
 

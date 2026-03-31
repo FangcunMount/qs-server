@@ -6,10 +6,17 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
+	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
+	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	relationDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -22,8 +29,11 @@ import (
 // ActorModule Actor 模块（测评对象和工作人员）
 type ActorModule struct {
 	// repository 层
-	TesteeRepo   testee.Repository
-	OperatorRepo operator.Repository
+	TesteeRepo          testee.Repository
+	OperatorRepo        operator.Repository
+	ClinicianRepo       clinicianDomain.Repository
+	RelationRepo        relationDomain.Repository
+	AssessmentEntryRepo assessmentEntryDomain.Repository
 
 	// handler 层
 	ActorHandler *handler.ActorHandler
@@ -39,6 +49,11 @@ type ActorModule struct {
 	OperatorLifecycleService     operatorApp.OperatorLifecycleService     // 生命周期服务 - 人事/行政
 	OperatorAuthorizationService operatorApp.OperatorAuthorizationService // 权限管理服务 - IT管理员
 	OperatorQueryService         operatorApp.OperatorQueryService         // 查询服务 - 通用
+	ClinicianLifecycleService    clinicianApp.ClinicianLifecycleService
+	ClinicianQueryService        clinicianApp.ClinicianQueryService
+	ClinicianRelationshipService clinicianApp.ClinicianRelationshipService
+	AssessmentEntryService       assessmentEntryApp.AssessmentEntryService
+	TesteeAccessService          actorAccessApp.TesteeAccessService
 }
 
 // NewActorModule 创建 Actor 模块
@@ -80,6 +95,9 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	}
 
 	m.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB)
+	m.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB)
+	m.RelationRepo = actorInfra.NewRelationRepository(mysqlDB)
+	m.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB)
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(m.TesteeRepo)
@@ -95,6 +113,8 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	operatorBinder := operator.NewBinder(m.OperatorRepo, operatorValidator)
 	operatorRoleAllocator := operator.NewRoleAllocator(operatorValidator)
 	operatorLifecycler := operator.NewLifecycler(operatorRoleAllocator)
+	clinicianValidator := clinicianDomain.NewValidator()
+	assessmentEntryValidator := assessmentEntryDomain.NewValidator()
 
 	// 初始化 testee service 层（按行为者组织）
 	// 注册服务 - 服务于C端用户（患者/家长）
@@ -106,7 +126,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		uow,
 		guardianshipSvc,
 	)
-	// 管理服务 - 服务于B端员工（Staff）
+	// 管理服务 - 服务于B端操作者
 	m.TesteeManagementService = testeeApp.NewManagementService(
 		m.TesteeRepo,
 		testeeEditor,
@@ -127,7 +147,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 
 	// 初始化 operator service 层（按行为者组织）
 	// 生命周期服务 - 服务于人事/行政部门
-	// 初始化 Staff Lifecycle Service，注入 IAM IdentityService 如果可用
+	// 初始化 Operator Lifecycle Service，注入 IAM IdentityService 如果可用
 	var identitySvc *iam.IdentityService
 	// 尝试从外部容器的 IAMModule 提取（在 Initialize 时 container 会传入该参数为 params[2]）
 	if len(params) > 2 {
@@ -163,6 +183,35 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	)
 	// 查询服务 - 服务于所有需要查询的用户
 	m.OperatorQueryService = operatorApp.NewQueryService(m.OperatorRepo)
+	m.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
+		m.ClinicianRepo,
+		m.OperatorRepo,
+		clinicianValidator,
+		uow,
+	)
+	m.ClinicianQueryService = clinicianApp.NewQueryService(m.ClinicianRepo)
+	m.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
+		m.RelationRepo,
+		m.ClinicianRepo,
+		m.TesteeRepo,
+		uow,
+	)
+	m.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
+		m.OperatorRepo,
+		m.ClinicianRepo,
+		m.RelationRepo,
+		m.TesteeRepo,
+	)
+	m.AssessmentEntryService = assessmentEntryApp.NewService(
+		m.AssessmentEntryRepo,
+		m.ClinicianRepo,
+		m.RelationRepo,
+		m.TesteeRepo,
+		testeeFactory,
+		assessmentEntryValidator,
+		guardianshipSvc,
+		uow,
+	)
 
 	// 初始化 handler 层 - 先不注入评估服务（评估模块还未初始化）
 	// 评估服务将在容器初始化完成后通过 SetEvaluationServices 方法注入
@@ -174,7 +223,13 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.OperatorLifecycleService,
 		m.OperatorAuthorizationService,
 		m.OperatorQueryService,
+		m.ClinicianLifecycleService,
+		m.ClinicianQueryService,
+		m.ClinicianRelationshipService,
+		m.TesteeAccessService,
+		m.AssessmentEntryService,
 		guardianshipSvc,
+		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
 		nil, // assessmentManagementService - 稍后注入
 		nil, // scoreQueryService - 稍后注入
 	)
@@ -189,6 +244,13 @@ func (m *ActorModule) SetEvaluationServices(
 ) {
 	if m.ActorHandler != nil {
 		m.ActorHandler.SetEvaluationServices(assessmentManagementService, scoreQueryService)
+	}
+}
+
+// SetQRCodeService 设置二维码服务（用于测评入口二维码生成）。
+func (m *ActorModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
+	if m.ActorHandler != nil {
+		m.ActorHandler.SetQRCodeService(qrCodeService)
 	}
 }
 

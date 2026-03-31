@@ -31,6 +31,7 @@ type DomainEvent = event.DomainEvent
 
 // AssessmentSubmittedData 测评已提交事件数据
 type AssessmentSubmittedData struct {
+	OrgID             int64     `json:"org_id"`
 	AssessmentID      int64     `json:"assessment_id"`
 	TesteeID          uint64    `json:"testee_id"`
 	QuestionnaireCode string    `json:"questionnaire_code"`
@@ -48,6 +49,7 @@ func (d AssessmentSubmittedData) NeedsEvaluation() bool {
 
 // AssessmentInterpretedData 测评已解读事件数据
 type AssessmentInterpretedData struct {
+	OrgID         int64     `json:"org_id"`
 	AssessmentID  int64     `json:"assessment_id"`
 	TesteeID      uint64    `json:"testee_id"`
 	ScaleCode     string    `json:"scale_code"`
@@ -64,6 +66,7 @@ func (d AssessmentInterpretedData) IsHighRisk() bool {
 
 // AssessmentFailedData 测评失败事件数据
 type AssessmentFailedData struct {
+	OrgID        int64     `json:"org_id"`
 	AssessmentID int64     `json:"assessment_id"`
 	TesteeID     uint64    `json:"testee_id"`
 	Reason       string    `json:"reason"`
@@ -85,6 +88,7 @@ type AssessmentFailedEvent = event.Event[AssessmentFailedData]
 
 // NewAssessmentSubmittedEvent 创建测评已提交事件
 func NewAssessmentSubmittedEvent(
+	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
 	questionnaireRef QuestionnaireRef,
@@ -93,6 +97,7 @@ func NewAssessmentSubmittedEvent(
 	submittedAt time.Time,
 ) AssessmentSubmittedEvent {
 	data := AssessmentSubmittedData{
+		OrgID:             orgID,
 		AssessmentID:      int64(assessmentID),
 		TesteeID:          uint64(testeeID),
 		QuestionnaireCode: string(questionnaireRef.Code()),
@@ -110,6 +115,7 @@ func NewAssessmentSubmittedEvent(
 
 // NewAssessmentInterpretedEvent 创建测评已解读事件
 func NewAssessmentInterpretedEvent(
+	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
 	medicalScaleRef MedicalScaleRef,
@@ -119,6 +125,7 @@ func NewAssessmentInterpretedEvent(
 ) AssessmentInterpretedEvent {
 	return event.New(EventTypeInterpreted, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
 		AssessmentInterpretedData{
+			OrgID:         orgID,
 			AssessmentID:  int64(assessmentID),
 			TesteeID:      uint64(testeeID),
 			ScaleCode:     string(medicalScaleRef.Code()),
@@ -132,6 +139,7 @@ func NewAssessmentInterpretedEvent(
 
 // NewAssessmentFailedEvent 创建测评失败事件
 func NewAssessmentFailedEvent(
+	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
 	reason string,
@@ -139,6 +147,7 @@ func NewAssessmentFailedEvent(
 ) AssessmentFailedEvent {
 	return event.New(EventTypeFailed, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
 		AssessmentFailedData{
+			OrgID:        orgID,
 			AssessmentID: int64(assessmentID),
 			TesteeID:     uint64(testeeID),
 			Reason:       reason,

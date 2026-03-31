@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// ListFilter 受试者列表查询过滤条件。
+type ListFilter struct {
+	Name     string
+	Tags     []string
+	KeyFocus *bool
+}
+
 // Repository 受试者仓储接口
 type Repository interface {
 	// Save 保存受试者
@@ -25,6 +32,9 @@ type Repository interface {
 	// ListByOrg 列出机构下的受试者
 	ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*Testee, error)
 
+	// ListByOrgAndIDs 在机构范围内按受试者 ID 集合查询。
+	ListByOrgAndIDs(ctx context.Context, orgID int64, ids []ID, filter ListFilter, offset, limit int) ([]*Testee, error)
+
 	// ListByTags 根据标签查找受试者
 	ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*Testee, error)
 
@@ -40,6 +50,9 @@ type Repository interface {
 
 	// Count 统计机构下的受试者数量
 	Count(ctx context.Context, orgID int64) (int64, error)
+
+	// CountByOrgAndIDs 在机构范围内按受试者 ID 集合统计数量。
+	CountByOrgAndIDs(ctx context.Context, orgID int64, ids []ID, filter ListFilter) (int64, error)
 }
 
 // Factory 受试者工厂领域服务

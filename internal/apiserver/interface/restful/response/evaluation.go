@@ -111,13 +111,13 @@ type ReportResponse struct {
 
 // DimensionItem 维度解读项
 type DimensionItem struct {
-	FactorCode  string   `json:"factor_code"`           // 因子编码
-	FactorName  string   `json:"factor_name"`           // 因子名称
-	RawScore    float64  `json:"raw_score"`             // 原始分
-	MaxScore    *float64 `json:"max_score,omitempty"`   // 最大分
-	RiskLevel   string   `json:"risk_level"`            // 风险等级
-	Description string   `json:"description"`           // 解读描述
-	Suggestion  string   `json:"suggestion,omitempty"`  // 维度建议
+	FactorCode  string   `json:"factor_code"`          // 因子编码
+	FactorName  string   `json:"factor_name"`          // 因子名称
+	RawScore    float64  `json:"raw_score"`            // 原始分
+	MaxScore    *float64 `json:"max_score,omitempty"`  // 最大分
+	RiskLevel   string   `json:"risk_level"`           // 风险等级
+	Description string   `json:"description"`          // 解读描述
+	Suggestion  string   `json:"suggestion,omitempty"` // 维度建议
 }
 
 // SuggestionItem 建议项

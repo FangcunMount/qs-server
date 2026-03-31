@@ -187,6 +187,10 @@ func (r *CachedTesteeRepository) ListByOrg(ctx context.Context, orgID int64, off
 	return r.repo.ListByOrg(ctx, orgID, offset, limit)
 }
 
+func (r *CachedTesteeRepository) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []testee.ID, filter testee.ListFilter, offset, limit int) ([]*testee.Testee, error) {
+	return r.repo.ListByOrgAndIDs(ctx, orgID, ids, filter, offset, limit)
+}
+
 func (r *CachedTesteeRepository) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*testee.Testee, error) {
 	return r.repo.ListByTags(ctx, orgID, tags, offset, limit)
 }
@@ -201,4 +205,8 @@ func (r *CachedTesteeRepository) ListByProfileIDs(ctx context.Context, profileID
 
 func (r *CachedTesteeRepository) Count(ctx context.Context, orgID int64) (int64, error) {
 	return r.repo.Count(ctx, orgID)
+}
+
+func (r *CachedTesteeRepository) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []testee.ID, filter testee.ListFilter) (int64, error) {
+	return r.repo.CountByOrgAndIDs(ctx, orgID, ids, filter)
 }

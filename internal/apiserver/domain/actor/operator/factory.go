@@ -44,6 +44,12 @@ func (f *factory) GetOrCreateByUser(
 		staff = NewOperator(orgID, userID, name)
 
 		if err := f.repo.Save(ctx, staff); err != nil {
+			if errors.IsCode(err, code.ErrUserAlreadyExists) {
+				existing, findErr := f.repo.FindByUser(ctx, orgID, userID)
+				if findErr == nil {
+					return existing, nil
+				}
+			}
 			return nil, errors.Wrap(err, "failed to save staff")
 		}
 

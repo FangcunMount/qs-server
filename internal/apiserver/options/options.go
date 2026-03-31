@@ -24,6 +24,7 @@ type Options struct {
 	MessagingOptions        *genericoptions.MessagingOptions       `json:"messaging" mapstructure:"messaging"`
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
 	WeChatOptions           *genericoptions.WeChatOptions          `json:"wechat"    mapstructure:"wechat"`
+	Plan                    *PlanOptions                           `json:"plan"      mapstructure:"plan"`
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure            *BackpressureOptions                   `json:"backpressure" mapstructure:"backpressure"`
 	Cache                   *CacheOptions                          `json:"cache"     mapstructure:"cache"`
@@ -45,6 +46,7 @@ func NewOptions() *Options {
 		MessagingOptions:        genericoptions.NewMessagingOptions(),
 		IAMOptions:              genericoptions.NewIAMOptions(),
 		WeChatOptions:           genericoptions.NewWeChatOptions(),
+		Plan:                    NewPlanOptions(),
 		RateLimit:               NewRateLimitOptions(),
 		Backpressure:            NewBackpressureOptions(),
 		Cache:                   NewCacheOptions(),
@@ -85,6 +87,26 @@ func NewBackpressureOptions() *BackpressureOptions {
 			TimeoutMs:   2000,
 		},
 	}
+}
+
+// PlanOptions 测评计划相关配置。
+type PlanOptions struct {
+	EntryBaseURL string `json:"entry_base_url" mapstructure:"entry_base_url"`
+}
+
+// NewPlanOptions 创建默认 plan 配置。
+func NewPlanOptions() *PlanOptions {
+	return &PlanOptions{
+		EntryBaseURL: "https://collect.fangcunmount.cn/entry",
+	}
+}
+
+// AddFlags 注册 plan 相关命令行参数。
+func (p *PlanOptions) AddFlags(fs *pflag.FlagSet) {
+	if p == nil {
+		return
+	}
+	fs.StringVar(&p.EntryBaseURL, "plan.entry-base-url", p.EntryBaseURL, "Public base URL used to generate plan task entry links.")
 }
 
 // RateLimitOptions 限流配置
@@ -145,6 +167,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.MessagingOptions.AddFlags(fss.FlagSet("messaging"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
+	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))
@@ -298,6 +321,7 @@ type StatisticsWarmupOptions struct {
 // StatisticsSyncOptions 统计同步定时任务配置
 type StatisticsSyncOptions struct {
 	Enable              bool          `json:"enable" mapstructure:"enable"`
+	OrgIDs              []int64       `json:"org_ids" mapstructure:"org_ids"`
 	InitialDelay        time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
 	DailyInterval       time.Duration `json:"daily_interval" mapstructure:"daily_interval"`
 	AccumulatedInterval time.Duration `json:"accumulated_interval" mapstructure:"accumulated_interval"`
@@ -308,6 +332,7 @@ type StatisticsSyncOptions struct {
 func NewStatisticsSyncOptions() *StatisticsSyncOptions {
 	return &StatisticsSyncOptions{
 		Enable:              true,
+		OrgIDs:              []int64{1},
 		InitialDelay:        time.Minute,
 		DailyInterval:       10 * time.Minute,
 		AccumulatedInterval: 10 * time.Minute,
@@ -321,6 +346,7 @@ func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 	fs.BoolVar(&s.Enable, "statistics_sync.enable", s.Enable, "Enable scheduled sync from Redis to MySQL for statistics.")
+	fs.Int64SliceVar(&s.OrgIDs, "statistics_sync.org-ids", s.OrgIDs, "Organization IDs included in scheduled statistics sync.")
 	fs.DurationVar(&s.InitialDelay, "statistics_sync.initial-delay", s.InitialDelay, "Initial delay before starting statistics sync schedulers.")
 	fs.DurationVar(&s.DailyInterval, "statistics_sync.daily-interval", s.DailyInterval, "Interval for syncing daily statistics.")
 	fs.DurationVar(&s.AccumulatedInterval, "statistics_sync.accumulated-interval", s.AccumulatedInterval, "Interval for syncing accumulated statistics.")

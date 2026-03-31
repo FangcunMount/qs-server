@@ -36,15 +36,26 @@ func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID
 
 // ListByTesteeID 获取受试者的报告列表
 func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error) {
-	if dto.TesteeID == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
-	}
-
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
-	testeeID := testee.NewID(dto.TesteeID)
 	pagination := report.NewPagination(page, pageSize)
 
-	reports, total, err := s.reportRepo.FindByTesteeID(ctx, testeeID, pagination)
+	var (
+		reports []*report.InterpretReport
+		total   int64
+		err     error
+	)
+	switch {
+	case dto.TesteeID != 0:
+		reports, total, err = s.reportRepo.FindByTesteeID(ctx, testee.NewID(dto.TesteeID), pagination)
+	case dto.RestrictToAccessScope:
+		testeeIDs := make([]testee.ID, 0, len(dto.AccessibleTesteeIDs))
+		for _, rawID := range dto.AccessibleTesteeIDs {
+			testeeIDs = append(testeeIDs, testee.NewID(rawID))
+		}
+		reports, total, err = s.reportRepo.FindByTesteeIDs(ctx, testeeIDs, pagination)
+	default:
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
+	}
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询报告列表失败")
 	}

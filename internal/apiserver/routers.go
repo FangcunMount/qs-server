@@ -45,8 +45,9 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 
 	// 注册需要认证的路由
 	r.registerProtectedRoutes(engine)
+	r.registerInternalRoutes(engine)
 
-	fmt.Printf("🔗 Registered routes for: public, protected(user, questionnaire)\n")
+	fmt.Printf("🔗 Registered routes for: public, protected(api/v1), internal(internal/v1)\n")
 }
 
 // registerPublicRoutes 注册公开路由（不需要认证）
@@ -67,6 +68,11 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 				"description": "问卷量表管理系统",
 			})
 		})
+
+		if r.container != nil && r.container.ActorModule != nil && r.container.ActorModule.ActorHandler != nil {
+			publicAPI.GET("/assessment-entries/:token", r.container.ActorModule.ActorHandler.ResolveAssessmentEntry)
+			publicAPI.POST("/assessment-entries/:token/intake", r.container.ActorModule.ActorHandler.IntakeAssessmentEntry)
+		}
 	}
 
 	// 二维码图片访问路由（公开，不需要认证）
@@ -78,21 +84,7 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 	// 创建需要认证的API组
 	apiV1 := engine.Group("/api/v1")
-
-	// 应用 IAM JWT 认证中间件（如果启用，使用 SDK TokenVerifier 本地验签）
-	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
-		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
-		if tokenVerifier != nil {
-			apiV1.Use(middleware.JWTAuthMiddleware(tokenVerifier))
-			// 添加用户身份解析中间件：从 JWT claims 提取 UserID、OrgID、Roles
-			apiV1.Use(restmiddleware.UserIdentityMiddleware())
-			fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1 (local JWKS verification)\n")
-		} else {
-			fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled!\n")
-		}
-	} else {
-		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
-	}
+	r.applyProtectedGroupMiddlewares(apiV1, "/api/v1")
 
 	// 注册用户相关的受保护路由
 	r.registerUserProtectedRoutes(apiV1)
@@ -123,6 +115,30 @@ func (r *Router) registerProtectedRoutes(engine *gin.Engine) {
 
 	// 管理员路由（需要额外的权限检查）
 	r.registerAdminRoutes(apiV1)
+}
+
+func (r *Router) registerInternalRoutes(engine *gin.Engine) {
+	internalV1 := engine.Group("/internal/v1")
+	r.applyProtectedGroupMiddlewares(internalV1, "/internal/v1")
+
+	r.registerPlanInternalRoutes(internalV1)
+	r.registerStatisticsInternalRoutes(internalV1)
+}
+
+func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePrefix string) {
+	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
+		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
+		if tokenVerifier != nil {
+			group.Use(middleware.JWTAuthMiddleware(tokenVerifier))
+			group.Use(restmiddleware.UserIdentityMiddleware())
+			fmt.Printf("🔐 JWT authentication middleware enabled for %s (local JWKS verification)\n", routePrefix)
+			return
+		}
+		fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled for %s!\n", routePrefix)
+		return
+	}
+
+	fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected for %s!\n", routePrefix)
 }
 
 // registerUserProtectedRoutes 注册用户相关的受保护路由
@@ -305,7 +321,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	}
 
 	// 员工路由
-	staff := apiV1.Group("/staff")
+	staff := apiV1.Group("/staff", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	{
 		staff.POST("", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -340,6 +356,74 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			actorHandler.DeleteStaff,
 		)...)
 	}
+
+	registerClinicianRoutes := func(group *gin.RouterGroup) {
+		adminClinicians := group.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		adminClinicians.POST("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.CreateClinician,
+		)...)
+		adminClinicians.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListClinicians,
+		)...)
+		me := group.Group("/me")
+		me.GET("", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetMyClinician,
+		)...)
+		me.GET("/testees", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListMyClinicianTestees,
+		)...)
+		me.POST("/assessment-entries", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.CreateMyAssessmentEntry,
+		)...)
+		me.GET("/assessment-entries", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListMyAssessmentEntries,
+		)...)
+		adminClinicians.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetClinician,
+		)...)
+	}
+
+	clinicians := apiV1.Group("/clinicians")
+	registerClinicianRoutes(clinicians)
+
+	// 兼容旧的 /practitioners 路由，后续客户端切换完成后可移除。
+	practitioners := apiV1.Group("/practitioners")
+	registerClinicianRoutes(practitioners)
 }
 
 // registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由
@@ -398,9 +482,9 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 				r.rateCfg.QueryUserBurst,
 				evalHandler.GetHighRiskFactors,
 			)...)
-
 			// 管理操作
-			assessments.POST("/:id/retry", r.rateLimitedHandlers(
+			assessmentAdmin := assessments.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEvaluateAssessments))
+			assessmentAdmin.POST("/:id/retry", r.rateLimitedHandlers(
 				r.rateCfg,
 				r.rateCfg.SubmitGlobalQPS,
 				r.rateCfg.SubmitGlobalBurst,
@@ -437,7 +521,8 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		}
 
 		// ==================== 批量操作路由 ====================
-		evaluations.POST("/batch-evaluate", r.rateLimitedHandlers(
+		evaluationAdmin := evaluations.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEvaluateAssessments))
+		evaluationAdmin.POST("/batch-evaluate", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -485,7 +570,8 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	plans := apiV1.Group("/plans")
 	{
 		// ==================== Plan 生命周期管理 ====================
-		plans.POST("", r.rateLimitedHandlers(
+		planWrites := plans.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
+		planWrites.POST("", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -493,7 +579,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserBurst,
 			planHandler.CreatePlan,
 		)...)
-		plans.POST("/:id/pause", r.rateLimitedHandlers(
+		planWrites.POST("/:id/pause", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -501,7 +587,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserBurst,
 			planHandler.PausePlan,
 		)...)
-		plans.POST("/:id/resume", r.rateLimitedHandlers(
+		planWrites.POST("/:id/resume", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -509,7 +595,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserBurst,
 			planHandler.ResumePlan,
 		)...)
-		plans.POST("/:id/cancel", r.rateLimitedHandlers(
+		planWrites.POST("/:id/cancel", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -545,7 +631,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 		)...)
 
 		// ==================== Plan 受试者管理 ====================
-		plans.POST("/enroll", r.rateLimitedHandlers(
+		planWrites.POST("/enroll", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -553,7 +639,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserBurst,
 			planHandler.EnrollTestee,
 		)...)
-		plans.POST("/:id/testees/:testee_id/terminate", r.rateLimitedHandlers(
+		planWrites.POST("/:id/testees/:testee_id/terminate", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -566,14 +652,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	// ==================== Task 管理 ====================
 	tasks := apiV1.Group("/plans/tasks")
 	{
-		tasks.POST("/schedule", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.SchedulePendingTasks,
-		)...)
+		taskWrites := tasks.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
 		tasks.GET("", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
@@ -590,7 +669,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			planHandler.GetTask,
 		)...)
-		tasks.POST("/:id/open", r.rateLimitedHandlers(
+		taskWrites.POST("/:id/open", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -598,23 +677,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserBurst,
 			planHandler.OpenTask,
 		)...)
-		tasks.POST("/:id/complete", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.CompleteTask,
-		)...)
-		tasks.POST("/:id/expire", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			planHandler.ExpireTask,
-		)...)
-		tasks.POST("/:id/cancel", r.rateLimitedHandlers(
+		taskWrites.POST("/:id/cancel", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,
@@ -665,7 +728,8 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 	statistics := apiV1.Group("/statistics")
 	{
 		// ==================== 统计查询 ====================
-		statistics.GET("/system", r.rateLimitedHandlers(
+		adminStatistics := statistics.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		adminStatistics.GET("/system", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
 			r.rateCfg.QueryGlobalBurst,
@@ -673,7 +737,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			statisticsModule.Handler.GetSystemStatistics,
 		)...)
-		statistics.GET("/questionnaires/:code", r.rateLimitedHandlers(
+		adminStatistics.GET("/questionnaires/:code", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
 			r.rateCfg.QueryGlobalBurst,
@@ -689,7 +753,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			statisticsModule.Handler.GetTesteeStatistics,
 		)...)
-		statistics.GET("/plans/:plan_id", r.rateLimitedHandlers(
+		adminStatistics.GET("/plans/:plan_id", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
 			r.rateCfg.QueryGlobalBurst,
@@ -699,44 +763,82 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 		)...)
 
 		// ==================== 定时任务接口 ====================
-		sync := statistics.Group("/sync")
-		{
-			sync.POST("/daily", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.SubmitGlobalQPS,
-				r.rateCfg.SubmitGlobalBurst,
-				r.rateCfg.SubmitUserQPS,
-				r.rateCfg.SubmitUserBurst,
-				statisticsModule.Handler.SyncDailyStatistics,
-			)...)
-			sync.POST("/accumulated", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.SubmitGlobalQPS,
-				r.rateCfg.SubmitGlobalBurst,
-				r.rateCfg.SubmitUserQPS,
-				r.rateCfg.SubmitUserBurst,
-				statisticsModule.Handler.SyncAccumulatedStatistics,
-			)...)
-			sync.POST("/plan", r.rateLimitedHandlers(
-				r.rateCfg,
-				r.rateCfg.SubmitGlobalQPS,
-				r.rateCfg.SubmitGlobalBurst,
-				r.rateCfg.SubmitUserQPS,
-				r.rateCfg.SubmitUserBurst,
-				statisticsModule.Handler.SyncPlanStatistics,
-			)...)
-		}
-
-		// ==================== 数据校验 ====================
-		statistics.POST("/validate", r.rateLimitedHandlers(
-			r.rateCfg,
-			r.rateCfg.SubmitGlobalQPS,
-			r.rateCfg.SubmitGlobalBurst,
-			r.rateCfg.SubmitUserQPS,
-			r.rateCfg.SubmitUserBurst,
-			statisticsModule.Handler.ValidateConsistency,
-		)...)
 	}
+}
+
+func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
+	planHandler := r.container.PlanModule.Handler
+	if planHandler == nil {
+		return
+	}
+
+	tasks := internalV1.Group("/plans/tasks", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
+	tasks.POST("/schedule", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		planHandler.SchedulePendingTasks,
+	)...)
+	tasks.POST("/:id/complete", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		planHandler.CompleteTask,
+	)...)
+	tasks.POST("/:id/expire", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		planHandler.ExpireTask,
+	)...)
+}
+
+func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
+	statisticsModule := r.container.StatisticsModule
+	if statisticsModule == nil || statisticsModule.Handler == nil {
+		return
+	}
+
+	statistics := internalV1.Group("/statistics", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	sync := statistics.Group("/sync")
+	sync.POST("/daily", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		statisticsModule.Handler.SyncDailyStatistics,
+	)...)
+	sync.POST("/accumulated", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		statisticsModule.Handler.SyncAccumulatedStatistics,
+	)...)
+	sync.POST("/plan", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		statisticsModule.Handler.SyncPlanStatistics,
+	)...)
+	statistics.POST("/validate", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		statisticsModule.Handler.ValidateConsistency,
+	)...)
 }
 
 // registerAdminRoutes 注册管理员路由

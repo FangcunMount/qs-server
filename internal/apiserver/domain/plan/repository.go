@@ -37,6 +37,9 @@ type AssessmentTaskRepository interface {
 	// FindByPlanID 查询某个计划的所有任务
 	FindByPlanID(ctx context.Context, planID AssessmentPlanID) ([]*AssessmentTask, error)
 
+	// FindByPlanIDAndTesteeIDs 查询某个计划下指定受试者集合的任务。
+	FindByPlanIDAndTesteeIDs(ctx context.Context, planID AssessmentPlanID, testeeIDs []testee.ID) ([]*AssessmentTask, error)
+
 	// FindByTesteeID 查询某个受试者的所有任务
 	FindByTesteeID(ctx context.Context, testeeID testee.ID) ([]*AssessmentTask, error)
 
@@ -44,13 +47,16 @@ type AssessmentTaskRepository interface {
 	FindByTesteeIDAndPlanID(ctx context.Context, testeeID testee.ID, planID AssessmentPlanID) ([]*AssessmentTask, error)
 
 	// FindPendingTasks 查询待推送的任务（计划时间 <= before）
-	FindPendingTasks(ctx context.Context, before time.Time) ([]*AssessmentTask, error)
+	FindPendingTasks(ctx context.Context, orgID int64, before time.Time) ([]*AssessmentTask, error)
 
 	// FindExpiredTasks 查询已过期的任务（状态为 opened，截止时间 <= now）
 	FindExpiredTasks(ctx context.Context) ([]*AssessmentTask, error)
 
 	// FindList 分页查询任务列表（支持条件筛选）
-	FindList(ctx context.Context, planID *AssessmentPlanID, testeeID *testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
+	FindList(ctx context.Context, orgID int64, planID *AssessmentPlanID, testeeID *testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
+
+	// FindListByTesteeIDs 分页查询受试者集合范围内的任务。
+	FindListByTesteeIDs(ctx context.Context, orgID int64, planID *AssessmentPlanID, testeeIDs []testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
 
 	// Save 保存任务
 	Save(ctx context.Context, task *AssessmentTask) error

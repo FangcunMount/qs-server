@@ -151,12 +151,14 @@ type UpdateTesteeProfileDTO struct {
 
 // ListTesteeDTO 列出受试者 DTO
 type ListTesteeDTO struct {
-	OrgID    int64    // 机构ID
-	Name     string   // 姓名（模糊搜索）
-	Tags     []string // 标签过滤
-	KeyFocus *bool    // 是否重点关注
-	Offset   int      // 偏移量
-	Limit    int      // 限制数量
+	OrgID                 int64    // 机构ID
+	Name                  string   // 姓名（模糊搜索）
+	Tags                  []string // 标签过滤
+	KeyFocus              *bool    // 是否重点关注
+	AccessibleTesteeIDs   []uint64 // 可访问的受试者范围（可选）
+	RestrictToAccessScope bool     // 是否按可访问范围过滤
+	Offset                int      // 偏移量
+	Limit                 int      // 限制数量
 }
 
 // TesteeResult 受试者结果 DTO

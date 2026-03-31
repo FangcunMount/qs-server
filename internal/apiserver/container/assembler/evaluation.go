@@ -10,6 +10,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
@@ -71,7 +72,8 @@ type EvaluationModule struct {
 	SuggestionService reportApp.SuggestionService
 
 	// 事件发布器（由容器统一注入）
-	eventPublisher event.EventPublisher
+	eventPublisher      event.EventPublisher
+	testeeAccessService actorAccessApp.TesteeAccessService
 }
 
 // NewEvaluationModule 创建评估模块
@@ -282,6 +284,9 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if statusCache != nil {
 		m.Handler.SetStatusCache(statusCache)
 	}
+	if m.testeeAccessService != nil {
+		m.Handler.SetTesteeAccessService(m.testeeAccessService)
+	}
 
 	// 注入等待队列注册表（如果可用，用于长轮询接口）
 	if waiterRegistry != nil {
@@ -333,6 +338,17 @@ func (m *EvaluationModule) SetScaleRepository(
 			m.ScoreQueryService,
 			m.EvaluationService,
 		)
+		if m.testeeAccessService != nil {
+			m.Handler.SetTesteeAccessService(m.testeeAccessService)
+		}
+	}
+}
+
+// SetTesteeAccessService 设置 testee 访问控制服务。
+func (m *EvaluationModule) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+	m.testeeAccessService = testeeAccessService
+	if m.Handler != nil {
+		m.Handler.SetTesteeAccessService(testeeAccessService)
 	}
 }
 

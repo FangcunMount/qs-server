@@ -25,15 +25,15 @@ type PlanLifecycleService interface {
 
 	// PausePlan 暂停计划
 	// 场景：管理员暂停计划，取消所有未执行的任务
-	PausePlan(ctx context.Context, planID string) (*PlanResult, error)
+	PausePlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
 
 	// ResumePlan 恢复计划
 	// 场景：管理员恢复计划，重新生成未完成的任务
-	ResumePlan(ctx context.Context, planID string, testeeStartDates map[string]string) (*PlanResult, error)
+	ResumePlan(ctx context.Context, orgID int64, planID string, testeeStartDates map[string]string) (*PlanResult, error)
 
 	// CancelPlan 取消计划
 	// 场景：管理员取消计划
-	CancelPlan(ctx context.Context, planID string) error
+	CancelPlan(ctx context.Context, orgID int64, planID string) error
 }
 
 // PlanEnrollmentService 受试者加入计划服务
@@ -47,7 +47,7 @@ type PlanEnrollmentService interface {
 
 	// TerminateEnrollment 终止受试者的计划参与
 	// 场景：受试者退出计划，取消所有待处理任务
-	TerminateEnrollment(ctx context.Context, planID string, testeeID string) error
+	TerminateEnrollment(ctx context.Context, orgID int64, planID string, testeeID string) error
 }
 
 // TaskSchedulerService 任务调度服务
@@ -57,7 +57,7 @@ type PlanEnrollmentService interface {
 type TaskSchedulerService interface {
 	// SchedulePendingTasks 调度待推送的任务
 	// 场景：定时任务扫描待推送任务，生成入口并开放
-	SchedulePendingTasks(ctx context.Context, before string) ([]*TaskResult, error)
+	SchedulePendingTasks(ctx context.Context, orgID int64, before string) ([]*TaskResult, error)
 }
 
 // TaskManagementService 任务管理服务
@@ -67,19 +67,19 @@ type TaskSchedulerService interface {
 type TaskManagementService interface {
 	// OpenTask 开放任务
 	// 场景：手动开放任务，生成入口
-	OpenTask(ctx context.Context, taskID string, dto OpenTaskDTO) (*TaskResult, error)
+	OpenTask(ctx context.Context, orgID int64, taskID string, dto OpenTaskDTO) (*TaskResult, error)
 
 	// CompleteTask 完成任务
 	// 场景：用户完成测评后，更新任务状态
-	CompleteTask(ctx context.Context, taskID string, assessmentID string) (*TaskResult, error)
+	CompleteTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error)
 
 	// ExpireTask 过期任务
 	// 场景：定时任务扫描已过期的任务
-	ExpireTask(ctx context.Context, taskID string) (*TaskResult, error)
+	ExpireTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error)
 
 	// CancelTask 取消任务
 	// 场景：手动取消任务
-	CancelTask(ctx context.Context, taskID string) error
+	CancelTask(ctx context.Context, orgID int64, taskID string) error
 }
 
 // PlanQueryService 计划查询服务
@@ -89,7 +89,7 @@ type TaskManagementService interface {
 type PlanQueryService interface {
 	// GetPlan 根据ID获取计划
 	// 场景：查询指定计划的完整信息
-	GetPlan(ctx context.Context, planID string) (*PlanResult, error)
+	GetPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
 
 	// ListPlans 查询计划列表
 	// 场景：分页查询计划列表，支持条件筛选
@@ -97,7 +97,7 @@ type PlanQueryService interface {
 
 	// GetTask 根据ID获取任务
 	// 场景：查询指定任务的完整信息
-	GetTask(ctx context.Context, taskID string) (*TaskResult, error)
+	GetTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error)
 
 	// ListTasks 查询任务列表
 	// 场景：分页查询任务列表，支持条件筛选
@@ -105,7 +105,10 @@ type PlanQueryService interface {
 
 	// ListTasksByPlan 查询计划下的所有任务
 	// 场景：查看某个计划的所有任务
-	ListTasksByPlan(ctx context.Context, planID string) ([]*TaskResult, error)
+	ListTasksByPlan(ctx context.Context, orgID int64, planID string) ([]*TaskResult, error)
+
+	// ListTasksByPlanInScope 查询计划下指定可访问范围内的任务。
+	ListTasksByPlanInScope(ctx context.Context, orgID int64, planID string, accessibleTesteeIDs []string) ([]*TaskResult, error)
 
 	// ListTasksByTestee 查询受试者的所有任务
 	// 场景：查看某个受试者的所有任务

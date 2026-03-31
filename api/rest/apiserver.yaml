@@ -15,6 +15,10 @@ servers:
 tags:
 - name: Actor
   description: 人员管理
+- name: Actor-AssessmentEntry
+  description: Actor-AssessmentEntry
+- name: Actor-Clinician
+  description: Actor-Clinician
 - name: AnswerSheet-Management
   description: 答卷管理
 - name: Evaluation-Admin
@@ -250,6 +254,272 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 查询从业者列表
+      description: 查询机构内从业者列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验，实际以 JWT org_id 为准
+      operationId: 查询从业者列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
+        name: org_id
+        in: query
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    post:
+      tags:
+      - Actor-Clinician
+      summary: 创建从业者
+      description: 创建机构内从业者档案，仅 qs:admin 可访问；请求体中的 org_id 仅作兼容校验，实际以 JWT org_id 为准
+      operationId: 创建从业者
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateClinicianRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/me:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 获取我的从业者身份
+      description: 获取当前后台操作者绑定的从业者档案；当前也兼容旧的 /practitioners 路由别名
+      operationId: 获取我的从业者身份
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/me/assessment-entries:
+    get:
+      tags:
+      - Actor-AssessmentEntry
+      summary: 查询我的测评入口列表
+      description: 查询当前从业者创建的测评入口列表；当前也兼容旧的 /practitioners 路由别名
+      operationId: 查询我的测评入口列表
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentEntryListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+    post:
+      tags:
+      - Actor-AssessmentEntry
+      summary: 创建我的测评入口
+      description: 为当前从业者创建测评入口二维码；当前也兼容旧的 /practitioners 路由别名
+      operationId: 创建我的测评入口
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.CreateAssessmentEntryRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentEntryResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/me/testees:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 查询我的受试者
+      description: 查询当前从业者可访问的受试者列表，底层复用与 /api/v1/testees 相同的访问范围收口逻辑
+      operationId: 查询我的受试者
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TesteeListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/{id}:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 获取从业者详情
+      description: 查询指定从业者详情，仅 qs:admin 可访问
+      operationId: 获取从业者详情
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 从业者ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /codes/apply:
     post:
       tags:
@@ -425,9 +695,14 @@ paths:
       tags:
       - Evaluation-Admin
       summary: 重试失败的测评
-      description: 重试指定测评的评估流程
+      description: 重试指定测评的评估流程；仅 qs:evaluator 或 qs:admin 可访问
       operationId: 重试失败的测评
       parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
       - type: string
         description: 测评ID
         name: id
@@ -487,8 +762,14 @@ paths:
       tags:
       - Evaluation-Admin
       summary: 批量评估
-      description: 批量执行测评评估（管理员/Worker使用）
+      description: 批量执行测评评估；仅 qs:evaluator 或 qs:admin 可访问
       operationId: 批量评估
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
       requestBody:
         required: true
         content:
@@ -653,7 +934,8 @@ paths:
       tags:
       - Plan-Lifecycle
       summary: 创建测评计划模板
-      description: '创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。不同周期类型需要不同的参数：
+      description: '创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。仅 qs:evaluation_plan_manager
+        或 qs:admin 可访问。不同周期类型需要不同的参数：
 
         - by_week/by_day: 需要 interval（间隔）和 total_times（总次数）
 
@@ -696,7 +978,7 @@ paths:
       tags:
       - Plan-Enrollment
       summary: 受试者加入计划
-      description: 将受试者加入计划，生成所有任务
+      description: 将受试者加入计划，生成所有任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 受试者加入计划
       parameters:
       - type: string
@@ -781,41 +1063,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /plans/tasks/schedule:
-    post:
-      tags:
-      - Task-Scheduler
-      summary: 调度待推送任务
-      description: 定时任务调用，扫描待推送任务，生成入口并开放
-      operationId: 调度待推送任务
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: string
-        description: 截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间
-        name: before
-        in: query
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.TaskListResponse'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}:
     get:
       tags:
@@ -857,7 +1104,7 @@ paths:
       tags:
       - Task-Management
       summary: 取消任务
-      description: 手动取消任务
+      description: 手动取消任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 取消任务
       parameters:
       - type: string
@@ -883,89 +1130,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /plans/tasks/{id}/complete:
-    post:
-      tags:
-      - Task-Management
-      summary: 完成任务
-      description: 用户完成测评后，更新任务状态
-      operationId: 完成任务
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: string
-        description: 任务ID
-        name: id
-        in: path
-        required: true
-      - type: string
-        description: 测评ID
-        name: assessment_id
-        in: query
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.TaskResponse'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /plans/tasks/{id}/expire:
-    post:
-      tags:
-      - Task-Management
-      summary: 过期任务
-      description: 定时任务调用，标记已过期的任务
-      operationId: 过期任务
-      parameters:
-      - type: string
-        description: Bearer 用户令牌
-        name: Authorization
-        in: header
-        required: true
-      - type: string
-        description: 任务ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.TaskResponse'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /plans/tasks/{id}/open:
     post:
       tags:
       - Task-Management
       summary: 开放任务
-      description: 手动开放任务，生成入口
+      description: 手动开放任务，生成入口；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 开放任务
       parameters:
       - type: string
@@ -1043,7 +1213,7 @@ paths:
       tags:
       - Plan-Lifecycle
       summary: 取消计划
-      description: 取消计划，不可恢复
+      description: 取消计划，不可恢复；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 取消计划
       parameters:
       - type: string
@@ -1074,7 +1244,7 @@ paths:
       tags:
       - Plan-Lifecycle
       summary: 暂停计划
-      description: 暂停计划，取消所有未执行的任务
+      description: 暂停计划，取消所有未执行的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 暂停计划
       parameters:
       - type: string
@@ -1110,7 +1280,7 @@ paths:
       tags:
       - Plan-Lifecycle
       summary: 恢复计划
-      description: 恢复计划，重新生成未完成的任务
+      description: 恢复计划，重新生成未完成的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 恢复计划
       parameters:
       - type: string
@@ -1188,7 +1358,7 @@ paths:
       tags:
       - Plan-Enrollment
       summary: 终止受试者的计划参与
-      description: 受试者退出计划，取消所有待处理任务
+      description: 受试者退出计划，取消所有待处理任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
       operationId: 终止受试者的计划参与
       parameters:
       - type: string
@@ -1213,6 +1383,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /public/assessment-entries/{token}:
+    get:
+      tags:
+      - Actor-AssessmentEntry
+      summary: 公开解析测评入口
+      description: 公开解析测评入口 token，返回入口配置和所属从业者摘要
+      operationId: 公开解析测评入口
+      parameters:
+      - type: string
+        description: 测评入口Token
+        name: token
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentEntryResolvedResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /public/assessment-entries/{token}/intake:
+    post:
+      tags:
+      - Actor-AssessmentEntry
+      summary: 公开扫码建档
+      description: 通过测评入口 token 建立受试者并自动绑定从业者关系
+      operationId: 公开扫码建档
+      parameters:
+      - type: string
+        description: 测评入口Token
+        name: token
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.IntakeByAssessmentEntryRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentEntryIntakeResponse'
         '429':
           description: Too Many Requests
           content:
@@ -2483,13 +2721,13 @@ paths:
       tags:
       - Actor
       summary: 查询员工列表
+      description: 机构级后台账号列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验
       operationId: 查询员工列表
       parameters:
       - type: string
-        description: 机构ID
+        description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
         name: org_id
         in: query
-        required: true
       - type: string
         description: 角色筛选
         name: role
@@ -2610,7 +2848,7 @@ paths:
       tags:
       - Statistics
       summary: 获取计划统计
-      description: 获取指定测评计划的统计数据，包括任务数、完成率等
+      description: 获取指定测评计划的统计数据，包括任务数、完成率等；仅 qs:admin 可访问
       operationId: 获取计划统计
       parameters:
       - type: string
@@ -2647,7 +2885,7 @@ paths:
       tags:
       - Statistics
       summary: 获取问卷/量表统计
-      description: 获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等
+      description: 获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等；仅 qs:admin 可访问
       operationId: 获取问卷量表统计
       parameters:
       - type: string
@@ -2678,90 +2916,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /statistics/sync/accumulated:
-    post:
-      tags:
-      - Statistics-Sync
-      summary: 同步累计统计
-      description: 将Redis中的累计统计数据同步到MySQL（定时任务调用）
-      operationId: 同步累计统计
-      parameters:
-      - type: string
-        description: Bearer 用户令牌（或内部调用token）
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /statistics/sync/daily:
-    post:
-      tags:
-      - Statistics-Sync
-      summary: 同步每日统计
-      description: 将Redis中的每日统计数据同步到MySQL（定时任务调用）
-      operationId: 同步每日统计
-      parameters:
-      - type: string
-        description: Bearer 用户令牌（或内部调用token）
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /statistics/sync/plan:
-    post:
-      tags:
-      - Statistics-Sync
-      summary: 同步计划统计
-      description: 同步计划统计数据到MySQL（定时任务调用）
-      operationId: 同步计划统计
-      parameters:
-      - type: string
-        description: Bearer 用户令牌（或内部调用token）
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /statistics/system:
     get:
       tags:
       - Statistics
       summary: 获取系统整体统计
-      description: 获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等
+      description: 获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等；仅 qs:admin 可访问
       operationId: 获取系统整体统计
       parameters:
       - type: string
@@ -2792,7 +2952,7 @@ paths:
       tags:
       - Statistics
       summary: 获取受试者统计
-      description: 获取指定受试者的统计数据，包括测评数、完成数、风险分布等
+      description: 获取指定受试者的统计数据，包括测评数、完成数、风险分布等；后台访问范围按 ClinicianTesteeRelation 收口
       operationId: 获取受试者统计
       parameters:
       - type: string
@@ -2824,44 +2984,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /statistics/validate:
-    post:
-      tags:
-      - Statistics-Sync
-      summary: 校验数据一致性
-      description: 校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）
-      operationId: 校验数据一致性
-      parameters:
-      - type: string
-        description: Bearer 用户令牌（或内部调用token）
-        name: Authorization
-        in: header
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
   /testees:
     get:
       tags:
       - Actor
       summary: 查询受试者列表
+      description: 以 JWT org_id 为准查询后台可见受试者。qs:admin 可查看机构全量，其他后台用户按 ClinicianTesteeRelation
+        自动收口；org_id 查询参数仅作兼容校验
       operationId: 查询受试者列表
       parameters:
       - type: string
-        description: 机构ID
+        description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
         name: org_id
         in: query
-        required: true
       - type: string
         description: 姓名（模糊匹配）
         name: name
@@ -2907,13 +3042,14 @@ paths:
       tags:
       - Actor
       summary: 根据 profile_id 获取受试者详情
+      description: 以 JWT org_id 为准，根据档案ID查询受试者；org_id 查询参数仅作兼容校验，若传入则必须与 JWT org_id
+        一致
       operationId: 根据profile_id获取受试者详情
       parameters:
       - type: string
-        description: 机构ID
+        description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
         name: org_id
         in: query
-        required: true
       - type: string
         description: 用户档案ID（IAM Child ID/ProfileID）
         name: profile_id
@@ -3000,48 +3136,6 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.TesteeResponse'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /testees/{id}/periodic-stats:
-    get:
-      tags:
-      - Testee
-      summary: 获取受试者周期统计
-      operationId: 获取受试者周期统计
-      parameters:
-      - type: string
-        description: Testee ID
-        name: id
-        in: path
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/response.PeriodicStatsResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.Response'
         '429':
           description: Too Many Requests
           content:
@@ -3218,6 +3312,223 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /internal/v1/plans/tasks/schedule:
+    post:
+      tags:
+      - Task-Scheduler
+      summary: 调度待推送任务
+      description: 定时任务调用，扫描待推送任务，生成入口并开放；仅 qs:evaluation_plan_manager 或 qs:admin
+        可访问
+      operationId: 调度待推送任务
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间
+        name: before
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TaskListResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/plans/tasks/{id}/complete:
+    post:
+      tags:
+      - Task-Management
+      summary: 完成任务
+      description: 系统动作：用户完成测评后回写任务状态，仅内部路由暴露
+      operationId: 完成任务
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 任务ID
+        name: id
+        in: path
+        required: true
+      - type: string
+        description: 测评ID
+        name: assessment_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TaskResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/plans/tasks/{id}/expire:
+    post:
+      tags:
+      - Task-Management
+      summary: 过期任务
+      description: 系统动作：定时任务调用，标记已过期的任务，仅内部路由暴露
+      operationId: 过期任务
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 任务ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.TaskResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/statistics/sync/accumulated:
+    post:
+      tags:
+      - Statistics-Sync
+      summary: 同步累计统计
+      description: 将Redis中的累计统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
+      operationId: 同步累计统计
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（或内部调用token）
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/statistics/sync/daily:
+    post:
+      tags:
+      - Statistics-Sync
+      summary: 同步每日统计
+      description: 将Redis中的每日统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
+      operationId: 同步每日统计
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（或内部调用token）
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/statistics/sync/plan:
+    post:
+      tags:
+      - Statistics-Sync
+      summary: 同步计划统计
+      description: 同步计划统计数据到MySQL（定时任务调用）；仅 qs:admin 可访问
+      operationId: 同步计划统计
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（或内部调用token）
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/statistics/validate:
+    post:
+      tags:
+      - Statistics-Sync
+      summary: 校验数据一致性
+      description: 校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）；仅 qs:admin 可访问
+      operationId: 校验数据一致性
+      parameters:
+      - type: string
+        description: Bearer 用户令牌（或内部调用token）
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /ping:
     get:
       tags:
@@ -3356,6 +3667,42 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/viewmodel.QuestionDTO'
+    request.CreateAssessmentEntryRequest:
+      type: object
+      required:
+      - target_code
+      - target_type
+      properties:
+        expires_at:
+          type: string
+        target_code:
+          type: string
+        target_type:
+          type: string
+        target_version:
+          type: string
+    request.CreateClinicianRequest:
+      type: object
+      required:
+      - clinician_type
+      - name
+      properties:
+        clinician_type:
+          type: string
+        department:
+          type: string
+        employee_code:
+          type: string
+        is_active:
+          type: boolean
+        name:
+          type: string
+        operator_id:
+          type: integer
+        org_id:
+          type: integer
+        title:
+          type: string
     request.CreatePlanRequest:
       type: object
       properties:
@@ -3423,7 +3770,6 @@ components:
       type: object
       required:
       - name
-      - org_id
       - roles
       properties:
         email:
@@ -3436,7 +3782,7 @@ components:
           description: 姓名
           type: string
         org_id:
-          description: 机构ID
+          description: 兼容字段：机构ID
           type: integer
         phone:
           description: 电话
@@ -3498,6 +3844,19 @@ components:
           type: string
         title:
           type: string
+    request.IntakeByAssessmentEntryRequest:
+      type: object
+      required:
+      - name
+      properties:
+        birthday:
+          type: string
+        gender:
+          type: string
+        name:
+          type: string
+        profile_id:
+          type: integer
     request.InterpretRuleModel:
       type: object
       properties:
@@ -3696,6 +4055,64 @@ components:
             type: string
         count:
           type: integer
+    response.AssessmentEntryIntakeResponse:
+      type: object
+      properties:
+        assignment:
+          $ref: '#/components/schemas/response.RelationResponse'
+        clinician:
+          $ref: '#/components/schemas/response.ClinicianSummaryResponse'
+        entry:
+          $ref: '#/components/schemas/response.AssessmentEntryResponse'
+        relation:
+          $ref: '#/components/schemas/response.RelationResponse'
+        testee:
+          $ref: '#/components/schemas/response.TesteeResponse'
+    response.AssessmentEntryListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.AssessmentEntryResponse'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+    response.AssessmentEntryResolvedResponse:
+      type: object
+      properties:
+        clinician:
+          $ref: '#/components/schemas/response.ClinicianSummaryResponse'
+        entry:
+          $ref: '#/components/schemas/response.AssessmentEntryResponse'
+    response.AssessmentEntryResponse:
+      type: object
+      properties:
+        clinician_id:
+          type: string
+        expires_at:
+          type: string
+        id:
+          type: string
+        is_active:
+          type: boolean
+        org_id:
+          type: string
+        qrcode_url:
+          type: string
+        target_code:
+          type: string
+        target_type:
+          type: string
+        target_version:
+          type: string
+        token:
+          type: string
     response.AssessmentListResponse:
       type: object
       properties:
@@ -3805,6 +4222,57 @@ components:
         label:
           type: string
         value:
+          type: string
+    response.ClinicianListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ClinicianResponse'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+    response.ClinicianResponse:
+      type: object
+      properties:
+        clinician_type:
+          type: string
+        department:
+          type: string
+        employee_code:
+          type: string
+        id:
+          type: string
+        is_active:
+          type: boolean
+        name:
+          type: string
+        operator_id:
+          type: string
+        org_id:
+          type: string
+        title:
+          type: string
+    response.ClinicianSummaryResponse:
+      type: object
+      properties:
+        clinician_type:
+          type: string
+        department:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        operator_id:
+          type: string
+        title:
           type: string
     response.DimensionItem:
       type: object
@@ -3962,73 +4430,6 @@ components:
           type: string
         suggestion:
           type: string
-    response.PeriodicProjectResponse:
-      type: object
-      properties:
-        completed_weeks:
-          description: 已完成周数
-          type: integer
-        completion_rate:
-          description: 完成率（0-100）
-          type: number
-        current_week:
-          description: 当前应该完成的周次
-          type: integer
-        end_date:
-          description: 项目结束日期
-          type: string
-        project_id:
-          description: 项目ID
-          type: string
-        project_name:
-          description: 项目名称
-          type: string
-        scale_name:
-          description: 关联的量表名称
-          type: string
-        start_date:
-          description: 项目开始日期
-          type: string
-        tasks:
-          description: 各周任务状态（按周次升序排列）
-          type: array
-          items:
-            $ref: '#/components/schemas/response.PeriodicTaskResponse'
-        total_weeks:
-          description: 总周数
-          type: integer
-    response.PeriodicStatsResponse:
-      type: object
-      properties:
-        active_projects:
-          description: 进行中的项目数
-          type: integer
-        projects:
-          description: 周期性项目列表
-          type: array
-          items:
-            $ref: '#/components/schemas/response.PeriodicProjectResponse'
-        total_projects:
-          description: 项目总数
-          type: integer
-    response.PeriodicTaskResponse:
-      type: object
-      properties:
-        assessment_id:
-          description: 关联的测评ID（如已完成）
-          type: string
-        completed_at:
-          description: 完成时间
-          type: string
-        due_date:
-          description: 截止时间
-          type: string
-        status:
-          description: 状态：completed/pending/overdue
-          type: string
-        week:
-          description: 第几周（从1开始）
-          type: integer
     response.PlanListResponse:
       type: object
       properties:
@@ -4115,6 +4516,27 @@ components:
         type:
           type: string
         version:
+          type: string
+    response.RelationResponse:
+      type: object
+      properties:
+        bound_at:
+          type: string
+        clinician_id:
+          type: string
+        id:
+          type: string
+        is_active:
+          type: boolean
+        org_id:
+          type: string
+        relation_type:
+          type: string
+        source_id:
+          type: string
+        source_type:
+          type: string
+        testee_id:
           type: string
     response.ReportListResponse:
       type: object

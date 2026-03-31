@@ -28,7 +28,7 @@ func NewQueryService(
 }
 
 // GetPlan 根据ID获取计划
-func (s *queryService) GetPlan(ctx context.Context, planID string) (*PlanResult, error) {
+func (s *queryService) GetPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
 	// 1. 转换参数
 	id, err := toPlanID(planID)
 	if err != nil {
@@ -39,6 +39,9 @@ func (s *queryService) GetPlan(ctx context.Context, planID string) (*PlanResult,
 	p, err := s.planRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
+	}
+	if p.GetOrgID() != orgID {
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
 	}
 
 	return toPlanResult(p), nil
@@ -78,7 +81,7 @@ func (s *queryService) ListPlans(ctx context.Context, dto ListPlansDTO) (*PlanLi
 }
 
 // GetTask 根据ID获取任务
-func (s *queryService) GetTask(ctx context.Context, taskID string) (*TaskResult, error) {
+func (s *queryService) GetTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
 	// 1. 转换参数
 	id, err := toTaskID(taskID)
 	if err != nil {
@@ -89,6 +92,9 @@ func (s *queryService) GetTask(ctx context.Context, taskID string) (*TaskResult,
 	task, err := s.taskRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrPageNotFound, "任务不存在")
+	}
+	if task.GetOrgID() != orgID {
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "任务不属于当前机构")
 	}
 
 	return toTaskResult(task), nil
@@ -135,8 +141,22 @@ func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskLi
 		status = &statusVal
 	}
 
-	// 3. 查询任务列表
-	tasks, total, err := s.taskRepo.FindList(ctx, planID, testeeID, status, dto.Page, dto.PageSize)
+	var tasks []*domainPlan.AssessmentTask
+	var total int64
+	var err error
+	if dto.RestrictToAccessScope {
+		accessibleTesteeIDs := make([]testee.ID, 0, len(dto.AccessibleTesteeIDs))
+		for _, rawID := range dto.AccessibleTesteeIDs {
+			id, err := toTesteeID(rawID)
+			if err != nil {
+				return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+			}
+			accessibleTesteeIDs = append(accessibleTesteeIDs, id)
+		}
+		tasks, total, err = s.taskRepo.FindListByTesteeIDs(ctx, dto.OrgID, planID, accessibleTesteeIDs, status, dto.Page, dto.PageSize)
+	} else {
+		tasks, total, err = s.taskRepo.FindList(ctx, dto.OrgID, planID, testeeID, status, dto.Page, dto.PageSize)
+	}
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务列表失败")
 	}
@@ -156,11 +176,14 @@ func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskLi
 }
 
 // ListTasksByPlan 查询计划下的所有任务
-func (s *queryService) ListTasksByPlan(ctx context.Context, planID string) ([]*TaskResult, error) {
+func (s *queryService) ListTasksByPlan(ctx context.Context, orgID int64, planID string) ([]*TaskResult, error) {
 	// 1. 转换参数
 	id, err := toPlanID(planID)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+	}
+	if err := s.ensurePlanInOrg(ctx, orgID, id); err != nil {
+		return nil, err
 	}
 
 	// 2. 查询任务
@@ -170,6 +193,43 @@ func (s *queryService) ListTasksByPlan(ctx context.Context, planID string) ([]*T
 	}
 
 	return toTaskResults(tasks), nil
+}
+
+// ListTasksByPlanInScope 查询计划下指定可访问范围内的任务。
+func (s *queryService) ListTasksByPlanInScope(ctx context.Context, orgID int64, planID string, accessibleTesteeIDs []string) ([]*TaskResult, error) {
+	id, err := toPlanID(planID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+	}
+	if err := s.ensurePlanInOrg(ctx, orgID, id); err != nil {
+		return nil, err
+	}
+
+	testeeIDs := make([]testee.ID, 0, len(accessibleTesteeIDs))
+	for _, rawID := range accessibleTesteeIDs {
+		testeeID, err := toTesteeID(rawID)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+		}
+		testeeIDs = append(testeeIDs, testeeID)
+	}
+
+	tasks, err := s.taskRepo.FindByPlanIDAndTesteeIDs(ctx, id, testeeIDs)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
+	}
+	return toTaskResults(tasks), nil
+}
+
+func (s *queryService) ensurePlanInOrg(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID) error {
+	item, err := s.planRepo.FindByID(ctx, planID)
+	if err != nil {
+		return errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
+	}
+	if item.GetOrgID() != orgID {
+		return errors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
+	}
+	return nil
 }
 
 // ListTasksByTestee 查询受试者的所有任务

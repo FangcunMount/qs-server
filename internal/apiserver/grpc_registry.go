@@ -188,21 +188,7 @@ func (r *GRPCRegistry) registerInternalService() error {
 		return nil
 	}
 
-	// 获取 Statistics 和 Plan 模块的服务（可选）
-	var statisticsSyncService interface{}      // statisticsApp.StatisticsSyncService
-	var statisticsValidatorService interface{} // statisticsApp.StatisticsValidatorService
-	var taskSchedulerService interface{}       // planApp.TaskSchedulerService
-
-	if r.container.StatisticsModule != nil {
-		statisticsSyncService = r.container.StatisticsModule.SyncService
-		statisticsValidatorService = r.container.StatisticsModule.ValidatorService
-	}
-
-	if r.container.PlanModule != nil {
-		taskSchedulerService = r.container.PlanModule.TaskSchedulerService
-	}
-
-	// 使用 SurveyModule、EvaluationModule、ScaleModule、ActorModule、StatisticsModule 和 PlanModule 中的服务
+	// 使用 SurveyModule、EvaluationModule、ScaleModule、ActorModule 中的服务
 	internalService := service.NewInternalService(
 		r.container.SurveyModule.AnswerSheet.ScoringService,
 		r.container.EvaluationModule.SubmissionService,
@@ -210,13 +196,10 @@ func (r *GRPCRegistry) registerInternalService() error {
 		r.container.EvaluationModule.EvaluationService,
 		r.container.ScaleModule.Repo,
 		r.container.ActorModule.TesteeTaggingService,
-		statisticsSyncService,      // 可能为 nil
-		statisticsValidatorService, // 可能为 nil
-		taskSchedulerService,       // 可能为 nil
-		r.container.QRCodeService,   // 可能为 nil
+		r.container.QRCodeService,  // 可能为 nil
 	)
 	r.server.RegisterService(internalService)
-	log.Info("   🔧 Internal service registered (for Worker & Sync)")
+	log.Info("   🔧 Internal service registered (for Worker)")
 	return nil
 }
 

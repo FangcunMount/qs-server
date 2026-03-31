@@ -180,10 +180,15 @@ func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  req.QuestionnaireVersion,
 		TesteeID:          req.TesteeID,
-		OrgID:             h.GetOrgIDWithDefault(c),
 		FillerID:          fillerID,
 		Answers:           answers,
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	dto.OrgID = uint64(orgID)
 
 	result, err := h.submissionService.Submit(c.Request.Context(), dto)
 	if err != nil {

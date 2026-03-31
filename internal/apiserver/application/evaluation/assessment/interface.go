@@ -60,7 +60,7 @@ type AssessmentManagementService interface {
 
 	// Retry 重试失败的测评
 	// 场景：管理员对评估失败的测评进行重试
-	Retry(ctx context.Context, assessmentID uint64) (*AssessmentResult, error)
+	Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error)
 }
 
 // ==================== 评估引擎服务 ====================

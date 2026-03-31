@@ -32,15 +32,12 @@ func NewSyncService(
 }
 
 // SyncDailyStatistics 同步每日统计（Redis → MySQL）
-func (s *syncService) SyncDailyStatistics(ctx context.Context) error {
+func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64) error {
 	l := logger.L(ctx)
-	l.Infow("开始同步每日统计", "action", "sync_daily_statistics")
+	l.Infow("开始同步每日统计", "action", "sync_daily_statistics", "org_id", orgID)
 
-	// 使用全局常量：org_id 固定为 1（单租户场景）
-	orgIDs := []int64{DefaultOrgID}
-
-	if len(orgIDs) == 0 {
-		l.Infow("未找到任何org_id，跳过同步")
+	if orgID <= 0 {
+		l.Warnw("无效的 org_id，跳过每日统计同步", "org_id", orgID)
 		return nil
 	}
 
@@ -52,80 +49,63 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context) error {
 	}
 
 	totalSynced := 0
-	for _, orgID := range orgIDs {
-		for _, statType := range statTypes {
-			// 扫描该org和type下的所有每日统计键
-			keys, err := s.cache.ScanDailyKeys(ctx, orgID, statType)
+	for _, statType := range statTypes {
+		keys, err := s.cache.ScanDailyKeys(ctx, orgID, statType)
+		if err != nil {
+			l.Errorw("扫描每日统计键失败",
+				"org_id", orgID,
+				"stat_type", statType,
+				"error", err.Error(),
+			)
+			continue
+		}
+
+		for _, key := range keys {
+			parts := parseDailyKey(key)
+			if len(parts) != 6 {
+				l.Warnw("每日统计键格式不正确，跳过", "key", key)
+				continue
+			}
+
+			statKey := parts[4]
+			dateStr := parts[5]
+			date, err := time.Parse("2006-01-02", dateStr)
 			if err != nil {
-				l.Errorw("扫描每日统计键失败",
-					"org_id", orgID,
-					"stat_type", statType,
+				l.Warnw("日期格式不正确，跳过",
+					"key", key,
+					"date", dateStr,
 					"error", err.Error(),
 				)
 				continue
 			}
 
-			// 解析键并同步
-			for _, key := range keys {
-				// 解析键格式：stats:daily:{org_id}:{type}:{key}:{date}
-				// 例如：stats:daily:1:questionnaire:Q001:2025-01-20
-				parts := parseDailyKey(key)
-				if len(parts) != 6 {
-					l.Warnw("每日统计键格式不正确，跳过",
-						"key", key,
-					)
-					continue
-				}
-
-				statKey := parts[4]
-				dateStr := parts[5]
-
-				// 解析日期
-				date, err := time.Parse("2006-01-02", dateStr)
-				if err != nil {
-					l.Warnw("日期格式不正确，跳过",
-						"key", key,
-						"date", dateStr,
-						"error", err.Error(),
-					)
-					continue
-				}
-
-				// 从Redis读取每日统计
-				submissionCount, completionCount, err := s.cache.GetDailyCount(ctx, orgID, statType, statKey, date)
-				if err != nil {
-					l.Errorw("读取每日统计失败",
-						"key", key,
-						"error", err.Error(),
-					)
-					continue
-				}
-
-				// 同步到MySQL
-				po := &statisticsInfra.StatisticsDailyPO{
-					OrgID:           orgID,
-					StatisticType:   string(statType),
-					StatisticKey:    statKey,
-					StatDate:        date,
-					SubmissionCount: submissionCount,
-					CompletionCount: completionCount,
-				}
-
-				if err := s.repo.UpsertDailyStatistics(ctx, po); err != nil {
-					l.Errorw("同步每日统计到MySQL失败",
-						"key", key,
-						"error", err.Error(),
-					)
-					continue
-				}
-
-				totalSynced++
+			submissionCount, completionCount, err := s.cache.GetDailyCount(ctx, orgID, statType, statKey, date)
+			if err != nil {
+				l.Errorw("读取每日统计失败", "key", key, "error", err.Error())
+				continue
 			}
+
+			po := &statisticsInfra.StatisticsDailyPO{
+				OrgID:           orgID,
+				StatisticType:   string(statType),
+				StatisticKey:    statKey,
+				StatDate:        date,
+				SubmissionCount: submissionCount,
+				CompletionCount: completionCount,
+			}
+
+			if err := s.repo.UpsertDailyStatistics(ctx, po); err != nil {
+				l.Errorw("同步每日统计到MySQL失败", "key", key, "error", err.Error())
+				continue
+			}
+
+			totalSynced++
 		}
 	}
 
 	l.Infow("每日统计同步完成",
 		"action", "sync_daily_statistics",
+		"org_id", orgID,
 		"total_synced", totalSynced,
 	)
 
@@ -133,81 +113,72 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context) error {
 }
 
 // SyncAccumulatedStatistics 同步累计统计（Redis → MySQL）
-func (s *syncService) SyncAccumulatedStatistics(ctx context.Context) error {
+func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64) error {
 	l := logger.L(ctx)
-	l.Infow("开始同步累计统计", "action", "sync_accumulated_statistics")
+	l.Infow("开始同步累计统计", "action", "sync_accumulated_statistics", "org_id", orgID)
 
-	// 使用全局常量：org_id 固定为 1（单租户场景）
-	orgIDs := []int64{DefaultOrgID}
-
-	if len(orgIDs) == 0 {
-		l.Infow("未找到任何org_id，跳过同步")
+	if orgID <= 0 {
+		l.Warnw("无效的 org_id，跳过累计统计同步", "org_id", orgID)
 		return nil
 	}
-
-	// 从每日统计聚合到累计统计
 
 	statTypes := []statistics.StatisticType{
 		statistics.StatisticTypeQuestionnaire,
 		statistics.StatisticTypeTestee,
 	}
 
-	for _, orgID := range orgIDs {
-		for _, statType := range statTypes {
-			// 扫描该org和type下的所有统计键
-			keys, err := s.cache.ScanDailyKeys(ctx, orgID, statType)
-			if err != nil {
-				l.Errorw("扫描统计键失败",
+	for _, statType := range statTypes {
+		keys, err := s.cache.ScanDailyKeys(ctx, orgID, statType)
+		if err != nil {
+			l.Errorw("扫描统计键失败",
+				"org_id", orgID,
+				"stat_type", statType,
+				"error", err.Error(),
+			)
+			continue
+		}
+
+		statKeys := make(map[string]bool)
+		for _, key := range keys {
+			parts := parseDailyKey(key)
+			if len(parts) == 6 {
+				statKeys[parts[4]] = true
+			}
+		}
+
+		for statKey := range statKeys {
+			if err := s.repo.AggregateDailyToAccumulated(ctx, orgID, statType, statKey); err != nil {
+				l.Errorw("聚合累计统计失败",
 					"org_id", orgID,
 					"stat_type", statType,
+					"stat_key", statKey,
 					"error", err.Error(),
 				)
 				continue
 			}
-
-			// 提取唯一的statKey
-			statKeys := make(map[string]bool)
-			for _, key := range keys {
-				parts := parseDailyKey(key)
-				if len(parts) == 6 {
-					statKeys[parts[4]] = true
-				}
-			}
-
-			// 对每个statKey进行聚合
-			for statKey := range statKeys {
-				if err := s.repo.AggregateDailyToAccumulated(ctx, orgID, statType, statKey); err != nil {
-					l.Errorw("聚合累计统计失败",
-						"org_id", orgID,
-						"stat_type", statType,
-						"stat_key", statKey,
-						"error", err.Error(),
-					)
-					continue
-				}
-			}
-		}
-
-		// 同步系统统计（从原始表直接聚合）
-		if err := s.syncSystemStatistics(ctx, orgID); err != nil {
-			l.Errorw("同步系统统计失败",
-				"org_id", orgID,
-				"error", err.Error(),
-			)
-			// 继续处理其他组织，不中断
 		}
 	}
 
-	l.Infow("累计统计同步完成", "action", "sync_accumulated_statistics")
+	if err := s.syncSystemStatistics(ctx, orgID); err != nil {
+		l.Errorw("同步系统统计失败",
+			"org_id", orgID,
+			"error", err.Error(),
+		)
+	}
+
+	l.Infow("累计统计同步完成", "action", "sync_accumulated_statistics", "org_id", orgID)
 	return nil
 }
 
 // SyncPlanStatistics 同步计划统计
-func (s *syncService) SyncPlanStatistics(ctx context.Context) error {
+func (s *syncService) SyncPlanStatistics(ctx context.Context, orgID int64) error {
 	l := logger.L(ctx)
-	l.Infow("开始同步计划统计", "action", "sync_plan_statistics")
+	l.Infow("开始同步计划统计", "action", "sync_plan_statistics", "org_id", orgID)
+	if orgID <= 0 {
+		l.Warnw("无效的 org_id，跳过计划统计同步", "org_id", orgID)
+		return nil
+	}
 
-	// 从assessment_plan表查询所有计划
 	var plans []struct {
 		OrgID  int64
 		PlanID uint64
@@ -215,7 +186,7 @@ func (s *syncService) SyncPlanStatistics(ctx context.Context) error {
 	if err := s.db.WithContext(ctx).
 		Table("assessment_plan").
 		Select("org_id, id as plan_id").
-		Where("deleted_at IS NULL").
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Scan(&plans).Error; err != nil {
 		l.Errorw("查询计划列表失败", "error", err.Error())
 		return err
@@ -274,7 +245,7 @@ func (s *syncService) SyncPlanStatistics(ctx context.Context) error {
 		}
 	}
 
-	l.Infow("计划统计同步完成", "action", "sync_plan_statistics", "plan_count", len(plans))
+	l.Infow("计划统计同步完成", "action", "sync_plan_statistics", "org_id", orgID, "plan_count", len(plans))
 	return nil
 }
 

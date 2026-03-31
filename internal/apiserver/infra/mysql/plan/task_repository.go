@@ -57,6 +57,29 @@ func (r *taskRepository) FindByPlanID(ctx context.Context, planID domainPlan.Ass
 	return r.mapper.ToDomainList(pos), nil
 }
 
+// FindByPlanIDAndTesteeIDs 查询某个计划下指定受试者集合的任务。
+func (r *taskRepository) FindByPlanIDAndTesteeIDs(ctx context.Context, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID) ([]*domainPlan.AssessmentTask, error) {
+	if len(testeeIDs) == 0 {
+		return []*domainPlan.AssessmentTask{}, nil
+	}
+
+	rawIDs := make([]uint64, 0, len(testeeIDs))
+	for _, id := range testeeIDs {
+		rawIDs = append(rawIDs, id.Uint64())
+	}
+
+	var pos []*AssessmentTaskPO
+	err := r.WithContext(ctx).
+		Where("plan_id = ? AND testee_id IN ? AND deleted_at IS NULL", planID.Uint64(), rawIDs).
+		Order("seq ASC").
+		Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return r.mapper.ToDomainList(pos), nil
+}
+
 // FindByTesteeID 查询某个受试者的所有任务
 func (r *taskRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID) ([]*domainPlan.AssessmentTask, error) {
 	var pos []*AssessmentTaskPO
@@ -88,11 +111,11 @@ func (r *taskRepository) FindByTesteeIDAndPlanID(ctx context.Context, testeeID t
 }
 
 // FindPendingTasks 查询待推送的任务（计划时间 <= before）
-func (r *taskRepository) FindPendingTasks(ctx context.Context, before time.Time) ([]*domainPlan.AssessmentTask, error) {
+func (r *taskRepository) FindPendingTasks(ctx context.Context, orgID int64, before time.Time) ([]*domainPlan.AssessmentTask, error) {
 	var pos []*AssessmentTaskPO
 	err := r.WithContext(ctx).
-		Where("status = ? AND planned_at <= ? AND deleted_at IS NULL",
-						domainPlan.TaskStatusPending.String(), before).
+		Where("org_id = ? AND status = ? AND planned_at <= ? AND deleted_at IS NULL",
+			orgID, domainPlan.TaskStatusPending.String(), before).
 		Order("planned_at ASC"). // 按计划时间升序，优先处理早的
 		Find(&pos).Error
 
@@ -121,11 +144,11 @@ func (r *taskRepository) FindExpiredTasks(ctx context.Context) ([]*domainPlan.As
 }
 
 // FindList 分页查询任务列表（支持条件筛选）
-func (r *taskRepository) FindList(ctx context.Context, planID *domainPlan.AssessmentPlanID, testeeID *testee.ID, status *domainPlan.TaskStatus, page, pageSize int) ([]*domainPlan.AssessmentTask, int64, error) {
+func (r *taskRepository) FindList(ctx context.Context, orgID int64, planID *domainPlan.AssessmentPlanID, testeeID *testee.ID, status *domainPlan.TaskStatus, page, pageSize int) ([]*domainPlan.AssessmentTask, int64, error) {
 	var pos []*AssessmentTaskPO
 	var total int64
 
-	query := r.WithContext(ctx).Where("deleted_at IS NULL")
+	query := r.WithContext(ctx).Where("org_id = ? AND deleted_at IS NULL", orgID)
 
 	// 条件筛选
 	if planID != nil {
@@ -151,6 +174,51 @@ func (r *taskRepository) FindList(ctx context.Context, planID *domainPlan.Assess
 		Limit(pageSize).
 		Find(&pos).Error
 
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return r.mapper.ToDomainList(pos), total, nil
+}
+
+// FindListByTesteeIDs 分页查询受试者集合范围内的任务。
+func (r *taskRepository) FindListByTesteeIDs(
+	ctx context.Context,
+	orgID int64,
+	planID *domainPlan.AssessmentPlanID,
+	testeeIDs []testee.ID,
+	status *domainPlan.TaskStatus,
+	page, pageSize int,
+) ([]*domainPlan.AssessmentTask, int64, error) {
+	if len(testeeIDs) == 0 {
+		return []*domainPlan.AssessmentTask{}, 0, nil
+	}
+
+	rawIDs := make([]uint64, 0, len(testeeIDs))
+	for _, id := range testeeIDs {
+		rawIDs = append(rawIDs, id.Uint64())
+	}
+
+	var pos []*AssessmentTaskPO
+	var total int64
+	query := r.WithContext(ctx).Where("org_id = ? AND testee_id IN ? AND deleted_at IS NULL", orgID, rawIDs)
+	if planID != nil {
+		query = query.Where("plan_id = ?", planID.Uint64())
+	}
+	if status != nil {
+		query = query.Where("status = ?", status.String())
+	}
+
+	if err := query.Model(&AssessmentTaskPO{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	err := query.
+		Order("planned_at DESC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&pos).Error
 	if err != nil {
 		return nil, 0, err
 	}

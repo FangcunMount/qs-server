@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -185,6 +186,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 				Namespace:              s.config.Cache.Namespace,
 				CompressPayload:        s.config.Cache.CompressPayload,
 			},
+			PlanEntryBaseURL: s.config.Plan.EntryBaseURL,
 		},
 	)
 	// 初始化 IAM 模块（优先）
@@ -220,6 +222,10 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			// 注入到 ScaleModule（量表）
 			if s.container.ScaleModule != nil {
 				s.container.ScaleModule.SetQRCodeService(s.container.QRCodeService)
+			}
+			// 注入到 ActorModule（测评入口二维码）
+			if s.container.ActorModule != nil {
+				s.container.ActorModule.SetQRCodeService(s.container.QRCodeService)
 			}
 		}
 	}
@@ -372,12 +378,21 @@ func (s *apiServer) startStatisticsSyncScheduler() {
 	}
 
 	syncSvc := s.container.StatisticsModule.SyncService
-	startTicker("daily", opts.DailyInterval, syncSvc.SyncDailyStatistics)
-	startTicker("accumulated", opts.AccumulatedInterval, syncSvc.SyncAccumulatedStatistics)
-	startTicker("plan", opts.PlanInterval, syncSvc.SyncPlanStatistics)
+	for _, orgID := range opts.OrgIDs {
+		scheduledOrgID := orgID
+		startTicker(fmt.Sprintf("daily(org=%d)", scheduledOrgID), opts.DailyInterval, func(ctx context.Context) error {
+			return syncSvc.SyncDailyStatistics(ctx, scheduledOrgID)
+		})
+		startTicker(fmt.Sprintf("accumulated(org=%d)", scheduledOrgID), opts.AccumulatedInterval, func(ctx context.Context) error {
+			return syncSvc.SyncAccumulatedStatistics(ctx, scheduledOrgID)
+		})
+		startTicker(fmt.Sprintf("plan(org=%d)", scheduledOrgID), opts.PlanInterval, func(ctx context.Context) error {
+			return syncSvc.SyncPlanStatistics(ctx, scheduledOrgID)
+		})
+	}
 
-	log.Infof("statistics sync scheduler started (daily=%s, accum=%s, plan=%s, initial_delay=%s)",
-		opts.DailyInterval, opts.AccumulatedInterval, opts.PlanInterval, opts.InitialDelay)
+	log.Infof("statistics sync scheduler started (org_ids=%v, daily=%s, accum=%s, plan=%s, initial_delay=%s)",
+		opts.OrgIDs, opts.DailyInterval, opts.AccumulatedInterval, opts.PlanInterval, opts.InitialDelay)
 }
 
 // buildGenericServer 构建通用服务器

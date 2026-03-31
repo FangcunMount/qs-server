@@ -21,7 +21,7 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 模块职责 | 管计划模板、受试者入组、任务时间线生成、到点开放、任务终态和 `assessmentID` 回写 |
-| 主入口 | 后台主要走 REST；调度可走 REST 或 internal gRPC `SchedulePendingTasks` |
+| 主入口 | 后台用户动作走 `/api/v1` REST；调度等系统动作走 `/internal/v1` |
 | 核心对象 | `AssessmentPlan`、`AssessmentTask`、`PlanEnrollment`、`TaskGenerator` |
 | 与评估的关系 | `plan` 不创建测评，只通过 `assessmentID` 和来源标记与 `evaluation` 建立弱引用闭环 |
 | 关键边界 | 不负责问卷/答卷、量表规则、测评引擎、IAM；这些分别在 `survey`、`scale`、`evaluation`、`actor` |
@@ -53,8 +53,7 @@
 
 ### 契约入口
 
-- **REST**：计划与任务路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准（如 `/api/v1/plans`、`/api/v1/plans/enroll`、`/api/v1/plans/tasks/schedule` 等）；Handler 见 [plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
-- **internal gRPC**：`InternalService.SchedulePendingTasks` 见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、实现 [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)（与 REST 调度共用应用服务）。
+- **REST**：用户侧计划与任务路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准（如 `/api/v1/plans`、`/api/v1/plans/enroll`）；系统动作走 `/internal/v1/plans/tasks/schedule|:id/complete|:id/expire`。Handler 见 [plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
 - **领域事件**：事件类型、Topic、handler 须与 [configs/events.yaml](../../configs/events.yaml) 一致；下文「核心契约」中有对照表便于 **Verify**。
 
 ### 运行时示意图
@@ -73,7 +72,7 @@ flowchart LR
     end
 
     admin -->|REST| plan
-    cron -->|REST / internal gRPC| plan
+    cron -->|internal REST| plan
     plan -->|ExistsByCode| scale
     plan -->|publish plan.* / task.*| worker
     survey -->|答卷| evaluation
@@ -82,7 +81,7 @@ flowchart LR
 
 #### 运行时图说明
 
-后台配置计划并入组；**调度**由外部 Cron 等调用 REST 或 internal gRPC 触发 `SchedulePendingTasks`；任务开放后答题走 `survey` → `evaluation`；`plan` 通过 `CompleteTask` 写入 `assessmentID` 形成弱引用闭环。
+后台配置计划并入组；**调度**由外部 Cron 等调用 `/internal/v1` 触发 `SchedulePendingTasks`；任务开放后答题走 `survey` → `evaluation`；`plan` 通过内部动作 `CompleteTask` 写入 `assessmentID` 形成弱引用闭环。
 
 ### 主要代码入口（索引）
 
@@ -170,8 +169,8 @@ erDiagram
 ```mermaid
 flowchart TB
     subgraph IF[interface]
-        REST[REST PlanHandler]
-        IG[InternalService gRPC]
+        REST[Protected REST PlanHandler]
+        IREST[Internal REST PlanHandler]
     end
 
     subgraph APP[application]
@@ -194,10 +193,10 @@ flowchart TB
 
     REST --> LSV
     REST --> ENV
-    REST --> SCH
     REST --> MGT
     REST --> QSV
-    IG --> SCH
+    IREST --> SCH
+    IREST --> MGT
 
     LSV --> PL
     LSV --> TK
@@ -221,12 +220,12 @@ flowchart TB
 
 ## 核心设计
 
-### 核心契约：REST、internal gRPC 与领域事件
+### 核心契约：REST 与领域事件
 
 #### 输入
 
 - 后台 REST：以 [apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [plan.go](../../internal/apiserver/interface/restful/handler/plan.go)。
-- **internal gRPC**：`SchedulePendingTasks(SchedulePendingTasksRequest{ before })` → [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
+- **系统动作 REST**：`POST /internal/v1/plans/tasks/schedule|:id/complete|:id/expire`，路由见 [routers.go](../../internal/apiserver/routers.go) `registerPlanInternalRoutes`。
 - **跨模块**：创建计划时可选 `scale.Repository.ExistsByCode`（[lifecycle_service.go](../../internal/apiserver/application/plan/lifecycle_service.go) 与装配注入）。
 
 #### 输出
@@ -319,7 +318,7 @@ sequenceDiagram
 
 #### 5. 调度由外部驱动，非模块内常驻线程
 
-推荐外部定时调用 **REST** 或 **internal gRPC** `SchedulePendingTasks`；模块内无独立调度循环。
+推荐外部定时调用 **internal REST** `SchedulePendingTasks`；模块内无独立调度循环。
 
 #### 6. SchedulePendingTasks 批处理语义：错误隔离
 
@@ -349,8 +348,7 @@ sequenceDiagram
 | 装配 | [internal/apiserver/container/assembler/plan.go](../../internal/apiserver/container/assembler/plan.go) |
 | 应用服务 | [internal/apiserver/application/plan/](../../internal/apiserver/application/plan/) |
 | 领域 | [internal/apiserver/domain/plan/](../../internal/apiserver/domain/plan/) |
-| REST | [internal/apiserver/interface/restful/handler/plan.go](../../internal/apiserver/interface/restful/handler/plan.go) |
-| internal gRPC | [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)（`SchedulePendingTasks`） |
+| REST | [internal/apiserver/interface/restful/handler/plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、[internal/apiserver/routers.go](../../internal/apiserver/routers.go)（受保护与 internal 路由） |
 | MySQL | [internal/apiserver/infra/mysql/plan/](../../internal/apiserver/infra/mysql/plan/) |
 
 ---
@@ -359,7 +357,7 @@ sequenceDiagram
 
 ### 常见误解
 
-- `plan` **无** `collection-server` 专属前台查询面；任务入口由 **开放后的 URL** 进入收集端；计划/任务管理以 **后台 REST** 与 internal gRPC 为主。
+- `plan` **无** `collection-server` 专属前台查询面；任务入口由 **开放后的 URL** 进入收集端；计划/任务管理以 **后台 REST** 与 internal REST 为主。
 - `SchedulePendingTasks` **不**保证「全成功或全回滚」；监控与补偿需按**单任务**理解。
 - **过期任务批量处理**：领域有单任务过期语义；若需「按日批量过期」，依赖外部定时循环调用应用层接口（以当前代码为准）。
 - `CompleteTask` 与答卷提交 **无**自动强绑定；闭环依赖 **evaluation/上游** 显式调用。
@@ -368,7 +366,7 @@ sequenceDiagram
 ### 维护时核对
 
 - 变更 REST：同步 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 与 Handler。
-- 变更 `SchedulePendingTasks`：同步 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto) 与 `internal` 实现。
+- 变更 `SchedulePendingTasks` / `CompleteTask` / `ExpireTask`：同步 [routers.go](../../internal/apiserver/routers.go)、[plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、运维脚本与本文说明。
 - 变更事件或 Topic：同步 [configs/events.yaml](../../configs/events.yaml)、领域 `events.go`、发布点与 worker。
 - 变更入口 URL 规则或 `baseURL`：同步 [entry_generator.go](../../internal/apiserver/infra/plan/entry_generator.go) 与装配/配置。
 

@@ -182,6 +182,16 @@ func (r *CachedAssessmentRepository) FindByOrgID(ctx context.Context, orgID int6
 	return r.repo.FindByOrgID(ctx, orgID, status, pagination)
 }
 
+func (r *CachedAssessmentRepository) FindByOrgIDAndTesteeIDs(
+	ctx context.Context,
+	orgID int64,
+	testeeIDs []testee.ID,
+	status *assessment.Status,
+	pagination assessment.Pagination,
+) ([]*assessment.Assessment, int64, error) {
+	return r.repo.FindByOrgIDAndTesteeIDs(ctx, orgID, testeeIDs, status, pagination)
+}
+
 func (r *CachedAssessmentRepository) FindPendingSubmission(ctx context.Context, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
 	return r.repo.FindPendingSubmission(ctx, pagination)
 }

@@ -1,14 +1,11 @@
 package handler
 
 import (
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
-)
-
-const (
-	// DefaultOrgID 默认机构ID（单租户场景）
-	DefaultOrgID uint64 = 1
 )
 
 // BaseHandler 基础Handler结构
@@ -48,21 +45,45 @@ func (h *BaseHandler) GetOrgID(c *gin.Context) uint64 {
 	return middleware.GetOrgID(c)
 }
 
-// GetOrgIDWithDefault 从上下文获取组织ID，如果为空则返回默认值
-func (h *BaseHandler) GetOrgIDWithDefault(c *gin.Context) uint64 {
+// RequireProtectedOrgID 获取受保护路由的机构范围。
+func (h *BaseHandler) RequireProtectedOrgID(c *gin.Context) (int64, error) {
 	orgID := h.GetOrgID(c)
 	if orgID == 0 {
-		return DefaultOrgID
+		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route requires org scope from JWT")
 	}
-	return orgID
+	return int64(orgID), nil
 }
 
-// GetRoles 从上下文获取用户角色列表
-func (h *BaseHandler) GetRoles(c *gin.Context) []string {
-	return middleware.GetRoles(c)
+// RequireProtectedUserID 获取受保护路由的用户身份。
+func (h *BaseHandler) RequireProtectedUserID(c *gin.Context) (int64, error) {
+	userID, ok := h.GetUserIDUint64(c)
+	if !ok || userID == 0 {
+		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route requires user identity from JWT")
+	}
+	return int64(userID), nil
 }
 
-// HasRole 检查用户是否拥有指定角色
-func (h *BaseHandler) HasRole(c *gin.Context, role string) bool {
-	return middleware.HasRole(c, role)
+// RequireProtectedScope 获取受保护路由的组织和用户信息。
+func (h *BaseHandler) RequireProtectedScope(c *gin.Context) (int64, int64, error) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		return 0, 0, err
+	}
+	userID, err := h.RequireProtectedUserID(c)
+	if err != nil {
+		return 0, 0, err
+	}
+	return orgID, userID, nil
+}
+
+// RequireProtectedOrgIDWithLegacy 在 JWT org 语义下兼容旧请求体/query 的 org_id。
+func (h *BaseHandler) RequireProtectedOrgIDWithLegacy(c *gin.Context, legacyOrgID int64) (int64, error) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		return 0, err
+	}
+	if legacyOrgID != 0 && legacyOrgID != orgID {
+		return 0, errors.WithCode(code.ErrInvalidArgument, "org_id does not match JWT org scope")
+	}
+	return orgID, nil
 }

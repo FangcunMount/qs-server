@@ -20,4 +20,3 @@ func parseDailyKey(key string) []string {
 	}
 	return parts
 }
-

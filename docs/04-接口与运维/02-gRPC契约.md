@@ -10,7 +10,7 @@
 
 ### 概览
 
-仅 **qs-apiserver** 对外提供 **gRPC Server**。**collection-server** 与 **qs-worker** 仅实现 **gRPC 客户端**。对内协作不替代对外 REST；**InternalService** 面向 **worker 回调**及部分与统计/调度重叠的能力，与前台查询类 RPC 区分。
+仅 **qs-apiserver** 对外提供 **gRPC Server**。**collection-server** 与 **qs-worker** 仅实现 **gRPC 客户端**。对内协作不替代对外 REST；**InternalService** 面向 **worker 回调**能力，与前台查询类 RPC 区分。
 
 ### 重点速查
 
@@ -22,7 +22,7 @@
 | 客户端角色 | `collection-server` 和 `qs-worker` 都是 gRPC 客户端，但调用的 Service 集合不同 |
 | 契约真值 | `.proto` 以 [internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/) 为准 |
 | 注册真值 | 服务端注册以 [grpc_registry.go](../../internal/apiserver/grpc_registry.go) 为准，客户端以各自 `grpc_client_registry.go` 为准 |
-| `InternalService` 定位 | 它主要服务 worker 回调和部分内部运维能力，不等价于对外查询型服务 |
+| `InternalService` 定位 | 它主要服务 worker 回调，不等价于对外查询型服务 |
 | 排障入口 | 先看 proto 和注册器，再看对应 service 实现与 client 调用点 |
 
 ### 基础设施边界
@@ -89,7 +89,7 @@ flowchart LR
 | `ActorService` | ✓ | — | 受试者相关 |
 | `EvaluationService` | ✓ | ✓ | 测评/报告/趋势等查询与提交侧能力 |
 | `ScaleService` | ✓ | — | 量表只读与分类 |
-| `InternalService` | — | ✓ | 计分、创建 Assessment、执行评估、打标签、二维码；**统计同步/校验/计划调度 RPC**（与 REST 并存） |
+| `InternalService` | — | ✓ | 计分、创建 Assessment、执行评估、打标签、二维码 |
 
 **Verify**：若某模块未装配，`GRPCRegistry` 会 **跳过** 对应服务（见 [`grpc_registry.go`](../../internal/apiserver/grpc_registry.go) 内 `nil` 判断与日志）。排障需 **proto + 注册器 + 容器装配** 一起看。
 
@@ -104,9 +104,9 @@ flowchart LR
 ### `InternalService` 为什么单独存在
 
 - **`.proto`**：方法名与消息类型的契约来源。  
-- **`GRPCRegistry.RegisterServices`**：运行时唯一注册入口；**InternalService** 依赖 `EvaluationModule`、`ScaleModule`、`SurveyModule`、`ActorModule` 等同时满足，且统计/计划相关依赖可为 nil（内部再类型断言）。
+- **`GRPCRegistry.RegisterServices`**：运行时唯一注册入口；**InternalService** 依赖 `EvaluationModule`、`ScaleModule`、`SurveyModule`、`ActorModule` 等同时满足。
 
-**InternalService** 中 **同步统计、校验、计划调度** 与 **REST**（及 Crontab）指向同一套应用服务；proto 注释通常标明 **推荐运维入口为 REST**。详见 [internalapi/internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)。
+系统调度与统计同步现已统一走 **internal REST**；`InternalService` 不再承载这组运维动作。详见 [internalapi/internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)。
 
 ## gRPC 的安全和元数据该怎么理解
 
@@ -128,7 +128,7 @@ flowchart LR
 
 - **collection / worker 均无 gRPC Server**，仅有客户端与连接配置。  
 - **gRPC health / reflection** 是否开启由 `grpc` 配置决定；与 IAM **skip** 列表的关系见 03-IAM。  
-- **「备用 gRPC 同步接口」** 与 **Crontab 调 REST** 并存时，避免运维侧混用导致重复触发（需结合 `statistics_sync` 进程内 ticker，见 [04-调度与后台任务](./04-调度与后台任务.md)）。
+- **系统动作** 已统一收口到 **internal REST**；不要再假设 `InternalService` 会提供统计同步、校验或计划调度能力。
 
 ---
 

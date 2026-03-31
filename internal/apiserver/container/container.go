@@ -36,6 +36,7 @@ type Container struct {
 	mongoDB      *mongo.Database
 	redisCache   redis.UniversalClient
 	cacheOptions ContainerCacheOptions
+	planEntryURL string
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -86,6 +87,8 @@ type ContainerOptions struct {
 	Env string
 	// Cache 缓存控制选项
 	Cache ContainerCacheOptions
+	// PlanEntryBaseURL 测评计划任务入口基础地址
+	PlanEntryBaseURL string
 }
 
 // ContainerCacheOptions 缓存控制配置
@@ -123,6 +126,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	}
 
 	c.cacheOptions = opts.Cache
+	c.planEntryURL = opts.PlanEntryBaseURL
 
 	// 应用缓存 TTL 覆盖（仅在启动时设置一次，全局生效）
 	scaleCache.ApplyTTLOptions(scaleCache.TTLOptions{
@@ -197,6 +201,18 @@ func (c *Container) Initialize() error {
 	// 初始化 Statistics 模块
 	if err := c.initStatisticsModule(); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
+	}
+
+	if c.ActorModule != nil && c.ActorModule.TesteeAccessService != nil {
+		if c.EvaluationModule != nil {
+			c.EvaluationModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
+		}
+		if c.PlanModule != nil {
+			c.PlanModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
+		}
+		if c.StatisticsModule != nil {
+			c.StatisticsModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
+		}
 	}
 
 	// 初始化 CodesService
@@ -375,7 +391,7 @@ func (c *Container) initPlanModule() error {
 	if c.ScaleModule != nil {
 		scaleRepo = c.ScaleModule.Repo
 	}
-	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher, scaleRepo, c.redisCache); err != nil {
+	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher, scaleRepo, c.redisCache, c.planEntryURL); err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
 	}
 
@@ -585,11 +601,11 @@ func (c *Container) GetContainerInfo() map[string]interface{} {
 		"initialized":  c.initialized,
 		"modules":      modules,
 		"infrastructure": map[string]bool{
-		"mysql":   c.mysqlDB != nil,
-		"mongodb": c.mongoDB != nil,
-		"redis":   c.redisCache != nil,
-	},
-}
+			"mysql":   c.mysqlDB != nil,
+			"mongodb": c.mongoDB != nil,
+			"redis":   c.redisCache != nil,
+		},
+	}
 }
 
 // IsInitialized 检查容器是否已初始化

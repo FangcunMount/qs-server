@@ -1,11 +1,14 @@
 package assembler
 
 import (
+	"strings"
+
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -35,7 +38,8 @@ type PlanModule struct {
 	QueryService          planApp.PlanQueryService
 
 	// 事件发布器（由容器统一注入）
-	eventPublisher event.EventPublisher
+	eventPublisher      event.EventPublisher
+	testeeAccessService actorAccessApp.TesteeAccessService
 }
 
 // NewPlanModule 创建 Plan 模块
@@ -71,7 +75,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 	// 初始化 repository 层
 	// 初始化基础 Repository
 	basePlanRepo := planInfra.NewPlanRepository(mysqlDB)
-	
+
 	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
 	var redisClient redis.UniversalClient
 	if len(params) > 3 {
@@ -79,19 +83,25 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
-	
+
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		m.PlanRepo = planCache.NewCachedPlanRepository(basePlanRepo, redisClient)
 	} else {
 		m.PlanRepo = basePlanRepo
 	}
-	
+
 	m.TaskRepo = planInfra.NewTaskRepository(mysqlDB)
 
+	entryBaseURL := "https://collect.fangcunmount.cn/entry"
+	if len(params) > 4 {
+		if baseURL, ok := params[4].(string); ok && strings.TrimSpace(baseURL) != "" {
+			entryBaseURL = strings.TrimSpace(baseURL)
+		}
+	}
+
 	// 初始化基础设施层（入口生成器）
-	// TODO: 从配置中读取 baseURL，默认使用占位符
-	entryGenerator := planEntryInfra.NewEntryGenerator("https://collect.fangcunmount.cn/entry")
+	entryGenerator := planEntryInfra.NewEntryGenerator(entryBaseURL)
 
 	// 获取 scale repository（可选参数，用于通过 code 查找 scale）
 	var scaleRepo scale.Repository
@@ -100,7 +110,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 			scaleRepo = sr
 		}
 	}
-	
+
 	// Redis 客户端已在上面处理（params[3]）
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
@@ -118,8 +128,19 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 		m.TaskManagementService,
 		m.QueryService,
 	)
+	if m.testeeAccessService != nil {
+		m.Handler.SetTesteeAccessService(m.testeeAccessService)
+	}
 
 	return nil
+}
+
+// SetTesteeAccessService 设置 testee 访问控制服务。
+func (m *PlanModule) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+	m.testeeAccessService = testeeAccessService
+	if m.Handler != nil {
+		m.Handler.SetTesteeAccessService(testeeAccessService)
+	}
 }
 
 // Cleanup 清理模块资源

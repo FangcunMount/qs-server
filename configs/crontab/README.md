@@ -76,7 +76,7 @@ sudo logrotate -d /etc/logrotate.d/qs-scheduler  # 测试配置
 # 5. 测试
 sudo /usr/local/bin/qs-refresh-token.sh
 sudo cat /etc/qs-server/internal-token
-sudo /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/daily
+sudo /usr/local/bin/qs-api-call.sh /internal/v1/statistics/sync/daily
 ```
 
 ## 工作原理
@@ -156,8 +156,8 @@ TOKEN_FILE="/etc/qs-server/internal-token"
 qs-api-call.sh <endpoint> [log_file]
 
 # 示例
-qs-api-call.sh /api/v1/statistics/sync/daily
-qs-api-call.sh /api/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
+qs-api-call.sh /internal/v1/statistics/sync/daily
+qs-api-call.sh /internal/v1/statistics/sync/daily /data/logs/crontab/sync-daily.log
 ```
 
 **环境变量**：
@@ -217,14 +217,14 @@ grep -c "$(date +%Y-%m-%d)" /data/logs/crontab/sync-daily.log
 
 ```bash
 # 使用脚本（推荐）
-sudo /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/daily
+sudo /usr/local/bin/qs-api-call.sh /internal/v1/statistics/sync/daily
 
 # 直接使用 curl（需要先获取 Token）
 TOKEN=$(cat /etc/qs-server/internal-token)
 curl -X POST \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
-  http://localhost:8080/api/v1/statistics/sync/daily
+  http://localhost:8080/internal/v1/statistics/sync/daily
 ```
 
 ### 验证配置
@@ -431,7 +431,7 @@ sudo logrotate -f /etc/logrotate.d/qs-scheduler
 
 ```bash
 # 改为每 30 分钟执行一次
-*/30 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/daily ...
+*/30 * * * * root /usr/local/bin/qs-api-call.sh /internal/v1/statistics/sync/daily ...
 ```
 
 ### Q4: 如何查看任务执行历史？
@@ -451,7 +451,7 @@ grep "$(date +%Y-%m-%d)" /data/logs/crontab/sync-daily.log
 **A**: 在 `qs-scheduler` 文件中注释掉对应的行：
 
 ```bash
-# 0 * * * * root /usr/local/bin/qs-api-call.sh /api/v1/statistics/sync/daily ...
+# 0 * * * * root /usr/local/bin/qs-api-call.sh /internal/v1/statistics/sync/daily ...
 ```
 
 ## GitHub Actions 自动部署

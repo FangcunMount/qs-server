@@ -3,9 +3,11 @@ package handler
 import (
 	"bytes"
 	"io"
+	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -23,6 +25,7 @@ type PlanHandler struct {
 	taskSchedulerService  planApp.TaskSchedulerService
 	taskManagementService planApp.TaskManagementService
 	queryService          planApp.PlanQueryService
+	testeeAccessService   actorAccessApp.TesteeAccessService
 }
 
 // NewPlanHandler 创建计划处理器
@@ -42,11 +45,16 @@ func NewPlanHandler(
 	}
 }
 
+// SetTesteeAccessService 设置 testee 访问控制服务。
+func (h *PlanHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+	h.testeeAccessService = testeeAccessService
+}
+
 // ============= Plan Lifecycle API (生命周期管理) =============
 
 // CreatePlan 创建计划
 // @Summary 创建测评计划模板
-// @Description 创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。不同周期类型需要不同的参数：
+// @Description 创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。仅 qs:evaluation_plan_manager 或 qs:admin 可访问。不同周期类型需要不同的参数：
 // @Description - by_week/by_day: 需要 interval（间隔）和 total_times（总次数）
 // @Description - fixed_date: 需要 fixed_dates（固定日期列表）
 // @Description - custom: 需要 relative_weeks（相对周次列表）
@@ -120,14 +128,14 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		"action", "create_plan",
 	)
 
-	// 获取组织ID（从 JWT 中提取，如果为空则使用默认值）
-	orgIDUint64 := h.GetOrgIDWithDefault(c)
-	orgID := int64(orgIDUint64)
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 	logger.L(ctx).Infow("CreatePlan got orgID",
 		"action", "create_plan",
-		"org_id_uint64", orgIDUint64,
 		"org_id_int64", orgID,
-		"is_default", orgIDUint64 == DefaultOrgID,
 	)
 
 	// 根据 schedule_type 验证必需的参数
@@ -232,7 +240,7 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 
 // PausePlan 暂停计划
 // @Summary 暂停计划
-// @Description 暂停计划，取消所有未执行的任务
+// @Description 暂停计划，取消所有未执行的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Plan-Lifecycle
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -246,8 +254,13 @@ func (h *PlanHandler) PausePlan(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	result, err := h.lifecycleService.PausePlan(c.Request.Context(), planID)
+	result, err := h.lifecycleService.PausePlan(c.Request.Context(), orgID, planID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to pause plan",
 			"action", "pause_plan",
@@ -264,7 +277,7 @@ func (h *PlanHandler) PausePlan(c *gin.Context) {
 
 // ResumePlan 恢复计划
 // @Summary 恢复计划
-// @Description 恢复计划，重新生成未完成的任务
+// @Description 恢复计划，重新生成未完成的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Plan-Lifecycle
 // @Accept json
 // @Produce json
@@ -280,6 +293,11 @@ func (h *PlanHandler) ResumePlan(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	var req request.ResumePlanRequest
 	// 可选请求体
@@ -290,7 +308,7 @@ func (h *PlanHandler) ResumePlan(c *gin.Context) {
 		}
 	}
 
-	result, err := h.lifecycleService.ResumePlan(c.Request.Context(), planID, req.TesteeStartDates)
+	result, err := h.lifecycleService.ResumePlan(c.Request.Context(), orgID, planID, req.TesteeStartDates)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to resume plan",
 			"action", "resume_plan",
@@ -307,7 +325,7 @@ func (h *PlanHandler) ResumePlan(c *gin.Context) {
 
 // CancelPlan 取消计划
 // @Summary 取消计划
-// @Description 取消计划，不可恢复
+// @Description 取消计划，不可恢复；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Plan-Lifecycle
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -321,8 +339,13 @@ func (h *PlanHandler) CancelPlan(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	err := h.lifecycleService.CancelPlan(c.Request.Context(), planID)
+	err = h.lifecycleService.CancelPlan(c.Request.Context(), orgID, planID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to cancel plan",
 			"action", "cancel_plan",
@@ -341,7 +364,7 @@ func (h *PlanHandler) CancelPlan(c *gin.Context) {
 
 // EnrollTestee 受试者加入计划
 // @Summary 受试者加入计划
-// @Description 将受试者加入计划，生成所有任务
+// @Description 将受试者加入计划，生成所有任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Plan-Enrollment
 // @Accept json
 // @Produce json
@@ -360,8 +383,18 @@ func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	if _, _, err := h.validateProtectedTesteeID(c, req.TesteeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	dto := planApp.EnrollTesteeDTO{
+		OrgID:     orgID,
 		PlanID:    req.PlanID,
 		TesteeID:  req.TesteeID,
 		StartDate: req.StartDate,
@@ -385,7 +418,7 @@ func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 
 // TerminateEnrollment 终止受试者的计划参与
 // @Summary 终止受试者的计划参与
-// @Description 受试者退出计划，取消所有待处理任务
+// @Description 受试者退出计划，取消所有待处理任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Plan-Enrollment
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -402,8 +435,17 @@ func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID和受试者ID不能为空"))
 		return
 	}
+	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	err := h.enrollmentService.TerminateEnrollment(c.Request.Context(), planID, testeeID)
+	err = h.enrollmentService.TerminateEnrollment(c.Request.Context(), orgID, planID, testeeID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to terminate enrollment",
 			"action", "terminate_enrollment",
@@ -423,22 +465,27 @@ func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 
 // SchedulePendingTasks 调度待推送任务
 // @Summary 调度待推送任务
-// @Description 定时任务调用，扫描待推送任务，生成入口并开放
+// @Description 定时任务调用，扫描待推送任务，生成入口并开放；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Task-Scheduler
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param before query string false "截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间"
 // @Success 200 {object} core.Response{data=response.TaskListResponse}
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/plans/tasks/schedule [post]
+// @Router /internal/v1/plans/tasks/schedule [post]
 func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 	before := c.Query("before")
 	if before == "" {
 		// 默认使用当前时间
 		before = ""
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	tasks, err := h.taskSchedulerService.SchedulePendingTasks(c.Request.Context(), before)
+	tasks, err := h.taskSchedulerService.SchedulePendingTasks(c.Request.Context(), orgID, before)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to schedule pending tasks",
 			"action", "schedule_pending_tasks",
@@ -456,7 +503,7 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 
 // OpenTask 开放任务
 // @Summary 开放任务
-// @Description 手动开放任务，生成入口
+// @Description 手动开放任务，生成入口；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Task-Management
 // @Accept json
 // @Produce json
@@ -470,6 +517,11 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 	taskID := c.Param("id")
 	if taskID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "任务ID不能为空"))
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
 		return
 	}
 
@@ -489,7 +541,7 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 		ExpireAt:   req.ExpireAt,
 	}
 
-	result, err := h.taskManagementService.OpenTask(c.Request.Context(), taskID, dto)
+	result, err := h.taskManagementService.OpenTask(c.Request.Context(), orgID, taskID, dto)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to open task",
 			"action", "open_task",
@@ -506,7 +558,7 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 
 // CompleteTask 完成任务
 // @Summary 完成任务
-// @Description 用户完成测评后，更新任务状态
+// @Description 系统动作：用户完成测评后回写任务状态，仅内部路由暴露
 // @Tags Task-Management
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -514,7 +566,7 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 // @Param assessment_id query string true "测评ID"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/plans/tasks/{id}/complete [post]
+// @Router /internal/v1/plans/tasks/{id}/complete [post]
 func (h *PlanHandler) CompleteTask(c *gin.Context) {
 	taskID := c.Param("id")
 	assessmentID := c.Query("assessment_id")
@@ -523,8 +575,13 @@ func (h *PlanHandler) CompleteTask(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "任务ID和测评ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	result, err := h.taskManagementService.CompleteTask(c.Request.Context(), taskID, assessmentID)
+	result, err := h.taskManagementService.CompleteTask(c.Request.Context(), orgID, taskID, assessmentID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to complete task",
 			"action", "complete_task",
@@ -541,22 +598,27 @@ func (h *PlanHandler) CompleteTask(c *gin.Context) {
 
 // ExpireTask 过期任务
 // @Summary 过期任务
-// @Description 定时任务调用，标记已过期的任务
+// @Description 系统动作：定时任务调用，标记已过期的任务，仅内部路由暴露
 // @Tags Task-Management
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "任务ID"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
 // @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/plans/tasks/{id}/expire [post]
+// @Router /internal/v1/plans/tasks/{id}/expire [post]
 func (h *PlanHandler) ExpireTask(c *gin.Context) {
 	taskID := c.Param("id")
 	if taskID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "任务ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	result, err := h.taskManagementService.ExpireTask(c.Request.Context(), taskID)
+	result, err := h.taskManagementService.ExpireTask(c.Request.Context(), orgID, taskID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to expire task",
 			"action", "expire_task",
@@ -573,7 +635,7 @@ func (h *PlanHandler) ExpireTask(c *gin.Context) {
 
 // CancelTask 取消任务
 // @Summary 取消任务
-// @Description 手动取消任务
+// @Description 手动取消任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Task-Management
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
@@ -587,8 +649,13 @@ func (h *PlanHandler) CancelTask(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "任务ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	err := h.taskManagementService.CancelTask(c.Request.Context(), taskID)
+	err = h.taskManagementService.CancelTask(c.Request.Context(), orgID, taskID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to cancel task",
 			"action", "cancel_task",
@@ -621,8 +688,13 @@ func (h *PlanHandler) GetPlan(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
 		return
 	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
 
-	result, err := h.queryService.GetPlan(c.Request.Context(), planID)
+	result, err := h.queryService.GetPlan(c.Request.Context(), orgID, planID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -655,14 +727,14 @@ func (h *PlanHandler) ListPlans(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-
-	// 如果没有指定 org_id，从 JWT 中获取，如果为空则使用默认值
-	if req.OrgID == 0 {
-		req.OrgID = int64(h.GetOrgIDWithDefault(c))
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
 	}
 
 	dto := planApp.ListPlansDTO{
-		OrgID:     req.OrgID,
+		OrgID:     orgID,
 		ScaleCode: req.ScaleCode,
 		Status:    req.Status,
 		Page:      req.Page,
@@ -694,9 +766,18 @@ func (h *PlanHandler) GetTask(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "任务ID不能为空"))
 		return
 	}
-
-	result, err := h.queryService.GetTask(c.Request.Context(), taskID)
+	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.queryService.GetTask(c.Request.Context(), orgID, taskID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if _, _, err := h.validateProtectedTesteeID(c, result.TesteeID); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -719,6 +800,12 @@ func (h *PlanHandler) GetTask(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks [get]
 func (h *PlanHandler) ListTasks(c *gin.Context) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
 	var req request.ListTasksRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.Error(c, err)
@@ -728,13 +815,35 @@ func (h *PlanHandler) ListTasks(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	if req.TesteeID != "" {
+		if _, _, err := h.validateProtectedTesteeID(c, req.TesteeID); err != nil {
+			h.Error(c, err)
+			return
+		}
+	}
 
 	dto := planApp.ListTasksDTO{
+		OrgID:    orgID,
 		PlanID:   req.PlanID,
 		TesteeID: req.TesteeID,
 		Status:   req.Status,
 		Page:     req.Page,
 		PageSize: req.PageSize,
+	}
+
+	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if !scope.IsAdmin && req.TesteeID == "" {
+		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		dto.AccessibleTesteeIDs = allowedTesteeIDsToStrings(allowedTesteeIDs)
+		dto.RestrictToAccessScope = true
 	}
 
 	result, err := h.queryService.ListTasks(c.Request.Context(), dto)
@@ -763,7 +872,28 @@ func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
 		return
 	}
 
-	tasks, err := h.queryService.ListTasksByPlan(c.Request.Context(), planID)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	var tasks []*planApp.TaskResult
+	if scope.IsAdmin {
+		tasks, err = h.queryService.ListTasksByPlan(c.Request.Context(), orgID, planID)
+	} else {
+		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		tasks, err = h.queryService.ListTasksByPlanInScope(c.Request.Context(), orgID, planID, allowedTesteeIDsToStrings(allowedTesteeIDs))
+	}
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -786,6 +916,10 @@ func (h *PlanHandler) ListTasksByTestee(c *gin.Context) {
 	testeeID := c.Param("id")
 	if testeeID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID不能为空"))
+		return
+	}
+	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+		h.Error(c, err)
 		return
 	}
 
@@ -812,6 +946,10 @@ func (h *PlanHandler) ListPlansByTestee(c *gin.Context) {
 	testeeID := c.Param("id")
 	if testeeID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID不能为空"))
+		return
+	}
+	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+		h.Error(c, err)
 		return
 	}
 
@@ -856,6 +994,10 @@ func (h *PlanHandler) ListTasksByTesteeAndPlan(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "受试者ID和计划ID不能为空"))
 		return
 	}
+	if _, _, err := h.validateProtectedTesteeID(c, testeeID); err != nil {
+		h.Error(c, err)
+		return
+	}
 
 	tasks, err := h.queryService.ListTasksByTesteeAndPlan(c.Request.Context(), testeeID, planID)
 	if err != nil {
@@ -864,4 +1006,39 @@ func (h *PlanHandler) ListTasksByTesteeAndPlan(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewTaskListResponseFromSlice(tasks))
+}
+
+func (h *PlanHandler) validateProtectedTesteeID(c *gin.Context, rawTesteeID string) (int64, int64, error) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		return 0, 0, err
+	}
+	if rawTesteeID == "" {
+		return orgID, operatorUserID, nil
+	}
+
+	testeeID, err := toUint64(rawTesteeID)
+	if err != nil {
+		return 0, 0, errors.WithCode(code.ErrInvalidArgument, "无效的受试者ID: %s", rawTesteeID)
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
+		return 0, 0, err
+	}
+	return orgID, operatorUserID, nil
+}
+
+func allowedTesteeIDsToStrings(ids []uint64) []string {
+	if len(ids) == 0 {
+		return []string{}
+	}
+
+	results := make([]string, 0, len(ids))
+	for _, id := range ids {
+		results = append(results, strconv.FormatUint(id, 10))
+	}
+	return results
+}
+
+func toUint64(raw string) (uint64, error) {
+	return strconv.ParseUint(raw, 10, 64)
 }

@@ -35,7 +35,7 @@ type Service interface {
 
 	// EvaluateBatch 批量评估
 	// 场景：批量处理积压的测评任务
-	EvaluateBatch(ctx context.Context, assessmentIDs []uint64) (*BatchResult, error)
+	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
 }
 
 // BatchResult 批量评估结果

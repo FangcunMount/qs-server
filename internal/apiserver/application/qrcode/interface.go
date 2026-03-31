@@ -24,4 +24,7 @@ type QRCodeService interface {
 	//   3. 保存二维码图片（当前为占位符，后续接入对象存储）
 	//   4. 返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, code string) (string, error)
+
+	// GenerateAssessmentEntryQRCode 生成测评入口小程序码
+	GenerateAssessmentEntryQRCode(ctx context.Context, token string) (string, error)
 }

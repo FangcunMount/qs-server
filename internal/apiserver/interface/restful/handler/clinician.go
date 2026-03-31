@@ -1,0 +1,577 @@
+package handler
+
+import (
+	"strconv"
+
+	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
+	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
+	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/gin-gonic/gin"
+)
+
+// CreateClinician 创建从业者。
+// @Summary 创建从业者
+// @Description 创建机构内从业者档案，仅 qs:admin 可访问；请求体中的 org_id 仅作兼容校验，实际以 JWT org_id 为准
+// @Tags Actor-Clinician
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.CreateClinicianRequest true "创建从业者请求"
+// @Success 200 {object} core.Response{data=response.ClinicianResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians [post]
+func (h *ActorHandler) CreateClinician(c *gin.Context) {
+	var req request.CreateClinicianRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.clinicianLifecycleService.Register(c.Request.Context(), clinicianApp.RegisterClinicianDTO{
+		OrgID:         orgID,
+		OperatorID:    req.OperatorID,
+		Name:          req.Name,
+		Department:    req.Department,
+		Title:         req.Title,
+		ClinicianType: req.ClinicianType,
+		EmployeeCode:  req.EmployeeCode,
+		IsActive:      req.IsActive,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "从业者创建成功", toClinicianResponse(result))
+}
+
+// GetClinician 获取从业者详情。
+// @Summary 获取从业者详情
+// @Description 查询指定从业者详情，仅 qs:admin 可访问
+// @Tags Actor-Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path string true "从业者ID"
+// @Success 200 {object} core.Response{data=response.ClinicianResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians/{id} [get]
+func (h *ActorHandler) GetClinician(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.clinicianQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "clinician does not belong to current organization"))
+		return
+	}
+
+	h.Success(c, toClinicianResponse(result))
+}
+
+// ListClinicians 查询从业者列表。
+// @Summary 查询从业者列表
+// @Description 查询机构内从业者列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验，实际以 JWT org_id 为准
+// @Tags Actor-Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param org_id query int false "兼容字段：机构ID，若传入必须与 JWT org_id 一致"
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(20)
+// @Success 200 {object} core.Response{data=response.ClinicianListResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians [get]
+func (h *ActorHandler) ListClinicians(c *gin.Context) {
+	var req request.ListClinicianRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	if req.Page == 0 {
+		req.Page = 1
+	}
+	if req.PageSize == 0 {
+		req.PageSize = 20
+	}
+
+	result, err := h.clinicianQueryService.ListClinicians(c.Request.Context(), clinicianApp.ListClinicianDTO{
+		OrgID:  orgID,
+		Offset: (req.Page - 1) * req.PageSize,
+		Limit:  req.PageSize,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toClinicianListResponse(result, req.Page, req.PageSize))
+}
+
+// GetMyClinician 获取当前操作者对应的从业者。
+// @Summary 获取我的从业者身份
+// @Description 获取当前后台操作者绑定的从业者档案；当前也兼容旧的 /practitioners 路由别名
+// @Tags Actor-Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response{data=response.ClinicianResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians/me [get]
+func (h *ActorHandler) GetMyClinician(c *gin.Context) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toClinicianResponse(clinicianItem))
+}
+
+// ListMyClinicianTestees 查询当前从业者名下受试者。
+// @Summary 查询我的受试者
+// @Description 查询当前从业者可访问的受试者列表，底层复用与 /api/v1/testees 相同的访问范围收口逻辑
+// @Tags Actor-Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(20)
+// @Success 200 {object} core.Response{data=response.TesteeListResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians/me/testees [get]
+func (h *ActorHandler) ListMyClinicianTestees(c *gin.Context) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	_, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	page, pageSize := paginationFromContext(c)
+	allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), clinicianItem.OrgID, operatorUserID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.testeeQueryService.ListTestees(c.Request.Context(), testeeApp.ListTesteeDTO{
+		OrgID:                 clinicianItem.OrgID,
+		AccessibleTesteeIDs:   allowedTesteeIDs,
+		RestrictToAccessScope: true,
+		Offset:                (page - 1) * pageSize,
+		Limit:                 pageSize,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toTesteeListResponse(result.Items, result.TotalCount, page, pageSize))
+}
+
+// CreateMyAssessmentEntry 创建当前从业者测评入口。
+// @Summary 创建我的测评入口
+// @Description 为当前从业者创建测评入口二维码；当前也兼容旧的 /practitioners 路由别名
+// @Tags Actor-AssessmentEntry
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
+// @Success 200 {object} core.Response{data=response.AssessmentEntryResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians/me/assessment-entries [post]
+func (h *ActorHandler) CreateMyAssessmentEntry(c *gin.Context) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	var req request.CreateAssessmentEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.assessmentEntryService.Create(c.Request.Context(), assessmentEntryApp.CreateAssessmentEntryDTO{
+		OrgID:         clinicianItem.OrgID,
+		ClinicianID:   clinicianItem.ID,
+		TargetType:    req.TargetType,
+		TargetCode:    req.TargetCode,
+		TargetVersion: req.TargetVersion,
+		ExpiresAt:     req.ExpiresAt,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	qrCodeURL := ""
+	if h.qrCodeService != nil {
+		if generated, err := h.qrCodeService.GenerateAssessmentEntryQRCode(c.Request.Context(), result.Token); err == nil {
+			qrCodeURL = generated
+		}
+	}
+
+	resp := toAssessmentEntryResponse(result, qrCodeURL)
+	h.SuccessResponseWithMessage(c, "测评入口创建成功", resp)
+}
+
+// ListMyAssessmentEntries 查询当前从业者测评入口列表。
+// @Summary 查询我的测评入口列表
+// @Description 查询当前从业者创建的测评入口列表；当前也兼容旧的 /practitioners 路由别名
+// @Tags Actor-AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(20)
+// @Success 200 {object} core.Response{data=response.AssessmentEntryListResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians/me/assessment-entries [get]
+func (h *ActorHandler) ListMyAssessmentEntries(c *gin.Context) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	page, pageSize := paginationFromContext(c)
+	result, err := h.assessmentEntryService.ListByClinician(c.Request.Context(), assessmentEntryApp.ListAssessmentEntryDTO{
+		OrgID:       clinicianItem.OrgID,
+		ClinicianID: clinicianItem.ID,
+		Offset:      (page - 1) * pageSize,
+		Limit:       pageSize,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
+}
+
+// ResolveAssessmentEntry 公开解析测评入口。
+// @Summary 公开解析测评入口
+// @Description 公开解析测评入口 token，返回入口配置和所属从业者摘要
+// @Tags Actor-AssessmentEntry
+// @Produce json
+// @Param token path string true "测评入口Token"
+// @Success 200 {object} core.Response{data=response.AssessmentEntryResolvedResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/public/assessment-entries/{token} [get]
+func (h *ActorHandler) ResolveAssessmentEntry(c *gin.Context) {
+	result, err := h.assessmentEntryService.Resolve(c.Request.Context(), c.Param("token"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toAssessmentEntryResolvedResponse(result))
+}
+
+// IntakeAssessmentEntry 公开扫码 intake。
+// @Summary 公开扫码建档
+// @Description 通过测评入口 token 建立受试者并自动绑定从业者关系
+// @Tags Actor-AssessmentEntry
+// @Accept json
+// @Produce json
+// @Param token path string true "测评入口Token"
+// @Param request body request.IntakeByAssessmentEntryRequest true "扫码 intake 请求"
+// @Success 200 {object} core.Response{data=response.AssessmentEntryIntakeResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/public/assessment-entries/{token}/intake [post]
+func (h *ActorHandler) IntakeAssessmentEntry(c *gin.Context) {
+	var req request.IntakeByAssessmentEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.assessmentEntryService.Intake(c.Request.Context(), c.Param("token"), assessmentEntryApp.IntakeByAssessmentEntryDTO{
+		ProfileID: req.ProfileID,
+		Name:      req.Name,
+		Gender:    parseGender(req.Gender),
+		Birthday:  req.Birthday,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "扫码建档成功", toAssessmentEntryIntakeResponse(result))
+}
+
+func (h *ActorHandler) currentClinician(c *gin.Context) (*clinicianApp.ClinicianResult, error) {
+	orgID, userID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		return nil, err
+	}
+
+	operatorItem, err := h.operatorQueryService.GetByUser(c.Request.Context(), orgID, userID)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to get operator for clinician",
+			"action", "current_clinician",
+			"org_id", orgID,
+			"user_id", userID,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+	if !operatorItem.IsActive {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "operator is inactive")
+	}
+
+	clinicianItem, err := h.clinicianQueryService.GetByOperator(c.Request.Context(), orgID, operatorItem.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !clinicianItem.IsActive {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "clinician is inactive")
+	}
+	return clinicianItem, nil
+}
+
+func paginationFromContext(c *gin.Context) (int, int) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return page, pageSize
+}
+
+func parseGender(value string) int8 {
+	switch value {
+	case "male", "男":
+		return 1
+	case "female", "女":
+		return 2
+	default:
+		return 0
+	}
+}
+
+func toClinicianResponse(item *clinicianApp.ClinicianResult) *response.ClinicianResponse {
+	if item == nil {
+		return nil
+	}
+
+	var operatorID *string
+	if item.OperatorID != nil {
+		value := strconv.FormatUint(*item.OperatorID, 10)
+		operatorID = &value
+	}
+
+	return &response.ClinicianResponse{
+		ID:            strconv.FormatUint(item.ID, 10),
+		OrgID:         strconv.FormatInt(item.OrgID, 10),
+		OperatorID:    operatorID,
+		Name:          item.Name,
+		Department:    item.Department,
+		Title:         item.Title,
+		ClinicianType: item.ClinicianType,
+		EmployeeCode:  item.EmployeeCode,
+		IsActive:      item.IsActive,
+	}
+}
+
+func toClinicianListResponse(result *clinicianApp.ClinicianListResult, page, pageSize int) *response.ClinicianListResponse {
+	items := make([]*response.ClinicianResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toClinicianResponse(item))
+	}
+
+	totalPages := 0
+	if pageSize > 0 {
+		totalPages = int((result.TotalCount + int64(pageSize) - 1) / int64(pageSize))
+	}
+
+	return &response.ClinicianListResponse{
+		Items:      items,
+		Total:      result.TotalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}
+}
+
+func toAssessmentEntryResponse(item *assessmentEntryApp.AssessmentEntryResult, qrCodeURL string) *response.AssessmentEntryResponse {
+	if item == nil {
+		return nil
+	}
+
+	return &response.AssessmentEntryResponse{
+		ID:            strconv.FormatUint(item.ID, 10),
+		OrgID:         strconv.FormatInt(item.OrgID, 10),
+		ClinicianID:   strconv.FormatUint(item.ClinicianID, 10),
+		Token:         item.Token,
+		TargetType:    item.TargetType,
+		TargetCode:    item.TargetCode,
+		TargetVersion: item.TargetVersion,
+		IsActive:      item.IsActive,
+		ExpiresAt:     item.ExpiresAt,
+		QRCodeURL:     qrCodeURL,
+	}
+}
+
+func toAssessmentEntryListResponse(result *assessmentEntryApp.AssessmentEntryListResult, page, pageSize int) *response.AssessmentEntryListResponse {
+	items := make([]*response.AssessmentEntryResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toAssessmentEntryResponse(item, ""))
+	}
+
+	totalPages := 0
+	if pageSize > 0 {
+		totalPages = int((result.TotalCount + int64(pageSize) - 1) / int64(pageSize))
+	}
+
+	return &response.AssessmentEntryListResponse{
+		Items:      items,
+		Total:      result.TotalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}
+}
+
+func toClinicianSummaryResponse(item *assessmentEntryApp.ClinicianSummaryResult) *response.ClinicianSummaryResponse {
+	if item == nil {
+		return nil
+	}
+
+	var operatorID *string
+	if item.OperatorID != nil {
+		value := strconv.FormatUint(*item.OperatorID, 10)
+		operatorID = &value
+	}
+
+	return &response.ClinicianSummaryResponse{
+		ID:            strconv.FormatUint(item.ID, 10),
+		OperatorID:    operatorID,
+		Name:          item.Name,
+		Department:    item.Department,
+		Title:         item.Title,
+		ClinicianType: item.ClinicianType,
+	}
+}
+
+func toAssessmentEntryResolvedResponse(item *assessmentEntryApp.ResolvedAssessmentEntryResult) *response.AssessmentEntryResolvedResponse {
+	if item == nil {
+		return nil
+	}
+
+	return &response.AssessmentEntryResolvedResponse{
+		Entry:     toAssessmentEntryResponse(item.Entry, ""),
+		Clinician: toClinicianSummaryResponse(item.Clinician),
+	}
+}
+
+func toRelationResponse(item *assessmentEntryApp.RelationSummaryResult) *response.RelationResponse {
+	if item == nil {
+		return nil
+	}
+
+	var sourceID *string
+	if item.SourceID != nil {
+		value := strconv.FormatUint(*item.SourceID, 10)
+		sourceID = &value
+	}
+
+	return &response.RelationResponse{
+		ID:           strconv.FormatUint(item.ID, 10),
+		OrgID:        strconv.FormatInt(item.OrgID, 10),
+		ClinicianID:  strconv.FormatUint(item.ClinicianID, 10),
+		TesteeID:     strconv.FormatUint(item.TesteeID, 10),
+		RelationType: item.RelationType,
+		SourceType:   item.SourceType,
+		SourceID:     sourceID,
+		IsActive:     item.IsActive,
+		BoundAt:      item.BoundAt,
+	}
+}
+
+func toAssessmentEntryIntakeResponse(item *assessmentEntryApp.AssessmentEntryIntakeResult) *response.AssessmentEntryIntakeResponse {
+	if item == nil {
+		return nil
+	}
+
+	relationResp := toRelationResponse(item.Relation)
+	return &response.AssessmentEntryIntakeResponse{
+		Entry:      toAssessmentEntryResponse(item.Entry, ""),
+		Clinician:  toClinicianSummaryResponse(item.Clinician),
+		Testee:     toTesteeSummaryResponse(item.Testee),
+		Relation:   relationResp,
+		Assignment: relationResp,
+	}
+}
+
+func toTesteeSummaryResponse(item *assessmentEntryApp.TesteeSummaryResult) *response.TesteeResponse {
+	if item == nil {
+		return nil
+	}
+
+	var gender string
+	switch item.Gender {
+	case 1:
+		gender = "male"
+	case 2:
+		gender = "female"
+	default:
+		gender = "unknown"
+	}
+
+	var profileID *string
+	if item.ProfileID != nil {
+		value := strconv.FormatUint(*item.ProfileID, 10)
+		profileID = &value
+	}
+
+	return &response.TesteeResponse{
+		ID:         strconv.FormatUint(item.ID, 10),
+		OrgID:      strconv.FormatInt(item.OrgID, 10),
+		ProfileID:  profileID,
+		IAMChildID: profileID,
+		Name:       item.Name,
+		Gender:     gender,
+		Birthday:   item.Birthday,
+		Tags:       item.Tags,
+		Source:     item.Source,
+		IsKeyFocus: item.IsKeyFocus,
+	}
+}

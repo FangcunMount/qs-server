@@ -296,6 +296,410 @@
                 }
             }
         },
+        "/api/v1/clinicians": {
+            "get": {
+                "description": "查询机构内从业者列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验，实际以 JWT org_id 为准",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-Clinician"
+                ],
+                "summary": "查询从业者列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "兼容字段：机构ID，若传入必须与 JWT org_id 一致",
+                        "name": "org_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ClinicianListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "创建机构内从业者档案，仅 qs:admin 可访问；请求体中的 org_id 仅作兼容校验，实际以 JWT org_id 为准",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-Clinician"
+                ],
+                "summary": "创建从业者",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "创建从业者请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.CreateClinicianRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ClinicianResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/me": {
+            "get": {
+                "description": "获取当前后台操作者绑定的从业者档案；当前也兼容旧的 /practitioners 路由别名",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-Clinician"
+                ],
+                "summary": "获取我的从业者身份",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ClinicianResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/me/assessment-entries": {
+            "get": {
+                "description": "查询当前从业者创建的测评入口列表；当前也兼容旧的 /practitioners 路由别名",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-AssessmentEntry"
+                ],
+                "summary": "查询我的测评入口列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentEntryListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "为当前从业者创建测评入口二维码；当前也兼容旧的 /practitioners 路由别名",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-AssessmentEntry"
+                ],
+                "summary": "创建我的测评入口",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "创建测评入口请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.CreateAssessmentEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentEntryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/me/testees": {
+            "get": {
+                "description": "查询当前从业者可访问的受试者列表，底层复用与 /api/v1/testees 相同的访问范围收口逻辑",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-Clinician"
+                ],
+                "summary": "查询我的受试者",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/clinicians/{id}": {
+            "get": {
+                "description": "查询指定从业者详情，仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-Clinician"
+                ],
+                "summary": "获取从业者详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "从业者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ClinicianResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/codes/apply": {
             "post": {
                 "consumes": [
@@ -556,7 +960,7 @@
         },
         "/api/v1/evaluations/assessments/{id}/retry": {
             "post": {
-                "description": "重试指定测评的评估流程",
+                "description": "重试指定测评的评估流程；仅 qs:evaluator 或 qs:admin 可访问",
                 "produces": [
                     "application/json"
                 ],
@@ -565,6 +969,13 @@
                 ],
                 "summary": "重试失败的测评",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "测评ID",
@@ -650,7 +1061,7 @@
         },
         "/api/v1/evaluations/batch-evaluate": {
             "post": {
-                "description": "批量执行测评评估（管理员/Worker使用）",
+                "description": "批量执行测评评估；仅 qs:evaluator 或 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -662,6 +1073,13 @@
                 ],
                 "summary": "批量评估",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "description": "批量评估请求",
                         "name": "request",
@@ -901,7 +1319,7 @@
                 }
             },
             "post": {
-                "description": "创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。不同周期类型需要不同的参数：\n- by_week/by_day: 需要 interval（间隔）和 total_times（总次数）\n- fixed_date: 需要 fixed_dates（固定日期列表）\n- custom: 需要 relative_weeks（相对周次列表）",
+                "description": "创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。仅 qs:evaluation_plan_manager 或 qs:admin 可访问。不同周期类型需要不同的参数：\n- by_week/by_day: 需要 interval（间隔）和 total_times（总次数）\n- fixed_date: 需要 fixed_dates（固定日期列表）\n- custom: 需要 relative_weeks（相对周次列表）",
                 "consumes": [
                     "application/json"
                 ],
@@ -960,7 +1378,7 @@
         },
         "/api/v1/plans/enroll": {
             "post": {
-                "description": "将受试者加入计划，生成所有任务",
+                "description": "将受试者加入计划，生成所有任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -1096,59 +1514,6 @@
                 }
             }
         },
-        "/api/v1/plans/tasks/schedule": {
-            "post": {
-                "description": "定时任务调用，扫描待推送任务，生成入口并开放",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Task-Scheduler"
-                ],
-                "summary": "调度待推送任务",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间",
-                        "name": "before",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TaskListResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/plans/tasks/{id}": {
             "get": {
                 "description": "查询指定任务的完整信息",
@@ -1205,7 +1570,7 @@
         },
         "/api/v1/plans/tasks/{id}/cancel": {
             "post": {
-                "description": "手动取消任务",
+                "description": "手动取消任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "produces": [
                     "application/json"
                 ],
@@ -1245,124 +1610,9 @@
                 }
             }
         },
-        "/api/v1/plans/tasks/{id}/complete": {
-            "post": {
-                "description": "用户完成测评后，更新任务状态",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Task-Management"
-                ],
-                "summary": "完成任务",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "任务ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "测评ID",
-                        "name": "assessment_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TaskResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/plans/tasks/{id}/expire": {
-            "post": {
-                "description": "定时任务调用，标记已过期的任务",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Task-Management"
-                ],
-                "summary": "过期任务",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "任务ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.TaskResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/plans/tasks/{id}/open": {
             "post": {
-                "description": "手动开放任务，生成入口",
+                "description": "手动开放任务，生成入口；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -1482,7 +1732,7 @@
         },
         "/api/v1/plans/{id}/cancel": {
             "post": {
-                "description": "取消计划，不可恢复",
+                "description": "取消计划，不可恢复；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "produces": [
                     "application/json"
                 ],
@@ -1524,7 +1774,7 @@
         },
         "/api/v1/plans/{id}/pause": {
             "post": {
-                "description": "暂停计划，取消所有未执行的任务",
+                "description": "暂停计划，取消所有未执行的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "produces": [
                     "application/json"
                 ],
@@ -1578,7 +1828,7 @@
         },
         "/api/v1/plans/{id}/resume": {
             "post": {
-                "description": "恢复计划，重新生成未完成的任务",
+                "description": "恢复计划，重新生成未完成的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -1697,7 +1947,7 @@
         },
         "/api/v1/plans/{id}/testees/{testee_id}/terminate": {
             "post": {
-                "description": "受试者退出计划，取消所有待处理任务",
+                "description": "受试者退出计划，取消所有待处理任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "produces": [
                     "application/json"
                 ],
@@ -1733,6 +1983,112 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/assessment-entries/{token}": {
+            "get": {
+                "description": "公开解析测评入口 token，返回入口配置和所属从业者摘要",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-AssessmentEntry"
+                ],
+                "summary": "公开解析测评入口",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评入口Token",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentEntryResolvedResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/assessment-entries/{token}/intake": {
+            "post": {
+                "description": "通过测评入口 token 建立受试者并自动绑定从业者关系",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-AssessmentEntry"
+                ],
+                "summary": "公开扫码建档",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评入口Token",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "扫码 intake 请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.IntakeByAssessmentEntryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentEntryIntakeResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "429": {
@@ -3606,6 +3962,7 @@
         },
         "/api/v1/staff": {
             "get": {
+                "description": "机构级后台账号列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验",
                 "produces": [
                     "application/json"
                 ],
@@ -3616,10 +3973,9 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "机构ID",
+                        "description": "兼容字段：机构ID，若传入必须与 JWT org_id 一致",
                         "name": "org_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -3799,7 +4155,7 @@
         },
         "/api/v1/statistics/plans/{plan_id}": {
             "get": {
-                "description": "获取指定测评计划的统计数据，包括任务数、完成率等",
+                "description": "获取指定测评计划的统计数据，包括任务数、完成率等；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -3857,7 +4213,7 @@
         },
         "/api/v1/statistics/questionnaires/{code}": {
             "get": {
-                "description": "获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等",
+                "description": "获取指定问卷/量表的统计数据，包括总提交数、完成数、趋势等；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -3912,123 +4268,9 @@
                 }
             }
         },
-        "/api/v1/statistics/sync/accumulated": {
-            "post": {
-                "description": "将Redis中的累计统计数据同步到MySQL（定时任务调用）",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "同步累计统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/sync/daily": {
-            "post": {
-                "description": "将Redis中的每日统计数据同步到MySQL（定时任务调用）",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "同步每日统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/sync/plan": {
-            "post": {
-                "description": "同步计划统计数据到MySQL（定时任务调用）",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "同步计划统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/statistics/system": {
             "get": {
-                "description": "获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等",
+                "description": "获取系统整体统计数据，包括问卷数量、答卷数量、受试者数量等；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -4078,7 +4320,7 @@
         },
         "/api/v1/statistics/testees/{testee_id}": {
             "get": {
-                "description": "获取指定受试者的统计数据，包括测评数、完成数、风险分布等",
+                "description": "获取指定受试者的统计数据，包括测评数、完成数、风险分布等；后台访问范围按 ClinicianTesteeRelation 收口",
                 "consumes": [
                     "application/json"
                 ],
@@ -4134,46 +4376,9 @@
                 }
             }
         },
-        "/api/v1/statistics/validate": {
-            "post": {
-                "description": "校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "校验数据一致性",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/testees": {
             "get": {
+                "description": "以 JWT org_id 为准查询后台可见受试者。qs:admin 可查看机构全量，其他后台用户按 ClinicianTesteeRelation 自动收口；org_id 查询参数仅作兼容校验",
                 "produces": [
                     "application/json"
                 ],
@@ -4184,10 +4389,9 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "机构ID",
+                        "description": "兼容字段：机构ID，若传入必须与 JWT org_id 一致",
                         "name": "org_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -4252,6 +4456,7 @@
         },
         "/api/v1/testees/by-profile-id": {
             "get": {
+                "description": "以 JWT org_id 为准，根据档案ID查询受试者；org_id 查询参数仅作兼容校验，若传入则必须与 JWT org_id 一致",
                 "produces": [
                     "application/json"
                 ],
@@ -4262,10 +4467,9 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "机构ID",
+                        "description": "兼容字段：机构ID，若传入必须与 JWT org_id 一致",
                         "name": "org_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -4400,64 +4604,6 @@
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/testees/{id}/periodic-stats": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Testee"
-                ],
-                "summary": "获取受试者周期统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Testee ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.PeriodicStatsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
                         }
                     },
                     "429": {
@@ -4717,6 +4863,326 @@
                 }
             }
         },
+        "/internal/v1/plans/tasks/schedule": {
+            "post": {
+                "description": "定时任务调用，扫描待推送任务，生成入口并开放；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Task-Scheduler"
+                ],
+                "summary": "调度待推送任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "截止时间（格式：YYYY-MM-DD HH:mm:ss），默认当前时间",
+                        "name": "before",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TaskListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/plans/tasks/{id}/complete": {
+            "post": {
+                "description": "系统动作：用户完成测评后回写任务状态，仅内部路由暴露",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Task-Management"
+                ],
+                "summary": "完成任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "任务ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "assessment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TaskResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/plans/tasks/{id}/expire": {
+            "post": {
+                "description": "系统动作：定时任务调用，标记已过期的任务，仅内部路由暴露",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Task-Management"
+                ],
+                "summary": "过期任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "任务ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TaskResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/statistics/sync/accumulated": {
+            "post": {
+                "description": "将Redis中的累计统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "同步累计统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/statistics/sync/daily": {
+            "post": {
+                "description": "将Redis中的每日统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "同步每日统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/statistics/sync/plan": {
+            "post": {
+                "description": "同步计划统计数据到MySQL（定时任务调用）；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "同步计划统计",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/statistics/validate": {
+            "post": {
+                "description": "校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "校验数据一致性",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ping": {
             "get": {
                 "description": "测试 API Server 连通性",
@@ -4916,6 +5382,60 @@
                 }
             }
         },
+        "request.CreateAssessmentEntryRequest": {
+            "type": "object",
+            "required": [
+                "target_code",
+                "target_type"
+            ],
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "target_code": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                },
+                "target_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.CreateClinicianRequest": {
+            "type": "object",
+            "required": [
+                "clinician_type",
+                "name"
+            ],
+            "properties": {
+                "clinician_type": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "employee_code": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "integer"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "request.CreatePlanRequest": {
             "type": "object",
             "properties": {
@@ -5014,7 +5534,6 @@
             "type": "object",
             "required": [
                 "name",
-                "org_id",
                 "roles"
             ],
             "properties": {
@@ -5031,7 +5550,7 @@
                     "type": "string"
                 },
                 "org_id": {
-                    "description": "机构ID",
+                    "description": "兼容字段：机构ID",
                     "type": "integer"
                 },
                 "phone": {
@@ -5121,6 +5640,26 @@
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "request.IntakeByAssessmentEntryRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "birthday": {
+                    "type": "string"
+                },
+                "gender": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "profile_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -5425,6 +5964,95 @@
                 }
             }
         },
+        "response.AssessmentEntryIntakeResponse": {
+            "type": "object",
+            "properties": {
+                "assignment": {
+                    "$ref": "#/definitions/response.RelationResponse"
+                },
+                "clinician": {
+                    "$ref": "#/definitions/response.ClinicianSummaryResponse"
+                },
+                "entry": {
+                    "$ref": "#/definitions/response.AssessmentEntryResponse"
+                },
+                "relation": {
+                    "$ref": "#/definitions/response.RelationResponse"
+                },
+                "testee": {
+                    "$ref": "#/definitions/response.TesteeResponse"
+                }
+            }
+        },
+        "response.AssessmentEntryListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.AssessmentEntryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.AssessmentEntryResolvedResponse": {
+            "type": "object",
+            "properties": {
+                "clinician": {
+                    "$ref": "#/definitions/response.ClinicianSummaryResponse"
+                },
+                "entry": {
+                    "$ref": "#/definitions/response.AssessmentEntryResponse"
+                }
+            }
+        },
+        "response.AssessmentEntryResponse": {
+            "type": "object",
+            "properties": {
+                "clinician_id": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "qrcode_url": {
+                    "type": "string"
+                },
+                "target_code": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                },
+                "target_version": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "response.AssessmentListResponse": {
             "type": "object",
             "properties": {
@@ -5575,6 +6203,84 @@
                     "type": "string"
                 },
                 "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ClinicianListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ClinicianResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.ClinicianResponse": {
+            "type": "object",
+            "properties": {
+                "clinician_type": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "employee_code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ClinicianSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "clinician_type": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }
@@ -5804,99 +6510,6 @@
                 }
             }
         },
-        "response.PeriodicProjectResponse": {
-            "type": "object",
-            "properties": {
-                "completed_weeks": {
-                    "description": "已完成周数",
-                    "type": "integer"
-                },
-                "completion_rate": {
-                    "description": "完成率（0-100）",
-                    "type": "number"
-                },
-                "current_week": {
-                    "description": "当前应该完成的周次",
-                    "type": "integer"
-                },
-                "end_date": {
-                    "description": "项目结束日期",
-                    "type": "string"
-                },
-                "project_id": {
-                    "description": "项目ID",
-                    "type": "string"
-                },
-                "project_name": {
-                    "description": "项目名称",
-                    "type": "string"
-                },
-                "scale_name": {
-                    "description": "关联的量表名称",
-                    "type": "string"
-                },
-                "start_date": {
-                    "description": "项目开始日期",
-                    "type": "string"
-                },
-                "tasks": {
-                    "description": "各周任务状态（按周次升序排列）",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.PeriodicTaskResponse"
-                    }
-                },
-                "total_weeks": {
-                    "description": "总周数",
-                    "type": "integer"
-                }
-            }
-        },
-        "response.PeriodicStatsResponse": {
-            "type": "object",
-            "properties": {
-                "active_projects": {
-                    "description": "进行中的项目数",
-                    "type": "integer"
-                },
-                "projects": {
-                    "description": "周期性项目列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.PeriodicProjectResponse"
-                    }
-                },
-                "total_projects": {
-                    "description": "项目总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "response.PeriodicTaskResponse": {
-            "type": "object",
-            "properties": {
-                "assessment_id": {
-                    "description": "关联的测评ID（如已完成）",
-                    "type": "string"
-                },
-                "completed_at": {
-                    "description": "完成时间",
-                    "type": "string"
-                },
-                "due_date": {
-                    "description": "截止时间",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "状态：completed/pending/overdue",
-                    "type": "string"
-                },
-                "week": {
-                    "description": "第几周（从1开始）",
-                    "type": "integer"
-                }
-            }
-        },
         "response.PlanListResponse": {
             "type": "object",
             "properties": {
@@ -6021,6 +6634,38 @@
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.RelationResponse": {
+            "type": "object",
+            "properties": {
+                "bound_at": {
+                    "type": "string"
+                },
+                "clinician_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "relation_type": {
+                    "type": "string"
+                },
+                "source_id": {
+                    "type": "string"
+                },
+                "source_type": {
+                    "type": "string"
+                },
+                "testee_id": {
                     "type": "string"
                 }
             }

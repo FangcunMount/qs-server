@@ -2,6 +2,7 @@ package assembler
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
@@ -30,6 +31,7 @@ type StatisticsModule struct {
 	ScreeningStatisticsService     statisticsApp.ScreeningStatisticsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	ValidatorService               statisticsApp.StatisticsValidatorService
+	testeeAccessService            actorAccessApp.TesteeAccessService
 }
 
 // NewStatisticsModule 创建统计模块
@@ -98,8 +100,19 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 		m.SyncService,
 		m.ValidatorService,
 	)
+	if m.testeeAccessService != nil {
+		m.Handler.SetTesteeAccessService(m.testeeAccessService)
+	}
 
 	return nil
+}
+
+// SetTesteeAccessService 设置 testee 访问控制服务。
+func (m *StatisticsModule) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+	m.testeeAccessService = testeeAccessService
+	if m.Handler != nil {
+		m.Handler.SetTesteeAccessService(testeeAccessService)
+	}
 }
 
 // Cleanup 清理模块资源

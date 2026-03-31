@@ -41,15 +41,15 @@ type ScreeningStatisticsService interface {
 // StatisticsSyncService 统计同步服务（定时任务）
 type StatisticsSyncService interface {
 	// SyncDailyStatistics 同步每日统计（Redis → MySQL）
-	SyncDailyStatistics(ctx context.Context) error
+	SyncDailyStatistics(ctx context.Context, orgID int64) error
 	// SyncAccumulatedStatistics 同步累计统计（Redis → MySQL）
-	SyncAccumulatedStatistics(ctx context.Context) error
+	SyncAccumulatedStatistics(ctx context.Context, orgID int64) error
 	// SyncPlanStatistics 同步计划统计
-	SyncPlanStatistics(ctx context.Context) error
+	SyncPlanStatistics(ctx context.Context, orgID int64) error
 }
 
 // StatisticsValidatorService 统计校验服务（定时任务）
 type StatisticsValidatorService interface {
 	// ValidateConsistency 校验数据一致性（Redis vs MySQL）
-	ValidateConsistency(ctx context.Context) error
+	ValidateConsistency(ctx context.Context, orgID int64) error
 }

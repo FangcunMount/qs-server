@@ -322,6 +322,48 @@ func (r *assessmentRepository) FindByOrgID(ctx context.Context, orgID int64, sta
 	return r.mapper.ToDomainList(pos), total, nil
 }
 
+// FindByOrgIDAndTesteeIDs 按组织和受试者集合查询测评列表。
+func (r *assessmentRepository) FindByOrgIDAndTesteeIDs(
+	ctx context.Context,
+	orgID int64,
+	testeeIDs []testee.ID,
+	status *assessment.Status,
+	pagination assessment.Pagination,
+) ([]*assessment.Assessment, int64, error) {
+	if len(testeeIDs) == 0 {
+		return []*assessment.Assessment{}, 0, nil
+	}
+
+	var pos []*AssessmentPO
+	var total int64
+	rawIDs := make([]uint64, 0, len(testeeIDs))
+	for _, id := range testeeIDs {
+		rawIDs = append(rawIDs, uint64(id))
+	}
+
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND testee_id IN ? AND deleted_at IS NULL", orgID, rawIDs)
+
+	if status != nil {
+		query = query.Where("status = ?", status.String())
+	}
+
+	if err := query.Model(&AssessmentPO{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Order("id DESC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit()).
+		Find(&pos).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return r.mapper.ToDomainList(pos), total, nil
+}
+
 // ==================== 辅助方法 ====================
 
 // translateAssessmentError 将数据库错误转换为领域错误

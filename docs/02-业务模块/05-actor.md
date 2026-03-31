@@ -1,6 +1,6 @@
 # actor
 
-**本文回答**：`actor` 模块负责回答“业务里的人是谁”，把 `Testee`、`Operator` 以及它们与 IAM 的关系稳定收敛成可引用的业务主体；这篇文档会先让读者一屏内看清模块职责、主入口、关键边界和运行时位置，再展开模型、契约、集成与存储细节。
+**本文回答**：`actor` 模块负责回答“业务里的人是谁”，把 `Testee`、`Operator`、`Clinician` 以及它们与 IAM、测评入口关系稳定收敛成可引用的业务主体；这篇文档会先让读者一屏内看清模块职责、主入口、关键边界和运行时位置，再展开模型、契约、集成与存储细节。
 
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
@@ -10,7 +10,7 @@
 
 ### 概览
 
-`actor` 是 `qs-apiserver` 里的**主体（Actor）模块**，在问卷/测评限界上下文内回答两件事：**谁是被测的人**（`Testee`）、**谁是机构侧操作者**（`Operator`）。它把 **IAM** 的用户/儿童档案与业务侧 **`testeeID` / `operatorID`** 对齐，并承载标签、重点关注、机构内角色等**本 BC 状态**；**不是**统一登录与全局权限中心。
+`actor` 是 `qs-apiserver` 里的**主体（Actor）模块**，现在在问卷/测评限界上下文内回答三件事：**谁是被测的人**（`Testee`）、**谁是机构侧操作者**（`Operator`）、**谁是业务从业者**（`Clinician`）。它把 **IAM** 的用户/儿童档案与业务侧 **`testeeID` / `operatorID` / `clinicianID`** 对齐，并承载标签、重点关注、机构内角色、医生-受试者关系、测评入口等**本 BC 状态**；**不是**统一登录与全局权限中心。
 
 代码主路径：`internal/apiserver/domain/actor`（`testee`、`operator`、引用值对象）、`internal/apiserver/application/actor`；持久化当前主要在 **MySQL**（见「核心存储」）。受试者读路径可经 **Redis** 装饰仓储（见 [assembler/actor.go](../../internal/apiserver/container/assembler/actor.go)）。与 IAM 的交互经 [infra/iam](../../internal/apiserver/infra/iam)（`GuardianshipService`、`IdentityService` 等）。
 
@@ -20,10 +20,12 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 模块职责 | 统一管理业务里的 `Testee` / `Operator` 主体，承载本域档案、标签、重点关注和机构内角色 |
+| 模块职责 | 统一管理业务里的 `Testee` / `Operator` / `Clinician` 主体，以及从业者-受试者关系与测评入口 |
 | 主入口 | 后台主要走 REST；C 端主要走 `ActorService` gRPC；worker 可通过 internal gRPC `TagTestee` 回写标签 |
-| 核心对象 | `Testee`、`Operator`、`TesteeRef`、`OperatorRef`、`FillerRef` |
+| 核心对象 | `Testee`、`Operator`、`Clinician`、`ClinicianTesteeRelation`、`AssessmentEntry`、`TesteeRef`、`OperatorRef`、`ClinicianRef`、`FillerRef` |
 | 与 IAM 的关系 | IAM 提供身份与档案源，`actor` 负责在业务域里完成绑定、投影与补充状态，不把 IAM 当聚合本身 |
+| 后台可见性 | 受保护接口以 JWT `org_id` 为准；`qs:admin` 可看机构全量，其他后台用户按 `ClinicianTesteeRelation` 收口 |
+| 后台动作权限 | `actor` 只提供统一角色守卫；计划写操作收口到 `qs:evaluation_plan_manager` / `qs:admin`，评估后台动作收口到 `qs:evaluator` / `qs:admin`，统计同步与校验收口到 `qs:admin` |
 | 关键边界 | 不负责登录、JWT、系统级授权，也不负责问卷、测评、计划等业务主流程 |
 | 存储分层 | 主存储在 MySQL；受试者读路径可经 Redis 装饰仓储加速 |
 
@@ -31,7 +33,7 @@
 
 | | 内容 |
 | -- | ---- |
-| **负责（摘要）** | 受试者/操作者档案与查询；与 IAM 的绑定与校验；`testeeID`/`operatorID` 及 `TesteeRef`/`OperatorRef`；后台 REST + C 端 gRPC（testee）；internal gRPC `TagTestee` |
+| **负责（摘要）** | 受试者/操作者/从业者档案与查询；与 IAM 的绑定与校验；`testeeID`/`operatorID`/`clinicianID` 及主体引用；从业者-受试者关系；测评入口；后台 REST + C 端 gRPC（testee）；internal gRPC `TagTestee` |
 | **不负责（摘要）** | 登录与系统级授权（IAM）；问卷与答卷（[survey](./01-survey.md)）；测评与报告（[evaluation](./03-evaluation.md)）；机构聚合全生命周期；`collection-server` BFF 策略 |
 | **关联专题** | 三界与主体引用 [05-专题/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)；异步链路 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md)；读侧 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
 
@@ -41,17 +43,21 @@
 
 - **受试者 `Testee`**：注册/幂等确保存在、基本信息与档案绑定、标签与重点关注、测评相关统计字段（见 [testee.go](../../internal/apiserver/domain/actor/testee/testee.go)）。
 - **操作者 `Operator`**：机构内注册、与 IAM 用户绑定、角色分配、激活/停用（见 [operator.go](../../internal/apiserver/domain/actor/operator/operator.go)）。
-- **跨模块引用**：`TesteeRef` / `OperatorRef`（[ref.go](../../internal/apiserver/domain/actor/ref.go)）；`FillerRef` 建模「谁填写」与「谁被测」分离（[filler_ref.go](../../internal/apiserver/domain/actor/filler_ref.go)，接入程度见「核心模式」）。
+- **业务从业者 `Clinician`**：医生/咨询师等业务身份，与后台 `Operator` 解耦，可绑定 `operator_id`（见 `domain/actor/clinician`）。
+- **业务关系 `ClinicianTesteeRelation`**：回答“这个受试者归谁看、来源是什么”，是医生“只能看自己的用户”的过滤基础（见 `domain/actor/relation`）。
+- **测评入口 `AssessmentEntry`**：承载二维码 token、归属从业者、目标问卷/量表、过期控制（见 `domain/actor/assessmententry`）。
+- **访问守卫 `TesteeAccessService`**：统一解析 `JWT org_id` + `operator user_id`，并把后台 testee / assessment / report / task / statistics 的访问范围收口到 `qs:admin` 或 `ClinicianTesteeRelation`。
+- **跨模块引用**：`TesteeRef` / `OperatorRef` / `ClinicianRef`（[ref.go](../../internal/apiserver/domain/actor/ref.go)）；`FillerRef` 建模「谁填写」与「谁被测」分离（[filler_ref.go](../../internal/apiserver/domain/actor/filler_ref.go)，接入程度见「核心模式」）。
 - **对外协议**：后台 [REST](#核心契约restgrpcinternal-grpc-与领域事件)；C 端 [ActorService gRPC](#核心契约restgrpcinternal-grpc-与领域事件)；worker 等经 **internal** `TagTestee` 打标。
 
 #### 不负责什么（细项）
 
-- **JWT / 会话**：由中间件与 Handler 上下文提供 `user_id` / `org_id` 等，**不**作为 `actor` 聚合内持久化状态（见「核心模式」）。
+- **JWT / 会话**：由中间件与 Handler 上下文提供 `user_id` / `org_id` 等，**不**作为 `actor` 聚合内持久化状态；后台受保护接口统一信任 JWT `org_id`，旧 `org_id` query/body 仅作兼容校验（见「核心模式」）。
 - **领域事件总线**：当前 **无** 与 `survey`/`plan` 同级的稳定 `actor.*` MQ 事件落地（代码中多为注释占位，见「核心契约」）。
 
 ### 契约入口
 
-- **REST**：`/api/v1/testees`、`/api/v1/staff` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [actor.go](../../internal/apiserver/interface/restful/handler/actor.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
+- **REST**：`/api/v1/testees`、`/api/v1/staff`、`/api/v1/clinicians`、`/api/v1/public/assessment-entries/:token` 等以代码为准；当前保留 `/api/v1/practitioners` 作为兼容别名。Handler [actor.go](../../internal/apiserver/interface/restful/handler/actor.go)、[clinician.go](../../internal/apiserver/interface/restful/handler/clinician.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
 - **C 端 / BFF gRPC**：`CreateTestee`、`GetTestee`、`ListTesteesByOrg` 等见 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)、[actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)。
 - **internal gRPC**：`TagTestee` 见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
 - **领域事件**：**N/A（当前无纳入 `configs/events.yaml` 的 actor 领域事件）**；与代码注释占位对照见「核心契约」。
@@ -103,7 +109,7 @@ flowchart LR
 
 ### 模型 ER 图
 
-描述 `actor` 子域内实体与 **租户边界**、**IAM 外部系统** 的关系（**非**与 MySQL 表字段 1:1）。本模块**不**实现 `Organization` 聚合；`org_id` 仅作多租户外键。`Testee` 与 `Operator` **无**彼此直接外键，只可能 **同属** `org_id`。
+描述 `actor` 子域内实体与 **租户边界**、**IAM 外部系统** 的关系（**非**与 MySQL 表字段 1:1）。本模块**不**实现 `Organization` 聚合；`org_id` 仅作多租户外键。`Clinician` 与 `Operator` 可通过 `operator_id` 绑定；`ClinicianTesteeRelation` 与 `AssessmentEntry` 负责承载业务归属关系。
 
 ```mermaid
 erDiagram
@@ -188,8 +194,11 @@ flowchart TB
 | 概念 | 职责 | 与相邻概念的关系 |
 | ---- | ---- | ---------------- |
 | `Testee` | 聚合根：机构内受试者，可绑定 IAM `profileID`（儿童档案） | 被 `plan`、`AnswerSheet` 等引用 `testeeID` |
-| `Operator` | 聚合根：机构内操作者，绑定 IAM `userID`，含角色与激活状态 | 后台操作与授权查询的主体之一 |
-| `TesteeRef` / `OperatorRef` | 值对象：跨聚合引用 ID（及可选展示字段） | [ref.go](../../internal/apiserver/domain/actor/ref.go) |
+| `Operator` | 聚合根：机构内操作者，绑定 IAM `userID`，含角色与激活状态 | 后台权限与系统管理主体 |
+| `Clinician` | 聚合根：业务从业者，可选绑定 `operator_id` | 医生/咨询师等业务身份，不直接等于后台账号 |
+| `ClinicianTesteeRelation` | 聚合根：从业者与受试者之间的业务关系 | 回答“谁能看谁”，并记录来源 |
+| `AssessmentEntry` | 聚合根：测评入口 | 回答“谁发的码、码指向什么、什么时候失效” |
+| `TesteeRef` / `OperatorRef` / `ClinicianRef` | 值对象：跨聚合引用 ID（及可选展示字段） | [ref.go](../../internal/apiserver/domain/actor/ref.go) |
 | `FillerRef` | 值对象：区分「谁填写」与「谁被测」 | 设计已完成，**全面接入 AnswerSheet 仍待演进**（见文件头注释） |
 
 #### 主要领域服务（按包）
@@ -198,6 +207,9 @@ flowchart TB
 | ---- | ---- | -------- | ---- |
 | testee | `Factory` / `Editor` / `Binder` / `Validator` / `Tagger` | 创建、编辑、档案绑定、校验、打标 | [testee/](../../internal/apiserver/domain/actor/testee/) |
 | operator | `Factory` / `Editor` / `Binder` / `Validator` / `RoleAllocator` / `Lifecycler` | 注册、绑定用户、角色、生命周期 | [operator/](../../internal/apiserver/domain/actor/operator/) |
+| clinician | `Validator` | 校验从业者业务身份 | `domain/actor/clinician/` |
+| relation | 聚合 + 仓储 | 持久化从业者-受试者关系 | `domain/actor/relation/` |
+| assessmententry | `Validator` | 校验测评入口目标与 token | `domain/actor/assessmententry/` |
 
 ### 应用服务、领域服务与领域模型
 
@@ -211,6 +223,11 @@ flowchart TB
 | `OperatorLifecycleService` | 操作者注册与绑定、同步联系方式 | `application/actor/operator/lifecycle_service.go` |
 | `OperatorAuthorizationService` | 角色分配、激活/停用 | `application/actor/operator/authorization_service.go` |
 | `OperatorQueryService` | 操作者查询 | `application/actor/operator/query_service.go` |
+| `ClinicianLifecycleService` | 从业者注册、绑定后台操作者 | `application/actor/clinician/lifecycle_service.go` |
+| `ClinicianQueryService` | 从业者查询、按 operator 反查业务身份 | `application/actor/clinician/query_service.go` |
+| `ClinicianRelationshipService` | 建立从业者-受试者关系、查询名下受试者 | `application/actor/clinician/relationship_service.go` |
+| `AssessmentEntryService` | 创建测评入口、解析 token、扫码 intake | `application/actor/assessmententry/service.go` |
+| `TesteeAccessService` | 解析后台访问范围：`admin bypass` / `ClinicianTesteeRelation` | `application/actor/access/service.go` |
 
 ```mermaid
 flowchart TB
@@ -400,21 +417,42 @@ BFF 侧编排示例：[collection-server/application/testee/service.go](../../in
 
 JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/middleware/iam_middleware.go)、[handler/base](../../internal/apiserver/interface/restful/handler/base.go) 等解析；领域对象不持久化「当前会话」。
 
-#### 5. Testee 创建入口统一，接入场景不同
+#### 5. 后台 testee 可见性统一走访问守卫
+
+`TesteeAccessService` 是第三阶段后新增的统一访问守卫：先从 JWT 解析 `org_id` 与当前 `user_id`，再在 `actor` 域内按 **`Operator -> qs:admin bypass -> Clinician -> ClinicianTesteeRelation`** 解析后台访问范围。规则如下：
+
+- `qs:admin`：拥有机构级全量可见性。
+- 非 admin 且绑定了 `Clinician`：只能访问自己 active relation 命中的 `Testee` 及其派生资源。
+- 非 admin 且未绑定 `Clinician`：访问受保护 testee 相关后台接口返回 `403`。
+- 旧 `org_id` query/body 字段只做兼容校验；与 JWT `org_id` 不一致时返回 `400`。
+
+当前这条规则已被收口到 `actor`、`evaluation`、`plan`、`statistics` 的后台 testee 读路径中；`/api/v1/clinicians/me/testees` 也复用了同一条受限查询链。
+
+#### 6. 后台动作权限统一走角色守卫
+
+第四阶段后，后台动作权限通过路由分组与 [capability_middleware.go](../../internal/apiserver/interface/restful/middleware/capability_middleware.go) 统一收口；它不替代全局 IAM 授权，而是把当前 BC 内最关键的动作权限稳定地表达在 REST 入口层：
+
+- `qs:evaluation_plan_manager` / `qs:admin`：创建/暂停/恢复/取消计划，受试者入组/退组，调度待推送任务，手动开放/取消任务。
+- `qs:evaluator` / `qs:admin`：批量评估、重试失败测评。
+- `qs:admin`：系统级统计、问卷统计、计划统计，以及统计同步/一致性校验。
+
+这里的分工是刻意的：**可见性** 仍由 `TesteeAccessService` 按 relation 收口，**动作权限** 则由角色守卫决定，二者不要混成同一条规则。
+
+#### 7. Testee 创建入口统一，接入场景不同
 
 - **前台路径**：`collection-server` → gRPC → `RegistrationService`。
 - **计划路径**：[plan](./04-plan.md) 入组引用已有 `testeeID`，**不**由 plan 代建 Testee（需前置存在）。
 - **筛查等**：以代码与产品为准；勿假设未在仓库落地的模块会自动建 Testee。
 
-#### 6. TesteeRef / OperatorRef / FillerRef
+#### 8. TesteeRef / OperatorRef / FillerRef
 
 引用值对象减轻跨聚合依赖；`FillerRef` 表达「填写人 ≠ 被测人」，**主链路全面接入仍以代码为准**。
 
-#### 7. IAM 集成：绑定 + 补充
+#### 9. IAM 集成：绑定 + 补充
 
 详见上文 **「核心集成：actor 与 IAM（分场景）」**；适配类见 [guardianship.go](../../internal/apiserver/infra/iam/guardianship.go)、[identity.go](../../internal/apiserver/infra/iam/identity.go)。原则：**本地 `testeeID`/`operatorID` 仍为业务主键**，IAM 用于档案存在性、监护关系与用户资料补全。
 
-#### 8. REST 上的「量表分析」类接口
+#### 10. REST 上的「量表分析」类接口
 
 如 `GetScaleAnalysis` 在 Handler 层聚合 **evaluation** 读数据，语义是「以 testee 为维度的查询」，**不是** actor 域原生生成的核心业务对象（见 [actor.go](../../internal/apiserver/interface/restful/handler/actor.go) 与装配注入）。
 

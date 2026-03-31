@@ -16,6 +16,7 @@ type CreatePlanDTO struct {
 
 // EnrollTesteeDTO 受试者加入计划 DTO
 type EnrollTesteeDTO struct {
+	OrgID     int64  // 机构ID
 	PlanID    string // 计划ID
 	TesteeID  string // 受试者ID
 	StartDate string // 开始日期（格式：YYYY-MM-DD）
@@ -39,9 +40,12 @@ type ListPlansDTO struct {
 
 // ListTasksDTO 查询任务列表 DTO
 type ListTasksDTO struct {
-	PlanID   string // 计划ID（可选）
-	TesteeID string // 受试者ID（可选）
-	Status   string // 状态（可选）
-	Page     int    // 页码（从1开始）
-	PageSize int    // 每页数量
+	OrgID                  int64    // 机构ID
+	PlanID                string   // 计划ID（可选）
+	TesteeID              string   // 受试者ID（可选）
+	Status                string   // 状态（可选）
+	AccessibleTesteeIDs   []string // 可访问的受试者范围（可选）
+	RestrictToAccessScope bool     // 是否按可访问范围过滤
+	Page                  int      // 页码（从1开始）
+	PageSize              int      // 每页数量
 }

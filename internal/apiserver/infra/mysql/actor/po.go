@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -71,8 +72,8 @@ type AssessmentStatsPO struct {
 type OperatorPO struct {
 	mysql.AuditFields
 
-	OrgID    int64          `gorm:"column:org_id;not null;index:idx_org_id"`
-	UserID   int64          `gorm:"column:user_id;not null;index:idx_user_id"`
+	OrgID    int64          `gorm:"column:org_id;not null;index:idx_org_id;uniqueIndex:uk_staff_org_user,priority:1"`
+	UserID   int64          `gorm:"column:user_id;not null;index:idx_user_id;uniqueIndex:uk_staff_org_user,priority:2"`
 	Roles    StringSliceCol `gorm:"column:roles;type:json;not null"`
 	Name     string         `gorm:"column:name;size:100;not null"`
 	Email    string         `gorm:"column:email;size:255"`
@@ -83,6 +84,64 @@ type OperatorPO struct {
 // TableName 指定表名
 func (OperatorPO) TableName() string {
 	return "staff"
+}
+
+// ClinicianPO 业务从业者持久化对象。
+type ClinicianPO struct {
+	mysql.AuditFields
+
+	OrgID         int64   `gorm:"column:org_id;not null;index:idx_org_id"`
+	OperatorID    *uint64 `gorm:"column:operator_id;type:bigint unsigned;index:idx_operator_id"`
+	Name          string  `gorm:"column:name;size:100;not null;index:idx_name"`
+	Department    string  `gorm:"column:department;size:100"`
+	Title         string  `gorm:"column:title;size:100"`
+	ClinicianType string  `gorm:"column:clinician_type;size:50;not null;index:idx_clinician_type"`
+	EmployeeCode  *string `gorm:"column:employee_code;size:50"`
+	IsActive      bool    `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
+}
+
+// TableName 指定表名。
+func (ClinicianPO) TableName() string {
+	return "clinician"
+}
+
+// ClinicianRelationPO 从业者与受试者关系持久化对象。
+type ClinicianRelationPO struct {
+	mysql.AuditFields
+
+	OrgID        int64              `gorm:"column:org_id;not null;index:idx_org_id"`
+	ClinicianID  clinicianDomain.ID `gorm:"column:clinician_id;type:bigint unsigned;not null;index:idx_clinician_id"`
+	TesteeID     meta.ID            `gorm:"column:testee_id;type:bigint unsigned;not null;index:idx_testee_id"`
+	RelationType string             `gorm:"column:relation_type;size:50;not null;index:idx_relation_type"`
+	SourceType   string             `gorm:"column:source_type;size:50;not null;index:idx_source_type"`
+	SourceID     *uint64            `gorm:"column:source_id;type:bigint unsigned;index:idx_source_id"`
+	IsActive     bool               `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
+	BoundAt      time.Time          `gorm:"column:bound_at;not null"`
+	UnboundAt    *time.Time         `gorm:"column:unbound_at"`
+}
+
+// TableName 指定表名。
+func (ClinicianRelationPO) TableName() string {
+	return "clinician_relation"
+}
+
+// AssessmentEntryPO 测评入口持久化对象。
+type AssessmentEntryPO struct {
+	mysql.AuditFields
+
+	OrgID         int64              `gorm:"column:org_id;not null;index:idx_org_id"`
+	ClinicianID   clinicianDomain.ID `gorm:"column:clinician_id;type:bigint unsigned;not null;index:idx_clinician_id"`
+	Token         string             `gorm:"column:token;size:32;not null;uniqueIndex:uk_token"`
+	TargetType    string             `gorm:"column:target_type;size:50;not null;index:idx_target_type"`
+	TargetCode    string             `gorm:"column:target_code;size:100;not null"`
+	TargetVersion *string            `gorm:"column:target_version;size:50"`
+	IsActive      bool               `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
+	ExpiresAt     *time.Time         `gorm:"column:expires_at;index:idx_expires_at"`
+}
+
+// TableName 指定表名。
+func (AssessmentEntryPO) TableName() string {
+	return "assessment_entry"
 }
 
 // BeforeCreate GORM hook，在创建前执行
@@ -105,6 +164,39 @@ func (p *OperatorPO) BeforeCreate() error {
 		p.ID = meta.New()
 	}
 	// 设置默认版本号
+	if p.Version == 0 {
+		p.Version = mysql.InitialVersion
+	}
+	return nil
+}
+
+// BeforeCreate GORM hook，在创建前执行。
+func (p *ClinicianPO) BeforeCreate() error {
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	if p.Version == 0 {
+		p.Version = mysql.InitialVersion
+	}
+	return nil
+}
+
+// BeforeCreate GORM hook，在创建前执行。
+func (p *ClinicianRelationPO) BeforeCreate() error {
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	if p.Version == 0 {
+		p.Version = mysql.InitialVersion
+	}
+	return nil
+}
+
+// BeforeCreate GORM hook，在创建前执行。
+func (p *AssessmentEntryPO) BeforeCreate() error {
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
 	if p.Version == 0 {
 		p.Version = mysql.InitialVersion
 	}

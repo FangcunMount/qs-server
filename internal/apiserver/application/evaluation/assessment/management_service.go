@@ -93,8 +93,31 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 	// 构建分页参数
 	pagination := assessment.NewPagination(dto.Page, dto.PageSize)
 
-	// 如果有 testee_id 条件，使用 FindByTesteeID 查询
-	if testeeIDStr, ok := dto.Conditions["testee_id"]; ok && testeeIDStr != "" {
+	if dto.RestrictToAccessScope {
+		testeeIDs := make([]testee.ID, 0, len(dto.AccessibleTesteeIDs))
+		for _, id := range dto.AccessibleTesteeIDs {
+			testeeIDs = append(testeeIDs, testee.NewID(id))
+		}
+
+		var statusFilter *assessment.Status
+		if statusStr, ok := dto.Conditions["status"]; ok && statusStr != "" {
+			status := assessment.Status(statusStr)
+			if status.IsValid() {
+				statusFilter = &status
+			}
+		}
+
+		assessments, total, err = s.repo.FindByOrgIDAndTesteeIDs(ctx, int64(dto.OrgID), testeeIDs, statusFilter, pagination)
+		if err != nil {
+			l.Errorw("按访问范围查询测评列表失败",
+				"org_id", dto.OrgID,
+				"accessible_testees", len(dto.AccessibleTesteeIDs),
+				"error", err.Error(),
+			)
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
+		}
+	} else if testeeIDStr, ok := dto.Conditions["testee_id"]; ok && testeeIDStr != "" {
+		// 如果有 testee_id 条件，使用 FindByTesteeID 查询
 		testeeIDUint, parseErr := strconv.ParseUint(testeeIDStr, 10, 64)
 		if parseErr != nil {
 			l.Errorw("解析受试者ID失败",
@@ -210,26 +233,20 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 }
 
 // Retry 重试失败的测评
-func (s *managementService) Retry(ctx context.Context, assessmentID uint64) (*AssessmentResult, error) {
+func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
 	l.Infow("开始重试失败的测评",
 		"action", "retry_assessment",
 		"resource", "assessment",
+		"org_id", orgID,
 		"assessment_id", assessmentID,
 	)
 
-	id := meta.FromUint64(assessmentID)
-	a, err := s.repo.FindByID(ctx, id)
+	a, err := s.loadAssessmentInOrg(ctx, orgID, assessmentID, "retry_assessment")
 	if err != nil {
-		l.Errorw("加载测评失败",
-			"assessment_id", assessmentID,
-			"action", "retry_assessment",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, err
 	}
 
 	// 检查是否为失败状态
@@ -299,4 +316,32 @@ func (s *managementService) Retry(ctx context.Context, assessmentID uint64) (*As
 	)
 
 	return toAssessmentResult(a), nil
+}
+
+func (s *managementService) loadAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64, action string) (*assessment.Assessment, error) {
+	l := logger.L(ctx)
+
+	id := meta.FromUint64(assessmentID)
+	a, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		l.Errorw("加载测评失败",
+			"assessment_id", assessmentID,
+			"action", action,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+	}
+
+	if a.OrgID() != orgID {
+		l.Warnw("测评写操作的机构范围校验失败",
+			"assessment_id", assessmentID,
+			"action", action,
+			"request_org_id", orgID,
+			"resource_org_id", a.OrgID(),
+		)
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "测评不属于当前机构")
+	}
+
+	return a, nil
 }

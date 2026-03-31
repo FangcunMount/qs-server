@@ -224,6 +224,7 @@ func (a *Assessment) Submit() error {
 
 	// 发布领域事件
 	a.addEvent(NewAssessmentSubmittedEvent(
+		a.orgID,
 		a.id,
 		a.testeeRef,
 		a.questionnaireRef,
@@ -257,6 +258,7 @@ func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
 
 	// 发布领域事件
 	a.addEvent(NewAssessmentInterpretedEvent(
+		a.orgID,
 		a.id,
 		a.testeeRef,
 		*a.medicalScaleRef,
@@ -286,6 +288,7 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 
 	// 发布领域事件
 	a.addEvent(NewAssessmentFailedEvent(
+		a.orgID,
 		a.id,
 		a.testeeRef,
 		reason,
@@ -311,6 +314,7 @@ func (a *Assessment) RetryFromFailed() error {
 
 	// 发布领域事件（重新触发评估流程）
 	a.addEvent(NewAssessmentSubmittedEvent(
+		a.orgID,
 		a.id,
 		a.testeeRef,
 		a.questionnaireRef,

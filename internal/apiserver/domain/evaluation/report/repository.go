@@ -25,6 +25,9 @@ type ReportRepository interface {
 	// FindByTesteeID 查询受试者的报告列表
 	FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination Pagination) ([]*InterpretReport, int64, error)
 
+	// FindByTesteeIDs 查询受试者集合范围内的报告列表
+	FindByTesteeIDs(ctx context.Context, testeeIDs []testee.ID, pagination Pagination) ([]*InterpretReport, int64, error)
+
 	// Update 更新报告
 	Update(ctx context.Context, report *InterpretReport) error
 

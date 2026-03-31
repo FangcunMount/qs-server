@@ -315,35 +315,20 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 }
 
 // PausePlan 暂停计划
-func (s *lifecycleService) PausePlan(ctx context.Context, planID string) (*PlanResult, error) {
+func (s *lifecycleService) PausePlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
 	logger.L(ctx).Infow("Pausing assessment plan",
 		"action", "pause_plan",
+		"org_id", orgID,
 		"plan_id", planID,
 	)
 
-	// 1. 转换参数
-	id, err := toPlanID(planID)
+	// 1. 查询并校验计划
+	p, err := s.loadPlanInOrg(ctx, orgID, planID, "pause_plan")
 	if err != nil {
-		logger.L(ctx).Errorw("Invalid plan ID",
-			"action", "pause_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+		return nil, err
 	}
 
-	// 2. 查询计划
-	p, err := s.planRepo.FindByID(ctx, id)
-	if err != nil {
-		logger.L(ctx).Errorw("Plan not found",
-			"action", "pause_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
-	}
-
-	// 3. 调用领域服务暂停计划
+	// 2. 调用领域服务暂停计划
 	canceledTasks, err := s.lifecycle.Pause(ctx, p)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to pause plan",
@@ -360,7 +345,7 @@ func (s *lifecycleService) PausePlan(ctx context.Context, planID string) (*PlanR
 		"canceled_tasks_count", len(canceledTasks),
 	)
 
-	// 4. 持久化计划
+	// 3. 持久化计划
 	if err := s.planRepo.Save(ctx, p); err != nil {
 		logger.L(ctx).Errorw("Failed to save paused plan",
 			"action", "pause_plan",
@@ -370,7 +355,7 @@ func (s *lifecycleService) PausePlan(ctx context.Context, planID string) (*PlanR
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
 	}
 
-	// 5. 持久化被取消的任务
+	// 4. 持久化被取消的任务
 	savedTaskCount := 0
 	for _, task := range canceledTasks {
 		if err := s.taskRepo.Save(ctx, task); err != nil {
@@ -399,7 +384,7 @@ func (s *lifecycleService) PausePlan(ctx context.Context, planID string) (*PlanR
 		task.ClearEvents()
 	}
 
-	// 6. 发布计划事件
+	// 5. 发布计划事件
 	events := p.Events()
 	for _, evt := range events {
 		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
@@ -424,22 +409,18 @@ func (s *lifecycleService) PausePlan(ctx context.Context, planID string) (*PlanR
 }
 
 // ResumePlan 恢复计划
-func (s *lifecycleService) ResumePlan(ctx context.Context, planID string, testeeStartDates map[string]string) (*PlanResult, error) {
+func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID string, testeeStartDates map[string]string) (*PlanResult, error) {
 	logger.L(ctx).Infow("Resuming assessment plan",
 		"action", "resume_plan",
+		"org_id", orgID,
 		"plan_id", planID,
 		"testee_count", len(testeeStartDates),
 	)
 
-	// 1. 转换参数
-	id, err := toPlanID(planID)
+	// 1. 查询并校验计划
+	p, err := s.loadPlanInOrg(ctx, orgID, planID, "resume_plan")
 	if err != nil {
-		logger.L(ctx).Errorw("Invalid plan ID",
-			"action", "resume_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+		return nil, err
 	}
 
 	// 转换 testeeStartDates
@@ -456,18 +437,7 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, planID string, testee
 		testeeStartDateMap[testeeID] = date
 	}
 
-	// 2. 查询计划
-	p, err := s.planRepo.FindByID(ctx, id)
-	if err != nil {
-		logger.L(ctx).Errorw("Plan not found",
-			"action", "resume_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
-	}
-
-	// 3. 调用领域服务恢复计划
+	// 2. 调用领域服务恢复计划
 	newTasks, err := s.lifecycle.Resume(ctx, p, testeeStartDateMap)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to resume plan",
@@ -484,7 +454,7 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, planID string, testee
 		"new_tasks_count", len(newTasks),
 	)
 
-	// 4. 持久化计划
+	// 3. 持久化计划
 	if err := s.planRepo.Save(ctx, p); err != nil {
 		logger.L(ctx).Errorw("Failed to save resumed plan",
 			"action", "resume_plan",
@@ -494,7 +464,7 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, planID string, testee
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
 	}
 
-	// 5. 持久化新生成的任务
+	// 4. 持久化新生成的任务
 	if len(newTasks) > 0 {
 		if err := s.taskRepo.SaveBatch(ctx, newTasks); err != nil {
 			logger.L(ctx).Errorw("Failed to save new tasks",
@@ -507,7 +477,7 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, planID string, testee
 		}
 	}
 
-	// 6. 发布计划事件
+	// 5. 发布计划事件
 	events := p.Events()
 	for _, evt := range events {
 		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
@@ -531,35 +501,20 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, planID string, testee
 }
 
 // CancelPlan 取消计划
-func (s *lifecycleService) CancelPlan(ctx context.Context, planID string) error {
+func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID string) error {
 	logger.L(ctx).Infow("Canceling assessment plan",
 		"action", "cancel_plan",
+		"org_id", orgID,
 		"plan_id", planID,
 	)
 
-	// 1. 转换参数
-	id, err := toPlanID(planID)
+	// 1. 查询并校验计划
+	p, err := s.loadPlanInOrg(ctx, orgID, planID, "cancel_plan")
 	if err != nil {
-		logger.L(ctx).Errorw("Invalid plan ID",
-			"action", "cancel_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+		return err
 	}
 
-	// 2. 查询计划
-	p, err := s.planRepo.FindByID(ctx, id)
-	if err != nil {
-		logger.L(ctx).Errorw("Plan not found",
-			"action", "cancel_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
-	}
-
-	// 3. 调用领域服务取消计划
+	// 2. 调用领域服务取消计划
 	if err := s.lifecycle.Cancel(ctx, p); err != nil {
 		logger.L(ctx).Errorw("Failed to cancel plan",
 			"action", "cancel_plan",
@@ -569,7 +524,7 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, planID string) error 
 		return err
 	}
 
-	// 4. 持久化
+	// 3. 持久化
 	if err := s.planRepo.Save(ctx, p); err != nil {
 		logger.L(ctx).Errorw("Failed to save canceled plan",
 			"action", "cancel_plan",
@@ -579,7 +534,7 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, planID string) error 
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
 	}
 
-	// 5. 发布领域事件
+	// 4. 发布领域事件
 	events := p.Events()
 	for _, evt := range events {
 		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
@@ -599,4 +554,38 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, planID string) error 
 	)
 
 	return nil
+}
+
+func (s *lifecycleService) loadPlanInOrg(ctx context.Context, orgID int64, planID string, action string) (*plan.AssessmentPlan, error) {
+	id, err := toPlanID(planID)
+	if err != nil {
+		logger.L(ctx).Errorw("Invalid plan ID",
+			"action", action,
+			"plan_id", planID,
+			"error", err.Error(),
+		)
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+	}
+
+	p, err := s.planRepo.FindByID(ctx, id)
+	if err != nil {
+		logger.L(ctx).Errorw("Plan not found",
+			"action", action,
+			"plan_id", planID,
+			"error", err.Error(),
+		)
+		return nil, errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
+	}
+
+	if p.GetOrgID() != orgID {
+		logger.L(ctx).Warnw("Plan access denied due to org scope mismatch",
+			"action", action,
+			"plan_id", planID,
+			"request_org_id", orgID,
+			"resource_org_id", p.GetOrgID(),
+		)
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
+	}
+
+	return p, nil
 }

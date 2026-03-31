@@ -29,17 +29,21 @@ type ListMyAssessmentsDTO struct {
 
 // ListAssessmentsDTO 查询测评列表 DTO
 type ListAssessmentsDTO struct {
-	OrgID      uint64            // 组织ID
-	Page       int               // 页码
-	PageSize   int               // 每页数量
-	Conditions map[string]string // 查询条件
+	OrgID                 uint64            // 组织ID
+	Page                  int               // 页码
+	PageSize              int               // 每页数量
+	Conditions            map[string]string // 查询条件
+	AccessibleTesteeIDs   []uint64          // 可访问的受试者范围（可选）
+	RestrictToAccessScope bool              // 是否按可访问范围过滤
 }
 
 // ListReportsDTO 查询报告列表 DTO
 type ListReportsDTO struct {
-	TesteeID uint64 // 受试者ID
-	Page     int    // 页码
-	PageSize int    // 每页数量
+	TesteeID              uint64   // 受试者ID
+	Page                  int      // 页码
+	PageSize              int      // 每页数量
+	AccessibleTesteeIDs   []uint64 // 可访问的受试者范围（可选）
+	RestrictToAccessScope bool     // 是否按可访问范围过滤
 }
 
 // GetFactorTrendDTO 获取因子趋势 DTO
@@ -98,13 +102,13 @@ type ReportResult struct {
 
 // DimensionResult 维度解读结果
 type DimensionResult struct {
-	FactorCode  string  // 因子编码
-	FactorName  string  // 因子名称
-	RawScore    float64 // 原始分
+	FactorCode  string   // 因子编码
+	FactorName  string   // 因子名称
+	RawScore    float64  // 原始分
 	MaxScore    *float64 // 最大分
-	RiskLevel   string  // 风险等级
-	Description string  // 解读描述
-	Suggestion  string  // 维度建议
+	RiskLevel   string   // 风险等级
+	Description string   // 解读描述
+	Suggestion  string   // 维度建议
 }
 
 // SuggestionDTO 结构化建议

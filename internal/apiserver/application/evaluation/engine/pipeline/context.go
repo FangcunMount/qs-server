@@ -24,7 +24,7 @@ type Context struct {
 	Conclusion       string                         // 总结论
 	Suggestion       string                         // 总建议
 	EvaluationResult *assessment.EvaluationResult   // 完整评估结果
-	Report           *domainReport.InterpretReport // 生成的报告（由 InterpretationHandler 填充）
+	Report           *domainReport.InterpretReport  // 生成的报告（由 InterpretationHandler 填充）
 
 	// 错误信息
 	Error error

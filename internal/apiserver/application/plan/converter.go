@@ -188,7 +188,7 @@ func toPlanScheduleType(s string) plan.PlanScheduleType {
 func toTesteeID(s string) (testee.ID, error) {
 	id, err := meta.ParseID(s)
 	if err != nil {
-		return meta.ID(0), nil
+		return meta.ID(0), err
 	}
 	return testee.ID(id), nil
 }

@@ -122,14 +122,33 @@ func (r *ReportRepository) FindByTesteeID(ctx context.Context, testeeID testee.I
 		"testee_id":  uint64(testeeID),
 		"deleted_at": nil,
 	}
+	return r.findByFilter(ctx, filter, pagination)
+}
 
-	// 统计总数
+// FindByTesteeIDs 查询受试者集合范围内的报告列表。
+func (r *ReportRepository) FindByTesteeIDs(ctx context.Context, testeeIDs []testee.ID, pagination report.Pagination) ([]*report.InterpretReport, int64, error) {
+	if len(testeeIDs) == 0 {
+		return []*report.InterpretReport{}, 0, nil
+	}
+
+	rawIDs := make([]uint64, 0, len(testeeIDs))
+	for _, id := range testeeIDs {
+		rawIDs = append(rawIDs, uint64(id))
+	}
+
+	filter := bson.M{
+		"testee_id":  bson.M{"$in": rawIDs},
+		"deleted_at": nil,
+	}
+	return r.findByFilter(ctx, filter, pagination)
+}
+
+func (r *ReportRepository) findByFilter(ctx context.Context, filter bson.M, pagination report.Pagination) ([]*report.InterpretReport, int64, error) {
 	total, err := r.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, fmt.Errorf("统计报告数量失败: %w", err)
 	}
 
-	// 分页查询
 	findOptions := options.Find()
 	findOptions.SetSkip(int64(pagination.Offset()))
 	findOptions.SetLimit(int64(pagination.Limit()))
@@ -141,7 +160,6 @@ func (r *ReportRepository) FindByTesteeID(ctx context.Context, testeeID testee.I
 	}
 	defer cursor.Close(ctx)
 
-	// 解析结果
 	var pos []*InterpretReportPO
 	for cursor.Next(ctx) {
 		var po InterpretReportPO
