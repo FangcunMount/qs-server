@@ -631,7 +631,12 @@ jobs:
               exit 1
             fi
 
-            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH"
+            # 必须同时修正所在目录：仅 chown 文件时，若 private 仍为 700 且属主为其他用户，容器内无法遍历目录 → stat key 报 permission denied
+            TLS_CERT_DIR="$(dirname "$CERT_HOST_PATH")"
+            TLS_KEY_DIR="$(dirname "$KEY_HOST_PATH")"
+            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH" "$TLS_CERT_DIR" "$TLS_KEY_DIR"
+            $SUDO chmod 0755 "$TLS_CERT_DIR"
+            $SUDO chmod 0750 "$TLS_KEY_DIR"
             $SUDO chmod 0644 "$CERT_HOST_PATH"
             $SUDO chmod 0640 "$KEY_HOST_PATH"
 
@@ -904,7 +909,11 @@ jobs:
               exit 1
             fi
 
-            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH"
+            TLS_CERT_DIR="$(dirname "$CERT_HOST_PATH")"
+            TLS_KEY_DIR="$(dirname "$KEY_HOST_PATH")"
+            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH" "$TLS_CERT_DIR" "$TLS_KEY_DIR"
+            $SUDO chmod 0755 "$TLS_CERT_DIR"
+            $SUDO chmod 0750 "$TLS_KEY_DIR"
             $SUDO chmod 0644 "$CERT_HOST_PATH"
             $SUDO chmod 0640 "$KEY_HOST_PATH"
 
@@ -1195,7 +1204,11 @@ jobs:
             KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
             if $SUDO test -r "$CERT_HOST_PATH" && $SUDO test -r "$KEY_HOST_PATH"; then
-              $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH"
+              TLS_CERT_DIR="$(dirname "$CERT_HOST_PATH")"
+              TLS_KEY_DIR="$(dirname "$KEY_HOST_PATH")"
+              $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH" "$TLS_CERT_DIR" "$TLS_KEY_DIR"
+              $SUDO chmod 0755 "$TLS_CERT_DIR"
+              $SUDO chmod 0750 "$TLS_KEY_DIR"
               $SUDO chmod 0644 "$CERT_HOST_PATH"
               $SUDO chmod 0640 "$KEY_HOST_PATH"
             fi
