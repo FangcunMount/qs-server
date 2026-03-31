@@ -1,8 +1,8 @@
-package staff
+package operator
 
-// Staff 后台工作人员聚合根
+// Operator 后台工作人员聚合根
 // 设计说明：
-// 1. Staff 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
+// 1. Operator 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
 // 2. 持久化的核心目的：
 //   - 存储业务角色（roles）：这是本 BC 的领域概念，IAM 不管
 //   - 多租户隔离：同一 IAM.User 在不同机构可能有不同角色
@@ -15,7 +15,7 @@ package staff
 //   - 以行为为中心，通过领域服务管理复杂逻辑
 //   - 不过度暴露内部状态，保持封装性
 //   - 审计字段由基础设施层（PO）处理
-type Staff struct {
+type Operator struct {
 	id       ID     // 内部员工ID（主键）
 	orgID    int64  // 所属机构（多租户隔离）
 	userID   int64  // 用户ID（外键，必须绑定）
@@ -26,9 +26,9 @@ type Staff struct {
 	isActive bool   // 在本系统内的激活状态
 }
 
-// NewStaff 创建新的员工
-func NewStaff(orgID int64, userID int64, name string) *Staff {
-	return &Staff{
+// NewOperator 创建新的后台操作者
+func NewOperator(orgID int64, userID int64, name string) *Operator {
+	return &Operator{
 		orgID:    orgID,
 		userID:   userID,
 		name:     name,
@@ -37,59 +37,67 @@ func NewStaff(orgID int64, userID int64, name string) *Staff {
 	}
 }
 
+// Staff 是 Operator 的兼容别名，保留给仍使用旧命名的调用方。
+type Staff = Operator
+
+// NewStaff 兼容旧构造函数，内部委托到 NewOperator。
+func NewStaff(orgID int64, userID int64, name string) *Operator {
+	return NewOperator(orgID, userID, name)
+}
+
 // === Getters ===
 
 // ID 获取员工ID
-func (s *Staff) ID() ID {
+func (s *Operator) ID() ID {
 	return s.id
 }
 
 // OrgID 获取机构ID
-func (s *Staff) OrgID() int64 {
+func (s *Operator) OrgID() int64 {
 	return s.orgID
 }
 
 // UserID 获取用户ID
-func (s *Staff) UserID() int64 {
+func (s *Operator) UserID() int64 {
 	return s.userID
 }
 
 // Roles 获取角色列表
-func (s *Staff) Roles() []Role {
+func (s *Operator) Roles() []Role {
 	return s.roles
 }
 
 // Name 获取姓名
-func (s *Staff) Name() string {
+func (s *Operator) Name() string {
 	return s.name
 }
 
 // Email 获取邮箱
-func (s *Staff) Email() string {
+func (s *Operator) Email() string {
 	return s.email
 }
 
 // Phone 获取手机号
-func (s *Staff) Phone() string {
+func (s *Operator) Phone() string {
 	return s.phone
 }
 
 // IsActive 是否激活
-func (s *Staff) IsActive() bool {
+func (s *Operator) IsActive() bool {
 	return s.isActive
 }
 
 // === Setters（用于仓储层）===
 
 // SetID 设置ID
-func (s *Staff) SetID(id ID) {
+func (s *Operator) SetID(id ID) {
 	s.id = id
 }
 
 // === 核心行为（包内可见，通过领域服务使用）===
 
 // assignRole 分配角色（包内方法，应通过 RoleManager 调用）
-func (s *Staff) assignRole(role Role) {
+func (s *Operator) assignRole(role Role) {
 	// 防重复
 	for _, existing := range s.roles {
 		if existing == role {
@@ -100,7 +108,7 @@ func (s *Staff) assignRole(role Role) {
 }
 
 // removeRole 移除角色（包内方法，应通过 RoleManager 调用）
-func (s *Staff) removeRole(role Role) {
+func (s *Operator) removeRole(role Role) {
 	for i, existing := range s.roles {
 		if existing == role {
 			s.roles = append(s.roles[:i], s.roles[i+1:]...)
@@ -110,7 +118,7 @@ func (s *Staff) removeRole(role Role) {
 }
 
 // HasRole 检查是否有某个角色
-func (s *Staff) HasRole(role Role) bool {
+func (s *Operator) HasRole(role Role) bool {
 	for _, r := range s.roles {
 		if r == role {
 			return true
@@ -120,7 +128,7 @@ func (s *Staff) HasRole(role Role) bool {
 }
 
 // HasAnyRole 检查是否有任意一个角色
-func (s *Staff) HasAnyRole(roles ...Role) bool {
+func (s *Operator) HasAnyRole(roles ...Role) bool {
 	for _, role := range roles {
 		if s.HasRole(role) {
 			return true
@@ -130,7 +138,7 @@ func (s *Staff) HasAnyRole(roles ...Role) bool {
 }
 
 // updateContactInfo 更新联系信息（包内方法，应通过 Editor 或 IAMSynchronizer 调用）
-func (s *Staff) updateContactInfo(email, phone string) {
+func (s *Operator) updateContactInfo(email, phone string) {
 	if email != "" {
 		s.email = email
 	}
@@ -140,41 +148,41 @@ func (s *Staff) updateContactInfo(email, phone string) {
 }
 
 // activate 激活（包内方法，应通过 Editor 调用）
-func (s *Staff) activate() {
+func (s *Operator) activate() {
 	s.isActive = true
 }
 
 // deactivate 停用（包内方法，应通过 Editor 调用）
-func (s *Staff) deactivate() {
+func (s *Operator) deactivate() {
 	s.isActive = false
 }
 
 // CanManageScales 是否可以管理量表
-func (s *Staff) CanManageScales() bool {
+func (s *Operator) CanManageScales() bool {
 	// 内容管理员或管理员可以管理量表
 	return s.HasAnyRole(RoleContentManager, RoleQSAdmin)
 }
 
 // CanEvaluate 是否可以评估
-func (s *Staff) CanEvaluate() bool {
+func (s *Operator) CanEvaluate() bool {
 	// QS 评估员或管理员可以评估
 	return s.HasAnyRole(RoleEvaluatorQS, RoleQSAdmin)
 }
 
 // CanManageScreeningProject 是否可以管理筛查项目
-func (s *Staff) CanManageScreeningProject() bool {
+func (s *Operator) CanManageScreeningProject() bool {
 	// 管理员或筛查计划管理员可以管理筛查项目
 	return s.HasAnyRole(RoleQSAdmin, RoleScreeningPlanManager)
 }
 
 // CanAuditReport 是否可以审核报告
-func (s *Staff) CanAuditReport() bool {
+func (s *Operator) CanAuditReport() bool {
 	// 目前仅管理员可以审核报告
 	return s.HasRole(RoleQSAdmin)
 }
 
 // CanManageEvaluationPlans 是否可以管理测评计划
-func (s *Staff) CanManageEvaluationPlans() bool {
+func (s *Operator) CanManageEvaluationPlans() bool {
 	// 管理员或测评计划管理员可以管理测评计划
 	return s.HasAnyRole(RoleQSAdmin, RoleEvaluationPlanManager)
 }
@@ -183,7 +191,7 @@ func (s *Staff) CanManageEvaluationPlans() bool {
 
 // RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
 // 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
-func (s *Staff) RestoreFromRepository(
+func (s *Operator) RestoreFromRepository(
 	roles []Role,
 	email string,
 	phone string,

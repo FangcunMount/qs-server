@@ -66,8 +66,9 @@ type AssessmentStatsPO struct {
 	LastRiskLevel    *string    `gorm:"column:last_risk_level"`
 }
 
-// StaffPO 员工持久化对象
-type StaffPO struct {
+// OperatorPO 后台操作者持久化对象
+// 兼容说明：底层表名仍为 `staff`，后续迁移前先保持存储结构稳定。
+type OperatorPO struct {
 	mysql.AuditFields
 
 	OrgID    int64          `gorm:"column:org_id;not null;index:idx_org_id"`
@@ -80,7 +81,7 @@ type StaffPO struct {
 }
 
 // TableName 指定表名
-func (StaffPO) TableName() string {
+func (OperatorPO) TableName() string {
 	return "staff"
 }
 
@@ -98,7 +99,7 @@ func (p *TesteePO) BeforeCreate() error {
 }
 
 // BeforeCreate GORM hook，在创建前执行
-func (p *StaffPO) BeforeCreate() error {
+func (p *OperatorPO) BeforeCreate() error {
 	// 如果 ID 为 0，使用 ID 生成器生成 ID
 	if p.ID == 0 {
 		p.ID = meta.New()

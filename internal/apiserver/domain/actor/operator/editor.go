@@ -1,15 +1,15 @@
-package staff
+package operator
 
 // Editor 员工编辑器领域服务
-// 负责 Staff 基础信息的编辑，包含业务规则验证
+// 负责 Operator 基础信息的编辑，包含业务规则验证
 type Editor interface {
 	// UpdateBasicInfo 更新基本信息（姓名）
 	// 参数使用指针表示可选更新
-	UpdateBasicInfo(staff *Staff, name *string) error
+	UpdateBasicInfo(staff *Operator, name *string) error
 
 	// UpdateContactInfo 更新联系信息（邮箱、手机号）
 	// 参数使用指针表示可选更新
-	UpdateContactInfo(staff *Staff, email *string, phone *string) error
+	UpdateContactInfo(staff *Operator, email *string, phone *string) error
 }
 
 // editor 编辑器实现
@@ -25,7 +25,7 @@ func NewEditor(validator Validator) Editor {
 }
 
 // UpdateBasicInfo 更新基本信息
-func (e *editor) UpdateBasicInfo(staff *Staff, name *string) error {
+func (e *editor) UpdateBasicInfo(staff *Operator, name *string) error {
 	// 验证并更新姓名
 	if name != nil {
 		if err := e.validator.ValidateName(*name, false); err != nil {
@@ -40,7 +40,7 @@ func (e *editor) UpdateBasicInfo(staff *Staff, name *string) error {
 }
 
 // UpdateContactInfo 更新联系信息
-func (e *editor) UpdateContactInfo(staff *Staff, email *string, phone *string) error {
+func (e *editor) UpdateContactInfo(staff *Operator, email *string, phone *string) error {
 	// 验证并更新邮箱
 	if email != nil {
 		if err := e.validator.ValidateEmail(*email); err != nil {

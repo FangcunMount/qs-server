@@ -1,4 +1,4 @@
-package staff
+package operator
 
 import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 
@@ -32,6 +32,9 @@ const (
 	RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
 	// RoleScreeningPlanManager 筛查计划管理员：筛查计划的管理权限
 	RoleScreeningPlanManager Role = "qs:screening_plan_manager"
-	// RoleStaff 普通员工：只能查看受试者
-	RoleStaff Role = "qs:staff"
+	// RoleOperator 普通员工：只能查看受试者
+	RoleOperator Role = "qs:staff"
 )
+
+// RoleStaff 是 RoleOperator 的兼容别名，保留旧命名。
+const RoleStaff Role = RoleOperator

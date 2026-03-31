@@ -1,12 +1,12 @@
-# Staff 子域设计说明
+# Operator 子域设计说明
 
 ## 概述
 
-Staff（员工）是问卷&量表BC中的后台工作人员聚合根，代表 IAM.User 在本系统的业务视图投影。Staff 存储业务角色和机构隔离信息，采用充血模型设计，将领域服务从聚合根中提取。
+Operator（员工）是问卷&量表BC中的后台工作人员聚合根，代表 IAM.User 在本系统的业务视图投影。Operator 存储业务角色和机构隔离信息，采用充血模型设计，将领域服务从聚合根中提取。
 
 ## 核心组件
 
-### 1. 聚合根：Staff
+### 1. 聚合根：Operator
 
 **职责**：维护员工的核心状态和不变量
 
@@ -20,7 +20,7 @@ Staff（员工）是问卷&量表BC中的后台工作人员聚合根，代表 IA
 
 **核心字段**：
 ```go
-type Staff struct {
+type Operator struct {
     // 核心标识
     id, orgID, iamUserID
     
@@ -51,7 +51,7 @@ type Staff struct {
 
 #### 2.1 Validator - 验证器
 
-**职责**：验证 Staff 的字段合法性
+**职责**：验证 Operator 的字段合法性
 
 **设计原则**：
 
@@ -83,7 +83,7 @@ ValidateRoles(roles []Role) error
 
 #### 2.2 RoleManager - 角色管理器
 
-**职责**：管理 Staff 的业务角色分配和权限检查
+**职责**：管理 Operator 的业务角色分配和权限检查
 
 **核心逻辑**：
 
@@ -127,7 +127,7 @@ if err != nil {
 
 #### 2.3 Editor - 编辑器
 
-**职责**：管理 Staff 信息的变更
+**职责**：管理 Operator 信息的变更
 
 **设计原则**：
 
@@ -151,7 +151,7 @@ Deactivate(staff, reason) error
 
 **重要行为**：
 ```go
-func (e *editor) Deactivate(staff *Staff, reason string) error {
+func (e *editor) Deactivate(staff *Operator, reason string) error {
     // 业务规则：停用时清空角色
     staff.roles = make([]Role, 0)
     staff.Deactivate()
@@ -203,7 +203,7 @@ const (
     RoleQSAdmin               Role = "qs:admin"
     RoleContentManager        Role = "qs:content_manager"
     RoleEvaluatorQS           Role = "qs:evaluator"
-    RoleStaff                 Role = "qs:staff"
+    RoleOperator                 Role = "qs:staff"
     // 测评计划与筛查计划管理员
     RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
     RoleScreeningPlanManager  Role = "qs:screening_plan_manager"
@@ -220,7 +220,7 @@ const (
 
 ### 4. 工厂（Factory）
 
-**职责**：创建或获取 Staff 实例，处理幂等性
+**职责**：创建或获取 Operator 实例，处理幂等性
 
 **方法**：
 
@@ -248,7 +248,7 @@ const (
 │              Domain Layer                       │
 │                                                 │
 │  ┌──────────┐      ┌──────────────────────┐    │
-│  │  Staff   │◄─────┤  Domain Services:    │    │
+│  │  Operator   │◄─────┤  Domain Services:    │    │
 │  │(Aggregate│      │  - Validator         │    │
 │  │  Root)   │      │  - RoleManager       │    │
 │  └──────────┘      │  - Editor            │    │
@@ -394,7 +394,7 @@ if err != nil {
 
 ## 与 Testee 的对比
 
-| 维度 | Testee | Staff |
+| 维度 | Testee | Operator |
 | ------ | -------- | ------- |
 | **身份来源** | 可选绑定 IAM（User/Child） | 必须绑定 IAM User |
 | **核心数据** | 测评统计、标签、关注度 | 业务角色 |

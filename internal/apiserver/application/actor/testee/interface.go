@@ -12,7 +12,7 @@ import (
 //
 // 行为者识别：
 // 1. C端用户(患者/家长) - 自助注册、查看自己的档案
-// 2. B端员工(Staff) - 管理受试者档案、标签、重点关注、批量操作
+// 2. B端操作者(Operator) - 管理受试者档案、标签、重点关注、批量操作
 // 3. 通用查询服务 (Query Service) - 为所有行为者提供只读查询
 
 // TesteeRegistrationService 受试者注册服务
@@ -34,7 +34,7 @@ type TesteeRegistrationService interface {
 }
 
 // TesteeManagementService 受试者档案管理服务
-// 行为者：B端员工(Staff)
+// 行为者：B端操作者(Operator)
 // 职责：管理受试者档案、业务标签、重点关注
 // 变更来源：B端管理后台的业务需求变化
 type TesteeManagementService interface {
@@ -107,7 +107,7 @@ type TesteeQueryService interface {
 }
 
 // TesteeBackendQueryService 受试者后台查询服务（只读）
-// 行为者：B端员工(Staff) - 后台管理系统
+// 行为者：B端操作者(Operator) - 后台管理系统
 // 职责：提供受试者详细信息查询能力（包含家长信息等后台管理所需数据）
 // 变更来源：后台管理需求变化
 type TesteeBackendQueryService interface {

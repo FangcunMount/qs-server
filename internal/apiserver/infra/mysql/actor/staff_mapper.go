@@ -1,84 +1,84 @@
 package actor
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// StaffMapper 员工映射器
-type StaffMapper struct{}
+// OperatorMapper 操作者映射器
+type OperatorMapper struct{}
 
-// NewStaffMapper 创建员工映射器
-func NewStaffMapper() *StaffMapper {
-	return &StaffMapper{}
+// NewOperatorMapper 创建操作者映射器
+func NewOperatorMapper() *OperatorMapper {
+	return &OperatorMapper{}
 }
 
 // ToPO 将领域对象转换为持久化对象
-func (m *StaffMapper) ToPO(domain *staff.Staff) *StaffPO {
-	if domain == nil {
+func (m *OperatorMapper) ToPO(item *domain.Operator) *OperatorPO {
+	if item == nil {
 		return nil
 	}
 
 	// 转换角色列表
-	roles := make([]string, len(domain.Roles()))
-	for i, role := range domain.Roles() {
+	roles := make([]string, len(item.Roles()))
+	for i, role := range item.Roles() {
 		roles[i] = string(role)
 	}
 
-	po := &StaffPO{
-		OrgID:    domain.OrgID(),
-		UserID:   domain.UserID(),
+	po := &OperatorPO{
+		OrgID:    item.OrgID(),
+		UserID:   item.UserID(),
 		Roles:    roles,
-		Name:     domain.Name(),
-		Email:    domain.Email(),
-		Phone:    domain.Phone(),
-		IsActive: domain.IsActive(),
+		Name:     item.Name(),
+		Email:    item.Email(),
+		Phone:    item.Phone(),
+		IsActive: item.IsActive(),
 	}
 
 	// 设置ID（如果已存在）
-	if domain.ID() > 0 {
-		po.ID = meta.ID(domain.ID())
+	if item.ID() > 0 {
+		po.ID = meta.ID(item.ID())
 	}
 
 	return po
 }
 
 // ToDomain 将持久化对象转换为领域对象
-func (m *StaffMapper) ToDomain(po *StaffPO) *staff.Staff {
+func (m *OperatorMapper) ToDomain(po *OperatorPO) *domain.Operator {
 	if po == nil {
 		return nil
 	}
 
-	// 创建员工
-	domain := staff.NewStaff(po.OrgID, po.UserID, po.Name)
+	// 创建操作者
+	item := domain.NewOperator(po.OrgID, po.UserID, po.Name)
 
 	// 设置ID
-	domain.SetID(staff.ID(po.ID))
+	item.SetID(domain.ID(po.ID))
 
 	// 转换角色列表
-	roles := make([]staff.Role, len(po.Roles))
+	roles := make([]domain.Role, len(po.Roles))
 	for i, roleStr := range po.Roles {
-		roles[i] = staff.Role(roleStr)
+		roles[i] = domain.Role(roleStr)
 	}
 
 	// 从仓储恢复状态
-	domain.RestoreFromRepository(
+	item.RestoreFromRepository(
 		roles,
 		po.Email,
 		po.Phone,
 		po.IsActive,
 	)
 
-	return domain
+	return item
 }
 
 // ToDomains 批量转换为领域对象
-func (m *StaffMapper) ToDomains(pos []*StaffPO) []*staff.Staff {
+func (m *OperatorMapper) ToDomains(pos []*OperatorPO) []*domain.Operator {
 	if pos == nil {
 		return nil
 	}
 
-	domains := make([]*staff.Staff, len(pos))
+	domains := make([]*domain.Operator, len(pos))
 	for i, po := range pos {
 		domains[i] = m.ToDomain(po)
 	}
@@ -86,8 +86,8 @@ func (m *StaffMapper) ToDomains(pos []*StaffPO) []*staff.Staff {
 }
 
 // SyncID 同步ID到领域对象
-func (m *StaffMapper) SyncID(po *StaffPO, domain *staff.Staff) {
-	if po != nil && domain != nil {
-		domain.SetID(staff.ID(po.ID))
+func (m *OperatorMapper) SyncID(po *OperatorPO, item *domain.Operator) {
+	if po != nil && item != nil {
+		item.SetID(domain.ID(po.ID))
 	}
 }

@@ -1,4 +1,4 @@
-package staff
+package operator
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -133,7 +133,7 @@ func (v *validator) ValidateRole(role Role) error {
 	// 验证角色是否是预定义的
 	switch role {
 	// 仅接受新的 QS 角色标识
-	case RoleQSAdmin, RoleContentManager, RoleEvaluatorQS, RoleStaff,
+	case RoleQSAdmin, RoleContentManager, RoleEvaluatorQS, RoleOperator,
 		RoleEvaluationPlanManager, RoleScreeningPlanManager:
 		return nil
 	default:

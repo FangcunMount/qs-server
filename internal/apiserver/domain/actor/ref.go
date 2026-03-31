@@ -1,7 +1,7 @@
 package actor
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
@@ -43,34 +43,47 @@ func (r *TesteeRef) ProfileID() *uint64 {
 	return r.profileID
 }
 
-// StaffRef 员工引用（值对象）
-// 用于在其他聚合根中引用员工
-type StaffRef struct {
-	staffID staff.ID // 员工ID
-	userID  int64    // 用户ID（必须）
-	name    string   // 姓名
+// OperatorRef 后台操作者引用（值对象）
+// 用于在其他聚合根中引用机构内操作者。
+type OperatorRef struct {
+	operatorID operator.ID // 操作者ID
+	userID     int64       // 用户ID（必须）
+	name       string      // 姓名
 }
 
-// NewStaffRef 创建员工引用
-func NewStaffRef(staffID staff.ID, userID int64, name string) *StaffRef {
-	return &StaffRef{
-		staffID: staffID,
-		userID:  userID,
-		name:    name,
+// NewOperatorRef 创建后台操作者引用
+func NewOperatorRef(operatorID operator.ID, userID int64, name string) *OperatorRef {
+	return &OperatorRef{
+		operatorID: operatorID,
+		userID:     userID,
+		name:       name,
 	}
 }
 
+// StaffRef 是 OperatorRef 的兼容别名，保留给旧调用方。
+type StaffRef = OperatorRef
+
+// NewStaffRef 创建员工引用
+func NewStaffRef(operatorID operator.ID, userID int64, name string) *StaffRef {
+	return NewOperatorRef(operatorID, userID, name)
+}
+
+// OperatorID 获取操作者ID
+func (r *OperatorRef) OperatorID() operator.ID {
+	return r.operatorID
+}
+
 // StaffID 获取员工ID
-func (r *StaffRef) StaffID() staff.ID {
-	return r.staffID
+func (r *OperatorRef) StaffID() operator.ID {
+	return r.operatorID
 }
 
 // UserID 获取用户ID
-func (r *StaffRef) UserID() int64 {
+func (r *OperatorRef) UserID() int64 {
 	return r.userID
 }
 
 // Name 获取姓名
-func (r *StaffRef) Name() string {
+func (r *OperatorRef) Name() string {
 	return r.name
 }

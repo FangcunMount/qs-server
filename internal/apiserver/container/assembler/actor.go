@@ -6,10 +6,10 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -22,8 +22,8 @@ import (
 // ActorModule Actor 模块（测评对象和工作人员）
 type ActorModule struct {
 	// repository 层
-	TesteeRepo testee.Repository
-	StaffRepo  staff.Repository
+	TesteeRepo   testee.Repository
+	OperatorRepo operator.Repository
 
 	// handler 层
 	ActorHandler *handler.ActorHandler
@@ -35,10 +35,10 @@ type ActorModule struct {
 	TesteeBackendQueryService testeeApp.TesteeBackendQueryService // 后台查询服务 - B端员工（包含家长信息）
 	TesteeTaggingService      testeeApp.TesteeTaggingService      // 标签服务 - 系统自动（事件驱动）
 
-	// staff service 层（按行为者组织）
-	StaffLifecycleService     staffApp.StaffLifecycleService     // 生命周期服务 - 人事/行政
-	StaffAuthorizationService staffApp.StaffAuthorizationService // 权限管理服务 - IT管理员
-	StaffQueryService         staffApp.StaffQueryService         // 查询服务 - 通用
+	// operator service 层（按行为者组织）
+	OperatorLifecycleService     operatorApp.OperatorLifecycleService     // 生命周期服务 - 人事/行政
+	OperatorAuthorizationService operatorApp.OperatorAuthorizationService // 权限管理服务 - IT管理员
+	OperatorQueryService         operatorApp.OperatorQueryService         // 查询服务 - 通用
 }
 
 // NewActorModule 创建 Actor 模块
@@ -79,7 +79,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.TesteeRepo = baseTesteeRepo
 	}
 
-	m.StaffRepo = actorInfra.NewStaffRepository(mysqlDB)
+	m.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB)
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(m.TesteeRepo)
@@ -88,13 +88,13 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	testeeBinder := testee.NewBinder(m.TesteeRepo)
 	testeeTagger := testee.NewTagger(testeeValidator)
 
-	// 初始化 staff domain services
-	staffValidator := staff.NewValidator()
-	staffFactory := staff.NewFactory(m.StaffRepo, staffValidator)
-	staffEditor := staff.NewEditor(staffValidator)
-	staffBinder := staff.NewBinder(m.StaffRepo, staffValidator)
-	staffRoleAllocator := staff.NewRoleAllocator(staffValidator)
-	staffLifecycler := staff.NewLifecycler(staffRoleAllocator)
+	// 初始化 operator domain services
+	operatorValidator := operator.NewValidator()
+	operatorFactory := operator.NewFactory(m.OperatorRepo, operatorValidator)
+	operatorEditor := operator.NewEditor(operatorValidator)
+	operatorBinder := operator.NewBinder(m.OperatorRepo, operatorValidator)
+	operatorRoleAllocator := operator.NewRoleAllocator(operatorValidator)
+	operatorLifecycler := operator.NewLifecycler(operatorRoleAllocator)
 
 	// 初始化 testee service 层（按行为者组织）
 	// 注册服务 - 服务于C端用户（患者/家长）
@@ -125,7 +125,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		uow,
 	)
 
-	// 初始化 staff service 层（按行为者组织）
+	// 初始化 operator service 层（按行为者组织）
 	// 生命周期服务 - 服务于人事/行政部门
 	// 初始化 Staff Lifecycle Service，注入 IAM IdentityService 如果可用
 	var identitySvc *iam.IdentityService
@@ -143,26 +143,26 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		guardianshipSvc,
 		identitySvc,
 	)
-	m.StaffLifecycleService = staffApp.NewLifecycleService(
-		m.StaffRepo,
-		staffFactory,
-		staffValidator,
-		staffEditor,
-		staffRoleAllocator,
-		staffBinder,
+	m.OperatorLifecycleService = operatorApp.NewLifecycleService(
+		m.OperatorRepo,
+		operatorFactory,
+		operatorValidator,
+		operatorEditor,
+		operatorRoleAllocator,
+		operatorBinder,
 		uow,
 		identitySvc,
 	)
 	// 权限管理服务 - 服务于IT管理员
-	m.StaffAuthorizationService = staffApp.NewAuthorizationService(
-		m.StaffRepo,
-		staffValidator,
-		staffRoleAllocator,
-		staffLifecycler,
+	m.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
+		m.OperatorRepo,
+		operatorValidator,
+		operatorRoleAllocator,
+		operatorLifecycler,
 		uow,
 	)
 	// 查询服务 - 服务于所有需要查询的用户
-	m.StaffQueryService = staffApp.NewQueryService(m.StaffRepo)
+	m.OperatorQueryService = operatorApp.NewQueryService(m.OperatorRepo)
 
 	// 初始化 handler 层 - 先不注入评估服务（评估模块还未初始化）
 	// 评估服务将在容器初始化完成后通过 SetEvaluationServices 方法注入
@@ -171,9 +171,9 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.TesteeManagementService,
 		m.TesteeQueryService,
 		m.TesteeBackendQueryService,
-		m.StaffLifecycleService,
-		m.StaffAuthorizationService,
-		m.StaffQueryService,
+		m.OperatorLifecycleService,
+		m.OperatorAuthorizationService,
+		m.OperatorQueryService,
 		guardianshipSvc,
 		nil, // assessmentManagementService - 稍后注入
 		nil, // scoreQueryService - 稍后注入

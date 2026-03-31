@@ -1,4 +1,4 @@
-package staff
+package operator
 
 import (
 	"context"
@@ -7,20 +7,20 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// Binder Staff与用户绑定领域服务
-// 负责 Staff 与 iam.User 的绑定和解绑
+// Binder Operator与用户绑定领域服务
+// 负责 Operator 与 iam.User 的绑定和解绑
 type Binder interface {
 	// Bind 绑定用户
-	// 场景：Staff创建后，需要绑定到具体的用户
-	Bind(ctx context.Context, staff *Staff, userID int64) error
+	// 场景：Operator创建后，需要绑定到具体的用户
+	Bind(ctx context.Context, staff *Operator, userID int64) error
 
 	// Unbind 解绑用户
 	// 场景：用户离职或需要解除关联
-	Unbind(ctx context.Context, staff *Staff) error
+	Unbind(ctx context.Context, staff *Operator) error
 
 	// ValidateBinding 验证绑定关系的有效性
 	// 场景：检查绑定的用户ID是否有效
-	ValidateBinding(ctx context.Context, staff *Staff) error
+	ValidateBinding(ctx context.Context, staff *Operator) error
 }
 
 // binder 绑定器实现
@@ -38,7 +38,7 @@ func NewBinder(repo Repository, validator Validator) Binder {
 }
 
 // Bind 绑定用户
-func (b *binder) Bind(ctx context.Context, staff *Staff, userID int64) error {
+func (b *binder) Bind(ctx context.Context, staff *Operator, userID int64) error {
 	// 1. 验证 userID
 	if err := b.validator.ValidateUserID(userID); err != nil {
 		return err
@@ -65,7 +65,7 @@ func (b *binder) Bind(ctx context.Context, staff *Staff, userID int64) error {
 }
 
 // Unbind 解绑用户
-func (b *binder) Unbind(ctx context.Context, staff *Staff) error {
+func (b *binder) Unbind(ctx context.Context, staff *Operator) error {
 	// 1. 检查是否已绑定
 	if staff.UserID() <= 0 {
 		return errors.WithCode(code.ErrValidation, "staff not bound to any user")
@@ -88,7 +88,7 @@ func (b *binder) Unbind(ctx context.Context, staff *Staff) error {
 }
 
 // ValidateBinding 验证绑定关系
-func (b *binder) ValidateBinding(ctx context.Context, staff *Staff) error {
+func (b *binder) ValidateBinding(ctx context.Context, staff *Operator) error {
 	// 检查是否有绑定
 	if staff.UserID() <= 0 {
 		return errors.WithCode(code.ErrValidation, "staff not bound to any user")

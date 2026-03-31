@@ -1,4 +1,4 @@
-package staff
+package operator
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -6,22 +6,22 @@ import (
 )
 
 // RoleAllocator 角色分配器领域服务
-// 负责 Staff 的角色分配、移除和清空
+// 负责 Operator 的角色分配、移除和清空
 type RoleAllocator interface {
 	// AssignRole 分配单个角色
-	AssignRole(staff *Staff, role Role) error
+	AssignRole(staff *Operator, role Role) error
 
 	// RemoveRole 移除单个角色
-	RemoveRole(staff *Staff, role Role) error
+	RemoveRole(staff *Operator, role Role) error
 
 	// ClearRoles 清空所有角色
-	ClearRoles(staff *Staff) error
+	ClearRoles(staff *Operator) error
 
 	// AssignRoles 批量分配角色
-	AssignRoles(staff *Staff, roles []Role) error
+	AssignRoles(staff *Operator, roles []Role) error
 
 	// ReplaceRoles 替换所有角色
-	ReplaceRoles(staff *Staff, roles []Role) error
+	ReplaceRoles(staff *Operator, roles []Role) error
 }
 
 // roleAllocator 角色分配器实现
@@ -37,7 +37,7 @@ func NewRoleAllocator(validator Validator) RoleAllocator {
 }
 
 // AssignRole 分配角色
-func (ra *roleAllocator) AssignRole(staff *Staff, role Role) error {
+func (ra *roleAllocator) AssignRole(staff *Operator, role Role) error {
 	// 1. 验证角色合法性
 	if err := ra.validator.ValidateRole(role); err != nil {
 		return err
@@ -60,7 +60,7 @@ func (ra *roleAllocator) AssignRole(staff *Staff, role Role) error {
 }
 
 // RemoveRole 移除角色
-func (ra *roleAllocator) RemoveRole(staff *Staff, role Role) error {
+func (ra *roleAllocator) RemoveRole(staff *Operator, role Role) error {
 	// 1. 验证角色合法性
 	if err := ra.validator.ValidateRole(role); err != nil {
 		return err
@@ -78,14 +78,14 @@ func (ra *roleAllocator) RemoveRole(staff *Staff, role Role) error {
 }
 
 // ClearRoles 清空所有角色
-func (ra *roleAllocator) ClearRoles(staff *Staff) error {
+func (ra *roleAllocator) ClearRoles(staff *Operator) error {
 	// 清空角色列表
 	staff.roles = make([]Role, 0)
 	return nil
 }
 
 // AssignRoles 批量分配角色
-func (ra *roleAllocator) AssignRoles(staff *Staff, roles []Role) error {
+func (ra *roleAllocator) AssignRoles(staff *Operator, roles []Role) error {
 	// 1. 验证角色列表
 	if err := ra.validator.ValidateRoles(roles); err != nil {
 		return err
@@ -107,7 +107,7 @@ func (ra *roleAllocator) AssignRoles(staff *Staff, roles []Role) error {
 }
 
 // ReplaceRoles 替换所有角色
-func (ra *roleAllocator) ReplaceRoles(staff *Staff, roles []Role) error {
+func (ra *roleAllocator) ReplaceRoles(staff *Operator, roles []Role) error {
 	// 1. 验证角色列表
 	if err := ra.validator.ValidateRoles(roles); err != nil {
 		return err

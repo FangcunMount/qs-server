@@ -1,31 +1,31 @@
-package staff
+package operator
 
 import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/staff"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
-// authorizationService 员工权限管理服务实现
+// authorizationService 操作者权限管理服务实现
 // 行为者：IT管理员/权限管理员
 type authorizationService struct {
-	repo          staff.Repository
-	validator     staff.Validator
-	roleAllocator staff.RoleAllocator
-	lifecycler    staff.Lifecycler
+	repo          domain.Repository
+	validator     domain.Validator
+	roleAllocator domain.RoleAllocator
+	lifecycler    domain.Lifecycler
 	uow           *mysql.UnitOfWork
 }
 
-// NewAuthorizationService 创建员工权限管理服务
+// NewAuthorizationService 创建操作者权限管理服务
 func NewAuthorizationService(
-	repo staff.Repository,
-	validator staff.Validator,
-	roleAllocator staff.RoleAllocator,
-	lifecycler staff.Lifecycler,
+	repo domain.Repository,
+	validator domain.Validator,
+	roleAllocator domain.RoleAllocator,
+	lifecycler domain.Lifecycler,
 	uow *mysql.UnitOfWork,
-) StaffAuthorizationService {
+) OperatorAuthorizationService {
 	return &authorizationService{
 		repo:          repo,
 		validator:     validator,
@@ -36,16 +36,16 @@ func NewAuthorizationService(
 }
 
 // AssignRole 分配角色
-func (s *authorizationService) AssignRole(ctx context.Context, staffID uint64, roleName string) error {
+func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64, roleName string) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找员工
-		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
+		// 1. 查找操作者
+		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
-			return errors.Wrap(err, "failed to find staff")
+			return errors.Wrap(err, "failed to find operator")
 		}
 
 		// 2. 验证角色
-		role := staff.Role(roleName)
+		role := domain.Role(roleName)
 		if err := s.validator.ValidateRole(role); err != nil {
 			return err
 		}
@@ -57,7 +57,7 @@ func (s *authorizationService) AssignRole(ctx context.Context, staffID uint64, r
 
 		// 4. 持久化
 		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update staff")
+			return errors.Wrap(err, "failed to update operator")
 		}
 
 		return nil
@@ -65,36 +65,36 @@ func (s *authorizationService) AssignRole(ctx context.Context, staffID uint64, r
 }
 
 // RemoveRole 移除角色
-func (s *authorizationService) RemoveRole(ctx context.Context, staffID uint64, roleName string) error {
+func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64, roleName string) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找员工
-		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
+		// 1. 查找操作者
+		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
-			return errors.Wrap(err, "failed to find staff")
+			return errors.Wrap(err, "failed to find operator")
 		}
 
 		// 2. 使用领域服务移除角色
-		role := staff.Role(roleName)
+		role := domain.Role(roleName)
 		if err := s.roleAllocator.RemoveRole(st, role); err != nil {
 			return err
 		}
 
 		// 3. 持久化
 		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update staff")
+			return errors.Wrap(err, "failed to update operator")
 		}
 
 		return nil
 	})
 }
 
-// Activate 激活员工
-func (s *authorizationService) Activate(ctx context.Context, staffID uint64) error {
+// Activate 激活操作者
+func (s *authorizationService) Activate(ctx context.Context, operatorID uint64) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找员工
-		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
+		// 1. 查找操作者
+		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
-			return errors.Wrap(err, "failed to find staff")
+			return errors.Wrap(err, "failed to find operator")
 		}
 
 		// 2. 使用领域服务激活
@@ -104,20 +104,20 @@ func (s *authorizationService) Activate(ctx context.Context, staffID uint64) err
 
 		// 3. 持久化
 		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update staff")
+			return errors.Wrap(err, "failed to update operator")
 		}
 
 		return nil
 	})
 }
 
-// Deactivate 停用员工
-func (s *authorizationService) Deactivate(ctx context.Context, staffID uint64) error {
+// Deactivate 停用操作者
+func (s *authorizationService) Deactivate(ctx context.Context, operatorID uint64) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找员工
-		st, err := s.repo.FindByID(txCtx, staff.ID(staffID))
+		// 1. 查找操作者
+		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
-			return errors.Wrap(err, "failed to find staff")
+			return errors.Wrap(err, "failed to find operator")
 		}
 
 		// 2. 使用领域服务停用（需要提供原因）
@@ -127,7 +127,7 @@ func (s *authorizationService) Deactivate(ctx context.Context, staffID uint64) e
 
 		// 3. 持久化
 		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update staff")
+			return errors.Wrap(err, "failed to update operator")
 		}
 
 		return nil

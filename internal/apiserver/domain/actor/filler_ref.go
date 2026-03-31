@@ -17,9 +17,12 @@ const (
 	FillerTypeSelf FillerType = "self"
 	// FillerTypeGuardian 监护人/家长/老师代填
 	FillerTypeGuardian FillerType = "guardian"
-	// FillerTypeStaff 内部员工代填
-	FillerTypeStaff FillerType = "staff"
+	// FillerTypeOperator 内部操作者代填
+	FillerTypeOperator FillerType = "staff"
 )
+
+// FillerTypeStaff 是 FillerTypeOperator 的兼容别名。
+const FillerTypeStaff FillerType = FillerTypeOperator
 
 // String 返回字符串表示
 func (f FillerType) String() string {
@@ -63,5 +66,10 @@ func (f *FillerRef) IsGuardian() bool {
 
 // IsStaff 是否员工代填
 func (f *FillerRef) IsStaff() bool {
-	return f.fillerType == FillerTypeStaff
+	return f.fillerType == FillerTypeOperator
+}
+
+// IsOperator 是否操作者代填
+func (f *FillerRef) IsOperator() bool {
+	return f.fillerType == FillerTypeOperator
 }

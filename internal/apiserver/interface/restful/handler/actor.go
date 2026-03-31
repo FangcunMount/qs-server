@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	staffApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/staff"
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -23,10 +23,10 @@ type ActorHandler struct {
 	testeeManagementService   testeeApp.TesteeManagementService
 	testeeQueryService        testeeApp.TesteeQueryService        // 通用查询服务（小程序、C端）
 	testeeBackendQueryService testeeApp.TesteeBackendQueryService // 后台查询服务（包含家长信息）
-	// Staff 服务按行为者组织
-	staffLifecycleService     staffApp.StaffLifecycleService
-	staffAuthorizationService staffApp.StaffAuthorizationService
-	staffQueryService         staffApp.StaffQueryService
+	// Operator 服务按行为者组织
+	operatorLifecycleService     operatorApp.OperatorLifecycleService
+	operatorAuthorizationService operatorApp.OperatorAuthorizationService
+	operatorQueryService         operatorApp.OperatorQueryService
 	// IAM 服务（可选）
 	guardianshipService *iam.GuardianshipService
 	// Evaluation 服务（用于查询测评记录）
@@ -40,25 +40,25 @@ func NewActorHandler(
 	testeeManagementService testeeApp.TesteeManagementService,
 	testeeQueryService testeeApp.TesteeQueryService,
 	testeeBackendQueryService testeeApp.TesteeBackendQueryService,
-	staffLifecycleService staffApp.StaffLifecycleService,
-	staffAuthorizationService staffApp.StaffAuthorizationService,
-	staffQueryService staffApp.StaffQueryService,
+	operatorLifecycleService operatorApp.OperatorLifecycleService,
+	operatorAuthorizationService operatorApp.OperatorAuthorizationService,
+	operatorQueryService operatorApp.OperatorQueryService,
 	guardianshipService *iam.GuardianshipService,
 	assessmentManagementService assessmentApp.AssessmentManagementService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 ) *ActorHandler {
 	return &ActorHandler{
-		BaseHandler:                 NewBaseHandler(),
-		testeeRegistrationService:   testeeRegistrationService,
-		testeeManagementService:     testeeManagementService,
-		testeeQueryService:          testeeQueryService,
-		testeeBackendQueryService:   testeeBackendQueryService,
-		staffLifecycleService:       staffLifecycleService,
-		staffAuthorizationService:   staffAuthorizationService,
-		staffQueryService:           staffQueryService,
-		guardianshipService:         guardianshipService,
-		assessmentManagementService: assessmentManagementService,
-		scoreQueryService:           scoreQueryService,
+		BaseHandler:                  NewBaseHandler(),
+		testeeRegistrationService:    testeeRegistrationService,
+		testeeManagementService:      testeeManagementService,
+		testeeQueryService:           testeeQueryService,
+		testeeBackendQueryService:    testeeBackendQueryService,
+		operatorLifecycleService:     operatorLifecycleService,
+		operatorAuthorizationService: operatorAuthorizationService,
+		operatorQueryService:         operatorQueryService,
+		guardianshipService:          guardianshipService,
+		assessmentManagementService:  assessmentManagementService,
+		scoreQueryService:            scoreQueryService,
 	}
 }
 
@@ -533,7 +533,7 @@ func (h *ActorHandler) CreateStaff(c *gin.Context) {
 
 	dto := toRegisterStaffDTO(&req)
 	// 使用生命周期服务 - 服务于人事/行放部门
-	result, err := h.staffLifecycleService.Register(c.Request.Context(), dto)
+	result, err := h.operatorLifecycleService.Register(c.Request.Context(), dto)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to create staff",
 			"action", "create_staff",
@@ -571,7 +571,7 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 	}
 
 	// 使用查询服务
-	result, err := h.staffQueryService.GetByID(c.Request.Context(), id)
+	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to get staff",
 			"action", "get_staff",
@@ -609,7 +609,7 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 	}
 
 	// 使用生命周期服务 - 服务于人事/行政部门
-	if err := h.staffLifecycleService.Delete(c.Request.Context(), id); err != nil {
+	if err := h.operatorLifecycleService.Delete(c.Request.Context(), id); err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to delete staff",
 			"action", "delete_staff",
 			"resource", "staff",
@@ -657,19 +657,19 @@ func (h *ActorHandler) ListStaff(c *gin.Context) {
 	offset := (req.Page - 1) * req.PageSize
 
 	// 根据查询条件调用不同的服务方法
-	var results []*staffApp.StaffResult
+	var results []*operatorApp.OperatorResult
 	var total int64
 	var err error
 
 	// 使用查询服务
-	listDTO := staffApp.ListStaffDTO{
+	listDTO := operatorApp.ListOperatorDTO{
 		OrgID:  req.OrgID,
 		Role:   req.Role,
 		Offset: offset,
 		Limit:  req.PageSize,
 	}
 
-	listResult, err := h.staffQueryService.ListStaffs(c.Request.Context(), listDTO)
+	listResult, err := h.operatorQueryService.ListOperators(c.Request.Context(), listDTO)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to list staff",
 			"action", "list_staff",
@@ -833,8 +833,8 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 }
 
 // toRegisterStaffDTO 将创建请求转换为应用层 DTO
-func toRegisterStaffDTO(req *request.CreateStaffRequest) staffApp.RegisterStaffDTO {
-	return staffApp.RegisterStaffDTO{
+func toRegisterStaffDTO(req *request.CreateStaffRequest) operatorApp.RegisterOperatorDTO {
+	return operatorApp.RegisterOperatorDTO{
 		OrgID: req.OrgID,
 		// UserID left zero; application service will create/resolve IAM user
 		Roles: req.Roles,
@@ -845,7 +845,7 @@ func toRegisterStaffDTO(req *request.CreateStaffRequest) staffApp.RegisterStaffD
 }
 
 // toStaffResponse 将应用层结果转换为响应
-func toStaffResponse(result *staffApp.StaffResult) *response.StaffResponse {
+func toStaffResponse(result *operatorApp.OperatorResult) *response.StaffResponse {
 	return &response.StaffResponse{
 		ID:       fmt.Sprintf("%d", result.ID),
 		OrgID:    fmt.Sprintf("%d", result.OrgID),
@@ -859,7 +859,7 @@ func toStaffResponse(result *staffApp.StaffResult) *response.StaffResponse {
 }
 
 // toStaffListResponse 将应用层列表结果转换为响应
-func toStaffListResponse(results []*staffApp.StaffResult, total int64, page, pageSize int) *response.StaffListResponse {
+func toStaffListResponse(results []*operatorApp.OperatorResult, total int64, page, pageSize int) *response.StaffListResponse {
 	items := make([]*response.StaffResponse, 0, len(results))
 	for _, result := range results {
 		items = append(items, toStaffResponse(result))

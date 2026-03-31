@@ -1,4 +1,4 @@
-package staff
+package operator
 
 import (
 	"context"
@@ -27,7 +27,7 @@ func (f *factory) GetOrCreateByUser(
 	orgID int64,
 	userID int64,
 	name string,
-) (*Staff, error) {
+) (*Operator, error) {
 	// 先尝试查找
 	staff, err := f.repo.FindByUser(ctx, orgID, userID)
 	if err == nil {
@@ -41,7 +41,7 @@ func (f *factory) GetOrCreateByUser(
 			return nil, err
 		}
 
-		staff = NewStaff(orgID, userID, name)
+		staff = NewOperator(orgID, userID, name)
 
 		if err := f.repo.Save(ctx, staff); err != nil {
 			return nil, errors.Wrap(err, "failed to save staff")
