@@ -4,7 +4,7 @@ package operator
 // 设计说明：
 // 1. Operator 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
 // 2. 持久化的核心目的：
-//   - 存储业务角色（roles）：这是本 BC 的领域概念，IAM 不管
+//   - 存储业务角色（roles）：IAM 启用时为 GetAuthorizationSnapshot.roles 的本地投影；未启用 IAM 时仍由本 BC 维护
 //   - 多租户隔离：同一 IAM.User 在不同机构可能有不同角色
 //   - 审计追溯：操作记录用 ID 比 IAMUserID 更有业务语义
 //   - 性能优化：缓存常用字段（name），减少 RPC 调用
@@ -188,6 +188,12 @@ func (s *Operator) CanManageEvaluationPlans() bool {
 }
 
 // === 仓储层重建方法（用于从数据库加载）===
+
+// ReplaceRolesProjection 用 IAM 授权快照中的角色名替换本地持久化投影（非业务规则真值来源）。
+func (s *Operator) ReplaceRolesProjection(roles []Role) {
+	s.roles = make([]Role, len(roles))
+	copy(s.roles, roles)
+}
 
 // RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
 // 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据

@@ -76,6 +76,19 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		}
 	}
 
+	var opAuthz *iam.OperatorAuthzBundle
+	if len(params) > 4 {
+		if b, ok := params[4].(*iam.OperatorAuthzBundle); ok {
+			opAuthz = b
+		}
+	}
+	var authzAssign *iam.AuthzAssignmentClient
+	var authzSnap *iam.AuthzSnapshotLoader
+	if opAuthz != nil {
+		authzAssign = opAuthz.Assignment
+		authzSnap = opAuthz.Snapshot
+	}
+
 	// 初始化 UnitOfWork
 	uow := mysql.NewUnitOfWork(mysqlDB)
 
@@ -172,6 +185,8 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		operatorBinder,
 		uow,
 		identitySvc,
+		authzAssign,
+		authzSnap,
 	)
 	// 权限管理服务 - 服务于IT管理员
 	m.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
@@ -180,6 +195,8 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		operatorRoleAllocator,
 		operatorLifecycler,
 		uow,
+		authzAssign,
+		authzSnap,
 	)
 	// 查询服务 - 服务于所有需要查询的用户
 	m.OperatorQueryService = operatorApp.NewQueryService(m.OperatorRepo)

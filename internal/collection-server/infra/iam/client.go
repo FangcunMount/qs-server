@@ -22,6 +22,10 @@ type IAMOptions struct {
 	JWKS              *JWKSOptions
 	UserCache         *CacheOptions
 	GuardianshipCache *CacheOptions
+
+	AuthzAppName              string
+	AuthzCacheTTL             time.Duration
+	AuthzCasbinDomainOverride string
 }
 
 type GRPCOptions struct {

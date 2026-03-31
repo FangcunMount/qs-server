@@ -443,6 +443,12 @@ func buildGRPCServer(cfg *config.Config, container *container.Container) (*grpcp
 		return nil, err
 	}
 
+	if loader := container.IAMModule.AuthzSnapshotLoader(); loader != nil {
+		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
+			NewAuthzSnapshotUnaryInterceptor(loader))
+		log.Info("gRPC server: IAM authorization snapshot interceptor enabled (after JWT auth)")
+	}
+
 	// 获取 SDK TokenVerifier（使用 SDK 的本地 JWKS 验签能力）
 	tokenVerifier := container.IAMModule.SDKTokenVerifier()
 	if tokenVerifier != nil {

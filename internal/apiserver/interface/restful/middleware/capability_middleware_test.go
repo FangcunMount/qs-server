@@ -5,38 +5,58 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/gin-gonic/gin"
 )
 
 func TestRequireCapabilityMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	planManagerSnap := &authzapp.Snapshot{
+		Roles: []string{"qs:evaluation_plan_manager"},
+		Permissions: []authzapp.Permission{
+			{Resource: "qs:evaluation_plans", Action: "create|read|list|update|pause|resume|cancel|enroll|terminate|statistics"},
+			{Resource: "qs:evaluation_plan_tasks", Action: "schedule|read|list|open|complete|expire|cancel"},
+		},
+	}
+	evaluatorSnap := &authzapp.Snapshot{
+		Roles: []string{"qs:evaluator"},
+		Permissions: []authzapp.Permission{
+			{Resource: "qs:assessments", Action: "read|list|retry|batch_evaluate|statistics"},
+		},
+	}
+	adminSnap := &authzapp.Snapshot{
+		Roles: []string{"qs:admin"},
+		Permissions: []authzapp.Permission{
+			{Resource: "qs:*", Action: ".*"},
+		},
+	}
+
 	tests := []struct {
 		name        string
 		capability  Capability
-		roles       []string
+		snapshot    *authzapp.Snapshot
 		wantStatus  int
 		wantNextRun bool
 	}{
 		{
 			name:        "plan manager can pass",
 			capability:  CapabilityManageEvaluationPlans,
-			roles:       []string{operator.RoleEvaluationPlanManager.String()},
+			snapshot:    planManagerSnap,
 			wantStatus:  http.StatusOK,
 			wantNextRun: true,
 		},
 		{
 			name:        "evaluator cannot pass plan manager capability",
 			capability:  CapabilityManageEvaluationPlans,
-			roles:       []string{operator.RoleEvaluatorQS.String()},
+			snapshot:    evaluatorSnap,
 			wantStatus:  http.StatusForbidden,
 			wantNextRun: false,
 		},
 		{
-			name:        "admin can pass all admin capability",
+			name:        "admin can pass org admin capability",
 			capability:  CapabilityOrgAdmin,
-			roles:       []string{operator.RoleQSAdmin.String()},
+			snapshot:    adminSnap,
 			wantStatus:  http.StatusOK,
 			wantNextRun: true,
 		},
@@ -46,7 +66,7 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
-			c.Set(RolesKey, tt.roles)
+			c.Set(AuthzSnapshotKey, tt.snapshot)
 
 			nextRun := false
 			mw := RequireCapabilityMiddleware(tt.capability)

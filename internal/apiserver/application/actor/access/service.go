@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
@@ -51,7 +52,11 @@ func (s *service) ResolveAccessScope(ctx context.Context, orgID int64, operatorU
 	if !operatorItem.IsActive() {
 		return nil, errors.WithCode(code.ErrPermissionDenied, "operator is inactive")
 	}
-	if operatorItem.HasRole(domainOperator.RoleQSAdmin) {
+	snap, ok := authzapp.FromContext(ctx)
+	if !ok || snap == nil {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required")
+	}
+	if snap.IsQSAdmin() {
 		return &TesteeAccessScope{IsAdmin: true}, nil
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	basemtls "github.com/FangcunMount/component-base/pkg/grpc/mtls"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	"google.golang.org/grpc"
 )
 
 // Config gRPC 服务器配置
@@ -32,6 +33,10 @@ type Config struct {
 
 	// 审计配置
 	Audit AuditConfig
+
+	// ExtraUnaryAfterAuth 在 IAM 认证拦截器之后追加的一元拦截器（例如授权快照）。
+	// 用于与 HTTP AuthzSnapshotMiddleware 对齐，供 TesteeAccessService 等从 context 读取快照。
+	ExtraUnaryAfterAuth []grpc.UnaryServerInterceptor
 
 	// 功能开关
 	EnableReflection  bool

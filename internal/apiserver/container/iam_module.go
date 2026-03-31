@@ -14,12 +14,13 @@ import (
 
 // IAMModule IAM 集成模块
 type IAMModule struct {
-	client            *iam.Client
-	tokenVerifier     *iam.TokenVerifier
-	serviceAuthHelper *iam.ServiceAuthHelper
-	identityService   *iam.IdentityService
-	guardianshipSvc   *iam.GuardianshipService
-	wechatAppService  *iam.WeChatAppService
+	client              *iam.Client
+	tokenVerifier       *iam.TokenVerifier
+	serviceAuthHelper   *iam.ServiceAuthHelper
+	identityService     *iam.IdentityService
+	guardianshipSvc     *iam.GuardianshipService
+	wechatAppService    *iam.WeChatAppService
+	authzSnapshotLoader *iam.AuthzSnapshotLoader
 }
 
 // NewIAMModule 创建 IAM 模块
@@ -116,18 +117,29 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
+	var authzSnapshotLoader *iam.AuthzSnapshotLoader
+	if client.IsEnabled() && opts.GRPCEnabled {
+		iamOpts := convertIAMOptions(opts)
+		authzSnapshotLoader = iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
+			AppName:              iamOpts.AuthzAppName,
+			CacheTTL:             iamOpts.AuthzCacheTTL,
+			CasbinDomainOverride: iamOpts.AuthzCasbinDomainOverride,
+		})
+	}
+
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
 		"component", "iam_module",
 		"result", "success",
 	)
 
 	return &IAMModule{
-		client:            client,
-		tokenVerifier:     tokenVerifier,
-		serviceAuthHelper: serviceAuthHelper,
-		identityService:   identityService,
-		guardianshipSvc:   guardianshipSvc,
-		wechatAppService:  wechatAppService,
+		client:              client,
+		tokenVerifier:       tokenVerifier,
+		serviceAuthHelper:   serviceAuthHelper,
+		identityService:     identityService,
+		guardianshipSvc:     guardianshipSvc,
+		wechatAppService:    wechatAppService,
+		authzSnapshotLoader: authzSnapshotLoader,
 	}, nil
 }
 
@@ -171,6 +183,11 @@ func (m *IAMModule) GuardianshipService() *iam.GuardianshipService {
 // 用于查询微信应用信息（AppID、AppSecret 等）
 func (m *IAMModule) WeChatAppService() *iam.WeChatAppService {
 	return m.wechatAppService
+}
+
+// AuthzSnapshotLoader 返回 IAM 授权快照加载器（gRPC GetAuthorizationSnapshot + 本地缓存）。
+func (m *IAMModule) AuthzSnapshotLoader() *iam.AuthzSnapshotLoader {
+	return m.authzSnapshotLoader
 }
 
 // IsEnabled 检查 IAM 模块是否启用
@@ -288,6 +305,14 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 			MaxSize: 50000,
 		}
 	}
+
+	if opts.AuthzAppName != "" {
+		iamOpts.AuthzAppName = opts.AuthzAppName
+	}
+	if opts.AuthzCacheTTL > 0 {
+		iamOpts.AuthzCacheTTL = opts.AuthzCacheTTL
+	}
+	iamOpts.AuthzCasbinDomainOverride = opts.AuthzCasbinDomainOverride
 
 	return iamOpts
 }

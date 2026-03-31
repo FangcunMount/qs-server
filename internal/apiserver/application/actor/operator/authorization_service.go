@@ -2,9 +2,12 @@ package operator
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
@@ -16,6 +19,8 @@ type authorizationService struct {
 	roleAllocator domain.RoleAllocator
 	lifecycler    domain.Lifecycler
 	uow           *mysql.UnitOfWork
+	assignment    *iaminfra.AuthzAssignmentClient
+	snapshot      *iaminfra.AuthzSnapshotLoader
 }
 
 // NewAuthorizationService 创建操作者权限管理服务
@@ -25,6 +30,8 @@ func NewAuthorizationService(
 	roleAllocator domain.RoleAllocator,
 	lifecycler domain.Lifecycler,
 	uow *mysql.UnitOfWork,
+	assignment *iaminfra.AuthzAssignmentClient,
+	snapshot *iaminfra.AuthzSnapshotLoader,
 ) OperatorAuthorizationService {
 	return &authorizationService{
 		repo:          repo,
@@ -32,104 +39,121 @@ func NewAuthorizationService(
 		roleAllocator: roleAllocator,
 		lifecycler:    lifecycler,
 		uow:           uow,
+		assignment:    assignment,
+		snapshot:      snapshot,
 	}
 }
 
-// AssignRole 分配角色
+// AssignRole 分配角色（IAM 启用时先 GrantAssignment，再以快照刷新本地投影）。
 func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64, roleName string) error {
+	role := domain.Role(roleName)
+	if err := s.validator.ValidateRole(role); err != nil {
+		return err
+	}
+
+	st, err := s.repo.FindByID(ctx, domain.ID(operatorID))
+	if err != nil {
+		return errors.Wrap(err, "failed to find operator")
+	}
+
+	if s.assignment != nil && s.snapshot != nil {
+		dom := s.snapshot.DomainForOrg(st.OrgID())
+		if err := s.assignment.Grant(ctx, dom, strconv.FormatInt(st.UserID(), 10), roleName, actorctx.IAMGrantedBySubject(ctx)); err != nil {
+			return errors.Wrap(err, "iam grant assignment")
+		}
+		if err := iaminfra.SyncOperatorRolesFromSnapshot(ctx, s.snapshot, st.OrgID(), st); err != nil {
+			return errors.Wrap(err, "sync roles from iam snapshot")
+		}
+		rolesCopy := append([]domain.Role(nil), st.Roles()...)
+		return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+			cur, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+			if err != nil {
+				return errors.Wrap(err, "failed to find operator")
+			}
+			cur.ReplaceRolesProjection(rolesCopy)
+			return s.repo.Update(txCtx, cur)
+		})
+	}
+
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找操作者
-		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st2, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
-
-		// 2. 验证角色
-		role := domain.Role(roleName)
-		if err := s.validator.ValidateRole(role); err != nil {
+		if err := s.roleAllocator.AssignRole(st2, role); err != nil {
 			return err
 		}
-
-		// 3. 使用领域服务分配角色
-		if err := s.roleAllocator.AssignRole(st, role); err != nil {
-			return err
-		}
-
-		// 4. 持久化
-		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update operator")
-		}
-
-		return nil
+		return s.repo.Update(txCtx, st2)
 	})
 }
 
 // RemoveRole 移除角色
 func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64, roleName string) error {
+	role := domain.Role(roleName)
+	if err := s.validator.ValidateRole(role); err != nil {
+		return err
+	}
+
+	st, err := s.repo.FindByID(ctx, domain.ID(operatorID))
+	if err != nil {
+		return errors.Wrap(err, "failed to find operator")
+	}
+
+	if s.assignment != nil && s.snapshot != nil {
+		dom := s.snapshot.DomainForOrg(st.OrgID())
+		if err := s.assignment.Revoke(ctx, dom, strconv.FormatInt(st.UserID(), 10), roleName); err != nil {
+			return errors.Wrap(err, "iam revoke assignment")
+		}
+		if err := iaminfra.SyncOperatorRolesFromSnapshot(ctx, s.snapshot, st.OrgID(), st); err != nil {
+			return errors.Wrap(err, "sync roles from iam snapshot")
+		}
+		rolesCopy := append([]domain.Role(nil), st.Roles()...)
+		return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+			cur, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+			if err != nil {
+				return errors.Wrap(err, "failed to find operator")
+			}
+			cur.ReplaceRolesProjection(rolesCopy)
+			return s.repo.Update(txCtx, cur)
+		})
+	}
+
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找操作者
-		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st2, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
-
-		// 2. 使用领域服务移除角色
-		role := domain.Role(roleName)
-		if err := s.roleAllocator.RemoveRole(st, role); err != nil {
+		if err := s.roleAllocator.RemoveRole(st2, role); err != nil {
 			return err
 		}
-
-		// 3. 持久化
-		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update operator")
-		}
-
-		return nil
+		return s.repo.Update(txCtx, st2)
 	})
 }
 
 // Activate 激活操作者
 func (s *authorizationService) Activate(ctx context.Context, operatorID uint64) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找操作者
 		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
-
-		// 2. 使用领域服务激活
 		if err := s.lifecycler.Activate(st); err != nil {
 			return err
 		}
-
-		// 3. 持久化
-		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update operator")
-		}
-
-		return nil
+		return s.repo.Update(txCtx, st)
 	})
 }
 
 // Deactivate 停用操作者
 func (s *authorizationService) Deactivate(ctx context.Context, operatorID uint64) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找操作者
 		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
-
-		// 2. 使用领域服务停用（需要提供原因）
 		if err := s.lifecycler.Deactivate(st, "deactivated by admin"); err != nil {
 			return err
 		}
-
-		// 3. 持久化
-		if err := s.repo.Update(txCtx, st); err != nil {
-			return errors.Wrap(err, "failed to update operator")
-		}
-
-		return nil
+		return s.repo.Update(txCtx, st)
 	})
 }

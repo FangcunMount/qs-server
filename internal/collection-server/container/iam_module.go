@@ -10,15 +10,17 @@ import (
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
+	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 )
 
 // IAMModule IAM 集成模块
 type IAMModule struct {
-	client            *iam.Client
-	tokenVerifier     *iam.TokenVerifier
-	serviceAuthHelper *iam.ServiceAuthHelper
-	identityService   *iam.IdentityService
-	guardianshipSvc   *iam.GuardianshipService
+	client              *iam.Client
+	tokenVerifier       *iam.TokenVerifier
+	serviceAuthHelper   *iam.ServiceAuthHelper
+	identityService     *iam.IdentityService
+	guardianshipSvc     *iam.GuardianshipService
+	authzSnapshotLoader *iamauth.SnapshotLoader
 }
 
 // NewIAMModule 创建 IAM 模块
@@ -86,14 +88,25 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
+	var authzSnapshotLoader *iamauth.SnapshotLoader
+	if client.IsEnabled() && opts.GRPCEnabled {
+		iamOpts := convertIAMOptions(opts)
+		authzSnapshotLoader = iamauth.NewSnapshotLoader(client, iamauth.SnapshotLoaderOptions{
+			AppName:              iamOpts.AuthzAppName,
+			CacheTTL:             iamOpts.AuthzCacheTTL,
+			CasbinDomainOverride: iamOpts.AuthzCasbinDomainOverride,
+		})
+	}
+
 	log.Info("IAM module initialized successfully")
 
 	return &IAMModule{
-		client:            client,
-		tokenVerifier:     tokenVerifier,
-		serviceAuthHelper: serviceAuthHelper,
-		identityService:   identityService,
-		guardianshipSvc:   guardianshipSvc,
+		client:              client,
+		tokenVerifier:       tokenVerifier,
+		serviceAuthHelper:   serviceAuthHelper,
+		identityService:     identityService,
+		guardianshipSvc:     guardianshipSvc,
+		authzSnapshotLoader: authzSnapshotLoader,
 	}, nil
 }
 
@@ -131,6 +144,11 @@ func (m *IAMModule) IdentityService() *iam.IdentityService {
 // 用于监护关系验证和查询
 func (m *IAMModule) GuardianshipService() *iam.GuardianshipService {
 	return m.guardianshipSvc
+}
+
+// AuthzSnapshotLoader 返回 IAM 授权快照加载器（与 apiserver 共用 pkg/iamauth）。
+func (m *IAMModule) AuthzSnapshotLoader() *iamauth.SnapshotLoader {
+	return m.authzSnapshotLoader
 }
 
 // IsEnabled 检查 IAM 模块是否启用
@@ -248,6 +266,14 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 			MaxSize: 50000,
 		}
 	}
+
+	if opts.AuthzAppName != "" {
+		iamOpts.AuthzAppName = opts.AuthzAppName
+	}
+	if opts.AuthzCacheTTL > 0 {
+		iamOpts.AuthzCacheTTL = opts.AuthzCacheTTL
+	}
+	iamOpts.AuthzCasbinDomainOverride = opts.AuthzCasbinDomainOverride
 
 	return iamOpts
 }

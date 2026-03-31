@@ -152,6 +152,12 @@ func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) [
 		log.Warn("gRPC server: auth enabled but TokenVerifier not provided, skipping authentication")
 	}
 
+	for _, extra := range config.ExtraUnaryAfterAuth {
+		if extra != nil {
+			interceptorChain = append(interceptorChain, extra)
+		}
+	}
+
 	// 6. ACL（权限控制 - 使用 component-base 的 ServiceACL）
 	if config.ACL.Enabled {
 		acl := loadACLConfig(config.ACL.ConfigFile, config.ACL.DefaultPolicy)

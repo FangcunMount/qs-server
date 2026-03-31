@@ -66,7 +66,8 @@ flowchart LR
 | ------ | ---- |
 | apiserver IAM 模块 | [internal/apiserver/container/iam_module.go](../../internal/apiserver/container/iam_module.go) |
 | collection IAM 模块 | [internal/collection-server/container/iam_module.go](../../internal/collection-server/container/iam_module.go) |
-| 共享拦截器 | [internal/pkg/grpc/interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go) |
+| 共享拦截器 | [internal/pkg/grpc/interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go)、[internal/pkg/grpc/server.go](../../internal/pkg/grpc/server.go)（`buildUnaryInterceptors`） |
+| apiserver gRPC 授权快照 | [internal/apiserver/grpc_authz_snapshot_interceptor.go](../../internal/apiserver/grpc_authz_snapshot_interceptor.go)、[`buildGRPCServer`](../../internal/apiserver/server.go) 注入 |
 
 ---
 
@@ -106,9 +107,10 @@ flowchart LR
 
 ### 核心模式：internal gRPC（apiserver 侧）
 
-- **拦截器链顺序**（ Unary）：Recovery → RequestID → Logging →（可选）mTLS Identity →（可选）**IAMAuth** →（可选）ACL →（可选）Audit，见 [server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)。
+- **拦截器链顺序**（Unary，与代码一致）：Recovery → RequestID → Logging →（可选）mTLS Identity →（可选）**IAMAuth** →（可选）**授权快照（ExtraUnaryAfterAuth）** →（可选）ACL →（可选）Audit，见 [pkg/grpc `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)。
+- **IAMAuth 之后：授权快照**：仅 **qs-apiserver** 在装配 gRPC 时，若 `IAMModule.AuthzSnapshotLoader()` 可用，则通过 `Config.ExtraUnaryAfterAuth` 追加 **`NewAuthzSnapshotUnaryInterceptor`**（[grpc_authz_snapshot_interceptor.go](../../internal/apiserver/grpc_authz_snapshot_interceptor.go)），调用 IAM **GetAuthorizationSnapshot**，并向 context 写入与 HTTP [`AuthzSnapshotMiddleware`](../../internal/apiserver/interface/restful/middleware/authz_snapshot_middleware.go) 一致的 **`authz` 快照**与 **`GrantingUserID`**。无 JWT 或未注入 `tenant_id`/`user_id` 的 RPC（如 Health、Reflection、未走 IAM 的内部调用）**不**拉快照。
 - **`grpc.auth.enabled`**：为 `true` 且注入了 `TokenVerifier` 时挂载 `IAMAuthInterceptor`；否则跳过认证（或仅打 warn）。
-- **默认跳过认证**：gRPC **Health**、**Reflection**（前缀匹配），见 `NewIAMAuthInterceptor` 内 `skipMethods`；**业务 RPC 不在默认白名单**，需带 JWT 或运行时扩展 `AddSkipMethod`。
+- **默认跳过认证**：gRPC **Health**、**Reflection**（前缀匹配），见 `NewIAMAuthInterceptor` 内 `skipMethods`；授权快照拦截器对同类路径 **跳过**加载（与 IAM 白名单对齐）。**业务 RPC 不在默认白名单**，需带 JWT 或运行时扩展 `AddSkipMethod`。
 - **worker → apiserver**：[`InternalClient`](../../internal/worker/infra/grpcclient/internal_client.go) 调用 **未**附加 `authorization` metadata；[`Manager`](../../internal/worker/infra/grpcclient/manager.go) 仅 TLS/mTLS 传输凭证。故 **生产若开启 `grpc.auth.enabled`**，需 **PerRPC 注入服务 JWT** 或调整拦截器/白名单；示例 [`configs/apiserver.dev.yaml`](../../configs/apiserver.dev.yaml) 中 **`auth.enabled: false`** 与当前客户端行为一致。
 
 ## 这篇和运行时文档怎么分工
@@ -119,7 +121,7 @@ flowchart LR
 | ---- | --------------------------- | --------------------------- |
 | IAM 是否独立进程 | 明确否，横切能力 | 同左；模块装配与配置键 |
 | HTTP JWT | `JWTAuthMiddleware` → 各进程 `UserIdentityMiddleware` | 共享 [`jwt_auth.go`](../../internal/pkg/middleware/jwt_auth.go)；进程差异见 05 |
-| gRPC JWT | metadata `authorization` → `IAMAuthInterceptor` | 同上 + **`grpc.*` 与 mTLS/ACL 开关**、**skip 列表** |
+| gRPC JWT | metadata `authorization` → `IAMAuthInterceptor` →（可选）**授权快照拦截器** | 同上 + **`grpc.*` 与 mTLS/ACL 开关**、**skip 列表**；快照与 REST 对齐（见本文「gRPC、mTLS 和 IAM JWT 是怎么叠起来的」） |
 | collection → apiserver gRPC | 服务间调用、监护与业务查询 | **ServiceAuthHelper**（服务态）；与 HTTP 用户 JWT 区分 |
 | worker | 不持 IAM 模块；依赖 apiserver gRPC 是否鉴权 | **internal 调用当前无 JWT**；与 05「依赖 gRPC 是否开启认证」一致 |
 | 配置 Verify | `iam.*` 影响验签与缓存 | 同左 + 对照 [05-配置体系](./05-配置体系.md) |

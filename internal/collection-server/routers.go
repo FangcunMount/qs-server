@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
-	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
@@ -114,8 +114,16 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 	}
 
 	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddleware(tokenVerifier)))
+	// 与 apiserver 对齐：tenant_id、org_id、IAM 授权快照（collection 无 Operator，不做 ActiveOperator 校验）
 	api.Use(withAuthSkip(skip, middleware.UserIdentityMiddleware()))
-	fmt.Printf("🔐 JWT authentication middleware enabled for /api/v1 (local JWKS verification)\n")
+	api.Use(withAuthSkip(skip, middleware.RequireTenantIDMiddleware()))
+	api.Use(withAuthSkip(skip, middleware.RequireNumericOrgScopeMiddleware()))
+	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
+		api.Use(withAuthSkip(skip, middleware.AuthzSnapshotMiddleware(loader)))
+	} else {
+		fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable for collection-server (need gRPC)\n")
+	}
+	fmt.Printf("🔐 JWT + IAM authz snapshot middleware enabled for /api/v1 (local JWKS verification)\n")
 }
 
 // withAuthSkip

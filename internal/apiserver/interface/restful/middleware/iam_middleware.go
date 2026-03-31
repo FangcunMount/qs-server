@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/gin-gonic/gin"
 
+	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 )
 
@@ -66,11 +69,70 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 			// 如果解析失败，不阻断请求，OrgID 可能不是数字格式
 		}
 
-		// 存储角色列表
-		if len(claims.Roles) > 0 {
-			c.Set(RolesKey, claims.Roles)
-		}
+		c.Next()
+	}
+}
 
+// RequireTenantIDMiddleware 要求 JWT 含非空 tenant_id（与 IAM 对齐；业务真值来自授权快照而非 JWT roles）。
+func RequireTenantIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims := pkgmiddleware.GetUserClaims(c)
+		if claims == nil || claims.TenantID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "tenant_id claim is required",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireNumericOrgScopeMiddleware 要求 tenant_id 可解析为 QS org_id（uint64）。
+func RequireNumericOrgScopeMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if GetOrgID(c) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "tenant_id must be a numeric organization id for QS",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireActiveOperatorMiddleware 要求当前租户下存在且已激活的 Operator（在 IAM 授权快照之前执行）。
+func RequireActiveOperatorMiddleware(repo domainOperator.Repository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if repo == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "operator repository not configured"})
+			c.Abort()
+			return
+		}
+		orgID := int64(GetOrgID(c))
+		uid := GetUserID(c)
+		if orgID <= 0 || uid == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid organization or user scope"})
+			c.Abort()
+			return
+		}
+		op, err := repo.FindByUser(c.Request.Context(), orgID, int64(uid))
+		if err != nil {
+			if errors.IsCode(err, code.ErrUserNotFound) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "operator not found in current organization"})
+				c.Abort()
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("operator lookup failed: %v", err)})
+			c.Abort()
+			return
+		}
+		if !op.IsActive() {
+			c.JSON(http.StatusForbidden, gin.H{"error": "operator is inactive"})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
@@ -221,6 +283,9 @@ func GetTenantID(c *gin.Context) string {
 
 // GetRoles 从 gin.Context 获取角色列表
 func GetRoles(c *gin.Context) []string {
+	if snap := GetAuthzSnapshot(c); snap != nil && len(snap.Roles) > 0 {
+		return snap.Roles
+	}
 	val, exists := c.Get(RolesKey)
 	if !exists {
 		return nil

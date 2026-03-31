@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -23,6 +24,8 @@ type lifecycleService struct {
 	binder        domain.Binder
 	uow           *mysql.UnitOfWork
 	identitySvc   *iam.IdentityService
+	assignment    *iam.AuthzAssignmentClient
+	snapshot      *iam.AuthzSnapshotLoader
 }
 
 // NewLifecycleService 创建操作者生命周期服务
@@ -35,6 +38,8 @@ func NewLifecycleService(
 	binder domain.Binder,
 	uow *mysql.UnitOfWork,
 	identitySvc *iam.IdentityService,
+	assignment *iam.AuthzAssignmentClient,
+	snapshot *iam.AuthzSnapshotLoader,
 ) OperatorLifecycleService {
 	return &lifecycleService{
 		repo:          repo,
@@ -45,6 +50,8 @@ func NewLifecycleService(
 		binder:        binder,
 		uow:           uow,
 		identitySvc:   identitySvc,
+		assignment:    assignment,
+		snapshot:      snapshot,
 	}
 }
 
@@ -75,6 +82,12 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 
 	if err != nil {
 		return nil, err
+	}
+
+	if s.assignment != nil && s.snapshot != nil && len(dto.Roles) > 0 {
+		if err := s.applyIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
+			return nil, errors.Wrap(err, "iam role assignment after register")
+		}
 	}
 
 	return toOperatorResult(result), nil
@@ -214,14 +227,18 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 	// 创建操作者
 	st := domain.NewOperator(dto.OrgID, userID, dto.Name)
 
-	// 分配角色
-	for _, roleName := range dto.Roles {
-		role := domain.Role(roleName)
-		if err := s.validator.ValidateRole(role); err != nil {
-			return nil, err
-		}
-		if err := s.roleAllocator.AssignRole(st, role); err != nil {
-			return nil, err
+	useIAM := s.assignment != nil && s.snapshot != nil
+	if useIAM {
+		// 角色由事务外 IAM Grant + 快照同步写入
+	} else {
+		for _, roleName := range dto.Roles {
+			role := domain.Role(roleName)
+			if err := s.validator.ValidateRole(role); err != nil {
+				return nil, err
+			}
+			if err := s.roleAllocator.AssignRole(st, role); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -234,4 +251,30 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 	}
 
 	return st, nil
+}
+
+func (s *lifecycleService) applyIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
+	dom := s.snapshot.DomainForOrg(op.OrgID())
+	uidStr := strconv.FormatInt(op.UserID(), 10)
+	for _, rn := range roleNames {
+		role := domain.Role(rn)
+		if err := s.validator.ValidateRole(role); err != nil {
+			return err
+		}
+		if err := s.assignment.Grant(ctx, dom, uidStr, rn, actorctx.IAMGrantedBySubject(ctx)); err != nil {
+			return err
+		}
+	}
+	if err := iam.SyncOperatorRolesFromSnapshot(ctx, s.snapshot, op.OrgID(), op); err != nil {
+		return err
+	}
+	rolesCopy := append([]domain.Role(nil), op.Roles()...)
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		cur, err := s.repo.FindByID(txCtx, op.ID())
+		if err != nil {
+			return errors.Wrap(err, "failed to find operator")
+		}
+		cur.ReplaceRolesProjection(rolesCopy)
+		return s.repo.Update(txCtx, cur)
+	})
 }

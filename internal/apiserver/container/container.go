@@ -338,12 +338,17 @@ func (c *Container) initActorModule() error {
 	// 获取 guardianshipSvc（如果 IAM 模块已启用）
 	var guardianshipSvc *iam.GuardianshipService
 	var identitySvc *iam.IdentityService
+	var opAuthz *iam.OperatorAuthzBundle
 	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
 		guardianshipSvc = c.IAMModule.GuardianshipService()
 		identitySvc = c.IAMModule.IdentityService()
+		opAuthz = &iam.OperatorAuthzBundle{
+			Assignment: iam.NewAuthzAssignmentClient(c.IAMModule.Client()),
+			Snapshot:   c.IAMModule.AuthzSnapshotLoader(),
+		}
 	}
 
-	if err := actorModule.Initialize(c.mysqlDB, guardianshipSvc, identitySvc, c.redisCache); err != nil {
+	if err := actorModule.Initialize(c.mysqlDB, guardianshipSvc, identitySvc, c.redisCache, opAuthz); err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
 	}
 

@@ -131,6 +131,16 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 		if tokenVerifier != nil {
 			group.Use(middleware.JWTAuthMiddleware(tokenVerifier))
 			group.Use(restmiddleware.UserIdentityMiddleware())
+			group.Use(restmiddleware.RequireTenantIDMiddleware())
+			group.Use(restmiddleware.RequireNumericOrgScopeMiddleware())
+			if r.container.ActorModule != nil && r.container.ActorModule.OperatorRepo != nil {
+				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.container.ActorModule.OperatorRepo))
+			}
+			if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
+				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader))
+			} else {
+				fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable (need gRPC); authorization snapshot disabled for %s\n", routePrefix)
+			}
 			fmt.Printf("🔐 JWT authentication middleware enabled for %s (local JWKS verification)\n", routePrefix)
 			return
 		}

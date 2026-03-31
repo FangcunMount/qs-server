@@ -34,6 +34,11 @@ type IAMOptions struct {
 
 	// 监护关系缓存配置
 	GuardianshipCache *IAMCacheOptions `json:"guardianship-cache" mapstructure:"guardianship-cache"`
+
+	// Authz 快照（与 IAM Casbin domain / app_name 对齐）
+	AuthzAppName              string        `json:"authz-app-name" mapstructure:"authz-app-name"`
+	AuthzCacheTTL             time.Duration `json:"authz-cache-ttl" mapstructure:"authz-cache-ttl"`
+	AuthzCasbinDomainOverride string        `json:"authz-casbin-domain" mapstructure:"authz-casbin-domain"` // 仅迁移例外：默认留空，使 domain=JWT tenant_id（与 IAM 契约一致）
 }
 
 // IAMGRPCOptions IAM gRPC 连接配置
@@ -112,7 +117,7 @@ func NewIAMOptions() *IAMOptions {
 			Audience:       []string{"qs"},
 			Algorithms:     []string{"RS256", "ES256"},
 			ClockSkew:      60 * time.Second,
-			RequiredClaims: []string{"user_id"},
+			RequiredClaims: []string{"user_id", "tenant_id"},
 		},
 
 		JWKS: &IAMJWKSOptions{
@@ -140,6 +145,10 @@ func NewIAMOptions() *IAMOptions {
 			TTL:     10 * time.Minute,
 			MaxSize: 50000,
 		},
+
+		AuthzAppName:              "qs",
+		AuthzCacheTTL:             30 * time.Second,
+		AuthzCasbinDomainOverride: "",
 	}
 }
 
@@ -242,4 +251,11 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"User cache TTL")
 	fs.IntVar(&o.UserCache.MaxSize, "iam.user-cache.max-size", o.UserCache.MaxSize,
 		"User cache max size")
+
+	fs.StringVar(&o.AuthzAppName, "iam.authz.app-name", o.AuthzAppName,
+		"IAM authorization snapshot app_name filter (e.g. qs)")
+	fs.DurationVar(&o.AuthzCacheTTL, "iam.authz.cache-ttl", o.AuthzCacheTTL,
+		"In-process TTL for GetAuthorizationSnapshot cache")
+	fs.StringVar(&o.AuthzCasbinDomainOverride, "iam.authz.casbin-domain", o.AuthzCasbinDomainOverride,
+		"Override Casbin domain for IAM snapshot when JWT tenant_id differs from IAM domain")
 }
