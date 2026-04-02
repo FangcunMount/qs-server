@@ -10,12 +10,15 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -30,6 +33,11 @@ type InternalService struct {
 	engineService             engine.Service
 	scaleRepo                 scale.Repository
 	testeeTaggingService      testeeApp.TesteeTaggingService
+	operatorLifecycleService  operatorApp.OperatorLifecycleService
+	operatorAuthService       operatorApp.OperatorAuthorizationService
+	operatorQueryService      operatorApp.OperatorQueryService
+	operatorRepo              domainoperator.Repository
+	authzSnapshot             *iaminfra.AuthzSnapshotLoader
 	// 小程序码生成服务（可选）
 	qrCodeService qrcodeApp.QRCodeService
 }
@@ -42,6 +50,11 @@ func NewInternalService(
 	engineService engine.Service,
 	scaleRepo scale.Repository,
 	testeeTaggingService testeeApp.TesteeTaggingService,
+	operatorLifecycleService operatorApp.OperatorLifecycleService,
+	operatorAuthService operatorApp.OperatorAuthorizationService,
+	operatorQueryService operatorApp.OperatorQueryService,
+	operatorRepo domainoperator.Repository,
+	authzSnapshot *iaminfra.AuthzSnapshotLoader,
 	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
 ) *InternalService {
 	var qrService qrcodeApp.QRCodeService
@@ -50,13 +63,18 @@ func NewInternalService(
 	}
 
 	return &InternalService{
-		answerSheetScoringService:  answerSheetScoringService,
-		submissionService:          submissionService,
-		managementService:          managementService,
-		engineService:              engineService,
-		scaleRepo:                  scaleRepo,
-		testeeTaggingService:       testeeTaggingService,
-		qrCodeService:              qrService,
+		answerSheetScoringService: answerSheetScoringService,
+		submissionService:         submissionService,
+		managementService:         managementService,
+		engineService:             engineService,
+		scaleRepo:                 scaleRepo,
+		testeeTaggingService:      testeeTaggingService,
+		operatorLifecycleService:  operatorLifecycleService,
+		operatorAuthService:       operatorAuthService,
+		operatorQueryService:      operatorQueryService,
+		operatorRepo:              operatorRepo,
+		authzSnapshot:             authzSnapshot,
+		qrCodeService:             qrService,
 	}
 }
 
@@ -511,5 +529,98 @@ func (s *InternalService) GenerateScaleQRCode(
 		Success:   true,
 		QrcodeUrl: qrCodeURL,
 		Message:   "小程序码生成成功",
+	}, nil
+}
+
+// BootstrapOperator 自举首个操作者。
+func (s *InternalService) BootstrapOperator(
+	ctx context.Context,
+	req *pb.BootstrapOperatorRequest,
+) (*pb.BootstrapOperatorResponse, error) {
+	l := logger.L(ctx)
+	l.Infow("gRPC: 收到 operator bootstrap 请求",
+		"action", "bootstrap_operator",
+		"org_id", req.OrgId,
+		"user_id", req.UserId,
+	)
+
+	if s.operatorLifecycleService == nil || s.operatorQueryService == nil {
+		return nil, status.Error(codes.FailedPrecondition, "operator services not configured")
+	}
+	if req.OrgId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	}
+	if req.UserId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id 不能为空")
+	}
+	if req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "name 不能为空")
+	}
+
+	created := false
+	if _, err := s.operatorQueryService.GetByUser(ctx, req.OrgId, req.UserId); err != nil {
+		if errors.IsCode(err, errorCode.ErrUserNotFound) {
+			created = true
+		} else {
+			return nil, status.Errorf(codes.Internal, "query existing operator failed: %v", err)
+		}
+	}
+
+	result, err := s.operatorLifecycleService.EnsureByUser(ctx, req.OrgId, req.UserId, req.Name)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "ensure operator failed: %v", err)
+	}
+
+	if req.Name != "" || req.Email != "" || req.Phone != "" {
+		if err := s.operatorLifecycleService.UpdateFromExternalSource(ctx, result.ID, req.Name, req.Email, req.Phone); err != nil {
+			return nil, status.Errorf(codes.Internal, "sync operator profile failed: %v", err)
+		}
+	}
+
+	if s.operatorAuthService != nil {
+		if req.IsActive {
+			if err := s.operatorAuthService.Activate(ctx, result.ID); err != nil {
+				return nil, status.Errorf(codes.Internal, "activate operator failed: %v", err)
+			}
+		} else {
+			if err := s.operatorAuthService.Deactivate(ctx, result.ID); err != nil {
+				return nil, status.Errorf(codes.Internal, "deactivate operator failed: %v", err)
+			}
+		}
+	}
+
+	if req.IsActive && s.authzSnapshot != nil && s.operatorRepo != nil {
+		op, err := s.operatorRepo.FindByID(ctx, domainoperator.ID(result.ID))
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "load operator aggregate failed: %v", err)
+		}
+		if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.authzSnapshot, s.operatorRepo, req.OrgId, op); err != nil {
+			return nil, status.Errorf(codes.Internal, "sync operator roles from snapshot failed: %v", err)
+		}
+	}
+
+	finalResult, err := s.operatorQueryService.GetByUser(ctx, req.OrgId, req.UserId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "query operator after bootstrap failed: %v", err)
+	}
+
+	message := "operator already exists"
+	if created {
+		message = "operator bootstrapped"
+	}
+	l.Infow("operator bootstrap 完成",
+		"action", "bootstrap_operator",
+		"org_id", req.OrgId,
+		"user_id", req.UserId,
+		"operator_id", finalResult.ID,
+		"created", created,
+		"roles", finalResult.Roles,
+	)
+
+	return &pb.BootstrapOperatorResponse{
+		OperatorId: finalResult.ID,
+		Created:    created,
+		Message:    message,
+		Roles:      append([]string(nil), finalResult.Roles...),
 	}, nil
 }

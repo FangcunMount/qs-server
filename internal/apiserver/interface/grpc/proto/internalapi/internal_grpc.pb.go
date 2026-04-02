@@ -25,6 +25,7 @@ const (
 	InternalService_TagTestee_FullMethodName                       = "/internalapi.InternalService/TagTestee"
 	InternalService_GenerateQuestionnaireQRCode_FullMethodName     = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
 	InternalService_GenerateScaleQRCode_FullMethodName             = "/internalapi.InternalService/GenerateScaleQRCode"
+	InternalService_BootstrapOperator_FullMethodName               = "/internalapi.InternalService/BootstrapOperator"
 )
 
 // InternalServiceClient is the client API for InternalService service.
@@ -58,6 +59,10 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 scale.published 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
+	// 自举首个操作者
+	// 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
+	// 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
+	BootstrapOperator(ctx context.Context, in *BootstrapOperatorRequest, opts ...grpc.CallOption) (*BootstrapOperatorResponse, error)
 }
 
 type internalServiceClient struct {
@@ -128,6 +133,16 @@ func (c *internalServiceClient) GenerateScaleQRCode(ctx context.Context, in *Gen
 	return out, nil
 }
 
+func (c *internalServiceClient) BootstrapOperator(ctx context.Context, in *BootstrapOperatorRequest, opts ...grpc.CallOption) (*BootstrapOperatorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BootstrapOperatorResponse)
+	err := c.cc.Invoke(ctx, InternalService_BootstrapOperator_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InternalServiceServer is the server API for InternalService service.
 // All implementations must embed UnimplementedInternalServiceServer
 // for forward compatibility.
@@ -159,6 +174,10 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 scale.published 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
+	// 自举首个操作者
+	// 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
+	// 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
+	BootstrapOperator(context.Context, *BootstrapOperatorRequest) (*BootstrapOperatorResponse, error)
 	mustEmbedUnimplementedInternalServiceServer()
 }
 
@@ -186,6 +205,9 @@ func (UnimplementedInternalServiceServer) GenerateQuestionnaireQRCode(context.Co
 }
 func (UnimplementedInternalServiceServer) GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateScaleQRCode not implemented")
+}
+func (UnimplementedInternalServiceServer) BootstrapOperator(context.Context, *BootstrapOperatorRequest) (*BootstrapOperatorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BootstrapOperator not implemented")
 }
 func (UnimplementedInternalServiceServer) mustEmbedUnimplementedInternalServiceServer() {}
 func (UnimplementedInternalServiceServer) testEmbeddedByValue()                         {}
@@ -316,6 +338,24 @@ func _InternalService_GenerateScaleQRCode_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_BootstrapOperator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BootstrapOperatorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).BootstrapOperator(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_BootstrapOperator_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).BootstrapOperator(ctx, req.(*BootstrapOperatorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InternalService_ServiceDesc is the grpc.ServiceDesc for InternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -346,6 +386,10 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateScaleQRCode",
 			Handler:    _InternalService_GenerateScaleQRCode_Handler,
+		},
+		{
+			MethodName: "BootstrapOperator",
+			Handler:    _InternalService_BootstrapOperator_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

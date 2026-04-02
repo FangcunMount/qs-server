@@ -50,6 +50,14 @@ service InternalService {
   // 流程：生成小程序码并保存，返回二维码 URL
   rpc GenerateScaleQRCode(GenerateScaleQRCodeRequest) 
       returns (GenerateScaleQRCodeResponse);
+
+  // ==================== Operator Bootstrap 操作 ====================
+
+  // 自举首个操作者
+  // 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
+  // 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
+  rpc BootstrapOperator(BootstrapOperatorRequest)
+      returns (BootstrapOperatorResponse);
 }
 
 // ==================== CalculateAnswerSheetScore ====================
@@ -151,4 +159,22 @@ message GenerateScaleQRCodeResponse {
   bool success = 1;                  // 是否成功
   string qrcode_url = 2;             // 二维码 URL
   string message = 3;                // 描述信息
+}
+
+// ==================== BootstrapOperator ====================
+
+message BootstrapOperatorRequest {
+  int64 org_id = 1;                  // 机构 ID
+  int64 user_id = 2;                 // IAM 用户 ID
+  string name = 3;                   // 姓名
+  string email = 4;                  // 邮箱（可选）
+  string phone = 5;                  // 手机号（可选）
+  bool is_active = 6;                // 是否激活
+}
+
+message BootstrapOperatorResponse {
+  uint64 operator_id = 1;            // 操作者 ID
+  bool created = 2;                  // 是否首次创建
+  string message = 3;                // 描述信息
+  repeated string roles = 4;         // 当前本地角色投影
 }

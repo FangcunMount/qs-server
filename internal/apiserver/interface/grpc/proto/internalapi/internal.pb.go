@@ -793,6 +793,158 @@ func (x *GenerateScaleQRCodeResponse) GetMessage() string {
 	return ""
 }
 
+type BootstrapOperatorRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgId         int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`          // 机构 ID
+	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`       // IAM 用户 ID
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`                          // 姓名
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`                        // 邮箱（可选）
+	Phone         string                 `protobuf:"bytes,5,opt,name=phone,proto3" json:"phone,omitempty"`                        // 手机号（可选）
+	IsActive      bool                   `protobuf:"varint,6,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"` // 是否激活
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BootstrapOperatorRequest) Reset() {
+	*x = BootstrapOperatorRequest{}
+	mi := &file_internalapi_internal_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BootstrapOperatorRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BootstrapOperatorRequest) ProtoMessage() {}
+
+func (x *BootstrapOperatorRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BootstrapOperatorRequest.ProtoReflect.Descriptor instead.
+func (*BootstrapOperatorRequest) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *BootstrapOperatorRequest) GetOrgId() int64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
+}
+
+func (x *BootstrapOperatorRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *BootstrapOperatorRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *BootstrapOperatorRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *BootstrapOperatorRequest) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *BootstrapOperatorRequest) GetIsActive() bool {
+	if x != nil {
+		return x.IsActive
+	}
+	return false
+}
+
+type BootstrapOperatorResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OperatorId    uint64                 `protobuf:"varint,1,opt,name=operator_id,json=operatorId,proto3" json:"operator_id,omitempty"` // 操作者 ID
+	Created       bool                   `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"`                         // 是否首次创建
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                          // 描述信息
+	Roles         []string               `protobuf:"bytes,4,rep,name=roles,proto3" json:"roles,omitempty"`                              // 当前本地角色投影
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BootstrapOperatorResponse) Reset() {
+	*x = BootstrapOperatorResponse{}
+	mi := &file_internalapi_internal_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BootstrapOperatorResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BootstrapOperatorResponse) ProtoMessage() {}
+
+func (x *BootstrapOperatorResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BootstrapOperatorResponse.ProtoReflect.Descriptor instead.
+func (*BootstrapOperatorResponse) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *BootstrapOperatorResponse) GetOperatorId() uint64 {
+	if x != nil {
+		return x.OperatorId
+	}
+	return 0
+}
+
+func (x *BootstrapOperatorResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
+func (x *BootstrapOperatorResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *BootstrapOperatorResponse) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
 var File_internalapi_internal_proto protoreflect.FileDescriptor
 
 const file_internalapi_internal_proto_rawDesc = "" +
@@ -860,14 +1012,28 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1d\n" +
 	"\n" +
 	"qrcode_url\x18\x02 \x01(\tR\tqrcodeUrl\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage2\xbc\x05\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xa7\x01\n" +
+	"\x18BootstrapOperatorRequest\x12\x15\n" +
+	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x14\n" +
+	"\x05phone\x18\x05 \x01(\tR\x05phone\x12\x1b\n" +
+	"\tis_active\x18\x06 \x01(\bR\bisActive\"\x86\x01\n" +
+	"\x19BootstrapOperatorResponse\x12\x1f\n" +
+	"\voperator_id\x18\x01 \x01(\x04R\n" +
+	"operatorId\x12\x18\n" +
+	"\acreated\x18\x02 \x01(\bR\acreated\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\x14\n" +
+	"\x05roles\x18\x04 \x03(\tR\x05roles2\xa0\x06\n" +
 	"\x0fInternalService\x12z\n" +
 	"\x19CalculateAnswerSheetScore\x12-.internalapi.CalculateAnswerSheetScoreRequest\x1a..internalapi.CalculateAnswerSheetScoreResponse\x12\x8c\x01\n" +
 	"\x1fCreateAssessmentFromAnswerSheet\x123.internalapi.CreateAssessmentFromAnswerSheetRequest\x1a4.internalapi.CreateAssessmentFromAnswerSheetResponse\x12e\n" +
 	"\x12EvaluateAssessment\x12&.internalapi.EvaluateAssessmentRequest\x1a'.internalapi.EvaluateAssessmentResponse\x12J\n" +
 	"\tTagTestee\x12\x1d.internalapi.TagTesteeRequest\x1a\x1e.internalapi.TagTesteeResponse\x12\x80\x01\n" +
 	"\x1bGenerateQuestionnaireQRCode\x12/.internalapi.GenerateQuestionnaireQRCodeRequest\x1a0.internalapi.GenerateQuestionnaireQRCodeResponse\x12h\n" +
-	"\x13GenerateScaleQRCode\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
+	"\x13GenerateScaleQRCode\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponse\x12b\n" +
+	"\x11BootstrapOperator\x12%.internalapi.BootstrapOperatorRequest\x1a&.internalapi.BootstrapOperatorResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
 
 var (
 	file_internalapi_internal_proto_rawDescOnce sync.Once
@@ -881,7 +1047,7 @@ func file_internalapi_internal_proto_rawDescGZIP() []byte {
 	return file_internalapi_internal_proto_rawDescData
 }
 
-var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_internalapi_internal_proto_goTypes = []any{
 	(*CalculateAnswerSheetScoreRequest)(nil),        // 0: internalapi.CalculateAnswerSheetScoreRequest
 	(*CalculateAnswerSheetScoreResponse)(nil),       // 1: internalapi.CalculateAnswerSheetScoreResponse
@@ -895,6 +1061,8 @@ var file_internalapi_internal_proto_goTypes = []any{
 	(*GenerateQuestionnaireQRCodeResponse)(nil),     // 9: internalapi.GenerateQuestionnaireQRCodeResponse
 	(*GenerateScaleQRCodeRequest)(nil),              // 10: internalapi.GenerateScaleQRCodeRequest
 	(*GenerateScaleQRCodeResponse)(nil),             // 11: internalapi.GenerateScaleQRCodeResponse
+	(*BootstrapOperatorRequest)(nil),                // 12: internalapi.BootstrapOperatorRequest
+	(*BootstrapOperatorResponse)(nil),               // 13: internalapi.BootstrapOperatorResponse
 }
 var file_internalapi_internal_proto_depIdxs = []int32{
 	0,  // 0: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
@@ -903,14 +1071,16 @@ var file_internalapi_internal_proto_depIdxs = []int32{
 	6,  // 3: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
 	8,  // 4: internalapi.InternalService.GenerateQuestionnaireQRCode:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
 	10, // 5: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
-	1,  // 6: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
-	3,  // 7: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
-	5,  // 8: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
-	7,  // 9: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
-	9,  // 10: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
-	11, // 11: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
-	6,  // [6:12] is the sub-list for method output_type
-	0,  // [0:6] is the sub-list for method input_type
+	12, // 6: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
+	1,  // 7: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
+	3,  // 8: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
+	5,  // 9: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
+	7,  // 10: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
+	9,  // 11: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	11, // 12: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
+	13, // 13: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
+	7,  // [7:14] is the sub-list for method output_type
+	0,  // [0:7] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -927,7 +1097,7 @@ func file_internalapi_internal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
