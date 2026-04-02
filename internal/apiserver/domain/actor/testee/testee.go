@@ -5,7 +5,7 @@ import "time"
 // Testee 受试者聚合根
 // 表示"被测评的人"在问卷&量表 BC 内的领域视图，是统计和趋势分析的核心主体
 // 设计原则：
-// 1. 只包含通用属性，特定场景（如筛查）的属性应在对应子域中维护
+// 1. 只包含通用属性，特定场景属性应在对应子域中维护
 // 2. 以行为为中心，而非数据中心，避免成为贫血模型
 // 3. 审计字段由基础设施层（PO）处理，领域层不关心
 type Testee struct {
@@ -24,7 +24,7 @@ type Testee struct {
 
 	// === 业务标签与关注 ===
 	tags       []Tag  // 业务标签：["high_risk", "adhd_suspect", "vip"]
-	source     string // 数据来源：online_form / clinic_import / screening_campaign
+	source     string // 数据来源：online_form / clinic_import / imported
 	isKeyFocus bool   // 是否重点关注对象
 
 	// === 测评统计快照（读模型优化）===

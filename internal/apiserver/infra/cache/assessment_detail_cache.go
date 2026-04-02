@@ -158,10 +158,6 @@ func (r *CachedAssessmentRepository) FindByPlanID(ctx context.Context, planID st
 	return r.repo.FindByPlanID(ctx, planID, pagination)
 }
 
-func (r *CachedAssessmentRepository) FindByScreeningProjectID(ctx context.Context, screeningProjectID string, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByScreeningProjectID(ctx, screeningProjectID, pagination)
-}
-
 func (r *CachedAssessmentRepository) CountByStatus(ctx context.Context, status assessment.Status) (int64, error) {
 	return r.repo.CountByStatus(ctx, status)
 }

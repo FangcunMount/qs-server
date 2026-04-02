@@ -30,8 +30,6 @@ const (
 	RoleEvaluatorQS Role = "qs:evaluator"
 	// RoleEvaluationPlanManager 测评计划管理员：测评计划的管理权限
 	RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
-	// RoleScreeningPlanManager 筛查计划管理员：筛查计划的管理权限
-	RoleScreeningPlanManager Role = "qs:screening_plan_manager"
 	// RoleOperator 普通员工：只能查看受试者
 	RoleOperator Role = "qs:staff"
 )

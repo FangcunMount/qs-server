@@ -97,7 +97,15 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 	l.Debugw("构造创建请求",
 		"testee_id", dto.TesteeID,
 	)
-	req := s.buildCreateRequest(dto)
+	req, err := s.buildCreateRequest(dto)
+	if err != nil {
+		l.Warnw("来源类型无效",
+			"origin_type", dto.OriginType,
+			"result", "invalid_params",
+			"error", err.Error(),
+		)
+		return nil, err
+	}
 
 	// 3. 调用领域服务创建测评
 	l.Debugw("调用领域服务创建测评",
@@ -421,7 +429,7 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 }
 
 // buildCreateRequest 构造创建请求
-func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) assessment.CreateAssessmentRequest {
+func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) (assessment.CreateAssessmentRequest, error) {
 	req := assessment.CreateAssessmentRequest{
 		OrgID:    int64(dto.OrgID),
 		TesteeID: meta.FromUint64(dto.TesteeID),
@@ -454,19 +462,17 @@ func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) assessme
 
 	// 设置来源
 	switch dto.OriginType {
+	case "", "adhoc":
+		req.Origin = assessment.NewAdhocOrigin()
 	case "plan":
 		if dto.OriginID != nil {
 			req.Origin = assessment.NewPlanOrigin(*dto.OriginID)
 		}
-	case "screening":
-		if dto.OriginID != nil {
-			req.Origin = assessment.NewScreeningOrigin(*dto.OriginID)
-		}
 	default:
-		req.Origin = assessment.NewAdhocOrigin()
+		return assessment.CreateAssessmentRequest{}, errors.WithCode(errorCode.ErrInvalidArgument, "不支持的来源类型: %s", dto.OriginType)
 	}
 
-	return req
+	return req, nil
 }
 
 func (s *submissionService) invalidateMyListCache(ctx context.Context, userID uint64) {

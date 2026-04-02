@@ -134,7 +134,7 @@ func (v *validator) ValidateRole(role Role) error {
 	switch role {
 	// 仅接受新的 QS 角色标识
 	case RoleQSAdmin, RoleContentManager, RoleEvaluatorQS, RoleOperator,
-		RoleEvaluationPlanManager, RoleScreeningPlanManager:
+		RoleEvaluationPlanManager:
 		return nil
 	default:
 		return errors.WithCode(code.ErrValidation, "invalid role")

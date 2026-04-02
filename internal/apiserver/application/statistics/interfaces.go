@@ -32,12 +32,6 @@ type PlanStatisticsService interface {
 	GetPlanStatistics(ctx context.Context, orgID int64, planID uint64) (*statistics.PlanStatistics, error)
 }
 
-// ScreeningStatisticsService 筛查项目统计服务
-type ScreeningStatisticsService interface {
-	// GetScreeningStatistics 获取筛查项目统计
-	GetScreeningStatistics(ctx context.Context, orgID int64, screeningID uint64) (*statistics.ScreeningStatistics, error)
-}
-
 // StatisticsSyncService 统计同步服务（定时任务）
 type StatisticsSyncService interface {
 	// SyncDailyStatistics 同步每日统计（Redis → MySQL）

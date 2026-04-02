@@ -172,34 +172,6 @@ func (r *assessmentRepository) FindByPlanID(ctx context.Context, planID string, 
 	return r.mapper.ToDomainList(pos), total, nil
 }
 
-// FindByScreeningProjectID 查询筛查项目下的测评列表
-func (r *assessmentRepository) FindByScreeningProjectID(ctx context.Context, screeningProjectID string, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	var pos []*AssessmentPO
-	var total int64
-
-	query := r.WithContext(ctx).
-		Where("origin_type = ? AND origin_id = ? AND deleted_at IS NULL",
-			assessment.OriginScreening, screeningProjectID)
-
-	// 统计总数
-	if err := query.Model(&AssessmentPO{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	// 分页查询
-	err := query.
-		Order("id DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit()).
-		Find(&pos).Error
-
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return r.mapper.ToDomainList(pos), total, nil
-}
-
 // ==================== 统计查询 ====================
 
 // CountByStatus 按状态统计数量

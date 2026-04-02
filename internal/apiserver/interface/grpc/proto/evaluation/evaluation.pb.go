@@ -29,7 +29,7 @@ type AssessmentSummary struct {
 	QuestionnaireVersion string                 `protobuf:"bytes,4,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"` // 问卷版本
 	ScaleCode            string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`                                  // 量表编码（可选）
 	ScaleName            string                 `protobuf:"bytes,6,opt,name=scale_name,json=scaleName,proto3" json:"scale_name,omitempty"`                                  // 量表名称（可选）
-	OriginType           string                 `protobuf:"bytes,7,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`                               // 来源类型：adhoc/plan/screening
+	OriginType           string                 `protobuf:"bytes,7,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`                               // 来源类型：adhoc/plan
 	Status               string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`                                                         // 状态：pending/submitted/interpreted/failed
 	TotalScore           float64                `protobuf:"fixed64,9,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`                             // 总分（已解读时有值）
 	RiskLevel            string                 `protobuf:"bytes,10,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`                                 // 风险等级（已解读时有值）

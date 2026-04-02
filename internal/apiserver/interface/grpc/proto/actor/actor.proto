@@ -42,7 +42,7 @@ message CreateTesteeRequest {
   int32 gender = 5;                     // 性别：1-男，2-女，3-其他
   google.protobuf.Timestamp birthday = 6; // 出生日期
   repeated string tags = 7;             // 标签列表
-  string source = 8;                    // 来源：online_form/plan/screening/imported
+  string source = 8;                    // 来源：online_form/plan/imported
   bool is_key_focus = 9;                // 是否重点关注
 }
 

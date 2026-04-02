@@ -85,14 +85,11 @@ func (s Status) IsTerminal() bool {
 type OriginType string
 
 const (
-	// OriginAdhoc 一次性测评：手动创建，不属于任何计划或筛查
+	// OriginAdhoc 一次性测评：手动创建，不属于任何计划
 	OriginAdhoc OriginType = "adhoc"
 
 	// OriginPlan 测评计划：由 AssessmentPlan 生成的 AssessmentTask 创建
 	OriginPlan OriginType = "plan"
-
-	// OriginScreening 入校筛查：由 ScreeningProject 创建
-	OriginScreening OriginType = "screening"
 )
 
 // String 返回来源类型的字符串表示
@@ -103,7 +100,7 @@ func (o OriginType) String() string {
 // IsValid 检查来源类型是否有效
 func (o OriginType) IsValid() bool {
 	switch o {
-	case OriginAdhoc, OriginPlan, OriginScreening:
+	case OriginAdhoc, OriginPlan:
 		return true
 	default:
 		return false
@@ -260,14 +257,6 @@ func NewPlanOrigin(planID string) Origin {
 	}
 }
 
-// NewScreeningOrigin 创建入校筛查来源
-func NewScreeningOrigin(screeningProjectID string) Origin {
-	return Origin{
-		originType: OriginScreening,
-		originID:   &screeningProjectID,
-	}
-}
-
 // Type 获取来源类型
 func (o Origin) Type() OriginType {
 	return o.originType
@@ -286,11 +275,6 @@ func (o Origin) IsAdhoc() bool {
 // IsPlan 是否来自测评计划
 func (o Origin) IsPlan() bool {
 	return o.originType == OriginPlan
-}
-
-// IsScreening 是否来自入校筛查
-func (o Origin) IsScreening() bool {
-	return o.originType == OriginScreening
 }
 
 // ReconstructOrigin 从持久化数据重建 Origin（用于仓储层）

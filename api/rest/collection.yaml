@@ -714,7 +714,7 @@ paths:
 
         - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
 
-        - stages: 阶段过滤（数组），可选值：screening/deep_assessment/follow_up/outcome
+        - stages: 阶段过滤（数组），可选值：deep_assessment/follow_up/outcome
 
         - applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult
 
@@ -812,7 +812,7 @@ paths:
         - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev,
         chronic, qol）
 
-        - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+        - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
 
         - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent,
         adult）
@@ -850,7 +850,7 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 
         - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
@@ -1774,7 +1774,7 @@ components:
           description: 姓名
           type: string
         source:
-          description: 来源：online_form/plan/screening/imported
+          description: 来源：online_form/plan/imported
           type: string
         tags:
           description: 标签列表

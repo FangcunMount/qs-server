@@ -233,7 +233,7 @@ type ReportBuilder interface {
 - **QuestionnaireRef**：问卷引用
 - **AnswerSheetRef**：答卷引用
 - **MedicalScaleRef**：量表引用
-- **Origin**：业务来源（adhoc/plan/screening）
+- **Origin**：业务来源（adhoc/plan）
 - **EvaluationResult**：评估结果
 - **FactorScoreResult**：因子得分结果
 - **RiskWarning**：风险预警信息

@@ -39,6 +39,9 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 	// 转换阶段列表
 	stages := make([]string, 0, len(domain.GetStages()))
 	for _, stage := range domain.GetStages() {
+		if !stage.IsValid() {
+			continue
+		}
 		stages = append(stages, stage.String())
 	}
 
@@ -151,7 +154,11 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 	// 转换阶段列表
 	stages := make([]scale.Stage, 0, len(po.Stages))
 	for _, stageStr := range po.Stages {
-		stages = append(stages, scale.NewStage(stageStr))
+		stage := scale.NewStage(stageStr)
+		if !stage.IsValid() {
+			continue
+		}
+		stages = append(stages, stage)
 	}
 
 	// 转换使用年龄列表

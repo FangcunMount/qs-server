@@ -52,7 +52,7 @@ func NewScaleHandler(
 // @Description 创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。
 // @Description 字段说明：
 // @Description - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
-// @Description - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
+// @Description - stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
 // @Description - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 // @Description - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
 // @Description - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
@@ -100,7 +100,7 @@ func (h *ScaleHandler) Create(c *gin.Context) {
 // @Description 更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。
 // @Description 字段说明：
 // @Description - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
-// @Description - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
+// @Description - stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
 // @Description - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 // @Description - reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选
 // @Description - tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文
@@ -426,7 +426,7 @@ func (h *ScaleHandler) ReplaceInterpretRules(c *gin.Context) {
 // @Description 根据编码获取量表详情。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 // @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
@@ -462,7 +462,7 @@ func (h *ScaleHandler) GetByCode(c *gin.Context) {
 // @Description 根据关联的问卷编码获取量表。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 // @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
@@ -556,7 +556,7 @@ func (h *ScaleHandler) List(c *gin.Context) {
 // @Description 根据编码获取已发布的量表。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 // @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
@@ -661,7 +661,7 @@ func (h *ScaleHandler) GetFactors(c *gin.Context) {
 // @Description 获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
 // @Description 返回说明：
 // @Description - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）
-// @Description - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+// @Description - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
 // @Description - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）
 // @Description - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
 // @Description - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）

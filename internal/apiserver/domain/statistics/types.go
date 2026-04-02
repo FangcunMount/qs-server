@@ -10,7 +10,6 @@ const (
 	StatisticTypeQuestionnaire StatisticType = "questionnaire" // 问卷/量表统计
 	StatisticTypeTestee        StatisticType = "testee"        // 受试者统计
 	StatisticTypePlan          StatisticType = "plan"          // 计划统计
-	StatisticTypeScreening     StatisticType = "screening"     // 筛查项目统计
 )
 
 // DailyCount 每日计数
@@ -60,7 +59,7 @@ type QuestionnaireStatistics struct {
 	DailyTrend []DailyCount `json:"daily_trend"` // 每日提交趋势
 
 	// 来源分布
-	OriginDistribution map[string]int64 `json:"origin_distribution"` // 按来源统计（adhoc/plan/screening）
+	OriginDistribution map[string]int64 `json:"origin_distribution"` // 按来源统计（adhoc/plan）
 }
 
 // TesteeStatistics 受试者统计
@@ -98,21 +97,4 @@ type PlanStatistics struct {
 	// 受试者统计
 	EnrolledTestees int64 `json:"enrolled_testees"` // 已加入计划的受试者数
 	ActiveTestees   int64 `json:"active_testees"`   // 活跃受试者数（有完成任务的）
-}
-
-// ScreeningStatistics 筛查项目统计
-type ScreeningStatistics struct {
-	OrgID       int64  `json:"org_id"`
-	ScreeningID uint64 `json:"screening_id"`
-
-	// 参与统计
-	TotalParticipants     int64   `json:"total_participants"`     // 总参与人数
-	CompletedParticipants int64   `json:"completed_participants"` // 已完成人数
-	ParticipationRate     float64 `json:"participation_rate"`     // 参与率 = TotalParticipants / TargetParticipants
-
-	// 风险分布
-	RiskDistribution map[string]int64 `json:"risk_distribution"` // 按风险等级统计
-
-	// 目标人数
-	TargetParticipants int64 `json:"target_participants"` // 目标参与人数
 }

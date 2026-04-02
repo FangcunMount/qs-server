@@ -298,11 +298,6 @@ func (c *DefaultAssessmentCreator) validateOrigin(origin Origin) error {
 			return ErrInvalidArgument
 		}
 		return nil
-	case OriginScreening:
-		if origin.ID() == nil || *origin.ID() == "" {
-			return ErrInvalidArgument
-		}
-		return nil
 	default:
 		return ErrInvalidArgument
 	}

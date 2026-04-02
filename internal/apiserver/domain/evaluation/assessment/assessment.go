@@ -151,25 +151,6 @@ func NewPlanAssessment(
 	)
 }
 
-// NewScreeningAssessment 从入校筛查创建测评
-func NewScreeningAssessment(
-	orgID int64,
-	testeeID testee.ID,
-	questionnaireRef QuestionnaireRef,
-	answerSheetRef AnswerSheetRef,
-	screeningProjectID string,
-	opts ...AssessmentOption,
-) (*Assessment, error) {
-	return NewAssessment(
-		orgID,
-		testeeID,
-		questionnaireRef,
-		answerSheetRef,
-		NewScreeningOrigin(screeningProjectID),
-		opts...,
-	)
-}
-
 // ==================== 重建方法（仓储层使用）====================
 
 // Reconstruct 从持久化数据重建测评对象

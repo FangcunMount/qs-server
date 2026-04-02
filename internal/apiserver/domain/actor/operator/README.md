@@ -204,9 +204,8 @@ const (
     RoleContentManager        Role = "qs:content_manager"
     RoleEvaluatorQS           Role = "qs:evaluator"
     RoleOperator                 Role = "qs:staff"
-    // 测评计划与筛查计划管理员
+    // 测评计划管理员
     RoleEvaluationPlanManager Role = "qs:evaluation_plan_manager"
-    RoleScreeningPlanManager  Role = "qs:screening_plan_manager"
 )
 ```
 

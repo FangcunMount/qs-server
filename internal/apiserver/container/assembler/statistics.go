@@ -28,7 +28,6 @@ type StatisticsModule struct {
 	QuestionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
 	TesteeStatisticsService        statisticsApp.TesteeStatisticsService
 	PlanStatisticsService          statisticsApp.PlanStatisticsService
-	ScreeningStatisticsService     statisticsApp.ScreeningStatisticsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	ValidatorService               statisticsApp.StatisticsValidatorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
@@ -77,9 +76,6 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	m.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(mysqlDB, m.Repo, m.Cache)
 	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(mysqlDB, m.Repo, m.Cache)
 
-	// TODO: 实现筛查统计服务
-	// m.ScreeningStatisticsService = statisticsApp.NewScreeningStatisticsService(mysqlDB, m.Repo, m.Cache)
-
 	// 初始化同步和校验服务
 	if m.Cache != nil {
 		m.SyncService = statisticsApp.NewSyncService(m.Repo, m.Cache, mysqlDB)
@@ -96,7 +92,6 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 		m.QuestionnaireStatisticsService,
 		m.TesteeStatisticsService,
 		m.PlanStatisticsService,
-		m.ScreeningStatisticsService,
 		m.SyncService,
 		m.ValidatorService,
 	)

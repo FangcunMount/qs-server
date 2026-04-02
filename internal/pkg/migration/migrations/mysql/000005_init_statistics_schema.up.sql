@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS `statistics_daily` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
     `org_id` BIGINT NOT NULL COMMENT '机构ID',
-    `statistic_type` VARCHAR(50) NOT NULL COMMENT '统计类型：questionnaire/testee/plan/screening',
+    `statistic_type` VARCHAR(50) NOT NULL COMMENT '统计类型：questionnaire/testee/plan',
     `statistic_key` VARCHAR(255) NOT NULL COMMENT '统计键（如 questionnaire_code、testee_id）',
     `stat_date` DATE NOT NULL COMMENT '统计日期',
     
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `statistics_daily` (
 CREATE TABLE IF NOT EXISTS `statistics_accumulated` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
     `org_id` BIGINT NOT NULL COMMENT '机构ID',
-    `statistic_type` VARCHAR(50) NOT NULL COMMENT '统计类型：questionnaire/testee/plan/screening/system',
+    `statistic_type` VARCHAR(50) NOT NULL COMMENT '统计类型：questionnaire/testee/plan/system',
     `statistic_key` VARCHAR(255) NOT NULL COMMENT '统计键',
     
     -- 基础指标
@@ -80,4 +80,3 @@ CREATE TABLE IF NOT EXISTS `statistics_plan` (
     UNIQUE KEY `uk_plan` (`org_id`, `plan_id`),
     KEY `idx_org_id` (`org_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计划统计表';
-

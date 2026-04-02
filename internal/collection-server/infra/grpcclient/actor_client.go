@@ -34,7 +34,7 @@ type CreateTesteeRequest struct {
 	Gender     int32      // 性别：1-男，2-女，3-其他
 	Birthday   *time.Time // 出生日期
 	Tags       []string   // 标签列表
-	Source     string     // 来源：online_form/plan/screening/imported
+	Source     string     // 来源：online_form/plan/imported
 	IsKeyFocus bool       // 是否重点关注
 }
 

@@ -158,7 +158,7 @@ erDiagram
 | `AssessmentScore` / `FactorScore` | 结构化得分 | 依附 Assessment，MySQL |
 | `InterpretReport` | 解读与建议视图 | 与测评关联，MongoDB |
 | `interpretation` | 解读规则与策略 | 与量表配置衔接 |
-| `Origin` | adhoc / plan / screening 等 | 业务来源锚点，非装饰字段 |
+| `Origin` | adhoc / plan | 业务来源锚点，非装饰字段 |
 | `engine` | 校验→计分→风险→解读→发事件 | 委托 scale / calculation |
 
 #### 不变量与状态（概要）

@@ -169,12 +169,6 @@ func (s *Operator) CanEvaluate() bool {
 	return s.HasAnyRole(RoleEvaluatorQS, RoleQSAdmin)
 }
 
-// CanManageScreeningProject 是否可以管理筛查项目
-func (s *Operator) CanManageScreeningProject() bool {
-	// 管理员或筛查计划管理员可以管理筛查项目
-	return s.HasAnyRole(RoleQSAdmin, RoleScreeningPlanManager)
-}
-
 // CanAuditReport 是否可以审核报告
 func (s *Operator) CanAuditReport() bool {
 	// 目前仅管理员可以审核报告

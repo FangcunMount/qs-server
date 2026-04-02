@@ -137,7 +137,7 @@ type CreateAssessmentFromAnswerSheetRequest struct {
 	OrgId                uint64                 `protobuf:"varint,5,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                                             // 组织ID
 	FillerId             uint64                 `protobuf:"varint,6,opt,name=filler_id,json=fillerId,proto3" json:"filler_id,omitempty"`                                    // 填写人ID
 	FillerType           string                 `protobuf:"bytes,7,opt,name=filler_type,json=fillerType,proto3" json:"filler_type,omitempty"`                               // 填写人类型：self/proxy
-	OriginType           string                 `protobuf:"bytes,8,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`                               // 来源类型：adhoc/plan/screening（可选）
+	OriginType           string                 `protobuf:"bytes,8,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`                               // 来源类型：adhoc/plan（可选）
 	OriginId             string                 `protobuf:"bytes,9,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`                                     // 来源ID（可选）
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache

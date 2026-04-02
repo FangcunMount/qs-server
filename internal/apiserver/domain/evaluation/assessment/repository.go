@@ -37,9 +37,6 @@ type Repository interface {
 	// FindByPlanID 查询计划下的测评列表
 	FindByPlanID(ctx context.Context, planID string, pagination Pagination) ([]*Assessment, int64, error)
 
-	// FindByScreeningProjectID 查询筛查项目下的测评列表
-	FindByScreeningProjectID(ctx context.Context, screeningProjectID string, pagination Pagination) ([]*Assessment, int64, error)
-
 	// === 统计查询 ===
 
 	// CountByStatus 按状态统计数量

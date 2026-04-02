@@ -32,7 +32,7 @@ type CreateTesteeRequest struct {
 	Gender        int32                  `protobuf:"varint,5,opt,name=gender,proto3" json:"gender,omitempty"`                             // 性别：1-男，2-女，3-其他
 	Birthday      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=birthday,proto3" json:"birthday,omitempty"`                          // 出生日期
 	Tags          []string               `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`                                  // 标签列表
-	Source        string                 `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`                              // 来源：online_form/plan/screening/imported
+	Source        string                 `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`                              // 来源：online_form/plan/imported
 	IsKeyFocus    bool                   `protobuf:"varint,9,opt,name=is_key_focus,json=isKeyFocus,proto3" json:"is_key_focus,omitempty"` // 是否重点关注
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

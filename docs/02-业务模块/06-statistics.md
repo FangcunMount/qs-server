@@ -32,7 +32,7 @@
 | | 内容 |
 | -- | ---- |
 | **负责（摘要）** | 多维度统计查询；Redis/MySQL/原始表分层读；运维向同步与一致性校验（internal REST）；测评事件驱动的 Redis 预聚合（在 worker 进程内实现） |
-| **不负责（摘要）** | 测评计分与流水线编排；计划调度；问卷/答卷主数据写入（[survey](./01-survey.md)）；筛查全链路（`screening` 多为预留）；**无**独立统计微服务进程（[`events.yaml`](../../configs/events.yaml) 已不与虚构 `statistics-service` consumer 对齐） |
+| **不负责（摘要）** | 测评计分与流水线编排；计划调度；问卷/答卷主数据写入（[survey](./01-survey.md)）；**无**独立统计微服务进程（[`events.yaml`](../../configs/events.yaml) 已不与虚构 `statistics-service` consumer 对齐） |
 | **关联专题** | 读侧与缓存策略 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)；横切存储细节 [03-基础设施](../03-基础设施/) |
 
 #### 负责什么（细项）
@@ -48,7 +48,6 @@
 
 - **领域事件输出**：本模块**不**发布稳定的 `statistics.*` 业务事件；对外是查询与运维接口。
 - **Mongo 问卷/答卷计数**：系统统计兜底路径中问卷数、答卷数、今日新增答卷等仍为占位或未接 Mongo（见 [system_service.go](../../internal/apiserver/application/statistics/system_service.go) 注释）。
-- **`ScreeningStatisticsService`**：装配中未初始化（[assembler/statistics.go](../../internal/apiserver/container/assembler/statistics.go) `TODO`）。
 - **plan / task / report.exported 的「统计更新」**：[`events.yaml`](../../configs/events.yaml) 仅列真实消费者（如 `qs-worker`）；对应 handler 内事件驱动统计仍为 **TODO**（[plan_handler.go](../../internal/worker/handlers/plan_handler.go)、[report_handler.go](../../internal/worker/handlers/report_handler.go)），**计划维度的 `statistics_plan` 以 apiserver `POST /statistics/sync/plan` 等同步为主**。
 
 ### 契约入口
@@ -179,7 +178,6 @@ flowchart TB
         Q[QuestionnaireStatistics]
         T[TesteeStatistics]
         P[PlanStatistics]
-        SCR[ScreeningStatistics]
     end
 
     subgraph HELP[领域工具]
@@ -207,7 +205,7 @@ flowchart TB
 
 | 概念 | 职责 | 与相邻概念的关系 |
 | ---- | ---- | ---------------- |
-| `StatisticType` | 维度枚举（system / questionnaire / testee / plan / screening） | 与 Redis 键、MySQL `statistic_type` 列一致 |
+| `StatisticType` | 维度枚举（system / questionnaire / testee / plan） | 与 Redis 键、MySQL `statistic_type` 列一致 |
 | `*Statistics` 结构体 | 对外 JSON 统计视图 | 由 PO 转换或实时聚合填充 |
 | `Aggregator` | 完成率、窗口计数等通用计算 | 被各应用服务调用 |
 | `TrendAnalyzer` | 时间序列趋势 | 系统/问卷趋势 |
@@ -223,8 +221,6 @@ flowchart TB
 | `PlanStatisticsService` | 计划任务聚合 | [plan_service.go](../../internal/apiserver/application/statistics/plan_service.go) |
 | `StatisticsSyncService` | daily / accumulated / plan 同步 | [sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
 | `StatisticsValidatorService` | Redis vs MySQL 一致性修复 | [validator_service.go](../../internal/apiserver/application/statistics/validator_service.go) |
-| `ScreeningStatisticsService` | 筛查 | **未装配** |
-
 ```mermaid
 flowchart TB
     subgraph IF[interface]
@@ -388,11 +384,11 @@ sequenceDiagram
 
 | internal REST | 主要输入 | 写入/更新 |
 | ------------- | -------- | -------- |
-| `POST /internal/v1/statistics/sync/daily` | 扫描**当前请求 org** 下的 Redis `stats:daily:{org}:{type}:*`（`ScanDailyKeys`），`statTypes` 含 questionnaire / testee / **plan** / screening | `statistics_daily`（[SyncDailyStatistics](../../internal/apiserver/application/statistics/sync_service.go)） |
+| `POST /internal/v1/statistics/sync/daily` | 扫描**当前请求 org** 下的 Redis `stats:daily:{org}:{type}:*`（`ScanDailyKeys`），`statTypes` 含 questionnaire / testee / **plan** | `statistics_daily`（[SyncDailyStatistics](../../internal/apiserver/application/statistics/sync_service.go)） |
 | `POST /internal/v1/statistics/sync/accumulated` | 按**当前请求 org**的日键提取 `statKey`，`AggregateDailyToAccumulated`；另对当前 `org_id` 调 `syncSystemStatistics` | `statistics_accumulated`（问卷/受试者累计 + **system** 行） |
 | `POST /internal/v1/statistics/sync/plan` | 只扫描**当前请求 org** 的 `assessment_plan`，再按任务表聚合 | `statistics_plan`（**不依赖** Redis 计划预聚合） |
 
-说明：`SyncDailyStatistics` 虽扫描 `plan` / `screening` 类型日键，worker 当前**未**对这两类写 `stats:daily`，故常见环境下对应键为空；计划统计以 **sync/plan** 与查询回源为主。
+说明：`SyncDailyStatistics` 当前扫描 `questionnaire` / `testee` / `plan` 三类日键；计划维度仍以 **sync/plan** 与查询回源为主。
 
 #### Redis 键模板与 TTL
 
@@ -448,7 +444,6 @@ sequenceDiagram
 
 ## 边界与注意事项
 
-- **`screening`**：领域类型存在，`ScreeningStatisticsService` 未装配，接口不可用。  
 - **系统统计中的问卷/答卷/今日答卷**：兜底路径仍可能为 `0`（Mongo 未注入），与 OpenAPI 描述「包括问卷数量、答卷数量」并存时，以代码为准。  
 - **worker 默认关闭统计缓存**：生产若依赖 Redis 增量，需显式打开并保证 Redis 与 apiserver 一致可用。  
 - **Redis 不可用**：同步与校验服务不初始化；查询仍可走 MySQL 与原始表。  

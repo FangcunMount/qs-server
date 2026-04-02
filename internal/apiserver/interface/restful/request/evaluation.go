@@ -11,7 +11,7 @@ type CreateAssessmentRequest struct {
 	MedicalScaleID       *uint64 `json:"medical_scale_id"`                       // 量表ID（可选）
 	MedicalScaleCode     *string `json:"medical_scale_code"`                     // 量表编码（可选）
 	MedicalScaleName     *string `json:"medical_scale_name"`                     // 量表名称（可选）
-	OriginType           string  `json:"origin_type" valid:"required"`           // 来源类型：adhoc/plan/screening
+	OriginType           string  `json:"origin_type" valid:"required"`           // 来源类型：adhoc/plan
 	OriginID             *string `json:"origin_id"`                              // 来源ID（可选）
 }
 

@@ -45,7 +45,6 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64) erro
 		statistics.StatisticTypeQuestionnaire,
 		statistics.StatisticTypeTestee,
 		statistics.StatisticTypePlan,
-		statistics.StatisticTypeScreening,
 	}
 
 	totalSynced := 0

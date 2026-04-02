@@ -483,8 +483,6 @@ func (c Category) IsOpen() bool {
 type Stage string
 
 const (
-	// StageScreening 筛查
-	StageScreening Stage = "screening"
 	// StageDeepAssessment 深评
 	StageDeepAssessment Stage = "deep_assessment"
 	// StageFollowUp 随访
@@ -519,7 +517,7 @@ func (s Stage) IsValid() bool {
 		return true // 允许为空（可选字段）
 	}
 	switch s {
-	case StageScreening, StageDeepAssessment, StageFollowUp, StageOutcome:
+	case StageDeepAssessment, StageFollowUp, StageOutcome:
 		return true
 	default:
 		return false

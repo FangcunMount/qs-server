@@ -77,7 +77,7 @@ message CreateAssessmentFromAnswerSheetRequest {
   uint64 org_id = 5;                 // 组织ID
   uint64 filler_id = 6;              // 填写人ID
   string filler_type = 7;            // 填写人类型：self/proxy
-  string origin_type = 8;            // 来源类型：adhoc/plan/screening（可选）
+  string origin_type = 8;            // 来源类型：adhoc/plan（可选）
   string origin_id = 9;              // 来源ID（可选）
 }
 

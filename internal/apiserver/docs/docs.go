@@ -3138,7 +3138,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。\n字段说明：\n- category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)\n- stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选\n- applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选\n- reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选\n- tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文",
+                "description": "创建新量表，初始状态为草稿。支持设置主类、阶段、使用年龄、填报人和标签等分类信息。\n字段说明：\n- category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)\n- stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选\n- applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选\n- reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选\n- tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文",
                 "consumes": [
                     "application/json"
                 ],
@@ -3191,7 +3191,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/by-questionnaire": {
             "get": {
-                "description": "根据关联的问卷编码获取量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据关联的问卷编码获取量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -3242,7 +3242,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/categories": {
             "get": {
-                "description": "获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。\n返回说明：\n- categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）\n- stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）\n- applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）\n- reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）\n- tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）",
+                "description": "获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。\n返回说明：\n- categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）\n- stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）\n- applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）\n- reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）\n- tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）",
                 "consumes": [
                     "application/json"
                 ],
@@ -3350,7 +3350,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/published/{code}": {
             "get": {
-                "description": "根据编码获取已发布的量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据编码获取已发布的量表。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -3401,7 +3401,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}": {
             "get": {
-                "description": "根据编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
+                "description": "根据编码获取量表详情。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- scoring_params: 计分参数，map[string]interface{}，cnt 策略直接包含 cnt_option_contents 字段\n- max_score: 因子的最大分（可选）\n- is_show: 是否显示（用于报告中的维度展示）\n- risk_level: 因子级别的风险等级，从解读规则中提取（使用第一个规则的风险等级），有效值：none/low/medium/high/severe",
                 "consumes": [
                     "application/json"
                 ],
@@ -3537,7 +3537,7 @@ const docTemplate = `{
         },
         "/api/v1/scales/{code}/basic-info": {
             "put": {
-                "description": "更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。\n字段说明：\n- category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)\n- stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选\n- applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选\n- reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选\n- tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文",
+                "description": "更新量表的标题、描述、主类、阶段、使用年龄、填报人和标签等分类信息。\n字段说明：\n- category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)\n- stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选\n- applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选\n- reporters: 填报人列表（数组），可选值：parent(家长评)、teacher(教师评)、self(自评)、clinical(临床评定)，可多选\n- tags: 标签列表（数组），动态输入，最多5个，每个标签长度1-50字符，只能包含字母、数字、下划线和中文",
                 "consumes": [
                     "application/json"
                 ],

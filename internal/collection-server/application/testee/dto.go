@@ -15,7 +15,7 @@ type CreateTesteeRequest struct {
 	Gender     int32          `json:"gender" binding:"required"`       // 性别：1-男，2-女，3-其他
 	Birthday   *meta.Birthday `json:"birthday"`                        // 出生日期（格式：YYYY-MM-DD）
 	Tags       []string       `json:"tags"`                            // 标签列表
-	Source     string         `json:"source"`                          // 来源：online_form/plan/screening/imported
+	Source     string         `json:"source"`                          // 来源：online_form/plan/imported
 	IsKeyFocus bool           `json:"is_key_focus"`                    // 是否重点关注
 }
 

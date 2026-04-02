@@ -442,7 +442,7 @@ JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/mid
 
 - **前台路径**：`collection-server` → gRPC → `RegistrationService`。
 - **计划路径**：[plan](./04-plan.md) 入组引用已有 `testeeID`，**不**由 plan 代建 Testee（需前置存在）。
-- **筛查等**：以代码与产品为准；勿假设未在仓库落地的模块会自动建 Testee。
+- **其它外部业务场景**：以代码与产品为准；勿假设未在仓库落地的模块会自动建 Testee。
 
 #### 8. TesteeRef / OperatorRef / FillerRef
 

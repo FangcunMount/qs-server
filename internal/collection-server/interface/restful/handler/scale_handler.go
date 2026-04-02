@@ -24,7 +24,7 @@ func NewScaleHandler(queryService *scale.QueryService) *ScaleHandler {
 // @Description 根据量表编码获取量表详情。注意：返回的因子列表只包含 is_show = true 的因子。
 // @Description 响应字段说明：
 // @Description - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
-// @Description - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+// @Description - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 // @Description - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 // @Description - reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）
 // @Description - tags: 标签列表（数组，动态输入）
@@ -64,7 +64,7 @@ func (h *ScaleHandler) Get(c *gin.Context) {
 // @Description 分页获取量表列表（摘要信息，不包含因子详情），支持按主类、阶段、使用年龄、填报人、标签等条件过滤。
 // @Description 查询参数说明：
 // @Description - category: 主类过滤，可选值：adhd/tic/sensory/executive/mental/neurodev/chronic/qol
-// @Description - stages: 阶段过滤（数组），可选值：screening/deep_assessment/follow_up/outcome
+// @Description - stages: 阶段过滤（数组），可选值：deep_assessment/follow_up/outcome
 // @Description - applicable_ages: 使用年龄过滤（数组），可选值：infant/preschool/school_child/adolescent/adult
 // @Description - reporters: 填报人过滤（数组），可选值：parent/teacher/self/clinical
 // @Description - tags: 标签过滤（数组），动态标签值
@@ -104,7 +104,7 @@ func (h *ScaleHandler) List(c *gin.Context) {
 // @Description 获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
 // @Description 返回说明：
 // @Description - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev, chronic, qol）
-// @Description - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+// @Description - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
 // @Description - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent, adult）
 // @Description - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
 // @Description - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）

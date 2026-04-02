@@ -65,7 +65,7 @@ func handleQuestionnairePublished(deps *Dependencies) HandlerFunc {
 		// 主动预热会占用较多内存和Redis空间。
 		//
 		// 建议场景：
-		// - 高并发问卷（如入校筛查）：可在发布时预热，避免瞬时峰值导致的cache stampede
+		// - 高并发问卷：可在发布时预热，避免瞬时峰值导致的 cache stampede
 		// - 低频问卷：按需加载更经济
 		//
 		// 实现参考 handleScalePublished 的注释，实施方案相同。

@@ -70,7 +70,6 @@ func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesRe
 
 	// 构建阶段列表
 	stages := []StageOption{
-		{Value: string(domainScale.StageScreening), Label: "筛查"},
 		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
 		{Value: string(domainScale.StageFollowUp), Label: "随访"},
 		{Value: string(domainScale.StageOutcome), Label: "结局"},
@@ -121,7 +120,6 @@ func (s *categoryService) GetOpenCategories(ctx context.Context) (*ScaleCategori
 
 	// 构建阶段列表
 	stages := []StageOption{
-		{Value: string(domainScale.StageScreening), Label: "筛查"},
 		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
 		{Value: string(domainScale.StageFollowUp), Label: "随访"},
 		{Value: string(domainScale.StageOutcome), Label: "结局"},

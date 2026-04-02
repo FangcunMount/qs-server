@@ -2096,7 +2096,7 @@ paths:
 
         - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
 
-        - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
+        - stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
 
         - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 
@@ -2139,7 +2139,7 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 
         - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
@@ -2191,7 +2191,7 @@ paths:
         - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev,
         chronic, qol）
 
-        - stages: 阶段列表，包含4个选项（screening, deep_assessment, follow_up, outcome）
+        - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
 
         - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent,
         adult）
@@ -2268,7 +2268,7 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 
         - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
@@ -2319,7 +2319,7 @@ paths:
 
         - category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）
 
-        - stages: 阶段列表（数组，screening/deep_assessment/follow_up/outcome）
+        - stages: 阶段列表（数组，deep_assessment/follow_up/outcome）
 
         - applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）
 
@@ -2424,7 +2424,7 @@ paths:
 
         - category: 主类，可选值：adhd(ADHD)、tic(抽动障碍)、sensory(感统)、executive(执行功能)、mental(心理健康)、neurodev(神经发育)、chronic(慢性病管理)、qol(生活质量)
 
-        - stages: 阶段列表（数组），可选值：screening(筛查)、deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
+        - stages: 阶段列表（数组），可选值：deep_assessment(深评)、follow_up(随访)、outcome(结局)，可多选
 
         - applicable_ages: 使用年龄列表（数组），可选值：infant(婴幼儿)、preschool(学龄前)、school_child(学龄儿童)、adolescent(青少年)、adult(成人)，可多选
 

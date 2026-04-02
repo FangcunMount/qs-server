@@ -47,7 +47,7 @@ message AssessmentSummary {
   string questionnaire_version = 4;   // 问卷版本
   string scale_code = 5;              // 量表编码（可选）
   string scale_name = 6;              // 量表名称（可选）
-  string origin_type = 7;             // 来源类型：adhoc/plan/screening
+  string origin_type = 7;             // 来源类型：adhoc/plan
   string status = 8;                  // 状态：pending/submitted/interpreted/failed
   double total_score = 9;             // 总分（已解读时有值）
   string risk_level = 10;             // 风险等级（已解读时有值）

@@ -15,8 +15,8 @@ type CreateAssessmentDTO struct {
 	MedicalScaleID       *uint64 // 量表ID（可选，纯问卷模式为空）
 	MedicalScaleCode     *string // 量表编码（可选）
 	MedicalScaleName     *string // 量表名称（可选）
-	OriginType           string  // 来源类型：adhoc/plan/screening
-	OriginID             *string // 来源ID（计划ID或筛查项目ID）
+	OriginType           string  // 来源类型：adhoc/plan
+	OriginID             *string // 来源ID（计划ID）
 }
 
 // ListMyAssessmentsDTO 查询我的测评列表 DTO

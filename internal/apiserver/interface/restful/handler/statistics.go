@@ -18,7 +18,6 @@ type StatisticsHandler struct {
 	questionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
 	testeeStatisticsService        statisticsApp.TesteeStatisticsService
 	planStatisticsService          statisticsApp.PlanStatisticsService
-	screeningStatisticsService     statisticsApp.ScreeningStatisticsService
 	syncService                    statisticsApp.StatisticsSyncService
 	validatorService               statisticsApp.StatisticsValidatorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
@@ -30,7 +29,6 @@ func NewStatisticsHandler(
 	questionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService,
 	testeeStatisticsService statisticsApp.TesteeStatisticsService,
 	planStatisticsService statisticsApp.PlanStatisticsService,
-	screeningStatisticsService statisticsApp.ScreeningStatisticsService,
 	syncService statisticsApp.StatisticsSyncService,
 	validatorService statisticsApp.StatisticsValidatorService,
 ) *StatisticsHandler {
@@ -39,7 +37,6 @@ func NewStatisticsHandler(
 		questionnaireStatisticsService: questionnaireStatisticsService,
 		testeeStatisticsService:        testeeStatisticsService,
 		planStatisticsService:          planStatisticsService,
-		screeningStatisticsService:     screeningStatisticsService,
 		syncService:                    syncService,
 		validatorService:               validatorService,
 	}
