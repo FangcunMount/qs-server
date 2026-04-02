@@ -438,7 +438,7 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 	}
 
 	// 2. 调用领域服务恢复计划
-	newTasks, err := s.lifecycle.Resume(ctx, p, testeeStartDateMap)
+	resumeResult, err := s.lifecycle.Resume(ctx, p, testeeStartDateMap)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to resume plan",
 			"action", "resume_plan",
@@ -448,10 +448,10 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 		return nil, err
 	}
 
-	logger.L(ctx).Infow("Plan resumed, generating new tasks",
+	logger.L(ctx).Infow("Plan resumed, preparing outstanding tasks",
 		"action", "resume_plan",
 		"plan_id", planID,
-		"new_tasks_count", len(newTasks),
+		"tasks_to_save_count", len(resumeResult.TasksToSave),
 	)
 
 	// 3. 持久化计划
@@ -464,17 +464,19 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
 	}
 
-	// 4. 持久化新生成的任务
-	if len(newTasks) > 0 {
-		if err := s.taskRepo.SaveBatch(ctx, newTasks); err != nil {
-			logger.L(ctx).Errorw("Failed to save new tasks",
+	// 4. 持久化恢复后的任务（包含新生成任务和复用重置任务）
+	savedTaskCount := 0
+	for _, task := range resumeResult.TasksToSave {
+		if err := s.taskRepo.Save(ctx, task); err != nil {
+			logger.L(ctx).Errorw("Failed to save resumed task",
 				"action", "resume_plan",
 				"plan_id", planID,
-				"tasks_count", len(newTasks),
+				"task_id", task.GetID().String(),
 				"error", err.Error(),
 			)
 			return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存任务失败")
 		}
+		savedTaskCount++
 	}
 
 	// 5. 发布计划事件
@@ -494,7 +496,8 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 	logger.L(ctx).Infow("Plan resumed successfully",
 		"action", "resume_plan",
 		"plan_id", planID,
-		"new_tasks_count", len(newTasks),
+		"tasks_to_save_count", len(resumeResult.TasksToSave),
+		"saved_tasks_count", savedTaskCount,
 	)
 
 	return toPlanResult(p), nil
@@ -515,7 +518,8 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 	}
 
 	// 2. 调用领域服务取消计划
-	if err := s.lifecycle.Cancel(ctx, p); err != nil {
+	canceledTasks, err := s.lifecycle.Cancel(ctx, p)
+	if err != nil {
 		logger.L(ctx).Errorw("Failed to cancel plan",
 			"action", "cancel_plan",
 			"plan_id", planID,
@@ -523,6 +527,12 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 		)
 		return err
 	}
+
+	logger.L(ctx).Infow("Plan canceled, canceling tasks",
+		"action", "cancel_plan",
+		"plan_id", planID,
+		"canceled_tasks_count", len(canceledTasks),
+	)
 
 	// 3. 持久化
 	if err := s.planRepo.Save(ctx, p); err != nil {
@@ -534,7 +544,35 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
 	}
 
-	// 4. 发布领域事件
+	// 4. 持久化被取消的任务
+	savedTaskCount := 0
+	for _, task := range canceledTasks {
+		if err := s.taskRepo.Save(ctx, task); err != nil {
+			logger.L(ctx).Errorw("Failed to save canceled task",
+				"action", "cancel_plan",
+				"plan_id", planID,
+				"task_id", task.GetID().String(),
+				"error", err.Error(),
+			)
+			continue
+		}
+		savedTaskCount++
+
+		events := task.Events()
+		for _, evt := range events {
+			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
+				logger.L(ctx).Errorw("Failed to publish task event",
+					"action", "cancel_plan",
+					"task_id", task.GetID().String(),
+					"event_type", evt.EventType(),
+					"error", err.Error(),
+				)
+			}
+		}
+		task.ClearEvents()
+	}
+
+	// 5. 发布领域事件
 	events := p.Events()
 	for _, evt := range events {
 		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
@@ -551,6 +589,8 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 	logger.L(ctx).Infow("Plan canceled successfully",
 		"action", "cancel_plan",
 		"plan_id", planID,
+		"canceled_tasks_count", len(canceledTasks),
+		"saved_tasks_count", savedTaskCount,
 	)
 
 	return nil

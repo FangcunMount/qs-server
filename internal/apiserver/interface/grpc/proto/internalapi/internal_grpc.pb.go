@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InternalService_CalculateAnswerSheetScore_FullMethodName       = "/internalapi.InternalService/CalculateAnswerSheetScore"
-	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
-	InternalService_EvaluateAssessment_FullMethodName              = "/internalapi.InternalService/EvaluateAssessment"
-	InternalService_TagTestee_FullMethodName                       = "/internalapi.InternalService/TagTestee"
-	InternalService_GenerateQuestionnaireQRCode_FullMethodName     = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
-	InternalService_GenerateScaleQRCode_FullMethodName             = "/internalapi.InternalService/GenerateScaleQRCode"
-	InternalService_BootstrapOperator_FullMethodName               = "/internalapi.InternalService/BootstrapOperator"
+	InternalService_CalculateAnswerSheetScore_FullMethodName             = "/internalapi.InternalService/CalculateAnswerSheetScore"
+	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName       = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
+	InternalService_EvaluateAssessment_FullMethodName                    = "/internalapi.InternalService/EvaluateAssessment"
+	InternalService_TagTestee_FullMethodName                             = "/internalapi.InternalService/TagTestee"
+	InternalService_GenerateQuestionnaireQRCode_FullMethodName           = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
+	InternalService_GenerateScaleQRCode_FullMethodName                   = "/internalapi.InternalService/GenerateScaleQRCode"
+	InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName = "/internalapi.InternalService/SendTaskOpenedMiniProgramNotification"
+	InternalService_BootstrapOperator_FullMethodName                     = "/internalapi.InternalService/BootstrapOperator"
 )
 
 // InternalServiceClient is the client API for InternalService service.
@@ -59,6 +60,10 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 scale.published 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
+	// 发送 task.opened 小程序订阅消息
+	// 场景：worker 处理 task.opened 事件后调用
+	// 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
+	SendTaskOpenedMiniProgramNotification(ctx context.Context, in *SendTaskOpenedMiniProgramNotificationRequest, opts ...grpc.CallOption) (*SendTaskOpenedMiniProgramNotificationResponse, error)
 	// 自举首个操作者
 	// 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
 	// 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
@@ -133,6 +138,16 @@ func (c *internalServiceClient) GenerateScaleQRCode(ctx context.Context, in *Gen
 	return out, nil
 }
 
+func (c *internalServiceClient) SendTaskOpenedMiniProgramNotification(ctx context.Context, in *SendTaskOpenedMiniProgramNotificationRequest, opts ...grpc.CallOption) (*SendTaskOpenedMiniProgramNotificationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendTaskOpenedMiniProgramNotificationResponse)
+	err := c.cc.Invoke(ctx, InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *internalServiceClient) BootstrapOperator(ctx context.Context, in *BootstrapOperatorRequest, opts ...grpc.CallOption) (*BootstrapOperatorResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BootstrapOperatorResponse)
@@ -174,6 +189,10 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 scale.published 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
+	// 发送 task.opened 小程序订阅消息
+	// 场景：worker 处理 task.opened 事件后调用
+	// 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
+	SendTaskOpenedMiniProgramNotification(context.Context, *SendTaskOpenedMiniProgramNotificationRequest) (*SendTaskOpenedMiniProgramNotificationResponse, error)
 	// 自举首个操作者
 	// 场景：seed/bootstrap 工具需要在尚无 active operator 的 org 中创建第一个 operator
 	// 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
@@ -205,6 +224,9 @@ func (UnimplementedInternalServiceServer) GenerateQuestionnaireQRCode(context.Co
 }
 func (UnimplementedInternalServiceServer) GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateScaleQRCode not implemented")
+}
+func (UnimplementedInternalServiceServer) SendTaskOpenedMiniProgramNotification(context.Context, *SendTaskOpenedMiniProgramNotificationRequest) (*SendTaskOpenedMiniProgramNotificationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendTaskOpenedMiniProgramNotification not implemented")
 }
 func (UnimplementedInternalServiceServer) BootstrapOperator(context.Context, *BootstrapOperatorRequest) (*BootstrapOperatorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BootstrapOperator not implemented")
@@ -338,6 +360,24 @@ func _InternalService_GenerateScaleQRCode_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_SendTaskOpenedMiniProgramNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendTaskOpenedMiniProgramNotificationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).SendTaskOpenedMiniProgramNotification(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).SendTaskOpenedMiniProgramNotification(ctx, req.(*SendTaskOpenedMiniProgramNotificationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InternalService_BootstrapOperator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BootstrapOperatorRequest)
 	if err := dec(in); err != nil {
@@ -388,8 +428,498 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _InternalService_GenerateScaleQRCode_Handler,
 		},
 		{
+			MethodName: "SendTaskOpenedMiniProgramNotification",
+			Handler:    _InternalService_SendTaskOpenedMiniProgramNotification_Handler,
+		},
+		{
 			MethodName: "BootstrapOperator",
 			Handler:    _InternalService_BootstrapOperator_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "internalapi/internal.proto",
+}
+
+const (
+	PlanCommandService_CreatePlan_FullMethodName           = "/internalapi.PlanCommandService/CreatePlan"
+	PlanCommandService_PausePlan_FullMethodName            = "/internalapi.PlanCommandService/PausePlan"
+	PlanCommandService_ResumePlan_FullMethodName           = "/internalapi.PlanCommandService/ResumePlan"
+	PlanCommandService_CancelPlan_FullMethodName           = "/internalapi.PlanCommandService/CancelPlan"
+	PlanCommandService_EnrollTestee_FullMethodName         = "/internalapi.PlanCommandService/EnrollTestee"
+	PlanCommandService_TerminateEnrollment_FullMethodName  = "/internalapi.PlanCommandService/TerminateEnrollment"
+	PlanCommandService_SchedulePendingTasks_FullMethodName = "/internalapi.PlanCommandService/SchedulePendingTasks"
+	PlanCommandService_OpenTask_FullMethodName             = "/internalapi.PlanCommandService/OpenTask"
+	PlanCommandService_CompleteTask_FullMethodName         = "/internalapi.PlanCommandService/CompleteTask"
+	PlanCommandService_ExpireTask_FullMethodName           = "/internalapi.PlanCommandService/ExpireTask"
+	PlanCommandService_CancelTask_FullMethodName           = "/internalapi.PlanCommandService/CancelTask"
+)
+
+// PlanCommandServiceClient is the client API for PlanCommandService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Plan 写侧命令服务 - 供 Worker 和内部系统动作调用
+type PlanCommandServiceClient interface {
+	CreatePlan(ctx context.Context, in *CreatePlanRequest, opts ...grpc.CallOption) (*CreatePlanResponse, error)
+	PausePlan(ctx context.Context, in *PausePlanRequest, opts ...grpc.CallOption) (*PausePlanResponse, error)
+	ResumePlan(ctx context.Context, in *ResumePlanRequest, opts ...grpc.CallOption) (*ResumePlanResponse, error)
+	CancelPlan(ctx context.Context, in *CancelPlanRequest, opts ...grpc.CallOption) (*CancelPlanResponse, error)
+	EnrollTestee(ctx context.Context, in *EnrollTesteeRequest, opts ...grpc.CallOption) (*EnrollTesteeResponse, error)
+	TerminateEnrollment(ctx context.Context, in *TerminateEnrollmentRequest, opts ...grpc.CallOption) (*TerminateEnrollmentResponse, error)
+	SchedulePendingTasks(ctx context.Context, in *SchedulePendingTasksRequest, opts ...grpc.CallOption) (*SchedulePendingTasksResponse, error)
+	OpenTask(ctx context.Context, in *OpenTaskRequest, opts ...grpc.CallOption) (*OpenTaskResponse, error)
+	CompleteTask(ctx context.Context, in *CompleteTaskRequest, opts ...grpc.CallOption) (*CompleteTaskResponse, error)
+	ExpireTask(ctx context.Context, in *ExpireTaskRequest, opts ...grpc.CallOption) (*ExpireTaskResponse, error)
+	CancelTask(ctx context.Context, in *CancelTaskRequest, opts ...grpc.CallOption) (*CancelTaskResponse, error)
+}
+
+type planCommandServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPlanCommandServiceClient(cc grpc.ClientConnInterface) PlanCommandServiceClient {
+	return &planCommandServiceClient{cc}
+}
+
+func (c *planCommandServiceClient) CreatePlan(ctx context.Context, in *CreatePlanRequest, opts ...grpc.CallOption) (*CreatePlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreatePlanResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_CreatePlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) PausePlan(ctx context.Context, in *PausePlanRequest, opts ...grpc.CallOption) (*PausePlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PausePlanResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_PausePlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) ResumePlan(ctx context.Context, in *ResumePlanRequest, opts ...grpc.CallOption) (*ResumePlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumePlanResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_ResumePlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) CancelPlan(ctx context.Context, in *CancelPlanRequest, opts ...grpc.CallOption) (*CancelPlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelPlanResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_CancelPlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) EnrollTestee(ctx context.Context, in *EnrollTesteeRequest, opts ...grpc.CallOption) (*EnrollTesteeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnrollTesteeResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_EnrollTestee_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) TerminateEnrollment(ctx context.Context, in *TerminateEnrollmentRequest, opts ...grpc.CallOption) (*TerminateEnrollmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TerminateEnrollmentResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_TerminateEnrollment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) SchedulePendingTasks(ctx context.Context, in *SchedulePendingTasksRequest, opts ...grpc.CallOption) (*SchedulePendingTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SchedulePendingTasksResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_SchedulePendingTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) OpenTask(ctx context.Context, in *OpenTaskRequest, opts ...grpc.CallOption) (*OpenTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OpenTaskResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_OpenTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) CompleteTask(ctx context.Context, in *CompleteTaskRequest, opts ...grpc.CallOption) (*CompleteTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteTaskResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_CompleteTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) ExpireTask(ctx context.Context, in *ExpireTaskRequest, opts ...grpc.CallOption) (*ExpireTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExpireTaskResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_ExpireTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) CancelTask(ctx context.Context, in *CancelTaskRequest, opts ...grpc.CallOption) (*CancelTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelTaskResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_CancelTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PlanCommandServiceServer is the server API for PlanCommandService service.
+// All implementations must embed UnimplementedPlanCommandServiceServer
+// for forward compatibility.
+//
+// Plan 写侧命令服务 - 供 Worker 和内部系统动作调用
+type PlanCommandServiceServer interface {
+	CreatePlan(context.Context, *CreatePlanRequest) (*CreatePlanResponse, error)
+	PausePlan(context.Context, *PausePlanRequest) (*PausePlanResponse, error)
+	ResumePlan(context.Context, *ResumePlanRequest) (*ResumePlanResponse, error)
+	CancelPlan(context.Context, *CancelPlanRequest) (*CancelPlanResponse, error)
+	EnrollTestee(context.Context, *EnrollTesteeRequest) (*EnrollTesteeResponse, error)
+	TerminateEnrollment(context.Context, *TerminateEnrollmentRequest) (*TerminateEnrollmentResponse, error)
+	SchedulePendingTasks(context.Context, *SchedulePendingTasksRequest) (*SchedulePendingTasksResponse, error)
+	OpenTask(context.Context, *OpenTaskRequest) (*OpenTaskResponse, error)
+	CompleteTask(context.Context, *CompleteTaskRequest) (*CompleteTaskResponse, error)
+	ExpireTask(context.Context, *ExpireTaskRequest) (*ExpireTaskResponse, error)
+	CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error)
+	mustEmbedUnimplementedPlanCommandServiceServer()
+}
+
+// UnimplementedPlanCommandServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPlanCommandServiceServer struct{}
+
+func (UnimplementedPlanCommandServiceServer) CreatePlan(context.Context, *CreatePlanRequest) (*CreatePlanResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePlan not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) PausePlan(context.Context, *PausePlanRequest) (*PausePlanResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PausePlan not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) ResumePlan(context.Context, *ResumePlanRequest) (*ResumePlanResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResumePlan not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) CancelPlan(context.Context, *CancelPlanRequest) (*CancelPlanResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelPlan not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) EnrollTestee(context.Context, *EnrollTesteeRequest) (*EnrollTesteeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EnrollTestee not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) TerminateEnrollment(context.Context, *TerminateEnrollmentRequest) (*TerminateEnrollmentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TerminateEnrollment not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) SchedulePendingTasks(context.Context, *SchedulePendingTasksRequest) (*SchedulePendingTasksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SchedulePendingTasks not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) OpenTask(context.Context, *OpenTaskRequest) (*OpenTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method OpenTask not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) CompleteTask(context.Context, *CompleteTaskRequest) (*CompleteTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteTask not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) ExpireTask(context.Context, *ExpireTaskRequest) (*ExpireTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExpireTask not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelTask not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) mustEmbedUnimplementedPlanCommandServiceServer() {}
+func (UnimplementedPlanCommandServiceServer) testEmbeddedByValue()                            {}
+
+// UnsafePlanCommandServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PlanCommandServiceServer will
+// result in compilation errors.
+type UnsafePlanCommandServiceServer interface {
+	mustEmbedUnimplementedPlanCommandServiceServer()
+}
+
+func RegisterPlanCommandServiceServer(s grpc.ServiceRegistrar, srv PlanCommandServiceServer) {
+	// If the following call pancis, it indicates UnimplementedPlanCommandServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PlanCommandService_ServiceDesc, srv)
+}
+
+func _PlanCommandService_CreatePlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).CreatePlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_CreatePlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).CreatePlan(ctx, req.(*CreatePlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_PausePlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PausePlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).PausePlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_PausePlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).PausePlan(ctx, req.(*PausePlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_ResumePlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumePlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).ResumePlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_ResumePlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).ResumePlan(ctx, req.(*ResumePlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_CancelPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelPlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).CancelPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_CancelPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).CancelPlan(ctx, req.(*CancelPlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_EnrollTestee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnrollTesteeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).EnrollTestee(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_EnrollTestee_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).EnrollTestee(ctx, req.(*EnrollTesteeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_TerminateEnrollment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TerminateEnrollmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).TerminateEnrollment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_TerminateEnrollment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).TerminateEnrollment(ctx, req.(*TerminateEnrollmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_SchedulePendingTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SchedulePendingTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).SchedulePendingTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_SchedulePendingTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).SchedulePendingTasks(ctx, req.(*SchedulePendingTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_OpenTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OpenTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).OpenTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_OpenTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).OpenTask(ctx, req.(*OpenTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_CompleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).CompleteTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_CompleteTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).CompleteTask(ctx, req.(*CompleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_ExpireTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExpireTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).ExpireTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_ExpireTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).ExpireTask(ctx, req.(*ExpireTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_CancelTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).CancelTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_CancelTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).CancelTask(ctx, req.(*CancelTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PlanCommandService_ServiceDesc is the grpc.ServiceDesc for PlanCommandService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PlanCommandService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "internalapi.PlanCommandService",
+	HandlerType: (*PlanCommandServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreatePlan",
+			Handler:    _PlanCommandService_CreatePlan_Handler,
+		},
+		{
+			MethodName: "PausePlan",
+			Handler:    _PlanCommandService_PausePlan_Handler,
+		},
+		{
+			MethodName: "ResumePlan",
+			Handler:    _PlanCommandService_ResumePlan_Handler,
+		},
+		{
+			MethodName: "CancelPlan",
+			Handler:    _PlanCommandService_CancelPlan_Handler,
+		},
+		{
+			MethodName: "EnrollTestee",
+			Handler:    _PlanCommandService_EnrollTestee_Handler,
+		},
+		{
+			MethodName: "TerminateEnrollment",
+			Handler:    _PlanCommandService_TerminateEnrollment_Handler,
+		},
+		{
+			MethodName: "SchedulePendingTasks",
+			Handler:    _PlanCommandService_SchedulePendingTasks_Handler,
+		},
+		{
+			MethodName: "OpenTask",
+			Handler:    _PlanCommandService_OpenTask_Handler,
+		},
+		{
+			MethodName: "CompleteTask",
+			Handler:    _PlanCommandService_CompleteTask_Handler,
+		},
+		{
+			MethodName: "ExpireTask",
+			Handler:    _PlanCommandService_ExpireTask_Handler,
+		},
+		{
+			MethodName: "CancelTask",
+			Handler:    _PlanCommandService_CancelTask_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

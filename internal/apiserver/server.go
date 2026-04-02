@@ -22,6 +22,7 @@ import (
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
+	redis "github.com/redis/go-redis/v9"
 )
 
 // apiServer 定义了 API 服务器的基本结构（六边形架构版本）
@@ -34,6 +35,8 @@ type apiServer struct {
 	grpcServer *grpcpkg.Server
 	// 数据库管理器
 	dbManager *DatabaseManager
+	// Redis 客户端（供内建调度器等后台任务复用）
+	redisCache redis.UniversalClient
 	// Container 主容器
 	container *container.Container
 	// IAM authz_version 同步订阅者
@@ -72,6 +75,7 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		gs:               gs,
 		genericAPIServer: genericServer,
 		dbManager:        dbManager,
+		redisCache:       nil,
 		grpcServer:       nil, // 延迟初始化
 		config:           cfg,
 	}
@@ -131,6 +135,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			"error", err.Error(),
 		)
 	}
+	s.redisCache = redisCache
 
 	// 创建消息队列 publisher（用于事件发布）
 	var mqPublisher messaging.Publisher
@@ -215,6 +220,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	// 初始化小程序码生成服务（从配置读取 wechat_app_id，然后从 IAM 查询）
 	if s.config.WeChatOptions != nil {
 		s.container.InitQRCodeService(s.config.WeChatOptions)
+		s.container.InitMiniProgramTaskNotificationService(s.config.WeChatOptions)
 		// 将 QRCodeService 注入到各个模块
 		if s.container.QRCodeService != nil {
 			// 注入到 EvaluationModule
@@ -274,6 +280,8 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 
 	// 启动统计同步定时任务（Redis -> MySQL），最终一致
 	s.startStatisticsSyncScheduler()
+	// 启动内建 plan 调度器
+	s.startPlanScheduler()
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {

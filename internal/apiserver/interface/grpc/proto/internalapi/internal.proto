@@ -4,6 +4,8 @@ package internalapi;
 
 option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi";
 
+import "google/protobuf/timestamp.proto";
+
 // 内部服务 - 供 Worker 调用
 // 用于事件处理后的业务逻辑调用
 service InternalService {
@@ -51,6 +53,12 @@ service InternalService {
   rpc GenerateScaleQRCode(GenerateScaleQRCodeRequest) 
       returns (GenerateScaleQRCodeResponse);
 
+  // 发送 task.opened 小程序订阅消息
+  // 场景：worker 处理 task.opened 事件后调用
+  // 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
+  rpc SendTaskOpenedMiniProgramNotification(SendTaskOpenedMiniProgramNotificationRequest)
+      returns (SendTaskOpenedMiniProgramNotificationResponse);
+
   // ==================== Operator Bootstrap 操作 ====================
 
   // 自举首个操作者
@@ -58,6 +66,186 @@ service InternalService {
   // 流程：EnsureByUser 幂等建档，同步基础信息，必要时激活/停用，并从 IAM 快照回填本地角色投影
   rpc BootstrapOperator(BootstrapOperatorRequest)
       returns (BootstrapOperatorResponse);
+}
+
+// Plan 写侧命令服务 - 供 Worker 和内部系统动作调用
+service PlanCommandService {
+  rpc CreatePlan(CreatePlanRequest) returns (CreatePlanResponse);
+  rpc PausePlan(PausePlanRequest) returns (PausePlanResponse);
+  rpc ResumePlan(ResumePlanRequest) returns (ResumePlanResponse);
+  rpc CancelPlan(CancelPlanRequest) returns (CancelPlanResponse);
+  rpc EnrollTestee(EnrollTesteeRequest) returns (EnrollTesteeResponse);
+  rpc TerminateEnrollment(TerminateEnrollmentRequest) returns (TerminateEnrollmentResponse);
+  rpc SchedulePendingTasks(SchedulePendingTasksRequest) returns (SchedulePendingTasksResponse);
+  rpc OpenTask(OpenTaskRequest) returns (OpenTaskResponse);
+  rpc CompleteTask(CompleteTaskRequest) returns (CompleteTaskResponse);
+  rpc ExpireTask(ExpireTaskRequest) returns (ExpireTaskResponse);
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+}
+
+// ==================== PlanCommandService ====================
+
+message PlanResultMessage {
+  string id = 1;
+  int64 org_id = 2;
+  string scale_code = 3;
+  string schedule_type = 4;
+  int32 interval = 5;
+  int32 total_times = 6;
+  repeated string fixed_dates = 7;
+  repeated int32 relative_weeks = 8;
+  string status = 9;
+}
+
+message TaskResultMessage {
+  string id = 1;
+  string plan_id = 2;
+  int32 seq = 3;
+  int64 org_id = 4;
+  string testee_id = 5;
+  string scale_code = 6;
+  string planned_at = 7;
+  optional string open_at = 8;
+  optional string expire_at = 9;
+  optional string completed_at = 10;
+  string status = 11;
+  optional string assessment_id = 12;
+  string entry_token = 13;
+  string entry_url = 14;
+}
+
+message EnrollmentResultMessage {
+  string plan_id = 1;
+  repeated TaskResultMessage tasks = 2;
+  bool idempotent = 3;
+  int32 created_task_count = 4;
+}
+
+message TaskScheduleStatsMessage {
+  int32 pending_count = 1;
+  int32 opened_count = 2;
+  int32 failed_count = 3;
+  int32 expired_count = 4;
+  int32 expire_failed_count = 5;
+}
+
+message CreatePlanRequest {
+  int64 org_id = 1;
+  string scale_code = 2;
+  string schedule_type = 3;
+  int32 interval = 4;
+  int32 total_times = 5;
+  repeated string fixed_dates = 6;
+  repeated int32 relative_weeks = 7;
+}
+
+message CreatePlanResponse {
+  PlanResultMessage plan = 1;
+}
+
+message PausePlanRequest {
+  int64 org_id = 1;
+  string plan_id = 2;
+}
+
+message PausePlanResponse {
+  PlanResultMessage plan = 1;
+}
+
+message ResumePlanRequest {
+  int64 org_id = 1;
+  string plan_id = 2;
+  map<string, string> testee_start_dates = 3;
+}
+
+message ResumePlanResponse {
+  PlanResultMessage plan = 1;
+}
+
+message CancelPlanRequest {
+  int64 org_id = 1;
+  string plan_id = 2;
+}
+
+message CancelPlanResponse {
+  string plan_id = 1;
+  int32 affected_task_count = 2;
+}
+
+message EnrollTesteeRequest {
+  int64 org_id = 1;
+  string plan_id = 2;
+  string testee_id = 3;
+  string start_date = 4;
+}
+
+message EnrollTesteeResponse {
+  EnrollmentResultMessage enrollment = 1;
+}
+
+message TerminateEnrollmentRequest {
+  int64 org_id = 1;
+  string plan_id = 2;
+  string testee_id = 3;
+}
+
+message TerminateEnrollmentResponse {
+  string plan_id = 1;
+  string testee_id = 2;
+  int32 affected_task_count = 3;
+}
+
+message SchedulePendingTasksRequest {
+  int64 org_id = 1;
+  string before = 2;
+  string source = 3;
+}
+
+message SchedulePendingTasksResponse {
+  repeated TaskResultMessage tasks = 1;
+  TaskScheduleStatsMessage stats = 2;
+}
+
+message OpenTaskRequest {
+  int64 org_id = 1;
+  string task_id = 2;
+  string entry_token = 3;
+  string entry_url = 4;
+  string expire_at = 5;
+}
+
+message OpenTaskResponse {
+  TaskResultMessage task = 1;
+}
+
+message CompleteTaskRequest {
+  int64 org_id = 1;
+  string task_id = 2;
+  string assessment_id = 3;
+}
+
+message CompleteTaskResponse {
+  TaskResultMessage task = 1;
+}
+
+message ExpireTaskRequest {
+  int64 org_id = 1;
+  string task_id = 2;
+}
+
+message ExpireTaskResponse {
+  TaskResultMessage task = 1;
+}
+
+message CancelTaskRequest {
+  int64 org_id = 1;
+  string task_id = 2;
+}
+
+message CancelTaskResponse {
+  string task_id = 1;
+  string plan_id = 2;
+  int32 affected_task_count = 3;
 }
 
 // ==================== CalculateAnswerSheetScore ====================
@@ -87,6 +275,7 @@ message CreateAssessmentFromAnswerSheetRequest {
   string filler_type = 7;            // 填写人类型：self/proxy
   string origin_type = 8;            // 来源类型：adhoc/plan（可选）
   string origin_id = 9;              // 来源ID（可选）
+  string task_id = 10;               // 计划任务ID（可选）
 }
 
 // 从答卷创建测评响应
@@ -159,6 +348,25 @@ message GenerateScaleQRCodeResponse {
   bool success = 1;                  // 是否成功
   string qrcode_url = 2;             // 二维码 URL
   string message = 3;                // 描述信息
+}
+
+// ==================== SendTaskOpenedMiniProgramNotification ====================
+
+message SendTaskOpenedMiniProgramNotificationRequest {
+  int64 org_id = 1;                  // 机构 ID
+  string task_id = 2;                // 任务 ID
+  uint64 testee_id = 3;              // 受试者 ID
+  string entry_url = 4;              // 任务入口 URL
+  google.protobuf.Timestamp open_at = 5; // 任务开放时间
+}
+
+message SendTaskOpenedMiniProgramNotificationResponse {
+  bool success = 1;                  // 是否成功
+  int32 sent_count = 2;              // 成功发送条数
+  repeated string recipient_open_ids = 3; // 实际命中的 openid 列表
+  string recipient_source = 4;       // 收件人来源：testee / guardian
+  bool skipped = 5;                  // 是否跳过发送
+  string message = 6;                // 描述信息
 }
 
 // ==================== BootstrapOperator ====================

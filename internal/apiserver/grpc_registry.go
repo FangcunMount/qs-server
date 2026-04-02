@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 )
@@ -59,6 +60,11 @@ func (r *GRPCRegistry) RegisterServices() error {
 
 	// 注册 Internal 服务（供 Worker 调用）
 	if err := r.registerInternalService(); err != nil {
+		return err
+	}
+
+	// 注册 PlanCommand 服务（供 Worker 和内部系统动作调用）
+	if err := r.registerPlanCommandService(); err != nil {
 		return err
 	}
 
@@ -187,8 +193,17 @@ func (r *GRPCRegistry) registerInternalService() error {
 		log.Warn("ActorModule is not initialized, skipping internal service registration")
 		return nil
 	}
+	if r.container.PlanModule == nil {
+		log.Warn("PlanModule is not initialized, skipping internal service registration")
+		return nil
+	}
 
 	// 使用 SurveyModule、EvaluationModule、ScaleModule、ActorModule 中的服务
+	var authzSnapshot *iaminfra.AuthzSnapshotLoader
+	if r.container.IAMModule != nil {
+		authzSnapshot = r.container.IAMModule.AuthzSnapshotLoader()
+	}
+
 	internalService := service.NewInternalService(
 		r.container.SurveyModule.AnswerSheet.ScoringService,
 		r.container.EvaluationModule.SubmissionService,
@@ -196,10 +211,30 @@ func (r *GRPCRegistry) registerInternalService() error {
 		r.container.EvaluationModule.EvaluationService,
 		r.container.ScaleModule.Repo,
 		r.container.ActorModule.TesteeTaggingService,
-		r.container.QRCodeService,  // 可能为 nil
+		r.container.PlanModule.TaskRepo,
+		r.container.PlanModule.CommandService,
+		r.container.ActorModule.OperatorLifecycleService,
+		r.container.ActorModule.OperatorAuthorizationService,
+		r.container.ActorModule.OperatorQueryService,
+		r.container.ActorModule.OperatorRepo,
+		authzSnapshot,
+		r.container.QRCodeService, // 可能为 nil
+		r.container.MiniProgramTaskNotificationService,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")
+	return nil
+}
+
+func (r *GRPCRegistry) registerPlanCommandService() error {
+	if r.container.PlanModule == nil || r.container.PlanModule.CommandService == nil {
+		log.Warn("PlanModule command service is not initialized, skipping plan command service registration")
+		return nil
+	}
+
+	planCommandService := service.NewPlanCommandService(r.container.PlanModule.CommandService)
+	r.server.RegisterService(planCommandService)
+	log.Info("   🗂️  PlanCommand service registered (write-side)")
 	return nil
 }
 
@@ -221,6 +256,10 @@ func (r *GRPCRegistry) GetRegisteredServices() []string {
 
 	if r.container.EvaluationModule != nil {
 		services = append(services, "EvaluationService")
+	}
+
+	if r.container.PlanModule != nil && r.container.PlanModule.CommandService != nil {
+		services = append(services, "PlanCommandService")
 	}
 
 	return services

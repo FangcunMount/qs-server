@@ -31,6 +31,12 @@ var (
 	// ErrTaskTerminal 任务已处于终态
 	ErrTaskTerminal = errors.New("task is in terminal state")
 
+	// ErrTaskAlreadyCompleted 任务已完成，不能再重置。
+	ErrTaskAlreadyCompleted = errors.New("task is already completed")
+
+	// ErrInvalidPlannedAt 无效的计划时间。
+	ErrInvalidPlannedAt = errors.New("invalid planned_at")
+
 	// ErrInvalidScheduleType 无效的周期类型
 	ErrInvalidScheduleType = errors.New("invalid schedule type")
 

@@ -16,7 +16,7 @@ else
 end
 `)
 
-// Acquire 获取分布式锁，返回 token、是否获取成功以及错误
+// Acquire 获取分布式锁，返回 token、是否获取成功以及错误。
 func Acquire(ctx context.Context, client redis.UniversalClient, key string, ttl time.Duration) (string, bool, error) {
 	if client == nil {
 		return "", false, nil
@@ -33,7 +33,7 @@ func Acquire(ctx context.Context, client redis.UniversalClient, key string, ttl 
 	return token, true, nil
 }
 
-// Release 释放分布式锁（只有 token 匹配时才删除）
+// Release 释放分布式锁，仅当 token 匹配时才删除。
 func Release(ctx context.Context, client redis.UniversalClient, key, token string) error {
 	if client == nil || token == "" {
 		return nil

@@ -20,28 +20,19 @@ import (
 // 对接按行为者组织的应用服务层
 type PlanHandler struct {
 	BaseHandler
-	lifecycleService      planApp.PlanLifecycleService
-	enrollmentService     planApp.PlanEnrollmentService
-	taskSchedulerService  planApp.TaskSchedulerService
-	taskManagementService planApp.TaskManagementService
-	queryService          planApp.PlanQueryService
-	testeeAccessService   actorAccessApp.TesteeAccessService
+	commandService      planApp.PlanCommandService
+	queryService        planApp.PlanQueryService
+	testeeAccessService actorAccessApp.TesteeAccessService
 }
 
 // NewPlanHandler 创建计划处理器
 func NewPlanHandler(
-	lifecycleService planApp.PlanLifecycleService,
-	enrollmentService planApp.PlanEnrollmentService,
-	taskSchedulerService planApp.TaskSchedulerService,
-	taskManagementService planApp.TaskManagementService,
+	commandService planApp.PlanCommandService,
 	queryService planApp.PlanQueryService,
 ) *PlanHandler {
 	return &PlanHandler{
-		lifecycleService:      lifecycleService,
-		enrollmentService:     enrollmentService,
-		taskSchedulerService:  taskSchedulerService,
-		taskManagementService: taskManagementService,
-		queryService:          queryService,
+		commandService: commandService,
+		queryService:   queryService,
 	}
 }
 
@@ -138,69 +129,6 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		"org_id_int64", orgID,
 	)
 
-	// 根据 schedule_type 验证必需的参数
-	logger.L(ctx).Infow("CreatePlan validating schedule_type",
-		"action", "create_plan",
-		"schedule_type", req.ScheduleType,
-	)
-	switch req.ScheduleType {
-	case "by_week", "by_day":
-		logger.L(ctx).Infow("CreatePlan validating by_week/by_day params",
-			"action", "create_plan",
-			"interval", req.Interval,
-			"total_times", req.TotalTimes,
-		)
-		if req.Interval <= 0 {
-			logger.L(ctx).Errorw("CreatePlan interval invalid",
-				"action", "create_plan",
-				"interval", req.Interval,
-			)
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "by_week/by_day 类型需要 interval 参数且必须大于0"))
-			return
-		}
-		if req.TotalTimes <= 0 {
-			logger.L(ctx).Errorw("CreatePlan total_times invalid",
-				"action", "create_plan",
-				"total_times", req.TotalTimes,
-			)
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "by_week/by_day 类型需要 total_times 参数且必须大于0"))
-			return
-		}
-	case "fixed_date":
-		logger.L(ctx).Infow("CreatePlan validating fixed_date params",
-			"action", "create_plan",
-			"fixed_dates_count", len(req.FixedDates),
-			"fixed_dates", req.FixedDates,
-		)
-		if len(req.FixedDates) == 0 {
-			logger.L(ctx).Errorw("CreatePlan fixed_dates empty",
-				"action", "create_plan",
-			)
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "fixed_date 类型需要 fixed_dates 参数且不能为空"))
-			return
-		}
-	case "custom":
-		logger.L(ctx).Infow("CreatePlan validating custom params",
-			"action", "create_plan",
-			"relative_weeks_count", len(req.RelativeWeeks),
-			"relative_weeks", req.RelativeWeeks,
-		)
-		if len(req.RelativeWeeks) == 0 {
-			logger.L(ctx).Errorw("CreatePlan relative_weeks empty",
-				"action", "create_plan",
-			)
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "custom 类型需要 relative_weeks 参数且不能为空"))
-			return
-		}
-	default:
-		logger.L(ctx).Errorw("CreatePlan invalid schedule_type",
-			"action", "create_plan",
-			"schedule_type", req.ScheduleType,
-		)
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "无效的 schedule_type: %s，支持的类型: by_week, by_day, fixed_date, custom", req.ScheduleType))
-		return
-	}
-
 	dto := planApp.CreatePlanDTO{
 		OrgID:         orgID,
 		ScaleCode:     req.ScaleCode,
@@ -211,14 +139,14 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		RelativeWeeks: req.RelativeWeeks,
 	}
 
-	logger.L(ctx).Infow("CreatePlan calling lifecycle service",
+	logger.L(ctx).Infow("CreatePlan calling command service",
 		"action", "create_plan",
 		"dto", dto,
 	)
 
-	result, err := h.lifecycleService.CreatePlan(ctx, dto)
+	result, err := h.commandService.CreatePlan(ctx, dto)
 	if err != nil {
-		logger.L(ctx).Errorw("CreatePlan lifecycle service failed",
+		logger.L(ctx).Errorw("CreatePlan command service failed",
 			"action", "create_plan",
 			"resource", "plan",
 			"org_id", orgID,
@@ -260,7 +188,7 @@ func (h *PlanHandler) PausePlan(c *gin.Context) {
 		return
 	}
 
-	result, err := h.lifecycleService.PausePlan(c.Request.Context(), orgID, planID)
+	result, err := h.commandService.PausePlan(c.Request.Context(), orgID, planID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to pause plan",
 			"action", "pause_plan",
@@ -308,7 +236,7 @@ func (h *PlanHandler) ResumePlan(c *gin.Context) {
 		}
 	}
 
-	result, err := h.lifecycleService.ResumePlan(c.Request.Context(), orgID, planID, req.TesteeStartDates)
+	result, err := h.commandService.ResumePlan(c.Request.Context(), orgID, planID, req.TesteeStartDates)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to resume plan",
 			"action", "resume_plan",
@@ -345,7 +273,7 @@ func (h *PlanHandler) CancelPlan(c *gin.Context) {
 		return
 	}
 
-	err = h.lifecycleService.CancelPlan(c.Request.Context(), orgID, planID)
+	_, err = h.commandService.CancelPlan(c.Request.Context(), orgID, planID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to cancel plan",
 			"action", "cancel_plan",
@@ -400,7 +328,7 @@ func (h *PlanHandler) EnrollTestee(c *gin.Context) {
 		StartDate: req.StartDate,
 	}
 
-	result, err := h.enrollmentService.EnrollTestee(c.Request.Context(), dto)
+	result, err := h.commandService.EnrollTestee(c.Request.Context(), dto)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to enroll testee",
 			"action", "enroll_testee",
@@ -445,7 +373,7 @@ func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 		return
 	}
 
-	err = h.enrollmentService.TerminateEnrollment(c.Request.Context(), orgID, planID, testeeID)
+	_, err = h.commandService.TerminateEnrollment(c.Request.Context(), orgID, planID, testeeID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to terminate enrollment",
 			"action", "terminate_enrollment",
@@ -485,18 +413,20 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 		return
 	}
 
-	tasks, err := h.taskSchedulerService.SchedulePendingTasks(c.Request.Context(), orgID, before)
+	ctx := planApp.WithTaskSchedulerSource(c.Request.Context(), planApp.TaskSchedulerSourceInternalAPI)
+	scheduleResult, err := h.commandService.SchedulePendingTasks(ctx, orgID, before)
 	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to schedule pending tasks",
+		logger.L(ctx).Errorw("Failed to schedule pending tasks",
 			"action", "schedule_pending_tasks",
 			"resource", "task",
+			"source", planApp.TaskSchedulerSourceInternalAPI,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
 		return
 	}
 
-	h.Success(c, response.NewTaskListResponseFromSlice(tasks))
+	h.Success(c, response.NewTaskListResponseFromSlice(scheduleResult.Tasks))
 }
 
 // ============= Task Management API (任务管理) =============
@@ -541,7 +471,7 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 		ExpireAt:   req.ExpireAt,
 	}
 
-	result, err := h.taskManagementService.OpenTask(c.Request.Context(), orgID, taskID, dto)
+	result, err := h.commandService.OpenTask(c.Request.Context(), orgID, taskID, dto)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to open task",
 			"action", "open_task",
@@ -581,7 +511,7 @@ func (h *PlanHandler) CompleteTask(c *gin.Context) {
 		return
 	}
 
-	result, err := h.taskManagementService.CompleteTask(c.Request.Context(), orgID, taskID, assessmentID)
+	result, err := h.commandService.CompleteTask(c.Request.Context(), orgID, taskID, assessmentID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to complete task",
 			"action", "complete_task",
@@ -618,7 +548,7 @@ func (h *PlanHandler) ExpireTask(c *gin.Context) {
 		return
 	}
 
-	result, err := h.taskManagementService.ExpireTask(c.Request.Context(), orgID, taskID)
+	result, err := h.commandService.ExpireTask(c.Request.Context(), orgID, taskID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to expire task",
 			"action", "expire_task",
@@ -655,7 +585,7 @@ func (h *PlanHandler) CancelTask(c *gin.Context) {
 		return
 	}
 
-	err = h.taskManagementService.CancelTask(c.Request.Context(), orgID, taskID)
+	_, err = h.commandService.CancelTask(c.Request.Context(), orgID, taskID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to cancel task",
 			"action", "cancel_task",

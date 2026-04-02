@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -44,8 +45,36 @@ type TaskResult struct {
 
 // EnrollmentResult 加入计划结果
 type EnrollmentResult struct {
-	PlanID string        // 计划ID
-	Tasks  []*TaskResult // 生成的任务列表
+	PlanID           string        // 计划ID
+	Tasks            []*TaskResult // 生成/复用后的任务列表
+	Idempotent       bool          // 是否命中幂等路径
+	CreatedTaskCount int           // 本次新建任务数量
+}
+
+// PlanMutationResult 计划写操作结果。
+type PlanMutationResult struct {
+	PlanID            string // 计划ID
+	AffectedTaskCount int    // 本次联动影响的任务数量
+}
+
+// EnrollmentTerminationResult 终止参与结果。
+type EnrollmentTerminationResult struct {
+	PlanID            string // 计划ID
+	TesteeID          string // 受试者ID
+	AffectedTaskCount int    // 本次取消的任务数量
+}
+
+// TaskMutationResult 任务写操作结果。
+type TaskMutationResult struct {
+	TaskID            string // 任务ID
+	PlanID            string // 计划ID
+	AffectedTaskCount int    // 受影响记录数
+}
+
+// TaskScheduleResult 调度结果。
+type TaskScheduleResult struct {
+	Tasks []*TaskResult     // 本轮新开放的任务
+	Stats TaskScheduleStats // 调度统计
 }
 
 // PlanListResult 计划列表结果
@@ -144,7 +173,7 @@ func toTaskResults(tasks []*plan.AssessmentTask) []*TaskResult {
 // parseTime 解析时间字符串
 func parseTime(timeStr string) (time.Time, error) {
 	if timeStr == "" {
-		return time.Time{}, nil
+		return time.Now(), nil
 	}
 	// 尝试多种格式
 	formats := []string{
@@ -153,11 +182,11 @@ func parseTime(timeStr string) (time.Time, error) {
 		"2006-01-02",
 	}
 	for _, format := range formats {
-		if t, err := time.Parse(format, timeStr); err == nil {
+		if t, err := time.ParseInLocation(format, timeStr, time.Local); err == nil {
 			return t, nil
 		}
 	}
-	return time.Time{}, nil
+	return time.Time{}, fmt.Errorf("unsupported time format: %s", timeStr)
 }
 
 // parseDate 解析日期字符串
@@ -165,7 +194,7 @@ func parseDate(dateStr string) (time.Time, error) {
 	if dateStr == "" {
 		return time.Time{}, nil
 	}
-	return time.Parse("2006-01-02", dateStr)
+	return time.ParseInLocation("2006-01-02", dateStr, time.Local)
 }
 
 // toPlanScheduleType 转换为计划周期类型

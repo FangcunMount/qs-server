@@ -3,12 +3,15 @@ package container
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/worker/application"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
+	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
+	"github.com/FangcunMount/qs-server/internal/worker/port"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -68,6 +71,7 @@ func (c *Container) initEventDispatcher() error {
 		EvaluationClient:  c.evaluationClient,
 		InternalClient:    c.internalClient,
 		RedisCache:        c.redisCache,
+		Notifier:          c.buildNotifier(),
 	}
 
 	// 创建事件分发器
@@ -89,6 +93,32 @@ func (c *Container) initEventDispatcher() error {
 
 	log.Info("✅ Event dispatcher initialized")
 	return nil
+}
+
+func (c *Container) buildNotifier() port.TaskNotifier {
+	if c.opts == nil || c.opts.Notification == nil {
+		return nil
+	}
+
+	gatewayNotifier := workernotifier.NewGatewayNotifier(
+		c.opts.Notification.GatewayURL,
+		c.opts.Notification.GatewayToken,
+		time.Duration(c.opts.Notification.TimeoutMs)*time.Millisecond,
+	)
+	if gatewayNotifier != nil {
+		if c.opts.Notification.WebhookURL != "" && c.logger != nil {
+			c.logger.Info("notification gateway configured; webhook adapter disabled",
+				"gateway_url", c.opts.Notification.GatewayURL,
+				"webhook_url", c.opts.Notification.WebhookURL,
+			)
+		}
+		return gatewayNotifier
+	}
+	return workernotifier.NewWebhookNotifier(
+		c.opts.Notification.WebhookURL,
+		time.Duration(c.opts.Notification.TimeoutMs)*time.Millisecond,
+		c.opts.Notification.SharedSecret,
+	)
 }
 
 // Cleanup 清理资源

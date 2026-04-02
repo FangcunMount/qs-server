@@ -15,6 +15,7 @@ type SaveAnswerSheetInput struct {
 	Title                string
 	WriterID             uint64
 	TesteeID             uint64
+	TaskID               string
 	OrgID                uint64
 	Answers              []AnswerInput
 }
@@ -95,6 +96,7 @@ func (c *AnswerSheetClient) SaveAnswerSheet(ctx context.Context, input *SaveAnsw
 		Title:                input.Title,
 		WriterId:             input.WriterID,
 		TesteeId:             input.TesteeID,
+		TaskId:               input.TaskID,
 		OrgId:                input.OrgID,
 		Answers:              answers,
 	}

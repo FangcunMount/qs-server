@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -22,7 +23,9 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 )
 
 // modulePool 模块池
@@ -56,10 +59,12 @@ type Container struct {
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 
 	// 基础设施服务
-	QRCodeGenerator wechatPort.QRCodeGenerator // 小程序码生成器（可选）
+	QRCodeGenerator wechatPort.QRCodeGenerator            // 小程序码生成器（可选）
+	SubscribeSender wechatPort.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
 
 	// 应用层服务
-	QRCodeService qrcodeApp.QRCodeService // 小程序码生成服务（可选）
+	QRCodeService                      qrcodeApp.QRCodeService                            // 小程序码生成服务（可选）
+	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService // 小程序 task 消息服务（可选）
 
 	// 容器状态
 	initialized bool
@@ -455,6 +460,7 @@ func (c *Container) initQRCodeGenerator() {
 	}
 
 	c.QRCodeGenerator = wechatapi.NewQRCodeGenerator(wechatCache)
+	c.SubscribeSender = wechatapi.NewSubscribeSender(wechatCache)
 	fmt.Printf("📱 QRCode generator initialized (infrastructure layer)\n")
 }
 
@@ -513,6 +519,66 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
 		wechatAppService,
 	)
 	fmt.Printf("📱 QRCode service initialized (application layer, page_path: %s)\n", wechatOptions.PagePath)
+}
+
+// InitMiniProgramTaskNotificationService 初始化 task.opened 小程序消息服务。
+func (c *Container) InitMiniProgramTaskNotificationService(wechatOptions *options.WeChatOptions) {
+	if c.SubscribeSender == nil {
+		fmt.Printf("⚠️  MiniProgram task notification service not initialized (subscribe sender not available)\n")
+		return
+	}
+	if c.ActorModule == nil || c.ActorModule.TesteeQueryService == nil {
+		fmt.Printf("⚠️  MiniProgram task notification service not initialized (testee query service not available)\n")
+		return
+	}
+	if c.PlanModule == nil || c.PlanModule.TaskRepo == nil || c.PlanModule.PlanRepo == nil {
+		fmt.Printf("⚠️  MiniProgram task notification service not initialized (plan repositories not available)\n")
+		return
+	}
+	if wechatOptions == nil {
+		fmt.Printf("⚠️  MiniProgram task notification service not initialized (wechat options not provided)\n")
+		return
+	}
+	if strings.TrimSpace(wechatOptions.TaskOpenedTemplateID) == "" {
+		fmt.Printf("⚠️  MiniProgram task notification service not initialized (missing task-opened-template-id)\n")
+		return
+	}
+	if wechatOptions.WeChatAppID == "" && (wechatOptions.AppID == "" || wechatOptions.AppSecret == "") {
+		fmt.Printf("⚠️  MiniProgram task notification service not initialized (missing wechat app config)\n")
+		return
+	}
+
+	var wechatAppService *iam.WeChatAppService
+	var guardianshipSvc *iam.GuardianshipService
+	var identitySvc *iam.IdentityService
+	var scaleQueryService scaleApp.ScaleQueryService
+	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
+		wechatAppService = c.IAMModule.WeChatAppService()
+		guardianshipSvc = c.IAMModule.GuardianshipService()
+		identitySvc = c.IAMModule.IdentityService()
+	}
+	if c.ScaleModule != nil {
+		scaleQueryService = c.ScaleModule.QueryService
+	}
+
+	c.MiniProgramTaskNotificationService = notificationApp.NewMiniProgramTaskNotificationService(
+		c.ActorModule.TesteeQueryService,
+		c.PlanModule.TaskRepo,
+		c.PlanModule.PlanRepo,
+		scaleQueryService,
+		guardianshipSvc,
+		identitySvc,
+		wechatAppService,
+		c.SubscribeSender,
+		&notificationApp.Config{
+			WeChatAppID:          wechatOptions.WeChatAppID,
+			PagePath:             wechatOptions.PagePath,
+			AppID:                wechatOptions.AppID,
+			AppSecret:            wechatOptions.AppSecret,
+			TaskOpenedTemplateID: wechatOptions.TaskOpenedTemplateID,
+		},
+	)
+	fmt.Printf("📨 MiniProgram task notification service initialized (template_id: %s)\n", wechatOptions.TaskOpenedTemplateID)
 }
 
 // HealthCheck 健康检查

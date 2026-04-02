@@ -1,0 +1,541 @@
+package notification
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/FangcunMount/component-base/pkg/logger"
+	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
+	idpv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/idp/v1"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+)
+
+var templateKeyPattern = regexp.MustCompile(`\{\{([a-zA-Z_]+\d+)\.DATA\}\}`)
+
+// Config 是小程序 task 通知配置。
+type Config struct {
+	WeChatAppID          string
+	PagePath             string
+	AppID                string
+	AppSecret            string
+	TaskOpenedTemplateID string
+}
+
+type testeeLookup interface {
+	GetByID(ctx context.Context, testeeID uint64) (*testeeApp.TesteeResult, error)
+}
+
+type taskLookup interface {
+	FindByID(ctx context.Context, id domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error)
+	FindByTesteeID(ctx context.Context, testeeID domainTestee.ID) ([]*domainPlan.AssessmentTask, error)
+}
+
+type planLookup interface {
+	FindByID(ctx context.Context, id domainPlan.AssessmentPlanID) (*domainPlan.AssessmentPlan, error)
+}
+
+type scaleLookup interface {
+	GetByCode(ctx context.Context, code string) (*scaleApp.ScaleResult, error)
+}
+
+type guardianshipLookup interface {
+	IsEnabled() bool
+	ListGuardians(ctx context.Context, childID string) (*identityv1.ListGuardiansResponse, error)
+}
+
+type userLookup interface {
+	IsEnabled() bool
+	GetUser(ctx context.Context, userID string) (*identityv1.GetUserResponse, error)
+}
+
+type wechatAppLookup interface {
+	IsEnabled() bool
+	GetWechatApp(ctx context.Context, appID string) (*idpv1.GetWechatAppResponse, error)
+}
+
+type templateSpec struct {
+	keys []string
+}
+
+type taskOpenedTemplateData struct {
+	planName     string
+	planDate     string
+	planProgress string
+	warmPrompt   string
+}
+
+type taskOpenedService struct {
+	testeeQueryService testeeLookup
+	taskRepo           taskLookup
+	planRepo           planLookup
+	scaleQueryService  scaleLookup
+	guardianshipSvc    guardianshipLookup
+	identitySvc        userLookup
+	wechatAppService   wechatAppLookup
+	sender             port.MiniProgramSubscribeSender
+	config             *Config
+
+	templateCache sync.Map
+}
+
+// NewMiniProgramTaskNotificationService 创建 task.opened 小程序通知服务。
+func NewMiniProgramTaskNotificationService(
+	testeeQueryService testeeLookup,
+	taskRepo taskLookup,
+	planRepo planLookup,
+	scaleQueryService scaleLookup,
+	guardianshipSvc guardianshipLookup,
+	identitySvc userLookup,
+	wechatAppService wechatAppLookup,
+	sender port.MiniProgramSubscribeSender,
+	config *Config,
+) MiniProgramTaskNotificationService {
+	return &taskOpenedService{
+		testeeQueryService: testeeQueryService,
+		taskRepo:           taskRepo,
+		planRepo:           planRepo,
+		scaleQueryService:  scaleQueryService,
+		guardianshipSvc:    guardianshipSvc,
+		identitySvc:        identitySvc,
+		wechatAppService:   wechatAppService,
+		sender:             sender,
+		config:             config,
+	}
+}
+
+func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDTO) (*TaskOpenedResult, error) {
+	result := &TaskOpenedResult{
+		TemplateID: s.taskOpenedTemplateID(),
+	}
+	if s == nil || s.sender == nil || s.config == nil {
+		result.Skipped = true
+		result.Message = "mini program notifier not configured"
+		return result, nil
+	}
+	if result.TemplateID == "" {
+		result.Skipped = true
+		result.Message = "task opened template id not configured"
+		return result, nil
+	}
+
+	testeeResult, err := s.testeeQueryService.GetByID(ctx, dto.TesteeID)
+	if err != nil {
+		return nil, fmt.Errorf("get testee: %w", err)
+	}
+
+	appID, appSecret, err := s.getWechatAppConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	recipients, source, err := s.resolveRecipients(ctx, testeeResult)
+	if err != nil {
+		return nil, err
+	}
+	if len(recipients) == 0 {
+		result.Skipped = true
+		result.Message = "no mini program recipients resolved"
+		return result, nil
+	}
+
+	spec, err := s.loadTemplateSpec(ctx, appID, appSecret, result.TemplateID)
+	if err != nil {
+		return nil, err
+	}
+	page := s.buildPagePath(dto.EntryURL)
+	data := s.buildTemplateData(spec, s.resolveTaskOpenedTemplateData(ctx, dto))
+
+	result.RecipientOpenIDs = recipients
+	result.RecipientSource = source
+
+	var sent int
+	var sendErrs []string
+	for _, openID := range recipients {
+		if err := s.sender.SendSubscribeMessage(ctx, appID, appSecret, port.SubscribeMessage{
+			ToUser:           openID,
+			TemplateID:       result.TemplateID,
+			Page:             page,
+			MiniProgramState: "formal",
+			Lang:             "zh_CN",
+			Data:             data,
+		}); err != nil {
+			sendErrs = append(sendErrs, fmt.Sprintf("%s: %v", openID, err))
+			continue
+		}
+		sent++
+	}
+
+	result.SentCount = sent
+	if sent == 0 {
+		return result, fmt.Errorf("send task opened message failed: %s", strings.Join(sendErrs, "; "))
+	}
+	if len(sendErrs) > 0 {
+		result.Message = "partial delivery: " + strings.Join(sendErrs, "; ")
+	}
+	return result, nil
+}
+
+func (s *taskOpenedService) taskOpenedTemplateID() string {
+	if s == nil || s.config == nil {
+		return ""
+	}
+	return strings.TrimSpace(s.config.TaskOpenedTemplateID)
+}
+
+func (s *taskOpenedService) getWechatAppConfig(ctx context.Context) (appID, appSecret string, err error) {
+	if s.config == nil {
+		return "", "", fmt.Errorf("mini program notification config is nil")
+	}
+	if s.config.WeChatAppID != "" && s.wechatAppService != nil && s.wechatAppService.IsEnabled() {
+		resp, err := s.wechatAppService.GetWechatApp(ctx, s.config.WeChatAppID)
+		if err != nil {
+			return "", "", fmt.Errorf("get wechat app from IAM: %w", err)
+		}
+		if resp == nil || resp.App == nil || resp.App.GetAppId() == "" || resp.App.GetAppSecret() == "" {
+			return "", "", fmt.Errorf("wechat app config from IAM is incomplete")
+		}
+		return resp.App.GetAppId(), resp.App.GetAppSecret(), nil
+	}
+	if s.config.AppID != "" && s.config.AppSecret != "" {
+		return s.config.AppID, s.config.AppSecret, nil
+	}
+	return "", "", fmt.Errorf("wechat mini program config is missing")
+}
+
+func (s *taskOpenedService) resolveRecipients(ctx context.Context, testeeResult *testeeApp.TesteeResult) ([]string, string, error) {
+	if testeeResult == nil || testeeResult.ProfileID == nil {
+		return nil, "", nil
+	}
+
+	// Best-effort: 某些数据可能直接把 profile_id 绑定到 IAM.User。
+	directUserOpenIDs := s.resolveUserOpenIDs(ctx, strconv.FormatUint(*testeeResult.ProfileID, 10))
+	if len(directUserOpenIDs) > 0 {
+		return directUserOpenIDs, "testee", nil
+	}
+
+	guardianOpenIDs, err := s.resolveGuardianOpenIDs(ctx, strconv.FormatUint(*testeeResult.ProfileID, 10))
+	if err != nil {
+		return nil, "", err
+	}
+	return guardianOpenIDs, "guardian", nil
+}
+
+func (s *taskOpenedService) resolveGuardianOpenIDs(ctx context.Context, childID string) ([]string, error) {
+	if childID == "" || s.guardianshipSvc == nil || !s.guardianshipSvc.IsEnabled() {
+		return nil, nil
+	}
+
+	resp, err := s.guardianshipSvc.ListGuardians(ctx, childID)
+	if err != nil {
+		return nil, fmt.Errorf("list guardians: %w", err)
+	}
+
+	var recipients []string
+	for _, edge := range resp.Items {
+		if edge == nil {
+			continue
+		}
+		if edge.Guardian != nil {
+			recipients = append(recipients, extractMiniProgramOpenIDs(edge.Guardian)...)
+			continue
+		}
+		if edge.Guardianship != nil && edge.Guardianship.UserId != "" {
+			recipients = append(recipients, s.resolveUserOpenIDs(ctx, edge.Guardianship.UserId)...)
+		}
+	}
+	return uniqueStrings(recipients), nil
+}
+
+func (s *taskOpenedService) resolveUserOpenIDs(ctx context.Context, userID string) []string {
+	if userID == "" || s.identitySvc == nil || !s.identitySvc.IsEnabled() {
+		return nil
+	}
+	resp, err := s.identitySvc.GetUser(ctx, userID)
+	if err != nil {
+		logger.L(ctx).Debugw("failed to resolve mini program recipient by user id",
+			"action", "resolve_miniprogram_recipient",
+			"user_id", userID,
+			"error", err.Error(),
+		)
+		return nil
+	}
+	if resp == nil || resp.User == nil {
+		return nil
+	}
+	return extractMiniProgramOpenIDs(resp.User)
+}
+
+func extractMiniProgramOpenIDs(user *identityv1.User) []string {
+	if user == nil {
+		return nil
+	}
+
+	var recipients []string
+	for _, identity := range user.ExternalIdentities {
+		if identity == nil || identity.ExternalId == "" {
+			continue
+		}
+		provider := strings.ToLower(identity.Provider)
+		if provider == "wx:minip" || provider == "wechat" || provider == "wechat_miniprogram" || strings.HasPrefix(provider, "wx:minip:") {
+			recipients = append(recipients, identity.ExternalId)
+		}
+	}
+	return uniqueStrings(recipients)
+}
+
+func (s *taskOpenedService) loadTemplateSpec(ctx context.Context, appID, appSecret, templateID string) (*templateSpec, error) {
+	expected := s.expectedTaskOpenedTemplateSpec(templateID)
+	if expected == nil {
+		return nil, fmt.Errorf("unsupported task opened template id: %s", templateID)
+	}
+
+	cacheKey := appID + ":" + templateID
+	if cached, ok := s.templateCache.Load(cacheKey); ok {
+		if spec, ok := cached.(*templateSpec); ok {
+			return spec, nil
+		}
+	}
+
+	templates, err := s.sender.ListTemplates(ctx, appID, appSecret)
+	if err != nil {
+		return nil, fmt.Errorf("list mini program templates: %w", err)
+	}
+	for _, tmpl := range templates {
+		if tmpl.ID != templateID {
+			continue
+		}
+		keys := extractTemplateKeys(tmpl.Content)
+		if !slices.Equal(keys, expected.keys) {
+			return nil, fmt.Errorf("template %s keys mismatch: got %v want %v", templateID, keys, expected.keys)
+		}
+		spec := &templateSpec{keys: append([]string(nil), expected.keys...)}
+		s.templateCache.Store(cacheKey, spec)
+		return spec, nil
+	}
+	return nil, fmt.Errorf("template %s not found in mini program template list", templateID)
+}
+
+func (s *taskOpenedService) expectedTaskOpenedTemplateSpec(templateID string) *templateSpec {
+	if strings.TrimSpace(templateID) == "" || strings.TrimSpace(templateID) != s.taskOpenedTemplateID() {
+		return nil
+	}
+	return &templateSpec{
+		keys: []string{"thing5", "date1", "character_string2", "thing3"},
+	}
+}
+
+func extractTemplateKeys(content string) []string {
+	matches := templateKeyPattern.FindAllStringSubmatch(content, -1)
+	keys := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}, len(matches))
+	for _, match := range matches {
+		if len(match) < 2 || match[1] == "" {
+			continue
+		}
+		if _, ok := seen[match[1]]; ok {
+			continue
+		}
+		seen[match[1]] = struct{}{}
+		keys = append(keys, match[1])
+	}
+	return keys
+}
+
+func (s *taskOpenedService) buildTemplateData(spec *templateSpec, data taskOpenedTemplateData) map[string]string {
+	if spec == nil {
+		return nil
+	}
+	return map[string]string{
+		spec.keys[0]: data.planName,
+		spec.keys[1]: data.planDate,
+		spec.keys[2]: data.planProgress,
+		spec.keys[3]: data.warmPrompt,
+	}
+}
+
+func (s *taskOpenedService) resolveTaskOpenedTemplateData(ctx context.Context, dto TaskOpenedDTO) taskOpenedTemplateData {
+	data := taskOpenedTemplateData{
+		planName:     "测评计划",
+		planDate:     formatTaskOpenedDate(dto.OpenAt),
+		planProgress: "1/1",
+		warmPrompt:   "请及时完成本次测评任务",
+	}
+	if s == nil || s.taskRepo == nil || strings.TrimSpace(dto.TaskID) == "" {
+		return data
+	}
+
+	taskID, err := domainPlan.ParseAssessmentTaskID(dto.TaskID)
+	if err != nil {
+		logger.L(ctx).Warnw("failed to parse task id for mini program notification",
+			"action", "resolve_task_opened_template_data",
+			"task_id", dto.TaskID,
+			"error", err.Error(),
+		)
+		return data
+	}
+
+	task, err := s.taskRepo.FindByID(ctx, taskID)
+	if err != nil {
+		logger.L(ctx).Warnw("failed to load task for mini program notification",
+			"action", "resolve_task_opened_template_data",
+			"task_id", dto.TaskID,
+			"error", err.Error(),
+		)
+		return data
+	}
+	if task == nil {
+		return data
+	}
+
+	if !task.GetPlannedAt().IsZero() {
+		data.planDate = formatTaskOpenedDate(task.GetPlannedAt())
+	}
+	if task.GetSeq() > 0 {
+		data.planProgress = strconv.Itoa(task.GetSeq())
+	}
+
+	if s.planRepo != nil {
+		parentPlan, err := s.planRepo.FindByID(ctx, task.GetPlanID())
+		if err != nil {
+			logger.L(ctx).Warnw("failed to load plan for mini program notification",
+				"action", "resolve_task_opened_template_data",
+				"task_id", dto.TaskID,
+				"plan_id", task.GetPlanID().String(),
+				"error", err.Error(),
+			)
+		} else if parentPlan != nil && parentPlan.GetTotalTimes() > 0 && task.GetSeq() > 0 {
+			data.planProgress = fmt.Sprintf("%d/%d", task.GetSeq(), parentPlan.GetTotalTimes())
+		}
+	}
+
+	if scaleTitle := s.resolveScaleTitle(ctx, task.GetScaleCode()); scaleTitle != "" {
+		data.planName = scaleTitle
+	} else if code := strings.TrimSpace(task.GetScaleCode()); code != "" {
+		data.planName = code
+	}
+
+	data.warmPrompt = s.buildWarmPrompt(ctx, task)
+	return data
+}
+
+func (s *taskOpenedService) resolveScaleTitle(ctx context.Context, scaleCode string) string {
+	if s == nil || s.scaleQueryService == nil || strings.TrimSpace(scaleCode) == "" {
+		return ""
+	}
+	result, err := s.scaleQueryService.GetByCode(ctx, scaleCode)
+	if err != nil {
+		logger.L(ctx).Warnw("failed to load scale for mini program notification",
+			"action", "resolve_task_opened_template_data",
+			"scale_code", scaleCode,
+			"error", err.Error(),
+		)
+		return ""
+	}
+	if result == nil {
+		return ""
+	}
+	return strings.TrimSpace(result.Title)
+}
+
+func (s *taskOpenedService) buildWarmPrompt(ctx context.Context, task *domainPlan.AssessmentTask) string {
+	const fallback = "请及时完成本次测评任务"
+
+	if s == nil || s.taskRepo == nil || task == nil {
+		return fallback
+	}
+	tasks, err := s.taskRepo.FindByTesteeID(ctx, task.GetTesteeID())
+	if err != nil {
+		logger.L(ctx).Warnw("failed to count unfinished tasks for mini program notification",
+			"action", "resolve_task_opened_template_data",
+			"task_id", task.GetID().String(),
+			"testee_id", task.GetTesteeID().String(),
+			"error", err.Error(),
+		)
+		return fallback
+	}
+
+	count := 0
+	for _, item := range tasks {
+		if item == nil || item.GetStatus().IsTerminal() {
+			continue
+		}
+		if sameLocalDate(item.GetPlannedAt(), task.GetPlannedAt()) {
+			count++
+		}
+	}
+	if count <= 0 {
+		return fallback
+	}
+	return fmt.Sprintf("今天有 %d 个任务未完成", count)
+}
+
+func formatTaskOpenedDate(openAt time.Time) string {
+	if openAt.IsZero() {
+		return time.Now().Local().Format("2006.01.02")
+	}
+	return openAt.Local().Format("2006.01.02")
+}
+
+func sameLocalDate(left, right time.Time) bool {
+	if left.IsZero() || right.IsZero() {
+		return false
+	}
+	left = left.Local()
+	right = right.Local()
+	return left.Year() == right.Year() && left.Month() == right.Month() && left.Day() == right.Day()
+}
+
+func (s *taskOpenedService) buildPagePath(entryURL string) string {
+	pagePath := strings.TrimSpace(s.config.PagePath)
+	if pagePath == "" {
+		return ""
+	}
+
+	u, err := url.Parse(entryURL)
+	if err != nil {
+		return pagePath
+	}
+	q := u.Query()
+	pageQuery := url.Values{}
+	if token := q.Get("token"); token != "" {
+		pageQuery.Set("token", token)
+	}
+	if taskID := q.Get("task_id"); taskID != "" {
+		pageQuery.Set("task_id", taskID)
+	}
+	if len(pageQuery) == 0 {
+		return pagePath
+	}
+	return pagePath + "?" + pageQuery.Encode()
+}
+
+func uniqueStrings(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(items))
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+	slices.Sort(result)
+	return result
+}

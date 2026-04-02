@@ -48,6 +48,7 @@ type Manager struct {
 	answerSheetClient *AnswerSheetClient
 	evaluationClient  *EvaluationClient
 	internalClient    *InternalClient
+	planClient        *PlanClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -168,6 +169,11 @@ func (m *Manager) RegisterClients() error {
 	m.clients["internal"] = m.internalClient
 	log.Info("   🔧 Internal client registered")
 
+	// 注册 PlanCommand 客户端
+	m.planClient = NewPlanClient(m)
+	m.clients["plan"] = m.planClient
+	log.Info("   🗂️  Plan client registered")
+
 	log.Infof("✅ All gRPC clients registered (endpoint: %s)", m.config.Endpoint)
 	return nil
 }
@@ -185,6 +191,11 @@ func (m *Manager) EvaluationClient() *EvaluationClient {
 // InternalClient 获取内部服务客户端
 func (m *Manager) InternalClient() *InternalClient {
 	return m.internalClient
+}
+
+// PlanClient 获取 plan 命令客户端
+func (m *Manager) PlanClient() *PlanClient {
+	return m.planClient
 }
 
 // GetClient 根据名称获取客户端

@@ -31,3 +31,26 @@ type QRCodeGenerator interface {
 		isHyaline bool,
 	) (io.Reader, error)
 }
+
+// SubscribeMessage 小程序订阅消息请求。
+type SubscribeMessage struct {
+	ToUser           string
+	TemplateID       string
+	Page             string
+	MiniProgramState string
+	Lang             string
+	Data             map[string]string
+}
+
+// SubscribeTemplate 小程序订阅消息模板。
+type SubscribeTemplate struct {
+	ID      string
+	Title   string
+	Content string
+}
+
+// MiniProgramSubscribeSender 小程序订阅消息发送器。
+type MiniProgramSubscribeSender interface {
+	SendSubscribeMessage(ctx context.Context, appID, appSecret string, msg SubscribeMessage) error
+	ListTemplates(ctx context.Context, appID, appSecret string) ([]SubscribeTemplate, error)
+}

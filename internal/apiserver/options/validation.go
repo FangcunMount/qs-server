@@ -53,5 +53,26 @@ func (o *Options) Validate() []error {
 		validateBackpressure("iam", o.Backpressure.IAM)
 	}
 
+	if o.PlanScheduler != nil && o.PlanScheduler.Enable {
+		if len(o.PlanScheduler.OrgIDs) == 0 {
+			errs = append(errs, fmt.Errorf("plan_scheduler.org_ids cannot be empty when enabled"))
+		}
+		if o.PlanScheduler.InitialDelay < 0 {
+			errs = append(errs, fmt.Errorf("plan_scheduler.initial_delay cannot be negative"))
+		}
+		if o.PlanScheduler.Interval <= 0 {
+			errs = append(errs, fmt.Errorf("plan_scheduler.interval must be greater than 0"))
+		}
+		if o.PlanScheduler.LockKey == "" {
+			errs = append(errs, fmt.Errorf("plan_scheduler.lock_key cannot be empty when enabled"))
+		}
+		if o.PlanScheduler.LockTTL <= 0 {
+			errs = append(errs, fmt.Errorf("plan_scheduler.lock_ttl must be greater than 0"))
+		}
+		if o.PlanScheduler.Interval > 0 && o.PlanScheduler.LockTTL > o.PlanScheduler.Interval {
+			errs = append(errs, fmt.Errorf("plan_scheduler.lock_ttl must be less than or equal to plan_scheduler.interval"))
+		}
+	}
+
 	return errs
 }

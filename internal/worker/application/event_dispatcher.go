@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/worker/port"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -35,6 +36,7 @@ type HandlerDependencies struct {
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    *grpcclient.InternalClient
 	RedisCache        redis.UniversalClient
+	Notifier          port.TaskNotifier
 }
 
 // NewEventDispatcher 创建事件分发器
@@ -74,6 +76,7 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 		EvaluationClient:  d.deps.EvaluationClient,
 		InternalClient:    d.deps.InternalClient,
 		RedisCache:        d.deps.RedisCache,
+		Notifier:          d.deps.Notifier,
 	}
 
 	// 4. 创建处理器工厂（基于 init() 注册的处理器）

@@ -4,12 +4,46 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
+
+func notificationMetaFromEnvelope(env *EventEnvelope) port.NotificationMeta {
+	if env == nil {
+		return port.NotificationMeta{}
+	}
+	return port.NotificationMeta{
+		EventID:       env.ID,
+		EventType:     env.EventType,
+		AggregateType: env.AggregateType,
+		AggregateID:   env.AggregateID,
+		OccurredAt:    env.OccurredAt,
+	}
+}
 
 func init() {
 	Register("plan_created_handler", func(deps *Dependencies) HandlerFunc {
 		return handlePlanCreated(deps)
+	})
+	Register("plan_testee_enrolled_handler", func(deps *Dependencies) HandlerFunc {
+		return handlePlanTesteeEnrolled(deps)
+	})
+	Register("plan_testee_terminated_handler", func(deps *Dependencies) HandlerFunc {
+		return handlePlanTesteeTerminated(deps)
+	})
+	Register("plan_paused_handler", func(deps *Dependencies) HandlerFunc {
+		return handlePlanPaused(deps)
+	})
+	Register("plan_resumed_handler", func(deps *Dependencies) HandlerFunc {
+		return handlePlanResumed(deps)
+	})
+	Register("plan_canceled_handler", func(deps *Dependencies) HandlerFunc {
+		return handlePlanCanceled(deps)
+	})
+	Register("plan_finished_handler", func(deps *Dependencies) HandlerFunc {
+		return handlePlanFinished(deps)
 	})
 	Register("task_opened_handler", func(deps *Dependencies) HandlerFunc {
 		return handleTaskOpened(deps)
@@ -20,6 +54,9 @@ func init() {
 	Register("task_expired_handler", func(deps *Dependencies) HandlerFunc {
 		return handleTaskExpired(deps)
 	})
+	Register("task_canceled_handler", func(deps *Dependencies) HandlerFunc {
+		return handleTaskCanceled(deps)
+	})
 }
 
 // ==================== Payload 定义 ====================
@@ -29,6 +66,53 @@ type PlanCreatedPayload struct {
 	PlanID    string    `json:"plan_id"`
 	ScaleCode string    `json:"scale_code"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// PlanTesteeEnrolledPayload 受试者加入计划事件数据
+type PlanTesteeEnrolledPayload struct {
+	PlanID           string    `json:"plan_id"`
+	TesteeID         string    `json:"testee_id"`
+	OrgID            int64     `json:"org_id"`
+	Idempotent       bool      `json:"idempotent"`
+	CreatedTaskCount int       `json:"created_task_count"`
+	OccurredAt       time.Time `json:"occurred_at"`
+}
+
+// PlanTesteeTerminatedPayload 受试者终止计划参与事件数据
+type PlanTesteeTerminatedPayload struct {
+	PlanID            string    `json:"plan_id"`
+	TesteeID          string    `json:"testee_id"`
+	OrgID             int64     `json:"org_id"`
+	AffectedTaskCount int       `json:"affected_task_count"`
+	OccurredAt        time.Time `json:"occurred_at"`
+}
+
+// PlanPausedPayload 计划暂停事件数据
+type PlanPausedPayload struct {
+	PlanID    string    `json:"plan_id"`
+	ScaleCode string    `json:"scale_code"`
+	PausedAt  time.Time `json:"paused_at"`
+}
+
+// PlanResumedPayload 计划恢复事件数据
+type PlanResumedPayload struct {
+	PlanID    string    `json:"plan_id"`
+	ScaleCode string    `json:"scale_code"`
+	ResumedAt time.Time `json:"resumed_at"`
+}
+
+// PlanCanceledPayload 计划取消事件数据
+type PlanCanceledPayload struct {
+	PlanID     string    `json:"plan_id"`
+	ScaleCode  string    `json:"scale_code"`
+	CanceledAt time.Time `json:"canceled_at"`
+}
+
+// PlanFinishedPayload 计划完成事件数据
+type PlanFinishedPayload struct {
+	PlanID     string    `json:"plan_id"`
+	ScaleCode  string    `json:"scale_code"`
+	FinishedAt time.Time `json:"finished_at"`
 }
 
 // TaskOpenedPayload 任务开放事件数据
@@ -44,6 +128,7 @@ type TaskOpenedPayload struct {
 type TaskCompletedPayload struct {
 	TaskID       string    `json:"task_id"`
 	PlanID       string    `json:"plan_id"`
+	TesteeID     string    `json:"testee_id"`
 	AssessmentID string    `json:"assessment_id"`
 	CompletedAt  time.Time `json:"completed_at"`
 }
@@ -52,7 +137,16 @@ type TaskCompletedPayload struct {
 type TaskExpiredPayload struct {
 	TaskID    string    `json:"task_id"`
 	PlanID    string    `json:"plan_id"`
+	TesteeID  string    `json:"testee_id"`
 	ExpiredAt time.Time `json:"expired_at"`
+}
+
+// TaskCanceledPayload 任务取消事件数据
+type TaskCanceledPayload struct {
+	TaskID     string    `json:"task_id"`
+	PlanID     string    `json:"plan_id"`
+	TesteeID   string    `json:"testee_id"`
+	CanceledAt time.Time `json:"canceled_at"`
 }
 
 // ==================== Handler 实现 ====================
@@ -77,12 +171,127 @@ func handlePlanCreated(deps *Dependencies) HandlerFunc {
 			slog.Time("created_at", data.CreatedAt),
 		)
 
-		// TODO: 更新统计指标
-		// - 计划创建数量
-		// - 按量表分组的计划数量
+		return nil
+	}
+}
 
-		// TODO: 可选：预热计划相关缓存
+// handlePlanTesteeEnrolled 处理受试者加入计划事件
+func handlePlanTesteeEnrolled(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data PlanTesteeEnrolledPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse plan testee enrolled event: %w", err)
+		}
 
+		deps.Logger.Info("processing plan testee enrolled",
+			slog.String("event_id", env.ID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("testee_id", data.TesteeID),
+			slog.Int64("org_id", data.OrgID),
+			slog.Bool("idempotent", data.Idempotent),
+			slog.Int("created_task_count", data.CreatedTaskCount),
+			slog.Time("occurred_at", data.OccurredAt),
+		)
+
+		return nil
+	}
+}
+
+// handlePlanTesteeTerminated 处理受试者终止计划参与事件
+func handlePlanTesteeTerminated(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data PlanTesteeTerminatedPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse plan testee terminated event: %w", err)
+		}
+
+		deps.Logger.Info("processing plan testee terminated",
+			slog.String("event_id", env.ID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("testee_id", data.TesteeID),
+			slog.Int64("org_id", data.OrgID),
+			slog.Int("affected_task_count", data.AffectedTaskCount),
+			slog.Time("occurred_at", data.OccurredAt),
+		)
+
+		return nil
+	}
+}
+
+// handlePlanPaused 处理计划暂停事件
+func handlePlanPaused(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data PlanPausedPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse plan paused event: %w", err)
+		}
+
+		deps.Logger.Info("processing plan paused",
+			slog.String("event_id", env.ID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("scale_code", data.ScaleCode),
+			slog.Time("paused_at", data.PausedAt),
+		)
+		return nil
+	}
+}
+
+// handlePlanResumed 处理计划恢复事件
+func handlePlanResumed(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data PlanResumedPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse plan resumed event: %w", err)
+		}
+
+		deps.Logger.Info("processing plan resumed",
+			slog.String("event_id", env.ID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("scale_code", data.ScaleCode),
+			slog.Time("resumed_at", data.ResumedAt),
+		)
+		return nil
+	}
+}
+
+// handlePlanCanceled 处理计划取消事件
+func handlePlanCanceled(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data PlanCanceledPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse plan canceled event: %w", err)
+		}
+
+		deps.Logger.Info("processing plan canceled",
+			slog.String("event_id", env.ID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("scale_code", data.ScaleCode),
+			slog.Time("canceled_at", data.CanceledAt),
+		)
+		return nil
+	}
+}
+
+// handlePlanFinished 处理计划完成事件
+func handlePlanFinished(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data PlanFinishedPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse plan finished event: %w", err)
+		}
+
+		deps.Logger.Info("processing plan finished",
+			slog.String("event_id", env.ID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("scale_code", data.ScaleCode),
+			slog.Time("finished_at", data.FinishedAt),
+		)
 		return nil
 	}
 }
@@ -111,21 +320,40 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 			slog.Time("open_at", data.OpenAt),
 		)
 
-		// TODO: 发送通知给受试者
-		// 通知内容：
-		// - 标题：测评提醒
-		// - 内容：您有一个新的测评任务，请点击链接完成测评
-		// - 链接：data.EntryURL
-		// - 截止时间：从任务信息中获取（需要查询任务详情）
-		//
-		// 实现方式：
-		// - 方案A：调用通知服务 API（HTTP/gRPC）
-		// - 方案B：直接发送到消息队列（如 NSQ/RabbitMQ）
-		// - 方案C：集成第三方通知服务（如极光推送、阿里云短信）
-
-		// TODO: 更新统计指标
-		// - 任务开放数量
-		// - 按计划分组的任务开放数量
+		if deps.InternalClient != nil {
+			testeeID, parseErr := strconv.ParseUint(data.TesteeID, 10, 64)
+			if parseErr != nil {
+				deps.Logger.Warn("failed to parse testee id for mini program notification",
+					slog.String("task_id", data.TaskID),
+					slog.String("testee_id", data.TesteeID),
+					slog.String("error", parseErr.Error()),
+				)
+			} else {
+				resp, notifyErr := deps.InternalClient.SendTaskOpenedMiniProgramNotification(
+					ctx,
+					0,
+					data.TaskID,
+					testeeID,
+					data.EntryURL,
+					data.OpenAt,
+				)
+				if notifyErr != nil {
+					deps.Logger.Warn("failed to send task opened mini program notification",
+						slog.String("task_id", data.TaskID),
+						slog.String("testee_id", data.TesteeID),
+						slog.String("error", notifyErr.Error()),
+					)
+				} else {
+					deps.Logger.Info("task opened mini program notification processed",
+						slog.String("task_id", data.TaskID),
+						slog.Int("sent_count", int(resp.GetSentCount())),
+						slog.Bool("skipped", resp.GetSkipped()),
+						slog.String("recipient_source", resp.GetRecipientSource()),
+						slog.String("message", resp.GetMessage()),
+					)
+				}
+			}
+		}
 
 		return nil
 	}
@@ -150,29 +378,26 @@ func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 			slog.String("event_id", env.ID),
 			slog.String("task_id", data.TaskID),
 			slog.String("plan_id", data.PlanID),
+			slog.String("testee_id", data.TesteeID),
 			slog.String("assessment_id", data.AssessmentID),
 			slog.Time("completed_at", data.CompletedAt),
 		)
 
-		// TODO: 更新统计指标
-		// - 任务完成数量
-		// - 计划完成率（已完成任务数 / 总任务数）
-		// - 按计划分组的完成率
-		// - 按受试者分组的完成进度
-
-		// TODO: 可选：发送完成确认通知
-		// 通知内容：
-		// - 标题：测评已完成
-		// - 内容：您已完成本次测评，感谢您的配合
-
-		// TODO: 可选：触发报告生成流程
-		// 如果计划配置了自动生成报告，调用报告生成服务
-		// 注意：报告生成可能需要等待评估完成（assessment.interpreted 事件）
-
-		// TODO: 可选：检查测评结果风险等级
-		// 如果测评结果风险等级高，触发预警流程
-		// 注意：需要等待 assessment.interpreted 事件，获取风险等级信息
-		// 可以通过查询 assessment 状态或订阅 assessment.interpreted 事件来实现
+		if deps.Notifier != nil {
+			if err := deps.Notifier.NotifyTaskCompleted(ctx, notificationMetaFromEnvelope(env), port.TaskCompletedNotification{
+				TaskID:       data.TaskID,
+				PlanID:       data.PlanID,
+				TesteeID:     data.TesteeID,
+				AssessmentID: data.AssessmentID,
+				CompletedAt:  data.CompletedAt,
+			}); err != nil {
+				deps.Logger.Warn("failed to notify task completed",
+					slog.String("task_id", data.TaskID),
+					slog.String("testee_id", data.TesteeID),
+					slog.String("error", err.Error()),
+				)
+			}
+		}
 
 		return nil
 	}
@@ -196,23 +421,60 @@ func handleTaskExpired(deps *Dependencies) HandlerFunc {
 			slog.String("event_id", env.ID),
 			slog.String("task_id", data.TaskID),
 			slog.String("plan_id", data.PlanID),
+			slog.String("testee_id", data.TesteeID),
 			slog.Time("expired_at", data.ExpiredAt),
 		)
 
-		// TODO: 更新统计指标
-		// - 任务过期数量
-		// - 计划完成率（需要排除过期任务）
-		// - 按计划分组的过期率
+		if deps.Notifier != nil {
+			if err := deps.Notifier.NotifyTaskExpired(ctx, notificationMetaFromEnvelope(env), port.TaskExpiredNotification{
+				TaskID:    data.TaskID,
+				PlanID:    data.PlanID,
+				TesteeID:  data.TesteeID,
+				ExpiredAt: data.ExpiredAt,
+			}); err != nil {
+				deps.Logger.Warn("failed to notify task expired",
+					slog.String("task_id", data.TaskID),
+					slog.String("testee_id", data.TesteeID),
+					slog.String("error", err.Error()),
+				)
+			}
+		}
 
-		// TODO: 可选：发送过期提醒通知
-		// 通知内容：
-		// - 标题：测评已过期
-		// - 内容：您的测评任务已过期，如有疑问请联系管理员
+		return nil
+	}
+}
 
-		// TODO: 可选：分析过期原因
-		// - 记录过期任务的相关信息
-		// - 生成过期原因分析报告
+// handleTaskCanceled 处理任务取消事件
+func handleTaskCanceled(deps *Dependencies) HandlerFunc {
+	return func(ctx context.Context, eventType string, payload []byte) error {
+		var data TaskCanceledPayload
+		env, err := ParseEventData(payload, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse task canceled event: %w", err)
+		}
 
+		deps.Logger.Info("processing task canceled",
+			slog.String("event_id", env.ID),
+			slog.String("task_id", data.TaskID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("testee_id", data.TesteeID),
+			slog.Time("canceled_at", data.CanceledAt),
+		)
+
+		if deps.Notifier != nil {
+			if err := deps.Notifier.NotifyTaskCanceled(ctx, notificationMetaFromEnvelope(env), port.TaskCanceledNotification{
+				TaskID:     data.TaskID,
+				PlanID:     data.PlanID,
+				TesteeID:   data.TesteeID,
+				CanceledAt: data.CanceledAt,
+			}); err != nil {
+				deps.Logger.Warn("failed to notify task canceled",
+					slog.String("task_id", data.TaskID),
+					slog.String("testee_id", data.TesteeID),
+					slog.String("error", err.Error()),
+				)
+			}
+		}
 		return nil
 	}
 }

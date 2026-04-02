@@ -80,9 +80,7 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 		originType := ""
-
-		// TODO: 从事件数据中提取origin_type
-		// 当前暂时跳过，后续可以在事件数据中添加OriginType字段
+		// assessment.submitted 事件当前没有 origin_type，来源分布统计因此暂时跳过。
 
 		// 获取当前日期
 		now := time.Now()

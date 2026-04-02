@@ -246,6 +246,7 @@ func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, o
 		Title:                req.Title,
 		WriterID:             writerID,
 		TesteeID:             req.TesteeID,
+		TaskID:               req.TaskID,
 		OrgID:                orgID,
 		Answers:              answers,
 	})

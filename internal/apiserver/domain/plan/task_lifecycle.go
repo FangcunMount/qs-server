@@ -143,3 +143,32 @@ func (l *TaskLifecycle) Cancel(ctx context.Context, task *AssessmentTask) error 
 	task.cancel()
 	return nil
 }
+
+// Reschedule 复用既有任务，将其重置为待推送状态。
+func (l *TaskLifecycle) Reschedule(ctx context.Context, task *AssessmentTask, plannedAt time.Time) error {
+	taskID := task.GetID().String()
+	logger.L(ctx).Infow("Rescheduling task in domain service",
+		"domain_action", "reschedule_task",
+		"task_id", taskID,
+		"current_status", task.GetStatus().String(),
+		"planned_at", plannedAt,
+	)
+
+	if plannedAt.IsZero() {
+		return errors.WithCode(code.ErrInvalidArgument, "计划时间不能为空")
+	}
+	if task.IsCompleted() {
+		return errors.WithCode(code.ErrInvalidArgument, "已完成任务不能重新调度")
+	}
+
+	if err := task.reschedule(plannedAt); err != nil {
+		logger.L(ctx).Errorw("Failed to reschedule task",
+			"domain_action", "reschedule_task",
+			"task_id", taskID,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	return nil
+}

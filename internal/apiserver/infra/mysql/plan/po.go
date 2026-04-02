@@ -57,16 +57,16 @@ type AssessmentTaskPO struct {
 	mysql.AuditFields
 
 	// 关联计划
-	PlanID uint64 `gorm:"column:plan_id;not null;index:idx_plan_id"`
+	PlanID uint64 `gorm:"column:plan_id;not null;index:idx_plan_id;uniqueIndex:uk_plan_testee_seq,priority:1"`
 
 	// 序号
-	Seq int `gorm:"column:seq;not null;index:idx_plan_seq"` // 计划内的序号
+	Seq int `gorm:"column:seq;not null;index:idx_plan_seq;uniqueIndex:uk_plan_testee_seq,priority:3"` // 计划内的序号
 
 	// 组织信息（冗余，用于查询优化和权限控制）
 	OrgID int64 `gorm:"column:org_id;not null;index:idx_org_id"`
 
 	// 受试者信息
-	TesteeID uint64 `gorm:"column:testee_id;not null;index:idx_testee_id"`
+	TesteeID uint64 `gorm:"column:testee_id;not null;index:idx_testee_id;uniqueIndex:uk_plan_testee_seq,priority:2"`
 
 	// 量表引用（冗余，用于查询优化）
 	ScaleCode string `gorm:"column:scale_code;size:100;not null;index:idx_scale_code"`
@@ -85,8 +85,7 @@ type AssessmentTaskPO struct {
 	EntryToken string `gorm:"column:entry_token;size:255"`
 	EntryURL   string `gorm:"column:entry_url;size:500"`
 
-	// 复合索引：计划ID + 序号（确保同一计划内序号唯一）
-	// 复合索引：计划ID + 受试者ID + 序号（用于查询某个受试者在某个计划下的任务）
+	// 唯一索引：计划ID + 受试者ID + 序号（保证同一受试者在同一计划下每个 seq 只有一条任务）
 }
 
 // TableName 指定表名

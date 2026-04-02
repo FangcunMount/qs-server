@@ -30,12 +30,9 @@ type PlanModule struct {
 	// handler 层
 	Handler *handler.PlanHandler
 
-	// service 层 - 按行为者组织
-	LifecycleService      planApp.PlanLifecycleService
-	EnrollmentService     planApp.PlanEnrollmentService
-	TaskSchedulerService  planApp.TaskSchedulerService
-	TaskManagementService planApp.TaskManagementService
-	QueryService          planApp.PlanQueryService
+	// service 层
+	CommandService planApp.PlanCommandService
+	QueryService   planApp.PlanQueryService
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher      event.EventPublisher
@@ -114,18 +111,23 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 	// Redis 客户端已在上面处理（params[3]）
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	m.LifecycleService = planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, scaleRepo, m.eventPublisher)
-	m.EnrollmentService = planApp.NewEnrollmentService(m.PlanRepo, m.TaskRepo, m.eventPublisher)
-	m.TaskSchedulerService = planApp.NewTaskSchedulerService(m.TaskRepo, entryGenerator, m.eventPublisher)
-	m.TaskManagementService = planApp.NewTaskManagementService(m.TaskRepo, m.eventPublisher)
+	lifecycleService := planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, scaleRepo, m.eventPublisher)
+	enrollmentService := planApp.NewEnrollmentService(m.PlanRepo, m.TaskRepo, m.eventPublisher)
+	taskSchedulerService := planApp.NewTaskSchedulerService(m.TaskRepo, m.PlanRepo, entryGenerator, m.eventPublisher)
+	taskManagementService := planApp.NewTaskManagementService(m.TaskRepo, m.PlanRepo, m.eventPublisher)
+	m.CommandService = planApp.NewCommandService(
+		lifecycleService,
+		enrollmentService,
+		taskSchedulerService,
+		taskManagementService,
+		m.PlanRepo,
+		m.TaskRepo,
+	)
 	m.QueryService = planApp.NewQueryService(m.PlanRepo, m.TaskRepo)
 
 	// 初始化 handler 层
 	m.Handler = handler.NewPlanHandler(
-		m.LifecycleService,
-		m.EnrollmentService,
-		m.TaskSchedulerService,
-		m.TaskManagementService,
+		m.CommandService,
 		m.QueryService,
 	)
 	if m.testeeAccessService != nil {

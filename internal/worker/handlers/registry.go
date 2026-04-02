@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/worker/port"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -34,6 +35,7 @@ type Dependencies struct {
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    *grpcclient.InternalClient
 	RedisCache        redis.UniversalClient
+	Notifier          port.TaskNotifier
 }
 
 // HandlerFactory 处理器工厂函数

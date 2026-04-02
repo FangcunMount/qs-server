@@ -68,8 +68,6 @@ func handleReportGenerated(deps *Dependencies) HandlerFunc {
 			tagTesteeWithReportData(ctx, deps, data, highRiskFactors)
 		}
 
-		// TODO: 发送报告生成通知
-
 		return nil
 	}
 }
@@ -98,7 +96,6 @@ func handleHighRiskAlert(deps *Dependencies, data ReportGeneratedPayload) {
 		slog.String("risk_level", data.RiskLevel),
 		slog.Float64("total_score", data.TotalScore),
 	)
-	// TODO: 发送预警通知
 }
 
 // extractHighRiskFactors 从报告中提取高风险因子
@@ -200,8 +197,6 @@ func handleReportExported(deps *Dependencies) HandlerFunc {
 			slog.Uint64("exported_by", data.ExportedBy),
 			slog.Time("exported_at", data.ExportedAt),
 		)
-
-		// TODO: 记录审计日志
 
 		return nil
 	}

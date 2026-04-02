@@ -3,8 +3,10 @@ package grpcclient
 import (
 	"context"
 	"fmt"
+	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // InternalClient 内部服务客户端
@@ -120,6 +122,32 @@ func (c *InternalClient) GenerateScaleQRCode(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate scale QR code: %w", err)
+	}
+
+	return resp, nil
+}
+
+// SendTaskOpenedMiniProgramNotification 发送 task.opened 小程序订阅消息。
+func (c *InternalClient) SendTaskOpenedMiniProgramNotification(
+	ctx context.Context,
+	orgID int64,
+	taskID string,
+	testeeID uint64,
+	entryURL string,
+	openAt time.Time,
+) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.SendTaskOpenedMiniProgramNotification(ctx, &pb.SendTaskOpenedMiniProgramNotificationRequest{
+		OrgId:    orgID,
+		TaskId:   taskID,
+		TesteeId: testeeID,
+		EntryUrl: entryURL,
+		OpenAt:   timestamppb.New(openAt),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to send task opened mini program notification: %w", err)
 	}
 
 	return resp, nil

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -14,13 +15,18 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	domaintestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // InternalService 内部 gRPC 服务 - 供 Worker 调用
@@ -33,6 +39,8 @@ type InternalService struct {
 	engineService             engine.Service
 	scaleRepo                 scale.Repository
 	testeeTaggingService      testeeApp.TesteeTaggingService
+	planTaskRepo              planDomain.AssessmentTaskRepository
+	planCommandService        planApp.PlanCommandService
 	operatorLifecycleService  operatorApp.OperatorLifecycleService
 	operatorAuthService       operatorApp.OperatorAuthorizationService
 	operatorQueryService      operatorApp.OperatorQueryService
@@ -40,6 +48,8 @@ type InternalService struct {
 	authzSnapshot             *iaminfra.AuthzSnapshotLoader
 	// 小程序码生成服务（可选）
 	qrCodeService qrcodeApp.QRCodeService
+	// 小程序 task 消息服务（可选）
+	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -50,12 +60,15 @@ func NewInternalService(
 	engineService engine.Service,
 	scaleRepo scale.Repository,
 	testeeTaggingService testeeApp.TesteeTaggingService,
+	planTaskRepo planDomain.AssessmentTaskRepository,
+	planCommandService planApp.PlanCommandService,
 	operatorLifecycleService operatorApp.OperatorLifecycleService,
 	operatorAuthService operatorApp.OperatorAuthorizationService,
 	operatorQueryService operatorApp.OperatorQueryService,
 	operatorRepo domainoperator.Repository,
 	authzSnapshot *iaminfra.AuthzSnapshotLoader,
 	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
+	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 ) *InternalService {
 	var qrService qrcodeApp.QRCodeService
 	if q, ok := qrCodeService.(qrcodeApp.QRCodeService); ok {
@@ -63,18 +76,21 @@ func NewInternalService(
 	}
 
 	return &InternalService{
-		answerSheetScoringService: answerSheetScoringService,
-		submissionService:         submissionService,
-		managementService:         managementService,
-		engineService:             engineService,
-		scaleRepo:                 scaleRepo,
-		testeeTaggingService:      testeeTaggingService,
-		operatorLifecycleService:  operatorLifecycleService,
-		operatorAuthService:       operatorAuthService,
-		operatorQueryService:      operatorQueryService,
-		operatorRepo:              operatorRepo,
-		authzSnapshot:             authzSnapshot,
-		qrCodeService:             qrService,
+		answerSheetScoringService:          answerSheetScoringService,
+		submissionService:                  submissionService,
+		managementService:                  managementService,
+		engineService:                      engineService,
+		scaleRepo:                          scaleRepo,
+		testeeTaggingService:               testeeTaggingService,
+		planTaskRepo:                       planTaskRepo,
+		planCommandService:                 planCommandService,
+		operatorLifecycleService:           operatorLifecycleService,
+		operatorAuthService:                operatorAuthService,
+		operatorQueryService:               operatorQueryService,
+		operatorRepo:                       operatorRepo,
+		authzSnapshot:                      authzSnapshot,
+		qrCodeService:                      qrService,
+		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 	}
 }
 
@@ -140,6 +156,7 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		"answersheet_id", req.AnswersheetId,
 		"questionnaire_code", req.QuestionnaireCode,
 		"filler_id", req.FillerId,
+		"task_id", req.TaskId,
 	)
 
 	// 验证参数
@@ -206,12 +223,30 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		dto.OriginID = &req.OriginId
 	}
 
+	var matchedTask *planDomain.AssessmentTask
+	if req.TaskId != "" {
+		matchedTask = s.resolvePlanTaskByID(ctx, req, medicalScaleCode)
+	} else if medicalScaleCode != nil {
+		matchedTask = s.resolveOpenedPlanTask(ctx, req.OrgId, req.TesteeId, *medicalScaleCode)
+	}
+	if matchedTask != nil {
+		planID := matchedTask.GetPlanID().String()
+		dto.OriginType = "plan"
+		dto.OriginID = &planID
+		l.Infow("识别到计划任务上下文",
+			"task_id", matchedTask.GetID().String(),
+			"plan_id", planID,
+			"testee_id", req.TesteeId,
+		)
+	}
+
 	// 幂等：先查是否已存在
 	if existing, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswersheetId); err == nil && existing != nil {
 		l.Infow("检测到答卷已创建测评，直接返回",
 			"answersheet_id", req.AnswersheetId,
 			"assessment_id", existing.ID,
 		)
+		s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, existing.ID)
 		return &pb.CreateAssessmentFromAnswerSheetResponse{
 			AssessmentId:  existing.ID,
 			Created:       false,
@@ -230,6 +265,7 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 					"answersheet_id", req.AnswersheetId,
 					"assessment_id", existing.ID,
 				)
+				s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, existing.ID)
 				return &pb.CreateAssessmentFromAnswerSheetResponse{
 					AssessmentId:  existing.ID,
 					Created:       false,
@@ -270,12 +306,162 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		}
 	}
 
+	s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, result.ID)
+
 	return &pb.CreateAssessmentFromAnswerSheetResponse{
 		AssessmentId:  result.ID,
 		Created:       true,
 		AutoSubmitted: autoSubmitted,
 		Message:       "测评创建成功",
 	}, nil
+}
+
+func (s *InternalService) resolvePlanTaskByID(
+	ctx context.Context,
+	req *pb.CreateAssessmentFromAnswerSheetRequest,
+	medicalScaleCode *string,
+) *planDomain.AssessmentTask {
+	if s.planTaskRepo == nil || req.TaskId == "" {
+		return nil
+	}
+
+	taskID, err := planDomain.ParseAssessmentTaskID(req.TaskId)
+	if err != nil {
+		logger.L(ctx).Warnw("计划任务ID格式非法，跳过显式任务识别",
+			"task_id", req.TaskId,
+			"error", err.Error(),
+		)
+		return nil
+	}
+
+	task, err := s.planTaskRepo.FindByID(ctx, taskID)
+	if err != nil || task == nil {
+		logger.L(ctx).Warnw("查询计划任务失败，跳过显式任务识别",
+			"task_id", req.TaskId,
+			"error", err,
+		)
+		return nil
+	}
+
+	if task.GetOrgID() != int64(req.OrgId) {
+		logger.L(ctx).Warnw("计划任务机构不匹配，跳过显式任务识别",
+			"task_id", req.TaskId,
+			"request_org_id", req.OrgId,
+			"task_org_id", task.GetOrgID(),
+		)
+		return nil
+	}
+	if task.GetTesteeID().Uint64() != req.TesteeId {
+		logger.L(ctx).Warnw("计划任务受试者不匹配，跳过显式任务识别",
+			"task_id", req.TaskId,
+			"request_testee_id", req.TesteeId,
+			"task_testee_id", task.GetTesteeID().Uint64(),
+		)
+		return nil
+	}
+	if !task.IsOpened() {
+		logger.L(ctx).Warnw("计划任务未处于 opened 状态，跳过显式任务识别",
+			"task_id", req.TaskId,
+			"task_status", task.GetStatus().String(),
+		)
+		return nil
+	}
+	if medicalScaleCode == nil {
+		logger.L(ctx).Warnw("计划任务已传入，但问卷未关联量表，无法建立计划测评关系",
+			"task_id", req.TaskId,
+			"questionnaire_code", req.QuestionnaireCode,
+		)
+		return nil
+	}
+	if task.GetScaleCode() != *medicalScaleCode {
+		logger.L(ctx).Warnw("计划任务量表不匹配，跳过显式任务识别",
+			"task_id", req.TaskId,
+			"task_scale_code", task.GetScaleCode(),
+			"request_scale_code", *medicalScaleCode,
+		)
+		return nil
+	}
+
+	return task
+}
+
+func (s *InternalService) resolveOpenedPlanTask(
+	ctx context.Context,
+	orgID uint64,
+	testeeID uint64,
+	scaleCode string,
+) *planDomain.AssessmentTask {
+	if s.planTaskRepo == nil || scaleCode == "" || testeeID == 0 {
+		return nil
+	}
+
+	tasks, err := s.planTaskRepo.FindByTesteeID(ctx, domaintestee.ID(meta.FromUint64(testeeID)))
+	if err != nil {
+		logger.L(ctx).Warnw("查询受试者计划任务失败",
+			"testee_id", testeeID,
+			"scale_code", scaleCode,
+			"error", err.Error(),
+		)
+		return nil
+	}
+
+	var matched *planDomain.AssessmentTask
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		if task.GetOrgID() != int64(orgID) || task.GetScaleCode() != scaleCode || !task.IsOpened() {
+			continue
+		}
+		if matched != nil {
+			logger.L(ctx).Warnw("存在多个候选 opened task，跳过自动 plan 识别",
+				"testee_id", testeeID,
+				"org_id", orgID,
+				"scale_code", scaleCode,
+				"first_task_id", matched.GetID().String(),
+				"second_task_id", task.GetID().String(),
+			)
+			return nil
+		}
+		matched = task
+	}
+
+	return matched
+}
+
+func (s *InternalService) completeMatchedTask(
+	ctx context.Context,
+	l *logger.RequestLogger,
+	orgID uint64,
+	task *planDomain.AssessmentTask,
+	assessmentID uint64,
+) {
+	if task == nil || s.planCommandService == nil || assessmentID == 0 {
+		return
+	}
+	if task.IsCompleted() {
+		return
+	}
+
+	if _, err := s.planCommandService.CompleteTask(
+		ctx,
+		int64(orgID),
+		task.GetID().String(),
+		meta.FromUint64(assessmentID).String(),
+	); err != nil {
+		l.Warnw("回写计划任务完成状态失败",
+			"task_id", task.GetID().String(),
+			"assessment_id", assessmentID,
+			"error", err.Error(),
+		)
+		return
+	}
+
+	l.Infow("已回写计划任务完成状态",
+		"task_id", task.GetID().String(),
+		"plan_id", task.GetPlanID().String(),
+		"assessment_id", assessmentID,
+	)
 }
 
 // EvaluateAssessment 执行测评评估
@@ -529,6 +715,69 @@ func (s *InternalService) GenerateScaleQRCode(
 		Success:   true,
 		QrcodeUrl: qrCodeURL,
 		Message:   "小程序码生成成功",
+	}, nil
+}
+
+// SendTaskOpenedMiniProgramNotification 发送 task.opened 小程序订阅消息。
+func (s *InternalService) SendTaskOpenedMiniProgramNotification(
+	ctx context.Context,
+	req *pb.SendTaskOpenedMiniProgramNotificationRequest,
+) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error) {
+	l := logger.L(ctx)
+
+	l.Infow("gRPC: 收到 task.opened 小程序通知请求",
+		"action", "send_task_opened_mini_program_notification",
+		"task_id", req.GetTaskId(),
+		"testee_id", req.GetTesteeId(),
+	)
+
+	if s.miniProgramTaskNotificationService == nil {
+		l.Warnw("小程序 task 通知服务未配置",
+			"action", "send_task_opened_mini_program_notification",
+			"task_id", req.GetTaskId(),
+		)
+		return &pb.SendTaskOpenedMiniProgramNotificationResponse{
+			Success: false,
+			Skipped: true,
+			Message: "小程序 task 通知服务未配置",
+		}, nil
+	}
+	if req.GetTaskId() == "" || req.GetTesteeId() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "task_id 和 testee_id 不能为空")
+	}
+
+	openAt := time.Time{}
+	if req.GetOpenAt() != nil {
+		openAt = req.GetOpenAt().AsTime()
+	}
+
+	result, err := s.miniProgramTaskNotificationService.SendTaskOpened(ctx, notificationApp.TaskOpenedDTO{
+		OrgID:    req.GetOrgId(),
+		TaskID:   req.GetTaskId(),
+		TesteeID: req.GetTesteeId(),
+		EntryURL: req.GetEntryUrl(),
+		OpenAt:   openAt,
+	})
+	if err != nil {
+		l.Errorw("发送 task.opened 小程序通知失败",
+			"action", "send_task_opened_mini_program_notification",
+			"task_id", req.GetTaskId(),
+			"testee_id", req.GetTesteeId(),
+			"error", err.Error(),
+		)
+		return &pb.SendTaskOpenedMiniProgramNotificationResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.SendTaskOpenedMiniProgramNotificationResponse{
+		Success:          result.SentCount > 0,
+		SentCount:        int32(result.SentCount),
+		RecipientOpenIds: result.RecipientOpenIDs,
+		RecipientSource:  result.RecipientSource,
+		Skipped:          result.Skipped,
+		Message:          result.Message,
 	}, nil
 }
 

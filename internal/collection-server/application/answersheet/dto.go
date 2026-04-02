@@ -12,6 +12,7 @@ type SubmitAnswerSheetRequest struct {
 	QuestionnaireVersion string   `json:"questionnaire_version" binding:"required"`
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id" binding:"required"`
+	TaskID               string   `json:"task_id,omitempty"`
 	Answers              []Answer `json:"answers" binding:"required"`
 }
 

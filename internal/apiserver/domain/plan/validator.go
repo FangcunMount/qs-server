@@ -80,7 +80,7 @@ func (v *PlanValidator) ValidateForEnrollment(
 		errs = append(errs, ValidationError{Field: "startDate", Message: "开始日期不能为空"})
 	}
 
-	// TODO: 检查该受试者是否已加入此计划（幂等性检查，可能需要查询 TaskRepository）
+	// enrollment 幂等性和任务一致性检查由 PlanEnrollment 结合 TaskRepository 完成。
 
 	return errs
 }

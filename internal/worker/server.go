@@ -113,7 +113,10 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
 
-	// 6. 预创建 NSQ Topics（可选，避免 TOPIC_NOT_FOUND 日志）
+	// 6. 启动内建 plan scheduler（通过 gRPC 调用 apiserver 写侧命令）
+	s.startPlanScheduler()
+
+	// 7. 预创建 NSQ Topics（可选，避免 TOPIC_NOT_FOUND 日志）
 	if s.config.Messaging.Provider == "nsq" {
 		if err = s.createTopics(); err != nil {
 			// Topic 创建失败不是致命错误，只记录警告
@@ -121,7 +124,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		}
 	}
 
-	// 7. 创建消息订阅者
+	// 8. 创建消息订阅者
 	maxInFlight := 1
 	if s.config != nil && s.config.Worker != nil && s.config.Worker.Concurrency > 0 {
 		maxInFlight = s.config.Worker.Concurrency
@@ -132,7 +135,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	}
 	log.Infof("✅ Message subscriber created (provider: %s)", s.config.Messaging.Provider)
 
-	// 8. 订阅所有处理器
+	// 9. 订阅所有处理器
 	if err = s.subscribeHandlers(); err != nil {
 		log.Fatalf("Failed to subscribe handlers: %v", err)
 	}

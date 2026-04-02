@@ -25,6 +25,7 @@ type Options struct {
 	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
 	WeChatOptions           *genericoptions.WeChatOptions          `json:"wechat"    mapstructure:"wechat"`
 	Plan                    *PlanOptions                           `json:"plan"      mapstructure:"plan"`
+	PlanScheduler           *PlanSchedulerOptions                  `json:"plan_scheduler" mapstructure:"plan_scheduler"`
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure            *BackpressureOptions                   `json:"backpressure" mapstructure:"backpressure"`
 	Cache                   *CacheOptions                          `json:"cache"     mapstructure:"cache"`
@@ -47,6 +48,7 @@ func NewOptions() *Options {
 		IAMOptions:              genericoptions.NewIAMOptions(),
 		WeChatOptions:           genericoptions.NewWeChatOptions(),
 		Plan:                    NewPlanOptions(),
+		PlanScheduler:           NewPlanSchedulerOptions(),
 		RateLimit:               NewRateLimitOptions(),
 		Backpressure:            NewBackpressureOptions(),
 		Cache:                   NewCacheOptions(),
@@ -101,12 +103,47 @@ func NewPlanOptions() *PlanOptions {
 	}
 }
 
+// PlanSchedulerOptions 内建 plan 调度器配置。
+type PlanSchedulerOptions struct {
+	Enable       bool          `json:"enable" mapstructure:"enable"`
+	OrgIDs       []int64       `json:"org_ids" mapstructure:"org_ids"`
+	InitialDelay time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	Interval     time.Duration `json:"interval" mapstructure:"interval"`
+	LockKey      string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL      time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+}
+
+// NewPlanSchedulerOptions 创建默认 plan scheduler 配置。
+func NewPlanSchedulerOptions() *PlanSchedulerOptions {
+	return &PlanSchedulerOptions{
+		Enable:       false,
+		OrgIDs:       []int64{1},
+		InitialDelay: time.Minute,
+		Interval:     time.Minute,
+		LockKey:      "qs:plan-scheduler:leader",
+		LockTTL:      50 * time.Second,
+	}
+}
+
 // AddFlags 注册 plan 相关命令行参数。
 func (p *PlanOptions) AddFlags(fs *pflag.FlagSet) {
 	if p == nil {
 		return
 	}
 	fs.StringVar(&p.EntryBaseURL, "plan.entry-base-url", p.EntryBaseURL, "Public base URL used to generate plan task entry links.")
+}
+
+// AddFlags 注册内建 plan scheduler 相关参数。
+func (p *PlanSchedulerOptions) AddFlags(fs *pflag.FlagSet) {
+	if p == nil {
+		return
+	}
+	fs.BoolVar(&p.Enable, "plan_scheduler.enable", p.Enable, "Enable the built-in plan task scheduler in qs-apiserver.")
+	fs.Int64SliceVar(&p.OrgIDs, "plan_scheduler.org-ids", p.OrgIDs, "Organization IDs included in the built-in plan task scheduler.")
+	fs.DurationVar(&p.InitialDelay, "plan_scheduler.initial-delay", p.InitialDelay, "Initial delay before starting the built-in plan task scheduler.")
+	fs.DurationVar(&p.Interval, "plan_scheduler.interval", p.Interval, "Interval for scanning plan tasks in the built-in scheduler.")
+	fs.StringVar(&p.LockKey, "plan_scheduler.lock-key", p.LockKey, "Redis distributed lock key used by the built-in plan scheduler.")
+	fs.DurationVar(&p.LockTTL, "plan_scheduler.lock-ttl", p.LockTTL, "Redis distributed lock TTL used by the built-in plan scheduler.")
 }
 
 // RateLimitOptions 限流配置
@@ -168,6 +205,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.Plan.AddFlags(fss.FlagSet("plan"))
+	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))

@@ -82,6 +82,22 @@ type TaskManagementService interface {
 	CancelTask(ctx context.Context, orgID int64, taskID string) error
 }
 
+// PlanCommandService 统一的 plan 写侧命令服务。
+// 对外只暴露一个写入口，内部可继续复用拆分后的实现。
+type PlanCommandService interface {
+	CreatePlan(ctx context.Context, dto CreatePlanDTO) (*PlanResult, error)
+	PausePlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
+	ResumePlan(ctx context.Context, orgID int64, planID string, testeeStartDates map[string]string) (*PlanResult, error)
+	CancelPlan(ctx context.Context, orgID int64, planID string) (*PlanMutationResult, error)
+	EnrollTestee(ctx context.Context, dto EnrollTesteeDTO) (*EnrollmentResult, error)
+	TerminateEnrollment(ctx context.Context, orgID int64, planID string, testeeID string) (*EnrollmentTerminationResult, error)
+	SchedulePendingTasks(ctx context.Context, orgID int64, before string) (*TaskScheduleResult, error)
+	OpenTask(ctx context.Context, orgID int64, taskID string, dto OpenTaskDTO) (*TaskResult, error)
+	CompleteTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error)
+	ExpireTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error)
+	CancelTask(ctx context.Context, orgID int64, taskID string) (*TaskMutationResult, error)
+}
+
 // PlanQueryService 计划查询服务
 // 行为者：所有用户（管理员、受试者、调度服务）
 // 职责：提供只读查询功能

@@ -45,6 +45,9 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	if err := h.BindJSON(c, &req); err != nil {
 		return // BindJSON 已包含 binding 标签校验
 	}
+	if req.TaskID == "" {
+		req.TaskID = c.Query("task_id")
+	}
 
 	// 从上下文获取当前用户ID（由 UserIdentityMiddleware 设置）
 	writerID := h.GetUserID(c)

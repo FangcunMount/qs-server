@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 )
@@ -21,6 +23,10 @@ type Config struct {
 	GRPC *GRPCConfig
 	// Worker 配置
 	Worker *WorkerConfig
+	// Notification 配置
+	Notification *NotificationConfig
+	// PlanScheduler 配置
+	PlanScheduler *PlanSchedulerConfig
 	// Redis 配置
 	Redis *genericoptions.RedisOptions
 }
@@ -72,6 +78,25 @@ type WorkerConfig struct {
 	ServiceName string
 }
 
+// NotificationConfig 通知配置。
+type NotificationConfig struct {
+	GatewayURL   string
+	GatewayToken string
+	WebhookURL   string
+	TimeoutMs    int
+	SharedSecret string
+}
+
+// PlanSchedulerConfig worker plan scheduler 配置。
+type PlanSchedulerConfig struct {
+	Enable       bool
+	OrgIDs       []int64
+	InitialDelay time.Duration
+	Interval     time.Duration
+	LockKey      string
+	LockTTL      time.Duration
+}
+
 // CreateConfigFromOptions 从 Options 创建 Config
 func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 	return &Config{
@@ -110,6 +135,21 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 			Concurrency: opts.Worker.Concurrency,
 			MaxRetries:  opts.Worker.MaxRetries,
 			ServiceName: opts.Worker.ServiceName,
+		},
+		Notification: &NotificationConfig{
+			GatewayURL:   opts.Notification.GatewayURL,
+			GatewayToken: opts.Notification.GatewayToken,
+			WebhookURL:   opts.Notification.WebhookURL,
+			TimeoutMs:    opts.Notification.TimeoutMs,
+			SharedSecret: opts.Notification.SharedSecret,
+		},
+		PlanScheduler: &PlanSchedulerConfig{
+			Enable:       opts.PlanScheduler.Enable,
+			OrgIDs:       append([]int64(nil), opts.PlanScheduler.OrgIDs...),
+			InitialDelay: opts.PlanScheduler.InitialDelay,
+			Interval:     opts.PlanScheduler.Interval,
+			LockKey:      opts.PlanScheduler.LockKey,
+			LockTTL:      opts.PlanScheduler.LockTTL,
 		},
 		Redis: opts.Redis,
 	}, nil

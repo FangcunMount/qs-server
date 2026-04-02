@@ -41,7 +41,7 @@ func (p AssessmentSubmittedPayload) NeedsEvaluation() bool {
 
 // AssessmentInterpretedPayload 测评解读完成事件数据
 type AssessmentInterpretedPayload struct {
-	OrgID          int64     `json:"org_id"`
+	OrgID         int64     `json:"org_id"`
 	AssessmentID  int64     `json:"assessment_id"`
 	TesteeID      uint64    `json:"testee_id"`
 	ScaleCode     string    `json:"scale_code"`
@@ -191,7 +191,6 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 				"risk_level", data.RiskLevel,
 				"total_score", data.TotalScore,
 			)
-			// TODO: 发送预警通知（可以调用通知服务）
 		}
 
 		return nil
@@ -215,8 +214,6 @@ func handleAssessmentFailed(deps *Dependencies) HandlerFunc {
 			slog.String("reason", data.Reason),
 			slog.Time("failed_at", data.FailedAt),
 		)
-
-		// TODO: 发送监控告警
 
 		return nil
 	}

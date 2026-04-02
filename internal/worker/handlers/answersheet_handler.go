@@ -8,7 +8,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	"github.com/FangcunMount/qs-server/internal/worker/infra/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 )
 
 func init() {
@@ -30,6 +30,7 @@ type AnswerSheetSubmittedPayload struct {
 	OrgID                uint64    `json:"org_id"`    // 组织ID
 	FillerID             uint64    `json:"filler_id"`
 	FillerType           string    `json:"filler_type"`
+	TaskID               string    `json:"task_id"`
 	SubmittedAt          time.Time `json:"submitted_at"`
 }
 
@@ -102,6 +103,7 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (uint64, *AnswerSh
 		"org_id", data.OrgID,
 		"filler_id", data.FillerID,
 		"filler_type", data.FillerType,
+		"task_id", data.TaskID,
 		"submitted_at", data.SubmittedAt,
 	)
 	return answerSheetID, &data, nil
@@ -182,7 +184,10 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 		OrgId:                data.OrgID,
 		FillerId:             data.FillerID,
 		FillerType:           data.FillerType,
-		OriginType:           "adhoc",
+		TaskId:               data.TaskID,
+	}
+	if data.TaskID == "" {
+		assessmentReq.OriginType = "adhoc"
 	}
 	// 创建测评
 	assessmentResp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(ctx, assessmentReq)

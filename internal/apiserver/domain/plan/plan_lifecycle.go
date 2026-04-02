@@ -79,45 +79,10 @@ func (l *PlanLifecycle) Pause(ctx context.Context, plan *AssessmentPlan) ([]*Ass
 		return nil, errors.WithCode(code.ErrInvalidArgument, "计划未处于活跃状态，无法暂停")
 	}
 
-	// 2. 查询该计划的所有任务
-	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
+	canceledTasks, err := l.cancelOutstandingTasks(ctx, plan, "pause_plan")
 	if err != nil {
-		logger.L(ctx).Errorw("Failed to find tasks for plan",
-			"domain_action", "pause_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
+		return nil, err
 	}
-
-	logger.L(ctx).Infow("Found tasks for plan",
-		"domain_action", "pause_plan",
-		"plan_id", planID,
-		"total_tasks", len(allTasks),
-	)
-
-	// 3. 取消所有未执行的任务（pending 和 opened 状态）
-	var canceledTasks []*AssessmentTask
-	for _, task := range allTasks {
-		if task.IsPending() || task.IsOpened() {
-			if err := l.taskLifecycle.Cancel(ctx, task); err != nil {
-				logger.L(ctx).Errorw("Failed to cancel task",
-					"domain_action", "pause_plan",
-					"plan_id", planID,
-					"task_id", task.GetID().String(),
-					"error", err.Error(),
-				)
-				continue
-			}
-			canceledTasks = append(canceledTasks, task)
-		}
-	}
-
-	logger.L(ctx).Infow("Tasks canceled for paused plan",
-		"domain_action", "pause_plan",
-		"plan_id", planID,
-		"canceled_tasks_count", len(canceledTasks),
-	)
 
 	// 4. 调用聚合根的包内方法（状态变更）
 	if err := plan.pause(); err != nil {
@@ -137,7 +102,7 @@ func (l *PlanLifecycle) Resume(
 	ctx context.Context,
 	plan *AssessmentPlan,
 	testeeStartDates map[testee.ID]time.Time,
-) ([]*AssessmentTask, error) {
+) (*ResumeTasksResult, error) {
 	planID := plan.GetID().String()
 	logger.L(ctx).Infow("Resuming plan in domain service",
 		"domain_action", "resume_plan",
@@ -178,10 +143,12 @@ func (l *PlanLifecycle) Resume(
 	testeeMaxSeq := make(map[testee.ID]int)
 	testeeStartDateMap := make(map[testee.ID]time.Time)
 	testeeFirstTask := make(map[testee.ID]*AssessmentTask)
+	testeeTasks := make(map[testee.ID][]*AssessmentTask)
 
 	// 找出每个受试者的第一个任务（用于推断 startDate）
 	for _, task := range allTasks {
 		testeeID := task.GetTesteeID()
+		testeeTasks[testeeID] = append(testeeTasks[testeeID], task)
 		if firstTask, exists := testeeFirstTask[testeeID]; !exists || task.GetSeq() < firstTask.GetSeq() {
 			testeeFirstTask[testeeID] = task
 		}
@@ -208,8 +175,10 @@ func (l *PlanLifecycle) Resume(
 		}
 	}
 
-	// 4. 为每个受试者重新生成未完成的任务
-	var newTasks []*AssessmentTask
+	// 4. 为每个受试者重新生成或复用未完成的任务
+	result := &ResumeTasksResult{
+		TasksToSave: make([]*AssessmentTask, 0),
+	}
 	for testeeID, startDate := range testeeStartDateMap {
 		if startDate.IsZero() {
 			logger.L(ctx).Warnw("Skipping testee with zero start date",
@@ -222,13 +191,33 @@ func (l *PlanLifecycle) Resume(
 
 		// 生成所有任务
 		allGeneratedTasks := l.taskGenerator.GenerateTasks(plan, testeeID, startDate)
+		existingBySeq := groupTasksBySeq(testeeTasks[testeeID])
 
-		// 找出需要重新生成的任务（序号大于已完成的最大序号）
+		// 找出需要重新生成或复用的任务（序号大于已完成的最大序号）
 		maxCompletedSeq := testeeMaxSeq[testeeID]
 		for _, task := range allGeneratedTasks {
-			if task.GetSeq() > maxCompletedSeq {
-				newTasks = append(newTasks, task)
+			if task.GetSeq() <= maxCompletedSeq {
+				continue
 			}
+
+			reusable := preferredReusableTask(existingBySeq[task.GetSeq()])
+			if reusable == nil {
+				result.TasksToSave = append(result.TasksToSave, task)
+				continue
+			}
+
+			if err := l.taskLifecycle.Reschedule(ctx, reusable, task.GetPlannedAt()); err != nil {
+				logger.L(ctx).Errorw("Failed to reschedule existing task for resumed plan",
+					"domain_action", "resume_plan",
+					"plan_id", planID,
+					"testee_id", testeeID.String(),
+					"task_id", reusable.GetID().String(),
+					"seq", reusable.GetSeq(),
+					"error", err.Error(),
+				)
+				return nil, errors.WithCode(code.ErrInternalServerError, "重置任务失败: %v", err)
+			}
+			result.TasksToSave = append(result.TasksToSave, reusable)
 		}
 
 		logger.L(ctx).Infow("Generated tasks for testee",
@@ -236,23 +225,25 @@ func (l *PlanLifecycle) Resume(
 			"plan_id", planID,
 			"testee_id", testeeID.String(),
 			"max_completed_seq", maxCompletedSeq,
-			"new_tasks_count", len(allGeneratedTasks)-maxCompletedSeq,
+			"tasks_to_save_count", len(allGeneratedTasks)-maxCompletedSeq,
 		)
 	}
 
-	logger.L(ctx).Infow("New tasks generated for resumed plan",
+	sortTasksBySeq(result.TasksToSave)
+
+	logger.L(ctx).Infow("Tasks prepared for resumed plan",
 		"domain_action", "resume_plan",
 		"plan_id", planID,
-		"new_tasks_count", len(newTasks),
+		"tasks_to_save_count", len(result.TasksToSave),
 	)
 
 	// 5. 调用聚合根的包内方法（状态变更）
 	if err := plan.resume(); err != nil {
-		return newTasks, err
+		return result, err
 	}
 
-	// 注意：领域层不负责持久化，返回新生成的任务供应用层保存
-	return newTasks, nil
+	// 注意：领域层不负责持久化，返回待保存的任务供应用层保存
+	return result, nil
 }
 
 // inferStartDateFromTask 从任务推断开始日期
@@ -295,16 +286,112 @@ func inferStartDateFromTask(plan *AssessmentPlan, task *AssessmentTask) time.Tim
 }
 
 // Cancel 取消计划（将计划变更为已取消状态）
-func (l *PlanLifecycle) Cancel(ctx context.Context, plan *AssessmentPlan) error {
+// 业务规则：取消时，联动取消所有未执行的任务（pending 和 opened 状态）
+func (l *PlanLifecycle) Cancel(ctx context.Context, plan *AssessmentPlan) ([]*AssessmentTask, error) {
+	planID := plan.GetID().String()
+	logger.L(ctx).Infow("Canceling plan in domain service",
+		"domain_action", "cancel_plan",
+		"plan_id", planID,
+		"current_status", plan.GetStatus().String(),
+	)
+
 	// 1. 前置状态检查
 	if plan.IsCanceled() {
-		return nil // 幂等操作
+		return nil, nil // 幂等操作
 	}
 	if plan.IsFinished() {
-		return errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能取消")
+		return nil, errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能取消")
+	}
+
+	canceledTasks, err := l.cancelOutstandingTasks(ctx, plan, "cancel_plan")
+	if err != nil {
+		return nil, err
 	}
 
 	// 2. 调用聚合根的包内方法（状态变更）
 	plan.cancel()
-	return nil
+	return canceledTasks, nil
+}
+
+// TryFinish 如果计划下所有任务都进入终态，则将计划标记为已完成。
+func (l *PlanLifecycle) TryFinish(ctx context.Context, plan *AssessmentPlan) (bool, error) {
+	if plan == nil {
+		return false, errors.WithCode(code.ErrInvalidArgument, "计划不能为空")
+	}
+	if plan.IsFinished() || plan.IsCanceled() || plan.IsPaused() {
+		return false, nil
+	}
+
+	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
+	if err != nil {
+		return false, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
+	}
+	if len(allTasks) == 0 {
+		return false, nil
+	}
+
+	for _, task := range allTasks {
+		if !task.IsTerminal() {
+			return false, nil
+		}
+	}
+
+	plan.finish()
+	return true, nil
+}
+
+func (l *PlanLifecycle) cancelOutstandingTasks(ctx context.Context, plan *AssessmentPlan, action string) ([]*AssessmentTask, error) {
+	planID := plan.GetID().String()
+
+	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to find tasks for plan",
+			"domain_action", action,
+			"plan_id", planID,
+			"error", err.Error(),
+		)
+		return nil, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
+	}
+
+	logger.L(ctx).Infow("Found tasks for plan",
+		"domain_action", action,
+		"plan_id", planID,
+		"total_tasks", len(allTasks),
+	)
+
+	var canceledTasks []*AssessmentTask
+	for _, task := range allTasks {
+		if !task.IsPending() && !task.IsOpened() {
+			continue
+		}
+		if err := l.taskLifecycle.Cancel(ctx, task); err != nil {
+			logger.L(ctx).Errorw("Failed to cancel task",
+				"domain_action", action,
+				"plan_id", planID,
+				"task_id", task.GetID().String(),
+				"error", err.Error(),
+			)
+			continue
+		}
+		canceledTasks = append(canceledTasks, task)
+	}
+
+	logger.L(ctx).Infow("Outstanding tasks canceled for plan",
+		"domain_action", action,
+		"plan_id", planID,
+		"canceled_tasks_count", len(canceledTasks),
+	)
+
+	return canceledTasks, nil
+}
+
+func preferredReusableTask(tasks []*AssessmentTask) *AssessmentTask {
+	var reusable []*AssessmentTask
+	for _, task := range tasks {
+		if task == nil || task.IsCompleted() {
+			continue
+		}
+		reusable = append(reusable, task)
+	}
+	return preferredTask(reusable)
 }

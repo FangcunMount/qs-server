@@ -217,6 +217,60 @@ events:
     consumers:
       - qs-worker
 
+  plan.testee_enrolled:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "受试者已加入计划"
+    handler: plan_testee_enrolled_handler
+    consumers:
+      - qs-worker
+
+  plan.testee_terminated:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "受试者已终止计划参与"
+    handler: plan_testee_terminated_handler
+    consumers:
+      - qs-worker
+
+  plan.paused:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "计划已暂停"
+    handler: plan_paused_handler
+    consumers:
+      - qs-worker
+
+  plan.resumed:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "计划已恢复"
+    handler: plan_resumed_handler
+    consumers:
+      - qs-worker
+
+  plan.canceled:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "计划已取消"
+    handler: plan_canceled_handler
+    consumers:
+      - qs-worker
+
+  plan.finished:
+    topic: plan-lifecycle
+    aggregate: AssessmentPlan
+    domain: plan
+    description: "计划已完成"
+    handler: plan_finished_handler
+    consumers:
+      - qs-worker
+
   task.opened:
     topic: task-lifecycle
     aggregate: AssessmentTask
@@ -224,7 +278,7 @@ events:
     description: "任务已开放"
     handler: task_opened_handler
     consumers:
-      - qs-worker  # 通知等 TODO；事件驱动统计 TODO
+      - qs-worker  # 小程序通知由 worker -> internal gRPC -> apiserver 处理；事件驱动统计 TODO
 
   task.completed:
     topic: task-lifecycle
@@ -242,6 +296,15 @@ events:
     domain: plan
     description: "任务已过期"
     handler: task_expired_handler
+    consumers:
+      - qs-worker  # 通知等 TODO；事件驱动统计 TODO
+
+  task.canceled:
+    topic: task-lifecycle
+    aggregate: AssessmentTask
+    domain: plan
+    description: "任务已取消"
+    handler: task_canceled_handler
     consumers:
       - qs-worker  # 通知等 TODO；事件驱动统计 TODO
 
@@ -306,9 +369,33 @@ handlers:
     package: plan
     description: "处理计划创建事件（日志等；事件驱动统计 TODO，计划聚合见 apiserver /statistics/sync/plan）"
 
+  plan_testee_enrolled_handler:
+    package: plan
+    description: "处理受试者加入计划事件（日志占位）"
+
+  plan_testee_terminated_handler:
+    package: plan
+    description: "处理受试者终止计划参与事件（日志占位）"
+
+  plan_paused_handler:
+    package: plan
+    description: "处理计划暂停事件（日志与统计 TODO）"
+
+  plan_resumed_handler:
+    package: plan
+    description: "处理计划恢复事件（日志与统计 TODO）"
+
+  plan_canceled_handler:
+    package: plan
+    description: "处理计划取消事件（日志与统计 TODO）"
+
+  plan_finished_handler:
+    package: plan
+    description: "处理计划完成事件（日志与统计 TODO）"
+
   task_opened_handler:
     package: plan
-    description: "处理任务开放事件（受试者通知 TODO；事件驱动统计 TODO）"
+    description: "处理任务开放事件（小程序通知；事件驱动统计 TODO）"
 
   task_completed_handler:
     package: plan
@@ -317,3 +404,7 @@ handlers:
   task_expired_handler:
     package: plan
     description: "处理任务过期事件（通知 TODO；事件驱动统计 TODO）"
+
+  task_canceled_handler:
+    package: plan
+    description: "处理任务取消事件（日志与统计 TODO）"

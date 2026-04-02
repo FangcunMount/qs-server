@@ -57,6 +57,32 @@ const (
 	ScaleArchived = "scale.archived"
 )
 
+// Plan 领域 - AssessmentPlan / AssessmentTask 聚合
+const (
+	// PlanCreated 计划已创建
+	PlanCreated = "plan.created"
+	// PlanTesteeEnrolled 受试者已加入计划
+	PlanTesteeEnrolled = "plan.testee_enrolled"
+	// PlanTesteeTerminated 受试者已终止计划参与
+	PlanTesteeTerminated = "plan.testee_terminated"
+	// PlanPaused 计划已暂停
+	PlanPaused = "plan.paused"
+	// PlanResumed 计划已恢复
+	PlanResumed = "plan.resumed"
+	// PlanCanceled 计划已取消
+	PlanCanceled = "plan.canceled"
+	// PlanFinished 计划已完成
+	PlanFinished = "plan.finished"
+	// TaskOpened 任务已开放
+	TaskOpened = "task.opened"
+	// TaskCompleted 任务已完成
+	TaskCompleted = "task.completed"
+	// TaskExpired 任务已过期
+	TaskExpired = "task.expired"
+	// TaskCanceled 任务已取消
+	TaskCanceled = "task.canceled"
+)
+
 // EventTypes 返回所有已注册的事件类型
 // 用于验证配置文件中的事件类型是否完整
 func EventTypes() []string {
@@ -79,6 +105,18 @@ func EventTypes() []string {
 		ScaleUnpublished,
 		ScaleUpdated,
 		ScaleArchived,
+		// Plan
+		PlanCreated,
+		PlanTesteeEnrolled,
+		PlanTesteeTerminated,
+		PlanPaused,
+		PlanResumed,
+		PlanCanceled,
+		PlanFinished,
+		TaskOpened,
+		TaskCompleted,
+		TaskExpired,
+		TaskCanceled,
 	}
 }
 

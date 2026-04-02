@@ -216,6 +216,7 @@ func (t *AssessmentTask) complete(assessmentID assessment.ID) error {
 	t.addEvent(NewTaskCompletedEvent(
 		t.id,
 		t.planID,
+		t.testeeID,
 		assessmentID,
 		now,
 	))
@@ -236,6 +237,7 @@ func (t *AssessmentTask) expire() error {
 	t.addEvent(NewTaskExpiredEvent(
 		t.id,
 		t.planID,
+		t.testeeID,
 		now,
 	))
 
@@ -248,7 +250,34 @@ func (t *AssessmentTask) cancel() {
 		return
 	}
 
+	now := time.Now()
 	t.status = TaskStatusCanceled
+	t.addEvent(NewTaskCanceledEvent(
+		t.id,
+		t.planID,
+		t.testeeID,
+		now,
+	))
+}
+
+// reschedule 复用既有任务并将其重置为待推送状态。
+func (t *AssessmentTask) reschedule(plannedAt time.Time) error {
+	if plannedAt.IsZero() {
+		return ErrInvalidPlannedAt
+	}
+	if t.status == TaskStatusCompleted {
+		return ErrTaskAlreadyCompleted
+	}
+
+	t.plannedAt = plannedAt
+	t.status = TaskStatusPending
+	t.openAt = nil
+	t.expireAt = nil
+	t.completedAt = nil
+	t.assessmentID = nil
+	t.entryToken = ""
+	t.entryURL = ""
+	return nil
 }
 
 // ==================== 领域事件相关方法 ====================
@@ -297,4 +326,5 @@ func (t *AssessmentTask) RestoreFromRepository(
 	t.assessmentID = assessmentID
 	t.entryToken = entryToken
 	t.entryURL = entryURL
+	t.ClearEvents()
 }

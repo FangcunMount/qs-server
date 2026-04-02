@@ -206,6 +206,11 @@ func (p *AssessmentPlan) pause() error {
 		return ErrPlanNotActive
 	}
 	p.status = PlanStatusPaused
+	p.addEvent(NewPlanPausedEvent(
+		p.id,
+		p.scaleCode,
+		time.Now(),
+	))
 	return nil
 }
 
@@ -215,6 +220,11 @@ func (p *AssessmentPlan) resume() error {
 		return ErrPlanNotPaused
 	}
 	p.status = PlanStatusActive
+	p.addEvent(NewPlanResumedEvent(
+		p.id,
+		p.scaleCode,
+		time.Now(),
+	))
 	return nil
 }
 
@@ -224,6 +234,11 @@ func (p *AssessmentPlan) finish() {
 		return
 	}
 	p.status = PlanStatusFinished
+	p.addEvent(NewPlanFinishedEvent(
+		p.id,
+		p.scaleCode,
+		time.Now(),
+	))
 }
 
 // cancel 取消计划（包内方法）
@@ -232,6 +247,11 @@ func (p *AssessmentPlan) cancel() {
 		return
 	}
 	p.status = PlanStatusCanceled
+	p.addEvent(NewPlanCanceledEvent(
+		p.id,
+		p.scaleCode,
+		time.Now(),
+	))
 }
 
 // ==================== 领域事件相关方法 ====================
@@ -268,4 +288,5 @@ func (p *AssessmentPlan) RestoreFromRepository(
 ) {
 	p.id = id
 	p.status = status
+	p.ClearEvents()
 }

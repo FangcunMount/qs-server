@@ -50,7 +50,7 @@ func (e *PlanEnrollment) EnrollTestee(
 	planID AssessmentPlanID,
 	testeeID testee.ID,
 	startDate time.Time,
-) ([]*AssessmentTask, error) {
+) (*EnrollmentTasksResult, error) {
 	logger.L(ctx).Infow("Enrolling testee in domain service",
 		"domain_action", "enroll_testee",
 		"plan_id", planID.String(),
@@ -88,9 +88,9 @@ func (e *PlanEnrollment) EnrollTestee(
 		return nil, ToError(errs)
 	}
 
-	// 4. 生成任务
-	tasks := e.taskGenerator.GenerateTasks(plan, testeeID, startDate)
-	if len(tasks) == 0 {
+	// 4. 生成期望任务
+	expectedTasks := e.taskGenerator.GenerateTasks(plan, testeeID, startDate)
+	if len(expectedTasks) == 0 {
 		logger.L(ctx).Errorw("No tasks generated",
 			"domain_action", "enroll_testee",
 			"plan_id", planID.String(),
@@ -99,17 +99,72 @@ func (e *PlanEnrollment) EnrollTestee(
 		return nil, errors.WithCode(code.ErrInvalidArgument, "未能生成任何任务")
 	}
 
-	logger.L(ctx).Infow("Tasks generated for enrollment",
+	logger.L(ctx).Infow("Expected tasks generated for enrollment",
 		"domain_action", "enroll_testee",
 		"plan_id", planID.String(),
 		"testee_id", testeeID.String(),
-		"tasks_count", len(tasks),
+		"tasks_count", len(expectedTasks),
 	)
 
-	// 注意：领域层不负责持久化，返回生成的任务供应用层保存
-	// TODO: 发布 TesteeEnrolledInPlanEvent 事件（由应用层负责）
+	// 5. 检查已有任务，实现 enroll 幂等
+	existingTasks, err := e.taskRepo.FindByTesteeIDAndPlanID(ctx, testeeID, planID)
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to find existing enrollment tasks",
+			"domain_action", "enroll_testee",
+			"plan_id", planID.String(),
+			"testee_id", testeeID.String(),
+			"error", err.Error(),
+		)
+		return nil, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
+	}
 
-	return tasks, nil
+	result := &EnrollmentTasksResult{
+		Tasks:       make([]*AssessmentTask, 0, len(expectedTasks)),
+		TasksToSave: make([]*AssessmentTask, 0, len(expectedTasks)),
+	}
+	if len(existingTasks) == 0 {
+		result.Tasks = expectedTasks
+		result.TasksToSave = expectedTasks
+		return result, nil
+	}
+
+	candidatesBySeq := groupTasksBySeq(existingTasks)
+	for _, expectedTask := range expectedTasks {
+		candidates := candidatesBySeq[expectedTask.GetSeq()]
+
+		var matchingCandidates []*AssessmentTask
+		for _, candidate := range candidates {
+			if taskMatchesExpectedSchedule(candidate, expectedTask) {
+				matchingCandidates = append(matchingCandidates, candidate)
+			}
+		}
+
+		if len(matchingCandidates) > 0 {
+			result.Tasks = append(result.Tasks, preferredTask(matchingCandidates))
+			delete(candidatesBySeq, expectedTask.GetSeq())
+			continue
+		}
+
+		if len(candidates) > 0 {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "受试者已加入此计划，且开始日期与现有任务不一致")
+		}
+
+		result.Tasks = append(result.Tasks, expectedTask)
+		result.TasksToSave = append(result.TasksToSave, expectedTask)
+	}
+
+	if len(candidatesBySeq) > 0 {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "受试者已加入此计划，且现有任务与计划定义不一致")
+	}
+
+	sortTasksBySeq(result.Tasks)
+	sortTasksBySeq(result.TasksToSave)
+	result.Idempotent = len(result.TasksToSave) == 0
+
+	// 注意：领域层不负责持久化，返回任务调和结果供应用层保存。
+	// enrollment 生命周期事件由应用层在持久化成功后发布。
+
+	return result, nil
 }
 
 // TerminateEnrollment 终止受试者的计划参与
@@ -183,8 +238,8 @@ func (e *PlanEnrollment) TerminateEnrollment(
 		"canceled_tasks_count", len(canceledTasks),
 	)
 
-	// 注意：领域层不负责持久化，返回被取消的任务供应用层保存
-	// TODO: 发布 TesteeTerminatedFromPlanEvent 事件（由应用层负责）
+	// 注意：领域层不负责持久化，返回被取消的任务供应用层保存。
+	// enrollment 生命周期事件由应用层在持久化成功后发布。
 
 	return canceledTasks, nil
 }

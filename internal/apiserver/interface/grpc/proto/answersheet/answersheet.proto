@@ -68,6 +68,7 @@ message SaveAnswerSheetRequest {
   uint64 testee_id = 5;
   repeated Answer answers = 6;
   uint64 org_id = 7;  // 机构ID
+  string task_id = 8; // 计划任务ID（可选）
 }
 
 // 保存答卷响应
