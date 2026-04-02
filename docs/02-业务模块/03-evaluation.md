@@ -253,7 +253,7 @@ flowchart TB
 
 #### Topic 与通道
 
-Topic 配置键 `assessment-lifecycle`，运行时名称 **`assessment.lifecycle`**（见 [configs/events.yaml](../../configs/events.yaml) `topics.assessment-lifecycle.name`）。
+Topic 配置键 `assessment-lifecycle`，运行时名称 **`qs.evaluation.lifecycle`**（见 [configs/events.yaml](../../configs/events.yaml) `topics.assessment-lifecycle.name`）。
 
 ```mermaid
 sequenceDiagram
@@ -262,7 +262,7 @@ sequenceDiagram
     participant Sub as SubmissionService
     participant Eng as engine.Service
     participant P as Pipeline
-    participant MQ as MQ assessment.lifecycle
+    participant MQ as MQ qs.evaluation.lifecycle
 
     Note over W: answersheet.submitted
     W->>I: CalculateAnswerSheetScore
@@ -311,12 +311,12 @@ sequenceDiagram
 
 | 事件类型 | Topic（name） | handler（yaml） | 发布侧（概念） | consumers（yaml 节选） |
 | -------- | -------------- | ----------------- | -------------- | ------------------------ |
-| `answersheet.submitted` | `assessment.lifecycle` | `answersheet_submitted_handler` | 答卷提交流程 | `qs-worker` 等 |
-| `assessment.submitted` | `assessment.lifecycle` | `assessment_submitted_handler` | 提交测评 | `qs-worker` 等 |
-| `assessment.interpreted` | `assessment.lifecycle` | `assessment_interpreted_handler` | 引擎 | 多消费者 |
-| `assessment.failed` | `assessment.lifecycle` | `assessment_failed_handler` | 失败路径 | logging 等 |
-| `report.generated` | `assessment.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
-| `report.exported` | `assessment.lifecycle` | `report_exported_handler` | 导出 | `qs-worker` |
+| `answersheet.submitted` | `qs.evaluation.lifecycle` | `answersheet_submitted_handler` | 答卷提交流程 | `qs-worker` 等 |
+| `assessment.submitted` | `qs.evaluation.lifecycle` | `assessment_submitted_handler` | 提交测评 | `qs-worker` 等 |
+| `assessment.interpreted` | `qs.evaluation.lifecycle` | `assessment_interpreted_handler` | 引擎 | 多消费者 |
+| `assessment.failed` | `qs.evaluation.lifecycle` | `assessment_failed_handler` | 失败路径 | logging 等 |
+| `report.generated` | `qs.evaluation.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
+| `report.exported` | `qs.evaluation.lifecycle` | `report_exported_handler` | 导出 | `qs-worker` |
 
 主异步闭环以 **`report.generated`** 为报告就绪信号；`report.exported` 存在但非本文主链路重点。
 

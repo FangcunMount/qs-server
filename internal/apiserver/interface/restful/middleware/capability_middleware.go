@@ -13,6 +13,11 @@ type Capability = authzapp.Capability
 
 const (
 	CapabilityOrgAdmin              = authzapp.CapabilityOrgAdmin
+	CapabilityReadQuestionnaires    = authzapp.CapabilityReadQuestionnaires
+	CapabilityManageQuestionnaires  = authzapp.CapabilityManageQuestionnaires
+	CapabilityReadScales            = authzapp.CapabilityReadScales
+	CapabilityManageScales          = authzapp.CapabilityManageScales
+	CapabilityReadAnswersheets      = authzapp.CapabilityReadAnswersheets
 	CapabilityManageEvaluationPlans = authzapp.CapabilityManageEvaluationPlans
 	CapabilityEvaluateAssessments   = authzapp.CapabilityEvaluateAssessments
 )

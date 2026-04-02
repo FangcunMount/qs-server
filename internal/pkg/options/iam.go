@@ -39,6 +39,9 @@ type IAMOptions struct {
 	AuthzAppName              string        `json:"authz-app-name" mapstructure:"authz-app-name"`
 	AuthzCacheTTL             time.Duration `json:"authz-cache-ttl" mapstructure:"authz-cache-ttl"`
 	AuthzCasbinDomainOverride string        `json:"authz-casbin-domain" mapstructure:"authz-casbin-domain"` // 仅迁移例外：默认留空，使 domain=JWT tenant_id（与 IAM 契约一致）
+
+	// Authz 版本同步订阅配置
+	AuthzSync *IAMAuthzSyncOptions `json:"authz-sync" mapstructure:"authz-sync"`
 }
 
 // IAMGRPCOptions IAM gRPC 连接配置
@@ -149,6 +152,7 @@ func NewIAMOptions() *IAMOptions {
 		AuthzAppName:              "qs",
 		AuthzCacheTTL:             30 * time.Second,
 		AuthzCasbinDomainOverride: "",
+		AuthzSync:                 NewIAMAuthzSyncOptions(),
 	}
 }
 
@@ -191,11 +195,20 @@ func (o *IAMOptions) Validate() []error {
 		}
 	}
 
+	if o.AuthzSync == nil {
+		o.AuthzSync = NewIAMAuthzSyncOptions()
+	}
+	errs = append(errs, o.AuthzSync.Validate()...)
+
 	return errs
 }
 
 // AddFlags 添加命令行参数
 func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
+	if o.AuthzSync == nil {
+		o.AuthzSync = NewIAMAuthzSyncOptions()
+	}
+
 	// 功能开关
 	fs.BoolVar(&o.Enabled, "iam.enabled", o.Enabled,
 		"Enable IAM integration (灰度发布开关)")
@@ -258,4 +271,16 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"In-process TTL for GetAuthorizationSnapshot cache")
 	fs.StringVar(&o.AuthzCasbinDomainOverride, "iam.authz.casbin-domain", o.AuthzCasbinDomainOverride,
 		"Override Casbin domain for IAM snapshot when JWT tenant_id differs from IAM domain")
+	fs.BoolVar(&o.AuthzSync.Enabled, "iam.authz-sync.enabled", o.AuthzSync.Enabled,
+		"Enable IAM authz version topic subscription for local snapshot invalidation")
+	fs.StringVar(&o.AuthzSync.Provider, "iam.authz-sync.provider", o.AuthzSync.Provider,
+		"Message queue provider for IAM authz version sync (nsq, rabbitmq)")
+	fs.StringVar(&o.AuthzSync.NSQLookupdAddr, "iam.authz-sync.nsq-lookupd-addr", o.AuthzSync.NSQLookupdAddr,
+		"NSQ lookupd address for IAM authz version sync")
+	fs.StringVar(&o.AuthzSync.RabbitMQURL, "iam.authz-sync.rabbitmq-url", o.AuthzSync.RabbitMQURL,
+		"RabbitMQ connection URL for IAM authz version sync")
+	fs.StringVar(&o.AuthzSync.Topic, "iam.authz-sync.topic", o.AuthzSync.Topic,
+		"Topic name used for IAM authz version notifications")
+	fs.StringVar(&o.AuthzSync.ChannelPrefix, "iam.authz-sync.channel-prefix", o.AuthzSync.ChannelPrefix,
+		"Channel prefix used to build per-instance IAM authz version sync subscriptions")
 }

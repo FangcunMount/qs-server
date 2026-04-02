@@ -5,6 +5,11 @@ type Capability string
 
 const (
 	CapabilityOrgAdmin              Capability = "org_admin"
+	CapabilityReadQuestionnaires    Capability = "read_questionnaires"
+	CapabilityManageQuestionnaires  Capability = "manage_questionnaires"
+	CapabilityReadScales            Capability = "read_scales"
+	CapabilityManageScales          Capability = "manage_scales"
+	CapabilityReadAnswersheets      Capability = "read_answersheets"
 	CapabilityManageEvaluationPlans Capability = "manage_evaluation_plans"
 	CapabilityEvaluateAssessments   Capability = "evaluate_assessments"
 )
@@ -26,6 +31,31 @@ func SnapshotSatisfiesCapability(s *Snapshot, c Capability) bool {
 	switch c {
 	case CapabilityOrgAdmin:
 		return s.IsQSAdmin()
+	case CapabilityReadQuestionnaires:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:questionnaires", []string{"read", "list"})
+	case CapabilityManageQuestionnaires:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:questionnaires", []string{"create", "update", "delete", "publish", "unpublish", "archive", "statistics"})
+	case CapabilityReadScales:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:scales", []string{"read", "list"})
+	case CapabilityManageScales:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:scales", []string{"create", "update", "delete", "publish", "unpublish", "archive"})
+	case CapabilityReadAnswersheets:
+		if s.IsQSAdmin() {
+			return true
+		}
+		return hasAnyResourceAction(s, "qs:answersheets", []string{"read", "list", "statistics"})
 	case CapabilityManageEvaluationPlans:
 		if s.IsQSAdmin() {
 			return true

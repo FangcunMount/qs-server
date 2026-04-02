@@ -44,7 +44,8 @@ type GetTesteeByProfileIDRequest struct {
 // CreateStaffRequest 创建员工请求
 type CreateStaffRequest struct {
 	OrgID    int64    `json:"org_id"`                          // 兼容字段：机构ID
-	Roles    []string `json:"roles" binding:"required,min=1"`  // 角色列表
+	UserID   int64    `json:"user_id,omitempty"`               // IAM用户ID（优先使用）
+	Roles    []string `json:"roles"`                           // 期望授予的角色列表（IAM 启用时转成 assignment）
 	Name     string   `json:"name" binding:"required"`         // 姓名
 	Email    string   `json:"email" binding:"omitempty,email"` // 邮箱
 	Phone    string   `json:"phone"`                           // 电话

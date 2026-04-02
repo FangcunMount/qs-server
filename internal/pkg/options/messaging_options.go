@@ -98,3 +98,19 @@ func (o *MessagingOptions) NewPublisher() (messaging.Publisher, error) {
 		return nil, fmt.Errorf("unsupported messaging provider: %s", o.Provider)
 	}
 }
+
+// NewSubscriber 创建消息队列订阅者。
+func (o *MessagingOptions) NewSubscriber() (messaging.Subscriber, error) {
+	if !o.Enabled {
+		return nil, fmt.Errorf("messaging is not enabled")
+	}
+
+	switch o.Provider {
+	case "nsq":
+		return nsq.NewSubscriber([]string{o.NSQLookupdAddr}, nil)
+	case "rabbitmq":
+		return rabbitmq.NewSubscriber(o.RabbitMQURL)
+	default:
+		return nil, fmt.Errorf("unsupported messaging provider: %s", o.Provider)
+	}
+}

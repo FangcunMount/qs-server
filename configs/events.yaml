@@ -13,7 +13,7 @@ version: "1.0"
 # ============================================================================
 topics:
   questionnaire-lifecycle:
-    name: "questionnaire.lifecycle"
+    name: "qs.survey.lifecycle"
     description: "问卷和量表生命周期事件"
     # 消费者配置
     consumer:
@@ -25,7 +25,7 @@ topics:
         max_interval: 30s
 
   assessment-lifecycle:
-    name: "assessment.lifecycle"
+    name: "qs.evaluation.lifecycle"
     description: "测评生命周期事件"
     consumer:
       group: "qs-worker"
@@ -36,7 +36,7 @@ topics:
         max_interval: 1m
 
   plan-lifecycle:
-    name: "plan.lifecycle"
+    name: "qs.plan.lifecycle"
     description: "测评计划生命周期事件"
     consumer:
       group: "qs-worker"
@@ -47,7 +47,7 @@ topics:
         max_interval: 30s
 
   task-lifecycle:
-    name: "task.lifecycle"
+    name: "qs.plan.task"
     description: "测评任务生命周期事件"
     consumer:
       group: "qs-worker"

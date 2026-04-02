@@ -84,8 +84,8 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 		return nil, err
 	}
 
-	if s.assignment != nil && s.snapshot != nil && len(dto.Roles) > 0 {
-		if err := s.applyIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
+	if s.assignment != nil && s.snapshot != nil {
+		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
 			return nil, errors.Wrap(err, "iam role assignment after register")
 		}
 	}
@@ -181,6 +181,16 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 	if err := s.validator.ValidateName(dto.Name, true); err != nil {
 		return err
 	}
+	for _, rn := range dto.Roles {
+		if err := s.validator.ValidateRole(domain.Role(rn)); err != nil {
+			return err
+		}
+	}
+	if s.assignment == nil || s.snapshot == nil {
+		if len(dto.Roles) == 0 {
+			return errors.WithCode(code.ErrValidation, "roles are required when IAM authorization is not enabled")
+		}
+	}
 	return nil
 }
 
@@ -253,7 +263,7 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 	return st, nil
 }
 
-func (s *lifecycleService) applyIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
+func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
 	dom := s.snapshot.DomainForOrg(op.OrgID())
 	uidStr := strconv.FormatInt(op.UserID(), 10)
 	for _, rn := range roleNames {
@@ -265,16 +275,6 @@ func (s *lifecycleService) applyIAMRolesAfterRegister(ctx context.Context, op *d
 			return err
 		}
 	}
-	if err := iam.SyncOperatorRolesFromSnapshot(ctx, s.snapshot, op.OrgID(), op); err != nil {
-		return err
-	}
-	rolesCopy := append([]domain.Role(nil), op.Roles()...)
-	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		cur, err := s.repo.FindByID(txCtx, op.ID())
-		if err != nil {
-			return errors.Wrap(err, "failed to find operator")
-		}
-		cur.ReplaceRolesProjection(rolesCopy)
-		return s.repo.Update(txCtx, cur)
-	})
+	_, err := iam.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, op.OrgID(), op)
+	return err
 }

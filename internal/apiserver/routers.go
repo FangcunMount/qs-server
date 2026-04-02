@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -137,7 +138,11 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.container.ActorModule.OperatorRepo))
 			}
 			if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
-				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader))
+				var operatorRepo domainoperator.Repository
+				if r.container.ActorModule != nil {
+					operatorRepo = r.container.ActorModule.OperatorRepo
+				}
+				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, operatorRepo))
 			} else {
 				fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable (need gRPC); authorization snapshot disabled for %s\n", routePrefix)
 			}
@@ -168,7 +173,8 @@ func (r *Router) registerCodesRoutes(apiV1 *gin.RouterGroup) {
 	}
 
 	handler := codesHandler.NewCodesHandler(r.container.CodesService)
-	apiV1.POST("/codes/apply", handler.Apply)
+	codes := apiV1.Group("/codes", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	codes.POST("/apply", handler.Apply)
 }
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由
@@ -180,28 +186,31 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	questionnaires := apiV1.Group("/questionnaires")
 	{
+		manage := questionnaires.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageQuestionnaires))
+		read := questionnaires.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadQuestionnaires))
+
 		// 生命周期管理
-		questionnaires.POST("", quesHandler.Create)                          // 创建问卷
-		questionnaires.PUT("/:code/basic-info", quesHandler.UpdateBasicInfo) // 更新基本信息
-		questionnaires.POST("/:code/draft", quesHandler.SaveDraft)           // 保存草稿
-		questionnaires.POST("/:code/publish", quesHandler.Publish)           // 发布问卷
-		questionnaires.POST("/:code/unpublish", quesHandler.Unpublish)       // 取消发布
-		questionnaires.POST("/:code/archive", quesHandler.Archive)           // 归档问卷
-		questionnaires.DELETE("/:code", quesHandler.Delete)                  // 删除问卷
+		manage.POST("", quesHandler.Create)                          // 创建问卷
+		manage.PUT("/:code/basic-info", quesHandler.UpdateBasicInfo) // 更新基本信息
+		manage.POST("/:code/draft", quesHandler.SaveDraft)           // 保存草稿
+		manage.POST("/:code/publish", quesHandler.Publish)           // 发布问卷
+		manage.POST("/:code/unpublish", quesHandler.Unpublish)       // 取消发布
+		manage.POST("/:code/archive", quesHandler.Archive)           // 归档问卷
+		manage.DELETE("/:code", quesHandler.Delete)                  // 删除问卷
 
 		// 问题内容管理
-		questionnaires.POST("/:code/questions", quesHandler.AddQuestion)               // 添加问题
-		questionnaires.PUT("/:code/questions/:qcode", quesHandler.UpdateQuestion)      // 更新问题
-		questionnaires.DELETE("/:code/questions/:qcode", quesHandler.RemoveQuestion)   // 删除问题
-		questionnaires.POST("/:code/questions/reorder", quesHandler.ReorderQuestions)  // 重排问题
-		questionnaires.PUT("/:code/questions/batch", quesHandler.BatchUpdateQuestions) // 批量更新
+		manage.POST("/:code/questions", quesHandler.AddQuestion)               // 添加问题
+		manage.PUT("/:code/questions/:qcode", quesHandler.UpdateQuestion)      // 更新问题
+		manage.DELETE("/:code/questions/:qcode", quesHandler.RemoveQuestion)   // 删除问题
+		manage.POST("/:code/questions/reorder", quesHandler.ReorderQuestions)  // 重排问题
+		manage.PUT("/:code/questions/batch", quesHandler.BatchUpdateQuestions) // 批量更新
 
 		// 查询接口
-		questionnaires.GET("", quesHandler.List)                               // 获取问卷列表
-		questionnaires.GET("/:code", quesHandler.GetByCode)                    // 获取问卷详情
-		questionnaires.GET("/published/:code", quesHandler.GetPublishedByCode) // 获取已发布问卷
-		questionnaires.GET("/published", quesHandler.ListPublished)            // 获取已发布列表
-		questionnaires.GET("/:code/qrcode", quesHandler.GetQRCode)             // 获取问卷小程序码
+		read.GET("", quesHandler.List)                               // 获取问卷列表
+		read.GET("/:code", quesHandler.GetByCode)                    // 获取问卷详情
+		read.GET("/published/:code", quesHandler.GetPublishedByCode) // 获取已发布问卷
+		read.GET("/published", quesHandler.ListPublished)            // 获取已发布列表
+		read.GET("/:code/qrcode", quesHandler.GetQRCode)             // 获取问卷小程序码
 	}
 }
 
@@ -214,8 +223,11 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	answersheets := apiV1.Group("/answersheets")
 	{
+		admin := answersheets.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		read := answersheets.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAnswersheets))
+
 		// 管理接口
-		answersheets.POST("/admin-submit", r.rateLimitedHandlers(
+		admin.POST("/admin-submit", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.AdminSubmitGlobalQPS,
 			r.rateCfg.AdminSubmitGlobalBurst,
@@ -223,7 +235,7 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.AdminSubmitUserBurst,
 			answersheetHandler.AdminSubmit,
 		)...)
-		answersheets.GET("/:id", r.rateLimitedHandlers(
+		read.GET("/:id", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
 			r.rateCfg.QueryGlobalBurst,
@@ -231,7 +243,7 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			answersheetHandler.GetByID,
 		)...)
-		answersheets.GET("", r.rateLimitedHandlers(
+		read.GET("", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
 			r.rateCfg.QueryGlobalBurst,
@@ -252,28 +264,31 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	scales := apiV1.Group("/scales")
 	{
+		manage := scales.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageScales))
+		read := scales.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadScales))
+
 		// 生命周期管理
-		scales.POST("", scaleHandler.Create)                                 // 创建量表
-		scales.PUT("/:code/basic-info", scaleHandler.UpdateBasicInfo)        // 更新基本信息
-		scales.PUT("/:code/questionnaire", scaleHandler.UpdateQuestionnaire) // 更新关联问卷
-		scales.POST("/:code/publish", scaleHandler.Publish)                  // 发布量表
-		scales.POST("/:code/unpublish", scaleHandler.Unpublish)              // 下架量表
-		scales.POST("/:code/archive", scaleHandler.Archive)                  // 归档量表
-		scales.DELETE("/:code", scaleHandler.Delete)                         // 删除量表
+		manage.POST("", scaleHandler.Create)                                 // 创建量表
+		manage.PUT("/:code/basic-info", scaleHandler.UpdateBasicInfo)        // 更新基本信息
+		manage.PUT("/:code/questionnaire", scaleHandler.UpdateQuestionnaire) // 更新关联问卷
+		manage.POST("/:code/publish", scaleHandler.Publish)                  // 发布量表
+		manage.POST("/:code/unpublish", scaleHandler.Unpublish)              // 下架量表
+		manage.POST("/:code/archive", scaleHandler.Archive)                  // 归档量表
+		manage.DELETE("/:code", scaleHandler.Delete)                         // 删除量表
 
 		// 因子管理（仅提供批量操作）
-		scales.PUT("/:code/factors/batch", scaleHandler.BatchUpdateFactors)      // 批量更新因子
-		scales.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
+		manage.PUT("/:code/factors/batch", scaleHandler.BatchUpdateFactors)      // 批量更新因子
+		manage.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
 
 		// 查询接口（注意：具体路径要放在参数路径之前，避免路由冲突）
-		scales.GET("/categories", scaleHandler.GetCategories)                // 获取量表分类列表
-		scales.GET("/by-questionnaire", scaleHandler.GetByQuestionnaireCode) // 根据问卷获取量表
-		scales.GET("/published/:code", scaleHandler.GetPublishedByCode)      // 获取已发布量表
-		scales.GET("/published", scaleHandler.ListPublished)                 // 获取已发布列表
-		scales.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
-		scales.GET("/:code/qrcode", scaleHandler.GetQRCode)                  // 获取量表小程序码
-		scales.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
-		scales.GET("", scaleHandler.List)                                    // 获取量表列表
+		read.GET("/categories", scaleHandler.GetCategories)                // 获取量表分类列表
+		read.GET("/by-questionnaire", scaleHandler.GetByQuestionnaireCode) // 根据问卷获取量表
+		read.GET("/published/:code", scaleHandler.GetPublishedByCode)      // 获取已发布量表
+		read.GET("/published", scaleHandler.ListPublished)                 // 获取已发布列表
+		read.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
+		read.GET("/:code/qrcode", scaleHandler.GetQRCode)                  // 获取量表小程序码
+		read.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
+		read.GET("", scaleHandler.List)                                    // 获取量表列表
 	}
 }
 

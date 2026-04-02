@@ -238,14 +238,15 @@ definitions:
         description: 电话
         type: string
       roles:
-        description: 角色列表
+        description: 期望授予的角色列表（IAM 启用时转成 assignment）
         items:
           type: string
-        minItems: 1
         type: array
+      user_id:
+        description: IAM用户ID（优先使用）
+        type: integer
     required:
     - name
-    - roles
     type: object
   request.EnrollTesteeRequest:
     properties:

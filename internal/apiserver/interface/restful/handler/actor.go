@@ -966,12 +966,12 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 // toRegisterStaffDTO 将创建请求转换为应用层 DTO
 func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorApp.RegisterOperatorDTO {
 	return operatorApp.RegisterOperatorDTO{
-		OrgID: orgID,
-		// UserID left zero; application service will create/resolve IAM user
-		Roles: req.Roles,
-		Name:  req.Name,
-		Email: req.Email,
-		Phone: req.Phone,
+		OrgID:  orgID,
+		UserID: req.UserID,
+		Roles:  req.Roles,
+		Name:   req.Name,
+		Email:  req.Email,
+		Phone:  req.Phone,
 	}
 }
 

@@ -23,6 +23,14 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 		Roles: []string{"qs:evaluator"},
 		Permissions: []authzapp.Permission{
 			{Resource: "qs:assessments", Action: "read|list|retry|batch_evaluate|statistics"},
+			{Resource: "qs:answersheets", Action: "read|list|statistics"},
+		},
+	}
+	contentManagerSnap := &authzapp.Snapshot{
+		Roles: []string{"qs:content_manager"},
+		Permissions: []authzapp.Permission{
+			{Resource: "qs:questionnaires", Action: "create|read|list|update|delete|publish|unpublish|archive|statistics"},
+			{Resource: "qs:scales", Action: "create|read|list|update|delete|publish|unpublish|archive"},
 		},
 	}
 	adminSnap := &authzapp.Snapshot{
@@ -59,6 +67,34 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 			snapshot:    adminSnap,
 			wantStatus:  http.StatusOK,
 			wantNextRun: true,
+		},
+		{
+			name:        "content manager can manage questionnaires",
+			capability:  CapabilityManageQuestionnaires,
+			snapshot:    contentManagerSnap,
+			wantStatus:  http.StatusOK,
+			wantNextRun: true,
+		},
+		{
+			name:        "content manager can read scales",
+			capability:  CapabilityReadScales,
+			snapshot:    contentManagerSnap,
+			wantStatus:  http.StatusOK,
+			wantNextRun: true,
+		},
+		{
+			name:        "evaluator can read answersheets",
+			capability:  CapabilityReadAnswersheets,
+			snapshot:    evaluatorSnap,
+			wantStatus:  http.StatusOK,
+			wantNextRun: true,
+		},
+		{
+			name:        "content manager cannot read answersheets",
+			capability:  CapabilityReadAnswersheets,
+			snapshot:    contentManagerSnap,
+			wantStatus:  http.StatusForbidden,
+			wantNextRun: false,
 		},
 	}
 

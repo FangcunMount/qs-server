@@ -12,6 +12,7 @@
 | HTTP 认证主路径 | 两个 HTTP 进程都通过 JWT 中间件验用户 token，再把身份写入业务上下文 |
 | gRPC 入站主路径 | `qs-apiserver` 的 gRPC 先经过 TLS / mTLS，再进入 Unary 拦截器链，可选读取 IAM JWT metadata |
 | `collection -> apiserver` 特点 | 除传输层 mTLS 外，还可能通过 `ServiceAuthHelper` 注入服务间 token；这和前台用户 Bearer 不是一回事 |
+| 授权快照失效 | `apiserver` / `collection-server` 可通过 `iam.authz-sync.*` 订阅 `iam.authz.version`，主动失效本地快照 |
 | worker 边界 | `qs-worker` 不嵌入 IAM 用户态链路，它只受 `qs-apiserver` gRPC 服务端的认证策略约束 |
 | 排障入口 | 先区分 HTTP 还是 gRPC，再看对应中间件 / 拦截器、IAM SDK 调用和配置开关 |
 
@@ -31,8 +32,8 @@
 
 | 进程 | IAM 相关职责（运行时） |
 | ---- | ---------------------- |
-| **collection-server** | 前台 REST：**用户 JWT** → **UserIdentity**；**Guardianship** 等；调 apiserver gRPC 时若启用 **`iam.service_auth`** 可装配 **服务间 token**（见 **§3.4**） |
-| **qs-apiserver** | 后台 REST：同上（**上下文字段更全**）；**gRPC**：拦截器链见 **§3.3**；容器内 **ServiceAuthHelper** 等多用于**向其它服务发请求**，与 **collection → 本进程** 的入站验签是两条线 |
+| **collection-server** | 前台 REST：**用户 JWT** → **UserIdentity**；**Guardianship** 等；调 apiserver gRPC 时若启用 **`iam.service_auth`** 可装配 **服务间 token**（见 **§3.4**）；可选通过 **`iam.authz-sync.*`** 订阅 **`iam.authz.version`** 失效授权快照 |
+| **qs-apiserver** | 后台 REST：同上（**上下文字段更全**）；**gRPC**：拦截器链见 **§3.3**；容器内 **ServiceAuthHelper** 等多用于**向其它服务发请求**，与 **collection → 本进程** 的入站验签是两条线；可选通过 **`iam.authz-sync.*`** 订阅 **`iam.authz.version`** |
 | **qs-worker** | **无** IAM 模块；依赖 **apiserver gRPC** 是否要求 `authorization`（见 03-04） |
 
 ---
@@ -65,6 +66,8 @@ flowchart LR
 ```
 
 **collection → apiserver（gRPC）**：除 **mTLS 传输**外，若部署启用 **服务间 JWT**，由 **`ServiceAuthHelper`（PerRPC）** 写入 metadata（与前台用户 Bearer **不是**同一条 token）；详见 **§3.4**。
+
+**授权快照失效**：HTTP / gRPC 请求上的授权快照仍由中间件 / 拦截器按需加载；为了避免只靠 TTL，`apiserver` 与 `collection-server` 还可通过 **`iam.authz-sync.*`** 订阅 **`iam.authz.version`**，在 IAM 侧策略或 assignment 变化后主动推进本地快照版本水位。
 
 ---
 

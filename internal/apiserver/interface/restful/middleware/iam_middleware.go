@@ -25,6 +25,8 @@ const (
 	TenantIDKey = "tenant_id"
 	// RolesKey 用户角色列表
 	RolesKey = "roles"
+	// CurrentOperatorKey 当前租户下已激活的 operator
+	CurrentOperatorKey = "current_operator"
 )
 
 // UserIdentityMiddleware 用户身份解析中间件
@@ -133,6 +135,7 @@ func RequireActiveOperatorMiddleware(repo domainOperator.Repository) gin.Handler
 			c.Abort()
 			return
 		}
+		c.Set(CurrentOperatorKey, op)
 		c.Next()
 	}
 }
@@ -294,6 +297,16 @@ func GetRoles(c *gin.Context) []string {
 		return roles
 	}
 	return nil
+}
+
+// GetCurrentOperator 获取当前租户下的已激活 operator。
+func GetCurrentOperator(c *gin.Context) *domainOperator.Operator {
+	v, ok := c.Get(CurrentOperatorKey)
+	if !ok {
+		return nil
+	}
+	op, _ := v.(*domainOperator.Operator)
+	return op
 }
 
 // HasRole 检查用户是否拥有指定角色

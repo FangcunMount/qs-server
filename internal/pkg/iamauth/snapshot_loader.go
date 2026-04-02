@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,6 +78,32 @@ func (l *SnapshotLoader) setCached(key, domain string, snap *authz.Snapshot) {
 		l.tenantAuthzVer[domain] = snap.AuthzVersion
 	}
 	l.cache[key] = cachedSnap{snap: snap, expiresAt: time.Now().Add(l.opts.CacheTTL)}
+}
+
+// ObserveTenantAuthzVersion 用外部版本通知推进租户授权版本水位，并主动剔除旧快照。
+// tenantID 传入 IAM 版本消息中的 tenant/domain 值；QS 不自行改写该语义。
+func (l *SnapshotLoader) ObserveTenantAuthzVersion(tenantID string, version int64) {
+	if l == nil || tenantID == "" || version <= 0 {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if current, ok := l.tenantAuthzVer[tenantID]; ok && version <= current {
+		return
+	}
+	l.tenantAuthzVer[tenantID] = version
+
+	prefix := tenantID + "\x00"
+	for key, ent := range l.cache {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if ent.snap != nil && ent.snap.AuthzVersion < version {
+			delete(l.cache, key)
+		}
+	}
 }
 
 // DomainForOrg 与 Load / Grant / Revoke 共用的 Casbin domain。

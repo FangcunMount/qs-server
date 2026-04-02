@@ -218,6 +218,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.ClinicianRepo,
 		m.RelationRepo,
 		m.TesteeRepo,
+		authzSnap,
 	)
 	m.AssessmentEntryService = assessmentEntryApp.NewService(
 		m.AssessmentEntryRepo,

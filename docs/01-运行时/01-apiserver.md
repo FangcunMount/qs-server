@@ -115,7 +115,9 @@ sequenceDiagram
 
 **统计同步 ticker**：`startStatisticsSyncScheduler` 内为三轮 `SyncDaily/Accumulated/Plan` **单独注册**一条 `ShutdownCallback`，仅对 ticker 使用的 **context 调用 `cancel()`**，使 goroutine 在 `select` 上退出。**与主回调同属** `GracefulShutdown`；若关心「cancel 与关库的先后」，以 **回调注册顺序** 与 **`github.com/FangcunMount/component-base/pkg/shutdown` 的实际 invocation 顺序**为准（排障时可打日志核对）。
 
-**MQ Publisher**：底层 **`messaging.Publisher`** 由 `PrepareRun` 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container `initEventPublisher`](../../internal/apiserver/container/container.go)）。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
+**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 `PrepareRun` 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container `initEventPublisher`](../../internal/apiserver/container/container.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
+
+**IAM 授权版本同步**：与业务事件总线分离，`apiserver` 通过 **`iam.authz-sync.*`** 创建独立订阅者，消费 **`iam.authz.version`** 控制面主题以推进本地授权快照失效，见 [server.go `startAuthzVersionSync`](../../internal/apiserver/server.go) 与 [version_sync.go](../../internal/pkg/iamauth/version_sync.go)。
 
 ---
 

@@ -304,10 +304,10 @@ flowchart TB
 
 | 事件类型 | Topic（`topics.*.name`） | handler（yaml） | 备注 |
 | -------- | ------------------------ | ----------------- | ---- |
-| `questionnaire.published` | `questionnaire.lifecycle` | `questionnaire_published_handler` | 与量表生命周期共用 Topic |
-| `questionnaire.unpublished` | `questionnaire.lifecycle` | `questionnaire_unpublished_handler` | |
-| `questionnaire.archived` | `questionnaire.lifecycle` | `questionnaire_archived_handler` | |
-| `answersheet.submitted` | **`assessment.lifecycle`** | `answersheet_submitted_handler` | 与测评链共用 Topic，消费者含 `qs-worker` |
+| `questionnaire.published` | `qs.survey.lifecycle` | `questionnaire_published_handler` | 与量表生命周期共用 Topic |
+| `questionnaire.unpublished` | `qs.survey.lifecycle` | `questionnaire_unpublished_handler` | |
+| `questionnaire.archived` | `qs.survey.lifecycle` | `questionnaire_archived_handler` | |
+| `answersheet.submitted` | **`qs.evaluation.lifecycle`** | `answersheet_submitted_handler` | 与测评链共用 Topic，消费者含 `qs-worker` |
 
 改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker [registry.go](../../internal/worker/handlers/registry.go)。
 

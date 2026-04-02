@@ -5536,8 +5536,7 @@ const docTemplate = `{
         "request.CreateStaffRequest": {
             "type": "object",
             "required": [
-                "name",
-                "roles"
+                "name"
             ],
             "properties": {
                 "email": {
@@ -5561,12 +5560,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "roles": {
-                    "description": "角色列表",
+                    "description": "期望授予的角色列表（IAM 启用时转成 assignment）",
                     "type": "array",
-                    "minItems": 1,
                     "items": {
                         "type": "string"
                     }
+                },
+                "user_id": {
+                    "description": "IAM用户ID（优先使用）",
+                    "type": "integer"
                 }
             }
         },

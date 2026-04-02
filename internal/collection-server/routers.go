@@ -119,7 +119,7 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 	api.Use(withAuthSkip(skip, middleware.RequireTenantIDMiddleware()))
 	api.Use(withAuthSkip(skip, middleware.RequireNumericOrgScopeMiddleware()))
 	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
-		api.Use(withAuthSkip(skip, middleware.AuthzSnapshotMiddleware(loader)))
+		api.Use(withAuthSkip(skip, middleware.AuthzSnapshotMiddleware(loader, nil)))
 	} else {
 		fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable for collection-server (need gRPC)\n")
 	}

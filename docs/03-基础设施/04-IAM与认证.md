@@ -82,6 +82,7 @@ flowchart LR
 | IAM gRPC | `iam.grpc.*` | 远程验证、业务查询客户端 |
 | JWT 声明 | `iam.jwt.*` | issuer、audience、algorithms、required claims |
 | JWKS | `iam.jwks.*` | 公钥拉取、刷新、缓存 TTL |
+| Authz 版本同步 | `iam.authz-sync.*` | 独立订阅 `iam.authz.version`，推进本地授权快照失效 |
 | 总开关 | `iam.enabled` | 关闭时整体退化路径（以代码为准） |
 
 **Verify**：以各进程 **`configs/*.yaml` + `Options` 绑定** 为准；修改后对照 [05-配置体系](./05-配置体系.md) 与运行时日志。
@@ -112,6 +113,7 @@ flowchart LR
 - **`grpc.auth.enabled`**：为 `true` 且注入了 `TokenVerifier` 时挂载 `IAMAuthInterceptor`；否则跳过认证（或仅打 warn）。
 - **默认跳过认证**：gRPC **Health**、**Reflection**（前缀匹配），见 `NewIAMAuthInterceptor` 内 `skipMethods`；授权快照拦截器对同类路径 **跳过**加载（与 IAM 白名单对齐）。**业务 RPC 不在默认白名单**，需带 JWT 或运行时扩展 `AddSkipMethod`。
 - **worker → apiserver**：[`InternalClient`](../../internal/worker/infra/grpcclient/internal_client.go) 调用 **未**附加 `authorization` metadata；[`Manager`](../../internal/worker/infra/grpcclient/manager.go) 仅 TLS/mTLS 传输凭证。故 **生产若开启 `grpc.auth.enabled`**，需 **PerRPC 注入服务 JWT** 或调整拦截器/白名单；示例 [`configs/apiserver.dev.yaml`](../../configs/apiserver.dev.yaml) 中 **`auth.enabled: false`** 与当前客户端行为一致。
+- **授权版本失效**：`qs-apiserver` 与 `collection-server` 都可通过 **`iam.authz-sync.*`** 创建独立订阅者，消费 **`iam.authz.version`**；这条链不复用 `messaging.*`，也不进入 `qs-worker`。
 
 ## 这篇和运行时文档怎么分工
 

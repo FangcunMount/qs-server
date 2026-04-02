@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -19,6 +20,7 @@ import (
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
 
@@ -34,6 +36,8 @@ type apiServer struct {
 	dbManager *DatabaseManager
 	// Container 主容器
 	container *container.Container
+	// IAM authz_version 同步订阅者
+	authzVersionSubscriber messaging.Subscriber
 	// 配置
 	config *config.Config
 }
@@ -206,6 +210,8 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		log.Fatalf("Failed to initialize hexagonal architecture container: %v", err)
 	}
 
+	s.startAuthzVersionSync()
+
 	// 初始化小程序码生成服务（从配置读取 wechat_app_id，然后从 IAM 查询）
 	if s.config.WeChatOptions != nil {
 		s.container.InitQRCodeService(s.config.WeChatOptions)
@@ -276,6 +282,13 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			s.container.Cleanup()
 		}
 
+		if s.authzVersionSubscriber != nil {
+			s.authzVersionSubscriber.Stop()
+			if err := s.authzVersionSubscriber.Close(); err != nil {
+				log.Errorf("Failed to close IAM authz version subscriber: %v", err)
+			}
+		}
+
 		// 关闭数据库连接
 		if s.dbManager != nil {
 			if err := s.dbManager.Close(); err != nil {
@@ -294,6 +307,43 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}))
 
 	return preparedAPIServer{s}
+}
+
+func (s *apiServer) startAuthzVersionSync() {
+	if s == nil || s.container == nil || s.container.IAMModule == nil {
+		return
+	}
+	loader := s.container.IAMModule.AuthzSnapshotLoader()
+	authzSync := s.config.IAMOptions.AuthzSync
+	if loader == nil || authzSync == nil || !authzSync.Enabled {
+		return
+	}
+
+	subscriber, err := authzSync.NewSubscriber()
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to create authz version subscriber",
+			"component", "apiserver",
+			"error", err.Error(),
+		)
+		return
+	}
+
+	channelPrefix := authzSync.ChannelPrefix
+	if channelPrefix == "" {
+		channelPrefix = "qs-authz-sync"
+	}
+	channel := iamauth.DefaultVersionSyncChannel(channelPrefix + "-apiserver")
+	if err := iamauth.SubscribeVersionChanges(context.Background(), subscriber, authzSync.Topic, channel, loader); err != nil {
+		_ = subscriber.Close()
+		logger.L(context.Background()).Warnw("Failed to subscribe IAM authz version sync",
+			"component", "apiserver",
+			"error", err.Error(),
+			"channel", channel,
+			"topic", authzSync.Topic,
+		)
+		return
+	}
+	s.authzVersionSubscriber = subscriber
 }
 
 // Run 运行 API 服务器
@@ -444,8 +494,12 @@ func buildGRPCServer(cfg *config.Config, container *container.Container) (*grpcp
 	}
 
 	if loader := container.IAMModule.AuthzSnapshotLoader(); loader != nil {
+		var operatorRepo domainoperator.Repository
+		if container.ActorModule != nil {
+			operatorRepo = container.ActorModule.OperatorRepo
+		}
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
-			NewAuthzSnapshotUnaryInterceptor(loader))
+			NewAuthzSnapshotUnaryInterceptor(loader, operatorRepo))
 		log.Info("gRPC server: IAM authorization snapshot interceptor enabled (after JWT auth)")
 	}
 

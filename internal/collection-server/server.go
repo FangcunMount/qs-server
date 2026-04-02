@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/credentials"
@@ -28,6 +30,8 @@ type collectionServer struct {
 	container *container.Container
 	// gRPC 客户端管理器
 	grpcManager *grpcclient.Manager
+	// IAM authz_version 同步订阅者
+	authzVersionSubscriber messaging.Subscriber
 }
 
 // preparedCollectionServer 定义了准备运行的 Collection 服务器
@@ -121,6 +125,7 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
+	s.startAuthzVersionSync()
 	log.Infof("Router registering with middlewares: %v", s.config.GenericServerRunOptions.Middlewares)
 
 	// 7. 安装全局并发限制中间件（避免过载）
@@ -142,6 +147,10 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		if s.grpcManager != nil {
 			_ = s.grpcManager.Close()
 		}
+		if s.authzVersionSubscriber != nil {
+			s.authzVersionSubscriber.Stop()
+			_ = s.authzVersionSubscriber.Close()
+		}
 
 		// 关闭 IAM 模块
 		if s.container.IAMModule != nil {
@@ -161,6 +170,34 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	}))
 
 	return preparedCollectionServer{s}
+}
+
+func (s *collectionServer) startAuthzVersionSync() {
+	if s == nil || s.container == nil || s.container.IAMModule == nil {
+		return
+	}
+	loader := s.container.IAMModule.AuthzSnapshotLoader()
+	authzSync := s.config.IAMOptions.AuthzSync
+	if loader == nil || authzSync == nil || !authzSync.Enabled {
+		return
+	}
+
+	subscriber, err := authzSync.NewSubscriber()
+	if err != nil {
+		log.Warnf("Failed to create collection authz version subscriber: %v", err)
+		return
+	}
+	channelPrefix := authzSync.ChannelPrefix
+	if channelPrefix == "" {
+		channelPrefix = "qs-authz-sync"
+	}
+	channel := iamauth.DefaultVersionSyncChannel(channelPrefix + "-collection")
+	if err := iamauth.SubscribeVersionChanges(context.Background(), subscriber, authzSync.Topic, channel, loader); err != nil {
+		_ = subscriber.Close()
+		log.Warnf("Failed to subscribe collection authz version sync: %v", err)
+		return
+	}
+	s.authzVersionSubscriber = subscriber
 }
 
 // Run 运行 Collection 服务器

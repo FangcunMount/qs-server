@@ -61,18 +61,10 @@ func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64
 		if err := s.assignment.Grant(ctx, dom, strconv.FormatInt(st.UserID(), 10), roleName, actorctx.IAMGrantedBySubject(ctx)); err != nil {
 			return errors.Wrap(err, "iam grant assignment")
 		}
-		if err := iaminfra.SyncOperatorRolesFromSnapshot(ctx, s.snapshot, st.OrgID(), st); err != nil {
+		if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, st.OrgID(), st); err != nil {
 			return errors.Wrap(err, "sync roles from iam snapshot")
 		}
-		rolesCopy := append([]domain.Role(nil), st.Roles()...)
-		return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			cur, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
-			if err != nil {
-				return errors.Wrap(err, "failed to find operator")
-			}
-			cur.ReplaceRolesProjection(rolesCopy)
-			return s.repo.Update(txCtx, cur)
-		})
+		return nil
 	}
 
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -104,18 +96,10 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 		if err := s.assignment.Revoke(ctx, dom, strconv.FormatInt(st.UserID(), 10), roleName); err != nil {
 			return errors.Wrap(err, "iam revoke assignment")
 		}
-		if err := iaminfra.SyncOperatorRolesFromSnapshot(ctx, s.snapshot, st.OrgID(), st); err != nil {
+		if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, st.OrgID(), st); err != nil {
 			return errors.Wrap(err, "sync roles from iam snapshot")
 		}
-		rolesCopy := append([]domain.Role(nil), st.Roles()...)
-		return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			cur, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
-			if err != nil {
-				return errors.Wrap(err, "failed to find operator")
-			}
-			cur.ReplaceRolesProjection(rolesCopy)
-			return s.repo.Update(txCtx, cur)
-		})
+		return nil
 	}
 
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
