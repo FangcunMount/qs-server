@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/gin-gonic/gin"
 
@@ -29,9 +28,11 @@ type UserClaims struct {
 // JWTAuthMiddleware JWT 认证中间件（使用 SDK TokenVerifier 本地 JWKS 验签）
 func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
 		// 检查 verifier 是否可用
 		if verifier == nil {
 			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware token verifier not configured", "error", "token verifier not configured")
+			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token verifier not configured", "path", c.Request.URL.Path, "method", c.Request.Method)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "token verifier not configured",
 			})
@@ -101,10 +102,12 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 // OptionalJWTAuthMiddleware 可选的 JWT 认证中间件（使用 SDK TokenVerifier）
 func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
 		// 提取 Token
 		token := extractToken(c)
-		log.Debugf("OptionalJWTAuthMiddleware token", token)
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token", "token", token)
 		if token == "" {
+			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
 			// Token 缺失，继续执行但不设置用户信息
 			c.Next()
 			return
@@ -112,14 +115,15 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 检查 verifier 是否可用
 		if verifier == nil {
+			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware verifier is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
 			c.Next()
 			return
 		}
 
 		// 使用 SDK TokenVerifier 验证
 		result, err := verifier.Verify(c.Request.Context(), token, nil)
-		log.Debugf("OptionalJWTAuthMiddleware result", result)
-		log.Debugf("OptionalJWTAuthMiddleware err", err)
+		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware result", "result", result)
+		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware err", "err", err)
 		if err != nil || !result.Valid {
 			// Token 无效，继续执行但不设置用户信息
 			c.Next()
@@ -128,7 +132,7 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 将用户信息存入上下文
 		tokenClaims := result.Claims
-		log.Debugf("OptionalJWTAuthMiddleware tokenClaims", tokenClaims)
+		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware tokenClaims", "tokenClaims", tokenClaims)
 		if tokenClaims == nil {
 			// Token 无效，继续执行但不设置用户信息
 			c.Next()
