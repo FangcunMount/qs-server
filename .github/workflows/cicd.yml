@@ -658,7 +658,7 @@ jobs:
             if [ -n "${GITHUB_TOKEN:-}" ]; then
               echo "Logging into GitHub Container Registry..."
               if [ "$SUDO" = "sudo_pw" ]; then
-                printf '%s\n%s' "$SUDO_PASSWORD" "$GITHUB_TOKEN" | sudo -S docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+                sudo_pw sh -lc 'printf "%s" "$GITHUB_TOKEN" | docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null' && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
               else
                 echo "$GITHUB_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
               fi
@@ -669,7 +669,7 @@ jobs:
                 echo "⚠️ GHCR login failed; falling back to Docker Hub..."
                 DOCKERHUB_LOGIN_OK=0
                 if [ "$SUDO" = "sudo_pw" ]; then
-                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
+                  sudo_pw sh -lc 'printf "%s" "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null' && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 else
                   echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 fi
@@ -946,7 +946,7 @@ jobs:
             if [ -n "${GITHUB_TOKEN:-}" ]; then
               echo "Logging into GitHub Container Registry..."
               if [ "$SUDO" = "sudo_pw" ]; then
-                printf '%s\n%s' "$SUDO_PASSWORD" "$GITHUB_TOKEN" | sudo -S docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+                sudo_pw sh -lc 'printf "%s" "$GITHUB_TOKEN" | docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null' && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
               else
                 echo "$GITHUB_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
               fi
@@ -957,7 +957,7 @@ jobs:
                 echo "⚠️ GHCR login failed; falling back to Docker Hub..."
                 DOCKERHUB_LOGIN_OK=0
                 if [ "$SUDO" = "sudo_pw" ]; then
-                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
+                  sudo_pw sh -lc 'printf "%s" "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null' && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 else
                   echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 fi
@@ -1260,7 +1260,7 @@ jobs:
             if [ -n "${GITHUB_TOKEN:-}" ]; then
               echo "Logging into GitHub Container Registry..."
               if [ "$SUDO" = "sudo_pw" ]; then
-                printf '%s\n%s' "$SUDO_PASSWORD" "$GITHUB_TOKEN" | sudo -S docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
+                sudo_pw sh -lc 'printf "%s" "$GITHUB_TOKEN" | docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null' && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
               else
                 echo "$GITHUB_TOKEN" | $SUDO docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null && GHCR_LOGIN_OK=1 || GHCR_LOGIN_OK=0
               fi
@@ -1271,7 +1271,7 @@ jobs:
                 echo "⚠️ GHCR login failed; falling back to Docker Hub..."
                 DOCKERHUB_LOGIN_OK=0
                 if [ "$SUDO" = "sudo_pw" ]; then
-                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
+                  sudo_pw sh -lc 'printf "%s" "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null' && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 else
                   echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 fi
