@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -73,7 +74,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		}
 
 		claims := &UserClaims{
-			UserID:   tokenClaims.UserID,
+			UserID:   resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
 			TenantID: tokenClaims.TenantID,
 			Roles:    tokenClaims.Roles,
 		}
@@ -120,7 +121,7 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		}
 
 		claims := &UserClaims{
-			UserID:   tokenClaims.UserID,
+			UserID:   resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
 			TenantID: tokenClaims.TenantID,
 			Roles:    tokenClaims.Roles,
 		}
@@ -281,4 +282,43 @@ func hasRole(roles []string, role string) bool {
 		}
 	}
 	return false
+}
+
+// resolveUserID 优先使用标准 UserID 字段，缺失时从 Extra 兼容提取。
+func resolveUserID(userID string, extra map[string]interface{}) string {
+	if userID != "" {
+		return userID
+	}
+	if len(extra) == 0 {
+		return ""
+	}
+	for _, key := range []string{"user_id", "uid", "sub"} {
+		if v, ok := extra[key]; ok {
+			if s := claimValueToString(v); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func claimValueToString(v interface{}) string {
+	switch x := v.(type) {
+	case string:
+		return strings.TrimSpace(x)
+	case fmt.Stringer:
+		return strings.TrimSpace(x.String())
+	case int:
+		return strconv.Itoa(x)
+	case int8, int16, int32, int64:
+		return strconv.FormatInt(reflect.ValueOf(x).Int(), 10)
+	case uint, uint8, uint16, uint32, uint64:
+		return strconv.FormatUint(reflect.ValueOf(x).Uint(), 10)
+	case float32:
+		return strconv.FormatFloat(float64(x), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	default:
+		return ""
+	}
 }
