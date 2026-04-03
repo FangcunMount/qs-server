@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/gin-gonic/gin"
 
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
@@ -75,9 +77,10 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		claims := &UserClaims{
 			UserID:   resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-			TenantID: tokenClaims.TenantID,
+			TenantID: resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
 			Roles:    tokenClaims.Roles,
 		}
+		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
 		ctx := context.WithValue(c.Request.Context(), UserClaimsContextKey{}, claims)
@@ -122,9 +125,10 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		claims := &UserClaims{
 			UserID:   resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-			TenantID: tokenClaims.TenantID,
+			TenantID: resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
 			Roles:    tokenClaims.Roles,
 		}
+		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
 		ctx := context.WithValue(c.Request.Context(), UserClaimsContextKey{}, claims)
@@ -282,6 +286,56 @@ func hasRole(roles []string, role string) bool {
 		}
 	}
 	return false
+}
+
+// resolveTenantID 优先使用 SDK 的 TenantID，缺失时从 Extra 兼容（IAM 常把自定义声明放在 Extra）。
+func resolveTenantID(tenantID string, extra map[string]interface{}) string {
+	if s := strings.TrimSpace(tenantID); s != "" {
+		return s
+	}
+	if len(extra) == 0 {
+		return ""
+	}
+	for _, key := range []string{"tenant_id", "org_id", "organization_id", "tid"} {
+		if v, ok := extra[key]; ok {
+			if s := claimValueToString(v); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// logJWTClaimMapping 在 tenant/user 映射后仍为空时打 Debug（只记录 Extra 的键名，不记录值）。
+func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaims) {
+	if mapped == nil {
+		return
+	}
+	if mapped.TenantID != "" && mapped.UserID != "" {
+		return
+	}
+	keys := sortedExtraKeys(raw)
+	log.Debugw("jwt claims mapped with missing tenant_id or user_id",
+		"path", c.Request.URL.Path,
+		"method", c.Request.Method,
+		"mapped_tenant_empty", mapped.TenantID == "",
+		"mapped_user_empty", mapped.UserID == "",
+		"raw_tenant_empty", strings.TrimSpace(raw.TenantID) == "",
+		"raw_user_empty", strings.TrimSpace(raw.UserID) == "",
+		"extra_keys", keys,
+	)
+}
+
+func sortedExtraKeys(raw *auth.TokenClaims) []string {
+	if raw == nil || len(raw.Extra) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(raw.Extra))
+	for k := range raw.Extra {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // resolveUserID 优先使用标准 UserID 字段，缺失时从 Extra 兼容提取。

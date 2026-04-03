@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -79,6 +80,7 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 func RequireTenantIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := pkgmiddleware.GetUserClaims(c)
+		log.Println("RequireTenantIDMiddleware claims", claims)
 		if claims == nil || claims.TenantID == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "tenant_id claim is required",
