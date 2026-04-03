@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -45,19 +44,6 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		token := extractToken(c)
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token", "token", token)
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
-
-		// 直接 base64 decode token
-		decodedToken, err := base64.StdEncoding.DecodeString(token)
-		if err != nil {
-			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware base64 decode token failed", "error", fmt.Sprintf("base64 decode token failed: %v", err))
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": fmt.Sprintf("base64 decode token failed: %v", err),
-			})
-			c.Abort()
-			return
-		}
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware decodedToken", "decodedToken", decodedToken)
-
 		if token == "" {
 			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware missing or invalid authorization token", "error", "missing or invalid authorization token")
 			c.JSON(http.StatusUnauthorized, gin.H{
