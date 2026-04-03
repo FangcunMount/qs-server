@@ -12,6 +12,7 @@ services:
     ports:
       - "8081:8080"
       - "9445:8443"
+      - "127.0.0.1:9090:9090"
     env_file:
       - /opt/qs-server/qs-apiserver/configs/env/config.prod.env
     volumes:
