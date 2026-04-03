@@ -67,6 +67,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 将用户信息存入上下文
 		tokenClaims := result.Claims
+		log.Debugf("JWTAuthMiddleware tokenClaims", tokenClaims)
 		if tokenClaims == nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token claims",
@@ -95,6 +96,7 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 提取 Token
 		token := extractToken(c)
+		log.Debugf("OptionalJWTAuthMiddleware token", token)
 		if token == "" {
 			// Token 缺失，继续执行但不设置用户信息
 			c.Next()
@@ -109,6 +111,8 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 使用 SDK TokenVerifier 验证
 		result, err := verifier.Verify(c.Request.Context(), token, nil)
+		log.Debugf("OptionalJWTAuthMiddleware result", result)
+		log.Debugf("OptionalJWTAuthMiddleware err", err)
 		if err != nil || !result.Valid {
 			// Token 无效，继续执行但不设置用户信息
 			c.Next()
@@ -117,6 +121,7 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 将用户信息存入上下文
 		tokenClaims := result.Claims
+		log.Debugf("OptionalJWTAuthMiddleware tokenClaims", tokenClaims)
 		if tokenClaims == nil {
 			// Token 无效，继续执行但不设置用户信息
 			c.Next()
