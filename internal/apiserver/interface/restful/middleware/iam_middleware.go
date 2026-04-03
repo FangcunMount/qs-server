@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/gin-gonic/gin"
 
 	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
@@ -80,8 +80,9 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 func RequireTenantIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := pkgmiddleware.GetUserClaims(c)
-		log.Println("RequireTenantIDMiddleware claims", claims)
+		logger.L(c.Request.Context()).Debugw("RequireTenantIDMiddleware claims", "claims", claims)
 		if claims == nil || claims.TenantID == "" {
+			logger.L(c.Request.Context()).Errorw("RequireTenantIDMiddleware claims is nil or empty", "claims", claims)
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "tenant_id claim is required",
 			})

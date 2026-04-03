@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/gin-gonic/gin"
 
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
@@ -30,6 +31,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 检查 verifier 是否可用
 		if verifier == nil {
+			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware token verifier not configured", "error", "token verifier not configured")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "token verifier not configured",
 			})
@@ -40,6 +42,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		// 提取 Token
 		token := extractToken(c)
 		if token == "" {
+			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware missing or invalid authorization token", "error", "missing or invalid authorization token")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "missing or invalid authorization token",
 			})
@@ -50,6 +53,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		// 使用 SDK TokenVerifier 验证（本地 JWKS 优先，远程降级）
 		result, err := verifier.Verify(c.Request.Context(), token, nil)
 		if err != nil {
+			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware token verification failed", "error", fmt.Sprintf("token verification failed: %v", err))
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": fmt.Sprintf("token verification failed: %v", err),
 			})
@@ -58,6 +62,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		}
 
 		if !result.Valid {
+			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware invalid token", "error", "invalid token")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token",
 			})
@@ -67,8 +72,9 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 将用户信息存入上下文
 		tokenClaims := result.Claims
-		log.Debugf("JWTAuthMiddleware tokenClaims", tokenClaims)
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware tokenClaims", "tokenClaims", tokenClaims)
 		if tokenClaims == nil {
+			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware invalid token claims", "error", "invalid token claims")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token claims",
 			})
@@ -81,6 +87,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 			TenantID: resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
 			Roles:    tokenClaims.Roles,
 		}
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware claims", "claims", claims)
 		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
@@ -314,13 +321,15 @@ func resolveTenantID(tenantID string, extra map[string]interface{}) string {
 // logJWTClaimMapping 在 tenant/user 映射后仍为空时打 Debug（只记录 Extra 的键名，不记录值）。
 func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaims) {
 	if mapped == nil {
+		logger.L(c.Request.Context()).Debugw("jwt claims mapped is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
 		return
 	}
 	if mapped.TenantID != "" && mapped.UserID != "" {
+		logger.L(c.Request.Context()).Debugw("jwt claims mapped with tenant_id and user_id", "path", c.Request.URL.Path, "method", c.Request.Method, "mapped_tenant_id", mapped.TenantID, "mapped_user_id", mapped.UserID)
 		return
 	}
 	keys := sortedExtraKeys(raw)
-	log.Debugw("jwt claims mapped with missing tenant_id or user_id",
+	logger.L(c.Request.Context()).Debugw("jwt claims mapped with missing tenant_id or user_id",
 		"path", c.Request.URL.Path,
 		"method", c.Request.Method,
 		"mapped_tenant_empty", mapped.TenantID == "",
