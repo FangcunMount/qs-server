@@ -19,7 +19,7 @@ name: CI/CD Pipeline
 #   JWT_SECRET
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
-#   部署拉 ghcr：与 iam-contracts 相同，远端用 GITHUB_TOKEN + github.repository_owner 登录；
+#   部署拉 ghcr：与 iam-contracts 一致保留 GITHUB_TOKEN 方案，但 runner/远端统一用 github.actor 登录；
 #   sudo 需密码时用 printf 先喂 sudo 密码再喂 token（见 deploy 脚本）。GHCR 失败时可回退 Docker Hub。
 # ============================================================================
 
@@ -409,6 +409,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify GHCR auth on runner
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          echo "🔐 Verifying GHCR access on runner..."
+          echo "$GITHUB_TOKEN" | docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null
+          echo "✅ GHCR login succeeded on runner"
+
       - name: Prepare deployment files
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
@@ -532,7 +541,7 @@ jobs:
           HTTPS_PORT: ${{ env.HTTPS_PORT }}
           INTERNAL_HTTP_PORT: ${{ env.INTERNAL_HTTP_PORT }}
           INTERNAL_HTTPS_PORT: ${{ env.INTERNAL_HTTPS_PORT }}
-          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_USERNAME: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -658,10 +667,15 @@ jobs:
             if [ "$GHCR_LOGIN_OK" -ne 1 ]; then
               if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
                 echo "⚠️ GHCR login failed; falling back to Docker Hub..."
+                DOCKERHUB_LOGIN_OK=0
                 if [ "$SUDO" = "sudo_pw" ]; then
-                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 else
-                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
+                fi
+                if [ "$DOCKERHUB_LOGIN_OK" -ne 1 ]; then
+                  echo "❌ Docker Hub login failed; verify DOCKERHUB_USERNAME/DOCKERHUB_TOKEN." >&2
+                  exit 1
                 fi
                 export DOCKER_IMAGE_QS_APISERVER="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
               else
@@ -678,7 +692,7 @@ jobs:
 
             # 启动容器（使用 compose）
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-apiserver || true
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-apiserver
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-apiserver
 
             # 健康检查：直接在容器内访问内部端口，避免宿主端口配置失误导致误判
@@ -738,6 +752,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify GHCR auth on runner
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          echo "🔐 Verifying GHCR access on runner..."
+          echo "$GITHUB_TOKEN" | docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null
+          echo "✅ GHCR login succeeded on runner"
 
       - name: Prepare deployment files
         env:
@@ -819,7 +842,7 @@ jobs:
           HTTPS_PORT: ${{ env.HTTPS_PORT }}
           INTERNAL_HTTP_PORT: ${{ env.INTERNAL_HTTP_PORT }}
           INTERNAL_HTTPS_PORT: ${{ env.INTERNAL_HTTPS_PORT }}
-          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_USERNAME: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -932,10 +955,15 @@ jobs:
             if [ "$GHCR_LOGIN_OK" -ne 1 ]; then
               if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
                 echo "⚠️ GHCR login failed; falling back to Docker Hub..."
+                DOCKERHUB_LOGIN_OK=0
                 if [ "$SUDO" = "sudo_pw" ]; then
-                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 else
-                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
+                fi
+                if [ "$DOCKERHUB_LOGIN_OK" -ne 1 ]; then
+                  echo "❌ Docker Hub login failed; verify DOCKERHUB_USERNAME/DOCKERHUB_TOKEN." >&2
+                  exit 1
                 fi
                 export DOCKER_IMAGE_QS_COLLECTION_SERVER="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
               else
@@ -951,7 +979,7 @@ jobs:
 
             # 启动（使用 compose）
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-collection-server || true
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-collection-server
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-collection-server
 
             # 健康检查：容器内访问内部端口，避免宿主端口误配置
@@ -1003,6 +1031,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify GHCR auth on runner
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          echo "🔐 Verifying GHCR access on runner..."
+          echo "$GITHUB_TOKEN" | docker login "$DOCKER_REGISTRY" -u "$GHCR_USERNAME" --password-stdin >/dev/null
+          echo "✅ GHCR login succeeded on runner"
 
       - name: Prepare deployment files
         env:
@@ -1123,7 +1160,7 @@ jobs:
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
-          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_USERNAME: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -1232,10 +1269,15 @@ jobs:
             if [ "$GHCR_LOGIN_OK" -ne 1 ]; then
               if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
                 echo "⚠️ GHCR login failed; falling back to Docker Hub..."
+                DOCKERHUB_LOGIN_OK=0
                 if [ "$SUDO" = "sudo_pw" ]; then
-                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                  printf '%s\n%s' "$SUDO_PASSWORD" "$DOCKERHUB_TOKEN" | sudo -S docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
                 else
-                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null || true
+                  echo "$DOCKERHUB_TOKEN" | $SUDO docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null && DOCKERHUB_LOGIN_OK=1 || DOCKERHUB_LOGIN_OK=0
+                fi
+                if [ "$DOCKERHUB_LOGIN_OK" -ne 1 ]; then
+                  echo "❌ Docker Hub login failed; verify DOCKERHUB_USERNAME/DOCKERHUB_TOKEN." >&2
+                  exit 1
                 fi
                 export DOCKER_IMAGE_QS_WORKER="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
               else
@@ -1251,7 +1293,7 @@ jobs:
 
             # 启动 (使用 compose，Worker 无端口/TLS)
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker || true
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-worker
 
             # Worker 无 HTTP 健康检查，检查容器是否正常运行
