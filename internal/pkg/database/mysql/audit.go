@@ -107,3 +107,36 @@ func (a *AuditFields) SetDeletedBy(id meta.ID) {
 func (a *AuditFields) SetVersion(v uint32) {
 	a.Version = v
 }
+
+// BeforeCreate GORM hook，在创建前执行。
+func (a *AuditFields) BeforeCreate() error {
+	if a.ID == 0 {
+		a.ID = meta.New()
+	}
+	if a.Version == 0 {
+		a.Version = InitialVersion
+	}
+	now := time.Now().UTC()
+	a.CreatedAt = now
+	a.UpdatedAt = now
+	a.DeletedAt = nil
+	a.CreatedBy = 0
+	a.UpdatedBy = 0
+	a.DeletedBy = 0
+	return nil
+}
+
+// BeforeUpdate GORM hook，在更新前执行。
+func (a *AuditFields) BeforeUpdate() error {
+	a.UpdatedAt = time.Now().UTC()
+	a.UpdatedBy = 0
+	return nil
+}
+
+// BeforeDelete GORM hook，在删除前执行。
+func (a *AuditFields) BeforeDelete() error {
+	now := time.Now().UTC()
+	a.DeletedAt = &now
+	a.DeletedBy = 0
+	return nil
+}
