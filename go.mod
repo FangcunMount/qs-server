@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/FangcunMount/component-base v0.4.4
-	github.com/FangcunMount/iam-contracts v0.1.4 // 需包含 api/grpc/iam/authz；本地联调见仓库根 go.work.example
+	github.com/FangcunMount/iam-contracts v0.1.5
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
