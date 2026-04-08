@@ -518,6 +518,9 @@ func loadExplicitPlanTestees(
 		if resp == nil || strings.TrimSpace(resp.ID) == "" {
 			return nil, fmt.Errorf("testee %s not found", testeeID)
 		}
+		if resp.CreatedAt.IsZero() {
+			return nil, newExplicitPlanZeroCreatedAtError(testeeID)
+		}
 		testees = append(testees, &TesteeResponse{
 			ID:        resp.ID,
 			CreatedAt: resp.CreatedAt,
@@ -689,5 +692,15 @@ func newPlanQuestionnaireVersionMismatchError(
 		loadedQuestionnaireVersion,
 		normalizedScaleCode,
 		normalizedScaleCode,
+	)
+}
+
+func newExplicitPlanZeroCreatedAtError(testeeID string) error {
+	return fmt.Errorf(
+		"explicit plan backfill requires non-zero created_at: testee_id=%s; seeddata refuses to fall back to updated_at/now when --plan-testee-ids is used; if the database already has created_at, refresh /api/v1/testees/%s or delete Redis key testee:info:%s (or <cache.namespace>:testee:info:%s) and retry",
+		testeeID,
+		testeeID,
+		testeeID,
+		testeeID,
 	)
 }

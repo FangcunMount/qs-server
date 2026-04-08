@@ -94,6 +94,7 @@ go run ./cmd/tools/seeddata \
 - 计划回填默认会流式扫描受试者列表，并随机抽样约 `1/5` 的 testee；不再先把所有 testee 全量加载到内存后再抽样。抽中的 testee 会按 `created_at` 排序后生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
 - `start_date` 默认取 `testee.created_at`；如果历史脏数据导致 `created_at` 为空，seeddata 会依次回退到 `updated_at`、当前日期，并记录 warning。
 - 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样，也不会再全量扫描 `/api/v1/testees`。
+- 显式模式会更严格：如果 `/api/v1/testees/{id}` 返回的 `created_at` 是零值，脚本会直接报错，不再回退到 `updated_at` 或当前时间。
 - 并发只发生在两段：testee 入组、以及按 testee 维度提交/等待任务完成；调度接口仍只会串行调用一次。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
 - 计划回填不会真实发送 `task.opened` 小程序消息；它只会生成对应的任务开放数据，并通过 `source=seeddata` 让 worker 跳过对外通知。

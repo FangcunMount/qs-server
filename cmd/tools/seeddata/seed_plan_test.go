@@ -27,6 +27,27 @@ func TestNewPlanQuestionnaireVersionMismatchError(t *testing.T) {
 	}
 }
 
+func TestNewExplicitPlanZeroCreatedAtError(t *testing.T) {
+	err := newExplicitPlanZeroCreatedAtError("614210295354634798")
+	if err == nil {
+		t.Fatal("expected explicit created_at error")
+	}
+
+	msg := err.Error()
+	for _, expected := range []string{
+		"explicit plan backfill requires non-zero created_at",
+		"testee_id=614210295354634798",
+		"--plan-testee-ids",
+		"/api/v1/testees/614210295354634798",
+		"testee:info:614210295354634798",
+		"<cache.namespace>:testee:info:614210295354634798",
+	} {
+		if !strings.Contains(msg, expected) {
+			t.Fatalf("expected error message to contain %q, got %q", expected, msg)
+		}
+	}
+}
+
 func TestPlanStartDateFromAuditTimes(t *testing.T) {
 	now := time.Date(2026, 4, 8, 10, 0, 0, 0, time.UTC)
 	createdAt := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
