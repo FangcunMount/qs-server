@@ -407,19 +407,23 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 		// 默认使用当前时间
 		before = ""
 	}
+	source := c.Query("source")
+	if source == "" {
+		source = planApp.TaskSchedulerSourceInternalAPI
+	}
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	ctx := planApp.WithTaskSchedulerSource(c.Request.Context(), planApp.TaskSchedulerSourceInternalAPI)
+	ctx := planApp.WithTaskSchedulerSource(c.Request.Context(), source)
 	scheduleResult, err := h.commandService.SchedulePendingTasks(ctx, orgID, before)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to schedule pending tasks",
 			"action", "schedule_pending_tasks",
 			"resource", "task",
-			"source", planApp.TaskSchedulerSourceInternalAPI,
+			"source", source,
 			"error", err.Error(),
 		)
 		h.Error(c, err)

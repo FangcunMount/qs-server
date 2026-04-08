@@ -651,6 +651,7 @@ func submitAnswerSheet(ctx context.Context, client *APIClient, req SubmitAnswerS
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		Title:                req.Title,
 		TesteeID:             req.TesteeID,
+		TaskID:               req.TaskID,
 		Answers:              req.Answers,
 	}
 
@@ -754,6 +755,7 @@ func logSubmitRequest(logger interface{ Infow(string, ...interface{}) }, req Sub
 		"questionnaire_code", req.QuestionnaireCode,
 		"questionnaire_version", req.QuestionnaireVersion,
 		"title", req.Title,
+		"task_id", req.TaskID,
 		"answer_count", len(req.Answers),
 		"answers", answerDetails,
 	)
@@ -999,7 +1001,11 @@ func iterateTesteesFromApiserver(
 
 		mapped := make([]*TesteeResponse, len(items))
 		for i, item := range items {
-			mapped[i] = &TesteeResponse{ID: item.ID}
+			mapped[i] = &TesteeResponse{
+				ID:        item.ID,
+				CreatedAt: item.CreatedAt,
+				UpdatedAt: item.UpdatedAt,
+			}
 		}
 
 		if err := fn(mapped); err != nil {

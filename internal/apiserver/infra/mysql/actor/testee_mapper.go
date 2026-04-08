@@ -90,6 +90,8 @@ func (m *TesteeMapper) ToDomain(po *TesteePO) *testee.Testee {
 		po.IsKeyFocus,
 		stats,
 	)
+	domain.SetCreatedAt(po.CreatedAt)
+	domain.SetUpdatedAt(po.UpdatedAt)
 
 	return domain
 }

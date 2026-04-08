@@ -9,12 +9,18 @@
 //
 // The tool is modularized into separate files:
 // - seed_assessment.go: Assessment data seeding
+// - seed_plan.go: Plan backfill
 //
 // Usage:
 //
 //	go run ./cmd/tools/seeddata \
 //	  --config configs/seeddata.yaml \
 //	  --steps assessment
+//	go run ./cmd/tools/seeddata \
+//	  --config configs/seeddata.yaml \
+//	  --steps plan \
+//	  --plan-id 614186929759466030 \
+//	  --plan-testee-ids 1001,1002,1003
 //
 // See README.md for detailed documentation.
 package main
@@ -35,6 +41,7 @@ type seedStep string
 // All available seed steps.
 const (
 	stepAssessment seedStep = "assessment" // 提交答卷并生成测评
+	stepPlan       seedStep = "plan"       // 回填测评计划并完成任务
 )
 
 // defaultSteps defines the default execution order of all seed steps.
@@ -82,6 +89,8 @@ func main() {
 		apiToken                = flag.String("api-token", "", "API authentication token")
 		configFile              = flag.String("config", "", "Base seed data config file (testees, legacy data)")
 		stepsRaw                = flag.String("steps", "", "Comma-separated steps to run (default: all)")
+		planID                  = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
+		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
 		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
 		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
@@ -181,7 +190,7 @@ func main() {
 	seedCtx := newSeedContext()
 	runCtx := context.Background()
 
-	if *assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin {
+	if containsSeedStep(steps, stepAssessment) && (*assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin) {
 		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
 	}
 
@@ -190,6 +199,10 @@ func main() {
 		case stepAssessment:
 			if err := seedAssessments(runCtx, deps, seedCtx, *assessmentMin, *assessmentMax, *assessmentWorkers, *assessmentSubmitWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *assessmentCategories, *verbose); err != nil {
 				logger.Fatalw("Assessment seeding failed", "error", err)
+			}
+		case stepPlan:
+			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, *planTesteeIDsRaw, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
+				logger.Fatalw("Plan backfill failed", "error", err)
 			}
 		default:
 			logger.Warnw("Skipping unimplemented step", "step", step)
@@ -225,4 +238,13 @@ func stepListToStrings(steps []seedStep) []string {
 		out = append(out, string(s))
 	}
 	return out
+}
+
+func containsSeedStep(steps []seedStep, target seedStep) bool {
+	for _, step := range steps {
+		if step == target {
+			return true
+		}
+	}
+	return false
 }

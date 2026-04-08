@@ -128,7 +128,7 @@ func TestFinalizePlanIfDonePublishesPlanFinishedEvent(t *testing.T) {
 		time.Now(),
 	)
 	taskLifecycle := domainPlan.NewTaskLifecycle()
-	if err := taskLifecycle.Open(ctx, task, "token", "https://example.com/entry", time.Now().Add(time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, task, "token", "https://example.com/entry", time.Now().Add(time.Hour), ""); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	task.ClearEvents()

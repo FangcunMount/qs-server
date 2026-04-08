@@ -21,7 +21,7 @@ func NewTaskLifecycle() *TaskLifecycle {
 
 // Open 开放任务（生成入口）
 // 将待推送状态的任务变更为已推送状态，并设置入口信息
-func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, expireAt time.Time) error {
+func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, expireAt time.Time, source string) error {
 	taskID := task.GetID().String()
 	logger.L(ctx).Infow("Opening task in domain service",
 		"domain_action", "open_task",
@@ -57,7 +57,7 @@ func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryTok
 	}
 
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
-	if err := task.open(entryToken, entryURL, expireAt); err != nil {
+	if err := task.open(entryToken, entryURL, expireAt, source); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"domain_action", "open_task",
 			"task_id", taskID,

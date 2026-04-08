@@ -98,6 +98,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	failedCount := 0
 	inactivePlanCanceledCount := 0
 	planCache := make(map[string]*plan.AssessmentPlan)
+	openSource := taskSchedulerSourceFromContext(ctx)
 	for _, task := range tasks {
 		parentPlan, err := s.loadPlanForTask(ctx, planCache, task.GetPlanID())
 		if err != nil {
@@ -142,7 +143,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 开放任务
-		if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt); err != nil {
+		if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt, openSource); err != nil {
 			logger.L(ctx).Errorw("Failed to open task",
 				"action", "schedule_pending_tasks",
 				"source", source,

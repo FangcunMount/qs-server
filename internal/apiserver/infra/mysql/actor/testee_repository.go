@@ -38,6 +38,8 @@ func (r *testeeRepository) Save(ctx context.Context, t *testee.Testee) error {
 
 	return r.CreateAndSync(ctx, po, func(po *TesteePO) {
 		r.mapper.SyncID(po, t)
+		t.SetCreatedAt(po.CreatedAt)
+		t.SetUpdatedAt(po.UpdatedAt)
 	})
 }
 
@@ -47,6 +49,8 @@ func (r *testeeRepository) Update(ctx context.Context, t *testee.Testee) error {
 
 	return r.UpdateAndSync(ctx, po, func(po *TesteePO) {
 		r.mapper.SyncID(po, t)
+		t.SetCreatedAt(po.CreatedAt)
+		t.SetUpdatedAt(po.UpdatedAt)
 	})
 }
 

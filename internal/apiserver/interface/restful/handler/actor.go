@@ -908,6 +908,8 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 		Tags:       result.Tags,
 		Source:     result.Source,
 		IsKeyFocus: result.IsKeyFocus,
+		CreatedAt:  result.CreatedAt,
+		UpdatedAt:  result.UpdatedAt,
 	}
 
 	// 测评统计信息

@@ -7,6 +7,9 @@ api:
     minDelay: "200ms"
     maxDelay: "5s"
 
+grpc:
+  apiserverAddr: "localhost:9090"
+
 iam:
   loginUrl: "https://iam.fangcunmount.cn/api/v1/authn/login"
   username: "+8613112345671"

@@ -74,6 +74,8 @@ type SeedConfig struct {
 	API APIConfig `yaml:"api"`
 	// IAM 配置
 	IAM IAMConfig `yaml:"iam"`
+	// GRPC 配置
+	GRPC GRPCConfig `yaml:"grpc"`
 
 	// 各个领域的种子数据配置
 	Testees        []TesteeConfig        `yaml:"testees"`
@@ -100,6 +102,11 @@ type IAMConfig struct {
 	LoginURL string `yaml:"loginUrl"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+// GRPCConfig gRPC 配置。
+type GRPCConfig struct {
+	ApiserverAddr string `yaml:"apiserverAddr"`
 }
 
 // RetryConfig defines retry behavior for API calls.

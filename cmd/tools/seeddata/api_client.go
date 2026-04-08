@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -116,10 +117,57 @@ type QuestionnaireResponse struct {
 
 // ScaleResponse 量表响应
 type ScaleResponse struct {
-	Code    string `json:"code"`
-	Title   string `json:"title"`
-	Status  string `json:"status"`
-	Version string `json:"version"`
+	Code                 string `json:"code"`
+	Title                string `json:"title"`
+	Status               string `json:"status"`
+	Version              string `json:"version"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+}
+
+// PlanResponse 计划响应。
+type PlanResponse struct {
+	ID            string   `json:"id"`
+	OrgID         int64    `json:"org_id"`
+	ScaleCode     string   `json:"scale_code"`
+	ScheduleType  string   `json:"schedule_type"`
+	Interval      int      `json:"interval"`
+	TotalTimes    int      `json:"total_times"`
+	FixedDates    []string `json:"fixed_dates"`
+	RelativeWeeks []int    `json:"relative_weeks"`
+	Status        string   `json:"status"`
+}
+
+// TaskResponse 计划任务响应。
+type TaskResponse struct {
+	ID           string  `json:"id"`
+	PlanID       string  `json:"plan_id"`
+	Seq          int     `json:"seq"`
+	OrgID        int64   `json:"org_id"`
+	TesteeID     string  `json:"testee_id"`
+	ScaleCode    string  `json:"scale_code"`
+	PlannedAt    string  `json:"planned_at"`
+	OpenAt       *string `json:"open_at,omitempty"`
+	ExpireAt     *string `json:"expire_at,omitempty"`
+	CompletedAt  *string `json:"completed_at,omitempty"`
+	Status       string  `json:"status"`
+	AssessmentID *string `json:"assessment_id,omitempty"`
+	EntryToken   string  `json:"entry_token,omitempty"`
+	EntryURL     string  `json:"entry_url,omitempty"`
+}
+
+// TaskListResponse 任务列表响应。
+type TaskListResponse struct {
+	Tasks      []TaskResponse `json:"tasks"`
+	TotalCount int64          `json:"total_count"`
+	Page       int            `json:"page"`
+	PageSize   int            `json:"page_size"`
+}
+
+// EnrollmentResponse 加入计划响应。
+type EnrollmentResponse struct {
+	PlanID string         `json:"plan_id"`
+	Tasks  []TaskResponse `json:"tasks"`
 }
 
 // CollectionScaleSummary 量表摘要（collection-server）
@@ -145,7 +193,9 @@ type CollectionListScalesResponse struct {
 
 // ApiserverTesteeResponse 受试者响应（apiserver）
 type ApiserverTesteeResponse struct {
-	ID string `json:"id"`
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ApiserverTesteeListResponse 受试者列表响应（apiserver）
@@ -159,8 +209,10 @@ type ApiserverTesteeListResponse struct {
 
 // TesteeResponse 受试者响应（collection-server）
 type TesteeResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
 // ListTesteesResponse 受试者列表响应（collection-server）
@@ -290,12 +342,20 @@ type BatchUpdateFactorsRequest struct {
 	Factors []FactorDTO `json:"factors"`
 }
 
+// EnrollTesteeRequest 计划入组请求（apiserver）。
+type EnrollTesteeRequest struct {
+	PlanID    string `json:"plan_id"`
+	TesteeID  string `json:"testee_id"`
+	StartDate string `json:"start_date"`
+}
+
 // SubmitAnswerSheetRequest 提交答卷请求（collection-server）
 type SubmitAnswerSheetRequest struct {
 	QuestionnaireCode    string   `json:"questionnaire_code"`
 	QuestionnaireVersion string   `json:"questionnaire_version"`
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id"`
+	TaskID               string   `json:"task_id,omitempty"`
 	Answers              []Answer `json:"answers"`
 }
 
@@ -305,6 +365,7 @@ type AdminSubmitAnswerSheetRequest struct {
 	QuestionnaireVersion string   `json:"questionnaire_version"`
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id"`
+	TaskID               string   `json:"task_id,omitempty"`
 	WriterID             uint64   `json:"writer_id,omitempty"`
 	FillerID             uint64   `json:"filler_id,omitempty"`
 	Answers              []Answer `json:"answers"`
@@ -789,6 +850,98 @@ func (c *APIClient) GetScale(ctx context.Context, code string) (*ScaleResponse, 
 	}
 
 	return &sResp, nil
+}
+
+func decodeResponseData(resp *Response, out interface{}) error {
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return fmt.Errorf("marshal response data: %w", err)
+	}
+	if err := json.Unmarshal(dataBytes, out); err != nil {
+		return fmt.Errorf("unmarshal response data: %w", err)
+	}
+	return nil
+}
+
+// GetPlan 获取计划详情（apiserver）。
+func (c *APIClient) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/plans/%s", planID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var planResp PlanResponse
+	if err := decodeResponseData(resp, &planResp); err != nil {
+		return nil, fmt.Errorf("unmarshal plan response: %w", err)
+	}
+	return &planResp, nil
+}
+
+// EnrollTestee 将受试者加入计划（apiserver）。
+func (c *APIClient) EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/plans/enroll", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var enrollResp EnrollmentResponse
+	if err := decodeResponseData(resp, &enrollResp); err != nil {
+		return nil, fmt.Errorf("unmarshal enrollment response: %w", err)
+	}
+	return &enrollResp, nil
+}
+
+// SchedulePendingTasks 调度待开放任务（apiserver internal API）。
+func (c *APIClient) SchedulePendingTasks(ctx context.Context, before, source string) (*TaskListResponse, error) {
+	path := "/internal/v1/plans/tasks/schedule"
+	query := url.Values{}
+	if strings.TrimSpace(before) != "" {
+		query.Set("before", before)
+	}
+	if strings.TrimSpace(source) != "" {
+		query.Set("source", source)
+	}
+	if len(query) > 0 {
+		path += "?" + query.Encode()
+	}
+	resp, err := c.doRequest(ctx, "POST", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskList TaskListResponse
+	if err := decodeResponseData(resp, &taskList); err != nil {
+		return nil, fmt.Errorf("unmarshal schedule response: %w", err)
+	}
+	return &taskList, nil
+}
+
+// ListTasksByTesteeAndPlan 查询受试者在指定计划下的任务。
+func (c *APIClient) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/testees/%s/plans/%s/tasks", testeeID, planID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskList TaskListResponse
+	if err := decodeResponseData(resp, &taskList); err != nil {
+		return nil, fmt.Errorf("unmarshal plan task list response: %w", err)
+	}
+	return &taskList, nil
+}
+
+// GetTask 获取任务详情（apiserver）。
+func (c *APIClient) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/plans/tasks/%s", taskID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskResp TaskResponse
+	if err := decodeResponseData(resp, &taskResp); err != nil {
+		return nil, fmt.Errorf("unmarshal task response: %w", err)
+	}
+	return &taskResp, nil
 }
 
 // ListTestees 获取受试者列表（collection-server）

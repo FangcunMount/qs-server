@@ -169,6 +169,8 @@ type TesteeResult struct {
 	Name       string     // 姓名
 	Gender     int8       // 性别
 	Birthday   *time.Time // 出生日期
+	CreatedAt  time.Time  // 创建时间
+	UpdatedAt  time.Time  // 更新时间
 	Age        int        // 年龄
 	Tags       []string   // 业务标签
 	Source     string     // 数据来源

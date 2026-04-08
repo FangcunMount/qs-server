@@ -66,7 +66,7 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 3. 调用领域服务开放任务
-	if err := s.taskLifecycle.Open(ctx, task, dto.EntryToken, dto.EntryURL, expireAt); err != nil {
+	if err := s.taskLifecycle.Open(ctx, task, dto.EntryToken, dto.EntryURL, expireAt, ""); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"action", "open_task",
 			"task_id", taskID,

@@ -7,6 +7,8 @@ const (
 	TaskSchedulerSourceBuiltin = "builtin_scheduler"
 	// TaskSchedulerSourceInternalAPI 表示手工触发的内部接口调用。
 	TaskSchedulerSourceInternalAPI = "internal_api"
+	// TaskSchedulerSourceSeedData 表示 seeddata 工具调用。
+	TaskSchedulerSourceSeedData = "seeddata"
 )
 
 type taskSchedulerSourceKey struct{}

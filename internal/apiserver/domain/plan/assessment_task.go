@@ -177,7 +177,7 @@ func (t *AssessmentTask) IsTerminal() bool {
 // ==================== 包内私有方法（供领域服务调用）===================
 
 // open 开放任务（包内方法）
-func (t *AssessmentTask) open(entryToken string, entryURL string, expireAt time.Time) error {
+func (t *AssessmentTask) open(entryToken string, entryURL string, expireAt time.Time, source string) error {
 	if t.status != TaskStatusPending {
 		return ErrTaskNotPending
 	}
@@ -196,6 +196,7 @@ func (t *AssessmentTask) open(entryToken string, entryURL string, expireAt time.
 		t.testeeID,
 		t.entryURL,
 		now,
+		source,
 	))
 
 	return nil

@@ -11,6 +11,8 @@ func toTesteeResult(testee *domain.Testee) *TesteeResult {
 		OrgID:      testee.OrgID(),
 		Name:       testee.Name(),
 		Gender:     int8(testee.Gender()),
+		CreatedAt:  testee.CreatedAt(),
+		UpdatedAt:  testee.UpdatedAt(),
 		Age:        testee.GetAge(),
 		Tags:       testee.TagsAsStrings(),
 		Source:     testee.Source(),

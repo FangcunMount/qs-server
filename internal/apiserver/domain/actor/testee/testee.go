@@ -18,9 +18,11 @@ type Testee struct {
 	profileID *uint64 // 可选：关联的用户档案ID（当前对应 IAM.Child.ID）
 
 	// === 基本属性 ===
-	name     string     // 姓名（可脱敏）
-	gender   Gender     // 性别
-	birthday *time.Time // 出生日期
+	name      string     // 姓名（可脱敏）
+	gender    Gender     // 性别
+	birthday  *time.Time // 出生日期
+	createdAt time.Time  // 创建时间
+	updatedAt time.Time  // 更新时间
 
 	// === 业务标签与关注 ===
 	tags       []Tag  // 业务标签：["high_risk", "adhd_suspect", "vip"]
@@ -93,6 +95,16 @@ func (t *Testee) Gender() Gender {
 // Birthday 获取出生日期
 func (t *Testee) Birthday() *time.Time {
 	return t.birthday
+}
+
+// CreatedAt 获取创建时间。
+func (t *Testee) CreatedAt() time.Time {
+	return t.createdAt
+}
+
+// UpdatedAt 获取更新时间。
+func (t *Testee) UpdatedAt() time.Time {
+	return t.updatedAt
 }
 
 // GetAge 计算当前年龄
@@ -239,6 +251,16 @@ func (t *Testee) SetID(id ID) {
 // SetSource 设置数据来源（仅用于从数据库加载）
 func (t *Testee) SetSource(source string) {
 	t.source = source
+}
+
+// SetCreatedAt 设置创建时间（仅用于从数据库加载）。
+func (t *Testee) SetCreatedAt(createdAt time.Time) {
+	t.createdAt = createdAt
+}
+
+// SetUpdatedAt 设置更新时间（仅用于从数据库加载）。
+func (t *Testee) SetUpdatedAt(updatedAt time.Time) {
+	t.updatedAt = updatedAt
 }
 
 // SetKeyFocus 设置重点关注状态（仅用于从数据库加载）
