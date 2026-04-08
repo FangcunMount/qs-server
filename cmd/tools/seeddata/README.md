@@ -91,7 +91,7 @@ go run ./cmd/tools/seeddata \
 
 - `plan` 步骤默认回填计划 `614186929759466030`，可通过 `--plan-id` 覆盖。
 - `plan` 步骤支持 `--plan-workers`，用于控制计划入组和任务执行的并发 worker 数；默认 `1`，建议从 `4` 开始压测。
-- 计划回填默认会先按受试者 `created_at` 排序，再随机抽样约 `1/5` 的 testee 生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
+- 计划回填默认会流式扫描受试者列表，并随机抽样约 `1/5` 的 testee；不再先把所有 testee 全量加载到内存后再抽样。抽中的 testee 会按 `created_at` 排序后生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
 - `start_date` 默认取 `testee.created_at`；如果历史脏数据导致 `created_at` 为空，seeddata 会依次回退到 `updated_at`、当前日期，并记录 warning。
 - 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样，也不会再全量扫描 `/api/v1/testees`。
 - 并发只发生在两段：testee 入组、以及按 testee 维度提交/等待任务完成；调度接口仍只会串行调用一次。

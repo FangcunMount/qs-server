@@ -117,6 +117,7 @@ func seedPlanBackfill(
 		testees         []*TesteeResponse
 		selectedTestees []*TesteeResponse
 		selectionMode   string
+		loadedTesteeCnt int
 	)
 	if len(explicitPlanTesteeIDs) > 0 {
 		testees, err = loadExplicitPlanTestees(ctx, deps.APIClient, explicitPlanTesteeIDs)
@@ -125,25 +126,31 @@ func seedPlanBackfill(
 		}
 		selectedTestees = testees
 		selectionMode = "explicit"
+		loadedTesteeCnt = len(testees)
 	} else {
 		pageSize := testeePageSize
 		if pageSize < 100 {
 			pageSize = 100
 		}
-		testees, err = loadApiserverTestees(ctx, deps.APIClient, orgID, pageSize, testeeOffset, testeeLimit)
+		selectedTestees, loadedTesteeCnt, err = streamSamplePlanEnrollmentTestees(
+			ctx,
+			deps.APIClient,
+			orgID,
+			pageSize,
+			testeeOffset,
+			testeeLimit,
+			planID,
+		)
 		if err != nil {
 			return err
 		}
-		sortTesteesByCreatedAt(testees)
-		selectedTestees, selectionMode, err = selectPlanEnrollmentTestees(testees, planID, nil)
-		if err != nil {
-			return err
-		}
+		testees = selectedTestees
+		selectionMode = "sample"
 	}
 	logger.Infow("Loaded testees for plan backfill",
 		"plan_id", planID,
 		"org_id", orgID,
-		"loaded_testee_count", len(testees),
+		"loaded_testee_count", loadedTesteeCnt,
 		"selected_testee_count", len(selectedTestees),
 		"selection_mode", selectionMode,
 		"sample_rate", fmt.Sprintf("1/%d", planEnrollmentSampleRate),
@@ -436,62 +443,6 @@ func parsePlanTesteeIDs(raw string) []string {
 	return ids
 }
 
-func selectPlanEnrollmentTestees(testees []*TesteeResponse, planID string, explicitIDs []string) ([]*TesteeResponse, string, error) {
-	if len(testees) == 0 {
-		return nil, "empty", nil
-	}
-
-	if len(explicitIDs) > 0 {
-		byID := make(map[string]*TesteeResponse, len(testees))
-		for _, testee := range testees {
-			if testee == nil || strings.TrimSpace(testee.ID) == "" {
-				continue
-			}
-			byID[testee.ID] = testee
-		}
-
-		selected := make([]*TesteeResponse, 0, len(explicitIDs))
-		missing := make([]string, 0)
-		for _, id := range explicitIDs {
-			testee, ok := byID[id]
-			if !ok || testee == nil {
-				missing = append(missing, id)
-				continue
-			}
-			selected = append(selected, testee)
-		}
-		if len(missing) > 0 {
-			return nil, "explicit", fmt.Errorf(
-				"plan testee ids not found in loaded testees: %s (adjust --testee-offset/--testee-limit or remove --plan-testee-ids)",
-				strings.Join(missing, ","),
-			)
-		}
-		return selected, "explicit", nil
-	}
-
-	selectedCount := (len(testees) + planEnrollmentSampleRate - 1) / planEnrollmentSampleRate
-	if selectedCount <= 0 {
-		selectedCount = 1
-	}
-	if selectedCount > len(testees) {
-		selectedCount = len(testees)
-	}
-
-	candidates := append([]*TesteeResponse(nil), testees...)
-	rngSeed := time.Now().UnixNano()
-	if id := parseID(planID); id > 0 {
-		rngSeed ^= int64(id)
-	}
-	rng := rand.New(rand.NewSource(rngSeed))
-	rng.Shuffle(len(candidates), func(i, j int) {
-		candidates[i], candidates[j] = candidates[j], candidates[i]
-	})
-
-	selected := append([]*TesteeResponse(nil), candidates[:selectedCount]...)
-	sortTesteesByCreatedAt(selected)
-	return selected, "sample", nil
-}
-
 func loadApiserverTestees(
 	ctx context.Context,
 	client *APIClient,
@@ -507,6 +458,50 @@ func loadApiserverTestees(
 		return nil, err
 	}
 	return testees, nil
+}
+
+func streamSamplePlanEnrollmentTestees(
+	ctx context.Context,
+	client *APIClient,
+	orgID int64,
+	pageSize, offset, limit int,
+	planID string,
+) ([]*TesteeResponse, int, error) {
+	rngSeed := time.Now().UnixNano()
+	if id := parseID(planID); id > 0 {
+		rngSeed ^= int64(id)
+	}
+	rng := rand.New(rand.NewSource(rngSeed))
+
+	selected := make([]*TesteeResponse, 0, 64)
+	var fallback *TesteeResponse
+	loadedCount := 0
+
+	err := iterateTesteesFromApiserver(ctx, client, orgID, pageSize, offset, limit, func(batch []*TesteeResponse) error {
+		for _, testee := range batch {
+			if testee == nil || strings.TrimSpace(testee.ID) == "" {
+				continue
+			}
+			loadedCount++
+			if rng.Intn(planEnrollmentSampleRate) == 0 {
+				selected = append(selected, testee)
+			}
+			if fallback == nil || rng.Intn(loadedCount) == 0 {
+				fallback = testee
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, loadedCount, err
+	}
+
+	if len(selected) == 0 && fallback != nil {
+		selected = append(selected, fallback)
+	}
+
+	sortTesteesByCreatedAt(selected)
+	return selected, loadedCount, nil
 }
 
 func loadExplicitPlanTestees(
