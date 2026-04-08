@@ -96,8 +96,9 @@ func seedPlanBackfill(
 		return fmt.Errorf("load questionnaire %s failed", scaleResp.QuestionnaireCode)
 	}
 	if strings.TrimSpace(detail.Version) != scaleResp.QuestionnaireVersion {
-		return fmt.Errorf(
-			"questionnaire version mismatch: scale=%s questionnaire=%s",
+		return newPlanQuestionnaireVersionMismatchError(
+			planResp.ScaleCode,
+			scaleResp.QuestionnaireCode,
 			scaleResp.QuestionnaireVersion,
 			detail.Version,
 		)
@@ -412,7 +413,12 @@ func buildPlanSubmissionRequest(
 		return nil, fmt.Errorf("questionnaire version is empty")
 	}
 	if strings.TrimSpace(detail.Version) != questionnaireVersion {
-		return nil, fmt.Errorf("questionnaire version mismatch: detail=%s expected=%s", detail.Version, questionnaireVersion)
+		return nil, fmt.Errorf(
+			"questionnaire version mismatch while building plan answersheet: questionnaire_code=%s expected=%s loaded=%s; retry after refreshing the scale/questionnaire cache path",
+			detail.Code,
+			questionnaireVersion,
+			detail.Version,
+		)
 	}
 
 	rngSeed := time.Now().UnixNano()
@@ -501,4 +507,22 @@ func planStartDateFromCreatedAt(createdAt time.Time) (string, error) {
 		return "", fmt.Errorf("created_at is zero")
 	}
 	return createdAt.In(time.Local).Format("2006-01-02"), nil
+}
+
+func newPlanQuestionnaireVersionMismatchError(
+	scaleCode string,
+	questionnaireCode string,
+	scaleQuestionnaireVersion string,
+	loadedQuestionnaireVersion string,
+) error {
+	normalizedScaleCode := strings.ToLower(strings.TrimSpace(scaleCode))
+	return fmt.Errorf(
+		"questionnaire version mismatch for plan backfill: scale_code=%s questionnaire_code=%s scale_questionnaire_version=%s loaded_questionnaire_version=%s; seeddata loads questionnaire detail by code only, so this usually means the scale still comes from apiserver Redis cache or the scale is bound to a different questionnaire version; if you changed scale.questionnaire_version directly in MongoDB, delete Redis key scale:%s (or <cache.namespace>:scale:%s) and retry",
+		scaleCode,
+		questionnaireCode,
+		scaleQuestionnaireVersion,
+		loadedQuestionnaireVersion,
+		normalizedScaleCode,
+		normalizedScaleCode,
+	)
 }

@@ -93,6 +93,7 @@ go run ./cmd/tools/seeddata \
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
 - 计划回填不会真实发送 `task.opened` 小程序消息；它只会生成对应的任务开放数据，并通过 `source=seeddata` 让 worker 跳过对外通知。
 - 计划回填默认按 `created_at` 升序处理所有受试者后再抽样；若要限制范围，可继续使用 `--testee-offset` 和 `--testee-limit`。
+- 如果你直接修改了 MongoDB 中的 `scale.questionnaire_version`，而脚本仍提示 `questionnaire version mismatch`，优先排查 apiserver Redis 里的量表详情缓存；通常需要删除 `scale:<scale_code小写>`，或带命名空间的 `<cache.namespace>:scale:<scale_code小写>` 后再重试。
 
 ## 配置文件示例
 
