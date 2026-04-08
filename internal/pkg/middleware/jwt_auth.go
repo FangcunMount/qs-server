@@ -42,9 +42,9 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 		// 提取 Token
 		token := extractToken(c)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token", "token", token)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token extracted", "has_token", token != "", "token_length", len(token))
 		if token == "" {
+			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
 			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware missing or invalid authorization token", "error", "missing or invalid authorization token")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "missing or invalid authorization token",
@@ -109,7 +109,7 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
 		// 提取 Token
 		token := extractToken(c)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token", "token", token)
+		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token extracted", "has_token", token != "", "token_length", len(token))
 		if token == "" {
 			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
 			// Token 缺失，继续执行但不设置用户信息

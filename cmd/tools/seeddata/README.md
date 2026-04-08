@@ -89,7 +89,7 @@ go run ./cmd/tools/seeddata \
 
 - `plan` 步骤默认回填计划 `614186929759466030`，可通过 `--plan-id` 覆盖。
 - 计划回填默认会先按受试者 `created_at` 排序，再随机抽样约 `1/5` 的 testee 生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
-- 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样。
+- 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样，也不会再全量扫描 `/api/v1/testees`。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
 - 计划回填不会真实发送 `task.opened` 小程序消息；它只会生成对应的任务开放数据，并通过 `source=seeddata` 让 worker 跳过对外通知。
 - 计划回填默认按 `created_at` 升序处理所有受试者后再抽样；若要限制范围，可继续使用 `--testee-offset` 和 `--testee-limit`。

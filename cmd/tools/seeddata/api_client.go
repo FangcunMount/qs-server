@@ -1028,6 +1028,26 @@ func (c *APIClient) ListTesteesByOrg(ctx context.Context, orgID int64, page, pag
 	return &listResp, nil
 }
 
+// GetTesteeByID 获取受试者详情（apiserver）。
+func (c *APIClient) GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/testees/%s", testeeID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("get testee: id=%s: %w", testeeID, err)
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var testeeResp ApiserverTesteeResponse
+	if err := json.Unmarshal(dataBytes, &testeeResp); err != nil {
+		return nil, fmt.Errorf("unmarshal testee response: %w", err)
+	}
+
+	return &testeeResp, nil
+}
+
 // GetQuestionnaireDetail 获取问卷详情（collection-server）
 func (c *APIClient) GetQuestionnaireDetail(ctx context.Context, code string) (*QuestionnaireDetailResponse, error) {
 	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/questionnaires/%s", code), nil)

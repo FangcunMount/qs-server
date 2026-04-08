@@ -109,18 +109,32 @@ func seedPlanBackfill(
 
 	explicitPlanTesteeIDs := parsePlanTesteeIDs(planTesteeIDsRaw)
 
-	pageSize := testeePageSize
-	if pageSize < 100 {
-		pageSize = 100
-	}
-	testees, err := loadApiserverTestees(ctx, deps.APIClient, orgID, pageSize, testeeOffset, testeeLimit)
-	if err != nil {
-		return err
-	}
-	sortTesteesByCreatedAt(testees)
-	selectedTestees, selectionMode, err := selectPlanEnrollmentTestees(testees, planID, explicitPlanTesteeIDs)
-	if err != nil {
-		return err
+	var (
+		testees         []*TesteeResponse
+		selectedTestees []*TesteeResponse
+		selectionMode   string
+	)
+	if len(explicitPlanTesteeIDs) > 0 {
+		testees, err = loadExplicitPlanTestees(ctx, deps.APIClient, explicitPlanTesteeIDs)
+		if err != nil {
+			return err
+		}
+		selectedTestees = testees
+		selectionMode = "explicit"
+	} else {
+		pageSize := testeePageSize
+		if pageSize < 100 {
+			pageSize = 100
+		}
+		testees, err = loadApiserverTestees(ctx, deps.APIClient, orgID, pageSize, testeeOffset, testeeLimit)
+		if err != nil {
+			return err
+		}
+		sortTesteesByCreatedAt(testees)
+		selectedTestees, selectionMode, err = selectPlanEnrollmentTestees(testees, planID, nil)
+		if err != nil {
+			return err
+		}
 	}
 	logger.Infow("Loaded testees for plan backfill",
 		"plan_id", planID,
@@ -366,6 +380,30 @@ func loadApiserverTestees(
 	if err != nil {
 		return nil, err
 	}
+	return testees, nil
+}
+
+func loadExplicitPlanTestees(
+	ctx context.Context,
+	client *APIClient,
+	testeeIDs []string,
+) ([]*TesteeResponse, error) {
+	testees := make([]*TesteeResponse, 0, len(testeeIDs))
+	for _, testeeID := range testeeIDs {
+		resp, err := client.GetTesteeByID(ctx, testeeID)
+		if err != nil {
+			return nil, err
+		}
+		if resp == nil || strings.TrimSpace(resp.ID) == "" {
+			return nil, fmt.Errorf("testee %s not found", testeeID)
+		}
+		testees = append(testees, &TesteeResponse{
+			ID:        resp.ID,
+			CreatedAt: resp.CreatedAt,
+			UpdatedAt: resp.UpdatedAt,
+		})
+	}
+	sortTesteesByCreatedAt(testees)
 	return testees, nil
 }
 
