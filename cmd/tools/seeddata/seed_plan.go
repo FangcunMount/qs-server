@@ -7,9 +7,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -25,6 +27,7 @@ func seedPlanBackfill(
 	_ *seedContext,
 	planID string,
 	planTesteeIDsRaw string,
+	planWorkers int,
 	testeePageSize, testeeOffset, testeeLimit int,
 	verbose bool,
 ) error {
@@ -50,6 +53,7 @@ func seedPlanBackfill(
 	logger.Infow("Plan backfill started",
 		"plan_id", planID,
 		"org_id", orgID,
+		"plan_workers", planWorkers,
 		"testee_page_size", testeePageSize,
 		"testee_offset", testeeOffset,
 		"testee_limit", testeeLimit,
@@ -150,29 +154,17 @@ func seedPlanBackfill(
 		return nil
 	}
 
-	enrolledCount := 0
-	for _, testee := range selectedTestees {
-		startDate, err := planStartDateFromCreatedAt(testee.CreatedAt)
-		if err != nil {
-			return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
-		}
+	planWorkers = normalizePlanWorkers(planWorkers, len(selectedTestees))
+	logger.Infow("Running plan backfill with worker pool",
+		"plan_id", planID,
+		"org_id", orgID,
+		"workers", planWorkers,
+		"selected_testee_count", len(selectedTestees),
+	)
 
-		resp, err := deps.APIClient.EnrollTestee(ctx, EnrollTesteeRequest{
-			PlanID:    planID,
-			TesteeID:  testee.ID,
-			StartDate: startDate,
-		})
-		if err != nil {
-			return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
-		}
-
-		logger.Infow("Testee enrolled into plan",
-			"plan_id", planID,
-			"testee_id", testee.ID,
-			"start_date", startDate,
-			"created_task_count", len(resp.Tasks),
-		)
-		enrolledCount++
+	enrolledCount, err := enrollPlanTesteesConcurrently(ctx, deps, planID, selectedTestees, planWorkers)
+	if err != nil {
+		return err
 	}
 
 	scheduleSource := planApp.TaskSchedulerSourceSeedData
@@ -188,91 +180,19 @@ func seedPlanBackfill(
 		"mini_program_delivery", "skipped",
 	)
 
-	submittedCount := 0
-	skippedCount := 0
-	completedCount := 0
-
-	for _, testee := range testees {
-		taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
-		if err != nil {
-			return fmt.Errorf("list tasks for testee %s plan %s: %w", testee.ID, planID, err)
-		}
-		tasks := append([]TaskResponse(nil), taskList.Tasks...)
-		sortTasksBySeq(tasks)
-
-		for _, task := range tasks {
-			switch normalizeTaskStatus(task.Status) {
-			case "completed", "canceled":
-				skippedCount++
-				if verbose {
-					logger.Debugw("Skipping terminal plan task",
-						"plan_id", planID,
-						"testee_id", testee.ID,
-						"task_id", task.ID,
-						"status", task.Status,
-					)
-				}
-				continue
-			case "pending", "expired":
-				skippedCount++
-				if verbose {
-					logger.Debugw("Skipping non-open plan task",
-						"plan_id", planID,
-						"testee_id", testee.ID,
-						"task_id", task.ID,
-						"status", task.Status,
-					)
-				}
-				continue
-			case "opened":
-				// 继续处理
-			default:
-				skippedCount++
-				logger.Warnw("Skipping task with unsupported status",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"task_id", task.ID,
-					"status", task.Status,
-				)
-				continue
-			}
-
-			req, err := buildPlanSubmissionRequest(detail, scaleResp.QuestionnaireVersion, testee, task, verbose, logger)
-			if err != nil {
-				return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
-			}
-
-			if verbose {
-				logSubmitRequest(logger, *req, testee.ID)
-			}
-
-			attempts, err := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
-			if err != nil {
-				return fmt.Errorf(
-					"submit answersheet for testee %s task %s failed after %d attempts: %w",
-					testee.ID,
-					task.ID,
-					attempts,
-					err,
-				)
-			}
-			submittedCount++
-
-			if err := waitForTaskCompletion(ctx, deps.APIClient, orgID, task.ID); err != nil {
-				return fmt.Errorf("wait for task %s completion: %w", task.ID, err)
-			}
-			completedCount++
-
-			if verbose {
-				logger.Infow("Plan task completed",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"task_id", task.ID,
-					"seq", task.Seq,
-					"attempts", attempts,
-				)
-			}
-		}
+	submittedCount, skippedCount, completedCount, err := processPlanTasksConcurrently(
+		ctx,
+		deps,
+		planID,
+		orgID,
+		scaleResp.QuestionnaireVersion,
+		detail,
+		selectedTestees,
+		planWorkers,
+		verbose,
+	)
+	if err != nil {
+		return err
 	}
 
 	logger.Infow("Plan backfill completed",
@@ -284,6 +204,212 @@ func seedPlanBackfill(
 		"skipped_tasks", skippedCount,
 		"opened_tasks", len(scheduleResp.Tasks),
 	)
+
+	return nil
+}
+
+func normalizePlanWorkers(workers, testeeCount int) int {
+	if workers <= 0 {
+		workers = 1
+	}
+	if testeeCount > 0 && workers > testeeCount {
+		return testeeCount
+	}
+	return workers
+}
+
+func enrollPlanTesteesConcurrently(
+	ctx context.Context,
+	deps *dependencies,
+	planID string,
+	selectedTestees []*TesteeResponse,
+	workers int,
+) (int, error) {
+	var enrolledCount atomic.Int64
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(workers)
+
+	for _, testee := range selectedTestees {
+		testee := testee
+		g.Go(func() error {
+			startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
+			if err != nil {
+				return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
+			}
+			if startDateSource != "created_at" {
+				deps.Logger.Warnw("Plan backfill falling back when deriving start_date",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"start_date", startDate,
+					"source", startDateSource,
+					"created_at", testee.CreatedAt,
+					"updated_at", testee.UpdatedAt,
+				)
+			}
+
+			resp, err := deps.APIClient.EnrollTestee(ctx, EnrollTesteeRequest{
+				PlanID:    planID,
+				TesteeID:  testee.ID,
+				StartDate: startDate,
+			})
+			if err != nil {
+				return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
+			}
+
+			deps.Logger.Infow("Testee enrolled into plan",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"start_date", startDate,
+				"start_date_source", startDateSource,
+				"task_count", len(resp.Tasks),
+			)
+			enrolledCount.Add(1)
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return 0, err
+	}
+	return int(enrolledCount.Load()), nil
+}
+
+func processPlanTasksConcurrently(
+	ctx context.Context,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	questionnaireVersion string,
+	detail *QuestionnaireDetailResponse,
+	selectedTestees []*TesteeResponse,
+	workers int,
+	verbose bool,
+) (int, int, int, error) {
+	var submittedCount atomic.Int64
+	var skippedCount atomic.Int64
+	var completedCount atomic.Int64
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(workers)
+
+	for _, testee := range selectedTestees {
+		testee := testee
+		g.Go(func() error {
+			return processPlanTasksForTestee(
+				ctx,
+				deps,
+				planID,
+				orgID,
+				questionnaireVersion,
+				detail,
+				testee,
+				verbose,
+				&submittedCount,
+				&skippedCount,
+				&completedCount,
+			)
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return 0, 0, 0, err
+	}
+	return int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), nil
+}
+
+func processPlanTasksForTestee(
+	ctx context.Context,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	questionnaireVersion string,
+	detail *QuestionnaireDetailResponse,
+	testee *TesteeResponse,
+	verbose bool,
+	submittedCount *atomic.Int64,
+	skippedCount *atomic.Int64,
+	completedCount *atomic.Int64,
+) error {
+	taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+	if err != nil {
+		return fmt.Errorf("list tasks for testee %s plan %s: %w", testee.ID, planID, err)
+	}
+	tasks := append([]TaskResponse(nil), taskList.Tasks...)
+	sortTasksBySeq(tasks)
+
+	for _, task := range tasks {
+		switch normalizeTaskStatus(task.Status) {
+		case "completed", "canceled":
+			skippedCount.Add(1)
+			if verbose {
+				deps.Logger.Debugw("Skipping terminal plan task",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"task_id", task.ID,
+					"status", task.Status,
+				)
+			}
+			continue
+		case "pending", "expired":
+			skippedCount.Add(1)
+			if verbose {
+				deps.Logger.Debugw("Skipping non-open plan task",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"task_id", task.ID,
+					"status", task.Status,
+				)
+			}
+			continue
+		case "opened":
+			// continue
+		default:
+			skippedCount.Add(1)
+			deps.Logger.Warnw("Skipping task with unsupported status",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"task_id", task.ID,
+				"status", task.Status,
+			)
+			continue
+		}
+
+		req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
+		if err != nil {
+			return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
+		}
+
+		if verbose {
+			logSubmitRequest(deps.Logger, *req, testee.ID)
+		}
+
+		attempts, err := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
+		if err != nil {
+			return fmt.Errorf(
+				"submit answersheet for testee %s task %s failed after %d attempts: %w",
+				testee.ID,
+				task.ID,
+				attempts,
+				err,
+			)
+		}
+		submittedCount.Add(1)
+
+		if err := waitForTaskCompletion(ctx, deps.APIClient, orgID, task.ID); err != nil {
+			return fmt.Errorf("wait for task %s completion: %w", task.ID, err)
+		}
+		completedCount.Add(1)
+
+		if verbose {
+			deps.Logger.Infow("Plan task completed",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"task_id", task.ID,
+				"seq", task.Seq,
+				"attempts", attempts,
+			)
+		}
+	}
 
 	return nil
 }
@@ -540,11 +666,17 @@ func normalizeTaskStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
 }
 
-func planStartDateFromCreatedAt(createdAt time.Time) (string, error) {
-	if createdAt.IsZero() {
-		return "", fmt.Errorf("created_at is zero")
+func planStartDateFromAuditTimes(createdAt, updatedAt, now time.Time) (string, string, error) {
+	switch {
+	case !createdAt.IsZero():
+		return createdAt.In(time.Local).Format("2006-01-02"), "created_at", nil
+	case !updatedAt.IsZero():
+		return updatedAt.In(time.Local).Format("2006-01-02"), "updated_at", nil
+	case !now.IsZero():
+		return now.In(time.Local).Format("2006-01-02"), "now", nil
+	default:
+		return "", "", fmt.Errorf("created_at and updated_at are both zero")
 	}
-	return createdAt.In(time.Local).Format("2006-01-02"), nil
 }
 
 func newPlanQuestionnaireVersionMismatchError(

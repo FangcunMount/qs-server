@@ -20,6 +20,7 @@
 //	  --config configs/seeddata.yaml \
 //	  --steps plan \
 //	  --plan-id 614186929759466030 \
+//	  --plan-workers 4 \
 //	  --plan-testee-ids 1001,1002,1003
 //
 // See README.md for detailed documentation.
@@ -90,6 +91,7 @@ func main() {
 		configFile              = flag.String("config", "", "Base seed data config file (testees, legacy data)")
 		stepsRaw                = flag.String("steps", "", "Comma-separated steps to run (default: all)")
 		planID                  = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
+		planWorkers             = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
 		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
 		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
 		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
@@ -201,7 +203,7 @@ func main() {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
 		case stepPlan:
-			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, *planTesteeIDsRaw, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
+			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, *planTesteeIDsRaw, *planWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
 				logger.Fatalw("Plan backfill failed", "error", err)
 			}
 		default:

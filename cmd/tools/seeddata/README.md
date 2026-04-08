@@ -52,12 +52,14 @@ go run ./cmd/tools/seeddata \
 go run ./cmd/tools/seeddata \
   --config ./configs/seeddata.yaml \
   --steps "plan" \
+  --plan-workers 4 \
   --plan-id 614186929759466030
 
 # 只回填指定受试者的测评计划
 go run ./cmd/tools/seeddata \
   --config ./configs/seeddata.yaml \
   --steps "plan" \
+  --plan-workers 4 \
   --plan-id 614186929759466030 \
   --plan-testee-ids "1001,1002,1003"
 ```
@@ -88,8 +90,11 @@ go run ./cmd/tools/seeddata \
 ### 计划回填说明
 
 - `plan` 步骤默认回填计划 `614186929759466030`，可通过 `--plan-id` 覆盖。
+- `plan` 步骤支持 `--plan-workers`，用于控制计划入组和任务执行的并发 worker 数；默认 `1`，建议从 `4` 开始压测。
 - 计划回填默认会先按受试者 `created_at` 排序，再随机抽样约 `1/5` 的 testee 生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
+- `start_date` 默认取 `testee.created_at`；如果历史脏数据导致 `created_at` 为空，seeddata 会依次回退到 `updated_at`、当前日期，并记录 warning。
 - 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样，也不会再全量扫描 `/api/v1/testees`。
+- 并发只发生在两段：testee 入组、以及按 testee 维度提交/等待任务完成；调度接口仍只会串行调用一次。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
 - 计划回填不会真实发送 `task.opened` 小程序消息；它只会生成对应的任务开放数据，并通过 `source=seeddata` 让 worker 跳过对外通知。
 - 计划回填默认按 `created_at` 升序处理所有受试者后再抽样；若要限制范围，可继续使用 `--testee-offset` 和 `--testee-limit`。
