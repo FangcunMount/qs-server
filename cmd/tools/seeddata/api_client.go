@@ -30,6 +30,11 @@ type APIClient struct {
 	retryMax      int
 	retryMinDelay time.Duration
 	retryMaxDelay time.Duration
+
+	scaleCacheMu         sync.RWMutex
+	scaleCache           map[string]*ScaleResponse
+	questionnaireCacheMu sync.RWMutex
+	questionnaireCache   map[string]*QuestionnaireDetailResponse
 }
 
 const (
@@ -50,10 +55,12 @@ func NewAPIClient(baseURL, token string, logger log.Logger) *APIClient {
 		httpClient: &http.Client{
 			Timeout: defaultHTTPTimeout,
 		},
-		logger:        logger,
-		retryMax:      retryMax,
-		retryMinDelay: retryMinDelay,
-		retryMaxDelay: retryMaxDelay,
+		logger:             logger,
+		retryMax:           retryMax,
+		retryMinDelay:      retryMinDelay,
+		retryMaxDelay:      retryMaxDelay,
+		scaleCache:         make(map[string]*ScaleResponse),
+		questionnaireCache: make(map[string]*QuestionnaireDetailResponse),
 	}
 }
 
@@ -103,6 +110,10 @@ func (c *APIClient) getToken() string {
 	c.tokenMu.RLock()
 	defer c.tokenMu.RUnlock()
 	return c.token
+}
+
+func normalizeSeedCacheKey(key string) string {
+	return strings.ToLower(strings.TrimSpace(key))
 }
 
 // Response 通用 API 响应
@@ -867,6 +878,17 @@ func (c *APIClient) PublishScale(ctx context.Context, code string) (*ScaleRespon
 
 // GetScale 获取量表详情
 func (c *APIClient) GetScale(ctx context.Context, code string) (*ScaleResponse, error) {
+	cacheKey := normalizeSeedCacheKey(code)
+	if cacheKey != "" {
+		c.scaleCacheMu.RLock()
+		cached := c.scaleCache[cacheKey]
+		c.scaleCacheMu.RUnlock()
+		if cached != nil {
+			cloned := *cached
+			return &cloned, nil
+		}
+	}
+
 	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/scales/%s", code), nil)
 	if err != nil {
 		return nil, err
@@ -880,6 +902,13 @@ func (c *APIClient) GetScale(ctx context.Context, code string) (*ScaleResponse, 
 	var sResp ScaleResponse
 	if err := json.Unmarshal(dataBytes, &sResp); err != nil {
 		return nil, fmt.Errorf("unmarshal scale response: %w", err)
+	}
+
+	if cacheKey != "" {
+		cloned := sResp
+		c.scaleCacheMu.Lock()
+		c.scaleCache[cacheKey] = &cloned
+		c.scaleCacheMu.Unlock()
 	}
 
 	return &sResp, nil
@@ -1117,6 +1146,17 @@ func (c *APIClient) GetTesteeByID(ctx context.Context, testeeID string) (*Apiser
 
 // GetQuestionnaireDetail 获取问卷详情（collection-server）
 func (c *APIClient) GetQuestionnaireDetail(ctx context.Context, code string) (*QuestionnaireDetailResponse, error) {
+	cacheKey := normalizeSeedCacheKey(code)
+	if cacheKey != "" {
+		c.questionnaireCacheMu.RLock()
+		cached := c.questionnaireCache[cacheKey]
+		c.questionnaireCacheMu.RUnlock()
+		if cached != nil {
+			cloned := *cached
+			return &cloned, nil
+		}
+	}
+
 	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/questionnaires/%s", code), nil)
 	if err != nil {
 		return nil, err
@@ -1130,6 +1170,13 @@ func (c *APIClient) GetQuestionnaireDetail(ctx context.Context, code string) (*Q
 	var detailResp QuestionnaireDetailResponse
 	if err := json.Unmarshal(dataBytes, &detailResp); err != nil {
 		return nil, fmt.Errorf("unmarshal questionnaire response: %w", err)
+	}
+
+	if cacheKey != "" {
+		cloned := detailResp
+		c.questionnaireCacheMu.Lock()
+		c.questionnaireCache[cacheKey] = &cloned
+		c.questionnaireCacheMu.Unlock()
 	}
 
 	return &detailResp, nil

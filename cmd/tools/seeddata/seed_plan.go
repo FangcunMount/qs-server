@@ -105,11 +105,12 @@ func seedPlanBackfill(
 		return fmt.Errorf("scale %s has empty questionnaire_version", planResp.ScaleCode)
 	}
 
-	questionnaireCache := make(map[string]*QuestionnaireDetailResponse)
-	var questionnaireCacheMu sync.RWMutex
-	detail := getQuestionnaireDetail(ctx, deps.CollectionClient, scaleResp.QuestionnaireCode, questionnaireCache, &questionnaireCacheMu, logger)
+	detail, err := deps.CollectionClient.GetQuestionnaireDetail(ctx, scaleResp.QuestionnaireCode)
+	if err != nil {
+		return fmt.Errorf("load questionnaire %s: %w", scaleResp.QuestionnaireCode, err)
+	}
 	if detail == nil {
-		return fmt.Errorf("load questionnaire %s failed", scaleResp.QuestionnaireCode)
+		return fmt.Errorf("questionnaire %s not found", scaleResp.QuestionnaireCode)
 	}
 	if strings.TrimSpace(detail.Version) != scaleResp.QuestionnaireVersion {
 		return newPlanQuestionnaireVersionMismatchError(
