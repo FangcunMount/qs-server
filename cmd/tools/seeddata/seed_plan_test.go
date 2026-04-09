@@ -164,3 +164,13 @@ func TestSummarizePlanTaskStatuses(t *testing.T) {
 		t.Fatalf("unexpected task stats: %+v", stats)
 	}
 }
+
+func TestMergePlanTaskStatusStats(t *testing.T) {
+	dst := &planTaskStatusStats{Total: 2, Pending: 1, Opened: 1}
+	src := &planTaskStatusStats{Total: 3, Completed: 2, Expired: 1}
+	mergePlanTaskStatusStats(dst, src)
+
+	if dst.Total != 5 || dst.Pending != 1 || dst.Opened != 1 || dst.Completed != 2 || dst.Expired != 1 {
+		t.Fatalf("unexpected merged stats: %+v", dst)
+	}
+}

@@ -103,12 +103,14 @@ go run ./cmd/tools/seeddata \
 - `plan` 步骤支持 `--plan-workers`，用于控制计划入组和任务执行的并发 worker 数；默认 `1`，建议从 `4` 开始压测。
 - `plan` 步骤支持 `--plan-expire-rate`，用于控制已打开任务中有多少比例会被直接标记为 `expired` 而不是提交答卷；默认 `0.2`，取值范围 `0.0-1.0`。
 - `plan` 步骤支持 `--plan-process-existing-only` 恢复模式：跳过 enroll，只对选中 testee 在该 plan 下已经存在的 task 做状态检查、定向调度和后续处理，适合补跑历史遗留的 `pending/opened` task。
+- 恢复模式下，如果没有显式传 `--plan-testee-ids`，脚本会处理 `--testee-limit` 范围内的全部 testee，不再做 `1/5` 随机抽样。
 - 计划回填默认会流式扫描受试者列表，并随机抽样约 `1/5` 的 testee；不再先把所有 testee 全量加载到内存后再抽样。抽中的 testee 会按 `created_at` 排序后生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
 - `start_date` 默认取 `testee.created_at`；如果历史脏数据导致 `created_at` 为空，seeddata 会依次回退到 `updated_at`、当前日期，并记录 warning。
 - 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样，也不会再全量扫描 `/api/v1/testees`。
 - 显式传入 `--plan-testee-ids` 时，`--testee-limit` 仍然生效；脚本会在去重后只取前 N 个 ID 继续执行。
 - 显式模式会更严格：如果 `/api/v1/testees/{id}` 返回的 `created_at` 是零值，脚本会直接报错，不再回退到 `updated_at` 或当前时间。
 - 开启 `--plan-process-existing-only` 时，脚本启动会先统计这批 testee 在目标 plan 下已有多少 `pending/opened/completed/expired/canceled` task，并打印到日志；如果一条现有 task 都没有，会直接退出，不会创建新 task。
+- 恢复模式里，`ExpireTask` 会按幂等方式补偿：如果第一次过期请求超时，但回读任务状态发现它已经进入 `expired/completed/canceled`，脚本会继续往下跑，不会因为重复过期返回 `400 Invalid argument` 而中断整轮恢复。
 - 并发只发生在两段：testee 入组、以及按 testee 维度提交/等待任务完成；两段都使用固定数量的 worker 和有缓冲 channel，其余 testee 会在队列中等待；调度接口仍只会串行调用一次。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
 - `plan` 回填会以 `planned_at` 作为业务时间基准：`open_at` 对齐 `planned_at`，`expire_at` 基于该时间继续推导，`completed_at` 默认使用 `planned_at + 2h`。

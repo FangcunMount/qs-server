@@ -140,6 +140,19 @@ func seedPlanBackfill(
 		selectedTestees = testees
 		selectionMode = "explicit"
 		loadedTesteeCnt = len(testees)
+	} else if planProcessExistingOnly {
+		pageSize := testeePageSize
+		if pageSize < 100 {
+			pageSize = 100
+		}
+		testees, err = loadApiserverTestees(ctx, deps.APIClient, orgID, pageSize, testeeOffset, testeeLimit)
+		if err != nil {
+			return err
+		}
+		sortTesteesByCreatedAt(testees)
+		selectedTestees = testees
+		selectionMode = "recovery_all"
+		loadedTesteeCnt = len(testees)
 	} else {
 		pageSize := testeePageSize
 		if pageSize < 100 {
@@ -215,7 +228,7 @@ func seedPlanBackfill(
 		}
 	}
 
-	openedCount, scheduleStats, submittedCount, skippedCount, completedCount, expiredCount, err := scheduleAndProcessPlanTasks(
+	openedCount, scheduleStats, submittedCount, skippedCount, completedCount, expiredCount, recoveredCount, err := scheduleAndProcessPlanTasks(
 		ctx,
 		deps,
 		planID,
@@ -238,6 +251,7 @@ func seedPlanBackfill(
 		"submitted_answersheets", submittedCount,
 		"completed_tasks", completedCount,
 		"expired_tasks", expiredCount,
+		"recovered_tasks", recoveredCount,
 		"skipped_tasks", skippedCount,
 		"opened_tasks", openedCount,
 		"schedule_stats", scheduleStats,
@@ -315,11 +329,12 @@ func scheduleAndProcessPlanTasks(
 	workers int,
 	planExpireRate float64,
 	verbose bool,
-) (int, *TaskScheduleStatsResponse, int, int, int, int, error) {
+) (int, *TaskScheduleStatsResponse, int, int, int, int, int, error) {
 	var submittedCount atomic.Int64
 	var skippedCount atomic.Int64
 	var completedCount atomic.Int64
 	var expiredCount atomic.Int64
+	var recoveredCount atomic.Int64
 	var reservedOpenTask atomic.Bool
 
 	aggregateScheduleStats := &TaskScheduleStatsResponse{}
@@ -335,7 +350,7 @@ func scheduleAndProcessPlanTasks(
 			TesteeIDs: collectPlanTesteeIDs(batch),
 		})
 		if err != nil {
-			return 0, nil, 0, 0, 0, 0, fmt.Errorf("schedule pending tasks for org %d batch %d/%d: %w", orgID, batchIndex+1, len(batches), err)
+			return 0, nil, 0, 0, 0, 0, 0, fmt.Errorf("schedule pending tasks for org %d batch %d/%d: %w", orgID, batchIndex+1, len(batches), err)
 		}
 
 		totalOpenedCount += len(scheduleResp.Tasks)
@@ -361,7 +376,7 @@ func scheduleAndProcessPlanTasks(
 			&skippedCount,
 		)
 		if err != nil {
-			return 0, nil, 0, 0, 0, 0, err
+			return 0, nil, 0, 0, 0, 0, 0, err
 		}
 		if len(taskJobs) == 0 {
 			continue
@@ -371,6 +386,16 @@ func scheduleAndProcessPlanTasks(
 			fmt.Sprintf("Processing scheduled pending plan tasks (%d/%d)", batchIndex+1, len(batches)),
 			len(taskJobs),
 			func() string {
+				if recovered := recoveredCount.Load(); recovered > 0 {
+					return fmt.Sprintf(
+						"completed=%d expired=%d submitted=%d skipped=%d recovered=%d",
+						completedCount.Load(),
+						expiredCount.Load(),
+						submittedCount.Load(),
+						skippedCount.Load(),
+						recovered,
+					)
+				}
 				return fmt.Sprintf(
 					"completed=%d expired=%d submitted=%d skipped=%d",
 					completedCount.Load(),
@@ -397,6 +422,7 @@ func scheduleAndProcessPlanTasks(
 				&skippedCount,
 				&completedCount,
 				&expiredCount,
+				&recoveredCount,
 			)
 			if err == nil {
 				progress.Advance()
@@ -405,12 +431,12 @@ func scheduleAndProcessPlanTasks(
 		})
 		if err != nil {
 			progress.Fail()
-			return 0, nil, 0, 0, 0, 0, err
+			return 0, nil, 0, 0, 0, 0, 0, err
 		}
 		progress.Finish()
 	}
 
-	return totalOpenedCount, aggregateScheduleStats, int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), nil
+	return totalOpenedCount, aggregateScheduleStats, int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), int(recoveredCount.Load()), nil
 }
 
 func runPlanTesteeWorkerPool(
@@ -665,6 +691,25 @@ func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats
 	dst.Unknown += src.Unknown
 }
 
+func expirePlanTaskWithRecovery(ctx context.Context, client *APIClient, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
+	expiredTask, err := client.ExpireTask(ctx, task.ID)
+	if err == nil {
+		return expiredTask, false, nil
+	}
+
+	currentTask, getErr := client.GetTask(ctx, task.ID)
+	if getErr != nil {
+		return nil, false, fmt.Errorf("expire failed: %w; additionally failed to fetch current task state: %v", err, getErr)
+	}
+
+	switch normalizeTaskStatus(currentTask.Status) {
+	case "expired", "completed", "canceled":
+		return currentTask, true, nil
+	default:
+		return nil, false, fmt.Errorf("expire failed: %w; current task status=%s org_id=%d", err, currentTask.Status, orgID)
+	}
+}
+
 func processPlanTaskJob(
 	ctx context.Context,
 	deps *dependencies,
@@ -680,6 +725,7 @@ func processPlanTaskJob(
 	skippedCount *atomic.Int64,
 	completedCount *atomic.Int64,
 	expiredCount *atomic.Int64,
+	recoveredCount *atomic.Int64,
 ) error {
 	testee := job.testee
 	task := job.task
@@ -696,10 +742,19 @@ func processPlanTaskJob(
 	}
 
 	if shouldExpirePlanTask(task, planExpireRate) {
-		if _, err := deps.APIClient.ExpireTask(ctx, task.ID); err != nil {
+		finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, deps.APIClient, orgID, task)
+		if err != nil {
 			return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
 		}
-		expiredCount.Add(1)
+		if recovered && recoveredCount != nil {
+			recoveredCount.Add(1)
+		}
+		switch normalizeTaskStatus(finalTask.Status) {
+		case "expired":
+			expiredCount.Add(1)
+		default:
+			skippedCount.Add(1)
+		}
 		if verbose {
 			deps.Logger.Infow("Plan task expired intentionally",
 				"plan_id", planID,
@@ -707,6 +762,8 @@ func processPlanTaskJob(
 				"task_id", task.ID,
 				"seq", task.Seq,
 				"expire_rate", planExpireRate,
+				"recovered", recovered,
+				"final_status", finalTask.Status,
 			)
 		}
 		return nil
