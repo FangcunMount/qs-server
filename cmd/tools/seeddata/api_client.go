@@ -156,12 +156,22 @@ type TaskResponse struct {
 	EntryURL     string  `json:"entry_url,omitempty"`
 }
 
+// TaskScheduleStatsResponse 任务调度统计。
+type TaskScheduleStatsResponse struct {
+	PendingCount      int `json:"pending_count"`
+	OpenedCount       int `json:"opened_count"`
+	FailedCount       int `json:"failed_count"`
+	ExpiredCount      int `json:"expired_count"`
+	ExpireFailedCount int `json:"expire_failed_count"`
+}
+
 // TaskListResponse 任务列表响应。
 type TaskListResponse struct {
 	Tasks      []TaskResponse `json:"tasks"`
 	TotalCount int64          `json:"total_count"`
 	Page       int            `json:"page"`
 	PageSize   int            `json:"page_size"`
+	Stats      *TaskScheduleStatsResponse `json:"stats,omitempty"`
 }
 
 // EnrollmentResponse 加入计划响应。
@@ -940,6 +950,20 @@ func (c *APIClient) GetTask(ctx context.Context, taskID string) (*TaskResponse, 
 	var taskResp TaskResponse
 	if err := decodeResponseData(resp, &taskResp); err != nil {
 		return nil, fmt.Errorf("unmarshal task response: %w", err)
+	}
+	return &taskResp, nil
+}
+
+// ExpireTask 将计划任务标记为过期（apiserver internal API）。
+func (c *APIClient) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/internal/v1/plans/tasks/%s/expire", taskID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskResp TaskResponse
+	if err := decodeResponseData(resp, &taskResp); err != nil {
+		return nil, fmt.Errorf("unmarshal expire task response: %w", err)
 	}
 	return &taskResp, nil
 }

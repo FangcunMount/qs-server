@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"sort"
 	"strings"
@@ -28,6 +29,7 @@ func seedPlanBackfill(
 	planID string,
 	planTesteeIDsRaw string,
 	planWorkers int,
+	planExpireRate float64,
 	testeePageSize, testeeOffset, testeeLimit int,
 	verbose bool,
 ) error {
@@ -50,10 +52,12 @@ func seedPlanBackfill(
 	}
 
 	logger := deps.Logger
+	planExpireRate = normalizePlanExpireRate(planExpireRate)
 	logger.Infow("Plan backfill started",
 		"plan_id", planID,
 		"org_id", orgID,
 		"plan_workers", planWorkers,
+		"plan_expire_rate", planExpireRate,
 		"testee_page_size", testeePageSize,
 		"testee_offset", testeeOffset,
 		"testee_limit", testeeLimit,
@@ -112,6 +116,7 @@ func seedPlanBackfill(
 	}
 
 	explicitPlanTesteeIDs := parsePlanTesteeIDs(planTesteeIDsRaw)
+	explicitPlanTesteeIDs = applyTesteeLimitToIDs(explicitPlanTesteeIDs, testeeLimit)
 
 	var (
 		testees         []*TesteeResponse
@@ -184,10 +189,11 @@ func seedPlanBackfill(
 		"org_id", orgID,
 		"source", scheduleSource,
 		"opened_count", len(scheduleResp.Tasks),
+		"schedule_stats", scheduleResp.Stats,
 		"mini_program_delivery", "skipped",
 	)
 
-	submittedCount, skippedCount, completedCount, err := processPlanTasksConcurrently(
+	submittedCount, skippedCount, completedCount, expiredCount, err := processPlanTasksConcurrently(
 		ctx,
 		deps,
 		planID,
@@ -196,6 +202,7 @@ func seedPlanBackfill(
 		detail,
 		selectedTestees,
 		planWorkers,
+		planExpireRate,
 		verbose,
 	)
 	if err != nil {
@@ -208,6 +215,7 @@ func seedPlanBackfill(
 		"enrolled_testees", enrolledCount,
 		"submitted_answersheets", submittedCount,
 		"completed_tasks", completedCount,
+		"expired_tasks", expiredCount,
 		"skipped_tasks", skippedCount,
 		"opened_tasks", len(scheduleResp.Tasks),
 	)
@@ -233,49 +241,41 @@ func enrollPlanTesteesConcurrently(
 	workers int,
 ) (int, error) {
 	var enrolledCount atomic.Int64
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(workers)
-
-	for _, testee := range selectedTestees {
-		testee := testee
-		g.Go(func() error {
-			startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
-			if err != nil {
-				return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
-			}
-			if startDateSource != "created_at" {
-				deps.Logger.Warnw("Plan backfill falling back when deriving start_date",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"start_date", startDate,
-					"source", startDateSource,
-					"created_at", testee.CreatedAt,
-					"updated_at", testee.UpdatedAt,
-				)
-			}
-
-			resp, err := deps.APIClient.EnrollTestee(ctx, EnrollTesteeRequest{
-				PlanID:    planID,
-				TesteeID:  testee.ID,
-				StartDate: startDate,
-			})
-			if err != nil {
-				return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
-			}
-
-			deps.Logger.Infow("Testee enrolled into plan",
+	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
+		startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
+		if err != nil {
+			return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
+		}
+		if startDateSource != "created_at" {
+			deps.Logger.Warnw("Plan backfill falling back when deriving start_date",
 				"plan_id", planID,
 				"testee_id", testee.ID,
 				"start_date", startDate,
-				"start_date_source", startDateSource,
-				"task_count", len(resp.Tasks),
+				"source", startDateSource,
+				"created_at", testee.CreatedAt,
+				"updated_at", testee.UpdatedAt,
 			)
-			enrolledCount.Add(1)
-			return nil
-		})
-	}
+		}
 
-	if err := g.Wait(); err != nil {
+		resp, err := deps.APIClient.EnrollTestee(ctx, EnrollTesteeRequest{
+			PlanID:    planID,
+			TesteeID:  testee.ID,
+			StartDate: startDate,
+		})
+		if err != nil {
+			return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
+		}
+
+		deps.Logger.Infow("Testee enrolled into plan",
+			"plan_id", planID,
+			"testee_id", testee.ID,
+			"start_date", startDate,
+			"start_date_source", startDateSource,
+			"task_count", len(resp.Tasks),
+		)
+		enrolledCount.Add(1)
+		return nil
+	}); err != nil {
 		return 0, err
 	}
 	return int(enrolledCount.Load()), nil
@@ -290,38 +290,89 @@ func processPlanTasksConcurrently(
 	detail *QuestionnaireDetailResponse,
 	selectedTestees []*TesteeResponse,
 	workers int,
+	planExpireRate float64,
 	verbose bool,
-) (int, int, int, error) {
+) (int, int, int, int, error) {
 	var submittedCount atomic.Int64
 	var skippedCount atomic.Int64
 	var completedCount atomic.Int64
+	var expiredCount atomic.Int64
 
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(workers)
+	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
+		return processPlanTasksForTestee(
+			ctx,
+			deps,
+			planID,
+			orgID,
+			questionnaireVersion,
+			detail,
+			testee,
+			planExpireRate,
+			verbose,
+			&submittedCount,
+			&skippedCount,
+			&completedCount,
+			&expiredCount,
+		)
+	}); err != nil {
+		return 0, 0, 0, 0, err
+	}
+	return int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), nil
+}
 
-	for _, testee := range selectedTestees {
-		testee := testee
+func runPlanTesteeWorkerPool(
+	ctx context.Context,
+	testees []*TesteeResponse,
+	workers int,
+	fn func(context.Context, *TesteeResponse) error,
+) error {
+	if len(testees) == 0 {
+		return nil
+	}
+	if workers <= 0 {
+		workers = 1
+	}
+	if fn == nil {
+		return fmt.Errorf("plan worker function is nil")
+	}
+
+	jobs := make(chan *TesteeResponse, workers)
+	g, gctx := errgroup.WithContext(ctx)
+
+	for i := 0; i < workers; i++ {
 		g.Go(func() error {
-			return processPlanTasksForTestee(
-				ctx,
-				deps,
-				planID,
-				orgID,
-				questionnaireVersion,
-				detail,
-				testee,
-				verbose,
-				&submittedCount,
-				&skippedCount,
-				&completedCount,
-			)
+			for {
+				select {
+				case <-gctx.Done():
+					return nil
+				case testee, ok := <-jobs:
+					if !ok {
+						return nil
+					}
+					if testee == nil {
+						continue
+					}
+					if err := fn(gctx, testee); err != nil {
+						return err
+					}
+				}
+			}
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return 0, 0, 0, err
-	}
-	return int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), nil
+	g.Go(func() error {
+		defer close(jobs)
+		for _, testee := range testees {
+			select {
+			case <-gctx.Done():
+				return nil
+			case jobs <- testee:
+			}
+		}
+		return nil
+	})
+
+	return g.Wait()
 }
 
 func processPlanTasksForTestee(
@@ -332,10 +383,12 @@ func processPlanTasksForTestee(
 	questionnaireVersion string,
 	detail *QuestionnaireDetailResponse,
 	testee *TesteeResponse,
+	planExpireRate float64,
 	verbose bool,
 	submittedCount *atomic.Int64,
 	skippedCount *atomic.Int64,
 	completedCount *atomic.Int64,
+	expiredCount *atomic.Int64,
 ) error {
 	taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
 	if err != nil {
@@ -370,19 +423,36 @@ func processPlanTasksForTestee(
 			continue
 		case "opened":
 			// continue
-		default:
-			skippedCount.Add(1)
-			deps.Logger.Warnw("Skipping task with unsupported status",
-				"plan_id", planID,
-				"testee_id", testee.ID,
+			default:
+				skippedCount.Add(1)
+				deps.Logger.Warnw("Skipping task with unsupported status",
+					"plan_id", planID,
+					"testee_id", testee.ID,
 				"task_id", task.ID,
 				"status", task.Status,
-			)
-			continue
-		}
+				)
+				continue
+			}
 
-		req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
-		if err != nil {
+			if shouldExpirePlanTask(task, planExpireRate) {
+				if _, err := deps.APIClient.ExpireTask(ctx, task.ID); err != nil {
+					return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
+				}
+				expiredCount.Add(1)
+				if verbose {
+					deps.Logger.Infow("Plan task expired intentionally",
+						"plan_id", planID,
+						"testee_id", testee.ID,
+						"task_id", task.ID,
+						"seq", task.Seq,
+						"expire_rate", planExpireRate,
+					)
+				}
+				continue
+			}
+
+			req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
+			if err != nil {
 			return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
 		}
 
@@ -441,6 +511,13 @@ func parsePlanTesteeIDs(raw string) []string {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+func applyTesteeLimitToIDs(ids []string, limit int) []string {
+	if limit <= 0 || len(ids) <= limit {
+		return ids
+	}
+	return append([]string(nil), ids[:limit]...)
 }
 
 func loadApiserverTestees(
@@ -662,6 +739,31 @@ func waitForTaskCompletion(ctx context.Context, client *APIClient, orgID int64, 
 
 func normalizeTaskStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
+}
+
+func normalizePlanExpireRate(rate float64) float64 {
+	switch {
+	case rate < 0:
+		return 0
+	case rate > 1:
+		return 1
+	default:
+		return rate
+	}
+}
+
+func shouldExpirePlanTask(task TaskResponse, expireRate float64) bool {
+	if expireRate <= 0 {
+		return false
+	}
+	if expireRate >= 1 {
+		return true
+	}
+
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.TrimSpace(task.ID)))
+	threshold := uint32(expireRate * 10000)
+	return h.Sum32()%10000 < threshold
 }
 
 func planStartDateFromAuditTimes(createdAt, updatedAt, now time.Time) (string, string, error) {

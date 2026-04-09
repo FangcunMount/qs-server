@@ -98,3 +98,51 @@ func TestNormalizePlanWorkers(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizePlanExpireRate(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    float64
+		expected float64
+	}{
+		{name: "negative to zero", input: -0.2, expected: 0},
+		{name: "keep middle value", input: 0.35, expected: 0.35},
+		{name: "cap at one", input: 1.5, expected: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizePlanExpireRate(tt.input); got != tt.expected {
+				t.Fatalf("normalizePlanExpireRate(%v)=%v, want=%v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestShouldExpirePlanTask(t *testing.T) {
+	task := TaskResponse{ID: "614186929759466030"}
+
+	if shouldExpirePlanTask(task, 0) {
+		t.Fatal("expected zero expire rate to never expire")
+	}
+	if !shouldExpirePlanTask(task, 1) {
+		t.Fatal("expected full expire rate to always expire")
+	}
+	if got1, got2 := shouldExpirePlanTask(task, 0.2), shouldExpirePlanTask(task, 0.2); got1 != got2 {
+		t.Fatalf("expected deterministic expire decision, got %v and %v", got1, got2)
+	}
+}
+
+func TestApplyTesteeLimitToIDs(t *testing.T) {
+	ids := []string{"1001", "1002", "1003"}
+
+	if got := applyTesteeLimitToIDs(ids, 0); len(got) != 3 {
+		t.Fatalf("expected no limit to keep all ids, got %v", got)
+	}
+	if got := applyTesteeLimitToIDs(ids, 2); len(got) != 2 || got[0] != "1001" || got[1] != "1002" {
+		t.Fatalf("expected limit to keep first two ids, got %v", got)
+	}
+	if got := applyTesteeLimitToIDs(ids, 5); len(got) != 3 {
+		t.Fatalf("expected large limit to keep all ids, got %v", got)
+	}
+}
