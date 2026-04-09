@@ -8,6 +8,7 @@ import (
 	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"gorm.io/gorm"
 )
 
 // TesteePO 受试者持久化对象
@@ -145,7 +146,7 @@ func (AssessmentEntryPO) TableName() string {
 }
 
 // BeforeCreate GORM hook，在创建前执行
-func (p *TesteePO) BeforeCreate() error {
+func (p *TesteePO) BeforeCreate(_ *gorm.DB) error {
 	// 如果 ID 为 0，使用 ID 生成器生成 ID
 	if p.ID == 0 {
 		p.ID = meta.New()
@@ -158,7 +159,7 @@ func (p *TesteePO) BeforeCreate() error {
 }
 
 // BeforeCreate GORM hook，在创建前执行
-func (p *OperatorPO) BeforeCreate() error {
+func (p *OperatorPO) BeforeCreate(_ *gorm.DB) error {
 	// 如果 ID 为 0，使用 ID 生成器生成 ID
 	if p.ID == 0 {
 		p.ID = meta.New()
@@ -171,7 +172,7 @@ func (p *OperatorPO) BeforeCreate() error {
 }
 
 // BeforeCreate GORM hook，在创建前执行。
-func (p *ClinicianPO) BeforeCreate() error {
+func (p *ClinicianPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = meta.New()
 	}
@@ -182,7 +183,7 @@ func (p *ClinicianPO) BeforeCreate() error {
 }
 
 // BeforeCreate GORM hook，在创建前执行。
-func (p *ClinicianRelationPO) BeforeCreate() error {
+func (p *ClinicianRelationPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = meta.New()
 	}
@@ -193,7 +194,7 @@ func (p *ClinicianRelationPO) BeforeCreate() error {
 }
 
 // BeforeCreate GORM hook，在创建前执行。
-func (p *AssessmentEntryPO) BeforeCreate() error {
+func (p *AssessmentEntryPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
 		p.ID = meta.New()
 	}

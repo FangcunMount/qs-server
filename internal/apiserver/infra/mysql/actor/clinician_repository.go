@@ -27,7 +27,7 @@ func NewClinicianRepository(db *gorm.DB) domain.Repository {
 
 func (r *clinicianRepository) Save(ctx context.Context, item *domain.Clinician) error {
 	po := r.mapper.ToPO(item)
-	if err := po.BeforeCreate(); err != nil {
+	if err := po.BeforeCreate(nil); err != nil {
 		return err
 	}
 

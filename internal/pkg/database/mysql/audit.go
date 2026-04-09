@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"gorm.io/gorm"
 )
 
 // InitialVersion 默认的乐观锁版本号起点。
@@ -109,7 +110,7 @@ func (a *AuditFields) SetVersion(v uint32) {
 }
 
 // BeforeCreate GORM hook，在创建前执行。
-func (a *AuditFields) BeforeCreate() error {
+func (a *AuditFields) BeforeCreate(_ *gorm.DB) error {
 	if a.ID == 0 {
 		a.ID = meta.New()
 	}
@@ -127,14 +128,14 @@ func (a *AuditFields) BeforeCreate() error {
 }
 
 // BeforeUpdate GORM hook，在更新前执行。
-func (a *AuditFields) BeforeUpdate() error {
+func (a *AuditFields) BeforeUpdate(_ *gorm.DB) error {
 	a.UpdatedAt = time.Now().UTC()
 	a.UpdatedBy = 0
 	return nil
 }
 
 // BeforeDelete GORM hook，在删除前执行。
-func (a *AuditFields) BeforeDelete() error {
+func (a *AuditFields) BeforeDelete(_ *gorm.DB) error {
 	now := time.Now().UTC()
 	a.DeletedAt = &now
 	a.DeletedBy = 0

@@ -28,7 +28,7 @@ func NewAssessmentEntryRepository(db *gorm.DB) domain.Repository {
 
 func (r *assessmentEntryRepository) Save(ctx context.Context, item *domain.AssessmentEntry) error {
 	po := r.mapper.ToPO(item)
-	if err := po.BeforeCreate(); err != nil {
+	if err := po.BeforeCreate(nil); err != nil {
 		return err
 	}
 

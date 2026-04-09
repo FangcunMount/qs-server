@@ -37,7 +37,7 @@ func (r *operatorRepository) Save(ctx context.Context, item *domain.Operator) er
 	po := r.mapper.ToPO(item)
 
 	// 确保 BeforeCreate 被调用以生成 ID
-	if err := po.BeforeCreate(); err != nil {
+	if err := po.BeforeCreate(nil); err != nil {
 		return err
 	}
 

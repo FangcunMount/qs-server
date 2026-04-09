@@ -29,7 +29,7 @@ func NewRelationRepository(db *gorm.DB) domain.Repository {
 
 func (r *relationRepository) Save(ctx context.Context, item *domain.ClinicianTesteeRelation) error {
 	po := r.mapper.ToPO(item)
-	if err := po.BeforeCreate(); err != nil {
+	if err := po.BeforeCreate(nil); err != nil {
 		return err
 	}
 

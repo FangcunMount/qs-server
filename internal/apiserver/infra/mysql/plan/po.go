@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"gorm.io/gorm"
 )
 
 // ==================== AssessmentPlan 持久化对象 ====================
@@ -38,7 +39,7 @@ func (AssessmentPlanPO) TableName() string {
 }
 
 // BeforeCreate GORM hook，在创建前执行
-func (p *AssessmentPlanPO) BeforeCreate() error {
+func (p *AssessmentPlanPO) BeforeCreate(_ *gorm.DB) error {
 	// 如果 ID 为 0，使用 ID 生成器生成 ID
 	if p.ID == 0 {
 		p.ID = meta.New()
@@ -94,7 +95,7 @@ func (AssessmentTaskPO) TableName() string {
 }
 
 // BeforeCreate GORM hook，在创建前执行
-func (p *AssessmentTaskPO) BeforeCreate() error {
+func (p *AssessmentTaskPO) BeforeCreate(_ *gorm.DB) error {
 	// 如果 ID 为 0，使用 ID 生成器生成 ID
 	if p.ID == 0 {
 		p.ID = meta.New()

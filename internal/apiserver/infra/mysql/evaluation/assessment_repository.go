@@ -37,7 +37,7 @@ func (r *assessmentRepository) Save(ctx context.Context, a *assessment.Assessmen
 	// 判断是新增还是更新
 	if a.ID().IsZero() {
 		// 确保 BeforeCreate 被调用以生成 ID
-		if err := po.BeforeCreate(); err != nil {
+		if err := po.BeforeCreate(nil); err != nil {
 			return err
 		}
 		return r.CreateAndSync(ctx, po, func(po *AssessmentPO) {

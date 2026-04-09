@@ -32,7 +32,7 @@ func (r *testeeRepository) Save(ctx context.Context, t *testee.Testee) error {
 	po := r.mapper.ToPO(t)
 
 	// 确保 BeforeCreate 被调用以生成 ID
-	if err := po.BeforeCreate(); err != nil {
+	if err := po.BeforeCreate(nil); err != nil {
 		return err
 	}
 

@@ -71,7 +71,7 @@ func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentD
 
 	// 确保每个 PO 都调用 BeforeCreate 生成 ID
 	for _, po := range pos {
-		if err := po.BeforeCreate(); err != nil {
+		if err := po.BeforeCreate(nil); err != nil {
 			return err
 		}
 	}

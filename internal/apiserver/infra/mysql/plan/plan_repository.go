@@ -138,7 +138,7 @@ func (r *planRepository) Save(ctx context.Context, plan *domainPlan.AssessmentPl
 	// 判断是新增还是更新
 	if plan.GetID().IsZero() {
 		// ID 为零，确保 BeforeCreate 被调用以生成 ID
-		if err := po.BeforeCreate(); err != nil {
+		if err := po.BeforeCreate(nil); err != nil {
 			return err
 		}
 		// 直接创建
@@ -155,7 +155,7 @@ func (r *planRepository) Save(ctx context.Context, plan *domainPlan.AssessmentPl
 
 	if !exists {
 		// 记录不存在，确保 BeforeCreate 被调用（虽然已有 ID，但需要设置版本号）
-		if err := po.BeforeCreate(); err != nil {
+		if err := po.BeforeCreate(nil); err != nil {
 			return err
 		}
 		// 执行 INSERT（使用指定的 ID）
