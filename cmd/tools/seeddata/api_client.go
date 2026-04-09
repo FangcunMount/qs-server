@@ -185,6 +185,14 @@ type EnrollmentResponse struct {
 	Tasks  []TaskResponse `json:"tasks"`
 }
 
+// SchedulePendingTasksRequest 调度待开放任务请求。
+type SchedulePendingTasksRequest struct {
+	Before    string   `json:"before,omitempty"`
+	Source    string   `json:"source,omitempty"`
+	PlanID    string   `json:"plan_id,omitempty"`
+	TesteeIDs []string `json:"testee_ids,omitempty"`
+}
+
 // CollectionScaleSummary 量表摘要（collection-server）
 type CollectionScaleSummary struct {
 	Code                 string   `json:"code"`
@@ -917,19 +925,39 @@ func (c *APIClient) EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (
 }
 
 // SchedulePendingTasks 调度待开放任务（apiserver internal API）。
-func (c *APIClient) SchedulePendingTasks(ctx context.Context, before, source string) (*TaskListResponse, error) {
+func (c *APIClient) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
 	path := "/internal/v1/plans/tasks/schedule"
 	query := url.Values{}
-	if strings.TrimSpace(before) != "" {
-		query.Set("before", before)
+	if strings.TrimSpace(req.Before) != "" {
+		query.Set("before", strings.TrimSpace(req.Before))
 	}
-	if strings.TrimSpace(source) != "" {
-		query.Set("source", source)
+	if strings.TrimSpace(req.Source) != "" {
+		query.Set("source", strings.TrimSpace(req.Source))
 	}
 	if len(query) > 0 {
 		path += "?" + query.Encode()
 	}
-	resp, err := c.doRequestWithRetryAndTimeout(ctx, "POST", path, nil, true, planScheduleRequestTimeout)
+	body := struct {
+		PlanID    string   `json:"plan_id,omitempty"`
+		TesteeIDs []string `json:"testee_ids,omitempty"`
+	}{
+		PlanID:    strings.TrimSpace(req.PlanID),
+		TesteeIDs: append([]string(nil), req.TesteeIDs...),
+	}
+	if body.PlanID == "" && len(body.TesteeIDs) == 0 {
+		resp, err := c.doRequestWithRetryAndTimeout(ctx, "POST", path, nil, true, planScheduleRequestTimeout)
+		if err != nil {
+			return nil, err
+		}
+
+		var taskList TaskListResponse
+		if err := decodeResponseData(resp, &taskList); err != nil {
+			return nil, fmt.Errorf("unmarshal schedule response: %w", err)
+		}
+		return &taskList, nil
+	}
+
+	resp, err := c.doRequestWithRetryAndTimeout(ctx, "POST", path, body, true, planScheduleRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

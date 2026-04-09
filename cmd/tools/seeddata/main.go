@@ -21,7 +21,8 @@
 //	  --steps plan \
 //	  --plan-id 614186929759466030 \
 //	  --plan-workers 4 \
-//	  --plan-testee-ids 1001,1002,1003
+//	  --plan-testee-ids 1001,1002,1003 \
+//	  --plan-process-existing-only
 //
 // See README.md for detailed documentation.
 package main
@@ -94,13 +95,14 @@ func main() {
 		planWorkers             = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
 		planExpireRate          = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
 		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
+		planProcessExistingOnly = flag.Bool("plan-process-existing-only", false, "Skip enrollment and only schedule/process existing plan tasks for the selected testees")
 		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
 		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
 		assessmentSubmitWorkers = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
 		testeePageSize          = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
 		testeeOffset            = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
-			testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan seeding (0 = no limit)")
+		testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan seeding (0 = no limit)")
 		assessmentCategories    = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
 		verbose                 = flag.Bool("verbose", false, "Enable verbose logging")
 	)
@@ -203,10 +205,10 @@ func main() {
 			if err := seedAssessments(runCtx, deps, seedCtx, *assessmentMin, *assessmentMax, *assessmentWorkers, *assessmentSubmitWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *assessmentCategories, *verbose); err != nil {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
-			case stepPlan:
-				if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, *planTesteeIDsRaw, *planWorkers, *planExpireRate, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
-					logger.Fatalw("Plan backfill failed", "error", err)
-				}
+		case stepPlan:
+			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, *planTesteeIDsRaw, *planWorkers, *planExpireRate, *planProcessExistingOnly, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
+				logger.Fatalw("Plan backfill failed", "error", err)
+			}
 		default:
 			logger.Warnw("Skipping unimplemented step", "step", step)
 		}

@@ -2,12 +2,16 @@ package plan
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -50,11 +54,14 @@ func NewTaskSchedulerService(
 // SchedulePendingTasks 调度待推送的任务
 func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID int64, before string) ([]*TaskResult, error) {
 	source := taskSchedulerSourceFromContext(ctx)
+	scope := taskSchedulerScopeFromContext(ctx)
 	logger.L(ctx).Infow("Scheduling pending tasks",
 		"action", "schedule_pending_tasks",
 		"source", source,
 		"org_id", orgID,
 		"before", before,
+		"scope_plan_id", scopePlanID(scope),
+		"scope_testee_count", scopeTesteeCount(scope),
 	)
 	if orgID <= 0 {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的机构ID")
@@ -73,13 +80,15 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	}
 
 	// 2. 查询待推送任务
-	tasks, err := s.taskRepo.FindPendingTasks(ctx, orgID, beforeTime)
+	tasks, err := s.findPendingTasks(ctx, orgID, beforeTime)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to find pending tasks",
 			"action", "schedule_pending_tasks",
 			"source", source,
 			"org_id", orgID,
 			"before", before,
+			"scope_plan_id", scopePlanID(scope),
+			"scope_testee_count", scopeTesteeCount(scope),
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询待推送任务失败")
@@ -90,6 +99,8 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		"source", source,
 		"org_id", orgID,
 		"before", before,
+		"scope_plan_id", scopePlanID(scope),
+		"scope_testee_count", scopeTesteeCount(scope),
 		"pending_tasks_count", len(tasks),
 	)
 
@@ -207,6 +218,8 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		"source", source,
 		"org_id", orgID,
 		"before", before,
+		"scope_plan_id", scopePlanID(scope),
+		"scope_testee_count", scopeTesteeCount(scope),
 		"total_pending", len(tasks),
 		"opened_count", len(openedTasks),
 		"failed_count", failedCount,
@@ -216,6 +229,94 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	)
 
 	return toTaskResults(openedTasks), nil
+}
+
+func (s *taskSchedulerService) findPendingTasks(ctx context.Context, orgID int64, before time.Time) ([]*plan.AssessmentTask, error) {
+	scope := taskSchedulerScopeFromContext(ctx)
+	if scope == nil || (strings.TrimSpace(scope.PlanID) == "" && len(scope.TesteeIDs) == 0) {
+		return s.taskRepo.FindPendingTasks(ctx, orgID, before)
+	}
+	planID := strings.TrimSpace(scope.PlanID)
+	if planID == "" {
+		return s.taskRepo.FindPendingTasks(ctx, orgID, before)
+	}
+
+	parsedPlanID, err := plan.ParseAssessmentPlanID(planID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID")
+	}
+
+	var tasks []*plan.AssessmentTask
+	if len(scope.TesteeIDs) > 0 {
+		testeeIDs, err := parseScheduleScopeTesteeIDs(scope.TesteeIDs)
+		if err != nil {
+			return nil, err
+		}
+		tasks, err = s.taskRepo.FindByPlanIDAndTesteeIDs(ctx, parsedPlanID, testeeIDs)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		tasks, err = s.taskRepo.FindByPlanID(ctx, parsedPlanID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	filtered := make([]*plan.AssessmentTask, 0, len(tasks))
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		if task.GetOrgID() != orgID || !task.IsPending() {
+			continue
+		}
+		if task.GetPlannedAt().After(before) {
+			continue
+		}
+		filtered = append(filtered, task)
+	}
+
+	sort.SliceStable(filtered, func(i, j int) bool {
+		if filtered[i].GetPlannedAt().Equal(filtered[j].GetPlannedAt()) {
+			return filtered[i].GetID().Uint64() < filtered[j].GetID().Uint64()
+		}
+		return filtered[i].GetPlannedAt().Before(filtered[j].GetPlannedAt())
+	})
+	return filtered, nil
+}
+
+func parseScheduleScopeTesteeIDs(rawIDs []string) ([]testee.ID, error) {
+	parsed := make([]testee.ID, 0, len(rawIDs))
+	for _, rawID := range rawIDs {
+		rawID = strings.TrimSpace(rawID)
+		if rawID == "" {
+			continue
+		}
+		id, err := meta.ParseID(rawID)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID")
+		}
+		if id.IsZero() {
+			continue
+		}
+		parsed = append(parsed, id)
+	}
+	return parsed, nil
+}
+
+func scopePlanID(scope *TaskSchedulerScope) string {
+	if scope == nil {
+		return ""
+	}
+	return scope.PlanID
+}
+
+func scopeTesteeCount(scope *TaskSchedulerScope) int {
+	if scope == nil {
+		return 0
+	}
+	return len(scope.TesteeIDs)
 }
 
 func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int64, planCache map[string]*plan.AssessmentPlan) (int, int) {

@@ -11,9 +11,14 @@ import (
 )
 
 type schedulerTaskRepoStub struct {
-	pendingTasks []*domainPlan.AssessmentTask
-	expiredTasks []*domainPlan.AssessmentTask
-	savedTasks   []*domainPlan.AssessmentTask
+	pendingTasks        []*domainPlan.AssessmentTask
+	scopedTasks         []*domainPlan.AssessmentTask
+	expiredTasks        []*domainPlan.AssessmentTask
+	savedTasks          []*domainPlan.AssessmentTask
+	findPendingCalled   bool
+	findScopedCalled    bool
+	lastScopedPlanID    domainPlan.AssessmentPlanID
+	lastScopedTesteeIDs []testee.ID
 }
 
 func (r *schedulerTaskRepoStub) FindByID(context.Context, domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error) {
@@ -24,8 +29,11 @@ func (r *schedulerTaskRepoStub) FindByPlanID(context.Context, domainPlan.Assessm
 	return nil, nil
 }
 
-func (r *schedulerTaskRepoStub) FindByPlanIDAndTesteeIDs(context.Context, domainPlan.AssessmentPlanID, []testee.ID) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
+func (r *schedulerTaskRepoStub) FindByPlanIDAndTesteeIDs(_ context.Context, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID) ([]*domainPlan.AssessmentTask, error) {
+	r.findScopedCalled = true
+	r.lastScopedPlanID = planID
+	r.lastScopedTesteeIDs = append([]testee.ID(nil), testeeIDs...)
+	return r.scopedTasks, nil
 }
 
 func (r *schedulerTaskRepoStub) FindByTesteeID(context.Context, testee.ID) ([]*domainPlan.AssessmentTask, error) {
@@ -37,6 +45,7 @@ func (r *schedulerTaskRepoStub) FindByTesteeIDAndPlanID(context.Context, testee.
 }
 
 func (r *schedulerTaskRepoStub) FindPendingTasks(context.Context, int64, time.Time) ([]*domainPlan.AssessmentTask, error) {
+	r.findPendingCalled = true
 	return r.pendingTasks, nil
 }
 
@@ -140,5 +149,65 @@ func TestTaskSchedulerServiceCancelsPendingTaskForInactivePlan(t *testing.T) {
 	}
 	if len(taskRepo.savedTasks) != 1 || taskRepo.savedTasks[0] != task {
 		t.Fatalf("expected canceled task to be persisted once")
+	}
+}
+
+func TestTaskSchedulerServiceSchedulesScopedTasksWithoutGlobalPendingScan(t *testing.T) {
+	p, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+
+	before := time.Now()
+	scopedTask := domainPlan.NewAssessmentTask(
+		p.GetID(),
+		1,
+		1,
+		testee.NewID(3001),
+		"scale-code",
+		before.Add(-time.Minute),
+	)
+	futureScopedTask := domainPlan.NewAssessmentTask(
+		p.GetID(),
+		1,
+		2,
+		testee.NewID(3001),
+		"scale-code",
+		before.Add(time.Hour),
+	)
+
+	taskRepo := &schedulerTaskRepoStub{
+		pendingTasks: []*domainPlan.AssessmentTask{
+			domainPlan.NewAssessmentTask(p.GetID(), 1, 9, testee.NewID(9999), "scale-code", before.Add(-time.Minute)),
+		},
+		scopedTasks: []*domainPlan.AssessmentTask{scopedTask, futureScopedTask},
+	}
+	planRepo := &schedulerPlanRepoByIDStub{plan: p}
+	entryGenerator := &entryGeneratorStub{}
+
+	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	ctx := WithTaskSchedulerScope(context.Background(), p.GetID().String(), []string{"3001"})
+	results, err := service.SchedulePendingTasks(ctx, 1, before.Format("2006-01-02 15:04:05"))
+	if err != nil {
+		t.Fatalf("SchedulePendingTasks returned error: %v", err)
+	}
+
+	if taskRepo.findPendingCalled {
+		t.Fatalf("expected scoped scheduling to avoid global pending scan")
+	}
+	if !taskRepo.findScopedCalled {
+		t.Fatalf("expected scoped scheduling to query scoped tasks")
+	}
+	if taskRepo.lastScopedPlanID != p.GetID() {
+		t.Fatalf("expected scoped plan id %s, got %s", p.GetID().String(), taskRepo.lastScopedPlanID.String())
+	}
+	if len(taskRepo.lastScopedTesteeIDs) != 1 || taskRepo.lastScopedTesteeIDs[0] != testee.NewID(3001) {
+		t.Fatalf("expected scoped testee ids [3001], got %+v", taskRepo.lastScopedTesteeIDs)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected only one due scoped task to be opened, got %d", len(results))
+	}
+	if results[0].ID != scopedTask.GetID().String() {
+		t.Fatalf("expected opened task %s, got %s", scopedTask.GetID().String(), results[0].ID)
 	}
 }

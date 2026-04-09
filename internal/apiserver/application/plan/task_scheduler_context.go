@@ -13,6 +13,7 @@ const (
 
 type taskSchedulerSourceKey struct{}
 type taskScheduleStatsCollectorKey struct{}
+type taskSchedulerScopeKey struct{}
 
 // TaskScheduleStats 记录一次任务调度中的统计数据。
 type TaskScheduleStats struct {
@@ -23,12 +24,30 @@ type TaskScheduleStats struct {
 	ExpireFailedCount int
 }
 
+// TaskSchedulerScope 表示一次调度的可选过滤范围。
+type TaskSchedulerScope struct {
+	PlanID    string
+	TesteeIDs []string
+}
+
 // WithTaskSchedulerSource 为调度上下文写入调用来源。
 func WithTaskSchedulerSource(ctx context.Context, source string) context.Context {
 	if source == "" {
 		return ctx
 	}
 	return context.WithValue(ctx, taskSchedulerSourceKey{}, source)
+}
+
+// WithTaskSchedulerScope 为调度上下文附加计划/受试者范围。
+func WithTaskSchedulerScope(ctx context.Context, planID string, testeeIDs []string) context.Context {
+	if planID == "" && len(testeeIDs) == 0 {
+		return ctx
+	}
+	scope := &TaskSchedulerScope{PlanID: planID}
+	if len(testeeIDs) > 0 {
+		scope.TesteeIDs = append([]string(nil), testeeIDs...)
+	}
+	return context.WithValue(ctx, taskSchedulerScopeKey{}, scope)
 }
 
 // WithTaskScheduleStatsCollector 为调度上下文附加统计收集器。
@@ -45,6 +64,14 @@ func taskSchedulerSourceFromContext(ctx context.Context) string {
 	}
 	source, _ := ctx.Value(taskSchedulerSourceKey{}).(string)
 	return source
+}
+
+func taskSchedulerScopeFromContext(ctx context.Context) *TaskSchedulerScope {
+	if ctx == nil {
+		return nil
+	}
+	scope, _ := ctx.Value(taskSchedulerScopeKey{}).(*TaskSchedulerScope)
+	return scope
 }
 
 // CollectTaskScheduleStats 将调度统计累加到上下文收集器中。

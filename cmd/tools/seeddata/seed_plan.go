@@ -24,6 +24,8 @@ const (
 	planTaskCompletionInterval = 2 * time.Second
 	planTaskCompletedOffset    = 2 * time.Hour
 	planTaskTimeLayout         = "2006-01-02 15:04:05"
+	planScheduleBatchFactor    = 4
+	planTaskBufferFactor       = 4
 )
 
 func seedPlanBackfill(
@@ -34,6 +36,7 @@ func seedPlanBackfill(
 	planTesteeIDsRaw string,
 	planWorkers int,
 	planExpireRate float64,
+	planProcessExistingOnly bool,
 	testeePageSize, testeeOffset, testeeLimit int,
 	verbose bool,
 ) error {
@@ -62,6 +65,7 @@ func seedPlanBackfill(
 		"org_id", orgID,
 		"plan_workers", planWorkers,
 		"plan_expire_rate", planExpireRate,
+		"plan_process_existing_only", planProcessExistingOnly,
 		"testee_page_size", testeePageSize,
 		"testee_offset", testeeOffset,
 		"testee_limit", testeeLimit,
@@ -178,26 +182,40 @@ func seedPlanBackfill(
 		"selected_testee_count", len(selectedTestees),
 	)
 
-	enrolledCount, err := enrollPlanTesteesConcurrently(ctx, deps, planID, selectedTestees, planWorkers)
+	existingStats, err := inspectExistingPlanTasks(ctx, deps, planID, selectedTestees, planWorkers)
 	if err != nil {
 		return err
 	}
-
-	scheduleSource := planApp.TaskSchedulerSourceSeedData
-	scheduleResp, err := deps.APIClient.SchedulePendingTasks(ctx, "", scheduleSource)
-	if err != nil {
-		return fmt.Errorf("schedule pending tasks for org %d: %w", orgID, err)
-	}
-	logger.Infow("Scheduled pending plan tasks",
+	logger.Infow("Inspected existing plan tasks before backfill",
 		"plan_id", planID,
 		"org_id", orgID,
-		"source", scheduleSource,
-		"opened_count", len(scheduleResp.Tasks),
-		"schedule_stats", scheduleResp.Stats,
-		"mini_program_delivery", "skipped",
+		"selected_testee_count", len(selectedTestees),
+		"existing_task_stats", existingStats,
 	)
 
-	submittedCount, skippedCount, completedCount, expiredCount, err := processPlanTasksConcurrently(
+	enrolledCount := 0
+	if planProcessExistingOnly {
+		if existingStats.Total == 0 {
+			logger.Infow("No existing plan tasks found for recovery mode",
+				"plan_id", planID,
+				"org_id", orgID,
+				"selected_testee_count", len(selectedTestees),
+			)
+			return nil
+		}
+		logger.Infow("Skipping plan enrollment because recovery mode is enabled",
+			"plan_id", planID,
+			"org_id", orgID,
+			"selected_testee_count", len(selectedTestees),
+		)
+	} else {
+		enrolledCount, err = enrollPlanTesteesConcurrently(ctx, deps, planID, selectedTestees, planWorkers)
+		if err != nil {
+			return err
+		}
+	}
+
+	openedCount, scheduleStats, submittedCount, skippedCount, completedCount, expiredCount, err := scheduleAndProcessPlanTasks(
 		ctx,
 		deps,
 		planID,
@@ -221,7 +239,8 @@ func seedPlanBackfill(
 		"completed_tasks", completedCount,
 		"expired_tasks", expiredCount,
 		"skipped_tasks", skippedCount,
-		"opened_tasks", len(scheduleResp.Tasks),
+		"opened_tasks", openedCount,
+		"schedule_stats", scheduleStats,
 	)
 
 	return nil
@@ -285,7 +304,7 @@ func enrollPlanTesteesConcurrently(
 	return int(enrolledCount.Load()), nil
 }
 
-func processPlanTasksConcurrently(
+func scheduleAndProcessPlanTasks(
 	ctx context.Context,
 	deps *dependencies,
 	planID string,
@@ -296,54 +315,102 @@ func processPlanTasksConcurrently(
 	workers int,
 	planExpireRate float64,
 	verbose bool,
-) (int, int, int, int, error) {
+) (int, *TaskScheduleStatsResponse, int, int, int, int, error) {
 	var submittedCount atomic.Int64
 	var skippedCount atomic.Int64
 	var completedCount atomic.Int64
 	var expiredCount atomic.Int64
 	var reservedOpenTask atomic.Bool
-	progress := newPlanTaskProgressBar(
-		"Processing scheduled pending plan tasks",
-		len(selectedTestees),
-		func() string {
-			return fmt.Sprintf(
-				"completed=%d expired=%d submitted=%d skipped=%d",
-				completedCount.Load(),
-				expiredCount.Load(),
-				submittedCount.Load(),
-				skippedCount.Load(),
-			)
-		},
-	)
-	defer progress.Close()
 
-	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
-		err := processPlanTasksForTestee(
+	aggregateScheduleStats := &TaskScheduleStatsResponse{}
+	totalOpenedCount := 0
+	scheduleSource := planApp.TaskSchedulerSourceSeedData
+	taskBufferSize := normalizePlanTaskBufferSize(workers)
+	batches := chunkPlanTestees(selectedTestees, normalizePlanScheduleBatchSize(workers))
+
+	for batchIndex, batch := range batches {
+		scheduleResp, err := deps.APIClient.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
+			Source:    scheduleSource,
+			PlanID:    planID,
+			TesteeIDs: collectPlanTesteeIDs(batch),
+		})
+		if err != nil {
+			return 0, nil, 0, 0, 0, 0, fmt.Errorf("schedule pending tasks for org %d batch %d/%d: %w", orgID, batchIndex+1, len(batches), err)
+		}
+
+		totalOpenedCount += len(scheduleResp.Tasks)
+		mergeTaskScheduleStats(aggregateScheduleStats, scheduleResp.Stats)
+		deps.Logger.Infow("Scheduled pending plan tasks",
+			"plan_id", planID,
+			"org_id", orgID,
+			"source", scheduleSource,
+			"batch_index", batchIndex+1,
+			"batch_count", len(batches),
+			"batch_testee_count", len(batch),
+			"opened_count", len(scheduleResp.Tasks),
+			"schedule_stats", scheduleResp.Stats,
+			"mini_program_delivery", "skipped",
+		)
+
+		taskJobs, err := collectPlanTaskJobs(
 			ctx,
 			deps,
 			planID,
-			orgID,
-			questionnaireVersion,
-			detail,
-			testee,
-			planExpireRate,
+			batch,
 			verbose,
-			&reservedOpenTask,
-			&submittedCount,
 			&skippedCount,
-			&completedCount,
-			&expiredCount,
 		)
-		if err == nil {
-			progress.Advance()
+		if err != nil {
+			return 0, nil, 0, 0, 0, 0, err
 		}
-		return err
-	}); err != nil {
-		progress.Fail()
-		return 0, 0, 0, 0, err
+		if len(taskJobs) == 0 {
+			continue
+		}
+
+		progress := newPlanTaskProgressBar(
+			fmt.Sprintf("Processing scheduled pending plan tasks (%d/%d)", batchIndex+1, len(batches)),
+			len(taskJobs),
+			func() string {
+				return fmt.Sprintf(
+					"completed=%d expired=%d submitted=%d skipped=%d",
+					completedCount.Load(),
+					expiredCount.Load(),
+					submittedCount.Load(),
+					skippedCount.Load(),
+				)
+			},
+		)
+
+		err = runPlanTaskWorkerPool(ctx, taskJobs, workers, taskBufferSize, func(ctx context.Context, job planTaskJob) error {
+			err := processPlanTaskJob(
+				ctx,
+				deps,
+				planID,
+				orgID,
+				questionnaireVersion,
+				detail,
+				job,
+				planExpireRate,
+				verbose,
+				&reservedOpenTask,
+				&submittedCount,
+				&skippedCount,
+				&completedCount,
+				&expiredCount,
+			)
+			if err == nil {
+				progress.Advance()
+			}
+			return err
+		})
+		if err != nil {
+			progress.Fail()
+			return 0, nil, 0, 0, 0, 0, err
+		}
+		progress.Finish()
 	}
-	progress.Finish()
-	return int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), nil
+
+	return totalOpenedCount, aggregateScheduleStats, int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), nil
 }
 
 func runPlanTesteeWorkerPool(
@@ -401,14 +468,211 @@ func runPlanTesteeWorkerPool(
 	return g.Wait()
 }
 
-func processPlanTasksForTestee(
+type planTaskJob struct {
+	testee *TesteeResponse
+	task   TaskResponse
+}
+
+type planTaskStatusStats struct {
+	Total     int `json:"total"`
+	Pending   int `json:"pending"`
+	Opened    int `json:"opened"`
+	Completed int `json:"completed"`
+	Expired   int `json:"expired"`
+	Canceled  int `json:"canceled"`
+	Unknown   int `json:"unknown"`
+}
+
+func runPlanTaskWorkerPool(
+	ctx context.Context,
+	jobs []planTaskJob,
+	workers int,
+	bufferSize int,
+	fn func(context.Context, planTaskJob) error,
+) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+	if workers <= 0 {
+		workers = 1
+	}
+	if bufferSize < workers {
+		bufferSize = workers
+	}
+	if fn == nil {
+		return fmt.Errorf("plan task worker function is nil")
+	}
+
+	jobCh := make(chan planTaskJob, bufferSize)
+	g, gctx := errgroup.WithContext(ctx)
+
+	for i := 0; i < workers; i++ {
+		g.Go(func() error {
+			for {
+				select {
+				case <-gctx.Done():
+					return nil
+				case job, ok := <-jobCh:
+					if !ok {
+						return nil
+					}
+					if job.testee == nil || strings.TrimSpace(job.task.ID) == "" {
+						continue
+					}
+					if err := fn(gctx, job); err != nil {
+						return err
+					}
+				}
+			}
+		})
+	}
+
+	g.Go(func() error {
+		defer close(jobCh)
+		for _, job := range jobs {
+			select {
+			case <-gctx.Done():
+				return nil
+			case jobCh <- job:
+			}
+		}
+		return nil
+	})
+
+	return g.Wait()
+}
+
+func collectPlanTaskJobs(
+	ctx context.Context,
+	deps *dependencies,
+	planID string,
+	testees []*TesteeResponse,
+	verbose bool,
+	skippedCount *atomic.Int64,
+) ([]planTaskJob, error) {
+	taskJobs := make([]planTaskJob, 0, len(testees))
+	for _, testee := range testees {
+		if testee == nil || strings.TrimSpace(testee.ID) == "" {
+			continue
+		}
+		taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+		if err != nil {
+			return nil, fmt.Errorf("list tasks for testee %s plan %s: %w", testee.ID, planID, err)
+		}
+		tasks := append([]TaskResponse(nil), taskList.Tasks...)
+		sortTasksBySeq(tasks)
+
+		for _, task := range tasks {
+			switch normalizeTaskStatus(task.Status) {
+			case "completed", "canceled":
+				skippedCount.Add(1)
+				if verbose {
+					deps.Logger.Debugw("Skipping terminal plan task",
+						"plan_id", planID,
+						"testee_id", testee.ID,
+						"task_id", task.ID,
+						"status", task.Status,
+					)
+				}
+			case "pending", "expired":
+				skippedCount.Add(1)
+				if verbose {
+					deps.Logger.Debugw("Skipping non-open plan task",
+						"plan_id", planID,
+						"testee_id", testee.ID,
+						"task_id", task.ID,
+						"status", task.Status,
+					)
+				}
+			case "opened":
+				taskJobs = append(taskJobs, planTaskJob{testee: testee, task: task})
+			default:
+				skippedCount.Add(1)
+				deps.Logger.Warnw("Skipping task with unsupported status",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"task_id", task.ID,
+					"status", task.Status,
+				)
+			}
+		}
+	}
+	return taskJobs, nil
+}
+
+func inspectExistingPlanTasks(
+	ctx context.Context,
+	deps *dependencies,
+	planID string,
+	testees []*TesteeResponse,
+	workers int,
+) (*planTaskStatusStats, error) {
+	stats := &planTaskStatusStats{}
+	var mu sync.Mutex
+
+	err := runPlanTesteeWorkerPool(ctx, testees, workers, func(ctx context.Context, testee *TesteeResponse) error {
+		if testee == nil || strings.TrimSpace(testee.ID) == "" {
+			return nil
+		}
+		taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+		if err != nil {
+			return fmt.Errorf("inspect existing tasks for testee %s plan %s: %w", testee.ID, planID, err)
+		}
+		local := summarizePlanTaskStatuses(taskList.Tasks)
+		mu.Lock()
+		mergePlanTaskStatusStats(stats, local)
+		mu.Unlock()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+func summarizePlanTaskStatuses(tasks []TaskResponse) *planTaskStatusStats {
+	stats := &planTaskStatusStats{}
+	for _, task := range tasks {
+		stats.Total++
+		switch normalizeTaskStatus(task.Status) {
+		case "pending":
+			stats.Pending++
+		case "opened":
+			stats.Opened++
+		case "completed":
+			stats.Completed++
+		case "expired":
+			stats.Expired++
+		case "canceled":
+			stats.Canceled++
+		default:
+			stats.Unknown++
+		}
+	}
+	return stats
+}
+
+func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.Total += src.Total
+	dst.Pending += src.Pending
+	dst.Opened += src.Opened
+	dst.Completed += src.Completed
+	dst.Expired += src.Expired
+	dst.Canceled += src.Canceled
+	dst.Unknown += src.Unknown
+}
+
+func processPlanTaskJob(
 	ctx context.Context,
 	deps *dependencies,
 	planID string,
 	orgID int64,
 	questionnaireVersion string,
 	detail *QuestionnaireDetailResponse,
-	testee *TesteeResponse,
+	job planTaskJob,
 	planExpireRate float64,
 	verbose bool,
 	reservedOpenTask *atomic.Bool,
@@ -417,115 +681,72 @@ func processPlanTasksForTestee(
 	completedCount *atomic.Int64,
 	expiredCount *atomic.Int64,
 ) error {
-	taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+	testee := job.testee
+	task := job.task
+
+	if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
+		skippedCount.Add(1)
+		deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
+			"plan_id", planID,
+			"testee_id", testee.ID,
+			"task_id", task.ID,
+			"seq", task.Seq,
+		)
+		return nil
+	}
+
+	if shouldExpirePlanTask(task, planExpireRate) {
+		if _, err := deps.APIClient.ExpireTask(ctx, task.ID); err != nil {
+			return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
+		}
+		expiredCount.Add(1)
+		if verbose {
+			deps.Logger.Infow("Plan task expired intentionally",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"task_id", task.ID,
+				"seq", task.Seq,
+				"expire_rate", planExpireRate,
+			)
+		}
+		return nil
+	}
+
+	req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
 	if err != nil {
-		return fmt.Errorf("list tasks for testee %s plan %s: %w", testee.ID, planID, err)
-	}
-	tasks := append([]TaskResponse(nil), taskList.Tasks...)
-	sortTasksBySeq(tasks)
-
-	for _, task := range tasks {
-		switch normalizeTaskStatus(task.Status) {
-		case "completed", "canceled":
-			skippedCount.Add(1)
-			if verbose {
-				deps.Logger.Debugw("Skipping terminal plan task",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"task_id", task.ID,
-					"status", task.Status,
-				)
-			}
-			continue
-		case "pending", "expired":
-			skippedCount.Add(1)
-			if verbose {
-				deps.Logger.Debugw("Skipping non-open plan task",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"task_id", task.ID,
-					"status", task.Status,
-				)
-			}
-			continue
-		case "opened":
-		// continue
-		default:
-			skippedCount.Add(1)
-			deps.Logger.Warnw("Skipping task with unsupported status",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"task_id", task.ID,
-				"status", task.Status,
-			)
-			continue
-		}
-
-		if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
-			skippedCount.Add(1)
-			deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"task_id", task.ID,
-				"seq", task.Seq,
-			)
-			continue
-		}
-
-		if shouldExpirePlanTask(task, planExpireRate) {
-			if _, err := deps.APIClient.ExpireTask(ctx, task.ID); err != nil {
-				return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
-			}
-			expiredCount.Add(1)
-			if verbose {
-				deps.Logger.Infow("Plan task expired intentionally",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"task_id", task.ID,
-					"seq", task.Seq,
-					"expire_rate", planExpireRate,
-				)
-			}
-			continue
-		}
-
-		req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
-		if err != nil {
-			return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
-		}
-
-		if verbose {
-			logSubmitRequest(deps.Logger, *req, testee.ID)
-		}
-
-		attempts, err := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
-		if err != nil {
-			return fmt.Errorf(
-				"submit answersheet for testee %s task %s failed after %d attempts: %w",
-				testee.ID,
-				task.ID,
-				attempts,
-				err,
-			)
-		}
-		submittedCount.Add(1)
-
-		if err := waitForTaskCompletion(ctx, deps.APIClient, orgID, task.ID); err != nil {
-			return fmt.Errorf("wait for task %s completion: %w", task.ID, err)
-		}
-		completedCount.Add(1)
-
-		if verbose {
-			deps.Logger.Infow("Plan task completed",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"task_id", task.ID,
-				"seq", task.Seq,
-				"attempts", attempts,
-			)
-		}
+		return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
 	}
 
+	if verbose {
+		logSubmitRequest(deps.Logger, *req, testee.ID)
+	}
+
+	attempts, err := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
+	if err != nil {
+		return fmt.Errorf(
+			"submit answersheet for testee %s task %s failed after %d attempts: %w",
+			testee.ID,
+			task.ID,
+			attempts,
+			err,
+		)
+	}
+	submittedCount.Add(1)
+
+	if err := waitForTaskCompletion(ctx, deps.APIClient, orgID, task.ID); err != nil {
+		return fmt.Errorf("wait for task %s completion: %w", task.ID, err)
+	}
+	completedCount.Add(1)
+
+	if verbose {
+		deps.Logger.Infow("Plan task completed",
+			"plan_id", planID,
+			"testee_id", testee.ID,
+			"task_id", task.ID,
+			"seq", task.Seq,
+			"attempts", attempts,
+		)
+	}
 	return nil
 }
 
@@ -669,6 +890,73 @@ func sortTasksBySeq(tasks []TaskResponse) {
 		}
 		return tasks[i].Seq < tasks[j].Seq
 	})
+}
+
+func collectPlanTesteeIDs(testees []*TesteeResponse) []string {
+	ids := make([]string, 0, len(testees))
+	for _, testee := range testees {
+		if testee == nil {
+			continue
+		}
+		id := strings.TrimSpace(testee.ID)
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func normalizePlanScheduleBatchSize(workers int) int {
+	if workers <= 0 {
+		return 1
+	}
+	size := workers * planScheduleBatchFactor
+	if size < workers {
+		size = workers
+	}
+	return size
+}
+
+func normalizePlanTaskBufferSize(workers int) int {
+	if workers <= 0 {
+		return 1
+	}
+	size := workers * planTaskBufferFactor
+	if size < workers {
+		size = workers
+	}
+	return size
+}
+
+func chunkPlanTestees(testees []*TesteeResponse, batchSize int) [][]*TesteeResponse {
+	if len(testees) == 0 {
+		return nil
+	}
+	if batchSize <= 0 {
+		batchSize = 1
+	}
+
+	batches := make([][]*TesteeResponse, 0, (len(testees)+batchSize-1)/batchSize)
+	for start := 0; start < len(testees); start += batchSize {
+		end := start + batchSize
+		if end > len(testees) {
+			end = len(testees)
+		}
+		batches = append(batches, testees[start:end])
+	}
+	return batches
+}
+
+func mergeTaskScheduleStats(dst *TaskScheduleStatsResponse, src *TaskScheduleStatsResponse) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.PendingCount += src.PendingCount
+	dst.OpenedCount += src.OpenedCount
+	dst.FailedCount += src.FailedCount
+	dst.ExpiredCount += src.ExpiredCount
+	dst.ExpireFailedCount += src.ExpireFailedCount
 }
 
 func buildPlanSubmissionRequest(
@@ -889,7 +1177,7 @@ func (b *planTaskProgressBar) renderLocked() {
 	}
 	bar := strings.Repeat("=", filled) + strings.Repeat(" ", width-filled)
 	elapsed := time.Since(b.startedAt).Round(time.Second)
-	line := fmt.Sprintf("\r%s [%s] %d/%d testees elapsed=%s", b.label, bar, b.current, b.total, elapsed)
+	line := fmt.Sprintf("\r%s [%s] %d/%d items elapsed=%s", b.label, bar, b.current, b.total, elapsed)
 	if b.extraStatus != nil {
 		if extra := strings.TrimSpace(b.extraStatus()); extra != "" {
 			line += " " + extra

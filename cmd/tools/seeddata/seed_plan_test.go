@@ -146,3 +146,21 @@ func TestApplyTesteeLimitToIDs(t *testing.T) {
 		t.Fatalf("expected large limit to keep all ids, got %v", got)
 	}
 }
+
+func TestSummarizePlanTaskStatuses(t *testing.T) {
+	stats := summarizePlanTaskStatuses([]TaskResponse{
+		{Status: "pending"},
+		{Status: "opened"},
+		{Status: "completed"},
+		{Status: "expired"},
+		{Status: "canceled"},
+		{Status: "weird"},
+	})
+
+	if stats.Total != 6 {
+		t.Fatalf("expected total=6, got %d", stats.Total)
+	}
+	if stats.Pending != 1 || stats.Opened != 1 || stats.Completed != 1 || stats.Expired != 1 || stats.Canceled != 1 || stats.Unknown != 1 {
+		t.Fatalf("unexpected task stats: %+v", stats)
+	}
+}

@@ -402,12 +402,22 @@ func (h *PlanHandler) TerminateEnrollment(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /internal/v1/plans/tasks/schedule [post]
 func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
-	before := c.Query("before")
-	if before == "" {
-		// 默认使用当前时间
-		before = ""
+	var req request.SchedulePendingTasksRequest
+	if c.Request != nil && c.Request.Body != nil && c.Request.ContentLength != 0 {
+		if err := h.BindJSON(c, &req); err != nil {
+			h.Error(c, err)
+			return
+		}
 	}
-	source := c.Query("source")
+
+	before := req.Before
+	if queryBefore := c.Query("before"); queryBefore != "" {
+		before = queryBefore
+	}
+	source := req.Source
+	if querySource := c.Query("source"); querySource != "" {
+		source = querySource
+	}
 	if source == "" {
 		source = planApp.TaskSchedulerSourceInternalAPI
 	}
@@ -418,6 +428,9 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 	}
 
 	ctx := planApp.WithTaskSchedulerSource(c.Request.Context(), source)
+	if req.PlanID != "" || len(req.TesteeIDs) > 0 {
+		ctx = planApp.WithTaskSchedulerScope(ctx, req.PlanID, req.TesteeIDs)
+	}
 	scheduleResult, err := h.commandService.SchedulePendingTasks(ctx, orgID, before)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to schedule pending tasks",
@@ -430,7 +443,7 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, response.NewTaskListResponseFromSlice(scheduleResult.Tasks))
+	h.Success(c, response.NewTaskScheduleResponse(scheduleResult))
 }
 
 // ============= Task Management API (任务管理) =============

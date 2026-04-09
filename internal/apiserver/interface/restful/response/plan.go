@@ -53,10 +53,20 @@ type PlanListResponse struct {
 
 // TaskListResponse 任务列表响应
 type TaskListResponse struct {
-	Tasks      []TaskResponse `json:"tasks"`
-	TotalCount int64          `json:"total_count"`
-	Page       int            `json:"page"`
-	PageSize   int            `json:"page_size"`
+	Tasks      []TaskResponse             `json:"tasks"`
+	TotalCount int64                      `json:"total_count"`
+	Page       int                        `json:"page"`
+	PageSize   int                        `json:"page_size"`
+	Stats      *TaskScheduleStatsResponse `json:"stats,omitempty"`
+}
+
+// TaskScheduleStatsResponse 调度统计响应
+type TaskScheduleStatsResponse struct {
+	PendingCount      int `json:"pending_count"`
+	OpenedCount       int `json:"opened_count"`
+	FailedCount       int `json:"failed_count"`
+	ExpiredCount      int `json:"expired_count"`
+	ExpireFailedCount int `json:"expire_failed_count"`
 }
 
 // ============= Converters =============
@@ -190,4 +200,20 @@ func NewTaskListResponseFromSlice(tasks []*plan.TaskResult) *TaskListResponse {
 		Page:       1,
 		PageSize:   len(taskResponses),
 	}
+}
+
+// NewTaskScheduleResponse 从 TaskScheduleResult 创建任务调度响应。
+func NewTaskScheduleResponse(result *plan.TaskScheduleResult) *TaskListResponse {
+	if result == nil {
+		return NewTaskListResponseFromSlice(nil)
+	}
+	resp := NewTaskListResponseFromSlice(result.Tasks)
+	resp.Stats = &TaskScheduleStatsResponse{
+		PendingCount:      result.Stats.PendingCount,
+		OpenedCount:       result.Stats.OpenedCount,
+		FailedCount:       result.Stats.FailedCount,
+		ExpiredCount:      result.Stats.ExpiredCount,
+		ExpireFailedCount: result.Stats.ExpireFailedCount,
+	}
+	return resp
 }

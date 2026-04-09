@@ -33,6 +33,14 @@ type EnrollTesteeRequest struct {
 
 // ============= Task Management Requests =============
 
+// SchedulePendingTasksRequest 调度待开放任务请求（内部接口）。
+type SchedulePendingTasksRequest struct {
+	Before    string   `json:"before,omitempty"`     // 截止时间（格式：YYYY-MM-DD HH:mm:ss）
+	Source    string   `json:"source,omitempty"`     // 调用来源
+	PlanID    string   `json:"plan_id,omitempty"`    // 可选：仅调度指定计划
+	TesteeIDs []string `json:"testee_ids,omitempty"` // 可选：仅调度指定受试者集合
+}
+
 // OpenTaskRequest 开放任务请求
 type OpenTaskRequest struct {
 	EntryToken string `json:"entry_token" valid:"required~入口令牌不能为空"`
