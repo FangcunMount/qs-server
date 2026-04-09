@@ -269,3 +269,36 @@ func TestResolvePlanMode(t *testing.T) {
 		})
 	}
 }
+
+func TestSeedPlanPacerNextDelay(t *testing.T) {
+	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+	pacer := newSeedPlanPacer(startedAt, 3*time.Minute, 15*time.Second, nil, false)
+	if pacer == nil {
+		t.Fatal("expected pacer to be initialized")
+	}
+
+	delay, fresh := pacer.nextDelay(startedAt.Add(2 * time.Minute))
+	if delay != 0 || fresh {
+		t.Fatalf("expected no pause before interval, got delay=%s fresh=%v", delay, fresh)
+	}
+
+	delay, fresh = pacer.nextDelay(startedAt.Add(3 * time.Minute))
+	if delay != 15*time.Second || !fresh {
+		t.Fatalf("expected fresh pause at interval boundary, got delay=%s fresh=%v", delay, fresh)
+	}
+
+	delay, fresh = pacer.nextDelay(startedAt.Add(3*time.Minute + 5*time.Second))
+	if delay != 10*time.Second || fresh {
+		t.Fatalf("expected remaining shared pause window, got delay=%s fresh=%v", delay, fresh)
+	}
+
+	delay, fresh = pacer.nextDelay(startedAt.Add(3*time.Minute + 16*time.Second))
+	if delay != 0 || fresh {
+		t.Fatalf("expected no pause immediately after pause window, got delay=%s fresh=%v", delay, fresh)
+	}
+
+	delay, fresh = pacer.nextDelay(startedAt.Add(6 * time.Minute))
+	if delay != 15*time.Second || !fresh {
+		t.Fatalf("expected next pause at following interval, got delay=%s fresh=%v", delay, fresh)
+	}
+}

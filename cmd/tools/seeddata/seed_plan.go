@@ -28,10 +28,117 @@ const (
 	planTaskBufferFactor       = 4
 	planMaxInFlightFactor      = 8
 	planMinMaxInFlightTasks    = 20
+	seedPlanPaceInterval       = 3 * time.Minute
+	seedPlanPaceSleep          = 15 * time.Second
 	seedPlanRecoverableRetries = 3
 	seedPlanRecoverableMinWait = 30 * time.Second
 	seedPlanRecoverableMaxWait = 120 * time.Second
 )
+
+type seedPlanPacerCtxKey struct{}
+
+type seedPlanPacer struct {
+	mu          sync.Mutex
+	startedAt   time.Time
+	interval    time.Duration
+	pause       time.Duration
+	nextPauseAt time.Time
+	sleepUntil  time.Time
+	logger      interface{ Infow(string, ...interface{}) }
+	verbose     bool
+}
+
+func newSeedPlanPacer(
+	startedAt time.Time,
+	interval time.Duration,
+	pause time.Duration,
+	logger interface{ Infow(string, ...interface{}) },
+	verbose bool,
+) *seedPlanPacer {
+	if interval <= 0 || pause <= 0 {
+		return nil
+	}
+	if startedAt.IsZero() {
+		startedAt = time.Now()
+	}
+	return &seedPlanPacer{
+		startedAt: startedAt,
+		interval:  interval,
+		pause:     pause,
+		logger:    logger,
+		verbose:   verbose,
+	}
+}
+
+func withSeedPlanPacer(ctx context.Context, pacer *seedPlanPacer) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if pacer == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, seedPlanPacerCtxKey{}, pacer)
+}
+
+func seedPlanPacerFromContext(ctx context.Context) *seedPlanPacer {
+	if ctx == nil {
+		return nil
+	}
+	pacer, _ := ctx.Value(seedPlanPacerCtxKey{}).(*seedPlanPacer)
+	return pacer
+}
+
+func (p *seedPlanPacer) nextDelay(now time.Time) (time.Duration, bool) {
+	if p == nil || p.interval <= 0 || p.pause <= 0 {
+		return 0, false
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.startedAt.IsZero() {
+		p.startedAt = now
+	}
+	if p.nextPauseAt.IsZero() {
+		p.nextPauseAt = p.startedAt.Add(p.interval)
+	}
+
+	if !p.sleepUntil.IsZero() && now.Before(p.sleepUntil) {
+		return p.sleepUntil.Sub(now), false
+	}
+	if now.Before(p.nextPauseAt) {
+		return 0, false
+	}
+
+	p.sleepUntil = now.Add(p.pause)
+	for !p.nextPauseAt.After(now) {
+		p.nextPauseAt = p.nextPauseAt.Add(p.interval)
+	}
+	return p.pause, true
+}
+
+func (p *seedPlanPacer) Wait(ctx context.Context, reason string) error {
+	if p == nil {
+		return nil
+	}
+	delay, freshPause := p.nextDelay(time.Now())
+	if delay <= 0 {
+		return nil
+	}
+
+	if freshPause && p.verbose && p.logger != nil {
+		p.logger.Infow("Seed plan pacing pause",
+			"reason", reason,
+			"pause_seconds", int(delay.Seconds()),
+			"interval_seconds", int(p.interval.Seconds()),
+		)
+	}
+	return sleepWithContext(ctx, delay)
+}
+
+func waitForSeedPlanPacer(ctx context.Context, reason string) error {
+	return seedPlanPacerFromContext(ctx).Wait(ctx, reason)
+}
 
 func seedPlanBackfill(
 	ctx context.Context,
@@ -83,6 +190,17 @@ func seedPlanBackfill(
 		"testee_offset", testeeOffset,
 		"testee_limit", testeeLimit,
 		"verbose", verbose,
+	)
+
+	ctx = withSeedPlanPacer(
+		ctx,
+		newSeedPlanPacer(
+			time.Now(),
+			seedPlanPaceInterval,
+			seedPlanPaceSleep,
+			logger,
+			verbose,
+		),
 	)
 
 	prewarmAPIToken(ctx, deps.APIClient, orgID, logger)
@@ -347,6 +465,10 @@ func enrollPlanTesteesConcurrently(
 				)
 			}
 
+			if err := waitForSeedPlanPacer(ctx, "enroll_testee_into_plan"); err != nil {
+				return err
+			}
+
 			resp, err := gateway.EnrollTestee(ctx, EnrollTesteeRequest{
 				PlanID:    planID,
 				TesteeID:  testee.ID,
@@ -450,6 +572,9 @@ func scheduleAndProcessPlanTasks(
 		dashboard.SetCurrentBatch(batchIndex + 1)
 		var scheduleResp *TaskListResponse
 		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "schedule_pending_plan_tasks", fmt.Sprintf("batch_%d", batchIndex+1), func() error {
+			if err := waitForSeedPlanPacer(ctx, "schedule_pending_plan_tasks"); err != nil {
+				return err
+			}
 			resp, err := gateway.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
 				Source:    scheduleSource,
 				PlanID:    planID,
@@ -949,6 +1074,9 @@ func processPlanTaskSubmitStage(
 
 	var attempts int
 	err = runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "submit_plan_answersheet", job.task.ID, func() error {
+		if err := waitForSeedPlanPacer(ctx, "submit_plan_answersheet"); err != nil {
+			return err
+		}
 		submitAttempts, submitErr := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
 		attempts = submitAttempts
 		if submitErr != nil {
@@ -1136,6 +1264,9 @@ func collectPlanTaskJobs(
 		}
 		var taskList *TaskListResponse
 		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_plan_tasks_for_testee", testee.ID, func() error {
+			if err := waitForSeedPlanPacer(ctx, "list_plan_tasks_for_testee"); err != nil {
+				return err
+			}
 			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
 			if err != nil {
 				return err
@@ -1219,6 +1350,9 @@ func inspectExistingPlanTasks(
 		}
 		var taskList *TaskListResponse
 		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "inspect_existing_plan_tasks", testee.ID, func() error {
+			if err := waitForSeedPlanPacer(ctx, "inspect_existing_plan_tasks"); err != nil {
+				return err
+			}
 			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
 			if err != nil {
 				return err
@@ -1284,11 +1418,17 @@ func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats
 }
 
 func expirePlanTaskWithRecovery(ctx context.Context, gateway PlanSeedGateway, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
+	if err := waitForSeedPlanPacer(ctx, "expire_plan_task"); err != nil {
+		return nil, false, err
+	}
 	expiredTask, err := gateway.ExpireTask(ctx, task.ID)
 	if err == nil {
 		return expiredTask, false, nil
 	}
 
+	if err := waitForSeedPlanPacer(ctx, "fetch_expire_plan_task_state"); err != nil {
+		return nil, false, err
+	}
 	currentTask, getErr := gateway.GetTask(ctx, task.ID)
 	if getErr != nil {
 		return nil, false, fmt.Errorf("expire failed: %w; additionally failed to fetch current task state: %v", err, getErr)
@@ -1693,6 +1833,9 @@ func waitForTaskCompletion(
 	for {
 		var task *TaskResponse
 		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "wait_for_plan_task_completion", taskID, func() error {
+			if err := waitForSeedPlanPacer(ctx, "wait_for_plan_task_completion"); err != nil {
+				return err
+			}
 			resp, err := client.GetTask(ctx, taskID)
 			if err != nil {
 				return err
