@@ -32,6 +32,11 @@ type APIClient struct {
 	retryMaxDelay time.Duration
 }
 
+const (
+	defaultHTTPTimeout         = 30 * time.Second
+	planScheduleRequestTimeout = 5 * time.Minute
+)
+
 // NewAPIClient 创建 API 客户端
 func NewAPIClient(baseURL, token string, logger log.Logger) *APIClient {
 	// 确保 baseURL 不以斜杠结尾
@@ -43,7 +48,7 @@ func NewAPIClient(baseURL, token string, logger log.Logger) *APIClient {
 		baseURL: baseURL,
 		token:   token,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultHTTPTimeout,
 		},
 		logger:        logger,
 		retryMax:      retryMax,
@@ -405,11 +410,19 @@ type SubmitAnswerSheetResponse struct {
 
 // doRequest 执行 HTTP 请求
 func (c *APIClient) doRequest(ctx context.Context, method, path string, body interface{}) (*Response, error) {
-	return c.doRequestWithRetry(ctx, method, path, body, true)
+	return c.doRequestWithRetryAndTimeout(ctx, method, path, body, true, c.httpClient.Timeout)
 }
 
 func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string, body interface{}, allowRefresh bool) (*Response, error) {
+	return c.doRequestWithRetryAndTimeout(ctx, method, path, body, allowRefresh, c.httpClient.Timeout)
+}
+
+func (c *APIClient) doRequestWithRetryAndTimeout(ctx context.Context, method, path string, body interface{}, allowRefresh bool, timeout time.Duration) (*Response, error) {
 	url := c.baseURL + path
+	httpClient := *c.httpClient
+	if timeout > 0 {
+		httpClient.Timeout = timeout
+	}
 	for attempt := 0; attempt <= c.retryMax; attempt++ {
 		var reqBody io.Reader
 		if body != nil {
@@ -430,7 +443,7 @@ func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string,
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
 
-		resp, err := c.httpClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
@@ -916,7 +929,7 @@ func (c *APIClient) SchedulePendingTasks(ctx context.Context, before, source str
 	if len(query) > 0 {
 		path += "?" + query.Encode()
 	}
-	resp, err := c.doRequest(ctx, "POST", path, nil)
+	resp, err := c.doRequestWithRetryAndTimeout(ctx, "POST", path, nil, true, planScheduleRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
