@@ -27,7 +27,7 @@ func NewIAMAuthzSyncOptions() *IAMAuthzSyncOptions {
 	return &IAMAuthzSyncOptions{
 		Enabled:        true,
 		Provider:       "nsq",
-		NSQLookupdAddr: "127.0.0.1:4161",
+		NSQLookupdAddr: "",
 		Topic:          DefaultIAMAuthzSyncTopic,
 		ChannelPrefix:  "qs-authz-sync",
 	}

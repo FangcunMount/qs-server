@@ -267,6 +267,14 @@ iam:
   enable-tracing: true            # 启用 OpenTelemetry 链路追踪
   enable-metrics: true            # 启用 Prometheus 指标
   
+  # authz 规则通知
+  authz-sync:
+    enabled: true
+    provider: "nsq"
+    nsq-lookupd-addr: "nsqlookupd:4161"
+    topic: "iam.authz.version"
+    channel-prefix: "qs-authz-sync"
+
   # gRPC 连接配置
   grpc:
     address: "iam-apiserver:9090"  # IAM gRPC 服务地址（Docker 容器，端口 9090）
