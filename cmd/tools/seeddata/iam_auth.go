@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,7 +96,59 @@ func fetchTokenFromIAM(ctx context.Context, cfg IAMConfig, logger log.Logger) (s
 		return "", fmt.Errorf("iam login response missing token")
 	}
 
+	identity := parseSeedTokenIdentity(token)
+	logger.Infow("IAM token acquired",
+		"iam_username", strings.TrimSpace(cfg.Username),
+		"subject", identity.Subject,
+		"user_id", identity.UserID,
+		"account_id", identity.AccountID,
+		"tenant_id", identity.TenantID,
+	)
+
 	return token, nil
+}
+
+type seedTokenIdentity struct {
+	Subject   string
+	UserID    string
+	AccountID string
+	TenantID  string
+}
+
+func parseSeedTokenIdentity(token string) seedTokenIdentity {
+	token = strings.TrimSpace(token)
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return seedTokenIdentity{}
+	}
+
+	payload, err := decodeSeedTokenSegment(parts[1])
+	if err != nil {
+		return seedTokenIdentity{}
+	}
+
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return seedTokenIdentity{}
+	}
+
+	return seedTokenIdentity{
+		Subject:   readStringField(claims, "sub"),
+		UserID:    readStringField(claims, "user_id"),
+		AccountID: readStringField(claims, "account_id"),
+		TenantID:  readStringField(claims, "tenant_id"),
+	}
+}
+
+func decodeSeedTokenSegment(segment string) ([]byte, error) {
+	segment = strings.TrimSpace(segment)
+	if segment == "" {
+		return nil, fmt.Errorf("empty token segment")
+	}
+	if payload, err := base64.RawURLEncoding.DecodeString(segment); err == nil {
+		return payload, nil
+	}
+	return base64.URLEncoding.DecodeString(segment)
 }
 
 func extractTokenFromIAMData(raw json.RawMessage) string {

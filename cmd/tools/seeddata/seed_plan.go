@@ -230,7 +230,7 @@ func seedPlanBackfill(
 		)
 	}
 
-	existingStats, err := inspectExistingPlanTasks(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers)
+	existingStats, err := inspectExistingPlanTasks(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers, verbose)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func enrollPlanTesteesConcurrently(
 	var enrolledCount atomic.Int64
 	var failedCount atomic.Int64
 	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
-		err := runSeedPlanOperationWithRecovery(ctx, logger, "enroll_testee_into_plan", testee.ID, func() error {
+		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "enroll_testee_into_plan", testee.ID, func() error {
 			startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
 			if err != nil {
 				return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
@@ -370,11 +370,13 @@ func enrollPlanTesteesConcurrently(
 		})
 		if err != nil {
 			failedCount.Add(1)
-			logger.Warnw("Plan enrollment failed after recovery attempts",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"error", err.Error(),
-			)
+			if verbose {
+				logger.Warnw("Plan enrollment failed after recovery attempts",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"error", err.Error(),
+				)
+			}
 			return nil
 		}
 		return nil
@@ -447,7 +449,7 @@ func scheduleAndProcessPlanTasks(
 	for batchIndex, batch := range batches {
 		dashboard.SetCurrentBatch(batchIndex + 1)
 		var scheduleResp *TaskListResponse
-		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "schedule_pending_plan_tasks", fmt.Sprintf("batch_%d", batchIndex+1), func() error {
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "schedule_pending_plan_tasks", fmt.Sprintf("batch_%d", batchIndex+1), func() error {
 			resp, err := gateway.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
 				Source:    scheduleSource,
 				PlanID:    planID,
@@ -866,7 +868,7 @@ func processPlanTaskSubmitStage(
 	}
 
 	if shouldExpirePlanTask(job.task, planExpireRate) {
-		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "expire_plan_task", job.task.ID, func() error {
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "expire_plan_task", job.task.ID, func() error {
 			finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, gateway, orgID, job.task)
 			if err != nil {
 				return fmt.Errorf("expire task %s for testee %s: %w", job.task.ID, job.testee.ID, err)
@@ -895,13 +897,15 @@ func processPlanTaskSubmitStage(
 		})
 		if err != nil {
 			failedTaskExecutionCount.Add(1)
-			deps.Logger.Warnw("Skipping task after recovery attempts failed",
-				"plan_id", planID,
-				"org_id", orgID,
-				"testee_id", job.testee.ID,
-				"task_id", job.task.ID,
-				"error", err.Error(),
-			)
+			if verbose {
+				deps.Logger.Warnw("Skipping task after recovery attempts failed",
+					"plan_id", planID,
+					"org_id", orgID,
+					"testee_id", job.testee.ID,
+					"task_id", job.task.ID,
+					"error", err.Error(),
+				)
+			}
 		}
 		dashboard.AdvanceTask()
 		return
@@ -910,13 +914,15 @@ func processPlanTaskSubmitStage(
 	req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, job.testee, job.task, verbose, deps.Logger)
 	if err != nil {
 		failedTaskExecutionCount.Add(1)
-		deps.Logger.Warnw("Skipping task because answersheet request build failed",
-			"plan_id", planID,
-			"org_id", orgID,
-			"testee_id", job.testee.ID,
-			"task_id", job.task.ID,
-			"error", err.Error(),
-		)
+		if verbose {
+			deps.Logger.Warnw("Skipping task because answersheet request build failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"testee_id", job.testee.ID,
+				"task_id", job.task.ID,
+				"error", err.Error(),
+			)
+		}
 		dashboard.AdvanceTask()
 		return
 	}
@@ -942,7 +948,7 @@ func processPlanTaskSubmitStage(
 	}
 
 	var attempts int
-	err = runSeedPlanOperationWithRecovery(ctx, deps.Logger, "submit_plan_answersheet", job.task.ID, func() error {
+	err = runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "submit_plan_answersheet", job.task.ID, func() error {
 		submitAttempts, submitErr := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
 		attempts = submitAttempts
 		if submitErr != nil {
@@ -959,13 +965,15 @@ func processPlanTaskSubmitStage(
 	if err != nil {
 		releaseSlot()
 		failedTaskExecutionCount.Add(1)
-		deps.Logger.Warnw("Skipping task after recovery attempts failed",
-			"plan_id", planID,
-			"org_id", orgID,
-			"testee_id", job.testee.ID,
-			"task_id", job.task.ID,
-			"error", err.Error(),
-		)
+		if verbose {
+			deps.Logger.Warnw("Skipping task after recovery attempts failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"testee_id", job.testee.ID,
+				"task_id", job.task.ID,
+				"error", err.Error(),
+			)
+		}
 		dashboard.AdvanceTask()
 		return
 	}
@@ -1009,16 +1017,18 @@ func processPlanTaskWaitStage(
 		dashboard.AdvanceTask()
 	}()
 
-	err := waitForTaskCompletion(ctx, deps.Logger, deps.APIClient, orgID, waitJob.task.ID)
+	err := waitForTaskCompletion(ctx, deps.Logger, deps.APIClient, orgID, waitJob.task.ID, verbose)
 	if err != nil {
 		failedTaskExecutionCount.Add(1)
-		deps.Logger.Warnw("Skipping task after completion wait failed",
-			"plan_id", planID,
-			"org_id", orgID,
-			"testee_id", waitJob.testee.ID,
-			"task_id", waitJob.task.ID,
-			"error", err.Error(),
-		)
+		if verbose {
+			deps.Logger.Warnw("Skipping task after completion wait failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"testee_id", waitJob.testee.ID,
+				"task_id", waitJob.task.ID,
+				"error", err.Error(),
+			)
+		}
 		return
 	}
 
@@ -1125,7 +1135,7 @@ func collectPlanTaskJobs(
 			continue
 		}
 		var taskList *TaskListResponse
-		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "list_plan_tasks_for_testee", testee.ID, func() error {
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_plan_tasks_for_testee", testee.ID, func() error {
 			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
 			if err != nil {
 				return err
@@ -1137,11 +1147,13 @@ func collectPlanTaskJobs(
 			if failedTaskListCount != nil {
 				failedTaskListCount.Add(1)
 			}
-			deps.Logger.Warnw("Skipping testee because listing plan tasks failed after recovery attempts",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"error", err.Error(),
-			)
+			if verbose {
+				deps.Logger.Warnw("Skipping testee because listing plan tasks failed after recovery attempts",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"error", err.Error(),
+				)
+			}
 			continue
 		}
 		tasks := append([]TaskResponse(nil), taskList.Tasks...)
@@ -1173,12 +1185,14 @@ func collectPlanTaskJobs(
 				taskJobs = append(taskJobs, planTaskJob{testee: testee, task: task})
 			default:
 				skippedCount.Add(1)
-				deps.Logger.Warnw("Skipping task with unsupported status",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"task_id", task.ID,
-					"status", task.Status,
-				)
+				if verbose {
+					deps.Logger.Warnw("Skipping task with unsupported status",
+						"plan_id", planID,
+						"testee_id", testee.ID,
+						"task_id", task.ID,
+						"status", task.Status,
+					)
+				}
 			}
 		}
 	}
@@ -1194,6 +1208,7 @@ func inspectExistingPlanTasks(
 	planID string,
 	testees []*TesteeResponse,
 	workers int,
+	verbose bool,
 ) (*planTaskStatusStats, error) {
 	stats := &planTaskStatusStats{}
 	var mu sync.Mutex
@@ -1203,7 +1218,7 @@ func inspectExistingPlanTasks(
 			return nil
 		}
 		var taskList *TaskListResponse
-		err := runSeedPlanOperationWithRecovery(ctx, logger, "inspect_existing_plan_tasks", testee.ID, func() error {
+		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "inspect_existing_plan_tasks", testee.ID, func() error {
 			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
 			if err != nil {
 				return err
@@ -1212,11 +1227,13 @@ func inspectExistingPlanTasks(
 			return nil
 		})
 		if err != nil {
-			logger.Warnw("Skipping testee in existing task inspection after recovery attempts failed",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"error", err.Error(),
-			)
+			if verbose {
+				logger.Warnw("Skipping testee in existing task inspection after recovery attempts failed",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"error", err.Error(),
+				)
+			}
 			return nil
 		}
 		local := summarizePlanTaskStatuses(taskList.Tasks)
@@ -1288,6 +1305,7 @@ func expirePlanTaskWithRecovery(ctx context.Context, gateway PlanSeedGateway, or
 func runSeedPlanOperationWithRecovery(
 	ctx context.Context,
 	logger interface{ Warnw(string, ...interface{}) },
+	verbose bool,
 	operation string,
 	resourceID string,
 	fn func() error,
@@ -1299,14 +1317,16 @@ func runSeedPlanOperationWithRecovery(
 	for attempt := 0; attempt <= seedPlanRecoverableRetries; attempt++ {
 		if attempt > 0 {
 			delay := seedPlanRecoverableDelay()
-			logger.Warnw("Seed plan recoverable error, waiting before retry",
-				"operation", operation,
-				"resource_id", resourceID,
-				"attempt", attempt,
-				"max_attempts", seedPlanRecoverableRetries,
-				"delay_seconds", int(delay.Seconds()),
-				"error", lastErr.Error(),
-			)
+			if verbose {
+				logger.Warnw("Seed plan recoverable error, waiting before retry",
+					"operation", operation,
+					"resource_id", resourceID,
+					"attempt", attempt,
+					"max_attempts", seedPlanRecoverableRetries,
+					"delay_seconds", int(delay.Seconds()),
+					"error", lastErr.Error(),
+				)
+			}
 			if err := sleepWithContext(ctx, delay); err != nil {
 				return err
 			}
@@ -1663,6 +1683,7 @@ func waitForTaskCompletion(
 	client *APIClient,
 	orgID int64,
 	taskID string,
+	verbose bool,
 ) error {
 	deadline := time.NewTimer(planTaskCompletionTimeout)
 	defer deadline.Stop()
@@ -1671,7 +1692,7 @@ func waitForTaskCompletion(
 
 	for {
 		var task *TaskResponse
-		err := runSeedPlanOperationWithRecovery(ctx, logger, "wait_for_plan_task_completion", taskID, func() error {
+		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "wait_for_plan_task_completion", taskID, func() error {
 			resp, err := client.GetTask(ctx, taskID)
 			if err != nil {
 				return err
