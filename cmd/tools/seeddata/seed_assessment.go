@@ -951,7 +951,9 @@ func startTesteeProducer(
 
 func iterateTesteesFromApiserver(
 	ctx context.Context,
-	client *APIClient,
+	client interface {
+		ListTesteesByOrg(context.Context, int64, int, int) (*ApiserverTesteeListResponse, error)
+	},
 	orgID int64,
 	pageSize, offset, limit int,
 	fn func([]*TesteeResponse) error,

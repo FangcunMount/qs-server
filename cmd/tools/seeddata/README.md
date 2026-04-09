@@ -4,7 +4,7 @@ QS 系统测试数据生成工具。
 
 ## 功能概述
 
-该工具用于通过 RESTful API 生成 QS 系统的测评测试数据：
+该工具用于生成 QS 系统的测评测试数据：
 
 1. **测评数据** (assessment) - 通过提交量表答卷触发测评生成
 2. **计划回填** (plan) - 按受试者创建时间回填指定测评计划，生成 task.opened 数据并完成对应任务
@@ -13,8 +13,9 @@ QS 系统测试数据生成工具。
 
 ### 前置条件
 
-1. apiserver 与 collection-server 已启动并可访问
-2. 配置种子数据文件 `configs/seeddata.yaml`（包含 API/IAM 信息）
+1. `assessment` 步骤需要 apiserver 与 collection-server 已启动并可访问
+2. `plan` 步骤默认运行在 `local` 模式，需要脚本所在环境可直连 QS 使用的 MySQL / MongoDB / Redis
+3. 配置种子数据文件 `configs/seeddata.yaml`
 
 ### 基本用法
 
@@ -52,6 +53,11 @@ go run ./cmd/tools/seeddata \
 go run ./cmd/tools/seeddata \
   --config ./configs/seeddata.yaml \
   --steps "plan" \
+  --plan-mode local \
+  --local-mysql-dsn "user:password@tcp(127.0.0.1:3306)/qs?charset=utf8mb4&parseTime=True&loc=Local" \
+  --local-mongo-uri "mongodb://127.0.0.1:27017" \
+  --local-mongo-database "qs" \
+  --local-redis-addr "127.0.0.1:6379" \
   --plan-workers 4 \
   --plan-expire-rate 0.2 \
   --plan-id 614186929759466030
@@ -60,6 +66,7 @@ go run ./cmd/tools/seeddata \
 go run ./cmd/tools/seeddata \
   --config ./configs/seeddata.yaml \
   --steps "plan" \
+  --plan-mode local \
   --plan-workers 4 \
   --plan-expire-rate 0.2 \
   --plan-id 614186929759466030 \
@@ -69,9 +76,17 @@ go run ./cmd/tools/seeddata \
 go run ./cmd/tools/seeddata \
   --config ./configs/seeddata.yaml \
   --steps "plan" \
+  --plan-mode local \
   --plan-id 614186929759466030 \
   --plan-testee-ids "1001,1002,1003" \
   --plan-process-existing-only
+
+# 如果脚本所在环境不能直连数据库，可回退为远程 HTTP 模式
+go run ./cmd/tools/seeddata \
+  --config ./configs/seeddata.yaml \
+  --steps "plan" \
+  --plan-mode remote \
+  --plan-id 614186929759466030
 ```
 
 ## 执行顺序
@@ -79,7 +94,7 @@ go run ./cmd/tools/seeddata \
 所有步骤按以下顺序执行：
 
 1. **assessment** - 通过 collection-server 提交量表答卷并生成测评
-2. **plan** - 读取 apiserver 的计划/任务接口，按 testee.created_at 回填计划、调度任务并提交答卷，并生成任务开放数据
+2. **plan** - 在 `local` 模式下直接调用 apiserver 应用服务完成计划查询/入组/调度/任务过期，在答卷侧仍通过远程真实链路提交答卷并等待 worker 回写；`remote` 模式继续完全走 HTTP
 
 ## 幂等性
 
@@ -100,11 +115,32 @@ go run ./cmd/tools/seeddata \
 ### 计划回填说明
 
 - `plan` 步骤默认回填计划 `614186929759466030`，可通过 `--plan-id` 覆盖。
+- `plan` 步骤支持 `--plan-mode local|remote`，默认 `local`。
+- `local` 模式所需的 MySQL / MongoDB / Redis 连接信息，既可以写在 `seeddata.yaml` 的 `local.*` 中，也可以通过命令行参数覆盖：
+  - `--local-mysql-dsn`
+  - `--local-mongo-uri`
+  - `--local-mongo-database`
+  - `--local-redis-addr`
+  - `--local-redis-username`
+  - `--local-redis-password`
+  - `--local-redis-db`
+  - `--local-plan-entry-base-url`
+- 如果你不希望把数据库密码写进代码库，推荐把 `seeddata.yaml` 里的 `local.*` 留空，仅在执行脚本时通过命令行传入。
+- `local` 模式只把 `plan` 侧收回到 seeddata 进程内：
+  - 计划查询
+  - 量表/问卷查询
+  - testee 查询
+  - 入组
+  - scoped 调度
+  - 查任务 / 任务过期
+- `local` 模式下，答卷提交流转仍然是远程真实链路：`seeddata -> apiserver admin-submit -> worker -> assessment -> task.completed`。
+- `remote` 模式保留原有 HTTP 实现，适合作为接口链路回归或数据库不可直连时的回退方案。
 - `plan` 步骤支持 `--plan-workers`，用于控制计划入组和任务执行的并发 worker 数；默认 `1`，建议从 `4` 开始压测。
 - `plan` 步骤支持 `--plan-expire-rate`，用于控制已打开任务中有多少比例会被直接标记为 `expired` 而不是提交答卷；默认 `0.2`，取值范围 `0.0-1.0`。
 - `plan` 步骤支持 `--plan-process-existing-only` 恢复模式：跳过 enroll，只对选中 testee 在该 plan 下已经存在的 task 做状态检查、定向调度和后续处理，适合补跑历史遗留的 `pending/opened` task。
 - 恢复模式下，如果没有显式传 `--plan-testee-ids`，脚本会处理 `--testee-limit` 范围内的全部 testee，不再做 `1/5` 随机抽样。
 - 计划回填默认会流式扫描受试者列表，并随机抽样约 `1/5` 的 testee；不再先把所有 testee 全量加载到内存后再抽样。抽中的 testee 会按 `created_at` 排序后生成 `start_date`，然后调用 apiserver 的计划入组、调度、任务查询接口。
+- `local` 模式不会通过 HTTP 再请求 plan/testee/scale/questionnaire 接口，因此可以显著减少大批量回填时的 504、超时和重试补偿复杂度。
 - `start_date` 默认取 `testee.created_at`；如果历史脏数据导致 `created_at` 为空，seeddata 会依次回退到 `updated_at`、当前日期，并记录 warning。
 - 如果显式传入 `--plan-testee-ids`，则只处理这些受试者，跳过随机抽样，也不会再全量扫描 `/api/v1/testees`。
 - 显式传入 `--plan-testee-ids` 时，`--testee-limit` 仍然生效；脚本会在去重后只取前 N 个 ID 继续执行。
@@ -138,6 +174,19 @@ iam:
   loginUrl: "https://iam.example.com/api/v1/authn/login"
   username: "your-username"
   password: "your-password"
+
+plan:
+  mode: "local" # local / remote
+
+local:
+  mysql_dsn: "user:password@tcp(127.0.0.1:3306)/qs?charset=utf8mb4&parseTime=True&loc=Local"
+  mongo_uri: "mongodb://127.0.0.1:27017"
+  mongo_database: "qs"
+  redis_addr: "127.0.0.1:6379"
+  redis_username: ""
+  redis_password: ""
+  redis_db: 0
+  plan_entry_base_url: "https://collect.example.com/entry"
 
 global:
   orgId: 0

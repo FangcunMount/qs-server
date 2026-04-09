@@ -76,6 +76,10 @@ type SeedConfig struct {
 	IAM IAMConfig `yaml:"iam"`
 	// GRPC 配置
 	GRPC GRPCConfig `yaml:"grpc"`
+	// Plan seed 配置
+	Plan PlanSeedConfig `yaml:"plan"`
+	// 本地 plan runtime 配置
+	Local LocalRuntimeConfig `yaml:"local"`
 
 	// 各个领域的种子数据配置
 	Testees        []TesteeConfig        `yaml:"testees"`
@@ -107,6 +111,23 @@ type IAMConfig struct {
 // GRPCConfig gRPC 配置。
 type GRPCConfig struct {
 	ApiserverAddr string `yaml:"apiserverAddr"`
+}
+
+// PlanSeedConfig plan 步骤配置。
+type PlanSeedConfig struct {
+	Mode string `yaml:"mode"`
+}
+
+// LocalRuntimeConfig seeddata 本地 plan runtime 配置。
+type LocalRuntimeConfig struct {
+	MySQLDSN        string `yaml:"mysql_dsn"`
+	MongoURI        string `yaml:"mongo_uri"`
+	MongoDatabase   string `yaml:"mongo_database"`
+	RedisAddr       string `yaml:"redis_addr"`
+	RedisUsername   string `yaml:"redis_username"`
+	RedisPassword   string `yaml:"redis_password"`
+	RedisDB         int    `yaml:"redis_db"`
+	PlanEntryBaseURL string `yaml:"plan_entry_base_url"`
 }
 
 // RetryConfig defines retry behavior for API calls.

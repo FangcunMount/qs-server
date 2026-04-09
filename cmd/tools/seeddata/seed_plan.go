@@ -26,6 +26,9 @@ const (
 	planTaskTimeLayout         = "2006-01-02 15:04:05"
 	planScheduleBatchFactor    = 4
 	planTaskBufferFactor       = 4
+	seedPlanRecoverableRetries = 3
+	seedPlanRecoverableMinWait = 30 * time.Second
+	seedPlanRecoverableMaxWait = 120 * time.Second
 )
 
 func seedPlanBackfill(
@@ -33,6 +36,7 @@ func seedPlanBackfill(
 	deps *dependencies,
 	_ *seedContext,
 	planID string,
+	planMode string,
 	planTesteeIDsRaw string,
 	planWorkers int,
 	planExpireRate float64,
@@ -46,7 +50,7 @@ func seedPlanBackfill(
 	if deps.APIClient == nil {
 		return fmt.Errorf("api client is not initialized")
 	}
-	if deps.CollectionClient == nil {
+	if planMode == planModeRemote && deps.CollectionClient == nil {
 		return fmt.Errorf("collection client is not initialized")
 	}
 	orgID := deps.Config.Global.OrgID
@@ -62,6 +66,7 @@ func seedPlanBackfill(
 	planExpireRate = normalizePlanExpireRate(planExpireRate)
 	logger.Infow("Plan backfill started",
 		"plan_id", planID,
+		"plan_mode", planMode,
 		"org_id", orgID,
 		"plan_workers", planWorkers,
 		"plan_expire_rate", planExpireRate,
@@ -74,7 +79,23 @@ func seedPlanBackfill(
 
 	prewarmAPIToken(ctx, deps.APIClient, orgID, logger)
 
-	planResp, err := deps.APIClient.GetPlan(ctx, planID)
+	gateway, cleanupGateway, err := newPlanSeedGateway(ctx, deps, planMode)
+	if err != nil {
+		return fmt.Errorf("initialize plan seed gateway (%s): %w", planMode, err)
+	}
+	if cleanupGateway != nil {
+		defer func() {
+			if cleanupErr := cleanupGateway(); cleanupErr != nil {
+				logger.Warnw("Failed to cleanup plan seed gateway",
+					"plan_id", planID,
+					"plan_mode", planMode,
+					"error", cleanupErr.Error(),
+				)
+			}
+		}()
+	}
+
+	planResp, err := gateway.GetPlan(ctx, planID)
 	if err != nil {
 		return fmt.Errorf("load plan %s: %w", planID, err)
 	}
@@ -91,7 +112,7 @@ func seedPlanBackfill(
 		return fmt.Errorf("plan %s has empty scale_code", planID)
 	}
 
-	scaleResp, err := deps.CollectionClient.GetScale(ctx, planResp.ScaleCode)
+	scaleResp, err := gateway.GetScale(ctx, planResp.ScaleCode)
 	if err != nil {
 		return fmt.Errorf("load scale %s: %w", planResp.ScaleCode, err)
 	}
@@ -105,7 +126,7 @@ func seedPlanBackfill(
 		return fmt.Errorf("scale %s has empty questionnaire_version", planResp.ScaleCode)
 	}
 
-	detail, err := deps.CollectionClient.GetQuestionnaireDetail(ctx, scaleResp.QuestionnaireCode)
+	detail, err := gateway.GetQuestionnaireDetail(ctx, scaleResp.QuestionnaireCode)
 	if err != nil {
 		return fmt.Errorf("load questionnaire %s: %w", scaleResp.QuestionnaireCode, err)
 	}
@@ -134,7 +155,7 @@ func seedPlanBackfill(
 		loadedTesteeCnt int
 	)
 	if len(explicitPlanTesteeIDs) > 0 {
-		testees, err = loadExplicitPlanTestees(ctx, deps.APIClient, explicitPlanTesteeIDs)
+		testees, err = loadExplicitPlanTestees(ctx, gateway, explicitPlanTesteeIDs)
 		if err != nil {
 			return err
 		}
@@ -146,7 +167,7 @@ func seedPlanBackfill(
 		if pageSize < 100 {
 			pageSize = 100
 		}
-		testees, err = loadApiserverTestees(ctx, deps.APIClient, orgID, pageSize, testeeOffset, testeeLimit)
+		testees, err = loadApiserverTestees(ctx, gateway, orgID, pageSize, testeeOffset, testeeLimit)
 		if err != nil {
 			return err
 		}
@@ -161,7 +182,7 @@ func seedPlanBackfill(
 		}
 		selectedTestees, loadedTesteeCnt, err = streamSamplePlanEnrollmentTestees(
 			ctx,
-			deps.APIClient,
+			gateway,
 			orgID,
 			pageSize,
 			testeeOffset,
@@ -196,7 +217,7 @@ func seedPlanBackfill(
 		"selected_testee_count", len(selectedTestees),
 	)
 
-	existingStats, err := inspectExistingPlanTasks(ctx, deps, planID, selectedTestees, planWorkers)
+	existingStats, err := inspectExistingPlanTasks(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers)
 	if err != nil {
 		return err
 	}
@@ -208,6 +229,7 @@ func seedPlanBackfill(
 	)
 
 	enrolledCount := 0
+	failedEnrollments := 0
 	if planProcessExistingOnly {
 		if existingStats.Total == 0 {
 			logger.Infow("No existing plan tasks found for recovery mode",
@@ -223,14 +245,15 @@ func seedPlanBackfill(
 			"selected_testee_count", len(selectedTestees),
 		)
 	} else {
-		enrolledCount, err = enrollPlanTesteesConcurrently(ctx, deps, planID, selectedTestees, planWorkers)
+		enrolledCount, failedEnrollments, err = enrollPlanTesteesConcurrently(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers)
 		if err != nil {
 			return err
 		}
 	}
 
-	openedCount, scheduleStats, submittedCount, skippedCount, completedCount, expiredCount, recoveredCount, err := scheduleAndProcessPlanTasks(
+	executionStats, err := scheduleAndProcessPlanTasks(
 		ctx,
+		gateway,
 		deps,
 		planID,
 		orgID,
@@ -249,13 +272,17 @@ func seedPlanBackfill(
 		"plan_id", planID,
 		"org_id", orgID,
 		"enrolled_testees", enrolledCount,
-		"submitted_answersheets", submittedCount,
-		"completed_tasks", completedCount,
-		"expired_tasks", expiredCount,
-		"recovered_tasks", recoveredCount,
-		"skipped_tasks", skippedCount,
-		"opened_tasks", openedCount,
-		"schedule_stats", scheduleStats,
+		"failed_enrollments", failedEnrollments,
+		"submitted_answersheets", executionStats.SubmittedCount,
+		"completed_tasks", executionStats.CompletedCount,
+		"expired_tasks", executionStats.ExpiredCount,
+		"recovered_tasks", executionStats.RecoveredCount,
+		"skipped_tasks", executionStats.SkippedCount,
+		"opened_tasks", executionStats.OpenedCount,
+		"schedule_stats", executionStats.ScheduleStats,
+		"failed_schedule_batches", executionStats.FailedScheduleBatches,
+		"failed_task_list_loads", executionStats.FailedTaskListLoads,
+		"failed_task_executions", executionStats.FailedTaskExecutions,
 	)
 
 	return nil
@@ -273,54 +300,72 @@ func normalizePlanWorkers(workers, testeeCount int) int {
 
 func enrollPlanTesteesConcurrently(
 	ctx context.Context,
-	deps *dependencies,
+	gateway PlanSeedGateway,
+	logger interface {
+		Warnw(string, ...interface{})
+		Infow(string, ...interface{})
+	},
 	planID string,
 	selectedTestees []*TesteeResponse,
 	workers int,
-) (int, error) {
+) (int, int, error) {
 	var enrolledCount atomic.Int64
+	var failedCount atomic.Int64
 	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
-		startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
-		if err != nil {
-			return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
-		}
-		if startDateSource != "created_at" {
-			deps.Logger.Warnw("Plan backfill falling back when deriving start_date",
+		err := runSeedPlanOperationWithRecovery(ctx, logger, "enroll_testee_into_plan", testee.ID, func() error {
+			startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
+			if err != nil {
+				return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
+			}
+			if startDateSource != "created_at" {
+				logger.Warnw("Plan backfill falling back when deriving start_date",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"start_date", startDate,
+					"source", startDateSource,
+					"created_at", testee.CreatedAt,
+					"updated_at", testee.UpdatedAt,
+				)
+			}
+
+			resp, err := gateway.EnrollTestee(ctx, EnrollTesteeRequest{
+				PlanID:    planID,
+				TesteeID:  testee.ID,
+				StartDate: startDate,
+			})
+			if err != nil {
+				return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
+			}
+
+			logger.Infow("Testee enrolled into plan",
 				"plan_id", planID,
 				"testee_id", testee.ID,
 				"start_date", startDate,
-				"source", startDateSource,
-				"created_at", testee.CreatedAt,
-				"updated_at", testee.UpdatedAt,
+				"start_date_source", startDateSource,
+				"task_count", len(resp.Tasks),
 			)
-		}
-
-		resp, err := deps.APIClient.EnrollTestee(ctx, EnrollTesteeRequest{
-			PlanID:    planID,
-			TesteeID:  testee.ID,
-			StartDate: startDate,
+			enrolledCount.Add(1)
+			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
+			failedCount.Add(1)
+			logger.Warnw("Plan enrollment failed after recovery attempts",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"error", err.Error(),
+			)
+			return nil
 		}
-
-		deps.Logger.Infow("Testee enrolled into plan",
-			"plan_id", planID,
-			"testee_id", testee.ID,
-			"start_date", startDate,
-			"start_date_source", startDateSource,
-			"task_count", len(resp.Tasks),
-		)
-		enrolledCount.Add(1)
 		return nil
 	}); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return int(enrolledCount.Load()), nil
+	return int(enrolledCount.Load()), int(failedCount.Load()), nil
 }
 
 func scheduleAndProcessPlanTasks(
 	ctx context.Context,
+	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -330,12 +375,15 @@ func scheduleAndProcessPlanTasks(
 	workers int,
 	planExpireRate float64,
 	verbose bool,
-) (int, *TaskScheduleStatsResponse, int, int, int, int, int, error) {
+) (*seedPlanExecutionStats, error) {
 	var submittedCount atomic.Int64
 	var skippedCount atomic.Int64
 	var completedCount atomic.Int64
 	var expiredCount atomic.Int64
 	var recoveredCount atomic.Int64
+	var failedScheduleBatchCount atomic.Int64
+	var failedTaskListCount atomic.Int64
+	var failedTaskExecutionCount atomic.Int64
 	var reservedOpenTask atomic.Bool
 
 	aggregateScheduleStats := &TaskScheduleStatsResponse{}
@@ -345,13 +393,30 @@ func scheduleAndProcessPlanTasks(
 	batches := chunkPlanTestees(selectedTestees, normalizePlanScheduleBatchSize(workers))
 
 	for batchIndex, batch := range batches {
-		scheduleResp, err := deps.APIClient.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
-			Source:    scheduleSource,
-			PlanID:    planID,
-			TesteeIDs: collectPlanTesteeIDs(batch),
+		var scheduleResp *TaskListResponse
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "schedule_pending_plan_tasks", fmt.Sprintf("batch_%d", batchIndex+1), func() error {
+			resp, err := gateway.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
+				Source:    scheduleSource,
+				PlanID:    planID,
+				TesteeIDs: collectPlanTesteeIDs(batch),
+			})
+			if err != nil {
+				return err
+			}
+			scheduleResp = resp
+			return nil
 		})
 		if err != nil {
-			return 0, nil, 0, 0, 0, 0, 0, fmt.Errorf("schedule pending tasks for org %d batch %d/%d: %w", orgID, batchIndex+1, len(batches), err)
+			failedScheduleBatchCount.Add(1)
+			deps.Logger.Warnw("Skipping schedule batch after recovery attempts failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"batch_index", batchIndex+1,
+				"batch_count", len(batches),
+				"batch_testee_count", len(batch),
+				"error", err.Error(),
+			)
+			continue
 		}
 
 		totalOpenedCount += len(scheduleResp.Tasks)
@@ -370,14 +435,16 @@ func scheduleAndProcessPlanTasks(
 
 		taskJobs, err := collectPlanTaskJobs(
 			ctx,
+			gateway,
 			deps,
 			planID,
 			batch,
 			verbose,
 			&skippedCount,
+			&failedTaskListCount,
 		)
 		if err != nil {
-			return 0, nil, 0, 0, 0, 0, 0, err
+			return nil, err
 		}
 		if len(taskJobs) == 0 {
 			continue
@@ -408,36 +475,60 @@ func scheduleAndProcessPlanTasks(
 		)
 
 		err = runPlanTaskWorkerPool(ctx, taskJobs, workers, taskBufferSize, func(ctx context.Context, job planTaskJob) error {
-			err := processPlanTaskJob(
-				ctx,
-				deps,
-				planID,
-				orgID,
-				questionnaireVersion,
-				detail,
-				job,
-				planExpireRate,
-				verbose,
-				&reservedOpenTask,
-				&submittedCount,
-				&skippedCount,
-				&completedCount,
-				&expiredCount,
-				&recoveredCount,
-			)
+			err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "process_plan_task", job.task.ID, func() error {
+				return processPlanTaskJob(
+					ctx,
+					gateway,
+					deps,
+					planID,
+					orgID,
+					questionnaireVersion,
+					detail,
+					job,
+					planExpireRate,
+					verbose,
+					&reservedOpenTask,
+					&submittedCount,
+					&skippedCount,
+					&completedCount,
+					&expiredCount,
+					&recoveredCount,
+				)
+			})
 			if err == nil {
 				progress.Advance()
+				return nil
 			}
-			return err
+			failedTaskExecutionCount.Add(1)
+			deps.Logger.Warnw("Skipping task after recovery attempts failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"testee_id", job.testee.ID,
+				"task_id", job.task.ID,
+				"error", err.Error(),
+			)
+			progress.Advance()
+			return nil
 		})
 		if err != nil {
 			progress.Fail()
-			return 0, nil, 0, 0, 0, 0, 0, err
+			return nil, err
 		}
 		progress.Finish()
 	}
 
-	return totalOpenedCount, aggregateScheduleStats, int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), int(recoveredCount.Load()), nil
+	return &seedPlanExecutionStats{
+		OpenedCount:           totalOpenedCount,
+		ScheduleStats:         aggregateScheduleStats,
+		SubmittedCount:        int(submittedCount.Load()),
+		SkippedCount:          int(skippedCount.Load()),
+		CompletedCount:        int(completedCount.Load()),
+		ExpiredCount:          int(expiredCount.Load()),
+		RecoveredCount:        int(recoveredCount.Load()),
+		FailedScheduleBatches: int(failedScheduleBatchCount.Load()),
+		FailedTaskListLoads:   int(failedTaskListCount.Load()),
+		FailedTaskExecutions:  int(failedTaskExecutionCount.Load()),
+	}, nil
 }
 
 func runPlanTesteeWorkerPool(
@@ -510,6 +601,20 @@ type planTaskStatusStats struct {
 	Unknown   int `json:"unknown"`
 }
 
+type seedPlanExecutionStats struct {
+	OpenedCount           int
+	ScheduleStats         *TaskScheduleStatsResponse
+	SubmittedCount        int
+	SkippedCount          int
+	CompletedCount        int
+	ExpiredCount          int
+	RecoveredCount        int
+	FailedEnrollments     int
+	FailedScheduleBatches int
+	FailedTaskListLoads   int
+	FailedTaskExecutions  int
+}
+
 func runPlanTaskWorkerPool(
 	ctx context.Context,
 	jobs []planTaskJob,
@@ -571,20 +676,38 @@ func runPlanTaskWorkerPool(
 
 func collectPlanTaskJobs(
 	ctx context.Context,
+	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
 	testees []*TesteeResponse,
 	verbose bool,
 	skippedCount *atomic.Int64,
+	failedTaskListCount *atomic.Int64,
 ) ([]planTaskJob, error) {
 	taskJobs := make([]planTaskJob, 0, len(testees))
 	for _, testee := range testees {
 		if testee == nil || strings.TrimSpace(testee.ID) == "" {
 			continue
 		}
-		taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+		var taskList *TaskListResponse
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "list_plan_tasks_for_testee", testee.ID, func() error {
+			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+			if err != nil {
+				return err
+			}
+			taskList = resp
+			return nil
+		})
 		if err != nil {
-			return nil, fmt.Errorf("list tasks for testee %s plan %s: %w", testee.ID, planID, err)
+			if failedTaskListCount != nil {
+				failedTaskListCount.Add(1)
+			}
+			deps.Logger.Warnw("Skipping testee because listing plan tasks failed after recovery attempts",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"error", err.Error(),
+			)
+			continue
 		}
 		tasks := append([]TaskResponse(nil), taskList.Tasks...)
 		sortTasksBySeq(tasks)
@@ -629,7 +752,10 @@ func collectPlanTaskJobs(
 
 func inspectExistingPlanTasks(
 	ctx context.Context,
-	deps *dependencies,
+	gateway PlanSeedGateway,
+	logger interface {
+		Warnw(string, ...interface{})
+	},
 	planID string,
 	testees []*TesteeResponse,
 	workers int,
@@ -641,9 +767,22 @@ func inspectExistingPlanTasks(
 		if testee == nil || strings.TrimSpace(testee.ID) == "" {
 			return nil
 		}
-		taskList, err := deps.APIClient.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+		var taskList *TaskListResponse
+		err := runSeedPlanOperationWithRecovery(ctx, logger, "inspect_existing_plan_tasks", testee.ID, func() error {
+			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+			if err != nil {
+				return err
+			}
+			taskList = resp
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("inspect existing tasks for testee %s plan %s: %w", testee.ID, planID, err)
+			logger.Warnw("Skipping testee in existing task inspection after recovery attempts failed",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"error", err.Error(),
+			)
+			return nil
 		}
 		local := summarizePlanTaskStatuses(taskList.Tasks)
 		mu.Lock()
@@ -692,13 +831,13 @@ func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats
 	dst.Unknown += src.Unknown
 }
 
-func expirePlanTaskWithRecovery(ctx context.Context, client *APIClient, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
-	expiredTask, err := client.ExpireTask(ctx, task.ID)
+func expirePlanTaskWithRecovery(ctx context.Context, gateway PlanSeedGateway, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
+	expiredTask, err := gateway.ExpireTask(ctx, task.ID)
 	if err == nil {
 		return expiredTask, false, nil
 	}
 
-	currentTask, getErr := client.GetTask(ctx, task.ID)
+	currentTask, getErr := gateway.GetTask(ctx, task.ID)
 	if getErr != nil {
 		return nil, false, fmt.Errorf("expire failed: %w; additionally failed to fetch current task state: %v", err, getErr)
 	}
@@ -711,8 +850,90 @@ func expirePlanTaskWithRecovery(ctx context.Context, client *APIClient, orgID in
 	}
 }
 
+func runSeedPlanOperationWithRecovery(
+	ctx context.Context,
+	logger interface{ Warnw(string, ...interface{}) },
+	operation string,
+	resourceID string,
+	fn func() error,
+) error {
+	if fn == nil {
+		return fmt.Errorf("seed plan operation %s is nil", operation)
+	}
+	var lastErr error
+	for attempt := 0; attempt <= seedPlanRecoverableRetries; attempt++ {
+		if attempt > 0 {
+			delay := seedPlanRecoverableDelay()
+			logger.Warnw("Seed plan recoverable error, waiting before retry",
+				"operation", operation,
+				"resource_id", resourceID,
+				"attempt", attempt,
+				"max_attempts", seedPlanRecoverableRetries,
+				"delay_seconds", int(delay.Seconds()),
+				"error", lastErr.Error(),
+			)
+			if err := sleepWithContext(ctx, delay); err != nil {
+				return err
+			}
+		}
+
+		if err := fn(); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			lastErr = err
+			if !isSeedPlanRecoverableError(err) || attempt == seedPlanRecoverableRetries {
+				return err
+			}
+			continue
+		}
+		return nil
+	}
+	return lastErr
+}
+
+func isSeedPlanRecoverableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	recoverablePatterns := []string{
+		"context deadline exceeded",
+		"client.timeout exceeded",
+		"http_status=500",
+		"http_status=502",
+		"http_status=503",
+		"http_status=504",
+		"http error: status=500",
+		"http error: status=502",
+		"http error: status=503",
+		"http error: status=504",
+		"connection reset by peer",
+		"broken pipe",
+		"tls handshake timeout",
+		"timeout awaiting headers",
+		"i/o timeout",
+	}
+	for _, pattern := range recoverablePatterns {
+		if strings.Contains(msg, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func seedPlanRecoverableDelay() time.Duration {
+	if seedPlanRecoverableMaxWait <= seedPlanRecoverableMinWait {
+		return seedPlanRecoverableMinWait
+	}
+	span := seedPlanRecoverableMaxWait - seedPlanRecoverableMinWait
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return seedPlanRecoverableMinWait + time.Duration(rng.Int63n(int64(span)+1))
+}
+
 func processPlanTaskJob(
 	ctx context.Context,
+	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -743,7 +964,7 @@ func processPlanTaskJob(
 	}
 
 	if shouldExpirePlanTask(task, planExpireRate) {
-		finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, deps.APIClient, orgID, task)
+		finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, gateway, orgID, task)
 		if err != nil {
 			return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
 		}
@@ -839,7 +1060,9 @@ func applyTesteeLimitToIDs(ids []string, limit int) []string {
 
 func loadApiserverTestees(
 	ctx context.Context,
-	client *APIClient,
+	client interface {
+		ListTesteesByOrg(context.Context, int64, int, int) (*ApiserverTesteeListResponse, error)
+	},
 	orgID int64,
 	pageSize, offset, limit int,
 ) ([]*TesteeResponse, error) {
@@ -856,7 +1079,9 @@ func loadApiserverTestees(
 
 func streamSamplePlanEnrollmentTestees(
 	ctx context.Context,
-	client *APIClient,
+	client interface {
+		ListTesteesByOrg(context.Context, int64, int, int) (*ApiserverTesteeListResponse, error)
+	},
 	orgID int64,
 	pageSize, offset, limit int,
 	planID string,
@@ -900,7 +1125,9 @@ func streamSamplePlanEnrollmentTestees(
 
 func loadExplicitPlanTestees(
 	ctx context.Context,
-	client *APIClient,
+	client interface {
+		GetTesteeByID(context.Context, string) (*ApiserverTesteeResponse, error)
+	},
 	testeeIDs []string,
 ) ([]*TesteeResponse, error) {
 	testees := make([]*TesteeResponse, 0, len(testeeIDs))

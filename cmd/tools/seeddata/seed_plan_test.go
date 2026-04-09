@@ -174,3 +174,36 @@ func TestMergePlanTaskStatusStats(t *testing.T) {
 		t.Fatalf("unexpected merged stats: %+v", dst)
 	}
 }
+
+func TestResolvePlanMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		cli     string
+		cfg     string
+		want    string
+		wantErr bool
+	}{
+		{name: "default local", cli: "", cfg: "", want: planModeLocal},
+		{name: "config remote", cli: "", cfg: planModeRemote, want: planModeRemote},
+		{name: "cli overrides config", cli: planModeLocal, cfg: planModeRemote, want: planModeLocal},
+		{name: "invalid mode", cli: "bad", cfg: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolvePlanMode(tt.cli, tt.cfg)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("resolvePlanMode(%q, %q)=%q, want=%q", tt.cli, tt.cfg, got, tt.want)
+			}
+		})
+	}
+}

@@ -92,10 +92,19 @@ func main() {
 		configFile              = flag.String("config", "", "Base seed data config file (testees, legacy data)")
 		stepsRaw                = flag.String("steps", "", "Comma-separated steps to run (default: all)")
 		planID                  = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
+		planMode                = flag.String("plan-mode", "", "Plan backfill mode: local or remote (default: local)")
 		planWorkers             = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
 		planExpireRate          = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
 		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
 		planProcessExistingOnly = flag.Bool("plan-process-existing-only", false, "Skip enrollment and only schedule/process existing plan tasks for the selected testees")
+		localMySQLDSN           = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override (used when --plan-mode=local)")
+		localMongoURI           = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override (used when --plan-mode=local)")
+		localMongoDatabase      = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override (used when --plan-mode=local)")
+		localRedisAddr          = flag.String("local-redis-addr", "", "Local seed_plan Redis address override (used when --plan-mode=local)")
+		localRedisUsername      = flag.String("local-redis-username", "", "Local seed_plan Redis username override (used when --plan-mode=local)")
+		localRedisPassword      = flag.String("local-redis-password", "", "Local seed_plan Redis password override (used when --plan-mode=local)")
+		localRedisDB            = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override (used when --plan-mode=local)")
+		localPlanEntryBaseURL   = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override (used when --plan-mode=local)")
 		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
 		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
@@ -153,6 +162,32 @@ func main() {
 		*apiToken = token
 	}
 
+	// 从命令行覆盖 local runtime 配置，避免把敏感信息写入仓库配置文件。
+	if strings.TrimSpace(*localMySQLDSN) != "" {
+		config.Local.MySQLDSN = strings.TrimSpace(*localMySQLDSN)
+	}
+	if strings.TrimSpace(*localMongoURI) != "" {
+		config.Local.MongoURI = strings.TrimSpace(*localMongoURI)
+	}
+	if strings.TrimSpace(*localMongoDatabase) != "" {
+		config.Local.MongoDatabase = strings.TrimSpace(*localMongoDatabase)
+	}
+	if strings.TrimSpace(*localRedisAddr) != "" {
+		config.Local.RedisAddr = strings.TrimSpace(*localRedisAddr)
+	}
+	if strings.TrimSpace(*localRedisUsername) != "" {
+		config.Local.RedisUsername = strings.TrimSpace(*localRedisUsername)
+	}
+	if *localRedisPassword != "" {
+		config.Local.RedisPassword = *localRedisPassword
+	}
+	if *localRedisDB >= 0 {
+		config.Local.RedisDB = *localRedisDB
+	}
+	if strings.TrimSpace(*localPlanEntryBaseURL) != "" {
+		config.Local.PlanEntryBaseURL = strings.TrimSpace(*localPlanEntryBaseURL)
+	}
+
 	// 初始化 API 客户端
 	if strings.TrimSpace(*apiBaseURL) == "" {
 		logger.Fatalw("API base URL is required, set via --api-base-url or API_BASE_URL env var")
@@ -198,6 +233,10 @@ func main() {
 	if containsSeedStep(steps, stepAssessment) && (*assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin) {
 		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
 	}
+	resolvedPlanMode, err := resolvePlanMode(*planMode, config.Plan.Mode)
+	if err != nil {
+		logger.Fatalw("Invalid plan mode", "error", err)
+	}
 
 	for _, step := range steps {
 		switch step {
@@ -206,7 +245,7 @@ func main() {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
 		case stepPlan:
-			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, *planTesteeIDsRaw, *planWorkers, *planExpireRate, *planProcessExistingOnly, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
+			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, resolvedPlanMode, *planTesteeIDsRaw, *planWorkers, *planExpireRate, *planProcessExistingOnly, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
 				logger.Fatalw("Plan backfill failed", "error", err)
 			}
 		default:
