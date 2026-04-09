@@ -177,14 +177,13 @@ func (t *AssessmentTask) IsTerminal() bool {
 // ==================== 包内私有方法（供领域服务调用）===================
 
 // open 开放任务（包内方法）
-func (t *AssessmentTask) open(entryToken string, entryURL string, expireAt time.Time, source string) error {
+func (t *AssessmentTask) open(entryToken string, entryURL string, openAt time.Time, expireAt time.Time, source string) error {
 	if t.status != TaskStatusPending {
 		return ErrTaskNotPending
 	}
 
-	now := time.Now()
 	t.status = TaskStatusOpened
-	t.openAt = &now
+	t.openAt = &openAt
 	t.expireAt = &expireAt
 	t.entryToken = entryToken
 	t.entryURL = entryURL
@@ -195,7 +194,7 @@ func (t *AssessmentTask) open(entryToken string, entryURL string, expireAt time.
 		t.planID,
 		t.testeeID,
 		t.entryURL,
-		now,
+		openAt,
 		source,
 	))
 
@@ -203,14 +202,13 @@ func (t *AssessmentTask) open(entryToken string, entryURL string, expireAt time.
 }
 
 // complete 完成任务（包内方法）
-func (t *AssessmentTask) complete(assessmentID assessment.ID) error {
+func (t *AssessmentTask) complete(assessmentID assessment.ID, completedAt time.Time) error {
 	if t.status != TaskStatusOpened {
 		return ErrTaskNotOpened
 	}
 
-	now := time.Now()
 	t.status = TaskStatusCompleted
-	t.completedAt = &now
+	t.completedAt = &completedAt
 	t.assessmentID = &assessmentID
 
 	// 发布任务完成事件
@@ -219,19 +217,18 @@ func (t *AssessmentTask) complete(assessmentID assessment.ID) error {
 		t.planID,
 		t.testeeID,
 		assessmentID,
-		now,
+		completedAt,
 	))
 
 	return nil
 }
 
 // expire 过期任务（包内方法）
-func (t *AssessmentTask) expire() error {
+func (t *AssessmentTask) expire(expiredAt time.Time) error {
 	if t.status != TaskStatusOpened {
 		return ErrTaskNotOpened
 	}
 
-	now := time.Now()
 	t.status = TaskStatusExpired
 
 	// 发布任务过期事件
@@ -239,25 +236,24 @@ func (t *AssessmentTask) expire() error {
 		t.id,
 		t.planID,
 		t.testeeID,
-		now,
+		expiredAt,
 	))
 
 	return nil
 }
 
 // cancel 取消任务（包内方法）
-func (t *AssessmentTask) cancel() {
+func (t *AssessmentTask) cancel(canceledAt time.Time) {
 	if t.status.IsTerminal() {
 		return
 	}
 
-	now := time.Now()
 	t.status = TaskStatusCanceled
 	t.addEvent(NewTaskCanceledEvent(
 		t.id,
 		t.planID,
 		t.testeeID,
-		now,
+		canceledAt,
 	))
 }
 

@@ -22,6 +22,8 @@ const (
 	planEnrollmentSampleRate   = 5
 	planTaskCompletionTimeout  = 5 * time.Minute
 	planTaskCompletionInterval = 2 * time.Second
+	planTaskCompletedOffset    = 2 * time.Hour
+	planTaskTimeLayout         = "2006-01-02 15:04:05"
 )
 
 func seedPlanBackfill(
@@ -722,6 +724,7 @@ func buildPlanSubmissionRequest(
 		Title:                detail.Title,
 		TesteeID:             testeeID,
 		TaskID:               task.ID,
+		TaskCompletedAt:      seedPlanTaskCompletedAt(task),
 		Answers:              answers,
 	}
 	return req, nil
@@ -761,6 +764,14 @@ func waitForTaskCompletion(ctx context.Context, client *APIClient, orgID int64, 
 
 func normalizeTaskStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
+}
+
+func seedPlanTaskCompletedAt(task TaskResponse) string {
+	plannedAt, err := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(task.PlannedAt), time.Local)
+	if err != nil || plannedAt.IsZero() {
+		return ""
+	}
+	return plannedAt.Add(planTaskCompletedOffset).Format(time.RFC3339)
 }
 
 type planTaskProgressBar struct {

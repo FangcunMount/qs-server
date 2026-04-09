@@ -199,7 +199,7 @@ func (a *AnswerSheet) addEvent(evt event.DomainEvent) {
 }
 
 // RaiseSubmittedEvent 在持久化后触发提交事件（确保带上持久化后的 ID）
-// testeeID、orgID 和 taskID 由应用层传入，用于传递给测评/计划层
-func (a *AnswerSheet) RaiseSubmittedEvent(testeeID, orgID uint64, taskID string) {
-	a.addEvent(NewAnswerSheetSubmittedEvent(a, testeeID, orgID, taskID))
+// testeeID、orgID、taskID 和 taskCompletedAt 由应用层传入，用于传递给测评/计划层
+func (a *AnswerSheet) RaiseSubmittedEvent(testeeID, orgID uint64, taskID string, taskCompletedAt string) {
+	a.addEvent(NewAnswerSheetSubmittedEvent(a, testeeID, orgID, taskID, taskCompletedAt))
 }

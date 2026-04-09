@@ -167,10 +167,10 @@ type TaskScheduleStatsResponse struct {
 
 // TaskListResponse 任务列表响应。
 type TaskListResponse struct {
-	Tasks      []TaskResponse `json:"tasks"`
-	TotalCount int64          `json:"total_count"`
-	Page       int            `json:"page"`
-	PageSize   int            `json:"page_size"`
+	Tasks      []TaskResponse             `json:"tasks"`
+	TotalCount int64                      `json:"total_count"`
+	Page       int                        `json:"page"`
+	PageSize   int                        `json:"page_size"`
 	Stats      *TaskScheduleStatsResponse `json:"stats,omitempty"`
 }
 
@@ -366,6 +366,7 @@ type SubmitAnswerSheetRequest struct {
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id"`
 	TaskID               string   `json:"task_id,omitempty"`
+	TaskCompletedAt      string   `json:"task_completed_at,omitempty"`
 	Answers              []Answer `json:"answers"`
 }
 
@@ -376,6 +377,7 @@ type AdminSubmitAnswerSheetRequest struct {
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id"`
 	TaskID               string   `json:"task_id,omitempty"`
+	TaskCompletedAt      string   `json:"task_completed_at,omitempty"`
 	WriterID             uint64   `json:"writer_id,omitempty"`
 	FillerID             uint64   `json:"filler_id,omitempty"`
 	Answers              []Answer `json:"answers"`

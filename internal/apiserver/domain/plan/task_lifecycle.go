@@ -23,10 +23,12 @@ func NewTaskLifecycle() *TaskLifecycle {
 // 将待推送状态的任务变更为已推送状态，并设置入口信息
 func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, expireAt time.Time, source string) error {
 	taskID := task.GetID().String()
+	actionAt := TaskActionTimeOrNow(ctx)
 	logger.L(ctx).Infow("Opening task in domain service",
 		"domain_action", "open_task",
 		"task_id", taskID,
 		"current_status", task.GetStatus().String(),
+		"open_at", actionAt,
 		"expire_at", expireAt,
 	)
 
@@ -47,17 +49,18 @@ func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryTok
 	if entryURL == "" {
 		return errors.WithCode(code.ErrInvalidArgument, "入口URL不能为空")
 	}
-	if expireAt.Before(time.Now()) {
+	if expireAt.Before(actionAt) {
 		logger.L(ctx).Errorw("Expire time is in the past",
 			"domain_action", "open_task",
 			"task_id", taskID,
+			"open_at", actionAt,
 			"expire_at", expireAt,
 		)
-		return errors.WithCode(code.ErrInvalidArgument, "过期时间必须在未来")
+		return errors.WithCode(code.ErrInvalidArgument, "过期时间必须晚于开放时间")
 	}
 
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
-	if err := task.open(entryToken, entryURL, expireAt, source); err != nil {
+	if err := task.open(entryToken, entryURL, actionAt, expireAt, source); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"domain_action", "open_task",
 			"task_id", taskID,
@@ -78,11 +81,13 @@ func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryTok
 // 将已推送状态的任务变更为已完成状态，并关联测评记录
 func (l *TaskLifecycle) Complete(ctx context.Context, task *AssessmentTask, assessmentID assessment.ID) error {
 	taskID := task.GetID().String()
+	actionAt := TaskActionTimeOrNow(ctx)
 	logger.L(ctx).Infow("Completing task in domain service",
 		"domain_action", "complete_task",
 		"task_id", taskID,
 		"assessment_id", assessmentID.String(),
 		"current_status", task.GetStatus().String(),
+		"completed_at", actionAt,
 	)
 
 	// 1. 前置状态检查
@@ -101,7 +106,7 @@ func (l *TaskLifecycle) Complete(ctx context.Context, task *AssessmentTask, asse
 	}
 
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
-	if err := task.complete(assessmentID); err != nil {
+	if err := task.complete(assessmentID, actionAt); err != nil {
 		logger.L(ctx).Errorw("Failed to complete task",
 			"domain_action", "complete_task",
 			"task_id", taskID,
@@ -128,7 +133,7 @@ func (l *TaskLifecycle) Expire(ctx context.Context, task *AssessmentTask) error 
 	}
 
 	// 2. 调用实体的包内方法（状态变更 + 事件触发）
-	return task.expire()
+	return task.expire(TaskActionTimeOrNow(ctx))
 }
 
 // Cancel 取消任务
@@ -140,7 +145,7 @@ func (l *TaskLifecycle) Cancel(ctx context.Context, task *AssessmentTask) error 
 	}
 
 	// 2. 调用实体的包内方法（状态变更）
-	task.cancel()
+	task.cancel(TaskActionTimeOrNow(ctx))
 	return nil
 }
 

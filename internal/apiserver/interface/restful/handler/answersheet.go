@@ -182,6 +182,7 @@ func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 		TesteeID:          req.TesteeID,
 		FillerID:          fillerID,
 		TaskID:            req.TaskID,
+		TaskCompletedAt:   req.TaskCompletedAt,
 		Answers:           answers,
 	}
 	orgID, err := h.RequireProtectedOrgID(c)

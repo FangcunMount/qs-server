@@ -100,6 +100,11 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	planCache := make(map[string]*plan.AssessmentPlan)
 	openSource := taskSchedulerSourceFromContext(ctx)
 	for _, task := range tasks {
+		taskCtx := ctx
+		if openSource == TaskSchedulerSourceSeedData {
+			taskCtx = plan.WithTaskActionTime(ctx, task.GetPlannedAt())
+		}
+
 		parentPlan, err := s.loadPlanForTask(ctx, planCache, task.GetPlanID())
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to load parent plan for task scheduling",
@@ -130,7 +135,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 生成入口
-		token, url, expireAt, err := s.entryGenerator.GenerateEntry(ctx, task)
+		token, url, expireAt, err := s.entryGenerator.GenerateEntry(taskCtx, task)
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to generate entry",
 				"action", "schedule_pending_tasks",
@@ -143,7 +148,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 开放任务
-		if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt, openSource); err != nil {
+		if err := s.taskLifecycle.Open(taskCtx, task, token, url, expireAt, openSource); err != nil {
 			logger.L(ctx).Errorw("Failed to open task",
 				"action", "schedule_pending_tasks",
 				"source", source,
@@ -184,7 +189,11 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		openedTasks = append(openedTasks, task)
 	}
 
-	expiredCount, expireFailedCount := s.expireOverdueTasks(ctx, orgID, planCache)
+	expiredCount := 0
+	expireFailedCount := 0
+	if source != TaskSchedulerSourceSeedData {
+		expiredCount, expireFailedCount = s.expireOverdueTasks(ctx, orgID, planCache)
+	}
 	CollectTaskScheduleStats(ctx, TaskScheduleStats{
 		PendingCount:      len(tasks),
 		OpenedCount:       len(openedTasks),

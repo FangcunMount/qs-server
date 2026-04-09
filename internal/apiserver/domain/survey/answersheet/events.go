@@ -30,6 +30,7 @@ type AnswerSheetSubmittedData struct {
 	FillerID             uint64    `json:"filler_id"`   // 填写人ID
 	FillerType           string    `json:"filler_type"` // 填写人类型
 	TaskID               string    `json:"task_id,omitempty"`
+	TaskCompletedAt      string    `json:"task_completed_at,omitempty"`
 	SubmittedAt          time.Time `json:"submitted_at"`
 }
 
@@ -41,7 +42,7 @@ type AnswerSheetSubmittedEvent = event.Event[AnswerSheetSubmittedData]
 // ==================== 事件构造函数 ====================
 
 // NewAnswerSheetSubmittedEvent 构造答卷提交事件
-func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, taskID string) AnswerSheetSubmittedEvent {
+func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, taskID string, taskCompletedAt string) AnswerSheetSubmittedEvent {
 	code, ver, _ := sheet.QuestionnaireInfo()
 	filler := sheet.Filler()
 
@@ -55,6 +56,7 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, ta
 			FillerID:             uint64(filler.UserID()),
 			FillerType:           filler.FillerType().String(),
 			TaskID:               taskID,
+			TaskCompletedAt:      taskCompletedAt,
 			SubmittedAt:          sheet.FilledAt(),
 		},
 	)

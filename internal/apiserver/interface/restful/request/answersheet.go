@@ -7,6 +7,7 @@ type AdminSubmitAnswerSheetRequest struct {
 	Title                string              `json:"title"`
 	TesteeID             uint64              `json:"testee_id" binding:"required"`
 	TaskID               string              `json:"task_id,omitempty"`
+	TaskCompletedAt      string              `json:"task_completed_at,omitempty"`
 	WriterID             uint64              `json:"writer_id"`
 	FillerID             uint64              `json:"filler_id"`
 	Answers              []AdminAnswerSubmit `json:"answers" binding:"required"`

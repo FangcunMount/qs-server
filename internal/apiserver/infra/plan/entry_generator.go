@@ -27,10 +27,12 @@ func NewEntryGenerator(baseURL string) plan.EntryGenerator {
 // GenerateEntry 生成测评入口
 func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.AssessmentTask) (token string, url string, expireAt time.Time, err error) {
 	taskID := task.GetID().String()
+	actionAt := planDomain.TaskActionTimeOrNow(ctx)
 	logger.L(ctx).Infow("Generating entry for task",
 		"infra_action", "generate_entry",
 		"task_id", taskID,
 		"base_url", g.baseURL,
+		"action_at", actionAt,
 	)
 
 	// 1. 生成唯一令牌
@@ -42,7 +44,7 @@ func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.Ass
 
 	// 3. 计算过期时间（默认从开放时间起 7 天）
 	// 这里可以根据业务需求调整过期时间策略
-	expireAt = time.Now().Add(7 * 24 * time.Hour)
+	expireAt = actionAt.Add(7 * 24 * time.Hour)
 
 	logger.L(ctx).Infow("Entry generated successfully",
 		"infra_action", "generate_entry",

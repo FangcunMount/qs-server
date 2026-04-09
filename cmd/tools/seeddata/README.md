@@ -101,6 +101,7 @@ go run ./cmd/tools/seeddata \
 - 显式模式会更严格：如果 `/api/v1/testees/{id}` 返回的 `created_at` 是零值，脚本会直接报错，不再回退到 `updated_at` 或当前时间。
 - 并发只发生在两段：testee 入组、以及按 testee 维度提交/等待任务完成；两段都使用固定数量的 worker 和有缓冲 channel，其余 testee 会在队列中等待；调度接口仍只会串行调用一次。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
+- `plan` 回填会以 `planned_at` 作为业务时间基准：`open_at` 对齐 `planned_at`，`expire_at` 基于该时间继续推导，`completed_at` 默认使用 `planned_at + 2h`。
 - 被抽中过期的 `opened` task 会走 apiserver 内部 `ExpireTask` 真实命令，不会提交答卷，因此最终会形成 `completed` 和 `expired` 混合任务。
 - 计划回填不会真实发送 `task.opened` 小程序消息；它只会生成对应的任务开放数据，并通过 `source=seeddata` 让 worker 跳过对外通知。
 - 计划回填默认按 `created_at` 升序处理所有受试者后再抽样；若要限制范围，可继续使用 `--testee-offset` 和 `--testee-limit`。

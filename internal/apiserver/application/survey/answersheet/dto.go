@@ -13,6 +13,7 @@ type SubmitAnswerSheetDTO struct {
 	OrgID             uint64      // 组织ID（传递给测评层）
 	FillerID          uint64      // 填写人ID
 	TaskID            string      // 计划任务ID（可选）
+	TaskCompletedAt   string      // 计划任务完成时间（seeddata 可选）
 	Answers           []AnswerDTO // 答案列表
 }
 

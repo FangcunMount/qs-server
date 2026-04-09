@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -26,6 +28,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/grpcmeta"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -443,8 +446,13 @@ func (s *InternalService) completeMatchedTask(
 		return
 	}
 
+	completeCtx := ctx
+	if actionAt, ok := taskCompletedAtFromGRPCMetadata(ctx); ok {
+		completeCtx = planDomain.WithTaskActionTime(ctx, actionAt)
+	}
+
 	if _, err := s.planCommandService.CompleteTask(
-		ctx,
+		completeCtx,
 		int64(orgID),
 		task.GetID().String(),
 		meta.FromUint64(assessmentID).String(),
@@ -462,6 +470,31 @@ func (s *InternalService) completeMatchedTask(
 		"plan_id", task.GetPlanID().String(),
 		"assessment_id", assessmentID,
 	)
+}
+
+func taskCompletedAtFromGRPCMetadata(ctx context.Context) (time.Time, bool) {
+	if ctx == nil {
+		return time.Time{}, false
+	}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return time.Time{}, false
+	}
+	values := md.Get(grpcmeta.TaskCompletedAtHeader)
+	if len(values) == 0 {
+		return time.Time{}, false
+	}
+	raw := strings.TrimSpace(values[0])
+	if raw == "" {
+		return time.Time{}, false
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed, true
+	}
+	if parsed, err := time.ParseInLocation("2006-01-02 15:04:05", raw, time.Local); err == nil {
+		return parsed, true
+	}
+	return time.Time{}, false
 }
 
 // EvaluateAssessment 执行测评评估

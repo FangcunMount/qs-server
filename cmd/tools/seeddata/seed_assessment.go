@@ -652,6 +652,7 @@ func submitAnswerSheet(ctx context.Context, client *APIClient, req SubmitAnswerS
 		Title:                req.Title,
 		TesteeID:             req.TesteeID,
 		TaskID:               req.TaskID,
+		TaskCompletedAt:      req.TaskCompletedAt,
 		Answers:              req.Answers,
 	}
 
