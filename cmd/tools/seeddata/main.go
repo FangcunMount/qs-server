@@ -121,15 +121,14 @@ func main() {
 	flag.Parse()
 	steps := parseSteps(*stepsRaw)
 
-	// 初始化日志
-	logOpts := log.NewOptions()
-	if *verbose {
-		logOpts.Level = "debug"
-	} else {
-		logOpts.Level = "info"
-	}
-	log.Init(logOpts)
-	logger := log.L(context.Background())
+	// 初始化全局日志与 seeddata 自身日志。
+	//
+	// seeddata 自身保持 info/debug 级别，便于观察脚本进度；而 local plan 模式下
+	// 需要的 component-base 全局日志会在解析出模式后再单独降到 warn，避免把
+	// 本地应用服务的高频 INFO 日志刷到终端。
+	seedLogger := newSeeddataLogger(*verbose)
+	configureSeeddataGlobalLog(*verbose, false)
+	logger := seedLogger
 
 	// 加载配置文件
 	var config *SeedConfig
@@ -243,6 +242,7 @@ func main() {
 	if err != nil {
 		logger.Fatalw("Invalid plan mode", "error", err)
 	}
+	configureSeeddataGlobalLog(*verbose, shouldQuietSeedPlanComponentLogs(steps, resolvedPlanMode))
 
 	for _, step := range steps {
 		switch step {
@@ -277,6 +277,33 @@ func main() {
 	}
 
 	logger.Infow("Seed process completed successfully")
+}
+
+func newSeeddataLogger(verbose bool) log.Logger {
+	opts := log.NewOptions()
+	if verbose {
+		opts.Level = "debug"
+	} else {
+		opts.Level = "info"
+	}
+	return log.New(opts)
+}
+
+func configureSeeddataGlobalLog(verbose bool, quiet bool) {
+	opts := log.NewOptions()
+	switch {
+	case verbose:
+		opts.Level = "debug"
+	case quiet:
+		opts.Level = "warn"
+	default:
+		opts.Level = "info"
+	}
+	log.Init(opts)
+}
+
+func shouldQuietSeedPlanComponentLogs(steps []seedStep, planMode string) bool {
+	return containsSeedStep(steps, stepPlan) && strings.EqualFold(strings.TrimSpace(planMode), planModeLocal)
 }
 
 // ==================== 通用辅助函数 ====================

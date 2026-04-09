@@ -1883,8 +1883,8 @@ type planSeedDashboard struct {
 	mu                   sync.Mutex
 	enabled              bool
 	finished             bool
-	rendered             bool
 	startedAt            time.Time
+	stopCh               chan struct{}
 	planMode             string
 	totalBatches         int
 	currentBatch         int
@@ -1902,6 +1902,8 @@ type planSeedDashboard struct {
 	failedExecutions     *atomic.Int64
 }
 
+const planSeedDashboardRenderInterval = 5 * time.Second
+
 func newPlanSeedDashboard(
 	planMode string,
 	totalBatches int,
@@ -1918,6 +1920,7 @@ func newPlanSeedDashboard(
 	dashboard := &planSeedDashboard{
 		enabled:          enabled,
 		startedAt:        time.Now(),
+		stopCh:           make(chan struct{}),
 		planMode:         strings.TrimSpace(planMode),
 		totalBatches:     totalBatches,
 		submitted:        submitted,
@@ -1931,8 +1934,33 @@ func newPlanSeedDashboard(
 	}
 	if dashboard.enabled {
 		dashboard.renderLocked()
+		dashboard.start()
 	}
 	return dashboard
+}
+
+func (d *planSeedDashboard) start() {
+	if d == nil || !d.enabled {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(planSeedDashboardRenderInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				d.mu.Lock()
+				if d.finished {
+					d.mu.Unlock()
+					return
+				}
+				d.renderLocked()
+				d.mu.Unlock()
+			case <-d.stopCh:
+				return
+			}
+		}
+	}()
 }
 
 func (d *planSeedDashboard) SetCurrentBatch(batch int) {
@@ -1951,7 +1979,6 @@ func (d *planSeedDashboard) SetCurrentBatch(batch int) {
 		batch = d.totalBatches
 	}
 	d.currentBatch = batch
-	d.renderLocked()
 }
 
 func (d *planSeedDashboard) IncrementScheduleFailures() {
@@ -1964,7 +1991,6 @@ func (d *planSeedDashboard) IncrementScheduleFailures() {
 		return
 	}
 	d.scheduleFailureCount++
-	d.renderLocked()
 }
 
 func (d *planSeedDashboard) AddOpenedTasks(delta int) {
@@ -1977,7 +2003,6 @@ func (d *planSeedDashboard) AddOpenedTasks(delta int) {
 		return
 	}
 	d.openedTasks += delta
-	d.renderLocked()
 }
 
 func (d *planSeedDashboard) AddDiscoveredTasks(delta int) {
@@ -1990,7 +2015,6 @@ func (d *planSeedDashboard) AddDiscoveredTasks(delta int) {
 		return
 	}
 	d.discoveredTasks += delta
-	d.renderLocked()
 }
 
 func (d *planSeedDashboard) AdvanceTask() {
@@ -2005,7 +2029,6 @@ func (d *planSeedDashboard) AdvanceTask() {
 	if d.processedTasks < d.discoveredTasks {
 		d.processedTasks++
 	}
-	d.renderLocked()
 }
 
 func (d *planSeedDashboard) Refresh() {
@@ -2017,7 +2040,6 @@ func (d *planSeedDashboard) Refresh() {
 	if d.finished {
 		return
 	}
-	d.renderLocked()
 }
 
 func (d *planSeedDashboard) Finish() {
@@ -2032,17 +2054,13 @@ func (d *planSeedDashboard) Finish() {
 	d.currentBatch = d.totalBatches
 	d.processedTasks = d.discoveredTasks
 	d.renderLocked()
-	fmt.Fprintln(os.Stderr)
 	d.finished = true
+	close(d.stopCh)
 }
 
 func (d *planSeedDashboard) renderLocked() {
 	if !d.enabled {
 		return
-	}
-
-	if d.rendered {
-		fmt.Fprintf(os.Stderr, "\x1b[%dF", 3)
 	}
 
 	elapsed := time.Since(d.startedAt).Round(time.Second)
@@ -2078,8 +2096,7 @@ func (d *planSeedDashboard) renderLocked() {
 		atomicLoadInt64(d.failedExecutions),
 	)
 
-	fmt.Fprintf(os.Stderr, "%s\n%s\n%s", planLine, taskLine, statsLine)
-	d.rendered = true
+	fmt.Fprintf(os.Stderr, "%s\n%s\n%s\n", planLine, taskLine, statsLine)
 }
 
 func (d *planSeedDashboard) planModeLabel() string {
@@ -2127,6 +2144,7 @@ type planTaskProgressBar struct {
 	current     int
 	label       string
 	startedAt   time.Time
+	lastRender  time.Time
 	extraStatus func() string
 	enabled     bool
 	finished    bool
@@ -2142,7 +2160,7 @@ func newPlanTaskProgressBar(label string, total int, extraStatus func() string) 
 		enabled:     enabled,
 	}
 	if enabled {
-		bar.renderLocked()
+		bar.renderLocked(true)
 	}
 	return bar
 }
@@ -2159,7 +2177,7 @@ func (b *planTaskProgressBar) Advance() {
 	if b.current < b.total {
 		b.current++
 	}
-	b.renderLocked()
+	b.renderLocked(false)
 }
 
 func (b *planTaskProgressBar) Finish() {
@@ -2172,8 +2190,7 @@ func (b *planTaskProgressBar) Finish() {
 		return
 	}
 	b.current = b.total
-	b.renderLocked()
-	fmt.Fprintln(os.Stderr)
+	b.renderLocked(true)
 	b.finished = true
 }
 
@@ -2186,8 +2203,7 @@ func (b *planTaskProgressBar) Fail() {
 	if b.finished {
 		return
 	}
-	b.renderLocked()
-	fmt.Fprintln(os.Stderr)
+	b.renderLocked(true)
 	b.finished = true
 }
 
@@ -2200,12 +2216,15 @@ func (b *planTaskProgressBar) Close() {
 	if b.finished {
 		return
 	}
-	fmt.Fprintln(os.Stderr)
+	b.renderLocked(true)
 	b.finished = true
 }
 
-func (b *planTaskProgressBar) renderLocked() {
+func (b *planTaskProgressBar) renderLocked(force bool) {
 	if !b.enabled {
+		return
+	}
+	if !force && !b.lastRender.IsZero() && time.Since(b.lastRender) < planSeedDashboardRenderInterval {
 		return
 	}
 	const width = 24
@@ -2222,13 +2241,14 @@ func (b *planTaskProgressBar) renderLocked() {
 	}
 	bar := strings.Repeat("=", filled) + strings.Repeat(" ", width-filled)
 	elapsed := time.Since(b.startedAt).Round(time.Second)
-	line := fmt.Sprintf("\r%s [%s] %d/%d items elapsed=%s", b.label, bar, b.current, b.total, elapsed)
+	line := fmt.Sprintf("%s [%s] %d/%d items elapsed=%s", b.label, bar, b.current, b.total, elapsed)
 	if b.extraStatus != nil {
 		if extra := strings.TrimSpace(b.extraStatus()); extra != "" {
 			line += " " + extra
 		}
 	}
-	fmt.Fprint(os.Stderr, line)
+	fmt.Fprintln(os.Stderr, line)
+	b.lastRender = time.Now()
 }
 
 func normalizePlanExpireRate(rate float64) float64 {
