@@ -87,7 +87,7 @@ func seedPlanBackfill(
 
 	prewarmAPIToken(ctx, deps.APIClient, orgID, logger)
 
-	gateway, cleanupGateway, err := newPlanSeedGateway(ctx, deps, planMode)
+	gateway, cleanupGateway, err := newPlanSeedGateway(ctx, deps, planMode, !verbose)
 	if err != nil {
 		return fmt.Errorf("initialize plan seed gateway (%s): %w", planMode, err)
 	}
@@ -221,12 +221,14 @@ func seedPlanBackfill(
 	}
 
 	planWorkers = normalizePlanWorkers(planWorkers, len(selectedTestees))
-	logger.Infow("Running plan backfill with worker pool",
-		"plan_id", planID,
-		"org_id", orgID,
-		"workers", planWorkers,
-		"selected_testee_count", len(selectedTestees),
-	)
+	if verbose {
+		logger.Infow("Running plan backfill with worker pool",
+			"plan_id", planID,
+			"org_id", orgID,
+			"workers", planWorkers,
+			"selected_testee_count", len(selectedTestees),
+		)
+	}
 
 	existingStats, err := inspectExistingPlanTasks(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers)
 	if err != nil {
@@ -256,7 +258,7 @@ func seedPlanBackfill(
 			"selected_testee_count", len(selectedTestees),
 		)
 	} else {
-		enrolledCount, failedEnrollments, err = enrollPlanTesteesConcurrently(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers)
+		enrolledCount, failedEnrollments, err = enrollPlanTesteesConcurrently(ctx, gateway, deps.Logger, planID, selectedTestees, planWorkers, verbose)
 		if err != nil {
 			return err
 		}
@@ -324,6 +326,7 @@ func enrollPlanTesteesConcurrently(
 	planID string,
 	selectedTestees []*TesteeResponse,
 	workers int,
+	verbose bool,
 ) (int, int, error) {
 	var enrolledCount atomic.Int64
 	var failedCount atomic.Int64
@@ -353,13 +356,15 @@ func enrollPlanTesteesConcurrently(
 				return fmt.Errorf("enroll testee %s into plan %s: %w", testee.ID, planID, err)
 			}
 
-			logger.Infow("Testee enrolled into plan",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"start_date", startDate,
-				"start_date_source", startDateSource,
-				"task_count", len(resp.Tasks),
-			)
+			if verbose {
+				logger.Infow("Testee enrolled into plan",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"start_date", startDate,
+					"start_date_source", startDateSource,
+					"task_count", len(resp.Tasks),
+				)
+			}
 			enrolledCount.Add(1)
 			return nil
 		})
@@ -428,14 +433,16 @@ func scheduleAndProcessPlanTasks(
 	)
 	defer dashboard.Finish()
 
-	deps.Logger.Infow("Running plan task execution pipeline",
-		"plan_id", planID,
-		"org_id", orgID,
-		"submit_workers", submitWorkers,
-		"wait_workers", waitWorkers,
-		"max_inflight_tasks", maxInFlightTasks,
-		"task_buffer_size", taskBufferSize,
-	)
+	if verbose {
+		deps.Logger.Infow("Running plan task execution pipeline",
+			"plan_id", planID,
+			"org_id", orgID,
+			"submit_workers", submitWorkers,
+			"wait_workers", waitWorkers,
+			"max_inflight_tasks", maxInFlightTasks,
+			"task_buffer_size", taskBufferSize,
+		)
+	}
 
 	for batchIndex, batch := range batches {
 		dashboard.SetCurrentBatch(batchIndex + 1)
@@ -469,17 +476,19 @@ func scheduleAndProcessPlanTasks(
 		totalOpenedCount += len(scheduleResp.Tasks)
 		dashboard.AddOpenedTasks(len(scheduleResp.Tasks))
 		mergeTaskScheduleStats(aggregateScheduleStats, scheduleResp.Stats)
-		deps.Logger.Infow("Scheduled pending plan tasks",
-			"plan_id", planID,
-			"org_id", orgID,
-			"source", scheduleSource,
-			"batch_index", batchIndex+1,
-			"batch_count", len(batches),
-			"batch_testee_count", len(batch),
-			"opened_count", len(scheduleResp.Tasks),
-			"schedule_stats", scheduleResp.Stats,
-			"mini_program_delivery", "skipped",
-		)
+		if verbose {
+			deps.Logger.Infow("Scheduled pending plan tasks",
+				"plan_id", planID,
+				"org_id", orgID,
+				"source", scheduleSource,
+				"batch_index", batchIndex+1,
+				"batch_count", len(batches),
+				"batch_testee_count", len(batch),
+				"opened_count", len(scheduleResp.Tasks),
+				"schedule_stats", scheduleResp.Stats,
+				"mini_program_delivery", "skipped",
+			)
+		}
 
 		taskJobs, err := collectPlanTaskJobs(
 			ctx,
@@ -844,12 +853,14 @@ func processPlanTaskSubmitStage(
 
 	if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
 		skippedCount.Add(1)
-		deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
-			"plan_id", planID,
-			"testee_id", job.testee.ID,
-			"task_id", job.task.ID,
-			"seq", job.task.Seq,
-		)
+		if verbose {
+			deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
+				"plan_id", planID,
+				"testee_id", job.testee.ID,
+				"task_id", job.task.ID,
+				"seq", job.task.Seq,
+			)
+		}
 		dashboard.AdvanceTask()
 		return
 	}

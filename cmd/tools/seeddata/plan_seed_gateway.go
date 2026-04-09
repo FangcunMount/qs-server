@@ -15,6 +15,7 @@ import (
 	apiservercontainer "github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	redis "github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"go.mongodb.org/mongo-driver/mongo"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 	"gorm.io/driver/mysql"
@@ -24,8 +25,8 @@ import (
 )
 
 const (
-	planModeLocal               = "local"
-	planModeRemote              = "remote"
+	planModeLocal                = "local"
+	planModeRemote               = "remote"
 	defaultLocalPlanEntryBaseURL = "https://collect.fangcunmount.cn/entry"
 )
 
@@ -58,7 +59,7 @@ func resolvePlanMode(cliMode string, configMode string) (string, error) {
 	}
 }
 
-func newPlanSeedGateway(ctx context.Context, deps *dependencies, mode string) (PlanSeedGateway, func() error, error) {
+func newPlanSeedGateway(ctx context.Context, deps *dependencies, mode string, silent bool) (PlanSeedGateway, func() error, error) {
 	switch mode {
 	case planModeRemote:
 		return &remotePlanSeedGateway{
@@ -66,7 +67,7 @@ func newPlanSeedGateway(ctx context.Context, deps *dependencies, mode string) (P
 			collection: deps.CollectionClient,
 		}, func() error { return nil }, nil
 	case planModeLocal:
-		runtime, err := newLocalPlanRuntime(ctx, deps.Config.Local, deps.Config.API.CollectionBaseURL)
+		runtime, err := newLocalPlanRuntime(ctx, deps.Config.Local, deps.Config.API.CollectionBaseURL, silent)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -132,7 +133,7 @@ type localPlanRuntime struct {
 	container   *apiservercontainer.Container
 }
 
-func newLocalPlanRuntime(ctx context.Context, cfg LocalRuntimeConfig, collectionBaseURL string) (*localPlanRuntime, error) {
+func newLocalPlanRuntime(ctx context.Context, cfg LocalRuntimeConfig, collectionBaseURL string, silent bool) (*localPlanRuntime, error) {
 	if strings.TrimSpace(cfg.MySQLDSN) == "" {
 		return nil, fmt.Errorf("seeddata local.mysql_dsn is required when plan-mode=local")
 	}
@@ -169,8 +170,9 @@ func newLocalPlanRuntime(ctx context.Context, cfg LocalRuntimeConfig, collection
 		mongoDB,
 		redisClient,
 		apiservercontainer.ContainerOptions{
-			PublisherMode:   eventconfig.PublishModeNop,
+			PublisherMode:    eventconfig.PublishModeNop,
 			PlanEntryBaseURL: resolveLocalPlanEntryBaseURL(cfg, collectionBaseURL),
+			Silent:           silent,
 		},
 	)
 	if err := container.Initialize(); err != nil {
@@ -396,16 +398,18 @@ func openLocalSeedRedis(ctx context.Context, cfg LocalRuntimeConfig) (redis.Univ
 	defer cancel()
 
 	client := redis.NewClient(&redis.Options{
-		Addr:         strings.TrimSpace(cfg.RedisAddr),
-		Username:     strings.TrimSpace(cfg.RedisUsername),
-		Password:     cfg.RedisPassword,
-		DB:           cfg.RedisDB,
-		DialTimeout:  10 * time.Second,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		PoolTimeout:  30 * time.Second,
-		MinIdleConns: 5,
-		MaxRetries:   3,
+		Addr:                     strings.TrimSpace(cfg.RedisAddr),
+		Username:                 strings.TrimSpace(cfg.RedisUsername),
+		Password:                 cfg.RedisPassword,
+		DB:                       cfg.RedisDB,
+		DialTimeout:              10 * time.Second,
+		ReadTimeout:              10 * time.Second,
+		WriteTimeout:             10 * time.Second,
+		PoolTimeout:              30 * time.Second,
+		MinIdleConns:             5,
+		MaxRetries:               3,
+		DisableIdentity:          true,
+		MaintNotificationsConfig: &maintnotifications.Config{Mode: maintnotifications.ModeDisabled},
 	})
 	if err := client.Ping(connectCtx).Err(); err != nil {
 		_ = client.Close()

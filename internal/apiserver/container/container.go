@@ -68,6 +68,7 @@ type Container struct {
 
 	// 容器状态
 	initialized bool
+	silent      bool
 }
 
 // NewContainer 创建容器
@@ -94,6 +95,8 @@ type ContainerOptions struct {
 	Cache ContainerCacheOptions
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
+	// Silent suppresses container stdout bootstrap/cleanup prints.
+	Silent bool
 }
 
 // ContainerCacheOptions 缓存控制配置
@@ -132,6 +135,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 
 	c.cacheOptions = opts.Cache
 	c.planEntryURL = opts.PlanEntryBaseURL
+	c.silent = opts.Silent
 
 	// 应用缓存 TTL 覆盖（仅在启动时设置一次，全局生效）
 	scaleCache.ApplyTTLOptions(scaleCache.TTLOptions{
@@ -160,11 +164,11 @@ func (c *Container) Initialize() error {
 	if err := eventconfig.Initialize("configs/events.yaml"); err != nil {
 		return fmt.Errorf("failed to load event config: %w", err)
 	}
-	fmt.Printf("📋 Event config loaded (events.yaml)\n")
+	c.printf("📋 Event config loaded (events.yaml)\n")
 
 	// 初始化事件发布器（所有模块共享）
 	c.initEventPublisher()
-	fmt.Printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
+	c.printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
 
 	// 初始化 IAM 模块（优先，因为其他模块可能依赖）
 	// 注意：这里需要传入 IAMOptions，在实际调用时需要从外部传入
@@ -227,9 +231,16 @@ func (c *Container) Initialize() error {
 	c.initQRCodeGenerator()
 
 	c.initialized = true
-	fmt.Printf("🏗️  Container initialized successfully\n")
+	c.printf("🏗️  Container initialized successfully\n")
 
 	return nil
+}
+
+func (c *Container) printf(format string, args ...interface{}) {
+	if c != nil && c.silent {
+		return
+	}
+	fmt.Printf(format, args...)
 }
 
 // WarmupCache 预热缓存（异步执行，不阻塞）
@@ -308,7 +319,7 @@ func (c *Container) initSurveyModule() error {
 	c.SurveyModule = surveyModule
 	modulePool["survey"] = surveyModule
 
-	fmt.Printf("📦 Survey module initialized (questionnaire + answersheet)\n")
+	c.printf("📦 Survey module initialized (questionnaire + answersheet)\n")
 	return nil
 }
 
@@ -332,7 +343,7 @@ func (c *Container) initScaleModule() error {
 	c.ScaleModule = scaleModule
 	modulePool["scale"] = scaleModule
 
-	fmt.Printf("📦 Scale module initialized\n")
+	c.printf("📦 Scale module initialized\n")
 	return nil
 }
 
@@ -360,7 +371,7 @@ func (c *Container) initActorModule() error {
 	c.ActorModule = actorModule
 	modulePool["actor"] = actorModule
 
-	fmt.Printf("📦 Actor module initialized\n")
+	c.printf("📦 Actor module initialized\n")
 	return nil
 }
 
@@ -389,7 +400,7 @@ func (c *Container) initEvaluationModule() error {
 	c.EvaluationModule = evaluationModule
 	modulePool["evaluation"] = evaluationModule
 
-	fmt.Printf("📦 Evaluation module initialized\n")
+	c.printf("📦 Evaluation module initialized\n")
 	return nil
 }
 
@@ -408,7 +419,7 @@ func (c *Container) initPlanModule() error {
 	c.PlanModule = planModule
 	modulePool["plan"] = planModule
 
-	fmt.Printf("📦 Plan module initialized\n")
+	c.printf("📦 Plan module initialized\n")
 	return nil
 }
 
@@ -427,7 +438,7 @@ func (c *Container) initStatisticsModule() error {
 	c.StatisticsModule = statisticsModule
 	modulePool["statistics"] = statisticsModule
 
-	fmt.Printf("📦 Statistics module initialized\n")
+	c.printf("📦 Statistics module initialized\n")
 	return nil
 }
 
@@ -439,12 +450,12 @@ func (c *Container) initCodesService() {
 	}
 	if c.redisCache != nil {
 		c.CodesService = codesapp.NewService(c.redisCache)
-		fmt.Printf("🔑 CodesService initialized using redisCache\n")
+		c.printf("🔑 CodesService initialized using redisCache\n")
 		return
 	}
 	// 无 redis 时使用 nil 或者 NewService 会回退到时间戳实现
 	c.CodesService = codesapp.NewService(nil)
-	fmt.Printf("🔑 CodesService initialized using fallback (no redis)\n")
+	c.printf("🔑 CodesService initialized using fallback (no redis)\n")
 }
 
 // initQRCodeGenerator 初始化小程序码生成器（基础设施层）
@@ -461,7 +472,7 @@ func (c *Container) initQRCodeGenerator() {
 
 	c.QRCodeGenerator = wechatapi.NewQRCodeGenerator(wechatCache)
 	c.SubscribeSender = wechatapi.NewSubscribeSender(wechatCache)
-	fmt.Printf("📱 QRCode generator initialized (infrastructure layer)\n")
+	c.printf("📱 QRCode generator initialized (infrastructure layer)\n")
 }
 
 // InitQRCodeService 初始化小程序码生成服务（应用层）
@@ -469,24 +480,24 @@ func (c *Container) initQRCodeGenerator() {
 func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
 	// 如果基础设施层未初始化，则应用层服务也不初始化
 	if c.QRCodeGenerator == nil {
-		fmt.Printf("⚠️  QRCode service not initialized (generator not available)\n")
+		c.printf("⚠️  QRCode service not initialized (generator not available)\n")
 		return
 	}
 
 	// 如果未提供配置，则不初始化
 	if wechatOptions == nil {
-		fmt.Printf("⚠️  QRCode service not initialized (wechat options not provided)\n")
+		c.printf("⚠️  QRCode service not initialized (wechat options not provided)\n")
 		return
 	}
 
 	// 检查是否有配置
 	if wechatOptions.WeChatAppID == "" && (wechatOptions.AppID == "" || wechatOptions.AppSecret == "") {
-		fmt.Printf("⚠️  QRCode service not initialized (missing config: wechat-app-id or app-id/app-secret)\n")
+		c.printf("⚠️  QRCode service not initialized (missing config: wechat-app-id or app-id/app-secret)\n")
 		return
 	}
 
 	if wechatOptions.PagePath == "" {
-		fmt.Printf("⚠️  QRCode service not initialized (missing page-path)\n")
+		c.printf("⚠️  QRCode service not initialized (missing page-path)\n")
 		return
 	}
 
@@ -504,12 +515,12 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
 	// 优先使用 IAM 查询（通过 WeChatAppID）
 	if wechatOptions.WeChatAppID != "" {
 		config.WeChatAppID = wechatOptions.WeChatAppID
-		fmt.Printf("📱 QRCode service will use IAM to query wechat app (wechat_app_id: %s)\n", wechatOptions.WeChatAppID)
+		c.printf("📱 QRCode service will use IAM to query wechat app (wechat_app_id: %s)\n", wechatOptions.WeChatAppID)
 	} else {
 		// 降级：使用直接配置
 		config.AppID = wechatOptions.AppID
 		config.AppSecret = wechatOptions.AppSecret
-		fmt.Printf("📱 QRCode service will use direct config (app_id: %s)\n", wechatOptions.AppID)
+		c.printf("📱 QRCode service will use direct config (app_id: %s)\n", wechatOptions.AppID)
 	}
 
 	// 创建应用层服务，封装基础设施层调用
@@ -518,33 +529,33 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
 		config,
 		wechatAppService,
 	)
-	fmt.Printf("📱 QRCode service initialized (application layer, page_path: %s)\n", wechatOptions.PagePath)
+	c.printf("📱 QRCode service initialized (application layer, page_path: %s)\n", wechatOptions.PagePath)
 }
 
 // InitMiniProgramTaskNotificationService 初始化 task.opened 小程序消息服务。
 func (c *Container) InitMiniProgramTaskNotificationService(wechatOptions *options.WeChatOptions) {
 	if c.SubscribeSender == nil {
-		fmt.Printf("⚠️  MiniProgram task notification service not initialized (subscribe sender not available)\n")
+		c.printf("⚠️  MiniProgram task notification service not initialized (subscribe sender not available)\n")
 		return
 	}
 	if c.ActorModule == nil || c.ActorModule.TesteeQueryService == nil {
-		fmt.Printf("⚠️  MiniProgram task notification service not initialized (testee query service not available)\n")
+		c.printf("⚠️  MiniProgram task notification service not initialized (testee query service not available)\n")
 		return
 	}
 	if c.PlanModule == nil || c.PlanModule.TaskRepo == nil || c.PlanModule.PlanRepo == nil {
-		fmt.Printf("⚠️  MiniProgram task notification service not initialized (plan repositories not available)\n")
+		c.printf("⚠️  MiniProgram task notification service not initialized (plan repositories not available)\n")
 		return
 	}
 	if wechatOptions == nil {
-		fmt.Printf("⚠️  MiniProgram task notification service not initialized (wechat options not provided)\n")
+		c.printf("⚠️  MiniProgram task notification service not initialized (wechat options not provided)\n")
 		return
 	}
 	if strings.TrimSpace(wechatOptions.TaskOpenedTemplateID) == "" {
-		fmt.Printf("⚠️  MiniProgram task notification service not initialized (missing task-opened-template-id)\n")
+		c.printf("⚠️  MiniProgram task notification service not initialized (missing task-opened-template-id)\n")
 		return
 	}
 	if wechatOptions.WeChatAppID == "" && (wechatOptions.AppID == "" || wechatOptions.AppSecret == "") {
-		fmt.Printf("⚠️  MiniProgram task notification service not initialized (missing wechat app config)\n")
+		c.printf("⚠️  MiniProgram task notification service not initialized (missing wechat app config)\n")
 		return
 	}
 
@@ -578,7 +589,7 @@ func (c *Container) InitMiniProgramTaskNotificationService(wechatOptions *option
 			TaskOpenedTemplateID: wechatOptions.TaskOpenedTemplateID,
 		},
 	)
-	fmt.Printf("📨 MiniProgram task notification service initialized (template_id: %s)\n", wechatOptions.TaskOpenedTemplateID)
+	c.printf("📨 MiniProgram task notification service initialized (template_id: %s)\n", wechatOptions.TaskOpenedTemplateID)
 }
 
 // HealthCheck 健康检查
@@ -635,25 +646,25 @@ func (c *Container) checkModulesHealth(ctx context.Context) error {
 
 // Cleanup 清理资源
 func (c *Container) Cleanup() error {
-	fmt.Printf("🧹 Cleaning up container resources...\n")
+	c.printf("🧹 Cleaning up container resources...\n")
 
 	// 清理 IAM 模块
 	if c.IAMModule != nil {
 		if err := c.IAMModule.Close(); err != nil {
 			return fmt.Errorf("failed to cleanup IAM module: %w", err)
 		}
-		fmt.Printf("   ✅ IAM module cleaned up\n")
+		c.printf("   ✅ IAM module cleaned up\n")
 	}
 
 	for _, module := range modulePool {
 		if err := module.Cleanup(); err != nil {
 			return fmt.Errorf("failed to cleanup module: %w", err)
 		}
-		fmt.Printf("   ✅ %s module cleaned up\n", module.ModuleInfo().Name)
+		c.printf("   ✅ %s module cleaned up\n", module.ModuleInfo().Name)
 	}
 
 	c.initialized = false
-	fmt.Printf("🏁 Container cleanup completed\n")
+	c.printf("🏁 Container cleanup completed\n")
 
 	return nil
 }
