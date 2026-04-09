@@ -42,12 +42,14 @@ type seedTokenProvider struct {
 	tokenMu   sync.RWMutex
 	refreshMu sync.Mutex
 	token     string
+	expiresAt time.Time
 	refresher func(context.Context) (string, error)
 }
 
 const (
 	defaultHTTPTimeout         = 30 * time.Second
 	planScheduleRequestTimeout = 5 * time.Minute
+	seedTokenRefreshSkew       = 2 * time.Minute
 )
 
 // NewAPIClient 创建 API 客户端
@@ -81,10 +83,11 @@ func (c *APIClient) SetTokenRefresher(fn func(context.Context) (string, error)) 
 }
 
 func newSeedTokenProvider(initialToken string, refresher func(context.Context) (string, error)) *seedTokenProvider {
-	return &seedTokenProvider{
-		token:     strings.TrimSpace(initialToken),
+	provider := &seedTokenProvider{
 		refresher: refresher,
 	}
+	provider.SetToken(initialToken)
+	return provider
 }
 
 func (p *seedTokenProvider) SetRefresher(fn func(context.Context) (string, error)) {
@@ -109,9 +112,82 @@ func (p *seedTokenProvider) SetToken(token string) {
 	if p == nil {
 		return
 	}
+	token = strings.TrimSpace(token)
+	identity := parseSeedTokenIdentity(token)
 	p.tokenMu.Lock()
-	p.token = strings.TrimSpace(token)
+	p.token = token
+	p.expiresAt = identity.ExpiresAt
 	p.tokenMu.Unlock()
+}
+
+func (p *seedTokenProvider) ExpiresAt() time.Time {
+	if p == nil {
+		return time.Time{}
+	}
+	p.tokenMu.RLock()
+	defer p.tokenMu.RUnlock()
+	return p.expiresAt
+}
+
+func (p *seedTokenProvider) RemainingTTL(now time.Time) time.Duration {
+	expiresAt := p.ExpiresAt()
+	if expiresAt.IsZero() {
+		return 0
+	}
+	return expiresAt.Sub(now)
+}
+
+func (p *seedTokenProvider) shouldRefresh(now time.Time, minTTL time.Duration) bool {
+	if p == nil {
+		return false
+	}
+	expiresAt := p.ExpiresAt()
+	if expiresAt.IsZero() {
+		return false
+	}
+	if minTTL < 0 {
+		minTTL = 0
+	}
+	return !expiresAt.After(now.Add(minTTL))
+}
+
+func (p *seedTokenProvider) RefreshIfNeeded(ctx context.Context, minTTL time.Duration) (bool, error) {
+	if p == nil {
+		return false, nil
+	}
+
+	now := time.Now()
+	if !p.shouldRefresh(now, minTTL) {
+		return false, nil
+	}
+
+	p.refreshMu.Lock()
+	defer p.refreshMu.Unlock()
+
+	now = time.Now()
+	if !p.shouldRefresh(now, minTTL) {
+		return false, nil
+	}
+	if p.refresher == nil {
+		if expiresAt := p.ExpiresAt(); expiresAt.IsZero() || expiresAt.After(now) {
+			return false, nil
+		}
+		return false, fmt.Errorf("token refresher not configured")
+	}
+
+	token, err := p.refresher(ctx)
+	if err != nil {
+		if expiresAt := p.ExpiresAt(); expiresAt.IsZero() || expiresAt.After(now) {
+			return false, nil
+		}
+		return false, err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return false, fmt.Errorf("token refresher returned empty token")
+	}
+	p.SetToken(token)
+	return true, nil
 }
 
 func (p *seedTokenProvider) Refresh(ctx context.Context, staleToken string) (string, error) {
@@ -561,6 +637,10 @@ func (c *APIClient) doRequestWithRetryTimeoutAndLimit(
 		retryMax = 0
 	}
 	for attempt := 0; attempt <= retryMax; attempt++ {
+		if err := c.ensureFreshToken(ctx); err != nil {
+			return nil, err
+		}
+
 		var reqBody io.Reader
 		if body != nil {
 			jsonData, err := json.Marshal(body)
@@ -776,6 +856,27 @@ func (c *APIClient) refreshToken(ctx context.Context) error {
 		return fmt.Errorf("token refresher returned empty token")
 	}
 	c.SetToken(token)
+	return nil
+}
+
+func (c *APIClient) ensureFreshToken(ctx context.Context) error {
+	if c.provider == nil {
+		return nil
+	}
+
+	remainingTTL := c.provider.RemainingTTL(time.Now())
+	refreshed, err := c.provider.RefreshIfNeeded(ctx, seedTokenRefreshSkew)
+	if err != nil {
+		return fmt.Errorf("refresh api token before request: %w", err)
+	}
+	if refreshed {
+		c.SetToken(c.provider.Token())
+		c.logger.Infow("Seeddata proactively refreshed API token",
+			"base_url", c.baseURL,
+			"previous_remaining_seconds", int64(remainingTTL/time.Second),
+			"expires_at", c.provider.ExpiresAt(),
+		)
+	}
 	return nil
 }
 

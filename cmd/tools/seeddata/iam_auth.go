@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -103,6 +104,7 @@ func fetchTokenFromIAM(ctx context.Context, cfg IAMConfig, logger log.Logger) (s
 		"user_id", identity.UserID,
 		"account_id", identity.AccountID,
 		"tenant_id", identity.TenantID,
+		"expires_at", identity.ExpiresAt,
 	)
 
 	return token, nil
@@ -113,6 +115,7 @@ type seedTokenIdentity struct {
 	UserID    string
 	AccountID string
 	TenantID  string
+	ExpiresAt time.Time
 }
 
 func parseSeedTokenIdentity(token string) seedTokenIdentity {
@@ -137,6 +140,7 @@ func parseSeedTokenIdentity(token string) seedTokenIdentity {
 		UserID:    readStringField(claims, "user_id"),
 		AccountID: readStringField(claims, "account_id"),
 		TenantID:  readStringField(claims, "tenant_id"),
+		ExpiresAt: readUnixTimeField(claims, "exp"),
 	}
 }
 
@@ -199,4 +203,38 @@ func readStringField(data map[string]interface{}, key string) string {
 		}
 	}
 	return ""
+}
+
+func readUnixTimeField(data map[string]interface{}, key string) time.Time {
+	value, ok := data[key]
+	if !ok || value == nil {
+		return time.Time{}
+	}
+
+	switch v := value.(type) {
+	case float64:
+		return time.Unix(int64(v), 0).UTC()
+	case int64:
+		return time.Unix(v, 0).UTC()
+	case int:
+		return time.Unix(int64(v), 0).UTC()
+	case json.Number:
+		seconds, err := v.Int64()
+		if err != nil {
+			return time.Time{}
+		}
+		return time.Unix(seconds, 0).UTC()
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return time.Time{}
+		}
+		seconds, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return time.Time{}
+		}
+		return time.Unix(seconds, 0).UTC()
+	default:
+		return time.Time{}
+	}
 }
