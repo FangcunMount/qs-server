@@ -94,6 +94,9 @@ func main() {
 		planID                  = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
 		planMode                = flag.String("plan-mode", "", "Plan backfill mode: local or remote (default: local)")
 		planWorkers             = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
+		planSubmitWorkers       = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
+		planWaitWorkers         = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
+		planMaxInFlightTasks    = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
 		planExpireRate          = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
 		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
 		planProcessExistingOnly = flag.Bool("plan-process-existing-only", false, "Skip enrollment and only schedule/process existing plan tasks for the selected testees")
@@ -212,6 +215,9 @@ func main() {
 		refresher := func(ctx context.Context) (string, error) {
 			return fetchTokenFromIAM(ctx, config.IAM, logger)
 		}
+		tokenProvider := newSeedTokenProvider(*apiToken, refresher)
+		apiClient.SetTokenProvider(tokenProvider)
+		collectionClient.SetTokenProvider(tokenProvider)
 		apiClient.SetTokenRefresher(refresher)
 		collectionClient.SetTokenRefresher(refresher)
 	}
@@ -245,7 +251,24 @@ func main() {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
 		case stepPlan:
-			if err := seedPlanBackfill(runCtx, deps, seedCtx, *planID, resolvedPlanMode, *planTesteeIDsRaw, *planWorkers, *planExpireRate, *planProcessExistingOnly, *testeePageSize, *testeeOffset, *testeeLimit, *verbose); err != nil {
+			if err := seedPlanBackfill(
+				runCtx,
+				deps,
+				seedCtx,
+				*planID,
+				resolvedPlanMode,
+				*planTesteeIDsRaw,
+				*planWorkers,
+				*planSubmitWorkers,
+				*planWaitWorkers,
+				*planMaxInFlightTasks,
+				*planExpireRate,
+				*planProcessExistingOnly,
+				*testeePageSize,
+				*testeeOffset,
+				*testeeLimit,
+				*verbose,
+			); err != nil {
 				logger.Fatalw("Plan backfill failed", "error", err)
 			}
 		default:

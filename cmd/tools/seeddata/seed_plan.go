@@ -26,6 +26,8 @@ const (
 	planTaskTimeLayout         = "2006-01-02 15:04:05"
 	planScheduleBatchFactor    = 4
 	planTaskBufferFactor       = 4
+	planMaxInFlightFactor      = 8
+	planMinMaxInFlightTasks    = 20
 	seedPlanRecoverableRetries = 3
 	seedPlanRecoverableMinWait = 30 * time.Second
 	seedPlanRecoverableMaxWait = 120 * time.Second
@@ -39,6 +41,9 @@ func seedPlanBackfill(
 	planMode string,
 	planTesteeIDsRaw string,
 	planWorkers int,
+	planSubmitWorkers int,
+	planWaitWorkers int,
+	planMaxInFlightTasks int,
 	planExpireRate float64,
 	planProcessExistingOnly bool,
 	testeePageSize, testeeOffset, testeeLimit int,
@@ -69,6 +74,9 @@ func seedPlanBackfill(
 		"plan_mode", planMode,
 		"org_id", orgID,
 		"plan_workers", planWorkers,
+		"plan_submit_workers", planSubmitWorkers,
+		"plan_wait_workers", planWaitWorkers,
+		"plan_max_inflight_tasks", planMaxInFlightTasks,
 		"plan_expire_rate", planExpireRate,
 		"plan_process_existing_only", planProcessExistingOnly,
 		"testee_page_size", testeePageSize,
@@ -97,6 +105,9 @@ func seedPlanBackfill(
 
 	planResp, err := gateway.GetPlan(ctx, planID)
 	if err != nil {
+		if planMode == planModeLocal {
+			return fmt.Errorf("load plan %s in local mode: %w; local mode reads plan data from --local-mysql-dsn/--local-mongo-uri/--local-redis-* instead of %s, so verify those local connections point to the environment that contains this plan or rerun with --plan-mode remote", planID, err, strings.TrimSpace(deps.APIClient.baseURL))
+		}
 		return fmt.Errorf("load plan %s: %w", planID, err)
 	}
 	if planResp == nil {
@@ -256,11 +267,15 @@ func seedPlanBackfill(
 		gateway,
 		deps,
 		planID,
+		planMode,
 		orgID,
 		scaleResp.QuestionnaireVersion,
 		detail,
 		selectedTestees,
 		planWorkers,
+		planSubmitWorkers,
+		planWaitWorkers,
+		planMaxInFlightTasks,
 		planExpireRate,
 		verbose,
 	)
@@ -277,6 +292,7 @@ func seedPlanBackfill(
 		"completed_tasks", executionStats.CompletedCount,
 		"expired_tasks", executionStats.ExpiredCount,
 		"recovered_tasks", executionStats.RecoveredCount,
+		"max_inflight_observed", executionStats.MaxInFlightObserved,
 		"skipped_tasks", executionStats.SkippedCount,
 		"opened_tasks", executionStats.OpenedCount,
 		"schedule_stats", executionStats.ScheduleStats,
@@ -368,11 +384,15 @@ func scheduleAndProcessPlanTasks(
 	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
+	planMode string,
 	orgID int64,
 	questionnaireVersion string,
 	detail *QuestionnaireDetailResponse,
 	selectedTestees []*TesteeResponse,
 	workers int,
+	submitWorkers int,
+	waitWorkers int,
+	maxInFlightTasks int,
 	planExpireRate float64,
 	verbose bool,
 ) (*seedPlanExecutionStats, error) {
@@ -385,14 +405,40 @@ func scheduleAndProcessPlanTasks(
 	var failedTaskListCount atomic.Int64
 	var failedTaskExecutionCount atomic.Int64
 	var reservedOpenTask atomic.Bool
+	var inflightCount atomic.Int64
+	var maxInflightObserved atomic.Int64
 
 	aggregateScheduleStats := &TaskScheduleStatsResponse{}
 	totalOpenedCount := 0
 	scheduleSource := planApp.TaskSchedulerSourceSeedData
-	taskBufferSize := normalizePlanTaskBufferSize(workers)
+	submitWorkers, waitWorkers, maxInFlightTasks = normalizePlanTaskExecutionConcurrency(workers, submitWorkers, waitWorkers, maxInFlightTasks)
+	taskBufferSize := normalizePlanTaskBufferSize(submitWorkers, maxInFlightTasks)
 	batches := chunkPlanTestees(selectedTestees, normalizePlanScheduleBatchSize(workers))
+	dashboard := newPlanSeedDashboard(
+		planMode,
+		len(batches),
+		&submittedCount,
+		&completedCount,
+		&expiredCount,
+		&skippedCount,
+		&recoveredCount,
+		&inflightCount,
+		&maxInflightObserved,
+		&failedTaskExecutionCount,
+	)
+	defer dashboard.Finish()
+
+	deps.Logger.Infow("Running plan task execution pipeline",
+		"plan_id", planID,
+		"org_id", orgID,
+		"submit_workers", submitWorkers,
+		"wait_workers", waitWorkers,
+		"max_inflight_tasks", maxInFlightTasks,
+		"task_buffer_size", taskBufferSize,
+	)
 
 	for batchIndex, batch := range batches {
+		dashboard.SetCurrentBatch(batchIndex + 1)
 		var scheduleResp *TaskListResponse
 		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "schedule_pending_plan_tasks", fmt.Sprintf("batch_%d", batchIndex+1), func() error {
 			resp, err := gateway.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
@@ -408,6 +454,7 @@ func scheduleAndProcessPlanTasks(
 		})
 		if err != nil {
 			failedScheduleBatchCount.Add(1)
+			dashboard.IncrementScheduleFailures()
 			deps.Logger.Warnw("Skipping schedule batch after recovery attempts failed",
 				"plan_id", planID,
 				"org_id", orgID,
@@ -420,6 +467,7 @@ func scheduleAndProcessPlanTasks(
 		}
 
 		totalOpenedCount += len(scheduleResp.Tasks)
+		dashboard.AddOpenedTasks(len(scheduleResp.Tasks))
 		mergeTaskScheduleStats(aggregateScheduleStats, scheduleResp.Stats)
 		deps.Logger.Infow("Scheduled pending plan tasks",
 			"plan_id", planID,
@@ -449,72 +497,37 @@ func scheduleAndProcessPlanTasks(
 		if len(taskJobs) == 0 {
 			continue
 		}
+		dashboard.AddDiscoveredTasks(len(taskJobs))
 
-		progress := newPlanTaskProgressBar(
-			fmt.Sprintf("Processing scheduled pending plan tasks (%d/%d)", batchIndex+1, len(batches)),
-			len(taskJobs),
-			func() string {
-				if recovered := recoveredCount.Load(); recovered > 0 {
-					return fmt.Sprintf(
-						"completed=%d expired=%d submitted=%d skipped=%d recovered=%d",
-						completedCount.Load(),
-						expiredCount.Load(),
-						submittedCount.Load(),
-						skippedCount.Load(),
-						recovered,
-					)
-				}
-				return fmt.Sprintf(
-					"completed=%d expired=%d submitted=%d skipped=%d",
-					completedCount.Load(),
-					expiredCount.Load(),
-					submittedCount.Load(),
-					skippedCount.Load(),
-				)
-			},
+		err = runPlanTaskExecutionPipeline(
+			ctx,
+			gateway,
+			deps,
+			planID,
+			orgID,
+			questionnaireVersion,
+			detail,
+			taskJobs,
+			submitWorkers,
+			waitWorkers,
+			taskBufferSize,
+			maxInFlightTasks,
+			planExpireRate,
+			verbose,
+			&reservedOpenTask,
+			&submittedCount,
+			&skippedCount,
+			&completedCount,
+			&expiredCount,
+			&recoveredCount,
+			&failedTaskExecutionCount,
+			&inflightCount,
+			&maxInflightObserved,
+			dashboard,
 		)
-
-		err = runPlanTaskWorkerPool(ctx, taskJobs, workers, taskBufferSize, func(ctx context.Context, job planTaskJob) error {
-			err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "process_plan_task", job.task.ID, func() error {
-				return processPlanTaskJob(
-					ctx,
-					gateway,
-					deps,
-					planID,
-					orgID,
-					questionnaireVersion,
-					detail,
-					job,
-					planExpireRate,
-					verbose,
-					&reservedOpenTask,
-					&submittedCount,
-					&skippedCount,
-					&completedCount,
-					&expiredCount,
-					&recoveredCount,
-				)
-			})
-			if err == nil {
-				progress.Advance()
-				return nil
-			}
-			failedTaskExecutionCount.Add(1)
-			deps.Logger.Warnw("Skipping task after recovery attempts failed",
-				"plan_id", planID,
-				"org_id", orgID,
-				"testee_id", job.testee.ID,
-				"task_id", job.task.ID,
-				"error", err.Error(),
-			)
-			progress.Advance()
-			return nil
-		})
 		if err != nil {
-			progress.Fail()
 			return nil, err
 		}
-		progress.Finish()
 	}
 
 	return &seedPlanExecutionStats{
@@ -525,6 +538,7 @@ func scheduleAndProcessPlanTasks(
 		CompletedCount:        int(completedCount.Load()),
 		ExpiredCount:          int(expiredCount.Load()),
 		RecoveredCount:        int(recoveredCount.Load()),
+		MaxInFlightObserved:   int(maxInflightObserved.Load()),
 		FailedScheduleBatches: int(failedScheduleBatchCount.Load()),
 		FailedTaskListLoads:   int(failedTaskListCount.Load()),
 		FailedTaskExecutions:  int(failedTaskExecutionCount.Load()),
@@ -609,10 +623,420 @@ type seedPlanExecutionStats struct {
 	CompletedCount        int
 	ExpiredCount          int
 	RecoveredCount        int
+	MaxInFlightObserved   int
 	FailedEnrollments     int
 	FailedScheduleBatches int
 	FailedTaskListLoads   int
 	FailedTaskExecutions  int
+}
+
+type planTaskWaitJob struct {
+	testee   *TesteeResponse
+	task     TaskResponse
+	attempts int
+}
+
+func normalizePlanTaskExecutionConcurrency(workers, submitWorkers, waitWorkers, maxInFlightTasks int) (int, int, int) {
+	baseWorkers := workers
+	if baseWorkers <= 0 {
+		baseWorkers = 1
+	}
+
+	if submitWorkers <= 0 {
+		submitWorkers = baseWorkers
+	}
+	if waitWorkers <= 0 {
+		waitWorkers = baseWorkers
+	}
+	if submitWorkers <= 0 {
+		submitWorkers = 1
+	}
+	if waitWorkers <= 0 {
+		waitWorkers = 1
+	}
+
+	if maxInFlightTasks <= 0 {
+		maxInFlightTasks = max(submitWorkers, waitWorkers) * planMaxInFlightFactor
+		if maxInFlightTasks < planMinMaxInFlightTasks {
+			maxInFlightTasks = planMinMaxInFlightTasks
+		}
+	}
+	if maxInFlightTasks < submitWorkers {
+		maxInFlightTasks = submitWorkers
+	}
+	if maxInFlightTasks < waitWorkers {
+		maxInFlightTasks = waitWorkers
+	}
+	return submitWorkers, waitWorkers, maxInFlightTasks
+}
+
+func runPlanTaskExecutionPipeline(
+	ctx context.Context,
+	gateway PlanSeedGateway,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	questionnaireVersion string,
+	detail *QuestionnaireDetailResponse,
+	jobs []planTaskJob,
+	submitWorkers int,
+	waitWorkers int,
+	taskBufferSize int,
+	maxInFlightTasks int,
+	planExpireRate float64,
+	verbose bool,
+	reservedOpenTask *atomic.Bool,
+	submittedCount *atomic.Int64,
+	skippedCount *atomic.Int64,
+	completedCount *atomic.Int64,
+	expiredCount *atomic.Int64,
+	recoveredCount *atomic.Int64,
+	failedTaskExecutionCount *atomic.Int64,
+	inflightCount *atomic.Int64,
+	maxInflightObserved *atomic.Int64,
+	dashboard *planSeedDashboard,
+) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+	if submitWorkers <= 0 {
+		submitWorkers = 1
+	}
+	if waitWorkers <= 0 {
+		waitWorkers = 1
+	}
+	if taskBufferSize < submitWorkers {
+		taskBufferSize = submitWorkers
+	}
+	if maxInFlightTasks < submitWorkers {
+		maxInFlightTasks = submitWorkers
+	}
+	if maxInFlightTasks < waitWorkers {
+		maxInFlightTasks = waitWorkers
+	}
+
+	jobCh := make(chan planTaskJob, taskBufferSize)
+	waitCh := make(chan planTaskWaitJob, maxInFlightTasks)
+	inflightSlots := make(chan struct{}, maxInFlightTasks)
+
+	var submitWG sync.WaitGroup
+	for i := 0; i < submitWorkers; i++ {
+		submitWG.Add(1)
+		go func() {
+			defer submitWG.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case job, ok := <-jobCh:
+					if !ok {
+						return
+					}
+					processPlanTaskSubmitStage(
+						ctx,
+						gateway,
+						deps,
+						planID,
+						orgID,
+						questionnaireVersion,
+						detail,
+						job,
+						planExpireRate,
+						verbose,
+						reservedOpenTask,
+						submittedCount,
+						skippedCount,
+						expiredCount,
+						recoveredCount,
+						failedTaskExecutionCount,
+						inflightSlots,
+						waitCh,
+						inflightCount,
+						maxInflightObserved,
+						dashboard,
+					)
+				}
+			}
+		}()
+	}
+
+	var waitWG sync.WaitGroup
+	for i := 0; i < waitWorkers; i++ {
+		waitWG.Add(1)
+		go func() {
+			defer waitWG.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case waitJob, ok := <-waitCh:
+					if !ok {
+						return
+					}
+					processPlanTaskWaitStage(
+						ctx,
+						deps,
+						planID,
+						orgID,
+						waitJob,
+						verbose,
+						completedCount,
+						failedTaskExecutionCount,
+						inflightSlots,
+						inflightCount,
+						dashboard,
+					)
+				}
+			}
+		}()
+	}
+
+	for _, job := range jobs {
+		select {
+		case <-ctx.Done():
+			close(jobCh)
+			submitWG.Wait()
+			close(waitCh)
+			waitWG.Wait()
+			return ctx.Err()
+		case jobCh <- job:
+		}
+	}
+
+	close(jobCh)
+	submitWG.Wait()
+	close(waitCh)
+	waitWG.Wait()
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return nil
+}
+
+func processPlanTaskSubmitStage(
+	ctx context.Context,
+	gateway PlanSeedGateway,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	questionnaireVersion string,
+	detail *QuestionnaireDetailResponse,
+	job planTaskJob,
+	planExpireRate float64,
+	verbose bool,
+	reservedOpenTask *atomic.Bool,
+	submittedCount *atomic.Int64,
+	skippedCount *atomic.Int64,
+	expiredCount *atomic.Int64,
+	recoveredCount *atomic.Int64,
+	failedTaskExecutionCount *atomic.Int64,
+	inflightSlots chan struct{},
+	waitCh chan<- planTaskWaitJob,
+	inflightCount *atomic.Int64,
+	maxInflightObserved *atomic.Int64,
+	dashboard *planSeedDashboard,
+) {
+	if job.testee == nil || strings.TrimSpace(job.task.ID) == "" {
+		dashboard.AdvanceTask()
+		return
+	}
+
+	if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
+		skippedCount.Add(1)
+		deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
+			"plan_id", planID,
+			"testee_id", job.testee.ID,
+			"task_id", job.task.ID,
+			"seq", job.task.Seq,
+		)
+		dashboard.AdvanceTask()
+		return
+	}
+
+	if shouldExpirePlanTask(job.task, planExpireRate) {
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, "expire_plan_task", job.task.ID, func() error {
+			finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, gateway, orgID, job.task)
+			if err != nil {
+				return fmt.Errorf("expire task %s for testee %s: %w", job.task.ID, job.testee.ID, err)
+			}
+			if recovered && recoveredCount != nil {
+				recoveredCount.Add(1)
+			}
+			switch normalizeTaskStatus(finalTask.Status) {
+			case "expired":
+				expiredCount.Add(1)
+			default:
+				skippedCount.Add(1)
+			}
+			if verbose {
+				deps.Logger.Infow("Plan task expired intentionally",
+					"plan_id", planID,
+					"testee_id", job.testee.ID,
+					"task_id", job.task.ID,
+					"seq", job.task.Seq,
+					"expire_rate", planExpireRate,
+					"recovered", recovered,
+					"final_status", finalTask.Status,
+				)
+			}
+			return nil
+		})
+		if err != nil {
+			failedTaskExecutionCount.Add(1)
+			deps.Logger.Warnw("Skipping task after recovery attempts failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"testee_id", job.testee.ID,
+				"task_id", job.task.ID,
+				"error", err.Error(),
+			)
+		}
+		dashboard.AdvanceTask()
+		return
+	}
+
+	req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, job.testee, job.task, verbose, deps.Logger)
+	if err != nil {
+		failedTaskExecutionCount.Add(1)
+		deps.Logger.Warnw("Skipping task because answersheet request build failed",
+			"plan_id", planID,
+			"org_id", orgID,
+			"testee_id", job.testee.ID,
+			"task_id", job.task.ID,
+			"error", err.Error(),
+		)
+		dashboard.AdvanceTask()
+		return
+	}
+
+	if verbose {
+		logSubmitRequest(deps.Logger, *req, job.testee.ID)
+	}
+
+	select {
+	case <-ctx.Done():
+		dashboard.AdvanceTask()
+		return
+	case inflightSlots <- struct{}{}:
+	}
+
+	currentInflight := inflightCount.Add(1)
+	updateMaxInFlightCounter(maxInflightObserved, currentInflight)
+	dashboard.Refresh()
+
+	releaseSlot := func() {
+		<-inflightSlots
+		inflightCount.Add(-1)
+	}
+
+	var attempts int
+	err = runSeedPlanOperationWithRecovery(ctx, deps.Logger, "submit_plan_answersheet", job.task.ID, func() error {
+		submitAttempts, submitErr := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
+		attempts = submitAttempts
+		if submitErr != nil {
+			return fmt.Errorf(
+				"submit answersheet for testee %s task %s failed after %d attempts: %w",
+				job.testee.ID,
+				job.task.ID,
+				submitAttempts,
+				submitErr,
+			)
+		}
+		return nil
+	})
+	if err != nil {
+		releaseSlot()
+		failedTaskExecutionCount.Add(1)
+		deps.Logger.Warnw("Skipping task after recovery attempts failed",
+			"plan_id", planID,
+			"org_id", orgID,
+			"testee_id", job.testee.ID,
+			"task_id", job.task.ID,
+			"error", err.Error(),
+		)
+		dashboard.AdvanceTask()
+		return
+	}
+
+	submittedCount.Add(1)
+	dashboard.Refresh()
+
+	waitJob := planTaskWaitJob{
+		testee:   job.testee,
+		task:     job.task,
+		attempts: attempts,
+	}
+	select {
+	case <-ctx.Done():
+		releaseSlot()
+		dashboard.AdvanceTask()
+		return
+	case waitCh <- waitJob:
+	}
+}
+
+func processPlanTaskWaitStage(
+	ctx context.Context,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	waitJob planTaskWaitJob,
+	verbose bool,
+	completedCount *atomic.Int64,
+	failedTaskExecutionCount *atomic.Int64,
+	inflightSlots chan struct{},
+	inflightCount *atomic.Int64,
+	dashboard *planSeedDashboard,
+) {
+	releaseSlot := func() {
+		<-inflightSlots
+		inflightCount.Add(-1)
+	}
+	defer func() {
+		releaseSlot()
+		dashboard.AdvanceTask()
+	}()
+
+	err := waitForTaskCompletion(ctx, deps.Logger, deps.APIClient, orgID, waitJob.task.ID)
+	if err != nil {
+		failedTaskExecutionCount.Add(1)
+		deps.Logger.Warnw("Skipping task after completion wait failed",
+			"plan_id", planID,
+			"org_id", orgID,
+			"testee_id", waitJob.testee.ID,
+			"task_id", waitJob.task.ID,
+			"error", err.Error(),
+		)
+		return
+	}
+
+	completedCount.Add(1)
+	if verbose {
+		deps.Logger.Infow("Plan task completed",
+			"plan_id", planID,
+			"testee_id", waitJob.testee.ID,
+			"task_id", waitJob.task.ID,
+			"seq", waitJob.task.Seq,
+			"attempts", waitJob.attempts,
+		)
+	}
+	dashboard.Refresh()
+}
+
+func updateMaxInFlightCounter(counter *atomic.Int64, current int64) {
+	if counter == nil {
+		return
+	}
+	for {
+		existing := counter.Load()
+		if current <= existing {
+			return
+		}
+		if counter.CompareAndSwap(existing, current) {
+			return
+		}
+	}
 }
 
 func runPlanTaskWorkerPool(
@@ -931,104 +1355,6 @@ func seedPlanRecoverableDelay() time.Duration {
 	return seedPlanRecoverableMinWait + time.Duration(rng.Int63n(int64(span)+1))
 }
 
-func processPlanTaskJob(
-	ctx context.Context,
-	gateway PlanSeedGateway,
-	deps *dependencies,
-	planID string,
-	orgID int64,
-	questionnaireVersion string,
-	detail *QuestionnaireDetailResponse,
-	job planTaskJob,
-	planExpireRate float64,
-	verbose bool,
-	reservedOpenTask *atomic.Bool,
-	submittedCount *atomic.Int64,
-	skippedCount *atomic.Int64,
-	completedCount *atomic.Int64,
-	expiredCount *atomic.Int64,
-	recoveredCount *atomic.Int64,
-) error {
-	testee := job.testee
-	task := job.task
-
-	if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
-		skippedCount.Add(1)
-		deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
-			"plan_id", planID,
-			"testee_id", testee.ID,
-			"task_id", task.ID,
-			"seq", task.Seq,
-		)
-		return nil
-	}
-
-	if shouldExpirePlanTask(task, planExpireRate) {
-		finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, gateway, orgID, task)
-		if err != nil {
-			return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
-		}
-		if recovered && recoveredCount != nil {
-			recoveredCount.Add(1)
-		}
-		switch normalizeTaskStatus(finalTask.Status) {
-		case "expired":
-			expiredCount.Add(1)
-		default:
-			skippedCount.Add(1)
-		}
-		if verbose {
-			deps.Logger.Infow("Plan task expired intentionally",
-				"plan_id", planID,
-				"testee_id", testee.ID,
-				"task_id", task.ID,
-				"seq", task.Seq,
-				"expire_rate", planExpireRate,
-				"recovered", recovered,
-				"final_status", finalTask.Status,
-			)
-		}
-		return nil
-	}
-
-	req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
-	if err != nil {
-		return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
-	}
-
-	if verbose {
-		logSubmitRequest(deps.Logger, *req, testee.ID)
-	}
-
-	attempts, err := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
-	if err != nil {
-		return fmt.Errorf(
-			"submit answersheet for testee %s task %s failed after %d attempts: %w",
-			testee.ID,
-			task.ID,
-			attempts,
-			err,
-		)
-	}
-	submittedCount.Add(1)
-
-	if err := waitForTaskCompletion(ctx, deps.APIClient, orgID, task.ID); err != nil {
-		return fmt.Errorf("wait for task %s completion: %w", task.ID, err)
-	}
-	completedCount.Add(1)
-
-	if verbose {
-		deps.Logger.Infow("Plan task completed",
-			"plan_id", planID,
-			"testee_id", testee.ID,
-			"task_id", task.ID,
-			"seq", task.Seq,
-			"attempts", attempts,
-		)
-	}
-	return nil
-}
-
 func parsePlanTesteeIDs(raw string) []string {
 	if strings.TrimSpace(raw) == "" {
 		return nil
@@ -1203,13 +1529,16 @@ func normalizePlanScheduleBatchSize(workers int) int {
 	return size
 }
 
-func normalizePlanTaskBufferSize(workers int) int {
-	if workers <= 0 {
-		return 1
+func normalizePlanTaskBufferSize(submitWorkers int, maxInFlightTasks int) int {
+	if submitWorkers <= 0 {
+		submitWorkers = 1
 	}
-	size := workers * planTaskBufferFactor
-	if size < workers {
-		size = workers
+	size := submitWorkers * planTaskBufferFactor
+	if size < submitWorkers {
+		size = submitWorkers
+	}
+	if maxInFlightTasks > size {
+		size = maxInFlightTasks
 	}
 	return size
 }
@@ -1317,14 +1646,28 @@ func buildPlanSubmissionRequest(
 	return req, nil
 }
 
-func waitForTaskCompletion(ctx context.Context, client *APIClient, orgID int64, taskID string) error {
+func waitForTaskCompletion(
+	ctx context.Context,
+	logger interface{ Warnw(string, ...interface{}) },
+	client *APIClient,
+	orgID int64,
+	taskID string,
+) error {
 	deadline := time.NewTimer(planTaskCompletionTimeout)
 	defer deadline.Stop()
 	ticker := time.NewTicker(planTaskCompletionInterval)
 	defer ticker.Stop()
 
 	for {
-		task, err := client.GetTask(ctx, taskID)
+		var task *TaskResponse
+		err := runSeedPlanOperationWithRecovery(ctx, logger, "wait_for_plan_task_completion", taskID, func() error {
+			resp, err := client.GetTask(ctx, taskID)
+			if err != nil {
+				return err
+			}
+			task = resp
+			return nil
+		})
 		if err != nil {
 			return err
 		}
@@ -1359,6 +1702,248 @@ func seedPlanTaskCompletedAt(task TaskResponse) string {
 		return ""
 	}
 	return plannedAt.Add(planTaskCompletedOffset).Format(time.RFC3339)
+}
+
+type planSeedDashboard struct {
+	mu                   sync.Mutex
+	enabled              bool
+	finished             bool
+	rendered             bool
+	startedAt            time.Time
+	planMode             string
+	totalBatches         int
+	currentBatch         int
+	openedTasks          int
+	discoveredTasks      int
+	processedTasks       int
+	scheduleFailureCount int
+	submitted            *atomic.Int64
+	completed            *atomic.Int64
+	expired              *atomic.Int64
+	skipped              *atomic.Int64
+	recovered            *atomic.Int64
+	inflight             *atomic.Int64
+	maxInflight          *atomic.Int64
+	failedExecutions     *atomic.Int64
+}
+
+func newPlanSeedDashboard(
+	planMode string,
+	totalBatches int,
+	submitted *atomic.Int64,
+	completed *atomic.Int64,
+	expired *atomic.Int64,
+	skipped *atomic.Int64,
+	recovered *atomic.Int64,
+	inflight *atomic.Int64,
+	maxInflight *atomic.Int64,
+	failedExecutions *atomic.Int64,
+) *planSeedDashboard {
+	enabled := isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
+	dashboard := &planSeedDashboard{
+		enabled:          enabled,
+		startedAt:        time.Now(),
+		planMode:         strings.TrimSpace(planMode),
+		totalBatches:     totalBatches,
+		submitted:        submitted,
+		completed:        completed,
+		expired:          expired,
+		skipped:          skipped,
+		recovered:        recovered,
+		inflight:         inflight,
+		maxInflight:      maxInflight,
+		failedExecutions: failedExecutions,
+	}
+	if dashboard.enabled {
+		dashboard.renderLocked()
+	}
+	return dashboard
+}
+
+func (d *planSeedDashboard) SetCurrentBatch(batch int) {
+	if d == nil || !d.enabled {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	if batch < 0 {
+		batch = 0
+	}
+	if d.totalBatches > 0 && batch > d.totalBatches {
+		batch = d.totalBatches
+	}
+	d.currentBatch = batch
+	d.renderLocked()
+}
+
+func (d *planSeedDashboard) IncrementScheduleFailures() {
+	if d == nil || !d.enabled {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	d.scheduleFailureCount++
+	d.renderLocked()
+}
+
+func (d *planSeedDashboard) AddOpenedTasks(delta int) {
+	if d == nil || !d.enabled || delta <= 0 {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	d.openedTasks += delta
+	d.renderLocked()
+}
+
+func (d *planSeedDashboard) AddDiscoveredTasks(delta int) {
+	if d == nil || !d.enabled || delta <= 0 {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	d.discoveredTasks += delta
+	d.renderLocked()
+}
+
+func (d *planSeedDashboard) AdvanceTask() {
+	if d == nil || !d.enabled {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	if d.processedTasks < d.discoveredTasks {
+		d.processedTasks++
+	}
+	d.renderLocked()
+}
+
+func (d *planSeedDashboard) Refresh() {
+	if d == nil || !d.enabled {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	d.renderLocked()
+}
+
+func (d *planSeedDashboard) Finish() {
+	if d == nil || !d.enabled {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.finished {
+		return
+	}
+	d.currentBatch = d.totalBatches
+	d.processedTasks = d.discoveredTasks
+	d.renderLocked()
+	fmt.Fprintln(os.Stderr)
+	d.finished = true
+}
+
+func (d *planSeedDashboard) renderLocked() {
+	if !d.enabled {
+		return
+	}
+
+	if d.rendered {
+		fmt.Fprintf(os.Stderr, "\x1b[%dF", 3)
+	}
+
+	elapsed := time.Since(d.startedAt).Round(time.Second)
+	planLine := fmt.Sprintf(
+		"plan(%s)      [%s] %d/%d batches elapsed=%s opened=%d schedule_failures=%d",
+		d.planModeLabel(),
+		renderDashboardBar(d.currentBatch, d.totalBatches, 24),
+		d.currentBatch,
+		max(d.totalBatches, 0),
+		elapsed,
+		d.openedTasks,
+		d.scheduleFailureCount,
+	)
+
+	inflight := atomicLoadInt64(d.inflight)
+	maxInflight := atomicLoadInt64(d.maxInflight)
+	taskLine := fmt.Sprintf(
+		"task-flow(remote) [%s] %d/%d tasks inflight=%d max=%d",
+		renderDashboardBar(d.processedTasks, d.discoveredTasks, 24),
+		d.processedTasks,
+		d.discoveredTasks,
+		inflight,
+		maxInflight,
+	)
+
+	statsLine := fmt.Sprintf(
+		"stats          submitted=%d completed=%d expired=%d skipped=%d recovered=%d failed=%d",
+		atomicLoadInt64(d.submitted),
+		atomicLoadInt64(d.completed),
+		atomicLoadInt64(d.expired),
+		atomicLoadInt64(d.skipped),
+		atomicLoadInt64(d.recovered),
+		atomicLoadInt64(d.failedExecutions),
+	)
+
+	fmt.Fprintf(os.Stderr, "%s\n%s\n%s", planLine, taskLine, statsLine)
+	d.rendered = true
+}
+
+func (d *planSeedDashboard) planModeLabel() string {
+	mode := strings.ToLower(strings.TrimSpace(d.planMode))
+	if mode == "" {
+		return "unknown"
+	}
+	return mode
+}
+
+func renderDashboardBar(current, total, width int) string {
+	if width <= 0 {
+		width = 24
+	}
+	if total <= 0 {
+		total = max(current, 1)
+	}
+	if current < 0 {
+		current = 0
+	}
+	if current > total {
+		current = total
+	}
+	progressRatio := float64(current) / float64(total)
+	filled := int(progressRatio * float64(width))
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > width {
+		filled = width
+	}
+	return strings.Repeat("=", filled) + strings.Repeat(" ", width-filled)
+}
+
+func atomicLoadInt64(counter *atomic.Int64) int64 {
+	if counter == nil {
+		return 0
+	}
+	return counter.Load()
 }
 
 type planTaskProgressBar struct {

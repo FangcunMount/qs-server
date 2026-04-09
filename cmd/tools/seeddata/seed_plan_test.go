@@ -99,6 +99,68 @@ func TestNormalizePlanWorkers(t *testing.T) {
 	}
 }
 
+func TestNormalizePlanTaskExecutionConcurrency(t *testing.T) {
+	tests := []struct {
+		name                string
+		workers             int
+		submitWorkers       int
+		waitWorkers         int
+		maxInFlight         int
+		expectedSubmit      int
+		expectedWait        int
+		expectedMaxInFlight int
+	}{
+		{
+			name:                "defaults follow plan workers",
+			workers:             4,
+			expectedSubmit:      4,
+			expectedWait:        4,
+			expectedMaxInFlight: 32,
+		},
+		{
+			name:                "explicit values respected",
+			workers:             2,
+			submitWorkers:       8,
+			waitWorkers:         3,
+			maxInFlight:         50,
+			expectedSubmit:      8,
+			expectedWait:        3,
+			expectedMaxInFlight: 50,
+		},
+		{
+			name:                "max inflight raised to worker counts",
+			workers:             2,
+			submitWorkers:       6,
+			waitWorkers:         5,
+			maxInFlight:         4,
+			expectedSubmit:      6,
+			expectedWait:        5,
+			expectedMaxInFlight: 6,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSubmit, gotWait, gotMaxInFlight := normalizePlanTaskExecutionConcurrency(tt.workers, tt.submitWorkers, tt.waitWorkers, tt.maxInFlight)
+			if gotSubmit != tt.expectedSubmit || gotWait != tt.expectedWait || gotMaxInFlight != tt.expectedMaxInFlight {
+				t.Fatalf(
+					"normalizePlanTaskExecutionConcurrency(%d, %d, %d, %d)=(%d,%d,%d), want=(%d,%d,%d)",
+					tt.workers,
+					tt.submitWorkers,
+					tt.waitWorkers,
+					tt.maxInFlight,
+					gotSubmit,
+					gotWait,
+					gotMaxInFlight,
+					tt.expectedSubmit,
+					tt.expectedWait,
+					tt.expectedMaxInFlight,
+				)
+			}
+		})
+	}
+}
+
 func TestNormalizePlanExpireRate(t *testing.T) {
 	tests := []struct {
 		name     string

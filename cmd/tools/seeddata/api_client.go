@@ -26,6 +26,7 @@ type APIClient struct {
 	logger     log.Logger
 	tokenMu    sync.RWMutex
 	refresher  func(context.Context) (string, error)
+	provider   *seedTokenProvider
 
 	retryMax      int
 	retryMinDelay time.Duration
@@ -35,6 +36,13 @@ type APIClient struct {
 	scaleCache           map[string]*ScaleResponse
 	questionnaireCacheMu sync.RWMutex
 	questionnaireCache   map[string]*QuestionnaireDetailResponse
+}
+
+type seedTokenProvider struct {
+	tokenMu   sync.RWMutex
+	refreshMu sync.Mutex
+	token     string
+	refresher func(context.Context) (string, error)
 }
 
 const (
@@ -67,6 +75,88 @@ func NewAPIClient(baseURL, token string, logger log.Logger) *APIClient {
 // SetTokenRefresher sets a callback to refresh token when needed.
 func (c *APIClient) SetTokenRefresher(fn func(context.Context) (string, error)) {
 	c.refresher = fn
+	if c.provider != nil {
+		c.provider.SetRefresher(fn)
+	}
+}
+
+func newSeedTokenProvider(initialToken string, refresher func(context.Context) (string, error)) *seedTokenProvider {
+	return &seedTokenProvider{
+		token:     strings.TrimSpace(initialToken),
+		refresher: refresher,
+	}
+}
+
+func (p *seedTokenProvider) SetRefresher(fn func(context.Context) (string, error)) {
+	if p == nil {
+		return
+	}
+	p.refreshMu.Lock()
+	defer p.refreshMu.Unlock()
+	p.refresher = fn
+}
+
+func (p *seedTokenProvider) Token() string {
+	if p == nil {
+		return ""
+	}
+	p.tokenMu.RLock()
+	defer p.tokenMu.RUnlock()
+	return p.token
+}
+
+func (p *seedTokenProvider) SetToken(token string) {
+	if p == nil {
+		return
+	}
+	p.tokenMu.Lock()
+	p.token = strings.TrimSpace(token)
+	p.tokenMu.Unlock()
+}
+
+func (p *seedTokenProvider) Refresh(ctx context.Context, staleToken string) (string, error) {
+	if p == nil {
+		return "", fmt.Errorf("token provider is nil")
+	}
+	current := p.Token()
+	if current != "" && staleToken != "" && current != staleToken {
+		return current, nil
+	}
+
+	p.refreshMu.Lock()
+	defer p.refreshMu.Unlock()
+
+	current = p.Token()
+	if current != "" && staleToken != "" && current != staleToken {
+		return current, nil
+	}
+	if p.refresher == nil {
+		return "", fmt.Errorf("token refresher not configured")
+	}
+
+	token, err := p.refresher(ctx)
+	if err != nil {
+		return "", err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", fmt.Errorf("token refresher returned empty token")
+	}
+	p.SetToken(token)
+	return token, nil
+}
+
+func (c *APIClient) SetTokenProvider(provider *seedTokenProvider) {
+	c.provider = provider
+	if provider == nil {
+		return
+	}
+	if c.refresher != nil {
+		provider.SetRefresher(c.refresher)
+	}
+	if token := strings.TrimSpace(c.getToken()); token != "" {
+		provider.SetToken(token)
+	}
 }
 
 // SetRetryConfig updates retry settings for the client.
@@ -101,12 +191,26 @@ func (c *APIClient) SetRetryConfig(cfg RetryConfig) {
 
 // SetToken updates the client token safely.
 func (c *APIClient) SetToken(token string) {
+	if c.provider != nil {
+		c.provider.SetToken(token)
+	}
 	c.tokenMu.Lock()
-	c.token = token
+	c.token = strings.TrimSpace(token)
 	c.tokenMu.Unlock()
 }
 
+func (c *APIClient) getLocalToken() string {
+	c.tokenMu.RLock()
+	defer c.tokenMu.RUnlock()
+	return c.token
+}
+
 func (c *APIClient) getToken() string {
+	if c.provider != nil {
+		if token := c.provider.Token(); token != "" {
+			return token
+		}
+	}
 	c.tokenMu.RLock()
 	defer c.tokenMu.RUnlock()
 	return c.token
@@ -635,6 +739,18 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 }
 
 func (c *APIClient) refreshToken(ctx context.Context) error {
+	current := strings.TrimSpace(c.getLocalToken())
+	if current == "" {
+		current = c.getToken()
+	}
+	if c.provider != nil {
+		token, err := c.provider.Refresh(ctx, current)
+		if err != nil {
+			return err
+		}
+		c.SetToken(token)
+		return nil
+	}
 	if c.refresher == nil {
 		return fmt.Errorf("token refresher not configured")
 	}

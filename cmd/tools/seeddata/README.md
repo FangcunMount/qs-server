@@ -60,6 +60,9 @@ go run ./cmd/tools/seeddata \
   --local-redis-addr "127.0.0.1:6379" \
   --local-redis-username "default" \
   --plan-workers 4 \
+  --plan-submit-workers 12 \
+  --plan-wait-workers 3 \
+  --plan-max-inflight-tasks 120 \
   --plan-expire-rate 0.2 \
   --plan-id 614186929759466030
 
@@ -136,7 +139,16 @@ go run ./cmd/tools/seeddata \
   - 查任务 / 任务过期
 - `local` 模式下，答卷提交流转仍然是远程真实链路：`seeddata -> apiserver admin-submit -> worker -> assessment -> task.completed`。
 - `remote` 模式保留原有 HTTP 实现，适合作为接口链路回归或数据库不可直连时的回退方案。
-- `plan` 步骤支持 `--plan-workers`，用于控制计划入组和任务执行的并发 worker 数；默认 `1`，建议从 `4` 开始压测。
+- `plan` 步骤支持 `--plan-workers`，用于控制计划侧工作负载：testee 入组、已有任务扫描、定向调度分批；默认 `1`，建议从 `4` 开始压测。
+- `plan` 步骤支持受控的 task 提交流水线：
+  - `--plan-submit-workers`：提交答卷的并发 worker 数，默认跟随 `--plan-workers`
+  - `--plan-wait-workers`：等待 `task.completed` 的并发 worker 数，默认跟随 `--plan-workers`
+  - `--plan-max-inflight-tasks`：已提交但仍在等待 worker/apiserver 消化的最大 task 数；达到上限后，新的提交会阻塞等待，默认根据 submit/wait worker 数自动推导
+- 推荐压测起点：
+  - `--plan-workers 4`
+  - `--plan-submit-workers 12`
+  - `--plan-wait-workers 3`
+  - `--plan-max-inflight-tasks 120`
 - `plan` 步骤支持 `--plan-expire-rate`，用于控制已打开任务中有多少比例会被直接标记为 `expired` 而不是提交答卷；默认 `0.2`，取值范围 `0.0-1.0`。
 - `plan` 步骤支持 `--plan-process-existing-only` 恢复模式：跳过 enroll，只对选中 testee 在该 plan 下已经存在的 task 做状态检查、定向调度和后续处理，适合补跑历史遗留的 `pending/opened` task。
 - 恢复模式下，如果没有显式传 `--plan-testee-ids`，脚本会处理 `--testee-limit` 范围内的全部 testee，不再做 `1/5` 随机抽样。
@@ -148,7 +160,7 @@ go run ./cmd/tools/seeddata \
 - 显式模式会更严格：如果 `/api/v1/testees/{id}` 返回的 `created_at` 是零值，脚本会直接报错，不再回退到 `updated_at` 或当前时间。
 - 开启 `--plan-process-existing-only` 时，脚本启动会先统计这批 testee 在目标 plan 下已有多少 `pending/opened/completed/expired/canceled` task，并打印到日志；如果一条现有 task 都没有，会直接退出，不会创建新 task。
 - 恢复模式里，`ExpireTask` 会按幂等方式补偿：如果第一次过期请求超时，但回读任务状态发现它已经进入 `expired/completed/canceled`，脚本会继续往下跑，不会因为重复过期返回 `400 Invalid argument` 而中断整轮恢复。
-- 并发只发生在两段：testee 入组、以及按 testee 维度提交/等待任务完成；两段都使用固定数量的 worker 和有缓冲 channel，其余 testee 会在队列中等待；调度接口仍只会串行调用一次。
+- task 执行阶段已经改成 submit/wait 双阶段流水线：提交 worker 会把答卷快速发出去，等待 worker 负责轮询任务完成，中间通过有界 inflight 池削峰填谷；调度接口仍按批次串行调用，不会整机构一次性放量。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
 - `plan` 回填会以 `planned_at` 作为业务时间基准：`open_at` 对齐 `planned_at`，`expire_at` 基于该时间继续推导，`completed_at` 默认使用 `planned_at + 2h`。
 - 为避免 seeddata 把整个计划自动收尾为 `finished`，脚本会故意保留 1 个 `opened` task 不处理，让计划保持 `active`。
