@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math/rand"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	"github.com/mattn/go-isatty"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -297,9 +299,23 @@ func processPlanTasksConcurrently(
 	var skippedCount atomic.Int64
 	var completedCount atomic.Int64
 	var expiredCount atomic.Int64
+	progress := newPlanTaskProgressBar(
+		"Processing scheduled pending plan tasks",
+		len(selectedTestees),
+		func() string {
+			return fmt.Sprintf(
+				"completed=%d expired=%d submitted=%d skipped=%d",
+				completedCount.Load(),
+				expiredCount.Load(),
+				submittedCount.Load(),
+				skippedCount.Load(),
+			)
+		},
+	)
+	defer progress.Close()
 
 	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
-		return processPlanTasksForTestee(
+		err := processPlanTasksForTestee(
 			ctx,
 			deps,
 			planID,
@@ -314,9 +330,15 @@ func processPlanTasksConcurrently(
 			&completedCount,
 			&expiredCount,
 		)
+		if err == nil {
+			progress.Advance()
+		}
+		return err
 	}); err != nil {
+		progress.Fail()
 		return 0, 0, 0, 0, err
 	}
+	progress.Finish()
 	return int(submittedCount.Load()), int(skippedCount.Load()), int(completedCount.Load()), int(expiredCount.Load()), nil
 }
 
@@ -422,37 +444,37 @@ func processPlanTasksForTestee(
 			}
 			continue
 		case "opened":
-			// continue
-			default:
-				skippedCount.Add(1)
-				deps.Logger.Warnw("Skipping task with unsupported status",
-					"plan_id", planID,
-					"testee_id", testee.ID,
+		// continue
+		default:
+			skippedCount.Add(1)
+			deps.Logger.Warnw("Skipping task with unsupported status",
+				"plan_id", planID,
+				"testee_id", testee.ID,
 				"task_id", task.ID,
 				"status", task.Status,
+			)
+			continue
+		}
+
+		if shouldExpirePlanTask(task, planExpireRate) {
+			if _, err := deps.APIClient.ExpireTask(ctx, task.ID); err != nil {
+				return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
+			}
+			expiredCount.Add(1)
+			if verbose {
+				deps.Logger.Infow("Plan task expired intentionally",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"task_id", task.ID,
+					"seq", task.Seq,
+					"expire_rate", planExpireRate,
 				)
-				continue
 			}
+			continue
+		}
 
-			if shouldExpirePlanTask(task, planExpireRate) {
-				if _, err := deps.APIClient.ExpireTask(ctx, task.ID); err != nil {
-					return fmt.Errorf("expire task %s for testee %s: %w", task.ID, testee.ID, err)
-				}
-				expiredCount.Add(1)
-				if verbose {
-					deps.Logger.Infow("Plan task expired intentionally",
-						"plan_id", planID,
-						"testee_id", testee.ID,
-						"task_id", task.ID,
-						"seq", task.Seq,
-						"expire_rate", planExpireRate,
-					)
-				}
-				continue
-			}
-
-			req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
-			if err != nil {
+		req, err := buildPlanSubmissionRequest(detail, questionnaireVersion, testee, task, verbose, deps.Logger)
+		if err != nil {
 			return fmt.Errorf("build answersheet for testee %s task %s: %w", testee.ID, task.ID, err)
 		}
 
@@ -739,6 +761,116 @@ func waitForTaskCompletion(ctx context.Context, client *APIClient, orgID int64, 
 
 func normalizeTaskStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
+}
+
+type planTaskProgressBar struct {
+	mu          sync.Mutex
+	total       int
+	current     int
+	label       string
+	startedAt   time.Time
+	extraStatus func() string
+	enabled     bool
+	finished    bool
+}
+
+func newPlanTaskProgressBar(label string, total int, extraStatus func() string) *planTaskProgressBar {
+	enabled := total > 0 && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
+	bar := &planTaskProgressBar{
+		total:       total,
+		label:       label,
+		startedAt:   time.Now(),
+		extraStatus: extraStatus,
+		enabled:     enabled,
+	}
+	if enabled {
+		bar.renderLocked()
+	}
+	return bar
+}
+
+func (b *planTaskProgressBar) Advance() {
+	if b == nil || !b.enabled {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.finished {
+		return
+	}
+	if b.current < b.total {
+		b.current++
+	}
+	b.renderLocked()
+}
+
+func (b *planTaskProgressBar) Finish() {
+	if b == nil || !b.enabled {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.finished {
+		return
+	}
+	b.current = b.total
+	b.renderLocked()
+	fmt.Fprintln(os.Stderr)
+	b.finished = true
+}
+
+func (b *planTaskProgressBar) Fail() {
+	if b == nil || !b.enabled {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.finished {
+		return
+	}
+	b.renderLocked()
+	fmt.Fprintln(os.Stderr)
+	b.finished = true
+}
+
+func (b *planTaskProgressBar) Close() {
+	if b == nil || !b.enabled {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.finished {
+		return
+	}
+	fmt.Fprintln(os.Stderr)
+	b.finished = true
+}
+
+func (b *planTaskProgressBar) renderLocked() {
+	if !b.enabled {
+		return
+	}
+	const width = 24
+	progressRatio := 1.0
+	if b.total > 0 {
+		progressRatio = float64(b.current) / float64(b.total)
+	}
+	filled := int(progressRatio * width)
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("=", filled) + strings.Repeat(" ", width-filled)
+	elapsed := time.Since(b.startedAt).Round(time.Second)
+	line := fmt.Sprintf("\r%s [%s] %d/%d testees elapsed=%s", b.label, bar, b.current, b.total, elapsed)
+	if b.extraStatus != nil {
+		if extra := strings.TrimSpace(b.extraStatus()); extra != "" {
+			line += " " + extra
+		}
+	}
+	fmt.Fprint(os.Stderr, line)
 }
 
 func normalizePlanExpireRate(rate float64) float64 {
