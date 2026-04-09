@@ -541,12 +541,26 @@ func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string,
 }
 
 func (c *APIClient) doRequestWithRetryAndTimeout(ctx context.Context, method, path string, body interface{}, allowRefresh bool, timeout time.Duration) (*Response, error) {
+	return c.doRequestWithRetryTimeoutAndLimit(ctx, method, path, body, allowRefresh, timeout, c.retryMax)
+}
+
+func (c *APIClient) doRequestWithRetryTimeoutAndLimit(
+	ctx context.Context,
+	method, path string,
+	body interface{},
+	allowRefresh bool,
+	timeout time.Duration,
+	retryMax int,
+) (*Response, error) {
 	url := c.baseURL + path
 	httpClient := *c.httpClient
 	if timeout > 0 {
 		httpClient.Timeout = timeout
 	}
-	for attempt := 0; attempt <= c.retryMax; attempt++ {
+	if retryMax < 0 {
+		retryMax = 0
+	}
+	for attempt := 0; attempt <= retryMax; attempt++ {
 		var reqBody io.Reader
 		if body != nil {
 			jsonData, err := json.Marshal(body)
@@ -571,7 +585,7 @@ func (c *APIClient) doRequestWithRetryAndTimeout(ctx context.Context, method, pa
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			if shouldRetryNetErr(err) && attempt < c.retryMax {
+			if shouldRetryNetErr(err) && attempt < retryMax {
 				delay := backoffDelay(attempt, c.retryMinDelay, c.retryMaxDelay)
 				c.logger.Warnw("seeddata request failed, retrying",
 					"url", url,
@@ -613,20 +627,20 @@ func (c *APIClient) doRequestWithRetryAndTimeout(ctx context.Context, method, pa
 			if err := json.Unmarshal(respBody, &apiResp); err == nil {
 				if allowRefresh && c.refresher != nil {
 					if err := c.refreshToken(ctx); err == nil {
-						return c.doRequestWithRetry(ctx, method, path, body, false)
+						return c.doRequestWithRetryTimeoutAndLimit(ctx, method, path, body, false, timeout, retryMax)
 					}
 				}
 				return nil, fmt.Errorf("authentication failed (401): please check your API token. message=%s", apiResp.Message)
 			}
 			if allowRefresh && c.refresher != nil {
 				if err := c.refreshToken(ctx); err == nil {
-					return c.doRequestWithRetry(ctx, method, path, body, false)
+					return c.doRequestWithRetryTimeoutAndLimit(ctx, method, path, body, false, timeout, retryMax)
 				}
 			}
 			return nil, fmt.Errorf("authentication failed (401): please check your API token. url=%s", url)
 		}
 
-		if isRetryableStatus(resp.StatusCode) && attempt < c.retryMax {
+		if isRetryableStatus(resp.StatusCode) && attempt < retryMax {
 			delay, ok := parseRetryAfter(resp.Header.Get("Retry-After"))
 			if !ok {
 				delay = backoffDelay(attempt, c.retryMinDelay, c.retryMaxDelay)
@@ -1321,6 +1335,30 @@ func (c *APIClient) SubmitAnswerSheet(ctx context.Context, req SubmitAnswerSheet
 // SubmitAnswerSheetAdmin 管理员提交答卷（apiserver）
 func (c *APIClient) SubmitAnswerSheetAdmin(ctx context.Context, req AdminSubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
 	resp, err := c.doRequest(ctx, "POST", "/api/v1/answersheets/admin-submit", req)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var submitResp SubmitAnswerSheetResponse
+	if err := json.Unmarshal(dataBytes, &submitResp); err != nil {
+		return nil, fmt.Errorf("unmarshal submit response: %w", err)
+	}
+
+	return &submitResp, nil
+}
+
+func (c *APIClient) SubmitAnswerSheetAdminWithPolicy(
+	ctx context.Context,
+	req AdminSubmitAnswerSheetRequest,
+	timeout time.Duration,
+	retryMax int,
+) (*SubmitAnswerSheetResponse, error) {
+	resp, err := c.doRequestWithRetryTimeoutAndLimit(ctx, "POST", "/api/v1/answersheets/admin-submit", req, true, timeout, retryMax)
 	if err != nil {
 		return nil, err
 	}

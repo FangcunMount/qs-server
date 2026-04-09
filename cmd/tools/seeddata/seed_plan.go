@@ -28,6 +28,12 @@ const (
 	planTaskBufferFactor       = 4
 	planMaxInFlightFactor      = 8
 	planMinMaxInFlightTasks    = 20
+	planSubmitRequestTimeout   = 15 * time.Second
+	planSubmitHTTPRetryMax     = 0
+	planSubmitMaxAttempts      = 2
+	planSubmitRetryBackoff     = 2 * time.Second
+	planSubmitCooldownBase     = 30 * time.Second
+	planSubmitCooldownMax      = 2 * time.Minute
 	seedPlanPaceInterval       = 3 * time.Minute
 	seedPlanPaceSleep          = 15 * time.Second
 	seedPlanRecoverableRetries = 3
@@ -543,6 +549,7 @@ func scheduleAndProcessPlanTasks(
 	submitWorkers, waitWorkers, maxInFlightTasks = normalizePlanTaskExecutionConcurrency(workers, submitWorkers, waitWorkers, maxInFlightTasks)
 	taskBufferSize := normalizePlanTaskBufferSize(submitWorkers, maxInFlightTasks)
 	batches := chunkPlanTestees(selectedTestees, normalizePlanScheduleBatchSize(workers))
+	submitController := newSeedPlanSubmitController()
 	dashboard := newPlanSeedDashboard(
 		planMode,
 		len(batches),
@@ -657,6 +664,7 @@ func scheduleAndProcessPlanTasks(
 			&expiredCount,
 			&recoveredCount,
 			&failedTaskExecutionCount,
+			submitController,
 			&inflightCount,
 			&maxInflightObserved,
 			dashboard,
@@ -772,6 +780,82 @@ type planTaskWaitJob struct {
 	attempts int
 }
 
+type seedPlanSubmitController struct {
+	pauseUntilNanos         atomic.Int64
+	consecutiveRecoverables atomic.Int64
+}
+
+func newSeedPlanSubmitController() *seedPlanSubmitController {
+	return &seedPlanSubmitController{}
+}
+
+func (c *seedPlanSubmitController) Wait(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
+	for {
+		untilNanos := c.pauseUntilNanos.Load()
+		if untilNanos <= 0 {
+			return nil
+		}
+		until := time.Unix(0, untilNanos)
+		delay := time.Until(until)
+		if delay <= 0 {
+			c.pauseUntilNanos.CompareAndSwap(untilNanos, 0)
+			return nil
+		}
+		if err := sleepWithContext(ctx, delay); err != nil {
+			return err
+		}
+	}
+}
+
+func (c *seedPlanSubmitController) OnSuccess() {
+	if c == nil {
+		return
+	}
+	c.consecutiveRecoverables.Store(0)
+}
+
+func (c *seedPlanSubmitController) OnRecoverableError(
+	logger interface{ Warnw(string, ...interface{}) },
+	planID string,
+	orgID int64,
+	taskID string,
+	err error,
+) {
+	if c == nil {
+		return
+	}
+	streak := c.consecutiveRecoverables.Add(1)
+	delay := planSubmitCooldownBase
+	for i := int64(1); i < streak; i++ {
+		delay *= 2
+		if delay >= planSubmitCooldownMax {
+			delay = planSubmitCooldownMax
+			break
+		}
+	}
+	until := time.Now().Add(delay)
+	for {
+		current := c.pauseUntilNanos.Load()
+		if current >= until.UnixNano() {
+			break
+		}
+		if c.pauseUntilNanos.CompareAndSwap(current, until.UnixNano()) {
+			break
+		}
+	}
+	logger.Warnw("Seed plan submit cooldown activated",
+		"plan_id", planID,
+		"org_id", orgID,
+		"task_id", taskID,
+		"cooldown_seconds", int(delay.Seconds()),
+		"recoverable_submit_failures", streak,
+		"error", err.Error(),
+	)
+}
+
 func normalizePlanTaskExecutionConcurrency(workers, submitWorkers, waitWorkers, maxInFlightTasks int) (int, int, int) {
 	baseWorkers := workers
 	if baseWorkers <= 0 {
@@ -828,6 +912,7 @@ func runPlanTaskExecutionPipeline(
 	expiredCount *atomic.Int64,
 	recoveredCount *atomic.Int64,
 	failedTaskExecutionCount *atomic.Int64,
+	submitController *seedPlanSubmitController,
 	inflightCount *atomic.Int64,
 	maxInflightObserved *atomic.Int64,
 	dashboard *planSeedDashboard,
@@ -885,6 +970,7 @@ func runPlanTaskExecutionPipeline(
 						expiredCount,
 						recoveredCount,
 						failedTaskExecutionCount,
+						submitController,
 						inflightSlots,
 						waitCh,
 						inflightCount,
@@ -967,6 +1053,7 @@ func processPlanTaskSubmitStage(
 	expiredCount *atomic.Int64,
 	recoveredCount *atomic.Int64,
 	failedTaskExecutionCount *atomic.Int64,
+	submitController *seedPlanSubmitController,
 	inflightSlots chan struct{},
 	waitCh chan<- planTaskWaitJob,
 	inflightCount *atomic.Int64,
@@ -1072,25 +1159,24 @@ func processPlanTaskSubmitStage(
 		inflightCount.Add(-1)
 	}
 
-	var attempts int
-	err = runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "submit_plan_answersheet", job.task.ID, func() error {
-		if err := waitForSeedPlanPacer(ctx, "submit_plan_answersheet"); err != nil {
-			return err
-		}
-		submitAttempts, submitErr := submitAnswerSheetWithRetry(ctx, deps.APIClient, *req, submitMaxRetry)
-		attempts = submitAttempts
-		if submitErr != nil {
-			return fmt.Errorf(
-				"submit answersheet for testee %s task %s failed after %d attempts: %w",
-				job.testee.ID,
-				job.task.ID,
-				submitAttempts,
-				submitErr,
-			)
-		}
-		return nil
-	})
+	if err := waitForSeedPlanPacer(ctx, "submit_plan_answersheet"); err != nil {
+		releaseSlot()
+		failedTaskExecutionCount.Add(1)
+		dashboard.AdvanceTask()
+		return
+	}
+	if err := submitController.Wait(ctx); err != nil {
+		releaseSlot()
+		failedTaskExecutionCount.Add(1)
+		dashboard.AdvanceTask()
+		return
+	}
+
+	attempts, err := submitPlanAnswerSheetWithControlledRetry(ctx, deps.APIClient, *req, planSubmitMaxAttempts)
 	if err != nil {
+		if isSeedPlanRecoverableError(err) {
+			submitController.OnRecoverableError(deps.Logger, planID, orgID, job.task.ID, err)
+		}
 		releaseSlot()
 		failedTaskExecutionCount.Add(1)
 		if verbose {
@@ -1105,6 +1191,7 @@ func processPlanTaskSubmitStage(
 		dashboard.AdvanceTask()
 		return
 	}
+	submitController.OnSuccess()
 
 	submittedCount.Add(1)
 	dashboard.Refresh()
@@ -1440,6 +1527,52 @@ func expirePlanTaskWithRecovery(ctx context.Context, gateway PlanSeedGateway, or
 	default:
 		return nil, false, fmt.Errorf("expire failed: %w; current task status=%s org_id=%d", err, currentTask.Status, orgID)
 	}
+}
+
+func submitPlanAnswerSheetWithControlledRetry(
+	ctx context.Context,
+	client *APIClient,
+	req SubmitAnswerSheetRequest,
+	maxAttempts int,
+) (int, error) {
+	if maxAttempts <= 0 {
+		maxAttempts = 1
+	}
+	var lastErr error
+	attempts := 0
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return attempts, ctx.Err()
+		}
+		attempts++
+		if err := submitPlanAnswerSheetOnce(ctx, client, req); err == nil {
+			return attempts, nil
+		} else {
+			lastErr = err
+			if !isSeedPlanRecoverableError(err) || attempt == maxAttempts-1 {
+				break
+			}
+		}
+		if err := sleepWithContext(ctx, planSubmitRetryBackoff*time.Duration(attempt+1)); err != nil {
+			return attempts, err
+		}
+	}
+	return attempts, lastErr
+}
+
+func submitPlanAnswerSheetOnce(ctx context.Context, client *APIClient, req SubmitAnswerSheetRequest) error {
+	adminReq := AdminSubmitAnswerSheetRequest{
+		QuestionnaireCode:    req.QuestionnaireCode,
+		QuestionnaireVersion: req.QuestionnaireVersion,
+		Title:                req.Title,
+		TesteeID:             req.TesteeID,
+		TaskID:               req.TaskID,
+		TaskCompletedAt:      req.TaskCompletedAt,
+		Answers:              req.Answers,
+	}
+
+	_, err := client.SubmitAnswerSheetAdminWithPolicy(ctx, adminReq, planSubmitRequestTimeout, planSubmitHTTPRetryMax)
+	return err
 }
 
 func runSeedPlanOperationWithRecovery(
