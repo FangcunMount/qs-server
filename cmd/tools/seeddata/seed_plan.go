@@ -301,6 +301,7 @@ func processPlanTasksConcurrently(
 	var skippedCount atomic.Int64
 	var completedCount atomic.Int64
 	var expiredCount atomic.Int64
+	var reservedOpenTask atomic.Bool
 	progress := newPlanTaskProgressBar(
 		"Processing scheduled pending plan tasks",
 		len(selectedTestees),
@@ -327,6 +328,7 @@ func processPlanTasksConcurrently(
 			testee,
 			planExpireRate,
 			verbose,
+			&reservedOpenTask,
 			&submittedCount,
 			&skippedCount,
 			&completedCount,
@@ -409,6 +411,7 @@ func processPlanTasksForTestee(
 	testee *TesteeResponse,
 	planExpireRate float64,
 	verbose bool,
+	reservedOpenTask *atomic.Bool,
 	submittedCount *atomic.Int64,
 	skippedCount *atomic.Int64,
 	completedCount *atomic.Int64,
@@ -454,6 +457,17 @@ func processPlanTasksForTestee(
 				"testee_id", testee.ID,
 				"task_id", task.ID,
 				"status", task.Status,
+			)
+			continue
+		}
+
+		if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
+			skippedCount.Add(1)
+			deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
+				"plan_id", planID,
+				"testee_id", testee.ID,
+				"task_id", task.ID,
+				"seq", task.Seq,
 			)
 			continue
 		}
