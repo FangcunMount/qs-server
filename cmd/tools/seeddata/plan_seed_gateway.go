@@ -409,9 +409,23 @@ func openLocalSeedRedis(ctx context.Context, cfg LocalRuntimeConfig) (redis.Univ
 	})
 	if err := client.Ping(connectCtx).Err(); err != nil {
 		_ = client.Close()
+		if shouldHintRedisUsername(err) {
+			return nil, fmt.Errorf("ping local redis for seeddata: %w; if your Redis uses ACL, pass --local-redis-username (or set local.redis_username)", err)
+		}
 		return nil, fmt.Errorf("ping local redis for seeddata: %w", err)
 	}
 	return client, nil
+}
+
+func shouldHintRedisUsername(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "wrongpass") ||
+		strings.Contains(msg, "noauth") ||
+		strings.Contains(msg, "authentication required") ||
+		strings.Contains(msg, "invalid username-password pair")
 }
 
 func toSeedPlanResponse(result *planApp.PlanResult) *PlanResponse {

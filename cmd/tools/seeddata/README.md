@@ -58,6 +58,7 @@ go run ./cmd/tools/seeddata \
   --local-mongo-uri "mongodb://127.0.0.1:27017" \
   --local-mongo-database "qs" \
   --local-redis-addr "127.0.0.1:6379" \
+  --local-redis-username "default" \
   --plan-workers 4 \
   --plan-expire-rate 0.2 \
   --plan-id 614186929759466030
@@ -121,7 +122,7 @@ go run ./cmd/tools/seeddata \
   - `--local-mongo-uri`
   - `--local-mongo-database`
   - `--local-redis-addr`
-  - `--local-redis-username`
+  - `--local-redis-username`（Redis 6.0+ ACL 场景下通常需要，和 `iam-contracts` 的 `--redis-cache-username` 作用一致）
   - `--local-redis-password`
   - `--local-redis-db`
   - `--local-plan-entry-base-url`
