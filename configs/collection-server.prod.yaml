@@ -180,7 +180,7 @@ iam:
 log:
   disable-caller: true      # 生产环境禁用调用者信息
   disable-stacktrace: true  # 生产环境禁用堆栈跟踪
-  level: debug               # 生产环境使用 info 级别(debug, info, warn, error, fatal, panic)
+  level: info               # 生产环境使用 info 级别(debug, info, warn, error, fatal, panic)
   format: json              # 生产环境使用 json 格式
   enable-color: false       # 生产环境禁用颜色
   development: false        # 生产环境使用生产模式
