@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	clog "github.com/FangcunMount/component-base/pkg/log"
 	actorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
@@ -131,6 +132,7 @@ type localPlanRuntime struct {
 	mongoDB     *mongo.Database
 	redisClient redis.UniversalClient
 	container   *apiservercontainer.Container
+	quietLogger clog.Logger
 }
 
 func newLocalPlanRuntime(ctx context.Context, cfg LocalRuntimeConfig, collectionBaseURL string, silent bool) (*localPlanRuntime, error) {
@@ -188,6 +190,7 @@ func newLocalPlanRuntime(ctx context.Context, cfg LocalRuntimeConfig, collection
 		mongoDB:     mongoDB,
 		redisClient: redisClient,
 		container:   container,
+		quietLogger: newLocalSeedQuietLogger(silent),
 	}, nil
 }
 
@@ -225,7 +228,7 @@ type localPlanSeedGateway struct {
 }
 
 func (g *localPlanSeedGateway) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
-	result, err := g.runtime.container.PlanModule.QueryService.GetPlan(ctx, g.orgID, planID)
+	result, err := g.runtime.container.PlanModule.QueryService.GetPlan(g.runtime.planContext(ctx), g.orgID, planID)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +236,7 @@ func (g *localPlanSeedGateway) GetPlan(ctx context.Context, planID string) (*Pla
 }
 
 func (g *localPlanSeedGateway) GetScale(ctx context.Context, code string) (*ScaleResponse, error) {
-	result, err := g.runtime.container.ScaleModule.QueryService.GetByCode(ctx, code)
+	result, err := g.runtime.container.ScaleModule.QueryService.GetByCode(g.runtime.planContext(ctx), code)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +244,7 @@ func (g *localPlanSeedGateway) GetScale(ctx context.Context, code string) (*Scal
 }
 
 func (g *localPlanSeedGateway) GetQuestionnaireDetail(ctx context.Context, code string) (*QuestionnaireDetailResponse, error) {
-	result, err := g.runtime.container.SurveyModule.Questionnaire.QueryService.GetByCode(ctx, code)
+	result, err := g.runtime.container.SurveyModule.Questionnaire.QueryService.GetByCode(g.runtime.planContext(ctx), code)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +259,7 @@ func (g *localPlanSeedGateway) ListTesteesByOrg(ctx context.Context, orgID int64
 		pageSize = 100
 	}
 	offset := (page - 1) * pageSize
-	result, err := g.runtime.container.ActorModule.TesteeQueryService.ListTestees(ctx, actorApp.ListTesteeDTO{
+	result, err := g.runtime.container.ActorModule.TesteeQueryService.ListTestees(g.runtime.planContext(ctx), actorApp.ListTesteeDTO{
 		OrgID:  orgID,
 		Offset: offset,
 		Limit:  pageSize,
@@ -272,7 +275,7 @@ func (g *localPlanSeedGateway) GetTesteeByID(ctx context.Context, testeeID strin
 	if err != nil {
 		return nil, fmt.Errorf("parse testee_id %q: %w", testeeID, err)
 	}
-	result, err := g.runtime.container.ActorModule.TesteeQueryService.GetByID(ctx, id)
+	result, err := g.runtime.container.ActorModule.TesteeQueryService.GetByID(g.runtime.planContext(ctx), id)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +283,7 @@ func (g *localPlanSeedGateway) GetTesteeByID(ctx context.Context, testeeID strin
 }
 
 func (g *localPlanSeedGateway) EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error) {
-	result, err := g.runtime.container.PlanModule.CommandService.EnrollTestee(ctx, planApp.EnrollTesteeDTO{
+	result, err := g.runtime.container.PlanModule.CommandService.EnrollTestee(g.runtime.planContext(ctx), planApp.EnrollTesteeDTO{
 		OrgID:     g.orgID,
 		PlanID:    req.PlanID,
 		TesteeID:  req.TesteeID,
@@ -293,7 +296,7 @@ func (g *localPlanSeedGateway) EnrollTestee(ctx context.Context, req EnrollTeste
 }
 
 func (g *localPlanSeedGateway) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
-	scheduleCtx := ctx
+	scheduleCtx := g.runtime.planContext(ctx)
 	if source := strings.TrimSpace(req.Source); source != "" {
 		scheduleCtx = planApp.WithTaskSchedulerSource(scheduleCtx, source)
 	}
@@ -308,7 +311,7 @@ func (g *localPlanSeedGateway) SchedulePendingTasks(ctx context.Context, req Sch
 }
 
 func (g *localPlanSeedGateway) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
-	results, err := g.runtime.container.PlanModule.QueryService.ListTasksByTesteeAndPlan(ctx, testeeID, planID)
+	results, err := g.runtime.container.PlanModule.QueryService.ListTasksByTesteeAndPlan(g.runtime.planContext(ctx), testeeID, planID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +319,7 @@ func (g *localPlanSeedGateway) ListTasksByTesteeAndPlan(ctx context.Context, tes
 }
 
 func (g *localPlanSeedGateway) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
-	result, err := g.runtime.container.PlanModule.QueryService.GetTask(ctx, g.orgID, taskID)
+	result, err := g.runtime.container.PlanModule.QueryService.GetTask(g.runtime.planContext(ctx), g.orgID, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -324,11 +327,27 @@ func (g *localPlanSeedGateway) GetTask(ctx context.Context, taskID string) (*Tas
 }
 
 func (g *localPlanSeedGateway) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
-	result, err := g.runtime.container.PlanModule.CommandService.ExpireTask(ctx, g.orgID, taskID)
+	result, err := g.runtime.container.PlanModule.CommandService.ExpireTask(g.runtime.planContext(ctx), g.orgID, taskID)
 	if err != nil {
 		return nil, err
 	}
 	return toSeedTaskResponse(result), nil
+}
+
+func (r *localPlanRuntime) planContext(ctx context.Context) context.Context {
+	if r == nil || r.quietLogger == nil {
+		return ctx
+	}
+	return r.quietLogger.WithContext(ctx)
+}
+
+func newLocalSeedQuietLogger(silent bool) clog.Logger {
+	if !silent {
+		return nil
+	}
+	opts := clog.NewOptions()
+	opts.Level = "warn"
+	return clog.New(opts)
 }
 
 func resolveLocalPlanEntryBaseURL(cfg LocalRuntimeConfig, collectionBaseURL string) string {
