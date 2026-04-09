@@ -4,8 +4,8 @@ services:
     container_name: qs-apiserver
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
-    mem_limit: "2g"
-    cpus: "1.5"
+    mem_limit: "4g"
+    cpus: "2"
     networks:
       - qs-network
       - infra-network
