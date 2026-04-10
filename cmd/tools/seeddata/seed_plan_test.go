@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -238,6 +240,132 @@ func TestMergePlanTaskStatusStats(t *testing.T) {
 	}
 }
 
+func TestIsRecoveryPlanCompleted(t *testing.T) {
+	tests := []struct {
+		name  string
+		tasks []TaskResponse
+		want  bool
+	}{
+		{
+			name: "last seq completed",
+			tasks: []TaskResponse{
+				{Seq: 1, Status: "completed"},
+				{Seq: 2, Status: "completed"},
+			},
+			want: true,
+		},
+		{
+			name: "last seq expired",
+			tasks: []TaskResponse{
+				{Seq: 1, Status: "completed"},
+				{Seq: 2, Status: "expired"},
+			},
+			want: true,
+		},
+		{
+			name: "last seq opened",
+			tasks: []TaskResponse{
+				{Seq: 1, Status: "completed"},
+				{Seq: 2, Status: "opened"},
+			},
+			want: false,
+		},
+		{
+			name: "mixed terminal statuses at last seq",
+			tasks: []TaskResponse{
+				{Seq: 1, Status: "completed"},
+				{Seq: 2, Status: "completed"},
+				{Seq: 2, Status: "expired"},
+			},
+			want: true,
+		},
+		{
+			name: "last seq contains opened duplicate",
+			tasks: []TaskResponse{
+				{Seq: 1, Status: "completed"},
+				{Seq: 2, Status: "completed"},
+				{Seq: 2, Status: "opened"},
+			},
+			want: false,
+		},
+		{
+			name: "last seq canceled is not treated as completed",
+			tasks: []TaskResponse{
+				{Seq: 1, Status: "completed"},
+				{Seq: 2, Status: "canceled"},
+			},
+			want: false,
+		},
+		{
+			name: "empty task list",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isRecoveryPlanCompleted(tt.tasks); got != tt.want {
+				t.Fatalf("isRecoveryPlanCompleted(%+v)=%v, want=%v", tt.tasks, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFilterRecoveryPlanTestees(t *testing.T) {
+	testees := []*TesteeResponse{
+		{ID: "1001"},
+		{ID: "1002"},
+		{ID: "1003"},
+		{ID: "1004"},
+		{ID: "1005"},
+	}
+	gateway := &planTaskCountProviderStub{
+		taskLists: map[string][]TaskResponse{
+			"1001": {
+				{ID: "2001", Seq: 1, Status: "completed"},
+				{ID: "2002", Seq: 2, Status: "completed"},
+			},
+			"1002": {
+				{ID: "2003", Seq: 1, Status: "completed"},
+				{ID: "2004", Seq: 2, Status: "expired"},
+			},
+			"1003": {
+				{ID: "2005", Seq: 1, Status: "completed"},
+				{ID: "2006", Seq: 2, Status: "opened"},
+			},
+			"1004": {},
+		},
+		taskErrs: map[string]error{
+			"1005": errors.New("temporary timeout"),
+		},
+	}
+
+	filtered, stats, err := filterRecoveryPlanTestees(context.Background(), gateway, noopSeedLogger{}, "614333603412718126", testees, 2, false)
+	if err != nil {
+		t.Fatalf("unexpected filter error: %v", err)
+	}
+
+	gotIDs := make([]string, 0, len(filtered))
+	for _, testee := range filtered {
+		gotIDs = append(gotIDs, testee.ID)
+	}
+	sort.Strings(gotIDs)
+	wantIDs := []string{"1003", "1005"}
+	if strings.Join(gotIDs, ",") != strings.Join(wantIDs, ",") {
+		t.Fatalf("unexpected filtered ids: got=%v want=%v", gotIDs, wantIDs)
+	}
+
+	if stats.FilteredCompletedPlanTestees != 2 || stats.FilteredNoTaskTestees != 1 || stats.RetainedUndeterminedTestees != 1 {
+		t.Fatalf("unexpected recovery filter stats: %+v", stats)
+	}
+	if stats.ExistingTaskStats == nil {
+		t.Fatal("expected existing task stats")
+	}
+	if stats.ExistingTaskStats.Total != 6 || stats.ExistingTaskStats.Completed != 4 || stats.ExistingTaskStats.Expired != 1 || stats.ExistingTaskStats.Opened != 1 {
+		t.Fatalf("unexpected existing task stats: %+v", stats.ExistingTaskStats)
+	}
+}
+
 func TestResolvePlanMode(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -359,7 +487,9 @@ func TestSelectPlanEnrollmentTesteesKeepsHighestPrioritySlice(t *testing.T) {
 }
 
 type planTaskCountProviderStub struct {
-	counts map[string]int
+	counts    map[string]int
+	taskLists map[string][]TaskResponse
+	taskErrs  map[string]error
 }
 
 func (s *planTaskCountProviderStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
@@ -391,7 +521,11 @@ func (s *planTaskCountProviderStub) SchedulePendingTasks(ctx context.Context, re
 }
 
 func (s *planTaskCountProviderStub) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
-	return &TaskListResponse{}, nil
+	if err, ok := s.taskErrs[testeeID]; ok {
+		return nil, err
+	}
+	tasks := append([]TaskResponse(nil), s.taskLists[testeeID]...)
+	return &TaskListResponse{Tasks: tasks}, nil
 }
 
 func (s *planTaskCountProviderStub) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {

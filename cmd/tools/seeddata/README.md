@@ -159,6 +159,7 @@ go run ./cmd/tools/seeddata \
 - 显式传入 `--plan-testee-ids` 时，`--testee-limit` 仍然生效；脚本会在去重后只取前 N 个 ID 继续执行。
 - 显式模式会更严格：如果 `/api/v1/testees/{id}` 返回的 `created_at` 是零值，脚本会直接报错，不再回退到 `updated_at` 或当前时间。
 - 开启 `--plan-process-existing-only` 时，脚本启动会先统计这批 testee 在目标 plan 下已有多少 `pending/opened/completed/expired/canceled` task，并打印到日志；如果一条现有 task 都没有，会直接退出，不会创建新 task。
+- 恢复模式会在最开始过滤掉“最后一个 `seq` 对应 task 已经 `completed/expired`”的 testee，避免这些已完成 plan 的 testee 继续进入后续的调度和 task 扫描。
 - 恢复模式里，`ExpireTask` 会按幂等方式补偿：如果第一次过期请求超时，但回读任务状态发现它已经进入 `expired/completed/canceled`，脚本会继续往下跑，不会因为重复过期返回 `400 Invalid argument` 而中断整轮恢复。
 - task 执行阶段已经改成 submit/wait 双阶段流水线：提交 worker 会把答卷快速发出去，等待 worker 负责轮询任务完成，中间通过有界 inflight 池削峰填谷；调度接口仍按批次串行调用，不会整机构一次性放量。
 - 计划任务提交时会携带 `task_id`，让 worker 通过既有链路创建测评并完成任务。
