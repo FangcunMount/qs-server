@@ -9,7 +9,7 @@
 //
 // The tool is modularized into separate files:
 // - seed_assessment.go: Assessment data seeding
-// - seed_plan.go: Plan backfill
+// - seed_plan_*.go: Plan task creation, selection, and processing
 //
 // Usage:
 //
@@ -18,11 +18,13 @@
 //	  --steps assessment
 //	go run ./cmd/tools/seeddata \
 //	  --config configs/seeddata.yaml \
-//	  --steps plan \
+//	  --steps plan_create_tasks \
 //	  --plan-id 614186929759466030 \
-//	  --plan-workers 4 \
-//	  --plan-testee-ids 1001,1002,1003 \
-//	  --plan-process-existing-only
+//	  --plan-workers 4
+//	go run ./cmd/tools/seeddata \
+//	  --config configs/seeddata.yaml \
+//	  --steps plan_process_tasks \
+//	  --plan-id 614186929759466030
 //
 // See README.md for detailed documentation.
 package main
@@ -30,7 +32,9 @@ package main
 import (
 	"context"
 	"flag"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 )
@@ -42,8 +46,10 @@ type seedStep string
 
 // All available seed steps.
 const (
-	stepAssessment seedStep = "assessment" // 提交答卷并生成测评
-	stepPlan       seedStep = "plan"       // 回填测评计划并完成任务
+	stepAssessment       seedStep = "assessment"         // 提交答卷并生成测评
+	stepPlan             seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
+	stepPlanCreateTasks  seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
+	stepPlanProcessTasks seedStep = "plan_process_tasks" // 调度并处理计划任务
 )
 
 // defaultSteps defines the default execution order of all seed steps.
@@ -114,7 +120,7 @@ func main() {
 		assessmentSubmitWorkers = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
 		testeePageSize          = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
 		testeeOffset            = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
-		testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan seeding (0 = no limit)")
+		testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan task creation (0 = no limit)")
 		assessmentCategories    = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
 		verbose                 = flag.Bool("verbose", false, "Enable verbose logging")
 	)
@@ -233,7 +239,8 @@ func main() {
 
 	// 创建上下文
 	seedCtx := newSeedContext()
-	runCtx := context.Background()
+	runCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	if containsSeedStep(steps, stepAssessment) && (*assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin) {
 		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
@@ -244,32 +251,58 @@ func main() {
 	}
 	configureSeeddataGlobalLog(*verbose, shouldQuietSeedPlanComponentLogs(steps, resolvedPlanMode))
 
+	assessmentOpts := assessmentSeedOptions{
+		MinPerTestee:      *assessmentMin,
+		MaxPerTestee:      *assessmentMax,
+		WorkerCount:       *assessmentWorkers,
+		SubmitWorkerCount: *assessmentSubmitWorkers,
+		TesteePageSize:    *testeePageSize,
+		TesteeOffset:      *testeeOffset,
+		TesteeLimit:       *testeeLimit,
+		CategoryFilter:    *assessmentCategories,
+		Verbose:           *verbose,
+	}
+	planCreateOpts := planCreateOptions{
+		PlanID:                  *planID,
+		PlanMode:                resolvedPlanMode,
+		PlanTesteeIDsRaw:        *planTesteeIDsRaw,
+		PlanWorkers:             *planWorkers,
+		PlanProcessExistingOnly: *planProcessExistingOnly,
+		TesteePageSize:          *testeePageSize,
+		TesteeOffset:            *testeeOffset,
+		TesteeLimit:             *testeeLimit,
+		Verbose:                 *verbose,
+	}
+	planProcessOpts := planProcessOptions{
+		PlanID:               *planID,
+		PlanMode:             resolvedPlanMode,
+		ScopeTesteeIDs:       parsePlanTesteeIDs(*planTesteeIDsRaw),
+		PlanWorkers:          *planWorkers,
+		PlanSubmitWorkers:    *planSubmitWorkers,
+		PlanWaitWorkers:      *planWaitWorkers,
+		PlanMaxInFlightTasks: *planMaxInFlightTasks,
+		PlanExpireRate:       *planExpireRate,
+		Verbose:              *verbose,
+		Continuous:           true,
+	}
+
 	for _, step := range steps {
 		switch step {
 		case stepAssessment:
-			if err := seedAssessments(runCtx, deps, seedCtx, *assessmentMin, *assessmentMax, *assessmentWorkers, *assessmentSubmitWorkers, *testeePageSize, *testeeOffset, *testeeLimit, *assessmentCategories, *verbose); err != nil {
+			if err := seedAssessments(runCtx, deps, seedCtx, assessmentOpts); err != nil {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
 		case stepPlan:
-			if err := seedPlanBackfill(
-				runCtx,
-				deps,
-				seedCtx,
-				*planID,
-				resolvedPlanMode,
-				*planTesteeIDsRaw,
-				*planWorkers,
-				*planSubmitWorkers,
-				*planWaitWorkers,
-				*planMaxInFlightTasks,
-				*planExpireRate,
-				*planProcessExistingOnly,
-				*testeePageSize,
-				*testeeOffset,
-				*testeeLimit,
-				*verbose,
-			); err != nil {
+			if err := seedPlanBackfill(runCtx, deps, seedCtx, planCreateOpts, planProcessOpts.withScope(planProcessOpts.ScopeTesteeIDs, false)); err != nil {
 				logger.Fatalw("Plan backfill failed", "error", err)
+			}
+		case stepPlanCreateTasks:
+			if _, err := seedPlanCreateTasks(runCtx, deps, planCreateOpts); err != nil {
+				logger.Fatalw("Plan task creation failed", "error", err)
+			}
+		case stepPlanProcessTasks:
+			if _, err := seedPlanProcessTasks(runCtx, deps, planProcessOpts); err != nil {
+				logger.Fatalw("Plan task processing failed", "error", err)
 			}
 		default:
 			logger.Warnw("Skipping unimplemented step", "step", step)
@@ -303,7 +336,12 @@ func configureSeeddataGlobalLog(verbose bool, quiet bool) {
 }
 
 func shouldQuietSeedPlanComponentLogs(steps []seedStep, planMode string) bool {
-	return containsSeedStep(steps, stepPlan) && strings.EqualFold(strings.TrimSpace(planMode), planModeLocal)
+	if !strings.EqualFold(strings.TrimSpace(planMode), planModeLocal) {
+		return false
+	}
+	return containsSeedStep(steps, stepPlan) ||
+		containsSeedStep(steps, stepPlanCreateTasks) ||
+		containsSeedStep(steps, stepPlanProcessTasks)
 }
 
 // ==================== 通用辅助函数 ====================

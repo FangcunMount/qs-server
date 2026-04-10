@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -210,6 +211,64 @@ func TestApplyTesteeLimitToIDs(t *testing.T) {
 	}
 	if got := applyTesteeLimitToIDs(ids, 5); len(got) != 3 {
 		t.Fatalf("expected large limit to keep all ids, got %v", got)
+	}
+}
+
+func TestPlanProcessOptionsWithScopeForcesOneShotAndCopiesIDs(t *testing.T) {
+	base := planProcessOptions{
+		PlanID:         "614333603412718126",
+		ScopeTesteeIDs: []string{"1001"},
+		Continuous:     true,
+	}
+
+	got := base.withScope([]string{"1002", "1003"}, false)
+	if got.Continuous {
+		t.Fatal("expected withScope to apply the requested continuous flag")
+	}
+	if strings.Join(got.ScopeTesteeIDs, ",") != "1002,1003" {
+		t.Fatalf("unexpected scope ids: %v", got.ScopeTesteeIDs)
+	}
+	got.ScopeTesteeIDs[0] = "changed"
+	if strings.Join(base.ScopeTesteeIDs, ",") != "1001" {
+		t.Fatalf("expected original scope ids to remain unchanged, got %v", base.ScopeTesteeIDs)
+	}
+}
+
+func TestNewPlanTesteeSelector(t *testing.T) {
+	tests := []struct {
+		name        string
+		opts        planCreateOptions
+		explicitIDs []string
+		wantType    string
+	}{
+		{
+			name:        "explicit selector",
+			opts:        planCreateOptions{PlanProcessExistingOnly: false},
+			explicitIDs: []string{"1001"},
+			wantType:    "main.explicitPlanTesteeSelector",
+		},
+		{
+			name:     "recovery selector",
+			opts:     planCreateOptions{PlanProcessExistingOnly: true},
+			wantType: "main.recoveryPlanTesteeSelector",
+		},
+		{
+			name:     "sampled selector",
+			opts:     planCreateOptions{},
+			wantType: "main.sampledPriorityPlanTesteeSelector",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			selector := newPlanTesteeSelector(tt.opts, tt.explicitIDs)
+			if selector == nil {
+				t.Fatal("expected selector")
+			}
+			if got := fmt.Sprintf("%T", selector); got != tt.wantType {
+				t.Fatalf("unexpected selector type: got=%s want=%s", got, tt.wantType)
+			}
+		})
 	}
 }
 
@@ -433,19 +492,21 @@ func TestSeedPlanPacerNextDelay(t *testing.T) {
 	}
 }
 
-func TestPrioritizePlanEnrollmentTesteesPrefersNeverJoinedThenLeastJoined(t *testing.T) {
+func TestPrioritizePlanEnrollmentTesteesPrefersNoTasksThenNoCurrentPlanThenFewerTasks(t *testing.T) {
 	testees := []*TesteeResponse{
 		{ID: "1001", CreatedAt: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)},
 		{ID: "1002", CreatedAt: time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)},
 		{ID: "1003", CreatedAt: time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)},
 		{ID: "1004", CreatedAt: time.Date(2026, 4, 4, 0, 0, 0, 0, time.UTC)},
+		{ID: "1005", CreatedAt: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC)},
 	}
 	gateway := &planTaskCountProviderStub{
-		counts: map[string]int{
-			"1001": 0,
-			"1002": 3,
-			"1003": 1,
-			"1004": 0,
+		priorityStats: map[string]planTesteeTaskPriority{
+			"1001": {TotalTaskCount: 0, CurrentPlanTaskCount: 0},
+			"1002": {TotalTaskCount: 5, CurrentPlanTaskCount: 0},
+			"1003": {TotalTaskCount: 2, CurrentPlanTaskCount: 1},
+			"1004": {TotalTaskCount: 3, CurrentPlanTaskCount: 0},
+			"1005": {TotalTaskCount: 1, CurrentPlanTaskCount: 1},
 		},
 	}
 
@@ -458,7 +519,41 @@ func TestPrioritizePlanEnrollmentTesteesPrefersNeverJoinedThenLeastJoined(t *tes
 	for _, testee := range prioritized {
 		gotIDs = append(gotIDs, testee.ID)
 	}
-	wantIDs := []string{"1001", "1004", "1003", "1002"}
+	wantIDs := []string{"1001", "1004", "1002", "1005", "1003"}
+	if strings.Join(gotIDs, ",") != strings.Join(wantIDs, ",") {
+		t.Fatalf("unexpected prioritized ids: got=%v want=%v", gotIDs, wantIDs)
+	}
+}
+
+func TestPrioritizePlanEnrollmentTesteesFallsBackToListTasksByTestee(t *testing.T) {
+	testees := []*TesteeResponse{
+		{ID: "1001", CreatedAt: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)},
+		{ID: "1002", CreatedAt: time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)},
+		{ID: "1003", CreatedAt: time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)},
+	}
+	gateway := &pagedPlanSeedGatewayStub{
+		taskLists: map[string][]TaskResponse{
+			"1001": {},
+			"1002": {
+				{ID: "2001", PlanID: "other-plan", TesteeID: "1002", Seq: 1, Status: "completed"},
+				{ID: "2002", PlanID: "other-plan", TesteeID: "1002", Seq: 2, Status: "opened"},
+			},
+			"1003": {
+				{ID: "2003", PlanID: "614333603412718126", TesteeID: "1003", Seq: 1, Status: "completed"},
+			},
+		},
+	}
+
+	prioritized, err := prioritizePlanEnrollmentTestees(context.Background(), gateway, noopSeedLogger{}, "614333603412718126", testees, 2, false)
+	if err != nil {
+		t.Fatalf("unexpected prioritize error: %v", err)
+	}
+
+	gotIDs := make([]string, 0, len(prioritized))
+	for _, testee := range prioritized {
+		gotIDs = append(gotIDs, testee.ID)
+	}
+	wantIDs := []string{"1001", "1002", "1003"}
 	if strings.Join(gotIDs, ",") != strings.Join(wantIDs, ",") {
 		t.Fatalf("unexpected prioritized ids: got=%v want=%v", gotIDs, wantIDs)
 	}
@@ -593,9 +688,9 @@ func TestStreamFilterRecoveryPlanTesteesUsesPagedFiltering(t *testing.T) {
 }
 
 type planTaskCountProviderStub struct {
-	counts    map[string]int
-	taskLists map[string][]TaskResponse
-	taskErrs  map[string]error
+	priorityStats map[string]planTesteeTaskPriority
+	taskLists     map[string][]TaskResponse
+	taskErrs      map[string]error
 }
 
 func (s *planTaskCountProviderStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
@@ -626,12 +721,29 @@ func (s *planTaskCountProviderStub) SchedulePendingTasks(ctx context.Context, re
 	return nil, nil
 }
 
+func (s *planTaskCountProviderStub) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
+	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{PlanID: planID}), nil
+}
+
+func (s *planTaskCountProviderStub) ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error) {
+	if err, ok := s.taskErrs[strings.TrimSpace(req.TesteeID)]; ok {
+		return nil, err
+	}
+	return buildStubTaskListResponse(s.taskLists, req), nil
+}
+
+func (s *planTaskCountProviderStub) ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error) {
+	if err, ok := s.taskErrs[testeeID]; ok {
+		return nil, err
+	}
+	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{TesteeID: testeeID}), nil
+}
+
 func (s *planTaskCountProviderStub) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
 	if err, ok := s.taskErrs[testeeID]; ok {
 		return nil, err
 	}
-	tasks := append([]TaskResponse(nil), s.taskLists[testeeID]...)
-	return &TaskListResponse{Tasks: tasks}, nil
+	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{PlanID: planID, TesteeID: testeeID}), nil
 }
 
 func (s *planTaskCountProviderStub) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
@@ -642,8 +754,8 @@ func (s *planTaskCountProviderStub) ExpireTask(ctx context.Context, taskID strin
 	return nil, nil
 }
 
-func (s *planTaskCountProviderStub) GetPlanTaskCountsByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]int, error) {
-	return s.counts, nil
+func (s *planTaskCountProviderStub) GetPlanTaskPriorityByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]planTesteeTaskPriority, error) {
+	return s.priorityStats, nil
 }
 
 type noopSeedLogger struct{}
@@ -652,11 +764,14 @@ func (noopSeedLogger) Warnw(string, ...interface{}) {}
 func (noopSeedLogger) Infow(string, ...interface{}) {}
 
 type pagedPlanSeedGatewayStub struct {
-	pages      map[int][]*ApiserverTesteeResponse
-	totalPages int
-	pageCalls  []string
-	taskLists  map[string][]TaskResponse
-	taskErrs   map[string]error
+	pages                      map[int][]*ApiserverTesteeResponse
+	totalPages                 int
+	pageCalls                  []string
+	taskLists                  map[string][]TaskResponse
+	taskErrs                   map[string]error
+	listTaskCalls              []ListTasksRequest
+	listTasksByPlanCallCount   int
+	listTasksByTesteePlanCalls []string
 }
 
 func (s *pagedPlanSeedGatewayStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
@@ -695,12 +810,32 @@ func (s *pagedPlanSeedGatewayStub) SchedulePendingTasks(ctx context.Context, req
 	return nil, nil
 }
 
+func (s *pagedPlanSeedGatewayStub) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
+	s.listTasksByPlanCallCount++
+	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{PlanID: planID}), nil
+}
+
+func (s *pagedPlanSeedGatewayStub) ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error) {
+	if err, ok := s.taskErrs[strings.TrimSpace(req.TesteeID)]; ok {
+		return nil, err
+	}
+	s.listTaskCalls = append(s.listTaskCalls, req)
+	return buildStubTaskListResponse(s.taskLists, req), nil
+}
+
+func (s *pagedPlanSeedGatewayStub) ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error) {
+	if err, ok := s.taskErrs[testeeID]; ok {
+		return nil, err
+	}
+	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{TesteeID: testeeID}), nil
+}
+
 func (s *pagedPlanSeedGatewayStub) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
 	if err, ok := s.taskErrs[testeeID]; ok {
 		return nil, err
 	}
-	tasks := append([]TaskResponse(nil), s.taskLists[testeeID]...)
-	return &TaskListResponse{Tasks: tasks}, nil
+	s.listTasksByTesteePlanCalls = append(s.listTasksByTesteePlanCalls, fmt.Sprintf("%s:%s", testeeID, planID))
+	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{PlanID: planID, TesteeID: testeeID}), nil
 }
 
 func (s *pagedPlanSeedGatewayStub) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
@@ -709,4 +844,161 @@ func (s *pagedPlanSeedGatewayStub) GetTask(ctx context.Context, taskID string) (
 
 func (s *pagedPlanSeedGatewayStub) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
 	return nil, nil
+}
+
+func buildStubTaskListResponse(taskLists map[string][]TaskResponse, req ListTasksRequest) *TaskListResponse {
+	allTasks := make([]TaskResponse, 0)
+	for testeeID, items := range taskLists {
+		for _, task := range items {
+			if strings.TrimSpace(task.TesteeID) == "" {
+				task.TesteeID = testeeID
+			}
+			allTasks = append(allTasks, task)
+		}
+	}
+
+	planID := strings.TrimSpace(req.PlanID)
+	testeeID := strings.TrimSpace(req.TesteeID)
+	status := normalizeTaskStatus(req.Status)
+	filtered := make([]TaskResponse, 0, len(allTasks))
+	for _, task := range allTasks {
+		if planID != "" {
+			taskPlanID := strings.TrimSpace(task.PlanID)
+			if taskPlanID != "" && taskPlanID != planID {
+				continue
+			}
+		}
+		if testeeID != "" {
+			taskTesteeID := strings.TrimSpace(task.TesteeID)
+			if taskTesteeID != "" && taskTesteeID != testeeID {
+				continue
+			}
+		}
+		if status != "" && normalizeTaskStatus(task.Status) != status {
+			continue
+		}
+		filtered = append(filtered, task)
+	}
+
+	sort.SliceStable(filtered, func(i, j int) bool {
+		left := strings.TrimSpace(filtered[i].TesteeID)
+		right := strings.TrimSpace(filtered[j].TesteeID)
+		if left != right {
+			return left < right
+		}
+		if filtered[i].Seq != filtered[j].Seq {
+			return filtered[i].Seq < filtered[j].Seq
+		}
+		return filtered[i].ID < filtered[j].ID
+	})
+
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = len(filtered)
+		if pageSize == 0 {
+			pageSize = 1
+		}
+	}
+
+	start := (page - 1) * pageSize
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+	end := start + pageSize
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return &TaskListResponse{
+		Tasks:      append([]TaskResponse(nil), filtered[start:end]...),
+		TotalCount: int64(len(filtered)),
+		Page:       page,
+		PageSize:   pageSize,
+	}
+}
+
+func TestCollectPlanTaskJobsByPlanUsesPlanTaskListing(t *testing.T) {
+	gateway := &planTaskCountProviderStub{
+		taskLists: map[string][]TaskResponse{
+			"1001": {
+				{ID: "2001", TesteeID: "1001", Seq: 1, Status: "opened"},
+				{ID: "2002", TesteeID: "1001", Seq: 2, Status: "completed"},
+			},
+			"1002": {
+				{ID: "2003", TesteeID: "1002", Seq: 1, Status: "expired"},
+				{ID: "2004", TesteeID: "1002", Seq: 2, Status: "opened"},
+			},
+		},
+	}
+	deps := &dependencies{Logger: newSeeddataLogger(false)}
+	var skipped atomic.Int64
+	var failed atomic.Int64
+
+	jobs, err := collectPlanTaskJobsByPlan(context.Background(), gateway, deps, "614333603412718126", false, &skipped, &failed)
+	if err != nil {
+		t.Fatalf("unexpected collect error: %v", err)
+	}
+	if failed.Load() != 0 {
+		t.Fatalf("expected no failed task list loads, got %d", failed.Load())
+	}
+	if skipped.Load() != 2 {
+		t.Fatalf("expected 2 skipped tasks, got %d", skipped.Load())
+	}
+	if len(jobs) != 2 {
+		t.Fatalf("expected 2 opened jobs, got %d", len(jobs))
+	}
+	if jobs[0].testeeID != "1001" || jobs[0].task.ID != "2001" {
+		t.Fatalf("unexpected first job: %+v", jobs[0])
+	}
+	if jobs[1].testeeID != "1002" || jobs[1].task.ID != "2004" {
+		t.Fatalf("unexpected second job: %+v", jobs[1])
+	}
+}
+
+func TestCollectPlanTaskJobWindowByPlanUsesPagedOpenedTasks(t *testing.T) {
+	planID := "614333603412718126"
+	gateway := &pagedPlanSeedGatewayStub{
+		taskLists: map[string][]TaskResponse{
+			"1001": {
+				{ID: "2001", PlanID: planID, TesteeID: "1001", Seq: 1, Status: "opened"},
+				{ID: "2002", PlanID: planID, TesteeID: "1001", Seq: 2, Status: "completed"},
+				{ID: "2003", PlanID: planID, TesteeID: "1001", Seq: 3, Status: "opened"},
+			},
+			"1002": {
+				{ID: "2004", PlanID: planID, TesteeID: "1002", Seq: 1, Status: "opened"},
+				{ID: "2005", PlanID: planID, TesteeID: "1002", Seq: 2, Status: "opened"},
+			},
+		},
+	}
+	deps := &dependencies{Logger: newSeeddataLogger(false)}
+	var skipped atomic.Int64
+	var failed atomic.Int64
+
+	jobs, more, err := collectPlanTaskJobWindowByPlan(context.Background(), gateway, deps, planID, 2, false, &skipped, &failed)
+	if err != nil {
+		t.Fatalf("unexpected collect error: %v", err)
+	}
+	if failed.Load() != 0 {
+		t.Fatalf("expected no failed task list loads, got %d", failed.Load())
+	}
+	if more != true {
+		t.Fatal("expected more opened tasks after bounded discovery window")
+	}
+	if len(jobs) != 2 {
+		t.Fatalf("expected 2 opened jobs, got %d", len(jobs))
+	}
+	if gateway.listTasksByPlanCallCount != 0 {
+		t.Fatalf("expected no full plan task listing calls, got %d", gateway.listTasksByPlanCallCount)
+	}
+	if len(gateway.listTaskCalls) != 1 {
+		t.Fatalf("expected 1 paged list tasks call, got %d", len(gateway.listTaskCalls))
+	}
+	call := gateway.listTaskCalls[0]
+	if call.PlanID != planID || call.Status != "opened" || call.Page != 1 || call.PageSize != 2 {
+		t.Fatalf("unexpected list task request: %+v", call)
+	}
 }

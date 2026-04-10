@@ -14,7 +14,6 @@ import (
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	apiservercontainer "github.com/FangcunMount/qs-server/internal/apiserver/container"
-	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	redis "github.com/redis/go-redis/v9"
@@ -42,13 +41,16 @@ type PlanSeedGateway interface {
 	GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error)
 	EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error)
 	SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error)
+	ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error)
+	ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error)
+	ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error)
 	ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error)
 	GetTask(ctx context.Context, taskID string) (*TaskResponse, error)
 	ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error)
 }
 
-type planTaskCountProvider interface {
-	GetPlanTaskCountsByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]int, error)
+type planTaskPriorityProvider interface {
+	GetPlanTaskPriorityByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]planTesteeTaskPriority, error)
 }
 
 func resolvePlanMode(cliMode string, configMode string) (string, error) {
@@ -119,6 +121,18 @@ func (g *remotePlanSeedGateway) EnrollTestee(ctx context.Context, req EnrollTest
 
 func (g *remotePlanSeedGateway) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
 	return g.api.SchedulePendingTasks(ctx, req)
+}
+
+func (g *remotePlanSeedGateway) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
+	return g.api.ListTasksByPlan(ctx, planID)
+}
+
+func (g *remotePlanSeedGateway) ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error) {
+	return g.api.ListTasks(ctx, req)
+}
+
+func (g *remotePlanSeedGateway) ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error) {
+	return g.api.ListTasksByTestee(ctx, testeeID)
 }
 
 func (g *remotePlanSeedGateway) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
@@ -317,6 +331,46 @@ func (g *localPlanSeedGateway) SchedulePendingTasks(ctx context.Context, req Sch
 	return toSeedScheduledTaskListResponse(result), nil
 }
 
+func (g *localPlanSeedGateway) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
+	results, err := g.runtime.container.PlanModule.QueryService.ListTasksByPlan(g.runtime.planContext(ctx), g.orgID, planID)
+	if err != nil {
+		return nil, err
+	}
+	return toSeedTaskListResponse(results), nil
+}
+
+func (g *localPlanSeedGateway) ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+
+	result, err := g.runtime.container.PlanModule.QueryService.ListTasks(g.runtime.planContext(ctx), planApp.ListTasksDTO{
+		OrgID:    g.orgID,
+		PlanID:   strings.TrimSpace(req.PlanID),
+		TesteeID: strings.TrimSpace(req.TesteeID),
+		Status:   strings.TrimSpace(req.Status),
+		Page:     page,
+		PageSize: pageSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toSeedTaskListResultResponse(result), nil
+}
+
+func (g *localPlanSeedGateway) ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error) {
+	results, err := g.runtime.container.PlanModule.QueryService.ListTasksByTestee(g.runtime.planContext(ctx), testeeID)
+	if err != nil {
+		return nil, err
+	}
+	return toSeedTaskListResponse(results), nil
+}
+
 func (g *localPlanSeedGateway) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
 	results, err := g.runtime.container.PlanModule.QueryService.ListTasksByTesteeAndPlan(g.runtime.planContext(ctx), testeeID, planID)
 	if err != nil {
@@ -341,18 +395,17 @@ func (g *localPlanSeedGateway) ExpireTask(ctx context.Context, taskID string) (*
 	return toSeedTaskResponse(result), nil
 }
 
-func (g *localPlanSeedGateway) GetPlanTaskCountsByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]int, error) {
+func (g *localPlanSeedGateway) GetPlanTaskPriorityByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]planTesteeTaskPriority, error) {
 	planDomainID, err := planDomain.ParseAssessmentPlanID(strings.TrimSpace(planID))
 	if err != nil {
 		return nil, fmt.Errorf("parse plan id %q: %w", planID, err)
 	}
 
-	counts := make(map[string]int, len(testeeIDs))
+	stats := make(map[string]planTesteeTaskPriority, len(testeeIDs))
 	if len(testeeIDs) == 0 {
-		return counts, nil
+		return stats, nil
 	}
 
-	parsedTesteeIDs := make([]testeeDomain.ID, 0, len(testeeIDs))
 	idStringsByValue := make(map[uint64]string, len(testeeIDs))
 	for _, rawID := range testeeIDs {
 		rawID = strings.TrimSpace(rawID)
@@ -363,32 +416,52 @@ func (g *localPlanSeedGateway) GetPlanTaskCountsByTesteeIDs(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("parse testee id %q: %w", rawID, err)
 		}
-		domainID := testeeDomain.NewID(value)
-		parsedTesteeIDs = append(parsedTesteeIDs, domainID)
 		idStringsByValue[value] = rawID
-		counts[rawID] = 0
+		stats[rawID] = planTesteeTaskPriority{}
 	}
 
-	for start := 0; start < len(parsedTesteeIDs); start += localPlanTaskCountBatchSize {
+	rawIDs := make([]uint64, 0, len(idStringsByValue))
+	for value := range idStringsByValue {
+		rawIDs = append(rawIDs, value)
+	}
+
+	type taskPriorityCountRow struct {
+		TesteeID             uint64 `gorm:"column:testee_id"`
+		TotalTaskCount       int64  `gorm:"column:total_task_count"`
+		CurrentPlanTaskCount int64  `gorm:"column:current_plan_task_count"`
+	}
+
+	for start := 0; start < len(rawIDs); start += localPlanTaskCountBatchSize {
 		end := start + localPlanTaskCountBatchSize
-		if end > len(parsedTesteeIDs) {
-			end = len(parsedTesteeIDs)
+		if end > len(rawIDs) {
+			end = len(rawIDs)
 		}
-		tasks, err := g.runtime.container.PlanModule.TaskRepo.FindByPlanIDAndTesteeIDs(g.runtime.planContext(ctx), planDomainID, parsedTesteeIDs[start:end])
+
+		rows := make([]taskPriorityCountRow, 0, end-start)
+		err := g.runtime.mysqlDB.WithContext(ctx).
+			Table("assessment_task").
+			Select(
+				"testee_id, COUNT(*) AS total_task_count, SUM(CASE WHEN plan_id = ? THEN 1 ELSE 0 END) AS current_plan_task_count",
+				planDomainID.Uint64(),
+			).
+			Where("org_id = ? AND testee_id IN ? AND deleted_at IS NULL", g.orgID, rawIDs[start:end]).
+			Group("testee_id").
+			Scan(&rows).Error
 		if err != nil {
 			return nil, err
 		}
-		for _, task := range tasks {
-			if task == nil {
-				continue
-			}
-			if rawID, ok := idStringsByValue[task.GetTesteeID().Uint64()]; ok {
-				counts[rawID]++
+
+		for _, row := range rows {
+			if rawID, ok := idStringsByValue[row.TesteeID]; ok {
+				stats[rawID] = planTesteeTaskPriority{
+					TotalTaskCount:       int(row.TotalTaskCount),
+					CurrentPlanTaskCount: int(row.CurrentPlanTaskCount),
+				}
 			}
 		}
 	}
 
-	return counts, nil
+	return stats, nil
 }
 
 func (r *localPlanRuntime) planContext(ctx context.Context) context.Context {
@@ -601,6 +674,18 @@ func toSeedTaskListResponse(results []*planApp.TaskResult) *TaskListResponse {
 		TotalCount: int64(len(tasks)),
 		Page:       1,
 		PageSize:   len(tasks),
+	}
+}
+
+func toSeedTaskListResultResponse(result *planApp.TaskListResult) *TaskListResponse {
+	if result == nil {
+		return &TaskListResponse{}
+	}
+	return &TaskListResponse{
+		Tasks:      toSeedTaskResponses(result.Items),
+		TotalCount: result.Total,
+		Page:       result.Page,
+		PageSize:   result.PageSize,
 	}
 }
 

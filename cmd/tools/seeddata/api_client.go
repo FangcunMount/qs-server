@@ -371,6 +371,15 @@ type TaskListResponse struct {
 	Stats      *TaskScheduleStatsResponse `json:"stats,omitempty"`
 }
 
+// ListTasksRequest 任务分页查询请求。
+type ListTasksRequest struct {
+	PlanID   string
+	TesteeID string
+	Status   string
+	Page     int
+	PageSize int
+}
+
 // EnrollmentResponse 加入计划响应。
 type EnrollmentResponse struct {
 	PlanID string         `json:"plan_id"`
@@ -1226,6 +1235,69 @@ func (c *APIClient) SchedulePendingTasks(ctx context.Context, req SchedulePendin
 	var taskList TaskListResponse
 	if err := decodeResponseData(resp, &taskList); err != nil {
 		return nil, fmt.Errorf("unmarshal schedule response: %w", err)
+	}
+	return &taskList, nil
+}
+
+// ListTasksByPlan 查询计划下的任务。
+func (c *APIClient) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/plans/%s/tasks", planID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskList TaskListResponse
+	if err := decodeResponseData(resp, &taskList); err != nil {
+		return nil, fmt.Errorf("unmarshal plan task list response: %w", err)
+	}
+	return &taskList, nil
+}
+
+// ListTasks 分页查询任务。
+func (c *APIClient) ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error) {
+	query := url.Values{}
+	if planID := strings.TrimSpace(req.PlanID); planID != "" {
+		query.Set("plan_id", planID)
+	}
+	if testeeID := strings.TrimSpace(req.TesteeID); testeeID != "" {
+		query.Set("testee_id", testeeID)
+	}
+	if status := strings.TrimSpace(req.Status); status != "" {
+		query.Set("status", status)
+	}
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+	query.Set("page", strconv.Itoa(page))
+	query.Set("page_size", strconv.Itoa(pageSize))
+
+	resp, err := c.doRequest(ctx, "GET", "/api/v1/plans/tasks?"+query.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskList TaskListResponse
+	if err := decodeResponseData(resp, &taskList); err != nil {
+		return nil, fmt.Errorf("unmarshal task list response: %w", err)
+	}
+	return &taskList, nil
+}
+
+// ListTasksByTestee 查询受试者下的全部任务。
+func (c *APIClient) ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/testees/%s/tasks", testeeID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskList TaskListResponse
+	if err := decodeResponseData(resp, &taskList); err != nil {
+		return nil, fmt.Errorf("unmarshal testee task list response: %w", err)
 	}
 	return &taskList, nil
 }
