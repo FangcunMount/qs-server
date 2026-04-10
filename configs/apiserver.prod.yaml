@@ -120,8 +120,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 10        # 降低空闲连接数
-  max-open-connections: 100       # 降低最大连接数（阿里云 RDS 有限制）
+  max-idle-connections: 20        # 保留一定热连接，减少高峰期建连抖动
+  max-open-connections: 180       # 1C2G / 600 连接上限下的保守提档
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
@@ -182,10 +182,10 @@ rate_limit:
   submit_global_burst: 300
   submit_user_qps: 200
   submit_user_burst: 300
-  admin_submit_global_qps: 200
-  admin_submit_global_burst: 300
-  admin_submit_user_qps: 200
-  admin_submit_user_burst: 300
+  admin_submit_global_qps: 320
+  admin_submit_global_burst: 480
+  admin_submit_user_qps: 320
+  admin_submit_user_burst: 480
   query_global_qps: 200
   query_global_burst: 300
   query_user_qps: 200
@@ -201,8 +201,8 @@ rate_limit:
 backpressure:
   mysql:
     enabled: true
-    max_inflight: 200
-    timeout_ms: 2000
+    max_inflight: 160
+    timeout_ms: 2500
   mongo:
     enabled: true
     max_inflight: 200
