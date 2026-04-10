@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -486,6 +487,111 @@ func TestSelectPlanEnrollmentTesteesKeepsHighestPrioritySlice(t *testing.T) {
 	}
 }
 
+func TestStreamSamplePlanEnrollmentTesteesUsesPagedIteration(t *testing.T) {
+	base := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
+	client := &pagedPlanSeedGatewayStub{
+		pages: map[int][]*ApiserverTesteeResponse{
+			1: {
+				{ID: "1001", CreatedAt: base.Add(1 * time.Minute)},
+				{ID: "1002", CreatedAt: base.Add(2 * time.Minute)},
+				{ID: "1003", CreatedAt: base.Add(3 * time.Minute)},
+			},
+			2: {
+				{ID: "1004", CreatedAt: base.Add(4 * time.Minute)},
+				{ID: "1005", CreatedAt: base.Add(5 * time.Minute)},
+				{ID: "1006", CreatedAt: base.Add(6 * time.Minute)},
+			},
+			3: {
+				{ID: "1007", CreatedAt: base.Add(7 * time.Minute)},
+			},
+		},
+		totalPages: 3,
+	}
+
+	selected, loadedCount, err := streamSamplePlanEnrollmentTestees(context.Background(), client, 1, 3, 0, 0, "614333603412718126")
+	if err != nil {
+		t.Fatalf("unexpected stream sample error: %v", err)
+	}
+	if loadedCount != 7 {
+		t.Fatalf("expected loadedCount=7, got %d", loadedCount)
+	}
+	if len(selected) == 0 {
+		t.Fatal("expected at least one selected testee")
+	}
+	for i := 1; i < len(selected); i++ {
+		if selected[i-1].CreatedAt.After(selected[i].CreatedAt) {
+			t.Fatalf("expected selected testees sorted by created_at, got %v before %v", selected[i-1].ID, selected[i].ID)
+		}
+	}
+	if got := strings.Join(client.pageCalls, ","); got != "1,2,3" {
+		t.Fatalf("expected paged calls 1,2,3, got %s", got)
+	}
+}
+
+func TestStreamFilterRecoveryPlanTesteesUsesPagedFiltering(t *testing.T) {
+	base := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
+	gateway := &pagedPlanSeedGatewayStub{
+		pages: map[int][]*ApiserverTesteeResponse{
+			1: {
+				{ID: "1001", CreatedAt: base.Add(1 * time.Minute)},
+				{ID: "1002", CreatedAt: base.Add(2 * time.Minute)},
+			},
+			2: {
+				{ID: "1003", CreatedAt: base.Add(3 * time.Minute)},
+				{ID: "1004", CreatedAt: base.Add(4 * time.Minute)},
+			},
+			3: {
+				{ID: "1005", CreatedAt: base.Add(5 * time.Minute)},
+				{ID: "1006", CreatedAt: base.Add(6 * time.Minute)},
+			},
+		},
+		totalPages: 3,
+		taskLists: map[string][]TaskResponse{
+			"1001": {{ID: "t1", Seq: 1, Status: "completed"}},
+			"1002": {{ID: "t2", Seq: 1, Status: "opened"}},
+			"1003": {},
+			"1004": {{ID: "t4", Seq: 1, Status: "expired"}},
+			"1005": {{ID: "t5", Seq: 1, Status: "pending"}},
+			"1006": {{ID: "t6", Seq: 1, Status: "completed"}},
+		},
+	}
+
+	retained, stats, loadedCount, err := streamFilterRecoveryPlanTestees(
+		context.Background(),
+		gateway,
+		noopSeedLogger{},
+		1,
+		2,
+		0,
+		0,
+		"614333603412718126",
+		1,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("unexpected stream filter error: %v", err)
+	}
+	if loadedCount != 6 {
+		t.Fatalf("expected loadedCount=6, got %d", loadedCount)
+	}
+	if stats == nil || stats.ExistingTaskStats == nil {
+		t.Fatal("expected aggregate filter stats")
+	}
+	gotIDs := make([]string, 0, len(retained))
+	for _, testee := range retained {
+		gotIDs = append(gotIDs, testee.ID)
+	}
+	if got := strings.Join(gotIDs, ","); got != "1002,1005" {
+		t.Fatalf("unexpected retained ids: got=%s want=1002,1005", got)
+	}
+	if got := strings.Join(gateway.pageCalls, ","); got != "1,2,3" {
+		t.Fatalf("expected paged calls 1,2,3, got %s", got)
+	}
+	if stats.FilteredCompletedPlanTestees != 3 || stats.FilteredNoTaskTestees != 1 || stats.RetainedUndeterminedTestees != 0 {
+		t.Fatalf("unexpected filter stats: %+v", stats)
+	}
+}
+
 type planTaskCountProviderStub struct {
 	counts    map[string]int
 	taskLists map[string][]TaskResponse
@@ -544,3 +650,63 @@ type noopSeedLogger struct{}
 
 func (noopSeedLogger) Warnw(string, ...interface{}) {}
 func (noopSeedLogger) Infow(string, ...interface{}) {}
+
+type pagedPlanSeedGatewayStub struct {
+	pages      map[int][]*ApiserverTesteeResponse
+	totalPages int
+	pageCalls  []string
+	taskLists  map[string][]TaskResponse
+	taskErrs   map[string]error
+}
+
+func (s *pagedPlanSeedGatewayStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) GetScale(ctx context.Context, code string) (*ScaleResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) GetQuestionnaireDetail(ctx context.Context, code string) (*QuestionnaireDetailResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) ListTesteesByOrg(ctx context.Context, orgID int64, page, pageSize int) (*ApiserverTesteeListResponse, error) {
+	s.pageCalls = append(s.pageCalls, fmt.Sprintf("%d", page))
+	items := append([]*ApiserverTesteeResponse(nil), s.pages[page]...)
+	return &ApiserverTesteeListResponse{
+		Items:      items,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: s.totalPages,
+		Total:      0,
+	}, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
+	if err, ok := s.taskErrs[testeeID]; ok {
+		return nil, err
+	}
+	tasks := append([]TaskResponse(nil), s.taskLists[testeeID]...)
+	return &TaskListResponse{Tasks: tasks}, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	return nil, nil
+}
+
+func (s *pagedPlanSeedGatewayStub) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	return nil, nil
+}

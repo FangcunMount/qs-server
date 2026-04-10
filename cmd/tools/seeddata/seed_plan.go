@@ -289,6 +289,7 @@ func seedPlanBackfill(
 		selectedTestees []*TesteeResponse
 		selectionMode   string
 		sampleRate      string
+		existingStats   *planTaskStatusStats
 		loadedTesteeCnt int
 	)
 	if len(explicitPlanTesteeIDs) > 0 {
@@ -305,31 +306,56 @@ func seedPlanBackfill(
 		if pageSize < 100 {
 			pageSize = 100
 		}
-		testees, err = loadApiserverTestees(ctx, gateway, orgID, pageSize, testeeOffset, testeeLimit)
+		var filterStats *recoveryPlanTesteeFilterStats
+		testees, filterStats, loadedTesteeCnt, err = streamFilterRecoveryPlanTestees(
+			ctx,
+			gateway,
+			logger,
+			orgID,
+			pageSize,
+			testeeOffset,
+			testeeLimit,
+			planID,
+			planWorkers,
+			verbose,
+		)
 		if err != nil {
 			return err
 		}
-		sortTesteesByCreatedAt(testees)
 		selectedTestees = testees
 		selectionMode = "recovery_all"
 		sampleRate = "all"
-		loadedTesteeCnt = len(testees)
+		existingStats = filterStats.ExistingTaskStats
+		logger.Infow("Inspected existing plan tasks before backfill",
+			"plan_id", planID,
+			"org_id", orgID,
+			"selected_testee_count", loadedTesteeCnt,
+			"existing_task_stats", existingStats,
+		)
+		logger.Infow("Filtered recovery-mode plan testees before scheduling",
+			"plan_id", planID,
+			"org_id", orgID,
+			"selected_testee_count", loadedTesteeCnt,
+			"retained_testee_count", len(selectedTestees),
+			"filtered_completed_plan_testees", filterStats.FilteredCompletedPlanTestees,
+			"filtered_no_task_testees", filterStats.FilteredNoTaskTestees,
+			"retained_undetermined_testees", filterStats.RetainedUndeterminedTestees,
+		)
 	} else {
 		pageSize := testeePageSize
 		if pageSize < 100 {
 			pageSize = 100
 		}
-		testees, err = loadApiserverTestees(ctx, gateway, orgID, pageSize, testeeOffset, testeeLimit)
+		testees, loadedTesteeCnt, err = streamSamplePlanEnrollmentTestees(ctx, gateway, orgID, pageSize, testeeOffset, testeeLimit, planID)
 		if err != nil {
 			return err
 		}
-		loadedTesteeCnt = len(testees)
 		testees, err = prioritizePlanEnrollmentTestees(ctx, gateway, logger, planID, testees, planWorkers, verbose)
 		if err != nil {
 			return err
 		}
-		selectedTestees = selectPlanEnrollmentTestees(testees)
-		selectionMode = "priority_sample"
+		selectedTestees = testees
+		selectionMode = "priority_stream_sample"
 		sampleRate = fmt.Sprintf("1/%d", planEnrollmentSampleRate)
 	}
 	logger.Infow("Loaded testees for plan backfill",
@@ -341,51 +367,29 @@ func seedPlanBackfill(
 		"sample_rate", sampleRate,
 		"explicit_testee_ids", explicitPlanTesteeIDs,
 	)
-	if len(selectedTestees) == 0 {
+	if len(selectedTestees) == 0 && !planProcessExistingOnly {
 		logger.Infow("No testees found for plan backfill", "plan_id", planID, "org_id", orgID)
 		return nil
 	}
 
 	inspectionWorkers := normalizePlanWorkers(planWorkers, len(selectedTestees))
-	var existingStats *planTaskStatusStats
 	if planProcessExistingOnly {
-		filteredTestees, filterStats, err := filterRecoveryPlanTestees(ctx, gateway, deps.Logger, planID, selectedTestees, inspectionWorkers, verbose)
-		if err != nil {
-			return err
-		}
-		existingStats = filterStats.ExistingTaskStats
-		logger.Infow("Inspected existing plan tasks before backfill",
-			"plan_id", planID,
-			"org_id", orgID,
-			"selected_testee_count", len(selectedTestees),
-			"existing_task_stats", existingStats,
-		)
-		logger.Infow("Filtered recovery-mode plan testees before scheduling",
-			"plan_id", planID,
-			"org_id", orgID,
-			"selected_testee_count", len(selectedTestees),
-			"retained_testee_count", len(filteredTestees),
-			"filtered_completed_plan_testees", filterStats.FilteredCompletedPlanTestees,
-			"filtered_no_task_testees", filterStats.FilteredNoTaskTestees,
-			"retained_undetermined_testees", filterStats.RetainedUndeterminedTestees,
-		)
-		if existingStats.Total == 0 && filterStats.RetainedUndeterminedTestees == 0 {
+		if existingStats == nil || existingStats.Total == 0 {
 			logger.Infow("No existing plan tasks found for recovery mode",
 				"plan_id", planID,
 				"org_id", orgID,
-				"selected_testee_count", len(selectedTestees),
+				"selected_testee_count", loadedTesteeCnt,
 			)
 			return nil
 		}
-		if len(filteredTestees) == 0 {
+		if len(selectedTestees) == 0 {
 			logger.Infow("All recovery-mode testees were filtered out before scheduling",
 				"plan_id", planID,
 				"org_id", orgID,
-				"selected_testee_count", len(selectedTestees),
+				"selected_testee_count", loadedTesteeCnt,
 			)
 			return nil
 		}
-		selectedTestees = filteredTestees
 	} else {
 		existingStats, err = inspectExistingPlanTasks(ctx, gateway, deps.Logger, planID, selectedTestees, inspectionWorkers, verbose)
 		if err != nil {
@@ -1528,6 +1532,7 @@ func filterRecoveryPlanTestees(
 		ExistingTaskStats: stats,
 	}
 	retained := make([]*TesteeResponse, 0, len(testees))
+	workers = normalizePlanWorkers(workers, len(testees))
 	var mu sync.Mutex
 
 	err := runPlanTesteeWorkerPool(ctx, testees, workers, func(ctx context.Context, testee *TesteeResponse) error {
@@ -1580,6 +1585,43 @@ func filterRecoveryPlanTestees(
 	}
 
 	return retained, filterStats, nil
+}
+
+func streamFilterRecoveryPlanTestees(
+	ctx context.Context,
+	gateway PlanSeedGateway,
+	logger interface {
+		Warnw(string, ...interface{})
+	},
+	orgID int64,
+	pageSize, offset, limit int,
+	planID string,
+	workers int,
+	verbose bool,
+) ([]*TesteeResponse, *recoveryPlanTesteeFilterStats, int, error) {
+	retained := make([]*TesteeResponse, 0, 64)
+	aggregate := &recoveryPlanTesteeFilterStats{
+		ExistingTaskStats: &planTaskStatusStats{},
+	}
+	loadedCount := 0
+
+	err := iterateTesteesFromApiserver(ctx, gateway, orgID, pageSize, offset, limit, func(batch []*TesteeResponse) error {
+		loadedCount += len(batch)
+		batchWorkers := normalizePlanWorkers(workers, len(batch))
+		filtered, stats, err := filterRecoveryPlanTestees(ctx, gateway, logger, planID, batch, batchWorkers, verbose)
+		if err != nil {
+			return err
+		}
+		retained = append(retained, filtered...)
+		mergeRecoveryPlanTesteeFilterStats(aggregate, stats)
+		return nil
+	})
+	if err != nil {
+		return nil, nil, loadedCount, err
+	}
+
+	sortTesteesByCreatedAt(retained)
+	return retained, aggregate, loadedCount, nil
 }
 
 func summarizePlanTaskStatuses(tasks []TaskResponse) *planTaskStatusStats {
@@ -1647,6 +1689,19 @@ func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats
 	dst.Expired += src.Expired
 	dst.Canceled += src.Canceled
 	dst.Unknown += src.Unknown
+}
+
+func mergeRecoveryPlanTesteeFilterStats(dst *recoveryPlanTesteeFilterStats, src *recoveryPlanTesteeFilterStats) {
+	if dst == nil || src == nil {
+		return
+	}
+	if dst.ExistingTaskStats == nil {
+		dst.ExistingTaskStats = &planTaskStatusStats{}
+	}
+	mergePlanTaskStatusStats(dst.ExistingTaskStats, src.ExistingTaskStats)
+	dst.FilteredCompletedPlanTestees += src.FilteredCompletedPlanTestees
+	dst.FilteredNoTaskTestees += src.FilteredNoTaskTestees
+	dst.RetainedUndeterminedTestees += src.RetainedUndeterminedTestees
 }
 
 func expirePlanTaskWithRecovery(ctx context.Context, gateway PlanSeedGateway, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
