@@ -52,6 +52,7 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"org_id", dto.OrgID,
 		"scale_code", dto.ScaleCode,
 		"schedule_type", dto.ScheduleType,
+		"trigger_time", dto.TriggerTime,
 		"interval", dto.Interval,
 		"total_times", dto.TotalTimes,
 		"fixed_dates", dto.FixedDates,
@@ -95,6 +96,16 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"action", "create_plan",
 		"schedule_type_parsed", string(scheduleType),
 	)
+
+	triggerTime, err := plan.NormalizePlanTriggerTime(dto.TriggerTime)
+	if err != nil {
+		logger.L(ctx).Errorw("CreatePlan invalid trigger_time",
+			"action", "create_plan",
+			"trigger_time", dto.TriggerTime,
+			"error", err.Error(),
+		)
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的触发时间: %s", dto.TriggerTime)
+	}
 
 	// 转换固定日期列表
 	var fixedDates []time.Time
@@ -173,12 +184,13 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"org_id", dto.OrgID,
 		"scale_code", dto.ScaleCode,
 		"schedule_type", string(scheduleType),
+		"trigger_time", triggerTime,
 		"interval", dto.Interval,
 		"total_times", totalTimes,
 		"fixed_dates_count", len(fixedDates),
 		"relative_weeks_count", len(dto.RelativeWeeks),
 	)
-	if errs := s.validator.ValidateForCreation(dto.OrgID, dto.ScaleCode, scheduleType, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
+	if errs := s.validator.ValidateForCreation(dto.OrgID, dto.ScaleCode, scheduleType, triggerTime, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
 		logger.L(ctx).Errorw("CreatePlan validation failed",
 			"action", "create_plan",
 			"org_id", dto.OrgID,
@@ -202,10 +214,11 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 	// 4. 创建计划选项
 	logger.L(ctx).Infow("CreatePlan building plan options",
 		"action", "create_plan",
+		"trigger_time", triggerTime,
 		"has_fixed_dates", len(fixedDates) > 0,
 		"has_relative_weeks", len(dto.RelativeWeeks) > 0,
 	)
-	var opts []plan.PlanOption
+	opts := []plan.PlanOption{plan.WithTriggerTime(triggerTime)}
 	if len(fixedDates) > 0 {
 		opts = append(opts, plan.WithFixedDates(fixedDates))
 		logger.L(ctx).Infow("CreatePlan added fixed_dates option",
@@ -231,6 +244,7 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"org_id", dto.OrgID,
 		"scale_code", dto.ScaleCode,
 		"schedule_type", string(scheduleType),
+		"trigger_time", triggerTime,
 		"interval", dto.Interval,
 		"total_times", totalTimes,
 	)
@@ -241,6 +255,7 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 			"org_id", dto.OrgID,
 			"scale_code", dto.ScaleCode,
 			"schedule_type", string(scheduleType),
+			"trigger_time", triggerTime,
 			"interval", dto.Interval,
 			"total_times", totalTimes,
 			"error", err.Error(),

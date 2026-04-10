@@ -8,6 +8,7 @@ type CreatePlanDTO struct {
 	OrgID         int64    // 机构ID
 	ScaleCode     string   // 量表编码
 	ScheduleType  string   // 周期类型：by_week, by_day, custom, fixed_date
+	TriggerTime   string   // 触发时间（格式：HH:MM 或 HH:MM:SS）
 	Interval      int      // 间隔（用于 by_week/by_day）
 	TotalTimes    int      // 总次数
 	FixedDates    []string // 固定日期列表（用于 fixed_date，格式：YYYY-MM-DD）
@@ -40,7 +41,7 @@ type ListPlansDTO struct {
 
 // ListTasksDTO 查询任务列表 DTO
 type ListTasksDTO struct {
-	OrgID                  int64    // 机构ID
+	OrgID                 int64    // 机构ID
 	PlanID                string   // 计划ID（可选）
 	TesteeID              string   // 受试者ID（可选）
 	Status                string   // 状态（可选）

@@ -517,6 +517,7 @@ func toSeedPlanResponse(result *planApp.PlanResult) *PlanResponse {
 		OrgID:         result.OrgID,
 		ScaleCode:     result.ScaleCode,
 		ScheduleType:  result.ScheduleType,
+		TriggerTime:   result.TriggerTime,
 		Interval:      result.Interval,
 		TotalTimes:    result.TotalTimes,
 		FixedDates:    append([]string(nil), result.FixedDates...),

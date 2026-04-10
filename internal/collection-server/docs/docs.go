@@ -1653,6 +1653,9 @@ const docTemplate = `{
                 "questionnaire_version": {
                     "type": "string"
                 },
+                "task_id": {
+                    "type": "string"
+                },
                 "testee_id": {
                     "type": "integer"
                 },

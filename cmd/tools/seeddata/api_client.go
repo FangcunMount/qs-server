@@ -327,6 +327,7 @@ type PlanResponse struct {
 	OrgID         int64    `json:"org_id"`
 	ScaleCode     string   `json:"scale_code"`
 	ScheduleType  string   `json:"schedule_type"`
+	TriggerTime   string   `json:"trigger_time"`
 	Interval      int      `json:"interval"`
 	TotalTimes    int      `json:"total_times"`
 	FixedDates    []string `json:"fixed_dates"`

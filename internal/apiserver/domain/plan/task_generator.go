@@ -31,7 +31,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 	case PlanScheduleByWeek:
 		// 每 N 周一次
 		for i := 0; i < plan.GetTotalTimes(); i++ {
-			plannedAt := startDate.AddDate(0, 0, i*plan.GetInterval()*7)
+			plannedAt := normalizeTaskPlannedAt(plan, startDate.AddDate(0, 0, i*plan.GetInterval()*7))
 			task := NewAssessmentTask(
 				plan.GetID(),
 				i+1,
@@ -46,7 +46,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 	case PlanScheduleByDay:
 		// 每 N 天一次
 		for i := 0; i < plan.GetTotalTimes(); i++ {
-			plannedAt := startDate.AddDate(0, 0, i*plan.GetInterval())
+			plannedAt := normalizeTaskPlannedAt(plan, startDate.AddDate(0, 0, i*plan.GetInterval()))
 			task := NewAssessmentTask(
 				plan.GetID(),
 				i+1,
@@ -63,7 +63,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 		// 每个周次都是相对于 startDate 的偏移
 		relativeWeeks := plan.GetRelativeWeeks()
 		for i, week := range relativeWeeks {
-			plannedAt := startDate.AddDate(0, 0, week*7)
+			plannedAt := normalizeTaskPlannedAt(plan, startDate.AddDate(0, 0, week*7))
 			task := NewAssessmentTask(
 				plan.GetID(),
 				i+1,
@@ -85,7 +85,7 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
-				date,
+				normalizeTaskPlannedAt(plan, date),
 			)
 			tasks = append(tasks, task)
 		}
@@ -113,13 +113,14 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 		// 每 N 周一次
 		currentDate := startDate
 		for currentDate.Before(endDate) && seq <= plan.GetTotalTimes() {
+			plannedAt := normalizeTaskPlannedAt(plan, currentDate)
 			task := NewAssessmentTask(
 				plan.GetID(),
 				seq,
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
-				currentDate,
+				plannedAt,
 			)
 			tasks = append(tasks, task)
 			currentDate = currentDate.AddDate(0, 0, plan.GetInterval()*7)
@@ -130,13 +131,14 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 		// 每 N 天一次
 		currentDate := startDate
 		for currentDate.Before(endDate) && seq <= plan.GetTotalTimes() {
+			plannedAt := normalizeTaskPlannedAt(plan, currentDate)
 			task := NewAssessmentTask(
 				plan.GetID(),
 				seq,
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
-				currentDate,
+				plannedAt,
 			)
 			tasks = append(tasks, task)
 			currentDate = currentDate.AddDate(0, 0, plan.GetInterval())
@@ -148,8 +150,9 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 		// 每个周次都是相对于 startDate 的偏移
 		relativeWeeks := plan.GetRelativeWeeks()
 		for _, week := range relativeWeeks {
-			plannedAt := startDate.AddDate(0, 0, week*7)
-			if plannedAt.Before(endDate) || plannedAt.Equal(endDate) {
+			candidateDate := startDate.AddDate(0, 0, week*7)
+			if candidateDate.Before(endDate) || candidateDate.Equal(endDate) {
+				plannedAt := normalizeTaskPlannedAt(plan, candidateDate)
 				task := NewAssessmentTask(
 					plan.GetID(),
 					seq,
@@ -168,13 +171,14 @@ func (g *TaskGenerator) GenerateTasksUntil(plan *AssessmentPlan, testeeID testee
 		fixedDates := plan.GetFixedDates()
 		for _, date := range fixedDates {
 			if date.Before(endDate) || date.Equal(endDate) {
+				plannedAt := normalizeTaskPlannedAt(plan, date)
 				task := NewAssessmentTask(
 					plan.GetID(),
 					seq,
 					plan.GetOrgID(),
 					testeeID,
 					plan.GetScaleCode(),
-					date,
+					plannedAt,
 				)
 				tasks = append(tasks, task)
 				seq++
@@ -218,6 +222,7 @@ func GenerateTasksWithIDs(
 	testeeID testee.ID,
 	scaleCode string,
 	scheduleType PlanScheduleType,
+	triggerTime string,
 	interval int,
 	totalTimes int,
 	startDate time.Time,
@@ -231,14 +236,14 @@ func GenerateTasksWithIDs(
 	switch scheduleType {
 	case PlanScheduleByWeek:
 		for i := 0; i < totalTimes; i++ {
-			plannedAt := startDate.AddDate(0, 0, i*interval*7)
+			plannedAt := normalizeTaskPlannedAtWithTriggerTime(triggerTime, startDate.AddDate(0, 0, i*interval*7))
 			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, plannedAt)
 			tasks = append(tasks, task)
 		}
 
 	case PlanScheduleByDay:
 		for i := 0; i < totalTimes; i++ {
-			plannedAt := startDate.AddDate(0, 0, i*interval)
+			plannedAt := normalizeTaskPlannedAtWithTriggerTime(triggerTime, startDate.AddDate(0, 0, i*interval))
 			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, plannedAt)
 			tasks = append(tasks, task)
 		}
@@ -246,17 +251,33 @@ func GenerateTasksWithIDs(
 	case PlanScheduleCustom:
 		for i, week := range customWeeks {
 			// 相对周次：相对于 startDate 的偏移
-			plannedAt := startDate.AddDate(0, 0, week*7)
+			plannedAt := normalizeTaskPlannedAtWithTriggerTime(triggerTime, startDate.AddDate(0, 0, week*7))
 			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, plannedAt)
 			tasks = append(tasks, task)
 		}
 
 	case PlanScheduleFixedDate:
 		for i, date := range fixedDates {
-			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, date)
+			task := NewAssessmentTask(planID, i+1, orgID, testeeID, scaleCode, normalizeTaskPlannedAtWithTriggerTime(triggerTime, date))
 			tasks = append(tasks, task)
 		}
 	}
 
 	return tasks
+}
+
+func normalizeTaskPlannedAt(plan *AssessmentPlan, t time.Time) time.Time {
+	if plan == nil {
+		return normalizeTaskPlannedAtWithTriggerTime(DefaultPlanTriggerTime, t)
+	}
+	return normalizeTaskPlannedAtWithTriggerTime(plan.GetTriggerTime(), t)
+}
+
+func normalizeTaskPlannedAtWithTriggerTime(triggerTime string, t time.Time) time.Time {
+	plannedAt, err := ApplyPlanTriggerTime(t, triggerTime)
+	if err == nil {
+		return plannedAt
+	}
+	fallback, _ := ApplyPlanTriggerTime(t, DefaultPlanTriggerTime)
+	return fallback
 }

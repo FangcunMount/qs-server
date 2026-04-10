@@ -24,6 +24,7 @@ type AssessmentPlanPO struct {
 
 	// 周期策略
 	ScheduleType  string      `gorm:"column:schedule_type;size:50;not null;index:idx_schedule_type"`
+	TriggerTime   string      `gorm:"column:trigger_time;size:8;not null;default:'19:00:00'"`
 	Interval      int         `gorm:"column:interval;not null;default:0"`
 	TotalTimes    int         `gorm:"column:total_times;not null"`
 	FixedDates    StringSlice `gorm:"column:fixed_dates;type:json"`    // 固定日期列表（JSON）

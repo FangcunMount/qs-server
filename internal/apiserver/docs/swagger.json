@@ -1319,7 +1319,7 @@
                 }
             },
             "post": {
-                "description": "创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。仅 qs:evaluation_plan_manager 或 qs:admin 可访问。不同周期类型需要不同的参数：\n- by_week/by_day: 需要 interval（间隔）和 total_times（总次数）\n- fixed_date: 需要 fixed_dates（固定日期列表）\n- custom: 需要 relative_weeks（相对周次列表）",
+                "description": "创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。可选 trigger_time 指定每天触发时间，默认 19:00:00。仅 qs:evaluation_plan_manager 或 qs:admin 可访问。不同周期类型需要不同的参数：\n- by_week/by_day: 需要 interval（间隔）和 total_times（总次数）\n- fixed_date: 需要 fixed_dates（固定日期列表）\n- custom: 需要 relative_weeks（相对周次列表）",
                 "consumes": [
                     "application/json"
                 ],
@@ -5319,6 +5319,12 @@
                 "questionnaire_version": {
                     "type": "string"
                 },
+                "task_completed_at": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
                 "testee_id": {
                     "type": "integer"
                 },
@@ -5466,6 +5472,10 @@
                 "total_times": {
                     "description": "总次数（用于 by_week/by_day）",
                     "type": "integer"
+                },
+                "trigger_time": {
+                    "description": "触发时间（格式：HH:MM 或 HH:MM:SS，默认 19:00:00）",
+                    "type": "string"
                 }
             }
         },
@@ -6576,6 +6586,10 @@
                 "total_times": {
                     "description": "总次数（用于 by_week/by_day）",
                     "type": "integer"
+                },
+                "trigger_time": {
+                    "description": "触发时间：HH:MM:SS",
+                    "type": "string"
                 }
             }
         },
@@ -7133,6 +7147,9 @@
                 "page_size": {
                     "type": "integer"
                 },
+                "stats": {
+                    "$ref": "#/definitions/response.TaskScheduleStatsResponse"
+                },
                 "tasks": {
                     "type": "array",
                     "items": {
@@ -7202,6 +7219,26 @@
                 "testee_id": {
                     "description": "受试者ID",
                     "type": "string"
+                }
+            }
+        },
+        "response.TaskScheduleStatsResponse": {
+            "type": "object",
+            "properties": {
+                "expire_failed_count": {
+                    "type": "integer"
+                },
+                "expired_count": {
+                    "type": "integer"
+                },
+                "failed_count": {
+                    "type": "integer"
+                },
+                "opened_count": {
+                    "type": "integer"
+                },
+                "pending_count": {
+                    "type": "integer"
                 }
             }
         },

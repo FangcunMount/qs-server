@@ -10,6 +10,7 @@ package request
 type CreatePlanRequest struct {
 	ScaleCode     string   `json:"scale_code" valid:"required~量表编码不能为空"`
 	ScheduleType  string   `json:"schedule_type" valid:"required~周期类型不能为空"`
+	TriggerTime   string   `json:"trigger_time,omitempty"`   // 触发时间（格式：HH:MM 或 HH:MM:SS，默认 19:00:00）
 	Interval      int      `json:"interval,omitempty"`       // 间隔（用于 by_week/by_day）
 	TotalTimes    int      `json:"total_times,omitempty"`    // 总次数（用于 by_week/by_day）
 	FixedDates    []string `json:"fixed_dates,omitempty"`    // 固定日期列表（用于 fixed_date，格式：YYYY-MM-DD）

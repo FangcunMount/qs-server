@@ -95,6 +95,7 @@ message PlanResultMessage {
   repeated string fixed_dates = 7;
   repeated int32 relative_weeks = 8;
   string status = 9;
+  string trigger_time = 10;
 }
 
 message TaskResultMessage {
@@ -137,6 +138,7 @@ message CreatePlanRequest {
   int32 total_times = 5;
   repeated string fixed_dates = 6;
   repeated int32 relative_weeks = 7;
+  string trigger_time = 8;
 }
 
 message CreatePlanResponse {

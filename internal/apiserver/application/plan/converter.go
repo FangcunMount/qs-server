@@ -18,6 +18,7 @@ type PlanResult struct {
 	OrgID         int64    // 机构ID
 	ScaleCode     string   // 量表编码
 	ScheduleType  string   // 周期类型
+	TriggerTime   string   // 触发时间
 	Interval      int      // 间隔
 	TotalTimes    int      // 总次数
 	FixedDates    []string // 固定日期列表
@@ -111,6 +112,7 @@ func toPlanResult(p *plan.AssessmentPlan) *PlanResult {
 		OrgID:         p.GetOrgID(),
 		ScaleCode:     p.GetScaleCode(),
 		ScheduleType:  string(p.GetScheduleType()),
+		TriggerTime:   p.GetTriggerTime(),
 		Interval:      p.GetInterval(),
 		TotalTimes:    p.GetTotalTimes(),
 		FixedDates:    fixedDates,

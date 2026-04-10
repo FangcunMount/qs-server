@@ -30,6 +30,7 @@ type AssessmentPlan struct {
 	// 所有周期策略都是相对时间窗口，不是绝对日期
 	// 任务生成时：plannedAt = startDate（参数）+ 相对时间偏移
 	scheduleType  PlanScheduleType
+	triggerTime   string      // 任务触发时间（格式：HH:MM:SS）
 	interval      int         // 间隔 N 周/天（用于 by_week / by_day）
 	totalTimes    int         // 计划总次数
 	fixedDates    []time.Time // 固定日期列表（用于 fixed_date，特殊场景使用绝对日期）
@@ -81,6 +82,7 @@ func NewAssessmentPlan(
 		orgID:        orgID,
 		scaleCode:    scaleCode,
 		scheduleType: scheduleType,
+		triggerTime:  DefaultPlanTriggerTime,
 		interval:     interval,
 		totalTimes:   totalTimes,
 		status:       PlanStatusActive,
@@ -91,6 +93,12 @@ func NewAssessmentPlan(
 	for _, opt := range opts {
 		opt(plan)
 	}
+
+	normalizedTriggerTime, err := NormalizePlanTriggerTime(plan.triggerTime)
+	if err != nil {
+		return nil, err
+	}
+	plan.triggerTime = normalizedTriggerTime
 
 	// 发布计划创建事件
 	plan.addEvent(NewPlanCreatedEvent(
@@ -104,6 +112,13 @@ func NewAssessmentPlan(
 
 // PlanOption 计划构造选项
 type PlanOption func(*AssessmentPlan)
+
+// WithTriggerTime 设置任务触发时间。
+func WithTriggerTime(triggerTime string) PlanOption {
+	return func(p *AssessmentPlan) {
+		p.triggerTime = triggerTime
+	}
+}
 
 // WithFixedDates 设置固定日期列表
 func WithFixedDates(dates []time.Time) PlanOption {
@@ -145,6 +160,11 @@ func (p *AssessmentPlan) GetScheduleType() PlanScheduleType {
 // GetInterval 获取间隔
 func (p *AssessmentPlan) GetInterval() int {
 	return p.interval
+}
+
+// GetTriggerTime 获取任务触发时间。
+func (p *AssessmentPlan) GetTriggerTime() string {
+	return p.triggerTime
 }
 
 // GetTotalTimes 获取总次数

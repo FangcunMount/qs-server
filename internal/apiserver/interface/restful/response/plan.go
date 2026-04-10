@@ -12,6 +12,7 @@ type PlanResponse struct {
 	OrgID         int64    `json:"org_id"`                   // 机构ID
 	ScaleCode     string   `json:"scale_code"`               // 量表编码（如 "3adyDE"）
 	ScheduleType  string   `json:"schedule_type"`            // 周期类型：by_week/by_day/fixed_date/custom
+	TriggerTime   string   `json:"trigger_time"`             // 触发时间：HH:MM:SS
 	Interval      int      `json:"interval"`                 // 间隔（周/天，用于 by_week/by_day）
 	TotalTimes    int      `json:"total_times"`              // 总次数（用于 by_week/by_day）
 	FixedDates    []string `json:"fixed_dates,omitempty"`    // 固定日期列表（用于 fixed_date）
@@ -82,6 +83,7 @@ func NewPlanResponse(result *plan.PlanResult) *PlanResponse {
 		OrgID:         result.OrgID,
 		ScaleCode:     result.ScaleCode,
 		ScheduleType:  result.ScheduleType,
+		TriggerTime:   result.TriggerTime,
 		Interval:      result.Interval,
 		TotalTimes:    result.TotalTimes,
 		FixedDates:    result.FixedDates,

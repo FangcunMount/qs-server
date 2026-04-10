@@ -71,6 +71,9 @@ func TestPlanCommandServiceCreatePlanMapsRequestAndResponse(t *testing.T) {
 			if dto.ScaleCode != "scale-code" || dto.ScheduleType != "custom" {
 				t.Fatalf("unexpected dto: %#v", dto)
 			}
+			if dto.TriggerTime != "08:30" {
+				t.Fatalf("unexpected trigger time: %s", dto.TriggerTime)
+			}
 			if len(dto.RelativeWeeks) != 2 || dto.RelativeWeeks[0] != 2 || dto.RelativeWeeks[1] != 4 {
 				t.Fatalf("unexpected relative weeks: %#v", dto.RelativeWeeks)
 			}
@@ -79,6 +82,7 @@ func TestPlanCommandServiceCreatePlanMapsRequestAndResponse(t *testing.T) {
 				OrgID:         dto.OrgID,
 				ScaleCode:     dto.ScaleCode,
 				ScheduleType:  dto.ScheduleType,
+				TriggerTime:   "08:30:00",
 				RelativeWeeks: dto.RelativeWeeks,
 				Status:        "active",
 			}, nil
@@ -95,6 +99,7 @@ func TestPlanCommandServiceCreatePlanMapsRequestAndResponse(t *testing.T) {
 		OrgId:         9,
 		ScaleCode:     "scale-code",
 		ScheduleType:  "custom",
+		TriggerTime:   "08:30",
 		RelativeWeeks: []int32{2, 4},
 	})
 	if err != nil {
@@ -105,6 +110,9 @@ func TestPlanCommandServiceCreatePlanMapsRequestAndResponse(t *testing.T) {
 	}
 	if got := resp.GetPlan().GetRelativeWeeks(); len(got) != 2 || got[0] != 2 || got[1] != 4 {
 		t.Fatalf("unexpected relative weeks response: %#v", got)
+	}
+	if got := resp.GetPlan().GetTriggerTime(); got != "08:30:00" {
+		t.Fatalf("unexpected trigger time response: %s", got)
 	}
 }
 

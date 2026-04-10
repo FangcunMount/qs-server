@@ -45,7 +45,7 @@ func (h *PlanHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.
 
 // CreatePlan 创建计划
 // @Summary 创建测评计划模板
-// @Description 创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。仅 qs:evaluation_plan_manager 或 qs:admin 可访问。不同周期类型需要不同的参数：
+// @Description 创建新的测评计划模板，定义周期策略。需要提供量表编码（scale_code）和周期类型（schedule_type）。可选 trigger_time 指定每天触发时间，默认 19:00:00。仅 qs:evaluation_plan_manager 或 qs:admin 可访问。不同周期类型需要不同的参数：
 // @Description - by_week/by_day: 需要 interval（间隔）和 total_times（总次数）
 // @Description - fixed_date: 需要 fixed_dates（固定日期列表）
 // @Description - custom: 需要 relative_weeks（相对周次列表）
@@ -97,6 +97,7 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		"action", "create_plan",
 		"scale_code", req.ScaleCode,
 		"schedule_type", req.ScheduleType,
+		"trigger_time", req.TriggerTime,
 		"interval", req.Interval,
 		"total_times", req.TotalTimes,
 		"fixed_dates", req.FixedDates,
@@ -133,6 +134,7 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		OrgID:         orgID,
 		ScaleCode:     req.ScaleCode,
 		ScheduleType:  req.ScheduleType,
+		TriggerTime:   req.TriggerTime,
 		Interval:      req.Interval,
 		TotalTimes:    req.TotalTimes,
 		FixedDates:    req.FixedDates,

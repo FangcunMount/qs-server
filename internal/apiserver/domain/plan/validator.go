@@ -35,6 +35,7 @@ func (v *PlanValidator) ValidateForCreation(
 	orgID int64,
 	scaleCode string,
 	scheduleType PlanScheduleType,
+	triggerTime string,
 	interval int,
 	totalTimes int,
 	fixedDates []time.Time,
@@ -50,6 +51,9 @@ func (v *PlanValidator) ValidateForCreation(
 	}
 	if !scheduleType.IsValid() {
 		errs = append(errs, ValidationError{Field: "scheduleType", Message: "无效的周期类型"})
+	}
+	if _, err := NormalizePlanTriggerTime(triggerTime); err != nil {
+		errs = append(errs, ValidationError{Field: "triggerTime", Message: "触发时间格式无效，应为 HH:MM 或 HH:MM:SS"})
 	}
 
 	// 验证周期策略的具体参数

@@ -29,6 +29,7 @@ func (m *PlanMapper) ToPO(domain *domainPlan.AssessmentPlan) *AssessmentPlanPO {
 		OrgID:        domain.GetOrgID(),
 		ScaleCode:    domain.GetScaleCode(),
 		ScheduleType: string(domain.GetScheduleType()),
+		TriggerTime:  domain.GetTriggerTime(),
 		Interval:     domain.GetInterval(),
 		TotalTimes:   domain.GetTotalTimes(),
 		Status:       string(domain.GetStatus()),
@@ -69,7 +70,7 @@ func (m *PlanMapper) ToDomain(po *AssessmentPlanPO) *domainPlan.AssessmentPlan {
 	if len(po.FixedDates) > 0 {
 		fixedDates = make([]time.Time, 0, len(po.FixedDates))
 		for _, dateStr := range po.FixedDates {
-			if date, err := time.Parse("2006-01-02", dateStr); err == nil {
+			if date, err := time.ParseInLocation("2006-01-02", dateStr, time.Local); err == nil {
 				fixedDates = append(fixedDates, date)
 			}
 		}
@@ -83,6 +84,9 @@ func (m *PlanMapper) ToDomain(po *AssessmentPlanPO) *domainPlan.AssessmentPlan {
 
 	// 构建选项
 	var opts []domainPlan.PlanOption
+	if po.TriggerTime != "" {
+		opts = append(opts, domainPlan.WithTriggerTime(po.TriggerTime))
+	}
 	if len(fixedDates) > 0 {
 		opts = append(opts, domainPlan.WithFixedDates(fixedDates))
 	}

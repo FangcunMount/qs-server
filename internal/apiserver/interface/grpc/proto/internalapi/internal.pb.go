@@ -33,6 +33,7 @@ type PlanResultMessage struct {
 	FixedDates    []string               `protobuf:"bytes,7,rep,name=fixed_dates,json=fixedDates,proto3" json:"fixed_dates,omitempty"`
 	RelativeWeeks []int32                `protobuf:"varint,8,rep,packed,name=relative_weeks,json=relativeWeeks,proto3" json:"relative_weeks,omitempty"`
 	Status        string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	TriggerTime   string                 `protobuf:"bytes,10,opt,name=trigger_time,json=triggerTime,proto3" json:"trigger_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -126,6 +127,13 @@ func (x *PlanResultMessage) GetRelativeWeeks() []int32 {
 func (x *PlanResultMessage) GetStatus() string {
 	if x != nil {
 		return x.Status
+	}
+	return ""
+}
+
+func (x *PlanResultMessage) GetTriggerTime() string {
+	if x != nil {
+		return x.TriggerTime
 	}
 	return ""
 }
@@ -431,6 +439,7 @@ type CreatePlanRequest struct {
 	TotalTimes    int32                  `protobuf:"varint,5,opt,name=total_times,json=totalTimes,proto3" json:"total_times,omitempty"`
 	FixedDates    []string               `protobuf:"bytes,6,rep,name=fixed_dates,json=fixedDates,proto3" json:"fixed_dates,omitempty"`
 	RelativeWeeks []int32                `protobuf:"varint,7,rep,packed,name=relative_weeks,json=relativeWeeks,proto3" json:"relative_weeks,omitempty"`
+	TriggerTime   string                 `protobuf:"bytes,8,opt,name=trigger_time,json=triggerTime,proto3" json:"trigger_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -512,6 +521,13 @@ func (x *CreatePlanRequest) GetRelativeWeeks() []int32 {
 		return x.RelativeWeeks
 	}
 	return nil
+}
+
+func (x *CreatePlanRequest) GetTriggerTime() string {
+	if x != nil {
+		return x.TriggerTime
+	}
+	return ""
 }
 
 type CreatePlanResponse struct {
@@ -2734,7 +2750,7 @@ var File_internalapi_internal_proto protoreflect.FileDescriptor
 
 const file_internalapi_internal_proto_rawDesc = "" +
 	"\n" +
-	"\x1ainternalapi/internal.proto\x12\vinternalapi\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9b\x02\n" +
+	"\x1ainternalapi/internal.proto\x12\vinternalapi\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\x02\n" +
 	"\x11PlanResultMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
 	"\x06org_id\x18\x02 \x01(\x03R\x05orgId\x12\x1d\n" +
@@ -2747,7 +2763,9 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\vfixed_dates\x18\a \x03(\tR\n" +
 	"fixedDates\x12%\n" +
 	"\x0erelative_weeks\x18\b \x03(\x05R\rrelativeWeeks\x12\x16\n" +
-	"\x06status\x18\t \x01(\tR\x06status\"\xe5\x03\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12!\n" +
+	"\ftrigger_time\x18\n" +
+	" \x01(\tR\vtriggerTime\"\xe5\x03\n" +
 	"\x11TaskResultMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aplan_id\x18\x02 \x01(\tR\x06planId\x12\x10\n" +
@@ -2785,7 +2803,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\fopened_count\x18\x02 \x01(\x05R\vopenedCount\x12!\n" +
 	"\ffailed_count\x18\x03 \x01(\x05R\vfailedCount\x12#\n" +
 	"\rexpired_count\x18\x04 \x01(\x05R\fexpiredCount\x12.\n" +
-	"\x13expire_failed_count\x18\x05 \x01(\x05R\x11expireFailedCount\"\xf3\x01\n" +
+	"\x13expire_failed_count\x18\x05 \x01(\x05R\x11expireFailedCount\"\x96\x02\n" +
 	"\x11CreatePlanRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x1d\n" +
 	"\n" +
@@ -2796,7 +2814,8 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"totalTimes\x12\x1f\n" +
 	"\vfixed_dates\x18\x06 \x03(\tR\n" +
 	"fixedDates\x12%\n" +
-	"\x0erelative_weeks\x18\a \x03(\x05R\rrelativeWeeks\"H\n" +
+	"\x0erelative_weeks\x18\a \x03(\x05R\rrelativeWeeks\x12!\n" +
+	"\ftrigger_time\x18\b \x01(\tR\vtriggerTime\"H\n" +
 	"\x12CreatePlanResponse\x122\n" +
 	"\x04plan\x18\x01 \x01(\v2\x1e.internalapi.PlanResultMessageR\x04plan\"B\n" +
 	"\x10PausePlanRequest\x12\x15\n" +

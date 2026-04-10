@@ -160,6 +160,91 @@ func TestEnrollmentServicePublishesPlanTesteeEnrolledEvent(t *testing.T) {
 	}
 }
 
+func TestEnrollmentServiceSchedulesGeneratedTasksAtSevenPM(t *testing.T) {
+	ctx := context.Background()
+	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByDay, 1, 2)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+	planAggregate.ClearEvents()
+
+	taskRepo := &enrollmentTaskRepoStub{}
+	service := NewEnrollmentService(
+		&enrollmentPlanRepoStub{plan: planAggregate},
+		taskRepo,
+		&enrollmentEventPublisherStub{},
+	)
+
+	result, err := service.EnrollTestee(ctx, EnrollTesteeDTO{
+		OrgID:     9,
+		PlanID:    planAggregate.GetID().String(),
+		TesteeID:  "3010",
+		StartDate: "2026-04-03",
+	})
+	if err != nil {
+		t.Fatalf("EnrollTestee returned error: %v", err)
+	}
+
+	wantPlannedAt := []string{
+		"2026-04-03 19:00:00",
+		"2026-04-04 19:00:00",
+	}
+	if len(result.Tasks) != len(wantPlannedAt) {
+		t.Fatalf("expected %d tasks, got %d", len(wantPlannedAt), len(result.Tasks))
+	}
+	for i, want := range wantPlannedAt {
+		if result.Tasks[i].PlannedAt != want {
+			t.Fatalf("expected task %d planned_at %s, got %s", i+1, want, result.Tasks[i].PlannedAt)
+		}
+	}
+}
+
+func TestEnrollmentServiceSchedulesGeneratedTasksUsingPlanTriggerTime(t *testing.T) {
+	ctx := context.Background()
+	planAggregate, err := domainPlan.NewAssessmentPlan(
+		9,
+		"scale-code",
+		domainPlan.PlanScheduleByDay,
+		1,
+		2,
+		domainPlan.WithTriggerTime("08:30"),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+	planAggregate.ClearEvents()
+
+	taskRepo := &enrollmentTaskRepoStub{}
+	service := NewEnrollmentService(
+		&enrollmentPlanRepoStub{plan: planAggregate},
+		taskRepo,
+		&enrollmentEventPublisherStub{},
+	)
+
+	result, err := service.EnrollTestee(ctx, EnrollTesteeDTO{
+		OrgID:     9,
+		PlanID:    planAggregate.GetID().String(),
+		TesteeID:  "3011",
+		StartDate: "2026-04-03",
+	})
+	if err != nil {
+		t.Fatalf("EnrollTestee returned error: %v", err)
+	}
+
+	wantPlannedAt := []string{
+		"2026-04-03 08:30:00",
+		"2026-04-04 08:30:00",
+	}
+	if len(result.Tasks) != len(wantPlannedAt) {
+		t.Fatalf("expected %d tasks, got %d", len(wantPlannedAt), len(result.Tasks))
+	}
+	for i, want := range wantPlannedAt {
+		if result.Tasks[i].PlannedAt != want {
+			t.Fatalf("expected task %d planned_at %s, got %s", i+1, want, result.Tasks[i].PlannedAt)
+		}
+	}
+}
+
 func TestEnrollmentServicePublishesIdempotentEnrollEvent(t *testing.T) {
 	ctx := context.Background()
 	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByWeek, 1, 2)

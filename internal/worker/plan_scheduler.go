@@ -146,14 +146,9 @@ func (r *workerPlanSchedulerRunner) start(ctx context.Context) <-chan struct{} {
 
 		r.executeTick(ctx)
 
-		ticker := time.NewTicker(r.opts.Interval)
-		defer ticker.Stop()
-
 		for {
-			select {
-			case <-ctx.Done():
+			if !waitWorkerPlanSchedulerUntilNextTick(ctx, r.opts.Interval) {
 				return
-			case <-ticker.C:
 			}
 			r.executeTick(ctx)
 		}
@@ -231,4 +226,28 @@ func waitWorkerPlanSchedulerDelay(ctx context.Context, delay time.Duration) bool
 	case <-timer.C:
 		return true
 	}
+}
+
+func waitWorkerPlanSchedulerUntilNextTick(ctx context.Context, interval time.Duration) bool {
+	nextTickAt := nextWorkerPlanSchedulerTickTime(time.Now(), interval)
+	return waitWorkerPlanSchedulerDelay(ctx, time.Until(nextTickAt))
+}
+
+func nextWorkerPlanSchedulerTickTime(now time.Time, interval time.Duration) time.Time {
+	if interval <= 0 {
+		return now
+	}
+	if interval%time.Minute != 0 {
+		return now.Add(interval)
+	}
+
+	loc := now.Location()
+	if loc == nil {
+		loc = time.Local
+	}
+
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	currentMinute := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), 0, 0, loc)
+	nextOffset := (currentMinute.Sub(midnight)/interval + 1) * interval
+	return midnight.Add(nextOffset)
 }

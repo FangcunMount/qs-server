@@ -51,4 +51,7 @@ var (
 
 	// ErrInvalidCustomWeeks 无效的自定义周次列表
 	ErrInvalidCustomWeeks = errors.New("invalid custom weeks")
+
+	// ErrInvalidTriggerTime 无效的计划触发时间
+	ErrInvalidTriggerTime = errors.New("invalid trigger time")
 )
