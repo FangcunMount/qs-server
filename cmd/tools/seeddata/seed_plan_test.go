@@ -461,6 +461,7 @@ func TestStreamSamplePlanEnrollmentTesteesUsesPagedIteration(t *testing.T) {
 type planTaskCountProviderStub struct {
 	priorityStats map[string]planTesteeTaskPriority
 	taskLists     map[string][]TaskResponse
+	dueTaskLists  map[string][]TaskResponse
 	taskErrs      map[string]error
 }
 
@@ -490,6 +491,10 @@ func (s *planTaskCountProviderStub) EnrollTestee(ctx context.Context, req Enroll
 
 func (s *planTaskCountProviderStub) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
 	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) ListSchedulablePendingTasks(ctx context.Context, req ListSchedulablePendingTasksRequest) (*TaskListResponse, error) {
+	return buildStubDueTaskListResponse(s.dueTaskLists, req), nil
 }
 
 func (s *planTaskCountProviderStub) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
@@ -539,10 +544,15 @@ type pagedPlanSeedGatewayStub struct {
 	totalPages                 int
 	pageCalls                  []string
 	taskLists                  map[string][]TaskResponse
+	dueTaskLists               map[string][]TaskResponse
 	taskErrs                   map[string]error
 	listTaskCalls              []ListTasksRequest
+	listDuePendingTaskCalls    []ListSchedulablePendingTasksRequest
 	listTasksByPlanCallCount   int
 	listTasksByTesteePlanCalls []string
+	schedulePendingRequests    []SchedulePendingTasksRequest
+	scheduleTaskLists          map[string][]TaskResponse
+	expireTaskStatuses         map[string]string
 }
 
 func (s *pagedPlanSeedGatewayStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
@@ -578,7 +588,13 @@ func (s *pagedPlanSeedGatewayStub) EnrollTestee(ctx context.Context, req EnrollT
 }
 
 func (s *pagedPlanSeedGatewayStub) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
-	return nil, nil
+	s.schedulePendingRequests = append(s.schedulePendingRequests, req)
+	return buildStubTaskListResponseForTesteeIDs(s.scheduleTaskLists, req.PlanID, req.TesteeIDs), nil
+}
+
+func (s *pagedPlanSeedGatewayStub) ListSchedulablePendingTasks(ctx context.Context, req ListSchedulablePendingTasksRequest) (*TaskListResponse, error) {
+	s.listDuePendingTaskCalls = append(s.listDuePendingTaskCalls, req)
+	return buildStubDueTaskListResponse(s.dueTaskLists, req), nil
 }
 
 func (s *pagedPlanSeedGatewayStub) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
@@ -614,7 +630,13 @@ func (s *pagedPlanSeedGatewayStub) GetTask(ctx context.Context, taskID string) (
 }
 
 func (s *pagedPlanSeedGatewayStub) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
-	return nil, nil
+	status := "expired"
+	if s.expireTaskStatuses != nil {
+		if explicit, ok := s.expireTaskStatuses[taskID]; ok && strings.TrimSpace(explicit) != "" {
+			status = explicit
+		}
+	}
+	return &TaskResponse{ID: taskID, Status: status}, nil
 }
 
 func buildStubTaskListResponse(taskLists map[string][]TaskResponse, req ListTasksRequest) *TaskListResponse {
@@ -687,6 +709,110 @@ func buildStubTaskListResponse(taskLists map[string][]TaskResponse, req ListTask
 	return &TaskListResponse{
 		Tasks:      append([]TaskResponse(nil), filtered[start:end]...),
 		TotalCount: int64(len(filtered)),
+		Page:       page,
+		PageSize:   pageSize,
+	}
+}
+
+func buildStubTaskListResponseForTesteeIDs(taskLists map[string][]TaskResponse, planID string, testeeIDs []string) *TaskListResponse {
+	if len(testeeIDs) == 0 {
+		return buildStubTaskListResponse(taskLists, ListTasksRequest{PlanID: planID})
+	}
+	filteredLists := make(map[string][]TaskResponse, len(testeeIDs))
+	for _, testeeID := range testeeIDs {
+		testeeID = strings.TrimSpace(testeeID)
+		if testeeID == "" {
+			continue
+		}
+		if items, ok := taskLists[testeeID]; ok {
+			filteredLists[testeeID] = items
+		}
+	}
+	return buildStubTaskListResponse(filteredLists, ListTasksRequest{PlanID: planID})
+}
+
+func buildStubDueTaskListResponse(taskLists map[string][]TaskResponse, req ListSchedulablePendingTasksRequest) *TaskListResponse {
+	if taskLists == nil {
+		return &TaskListResponse{
+			Page:     max(req.Page, 1),
+			PageSize: max(req.PageSize, 1),
+		}
+	}
+
+	allTasks := make([]TaskResponse, 0)
+	allowedTestees := make(map[string]struct{}, len(req.TesteeIDs))
+	for _, testeeID := range req.TesteeIDs {
+		testeeID = strings.TrimSpace(testeeID)
+		if testeeID != "" {
+			allowedTestees[testeeID] = struct{}{}
+		}
+	}
+
+	for testeeID, items := range taskLists {
+		if len(allowedTestees) > 0 {
+			if _, ok := allowedTestees[testeeID]; !ok {
+				continue
+			}
+		}
+		for _, task := range items {
+			if strings.TrimSpace(task.TesteeID) == "" {
+				task.TesteeID = testeeID
+			}
+			if planID := strings.TrimSpace(req.PlanID); planID != "" && strings.TrimSpace(task.PlanID) != "" && strings.TrimSpace(task.PlanID) != planID {
+				continue
+			}
+			if normalizeTaskStatus(task.Status) != "pending" {
+				continue
+			}
+			plannedAt, err := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(task.PlannedAt), time.Local)
+			if err != nil {
+				continue
+			}
+			if !req.Before.IsZero() && plannedAt.After(req.Before) {
+				continue
+			}
+			allTasks = append(allTasks, task)
+		}
+	}
+
+	sort.SliceStable(allTasks, func(i, j int) bool {
+		leftTime, _ := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(allTasks[i].PlannedAt), time.Local)
+		rightTime, _ := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(allTasks[j].PlannedAt), time.Local)
+		if !leftTime.Equal(rightTime) {
+			return leftTime.Before(rightTime)
+		}
+		if allTasks[i].TesteeID != allTasks[j].TesteeID {
+			return allTasks[i].TesteeID < allTasks[j].TesteeID
+		}
+		if allTasks[i].Seq != allTasks[j].Seq {
+			return allTasks[i].Seq < allTasks[j].Seq
+		}
+		return allTasks[i].ID < allTasks[j].ID
+	})
+
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = len(allTasks)
+		if pageSize == 0 {
+			pageSize = 1
+		}
+	}
+	start := (page - 1) * pageSize
+	if start > len(allTasks) {
+		start = len(allTasks)
+	}
+	end := start + pageSize
+	if end > len(allTasks) {
+		end = len(allTasks)
+	}
+
+	return &TaskListResponse{
+		Tasks:      append([]TaskResponse(nil), allTasks[start:end]...),
+		TotalCount: int64(len(allTasks)),
 		Page:       page,
 		PageSize:   pageSize,
 	}
@@ -771,5 +897,147 @@ func TestCollectPlanTaskJobWindowByPlanUsesPagedOpenedTasks(t *testing.T) {
 	call := gateway.listTaskCalls[0]
 	if call.PlanID != planID || call.Status != "opened" || call.Page != 1 || call.PageSize != 2 {
 		t.Fatalf("unexpected list task request: %+v", call)
+	}
+}
+
+func TestRunPlanTaskProcessingCyclePrefersOpenedBacklogBeforeSchedulingPending(t *testing.T) {
+	planID := "614333603412718126"
+	now := time.Now()
+	gateway := &pagedPlanSeedGatewayStub{
+		taskLists: map[string][]TaskResponse{
+			"1001": {
+				{ID: "2001", PlanID: planID, TesteeID: "1001", Seq: 1, Status: "opened", PlannedAt: now.Add(-1 * time.Minute).Format(planTaskTimeLayout)},
+			},
+		},
+		dueTaskLists: map[string][]TaskResponse{
+			"1002": {
+				{ID: "3001", PlanID: planID, TesteeID: "1002", Seq: 1, Status: "pending", PlannedAt: now.Add(-2 * time.Minute).Format(planTaskTimeLayout)},
+			},
+		},
+		expireTaskStatuses: map[string]string{
+			"2001": "expired",
+		},
+	}
+	deps := &dependencies{Logger: newSeeddataLogger(false)}
+
+	stats, more, err := runPlanTaskProcessingCycle(
+		context.Background(),
+		gateway,
+		deps,
+		planID,
+		1,
+		"",
+		nil,
+		nil,
+		1,
+		1,
+		1,
+		4,
+		4,
+		4,
+		4,
+		1,
+		false,
+		nil,
+		newSeedPlanSubmitController(),
+		"seeddata-test",
+	)
+	if err != nil {
+		t.Fatalf("unexpected cycle error: %v", err)
+	}
+	if more {
+		t.Fatal("expected no remaining backlog after single opened task")
+	}
+	if stats.ExpiredCount != 1 {
+		t.Fatalf("expected one expired task from opened backlog, got %+v", stats)
+	}
+	if len(gateway.schedulePendingRequests) != 0 {
+		t.Fatalf("expected no pending scheduling while opened backlog exists, got %+v", gateway.schedulePendingRequests)
+	}
+	if len(gateway.listDuePendingTaskCalls) != 0 {
+		t.Fatalf("expected no pending discovery while opened backlog exists, got %+v", gateway.listDuePendingTaskCalls)
+	}
+}
+
+func TestRunPlanTaskProcessingCycleSchedulesPendingByScopedTesteeWindow(t *testing.T) {
+	planID := "614333603412718126"
+	now := time.Now()
+	gateway := &pagedPlanSeedGatewayStub{
+		dueTaskLists: map[string][]TaskResponse{
+			"1001": {
+				{ID: "3001", PlanID: planID, TesteeID: "1001", Seq: 1, Status: "pending", PlannedAt: now.Add(-3 * time.Minute).Format(planTaskTimeLayout)},
+			},
+			"1002": {
+				{ID: "3002", PlanID: planID, TesteeID: "1002", Seq: 1, Status: "pending", PlannedAt: now.Add(-2 * time.Minute).Format(planTaskTimeLayout)},
+			},
+			"1003": {
+				{ID: "3003", PlanID: planID, TesteeID: "1003", Seq: 1, Status: "pending", PlannedAt: now.Add(-1 * time.Minute).Format(planTaskTimeLayout)},
+			},
+		},
+		scheduleTaskLists: map[string][]TaskResponse{
+			"1001": {
+				{ID: "4001", PlanID: planID, TesteeID: "1001", Seq: 1, Status: "opened", PlannedAt: now.Add(-3 * time.Minute).Format(planTaskTimeLayout)},
+			},
+			"1002": {
+				{ID: "4002", PlanID: planID, TesteeID: "1002", Seq: 1, Status: "opened", PlannedAt: now.Add(-2 * time.Minute).Format(planTaskTimeLayout)},
+			},
+			"1003": {
+				{ID: "4003", PlanID: planID, TesteeID: "1003", Seq: 1, Status: "opened", PlannedAt: now.Add(-1 * time.Minute).Format(planTaskTimeLayout)},
+			},
+		},
+		expireTaskStatuses: map[string]string{
+			"4001": "expired",
+			"4002": "expired",
+			"4003": "expired",
+		},
+	}
+	deps := &dependencies{Logger: newSeeddataLogger(false)}
+
+	stats, more, err := runPlanTaskProcessingCycle(
+		context.Background(),
+		gateway,
+		deps,
+		planID,
+		1,
+		"",
+		nil,
+		nil,
+		1,
+		1,
+		1,
+		4,
+		4,
+		4,
+		2,
+		1,
+		false,
+		nil,
+		newSeedPlanSubmitController(),
+		"seeddata-test",
+	)
+	if err != nil {
+		t.Fatalf("unexpected cycle error: %v", err)
+	}
+	if len(gateway.listDuePendingTaskCalls) != 1 {
+		t.Fatalf("expected one paged due pending listing call, got %d", len(gateway.listDuePendingTaskCalls))
+	}
+	if len(gateway.schedulePendingRequests) != 1 {
+		t.Fatalf("expected one scoped schedule request, got %d", len(gateway.schedulePendingRequests))
+	}
+	req := gateway.schedulePendingRequests[0]
+	if req.PlanID != planID {
+		t.Fatalf("expected schedule request plan_id=%s, got %+v", planID, req)
+	}
+	if len(req.TesteeIDs) == 0 {
+		t.Fatalf("expected scoped schedule request to contain testee ids, got %+v", req)
+	}
+	if strings.Join(req.TesteeIDs, ",") != "1001,1002" {
+		t.Fatalf("unexpected scoped schedule ids: %+v", req.TesteeIDs)
+	}
+	if !more {
+		t.Fatal("expected more pending backlog after bounded scoped scheduling window")
+	}
+	if stats.ExpiredCount != 2 || stats.OpenedCount != 2 {
+		t.Fatalf("unexpected scheduled cycle stats: %+v", stats)
 	}
 }

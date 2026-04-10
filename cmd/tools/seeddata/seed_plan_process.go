@@ -112,11 +112,17 @@ func scheduleAndProcessPlanTasks(
 	submitWorkers, waitWorkers, maxInFlightTasks = normalizePlanTaskExecutionConcurrency(workers, submitWorkers, waitWorkers, maxInFlightTasks)
 	taskBufferSize := normalizePlanTaskBufferSize(submitWorkers, maxInFlightTasks)
 	discoveryLimit := max(taskBufferSize, maxInFlightTasks)
+	pendingScheduleScopeLimit := normalizePlanScheduleBatchSize(max(submitWorkers, waitWorkers))
+	if maxInFlightTasks > 0 && pendingScheduleScopeLimit > maxInFlightTasks {
+		pendingScheduleScopeLimit = maxInFlightTasks
+	}
+	if pendingScheduleScopeLimit <= 0 {
+		pendingScheduleScopeLimit = 1
+	}
 	submitController := newSeedPlanSubmitController()
 	aggregateStats := &seedPlanExecutionStats{
 		ScheduleStats: &TaskScheduleStatsResponse{},
 	}
-	schedulePending := true
 
 	if verbose {
 		deps.Logger.Infow("Running plan task execution pipeline",
@@ -128,6 +134,7 @@ func scheduleAndProcessPlanTasks(
 			"task_buffer_size", taskBufferSize,
 			"task_page_size", planProcessTaskPageSize,
 			"task_window_limit", discoveryLimit,
+			"pending_schedule_scope_limit", pendingScheduleScopeLimit,
 			"continuous", continuous,
 		)
 	}
@@ -148,9 +155,9 @@ func scheduleAndProcessPlanTasks(
 			taskBufferSize,
 			maxInFlightTasks,
 			discoveryLimit,
+			pendingScheduleScopeLimit,
 			planExpireRate,
 			verbose,
-			schedulePending,
 			&reservedOpenTask,
 			submitController,
 			scheduleSource,
@@ -161,7 +168,6 @@ func scheduleAndProcessPlanTasks(
 		if err != nil {
 			return aggregateStats, err
 		}
-		schedulePending = !more
 		if !continuous {
 			return aggregateStats, nil
 		}
@@ -271,9 +277,9 @@ func runPlanTaskProcessingCycle(
 	taskBufferSize int,
 	maxInFlightTasks int,
 	discoveryLimit int,
+	pendingScheduleScopeLimit int,
 	planExpireRate float64,
 	verbose bool,
-	schedulePending bool,
 	reservedOpenTask *atomic.Bool,
 	submitController *seedPlanSubmitController,
 	scheduleSource string,
@@ -314,34 +320,6 @@ func runPlanTaskProcessingCycle(
 	runBatch := func(batchIndex int, batchTesteeIDs []string) error {
 		dashboard.SetCurrentBatch(batchIndex)
 
-		if schedulePending {
-			scheduleResp, err := schedulePlanTaskBatch(ctx, gateway, deps, planID, orgID, scheduleSource, batchIndex, totalBatches, batchTesteeIDs, verbose)
-			if err != nil {
-				failedScheduleBatchCount.Add(1)
-				dashboard.IncrementScheduleFailures()
-				deps.Logger.Warnw("Skipping schedule batch after recovery attempts failed",
-					"plan_id", planID,
-					"org_id", orgID,
-					"batch_index", batchIndex,
-					"batch_count", totalBatches,
-					"batch_testee_count", len(batchTesteeIDs),
-					"error", err.Error(),
-				)
-				return nil
-			}
-
-			stats.OpenedCount += len(scheduleResp.Tasks)
-			dashboard.AddOpenedTasks(len(scheduleResp.Tasks))
-			mergeTaskScheduleStats(stats.ScheduleStats, scheduleResp.Stats)
-		} else if verbose {
-			deps.Logger.Debugw("Skipping pending task scheduling because opened backlog remains",
-				"plan_id", planID,
-				"batch_index", batchIndex,
-				"batch_count", totalBatches,
-				"batch_testee_count", len(batchTesteeIDs),
-			)
-		}
-
 		var (
 			taskJobs  []planTaskJob
 			batchMore bool
@@ -378,7 +356,58 @@ func runPlanTaskProcessingCycle(
 			moreDiscovered = true
 		}
 		if len(taskJobs) == 0 {
-			return nil
+			var scheduleBatchTesteeIDs []string
+			if len(batchTesteeIDs) == 0 {
+				scheduleBatchTesteeIDs, batchMore, err = collectSchedulablePendingTesteeWindowByPlan(
+					ctx,
+					gateway,
+					deps,
+					planID,
+					pendingScheduleScopeLimit,
+					verbose,
+					&skippedCount,
+					&failedTaskListCount,
+				)
+				if err != nil {
+					return err
+				}
+			} else {
+				scheduleBatchTesteeIDs = append([]string(nil), batchTesteeIDs...)
+			}
+			if batchMore {
+				moreDiscovered = true
+			}
+			if len(scheduleBatchTesteeIDs) == 0 {
+				return nil
+			}
+
+			scheduleResp, err := schedulePlanTaskBatch(ctx, gateway, deps, planID, orgID, scheduleSource, batchIndex, totalBatches, scheduleBatchTesteeIDs, verbose)
+			if err != nil {
+				failedScheduleBatchCount.Add(1)
+				dashboard.IncrementScheduleFailures()
+				deps.Logger.Warnw("Skipping schedule batch after recovery attempts failed",
+					"plan_id", planID,
+					"org_id", orgID,
+					"batch_index", batchIndex,
+					"batch_count", totalBatches,
+					"batch_testee_count", len(scheduleBatchTesteeIDs),
+					"error", err.Error(),
+				)
+				return nil
+			}
+
+			stats.OpenedCount += len(scheduleResp.Tasks)
+			dashboard.AddOpenedTasks(len(scheduleResp.Tasks))
+			mergeTaskScheduleStats(stats.ScheduleStats, scheduleResp.Stats)
+
+			taskJobs = appendPlanTaskJobsFromTasks(nil, scheduleResp.Tasks, "", planID, deps, verbose, &skippedCount)
+			if len(taskJobs) > discoveryLimit {
+				taskJobs = taskJobs[:discoveryLimit]
+				moreDiscovered = true
+			}
+			if len(taskJobs) == 0 {
+				return nil
+			}
 		}
 		dashboard.AddDiscoveredTasks(len(taskJobs))
 
@@ -973,6 +1002,93 @@ func collectPlanTaskJobWindowForTesteeIDs(
 	}
 
 	return taskJobs, false, nil
+}
+
+func collectSchedulablePendingTesteeWindowByPlan(
+	ctx context.Context,
+	gateway PlanSeedGateway,
+	deps *dependencies,
+	planID string,
+	scopeLimit int,
+	verbose bool,
+	skippedCount *atomic.Int64,
+	failedTaskListCount *atomic.Int64,
+) ([]string, bool, error) {
+	if scopeLimit <= 0 {
+		scopeLimit = 1
+	}
+
+	before := time.Now()
+	selectedIDs := make([]string, 0, scopeLimit)
+	seen := make(map[string]struct{}, scopeLimit)
+	resourceID := strings.TrimSpace(planID)
+	if resourceID == "" {
+		resourceID = "schedulable_pending_plan_tasks"
+	}
+
+	for page := 1; len(selectedIDs) < scopeLimit; page++ {
+		pageSize := min(planProcessTaskPageSize, scopeLimit-len(selectedIDs))
+		if pageSize <= 0 {
+			pageSize = 1
+		}
+
+		var taskList *TaskListResponse
+		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_schedulable_pending_plan_tasks", resourceID, func() error {
+			if err := waitForSeedPlanPacer(ctx, "list_schedulable_pending_plan_tasks"); err != nil {
+				return err
+			}
+			resp, err := gateway.ListSchedulablePendingTasks(ctx, ListSchedulablePendingTasksRequest{
+				PlanID:   planID,
+				Before:   before,
+				Page:     page,
+				PageSize: pageSize,
+			})
+			if err != nil {
+				return err
+			}
+			taskList = resp
+			return nil
+		})
+		if err != nil {
+			if failedTaskListCount != nil {
+				failedTaskListCount.Add(1)
+			}
+			return nil, false, err
+		}
+		if taskList == nil {
+			taskList = &TaskListResponse{}
+		}
+
+		for _, task := range taskList.Tasks {
+			testeeID := strings.TrimSpace(task.TesteeID)
+			if testeeID == "" {
+				if skippedCount != nil {
+					skippedCount.Add(1)
+				}
+				if verbose {
+					deps.Logger.Warnw("Skipping schedulable pending task without testee_id",
+						"plan_id", planID,
+						"task_id", task.ID,
+					)
+				}
+				continue
+			}
+			if _, ok := seen[testeeID]; ok {
+				continue
+			}
+			seen[testeeID] = struct{}{}
+			selectedIDs = append(selectedIDs, testeeID)
+			if len(selectedIDs) >= scopeLimit {
+				return selectedIDs[:scopeLimit], true, nil
+			}
+		}
+
+		if !hasMoreTaskListPages(taskList, page, pageSize) {
+			return selectedIDs, false, nil
+		}
+	}
+
+	return selectedIDs, false, nil
 }
 
 func collectPlanTaskJobsByPlan(

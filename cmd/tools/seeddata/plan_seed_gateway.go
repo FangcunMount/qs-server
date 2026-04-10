@@ -15,6 +15,7 @@ import (
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	apiservercontainer "github.com/FangcunMount/qs-server/internal/apiserver/container"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
@@ -39,12 +40,21 @@ type PlanSeedGateway interface {
 	GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error)
 	EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error)
 	SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error)
+	ListSchedulablePendingTasks(ctx context.Context, req ListSchedulablePendingTasksRequest) (*TaskListResponse, error)
 	ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error)
 	ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error)
 	ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error)
 	ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error)
 	GetTask(ctx context.Context, taskID string) (*TaskResponse, error)
 	ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error)
+}
+
+type ListSchedulablePendingTasksRequest struct {
+	PlanID    string
+	TesteeIDs []string
+	Before    time.Time
+	Page      int
+	PageSize  int
 }
 
 type planTaskPriorityProvider interface {
@@ -244,6 +254,87 @@ func (g *localPlanSeedGateway) SchedulePendingTasks(ctx context.Context, req Sch
 		return nil, err
 	}
 	return toSeedScheduledTaskListResponse(result), nil
+}
+
+func (g *localPlanSeedGateway) ListSchedulablePendingTasks(ctx context.Context, req ListSchedulablePendingTasksRequest) (*TaskListResponse, error) {
+	planID := strings.TrimSpace(req.PlanID)
+	if planID == "" {
+		return &TaskListResponse{}, nil
+	}
+
+	parsedPlanID, err := planDomain.ParseAssessmentPlanID(planID)
+	if err != nil {
+		return nil, fmt.Errorf("parse plan id %q: %w", planID, err)
+	}
+
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = planProcessTaskPageSize
+	}
+
+	before := req.Before
+	if before.IsZero() {
+		before = time.Now()
+	}
+
+	query := g.runtime.mysqlDB.WithContext(ctx).
+		Model(&planInfra.AssessmentTaskPO{}).
+		Where(
+			"org_id = ? AND plan_id = ? AND status = ? AND planned_at <= ? AND deleted_at IS NULL",
+			g.orgID,
+			parsedPlanID.Uint64(),
+			planDomain.TaskStatusPending.String(),
+			before,
+		)
+
+	if len(req.TesteeIDs) > 0 {
+		rawIDs := make([]uint64, 0, len(req.TesteeIDs))
+		for _, rawID := range req.TesteeIDs {
+			rawID = strings.TrimSpace(rawID)
+			if rawID == "" {
+				continue
+			}
+			value, err := strconv.ParseUint(rawID, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parse testee id %q: %w", rawID, err)
+			}
+			rawIDs = append(rawIDs, value)
+		}
+		if len(rawIDs) == 0 {
+			return &TaskListResponse{
+				Page:     page,
+				PageSize: pageSize,
+			}, nil
+		}
+		query = query.Where("testee_id IN ?", rawIDs)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	var pos []*planInfra.AssessmentTaskPO
+	offset := (page - 1) * pageSize
+	if err := query.
+		Order("planned_at ASC").
+		Order("id ASC").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&pos).Error; err != nil {
+		return nil, err
+	}
+
+	return &TaskListResponse{
+		Tasks:      toSeedTaskResponsesFromPOs(pos),
+		TotalCount: total,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
 }
 
 func (g *localPlanSeedGateway) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
@@ -549,6 +640,41 @@ func toSeedTaskResponse(result *planApp.TaskResult) *TaskResponse {
 	return resp
 }
 
+func toSeedTaskResponseFromPO(result *planInfra.AssessmentTaskPO) *TaskResponse {
+	if result == nil {
+		return nil
+	}
+	resp := &TaskResponse{
+		ID:         result.ID.String(),
+		PlanID:     strconv.FormatUint(result.PlanID, 10),
+		Seq:        result.Seq,
+		OrgID:      result.OrgID,
+		TesteeID:   strconv.FormatUint(result.TesteeID, 10),
+		ScaleCode:  result.ScaleCode,
+		PlannedAt:  result.PlannedAt.Format(planTaskTimeLayout),
+		Status:     result.Status,
+		EntryToken: result.EntryToken,
+		EntryURL:   result.EntryURL,
+	}
+	if result.OpenAt != nil {
+		openAt := result.OpenAt.Format(planTaskTimeLayout)
+		resp.OpenAt = &openAt
+	}
+	if result.ExpireAt != nil {
+		expireAt := result.ExpireAt.Format(planTaskTimeLayout)
+		resp.ExpireAt = &expireAt
+	}
+	if result.CompletedAt != nil {
+		completedAt := result.CompletedAt.Format(planTaskTimeLayout)
+		resp.CompletedAt = &completedAt
+	}
+	if result.AssessmentID != nil {
+		assessmentID := strconv.FormatUint(*result.AssessmentID, 10)
+		resp.AssessmentID = &assessmentID
+	}
+	return resp
+}
+
 func toSeedTaskResponses(results []*planApp.TaskResult) []TaskResponse {
 	if len(results) == 0 {
 		return nil
@@ -556,6 +682,19 @@ func toSeedTaskResponses(results []*planApp.TaskResult) []TaskResponse {
 	items := make([]TaskResponse, 0, len(results))
 	for _, result := range results {
 		if task := toSeedTaskResponse(result); task != nil {
+			items = append(items, *task)
+		}
+	}
+	return items
+}
+
+func toSeedTaskResponsesFromPOs(results []*planInfra.AssessmentTaskPO) []TaskResponse {
+	if len(results) == 0 {
+		return nil
+	}
+	items := make([]TaskResponse, 0, len(results))
+	for _, result := range results {
+		if task := toSeedTaskResponseFromPO(result); task != nil {
 			items = append(items, *task)
 		}
 	}
