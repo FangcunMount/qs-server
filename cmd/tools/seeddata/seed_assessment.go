@@ -240,7 +240,7 @@ func (d *assessmentDiagnostics) LogSubmitCompleted(payload submitLogPayload) {
 // seedAssessments runs a two-stage pipeline:
 // 1) load testees -> build answersheets
 // 2) submit answersheets -> write assessments
-func seedAssessments(ctx context.Context, deps *dependencies, seedCtx *seedContext, opts assessmentSeedOptions) error {
+func seedAssessments(ctx context.Context, deps *dependencies, opts assessmentSeedOptions) error {
 	logger := deps.Logger
 	client := deps.CollectionClient
 	if client == nil {

@@ -23,16 +23,12 @@ func seedPlanProcessTasks(
 	if deps.APIClient == nil {
 		return nil, fmt.Errorf("api client is not initialized")
 	}
-	if opts.PlanMode == planModeRemote && deps.CollectionClient == nil {
-		return nil, fmt.Errorf("collection client is not initialized")
-	}
 
 	logger := deps.Logger
 	planID := normalizePlanID(opts.PlanID)
 	planExpireRate := normalizePlanExpireRate(opts.PlanExpireRate)
 	logger.Infow("Plan task processing started",
 		"plan_id", planID,
-		"plan_mode", opts.PlanMode,
 		"org_id", deps.Config.Global.OrgID,
 		"plan_workers", opts.PlanWorkers,
 		"plan_submit_workers", opts.PlanSubmitWorkers,
@@ -44,7 +40,7 @@ func seedPlanProcessTasks(
 		"verbose", opts.Verbose,
 	)
 
-	session, err := openPlanSeedSession(ctx, deps, planID, opts.PlanMode, opts.Verbose)
+	session, err := openPlanSeedSession(ctx, deps, planID, opts.Verbose)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +56,6 @@ func seedPlanProcessTasks(
 		session.gateway,
 		deps,
 		session.planID,
-		session.planMode,
 		session.orgID,
 		scaleResp.QuestionnaireVersion,
 		detail,
@@ -100,7 +95,6 @@ func scheduleAndProcessPlanTasks(
 	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
-	planMode string,
 	orgID int64,
 	questionnaireVersion string,
 	detail *QuestionnaireDetailResponse,
@@ -144,7 +138,6 @@ func scheduleAndProcessPlanTasks(
 			gateway,
 			deps,
 			planID,
-			planMode,
 			orgID,
 			questionnaireVersion,
 			detail,
@@ -268,7 +261,6 @@ func runPlanTaskProcessingCycle(
 	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
-	planMode string,
 	orgID int64,
 	questionnaireVersion string,
 	detail *QuestionnaireDetailResponse,
@@ -306,7 +298,6 @@ func runPlanTaskProcessingCycle(
 		totalBatches = 1
 	}
 	dashboard := newPlanSeedDashboard(
-		planMode,
 		totalBatches,
 		&submittedCount,
 		&completedCount,
@@ -588,6 +579,7 @@ func runPlanTaskExecutionPipeline(
 					}
 					processPlanTaskWaitStage(
 						ctx,
+						gateway,
 						deps,
 						planID,
 						orgID,
@@ -743,7 +735,6 @@ func processPlanTaskSubmitStage(
 
 	currentInflight := inflightCount.Add(1)
 	updateMaxInFlightCounter(maxInflightObserved, currentInflight)
-	dashboard.Refresh()
 
 	releaseSlot := func() {
 		<-inflightSlots
@@ -785,7 +776,6 @@ func processPlanTaskSubmitStage(
 	submitController.OnSuccess()
 
 	submittedCount.Add(1)
-	dashboard.Refresh()
 
 	waitJob := planTaskWaitJob{
 		testeeID: job.testeeID,
@@ -803,6 +793,7 @@ func processPlanTaskSubmitStage(
 
 func processPlanTaskWaitStage(
 	ctx context.Context,
+	gateway PlanSeedGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -823,7 +814,7 @@ func processPlanTaskWaitStage(
 		dashboard.AdvanceTask()
 	}()
 
-	err := waitForTaskCompletion(ctx, deps.Logger, deps.APIClient, orgID, waitJob.task.ID, verbose)
+	err := waitForTaskCompletion(ctx, deps.Logger, gateway, orgID, waitJob.task.ID, verbose)
 	if err != nil {
 		failedTaskExecutionCount.Add(1)
 		if verbose {
@@ -848,7 +839,6 @@ func processPlanTaskWaitStage(
 			"attempts", waitJob.attempts,
 		)
 	}
-	dashboard.Refresh()
 }
 
 func collectPlanTaskJobsForTesteeIDs(
@@ -1301,7 +1291,9 @@ func buildPlanSubmissionRequest(
 func waitForTaskCompletion(
 	ctx context.Context,
 	logger interface{ Warnw(string, ...interface{}) },
-	client *APIClient,
+	client interface {
+		GetTask(context.Context, string) (*TaskResponse, error)
+	},
 	orgID int64,
 	taskID string,
 	verbose bool,

@@ -18,12 +18,11 @@ type planTesteeTaskPriority struct {
 }
 
 type planTesteeSelectionResult struct {
-	SelectedTestees     []*TesteeResponse
-	LoadedTesteeCount   int
-	SelectionMode       string
-	SampleRate          string
-	ExistingStats       *planTaskStatusStats
-	RecoveryFilterStats *recoveryPlanTesteeFilterStats
+	SelectedTestees   []*TesteeResponse
+	LoadedTesteeCount int
+	SelectionMode     string
+	SampleRate        string
+	ExistingStats     *planTaskStatusStats
 }
 
 type planTesteeSelector interface {
@@ -33,10 +32,6 @@ type planTesteeSelector interface {
 type explicitPlanTesteeSelector struct {
 	opts      planCreateOptions
 	testeeIDs []string
-}
-
-type recoveryPlanTesteeSelector struct {
-	opts planCreateOptions
 }
 
 type sampledPriorityPlanTesteeSelector struct {
@@ -49,9 +44,6 @@ func newPlanTesteeSelector(opts planCreateOptions, explicitPlanTesteeIDs []strin
 			opts:      opts,
 			testeeIDs: append([]string(nil), explicitPlanTesteeIDs...),
 		}
-	}
-	if opts.PlanProcessExistingOnly {
-		return recoveryPlanTesteeSelector{opts: opts}
 	}
 	return sampledPriorityPlanTesteeSelector{opts: opts}
 }
@@ -66,36 +58,6 @@ func (s explicitPlanTesteeSelector) Select(ctx context.Context, session *planSee
 		LoadedTesteeCount: len(selected),
 		SelectionMode:     "explicit",
 		SampleRate:        "all",
-	}, nil
-}
-
-func (s recoveryPlanTesteeSelector) Select(ctx context.Context, session *planSeedSession) (*planTesteeSelectionResult, error) {
-	pageSize := s.opts.TesteePageSize
-	if pageSize < 100 {
-		pageSize = 100
-	}
-	filtered, filterStats, loadedCount, err := streamFilterRecoveryPlanTestees(
-		ctx,
-		session.gateway,
-		session.logger,
-		session.orgID,
-		pageSize,
-		s.opts.TesteeOffset,
-		s.opts.TesteeLimit,
-		session.planID,
-		s.opts.PlanWorkers,
-		s.opts.Verbose,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &planTesteeSelectionResult{
-		SelectedTestees:     filtered,
-		LoadedTesteeCount:   loadedCount,
-		SelectionMode:       "recovery_all",
-		SampleRate:          "all",
-		ExistingStats:       filterStats.ExistingTaskStats,
-		RecoveryFilterStats: filterStats,
 	}, nil
 }
 
@@ -601,114 +563,6 @@ func inspectExistingPlanTasks(
 	return stats, nil
 }
 
-func filterRecoveryPlanTestees(
-	ctx context.Context,
-	gateway PlanSeedGateway,
-	logger interface {
-		Warnw(string, ...interface{})
-	},
-	planID string,
-	testees []*TesteeResponse,
-	workers int,
-	verbose bool,
-) ([]*TesteeResponse, *recoveryPlanTesteeFilterStats, error) {
-	stats := &planTaskStatusStats{}
-	filterStats := &recoveryPlanTesteeFilterStats{
-		ExistingTaskStats: stats,
-	}
-	retained := make([]*TesteeResponse, 0, len(testees))
-	workers = normalizePlanWorkers(workers, len(testees))
-	var mu sync.Mutex
-
-	err := runPlanTesteeWorkerPool(ctx, testees, workers, func(ctx context.Context, testee *TesteeResponse) error {
-		if testee == nil || strings.TrimSpace(testee.ID) == "" {
-			return nil
-		}
-		var taskList *TaskListResponse
-		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "inspect_recovery_plan_tasks", testee.ID, func() error {
-			if err := waitForSeedPlanPacer(ctx, "inspect_recovery_plan_tasks"); err != nil {
-				return err
-			}
-			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
-			if err != nil {
-				return err
-			}
-			taskList = resp
-			return nil
-		})
-
-		mu.Lock()
-		defer mu.Unlock()
-
-		if err != nil {
-			filterStats.RetainedUndeterminedTestees++
-			retained = append(retained, testee)
-			if verbose {
-				logger.Warnw("Keeping testee in recovery mode because initial plan task inspection failed",
-					"plan_id", planID,
-					"testee_id", testee.ID,
-					"error", err.Error(),
-				)
-			}
-			return nil
-		}
-
-		localStats := summarizePlanTaskStatuses(taskList.Tasks)
-		mergePlanTaskStatusStats(stats, localStats)
-		switch {
-		case localStats.Total == 0:
-			filterStats.FilteredNoTaskTestees++
-		case isRecoveryPlanCompleted(taskList.Tasks):
-			filterStats.FilteredCompletedPlanTestees++
-		default:
-			retained = append(retained, testee)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return retained, filterStats, nil
-}
-
-func streamFilterRecoveryPlanTestees(
-	ctx context.Context,
-	gateway PlanSeedGateway,
-	logger interface {
-		Warnw(string, ...interface{})
-	},
-	orgID int64,
-	pageSize, offset, limit int,
-	planID string,
-	workers int,
-	verbose bool,
-) ([]*TesteeResponse, *recoveryPlanTesteeFilterStats, int, error) {
-	retained := make([]*TesteeResponse, 0, 64)
-	aggregate := &recoveryPlanTesteeFilterStats{
-		ExistingTaskStats: &planTaskStatusStats{},
-	}
-	loadedCount := 0
-
-	err := iterateTesteesFromApiserver(ctx, gateway, orgID, pageSize, offset, limit, func(batch []*TesteeResponse) error {
-		loadedCount += len(batch)
-		batchWorkers := normalizePlanWorkers(workers, len(batch))
-		filtered, stats, err := filterRecoveryPlanTestees(ctx, gateway, logger, planID, batch, batchWorkers, verbose)
-		if err != nil {
-			return err
-		}
-		retained = append(retained, filtered...)
-		mergeRecoveryPlanTesteeFilterStats(aggregate, stats)
-		return nil
-	})
-	if err != nil {
-		return nil, nil, loadedCount, err
-	}
-
-	sortTesteesByCreatedAt(retained)
-	return retained, aggregate, loadedCount, nil
-}
-
 func summarizePlanTaskStatuses(tasks []TaskResponse) *planTaskStatusStats {
 	stats := &planTaskStatusStats{}
 	for _, task := range tasks {
@@ -729,36 +583,4 @@ func summarizePlanTaskStatuses(tasks []TaskResponse) *planTaskStatusStats {
 		}
 	}
 	return stats
-}
-
-func isRecoveryPlanCompleted(tasks []TaskResponse) bool {
-	if len(tasks) == 0 {
-		return false
-	}
-
-	maxSeq := 0
-	hasTask := false
-	for _, task := range tasks {
-		if !hasTask || task.Seq > maxSeq {
-			maxSeq = task.Seq
-			hasTask = true
-		}
-	}
-	if !hasTask {
-		return false
-	}
-
-	hasLastTask := false
-	for _, task := range tasks {
-		if task.Seq != maxSeq {
-			continue
-		}
-		hasLastTask = true
-		switch normalizeTaskStatus(task.Status) {
-		case "completed", "expired":
-		default:
-			return false
-		}
-	}
-	return hasLastTask
 }

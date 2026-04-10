@@ -10,7 +10,6 @@ import (
 func seedPlanBackfill(
 	ctx context.Context,
 	deps *dependencies,
-	_ *seedContext,
 	createOpts planCreateOptions,
 	processOpts planProcessOptions,
 ) error {
@@ -35,17 +34,15 @@ func seedPlanCreateTasks(
 	planID := normalizePlanID(opts.PlanID)
 	logger.Infow("Plan task creation started",
 		"plan_id", planID,
-		"plan_mode", opts.PlanMode,
 		"org_id", deps.Config.Global.OrgID,
 		"plan_workers", opts.PlanWorkers,
-		"plan_process_existing_only", opts.PlanProcessExistingOnly,
 		"testee_page_size", opts.TesteePageSize,
 		"testee_offset", opts.TesteeOffset,
 		"testee_limit", opts.TesteeLimit,
 		"verbose", opts.Verbose,
 	)
 
-	session, err := openPlanSeedSession(ctx, deps, planID, opts.PlanMode, opts.Verbose)
+	session, err := openPlanSeedSession(ctx, deps, planID, opts.Verbose)
 	if err != nil {
 		return nil, err
 	}
@@ -72,27 +69,7 @@ func seedPlanCreateTasks(
 		selectedTestees = selection.SelectedTestees
 		selectionMode = selection.SelectionMode
 		sampleRate = selection.SampleRate
-		existingStats = selection.ExistingStats
 		loadedTesteeCnt = selection.LoadedTesteeCount
-	}
-
-	if selection != nil && selection.RecoveryFilterStats != nil {
-		filterStats := selection.RecoveryFilterStats
-		logger.Infow("Inspected existing plan tasks before task creation",
-			"plan_id", session.planID,
-			"org_id", session.orgID,
-			"selected_testee_count", loadedTesteeCnt,
-			"existing_task_stats", existingStats,
-		)
-		logger.Infow("Filtered recovery-mode plan testees before task creation",
-			"plan_id", session.planID,
-			"org_id", session.orgID,
-			"selected_testee_count", loadedTesteeCnt,
-			"retained_testee_count", len(selectedTestees),
-			"filtered_completed_plan_testees", filterStats.FilteredCompletedPlanTestees,
-			"filtered_no_task_testees", filterStats.FilteredNoTaskTestees,
-			"retained_undetermined_testees", filterStats.RetainedUndeterminedTestees,
-		)
 	}
 
 	logger.Infow("Loaded testees for plan task creation",
@@ -104,55 +81,26 @@ func seedPlanCreateTasks(
 		"sample_rate", sampleRate,
 		"explicit_testee_ids", explicitPlanTesteeIDs,
 	)
-	if len(selectedTestees) == 0 && !opts.PlanProcessExistingOnly {
+	if len(selectedTestees) == 0 {
 		logger.Infow("No testees found for plan task creation", "plan_id", session.planID, "org_id", session.orgID)
 		return &seedPlanCreateResult{}, nil
 	}
 
 	inspectionWorkers := normalizePlanWorkers(opts.PlanWorkers, len(selectedTestees))
-	if opts.PlanProcessExistingOnly {
-		if existingStats == nil || existingStats.Total == 0 {
-			logger.Infow("No existing plan tasks found for recovery mode",
-				"plan_id", session.planID,
-				"org_id", session.orgID,
-				"selected_testee_count", loadedTesteeCnt,
-			)
-			return &seedPlanCreateResult{}, nil
-		}
-		if len(selectedTestees) == 0 {
-			logger.Infow("All recovery-mode testees were filtered out before scheduling",
-				"plan_id", session.planID,
-				"org_id", session.orgID,
-				"selected_testee_count", loadedTesteeCnt,
-			)
-			return &seedPlanCreateResult{}, nil
-		}
-	} else {
-		existingStats, err = inspectExistingPlanTasks(session.ctx, session.gateway, deps.Logger, session.planID, selectedTestees, inspectionWorkers, opts.Verbose)
-		if err != nil {
-			return nil, err
-		}
-		logger.Infow("Inspected existing plan tasks before task creation",
-			"plan_id", session.planID,
-			"org_id", session.orgID,
-			"selected_testee_count", len(selectedTestees),
-			"existing_task_stats", existingStats,
-		)
+	existingStats, err = inspectExistingPlanTasks(session.ctx, session.gateway, deps.Logger, session.planID, selectedTestees, inspectionWorkers, opts.Verbose)
+	if err != nil {
+		return nil, err
 	}
+	logger.Infow("Inspected existing plan tasks before task creation",
+		"plan_id", session.planID,
+		"org_id", session.orgID,
+		"selected_testee_count", len(selectedTestees),
+		"existing_task_stats", existingStats,
+	)
 
-	enrolledCount := 0
-	failedEnrollments := 0
-	if opts.PlanProcessExistingOnly {
-		logger.Infow("Skipping plan enrollment because recovery mode is enabled",
-			"plan_id", session.planID,
-			"org_id", session.orgID,
-			"selected_testee_count", len(selectedTestees),
-		)
-	} else {
-		enrolledCount, failedEnrollments, err = enrollPlanTesteesConcurrently(session.ctx, session.gateway, deps.Logger, session.planID, selectedTestees, opts.PlanWorkers, opts.Verbose)
-		if err != nil {
-			return nil, err
-		}
+	enrolledCount, failedEnrollments, err := enrollPlanTesteesConcurrently(session.ctx, session.gateway, deps.Logger, session.planID, selectedTestees, opts.PlanWorkers, opts.Verbose)
+	if err != nil {
+		return nil, err
 	}
 
 	logger.Infow("Plan task creation completed",

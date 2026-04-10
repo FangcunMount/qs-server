@@ -27,8 +27,6 @@ import (
 )
 
 const (
-	planModeLocal                = "local"
-	planModeRemote               = "remote"
 	defaultLocalPlanEntryBaseURL = "https://collect.fangcunmount.cn/entry"
 	localPlanTaskCountBatchSize  = 500
 )
@@ -53,98 +51,15 @@ type planTaskPriorityProvider interface {
 	GetPlanTaskPriorityByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]planTesteeTaskPriority, error)
 }
 
-func resolvePlanMode(cliMode string, configMode string) (string, error) {
-	mode := strings.ToLower(strings.TrimSpace(cliMode))
-	if mode == "" {
-		mode = strings.ToLower(strings.TrimSpace(configMode))
+func newPlanSeedGateway(ctx context.Context, deps *dependencies, silent bool) (PlanSeedGateway, func() error, error) {
+	runtime, err := newLocalPlanRuntime(ctx, deps.Config.Local, deps.Config.API.CollectionBaseURL, silent)
+	if err != nil {
+		return nil, nil, err
 	}
-	if mode == "" {
-		mode = planModeLocal
-	}
-	switch mode {
-	case planModeLocal, planModeRemote:
-		return mode, nil
-	default:
-		return "", fmt.Errorf("unsupported plan mode %q", mode)
-	}
-}
-
-func newPlanSeedGateway(ctx context.Context, deps *dependencies, mode string, silent bool) (PlanSeedGateway, func() error, error) {
-	switch mode {
-	case planModeRemote:
-		return &remotePlanSeedGateway{
-			api:        deps.APIClient,
-			collection: deps.CollectionClient,
-		}, func() error { return nil }, nil
-	case planModeLocal:
-		runtime, err := newLocalPlanRuntime(ctx, deps.Config.Local, deps.Config.API.CollectionBaseURL, silent)
-		if err != nil {
-			return nil, nil, err
-		}
-		return &localPlanSeedGateway{
-			orgID:   deps.Config.Global.OrgID,
-			runtime: runtime,
-		}, runtime.Cleanup, nil
-	default:
-		return nil, nil, fmt.Errorf("unsupported plan mode %q", mode)
-	}
-}
-
-type remotePlanSeedGateway struct {
-	api        *APIClient
-	collection *APIClient
-}
-
-func (g *remotePlanSeedGateway) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
-	return g.api.GetPlan(ctx, planID)
-}
-
-func (g *remotePlanSeedGateway) GetScale(ctx context.Context, code string) (*ScaleResponse, error) {
-	return g.collection.GetScale(ctx, code)
-}
-
-func (g *remotePlanSeedGateway) GetQuestionnaireDetail(ctx context.Context, code string) (*QuestionnaireDetailResponse, error) {
-	return g.collection.GetQuestionnaireDetail(ctx, code)
-}
-
-func (g *remotePlanSeedGateway) ListTesteesByOrg(ctx context.Context, orgID int64, page, pageSize int) (*ApiserverTesteeListResponse, error) {
-	return g.api.ListTesteesByOrg(ctx, orgID, page, pageSize)
-}
-
-func (g *remotePlanSeedGateway) GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error) {
-	return g.api.GetTesteeByID(ctx, testeeID)
-}
-
-func (g *remotePlanSeedGateway) EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error) {
-	return g.api.EnrollTestee(ctx, req)
-}
-
-func (g *remotePlanSeedGateway) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
-	return g.api.SchedulePendingTasks(ctx, req)
-}
-
-func (g *remotePlanSeedGateway) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
-	return g.api.ListTasksByPlan(ctx, planID)
-}
-
-func (g *remotePlanSeedGateway) ListTasks(ctx context.Context, req ListTasksRequest) (*TaskListResponse, error) {
-	return g.api.ListTasks(ctx, req)
-}
-
-func (g *remotePlanSeedGateway) ListTasksByTestee(ctx context.Context, testeeID string) (*TaskListResponse, error) {
-	return g.api.ListTasksByTestee(ctx, testeeID)
-}
-
-func (g *remotePlanSeedGateway) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
-	return g.api.ListTasksByTesteeAndPlan(ctx, testeeID, planID)
-}
-
-func (g *remotePlanSeedGateway) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
-	return g.api.GetTask(ctx, taskID)
-}
-
-func (g *remotePlanSeedGateway) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
-	return g.api.ExpireTask(ctx, taskID)
+	return &localPlanSeedGateway{
+		orgID:   deps.Config.Global.OrgID,
+		runtime: runtime,
+	}, runtime.Cleanup, nil
 }
 
 type localPlanRuntime struct {
@@ -158,16 +73,16 @@ type localPlanRuntime struct {
 
 func newLocalPlanRuntime(ctx context.Context, cfg LocalRuntimeConfig, collectionBaseURL string, silent bool) (*localPlanRuntime, error) {
 	if strings.TrimSpace(cfg.MySQLDSN) == "" {
-		return nil, fmt.Errorf("seeddata local.mysql_dsn is required when plan-mode=local")
+		return nil, fmt.Errorf("seeddata local.mysql_dsn is required for plan steps")
 	}
 	if strings.TrimSpace(cfg.MongoURI) == "" {
-		return nil, fmt.Errorf("seeddata local.mongo_uri is required when plan-mode=local")
+		return nil, fmt.Errorf("seeddata local.mongo_uri is required for plan steps")
 	}
 	if strings.TrimSpace(cfg.MongoDatabase) == "" {
-		return nil, fmt.Errorf("seeddata local.mongo_database is required when plan-mode=local")
+		return nil, fmt.Errorf("seeddata local.mongo_database is required for plan steps")
 	}
 	if strings.TrimSpace(cfg.RedisAddr) == "" {
-		return nil, fmt.Errorf("seeddata local.redis_addr is required when plan-mode=local")
+		return nil, fmt.Errorf("seeddata local.redis_addr is required for plan steps")
 	}
 
 	mysqlDB, err := openLocalSeedMySQL(cfg.MySQLDSN)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -243,14 +242,9 @@ func TestNewPlanTesteeSelector(t *testing.T) {
 	}{
 		{
 			name:        "explicit selector",
-			opts:        planCreateOptions{PlanProcessExistingOnly: false},
+			opts:        planCreateOptions{},
 			explicitIDs: []string{"1001"},
 			wantType:    "main.explicitPlanTesteeSelector",
-		},
-		{
-			name:     "recovery selector",
-			opts:     planCreateOptions{PlanProcessExistingOnly: true},
-			wantType: "main.recoveryPlanTesteeSelector",
 		},
 		{
 			name:     "sampled selector",
@@ -297,165 +291,6 @@ func TestMergePlanTaskStatusStats(t *testing.T) {
 
 	if dst.Total != 5 || dst.Pending != 1 || dst.Opened != 1 || dst.Completed != 2 || dst.Expired != 1 {
 		t.Fatalf("unexpected merged stats: %+v", dst)
-	}
-}
-
-func TestIsRecoveryPlanCompleted(t *testing.T) {
-	tests := []struct {
-		name  string
-		tasks []TaskResponse
-		want  bool
-	}{
-		{
-			name: "last seq completed",
-			tasks: []TaskResponse{
-				{Seq: 1, Status: "completed"},
-				{Seq: 2, Status: "completed"},
-			},
-			want: true,
-		},
-		{
-			name: "last seq expired",
-			tasks: []TaskResponse{
-				{Seq: 1, Status: "completed"},
-				{Seq: 2, Status: "expired"},
-			},
-			want: true,
-		},
-		{
-			name: "last seq opened",
-			tasks: []TaskResponse{
-				{Seq: 1, Status: "completed"},
-				{Seq: 2, Status: "opened"},
-			},
-			want: false,
-		},
-		{
-			name: "mixed terminal statuses at last seq",
-			tasks: []TaskResponse{
-				{Seq: 1, Status: "completed"},
-				{Seq: 2, Status: "completed"},
-				{Seq: 2, Status: "expired"},
-			},
-			want: true,
-		},
-		{
-			name: "last seq contains opened duplicate",
-			tasks: []TaskResponse{
-				{Seq: 1, Status: "completed"},
-				{Seq: 2, Status: "completed"},
-				{Seq: 2, Status: "opened"},
-			},
-			want: false,
-		},
-		{
-			name: "last seq canceled is not treated as completed",
-			tasks: []TaskResponse{
-				{Seq: 1, Status: "completed"},
-				{Seq: 2, Status: "canceled"},
-			},
-			want: false,
-		},
-		{
-			name: "empty task list",
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isRecoveryPlanCompleted(tt.tasks); got != tt.want {
-				t.Fatalf("isRecoveryPlanCompleted(%+v)=%v, want=%v", tt.tasks, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFilterRecoveryPlanTestees(t *testing.T) {
-	testees := []*TesteeResponse{
-		{ID: "1001"},
-		{ID: "1002"},
-		{ID: "1003"},
-		{ID: "1004"},
-		{ID: "1005"},
-	}
-	gateway := &planTaskCountProviderStub{
-		taskLists: map[string][]TaskResponse{
-			"1001": {
-				{ID: "2001", Seq: 1, Status: "completed"},
-				{ID: "2002", Seq: 2, Status: "completed"},
-			},
-			"1002": {
-				{ID: "2003", Seq: 1, Status: "completed"},
-				{ID: "2004", Seq: 2, Status: "expired"},
-			},
-			"1003": {
-				{ID: "2005", Seq: 1, Status: "completed"},
-				{ID: "2006", Seq: 2, Status: "opened"},
-			},
-			"1004": {},
-		},
-		taskErrs: map[string]error{
-			"1005": errors.New("temporary timeout"),
-		},
-	}
-
-	filtered, stats, err := filterRecoveryPlanTestees(context.Background(), gateway, noopSeedLogger{}, "614333603412718126", testees, 2, false)
-	if err != nil {
-		t.Fatalf("unexpected filter error: %v", err)
-	}
-
-	gotIDs := make([]string, 0, len(filtered))
-	for _, testee := range filtered {
-		gotIDs = append(gotIDs, testee.ID)
-	}
-	sort.Strings(gotIDs)
-	wantIDs := []string{"1003", "1005"}
-	if strings.Join(gotIDs, ",") != strings.Join(wantIDs, ",") {
-		t.Fatalf("unexpected filtered ids: got=%v want=%v", gotIDs, wantIDs)
-	}
-
-	if stats.FilteredCompletedPlanTestees != 2 || stats.FilteredNoTaskTestees != 1 || stats.RetainedUndeterminedTestees != 1 {
-		t.Fatalf("unexpected recovery filter stats: %+v", stats)
-	}
-	if stats.ExistingTaskStats == nil {
-		t.Fatal("expected existing task stats")
-	}
-	if stats.ExistingTaskStats.Total != 6 || stats.ExistingTaskStats.Completed != 4 || stats.ExistingTaskStats.Expired != 1 || stats.ExistingTaskStats.Opened != 1 {
-		t.Fatalf("unexpected existing task stats: %+v", stats.ExistingTaskStats)
-	}
-}
-
-func TestResolvePlanMode(t *testing.T) {
-	tests := []struct {
-		name    string
-		cli     string
-		cfg     string
-		want    string
-		wantErr bool
-	}{
-		{name: "default local", cli: "", cfg: "", want: planModeLocal},
-		{name: "config remote", cli: "", cfg: planModeRemote, want: planModeRemote},
-		{name: "cli overrides config", cli: planModeLocal, cfg: planModeRemote, want: planModeLocal},
-		{name: "invalid mode", cli: "bad", cfg: "", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePlanMode(tt.cli, tt.cfg)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("resolvePlanMode(%q, %q)=%q, want=%q", tt.cli, tt.cfg, got, tt.want)
-			}
-		})
 	}
 }
 
@@ -620,70 +455,6 @@ func TestStreamSamplePlanEnrollmentTesteesUsesPagedIteration(t *testing.T) {
 	}
 	if got := strings.Join(client.pageCalls, ","); got != "1,2,3" {
 		t.Fatalf("expected paged calls 1,2,3, got %s", got)
-	}
-}
-
-func TestStreamFilterRecoveryPlanTesteesUsesPagedFiltering(t *testing.T) {
-	base := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
-	gateway := &pagedPlanSeedGatewayStub{
-		pages: map[int][]*ApiserverTesteeResponse{
-			1: {
-				{ID: "1001", CreatedAt: base.Add(1 * time.Minute)},
-				{ID: "1002", CreatedAt: base.Add(2 * time.Minute)},
-			},
-			2: {
-				{ID: "1003", CreatedAt: base.Add(3 * time.Minute)},
-				{ID: "1004", CreatedAt: base.Add(4 * time.Minute)},
-			},
-			3: {
-				{ID: "1005", CreatedAt: base.Add(5 * time.Minute)},
-				{ID: "1006", CreatedAt: base.Add(6 * time.Minute)},
-			},
-		},
-		totalPages: 3,
-		taskLists: map[string][]TaskResponse{
-			"1001": {{ID: "t1", Seq: 1, Status: "completed"}},
-			"1002": {{ID: "t2", Seq: 1, Status: "opened"}},
-			"1003": {},
-			"1004": {{ID: "t4", Seq: 1, Status: "expired"}},
-			"1005": {{ID: "t5", Seq: 1, Status: "pending"}},
-			"1006": {{ID: "t6", Seq: 1, Status: "completed"}},
-		},
-	}
-
-	retained, stats, loadedCount, err := streamFilterRecoveryPlanTestees(
-		context.Background(),
-		gateway,
-		noopSeedLogger{},
-		1,
-		2,
-		0,
-		0,
-		"614333603412718126",
-		1,
-		false,
-	)
-	if err != nil {
-		t.Fatalf("unexpected stream filter error: %v", err)
-	}
-	if loadedCount != 6 {
-		t.Fatalf("expected loadedCount=6, got %d", loadedCount)
-	}
-	if stats == nil || stats.ExistingTaskStats == nil {
-		t.Fatal("expected aggregate filter stats")
-	}
-	gotIDs := make([]string, 0, len(retained))
-	for _, testee := range retained {
-		gotIDs = append(gotIDs, testee.ID)
-	}
-	if got := strings.Join(gotIDs, ","); got != "1002,1005" {
-		t.Fatalf("unexpected retained ids: got=%s want=1002,1005", got)
-	}
-	if got := strings.Join(gateway.pageCalls, ","); got != "1,2,3" {
-		t.Fatalf("expected paged calls 1,2,3, got %s", got)
-	}
-	if stats.FilteredCompletedPlanTestees != 3 || stats.FilteredNoTaskTestees != 1 || stats.RetainedUndeterminedTestees != 0 {
-		t.Fatalf("unexpected filter stats: %+v", stats)
 	}
 }
 

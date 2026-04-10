@@ -15,7 +15,6 @@ type planSeedSession struct {
 	logger         log.Logger
 	orgID          int64
 	planID         string
-	planMode       string
 	gateway        PlanSeedGateway
 	cleanupGateway func() error
 	plan           *PlanResponse
@@ -25,7 +24,6 @@ func openPlanSeedSession(
 	ctx context.Context,
 	deps *dependencies,
 	planID string,
-	planMode string,
 	verbose bool,
 ) (*planSeedSession, error) {
 	if deps == nil {
@@ -53,9 +51,9 @@ func openPlanSeedSession(
 	)
 	prewarmAPIToken(ctx, deps.APIClient, orgID, logger)
 
-	gateway, cleanupGateway, err := newPlanSeedGateway(ctx, deps, planMode, !verbose)
+	gateway, cleanupGateway, err := newPlanSeedGateway(ctx, deps, !verbose)
 	if err != nil {
-		return nil, fmt.Errorf("initialize plan seed gateway (%s): %w", planMode, err)
+		return nil, fmt.Errorf("initialize local plan seed gateway: %w", err)
 	}
 
 	closeOnError := func() {
@@ -63,7 +61,6 @@ func openPlanSeedSession(
 			if cleanupErr := cleanupGateway(); cleanupErr != nil {
 				logger.Warnw("Failed to cleanup plan seed gateway",
 					"plan_id", planID,
-					"plan_mode", planMode,
 					"error", cleanupErr.Error(),
 				)
 			}
@@ -73,10 +70,7 @@ func openPlanSeedSession(
 	planResp, err := gateway.GetPlan(ctx, planID)
 	if err != nil {
 		closeOnError()
-		if planMode == planModeLocal {
-			return nil, fmt.Errorf("load plan %s in local mode: %w; local mode reads plan data from --local-mysql-dsn/--local-mongo-uri/--local-redis-* instead of %s, so verify those local connections point to the environment that contains this plan or rerun with --plan-mode remote", planID, err, strings.TrimSpace(deps.APIClient.baseURL))
-		}
-		return nil, fmt.Errorf("load plan %s: %w", planID, err)
+		return nil, fmt.Errorf("load plan %s from local runtime: %w; seeddata plan steps read plan data from --local-mysql-dsn/--local-mongo-uri/--local-redis-* instead of %s, so verify those local connections point to the environment that contains this plan", planID, err, strings.TrimSpace(deps.APIClient.baseURL))
 	}
 	if planResp == nil {
 		closeOnError()
@@ -97,7 +91,6 @@ func openPlanSeedSession(
 		logger:         logger,
 		orgID:          orgID,
 		planID:         planID,
-		planMode:       planMode,
 		gateway:        gateway,
 		cleanupGateway: cleanupGateway,
 		plan:           planResp,
@@ -111,7 +104,6 @@ func (s *planSeedSession) Close() {
 	if err := s.cleanupGateway(); err != nil {
 		s.logger.Warnw("Failed to cleanup plan seed gateway",
 			"plan_id", s.planID,
-			"plan_mode", s.planMode,
 			"error", err.Error(),
 		)
 	}

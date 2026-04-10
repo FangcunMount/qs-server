@@ -167,13 +167,6 @@ type planTaskStatusStats struct {
 	Unknown   int `json:"unknown"`
 }
 
-type recoveryPlanTesteeFilterStats struct {
-	ExistingTaskStats            *planTaskStatusStats `json:"existing_task_stats"`
-	FilteredCompletedPlanTestees int                  `json:"filtered_completed_plan_testees"`
-	FilteredNoTaskTestees        int                  `json:"filtered_no_task_testees"`
-	RetainedUndeterminedTestees  int                  `json:"retained_undetermined_testees"`
-}
-
 type seedPlanExecutionStats struct {
 	OpenedCount           int
 	ScheduleStats         *TaskScheduleStatsResponse
@@ -331,19 +324,6 @@ func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats
 	dst.Expired += src.Expired
 	dst.Canceled += src.Canceled
 	dst.Unknown += src.Unknown
-}
-
-func mergeRecoveryPlanTesteeFilterStats(dst *recoveryPlanTesteeFilterStats, src *recoveryPlanTesteeFilterStats) {
-	if dst == nil || src == nil {
-		return
-	}
-	if dst.ExistingTaskStats == nil {
-		dst.ExistingTaskStats = &planTaskStatusStats{}
-	}
-	mergePlanTaskStatusStats(dst.ExistingTaskStats, src.ExistingTaskStats)
-	dst.FilteredCompletedPlanTestees += src.FilteredCompletedPlanTestees
-	dst.FilteredNoTaskTestees += src.FilteredNoTaskTestees
-	dst.RetainedUndeterminedTestees += src.RetainedUndeterminedTestees
 }
 
 func mergeTaskScheduleStats(dst *TaskScheduleStatsResponse, src *TaskScheduleStatsResponse) {
@@ -509,7 +489,6 @@ type planSeedDashboard struct {
 	finished             bool
 	startedAt            time.Time
 	stopCh               chan struct{}
-	planMode             string
 	totalBatches         int
 	currentBatch         int
 	openedTasks          int
@@ -529,7 +508,6 @@ type planSeedDashboard struct {
 const planSeedDashboardRenderInterval = 5 * time.Second
 
 func newPlanSeedDashboard(
-	planMode string,
 	totalBatches int,
 	submitted *atomic.Int64,
 	completed *atomic.Int64,
@@ -545,7 +523,6 @@ func newPlanSeedDashboard(
 		enabled:          enabled,
 		startedAt:        time.Now(),
 		stopCh:           make(chan struct{}),
-		planMode:         strings.TrimSpace(planMode),
 		totalBatches:     totalBatches,
 		submitted:        submitted,
 		completed:        completed,
@@ -655,17 +632,6 @@ func (d *planSeedDashboard) AdvanceTask() {
 	}
 }
 
-func (d *planSeedDashboard) Refresh() {
-	if d == nil || !d.enabled {
-		return
-	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.finished {
-		return
-	}
-}
-
 func (d *planSeedDashboard) Finish() {
 	if d == nil || !d.enabled {
 		return
@@ -689,8 +655,7 @@ func (d *planSeedDashboard) renderLocked() {
 
 	elapsed := time.Since(d.startedAt).Round(time.Second)
 	planLine := fmt.Sprintf(
-		"plan(%s)      [%s] %d/%d batches elapsed=%s opened=%d schedule_failures=%d",
-		d.planModeLabel(),
+		"plan           [%s] %d/%d batches elapsed=%s opened=%d schedule_failures=%d",
 		renderDashboardBar(d.currentBatch, d.totalBatches, 24),
 		d.currentBatch,
 		max(d.totalBatches, 0),
@@ -702,7 +667,7 @@ func (d *planSeedDashboard) renderLocked() {
 	inflight := atomicLoadInt64(d.inflight)
 	maxInflight := atomicLoadInt64(d.maxInflight)
 	taskLine := fmt.Sprintf(
-		"task-flow(remote) [%s] %d/%d tasks inflight=%d max=%d",
+		"task-flow      [%s] %d/%d tasks inflight=%d max=%d",
 		renderDashboardBar(d.processedTasks, d.discoveredTasks, 24),
 		d.processedTasks,
 		d.discoveredTasks,
@@ -721,14 +686,6 @@ func (d *planSeedDashboard) renderLocked() {
 	)
 
 	fmt.Fprintf(os.Stderr, "%s\n%s\n%s\n", planLine, taskLine, statsLine)
-}
-
-func (d *planSeedDashboard) planModeLabel() string {
-	mode := strings.ToLower(strings.TrimSpace(d.planMode))
-	if mode == "" {
-		return "unknown"
-	}
-	return mode
 }
 
 func renderDashboardBar(current, total, width int) string {

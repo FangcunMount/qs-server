@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -141,6 +143,70 @@ func TestSeedTokenProviderFailsWhenExpiredTokenCannotRefresh(t *testing.T) {
 	}
 	if got, want := err.Error(), "refresh api token before request"; got == "" || !containsString(got, want) {
 		t.Fatalf("expected error to contain %q, got %q", want, got)
+	}
+}
+
+func TestAPIClientRefreshesAndRetriesOnceAfterUnauthorized(t *testing.T) {
+	const staleToken = "stale-token"
+	const freshToken = "fresh-token"
+
+	var staleRequests atomic.Int32
+	var freshRequests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Header.Get("Authorization") {
+		case "Bearer " + staleToken:
+			staleRequests.Add(1)
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(Response{
+				Code:    40101,
+				Message: "token expired",
+			})
+		case "Bearer " + freshToken:
+			freshRequests.Add(1)
+			_ = json.NewEncoder(w).Encode(Response{
+				Code:    0,
+				Message: "ok",
+				Data: map[string]any{
+					"ok": true,
+				},
+			})
+		default:
+			t.Fatalf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+		}
+	}))
+	defer server.Close()
+
+	var refreshCalls atomic.Int32
+	refresher := func(ctx context.Context) (string, error) {
+		refreshCalls.Add(1)
+		return freshToken, nil
+	}
+	provider := newSeedTokenProvider(staleToken, refresher)
+
+	logger := log.L(context.Background())
+	client := NewAPIClient(server.URL, staleToken, logger)
+	client.SetTokenProvider(provider)
+	client.SetTokenRefresher(refresher)
+
+	resp, err := client.doRequest(context.Background(), http.MethodGet, "/api/v1/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected request error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if got := refreshCalls.Load(); got != 1 {
+		t.Fatalf("expected one refresh call after 401, got %d", got)
+	}
+	if got := staleRequests.Load(); got != 1 {
+		t.Fatalf("expected one stale-token request, got %d", got)
+	}
+	if got := freshRequests.Load(); got != 1 {
+		t.Fatalf("expected one fresh-token retry request, got %d", got)
+	}
+	if got := client.getToken(); got != freshToken {
+		t.Fatalf("expected client token to update after refresh, got %q", got)
 	}
 }
 

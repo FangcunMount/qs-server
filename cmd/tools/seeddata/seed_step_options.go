@@ -15,20 +15,17 @@ type assessmentSeedOptions struct {
 }
 
 type planCreateOptions struct {
-	PlanID                  string
-	PlanMode                string
-	PlanTesteeIDsRaw        string
-	PlanWorkers             int
-	PlanProcessExistingOnly bool
-	TesteePageSize          int
-	TesteeOffset            int
-	TesteeLimit             int
-	Verbose                 bool
+	PlanID           string
+	PlanTesteeIDsRaw string
+	PlanWorkers      int
+	TesteePageSize   int
+	TesteeOffset     int
+	TesteeLimit      int
+	Verbose          bool
 }
 
 type planProcessOptions struct {
 	PlanID               string
-	PlanMode             string
 	ScopeTesteeIDs       []string
 	PlanWorkers          int
 	PlanSubmitWorkers    int

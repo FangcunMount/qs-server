@@ -65,28 +65,6 @@ type dependencies struct {
 	CollectionClient *APIClient  // 采集端 HTTP API 客户端
 }
 
-// seedContext holds the state and references created during seeding.
-// This allows later steps to reference entities created by earlier steps.
-type seedContext struct {
-	// 受试者映射：name -> ID
-	TesteeIDsByName map[string]string
-
-	// 问卷映射：code -> version
-	QuestionnaireVersionsByCode map[string]string
-
-	// 量表映射：code -> ID
-	ScaleIDsByCode map[string]string
-}
-
-// newSeedContext creates a new seed context with initialized maps.
-func newSeedContext() *seedContext {
-	return &seedContext{
-		TesteeIDsByName:             make(map[string]string),
-		QuestionnaireVersionsByCode: make(map[string]string),
-		ScaleIDsByCode:              make(map[string]string),
-	}
-}
-
 // ==================== 主程序入口 ====================
 
 func main() {
@@ -98,22 +76,20 @@ func main() {
 		configFile              = flag.String("config", "", "Base seed data config file (testees, legacy data)")
 		stepsRaw                = flag.String("steps", "", "Comma-separated steps to run (default: all)")
 		planID                  = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
-		planMode                = flag.String("plan-mode", "", "Plan backfill mode: local or remote (default: local)")
 		planWorkers             = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
 		planSubmitWorkers       = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
 		planWaitWorkers         = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
 		planMaxInFlightTasks    = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
 		planExpireRate          = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
 		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
-		planProcessExistingOnly = flag.Bool("plan-process-existing-only", false, "Skip enrollment and only schedule/process existing plan tasks for the selected testees")
-		localMySQLDSN           = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override (used when --plan-mode=local)")
-		localMongoURI           = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override (used when --plan-mode=local)")
-		localMongoDatabase      = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override (used when --plan-mode=local)")
-		localRedisAddr          = flag.String("local-redis-addr", "", "Local seed_plan Redis address override (used when --plan-mode=local)")
-		localRedisUsername      = flag.String("local-redis-username", "", "Local seed_plan Redis username override (used when --plan-mode=local)")
-		localRedisPassword      = flag.String("local-redis-password", "", "Local seed_plan Redis password override (used when --plan-mode=local)")
-		localRedisDB            = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override (used when --plan-mode=local)")
-		localPlanEntryBaseURL   = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override (used when --plan-mode=local)")
+		localMySQLDSN           = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override")
+		localMongoURI           = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override")
+		localMongoDatabase      = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override")
+		localRedisAddr          = flag.String("local-redis-addr", "", "Local seed_plan Redis address override")
+		localRedisUsername      = flag.String("local-redis-username", "", "Local seed_plan Redis username override")
+		localRedisPassword      = flag.String("local-redis-password", "", "Local seed_plan Redis password override")
+		localRedisDB            = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override")
+		localPlanEntryBaseURL   = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override")
 		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
 		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
@@ -237,19 +213,13 @@ func main() {
 
 	logger.Infow("Starting seed process", "steps", stepListToStrings(steps))
 
-	// 创建上下文
-	seedCtx := newSeedContext()
 	runCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	if containsSeedStep(steps, stepAssessment) && (*assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin) {
 		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
 	}
-	resolvedPlanMode, err := resolvePlanMode(*planMode, config.Plan.Mode)
-	if err != nil {
-		logger.Fatalw("Invalid plan mode", "error", err)
-	}
-	configureSeeddataGlobalLog(*verbose, shouldQuietSeedPlanComponentLogs(steps, resolvedPlanMode))
+	configureSeeddataGlobalLog(*verbose, shouldQuietSeedPlanComponentLogs(steps))
 
 	assessmentOpts := assessmentSeedOptions{
 		MinPerTestee:      *assessmentMin,
@@ -263,19 +233,16 @@ func main() {
 		Verbose:           *verbose,
 	}
 	planCreateOpts := planCreateOptions{
-		PlanID:                  *planID,
-		PlanMode:                resolvedPlanMode,
-		PlanTesteeIDsRaw:        *planTesteeIDsRaw,
-		PlanWorkers:             *planWorkers,
-		PlanProcessExistingOnly: *planProcessExistingOnly,
-		TesteePageSize:          *testeePageSize,
-		TesteeOffset:            *testeeOffset,
-		TesteeLimit:             *testeeLimit,
-		Verbose:                 *verbose,
+		PlanID:           *planID,
+		PlanTesteeIDsRaw: *planTesteeIDsRaw,
+		PlanWorkers:      *planWorkers,
+		TesteePageSize:   *testeePageSize,
+		TesteeOffset:     *testeeOffset,
+		TesteeLimit:      *testeeLimit,
+		Verbose:          *verbose,
 	}
 	planProcessOpts := planProcessOptions{
 		PlanID:               *planID,
-		PlanMode:             resolvedPlanMode,
 		ScopeTesteeIDs:       parsePlanTesteeIDs(*planTesteeIDsRaw),
 		PlanWorkers:          *planWorkers,
 		PlanSubmitWorkers:    *planSubmitWorkers,
@@ -289,11 +256,11 @@ func main() {
 	for _, step := range steps {
 		switch step {
 		case stepAssessment:
-			if err := seedAssessments(runCtx, deps, seedCtx, assessmentOpts); err != nil {
+			if err := seedAssessments(runCtx, deps, assessmentOpts); err != nil {
 				logger.Fatalw("Assessment seeding failed", "error", err)
 			}
 		case stepPlan:
-			if err := seedPlanBackfill(runCtx, deps, seedCtx, planCreateOpts, planProcessOpts.withScope(planProcessOpts.ScopeTesteeIDs, false)); err != nil {
+			if err := seedPlanBackfill(runCtx, deps, planCreateOpts, planProcessOpts.withScope(planProcessOpts.ScopeTesteeIDs, false)); err != nil {
 				logger.Fatalw("Plan backfill failed", "error", err)
 			}
 		case stepPlanCreateTasks:
@@ -335,10 +302,7 @@ func configureSeeddataGlobalLog(verbose bool, quiet bool) {
 	log.Init(opts)
 }
 
-func shouldQuietSeedPlanComponentLogs(steps []seedStep, planMode string) bool {
-	if !strings.EqualFold(strings.TrimSpace(planMode), planModeLocal) {
-		return false
-	}
+func shouldQuietSeedPlanComponentLogs(steps []seedStep) bool {
 	return containsSeedStep(steps, stepPlan) ||
 		containsSeedStep(steps, stepPlanCreateTasks) ||
 		containsSeedStep(steps, stepPlanProcessTasks)
