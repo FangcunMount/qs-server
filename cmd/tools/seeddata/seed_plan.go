@@ -20,6 +20,7 @@ import (
 const (
 	defaultPlanID              = "614186929759466030"
 	planEnrollmentSampleRate   = 5
+	planEnrollmentUnknownCount = int(^uint(0) >> 2)
 	planTaskCompletionTimeout  = 5 * time.Minute
 	planTaskCompletionInterval = 2 * time.Second
 	planTaskCompletedOffset    = 2 * time.Hour
@@ -315,20 +316,17 @@ func seedPlanBackfill(
 		if pageSize < 100 {
 			pageSize = 100
 		}
-		selectedTestees, loadedTesteeCnt, err = streamSamplePlanEnrollmentTestees(
-			ctx,
-			gateway,
-			orgID,
-			pageSize,
-			testeeOffset,
-			testeeLimit,
-			planID,
-		)
+		testees, err = loadApiserverTestees(ctx, gateway, orgID, pageSize, testeeOffset, testeeLimit)
 		if err != nil {
 			return err
 		}
-		testees = selectedTestees
-		selectionMode = "sample"
+		loadedTesteeCnt = len(testees)
+		testees, err = prioritizePlanEnrollmentTestees(ctx, gateway, logger, planID, testees, planWorkers, verbose)
+		if err != nil {
+			return err
+		}
+		selectedTestees = selectPlanEnrollmentTestees(testees)
+		selectionMode = "priority_sample"
 	}
 	logger.Infow("Loaded testees for plan backfill",
 		"plan_id", planID,
@@ -1751,6 +1749,155 @@ func streamSamplePlanEnrollmentTestees(
 
 	sortTesteesByCreatedAt(selected)
 	return selected, loadedCount, nil
+}
+
+func prioritizePlanEnrollmentTestees(
+	ctx context.Context,
+	gateway PlanSeedGateway,
+	logger interface {
+		Warnw(string, ...interface{})
+		Infow(string, ...interface{})
+	},
+	planID string,
+	testees []*TesteeResponse,
+	workers int,
+	verbose bool,
+) ([]*TesteeResponse, error) {
+	if len(testees) == 0 {
+		return nil, nil
+	}
+
+	taskCounts, err := loadPlanTaskCountsForTestees(ctx, gateway, logger, planID, testees, workers, verbose)
+	if err != nil {
+		return nil, err
+	}
+
+	prioritized := append([]*TesteeResponse(nil), testees...)
+	sort.SliceStable(prioritized, func(i, j int) bool {
+		left := prioritized[i]
+		right := prioritized[j]
+		if left == nil {
+			return false
+		}
+		if right == nil {
+			return true
+		}
+
+		leftCount := planTaskCountForPriority(taskCounts, left.ID)
+		rightCount := planTaskCountForPriority(taskCounts, right.ID)
+		leftNeverJoined := leftCount == 0
+		rightNeverJoined := rightCount == 0
+		if leftNeverJoined != rightNeverJoined {
+			return leftNeverJoined
+		}
+		if leftCount != rightCount {
+			return leftCount < rightCount
+		}
+		if left.CreatedAt.Equal(right.CreatedAt) {
+			return parseID(left.ID) < parseID(right.ID)
+		}
+		return left.CreatedAt.Before(right.CreatedAt)
+	})
+	return prioritized, nil
+}
+
+func loadPlanTaskCountsForTestees(
+	ctx context.Context,
+	gateway PlanSeedGateway,
+	logger interface {
+		Warnw(string, ...interface{})
+		Infow(string, ...interface{})
+	},
+	planID string,
+	testees []*TesteeResponse,
+	workers int,
+	verbose bool,
+) (map[string]int, error) {
+	if len(testees) == 0 {
+		return map[string]int{}, nil
+	}
+
+	if provider, ok := gateway.(planTaskCountProvider); ok {
+		if err := waitForSeedPlanPacer(ctx, "load_plan_task_counts_for_testees"); err != nil {
+			return nil, err
+		}
+		counts, err := provider.GetPlanTaskCountsByTesteeIDs(ctx, planID, collectPlanTesteeIDs(testees))
+		if err == nil {
+			return counts, nil
+		}
+		if verbose {
+			logger.Warnw("Falling back to per-testee plan task counting after batch counting failed",
+				"plan_id", planID,
+				"error", err.Error(),
+			)
+		}
+	}
+
+	counts := make(map[string]int, len(testees))
+	var mu sync.Mutex
+	workers = normalizePlanWorkers(workers, len(testees))
+	err := runPlanTesteeWorkerPool(ctx, testees, workers, func(ctx context.Context, testee *TesteeResponse) error {
+		if testee == nil || strings.TrimSpace(testee.ID) == "" {
+			return nil
+		}
+		var taskList *TaskListResponse
+		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "load_plan_task_count_for_testee", testee.ID, func() error {
+			if err := waitForSeedPlanPacer(ctx, "load_plan_task_count_for_testee"); err != nil {
+				return err
+			}
+			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testee.ID, planID)
+			if err != nil {
+				return err
+			}
+			taskList = resp
+			return nil
+		})
+		if err != nil {
+			if verbose {
+				logger.Warnw("Unable to determine plan join count for testee, treating as lowest priority",
+					"plan_id", planID,
+					"testee_id", testee.ID,
+					"error", err.Error(),
+				)
+			}
+			return nil
+		}
+
+		mu.Lock()
+		counts[testee.ID] = len(taskList.Tasks)
+		mu.Unlock()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return counts, nil
+}
+
+func planTaskCountForPriority(counts map[string]int, testeeID string) int {
+	if counts == nil {
+		return planEnrollmentUnknownCount
+	}
+	if count, ok := counts[strings.TrimSpace(testeeID)]; ok {
+		return count
+	}
+	return planEnrollmentUnknownCount
+}
+
+func selectPlanEnrollmentTestees(prioritized []*TesteeResponse) []*TesteeResponse {
+	if len(prioritized) == 0 {
+		return nil
+	}
+
+	targetCount := len(prioritized) / planEnrollmentSampleRate
+	if targetCount <= 0 {
+		targetCount = 1
+	}
+	if targetCount > len(prioritized) {
+		targetCount = len(prioritized)
+	}
+	return append([]*TesteeResponse(nil), prioritized[:targetCount]...)
 }
 
 func loadExplicitPlanTestees(

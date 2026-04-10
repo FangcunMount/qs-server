@@ -14,6 +14,8 @@ import (
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	apiservercontainer "github.com/FangcunMount/qs-server/internal/apiserver/container"
+	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
@@ -29,6 +31,7 @@ const (
 	planModeLocal                = "local"
 	planModeRemote               = "remote"
 	defaultLocalPlanEntryBaseURL = "https://collect.fangcunmount.cn/entry"
+	localPlanTaskCountBatchSize  = 500
 )
 
 type PlanSeedGateway interface {
@@ -42,6 +45,10 @@ type PlanSeedGateway interface {
 	ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error)
 	GetTask(ctx context.Context, taskID string) (*TaskResponse, error)
 	ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error)
+}
+
+type planTaskCountProvider interface {
+	GetPlanTaskCountsByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]int, error)
 }
 
 func resolvePlanMode(cliMode string, configMode string) (string, error) {
@@ -332,6 +339,56 @@ func (g *localPlanSeedGateway) ExpireTask(ctx context.Context, taskID string) (*
 		return nil, err
 	}
 	return toSeedTaskResponse(result), nil
+}
+
+func (g *localPlanSeedGateway) GetPlanTaskCountsByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]int, error) {
+	planDomainID, err := planDomain.ParseAssessmentPlanID(strings.TrimSpace(planID))
+	if err != nil {
+		return nil, fmt.Errorf("parse plan id %q: %w", planID, err)
+	}
+
+	counts := make(map[string]int, len(testeeIDs))
+	if len(testeeIDs) == 0 {
+		return counts, nil
+	}
+
+	parsedTesteeIDs := make([]testeeDomain.ID, 0, len(testeeIDs))
+	idStringsByValue := make(map[uint64]string, len(testeeIDs))
+	for _, rawID := range testeeIDs {
+		rawID = strings.TrimSpace(rawID)
+		if rawID == "" {
+			continue
+		}
+		value, err := strconv.ParseUint(rawID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse testee id %q: %w", rawID, err)
+		}
+		domainID := testeeDomain.NewID(value)
+		parsedTesteeIDs = append(parsedTesteeIDs, domainID)
+		idStringsByValue[value] = rawID
+		counts[rawID] = 0
+	}
+
+	for start := 0; start < len(parsedTesteeIDs); start += localPlanTaskCountBatchSize {
+		end := start + localPlanTaskCountBatchSize
+		if end > len(parsedTesteeIDs) {
+			end = len(parsedTesteeIDs)
+		}
+		tasks, err := g.runtime.container.PlanModule.TaskRepo.FindByPlanIDAndTesteeIDs(g.runtime.planContext(ctx), planDomainID, parsedTesteeIDs[start:end])
+		if err != nil {
+			return nil, err
+		}
+		for _, task := range tasks {
+			if task == nil {
+				continue
+			}
+			if rawID, ok := idStringsByValue[task.GetTesteeID().Uint64()]; ok {
+				counts[rawID]++
+			}
+		}
+	}
+
+	return counts, nil
 }
 
 func (r *localPlanRuntime) planContext(ctx context.Context) context.Context {

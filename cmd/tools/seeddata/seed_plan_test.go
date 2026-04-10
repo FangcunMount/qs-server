@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -302,3 +303,110 @@ func TestSeedPlanPacerNextDelay(t *testing.T) {
 		t.Fatalf("expected next pause at following interval, got delay=%s fresh=%v", delay, fresh)
 	}
 }
+
+func TestPrioritizePlanEnrollmentTesteesPrefersNeverJoinedThenLeastJoined(t *testing.T) {
+	testees := []*TesteeResponse{
+		{ID: "1001", CreatedAt: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)},
+		{ID: "1002", CreatedAt: time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)},
+		{ID: "1003", CreatedAt: time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)},
+		{ID: "1004", CreatedAt: time.Date(2026, 4, 4, 0, 0, 0, 0, time.UTC)},
+	}
+	gateway := &planTaskCountProviderStub{
+		counts: map[string]int{
+			"1001": 0,
+			"1002": 3,
+			"1003": 1,
+			"1004": 0,
+		},
+	}
+
+	prioritized, err := prioritizePlanEnrollmentTestees(context.Background(), gateway, noopSeedLogger{}, "614333603412718126", testees, 2, false)
+	if err != nil {
+		t.Fatalf("unexpected prioritize error: %v", err)
+	}
+
+	gotIDs := make([]string, 0, len(prioritized))
+	for _, testee := range prioritized {
+		gotIDs = append(gotIDs, testee.ID)
+	}
+	wantIDs := []string{"1001", "1004", "1003", "1002"}
+	if strings.Join(gotIDs, ",") != strings.Join(wantIDs, ",") {
+		t.Fatalf("unexpected prioritized ids: got=%v want=%v", gotIDs, wantIDs)
+	}
+}
+
+func TestSelectPlanEnrollmentTesteesKeepsHighestPrioritySlice(t *testing.T) {
+	prioritized := []*TesteeResponse{
+		{ID: "1001"},
+		{ID: "1002"},
+		{ID: "1003"},
+		{ID: "1004"},
+		{ID: "1005"},
+		{ID: "1006"},
+		{ID: "1007"},
+		{ID: "1008"},
+		{ID: "1009"},
+		{ID: "1010"},
+	}
+
+	selected := selectPlanEnrollmentTestees(prioritized)
+	if len(selected) != 2 {
+		t.Fatalf("expected top 2 selected testees from 10 candidates, got %d", len(selected))
+	}
+	if selected[0].ID != "1001" || selected[1].ID != "1002" {
+		t.Fatalf("expected highest priority testees to be kept, got %v and %v", selected[0].ID, selected[1].ID)
+	}
+}
+
+type planTaskCountProviderStub struct {
+	counts map[string]int
+}
+
+func (s *planTaskCountProviderStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) GetScale(ctx context.Context, code string) (*ScaleResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) GetQuestionnaireDetail(ctx context.Context, code string) (*QuestionnaireDetailResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) ListTesteesByOrg(ctx context.Context, orgID int64, page, pageSize int) (*ApiserverTesteeListResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) EnrollTestee(ctx context.Context, req EnrollTesteeRequest) (*EnrollmentResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) ListTasksByTesteeAndPlan(ctx context.Context, testeeID, planID string) (*TaskListResponse, error) {
+	return &TaskListResponse{}, nil
+}
+
+func (s *planTaskCountProviderStub) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	return nil, nil
+}
+
+func (s *planTaskCountProviderStub) GetPlanTaskCountsByTesteeIDs(ctx context.Context, planID string, testeeIDs []string) (map[string]int, error) {
+	return s.counts, nil
+}
+
+type noopSeedLogger struct{}
+
+func (noopSeedLogger) Warnw(string, ...interface{}) {}
+func (noopSeedLogger) Infow(string, ...interface{}) {}
