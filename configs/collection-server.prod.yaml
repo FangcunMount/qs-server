@@ -143,8 +143,8 @@ iam:
   
   # JWT 验证配置
   jwt:
-    issuer: "https://iam-apiserver:9444"  # HTTPS 端口
-    audience: ["collection-api", "qs-api"]
+    issuer: "https://iam.fangcunmount.cn"  # canonical issuer
+    audience: ["collection-api"]
     algorithms: ["RS256", "ES256"]
     clock-skew: 30s
     required-claims: ["sub", "exp"]

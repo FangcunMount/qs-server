@@ -290,8 +290,8 @@ iam:
   
   # JWT 验证配置
   jwt:
-    issuer: "https://iam-apiserver:9444"              # Token 签发者（HTTPS 端口 9444）
-    audience: ["qs"]                                   # 允许的受众（QS 服务标识）
+    issuer: "https://iam.fangcunmount.cn"              # Token 签发者（canonical issuer）
+    audience: ["qs-api"]                               # 允许的受众（QS API 标识）
     algorithms: ["RS256", "ES256"]                     # 支持的签名算法
     clock-skew: 60s                                    # 时钟偏移容忍度
     required-claims: ["user_id", "tenant_id"]          # 必需的 Claims
