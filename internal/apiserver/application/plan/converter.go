@@ -94,6 +94,15 @@ type TaskListResult struct {
 	PageSize int           // 每页数量
 }
 
+// TaskWindowResult 任务窗口结果。
+// 使用 has_more 表达是否存在下一页，避免 process 路径依赖 COUNT(*)。
+type TaskWindowResult struct {
+	Items    []*TaskResult // 当前窗口内的任务
+	Page     int           // 当前页码
+	PageSize int           // 当前页大小
+	HasMore  bool          // 是否还有下一页
+}
+
 // ============= 转换函数 =============
 
 // toPlanResult 将领域对象转换为结果对象

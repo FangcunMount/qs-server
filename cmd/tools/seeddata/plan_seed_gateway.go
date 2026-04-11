@@ -243,9 +243,6 @@ func (g *localPlanSeedGateway) EnrollTestee(ctx context.Context, req EnrollTeste
 
 func (g *localPlanSeedGateway) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
 	scheduleCtx := g.runtime.planContext(ctx)
-	if source := strings.TrimSpace(req.Source); source != "" {
-		scheduleCtx = planApp.WithTaskSchedulerSource(scheduleCtx, source)
-	}
 	if req.PlanID != "" || len(req.TesteeIDs) > 0 {
 		scheduleCtx = planApp.WithTaskSchedulerScope(scheduleCtx, req.PlanID, req.TesteeIDs)
 	}

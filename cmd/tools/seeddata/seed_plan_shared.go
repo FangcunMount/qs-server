@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-isatty"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -20,7 +21,6 @@ const (
 	planEnrollmentUnknownCount = int(^uint(0) >> 2)
 	planTaskCompletionTimeout  = 5 * time.Minute
 	planTaskCompletionInterval = 2 * time.Second
-	planTaskCompletedOffset    = 2 * time.Hour
 	planTaskTimeLayout         = "2006-01-02 15:04:05"
 	planScheduleBatchFactor    = 4
 	planTaskBufferFactor       = 4
@@ -193,8 +193,31 @@ type seedPlanSubmitController struct {
 	consecutiveRecoverables atomic.Int64
 }
 
+type seedPlanSubmitDispatchController struct {
+	limiter *rate.Limiter
+}
+
 func newSeedPlanSubmitController() *seedPlanSubmitController {
 	return &seedPlanSubmitController{}
+}
+
+func newSeedPlanSubmitDispatchController(qps float64, burst int) *seedPlanSubmitDispatchController {
+	if qps <= 0 {
+		return nil
+	}
+	if burst <= 0 {
+		burst = 1
+	}
+	return &seedPlanSubmitDispatchController{
+		limiter: rate.NewLimiter(rate.Limit(qps), burst),
+	}
+}
+
+func (c *seedPlanSubmitDispatchController) Wait(ctx context.Context) error {
+	if c == nil || c.limiter == nil {
+		return nil
+	}
+	return c.limiter.Wait(ctx)
 }
 
 func (c *seedPlanSubmitController) Wait(ctx context.Context) error {
@@ -311,6 +334,37 @@ func updateMaxInFlightCounter(counter *atomic.Int64, current int64) {
 			return
 		}
 	}
+}
+
+func normalizePlanSubmitQueueConfig(
+	submitWorkers int,
+	maxInFlightTasks int,
+	queueSize int,
+	qps float64,
+	burst int,
+) (int, float64, int) {
+	if submitWorkers <= 0 {
+		submitWorkers = 1
+	}
+	if queueSize <= 0 {
+		queueSize = normalizePlanTaskBufferSize(submitWorkers, maxInFlightTasks)
+	}
+	if queueSize < submitWorkers {
+		queueSize = submitWorkers
+	}
+	if qps <= 0 {
+		qps = float64(submitWorkers)
+	}
+	if qps < 0 {
+		qps = 0
+	}
+	if burst <= 0 {
+		burst = submitWorkers
+	}
+	if burst < 1 {
+		burst = 1
+	}
+	return queueSize, qps, burst
 }
 
 func mergePlanTaskStatusStats(dst *planTaskStatusStats, src *planTaskStatusStats) {
@@ -473,14 +527,6 @@ func shouldExpirePlanTask(task TaskResponse, expireRate float64) bool {
 
 func normalizeTaskStatus(status string) string {
 	return strings.ToLower(strings.TrimSpace(status))
-}
-
-func seedPlanTaskCompletedAt(task TaskResponse) string {
-	plannedAt, err := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(task.PlannedAt), time.Local)
-	if err != nil || plannedAt.IsZero() {
-		return ""
-	}
-	return plannedAt.Add(planTaskCompletedOffset).Format(time.RFC3339)
 }
 
 type planSeedDashboard struct {
@@ -719,17 +765,11 @@ func atomicLoadInt64(counter *atomic.Int64) int64 {
 	return counter.Load()
 }
 
-func planStartDateFromAuditTimes(createdAt, updatedAt, now time.Time) (string, string, error) {
-	switch {
-	case !createdAt.IsZero():
-		return createdAt.In(time.Local).Format("2006-01-02"), "created_at", nil
-	case !updatedAt.IsZero():
-		return updatedAt.In(time.Local).Format("2006-01-02"), "updated_at", nil
-	case !now.IsZero():
-		return now.In(time.Local).Format("2006-01-02"), "now", nil
-	default:
-		return "", "", fmt.Errorf("created_at and updated_at are both zero")
+func planStartDateFromCreatedAt(createdAt time.Time) (string, error) {
+	if createdAt.IsZero() {
+		return "", fmt.Errorf("created_at is zero")
 	}
+	return createdAt.In(time.Local).Format("2006-01-02"), nil
 }
 
 func newPlanQuestionnaireVersionMismatchError(

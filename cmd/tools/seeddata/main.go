@@ -50,6 +50,7 @@ const (
 	stepPlan             seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
 	stepPlanCreateTasks  seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
 	stepPlanProcessTasks seedStep = "plan_process_tasks" // 调度并处理计划任务
+	stepPlanFixupTimes   seedStep = "plan_fixup_timestamps"
 )
 
 // defaultSteps defines the default execution order of all seed steps.
@@ -80,6 +81,9 @@ func main() {
 		planSubmitWorkers       = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
 		planWaitWorkers         = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
 		planMaxInFlightTasks    = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
+		planSubmitQueueSize     = flag.Int("plan-submit-queue-size", 0, "Buffered queue size before plan task answersheet submission dispatch (defaults based on submit workers and inflight limit)")
+		planSubmitQPS           = flag.Float64("plan-submit-qps", 0, "Global dequeue rate for plan task answersheet submission queue (0 = derive from submit workers)")
+		planSubmitBurst         = flag.Int("plan-submit-burst", 0, "Burst size for plan task answersheet submission queue dispatch (0 = derive from submit workers)")
 		planExpireRate          = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
 		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
 		localMySQLDSN           = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override")
@@ -248,9 +252,17 @@ func main() {
 		PlanSubmitWorkers:    *planSubmitWorkers,
 		PlanWaitWorkers:      *planWaitWorkers,
 		PlanMaxInFlightTasks: *planMaxInFlightTasks,
+		PlanSubmitQueueSize:  *planSubmitQueueSize,
+		PlanSubmitQPS:        *planSubmitQPS,
+		PlanSubmitBurst:      *planSubmitBurst,
 		PlanExpireRate:       *planExpireRate,
 		Verbose:              *verbose,
 		Continuous:           true,
+	}
+	planFixupOpts := planFixupOptions{
+		PlanID:         *planID,
+		ScopeTesteeIDs: parsePlanTesteeIDs(*planTesteeIDsRaw),
+		Verbose:        *verbose,
 	}
 
 	for _, step := range steps {
@@ -270,6 +282,10 @@ func main() {
 		case stepPlanProcessTasks:
 			if _, err := seedPlanProcessTasks(runCtx, deps, planProcessOpts); err != nil {
 				logger.Fatalw("Plan task processing failed", "error", err)
+			}
+		case stepPlanFixupTimes:
+			if err := seedPlanFixupTimestamps(runCtx, deps, planFixupOpts); err != nil {
+				logger.Fatalw("Plan timestamp fixup failed", "error", err)
 			}
 		default:
 			logger.Warnw("Skipping unimplemented step", "step", step)
@@ -305,7 +321,8 @@ func configureSeeddataGlobalLog(verbose bool, quiet bool) {
 func shouldQuietSeedPlanComponentLogs(steps []seedStep) bool {
 	return containsSeedStep(steps, stepPlan) ||
 		containsSeedStep(steps, stepPlanCreateTasks) ||
-		containsSeedStep(steps, stepPlanProcessTasks)
+		containsSeedStep(steps, stepPlanProcessTasks) ||
+		containsSeedStep(steps, stepPlanFixupTimes)
 }
 
 // ==================== 通用辅助函数 ====================

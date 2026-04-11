@@ -15,14 +15,14 @@ import (
 type TesteePO struct {
 	mysql.AuditFields
 
-	OrgID      int64          `gorm:"column:org_id;not null;index:idx_org_id"`
+	OrgID      int64          `gorm:"column:org_id;not null"`
 	ProfileID  *uint64        `gorm:"column:profile_id;type:bigint unsigned;index:idx_profile_id"`
 	Name       string         `gorm:"column:name;size:100;not null;index:idx_name"`
 	Gender     int8           `gorm:"column:gender;not null"`
 	Birthday   *time.Time     `gorm:"column:birthday"`
 	Tags       StringSliceCol `gorm:"column:tags;type:json"`
 	Source     string         `gorm:"column:source;size:50;not null;default:unknown"`
-	IsKeyFocus bool           `gorm:"column:is_key_focus;not null;default:false;index:idx_is_key_focus"`
+	IsKeyFocus bool           `gorm:"column:is_key_focus;not null;default:false"`
 
 	// 测评统计字段
 	TotalAssessments int        `gorm:"column:total_assessments;not null;default:0"`

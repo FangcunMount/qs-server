@@ -61,6 +61,10 @@ func (r *schedulerTaskRepoStub) FindListByTesteeIDs(context.Context, int64, *dom
 	return nil, 0, nil
 }
 
+func (r *schedulerTaskRepoStub) FindWindow(context.Context, int64, domainPlan.AssessmentPlanID, []testee.ID, *domainPlan.TaskStatus, *time.Time, int, int) ([]*domainPlan.AssessmentTask, bool, error) {
+	return nil, false, nil
+}
+
 func (r *schedulerTaskRepoStub) Save(_ context.Context, task *domainPlan.AssessmentTask) error {
 	r.savedTasks = append(r.savedTasks, task)
 	return nil
@@ -209,5 +213,50 @@ func TestTaskSchedulerServiceSchedulesScopedTasksWithoutGlobalPendingScan(t *tes
 	}
 	if results[0].ID != scopedTask.GetID().String() {
 		t.Fatalf("expected opened task %s, got %s", scopedTask.GetID().String(), results[0].ID)
+	}
+}
+
+func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
+	p, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+
+	now := time.Now()
+	pendingTask := domainPlan.NewAssessmentTask(
+		p.GetID(),
+		1,
+		1,
+		testee.NewID(4001),
+		"scale-code",
+		now.Add(-time.Minute),
+	)
+	expiredTask := domainPlan.NewAssessmentTask(
+		p.GetID(),
+		2,
+		1,
+		testee.NewID(4002),
+		"scale-code",
+		now.Add(-2*time.Hour),
+	)
+	taskLifecycle := domainPlan.NewTaskLifecycle()
+	if err := taskLifecycle.Open(context.Background(), expiredTask, "token", "https://example.com/entry", now.Add(time.Hour)); err != nil {
+		t.Fatalf("open expiredTask returned error: %v", err)
+	}
+
+	taskRepo := &schedulerTaskRepoStub{
+		pendingTasks: []*domainPlan.AssessmentTask{pendingTask},
+		expiredTasks: []*domainPlan.AssessmentTask{expiredTask},
+	}
+	planRepo := &schedulerPlanRepoByIDStub{plan: p}
+	entryGenerator := &entryGeneratorStub{}
+
+	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	_, err = service.SchedulePendingTasks(context.Background(), 1, "")
+	if err != nil {
+		t.Fatalf("SchedulePendingTasks returned error: %v", err)
+	}
+	if !expiredTask.IsExpired() {
+		t.Fatalf("expected expired task to be expired")
 	}
 }

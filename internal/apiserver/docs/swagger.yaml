@@ -76,8 +76,6 @@ definitions:
         type: string
       questionnaire_version:
         type: string
-      task_completed_at:
-        type: string
       task_id:
         type: string
       testee_id:
@@ -331,6 +329,23 @@ definitions:
         type: string
       suggestion:
         type: string
+    type: object
+  request.ListTaskWindowRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      plan_id:
+        type: string
+      planned_before:
+        type: string
+      status:
+        type: string
+      testee_ids:
+        items:
+          type: string
+        type: array
     type: object
   request.OpenTaskRequest:
     properties:
@@ -1390,6 +1405,19 @@ definitions:
         type: integer
       pending_count:
         type: integer
+    type: object
+  response.TaskWindowResponse:
+    properties:
+      has_more:
+        type: boolean
+      page:
+        type: integer
+      page_size:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/response.TaskResponse'
+        type: array
     type: object
   response.TesteeListResponse:
     properties:
@@ -4900,6 +4928,43 @@ paths:
       summary: 调度待推送任务
       tags:
       - Task-Scheduler
+  /internal/v1/plans/tasks/window:
+    post:
+      consumes:
+      - application/json
+      description: 为后台任务按窗口查询 plan task，避免分页时额外执行 COUNT(*)；仅 qs:evaluation_plan_manager
+        或 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 查询任务窗口请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ListTaskWindowRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TaskWindowResponse'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询任务窗口
+      tags:
+      - Task-Query
   /internal/v1/statistics/sync/accumulated:
     post:
       consumes:

@@ -2,6 +2,8 @@ package plan
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -172,6 +174,63 @@ func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskLi
 		Total:    total,
 		Page:     dto.Page,
 		PageSize: dto.PageSize,
+	}, nil
+}
+
+// ListTaskWindow 查询计划任务窗口。
+func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO) (*TaskWindowResult, error) {
+	if dto.Page <= 0 {
+		dto.Page = 1
+	}
+	if dto.PageSize <= 0 {
+		dto.PageSize = 10
+	}
+	if dto.PageSize > 100 {
+		dto.PageSize = 100
+	}
+
+	planID, err := toPlanID(dto.PlanID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+	}
+
+	var status *domainPlan.TaskStatus
+	if rawStatus := strings.TrimSpace(dto.Status); rawStatus != "" {
+		statusVal := domainPlan.TaskStatus(rawStatus)
+		if !statusVal.IsValid() {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务状态: %s", dto.Status)
+		}
+		status = &statusVal
+	}
+
+	var plannedBefore *time.Time
+	if rawBefore := strings.TrimSpace(dto.PlannedBefore); rawBefore != "" {
+		parsed, err := parseTime(rawBefore)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的 planned_before: %v", err)
+		}
+		plannedBefore = &parsed
+	}
+
+	testeeIDs := make([]testee.ID, 0, len(dto.TesteeIDs))
+	for _, rawID := range dto.TesteeIDs {
+		id, err := toTesteeID(rawID)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+		}
+		testeeIDs = append(testeeIDs, id)
+	}
+
+	tasks, hasMore, err := s.taskRepo.FindWindow(ctx, dto.OrgID, planID, testeeIDs, status, plannedBefore, dto.Page, dto.PageSize)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务窗口失败")
+	}
+
+	return &TaskWindowResult{
+		Items:    toTaskResults(tasks),
+		Page:     dto.Page,
+		PageSize: dto.PageSize,
+		HasMore:  hasMore,
 	}, nil
 }
 

@@ -56,6 +56,10 @@ func (r *lifecycleTaskRepoStub) FindListByTesteeIDs(context.Context, int64, *Ass
 	return nil, 0, nil
 }
 
+func (r *lifecycleTaskRepoStub) FindWindow(context.Context, int64, AssessmentPlanID, []testee.ID, *TaskStatus, *time.Time, int, int) ([]*AssessmentTask, bool, error) {
+	return nil, false, nil
+}
+
 func (r *lifecycleTaskRepoStub) Save(context.Context, *AssessmentTask) error {
 	return nil
 }
@@ -78,16 +82,16 @@ func TestPlanLifecycleCancelCancelsOutstandingTasks(t *testing.T) {
 	expiredTask := NewAssessmentTask(p.GetID(), 4, 1, testeeID, "scale-code", time.Now().Add(3*time.Hour))
 
 	taskLifecycle := NewTaskLifecycle()
-	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
-	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	if err := taskLifecycle.Complete(ctx, completedTask, assessment.NewID(9001)); err != nil {
 		t.Fatalf("failed to complete task: %v", err)
 	}
-	if err := taskLifecycle.Open(ctx, expiredTask, "expired-token", "https://example.com/expired", time.Now().Add(2*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(ctx, expiredTask, "expired-token", "https://example.com/expired", time.Now().Add(2*time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	if err := taskLifecycle.Expire(ctx, expiredTask); err != nil {
@@ -140,7 +144,7 @@ func TestPlanLifecycleResumeReusesCanceledTasks(t *testing.T) {
 	taskLifecycle := NewTaskLifecycle()
 
 	completedTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", startDate)
-	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
 		t.Fatalf("failed to open completed task: %v", err)
 	}
 	if err := taskLifecycle.Complete(ctx, completedTask, assessment.NewID(9101)); err != nil {

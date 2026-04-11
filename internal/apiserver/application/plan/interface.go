@@ -119,6 +119,10 @@ type PlanQueryService interface {
 	// 场景：分页查询任务列表，支持条件筛选
 	ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskListResult, error)
 
+	// ListTaskWindow 查询计划任务窗口。
+	// 场景：seeddata process 等后台任务按窗口拉取 opened/pending 任务，避免 COUNT(*)。
+	ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO) (*TaskWindowResult, error)
+
 	// ListTasksByPlan 查询计划下的所有任务
 	// 场景：查看某个计划的所有任务
 	ListTasksByPlan(ctx context.Context, orgID int64, planID string) ([]*TaskResult, error)

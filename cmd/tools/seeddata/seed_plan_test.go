@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -52,33 +55,20 @@ func TestNewExplicitPlanZeroCreatedAtError(t *testing.T) {
 	}
 }
 
-func TestPlanStartDateFromAuditTimes(t *testing.T) {
-	now := time.Date(2026, 4, 8, 10, 0, 0, 0, time.UTC)
+func TestPlanStartDateFromCreatedAt(t *testing.T) {
 	createdAt := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
-	updatedAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 
-	date, source, err := planStartDateFromAuditTimes(createdAt, updatedAt, now)
+	date, err := planStartDateFromCreatedAt(createdAt)
 	if err != nil {
 		t.Fatalf("unexpected error for created_at: %v", err)
 	}
-	if source != "created_at" || date != "2026-04-01" {
-		t.Fatalf("unexpected created_at fallback result: date=%s source=%s", date, source)
+	if date != "2026-04-01" {
+		t.Fatalf("unexpected created_at result: date=%s", date)
 	}
 
-	date, source, err = planStartDateFromAuditTimes(time.Time{}, updatedAt, now)
-	if err != nil {
-		t.Fatalf("unexpected error for updated_at fallback: %v", err)
-	}
-	if source != "updated_at" || date != "2026-04-05" {
-		t.Fatalf("unexpected updated_at fallback result: date=%s source=%s", date, source)
-	}
-
-	date, source, err = planStartDateFromAuditTimes(time.Time{}, time.Time{}, now)
-	if err != nil {
-		t.Fatalf("unexpected error for now fallback: %v", err)
-	}
-	if source != "now" || date != "2026-04-08" {
-		t.Fatalf("unexpected now fallback result: date=%s source=%s", date, source)
+	_, err = planStartDateFromCreatedAt(time.Time{})
+	if err == nil {
+		t.Fatal("expected error for zero created_at")
 	}
 }
 
@@ -165,6 +155,70 @@ func TestNormalizePlanTaskExecutionConcurrency(t *testing.T) {
 	}
 }
 
+func TestBuildPlanSubmissionRequestIncludesTaskID(t *testing.T) {
+	detail := &QuestionnaireDetailResponse{
+		Code:    "QNR-001",
+		Title:   "Test Questionnaire",
+		Version: "1.0.0",
+		Questions: []QuestionResponse{
+			{
+				Code:  "Q1",
+				Type:  questionTypeRadio,
+				Title: "Question 1",
+				Options: []OptionResponse{
+					{Code: "A", Content: "A", Score: 1},
+					{Code: "B", Content: "B", Score: 2},
+				},
+			},
+		},
+	}
+
+	req, err := buildPlanSubmissionRequest(
+		detail,
+		"1.0.0",
+		"1001",
+		TaskResponse{
+			ID:       "2001",
+			TesteeID: "1001",
+		},
+		false,
+		newSeeddataLogger(false),
+	)
+	if err != nil {
+		t.Fatalf("buildPlanSubmissionRequest returned error: %v", err)
+	}
+	if req == nil {
+		t.Fatal("expected non-nil request")
+	}
+	if req.TaskID != "2001" {
+		t.Fatalf("expected task_id=2001, got %q", req.TaskID)
+	}
+}
+
+func TestNormalizePlanSubmitQueueConfig(t *testing.T) {
+	queueSize, qps, burst := normalizePlanSubmitQueueConfig(4, 32, 0, 0, 0)
+	if queueSize < 4 {
+		t.Fatalf("expected derived queue size >= submit workers, got %d", queueSize)
+	}
+	if qps != 4 {
+		t.Fatalf("expected derived qps=4, got %v", qps)
+	}
+	if burst != 4 {
+		t.Fatalf("expected derived burst=4, got %d", burst)
+	}
+
+	queueSize, qps, burst = normalizePlanSubmitQueueConfig(8, 16, 3, 2.5, 1)
+	if queueSize != 8 {
+		t.Fatalf("expected queue size raised to submit workers, got %d", queueSize)
+	}
+	if qps != 2.5 {
+		t.Fatalf("expected explicit qps to be preserved, got %v", qps)
+	}
+	if burst != 1 {
+		t.Fatalf("expected explicit burst to be preserved, got %d", burst)
+	}
+}
+
 func TestNormalizePlanExpireRate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -230,6 +284,118 @@ func TestPlanProcessOptionsWithScopeForcesOneShotAndCopiesIDs(t *testing.T) {
 	got.ScopeTesteeIDs[0] = "changed"
 	if strings.Join(base.ScopeTesteeIDs, ",") != "1001" {
 		t.Fatalf("expected original scope ids to remain unchanged, got %v", base.ScopeTesteeIDs)
+	}
+}
+
+func TestOpenPlanProcessSessionDoesNotRequireLocalRuntimeConfig(t *testing.T) {
+	const planID = "614333603412718126"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/testees":
+			_ = json.NewEncoder(w).Encode(Response{Code: 0, Message: "ok", Data: map[string]any{
+				"items":     []any{},
+				"page":      1,
+				"page_size": 1,
+			}})
+		case "/api/v1/plans/" + planID:
+			_ = json.NewEncoder(w).Encode(Response{Code: 0, Message: "ok", Data: map[string]any{
+				"id":         planID,
+				"org_id":     1,
+				"scale_code": "SAS-TEST",
+				"status":     "active",
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	logger := newSeeddataLogger(false)
+	deps := &dependencies{
+		Logger: logger,
+		Config: &SeedConfig{
+			Global: GlobalConfig{OrgID: 1},
+		},
+		APIClient: NewAPIClient(server.URL, "test-token", logger),
+	}
+
+	session, err := openPlanProcessSession(context.Background(), deps, planID, false)
+	if err != nil {
+		t.Fatalf("openPlanProcessSession returned error: %v", err)
+	}
+	if session == nil || session.plan == nil {
+		t.Fatalf("expected non-nil process session and plan")
+	}
+	if session.plan.ID != planID || session.plan.ScaleCode != "SAS-TEST" {
+		t.Fatalf("unexpected loaded plan: %#v", session.plan)
+	}
+}
+
+func TestLoadPlanProcessQuestionnaireUsesAPIGateway(t *testing.T) {
+	const planID = "614333603412718126"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/testees":
+			_ = json.NewEncoder(w).Encode(Response{Code: 0, Message: "ok", Data: map[string]any{
+				"items":     []any{},
+				"page":      1,
+				"page_size": 1,
+			}})
+		case "/api/v1/plans/" + planID:
+			_ = json.NewEncoder(w).Encode(Response{Code: 0, Message: "ok", Data: map[string]any{
+				"id":         planID,
+				"org_id":     1,
+				"scale_code": "SAS-TEST",
+				"status":     "active",
+			}})
+		case "/api/v1/scales/SAS-TEST":
+			_ = json.NewEncoder(w).Encode(Response{Code: 0, Message: "ok", Data: map[string]any{
+				"code":                  "SAS-TEST",
+				"questionnaire_code":    "QNR-TEST",
+				"questionnaire_version": "1.0.1",
+			}})
+		case "/api/v1/questionnaires/QNR-TEST":
+			_ = json.NewEncoder(w).Encode(Response{Code: 0, Message: "ok", Data: map[string]any{
+				"code":    "QNR-TEST",
+				"title":   "Questionnaire",
+				"version": "1.0.1",
+				"questions": []any{
+					map[string]any{"code": "q1", "type": "radio", "title": "Q1", "options": []any{
+						map[string]any{"code": "a", "content": "A", "score": 1},
+					}},
+				},
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	logger := newSeeddataLogger(false)
+	deps := &dependencies{
+		Logger: logger,
+		Config: &SeedConfig{
+			Global: GlobalConfig{OrgID: 1},
+		},
+		APIClient: NewAPIClient(server.URL, "test-token", logger),
+	}
+
+	session, err := openPlanProcessSession(context.Background(), deps, planID, false)
+	if err != nil {
+		t.Fatalf("openPlanProcessSession returned error: %v", err)
+	}
+
+	scaleResp, detail, err := loadPlanProcessQuestionnaire(context.Background(), session, false)
+	if err != nil {
+		t.Fatalf("loadPlanProcessQuestionnaire returned error: %v", err)
+	}
+	if scaleResp == nil || scaleResp.QuestionnaireCode != "QNR-TEST" || scaleResp.QuestionnaireVersion != "1.0.1" {
+		t.Fatalf("unexpected scale response: %#v", scaleResp)
+	}
+	if detail == nil || detail.Code != "QNR-TEST" || detail.Version != "1.0.1" {
+		t.Fatalf("unexpected questionnaire detail: %#v", detail)
 	}
 }
 
@@ -540,19 +706,17 @@ func (noopSeedLogger) Warnw(string, ...interface{}) {}
 func (noopSeedLogger) Infow(string, ...interface{}) {}
 
 type pagedPlanSeedGatewayStub struct {
-	pages                      map[int][]*ApiserverTesteeResponse
-	totalPages                 int
-	pageCalls                  []string
-	taskLists                  map[string][]TaskResponse
-	dueTaskLists               map[string][]TaskResponse
-	taskErrs                   map[string]error
-	listTaskCalls              []ListTasksRequest
-	listDuePendingTaskCalls    []ListSchedulablePendingTasksRequest
-	listTasksByPlanCallCount   int
-	listTasksByTesteePlanCalls []string
-	schedulePendingRequests    []SchedulePendingTasksRequest
-	scheduleTaskLists          map[string][]TaskResponse
-	expireTaskStatuses         map[string]string
+	pages                   map[int][]*ApiserverTesteeResponse
+	totalPages              int
+	pageCalls               []string
+	taskLists               map[string][]TaskResponse
+	dueTaskLists            map[string][]TaskResponse
+	taskErrs                map[string]error
+	listTaskWindowCalls     []ListPlanTaskWindowRequest
+	listDuePendingTaskCalls []ListPlanTaskWindowRequest
+	schedulePendingRequests []SchedulePendingTasksRequest
+	scheduleTaskLists       map[string][]TaskResponse
+	expireTaskStatuses      map[string]string
 }
 
 func (s *pagedPlanSeedGatewayStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
@@ -592,13 +756,25 @@ func (s *pagedPlanSeedGatewayStub) SchedulePendingTasks(ctx context.Context, req
 	return buildStubTaskListResponseForTesteeIDs(s.scheduleTaskLists, req.PlanID, req.TesteeIDs), nil
 }
 
+func (s *pagedPlanSeedGatewayStub) ListPlanTaskWindow(ctx context.Context, req ListPlanTaskWindowRequest) (*PlanTaskWindowResponse, error) {
+	if len(req.TesteeIDs) == 1 {
+		if err, ok := s.taskErrs[strings.TrimSpace(req.TesteeIDs[0])]; ok {
+			return nil, err
+		}
+	}
+	if normalizeTaskStatus(req.Status) == "pending" {
+		s.listDuePendingTaskCalls = append(s.listDuePendingTaskCalls, req)
+		return buildStubTaskWindowResponse(s.dueTaskLists, req), nil
+	}
+	s.listTaskWindowCalls = append(s.listTaskWindowCalls, req)
+	return buildStubTaskWindowResponse(s.taskLists, req), nil
+}
+
 func (s *pagedPlanSeedGatewayStub) ListSchedulablePendingTasks(ctx context.Context, req ListSchedulablePendingTasksRequest) (*TaskListResponse, error) {
-	s.listDuePendingTaskCalls = append(s.listDuePendingTaskCalls, req)
 	return buildStubDueTaskListResponse(s.dueTaskLists, req), nil
 }
 
 func (s *pagedPlanSeedGatewayStub) ListTasksByPlan(ctx context.Context, planID string) (*TaskListResponse, error) {
-	s.listTasksByPlanCallCount++
 	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{PlanID: planID}), nil
 }
 
@@ -606,7 +782,6 @@ func (s *pagedPlanSeedGatewayStub) ListTasks(ctx context.Context, req ListTasksR
 	if err, ok := s.taskErrs[strings.TrimSpace(req.TesteeID)]; ok {
 		return nil, err
 	}
-	s.listTaskCalls = append(s.listTaskCalls, req)
 	return buildStubTaskListResponse(s.taskLists, req), nil
 }
 
@@ -621,7 +796,6 @@ func (s *pagedPlanSeedGatewayStub) ListTasksByTesteeAndPlan(ctx context.Context,
 	if err, ok := s.taskErrs[testeeID]; ok {
 		return nil, err
 	}
-	s.listTasksByTesteePlanCalls = append(s.listTasksByTesteePlanCalls, fmt.Sprintf("%s:%s", testeeID, planID))
 	return buildStubTaskListResponse(s.taskLists, ListTasksRequest{PlanID: planID, TesteeID: testeeID}), nil
 }
 
@@ -731,6 +905,96 @@ func buildStubTaskListResponseForTesteeIDs(taskLists map[string][]TaskResponse, 
 	return buildStubTaskListResponse(filteredLists, ListTasksRequest{PlanID: planID})
 }
 
+func buildStubTaskWindowResponse(taskLists map[string][]TaskResponse, req ListPlanTaskWindowRequest) *PlanTaskWindowResponse {
+	if taskLists == nil {
+		return &PlanTaskWindowResponse{
+			Page:     max(req.Page, 1),
+			PageSize: max(req.PageSize, 1),
+		}
+	}
+
+	allTasks := make([]TaskResponse, 0)
+	allowedTestees := make(map[string]struct{}, len(req.TesteeIDs))
+	for _, testeeID := range req.TesteeIDs {
+		testeeID = strings.TrimSpace(testeeID)
+		if testeeID != "" {
+			allowedTestees[testeeID] = struct{}{}
+		}
+	}
+
+	var plannedBefore time.Time
+	if strings.TrimSpace(req.PlannedBefore) != "" {
+		plannedBefore, _ = time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(req.PlannedBefore), time.Local)
+	}
+	for testeeID, items := range taskLists {
+		if len(allowedTestees) > 0 {
+			if _, ok := allowedTestees[testeeID]; !ok {
+				continue
+			}
+		}
+		for _, task := range items {
+			if strings.TrimSpace(task.TesteeID) == "" {
+				task.TesteeID = testeeID
+			}
+			if planID := strings.TrimSpace(req.PlanID); planID != "" && strings.TrimSpace(task.PlanID) != "" && strings.TrimSpace(task.PlanID) != planID {
+				continue
+			}
+			if status := normalizeTaskStatus(req.Status); status != "" && normalizeTaskStatus(task.Status) != status {
+				continue
+			}
+			if !plannedBefore.IsZero() {
+				plannedAt, err := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(task.PlannedAt), time.Local)
+				if err != nil || plannedAt.After(plannedBefore) {
+					continue
+				}
+			}
+			allTasks = append(allTasks, task)
+		}
+	}
+
+	sort.SliceStable(allTasks, func(i, j int) bool {
+		leftTime, leftErr := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(allTasks[i].PlannedAt), time.Local)
+		rightTime, rightErr := time.ParseInLocation(planTaskTimeLayout, strings.TrimSpace(allTasks[j].PlannedAt), time.Local)
+		switch {
+		case leftErr == nil && rightErr == nil && !leftTime.Equal(rightTime):
+			return leftTime.Before(rightTime)
+		case allTasks[i].TesteeID != allTasks[j].TesteeID:
+			return allTasks[i].TesteeID < allTasks[j].TesteeID
+		case allTasks[i].Seq != allTasks[j].Seq:
+			return allTasks[i].Seq < allTasks[j].Seq
+		default:
+			return allTasks[i].ID < allTasks[j].ID
+		}
+	})
+
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = len(allTasks)
+		if pageSize == 0 {
+			pageSize = 1
+		}
+	}
+	start := (page - 1) * pageSize
+	if start > len(allTasks) {
+		start = len(allTasks)
+	}
+	end := start + pageSize
+	if end > len(allTasks) {
+		end = len(allTasks)
+	}
+
+	return &PlanTaskWindowResponse{
+		Tasks:    append([]TaskResponse(nil), allTasks[start:end]...),
+		Page:     page,
+		PageSize: pageSize,
+		HasMore:  end < len(allTasks),
+	}
+}
+
 func buildStubDueTaskListResponse(taskLists map[string][]TaskResponse, req ListSchedulablePendingTasksRequest) *TaskListResponse {
 	if taskLists == nil {
 		return &TaskListResponse{
@@ -818,44 +1082,6 @@ func buildStubDueTaskListResponse(taskLists map[string][]TaskResponse, req ListS
 	}
 }
 
-func TestCollectPlanTaskJobsByPlanUsesPlanTaskListing(t *testing.T) {
-	gateway := &planTaskCountProviderStub{
-		taskLists: map[string][]TaskResponse{
-			"1001": {
-				{ID: "2001", TesteeID: "1001", Seq: 1, Status: "opened"},
-				{ID: "2002", TesteeID: "1001", Seq: 2, Status: "completed"},
-			},
-			"1002": {
-				{ID: "2003", TesteeID: "1002", Seq: 1, Status: "expired"},
-				{ID: "2004", TesteeID: "1002", Seq: 2, Status: "opened"},
-			},
-		},
-	}
-	deps := &dependencies{Logger: newSeeddataLogger(false)}
-	var skipped atomic.Int64
-	var failed atomic.Int64
-
-	jobs, err := collectPlanTaskJobsByPlan(context.Background(), gateway, deps, "614333603412718126", false, &skipped, &failed)
-	if err != nil {
-		t.Fatalf("unexpected collect error: %v", err)
-	}
-	if failed.Load() != 0 {
-		t.Fatalf("expected no failed task list loads, got %d", failed.Load())
-	}
-	if skipped.Load() != 2 {
-		t.Fatalf("expected 2 skipped tasks, got %d", skipped.Load())
-	}
-	if len(jobs) != 2 {
-		t.Fatalf("expected 2 opened jobs, got %d", len(jobs))
-	}
-	if jobs[0].testeeID != "1001" || jobs[0].task.ID != "2001" {
-		t.Fatalf("unexpected first job: %+v", jobs[0])
-	}
-	if jobs[1].testeeID != "1002" || jobs[1].task.ID != "2004" {
-		t.Fatalf("unexpected second job: %+v", jobs[1])
-	}
-}
-
 func TestCollectPlanTaskJobWindowByPlanUsesPagedOpenedTasks(t *testing.T) {
 	planID := "614333603412718126"
 	gateway := &pagedPlanSeedGatewayStub{
@@ -888,15 +1114,12 @@ func TestCollectPlanTaskJobWindowByPlanUsesPagedOpenedTasks(t *testing.T) {
 	if len(jobs) != 2 {
 		t.Fatalf("expected 2 opened jobs, got %d", len(jobs))
 	}
-	if gateway.listTasksByPlanCallCount != 0 {
-		t.Fatalf("expected no full plan task listing calls, got %d", gateway.listTasksByPlanCallCount)
+	if len(gateway.listTaskWindowCalls) != 1 {
+		t.Fatalf("expected 1 paged task window call, got %d", len(gateway.listTaskWindowCalls))
 	}
-	if len(gateway.listTaskCalls) != 1 {
-		t.Fatalf("expected 1 paged list tasks call, got %d", len(gateway.listTaskCalls))
-	}
-	call := gateway.listTaskCalls[0]
+	call := gateway.listTaskWindowCalls[0]
 	if call.PlanID != planID || call.Status != "opened" || call.Page != 1 || call.PageSize != 2 {
-		t.Fatalf("unexpected list task request: %+v", call)
+		t.Fatalf("unexpected task window request: %+v", call)
 	}
 }
 
@@ -937,10 +1160,11 @@ func TestRunPlanTaskProcessingCyclePrefersOpenedBacklogBeforeSchedulingPending(t
 		4,
 		4,
 		1,
+		1,
 		false,
 		nil,
 		newSeedPlanSubmitController(),
-		"seeddata-test",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected cycle error: %v", err)
@@ -1008,12 +1232,13 @@ func TestRunPlanTaskProcessingCycleSchedulesPendingByScopedTesteeWindow(t *testi
 		4,
 		4,
 		4,
+		4,
 		2,
 		1,
 		false,
 		nil,
 		newSeedPlanSubmitController(),
-		"seeddata-test",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected cycle error: %v", err)

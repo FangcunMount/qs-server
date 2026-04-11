@@ -1114,7 +1114,6 @@ type SchedulePendingTasksRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	Before        string                 `protobuf:"bytes,2,opt,name=before,proto3" json:"before,omitempty"`
-	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1159,13 +1158,6 @@ func (x *SchedulePendingTasksRequest) GetOrgId() int64 {
 func (x *SchedulePendingTasksRequest) GetBefore() string {
 	if x != nil {
 		return x.Before
-	}
-	return ""
-}
-
-func (x *SchedulePendingTasksRequest) GetSource() string {
-	if x != nil {
-		return x.Source
 	}
 	return ""
 }
@@ -2855,11 +2847,10 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x1bTerminateEnrollmentResponse\x12\x17\n" +
 	"\aplan_id\x18\x01 \x01(\tR\x06planId\x12\x1b\n" +
 	"\ttestee_id\x18\x02 \x01(\tR\btesteeId\x12.\n" +
-	"\x13affected_task_count\x18\x03 \x01(\x05R\x11affectedTaskCount\"d\n" +
+	"\x13affected_task_count\x18\x03 \x01(\x05R\x11affectedTaskCount\"L\n" +
 	"\x1bSchedulePendingTasksRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x16\n" +
-	"\x06before\x18\x02 \x01(\tR\x06before\x12\x16\n" +
-	"\x06source\x18\x03 \x01(\tR\x06source\"\x91\x01\n" +
+	"\x06before\x18\x02 \x01(\tR\x06before\"\x91\x01\n" +
 	"\x1cSchedulePendingTasksResponse\x124\n" +
 	"\x05tasks\x18\x01 \x03(\v2\x1e.internalapi.TaskResultMessageR\x05tasks\x12;\n" +
 	"\x05stats\x18\x02 \x01(\v2%.internalapi.TaskScheduleStatsMessageR\x05stats\"\x9c\x01\n" +

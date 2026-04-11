@@ -50,3 +50,15 @@ type ListTasksDTO struct {
 	Page                  int      // 页码（从1开始）
 	PageSize              int      // 每页数量
 }
+
+// ListTaskWindowDTO 查询计划任务窗口 DTO。
+// 供 seeddata process 等后台任务使用，避免分页时额外执行 COUNT(*)。
+type ListTaskWindowDTO struct {
+	OrgID         int64    // 机构ID
+	PlanID        string   // 计划ID（必填）
+	TesteeIDs     []string // 受试者ID集合（可选）
+	Status        string   // 状态（可选）
+	PlannedBefore string   // planned_at <= before（可选）
+	Page          int      // 页码（从1开始）
+	PageSize      int      // 每页数量
+}

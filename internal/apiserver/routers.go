@@ -806,6 +806,14 @@ func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitUserBurst,
 		planHandler.SchedulePendingTasks,
 	)...)
+	tasks.POST("/window", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.QueryGlobalQPS,
+		r.rateCfg.QueryGlobalBurst,
+		r.rateCfg.QueryUserQPS,
+		r.rateCfg.QueryUserBurst,
+		planHandler.ListTaskWindow,
+	)...)
 	tasks.POST("/:id/complete", r.rateLimitedHandlers(
 		r.rateCfg,
 		r.rateCfg.SubmitGlobalQPS,

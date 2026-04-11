@@ -129,11 +129,11 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	}
 
 	// 今日新增
-	today := time.Now().Format("2006-01-02")
+	todayStart, tomorrowStart := currentDayBounds(time.Now())
 	var todayCount int64
 	if err := s.db.WithContext(ctx).
 		Table("assessment").
-		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
 		Count(&todayCount).Error; err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	var todayNewTestees int64
 	if err := s.db.WithContext(ctx).
 		Table("testee").
-		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
 		Count(&todayNewTestees).Error; err != nil {
 		return nil, err
 	}

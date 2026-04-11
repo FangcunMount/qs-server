@@ -1,0 +1,14 @@
+[
+  {
+    "dropIndexes": "answersheets",
+    "index": "idx_filled_at"
+  },
+  {
+    "dropIndexes": "interpret_reports",
+    "index": "idx_testee_id"
+  },
+  {
+    "dropIndexes": "scales",
+    "index": "idx_status"
+  }
+]

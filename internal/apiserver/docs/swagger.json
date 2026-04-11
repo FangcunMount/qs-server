@@ -4916,6 +4916,65 @@
                 }
             }
         },
+        "/internal/v1/plans/tasks/window": {
+            "post": {
+                "description": "为后台任务按窗口查询 plan task，避免分页时额外执行 COUNT(*)；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Task-Query"
+                ],
+                "summary": "查询任务窗口",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询任务窗口请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ListTaskWindowRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TaskWindowResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/plans/tasks/{id}/complete": {
             "post": {
                 "description": "系统动作：用户完成测评后回写任务状态，仅内部路由暴露",
@@ -5319,9 +5378,6 @@
                 "questionnaire_version": {
                     "type": "string"
                 },
-                "task_completed_at": {
-                    "type": "string"
-                },
                 "task_id": {
                     "type": "string"
                 },
@@ -5692,6 +5748,32 @@
                 },
                 "suggestion": {
                     "type": "string"
+                }
+            }
+        },
+        "request.ListTaskWindowRequest": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "planned_before": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "testee_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -7239,6 +7321,26 @@
                 },
                 "pending_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "response.TaskWindowResponse": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.TaskResponse"
+                    }
                 }
             }
         },

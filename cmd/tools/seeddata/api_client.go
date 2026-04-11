@@ -370,6 +370,14 @@ type TaskListResponse struct {
 	Stats      *TaskScheduleStatsResponse `json:"stats,omitempty"`
 }
 
+// PlanTaskWindowResponse 任务窗口响应。
+type PlanTaskWindowResponse struct {
+	Tasks    []TaskResponse `json:"tasks"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+	HasMore  bool           `json:"has_more"`
+}
+
 // ListTasksRequest 任务分页查询请求。
 type ListTasksRequest struct {
 	PlanID   string
@@ -377,6 +385,16 @@ type ListTasksRequest struct {
 	Status   string
 	Page     int
 	PageSize int
+}
+
+// ListPlanTaskWindowRequest 查询任务窗口请求。
+type ListPlanTaskWindowRequest struct {
+	PlanID        string   `json:"plan_id"`
+	Status        string   `json:"status,omitempty"`
+	TesteeIDs     []string `json:"testee_ids,omitempty"`
+	PlannedBefore string   `json:"planned_before,omitempty"`
+	Page          int      `json:"page,omitempty"`
+	PageSize      int      `json:"page_size,omitempty"`
 }
 
 // EnrollmentResponse 加入计划响应。
@@ -388,7 +406,6 @@ type EnrollmentResponse struct {
 // SchedulePendingTasksRequest 调度待开放任务请求。
 type SchedulePendingTasksRequest struct {
 	Before    string   `json:"before,omitempty"`
-	Source    string   `json:"source,omitempty"`
 	PlanID    string   `json:"plan_id,omitempty"`
 	TesteeIDs []string `json:"testee_ids,omitempty"`
 }
@@ -579,7 +596,6 @@ type SubmitAnswerSheetRequest struct {
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id"`
 	TaskID               string   `json:"task_id,omitempty"`
-	TaskCompletedAt      string   `json:"task_completed_at,omitempty"`
 	Answers              []Answer `json:"answers"`
 }
 
@@ -590,7 +606,6 @@ type AdminSubmitAnswerSheetRequest struct {
 	Title                string   `json:"title"`
 	TesteeID             uint64   `json:"testee_id"`
 	TaskID               string   `json:"task_id,omitempty"`
-	TaskCompletedAt      string   `json:"task_completed_at,omitempty"`
 	WriterID             uint64   `json:"writer_id,omitempty"`
 	FillerID             uint64   `json:"filler_id,omitempty"`
 	Answers              []Answer `json:"answers"`
@@ -1163,6 +1178,76 @@ func decodeResponseData(resp *Response, out interface{}) error {
 		return fmt.Errorf("unmarshal response data: %w", err)
 	}
 	return nil
+}
+
+// GetPlan 获取计划详情（apiserver）。
+func (c *APIClient) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/plans/%s", planID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var planResp PlanResponse
+	if err := decodeResponseData(resp, &planResp); err != nil {
+		return nil, fmt.Errorf("decode plan response: %w", err)
+	}
+	return &planResp, nil
+}
+
+// GetTask 获取任务详情（apiserver）。
+func (c *APIClient) GetTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/plans/tasks/%s", taskID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskResp TaskResponse
+	if err := decodeResponseData(resp, &taskResp); err != nil {
+		return nil, fmt.Errorf("decode task response: %w", err)
+	}
+	return &taskResp, nil
+}
+
+// SchedulePendingTasks 调度待开放任务（apiserver internal）。
+func (c *APIClient) SchedulePendingTasks(ctx context.Context, req SchedulePendingTasksRequest) (*TaskListResponse, error) {
+	resp, err := c.doRequestWithRetryAndTimeout(ctx, "POST", "/internal/v1/plans/tasks/schedule", req, true, planScheduleRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskList TaskListResponse
+	if err := decodeResponseData(resp, &taskList); err != nil {
+		return nil, fmt.Errorf("decode scheduled task list response: %w", err)
+	}
+	return &taskList, nil
+}
+
+// ListPlanTaskWindow 查询任务窗口（apiserver internal）。
+func (c *APIClient) ListPlanTaskWindow(ctx context.Context, req ListPlanTaskWindowRequest) (*PlanTaskWindowResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/internal/v1/plans/tasks/window", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var windowResp PlanTaskWindowResponse
+	if err := decodeResponseData(resp, &windowResp); err != nil {
+		return nil, fmt.Errorf("decode task window response: %w", err)
+	}
+	return &windowResp, nil
+}
+
+// ExpireTask 过期任务（apiserver internal）。
+func (c *APIClient) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/internal/v1/plans/tasks/%s/expire", taskID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskResp TaskResponse
+	if err := decodeResponseData(resp, &taskResp); err != nil {
+		return nil, fmt.Errorf("decode expired task response: %w", err)
+	}
+	return &taskResp, nil
 }
 
 // ListTestees 获取受试者列表（collection-server）

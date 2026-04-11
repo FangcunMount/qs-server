@@ -210,6 +210,56 @@ func TestAPIClientRefreshesAndRetriesOnceAfterUnauthorized(t *testing.T) {
 	}
 }
 
+func TestAPIClientListPlanTaskWindowDecodesHasMore(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/internal/v1/plans/tasks/window" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(Response{
+			Code:    0,
+			Message: "ok",
+			Data: map[string]any{
+				"tasks": []map[string]any{
+					{
+						"id":         "task-1",
+						"plan_id":    "plan-1",
+						"seq":        1,
+						"org_id":     1,
+						"testee_id":  "1001",
+						"status":     "opened",
+						"planned_at": "2026-04-11 10:00:00",
+					},
+				},
+				"page":      2,
+				"page_size": 50,
+				"has_more":  true,
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := NewAPIClient(server.URL, "test-token", log.L(context.Background()))
+	resp, err := client.ListPlanTaskWindow(context.Background(), ListPlanTaskWindowRequest{
+		PlanID:   "plan-1",
+		Status:   "opened",
+		Page:     2,
+		PageSize: 50,
+	})
+	if err != nil {
+		t.Fatalf("ListPlanTaskWindow returned error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if !resp.HasMore || resp.Page != 2 || resp.PageSize != 50 || len(resp.Tasks) != 1 {
+		t.Fatalf("unexpected task window response: %#v", resp)
+	}
+	if resp.Tasks[0].ID != "task-1" || resp.Tasks[0].TesteeID != "1001" {
+		t.Fatalf("unexpected task payload: %#v", resp.Tasks[0])
+	}
+}
+
 func mustMakeSeedTokenForTest(t *testing.T, exp time.Time) string {
 	t.Helper()
 

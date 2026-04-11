@@ -59,16 +59,16 @@ type AssessmentTaskPO struct {
 	mysql.AuditFields
 
 	// 关联计划
-	PlanID uint64 `gorm:"column:plan_id;not null;index:idx_plan_id;uniqueIndex:uk_plan_testee_seq,priority:1"`
+	PlanID uint64 `gorm:"column:plan_id;not null;uniqueIndex:uk_plan_testee_seq,priority:1"`
 
 	// 序号
 	Seq int `gorm:"column:seq;not null;index:idx_plan_seq;uniqueIndex:uk_plan_testee_seq,priority:3"` // 计划内的序号
 
 	// 组织信息（冗余，用于查询优化和权限控制）
-	OrgID int64 `gorm:"column:org_id;not null;index:idx_org_id"`
+	OrgID int64 `gorm:"column:org_id;not null"`
 
 	// 受试者信息
-	TesteeID uint64 `gorm:"column:testee_id;not null;index:idx_testee_id;uniqueIndex:uk_plan_testee_seq,priority:2"`
+	TesteeID uint64 `gorm:"column:testee_id;not null;uniqueIndex:uk_plan_testee_seq,priority:2"`
 
 	// 量表引用（冗余，用于查询优化）
 	ScaleCode string `gorm:"column:scale_code;size:100;not null;index:idx_scale_code"`
@@ -76,11 +76,11 @@ type AssessmentTaskPO struct {
 	// 时间点
 	PlannedAt   time.Time  `gorm:"column:planned_at;not null;index:idx_planned_at"`
 	OpenAt      *time.Time `gorm:"column:open_at;index:idx_open_at"`
-	ExpireAt    *time.Time `gorm:"column:expire_at;index:idx_expire_at"`
+	ExpireAt    *time.Time `gorm:"column:expire_at"`
 	CompletedAt *time.Time `gorm:"column:completed_at"`
 
 	// 状态与关联
-	Status       string  `gorm:"column:status;size:50;not null;default:'pending';index:idx_status"`
+	Status       string  `gorm:"column:status;size:50;not null;default:'pending'"`
 	AssessmentID *uint64 `gorm:"column:assessment_id;index:idx_assessment_id"`
 
 	// 入口信息

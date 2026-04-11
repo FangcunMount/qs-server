@@ -320,7 +320,7 @@ func (s *submissionService) createAndSaveAnswerSheet(
 	}
 
 	// 发布领域事件
-	sheet.RaiseSubmittedEvent(dto.TesteeID, dto.OrgID, dto.TaskID, dto.TaskCompletedAt)
+	sheet.RaiseSubmittedEvent(dto.TesteeID, dto.OrgID, dto.TaskID)
 	s.publishEvents(ctx, sheet, l)
 
 	return sheet, nil

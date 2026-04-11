@@ -49,7 +49,6 @@ func TestBuildAdminSubmitAnswerSheetRequest(t *testing.T) {
 		Title:                "测试问卷",
 		TesteeID:             1001,
 		TaskID:               "2001",
-		TaskCompletedAt:      "2026-04-10T10:00:00+08:00",
 		Answers: []Answer{
 			{QuestionCode: "Q1", QuestionType: questionTypeRadio, Value: "A"},
 		},
@@ -61,7 +60,6 @@ func TestBuildAdminSubmitAnswerSheetRequest(t *testing.T) {
 		adminReq.Title != req.Title ||
 		adminReq.TesteeID != req.TesteeID ||
 		adminReq.TaskID != req.TaskID ||
-		adminReq.TaskCompletedAt != req.TaskCompletedAt ||
 		len(adminReq.Answers) != 1 {
 		t.Fatalf("unexpected admin submit request: %+v", adminReq)
 	}

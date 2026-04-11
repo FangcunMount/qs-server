@@ -292,11 +292,11 @@ func (s *syncService) syncSystemStatistics(ctx context.Context, orgID int64) err
 	}
 
 	// 今日新增
-	today := time.Now().Format("2006-01-02")
+	todayStart, tomorrowStart := currentDayBounds(time.Now())
 	var todayNewAssessments int64
 	if err := s.db.WithContext(ctx).
 		Table("assessment").
-		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
 		Count(&todayNewAssessments).Error; err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func (s *syncService) syncSystemStatistics(ctx context.Context, orgID int64) err
 	var todayNewTestees int64
 	if err := s.db.WithContext(ctx).
 		Table("testee").
-		Where("org_id = ? AND DATE(created_at) = ? AND deleted_at IS NULL", orgID, today).
+		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
 		Count(&todayNewTestees).Error; err != nil {
 		return err
 	}

@@ -58,6 +58,9 @@ type AssessmentTaskRepository interface {
 	// FindListByTesteeIDs 分页查询受试者集合范围内的任务。
 	FindListByTesteeIDs(ctx context.Context, orgID int64, planID *AssessmentPlanID, testeeIDs []testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
 
+	// FindWindow 查询任务窗口，不返回 total，仅返回是否还有下一页。
+	FindWindow(ctx context.Context, orgID int64, planID AssessmentPlanID, testeeIDs []testee.ID, status *TaskStatus, plannedBefore *time.Time, page, pageSize int) ([]*AssessmentTask, bool, error)
+
 	// Save 保存任务
 	Save(ctx context.Context, task *AssessmentTask) error
 

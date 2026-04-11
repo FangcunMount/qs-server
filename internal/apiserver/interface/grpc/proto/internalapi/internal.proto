@@ -200,7 +200,6 @@ message TerminateEnrollmentResponse {
 message SchedulePendingTasksRequest {
   int64 org_id = 1;
   string before = 2;
-  string source = 3;
 }
 
 message SchedulePendingTasksResponse {

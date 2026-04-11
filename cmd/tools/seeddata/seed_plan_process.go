@@ -8,8 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 )
 
 func seedPlanProcessTasks(
@@ -34,13 +32,16 @@ func seedPlanProcessTasks(
 		"plan_submit_workers", opts.PlanSubmitWorkers,
 		"plan_wait_workers", opts.PlanWaitWorkers,
 		"plan_max_inflight_tasks", opts.PlanMaxInFlightTasks,
+		"plan_submit_queue_size", opts.PlanSubmitQueueSize,
+		"plan_submit_qps", opts.PlanSubmitQPS,
+		"plan_submit_burst", opts.PlanSubmitBurst,
 		"plan_expire_rate", planExpireRate,
 		"scope_testee_count", len(opts.ScopeTesteeIDs),
 		"continuous", opts.Continuous,
 		"verbose", opts.Verbose,
 	)
 
-	session, err := openPlanSeedSession(ctx, deps, planID, opts.Verbose)
+	session, err := openPlanProcessSession(ctx, deps, planID, opts.Verbose)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +65,9 @@ func seedPlanProcessTasks(
 		opts.PlanSubmitWorkers,
 		opts.PlanWaitWorkers,
 		opts.PlanMaxInFlightTasks,
+		opts.PlanSubmitQueueSize,
+		opts.PlanSubmitQPS,
+		opts.PlanSubmitBurst,
 		planExpireRate,
 		opts.Verbose,
 		opts.Continuous,
@@ -92,7 +96,7 @@ func seedPlanProcessTasks(
 
 func scheduleAndProcessPlanTasks(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -103,14 +107,17 @@ func scheduleAndProcessPlanTasks(
 	submitWorkers int,
 	waitWorkers int,
 	maxInFlightTasks int,
+	submitQueueSize int,
+	submitQPS float64,
+	submitBurst int,
 	planExpireRate float64,
 	verbose bool,
 	continuous bool,
 ) (*seedPlanExecutionStats, error) {
 	var reservedOpenTask atomic.Bool
-	scheduleSource := planApp.TaskSchedulerSourceSeedData
 	submitWorkers, waitWorkers, maxInFlightTasks = normalizePlanTaskExecutionConcurrency(workers, submitWorkers, waitWorkers, maxInFlightTasks)
 	taskBufferSize := normalizePlanTaskBufferSize(submitWorkers, maxInFlightTasks)
+	submitQueueSize, submitQPS, submitBurst = normalizePlanSubmitQueueConfig(submitWorkers, maxInFlightTasks, submitQueueSize, submitQPS, submitBurst)
 	discoveryLimit := max(taskBufferSize, maxInFlightTasks)
 	pendingScheduleScopeLimit := normalizePlanScheduleBatchSize(max(submitWorkers, waitWorkers))
 	if maxInFlightTasks > 0 && pendingScheduleScopeLimit > maxInFlightTasks {
@@ -120,6 +127,7 @@ func scheduleAndProcessPlanTasks(
 		pendingScheduleScopeLimit = 1
 	}
 	submitController := newSeedPlanSubmitController()
+	submitDispatchController := newSeedPlanSubmitDispatchController(submitQPS, submitBurst)
 	aggregateStats := &seedPlanExecutionStats{
 		ScheduleStats: &TaskScheduleStatsResponse{},
 	}
@@ -132,6 +140,9 @@ func scheduleAndProcessPlanTasks(
 			"wait_workers", waitWorkers,
 			"max_inflight_tasks", maxInFlightTasks,
 			"task_buffer_size", taskBufferSize,
+			"submit_queue_size", submitQueueSize,
+			"submit_qps", submitQPS,
+			"submit_burst", submitBurst,
 			"task_page_size", planProcessTaskPageSize,
 			"task_window_limit", discoveryLimit,
 			"pending_schedule_scope_limit", pendingScheduleScopeLimit,
@@ -154,13 +165,14 @@ func scheduleAndProcessPlanTasks(
 			waitWorkers,
 			taskBufferSize,
 			maxInFlightTasks,
+			submitQueueSize,
 			discoveryLimit,
 			pendingScheduleScopeLimit,
 			planExpireRate,
 			verbose,
 			&reservedOpenTask,
 			submitController,
-			scheduleSource,
+			submitDispatchController,
 		)
 		if cycleStats != nil {
 			mergeSeedPlanExecutionStats(aggregateStats, cycleStats)
@@ -209,11 +221,10 @@ func scheduleAndProcessPlanTasks(
 
 func schedulePlanTaskBatch(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
-	scheduleSource string,
 	batchIndex int,
 	batchCount int,
 	testeeIDs []string,
@@ -229,7 +240,6 @@ func schedulePlanTaskBatch(
 			return err
 		}
 		resp, err := gateway.SchedulePendingTasks(ctx, SchedulePendingTasksRequest{
-			Source:    scheduleSource,
 			PlanID:    planID,
 			TesteeIDs: testeeIDs,
 		})
@@ -250,7 +260,6 @@ func schedulePlanTaskBatch(
 		deps.Logger.Infow("Scheduled pending plan tasks",
 			"plan_id", planID,
 			"org_id", orgID,
-			"source", scheduleSource,
 			"batch_index", batchIndex,
 			"batch_count", batchCount,
 			"batch_testee_count", len(testeeIDs),
@@ -264,7 +273,7 @@ func schedulePlanTaskBatch(
 
 func runPlanTaskProcessingCycle(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -276,13 +285,14 @@ func runPlanTaskProcessingCycle(
 	waitWorkers int,
 	taskBufferSize int,
 	maxInFlightTasks int,
+	submitQueueSize int,
 	discoveryLimit int,
 	pendingScheduleScopeLimit int,
 	planExpireRate float64,
 	verbose bool,
 	reservedOpenTask *atomic.Bool,
 	submitController *seedPlanSubmitController,
-	scheduleSource string,
+	submitDispatchController *seedPlanSubmitDispatchController,
 ) (*seedPlanExecutionStats, bool, error) {
 	var submittedCount atomic.Int64
 	var skippedCount atomic.Int64
@@ -381,7 +391,7 @@ func runPlanTaskProcessingCycle(
 				return nil
 			}
 
-			scheduleResp, err := schedulePlanTaskBatch(ctx, gateway, deps, planID, orgID, scheduleSource, batchIndex, totalBatches, scheduleBatchTesteeIDs, verbose)
+			scheduleResp, err := schedulePlanTaskBatch(ctx, gateway, deps, planID, orgID, batchIndex, totalBatches, scheduleBatchTesteeIDs, verbose)
 			if err != nil {
 				failedScheduleBatchCount.Add(1)
 				dashboard.IncrementScheduleFailures()
@@ -424,6 +434,7 @@ func runPlanTaskProcessingCycle(
 			waitWorkers,
 			taskBufferSize,
 			maxInFlightTasks,
+			submitQueueSize,
 			planExpireRate,
 			verbose,
 			reservedOpenTask,
@@ -434,6 +445,7 @@ func runPlanTaskProcessingCycle(
 			&recoveredCount,
 			&failedTaskExecutionCount,
 			submitController,
+			submitDispatchController,
 			&inflightCount,
 			&maxInflightObserved,
 			dashboard,
@@ -503,7 +515,7 @@ func isSeedPlanExecutionStatsIdle(stats *seedPlanExecutionStats) bool {
 
 func runPlanTaskExecutionPipeline(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -514,6 +526,7 @@ func runPlanTaskExecutionPipeline(
 	waitWorkers int,
 	taskBufferSize int,
 	maxInFlightTasks int,
+	submitQueueSize int,
 	planExpireRate float64,
 	verbose bool,
 	reservedOpenTask *atomic.Bool,
@@ -524,6 +537,7 @@ func runPlanTaskExecutionPipeline(
 	recoveredCount *atomic.Int64,
 	failedTaskExecutionCount *atomic.Int64,
 	submitController *seedPlanSubmitController,
+	submitDispatchController *seedPlanSubmitDispatchController,
 	inflightCount *atomic.Int64,
 	maxInflightObserved *atomic.Int64,
 	dashboard *planSeedDashboard,
@@ -540,6 +554,9 @@ func runPlanTaskExecutionPipeline(
 	if taskBufferSize < submitWorkers {
 		taskBufferSize = submitWorkers
 	}
+	if submitQueueSize < submitWorkers {
+		submitQueueSize = submitWorkers
+	}
 	if maxInFlightTasks < submitWorkers {
 		maxInFlightTasks = submitWorkers
 	}
@@ -547,9 +564,41 @@ func runPlanTaskExecutionPipeline(
 		maxInFlightTasks = waitWorkers
 	}
 
+	submitQueueCh := make(chan planTaskJob, submitQueueSize)
 	jobCh := make(chan planTaskJob, taskBufferSize)
 	waitCh := make(chan planTaskWaitJob, maxInFlightTasks)
 	inflightSlots := make(chan struct{}, maxInFlightTasks)
+
+	var dispatchWG sync.WaitGroup
+	dispatchWG.Add(1)
+	go func() {
+		defer dispatchWG.Done()
+		defer close(jobCh)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case job, ok := <-submitQueueCh:
+				if !ok {
+					return
+				}
+				if err := waitForSeedPlanPacer(ctx, "dispatch_plan_answersheet_submit"); err != nil {
+					return
+				}
+				if err := submitController.Wait(ctx); err != nil {
+					return
+				}
+				if err := submitDispatchController.Wait(ctx); err != nil {
+					return
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case jobCh <- job:
+				}
+			}
+		}
+	}()
 
 	var submitWG sync.WaitGroup
 	for i := 0; i < submitWorkers; i++ {
@@ -628,16 +677,18 @@ func runPlanTaskExecutionPipeline(
 	for _, job := range jobs {
 		select {
 		case <-ctx.Done():
-			close(jobCh)
+			close(submitQueueCh)
+			dispatchWG.Wait()
 			submitWG.Wait()
 			close(waitCh)
 			waitWG.Wait()
 			return ctx.Err()
-		case jobCh <- job:
+		case submitQueueCh <- job:
 		}
 	}
 
-	close(jobCh)
+	close(submitQueueCh)
+	dispatchWG.Wait()
 	submitWG.Wait()
 	close(waitCh)
 	waitWG.Wait()
@@ -650,7 +701,7 @@ func runPlanTaskExecutionPipeline(
 
 func processPlanTaskSubmitStage(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -770,19 +821,6 @@ func processPlanTaskSubmitStage(
 		inflightCount.Add(-1)
 	}
 
-	if err := waitForSeedPlanPacer(ctx, "submit_plan_answersheet"); err != nil {
-		releaseSlot()
-		failedTaskExecutionCount.Add(1)
-		dashboard.AdvanceTask()
-		return
-	}
-	if err := submitController.Wait(ctx); err != nil {
-		releaseSlot()
-		failedTaskExecutionCount.Add(1)
-		dashboard.AdvanceTask()
-		return
-	}
-
 	attempts, err := submitPlanAnswerSheetWithControlledRetry(ctx, deps.APIClient, *req, planSubmitMaxAttempts)
 	if err != nil {
 		if isSeedPlanRecoverableError(err) {
@@ -822,7 +860,7 @@ func processPlanTaskSubmitStage(
 
 func processPlanTaskWaitStage(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	orgID int64,
@@ -870,58 +908,9 @@ func processPlanTaskWaitStage(
 	}
 }
 
-func collectPlanTaskJobsForTesteeIDs(
-	ctx context.Context,
-	gateway PlanSeedGateway,
-	deps *dependencies,
-	planID string,
-	testeeIDs []string,
-	verbose bool,
-	skippedCount *atomic.Int64,
-	failedTaskListCount *atomic.Int64,
-) ([]planTaskJob, error) {
-	taskJobs := make([]planTaskJob, 0, len(testeeIDs))
-	for _, testeeID := range testeeIDs {
-		testeeID = strings.TrimSpace(testeeID)
-		if testeeID == "" {
-			continue
-		}
-		var taskList *TaskListResponse
-		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_plan_tasks_for_testee", testeeID, func() error {
-			if err := waitForSeedPlanPacer(ctx, "list_plan_tasks_for_testee"); err != nil {
-				return err
-			}
-			resp, err := gateway.ListTasksByTesteeAndPlan(ctx, testeeID, planID)
-			if err != nil {
-				return err
-			}
-			taskList = resp
-			return nil
-		})
-		if err != nil {
-			if failedTaskListCount != nil {
-				failedTaskListCount.Add(1)
-			}
-			if verbose {
-				deps.Logger.Warnw("Skipping testee because listing plan tasks failed after recovery attempts",
-					"plan_id", planID,
-					"testee_id", testeeID,
-					"error", err.Error(),
-				)
-			}
-			continue
-		}
-		if taskList == nil {
-			taskList = &TaskListResponse{}
-		}
-		taskJobs = appendPlanTaskJobsFromTasks(taskJobs, taskList.Tasks, testeeID, planID, deps, verbose, skippedCount)
-	}
-	return taskJobs, nil
-}
-
 func collectPlanTaskJobWindowByPlan(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	discoveryLimit int,
@@ -933,11 +922,10 @@ func collectPlanTaskJobWindowByPlan(
 		ctx,
 		gateway,
 		deps,
-		ListTasksRequest{
+		ListPlanTaskWindowRequest{
 			PlanID: planID,
 			Status: "opened",
 		},
-		"",
 		planID,
 		discoveryLimit,
 		verbose,
@@ -948,7 +936,7 @@ func collectPlanTaskJobWindowByPlan(
 
 func collectPlanTaskJobWindowForTesteeIDs(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	testeeIDs []string,
@@ -977,12 +965,11 @@ func collectPlanTaskJobWindowForTesteeIDs(
 			ctx,
 			gateway,
 			deps,
-			ListTasksRequest{
-				PlanID:   planID,
-				TesteeID: testeeID,
-				Status:   "opened",
+			ListPlanTaskWindowRequest{
+				PlanID:    planID,
+				TesteeIDs: []string{testeeID},
+				Status:    "opened",
 			},
-			testeeID,
 			planID,
 			remaining,
 			verbose,
@@ -1006,7 +993,7 @@ func collectPlanTaskJobWindowForTesteeIDs(
 
 func collectSchedulablePendingTesteeWindowByPlan(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
 	planID string,
 	scopeLimit int,
@@ -1019,6 +1006,7 @@ func collectSchedulablePendingTesteeWindowByPlan(
 	}
 
 	before := time.Now()
+	beforeStr := before.Format("2006-01-02 15:04:05")
 	selectedIDs := make([]string, 0, scopeLimit)
 	seen := make(map[string]struct{}, scopeLimit)
 	resourceID := strings.TrimSpace(planID)
@@ -1032,16 +1020,17 @@ func collectSchedulablePendingTesteeWindowByPlan(
 			pageSize = 1
 		}
 
-		var taskList *TaskListResponse
+		var taskList *PlanTaskWindowResponse
 		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_schedulable_pending_plan_tasks", resourceID, func() error {
 			if err := waitForSeedPlanPacer(ctx, "list_schedulable_pending_plan_tasks"); err != nil {
 				return err
 			}
-			resp, err := gateway.ListSchedulablePendingTasks(ctx, ListSchedulablePendingTasksRequest{
-				PlanID:   planID,
-				Before:   before,
-				Page:     page,
-				PageSize: pageSize,
+			resp, err := gateway.ListPlanTaskWindow(ctx, ListPlanTaskWindowRequest{
+				PlanID:        planID,
+				Status:        "pending",
+				PlannedBefore: beforeStr,
+				Page:          page,
+				PageSize:      pageSize,
 			})
 			if err != nil {
 				return err
@@ -1056,7 +1045,7 @@ func collectSchedulablePendingTesteeWindowByPlan(
 			return nil, false, err
 		}
 		if taskList == nil {
-			taskList = &TaskListResponse{}
+			taskList = &PlanTaskWindowResponse{}
 		}
 
 		for _, task := range taskList.Tasks {
@@ -1083,7 +1072,7 @@ func collectSchedulablePendingTesteeWindowByPlan(
 			}
 		}
 
-		if !hasMoreTaskListPages(taskList, page, pageSize) {
+		if !hasMorePlanTaskWindow(taskList, page, pageSize) {
 			return selectedIDs, false, nil
 		}
 	}
@@ -1091,45 +1080,11 @@ func collectSchedulablePendingTesteeWindowByPlan(
 	return selectedIDs, false, nil
 }
 
-func collectPlanTaskJobsByPlan(
-	ctx context.Context,
-	gateway PlanSeedGateway,
-	deps *dependencies,
-	planID string,
-	verbose bool,
-	skippedCount *atomic.Int64,
-	failedTaskListCount *atomic.Int64,
-) ([]planTaskJob, error) {
-	var taskList *TaskListResponse
-	err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_plan_tasks", planID, func() error {
-		if err := waitForSeedPlanPacer(ctx, "list_plan_tasks"); err != nil {
-			return err
-		}
-		resp, err := gateway.ListTasksByPlan(ctx, planID)
-		if err != nil {
-			return err
-		}
-		taskList = resp
-		return nil
-	})
-	if err != nil {
-		if failedTaskListCount != nil {
-			failedTaskListCount.Add(1)
-		}
-		return nil, err
-	}
-	if taskList == nil {
-		taskList = &TaskListResponse{}
-	}
-	return appendPlanTaskJobsFromTasks(nil, taskList.Tasks, "", planID, deps, verbose, skippedCount), nil
-}
-
 func collectPlanTaskJobWindow(
 	ctx context.Context,
-	gateway PlanSeedGateway,
+	gateway planProcessGateway,
 	deps *dependencies,
-	req ListTasksRequest,
-	fallbackTesteeID string,
+	req ListPlanTaskWindowRequest,
 	planID string,
 	discoveryLimit int,
 	verbose bool,
@@ -1142,8 +1097,8 @@ func collectPlanTaskJobWindow(
 
 	taskJobs := make([]planTaskJob, 0, min(discoveryLimit, planProcessTaskPageSize))
 	resourceID := strings.TrimSpace(req.PlanID)
-	if testeeID := strings.TrimSpace(req.TesteeID); testeeID != "" {
-		resourceID = testeeID
+	if len(req.TesteeIDs) > 0 && strings.TrimSpace(req.TesteeIDs[0]) != "" {
+		resourceID = strings.TrimSpace(req.TesteeIDs[0])
 	}
 	if resourceID == "" {
 		resourceID = "opened_plan_tasks"
@@ -1157,12 +1112,12 @@ func collectPlanTaskJobWindow(
 			pageReq.PageSize = 1
 		}
 
-		var taskList *TaskListResponse
+		var taskList *PlanTaskWindowResponse
 		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "list_opened_plan_tasks", resourceID, func() error {
 			if err := waitForSeedPlanPacer(ctx, "list_opened_plan_tasks"); err != nil {
 				return err
 			}
-			resp, err := gateway.ListTasks(ctx, pageReq)
+			resp, err := gateway.ListPlanTaskWindow(ctx, pageReq)
 			if err != nil {
 				return err
 			}
@@ -1176,14 +1131,18 @@ func collectPlanTaskJobWindow(
 			return nil, false, err
 		}
 		if taskList == nil {
-			taskList = &TaskListResponse{}
+			taskList = &PlanTaskWindowResponse{}
 		}
 
+		fallbackTesteeID := ""
+		if len(pageReq.TesteeIDs) == 1 {
+			fallbackTesteeID = pageReq.TesteeIDs[0]
+		}
 		taskJobs = appendPlanTaskJobsFromTasks(taskJobs, taskList.Tasks, fallbackTesteeID, planID, deps, verbose, skippedCount)
 		if len(taskJobs) >= discoveryLimit {
 			return taskJobs[:discoveryLimit], true, nil
 		}
-		if !hasMoreTaskListPages(taskList, pageReq.Page, pageReq.PageSize) {
+		if !hasMorePlanTaskWindow(taskList, pageReq.Page, pageReq.PageSize) {
 			return taskJobs, false, nil
 		}
 	}
@@ -1191,9 +1150,12 @@ func collectPlanTaskJobWindow(
 	return taskJobs, false, nil
 }
 
-func hasMoreTaskListPages(taskList *TaskListResponse, page int, pageSize int) bool {
+func hasMorePlanTaskWindow(taskList *PlanTaskWindowResponse, page int, pageSize int) bool {
 	if taskList == nil {
 		return false
+	}
+	if taskList.HasMore {
+		return true
 	}
 	if taskList.Page > 0 {
 		page = taskList.Page
@@ -1206,9 +1168,6 @@ func hasMoreTaskListPages(taskList *TaskListResponse, page int, pageSize int) bo
 	}
 	if pageSize <= 0 {
 		pageSize = len(taskList.Tasks)
-	}
-	if taskList.TotalCount > 0 && pageSize > 0 {
-		return int64(page*pageSize) < taskList.TotalCount
 	}
 	return pageSize > 0 && len(taskList.Tasks) >= pageSize
 }
@@ -1285,7 +1244,7 @@ func appendPlanTaskJobsFromTasks(
 	return taskJobs
 }
 
-func expirePlanTaskWithRecovery(ctx context.Context, gateway PlanSeedGateway, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
+func expirePlanTaskWithRecovery(ctx context.Context, gateway planProcessGateway, orgID int64, task TaskResponse) (*TaskResponse, bool, error) {
 	if err := waitForSeedPlanPacer(ctx, "expire_plan_task"); err != nil {
 		return nil, false, err
 	}
@@ -1398,7 +1357,6 @@ func buildPlanSubmissionRequest(
 		Title:                detail.Title,
 		TesteeID:             testeeIDUint,
 		TaskID:               task.ID,
-		TaskCompletedAt:      seedPlanTaskCompletedAt(task),
 		Answers:              answers,
 	}
 	return req, nil

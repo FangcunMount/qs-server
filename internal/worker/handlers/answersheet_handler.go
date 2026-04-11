@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/grpcmeta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"google.golang.org/grpc/metadata"
 )
 
 func init() {
@@ -34,7 +31,6 @@ type AnswerSheetSubmittedPayload struct {
 	FillerID             uint64    `json:"filler_id"`
 	FillerType           string    `json:"filler_type"`
 	TaskID               string    `json:"task_id"`
-	TaskCompletedAt      string    `json:"task_completed_at"`
 	SubmittedAt          time.Time `json:"submitted_at"`
 }
 
@@ -108,7 +104,6 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (uint64, *AnswerSh
 		"filler_id", data.FillerID,
 		"filler_type", data.FillerType,
 		"task_id", data.TaskID,
-		"task_completed_at", data.TaskCompletedAt,
 		"submitted_at", data.SubmittedAt,
 	)
 	return answerSheetID, &data, nil
@@ -194,12 +189,8 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 	if data.TaskID == "" {
 		assessmentReq.OriginType = "adhoc"
 	}
-	callCtx := ctx
-	if completedAt := strings.TrimSpace(data.TaskCompletedAt); completedAt != "" {
-		callCtx = metadata.AppendToOutgoingContext(callCtx, grpcmeta.TaskCompletedAtHeader, completedAt)
-	}
 	// 创建测评
-	assessmentResp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(callCtx, assessmentReq)
+	assessmentResp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(ctx, assessmentReq)
 	if err != nil {
 		return fmt.Errorf("failed to create assessment from answersheet: %w", err)
 	}

@@ -27,7 +27,7 @@ func NewEntryGenerator(baseURL string) plan.EntryGenerator {
 // GenerateEntry 生成测评入口
 func (g *entryGenerator) GenerateEntry(ctx context.Context, task *planDomain.AssessmentTask) (token string, url string, expireAt time.Time, err error) {
 	taskID := task.GetID().String()
-	actionAt := planDomain.TaskActionTimeOrNow(ctx)
+	actionAt := time.Now()
 	logger.L(ctx).Infow("Generating entry for task",
 		"infra_action", "generate_entry",
 		"task_id", taskID,

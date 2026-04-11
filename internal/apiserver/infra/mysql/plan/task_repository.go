@@ -115,7 +115,7 @@ func (r *taskRepository) FindPendingTasks(ctx context.Context, orgID int64, befo
 	var pos []*AssessmentTaskPO
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND status = ? AND planned_at <= ? AND deleted_at IS NULL",
-			orgID, domainPlan.TaskStatusPending.String(), before).
+						orgID, domainPlan.TaskStatusPending.String(), before).
 		Order("planned_at ASC"). // 按计划时间升序，优先处理早的
 		Find(&pos).Error
 
@@ -224,6 +224,59 @@ func (r *taskRepository) FindListByTesteeIDs(
 	}
 
 	return r.mapper.ToDomainList(pos), total, nil
+}
+
+// FindWindow 查询任务窗口，不执行 COUNT(*)。
+func (r *taskRepository) FindWindow(
+	ctx context.Context,
+	orgID int64,
+	planID domainPlan.AssessmentPlanID,
+	testeeIDs []testee.ID,
+	status *domainPlan.TaskStatus,
+	plannedBefore *time.Time,
+	page, pageSize int,
+) ([]*domainPlan.AssessmentTask, bool, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND plan_id = ? AND deleted_at IS NULL", orgID, planID.Uint64())
+
+	if len(testeeIDs) > 0 {
+		rawIDs := make([]uint64, 0, len(testeeIDs))
+		for _, id := range testeeIDs {
+			rawIDs = append(rawIDs, id.Uint64())
+		}
+		query = query.Where("testee_id IN ?", rawIDs)
+	}
+	if status != nil {
+		query = query.Where("status = ?", status.String())
+	}
+	if plannedBefore != nil {
+		query = query.Where("planned_at <= ?", *plannedBefore)
+	}
+
+	offset := (page - 1) * pageSize
+	limit := pageSize + 1
+	var pos []*AssessmentTaskPO
+	if err := query.
+		Order("planned_at ASC").
+		Order("id ASC").
+		Offset(offset).
+		Limit(limit).
+		Find(&pos).Error; err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(pos) > pageSize
+	if hasMore {
+		pos = pos[:pageSize]
+	}
+	return r.mapper.ToDomainList(pos), hasMore, nil
 }
 
 // Save 保存任务（新增或更新）

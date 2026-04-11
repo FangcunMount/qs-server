@@ -108,7 +108,6 @@ type TaskOpenedData struct {
 	TesteeID string    `json:"testee_id"`
 	EntryURL string    `json:"entry_url"`
 	OpenAt   time.Time `json:"open_at"`
-	Source   string    `json:"source,omitempty"`
 }
 
 // TaskCompletedData 任务完成事件数据
@@ -316,7 +315,6 @@ func NewTaskOpenedEvent(
 	testeeID testee.ID,
 	entryURL string,
 	openAt time.Time,
-	source string,
 ) TaskOpenedEvent {
 	return event.New(
 		EventTypeTaskOpened,
@@ -328,7 +326,6 @@ func NewTaskOpenedEvent(
 			TesteeID: testeeID.String(),
 			EntryURL: entryURL,
 			OpenAt:   openAt,
-			Source:   source,
 		},
 	)
 }

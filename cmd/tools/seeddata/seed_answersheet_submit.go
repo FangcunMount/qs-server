@@ -25,7 +25,6 @@ func buildAdminSubmitAnswerSheetRequest(req SubmitAnswerSheetRequest) AdminSubmi
 		Title:                req.Title,
 		TesteeID:             req.TesteeID,
 		TaskID:               req.TaskID,
-		TaskCompletedAt:      req.TaskCompletedAt,
 		Answers:              req.Answers,
 	}
 }

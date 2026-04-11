@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
-	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
@@ -190,7 +189,6 @@ func (r *workerPlanSchedulerRunner) runOnce(ctx context.Context) error {
 		resp, err := r.client.SchedulePendingTasks(ctx, &pb.SchedulePendingTasksRequest{
 			OrgId:  orgID,
 			Before: "",
-			Source: planApp.TaskSchedulerSourceBuiltin,
 		})
 		if err != nil {
 			failedOrgs++

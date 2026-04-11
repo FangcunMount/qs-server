@@ -1,0 +1,8 @@
+[
+  { "dropIndexes": "scales", "index": "idx_scales_status_deleted_created" },
+  { "dropIndexes": "scales", "index": "idx_scales_questionnaire_deleted_created" },
+  { "dropIndexes": "scales", "index": "idx_scales_category_deleted_created" },
+  { "dropIndexes": "interpret_reports", "index": "idx_reports_testee_active_created" },
+  { "dropIndexes": "answersheets", "index": "idx_answersheets_filler_active_filled" },
+  { "dropIndexes": "answersheets", "index": "idx_answersheets_questionnaire_active_filled" }
+]

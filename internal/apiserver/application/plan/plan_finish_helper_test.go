@@ -84,6 +84,10 @@ func (r *finalizeTaskRepoStub) FindListByTesteeIDs(context.Context, int64, *doma
 	return nil, 0, nil
 }
 
+func (r *finalizeTaskRepoStub) FindWindow(context.Context, int64, domainPlan.AssessmentPlanID, []testee.ID, *domainPlan.TaskStatus, *time.Time, int, int) ([]*domainPlan.AssessmentTask, bool, error) {
+	return nil, false, nil
+}
+
 func (r *finalizeTaskRepoStub) Save(context.Context, *domainPlan.AssessmentTask) error {
 	return nil
 }
@@ -128,7 +132,7 @@ func TestFinalizePlanIfDonePublishesPlanFinishedEvent(t *testing.T) {
 		time.Now(),
 	)
 	taskLifecycle := domainPlan.NewTaskLifecycle()
-	if err := taskLifecycle.Open(ctx, task, "token", "https://example.com/entry", time.Now().Add(time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(ctx, task, "token", "https://example.com/entry", time.Now().Add(time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	task.ClearEvents()

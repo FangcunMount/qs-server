@@ -1,0 +1,44 @@
+[
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "filler_id": 1, "filled_at": -1 },
+        "name": "idx_answersheets_filler_active_filled",
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "questionnaire_code": 1, "filled_at": -1 },
+        "name": "idx_answersheets_questionnaire_active_filled",
+        "partialFilterExpression": { "deleted_at": null }
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpret_reports",
+    "indexes": [
+      {
+        "key": { "testee_id": 1, "created_at": -1 },
+        "name": "idx_reports_testee_active_created",
+        "partialFilterExpression": { "deleted_at": null }
+      }
+    ]
+  },
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "status": 1, "deleted_at": 1, "created_at": -1 },
+        "name": "idx_scales_status_deleted_created"
+      },
+      {
+        "key": { "questionnaire_code": 1, "deleted_at": 1, "created_at": -1 },
+        "name": "idx_scales_questionnaire_deleted_created"
+      },
+      {
+        "key": { "category": 1, "deleted_at": 1, "created_at": -1 },
+        "name": "idx_scales_category_deleted_created"
+      }
+    ]
+  }
+]

@@ -144,6 +144,10 @@ func (f *fakeTaskRepo) FindListByTesteeIDs(context.Context, int64, *domainplan.A
 	return nil, 0, nil
 }
 
+func (f *fakeTaskRepo) FindWindow(context.Context, int64, domainplan.AssessmentPlanID, []testee.ID, *domainplan.TaskStatus, *time.Time, int, int) ([]*domainplan.AssessmentTask, bool, error) {
+	return nil, false, nil
+}
+
 func (f *fakeTaskRepo) Save(context.Context, *domainplan.AssessmentTask) error {
 	return nil
 }
@@ -205,10 +209,10 @@ func TestCommandServiceCancelPlanCountsAffectedTasks(t *testing.T) {
 	openedTask := domainplan.NewAssessmentTask(planAggregate.GetID(), 2, 7, testeeID, "scale-code", time.Now().Add(time.Hour))
 	completedTask := domainplan.NewAssessmentTask(planAggregate.GetID(), 3, 7, testeeID, "scale-code", time.Now().Add(2*time.Hour))
 
-	if err := taskLifecycle.Open(context.Background(), openedTask, "token-open", "https://example.com/open", time.Now().Add(4*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(context.Background(), openedTask, "token-open", "https://example.com/open", time.Now().Add(4*time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
-	if err := taskLifecycle.Open(context.Background(), completedTask, "token-complete", "https://example.com/complete", time.Now().Add(4*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(context.Background(), completedTask, "token-complete", "https://example.com/complete", time.Now().Add(4*time.Hour)); err != nil {
 		t.Fatalf("failed to open completed task: %v", err)
 	}
 	if err := taskLifecycle.Complete(context.Background(), completedTask, 9001); err != nil {

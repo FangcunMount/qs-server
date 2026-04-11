@@ -53,11 +53,9 @@ func NewTaskSchedulerService(
 
 // SchedulePendingTasks 调度待推送的任务
 func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID int64, before string) ([]*TaskResult, error) {
-	source := taskSchedulerSourceFromContext(ctx)
 	scope := taskSchedulerScopeFromContext(ctx)
 	logger.L(ctx).Infow("Scheduling pending tasks",
 		"action", "schedule_pending_tasks",
-		"source", source,
 		"org_id", orgID,
 		"before", before,
 		"scope_plan_id", scopePlanID(scope),
@@ -72,7 +70,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	if err != nil {
 		logger.L(ctx).Errorw("Invalid time format",
 			"action", "schedule_pending_tasks",
-			"source", source,
 			"before", before,
 			"error", err.Error(),
 		)
@@ -84,7 +81,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to find pending tasks",
 			"action", "schedule_pending_tasks",
-			"source", source,
 			"org_id", orgID,
 			"before", before,
 			"scope_plan_id", scopePlanID(scope),
@@ -96,7 +92,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 
 	logger.L(ctx).Infow("Found pending tasks",
 		"action", "schedule_pending_tasks",
-		"source", source,
 		"org_id", orgID,
 		"before", before,
 		"scope_plan_id", scopePlanID(scope),
@@ -109,18 +104,11 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 	failedCount := 0
 	inactivePlanCanceledCount := 0
 	planCache := make(map[string]*plan.AssessmentPlan)
-	openSource := taskSchedulerSourceFromContext(ctx)
 	for _, task := range tasks {
-		taskCtx := ctx
-		if openSource == TaskSchedulerSourceSeedData {
-			taskCtx = plan.WithTaskActionTime(ctx, task.GetPlannedAt())
-		}
-
 		parentPlan, err := s.loadPlanForTask(ctx, planCache, task.GetPlanID())
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to load parent plan for task scheduling",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"plan_id", task.GetPlanID().String(),
 				"error", err.Error(),
@@ -132,7 +120,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 			if err := s.cancelTaskForInactivePlan(ctx, task, parentPlan); err != nil {
 				logger.L(ctx).Errorw("Failed to cancel pending task for inactive plan",
 					"action", "schedule_pending_tasks",
-					"source", source,
 					"task_id", task.GetID().String(),
 					"plan_id", task.GetPlanID().String(),
 					"plan_status", parentPlan.GetStatus().String(),
@@ -146,11 +133,10 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 生成入口
-		token, url, expireAt, err := s.entryGenerator.GenerateEntry(taskCtx, task)
+		token, url, expireAt, err := s.entryGenerator.GenerateEntry(ctx, task)
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to generate entry",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"error", err.Error(),
 			)
@@ -159,10 +145,9 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 开放任务
-		if err := s.taskLifecycle.Open(taskCtx, task, token, url, expireAt, openSource); err != nil {
+		if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt); err != nil {
 			logger.L(ctx).Errorw("Failed to open task",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"error", err.Error(),
 			)
@@ -174,7 +159,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		if err := s.taskRepo.Save(ctx, task); err != nil {
 			logger.L(ctx).Errorw("Failed to save opened task",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"error", err.Error(),
 			)
@@ -188,7 +172,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
 				logger.L(ctx).Errorw("Failed to publish task event",
 					"action", "schedule_pending_tasks",
-					"source", source,
 					"task_id", task.GetID().String(),
 					"event_type", evt.EventType(),
 					"error", err.Error(),
@@ -202,9 +185,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 
 	expiredCount := 0
 	expireFailedCount := 0
-	if source != TaskSchedulerSourceSeedData {
-		expiredCount, expireFailedCount = s.expireOverdueTasks(ctx, orgID, planCache)
-	}
+	expiredCount, expireFailedCount = s.expireOverdueTasks(ctx, orgID, planCache)
 	CollectTaskScheduleStats(ctx, TaskScheduleStats{
 		PendingCount:      len(tasks),
 		OpenedCount:       len(openedTasks),
@@ -215,7 +196,6 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 
 	logger.L(ctx).Infow("Tasks scheduled",
 		"action", "schedule_pending_tasks",
-		"source", source,
 		"org_id", orgID,
 		"before", before,
 		"scope_plan_id", scopePlanID(scope),
@@ -320,12 +300,10 @@ func scopeTesteeCount(scope *TaskSchedulerScope) int {
 }
 
 func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int64, planCache map[string]*plan.AssessmentPlan) (int, int) {
-	source := taskSchedulerSourceFromContext(ctx)
 	tasks, err := s.taskRepo.FindExpiredTasks(ctx)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to find expired tasks",
 			"action", "schedule_pending_tasks",
-			"source", source,
 			"error", err.Error(),
 		)
 		return 0, 1
@@ -342,7 +320,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 		if err != nil {
 			logger.L(ctx).Errorw("Failed to load parent plan for expiring task",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"plan_id", task.GetPlanID().String(),
 				"error", err.Error(),
@@ -354,7 +331,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 			if err := s.cancelTaskForInactivePlan(ctx, task, parentPlan); err != nil {
 				logger.L(ctx).Errorw("Failed to cancel opened task for inactive plan",
 					"action", "schedule_pending_tasks",
-					"source", source,
 					"task_id", task.GetID().String(),
 					"plan_id", task.GetPlanID().String(),
 					"plan_status", parentPlan.GetStatus().String(),
@@ -367,7 +343,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 		if err := s.taskLifecycle.Expire(ctx, task); err != nil {
 			logger.L(ctx).Errorw("Failed to expire task",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"error", err.Error(),
 			)
@@ -378,7 +353,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 		if err := s.taskRepo.Save(ctx, task); err != nil {
 			logger.L(ctx).Errorw("Failed to save expired task",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"task_id", task.GetID().String(),
 				"error", err.Error(),
 			)
@@ -390,7 +364,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
 				logger.L(ctx).Errorw("Failed to publish expired task event",
 					"action", "schedule_pending_tasks",
-					"source", source,
 					"task_id", task.GetID().String(),
 					"event_type", evt.EventType(),
 					"error", err.Error(),
@@ -407,7 +380,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 		if err := s.finishPlanIfDone(ctx, planID); err != nil {
 			logger.L(ctx).Warnw("Failed to finalize plan after expiring tasks",
 				"action", "schedule_pending_tasks",
-				"source", source,
 				"plan_id", planID.String(),
 				"error", err.Error(),
 			)
@@ -459,7 +431,6 @@ func (s *taskSchedulerService) cancelTaskForInactivePlan(
 		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
 			logger.L(ctx).Errorw("Failed to publish task event while canceling inactive-plan task",
 				"action", "schedule_pending_tasks",
-				"source", taskSchedulerSourceFromContext(ctx),
 				"task_id", task.GetID().String(),
 				"plan_id", task.GetPlanID().String(),
 				"plan_status", parentPlan.GetStatus().String(),

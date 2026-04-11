@@ -2,43 +2,34 @@
 
 QS 系统测试数据生成工具。
 
-## 本文回答
-
-这份 README 重点回答 3 个问题：
-
-- 我现在想造哪类数据，应该跑哪个 `--steps`
-- 常见运行方案下，命令应该怎么写
-- `assessment`、`plan_create_tasks`、`plan_process_tasks` 的职责边界是什么
-
 ## 30 秒结论
 
-- 只想批量生成测评，运行 `--steps assessment`。
-- 想批量创建计划 task，运行 `--steps plan_create_tasks`。
-- 想慢慢处理已有 task，运行 `--steps plan_process_tasks`；它默认不会自动退出，适合放到 `tmux` 后台长期运行。
-- `plan_process_tasks` 本身就是“处理已有 task”的脚本，所以不再需要单独的“恢复模式”概念。
-- plan 相关步骤现在只保留本地 runtime 路径：直接读取本地 MySQL / MongoDB / Redis，不再保留 remote 回退模式。
-- `plan` 只是兼容旧入口，等价于单次执行一次 `plan_create_tasks`，然后再执行一次 one-shot `plan_process_tasks`。
+- 只想批量生成测评：运行 `--steps assessment`
+- 只想批量创建计划 task：运行 `--steps plan_create_tasks`
+- 想在后台长期处理 backlog task：运行 `--steps plan_process_tasks`
+- 想把历史时间修正成“按 planned_at 回放”的拟真结果：运行 `--steps plan_fixup_timestamps`
+- `plan` 只是兼容旧入口，等价于单次执行 `plan_create_tasks`，再执行 one-shot `plan_process_tasks`
 
-## 方案速查
+## 先选方案
 
-| 目标 | 推荐步骤 | 是否常驻 | 适用说明 |
+| 目标 | 推荐步骤 | 是否常驻 | 依赖 |
 | --- | --- | --- | --- |
-| 只生成测评数据 | `assessment` | 否 | 只提交答卷并生成测评，不碰 plan task |
-| 只批量创建 task | `plan_create_tasks` | 否 | 先把 task 数据造出来，暂不处理 task |
-| 先造 task，再后台慢慢轮转 | `plan_create_tasks` + `plan_process_tasks` | `plan_process_tasks` 常驻 | 最推荐的 plan 造数方式 |
-| 只处理已有 task | `plan_process_tasks` | 是 | 不再创建新 task，只消费 backlog |
-| 一次性跑完 create + process | `plan` | 否 | 兼容旧入口，适合小批量单次执行 |
+| 只生成测评数据 | `assessment` | 否 | apiserver + collection-server |
+| 只创建 task | `plan_create_tasks` | 否 | 本地 MySQL + MongoDB + Redis |
+| 长期后台处理 task | `plan_process_tasks` | 是 | apiserver API |
+| 修正 task/assessment/report 时间 | `plan_fixup_timestamps` | 否 | 本地 MySQL + MongoDB |
+| 一次性 create + process | `plan` | 否 | create 走本地依赖，process 走 apiserver API |
 
 ## 运行前准备
 
-- `assessment` 依赖 apiserver 与 collection-server 可访问。
-- `plan_create_tasks` / `plan_process_tasks` 依赖脚本所在环境可直连 QS 使用的 MySQL / MongoDB / Redis。
-- 配置文件在 `configs/seeddata.yaml`，至少要配置好 `global.orgId`、API 地址和鉴权信息。
-- `api-token` 为空时，脚本会尝试使用 `iam` 配置登录并自动刷新 token。
+- `global.orgId` 必须配置
+- `api.baseUrl`、`api.token` 或 `iam.*` 必须可用
+- `assessment` 需要 `collectionBaseUrl`
+- `plan_create_tasks` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`、`local.redis_*`
+- `plan_fixup_timestamps` 只需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
+- `plan_process_tasks` 不再初始化本地 runtime，不再要求本地 MySQL / MongoDB / Redis
 
 ## 公共变量
-
-下面的示例默认先准备这些 shell 变量，后面的命令可以直接复制。
 
 ```bash
 export CFG=./configs/seeddata.yaml
@@ -53,14 +44,9 @@ export REDIS_PASSWORD=''
 export REDIS_DB=0
 ```
 
-如果你不想把数据库密码写进仓库里的 `seeddata.yaml`，推荐把 `local.*` 留空，仅在执行时通过命令行覆盖。
+## 按方案运行
 
-## 按方案运行命令
-
-### 方案 1：只生成测评数据
-
-适用场景：
-需要批量提交医学量表答卷并生成测评，不需要 plan task。
+### 方案 1：只生成测评
 
 ```bash
 go run ./cmd/tools/seeddata \
@@ -76,10 +62,7 @@ go run ./cmd/tools/seeddata \
   --assessment-scale-categories "cognitive,behavior"
 ```
 
-### 方案 2：只批量创建计划 task
-
-适用场景：
-先把 `assessment_planid` 对应的 task 数据造出来，后续再单独处理 task。
+### 方案 2：只创建计划 task
 
 ```bash
 go run ./cmd/tools/seeddata \
@@ -99,50 +82,29 @@ go run ./cmd/tools/seeddata \
   --local-redis-db "$REDIS_DB"
 ```
 
-### 方案 3：先创建 task，再后台长期处理 task
+### 方案 3：后台长期处理 backlog task
 
-适用场景：
-你希望先集中造数，再把 task 轮转脚本放到后台慢慢跑几小时或几天。
+`plan_process_tasks` 现在是 API-only 轻量进程：
 
-第一步，创建 task：
-
-```bash
-go run ./cmd/tools/seeddata \
-  --config "$CFG" \
-  --steps "plan_create_tasks" \
-  --plan-id "$PLAN_ID" \
-  --plan-workers 4 \
-  --testee-limit 1000 \
-  --local-mysql-dsn "$MYSQL_DSN" \
-  --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB" \
-  --local-redis-addr "$REDIS_ADDR" \
-  --local-redis-username "$REDIS_USERNAME" \
-  --local-redis-password "$REDIS_PASSWORD" \
-  --local-redis-db "$REDIS_DB"
-```
-
-第二步，单独长期运行 task 处理器：
+- 不再启动本地 apiserver container
+- 不再直连本地 MySQL / MongoDB / Redis
+- 适合放在 `tmux` 后台常驻
 
 ```bash
 go run ./cmd/tools/seeddata \
   --config "$CFG" \
   --steps "plan_process_tasks" \
   --plan-id "$PLAN_ID" \
-  --plan-submit-workers 12 \
-  --plan-wait-workers 3 \
-  --plan-max-inflight-tasks 120 \
-  --plan-expire-rate 0.2 \
-  --local-mysql-dsn "$MYSQL_DSN" \
-  --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB" \
-  --local-redis-addr "$REDIS_ADDR" \
-  --local-redis-username "$REDIS_USERNAME" \
-  --local-redis-password "$REDIS_PASSWORD" \
-  --local-redis-db "$REDIS_DB"
+  --plan-submit-workers 8 \
+  --plan-wait-workers 4 \
+  --plan-max-inflight-tasks 64 \
+  --plan-submit-queue-size 32 \
+  --plan-submit-qps 4 \
+  --plan-submit-burst 8 \
+  --plan-expire-rate 0.2
 ```
 
-用 `tmux` 在后台长跑：
+`tmux` 后台示例：
 
 ```bash
 tmux new-session -d -s seed-plan-process "
@@ -151,46 +113,17 @@ go run ./cmd/tools/seeddata \
   --config '$CFG' \
   --steps 'plan_process_tasks' \
   --plan-id '$PLAN_ID' \
-  --plan-submit-workers 12 \
-  --plan-wait-workers 3 \
-  --plan-max-inflight-tasks 120 \
-  --plan-expire-rate 0.2 \
-  --local-mysql-dsn '$MYSQL_DSN' \
-  --local-mongo-uri '$MONGO_URI' \
-  --local-mongo-database '$MONGO_DB' \
-  --local-redis-addr '$REDIS_ADDR' \
-  --local-redis-username '$REDIS_USERNAME' \
-  --local-redis-password '$REDIS_PASSWORD' \
-  --local-redis-db '$REDIS_DB'
+  --plan-submit-workers 8 \
+  --plan-wait-workers 4 \
+  --plan-max-inflight-tasks 64 \
+  --plan-submit-queue-size 32 \
+  --plan-submit-qps 4 \
+  --plan-submit-burst 8 \
+  --plan-expire-rate 0.2
 "
 ```
 
-### 方案 4：只处理已有 task
-
-适用场景：
-task 已经存在，不想再 enroll，只想处理 backlog。
-
-处理整个 plan 下已有 task：
-
-```bash
-go run ./cmd/tools/seeddata \
-  --config "$CFG" \
-  --steps "plan_process_tasks" \
-  --plan-id "$PLAN_ID" \
-  --plan-submit-workers 12 \
-  --plan-wait-workers 3 \
-  --plan-max-inflight-tasks 120 \
-  --plan-expire-rate 0.2 \
-  --local-mysql-dsn "$MYSQL_DSN" \
-  --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB" \
-  --local-redis-addr "$REDIS_ADDR" \
-  --local-redis-username "$REDIS_USERNAME" \
-  --local-redis-password "$REDIS_PASSWORD" \
-  --local-redis-db "$REDIS_DB"
-```
-
-只处理指定 testee 的已有 task：
+只处理指定 testee 的 backlog：
 
 ```bash
 go run ./cmd/tools/seeddata \
@@ -198,23 +131,44 @@ go run ./cmd/tools/seeddata \
   --steps "plan_process_tasks" \
   --plan-id "$PLAN_ID" \
   --plan-testee-ids "1001,1002,1003" \
-  --plan-submit-workers 12 \
-  --plan-wait-workers 3 \
-  --plan-max-inflight-tasks 120 \
-  --plan-expire-rate 0.2 \
+  --plan-submit-workers 8 \
+  --plan-wait-workers 4 \
+  --plan-max-inflight-tasks 64 \
+  --plan-submit-queue-size 32 \
+  --plan-submit-qps 4 \
+  --plan-submit-burst 8 \
+  --plan-expire-rate 0.2
+```
+
+### 方案 4：处理完成后再修正历史时间
+
+`plan_process_tasks` 现在只走真实业务语义。  
+如果你要把结果修正成“按 `planned_at` 回放历史”的拟真时间，再单独执行 `plan_fixup_timestamps`。
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "plan_fixup_timestamps" \
+  --plan-id "$PLAN_ID" \
   --local-mysql-dsn "$MYSQL_DSN" \
   --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB" \
-  --local-redis-addr "$REDIS_ADDR" \
-  --local-redis-username "$REDIS_USERNAME" \
-  --local-redis-password "$REDIS_PASSWORD" \
-  --local-redis-db "$REDIS_DB"
+  --local-mongo-database "$MONGO_DB"
+```
+
+只修正指定 testee：
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "plan_fixup_timestamps" \
+  --plan-id "$PLAN_ID" \
+  --plan-testee-ids "1001,1002,1003" \
+  --local-mysql-dsn "$MYSQL_DSN" \
+  --local-mongo-uri "$MONGO_URI" \
+  --local-mongo-database "$MONGO_DB"
 ```
 
 ### 方案 5：兼容旧入口，一次跑完 create + process
-
-适用场景：
-批量不大，希望一次命令直接跑完。
 
 ```bash
 go run ./cmd/tools/seeddata \
@@ -222,10 +176,9 @@ go run ./cmd/tools/seeddata \
   --steps "plan" \
   --plan-id "$PLAN_ID" \
   --plan-workers 4 \
-  --plan-submit-workers 12 \
-  --plan-wait-workers 3 \
-  --plan-max-inflight-tasks 120 \
-  --plan-expire-rate 0.2 \
+  --plan-submit-workers 8 \
+  --plan-wait-workers 4 \
+  --plan-max-inflight-tasks 64 \
   --testee-limit 1000 \
   --local-mysql-dsn "$MYSQL_DSN" \
   --local-mongo-uri "$MONGO_URI" \
@@ -236,92 +189,89 @@ go run ./cmd/tools/seeddata \
   --local-redis-db "$REDIS_DB"
 ```
 
-## 关键行为说明
+注意：
+
+- `plan` 不会自动串联 `plan_fixup_timestamps`
+- 如果你需要历史时间拟真，要在 `plan` 之后手动再跑一次 `plan_fixup_timestamps`
+
+## 步骤边界
 
 ### `assessment`
 
-- 仅对医学量表对应的问卷提交答卷。
-- 当前自动填充支持 `Radio`、`Checkbox`、`Text`、`Textarea`、`Number`；`Section` 题不会生成答案。
-- 使用 apiserver 的 testee 列表接口，因此需要在 `seeddata.yaml` 中配置 `global.orgId`。
-- `--testee-page-size` 最大建议不超过 `100`，受 apiserver 参数校验限制。
+- 只负责提交答卷并生成测评
+- 不碰 plan task
+- 通过 collection/apiserver 的真实接口完成
 
 ### `plan_create_tasks`
 
-- 默认计划 ID 是 `614186929759466030`，可通过 `--plan-id` 覆盖。
-- 默认会流式扫描 testee，并按约 `1/5` 抽样；不会先把全量 testee 全部留在内存里再抽样。
-- 抽样后的 testee 会再按优先级排序：
-  `没有 task` 优先，`没有当前 plan 的 task` 次之，然后是 `task 更少的` 优先。
-- 传入 `--plan-testee-ids` 后，会跳过随机抽样和全量 testee 扫描，只处理这些 testee。
-- 显式传入 `--plan-testee-ids` 时，`--testee-limit` 仍然生效；去重后只取前 N 个。
-- `start_date` 默认取 `testee.created_at`；如果普通模式下历史脏数据导致它为空，会依次回退到 `updated_at`、当前日期并打 warning。
-- 显式 `--plan-testee-ids` 模式更严格：如果某个 testee 的 `created_at` 是零值，脚本会直接报错。
-- `plan_create_tasks` 的职责只有一件事：选 testee、入组、补齐 task；它不负责处理历史 task backlog。
+- 只负责选 testee、入组、补齐 task
+- 使用本地 runtime
+- 普通模式会流式扫描 testee，不会先把全量 testee 常驻内存
+- 抽样后优先级是：
+  - 没有 task 的 testee 优先
+  - 没有当前 plan task 的 testee 次之
+  - 总 task 更少的 testee 更靠前
+- `start_date` 现在只认 `testee.created_at`
+- 普通模式遇到 `created_at=0` 的 testee：跳过并打 warning
+- 显式 `--plan-testee-ids` 模式遇到 `created_at=0`：直接报错
 
 ### `plan_process_tasks`
 
-- 不会创建新 task；它只负责调度并处理当前 plan 下已存在的 task。
-- 独立运行时默认不会退出，而是持续执行：
-  `schedule -> 发现 opened task -> submit/wait -> sleep -> 下一轮`，直到收到 `SIGINT` / `SIGTERM`。
-- 因为 `plan_process_tasks` 已经可以单独处理已有 task，所以不再需要单独的“恢复模式”。
-- 支持 submit/wait 双阶段流水线：
-  `--plan-submit-workers` 控制提交答卷并发，
-  `--plan-wait-workers` 控制等待任务完成并发，
-  `--plan-max-inflight-tasks` 控制已提交未完成 task 的上限。
-- 推荐压测起点：
-  `--plan-workers 4`
-  `--plan-submit-workers 12`
-  `--plan-wait-workers 3`
-  `--plan-max-inflight-tasks 120`
-- `--plan-expire-rate` 用于控制 `opened` task 中有多少比例会被直接标记为 `expired`，默认 `0.2`。
-- 不传 `--plan-testee-ids` 时，会按 plan 维度分页扫描 `opened` task。
-- 传了 `--plan-testee-ids` 时，只扫描该范围内的 task。
-- 独立运行 `plan_process_tasks` 时，`--testee-limit` 不再影响处理范围。
-- 为避免把整个 plan 自动收尾为 `finished`，脚本会故意保留 1 个 `opened` task 不处理，让 plan 维持 `active`。
-- 被抽中过期的 `opened` task 会走真实 `ExpireTask` 命令，不会提交答卷，因此最后会形成 `completed` 与 `expired` 混合结果。
+- 只负责调度和处理已有 task
+- 使用 apiserver API，不使用本地 MySQL / MongoDB / Redis
+- 默认常驻，不自动退出
+- 处理顺序是：
+  - 先消费已有 `opened` backlog
+  - `opened` 不足时，再按窗口调度 `due pending`
+  - 再进入 submit / wait 双阶段 pipeline
+- 提交侧自带缓冲队列和限速：
+  - `--plan-submit-queue-size`
+  - `--plan-submit-qps`
+  - `--plan-submit-burst`
+- `--testee-limit` 不影响 `plan_process_tasks`
+- `--plan-testee-ids` 只用于限制处理范围
 
-### plan 本地 runtime
+### `plan_fixup_timestamps`
 
-- plan 相关步骤现在只保留本地 runtime，不再保留 remote 模式。
-- 本地连接信息可以写在 `seeddata.yaml` 的 `local.*` 中，也可以通过命令行覆盖：
-  `--local-mysql-dsn`
-  `--local-mongo-uri`
-  `--local-mongo-database`
-  `--local-redis-addr`
-  `--local-redis-username`
-  `--local-redis-password`
-  `--local-redis-db`
-  `--local-plan-entry-base-url`
-- plan 本地 runtime 会把计划查询、量表/问卷查询、testee 查询、入组、定向调度、任务查询、任务过期收回到 seeddata 进程内。
-- 但答卷提交流转仍然走真实链路：
-  `seeddata -> apiserver admin-submit -> worker -> assessment -> task.completed`。
-
-### `plan`
-
-- `plan` 只是兼容旧入口。
-- 它的行为等价于：
-  先执行一次 `plan_create_tasks`，
-  再对刚刚选中的 testee 执行一次 one-shot `plan_process_tasks`。
-- 如果你要长时间慢慢处理 backlog，优先直接使用独立的 `plan_process_tasks`。
-
-### 幂等性
-
-- 所有种子操作都按幂等方式设计。
-- 已存在的数据会被更新或跳过，不会因为重复执行而无限创建重复记录。
+- 只做离线时间修正
+- 不调用新的业务命令
+- 直接定向更新 MySQL / MongoDB
+- 目标范围：
+  - `assessment_task`
+  - `assessment`
+  - `answersheet`
+  - `interpret_report`
+- 默认规则：
+  - `task.open_at = planned_at`
+  - `task.expire_at = planned_at + ttl`
+  - `completed_at = planned_at + 5m`
+  - `interpret_at = completed_at + 30s`
 
 ## 常见问题
 
+### 为什么 `plan_process_tasks` 不再接收本地连接参数
+
+因为它已经切成轻量进程路径，只通过 apiserver API 驱动 task 流转。  
+本地 MySQL / MongoDB / Redis 现在只属于：
+
+- `plan_create_tasks`
+- `plan_fixup_timestamps`
+
+### 为什么 `plan_process_tasks` 不再做历史时间拟真
+
+因为 `seeddata` 的一次性造数语义不应该污染 qs-server 主业务。  
+现在主链路只做真实业务处理；如果需要历史拟真，再单独跑 `plan_fixup_timestamps`。
+
 ### `questionnaire version mismatch`
 
-如果你直接修改了 MongoDB 里的 `scale.questionnaire_version`，而脚本仍然报 `questionnaire version mismatch`，优先排查 apiserver Redis 缓存。
+如果你直接改了 MongoDB 里的 `scale.questionnaire_version`，但脚本仍然报错，优先排查 apiserver Redis 缓存。
 
-通常需要删除以下 key 后再重试：
+通常需要删除：
 
 - `scale:<scale_code小写>`
-- 或带命名空间的 `<cache.namespace>:scale:<scale_code小写>`
+- 或 `<cache.namespace>:scale:<scale_code小写>`
 
 ## 配置文件示例
-
-详见 `configs/seeddata.yaml`。下面是常见字段示例：
 
 ```yaml
 api:
@@ -351,8 +301,4 @@ local:
 global:
   orgId: 0
   defaultTag: ""
-
-testees: []
-questionnaires: []
-scales: []
 ```

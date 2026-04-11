@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
-	"time"
 )
 
 func seedPlanBackfill(
@@ -134,19 +133,19 @@ func enrollPlanTesteesConcurrently(
 	var failedCount atomic.Int64
 	if err := runPlanTesteeWorkerPool(ctx, selectedTestees, workers, func(ctx context.Context, testee *TesteeResponse) error {
 		err := runSeedPlanOperationWithRecovery(ctx, logger, verbose, "enroll_testee_into_plan", testee.ID, func() error {
-			startDate, startDateSource, err := planStartDateFromAuditTimes(testee.CreatedAt, testee.UpdatedAt, time.Now())
-			if err != nil {
-				return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
-			}
-			if startDateSource != "created_at" {
-				logger.Warnw("Plan backfill falling back when deriving start_date",
+			if testee.CreatedAt.IsZero() {
+				logger.Warnw("Skipping plan enrollment because created_at is zero",
 					"plan_id", planID,
 					"testee_id", testee.ID,
-					"start_date", startDate,
-					"source", startDateSource,
 					"created_at", testee.CreatedAt,
 					"updated_at", testee.UpdatedAt,
 				)
+				return nil
+			}
+
+			startDate, err := planStartDateFromCreatedAt(testee.CreatedAt)
+			if err != nil {
+				return fmt.Errorf("derive start_date for testee %s: %w", testee.ID, err)
 			}
 
 			if err := waitForSeedPlanPacer(ctx, "enroll_testee_into_plan"); err != nil {
@@ -167,7 +166,7 @@ func enrollPlanTesteesConcurrently(
 					"plan_id", planID,
 					"testee_id", testee.ID,
 					"start_date", startDate,
-					"start_date_source", startDateSource,
+					"start_date_source", "created_at",
 					"task_count", len(resp.Tasks),
 				)
 			}

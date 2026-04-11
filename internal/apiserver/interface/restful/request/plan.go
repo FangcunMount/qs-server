@@ -37,9 +37,18 @@ type EnrollTesteeRequest struct {
 // SchedulePendingTasksRequest 调度待开放任务请求（内部接口）。
 type SchedulePendingTasksRequest struct {
 	Before    string   `json:"before,omitempty"`     // 截止时间（格式：YYYY-MM-DD HH:mm:ss）
-	Source    string   `json:"source,omitempty"`     // 调用来源
 	PlanID    string   `json:"plan_id,omitempty"`    // 可选：仅调度指定计划
 	TesteeIDs []string `json:"testee_ids,omitempty"` // 可选：仅调度指定受试者集合
+}
+
+// ListTaskWindowRequest 查询任务窗口请求（内部接口）。
+type ListTaskWindowRequest struct {
+	PlanID        string   `json:"plan_id"`
+	Status        string   `json:"status,omitempty"`
+	TesteeIDs     []string `json:"testee_ids,omitempty"`
+	PlannedBefore string   `json:"planned_before,omitempty"`
+	Page          int      `json:"page,omitempty"`
+	PageSize      int      `json:"page_size,omitempty"`
 }
 
 // OpenTaskRequest 开放任务请求

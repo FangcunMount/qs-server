@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
 
@@ -123,7 +122,6 @@ type TaskOpenedPayload struct {
 	TesteeID string    `json:"testee_id"`
 	EntryURL string    `json:"entry_url"`
 	OpenAt   time.Time `json:"open_at"`
-	Source   string    `json:"source,omitempty"`
 }
 
 // TaskCompletedPayload 任务完成事件数据
@@ -318,18 +316,9 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 			slog.String("task_id", data.TaskID),
 			slog.String("plan_id", data.PlanID),
 			slog.String("testee_id", data.TesteeID),
-			slog.String("source", data.Source),
 			slog.String("entry_url", data.EntryURL),
 			slog.Time("open_at", data.OpenAt),
 		)
-
-		if data.Source == planApp.TaskSchedulerSourceSeedData {
-			deps.Logger.Info("skip task opened mini program notification for seeddata source",
-				slog.String("task_id", data.TaskID),
-				slog.String("source", data.Source),
-			)
-			return nil
-		}
 
 		if deps.InternalClient != nil {
 			testeeID, parseErr := strconv.ParseUint(data.TesteeID, 10, 64)

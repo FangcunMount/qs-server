@@ -1,0 +1,29 @@
+[
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "status": 1 },
+        "name": "idx_status"
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpret_reports",
+    "indexes": [
+      {
+        "key": { "testee_id": 1 },
+        "name": "idx_testee_id"
+      }
+    ]
+  },
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "filled_at": -1 },
+        "name": "idx_filled_at"
+      }
+    ]
+  }
+]

@@ -81,6 +81,10 @@ func (r *enrollmentTaskRepoStub) FindListByTesteeIDs(context.Context, int64, *do
 	return nil, 0, nil
 }
 
+func (r *enrollmentTaskRepoStub) FindWindow(context.Context, int64, domainPlan.AssessmentPlanID, []testeeDomain.ID, *domainPlan.TaskStatus, *time.Time, int, int) ([]*domainPlan.AssessmentTask, bool, error) {
+	return nil, false, nil
+}
+
 func (r *enrollmentTaskRepoStub) Save(_ context.Context, task *domainPlan.AssessmentTask) error {
 	r.saved = append(r.saved, task)
 	return nil
@@ -309,7 +313,7 @@ func TestEnrollmentServicePublishesPlanTesteeTerminatedEvent(t *testing.T) {
 	taskLifecycle := domainPlan.NewTaskLifecycle()
 	pendingTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), 1, 9, testeeID, "scale-code", time.Now())
 	openedTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), 2, 9, testeeID, "scale-code", time.Now().Add(time.Hour))
-	if err := taskLifecycle.Open(ctx, openedTask, "token", "https://example.com/entry", time.Now().Add(2*time.Hour), ""); err != nil {
+	if err := taskLifecycle.Open(ctx, openedTask, "token", "https://example.com/entry", time.Now().Add(2*time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	pendingTask.ClearEvents()

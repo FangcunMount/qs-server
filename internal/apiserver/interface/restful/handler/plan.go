@@ -416,20 +416,13 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 	if queryBefore := c.Query("before"); queryBefore != "" {
 		before = queryBefore
 	}
-	source := req.Source
-	if querySource := c.Query("source"); querySource != "" {
-		source = querySource
-	}
-	if source == "" {
-		source = planApp.TaskSchedulerSourceInternalAPI
-	}
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	ctx := planApp.WithTaskSchedulerSource(c.Request.Context(), source)
+	ctx := c.Request.Context()
 	if req.PlanID != "" || len(req.TesteeIDs) > 0 {
 		ctx = planApp.WithTaskSchedulerScope(ctx, req.PlanID, req.TesteeIDs)
 	}
@@ -438,7 +431,6 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 		logger.L(ctx).Errorw("Failed to schedule pending tasks",
 			"action", "schedule_pending_tasks",
 			"resource", "task",
-			"source", source,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
@@ -446,6 +438,51 @@ func (h *PlanHandler) SchedulePendingTasks(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewTaskScheduleResponse(scheduleResult))
+}
+
+// ListTaskWindow 查询任务窗口（内部接口）。
+// @Summary 查询任务窗口
+// @Description 为后台任务按窗口查询 plan task，避免分页时额外执行 COUNT(*)；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
+// @Tags Task-Query
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.ListTaskWindowRequest true "查询任务窗口请求"
+// @Success 200 {object} core.Response{data=response.TaskWindowResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /internal/v1/plans/tasks/window [post]
+func (h *PlanHandler) ListTaskWindow(c *gin.Context) {
+	var req request.ListTaskWindowRequest
+	if err := h.BindJSON(c, &req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	if req.PlanID == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
+		return
+	}
+
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.queryService.ListTaskWindow(c.Request.Context(), planApp.ListTaskWindowDTO{
+		OrgID:         orgID,
+		PlanID:        req.PlanID,
+		TesteeIDs:     req.TesteeIDs,
+		Status:        req.Status,
+		PlannedBefore: req.PlannedBefore,
+		Page:          req.Page,
+		PageSize:      req.PageSize,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, response.NewTaskWindowResponse(result))
 }
 
 // ============= Task Management API (任务管理) =============

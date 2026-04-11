@@ -61,6 +61,15 @@ type TaskListResponse struct {
 	Stats      *TaskScheduleStatsResponse `json:"stats,omitempty"`
 }
 
+// TaskWindowResponse 任务窗口响应。
+// 供内部后台任务按窗口扫描任务，不返回 total_count。
+type TaskWindowResponse struct {
+	Tasks    []TaskResponse `json:"tasks"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+	HasMore  bool           `json:"has_more"`
+}
+
 // TaskScheduleStatsResponse 调度统计响应
 type TaskScheduleStatsResponse struct {
 	PendingCount      int `json:"pending_count"`
@@ -218,4 +227,30 @@ func NewTaskScheduleResponse(result *plan.TaskScheduleResult) *TaskListResponse 
 		ExpireFailedCount: result.Stats.ExpireFailedCount,
 	}
 	return resp
+}
+
+// NewTaskWindowResponse 从 TaskWindowResult 创建 TaskWindowResponse。
+func NewTaskWindowResponse(result *plan.TaskWindowResult) *TaskWindowResponse {
+	if result == nil {
+		return &TaskWindowResponse{
+			Tasks:    []TaskResponse{},
+			Page:     1,
+			PageSize: 10,
+			HasMore:  false,
+		}
+	}
+
+	tasks := make([]TaskResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		if resp := NewTaskResponse(item); resp != nil {
+			tasks = append(tasks, *resp)
+		}
+	}
+
+	return &TaskWindowResponse{
+		Tasks:    tasks,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+		HasMore:  result.HasMore,
+	}
 }

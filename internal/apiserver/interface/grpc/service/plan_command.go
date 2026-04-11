@@ -153,9 +153,6 @@ func (s *PlanCommandService) SchedulePendingTasks(ctx context.Context, req *pb.S
 	if req.GetOrgId() <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
 	}
-	if req.GetSource() != "" {
-		ctx = planApp.WithTaskSchedulerSource(ctx, req.GetSource())
-	}
 
 	result, err := s.commandService.SchedulePendingTasks(ctx, req.GetOrgId(), req.GetBefore())
 	if err != nil {

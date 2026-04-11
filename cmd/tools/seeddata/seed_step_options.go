@@ -31,9 +31,18 @@ type planProcessOptions struct {
 	PlanSubmitWorkers    int
 	PlanWaitWorkers      int
 	PlanMaxInFlightTasks int
+	PlanSubmitQueueSize  int
+	PlanSubmitQPS        float64
+	PlanSubmitBurst      int
 	PlanExpireRate       float64
 	Verbose              bool
 	Continuous           bool
+}
+
+type planFixupOptions struct {
+	PlanID         string
+	ScopeTesteeIDs []string
+	Verbose        bool
 }
 
 func (o planProcessOptions) withScope(scopeTesteeIDs []string, continuous bool) planProcessOptions {

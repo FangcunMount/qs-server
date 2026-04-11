@@ -2,16 +2,6 @@ package plan
 
 import "context"
 
-const (
-	// TaskSchedulerSourceBuiltin 表示内建 plan scheduler 调用。
-	TaskSchedulerSourceBuiltin = "builtin_scheduler"
-	// TaskSchedulerSourceInternalAPI 表示手工触发的内部接口调用。
-	TaskSchedulerSourceInternalAPI = "internal_api"
-	// TaskSchedulerSourceSeedData 表示 seeddata 工具调用。
-	TaskSchedulerSourceSeedData = "seeddata"
-)
-
-type taskSchedulerSourceKey struct{}
 type taskScheduleStatsCollectorKey struct{}
 type taskSchedulerScopeKey struct{}
 
@@ -28,14 +18,6 @@ type TaskScheduleStats struct {
 type TaskSchedulerScope struct {
 	PlanID    string
 	TesteeIDs []string
-}
-
-// WithTaskSchedulerSource 为调度上下文写入调用来源。
-func WithTaskSchedulerSource(ctx context.Context, source string) context.Context {
-	if source == "" {
-		return ctx
-	}
-	return context.WithValue(ctx, taskSchedulerSourceKey{}, source)
 }
 
 // WithTaskSchedulerScope 为调度上下文附加计划/受试者范围。
@@ -56,14 +38,6 @@ func WithTaskScheduleStatsCollector(ctx context.Context, collector *TaskSchedule
 		return ctx
 	}
 	return context.WithValue(ctx, taskScheduleStatsCollectorKey{}, collector)
-}
-
-func taskSchedulerSourceFromContext(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-	source, _ := ctx.Value(taskSchedulerSourceKey{}).(string)
-	return source
 }
 
 func taskSchedulerScopeFromContext(ctx context.Context) *TaskSchedulerScope {

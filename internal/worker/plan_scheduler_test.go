@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
@@ -30,10 +29,6 @@ func (f *fakePlanSchedulerClient) SchedulePendingTasks(ctx context.Context, req 
 	started := f.started
 	block := f.block
 	f.mu.Unlock()
-
-	if req.GetSource() != planApp.TaskSchedulerSourceBuiltin {
-		return nil, errors.New("unexpected schedule source")
-	}
 
 	if started != nil {
 		select {
