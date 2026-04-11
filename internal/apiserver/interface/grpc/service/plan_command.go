@@ -83,6 +83,21 @@ func (s *PlanCommandService) ResumePlan(ctx context.Context, req *pb.ResumePlanR
 	return &pb.ResumePlanResponse{Plan: toPBPlanResult(result)}, nil
 }
 
+func (s *PlanCommandService) FinishPlan(ctx context.Context, req *pb.FinishPlanRequest) (*pb.FinishPlanResponse, error) {
+	if req.GetOrgId() <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	}
+	if req.GetPlanId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
+	}
+
+	result, err := s.commandService.FinishPlan(ctx, req.GetOrgId(), req.GetPlanId())
+	if err != nil {
+		return nil, toPlanCommandGRPCError(err)
+	}
+	return &pb.FinishPlanResponse{Plan: toPBPlanResult(result)}, nil
+}
+
 func (s *PlanCommandService) CancelPlan(ctx context.Context, req *pb.CancelPlanRequest) (*pb.CancelPlanResponse, error) {
 	if req.GetOrgId() <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")

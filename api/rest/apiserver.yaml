@@ -1242,6 +1242,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /plans/{id}/finish:
+    post:
+      tags:
+      - Plan-Lifecycle
+      summary: 手动结束计划
+      description: 手动结束计划，取消所有未执行任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
+      operationId: 手动结束计划
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 计划ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.PlanResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /plans/{id}/pause:
     post:
       tags:

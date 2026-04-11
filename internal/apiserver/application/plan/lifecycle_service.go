@@ -518,6 +518,94 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 	return toPlanResult(p), nil
 }
 
+// FinishPlan 手动结束计划
+func (s *lifecycleService) FinishPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
+	logger.L(ctx).Infow("Finishing assessment plan",
+		"action", "finish_plan",
+		"org_id", orgID,
+		"plan_id", planID,
+	)
+
+	p, err := s.loadPlanInOrg(ctx, orgID, planID, "finish_plan")
+	if err != nil {
+		return nil, err
+	}
+
+	canceledTasks, err := s.lifecycle.Finish(ctx, p)
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to finish plan",
+			"action", "finish_plan",
+			"plan_id", planID,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	logger.L(ctx).Infow("Plan finished, canceling outstanding tasks",
+		"action", "finish_plan",
+		"plan_id", planID,
+		"canceled_tasks_count", len(canceledTasks),
+	)
+
+	if err := s.planRepo.Save(ctx, p); err != nil {
+		logger.L(ctx).Errorw("Failed to save finished plan",
+			"action", "finish_plan",
+			"plan_id", planID,
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
+	}
+
+	savedTaskCount := 0
+	for _, task := range canceledTasks {
+		if err := s.taskRepo.Save(ctx, task); err != nil {
+			logger.L(ctx).Errorw("Failed to save canceled task while finishing plan",
+				"action", "finish_plan",
+				"plan_id", planID,
+				"task_id", task.GetID().String(),
+				"error", err.Error(),
+			)
+			continue
+		}
+		savedTaskCount++
+
+		events := task.Events()
+		for _, evt := range events {
+			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
+				logger.L(ctx).Errorw("Failed to publish task event",
+					"action", "finish_plan",
+					"task_id", task.GetID().String(),
+					"event_type", evt.EventType(),
+					"error", err.Error(),
+				)
+			}
+		}
+		task.ClearEvents()
+	}
+
+	events := p.Events()
+	for _, evt := range events {
+		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
+			logger.L(ctx).Errorw("Failed to publish plan event",
+				"action", "finish_plan",
+				"plan_id", planID,
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		}
+	}
+	p.ClearEvents()
+
+	logger.L(ctx).Infow("Plan finished successfully",
+		"action", "finish_plan",
+		"plan_id", planID,
+		"canceled_tasks_count", len(canceledTasks),
+		"saved_tasks_count", savedTaskCount,
+	)
+
+	return toPlanResult(p), nil
+}
+
 // CancelPlan 取消计划
 func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID string) error {
 	logger.L(ctx).Infow("Canceling assessment plan",

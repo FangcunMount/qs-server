@@ -15,25 +15,19 @@ import (
 // 行为者：任务管理服务
 type taskManagementService struct {
 	taskRepo       plan.AssessmentTaskRepository
-	planRepo       plan.AssessmentPlanRepository
 	taskLifecycle  *plan.TaskLifecycle
-	planLifecycle  *plan.PlanLifecycle
 	eventPublisher event.EventPublisher
 }
 
 // NewTaskManagementService 创建任务管理服务
 func NewTaskManagementService(
 	taskRepo plan.AssessmentTaskRepository,
-	planRepo plan.AssessmentPlanRepository,
 	eventPublisher event.EventPublisher,
 ) TaskManagementService {
-	taskGenerator := plan.NewTaskGenerator()
 	taskLifecycle := plan.NewTaskLifecycle()
 	return &taskManagementService{
 		taskRepo:       taskRepo,
-		planRepo:       planRepo,
 		taskLifecycle:  taskLifecycle,
-		planLifecycle:  plan.NewPlanLifecycle(taskRepo, taskGenerator, taskLifecycle),
 		eventPublisher: eventPublisher,
 	}
 }
@@ -168,15 +162,6 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	}
 	task.ClearEvents()
 
-	if err := s.finishPlanIfDone(ctx, task.GetPlanID()); err != nil {
-		logger.L(ctx).Warnw("Failed to finalize plan after task completion",
-			"action", "complete_task",
-			"task_id", taskID,
-			"plan_id", task.GetPlanID().String(),
-			"error", err.Error(),
-		)
-	}
-
 	logger.L(ctx).Infow("Task completed successfully",
 		"action", "complete_task",
 		"task_id", taskID,
@@ -234,15 +219,6 @@ func (s *taskManagementService) ExpireTask(ctx context.Context, orgID int64, tas
 	}
 	task.ClearEvents()
 
-	if err := s.finishPlanIfDone(ctx, task.GetPlanID()); err != nil {
-		logger.L(ctx).Warnw("Failed to finalize plan after task expiration",
-			"action", "expire_task",
-			"task_id", taskID,
-			"plan_id", task.GetPlanID().String(),
-			"error", err.Error(),
-		)
-	}
-
 	logger.L(ctx).Infow("Task expired successfully",
 		"action", "expire_task",
 		"task_id", taskID,
@@ -299,15 +275,6 @@ func (s *taskManagementService) CancelTask(ctx context.Context, orgID int64, tas
 	}
 	task.ClearEvents()
 
-	if err := s.finishPlanIfDone(ctx, task.GetPlanID()); err != nil {
-		logger.L(ctx).Warnw("Failed to finalize plan after task cancellation",
-			"action", "cancel_task",
-			"task_id", taskID,
-			"plan_id", task.GetPlanID().String(),
-			"error", err.Error(),
-		)
-	}
-
 	logger.L(ctx).Infow("Task canceled successfully",
 		"action", "cancel_task",
 		"task_id", taskID,
@@ -348,15 +315,4 @@ func (s *taskManagementService) loadTaskInOrg(ctx context.Context, orgID int64, 
 	}
 
 	return task, nil
-}
-
-func (s *taskManagementService) finishPlanIfDone(ctx context.Context, planID plan.AssessmentPlanID) error {
-	return finalizePlanIfDone(
-		ctx,
-		"finish_plan_after_task_transition",
-		s.planRepo,
-		s.planLifecycle,
-		s.eventPublisher,
-		planID,
-	)
 }

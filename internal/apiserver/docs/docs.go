@@ -1775,6 +1775,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/plans/{id}/finish": {
+            "post": {
+                "description": "手动结束计划，取消所有未执行任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plan-Lifecycle"
+                ],
+                "summary": "手动结束计划",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "计划ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.PlanResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/plans/{id}/pause": {
             "post": {
                 "description": "暂停计划，取消所有未执行的任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",

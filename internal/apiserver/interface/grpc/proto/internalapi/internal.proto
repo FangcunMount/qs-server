@@ -73,6 +73,7 @@ service PlanCommandService {
   rpc CreatePlan(CreatePlanRequest) returns (CreatePlanResponse);
   rpc PausePlan(PausePlanRequest) returns (PausePlanResponse);
   rpc ResumePlan(ResumePlanRequest) returns (ResumePlanResponse);
+  rpc FinishPlan(FinishPlanRequest) returns (FinishPlanResponse);
   rpc CancelPlan(CancelPlanRequest) returns (CancelPlanResponse);
   rpc EnrollTestee(EnrollTesteeRequest) returns (EnrollTesteeResponse);
   rpc TerminateEnrollment(TerminateEnrollmentRequest) returns (TerminateEnrollmentResponse);
@@ -161,6 +162,15 @@ message ResumePlanRequest {
 }
 
 message ResumePlanResponse {
+  PlanResultMessage plan = 1;
+}
+
+message FinishPlanRequest {
+  int64 org_id = 1;
+  string plan_id = 2;
+}
+
+message FinishPlanResponse {
   PlanResultMessage plan = 1;
 }
 

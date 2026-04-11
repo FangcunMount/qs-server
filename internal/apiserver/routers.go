@@ -620,6 +620,14 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserBurst,
 			planHandler.ResumePlan,
 		)...)
+		planWrites.POST("/:id/finish", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			planHandler.FinishPlan,
+		)...)
 		planWrites.POST("/:id/cancel", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,

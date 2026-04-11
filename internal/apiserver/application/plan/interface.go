@@ -16,7 +16,7 @@ import "context"
 
 // PlanLifecycleService 计划生命周期服务
 // 行为者：计划管理员 (Plan Admin)
-// 职责：计划创建、暂停、恢复、取消
+// 职责：计划创建、暂停、恢复、手动结束、取消
 // 变更来源：管理员的业务流程需求变化
 type PlanLifecycleService interface {
 	// CreatePlan 创建测评计划模板
@@ -30,6 +30,10 @@ type PlanLifecycleService interface {
 	// ResumePlan 恢复计划
 	// 场景：管理员恢复计划，重新生成未完成的任务
 	ResumePlan(ctx context.Context, orgID int64, planID string, testeeStartDates map[string]string) (*PlanResult, error)
+
+	// FinishPlan 手动结束计划
+	// 场景：管理员手动结束计划，取消所有未执行任务并停止后续加入/调度
+	FinishPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
 
 	// CancelPlan 取消计划
 	// 场景：管理员取消计划
@@ -88,6 +92,7 @@ type PlanCommandService interface {
 	CreatePlan(ctx context.Context, dto CreatePlanDTO) (*PlanResult, error)
 	PausePlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
 	ResumePlan(ctx context.Context, orgID int64, planID string, testeeStartDates map[string]string) (*PlanResult, error)
+	FinishPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
 	CancelPlan(ctx context.Context, orgID int64, planID string) (*PlanMutationResult, error)
 	EnrollTestee(ctx context.Context, dto EnrollTesteeDTO) (*EnrollmentResult, error)
 	TerminateEnrollment(ctx context.Context, orgID int64, planID string, testeeID string) (*EnrollmentTerminationResult, error)

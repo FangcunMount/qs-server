@@ -259,4 +259,7 @@ func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
 	if !expiredTask.IsExpired() {
 		t.Fatalf("expected expired task to be expired")
 	}
+	if !p.IsActive() {
+		t.Fatalf("expected plan to remain active after expiring overdue tasks, got %s", p.GetStatus())
+	}
 }

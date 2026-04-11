@@ -444,6 +444,7 @@ const (
 	PlanCommandService_CreatePlan_FullMethodName           = "/internalapi.PlanCommandService/CreatePlan"
 	PlanCommandService_PausePlan_FullMethodName            = "/internalapi.PlanCommandService/PausePlan"
 	PlanCommandService_ResumePlan_FullMethodName           = "/internalapi.PlanCommandService/ResumePlan"
+	PlanCommandService_FinishPlan_FullMethodName           = "/internalapi.PlanCommandService/FinishPlan"
 	PlanCommandService_CancelPlan_FullMethodName           = "/internalapi.PlanCommandService/CancelPlan"
 	PlanCommandService_EnrollTestee_FullMethodName         = "/internalapi.PlanCommandService/EnrollTestee"
 	PlanCommandService_TerminateEnrollment_FullMethodName  = "/internalapi.PlanCommandService/TerminateEnrollment"
@@ -463,6 +464,7 @@ type PlanCommandServiceClient interface {
 	CreatePlan(ctx context.Context, in *CreatePlanRequest, opts ...grpc.CallOption) (*CreatePlanResponse, error)
 	PausePlan(ctx context.Context, in *PausePlanRequest, opts ...grpc.CallOption) (*PausePlanResponse, error)
 	ResumePlan(ctx context.Context, in *ResumePlanRequest, opts ...grpc.CallOption) (*ResumePlanResponse, error)
+	FinishPlan(ctx context.Context, in *FinishPlanRequest, opts ...grpc.CallOption) (*FinishPlanResponse, error)
 	CancelPlan(ctx context.Context, in *CancelPlanRequest, opts ...grpc.CallOption) (*CancelPlanResponse, error)
 	EnrollTestee(ctx context.Context, in *EnrollTesteeRequest, opts ...grpc.CallOption) (*EnrollTesteeResponse, error)
 	TerminateEnrollment(ctx context.Context, in *TerminateEnrollmentRequest, opts ...grpc.CallOption) (*TerminateEnrollmentResponse, error)
@@ -505,6 +507,16 @@ func (c *planCommandServiceClient) ResumePlan(ctx context.Context, in *ResumePla
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResumePlanResponse)
 	err := c.cc.Invoke(ctx, PlanCommandService_ResumePlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planCommandServiceClient) FinishPlan(ctx context.Context, in *FinishPlanRequest, opts ...grpc.CallOption) (*FinishPlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FinishPlanResponse)
+	err := c.cc.Invoke(ctx, PlanCommandService_FinishPlan_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -600,6 +612,7 @@ type PlanCommandServiceServer interface {
 	CreatePlan(context.Context, *CreatePlanRequest) (*CreatePlanResponse, error)
 	PausePlan(context.Context, *PausePlanRequest) (*PausePlanResponse, error)
 	ResumePlan(context.Context, *ResumePlanRequest) (*ResumePlanResponse, error)
+	FinishPlan(context.Context, *FinishPlanRequest) (*FinishPlanResponse, error)
 	CancelPlan(context.Context, *CancelPlanRequest) (*CancelPlanResponse, error)
 	EnrollTestee(context.Context, *EnrollTesteeRequest) (*EnrollTesteeResponse, error)
 	TerminateEnrollment(context.Context, *TerminateEnrollmentRequest) (*TerminateEnrollmentResponse, error)
@@ -626,6 +639,9 @@ func (UnimplementedPlanCommandServiceServer) PausePlan(context.Context, *PausePl
 }
 func (UnimplementedPlanCommandServiceServer) ResumePlan(context.Context, *ResumePlanRequest) (*ResumePlanResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResumePlan not implemented")
+}
+func (UnimplementedPlanCommandServiceServer) FinishPlan(context.Context, *FinishPlanRequest) (*FinishPlanResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinishPlan not implemented")
 }
 func (UnimplementedPlanCommandServiceServer) CancelPlan(context.Context, *CancelPlanRequest) (*CancelPlanResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelPlan not implemented")
@@ -722,6 +738,24 @@ func _PlanCommandService_ResumePlan_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(PlanCommandServiceServer).ResumePlan(ctx, req.(*ResumePlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanCommandService_FinishPlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinishPlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanCommandServiceServer).FinishPlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanCommandService_FinishPlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanCommandServiceServer).FinishPlan(ctx, req.(*FinishPlanRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -888,6 +922,10 @@ var PlanCommandService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResumePlan",
 			Handler:    _PlanCommandService_ResumePlan_Handler,
+		},
+		{
+			MethodName: "FinishPlan",
+			Handler:    _PlanCommandService_FinishPlan_Handler,
 		},
 		{
 			MethodName: "CancelPlan",

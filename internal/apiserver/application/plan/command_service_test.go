@@ -12,6 +12,7 @@ import (
 )
 
 type fakeLifecycleService struct {
+	finishPlanFn func(ctx context.Context, orgID int64, planID string) (*PlanResult, error)
 	cancelPlanFn func(ctx context.Context, orgID int64, planID string) error
 }
 
@@ -24,6 +25,13 @@ func (f *fakeLifecycleService) PausePlan(context.Context, int64, string) (*PlanR
 }
 
 func (f *fakeLifecycleService) ResumePlan(context.Context, int64, string, map[string]string) (*PlanResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeLifecycleService) FinishPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
+	if f.finishPlanFn != nil {
+		return f.finishPlanFn(ctx, orgID, planID)
+	}
 	return nil, errors.New("not implemented")
 }
 
@@ -253,5 +261,34 @@ func TestCommandServiceCancelPlanCountsAffectedTasks(t *testing.T) {
 	}
 	if result.AffectedTaskCount != 2 {
 		t.Fatalf("unexpected affected task count: %d", result.AffectedTaskCount)
+	}
+}
+
+func TestCommandServiceFinishPlanDelegatesToLifecycle(t *testing.T) {
+	service := NewCommandService(
+		&fakeLifecycleService{
+			finishPlanFn: func(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
+				if orgID != 7 {
+					t.Fatalf("unexpected org id: %d", orgID)
+				}
+				if planID != "plan-1" {
+					t.Fatalf("unexpected plan id: %s", planID)
+				}
+				return &PlanResult{ID: planID, OrgID: orgID, Status: "finished"}, nil
+			},
+		},
+		&fakeEnrollmentService{},
+		&fakeTaskSchedulerService{},
+		&fakeTaskManagementService{},
+		nil,
+		nil,
+	)
+
+	result, err := service.FinishPlan(context.Background(), 7, "plan-1")
+	if err != nil {
+		t.Fatalf("FinishPlan returned error: %v", err)
+	}
+	if result == nil || result.ID != "plan-1" || result.Status != "finished" {
+		t.Fatalf("unexpected result: %#v", result)
 	}
 }

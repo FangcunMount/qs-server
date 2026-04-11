@@ -21,7 +21,6 @@ type taskSchedulerService struct {
 	taskRepo       plan.AssessmentTaskRepository
 	planRepo       plan.AssessmentPlanRepository
 	taskLifecycle  *plan.TaskLifecycle
-	planLifecycle  *plan.PlanLifecycle
 	entryGenerator EntryGenerator // 入口生成器（由基础设施层实现）
 	eventPublisher event.EventPublisher
 }
@@ -39,13 +38,11 @@ func NewTaskSchedulerService(
 	entryGenerator EntryGenerator,
 	eventPublisher event.EventPublisher,
 ) TaskSchedulerService {
-	taskGenerator := plan.NewTaskGenerator()
 	taskLifecycle := plan.NewTaskLifecycle()
 	return &taskSchedulerService{
 		taskRepo:       taskRepo,
 		planRepo:       planRepo,
 		taskLifecycle:  taskLifecycle,
-		planLifecycle:  plan.NewPlanLifecycle(taskRepo, taskGenerator, taskLifecycle),
 		entryGenerator: entryGenerator,
 		eventPublisher: eventPublisher,
 	}
@@ -311,7 +308,6 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 
 	expiredCount := 0
 	failedCount := 0
-	affectedPlans := make(map[string]plan.AssessmentPlanID)
 	for _, task := range tasks {
 		if task.GetOrgID() != orgID {
 			continue
@@ -372,18 +368,7 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 		}
 		task.ClearEvents()
 
-		affectedPlans[task.GetPlanID().String()] = task.GetPlanID()
 		expiredCount++
-	}
-
-	for _, planID := range affectedPlans {
-		if err := s.finishPlanIfDone(ctx, planID); err != nil {
-			logger.L(ctx).Warnw("Failed to finalize plan after expiring tasks",
-				"action", "schedule_pending_tasks",
-				"plan_id", planID.String(),
-				"error", err.Error(),
-			)
-		}
 	}
 
 	return expiredCount, failedCount
@@ -441,15 +426,4 @@ func (s *taskSchedulerService) cancelTaskForInactivePlan(
 	}
 	task.ClearEvents()
 	return nil
-}
-
-func (s *taskSchedulerService) finishPlanIfDone(ctx context.Context, planID plan.AssessmentPlanID) error {
-	return finalizePlanIfDone(
-		ctx,
-		"finish_plan_after_task_scheduling",
-		s.planRepo,
-		s.planLifecycle,
-		s.eventPublisher,
-		planID,
-	)
 }

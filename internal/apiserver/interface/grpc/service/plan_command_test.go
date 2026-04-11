@@ -14,6 +14,7 @@ import (
 
 type fakePlanCommandService struct {
 	createPlanFn           func(ctx context.Context, dto planApp.CreatePlanDTO) (*planApp.PlanResult, error)
+	finishPlanFn           func(ctx context.Context, orgID int64, planID string) (*planApp.PlanResult, error)
 	cancelPlanFn           func(ctx context.Context, orgID int64, planID string) (*planApp.PlanMutationResult, error)
 	schedulePendingTasksFn func(ctx context.Context, orgID int64, before string) (*planApp.TaskScheduleResult, error)
 }
@@ -28,6 +29,10 @@ func (f *fakePlanCommandService) PausePlan(context.Context, int64, string) (*pla
 
 func (f *fakePlanCommandService) ResumePlan(context.Context, int64, string, map[string]string) (*planApp.PlanResult, error) {
 	panic("unexpected call")
+}
+
+func (f *fakePlanCommandService) FinishPlan(ctx context.Context, orgID int64, planID string) (*planApp.PlanResult, error) {
+	return f.finishPlanFn(ctx, orgID, planID)
 }
 
 func (f *fakePlanCommandService) CancelPlan(ctx context.Context, orgID int64, planID string) (*planApp.PlanMutationResult, error) {
@@ -121,6 +126,9 @@ func TestPlanCommandServiceCancelPlanMapsPermissionDenied(t *testing.T) {
 		createPlanFn: func(context.Context, planApp.CreatePlanDTO) (*planApp.PlanResult, error) {
 			panic("unexpected call")
 		},
+		finishPlanFn: func(context.Context, int64, string) (*planApp.PlanResult, error) {
+			panic("unexpected call")
+		},
 		cancelPlanFn: func(ctx context.Context, orgID int64, planID string) (*planApp.PlanMutationResult, error) {
 			return nil, pkgerrors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
 		},
@@ -142,5 +150,39 @@ func TestPlanCommandServiceCancelPlanMapsPermissionDenied(t *testing.T) {
 	}
 	if st.Code() != codes.PermissionDenied {
 		t.Fatalf("unexpected grpc code: %s", st.Code())
+	}
+}
+
+func TestPlanCommandServiceFinishPlanMapsRequestAndResponse(t *testing.T) {
+	svc := NewPlanCommandService(&fakePlanCommandService{
+		createPlanFn: func(context.Context, planApp.CreatePlanDTO) (*planApp.PlanResult, error) {
+			panic("unexpected call")
+		},
+		finishPlanFn: func(ctx context.Context, orgID int64, planID string) (*planApp.PlanResult, error) {
+			if orgID != 3 {
+				t.Fatalf("unexpected org id: %d", orgID)
+			}
+			if planID != "plan-3" {
+				t.Fatalf("unexpected plan id: %s", planID)
+			}
+			return &planApp.PlanResult{ID: planID, OrgID: orgID, Status: "finished"}, nil
+		},
+		cancelPlanFn: func(context.Context, int64, string) (*planApp.PlanMutationResult, error) {
+			panic("unexpected call")
+		},
+		schedulePendingTasksFn: func(context.Context, int64, string) (*planApp.TaskScheduleResult, error) {
+			panic("unexpected call")
+		},
+	})
+
+	resp, err := svc.FinishPlan(context.Background(), &pb.FinishPlanRequest{
+		OrgId:  3,
+		PlanId: "plan-3",
+	})
+	if err != nil {
+		t.Fatalf("FinishPlan returned error: %v", err)
+	}
+	if resp.GetPlan().GetId() != "plan-3" || resp.GetPlan().GetStatus() != "finished" {
+		t.Fatalf("unexpected response: %#v", resp)
 	}
 }

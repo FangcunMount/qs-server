@@ -114,7 +114,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 	lifecycleService := planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, scaleRepo, m.eventPublisher)
 	enrollmentService := planApp.NewEnrollmentService(m.PlanRepo, m.TaskRepo, m.eventPublisher)
 	taskSchedulerService := planApp.NewTaskSchedulerService(m.TaskRepo, m.PlanRepo, entryGenerator, m.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementService(m.TaskRepo, m.PlanRepo, m.eventPublisher)
+	taskManagementService := planApp.NewTaskManagementService(m.TaskRepo, m.eventPublisher)
 	m.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,

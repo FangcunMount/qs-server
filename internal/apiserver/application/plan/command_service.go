@@ -49,6 +49,10 @@ func (s *commandService) ResumePlan(ctx context.Context, orgID int64, planID str
 	return s.lifecycle.ResumePlan(ctx, orgID, planID, testeeStartDates)
 }
 
+func (s *commandService) FinishPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
+	return s.lifecycle.FinishPlan(ctx, orgID, planID)
+}
+
 func (s *commandService) CancelPlan(ctx context.Context, orgID int64, planID string) (*PlanMutationResult, error) {
 	affectedTaskCount, err := s.countCancelableTasksByPlan(ctx, orgID, planID)
 	if err != nil {

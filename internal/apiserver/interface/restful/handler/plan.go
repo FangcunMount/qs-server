@@ -253,6 +253,43 @@ func (h *PlanHandler) ResumePlan(c *gin.Context) {
 	h.Success(c, response.NewPlanResponse(result))
 }
 
+// FinishPlan 手动结束计划
+// @Summary 手动结束计划
+// @Description 手动结束计划，取消所有未执行任务；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
+// @Tags Plan-Lifecycle
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path string true "计划ID"
+// @Success 200 {object} core.Response{data=response.PlanResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/plans/{id}/finish [post]
+func (h *PlanHandler) FinishPlan(c *gin.Context) {
+	planID := c.Param("id")
+	if planID == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "计划ID不能为空"))
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.commandService.FinishPlan(c.Request.Context(), orgID, planID)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to finish plan",
+			"action", "finish_plan",
+			"resource", "plan",
+			"plan_id", planID,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, response.NewPlanResponse(result))
+}
+
 // CancelPlan 取消计划
 // @Summary 取消计划
 // @Description 取消计划，不可恢复；仅 qs:evaluation_plan_manager 或 qs:admin 可访问

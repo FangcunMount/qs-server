@@ -42,7 +42,7 @@ const (
 	PlanStatusActive PlanStatus = "active"
 	// PlanStatusPaused 暂停：计划暂时停止，可恢复
 	PlanStatusPaused PlanStatus = "paused"
-	// PlanStatusFinished 已完成：所有任务已完成或计划到期
+	// PlanStatusFinished 已完成：管理员手动结束计划，不再允许新的加入和任务继续推进
 	PlanStatusFinished PlanStatus = "finished"
 	// PlanStatusCanceled 已取消：计划被取消，不可恢复
 	PlanStatusCanceled PlanStatus = "canceled"

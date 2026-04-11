@@ -128,6 +128,56 @@ func TestPlanLifecycleCancelCancelsOutstandingTasks(t *testing.T) {
 	}
 }
 
+func TestPlanLifecycleFinishFinishesPlanAndCancelsOutstandingTasks(t *testing.T) {
+	ctx := context.Background()
+	p, err := NewAssessmentPlan(1, "scale-code", PlanScheduleByWeek, 1, 4)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+
+	testeeID := testee.NewID(1011)
+	pendingTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", time.Now())
+	openedTask := NewAssessmentTask(p.GetID(), 2, 1, testeeID, "scale-code", time.Now().Add(time.Hour))
+	completedTask := NewAssessmentTask(p.GetID(), 3, 1, testeeID, "scale-code", time.Now().Add(2*time.Hour))
+
+	taskLifecycle := NewTaskLifecycle()
+	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour)); err != nil {
+		t.Fatalf("failed to open task: %v", err)
+	}
+	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
+		t.Fatalf("failed to open task: %v", err)
+	}
+	if err := taskLifecycle.Complete(ctx, completedTask, assessment.NewID(9011)); err != nil {
+		t.Fatalf("failed to complete task: %v", err)
+	}
+
+	repo := &lifecycleTaskRepoStub{
+		tasks: []*AssessmentTask{pendingTask, openedTask, completedTask},
+	}
+	lifecycle := NewPlanLifecycle(repo, NewTaskGenerator(), taskLifecycle)
+
+	canceledTasks, err := lifecycle.Finish(ctx, p)
+	if err != nil {
+		t.Fatalf("Finish returned error: %v", err)
+	}
+
+	if !p.IsFinished() {
+		t.Fatalf("expected plan status finished, got %s", p.GetStatus())
+	}
+	if len(canceledTasks) != 2 {
+		t.Fatalf("expected 2 canceled tasks, got %d", len(canceledTasks))
+	}
+	if !pendingTask.IsCanceled() {
+		t.Fatalf("expected pending task to be canceled")
+	}
+	if !openedTask.IsCanceled() {
+		t.Fatalf("expected opened task to be canceled")
+	}
+	if !completedTask.IsCompleted() {
+		t.Fatalf("expected completed task to remain completed")
+	}
+}
+
 func TestPlanLifecycleResumeReusesCanceledTasks(t *testing.T) {
 	ctx := context.Background()
 	startDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.Local)

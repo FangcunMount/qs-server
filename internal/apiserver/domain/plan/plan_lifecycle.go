@@ -313,31 +313,30 @@ func (l *PlanLifecycle) Cancel(ctx context.Context, plan *AssessmentPlan) ([]*As
 	return canceledTasks, nil
 }
 
-// TryFinish 如果计划下所有任务都进入终态，则将计划标记为已完成。
-func (l *PlanLifecycle) TryFinish(ctx context.Context, plan *AssessmentPlan) (bool, error) {
-	if plan == nil {
-		return false, errors.WithCode(code.ErrInvalidArgument, "计划不能为空")
+// Finish 手动结束计划。
+// 业务规则：结束计划时，联动取消所有未执行的任务（pending 和 opened 状态）。
+func (l *PlanLifecycle) Finish(ctx context.Context, plan *AssessmentPlan) ([]*AssessmentTask, error) {
+	planID := plan.GetID().String()
+	logger.L(ctx).Infow("Finishing plan in domain service",
+		"domain_action", "finish_plan",
+		"plan_id", planID,
+		"current_status", plan.GetStatus().String(),
+	)
+
+	if plan.IsFinished() {
+		return nil, nil
 	}
-	if plan.IsFinished() || plan.IsCanceled() || plan.IsPaused() {
-		return false, nil
+	if plan.IsCanceled() {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "已取消的计划不能完成")
 	}
 
-	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
+	canceledTasks, err := l.cancelOutstandingTasks(ctx, plan, "finish_plan")
 	if err != nil {
-		return false, errors.WithCode(code.ErrInternalServerError, "查询任务失败: %v", err)
-	}
-	if len(allTasks) == 0 {
-		return false, nil
-	}
-
-	for _, task := range allTasks {
-		if !task.IsTerminal() {
-			return false, nil
-		}
+		return nil, err
 	}
 
 	plan.finish()
-	return true, nil
+	return canceledTasks, nil
 }
 
 func (l *PlanLifecycle) cancelOutstandingTasks(ctx context.Context, plan *AssessmentPlan, action string) ([]*AssessmentTask, error) {
