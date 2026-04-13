@@ -42,12 +42,22 @@ func NewMyAssessmentListCache(c Cache) *MyAssessmentListCache {
 }
 
 // Get 读取缓存并解码到 dest（指针）
-func (c *MyAssessmentListCache) Get(ctx context.Context, userID uint64, page, pageSize int, status string, dest interface{}) error {
+func (c *MyAssessmentListCache) Get(
+	ctx context.Context,
+	userID uint64,
+	page, pageSize int,
+	status string,
+	scaleCode string,
+	riskLevel string,
+	dateFrom string,
+	dateTo string,
+	dest interface{},
+) error {
 	if c == nil || c.cache == nil {
 		return ErrCacheNotFound
 	}
 
-	key := c.buildKey(userID, page, pageSize, status)
+	key := c.buildKey(userID, page, pageSize, status, scaleCode, riskLevel, dateFrom, dateTo)
 
 	// 1) 尝试节点内缓存
 	if data, ok := c.getMemory(key); ok {
@@ -69,12 +79,22 @@ func (c *MyAssessmentListCache) Get(ctx context.Context, userID uint64, page, pa
 }
 
 // Set 写入缓存（value 将被 JSON 序列化）
-func (c *MyAssessmentListCache) Set(ctx context.Context, userID uint64, page, pageSize int, status string, value interface{}) {
+func (c *MyAssessmentListCache) Set(
+	ctx context.Context,
+	userID uint64,
+	page, pageSize int,
+	status string,
+	scaleCode string,
+	riskLevel string,
+	dateFrom string,
+	dateTo string,
+	value interface{},
+) {
 	if c == nil || c.cache == nil || value == nil {
 		return
 	}
 
-	key := c.buildKey(userID, page, pageSize, status)
+	key := c.buildKey(userID, page, pageSize, status, scaleCode, riskLevel, dateFrom, dateTo)
 	data, err := json.Marshal(value)
 	if err != nil {
 		return
@@ -105,8 +125,25 @@ func (c *MyAssessmentListCache) Invalidate(ctx context.Context, userID uint64) {
 	c.memoryMutex.Unlock()
 }
 
-func (c *MyAssessmentListCache) buildKey(userID uint64, page, pageSize int, status string) string {
-	raw := fmt.Sprintf("status=%s&page=%d&page_size=%d", status, page, pageSize)
+func (c *MyAssessmentListCache) buildKey(
+	userID uint64,
+	page, pageSize int,
+	status string,
+	scaleCode string,
+	riskLevel string,
+	dateFrom string,
+	dateTo string,
+) string {
+	raw := fmt.Sprintf(
+		"status=%s&scale_code=%s&risk_level=%s&date_from=%s&date_to=%s&page=%d&page_size=%d",
+		status,
+		scaleCode,
+		riskLevel,
+		dateFrom,
+		dateTo,
+		page,
+		pageSize,
+	)
 	hash := sha1.Sum([]byte(raw))
 	suffix := ":" + hex.EncodeToString(hash[:])[:8]
 	return c.keyBuilder.BuildAssessmentListKey(userID, suffix)

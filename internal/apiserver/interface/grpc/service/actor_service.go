@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -10,6 +11,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
+	relationDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor"
 )
@@ -18,9 +22,11 @@ import (
 // 提供受试者相关的服务，主要面向 C 端用户（患者/家长）和外部系统（collection-server）
 type ActorService struct {
 	pb.UnimplementedActorServiceServer
-	registrationService testeeApp.TesteeRegistrationService
-	managementService   testeeApp.TesteeManagementService
-	queryService        testeeApp.TesteeQueryService
+	registrationService          testeeApp.TesteeRegistrationService
+	managementService            testeeApp.TesteeManagementService
+	queryService                 testeeApp.TesteeQueryService
+	clinicianRelationshipService clinicianApp.ClinicianRelationshipService
+	assessmentEntryRepo          assessmentEntryDomain.Repository
 }
 
 // NewActorService 创建 Actor gRPC 服务
@@ -28,11 +34,15 @@ func NewActorService(
 	registrationService testeeApp.TesteeRegistrationService,
 	managementService testeeApp.TesteeManagementService,
 	queryService testeeApp.TesteeQueryService,
+	clinicianRelationshipService clinicianApp.ClinicianRelationshipService,
+	assessmentEntryRepo assessmentEntryDomain.Repository,
 ) *ActorService {
 	return &ActorService{
-		registrationService: registrationService,
-		managementService:   managementService,
-		queryService:        queryService,
+		registrationService:          registrationService,
+		managementService:            managementService,
+		queryService:                 queryService,
+		clinicianRelationshipService: clinicianRelationshipService,
+		assessmentEntryRepo:          assessmentEntryRepo,
 	}
 }
 
@@ -302,6 +312,64 @@ func (s *ActorService) ListTesteesByUser(ctx context.Context, req *pb.ListTestee
 	return s.toProtoTesteeListResponse(result), nil
 }
 
+// GetTesteeCareContext 获取受试者当前照护上下文摘要
+func (s *ActorService) GetTesteeCareContext(ctx context.Context, req *pb.GetTesteeCareContextRequest) (*pb.TesteeCareContextResponse, error) {
+	if req.Id == 0 {
+		return nil, status.Error(codes.InvalidArgument, "受试者ID不能为空")
+	}
+
+	testeeResult, err := s.queryService.GetByID(ctx, req.Id)
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to get testee for care context",
+			"action", "get_testee_care_context",
+			"testee_id", req.Id,
+			"error", err.Error(),
+		)
+		return nil, status.Error(codes.NotFound, "受试者不存在")
+	}
+
+	if s.clinicianRelationshipService == nil {
+		return &pb.TesteeCareContextResponse{}, nil
+	}
+
+	relations, err := s.clinicianRelationshipService.ListTesteeRelations(ctx, clinicianApp.ListTesteeRelationDTO{
+		OrgID:      testeeResult.OrgID,
+		TesteeID:   req.Id,
+		ActiveOnly: true,
+	})
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to get testee care context",
+			"action", "get_testee_care_context",
+			"testee_id", req.Id,
+			"error", err.Error(),
+		)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	item := pickPreferredCareContext(relations)
+	if item == nil || item.Relation == nil || item.Clinician == nil {
+		return &pb.TesteeCareContextResponse{}, nil
+	}
+
+	resp := &pb.TesteeCareContextResponse{
+		ClinicianName: item.Clinician.Name,
+		ClinicianRole: resolveClinicianRole(item.Clinician),
+		RelationType:  item.Relation.RelationType,
+	}
+
+	if item.Relation.SourceType != "" {
+		resp.EntrySourceType = item.Relation.SourceType
+	}
+	if item.Relation.SourceType == string(relationDomain.SourceTypeAssessmentEntry) && item.Relation.SourceID != nil && s.assessmentEntryRepo != nil {
+		entry, err := s.assessmentEntryRepo.FindByID(ctx, assessmentEntryDomain.NewID(*item.Relation.SourceID))
+		if err == nil && entry != nil {
+			resp.EntryTitle = buildAssessmentEntryTitle(entry)
+		}
+	}
+
+	return resp, nil
+}
+
 // toProtoTesteeResponse 转换为 proto TesteeResponse
 func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) *pb.TesteeResponse {
 	if result == nil {
@@ -361,4 +429,61 @@ func (s *ActorService) toProtoTesteeListResponse(result *testeeApp.TesteeListRes
 		Items: items,
 		Total: result.TotalCount,
 	}
+}
+
+func pickPreferredCareContext(result *clinicianApp.TesteeRelationListResult) *clinicianApp.TesteeRelationResult {
+	if result == nil || len(result.Items) == 0 {
+		return nil
+	}
+
+	var selected *clinicianApp.TesteeRelationResult
+	bestPriority := 1 << 30
+	for _, item := range result.Items {
+		if item == nil || item.Relation == nil || item.Clinician == nil {
+			continue
+		}
+		priority := relationTypePriority(item.Relation.RelationType)
+		if priority < bestPriority {
+			selected = item
+			bestPriority = priority
+		}
+	}
+	return selected
+}
+
+func relationTypePriority(raw string) int {
+	switch relationDomain.RelationType(raw) {
+	case relationDomain.RelationTypePrimary:
+		return 0
+	case relationDomain.RelationTypeAttending:
+		return 1
+	case relationDomain.RelationTypeCollaborator:
+		return 2
+	case relationDomain.RelationTypeAssigned:
+		return 3
+	case relationDomain.RelationTypeCreator:
+		return 4
+	default:
+		return 100
+	}
+}
+
+func resolveClinicianRole(item *clinicianApp.ClinicianResult) string {
+	if item == nil {
+		return ""
+	}
+	if item.Title != "" {
+		return item.Title
+	}
+	return item.ClinicianType
+}
+
+func buildAssessmentEntryTitle(item *assessmentEntryDomain.AssessmentEntry) string {
+	if item == nil {
+		return ""
+	}
+	if item.TargetVersion() != "" {
+		return fmt.Sprintf("%s:%s@%s", item.TargetType(), item.TargetCode(), item.TargetVersion())
+	}
+	return fmt.Sprintf("%s:%s", item.TargetType(), item.TargetCode())
 }

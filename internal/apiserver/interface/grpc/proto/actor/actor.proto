@@ -29,6 +29,9 @@ service ActorService {
   // ListTesteesByUser 根据用户（监护人）查询受试者列表
   // 用于 collection-server 查询当前用户的受试者
   rpc ListTesteesByUser(ListTesteesByUserRequest) returns (TesteeListResponse);
+
+  // GetTesteeCareContext 获取受试者当前照护上下文摘要
+  rpc GetTesteeCareContext(GetTesteeCareContextRequest) returns (TesteeCareContextResponse);
 }
 
 // ========== Testee 消息定义 ==========
@@ -119,4 +122,16 @@ message AssessmentStats {
 message TesteeListResponse {
   repeated TesteeResponse items = 1;    // 受试者列表
   int64 total = 2;                      // 总数
+}
+
+message GetTesteeCareContextRequest {
+  uint64 id = 1;                        // 受试者ID
+}
+
+message TesteeCareContextResponse {
+  string clinician_name = 1;            // 当前跟进从业者姓名
+  string clinician_role = 2;            // 从业者角色/职称
+  string relation_type = 3;             // 关系类型
+  string entry_title = 4;               // 来源入口标题
+  string entry_source_type = 5;         // 入口来源类型
 }

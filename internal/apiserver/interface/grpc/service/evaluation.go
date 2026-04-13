@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -109,7 +110,19 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 		Page:     page,
 		PageSize: pageSize,
 		Status:   req.Status,
+		ScaleCode: req.ScaleCode,
+		RiskLevel: req.RiskLevel,
 	}
+	dateFrom, err := parseAssessmentListDate(req.DateFrom, false)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "date_from 格式不正确")
+	}
+	dateTo, err := parseAssessmentListDate(req.DateTo, true)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "date_to 格式不正确")
+	}
+	dto.DateFrom = dateFrom
+	dto.DateTo = dateTo
 
 	result, err := s.submissionService.ListMyAssessments(ctx, dto)
 	if err != nil {
@@ -128,6 +141,25 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 		PageSize:   int32(result.PageSize),
 		TotalPages: int32(result.TotalPages),
 	}, nil
+}
+
+func parseAssessmentListDate(raw string, endExclusive bool) (*time.Time, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	layouts := []string{time.RFC3339, "2006-01-02"}
+	for _, layout := range layouts {
+		parsed, err := time.Parse(layout, raw)
+		if err != nil {
+			continue
+		}
+		if layout == "2006-01-02" && endExclusive {
+			parsed = parsed.Add(24 * time.Hour)
+		}
+		return &parsed, nil
+	}
+	return nil, status.Error(codes.InvalidArgument, "invalid date format")
 }
 
 // ==================== 得分查询接口 ====================

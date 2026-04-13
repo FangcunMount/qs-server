@@ -168,15 +168,28 @@ func (c *EvaluationClient) GetMyAssessmentByAnswerSheetID(ctx context.Context, a
 }
 
 // ListMyAssessments 获取我的测评列表
-func (c *EvaluationClient) ListMyAssessments(ctx context.Context, testeeID uint64, status string, page, pageSize int32) (*ListAssessmentsOutput, error) {
+func (c *EvaluationClient) ListMyAssessments(
+	ctx context.Context,
+	testeeID uint64,
+	status string,
+	scaleCode string,
+	riskLevel string,
+	dateFrom string,
+	dateTo string,
+	page, pageSize int32,
+) (*ListAssessmentsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
 	req := &pb.ListMyAssessmentsRequest{
-		TesteeId: testeeID,
-		Status:   status,
-		Page:     page,
-		PageSize: pageSize,
+		TesteeId:  testeeID,
+		Status:    status,
+		Page:      page,
+		PageSize:  pageSize,
+		ScaleCode: scaleCode,
+		RiskLevel: riskLevel,
+		DateFrom:  dateFrom,
+		DateTo:    dateTo,
 	}
 
 	resp, err := c.grpcClient.ListMyAssessments(ctx, req)

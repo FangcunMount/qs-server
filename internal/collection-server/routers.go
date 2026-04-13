@@ -343,6 +343,8 @@ func (r *Router) registerTesteeRoutes(api *gin.RouterGroup) {
 		testees.GET("", testeeHandler.List)
 		// 获取受试者详情
 		testees.GET("/:id", testeeHandler.Get)
+		// 获取受试者照护上下文
+		testees.GET("/:id/care-context", testeeHandler.GetCareContext)
 		// 更新受试者信息
 		testees.PUT("/:id", testeeHandler.Update)
 	}

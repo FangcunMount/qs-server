@@ -48,6 +48,15 @@ type TesteeResponse struct {
 	UpdatedAt time.Time `json:"updated_at"` // 更新时间
 }
 
+// TesteeCareContextResponse 受试者照护上下文响应
+type TesteeCareContextResponse struct {
+	ClinicianName   string `json:"clinician_name,omitempty"`    // 当前跟进临床人员姓名
+	ClinicianRole   string `json:"clinician_role,omitempty"`    // 当前跟进临床人员角色/类型
+	RelationType    string `json:"relation_type,omitempty"`     // 与受试者的关系类型
+	EntryTitle      string `json:"entry_title,omitempty"`       // 入口标题
+	EntrySourceType string `json:"entry_source_type,omitempty"` // 入口来源类型
+}
+
 // AssessmentStatsDTO 测评统计信息
 type AssessmentStatsDTO struct {
 	TotalCount       int32     `json:"total_count"`        // 总测评次数

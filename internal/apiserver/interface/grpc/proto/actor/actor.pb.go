@@ -746,6 +746,126 @@ func (x *TesteeListResponse) GetTotal() int64 {
 	return 0
 }
 
+type GetTesteeCareContextRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"` // 受试者ID
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTesteeCareContextRequest) Reset() {
+	*x = GetTesteeCareContextRequest{}
+	mi := &file_actor_actor_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTesteeCareContextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTesteeCareContextRequest) ProtoMessage() {}
+
+func (x *GetTesteeCareContextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_actor_actor_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTesteeCareContextRequest.ProtoReflect.Descriptor instead.
+func (*GetTesteeCareContextRequest) Descriptor() ([]byte, []int) {
+	return file_actor_actor_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetTesteeCareContextRequest) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type TesteeCareContextResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ClinicianName   string                 `protobuf:"bytes,1,opt,name=clinician_name,json=clinicianName,proto3" json:"clinician_name,omitempty"`         // 当前跟进从业者姓名
+	ClinicianRole   string                 `protobuf:"bytes,2,opt,name=clinician_role,json=clinicianRole,proto3" json:"clinician_role,omitempty"`         // 从业者角色/职称
+	RelationType    string                 `protobuf:"bytes,3,opt,name=relation_type,json=relationType,proto3" json:"relation_type,omitempty"`            // 关系类型
+	EntryTitle      string                 `protobuf:"bytes,4,opt,name=entry_title,json=entryTitle,proto3" json:"entry_title,omitempty"`                  // 来源入口标题
+	EntrySourceType string                 `protobuf:"bytes,5,opt,name=entry_source_type,json=entrySourceType,proto3" json:"entry_source_type,omitempty"` // 入口来源类型
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TesteeCareContextResponse) Reset() {
+	*x = TesteeCareContextResponse{}
+	mi := &file_actor_actor_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TesteeCareContextResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TesteeCareContextResponse) ProtoMessage() {}
+
+func (x *TesteeCareContextResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_actor_actor_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TesteeCareContextResponse.ProtoReflect.Descriptor instead.
+func (*TesteeCareContextResponse) Descriptor() ([]byte, []int) {
+	return file_actor_actor_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *TesteeCareContextResponse) GetClinicianName() string {
+	if x != nil {
+		return x.ClinicianName
+	}
+	return ""
+}
+
+func (x *TesteeCareContextResponse) GetClinicianRole() string {
+	if x != nil {
+		return x.ClinicianRole
+	}
+	return ""
+}
+
+func (x *TesteeCareContextResponse) GetRelationType() string {
+	if x != nil {
+		return x.RelationType
+	}
+	return ""
+}
+
+func (x *TesteeCareContextResponse) GetEntryTitle() string {
+	if x != nil {
+		return x.EntryTitle
+	}
+	return ""
+}
+
+func (x *TesteeCareContextResponse) GetEntrySourceType() string {
+	if x != nil {
+		return x.EntrySourceType
+	}
+	return ""
+}
+
 var File_actor_actor_proto protoreflect.FileDescriptor
 
 const file_actor_actor_proto_rawDesc = "" +
@@ -814,14 +934,24 @@ const file_actor_actor_proto_rawDesc = "" +
 	"\x0flast_risk_level\x18\x03 \x01(\tR\rlastRiskLevel\"W\n" +
 	"\x12TesteeListResponse\x12+\n" +
 	"\x05items\x18\x01 \x03(\v2\x15.actor.TesteeResponseR\x05items\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total2\xba\x03\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total\"-\n" +
+	"\x1bGetTesteeCareContextRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\"\xdb\x01\n" +
+	"\x19TesteeCareContextResponse\x12%\n" +
+	"\x0eclinician_name\x18\x01 \x01(\tR\rclinicianName\x12%\n" +
+	"\x0eclinician_role\x18\x02 \x01(\tR\rclinicianRole\x12#\n" +
+	"\rrelation_type\x18\x03 \x01(\tR\frelationType\x12\x1f\n" +
+	"\ventry_title\x18\x04 \x01(\tR\n" +
+	"entryTitle\x12*\n" +
+	"\x11entry_source_type\x18\x05 \x01(\tR\x0fentrySourceType2\x98\x04\n" +
 	"\fActorService\x12A\n" +
 	"\fCreateTestee\x12\x1a.actor.CreateTesteeRequest\x1a\x15.actor.TesteeResponse\x12;\n" +
 	"\tGetTestee\x12\x17.actor.GetTesteeRequest\x1a\x15.actor.TesteeResponse\x12A\n" +
 	"\fUpdateTestee\x12\x1a.actor.UpdateTesteeRequest\x1a\x15.actor.TesteeResponse\x12G\n" +
 	"\fTesteeExists\x12\x1a.actor.TesteeExistsRequest\x1a\x1b.actor.TesteeExistsResponse\x12M\n" +
 	"\x10ListTesteesByOrg\x12\x1e.actor.ListTesteesByOrgRequest\x1a\x19.actor.TesteeListResponse\x12O\n" +
-	"\x11ListTesteesByUser\x12\x1f.actor.ListTesteesByUserRequest\x1a\x19.actor.TesteeListResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actorb\x06proto3"
+	"\x11ListTesteesByUser\x12\x1f.actor.ListTesteesByUserRequest\x1a\x19.actor.TesteeListResponse\x12\\\n" +
+	"\x14GetTesteeCareContext\x12\".actor.GetTesteeCareContextRequest\x1a .actor.TesteeCareContextResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actorb\x06proto3"
 
 var (
 	file_actor_actor_proto_rawDescOnce sync.Once
@@ -835,28 +965,30 @@ func file_actor_actor_proto_rawDescGZIP() []byte {
 	return file_actor_actor_proto_rawDescData
 }
 
-var file_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_actor_actor_proto_goTypes = []any{
-	(*CreateTesteeRequest)(nil),      // 0: actor.CreateTesteeRequest
-	(*GetTesteeRequest)(nil),         // 1: actor.GetTesteeRequest
-	(*UpdateTesteeRequest)(nil),      // 2: actor.UpdateTesteeRequest
-	(*TesteeExistsRequest)(nil),      // 3: actor.TesteeExistsRequest
-	(*TesteeExistsResponse)(nil),     // 4: actor.TesteeExistsResponse
-	(*ListTesteesByOrgRequest)(nil),  // 5: actor.ListTesteesByOrgRequest
-	(*ListTesteesByUserRequest)(nil), // 6: actor.ListTesteesByUserRequest
-	(*TesteeResponse)(nil),           // 7: actor.TesteeResponse
-	(*AssessmentStats)(nil),          // 8: actor.AssessmentStats
-	(*TesteeListResponse)(nil),       // 9: actor.TesteeListResponse
-	(*timestamppb.Timestamp)(nil),    // 10: google.protobuf.Timestamp
+	(*CreateTesteeRequest)(nil),         // 0: actor.CreateTesteeRequest
+	(*GetTesteeRequest)(nil),            // 1: actor.GetTesteeRequest
+	(*UpdateTesteeRequest)(nil),         // 2: actor.UpdateTesteeRequest
+	(*TesteeExistsRequest)(nil),         // 3: actor.TesteeExistsRequest
+	(*TesteeExistsResponse)(nil),        // 4: actor.TesteeExistsResponse
+	(*ListTesteesByOrgRequest)(nil),     // 5: actor.ListTesteesByOrgRequest
+	(*ListTesteesByUserRequest)(nil),    // 6: actor.ListTesteesByUserRequest
+	(*TesteeResponse)(nil),              // 7: actor.TesteeResponse
+	(*AssessmentStats)(nil),             // 8: actor.AssessmentStats
+	(*TesteeListResponse)(nil),          // 9: actor.TesteeListResponse
+	(*GetTesteeCareContextRequest)(nil), // 10: actor.GetTesteeCareContextRequest
+	(*TesteeCareContextResponse)(nil),   // 11: actor.TesteeCareContextResponse
+	(*timestamppb.Timestamp)(nil),       // 12: google.protobuf.Timestamp
 }
 var file_actor_actor_proto_depIdxs = []int32{
-	10, // 0: actor.CreateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
-	10, // 1: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
-	10, // 2: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
+	12, // 0: actor.CreateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
+	12, // 1: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
+	12, // 2: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
 	8,  // 3: actor.TesteeResponse.assessment_stats:type_name -> actor.AssessmentStats
-	10, // 4: actor.TesteeResponse.created_at:type_name -> google.protobuf.Timestamp
-	10, // 5: actor.TesteeResponse.updated_at:type_name -> google.protobuf.Timestamp
-	10, // 6: actor.AssessmentStats.last_assessment_at:type_name -> google.protobuf.Timestamp
+	12, // 4: actor.TesteeResponse.created_at:type_name -> google.protobuf.Timestamp
+	12, // 5: actor.TesteeResponse.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 6: actor.AssessmentStats.last_assessment_at:type_name -> google.protobuf.Timestamp
 	7,  // 7: actor.TesteeListResponse.items:type_name -> actor.TesteeResponse
 	0,  // 8: actor.ActorService.CreateTestee:input_type -> actor.CreateTesteeRequest
 	1,  // 9: actor.ActorService.GetTestee:input_type -> actor.GetTesteeRequest
@@ -864,14 +996,16 @@ var file_actor_actor_proto_depIdxs = []int32{
 	3,  // 11: actor.ActorService.TesteeExists:input_type -> actor.TesteeExistsRequest
 	5,  // 12: actor.ActorService.ListTesteesByOrg:input_type -> actor.ListTesteesByOrgRequest
 	6,  // 13: actor.ActorService.ListTesteesByUser:input_type -> actor.ListTesteesByUserRequest
-	7,  // 14: actor.ActorService.CreateTestee:output_type -> actor.TesteeResponse
-	7,  // 15: actor.ActorService.GetTestee:output_type -> actor.TesteeResponse
-	7,  // 16: actor.ActorService.UpdateTestee:output_type -> actor.TesteeResponse
-	4,  // 17: actor.ActorService.TesteeExists:output_type -> actor.TesteeExistsResponse
-	9,  // 18: actor.ActorService.ListTesteesByOrg:output_type -> actor.TesteeListResponse
-	9,  // 19: actor.ActorService.ListTesteesByUser:output_type -> actor.TesteeListResponse
-	14, // [14:20] is the sub-list for method output_type
-	8,  // [8:14] is the sub-list for method input_type
+	10, // 14: actor.ActorService.GetTesteeCareContext:input_type -> actor.GetTesteeCareContextRequest
+	7,  // 15: actor.ActorService.CreateTestee:output_type -> actor.TesteeResponse
+	7,  // 16: actor.ActorService.GetTestee:output_type -> actor.TesteeResponse
+	7,  // 17: actor.ActorService.UpdateTestee:output_type -> actor.TesteeResponse
+	4,  // 18: actor.ActorService.TesteeExists:output_type -> actor.TesteeExistsResponse
+	9,  // 19: actor.ActorService.ListTesteesByOrg:output_type -> actor.TesteeListResponse
+	9,  // 20: actor.ActorService.ListTesteesByUser:output_type -> actor.TesteeListResponse
+	11, // 21: actor.ActorService.GetTesteeCareContext:output_type -> actor.TesteeCareContextResponse
+	15, // [15:22] is the sub-list for method output_type
+	8,  // [8:15] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -888,7 +1022,7 @@ func file_actor_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_actor_actor_proto_rawDesc), len(file_actor_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

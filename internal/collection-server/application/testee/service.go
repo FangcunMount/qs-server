@@ -120,6 +120,45 @@ func (s *Service) GetTestee(ctx context.Context, testeeID uint64) (*TesteeRespon
 	return convertToTesteeResponse(result), nil
 }
 
+// GetTesteeCareContext 获取受试者照护上下文
+func (s *Service) GetTesteeCareContext(ctx context.Context, testeeID uint64) (*TesteeCareContextResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	l.Debugw("获取受试者照护上下文",
+		"action", "get_testee_care_context",
+		"testee_id", testeeID,
+	)
+
+	result, err := s.actorClient.GetTesteeCareContext(ctx, testeeID)
+	if err != nil {
+		l.Errorw("获取受试者照护上下文失败",
+			"action", "get_testee_care_context",
+			"testee_id", testeeID,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	l.Debugw("获取受试者照护上下文成功",
+		"action", "get_testee_care_context",
+		"testee_id", testeeID,
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
+
+	if result == nil {
+		return &TesteeCareContextResponse{}, nil
+	}
+
+	return &TesteeCareContextResponse{
+		ClinicianName:   result.ClinicianName,
+		ClinicianRole:   result.ClinicianRole,
+		RelationType:    result.RelationType,
+		EntryTitle:      result.EntryTitle,
+		EntrySourceType: result.EntrySourceType,
+	}, nil
+}
+
 // UpdateTestee 更新受试者信息
 func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *UpdateTesteeRequest) (*TesteeResponse, error) {
 	l := logger.L(ctx)

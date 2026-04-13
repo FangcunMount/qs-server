@@ -959,10 +959,14 @@ func (x *GetMyAssessmentByAnswerSheetIDResponse) GetAssessment() *AssessmentDeta
 // 获取我的测评列表请求
 type ListMyAssessmentsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"` // 受试者ID（从上下文获取）
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                      // 状态筛选（可选）
-	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`                         // 页码
-	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"` // 每页数量
+	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`   // 受试者ID（从上下文获取）
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                        // 状态筛选（可选）
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`                           // 页码
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`   // 每页数量
+	ScaleCode     string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"` // 量表编码筛选（可选）
+	RiskLevel     string                 `protobuf:"bytes,6,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"` // 风险等级筛选（可选）
+	DateFrom      string                 `protobuf:"bytes,7,opt,name=date_from,json=dateFrom,proto3" json:"date_from,omitempty"`    // 开始日期（YYYY-MM-DD 或 RFC3339，可选）
+	DateTo        string                 `protobuf:"bytes,8,opt,name=date_to,json=dateTo,proto3" json:"date_to,omitempty"`          // 结束日期（YYYY-MM-DD 或 RFC3339，可选）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1023,6 +1027,34 @@ func (x *ListMyAssessmentsRequest) GetPageSize() int32 {
 		return x.PageSize
 	}
 	return 0
+}
+
+func (x *ListMyAssessmentsRequest) GetScaleCode() string {
+	if x != nil {
+		return x.ScaleCode
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsRequest) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsRequest) GetDateFrom() string {
+	if x != nil {
+		return x.DateFrom
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsRequest) GetDateTo() string {
+	if x != nil {
+		return x.DateTo
+	}
+	return ""
 }
 
 // 获取我的测评列表响应
@@ -1830,12 +1862,18 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"&GetMyAssessmentByAnswerSheetIDResponse\x12<\n" +
 	"\n" +
 	"assessment\x18\x01 \x01(\v2\x1c.evaluation.AssessmentDetailR\n" +
-	"assessment\"\x80\x01\n" +
+	"assessment\"\xf4\x01\n" +
 	"\x18ListMyAssessmentsRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xb8\x01\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"scale_code\x18\x05 \x01(\tR\tscaleCode\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\x06 \x01(\tR\triskLevel\x12\x1b\n" +
+	"\tdate_from\x18\a \x01(\tR\bdateFrom\x12\x17\n" +
+	"\adate_to\x18\b \x01(\tR\x06dateTo\"\xb8\x01\n" +
 	"\x19ListMyAssessmentsResponse\x123\n" +
 	"\x05items\x18\x01 \x03(\v2\x1d.evaluation.AssessmentSummaryR\x05items\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x12\n" +

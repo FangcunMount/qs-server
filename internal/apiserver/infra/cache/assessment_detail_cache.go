@@ -150,6 +150,19 @@ func (r *CachedAssessmentRepository) FindByTesteeID(ctx context.Context, testeeI
 	return r.repo.FindByTesteeID(ctx, testeeID, pagination)
 }
 
+func (r *CachedAssessmentRepository) FindByTesteeIDWithFilters(
+	ctx context.Context,
+	testeeID testee.ID,
+	status string,
+	scaleCode string,
+	riskLevel string,
+	dateFrom *time.Time,
+	dateTo *time.Time,
+	pagination assessment.Pagination,
+) ([]*assessment.Assessment, int64, error) {
+	return r.repo.FindByTesteeIDWithFilters(ctx, testeeID, status, scaleCode, riskLevel, dateFrom, dateTo, pagination)
+}
+
 func (r *CachedAssessmentRepository) FindByTesteeIDAndScaleID(ctx context.Context, testeeID testee.ID, scaleRef assessment.MedicalScaleRef, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
 	return r.repo.FindByTesteeIDAndScaleID(ctx, testeeID, scaleRef, pagination)
 }

@@ -89,6 +89,35 @@ func (h *TesteeHandler) Get(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// GetCareContext 获取受试者照护上下文
+// @Summary 获取受试者照护上下文
+// @Description 获取当前受试者关联的临床人员和入口来源摘要
+// @Tags 受试者
+// @Produce json
+// @Param id path int true "受试者ID"
+// @Success 200 {object} core.Response{data=testee.TesteeCareContextResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/testees/{id}/care-context [get]
+func (h *TesteeHandler) GetCareContext(c *gin.Context) {
+	idStr := h.GetPathParam(c, "id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid id format", err)
+		return
+	}
+
+	result, err := h.testeeService.GetTesteeCareContext(c.Request.Context(), id)
+	if err != nil {
+		h.InternalErrorResponse(c, "get testee care context failed", err)
+		return
+	}
+
+	h.Success(c, result)
+}
+
 // Update 更新受试者信息
 // @Summary 更新受试者信息
 // @Description 更新受试者的基本信息

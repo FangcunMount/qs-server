@@ -178,6 +178,10 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		"page", req.Page,
 		"page_size", req.PageSize,
 		"status_filter", req.Status,
+		"scale_code", req.ScaleCode,
+		"risk_level", req.RiskLevel,
+		"date_from", req.DateFrom,
+		"date_to", req.DateTo,
 	)
 
 	// 默认分页参数
@@ -198,7 +202,17 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		"page_size", req.PageSize,
 	)
 
-	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, req.Page, req.PageSize)
+	result, err := s.evaluationClient.ListMyAssessments(
+		ctx,
+		testeeID,
+		req.Status,
+		req.ScaleCode,
+		req.RiskLevel,
+		req.DateFrom,
+		req.DateTo,
+		req.Page,
+		req.PageSize,
+	)
 	if err != nil {
 		log.Errorf("Failed to list assessments via gRPC: %v", err)
 		l.Errorw("查询测评列表失败",

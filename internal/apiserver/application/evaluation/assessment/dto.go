@@ -21,10 +21,14 @@ type CreateAssessmentDTO struct {
 
 // ListMyAssessmentsDTO 查询我的测评列表 DTO
 type ListMyAssessmentsDTO struct {
-	TesteeID uint64 // 受试者ID
-	Page     int    // 页码
-	PageSize int    // 每页数量
-	Status   string // 状态筛选（可选）
+	TesteeID   uint64     // 受试者ID
+	Page       int        // 页码
+	PageSize   int        // 每页数量
+	Status     string     // 状态筛选（可选）
+	ScaleCode  string     // 量表编码筛选（可选）
+	RiskLevel  string     // 风险等级筛选（可选）
+	DateFrom   *time.Time // 开始日期筛选（可选）
+	DateTo     *time.Time // 结束日期筛选（可选）
 }
 
 // ListAssessmentsDTO 查询测评列表 DTO

@@ -65,6 +65,15 @@ type AssessmentStats struct {
 	LastRiskLevel    string    // 最后风险等级
 }
 
+// TesteeCareContextResponse 受试者照护上下文摘要
+type TesteeCareContextResponse struct {
+	ClinicianName   string
+	ClinicianRole   string
+	RelationType    string
+	EntryTitle      string
+	EntrySourceType string
+}
+
 // CreateTestee 创建受试者
 func (c *ActorClient) CreateTestee(ctx context.Context, req *CreateTesteeRequest) (*TesteeResponse, error) {
 	ctx, cancel := c.base.ContextWithTimeout(ctx)
@@ -125,6 +134,27 @@ func (c *ActorClient) GetTestee(ctx context.Context, testeeID uint64) (*TesteeRe
 	}
 
 	return convertTesteeResponse(resp), nil
+}
+
+// GetTesteeCareContext 获取受试者照护上下文摘要
+func (c *ActorClient) GetTesteeCareContext(ctx context.Context, testeeID uint64) (*TesteeCareContextResponse, error) {
+	ctx, cancel := c.base.ContextWithTimeout(ctx)
+	defer cancel()
+
+	resp, err := c.client.GetTesteeCareContext(ctx, &pb.GetTesteeCareContextRequest{
+		Id: testeeID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &TesteeCareContextResponse{
+		ClinicianName:   resp.GetClinicianName(),
+		ClinicianRole:   resp.GetClinicianRole(),
+		RelationType:    resp.GetRelationType(),
+		EntryTitle:      resp.GetEntryTitle(),
+		EntrySourceType: resp.GetEntrySourceType(),
+	}, nil
 }
 
 // UpdateTesteeRequest 更新受试者请求参数

@@ -158,6 +158,10 @@ message ListMyAssessmentsRequest {
   string status = 2;          // 状态筛选（可选）
   int32 page = 3;             // 页码
   int32 page_size = 4;        // 每页数量
+  string scale_code = 5;      // 量表编码筛选（可选）
+  string risk_level = 6;      // 风险等级筛选（可选）
+  string date_from = 7;       // 开始日期（YYYY-MM-DD 或 RFC3339，可选）
+  string date_to = 8;         // 结束日期（YYYY-MM-DD 或 RFC3339，可选）
 }
 
 // 获取我的测评列表响应

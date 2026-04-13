@@ -349,6 +349,9 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"testee_id", dto.TesteeID,
 		"page", dto.Page,
 		"page_size", dto.PageSize,
+		"status", dto.Status,
+		"scale_code", dto.ScaleCode,
+		"risk_level", dto.RiskLevel,
 	)
 
 	// 1. 验证参数
@@ -366,11 +369,24 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"page_size", dto.PageSize,
 	)
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
+	dateFromKey := formatAssessmentListDateKey(dto.DateFrom)
+	dateToKey := formatAssessmentListDateKey(dto.DateTo)
 
 	// 2.1 尝试缓存（按用户+状态+分页）
 	if s.listCache != nil {
 		var cached AssessmentListResult
-		if err := s.listCache.Get(ctx, dto.TesteeID, page, pageSize, dto.Status, &cached); err == nil {
+		if err := s.listCache.Get(
+			ctx,
+			dto.TesteeID,
+			page,
+			pageSize,
+			dto.Status,
+			dto.ScaleCode,
+			dto.RiskLevel,
+			dateFromKey,
+			dateToKey,
+			&cached,
+		); err == nil {
 			return &cached, nil
 		}
 	}
@@ -379,13 +395,26 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 	testeeID := testee.NewID(dto.TesteeID)
 	pagination := assessment.NewPagination(page, pageSize)
 
-	// 4. 查询（暂不支持状态筛选，后续可扩展 Repository 接口）
 	l.Debugw("开始查询测评列表",
 		"testee_id", dto.TesteeID,
 		"page", page,
 		"page_size", pageSize,
+		"status", dto.Status,
+		"scale_code", dto.ScaleCode,
+		"risk_level", dto.RiskLevel,
+		"date_from", dateFromKey,
+		"date_to", dateToKey,
 	)
-	list, total, err := s.repo.FindByTesteeID(ctx, testeeID, pagination)
+	list, total, err := s.repo.FindByTesteeIDWithFilters(
+		ctx,
+		testeeID,
+		dto.Status,
+		dto.ScaleCode,
+		dto.RiskLevel,
+		dto.DateFrom,
+		dto.DateTo,
+		pagination,
+	)
 	if err != nil {
 		l.Errorw("查询测评列表失败",
 			"testee_id", dto.TesteeID,
@@ -422,10 +451,28 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 	}
 
 	if s.listCache != nil {
-		s.listCache.Set(ctx, dto.TesteeID, page, pageSize, dto.Status, result)
+		s.listCache.Set(
+			ctx,
+			dto.TesteeID,
+			page,
+			pageSize,
+			dto.Status,
+			dto.ScaleCode,
+			dto.RiskLevel,
+			dateFromKey,
+			dateToKey,
+			result,
+		)
 	}
 
 	return result, nil
+}
+
+func formatAssessmentListDateKey(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 // buildCreateRequest 构造创建请求

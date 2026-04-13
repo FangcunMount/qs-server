@@ -91,9 +91,13 @@ type AssessmentReportResponse struct {
 
 // ListAssessmentsRequest 测评列表请求
 type ListAssessmentsRequest struct {
-	Status   string `form:"status"`
-	Page     int32  `form:"page"`
-	PageSize int32  `form:"page_size"`
+	Status    string `form:"status"`
+	Page      int32  `form:"page"`
+	PageSize  int32  `form:"page_size"`
+	ScaleCode string `form:"scale_code"`
+	RiskLevel string `form:"risk_level"`
+	DateFrom  string `form:"date_from"`
+	DateTo    string `form:"date_to"`
 }
 
 // ListAssessmentsResponse 测评列表响应

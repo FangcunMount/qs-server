@@ -2,6 +2,8 @@ package evaluation
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -114,6 +116,53 @@ func (r *assessmentRepository) FindByTesteeID(ctx context.Context, testeeID test
 	return r.mapper.ToDomainList(pos), total, nil
 }
 
+// FindByTesteeIDWithFilters 查询受试者的测评列表（支持分页和筛选）
+func (r *assessmentRepository) FindByTesteeIDWithFilters(
+	ctx context.Context,
+	testeeID testee.ID,
+	status string,
+	scaleCode string,
+	riskLevel string,
+	dateFrom *time.Time,
+	dateTo *time.Time,
+	pagination assessment.Pagination,
+) ([]*assessment.Assessment, int64, error) {
+	var pos []*AssessmentPO
+	var total int64
+
+	query := r.WithContext(ctx).
+		Where("testee_id = ? AND deleted_at IS NULL", uint64(testeeID))
+
+	query = applyAssessmentStatusFilter(query, status)
+	if scaleCode != "" {
+		query = query.Where("medical_scale_code = ?", scaleCode)
+	}
+	if riskLevel != "" {
+		query = query.Where("risk_level = ?", strings.ToLower(riskLevel))
+	}
+	if dateFrom != nil {
+		query = query.Where("created_at >= ?", *dateFrom)
+	}
+	if dateTo != nil {
+		query = query.Where("created_at < ?", *dateTo)
+	}
+
+	if err := query.Model(&AssessmentPO{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Order("id DESC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit()).
+		Find(&pos).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return r.mapper.ToDomainList(pos), total, nil
+}
+
 // FindByTesteeIDAndScaleID 查询受试者在某个量表下的测评列表
 func (r *assessmentRepository) FindByTesteeIDAndScaleID(ctx context.Context, testeeID testee.ID, scaleRef assessment.MedicalScaleRef, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
 	var pos []*AssessmentPO
@@ -140,6 +189,22 @@ func (r *assessmentRepository) FindByTesteeIDAndScaleID(ctx context.Context, tes
 	}
 
 	return r.mapper.ToDomainList(pos), total, nil
+}
+
+func applyAssessmentStatusFilter(query *gorm.DB, rawStatus string) *gorm.DB {
+	switch strings.ToLower(strings.TrimSpace(rawStatus)) {
+	case "":
+		return query
+	case "pending":
+		return query.Where("status IN ?", []string{
+			assessment.StatusPending.String(),
+			assessment.StatusSubmitted.String(),
+		})
+	case "done":
+		return query.Where("status = ?", assessment.StatusInterpreted.String())
+	default:
+		return query.Where("status = ?", rawStatus)
+	}
 }
 
 // ==================== 按业务来源查询 ====================

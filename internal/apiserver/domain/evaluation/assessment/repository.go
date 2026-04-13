@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
@@ -28,6 +29,18 @@ type Repository interface {
 
 	// FindByTesteeID 查询受试者的测评列表（支持分页）
 	FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination Pagination) ([]*Assessment, int64, error)
+
+	// FindByTesteeIDWithFilters 查询受试者的测评列表（支持分页和筛选）
+	FindByTesteeIDWithFilters(
+		ctx context.Context,
+		testeeID testee.ID,
+		status string,
+		scaleCode string,
+		riskLevel string,
+		dateFrom *time.Time,
+		dateTo *time.Time,
+		pagination Pagination,
+	) ([]*Assessment, int64, error)
 
 	// FindByTesteeIDAndScaleID 查询受试者在某个量表下的测评列表
 	FindByTesteeIDAndScaleID(ctx context.Context, testeeID testee.ID, scaleRef MedicalScaleRef, pagination Pagination) ([]*Assessment, int64, error)

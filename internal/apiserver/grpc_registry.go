@@ -121,6 +121,8 @@ func (r *GRPCRegistry) registerActorService() error {
 		r.container.ActorModule.TesteeRegistrationService,
 		r.container.ActorModule.TesteeManagementService,
 		r.container.ActorModule.TesteeQueryService,
+		r.container.ActorModule.ClinicianRelationshipService,
+		r.container.ActorModule.AssessmentEntryRepo,
 	)
 	r.server.RegisterService(actorService)
 	log.Info("   👥 Actor service registered")
