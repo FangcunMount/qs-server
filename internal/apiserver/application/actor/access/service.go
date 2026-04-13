@@ -108,7 +108,7 @@ func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operato
 		orgID,
 		domainClinician.ID(*scope.ClinicianID),
 		domainTestee.ID(testeeID),
-		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+		domainRelation.AccessGrantRelationTypes(),
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to validate testee relation access")
@@ -135,15 +135,21 @@ func (s *service) ListAccessibleTesteeIDs(ctx context.Context, orgID int64, oper
 		ctx,
 		orgID,
 		domainClinician.ID(*scope.ClinicianID),
-		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+		domainRelation.AccessGrantRelationTypes(),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list accessible testee ids")
 	}
 
+	seen := make(map[uint64]struct{}, len(ids))
 	result := make([]uint64, 0, len(ids))
 	for _, id := range ids {
-		result = append(result, id.Uint64())
+		rawID := id.Uint64()
+		if _, ok := seen[rawID]; ok {
+			continue
+		}
+		seen[rawID] = struct{}{}
+		result = append(result, rawID)
 	}
 	return result, nil
 }

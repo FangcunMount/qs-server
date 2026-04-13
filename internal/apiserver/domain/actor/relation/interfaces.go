@@ -19,6 +19,11 @@ type Repository interface {
 		testeeID testee.ID,
 		relationType RelationType,
 	) (*ClinicianTesteeRelation, error)
+	FindActivePrimaryByTestee(
+		ctx context.Context,
+		orgID int64,
+		testeeID testee.ID,
+	) (*ClinicianTesteeRelation, error)
 	FindActiveByTypes(
 		ctx context.Context,
 		orgID int64,
@@ -33,6 +38,7 @@ type Repository interface {
 		relationTypes []RelationType,
 		offset, limit int,
 	) ([]*ClinicianTesteeRelation, error)
+	ListHistoryByClinician(ctx context.Context, orgID int64, clinicianID clinician.ID) ([]*ClinicianTesteeRelation, error)
 	CountActiveByClinician(
 		ctx context.Context,
 		orgID int64,

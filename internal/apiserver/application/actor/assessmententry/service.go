@@ -239,23 +239,23 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 			}
 		}
 
-		assignedRelation, err := s.relationRepo.FindActive(
+		assignedRelation, err := s.relationRepo.FindActiveByTypes(
 			txCtx,
 			entry.OrgID(),
 			entry.ClinicianID(),
 			testeeItem.ID(),
-			domainRelation.RelationTypeAssigned,
+			domainRelation.AccessGrantRelationTypes(),
 		)
 		if err != nil {
 			if !errors.IsCode(err, code.ErrUserNotFound) {
-				return errors.Wrap(err, "failed to find assigned relation")
+				return errors.Wrap(err, "failed to find access relation")
 			}
 
 			assignedRelation = domainRelation.NewClinicianTesteeRelation(
 				entry.OrgID(),
 				entry.ClinicianID(),
 				testeeItem.ID(),
-				domainRelation.RelationTypeAssigned,
+				domainRelation.RelationTypeAttending,
 				domainRelation.SourceTypeAssessmentEntry,
 				&entryID,
 				true,
@@ -263,7 +263,7 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 				nil,
 			)
 			if err := s.relationRepo.Save(txCtx, assignedRelation); err != nil {
-				return errors.Wrap(err, "failed to save assigned relation")
+				return errors.Wrap(err, "failed to save attending relation")
 			}
 		}
 

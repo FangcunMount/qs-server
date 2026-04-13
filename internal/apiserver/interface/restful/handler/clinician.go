@@ -8,6 +8,7 @@ import (
 	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -418,6 +419,25 @@ func (h *ActorHandler) ListClinicianAssessmentEntries(c *gin.Context) {
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
 
+func (h *ActorHandler) ListClinicianRelations(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	clinicianID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if _, err := h.requireClinicianInOrg(c, orgID, clinicianID); err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.listClinicianRelationsFor(c, orgID, clinicianID)
+}
+
 // GetMyClinician 获取当前操作者对应的从业者。
 // @Summary 获取我的从业者身份
 // @Description 获取当前后台操作者绑定的从业者档案；当前也兼容旧的 /practitioners 路由别名
@@ -563,6 +583,16 @@ func (h *ActorHandler) ListMyAssessmentEntries(c *gin.Context) {
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
 
+func (h *ActorHandler) ListMyClinicianRelations(c *gin.Context) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.listClinicianRelationsFor(c, clinicianItem.OrgID, clinicianItem.ID)
+}
+
 func (h *ActorHandler) AssignClinicianTestee(c *gin.Context) {
 	var req request.AssignClinicianTesteeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -588,6 +618,44 @@ func (h *ActorHandler) AssignClinicianTestee(c *gin.Context) {
 		return
 	}
 	h.SuccessResponseWithMessage(c, "分配受试者成功", toRelationResponseFromClinicianResult(result))
+}
+
+func (h *ActorHandler) AssignPrimaryClinicianTestee(c *gin.Context) {
+	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypePrimary), "设置主责从业者成功")
+}
+
+func (h *ActorHandler) AssignAttendingClinicianTestee(c *gin.Context) {
+	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeAttending), "设置跟进从业者成功")
+}
+
+func (h *ActorHandler) AssignCollaboratorClinicianTestee(c *gin.Context) {
+	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeCollaborator), "设置协作从业者成功")
+}
+
+func (h *ActorHandler) TransferPrimaryClinicianTestee(c *gin.Context) {
+	var req request.TransferPrimaryClinicianRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.clinicianRelationshipService.TransferPrimary(c.Request.Context(), clinicianApp.TransferPrimaryDTO{
+		OrgID:         orgID,
+		ToClinicianID: req.ToClinicianID,
+		TesteeID:      req.TesteeID,
+		SourceType:    req.SourceType,
+		SourceID:      req.SourceID,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.SuccessResponseWithMessage(c, "转移主责从业者成功", toRelationResponseFromClinicianResult(result))
 }
 
 func (h *ActorHandler) UnbindClinicianTesteeRelation(c *gin.Context) {
@@ -650,6 +718,14 @@ func (h *ActorHandler) DeactivateAssessmentEntry(c *gin.Context) {
 
 func (h *ActorHandler) ReactivateAssessmentEntry(c *gin.Context) {
 	h.setAssessmentEntryActive(c, true)
+}
+
+func (h *ActorHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
+	h.setMyAssessmentEntryActive(c, false)
+}
+
+func (h *ActorHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
+	h.setMyAssessmentEntryActive(c, true)
 }
 
 // ResolveAssessmentEntry 公开解析测评入口。
@@ -1020,6 +1096,16 @@ func toTesteeClinicianRelationResponse(item *clinicianApp.TesteeRelationResult) 
 	}
 }
 
+func toClinicianRelationResponse(item *clinicianApp.ClinicianRelationResult) *response.ClinicianRelationResponse {
+	if item == nil {
+		return nil
+	}
+	return &response.ClinicianRelationResponse{
+		Testee:   toAssignedTesteeResponse(item.Testee),
+		Relation: toRelationResponseFromClinicianResult(item.Relation),
+	}
+}
+
 func (h *ActorHandler) requireClinicianInOrg(c *gin.Context, orgID int64, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
 	result, err := h.clinicianQueryService.GetByID(c.Request.Context(), clinicianID)
 	if err != nil {
@@ -1057,6 +1143,38 @@ func (h *ActorHandler) listTesteeClinicianRelations(c *gin.Context, activeOnly b
 		items = append(items, toTesteeClinicianRelationResponse(item))
 	}
 	h.Success(c, &response.TesteeClinicianRelationListResponse{Items: items})
+}
+
+func (h *ActorHandler) listClinicianRelationsFor(c *gin.Context, orgID int64, clinicianID uint64) {
+	page, pageSize := paginationFromContext(c)
+	result, err := h.clinicianRelationshipService.ListClinicianRelations(c.Request.Context(), clinicianApp.ListClinicianRelationDTO{
+		OrgID:       orgID,
+		ClinicianID: clinicianID,
+		Offset:      (page - 1) * pageSize,
+		Limit:       pageSize,
+		ActiveOnly:  true,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	items := make([]*response.ClinicianRelationResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toClinicianRelationResponse(item))
+	}
+
+	totalPages := 0
+	if pageSize > 0 {
+		totalPages = int((result.TotalCount + int64(pageSize) - 1) / int64(pageSize))
+	}
+	h.Success(c, &response.ClinicianRelationListResponse{
+		Items:      items,
+		Total:      result.TotalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	})
 }
 
 func (h *ActorHandler) setAssessmentEntryActive(c *gin.Context, active bool) {
@@ -1098,4 +1216,87 @@ func (h *ActorHandler) setAssessmentEntryActive(c *gin.Context, active bool) {
 		return
 	}
 	h.SuccessResponseWithMessage(c, "测评入口已停用", toAssessmentEntryResponse(result, ""))
+}
+
+func (h *ActorHandler) setMyAssessmentEntryActive(c *gin.Context, active bool) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	_, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	var result *assessmentEntryApp.AssessmentEntryResult
+	if active {
+		result, err = h.assessmentEntryService.Reactivate(c.Request.Context(), entryID)
+	} else {
+		result, err = h.assessmentEntryService.Deactivate(c.Request.Context(), entryID)
+	}
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result.ClinicianID != clinicianItem.ID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current clinician"))
+		return
+	}
+	logger.L(c.Request.Context()).Infow("Assessment entry lifecycle changed",
+		"action", map[bool]string{true: "reactivate_my_assessment_entry", false: "deactivate_my_assessment_entry"}[active],
+		"org_id", clinicianItem.OrgID,
+		"assessment_entry_id", entryID,
+		"clinician_id", result.ClinicianID,
+		"operator_user_id", operatorUserID,
+		"is_active", result.IsActive,
+	)
+	if active {
+		h.SuccessResponseWithMessage(c, "测评入口已启用", toAssessmentEntryResponse(result, ""))
+		return
+	}
+	h.SuccessResponseWithMessage(c, "测评入口已停用", toAssessmentEntryResponse(result, ""))
+}
+
+func (h *ActorHandler) assignClinicianTesteeWithType(c *gin.Context, relationType string, successMessage string) {
+	var req request.AssignClinicianTesteeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	dto := clinicianApp.AssignTesteeDTO{
+		OrgID:        orgID,
+		ClinicianID:  req.ClinicianID,
+		TesteeID:     req.TesteeID,
+		RelationType: relationType,
+		SourceType:   req.SourceType,
+		SourceID:     req.SourceID,
+	}
+
+	var result *clinicianApp.RelationResult
+	switch relationType {
+	case string(domainRelation.RelationTypePrimary):
+		result, err = h.clinicianRelationshipService.AssignPrimary(c.Request.Context(), dto)
+	case string(domainRelation.RelationTypeCollaborator):
+		result, err = h.clinicianRelationshipService.AssignCollaborator(c.Request.Context(), dto)
+	default:
+		result, err = h.clinicianRelationshipService.AssignAttending(c.Request.Context(), dto)
+	}
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.SuccessResponseWithMessage(c, successMessage, toRelationResponseFromClinicianResult(result))
 }

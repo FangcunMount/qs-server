@@ -35,14 +35,53 @@ func NewRelationshipService(
 }
 
 func (s *relationshipService) AssignTestee(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error) {
+	normalizedType, err := normalizeAssignmentRelationType(dto.RelationType)
+	if err != nil {
+		return nil, err
+	}
+	dto.RelationType = string(normalizedType)
+	return s.assignRelation(ctx, dto)
+}
+
+func (s *relationshipService) AssignPrimary(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error) {
+	dto.RelationType = string(domainRelation.RelationTypePrimary)
+	return s.assignRelation(ctx, dto)
+}
+
+func (s *relationshipService) AssignAttending(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error) {
+	dto.RelationType = string(domainRelation.RelationTypeAttending)
+	return s.assignRelation(ctx, dto)
+}
+
+func (s *relationshipService) AssignCollaborator(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error) {
+	dto.RelationType = string(domainRelation.RelationTypeCollaborator)
+	return s.assignRelation(ctx, dto)
+}
+
+func (s *relationshipService) TransferPrimary(ctx context.Context, dto TransferPrimaryDTO) (*RelationResult, error) {
+	sourceType := dto.SourceType
+	if sourceType == "" {
+		sourceType = string(domainRelation.SourceTypeTransfer)
+	}
+	return s.assignRelation(ctx, AssignTesteeDTO{
+		OrgID:        dto.OrgID,
+		ClinicianID:  dto.ToClinicianID,
+		TesteeID:     dto.TesteeID,
+		RelationType: string(domainRelation.RelationTypePrimary),
+		SourceType:   sourceType,
+		SourceID:     dto.SourceID,
+	})
+}
+
+func (s *relationshipService) assignRelation(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error) {
 	var result *domainRelation.ClinicianTesteeRelation
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		relationshipType := domainRelation.RelationType(dto.RelationType)
-		if relationshipType == "" {
-			relationshipType = domainRelation.RelationTypeAssigned
-		}
+	relationshipType, err := normalizeAssignmentRelationType(dto.RelationType)
+	if err != nil {
+		return nil, err
+	}
 
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		sourceType := domainRelation.SourceType(dto.SourceType)
 		if sourceType == "" {
 			sourceType = domainRelation.SourceTypeManual
@@ -64,18 +103,47 @@ func (s *relationshipService) AssignTestee(ctx context.Context, dto AssignTestee
 			return errors.WithCode(code.ErrInvalidArgument, "testee does not belong to the requested organization")
 		}
 
-		result, err = s.relationRepo.FindActive(
+		now := time.Now()
+		if relationshipType == domainRelation.RelationTypePrimary {
+			existingPrimaryRelation, err := s.relationRepo.FindActivePrimaryByTestee(
+				txCtx,
+				dto.OrgID,
+				domainTestee.ID(dto.TesteeID),
+			)
+			if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+				return errors.Wrap(err, "failed to find active primary relation")
+			}
+			if err == nil && existingPrimaryRelation != nil {
+				if existingPrimaryRelation.ClinicianID() == domainClinician.ID(dto.ClinicianID) {
+					result = existingPrimaryRelation
+					return nil
+				}
+				existingPrimaryRelation.Unbind(now)
+				if err := s.relationRepo.Update(txCtx, existingPrimaryRelation); err != nil {
+					return errors.Wrap(err, "failed to unbind existing primary relation")
+				}
+			}
+		}
+
+		existingRelation, err := s.relationRepo.FindActiveByTypes(
 			txCtx,
 			dto.OrgID,
 			domainClinician.ID(dto.ClinicianID),
 			domainTestee.ID(dto.TesteeID),
-			relationshipType,
+			domainRelation.AccessGrantRelationTypes(),
 		)
-		if err == nil {
-			return nil
+		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+			return errors.Wrap(err, "failed to find existing access relation")
 		}
-		if !errors.IsCode(err, code.ErrUserNotFound) {
-			return errors.Wrap(err, "failed to find active relation")
+		if err == nil && existingRelation != nil {
+			if existingRelation.RelationType() == relationshipType {
+				result = existingRelation
+				return nil
+			}
+			existingRelation.Unbind(now)
+			if err := s.relationRepo.Update(txCtx, existingRelation); err != nil {
+				return errors.Wrap(err, "failed to replace existing access relation")
+			}
 		}
 
 		result = domainRelation.NewClinicianTesteeRelation(
@@ -86,7 +154,7 @@ func (s *relationshipService) AssignTestee(ctx context.Context, dto AssignTestee
 			sourceType,
 			dto.SourceID,
 			true,
-			time.Now(),
+			now,
 			nil,
 		)
 		if err := s.relationRepo.Save(txCtx, result); err != nil {
@@ -132,7 +200,7 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 		ctx,
 		dto.OrgID,
 		domainClinician.ID(dto.ClinicianID),
-		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+		domainRelation.AccessGrantRelationTypes(),
 		dto.Offset,
 		dto.Limit,
 	)
@@ -144,7 +212,7 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 		ctx,
 		dto.OrgID,
 		domainClinician.ID(dto.ClinicianID),
-		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+		domainRelation.AccessGrantRelationTypes(),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count relations")
@@ -175,15 +243,21 @@ func (s *relationshipService) ListAssignedTesteeIDs(ctx context.Context, orgID i
 		ctx,
 		orgID,
 		domainClinician.ID(clinicianID),
-		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+		domainRelation.AccessGrantRelationTypes(),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list assigned testee ids")
 	}
 
+	seen := make(map[uint64]struct{}, len(ids))
 	result := make([]uint64, 0, len(ids))
 	for _, id := range ids {
-		result = append(result, id.Uint64())
+		rawID := id.Uint64()
+		if _, ok := seen[rawID]; ok {
+			continue
+		}
+		seen[rawID] = struct{}{}
+		result = append(result, rawID)
 	}
 	return result, nil
 }
@@ -219,4 +293,65 @@ func (s *relationshipService) ListTesteeRelations(ctx context.Context, dto ListT
 	}
 
 	return &TesteeRelationListResult{Items: items}, nil
+}
+
+func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto ListClinicianRelationDTO) (*ClinicianRelationListResult, error) {
+	var (
+		relations []*domainRelation.ClinicianTesteeRelation
+		err       error
+	)
+
+	if dto.ActiveOnly {
+		relations, err = s.relationRepo.ListActiveByClinician(
+			ctx,
+			dto.OrgID,
+			domainClinician.ID(dto.ClinicianID),
+			nil,
+			dto.Offset,
+			dto.Limit,
+		)
+	} else {
+		relations, err = s.relationRepo.ListHistoryByClinician(ctx, dto.OrgID, domainClinician.ID(dto.ClinicianID))
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list clinician relations")
+	}
+
+	totalCount := int64(len(relations))
+	if dto.ActiveOnly {
+		totalCount, err = s.relationRepo.CountActiveByClinician(ctx, dto.OrgID, domainClinician.ID(dto.ClinicianID), nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to count clinician relations")
+		}
+	}
+
+	items := make([]*ClinicianRelationResult, 0, len(relations))
+	for _, relationItem := range relations {
+		testeeItem, err := s.testeeRepo.FindByID(ctx, relationItem.TesteeID())
+		if err != nil {
+			if errors.IsCode(err, code.ErrUserNotFound) {
+				continue
+			}
+			return nil, errors.Wrap(err, "failed to find testee")
+		}
+		items = append(items, &ClinicianRelationResult{
+			Relation: toRelationResult(relationItem),
+			Testee:   toAssignedTesteeResult(testeeItem),
+		})
+	}
+
+	return &ClinicianRelationListResult{
+		Items:      items,
+		TotalCount: totalCount,
+		Offset:     dto.Offset,
+		Limit:      dto.Limit,
+	}, nil
+}
+
+func normalizeAssignmentRelationType(raw string) (domainRelation.RelationType, error) {
+	relationType := domainRelation.NormalizeAssignableRelationType(domainRelation.RelationType(raw))
+	if !domainRelation.IsSupportedAssignmentRelationType(relationType) {
+		return "", errors.WithCode(code.ErrInvalidArgument, "unsupported clinician relation type")
+	}
+	return relationType, nil
 }

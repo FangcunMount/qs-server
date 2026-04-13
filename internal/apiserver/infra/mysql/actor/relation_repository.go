@@ -78,6 +78,30 @@ func (r *relationRepository) FindActive(
 	return r.FindActiveByTypes(ctx, orgID, clinicianID, testeeID, []domain.RelationType{relationType})
 }
 
+func (r *relationRepository) FindActivePrimaryByTestee(
+	ctx context.Context,
+	orgID int64,
+	testeeID testee.ID,
+) (*domain.ClinicianTesteeRelation, error) {
+	var po ClinicianRelationPO
+	err := r.WithContext(ctx).
+		Where(
+			"org_id = ? AND testee_id = ? AND relation_type = ? AND is_active = ? AND deleted_at IS NULL",
+			orgID,
+			testeeID,
+			string(domain.RelationTypePrimary),
+			true,
+		).
+		First(&po).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.WithCode(code.ErrUserNotFound, "primary relation not found")
+		}
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
+}
+
 func (r *relationRepository) FindActiveByTypes(
 	ctx context.Context,
 	orgID int64,
@@ -124,6 +148,22 @@ func (r *relationRepository) ListActiveByClinician(
 		Order("bound_at DESC, id DESC").
 		Offset(offset).
 		Limit(limit).
+		Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomains(pos), nil
+}
+
+func (r *relationRepository) ListHistoryByClinician(
+	ctx context.Context,
+	orgID int64,
+	clinicianID clinician.ID,
+) ([]*domain.ClinicianTesteeRelation, error) {
+	var pos []*ClinicianRelationPO
+	err := r.WithContext(ctx).
+		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinicianID).
+		Order("bound_at DESC, id DESC").
 		Find(&pos).Error
 	if err != nil {
 		return nil, err

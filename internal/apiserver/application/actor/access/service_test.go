@@ -11,7 +11,7 @@ import (
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
-func TestValidateTesteeAccessUsesAssignedRelationOnly(t *testing.T) {
+func TestValidateTesteeAccessUsesAccessGrantRelations(t *testing.T) {
 	operatorItem := domainOperator.NewOperator(1, 101, "operator")
 	operatorItem.SetID(201)
 
@@ -35,8 +35,14 @@ func TestValidateTesteeAccessUsesAssignedRelationOnly(t *testing.T) {
 		t.Fatalf("expected access validation to pass: %v", err)
 	}
 
-	if len(relationRepo.lastRelationTypes) != 1 || relationRepo.lastRelationTypes[0] != domainRelation.RelationTypeAssigned {
-		t.Fatalf("expected access validation to check assigned relation only, got %v", relationRepo.lastRelationTypes)
+	expected := domainRelation.AccessGrantRelationTypes()
+	if len(relationRepo.lastRelationTypes) != len(expected) {
+		t.Fatalf("expected access validation to check %v, got %v", expected, relationRepo.lastRelationTypes)
+	}
+	for index := range expected {
+		if relationRepo.lastRelationTypes[index] != expected[index] {
+			t.Fatalf("expected access validation to check %v, got %v", expected, relationRepo.lastRelationTypes)
+		}
 	}
 }
 
@@ -112,10 +118,16 @@ func (s *stubRelationRepository) FindByID(ctx context.Context, id domainRelation
 func (s *stubRelationRepository) FindActive(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationType domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
+func (s *stubRelationRepository) FindActivePrimaryByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+	panic("unexpected call")
+}
 func (s *stubRelationRepository) FindActiveByTypes(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
 func (s *stubRelationRepository) ListActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType, offset, limit int) ([]*domainRelation.ClinicianTesteeRelation, error) {
+	panic("unexpected call")
+}
+func (s *stubRelationRepository) ListHistoryByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
 func (s *stubRelationRepository) CountActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType) (int64, error) {

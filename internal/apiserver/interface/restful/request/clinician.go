@@ -59,6 +59,15 @@ type AssignClinicianTesteeRequest struct {
 	SourceID     *uint64 `json:"source_id"`
 }
 
+// TransferPrimaryClinicianRequest 转移主责从业者请求。
+type TransferPrimaryClinicianRequest struct {
+	OrgID         int64   `json:"org_id"`
+	ToClinicianID uint64  `json:"to_clinician_id" binding:"required"`
+	TesteeID      uint64  `json:"testee_id" binding:"required"`
+	SourceType    string  `json:"source_type"`
+	SourceID      *uint64 `json:"source_id"`
+}
+
 // IntakeByAssessmentEntryRequest 扫码 intake 请求。
 type IntakeByAssessmentEntryRequest struct {
 	ProfileID *uint64    `json:"profile_id"`

@@ -457,6 +457,14 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			actorHandler.ListMyClinicianTestees,
 		)...)
+		me.GET("/relations", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListMyClinicianRelations,
+		)...)
 		me.POST("/assessment-entries", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
@@ -473,6 +481,22 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			actorHandler.ListMyAssessmentEntries,
 		)...)
+		me.POST("/assessment-entries/:id/deactivate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.DeactivateMyAssessmentEntry,
+		)...)
+		me.POST("/assessment-entries/:id/reactivate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.ReactivateMyAssessmentEntry,
+		)...)
 		adminClinicians.GET("/:id", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
@@ -488,6 +512,14 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
 			actorHandler.ListClinicianTestees,
+		)...)
+		adminClinicians.GET("/:id/relations", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListClinicianRelations,
 		)...)
 		adminClinicians.POST("/:id/assessment-entries", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -523,6 +555,38 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitUserQPS,
 			r.rateCfg.SubmitUserBurst,
 			actorHandler.AssignClinicianTestee,
+		)...)
+		relationAdmin.POST("/assign-primary", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.AssignPrimaryClinicianTestee,
+		)...)
+		relationAdmin.POST("/assign-attending", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.AssignAttendingClinicianTestee,
+		)...)
+		relationAdmin.POST("/assign-collaborator", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.AssignCollaboratorClinicianTestee,
+		)...)
+		relationAdmin.POST("/transfer-primary", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.TransferPrimaryClinicianTestee,
 		)...)
 		relationAdmin.POST("/:id/unbind", r.rateLimitedHandlers(
 			r.rateCfg,

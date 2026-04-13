@@ -77,16 +77,20 @@ func (s *queryService) enrichCounts(ctx context.Context, item *ClinicianResult) 
 		return nil, nil
 	}
 	if s.relationRepo != nil {
-		count, err := s.relationRepo.CountActiveByClinician(
+		ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
 			ctx,
 			item.OrgID,
 			domainClinician.ID(item.ID),
-			[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+			domainRelation.AccessGrantRelationTypes(),
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to count assigned testees")
+			return nil, errors.Wrap(err, "failed to count accessible testees")
 		}
-		item.AssignedTesteeCount = count
+		seen := make(map[uint64]struct{}, len(ids))
+		for _, id := range ids {
+			seen[id.Uint64()] = struct{}{}
+		}
+		item.AssignedTesteeCount = int64(len(seen))
 	}
 	if s.assessmentEntryRepo != nil {
 		count, err := s.assessmentEntryRepo.CountByClinician(ctx, item.OrgID, domainClinician.ID(item.ID))

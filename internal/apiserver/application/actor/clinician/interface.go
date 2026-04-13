@@ -26,10 +26,15 @@ type ClinicianQueryService interface {
 // ClinicianRelationshipService 从业者关系服务。
 type ClinicianRelationshipService interface {
 	AssignTestee(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error)
+	AssignPrimary(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error)
+	AssignAttending(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error)
+	AssignCollaborator(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error)
+	TransferPrimary(ctx context.Context, dto TransferPrimaryDTO) (*RelationResult, error)
 	UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error)
 	ListAssignedTestees(ctx context.Context, dto ListAssignedTesteeDTO) (*AssignedTesteeListResult, error)
 	ListAssignedTesteeIDs(ctx context.Context, orgID int64, clinicianID uint64) ([]uint64, error)
 	ListTesteeRelations(ctx context.Context, dto ListTesteeRelationDTO) (*TesteeRelationListResult, error)
+	ListClinicianRelations(ctx context.Context, dto ListClinicianRelationDTO) (*ClinicianRelationListResult, error)
 }
 
 // RegisterClinicianDTO 注册从业者。
@@ -100,6 +105,15 @@ type AssignTesteeDTO struct {
 	SourceID     *uint64
 }
 
+// TransferPrimaryDTO 转移主责从业者。
+type TransferPrimaryDTO struct {
+	OrgID         int64
+	ToClinicianID uint64
+	TesteeID      uint64
+	SourceType    string
+	SourceID      *uint64
+}
+
 // RelationResult 关系结果。
 type RelationResult struct {
 	ID           uint64
@@ -127,6 +141,15 @@ type ListTesteeRelationDTO struct {
 	OrgID      int64
 	TesteeID   uint64
 	ActiveOnly bool
+}
+
+// ListClinicianRelationDTO 查询从业者关系列表。
+type ListClinicianRelationDTO struct {
+	OrgID       int64
+	ClinicianID uint64
+	Offset      int
+	Limit       int
+	ActiveOnly  bool
 }
 
 // AssignedTesteeResult 从业者名下受试者结果。
@@ -160,4 +183,18 @@ type TesteeRelationResult struct {
 // TesteeRelationListResult 受试者关系列表结果。
 type TesteeRelationListResult struct {
 	Items []*TesteeRelationResult
+}
+
+// ClinicianRelationResult 从业者关系列表项。
+type ClinicianRelationResult struct {
+	Relation *RelationResult
+	Testee   *AssignedTesteeResult
+}
+
+// ClinicianRelationListResult 从业者关系列表结果。
+type ClinicianRelationListResult struct {
+	Items      []*ClinicianRelationResult
+	TotalCount int64
+	Offset     int
+	Limit      int
 }
