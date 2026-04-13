@@ -4,15 +4,17 @@ import "time"
 
 // ClinicianResponse 从业者响应。
 type ClinicianResponse struct {
-	ID            string  `json:"id"`
-	OrgID         string  `json:"org_id"`
-	OperatorID    *string `json:"operator_id,omitempty"`
-	Name          string  `json:"name"`
-	Department    string  `json:"department,omitempty"`
-	Title         string  `json:"title,omitempty"`
-	ClinicianType string  `json:"clinician_type"`
-	EmployeeCode  string  `json:"employee_code,omitempty"`
-	IsActive      bool    `json:"is_active"`
+	ID                   string  `json:"id"`
+	OrgID                string  `json:"org_id"`
+	OperatorID           *string `json:"operator_id,omitempty"`
+	Name                 string  `json:"name"`
+	Department           string  `json:"department,omitempty"`
+	Title                string  `json:"title,omitempty"`
+	ClinicianType        string  `json:"clinician_type"`
+	EmployeeCode         string  `json:"employee_code,omitempty"`
+	IsActive             bool    `json:"is_active"`
+	AssignedTesteeCount  int64   `json:"assigned_testee_count"`
+	AssessmentEntryCount int64   `json:"assessment_entry_count"`
 }
 
 // ClinicianListResponse 从业者列表响应。
@@ -74,13 +76,25 @@ type AssessmentEntryIntakeResponse struct {
 
 // RelationResponse 从业者关系响应。
 type RelationResponse struct {
-	ID           string    `json:"id"`
-	OrgID        string    `json:"org_id"`
-	ClinicianID  string    `json:"clinician_id"`
-	TesteeID     string    `json:"testee_id"`
-	RelationType string    `json:"relation_type"`
-	SourceType   string    `json:"source_type"`
-	SourceID     *string   `json:"source_id,omitempty"`
-	IsActive     bool      `json:"is_active"`
-	BoundAt      time.Time `json:"bound_at"`
+	ID           string     `json:"id"`
+	OrgID        string     `json:"org_id"`
+	ClinicianID  string     `json:"clinician_id"`
+	TesteeID     string     `json:"testee_id"`
+	RelationType string     `json:"relation_type"`
+	SourceType   string     `json:"source_type"`
+	SourceID     *string    `json:"source_id,omitempty"`
+	IsActive     bool       `json:"is_active"`
+	BoundAt      time.Time  `json:"bound_at"`
+	UnboundAt    *time.Time `json:"unbound_at,omitempty"`
+}
+
+// TesteeClinicianRelationResponse 受试者-从业者关系响应。
+type TesteeClinicianRelationResponse struct {
+	Clinician *ClinicianResponse `json:"clinician"`
+	Relation  *RelationResponse  `json:"relation"`
+}
+
+// TesteeClinicianRelationListResponse 受试者-从业者关系列表响应。
+type TesteeClinicianRelationListResponse struct {
+	Items []*TesteeClinicianRelationResponse `json:"items"`
 }

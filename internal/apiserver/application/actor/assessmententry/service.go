@@ -112,6 +112,14 @@ func (s *service) GetByID(ctx context.Context, entryID uint64) (*AssessmentEntry
 	return toAssessmentEntryResult(item), nil
 }
 
+func (s *service) Deactivate(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error) {
+	return s.setActive(ctx, entryID, false)
+}
+
+func (s *service) Reactivate(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error) {
+	return s.setActive(ctx, entryID, true)
+}
+
 func (s *service) ListByClinician(ctx context.Context, dto ListAssessmentEntryDTO) (*AssessmentEntryListResult, error) {
 	items, err := s.repo.ListByClinician(
 		ctx,
@@ -160,6 +168,7 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 		clinicianItem *domainClinician.Clinician
 		testeeItem    *domainTestee.Testee
 		relationItem  *domainRelation.ClinicianTesteeRelation
+		assignment    *RelationSummaryResult
 	)
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -230,6 +239,36 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 			}
 		}
 
+		assignedRelation, err := s.relationRepo.FindActive(
+			txCtx,
+			entry.OrgID(),
+			entry.ClinicianID(),
+			testeeItem.ID(),
+			domainRelation.RelationTypeAssigned,
+		)
+		if err != nil {
+			if !errors.IsCode(err, code.ErrUserNotFound) {
+				return errors.Wrap(err, "failed to find assigned relation")
+			}
+
+			assignedRelation = domainRelation.NewClinicianTesteeRelation(
+				entry.OrgID(),
+				entry.ClinicianID(),
+				testeeItem.ID(),
+				domainRelation.RelationTypeAssigned,
+				domainRelation.SourceTypeAssessmentEntry,
+				&entryID,
+				true,
+				time.Now(),
+				nil,
+			)
+			if err := s.relationRepo.Save(txCtx, assignedRelation); err != nil {
+				return errors.Wrap(err, "failed to save assigned relation")
+			}
+		}
+
+		assignment = toRelationSummaryResult(assignedRelation)
+
 		return nil
 	})
 	if err != nil {
@@ -237,10 +276,11 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 	}
 
 	return &AssessmentEntryIntakeResult{
-		Entry:     toAssessmentEntryResult(entry),
-		Clinician: toClinicianSummaryResult(clinicianItem),
-		Testee:    toTesteeSummaryResult(testeeItem),
-		Relation:  toRelationSummaryResult(relationItem),
+		Entry:      toAssessmentEntryResult(entry),
+		Clinician:  toClinicianSummaryResult(clinicianItem),
+		Testee:     toTesteeSummaryResult(testeeItem),
+		Relation:   toRelationSummaryResult(relationItem),
+		Assignment: assignment,
 	}, nil
 }
 
@@ -268,4 +308,30 @@ func (s *service) resolveEntry(
 	}
 
 	return entry, clinicianItem, nil
+}
+
+func (s *service) setActive(ctx context.Context, entryID uint64, active bool) (*AssessmentEntryResult, error) {
+	var result *domainAssessmentEntry.AssessmentEntry
+
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.repo.FindByID(txCtx, domainAssessmentEntry.ID(entryID))
+		if err != nil {
+			return errors.Wrap(err, "failed to find assessment entry")
+		}
+		if active {
+			item.Reactivate()
+		} else {
+			item.Deactivate()
+		}
+		if err := s.repo.Update(txCtx, item); err != nil {
+			return errors.Wrap(err, "failed to update assessment entry")
+		}
+		result = item
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toAssessmentEntryResult(result), nil
 }

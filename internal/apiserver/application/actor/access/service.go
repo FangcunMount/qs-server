@@ -108,6 +108,7 @@ func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operato
 		orgID,
 		domainClinician.ID(*scope.ClinicianID),
 		domainTestee.ID(testeeID),
+		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to validate testee relation access")
@@ -130,7 +131,12 @@ func (s *service) ListAccessibleTesteeIDs(ctx context.Context, orgID int64, oper
 		return []uint64{}, nil
 	}
 
-	ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(ctx, orgID, domainClinician.ID(*scope.ClinicianID))
+	ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
+		ctx,
+		orgID,
+		domainClinician.ID(*scope.ClinicianID),
+		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list accessible testee ids")
 	}

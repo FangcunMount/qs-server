@@ -36,6 +36,14 @@ func (r *clinicianRepository) Save(ctx context.Context, item *domain.Clinician) 
 	})
 }
 
+func (r *clinicianRepository) Update(ctx context.Context, item *domain.Clinician) error {
+	po := r.mapper.ToPO(item)
+
+	return r.UpdateAndSync(ctx, po, func(saved *ClinicianPO) {
+		r.mapper.SyncID(saved, item)
+	})
+}
+
 func (r *clinicianRepository) FindByID(ctx context.Context, id domain.ID) (*domain.Clinician, error) {
 	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
 	if err != nil {

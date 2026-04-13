@@ -12,15 +12,17 @@ func toClinicianResult(item *domainClinician.Clinician) *ClinicianResult {
 	}
 
 	return &ClinicianResult{
-		ID:            item.ID().Uint64(),
-		OrgID:         item.OrgID(),
-		OperatorID:    item.OperatorID(),
-		Name:          item.Name(),
-		Department:    item.Department(),
-		Title:         item.Title(),
-		ClinicianType: string(item.ClinicianType()),
-		EmployeeCode:  item.EmployeeCode(),
-		IsActive:      item.IsActive(),
+		ID:                   item.ID().Uint64(),
+		OrgID:                item.OrgID(),
+		OperatorID:           item.OperatorID(),
+		Name:                 item.Name(),
+		Department:           item.Department(),
+		Title:                item.Title(),
+		ClinicianType:        string(item.ClinicianType()),
+		EmployeeCode:         item.EmployeeCode(),
+		IsActive:             item.IsActive(),
+		AssignedTesteeCount:  0,
+		AssessmentEntryCount: 0,
 	}
 }
 

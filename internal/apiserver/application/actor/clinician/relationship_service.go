@@ -40,7 +40,7 @@ func (s *relationshipService) AssignTestee(ctx context.Context, dto AssignTestee
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		relationshipType := domainRelation.RelationType(dto.RelationType)
 		if relationshipType == "" {
-			relationshipType = domainRelation.RelationTypePrimary
+			relationshipType = domainRelation.RelationTypeAssigned
 		}
 
 		sourceType := domainRelation.SourceType(dto.SourceType)
@@ -101,11 +101,38 @@ func (s *relationshipService) AssignTestee(ctx context.Context, dto AssignTestee
 	return toRelationResult(result), nil
 }
 
+func (s *relationshipService) UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error) {
+	var result *domainRelation.ClinicianTesteeRelation
+
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.relationRepo.FindByID(txCtx, domainRelation.ID(relationID))
+		if err != nil {
+			return errors.Wrap(err, "failed to find relation")
+		}
+		if !item.IsActive() {
+			result = item
+			return nil
+		}
+		item.Unbind(time.Now())
+		if err := s.relationRepo.Update(txCtx, item); err != nil {
+			return errors.Wrap(err, "failed to unbind relation")
+		}
+		result = item
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toRelationResult(result), nil
+}
+
 func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListAssignedTesteeDTO) (*AssignedTesteeListResult, error) {
 	relations, err := s.relationRepo.ListActiveByClinician(
 		ctx,
 		dto.OrgID,
 		domainClinician.ID(dto.ClinicianID),
+		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
 		dto.Offset,
 		dto.Limit,
 	)
@@ -113,7 +140,12 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 		return nil, errors.Wrap(err, "failed to list relations")
 	}
 
-	totalCount, err := s.relationRepo.CountActiveByClinician(ctx, dto.OrgID, domainClinician.ID(dto.ClinicianID))
+	totalCount, err := s.relationRepo.CountActiveByClinician(
+		ctx,
+		dto.OrgID,
+		domainClinician.ID(dto.ClinicianID),
+		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count relations")
 	}
@@ -136,4 +168,37 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 		Offset:     dto.Offset,
 		Limit:      dto.Limit,
 	}, nil
+}
+
+func (s *relationshipService) ListTesteeRelations(ctx context.Context, dto ListTesteeRelationDTO) (*TesteeRelationListResult, error) {
+	var (
+		relations []*domainRelation.ClinicianTesteeRelation
+		err       error
+	)
+
+	if dto.ActiveOnly {
+		relations, err = s.relationRepo.ListActiveByTestee(ctx, dto.OrgID, domainTestee.ID(dto.TesteeID), nil)
+	} else {
+		relations, err = s.relationRepo.ListHistoryByTestee(ctx, dto.OrgID, domainTestee.ID(dto.TesteeID))
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list testee relations")
+	}
+
+	items := make([]*TesteeRelationResult, 0, len(relations))
+	for _, relationItem := range relations {
+		clinicianItem, err := s.clinicianRepo.FindByID(ctx, relationItem.ClinicianID())
+		if err != nil {
+			if errors.IsCode(err, code.ErrUserNotFound) {
+				continue
+			}
+			return nil, errors.Wrap(err, "failed to find clinician")
+		}
+		items = append(items, &TesteeRelationResult{
+			Relation:  toRelationResult(relationItem),
+			Clinician: toClinicianResult(clinicianItem),
+		})
+	}
+
+	return &TesteeRelationListResult{Items: items}, nil
 }

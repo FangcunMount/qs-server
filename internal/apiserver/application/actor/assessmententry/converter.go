@@ -74,5 +74,6 @@ func toRelationSummaryResult(item *domainRelation.ClinicianTesteeRelation) *Rela
 		SourceID:     item.SourceID(),
 		IsActive:     item.IsActive(),
 		BoundAt:      item.BoundAt(),
+		UnboundAt:    item.UnboundAt(),
 	}
 }

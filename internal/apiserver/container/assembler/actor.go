@@ -206,7 +206,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		clinicianValidator,
 		uow,
 	)
-	m.ClinicianQueryService = clinicianApp.NewQueryService(m.ClinicianRepo)
+	m.ClinicianQueryService = clinicianApp.NewQueryService(m.ClinicianRepo, m.RelationRepo, m.AssessmentEntryRepo)
 	m.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
 		m.RelationRepo,
 		m.ClinicianRepo,

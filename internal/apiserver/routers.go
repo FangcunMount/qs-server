@@ -400,6 +400,46 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			actorHandler.ListClinicians,
 		)...)
+		adminClinicians.PUT("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.UpdateClinician,
+		)...)
+		adminClinicians.POST("/:id/activate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.ActivateClinician,
+		)...)
+		adminClinicians.POST("/:id/deactivate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.DeactivateClinician,
+		)...)
+		adminClinicians.POST("/:id/bind-operator", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.BindClinicianOperator,
+		)...)
+		adminClinicians.POST("/:id/unbind-operator", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.UnbindClinicianOperator,
+		)...)
 		me := group.Group("/me")
 		me.GET("", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -441,6 +481,30 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			actorHandler.GetClinician,
 		)...)
+		adminClinicians.GET("/:id/testees", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListClinicianTestees,
+		)...)
+		adminClinicians.POST("/:id/assessment-entries", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.CreateClinicianAssessmentEntry,
+		)...)
+		adminClinicians.GET("/:id/assessment-entries", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.ListClinicianAssessmentEntries,
+		)...)
 	}
 
 	clinicians := apiV1.Group("/clinicians")
@@ -449,6 +513,71 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	// 兼容旧的 /practitioners 路由，后续客户端切换完成后可移除。
 	practitioners := apiV1.Group("/practitioners")
 	registerClinicianRoutes(practitioners)
+
+	relationAdmin := apiV1.Group("/clinician-testee-relations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	{
+		relationAdmin.POST(":assign", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.AssignClinicianTestee,
+		)...)
+		relationAdmin.POST("/:id/unbind", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.UnbindClinicianTesteeRelation,
+		)...)
+	}
+
+	assessmentEntries := apiV1.Group("/assessment-entries", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	{
+		assessmentEntries.GET("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetAssessmentEntry,
+		)...)
+		assessmentEntries.POST("/:id/deactivate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.DeactivateAssessmentEntry,
+		)...)
+		assessmentEntries.POST("/:id/reactivate", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.ReactivateAssessmentEntry,
+		)...)
+	}
+
+	testees.GET("/:id/clinicians", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.QueryGlobalQPS,
+		r.rateCfg.QueryGlobalBurst,
+		r.rateCfg.QueryUserQPS,
+		r.rateCfg.QueryUserBurst,
+		actorHandler.GetTesteeClinicians,
+	)...)
+	testees.GET("/:id/clinician-relations", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.QueryGlobalQPS,
+		r.rateCfg.QueryGlobalBurst,
+		r.rateCfg.QueryUserQPS,
+		r.rateCfg.QueryUserBurst,
+		actorHandler.ListTesteeClinicianRelations,
+	)...)
 }
 
 // registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由

@@ -110,3 +110,9 @@ func (a *ClinicianTesteeRelation) UnboundAt() *time.Time {
 func (a *ClinicianTesteeRelation) SetID(id ID) {
 	a.id = id
 }
+
+// Unbind 解绑关系。
+func (a *ClinicianTesteeRelation) Unbind(now time.Time) {
+	a.isActive = false
+	a.unboundAt = &now
+}

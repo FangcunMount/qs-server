@@ -94,3 +94,37 @@ func (p *Clinician) IsActive() bool {
 func (p *Clinician) SetID(id ID) {
 	p.id = id
 }
+
+// UpdateProfile 更新从业者业务档案。
+func (p *Clinician) UpdateProfile(
+	name, department, title string,
+	clinicianType Type,
+	employeeCode string,
+) {
+	p.name = name
+	p.department = department
+	p.title = title
+	p.clinicianType = clinicianType
+	p.employeeCode = employeeCode
+}
+
+// BindOperator 绑定后台操作者。
+func (p *Clinician) BindOperator(operatorID uint64) {
+	value := operatorID
+	p.operatorID = &value
+}
+
+// UnbindOperator 解绑后台操作者。
+func (p *Clinician) UnbindOperator() {
+	p.operatorID = nil
+}
+
+// Activate 激活从业者。
+func (p *Clinician) Activate() {
+	p.isActive = true
+}
+
+// Deactivate 停用从业者。
+func (p *Clinician) Deactivate() {
+	p.isActive = false
+}

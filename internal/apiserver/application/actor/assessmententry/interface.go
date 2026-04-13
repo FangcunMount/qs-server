@@ -9,6 +9,8 @@ import (
 type AssessmentEntryService interface {
 	Create(ctx context.Context, dto CreateAssessmentEntryDTO) (*AssessmentEntryResult, error)
 	GetByID(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error)
+	Deactivate(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error)
+	Reactivate(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error)
 	ListByClinician(ctx context.Context, dto ListAssessmentEntryDTO) (*AssessmentEntryListResult, error)
 	Resolve(ctx context.Context, token string) (*ResolvedAssessmentEntryResult, error)
 	Intake(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error)
@@ -88,6 +90,7 @@ type RelationSummaryResult struct {
 	SourceID     *uint64
 	IsActive     bool
 	BoundAt      time.Time
+	UnboundAt    *time.Time
 }
 
 // ResolvedAssessmentEntryResult 入口解析结果。
@@ -106,8 +109,9 @@ type IntakeByAssessmentEntryDTO struct {
 
 // AssessmentEntryIntakeResult 扫码 intake 结果。
 type AssessmentEntryIntakeResult struct {
-	Entry     *AssessmentEntryResult
-	Clinician *ClinicianSummaryResult
-	Testee    *TesteeSummaryResult
-	Relation  *RelationSummaryResult
+	Entry      *AssessmentEntryResult
+	Clinician  *ClinicianSummaryResult
+	Testee     *TesteeSummaryResult
+	Relation   *RelationSummaryResult
+	Assignment *RelationSummaryResult
 }

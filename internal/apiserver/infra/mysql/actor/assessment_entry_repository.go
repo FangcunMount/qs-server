@@ -37,6 +37,14 @@ func (r *assessmentEntryRepository) Save(ctx context.Context, item *domain.Asses
 	})
 }
 
+func (r *assessmentEntryRepository) Update(ctx context.Context, item *domain.AssessmentEntry) error {
+	po := r.mapper.ToPO(item)
+
+	return r.UpdateAndSync(ctx, po, func(saved *AssessmentEntryPO) {
+		r.mapper.SyncID(saved, item)
+	})
+}
+
 func (r *assessmentEntryRepository) FindByID(ctx context.Context, id domain.ID) (*domain.AssessmentEntry, error) {
 	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
 	if err != nil {

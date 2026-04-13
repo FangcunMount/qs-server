@@ -101,3 +101,13 @@ func (e *AssessmentEntry) CanResolve(now time.Time) bool {
 func (e *AssessmentEntry) SetID(id ID) {
 	e.id = id
 }
+
+// Deactivate 停用入口。
+func (e *AssessmentEntry) Deactivate() {
+	e.isActive = false
+}
+
+// Reactivate 重新启用入口。
+func (e *AssessmentEntry) Reactivate() {
+	e.isActive = true
+}

@@ -14,10 +14,11 @@ func NewID(id uint64) ID {
 type RelationType string
 
 const (
-	RelationTypePrimary      RelationType = "primary"      // 主诊
-	RelationTypeAttending    RelationType = "attending"    // 随诊
-	RelationTypeCreator      RelationType = "creator"      // 创建
-	RelationTypeCollaborator RelationType = "collaborator" // 协作
+	RelationTypeAssigned     RelationType = "assigned"     // 已分配，授予访问权
+	RelationTypeCreator      RelationType = "creator"      // 创建来源，不授予访问权
+	RelationTypePrimary      RelationType = "primary"      // 兼容预留：主诊
+	RelationTypeAttending    RelationType = "attending"    // 兼容预留：随诊
+	RelationTypeCollaborator RelationType = "collaborator" // 兼容预留：协作
 )
 
 // SourceType 关系来源类型。

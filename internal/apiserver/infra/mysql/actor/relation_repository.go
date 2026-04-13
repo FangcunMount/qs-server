@@ -27,6 +27,17 @@ func NewRelationRepository(db *gorm.DB) domain.Repository {
 	return repo
 }
 
+func relationTypesToStrings(types []domain.RelationType) []string {
+	if len(types) == 0 {
+		return nil
+	}
+	values := make([]string, 0, len(types))
+	for _, item := range types {
+		values = append(values, string(item))
+	}
+	return values
+}
+
 func (r *relationRepository) Save(ctx context.Context, item *domain.ClinicianTesteeRelation) error {
 	po := r.mapper.ToPO(item)
 	if err := po.BeforeCreate(nil); err != nil {
@@ -34,6 +45,14 @@ func (r *relationRepository) Save(ctx context.Context, item *domain.ClinicianTes
 	}
 
 	return r.CreateAndSync(ctx, po, func(saved *ClinicianRelationPO) {
+		r.mapper.SyncID(saved, item)
+	})
+}
+
+func (r *relationRepository) Update(ctx context.Context, item *domain.ClinicianTesteeRelation) error {
+	po := r.mapper.ToPO(item)
+
+	return r.UpdateAndSync(ctx, po, func(saved *ClinicianRelationPO) {
 		r.mapper.SyncID(saved, item)
 	})
 }
@@ -56,17 +75,29 @@ func (r *relationRepository) FindActive(
 	testeeID testee.ID,
 	relationType domain.RelationType,
 ) (*domain.ClinicianTesteeRelation, error) {
+	return r.FindActiveByTypes(ctx, orgID, clinicianID, testeeID, []domain.RelationType{relationType})
+}
+
+func (r *relationRepository) FindActiveByTypes(
+	ctx context.Context,
+	orgID int64,
+	clinicianID clinician.ID,
+	testeeID testee.ID,
+	relationTypes []domain.RelationType,
+) (*domain.ClinicianTesteeRelation, error) {
 	var po ClinicianRelationPO
-	err := r.WithContext(ctx).
+	query := r.WithContext(ctx).
 		Where(
-			"org_id = ? AND clinician_id = ? AND testee_id = ? AND relation_type = ? AND is_active = ? AND deleted_at IS NULL",
+			"org_id = ? AND clinician_id = ? AND testee_id = ? AND is_active = ? AND deleted_at IS NULL",
 			orgID,
 			clinicianID,
 			testeeID,
-			string(relationType),
 			true,
-		).
-		First(&po).Error
+		)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypesToStrings(relationTypes))
+	}
+	err := query.First(&po).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "relation not found")
@@ -80,12 +111,17 @@ func (r *relationRepository) ListActiveByClinician(
 	ctx context.Context,
 	orgID int64,
 	clinicianID clinician.ID,
+	relationTypes []domain.RelationType,
 	offset, limit int,
 ) ([]*domain.ClinicianTesteeRelation, error) {
 	var pos []*ClinicianRelationPO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND clinician_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, clinicianID, true).
-		Order("bound_at DESC").
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND clinician_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, clinicianID, true)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypesToStrings(relationTypes))
+	}
+	err := query.
+		Order("bound_at DESC, id DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&pos).Error
@@ -95,13 +131,56 @@ func (r *relationRepository) ListActiveByClinician(
 	return r.mapper.ToDomains(pos), nil
 }
 
-func (r *relationRepository) CountActiveByClinician(ctx context.Context, orgID int64, clinicianID clinician.ID) (int64, error) {
+func (r *relationRepository) CountActiveByClinician(
+	ctx context.Context,
+	orgID int64,
+	clinicianID clinician.ID,
+	relationTypes []domain.RelationType,
+) (int64, error) {
 	var count int64
-	err := r.WithContext(ctx).
+	query := r.WithContext(ctx).
 		Model(&ClinicianRelationPO{}).
-		Where("org_id = ? AND clinician_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, clinicianID, true).
-		Count(&count).Error
+		Where("org_id = ? AND clinician_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, clinicianID, true)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypesToStrings(relationTypes))
+	}
+	err := query.Count(&count).Error
 	return count, err
+}
+
+func (r *relationRepository) ListActiveByTestee(
+	ctx context.Context,
+	orgID int64,
+	testeeID testee.ID,
+	relationTypes []domain.RelationType,
+) ([]*domain.ClinicianTesteeRelation, error) {
+	var pos []*ClinicianRelationPO
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND testee_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, testeeID, true)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypesToStrings(relationTypes))
+	}
+	err := query.Order("bound_at DESC, id DESC").Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomains(pos), nil
+}
+
+func (r *relationRepository) ListHistoryByTestee(
+	ctx context.Context,
+	orgID int64,
+	testeeID testee.ID,
+) ([]*domain.ClinicianTesteeRelation, error) {
+	var pos []*ClinicianRelationPO
+	err := r.WithContext(ctx).
+		Where("org_id = ? AND testee_id = ? AND deleted_at IS NULL", orgID, testeeID).
+		Order("bound_at DESC, id DESC").
+		Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomains(pos), nil
 }
 
 func (r *relationRepository) HasActiveRelationForTestee(
@@ -109,9 +188,10 @@ func (r *relationRepository) HasActiveRelationForTestee(
 	orgID int64,
 	clinicianID clinician.ID,
 	testeeID testee.ID,
+	relationTypes []domain.RelationType,
 ) (bool, error) {
 	var count int64
-	err := r.WithContext(ctx).
+	query := r.WithContext(ctx).
 		Model(&ClinicianRelationPO{}).
 		Where(
 			"org_id = ? AND clinician_id = ? AND testee_id = ? AND is_active = ? AND deleted_at IS NULL",
@@ -119,8 +199,11 @@ func (r *relationRepository) HasActiveRelationForTestee(
 			clinicianID,
 			testeeID,
 			true,
-		).
-		Count(&count).Error
+		)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypesToStrings(relationTypes))
+	}
+	err := query.Count(&count).Error
 	return count > 0, err
 }
 
@@ -128,13 +211,16 @@ func (r *relationRepository) ListActiveTesteeIDsByClinician(
 	ctx context.Context,
 	orgID int64,
 	clinicianID clinician.ID,
+	relationTypes []domain.RelationType,
 ) ([]testee.ID, error) {
 	var rawIDs []uint64
-	err := r.WithContext(ctx).
+	query := r.WithContext(ctx).
 		Model(&ClinicianRelationPO{}).
-		Where("org_id = ? AND clinician_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, clinicianID, true).
-		Order("bound_at DESC").
-		Pluck("testee_id", &rawIDs).Error
+		Where("org_id = ? AND clinician_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, clinicianID, true)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypesToStrings(relationTypes))
+	}
+	err := query.Order("bound_at DESC, id DESC").Pluck("testee_id", &rawIDs).Error
 	if err != nil {
 		return nil, err
 	}
