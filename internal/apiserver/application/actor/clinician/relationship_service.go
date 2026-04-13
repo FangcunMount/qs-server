@@ -170,6 +170,24 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 	}, nil
 }
 
+func (s *relationshipService) ListAssignedTesteeIDs(ctx context.Context, orgID int64, clinicianID uint64) ([]uint64, error) {
+	ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
+		ctx,
+		orgID,
+		domainClinician.ID(clinicianID),
+		[]domainRelation.RelationType{domainRelation.RelationTypeAssigned},
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list assigned testee ids")
+	}
+
+	result := make([]uint64, 0, len(ids))
+	for _, id := range ids {
+		result = append(result, id.Uint64())
+	}
+	return result, nil
+}
+
 func (s *relationshipService) ListTesteeRelations(ctx context.Context, dto ListTesteeRelationDTO) (*TesteeRelationListResult, error) {
 	var (
 		relations []*domainRelation.ClinicianTesteeRelation

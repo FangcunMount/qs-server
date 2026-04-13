@@ -516,7 +516,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	relationAdmin := apiV1.Group("/clinician-testee-relations", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	{
-		relationAdmin.POST(":assign", r.rateLimitedHandlers(
+		relationAdmin.POST("/assign", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
 			r.rateCfg.SubmitGlobalBurst,

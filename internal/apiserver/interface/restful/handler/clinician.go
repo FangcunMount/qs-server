@@ -94,7 +94,7 @@ func (h *ActorHandler) UpdateClinician(c *gin.Context) {
 }
 
 func (h *ActorHandler) ActivateClinician(c *gin.Context) {
-	orgID, err := h.RequireProtectedOrgID(c)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -114,11 +114,17 @@ func (h *ActorHandler) ActivateClinician(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	logger.L(c.Request.Context()).Infow("Clinician activated",
+		"action", "activate_clinician",
+		"org_id", orgID,
+		"clinician_id", id,
+		"operator_user_id", operatorUserID,
+	)
 	h.SuccessResponseWithMessage(c, "从业者已激活", toClinicianResponse(result))
 }
 
 func (h *ActorHandler) DeactivateClinician(c *gin.Context) {
-	orgID, err := h.RequireProtectedOrgID(c)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -138,6 +144,12 @@ func (h *ActorHandler) DeactivateClinician(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
+	logger.L(c.Request.Context()).Infow("Clinician deactivated",
+		"action", "deactivate_clinician",
+		"org_id", orgID,
+		"clinician_id", id,
+		"operator_user_id", operatorUserID,
+	)
 	h.SuccessResponseWithMessage(c, "从业者已停用", toClinicianResponse(result))
 }
 
@@ -1048,7 +1060,7 @@ func (h *ActorHandler) listTesteeClinicianRelations(c *gin.Context, activeOnly b
 }
 
 func (h *ActorHandler) setAssessmentEntryActive(c *gin.Context, active bool) {
-	orgID, err := h.RequireProtectedOrgID(c)
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -1073,6 +1085,14 @@ func (h *ActorHandler) setAssessmentEntryActive(c *gin.Context, active bool) {
 		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current organization"))
 		return
 	}
+	logger.L(c.Request.Context()).Infow("Assessment entry lifecycle changed",
+		"action", map[bool]string{true: "reactivate_assessment_entry", false: "deactivate_assessment_entry"}[active],
+		"org_id", orgID,
+		"assessment_entry_id", entryID,
+		"clinician_id", result.ClinicianID,
+		"operator_user_id", operatorUserID,
+		"is_active", result.IsActive,
+	)
 	if active {
 		h.SuccessResponseWithMessage(c, "测评入口已启用", toAssessmentEntryResponse(result, ""))
 		return

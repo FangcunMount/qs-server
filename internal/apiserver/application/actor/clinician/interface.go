@@ -28,6 +28,7 @@ type ClinicianRelationshipService interface {
 	AssignTestee(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error)
 	UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error)
 	ListAssignedTestees(ctx context.Context, dto ListAssignedTesteeDTO) (*AssignedTesteeListResult, error)
+	ListAssignedTesteeIDs(ctx context.Context, orgID int64, clinicianID uint64) ([]uint64, error)
 	ListTesteeRelations(ctx context.Context, dto ListTesteeRelationDTO) (*TesteeRelationListResult, error)
 }
 

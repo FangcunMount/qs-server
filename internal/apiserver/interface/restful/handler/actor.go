@@ -501,6 +501,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Param name query string false "姓名（模糊匹配）"
 // @Param is_key_focus query bool false "是否重点关注"
 // @Param profile_id query string false "档案ID（等同于IAM儿童ID）"
+// @Param clinician_id query string false "按 Clinician 过滤受试者"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} core.Response{data=response.TesteeListResponse}
@@ -548,6 +549,21 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 			h.Error(c, err)
 			return
 		}
+		if req.ClinicianID != nil {
+			if _, err := h.requireClinicianInOrg(c, orgID, *req.ClinicianID); err != nil {
+				h.Error(c, err)
+				return
+			}
+			clinicianTesteeIDs, err := h.clinicianRelationshipService.ListAssignedTesteeIDs(c.Request.Context(), orgID, *req.ClinicianID)
+			if err != nil {
+				h.Error(c, err)
+				return
+			}
+			if !containsUint64(clinicianTesteeIDs, result.ID) {
+				h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, req.Page, req.PageSize))
+				return
+			}
+		}
 
 		h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{result}, 1, req.Page, req.PageSize))
 		return
@@ -568,13 +584,30 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		Offset:   (req.Page - 1) * req.PageSize,
 		Limit:    req.PageSize,
 	}
+	if req.ClinicianID != nil {
+		if _, err := h.requireClinicianInOrg(c, orgID, *req.ClinicianID); err != nil {
+			h.Error(c, err)
+			return
+		}
+		clinicianTesteeIDs, err := h.clinicianRelationshipService.ListAssignedTesteeIDs(c.Request.Context(), orgID, *req.ClinicianID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		dto.AccessibleTesteeIDs = clinicianTesteeIDs
+		dto.RestrictToAccessScope = true
+	}
 	if !scope.IsAdmin {
 		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
 		if err != nil {
 			h.Error(c, err)
 			return
 		}
-		dto.AccessibleTesteeIDs = allowedTesteeIDs
+		if dto.RestrictToAccessScope {
+			dto.AccessibleTesteeIDs = intersectUint64Slices(dto.AccessibleTesteeIDs, allowedTesteeIDs)
+		} else {
+			dto.AccessibleTesteeIDs = allowedTesteeIDs
+		}
 		dto.RestrictToAccessScope = true
 	}
 
@@ -1024,4 +1057,32 @@ func (h *ActorHandler) SetEvaluationServices(
 // SetQRCodeService 设置二维码服务。
 func (h *ActorHandler) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
 	h.qrCodeService = qrCodeService
+}
+
+func containsUint64(items []uint64, target uint64) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
+func intersectUint64Slices(left, right []uint64) []uint64 {
+	if len(left) == 0 || len(right) == 0 {
+		return []uint64{}
+	}
+
+	set := make(map[uint64]struct{}, len(right))
+	for _, item := range right {
+		set[item] = struct{}{}
+	}
+
+	result := make([]uint64, 0, len(left))
+	for _, item := range left {
+		if _, ok := set[item]; ok {
+			result = append(result, item)
+		}
+	}
+	return result
 }
