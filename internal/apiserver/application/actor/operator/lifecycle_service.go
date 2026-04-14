@@ -20,6 +20,7 @@ type lifecycleService struct {
 	factory       domain.Factory
 	validator     domain.Validator
 	editor        domain.Editor
+	lifecycler    domain.Lifecycler
 	roleAllocator domain.RoleAllocator
 	binder        domain.Binder
 	uow           *mysql.UnitOfWork
@@ -34,6 +35,7 @@ func NewLifecycleService(
 	factory domain.Factory,
 	validator domain.Validator,
 	editor domain.Editor,
+	lifecycler domain.Lifecycler,
 	roleAllocator domain.RoleAllocator,
 	binder domain.Binder,
 	uow *mysql.UnitOfWork,
@@ -46,6 +48,7 @@ func NewLifecycleService(
 		factory:       factory,
 		validator:     validator,
 		editor:        editor,
+		lifecycler:    lifecycler,
 		roleAllocator: roleAllocator,
 		binder:        binder,
 		uow:           uow,
@@ -84,7 +87,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 		return nil, err
 	}
 
-	if s.assignment != nil && s.snapshot != nil {
+	if dto.IsActive && s.assignment != nil && s.snapshot != nil {
 		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
 			return nil, errors.Wrap(err, "iam role assignment after register")
 		}
@@ -119,6 +122,36 @@ func (s *lifecycleService) Delete(ctx context.Context, operatorID uint64) error 
 		}
 		return nil
 	})
+}
+
+// UpdateProfile 更新本地员工投影资料。
+func (s *lifecycleService) UpdateProfile(ctx context.Context, dto UpdateOperatorProfileDTO) (*OperatorResult, error) {
+	var result *domain.Operator
+
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		st, err := s.repo.FindByID(txCtx, domain.ID(dto.OperatorID))
+		if err != nil {
+			return errors.Wrap(err, "failed to find operator")
+		}
+
+		if err := s.editor.UpdateBasicInfo(st, dto.Name); err != nil {
+			return err
+		}
+		if err := s.editor.UpdateContactInfo(st, dto.Email, dto.Phone); err != nil {
+			return err
+		}
+		if err := s.repo.Update(txCtx, st); err != nil {
+			return errors.Wrap(err, "failed to update operator")
+		}
+
+		result = st
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return toOperatorResult(result), nil
 }
 
 // UpdateContactInfo 更新联系方式
@@ -191,6 +224,9 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 			return errors.WithCode(code.ErrValidation, "roles are required when IAM authorization is not enabled")
 		}
 	}
+	if dto.UserID == 0 && dto.Phone == "" {
+		return errors.WithCode(code.ErrValidation, "phone is required when user_id is not provided")
+	}
 	return nil
 }
 
@@ -249,6 +285,12 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 			if err := s.roleAllocator.AssignRole(st, role); err != nil {
 				return nil, err
 			}
+		}
+	}
+
+	if !dto.IsActive {
+		if err := s.lifecycler.Deactivate(st, "created as inactive"); err != nil {
+			return nil, err
 		}
 	}
 

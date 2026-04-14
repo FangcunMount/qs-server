@@ -1,17 +1,21 @@
 package request
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // CreateClinicianRequest 创建从业者请求。
 type CreateClinicianRequest struct {
-	OrgID         int64   `json:"org_id"`
-	OperatorID    *uint64 `json:"operator_id"`
-	Name          string  `json:"name" binding:"required"`
-	Department    string  `json:"department"`
-	Title         string  `json:"title"`
-	ClinicianType string  `json:"clinician_type" binding:"required"`
-	EmployeeCode  string  `json:"employee_code"`
-	IsActive      bool    `json:"is_active"`
+	OrgID         int64    `json:"org_id"`
+	OperatorID    *meta.ID `json:"operator_id"`
+	Name          string   `json:"name" binding:"required"`
+	Department    string   `json:"department"`
+	Title         string   `json:"title"`
+	ClinicianType string   `json:"clinician_type" binding:"required"`
+	EmployeeCode  string   `json:"employee_code"`
+	IsActive      bool     `json:"is_active"`
 }
 
 // UpdateClinicianRequest 更新从业者请求。
@@ -25,7 +29,7 @@ type UpdateClinicianRequest struct {
 
 // BindClinicianOperatorRequest 绑定从业者与后台操作者。
 type BindClinicianOperatorRequest struct {
-	OperatorID uint64 `json:"operator_id" binding:"required"`
+	OperatorID meta.ID `json:"operator_id" binding:"required"`
 }
 
 // ListClinicianRequest 从业者列表请求。
@@ -51,21 +55,21 @@ type ListAssessmentEntryRequest struct {
 
 // AssignClinicianTesteeRequest 分配受试者给从业者。
 type AssignClinicianTesteeRequest struct {
-	OrgID        int64   `json:"org_id"`
-	ClinicianID  uint64  `json:"clinician_id" binding:"required"`
-	TesteeID     uint64  `json:"testee_id" binding:"required"`
-	RelationType string  `json:"relation_type"`
-	SourceType   string  `json:"source_type"`
-	SourceID     *uint64 `json:"source_id"`
+	OrgID        int64    `json:"org_id"`
+	ClinicianID  meta.ID  `json:"clinician_id" binding:"required"`
+	TesteeID     meta.ID  `json:"testee_id" binding:"required"`
+	RelationType string   `json:"relation_type"`
+	SourceType   string   `json:"source_type"`
+	SourceID     *meta.ID `json:"source_id"`
 }
 
 // TransferPrimaryClinicianRequest 转移主责从业者请求。
 type TransferPrimaryClinicianRequest struct {
-	OrgID         int64   `json:"org_id"`
-	ToClinicianID uint64  `json:"to_clinician_id" binding:"required"`
-	TesteeID      uint64  `json:"testee_id" binding:"required"`
-	SourceType    string  `json:"source_type"`
-	SourceID      *uint64 `json:"source_id"`
+	OrgID         int64    `json:"org_id"`
+	ToClinicianID meta.ID  `json:"to_clinician_id" binding:"required"`
+	TesteeID      meta.ID  `json:"testee_id" binding:"required"`
+	SourceType    string   `json:"source_type"`
+	SourceID      *meta.ID `json:"source_id"`
 }
 
 // IntakeByAssessmentEntryRequest 扫码 intake 请求。

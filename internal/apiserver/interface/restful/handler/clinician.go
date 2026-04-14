@@ -12,8 +12,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/gin-gonic/gin"
 )
+
+func metaIDPtrToUint64(id *meta.ID) *uint64 {
+	if id == nil || id.IsZero() {
+		return nil
+	}
+
+	value := id.Uint64()
+	return &value
+}
 
 // CreateClinician 创建从业者。
 // @Summary 创建从业者
@@ -40,7 +50,7 @@ func (h *ActorHandler) CreateClinician(c *gin.Context) {
 
 	result, err := h.clinicianLifecycleService.Register(c.Request.Context(), clinicianApp.RegisterClinicianDTO{
 		OrgID:         orgID,
-		OperatorID:    req.OperatorID,
+		OperatorID:    metaIDPtrToUint64(req.OperatorID),
 		Name:          req.Name,
 		Department:    req.Department,
 		Title:         req.Title,
@@ -175,7 +185,7 @@ func (h *ActorHandler) BindClinicianOperator(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	operatorItem, err := h.operatorQueryService.GetByID(c.Request.Context(), req.OperatorID)
+	operatorItem, err := h.operatorQueryService.GetByID(c.Request.Context(), req.OperatorID.Uint64())
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -187,7 +197,7 @@ func (h *ActorHandler) BindClinicianOperator(c *gin.Context) {
 
 	result, err := h.clinicianLifecycleService.BindOperator(c.Request.Context(), clinicianApp.BindClinicianOperatorDTO{
 		ClinicianID: id,
-		OperatorID:  req.OperatorID,
+		OperatorID:  req.OperatorID.Uint64(),
 	})
 	if err != nil {
 		h.Error(c, err)
@@ -607,11 +617,11 @@ func (h *ActorHandler) AssignClinicianTestee(c *gin.Context) {
 
 	result, err := h.clinicianRelationshipService.AssignTestee(c.Request.Context(), clinicianApp.AssignTesteeDTO{
 		OrgID:        orgID,
-		ClinicianID:  req.ClinicianID,
-		TesteeID:     req.TesteeID,
+		ClinicianID:  req.ClinicianID.Uint64(),
+		TesteeID:     req.TesteeID.Uint64(),
 		RelationType: req.RelationType,
 		SourceType:   req.SourceType,
-		SourceID:     req.SourceID,
+		SourceID:     metaIDPtrToUint64(req.SourceID),
 	})
 	if err != nil {
 		h.Error(c, err)
@@ -646,10 +656,10 @@ func (h *ActorHandler) TransferPrimaryClinicianTestee(c *gin.Context) {
 
 	result, err := h.clinicianRelationshipService.TransferPrimary(c.Request.Context(), clinicianApp.TransferPrimaryDTO{
 		OrgID:         orgID,
-		ToClinicianID: req.ToClinicianID,
-		TesteeID:      req.TesteeID,
+		ToClinicianID: req.ToClinicianID.Uint64(),
+		TesteeID:      req.TesteeID.Uint64(),
 		SourceType:    req.SourceType,
-		SourceID:      req.SourceID,
+		SourceID:      metaIDPtrToUint64(req.SourceID),
 	})
 	if err != nil {
 		h.Error(c, err)
@@ -1278,11 +1288,11 @@ func (h *ActorHandler) assignClinicianTesteeWithType(c *gin.Context, relationTyp
 
 	dto := clinicianApp.AssignTesteeDTO{
 		OrgID:        orgID,
-		ClinicianID:  req.ClinicianID,
-		TesteeID:     req.TesteeID,
+		ClinicianID:  req.ClinicianID.Uint64(),
+		TesteeID:     req.TesteeID.Uint64(),
 		RelationType: relationType,
 		SourceType:   req.SourceType,
-		SourceID:     req.SourceID,
+		SourceID:     metaIDPtrToUint64(req.SourceID),
 	}
 
 	var result *clinicianApp.RelationResult

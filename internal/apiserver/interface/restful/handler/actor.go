@@ -719,6 +719,129 @@ func (h *ActorHandler) GetStaff(c *gin.Context) {
 	h.Success(c, toStaffResponse(result))
 }
 
+// UpdateStaff 更新员工
+// @Summary 更新员工
+// @Tags Actor
+// @Accept json
+// @Produce json
+// @Param id path string true "员工ID"
+// @Param body body request.UpdateStaffRequest true "更新员工请求"
+// @Success 200 {object} core.Response{data=response.StaffResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/staff/{id} [put]
+func (h *ActorHandler) UpdateStaff(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid staff ID",
+			"action", "update_staff",
+			"resource", "staff",
+			"staff_id", idStr,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	current, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if current.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
+		return
+	}
+
+	var req request.UpdateStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid update staff request",
+			"action", "update_staff",
+			"resource", "staff",
+			"staff_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	if _, err := h.operatorLifecycleService.UpdateProfile(c.Request.Context(), operatorApp.UpdateOperatorProfileDTO{
+		OperatorID: id,
+		Name:       req.Name,
+		Email:      req.Email,
+		Phone:      req.Phone,
+	}); err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	targetActive := current.IsActive
+	if req.IsActive != nil {
+		targetActive = *req.IsActive
+	}
+
+	if !targetActive {
+		if current.IsActive {
+			if err := h.operatorAuthorizationService.Deactivate(c.Request.Context(), id); err != nil {
+				h.Error(c, err)
+				return
+			}
+		}
+	} else {
+		if !current.IsActive {
+			if err := h.operatorAuthorizationService.Activate(c.Request.Context(), id); err != nil {
+				h.Error(c, err)
+				return
+			}
+		}
+
+		latest, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+
+		if req.Roles != nil {
+			currentRoles := make(map[string]struct{}, len(latest.Roles))
+			for _, role := range latest.Roles {
+				currentRoles[role] = struct{}{}
+			}
+			targetRoles := make(map[string]struct{}, len(req.Roles))
+			for _, role := range req.Roles {
+				targetRoles[role] = struct{}{}
+				if _, exists := currentRoles[role]; !exists {
+					if err := h.operatorAuthorizationService.AssignRole(c.Request.Context(), id, role); err != nil {
+						h.Error(c, err)
+						return
+					}
+				}
+			}
+			for _, role := range latest.Roles {
+				if _, exists := targetRoles[role]; !exists {
+					if err := h.operatorAuthorizationService.RemoveRole(c.Request.Context(), id, role); err != nil {
+						h.Error(c, err)
+						return
+					}
+				}
+			}
+		}
+	}
+
+	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "员工更新成功", toStaffResponse(result))
+}
+
 // DeleteStaff 删除员工
 // @Summary 删除员工
 // @Tags Actor
@@ -753,6 +876,14 @@ func (h *ActorHandler) DeleteStaff(c *gin.Context) {
 	}
 	if result.OrgID != orgID {
 		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
+		return
+	}
+
+	if clinicianItem, err := h.clinicianQueryService.GetByOperator(c.Request.Context(), orgID, id); err == nil && clinicianItem != nil {
+		h.Error(c, errors.WithCode(code.ErrValidation, "员工已绑定临床人员，请先解绑"))
+		return
+	} else if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+		h.Error(c, err)
 		return
 	}
 
@@ -1000,13 +1131,19 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 
 // toRegisterStaffDTO 将创建请求转换为应用层 DTO
 func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorApp.RegisterOperatorDTO {
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
 	return operatorApp.RegisterOperatorDTO{
-		OrgID:  orgID,
-		UserID: req.UserID,
-		Roles:  req.Roles,
-		Name:   req.Name,
-		Email:  req.Email,
-		Phone:  req.Phone,
+		OrgID:    orgID,
+		UserID:   req.UserID.Int64(),
+		Roles:    req.Roles,
+		Name:     req.Name,
+		Email:    req.Email,
+		Phone:    req.Phone,
+		IsActive: isActive,
 	}
 }
 

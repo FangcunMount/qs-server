@@ -1,6 +1,10 @@
 package request
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // CreateTesteeRequest 创建受试者请求
 type CreateTesteeRequest struct {
@@ -45,12 +49,12 @@ type GetTesteeByProfileIDRequest struct {
 // CreateStaffRequest 创建员工请求
 type CreateStaffRequest struct {
 	OrgID    int64    `json:"org_id"`                          // 兼容字段：机构ID
-	UserID   int64    `json:"user_id,omitempty"`               // IAM用户ID（优先使用）
+	UserID   meta.ID  `json:"user_id,omitempty"`               // IAM用户ID（优先使用）
 	Roles    []string `json:"roles"`                           // 期望授予的角色列表（IAM 启用时转成 assignment）
 	Name     string   `json:"name" binding:"required"`         // 姓名
 	Email    string   `json:"email" binding:"omitempty,email"` // 邮箱
 	Phone    string   `json:"phone"`                           // 电话
-	IsActive bool     `json:"is_active"`                       // 是否激活
+	IsActive *bool    `json:"is_active"`                       // 是否激活
 }
 
 // UpdateStaffRequest 更新员工请求

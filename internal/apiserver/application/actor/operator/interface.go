@@ -26,6 +26,9 @@ type OperatorLifecycleService interface {
 	// Delete 删除操作者（离职）
 	Delete(ctx context.Context, operatorID uint64) error
 
+	// UpdateProfile 更新本地员工投影资料
+	UpdateProfile(ctx context.Context, dto UpdateOperatorProfileDTO) (*OperatorResult, error)
+
 	// UpdateContactInfo 更新联系方式
 	// 场景：成员联系方式变更时，人事部门更新
 	UpdateContactInfo(ctx context.Context, dto UpdateOperatorContactDTO) error
@@ -71,12 +74,21 @@ type OperatorQueryService interface {
 
 // RegisterOperatorDTO 注册操作者 DTO
 type RegisterOperatorDTO struct {
-	OrgID  int64    // 机构ID
-	UserID int64    // 用户ID
-	Name   string   // 姓名
-	Email  string   // 邮箱
-	Phone  string   // 手机号
-	Roles  []string // 角色列表
+	OrgID    int64    // 机构ID
+	UserID   int64    // 用户ID
+	Name     string   // 姓名
+	Email    string   // 邮箱
+	Phone    string   // 手机号
+	Roles    []string // 角色列表
+	IsActive bool     // 是否激活
+}
+
+// UpdateOperatorProfileDTO 更新员工资料 DTO
+type UpdateOperatorProfileDTO struct {
+	OperatorID uint64  // 操作者ID
+	Name       *string // 姓名
+	Email      *string // 邮箱
+	Phone      *string // 手机号
 }
 
 // UpdateOperatorContactDTO 更新操作者联系方式 DTO

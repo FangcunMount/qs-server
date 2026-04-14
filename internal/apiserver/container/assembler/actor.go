@@ -181,6 +181,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		operatorFactory,
 		operatorValidator,
 		operatorEditor,
+		operatorLifecycler,
 		operatorRoleAllocator,
 		operatorBinder,
 		uow,

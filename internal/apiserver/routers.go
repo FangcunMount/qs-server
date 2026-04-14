@@ -372,6 +372,14 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			actorHandler.GetStaff,
 		)...)
+		staff.PUT("/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			actorHandler.UpdateStaff,
+		)...)
 		staff.DELETE("/:id", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
