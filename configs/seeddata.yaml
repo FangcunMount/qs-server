@@ -237,8 +237,8 @@ clinicianGenerators:
     isActive: true
 
 testeeAssignments:
-  - key: "seed_primary_pool_real"
-    strategy: "round_robin"
+  - key: "seed_primary_pool_all"
+    strategy: "random"
     relationType: "primary"
     clinicianIds: &seed_clinician_ids
       - "614995509882401326"
@@ -265,18 +265,9 @@ testeeAssignments:
       - "615088946610713134"
       - "615089195702039086"
       - "615089235111719470"
-    testeeOffset: 0
-    testeeLimit: 300
-    testeePageSize: 100
-    includeAlreadyAssigned: false
-
-  - key: "seed_primary_pool_generated"
-    strategy: "round_robin"
-    relationType: "primary"
     clinicianKeyPrefixes:
       - "seed_doctor_"
-    testeeOffset: 300
-    testeeLimit: 2000
+    testeeOffset: 0
     testeePageSize: 100
     includeAlreadyAssigned: false
 

@@ -118,8 +118,9 @@ go run ./cmd/tools/seeddata \
 
 - `assign_testees` 只操作现有 testee，不创建新 testee
 - 支持：
-  - `explicit`：把指定 testee IDs 分配给某个 clinician
-  - `round_robin`：把一批现有 testee 按轮询分给一组 clinician
+- `explicit`：把指定 testee IDs 分配给某个 clinician
+- `round_robin`：把一批现有 testee 按轮询分给一组 clinician
+- `random`：把一批现有 testee 按稳定哈希随机分给一组 clinician；映射结果可重复执行，不会每次漂移
 - `round_robin` 默认跳过已经存在有效 clinician 关系的 testee，避免重复堆叠
 - `--assignment-workers` 控制分配并发；默认 `8`，会自动按实际 job 数量收缩
 
@@ -421,6 +422,10 @@ go run ./cmd/tools/seeddata \
   - 需要 `clinicianRefs` / `clinicianIds`
   - 可选 `testeeOffset`、`testeeLimit`、`testeePageSize`
   - 默认跳过已存在 active `primary / attending / collaborator` 关系的 testee；若要强制纳入，用 `includeAlreadyAssigned: true`
+- `strategy=random`
+  - 需要 `clinicianRefs` / `clinicianIds`
+  - 可选 `testeeOffset`、`testeeLimit`、`testeePageSize`
+  - 按 `assignment.key + testee_id` 做稳定随机分配，兼容重复运行
 
 ### `assessment_entries`
 

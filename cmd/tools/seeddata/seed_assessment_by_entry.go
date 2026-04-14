@@ -8,10 +8,13 @@ import (
 	"sync"
 	"time"
 
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	answerSheetMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	evaluationMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	actorMySQL "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	evaluationMySQL "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	"github.com/FangcunMount/qs-server/pkg/event"
 	"gorm.io/gorm"
 )
 
@@ -62,6 +65,8 @@ func seedAssessmentByEntry(ctx context.Context, deps *dependencies) error {
 			deps.Logger.Warnw("Failed to close local mongo after assessment_by_entry", "error", closeErr.Error())
 		}
 	}()
+
+	localSubmissionService := newLocalSeedAssessmentSubmissionService(mysqlDB)
 
 	cfg := deps.Config.AssessmentByEntry
 	clinicians, err := resolveSeedClinicianScope(ctx, deps, seedClinicianScopeSpec{
@@ -172,7 +177,7 @@ func seedAssessmentByEntry(ctx context.Context, deps *dependencies) error {
 		if answerSheetID == 0 {
 			return fmt.Errorf("invalid answersheet id after entry-based submit: %s", submitResp.ID)
 		}
-		assessmentRow, err := waitForAssessmentByAnswerSheet(ctx, mysqlDB, answerSheetID)
+		assessmentRow, err := ensureAssessmentByAnswerSheet(ctx, mysqlDB, localSubmissionService, deps.Config.Global.OrgID, candidate, target, answerSheetID)
 		if err != nil {
 			return fmt.Errorf("wait for assessment by answersheet %d: %w", answerSheetID, err)
 		}
@@ -312,16 +317,47 @@ func assessmentExistsForEntryCandidate(
 	return count > 0, nil
 }
 
+func newLocalSeedAssessmentSubmissionService(mysqlDB *gorm.DB) assessmentApp.AssessmentSubmissionService {
+	return assessmentApp.NewSubmissionService(
+		evaluationMySQL.NewAssessmentRepository(mysqlDB),
+		assessmentDomain.NewDefaultAssessmentCreator(),
+		event.NewNopEventPublisher(),
+	)
+}
+
+func ensureAssessmentByAnswerSheet(
+	ctx context.Context,
+	mysqlDB *gorm.DB,
+	submissionService assessmentApp.AssessmentSubmissionService,
+	orgID int64,
+	candidate entryAssessmentCandidateRow,
+	target *resolvedEntryAssessmentTarget,
+	answerSheetID uint64,
+) (planFixupAssessmentRow, error) {
+	row, err := waitForAssessmentByAnswerSheet(ctx, mysqlDB, answerSheetID)
+	if err == nil {
+		return row, nil
+	}
+
+	if !isAssessmentLookupTimeout(err) {
+		return planFixupAssessmentRow{}, err
+	}
+
+	if ensureErr := createAssessmentByAnswerSheetLocally(ctx, submissionService, orgID, candidate, target, answerSheetID); ensureErr != nil {
+		return planFixupAssessmentRow{}, fmt.Errorf("ensure assessment locally: %w", ensureErr)
+	}
+
+	row, err = waitForAssessmentByAnswerSheet(ctx, mysqlDB, answerSheetID)
+	if err != nil {
+		return planFixupAssessmentRow{}, err
+	}
+	return row, nil
+}
+
 func waitForAssessmentByAnswerSheet(ctx context.Context, mysqlDB *gorm.DB, answerSheetID uint64) (planFixupAssessmentRow, error) {
 	deadline := time.Now().Add(seedAssessmentPollTimeout)
 	for {
-		var row planFixupAssessmentRow
-		err := mysqlDB.WithContext(ctx).
-			Table((evaluationMySQL.AssessmentPO{}).TableName()).
-			Select("id, answer_sheet_id, status, created_at, updated_at, submitted_at, interpreted_at, failed_at").
-			Where("answer_sheet_id = ? AND deleted_at IS NULL", answerSheetID).
-			Order("id DESC").
-			Take(&row).Error
+		row, err := loadAssessmentByAnswerSheet(ctx, mysqlDB, answerSheetID)
 		if err == nil {
 			return row, nil
 		}
@@ -337,6 +373,66 @@ func waitForAssessmentByAnswerSheet(ctx context.Context, mysqlDB *gorm.DB, answe
 		case <-time.After(seedAssessmentPollInterval):
 		}
 	}
+}
+
+func loadAssessmentByAnswerSheet(ctx context.Context, mysqlDB *gorm.DB, answerSheetID uint64) (planFixupAssessmentRow, error) {
+	var row planFixupAssessmentRow
+	err := mysqlDB.WithContext(ctx).
+		Table((evaluationMySQL.AssessmentPO{}).TableName()).
+		Select("id, answer_sheet_id, status, created_at, updated_at, submitted_at, interpreted_at, failed_at").
+		Where("answer_sheet_id = ? AND deleted_at IS NULL", answerSheetID).
+		Order("id DESC").
+		Take(&row).Error
+	if err != nil {
+		return planFixupAssessmentRow{}, err
+	}
+	return row, nil
+}
+
+func isAssessmentLookupTimeout(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "assessment not found by answersheet")
+}
+
+func createAssessmentByAnswerSheetLocally(
+	ctx context.Context,
+	submissionService assessmentApp.AssessmentSubmissionService,
+	orgID int64,
+	candidate entryAssessmentCandidateRow,
+	target *resolvedEntryAssessmentTarget,
+	answerSheetID uint64,
+) error {
+	if submissionService == nil {
+		return fmt.Errorf("local assessment submission service is nil")
+	}
+	if target == nil {
+		return fmt.Errorf("resolved assessment target is nil")
+	}
+
+	dto := assessmentApp.CreateAssessmentDTO{
+		OrgID:                uint64(orgID),
+		TesteeID:             candidate.TesteeID,
+		QuestionnaireCode:    target.QuestionnaireCode,
+		QuestionnaireVersion: target.QuestionnaireVersion,
+		AnswerSheetID:        answerSheetID,
+		MedicalScaleID:       target.MedicalScaleID,
+		MedicalScaleCode:     target.MedicalScaleCode,
+		MedicalScaleName:     target.MedicalScaleName,
+		OriginType:           "adhoc",
+	}
+
+	result, err := submissionService.Create(ctx, dto)
+	if err != nil {
+		if _, existingErr := submissionService.GetMyAssessmentByAnswerSheetID(ctx, answerSheetID); existingErr == nil {
+			return nil
+		}
+		return err
+	}
+	if result != nil && !strings.EqualFold(strings.TrimSpace(result.Status), "submitted") {
+		if _, submitErr := submissionService.Submit(ctx, result.ID); submitErr != nil {
+			return submitErr
+		}
+	}
+	return nil
 }
 
 var (

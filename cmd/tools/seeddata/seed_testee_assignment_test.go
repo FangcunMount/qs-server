@@ -53,6 +53,32 @@ func TestBuildTesteeAssignmentJobs_RoundRobinPreservesPosition(t *testing.T) {
 	}
 }
 
+func TestBuildTesteeAssignmentJobs_RandomIsStable(t *testing.T) {
+	cfg := TesteeAssignmentConfig{Key: "seed_all_pool", Strategy: "random"}
+	targets := []clinicianAssignmentTarget{
+		{ID: "c1"},
+		{ID: "c2"},
+		{ID: "c3"},
+	}
+	testees := []*ApiserverTesteeResponse{
+		{ID: "t1"},
+		{ID: "t2"},
+		{ID: "t3"},
+		{ID: "t4"},
+	}
+
+	jobsA := buildTesteeAssignmentJobs(cfg, targets, testees)
+	jobsB := buildTesteeAssignmentJobs(cfg, targets, testees)
+	if len(jobsA) != len(jobsB) {
+		t.Fatalf("expected same number of jobs, got %d and %d", len(jobsA), len(jobsB))
+	}
+	for i := range jobsA {
+		if jobsA[i].Target.ID != jobsB[i].Target.ID {
+			t.Fatalf("expected stable random assignment at index %d, got %s and %s", i, jobsA[i].Target.ID, jobsB[i].Target.ID)
+		}
+	}
+}
+
 func TestNormalizeAssignmentWorkers(t *testing.T) {
 	if got := normalizeAssignmentWorkers(0, 0); got != defaultAssignmentWorkers {
 		t.Fatalf("expected default workers %d, got %d", defaultAssignmentWorkers, got)

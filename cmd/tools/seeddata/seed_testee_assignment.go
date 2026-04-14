@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 const (
 	testeeAssignmentStrategyExplicit   = "explicit"
 	testeeAssignmentStrategyRoundRobin = "round_robin"
+	testeeAssignmentStrategyRandom     = "random"
 	defaultAssignmentPageSize          = 100
 	defaultAssignmentWorkers           = 8
 )
@@ -113,7 +115,7 @@ func validateTesteeAssignmentConfig(cfg TesteeAssignmentConfig) error {
 		if strings.TrimSpace(cfg.ClinicianRef) == "" && cfg.ClinicianID.IsZero() {
 			return fmt.Errorf("clinicianRef or clinicianId is required for explicit assignment")
 		}
-	case testeeAssignmentStrategyRoundRobin:
+	case testeeAssignmentStrategyRoundRobin, testeeAssignmentStrategyRandom:
 		targetCount := len(nonEmptyStrings(cfg.ClinicianRefs)) + len(nonEmptyStrings(cfg.ClinicianKeyPrefixes)) + len(nonZeroFlexibleIDs(cfg.ClinicianIDs))
 		if strings.TrimSpace(cfg.ClinicianRef) != "" || !cfg.ClinicianID.IsZero() {
 			targetCount++
@@ -380,6 +382,17 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 				Target:   targets[idx%len(targets)],
 			})
 		}
+	case testeeAssignmentStrategyRandom:
+		for _, testee := range testees {
+			if testee == nil || strings.TrimSpace(testee.ID) == "" {
+				continue
+			}
+			targetIdx := stableRandomAssignmentIndex(cfg.Key, strings.TrimSpace(testee.ID), len(targets))
+			jobs = append(jobs, testeeAssignmentJob{
+				TesteeID: strings.TrimSpace(testee.ID),
+				Target:   targets[targetIdx],
+			})
+		}
 	default:
 		target := targets[0]
 		for _, testee := range testees {
@@ -393,6 +406,17 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 		}
 	}
 	return jobs
+}
+
+func stableRandomAssignmentIndex(assignmentKey, testeeID string, targetCount int) int {
+	if targetCount <= 1 {
+		return 0
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.TrimSpace(assignmentKey)))
+	_, _ = h.Write([]byte{':'})
+	_, _ = h.Write([]byte(strings.TrimSpace(testeeID)))
+	return int(h.Sum32() % uint32(targetCount))
 }
 
 func normalizeAssignmentWorkers(workers, jobCount int) int {
