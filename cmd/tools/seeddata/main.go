@@ -225,6 +225,8 @@ func main() {
 	}
 
 	logger.Infow("Starting seed process", "steps", stepListToStrings(steps))
+	stepProgress := newSeedProgressBar("seed steps", len(steps))
+	defer stepProgress.Close()
 
 	runCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -278,64 +280,46 @@ func main() {
 	}
 
 	for _, step := range steps {
+		logger.Infow("Running seed step", "step", step)
+		var err error
 		switch step {
 		case stepStaff:
-			if err := seedStaffs(runCtx, deps); err != nil {
-				logger.Fatalw("Staff seeding failed", "error", err)
-			}
+			err = seedStaffs(runCtx, deps)
 		case stepClinician:
-			if err := seedClinicians(runCtx, deps); err != nil {
-				logger.Fatalw("Clinician seeding failed", "error", err)
-			}
+			err = seedClinicians(runCtx, deps)
 		case stepAssignTestees:
-			if err := seedAssignTestees(runCtx, deps, assignmentOpts); err != nil {
-				logger.Fatalw("Testee assignment seeding failed", "error", err)
-			}
+			err = seedAssignTestees(runCtx, deps, assignmentOpts)
 		case stepActorFixupTimes:
-			if err := seedActorFixupTimestamps(runCtx, deps); err != nil {
-				logger.Fatalw("Actor timestamp fixup failed", "error", err)
-			}
+			err = seedActorFixupTimestamps(runCtx, deps)
 		case stepAssessmentEntries:
-			if err := seedAssessmentEntries(runCtx, deps); err != nil {
-				logger.Fatalw("Assessment entry seeding failed", "error", err)
-			}
+			err = seedAssessmentEntries(runCtx, deps)
 		case stepAssessmentEntryFlow:
-			if err := seedAssessmentEntryFlow(runCtx, deps); err != nil {
-				logger.Fatalw("Assessment entry flow seeding failed", "error", err)
-			}
+			err = seedAssessmentEntryFlow(runCtx, deps)
 		case stepAssessmentByEntry:
-			if err := seedAssessmentByEntry(runCtx, deps); err != nil {
-				logger.Fatalw("Assessment by entry seeding failed", "error", err)
-			}
+			err = seedAssessmentByEntry(runCtx, deps)
 		case stepAssessment:
-			if err := seedAssessments(runCtx, deps, assessmentOpts); err != nil {
-				logger.Fatalw("Assessment seeding failed", "error", err)
-			}
+			err = seedAssessments(runCtx, deps, assessmentOpts)
 		case stepPlan:
-			if err := seedPlanBackfill(runCtx, deps, planCreateOpts, planProcessOpts.withScope(planProcessOpts.ScopeTesteeIDs, false)); err != nil {
-				logger.Fatalw("Plan backfill failed", "error", err)
-			}
+			err = seedPlanBackfill(runCtx, deps, planCreateOpts, planProcessOpts.withScope(planProcessOpts.ScopeTesteeIDs, false))
 		case stepPlanCreateTasks:
-			if _, err := seedPlanCreateTasks(runCtx, deps, planCreateOpts); err != nil {
-				logger.Fatalw("Plan task creation failed", "error", err)
-			}
+			_, err = seedPlanCreateTasks(runCtx, deps, planCreateOpts)
 		case stepPlanProcessTasks:
-			if _, err := seedPlanProcessTasks(runCtx, deps, planProcessOpts); err != nil {
-				logger.Fatalw("Plan task processing failed", "error", err)
-			}
+			_, err = seedPlanProcessTasks(runCtx, deps, planProcessOpts)
 		case stepPlanFixupTimes:
-			if err := seedPlanFixupTimestamps(runCtx, deps, planFixupOpts); err != nil {
-				logger.Fatalw("Plan timestamp fixup failed", "error", err)
-			}
+			err = seedPlanFixupTimestamps(runCtx, deps, planFixupOpts)
 		case stepStatisticsBackfill:
-			if err := seedStatisticsBackfill(runCtx, deps); err != nil {
-				logger.Fatalw("Statistics backfill failed", "error", err)
-			}
+			err = seedStatisticsBackfill(runCtx, deps)
 		default:
 			logger.Warnw("Skipping unimplemented step", "step", step)
 		}
+		if err != nil {
+			stepProgress.Close()
+			logger.Fatalw(seedStepFailureMessage(step), "error", err)
+		}
+		stepProgress.Increment()
 	}
 
+	stepProgress.Complete()
 	logger.Infow("Seed process completed successfully")
 }
 
@@ -404,4 +388,37 @@ func containsSeedStep(steps []seedStep, target seedStep) bool {
 		}
 	}
 	return false
+}
+
+func seedStepFailureMessage(step seedStep) string {
+	switch step {
+	case stepStaff:
+		return "Staff seeding failed"
+	case stepClinician:
+		return "Clinician seeding failed"
+	case stepAssignTestees:
+		return "Testee assignment seeding failed"
+	case stepActorFixupTimes:
+		return "Actor timestamp fixup failed"
+	case stepAssessmentEntries:
+		return "Assessment entry seeding failed"
+	case stepAssessmentEntryFlow:
+		return "Assessment entry flow seeding failed"
+	case stepAssessmentByEntry:
+		return "Assessment by entry seeding failed"
+	case stepAssessment:
+		return "Assessment seeding failed"
+	case stepPlan:
+		return "Plan backfill failed"
+	case stepPlanCreateTasks:
+		return "Plan task creation failed"
+	case stepPlanProcessTasks:
+		return "Plan task processing failed"
+	case stepPlanFixupTimes:
+		return "Plan timestamp fixup failed"
+	case stepStatisticsBackfill:
+		return "Statistics backfill failed"
+	default:
+		return "Seed step failed"
+	}
 }

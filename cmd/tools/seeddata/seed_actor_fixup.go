@@ -58,6 +58,8 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 	anchors := make(map[uint64]actorFixupClinicianAnchor, len(rows))
 	relationsUpdated := 0
 	relationsSkipped := 0
+	relationProgress := newSeedProgressBar("actor_fixup relations", len(rows))
+	defer relationProgress.Close()
 
 	for _, row := range rows {
 		if row.TesteeCreatedAt.IsZero() {
@@ -67,6 +69,7 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 				"clinician_id", row.ClinicianID,
 				"relation_type", row.RelationType,
 			)
+			relationProgress.Increment()
 			continue
 		}
 
@@ -79,6 +82,7 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 				"relation_type", row.RelationType,
 				"error", err.Error(),
 			)
+			relationProgress.Increment()
 			continue
 		}
 		if err := updateActorFixupRelation(ctx, mysqlDB, row.RelationID, boundAt); err != nil {
@@ -94,12 +98,17 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 				FirstBound:  boundAt,
 			}
 		}
+		relationProgress.Increment()
 	}
+	relationProgress.Complete()
 
 	cliniciansUpdated := 0
 	staffUpdated := 0
+	anchorProgress := newSeedProgressBar("actor_fixup anchors", len(anchors))
+	defer anchorProgress.Close()
 	for _, anchor := range anchors {
 		if anchor.FirstBound.IsZero() {
+			anchorProgress.Increment()
 			continue
 		}
 		clinicianCreatedAt := deriveClinicianCreatedAt(anchor.FirstBound)
@@ -118,7 +127,9 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 				staffUpdated++
 			}
 		}
+		anchorProgress.Increment()
 	}
+	anchorProgress.Complete()
 
 	deps.Logger.Infow("Actor timestamp fixup completed",
 		"org_id", deps.Config.Global.OrgID,

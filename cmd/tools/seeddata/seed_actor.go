@@ -43,6 +43,8 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 	createdCount := 0
 	updatedCount := 0
 	reusedCount := 0
+	progress := newSeedProgressBar("staff", len(staffConfigs))
+	defer progress.Close()
 	for idx, cfg := range staffConfigs {
 		if err := validateStaffConfig(cfg); err != nil {
 			return fmt.Errorf("invalid staff config at index %d: %w", idx, err)
@@ -66,8 +68,10 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 			"user_id", item.UserID,
 			"status", status,
 		)
+		progress.Increment()
 	}
 
+	progress.Complete()
 	deps.Logger.Infow("Staff seeding completed",
 		"configured", len(staffConfigs),
 		"created", createdCount,
@@ -111,6 +115,8 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 	createdCount := 0
 	updatedCount := 0
 	reusedCount := 0
+	progress := newSeedProgressBar("clinician", len(clinicianConfigs))
+	defer progress.Close()
 	for idx, cfg := range clinicianConfigs {
 		if err := validateClinicianConfig(cfg); err != nil {
 			return fmt.Errorf("invalid clinician config at index %d: %w", idx, err)
@@ -140,8 +146,10 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 			"operator_id", nullableString(item.OperatorID),
 			"status", status,
 		)
+		progress.Increment()
 	}
 
+	progress.Complete()
 	deps.Logger.Infow("Clinician seeding completed",
 		"configured", len(clinicianConfigs),
 		"created", createdCount,

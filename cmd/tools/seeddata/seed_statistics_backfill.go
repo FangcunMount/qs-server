@@ -18,23 +18,31 @@ func seedStatisticsBackfill(ctx context.Context, deps *dependencies) error {
 	}
 
 	deps.Logger.Infow("Statistics backfill started", "org_id", deps.Config.Global.OrgID)
+	progress := newSeedProgressBar("statistics_backfill", 5)
+	defer progress.Close()
 
 	if err := deps.APIClient.SyncStatisticsDaily(ctx); err != nil {
 		return err
 	}
+	progress.Increment()
 	if err := deps.APIClient.SyncStatisticsAccumulated(ctx); err != nil {
 		return err
 	}
+	progress.Increment()
 	if err := deps.APIClient.SyncStatisticsPlan(ctx); err != nil {
 		return err
 	}
+	progress.Increment()
 	if err := deps.APIClient.ValidateStatisticsConsistency(ctx); err != nil {
 		return err
 	}
+	progress.Increment()
 
 	if err := warmStatisticsReads(ctx, deps); err != nil {
 		return err
 	}
+	progress.Increment()
+	progress.Complete()
 
 	deps.Logger.Infow("Statistics backfill completed", "org_id", deps.Config.Global.OrgID)
 	return nil

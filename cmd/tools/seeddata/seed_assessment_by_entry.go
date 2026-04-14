@@ -109,98 +109,108 @@ func seedAssessmentByEntry(ctx context.Context, deps *dependencies) error {
 
 	createdCount := 0
 	skippedCount := 0
+	progress := newSeedProgressBar("assessment_by_entry candidates", len(candidates))
+	defer progress.Close()
 	for _, candidate := range candidates {
-		if entryCounts[candidate.EntryID] >= maxPerEntry {
-			skippedCount++
-			continue
-		}
+		if err := func(candidate entryAssessmentCandidateRow) error {
+			defer progress.Increment()
 
-		target, err := resolveEntryAssessmentTarget(ctx, deps.APIClient, candidate)
-		if err != nil {
-			deps.Logger.Warnw("Skipping entry-based assessment because target resolution failed",
-				"entry_id", candidate.EntryID,
-				"testee_id", candidate.TesteeID,
-				"error", err.Error(),
-			)
-			skippedCount++
-			continue
-		}
-		if target.SkipReason != "" {
-			deps.Logger.Infow("Skipping entry-based assessment",
-				"entry_id", candidate.EntryID,
-				"testee_id", candidate.TesteeID,
-				"reason", target.SkipReason,
-			)
-			skippedCount++
-			continue
-		}
+			if entryCounts[candidate.EntryID] >= maxPerEntry {
+				skippedCount++
+				return nil
+			}
 
-		exists, err := assessmentExistsForEntryCandidate(ctx, mysqlDB, deps.Config.Global.OrgID, candidate, target.QuestionnaireCode, target.QuestionnaireVersion)
-		if err != nil {
+			target, err := resolveEntryAssessmentTarget(ctx, deps.APIClient, candidate)
+			if err != nil {
+				deps.Logger.Warnw("Skipping entry-based assessment because target resolution failed",
+					"entry_id", candidate.EntryID,
+					"testee_id", candidate.TesteeID,
+					"error", err.Error(),
+				)
+				skippedCount++
+				return nil
+			}
+			if target.SkipReason != "" {
+				deps.Logger.Infow("Skipping entry-based assessment",
+					"entry_id", candidate.EntryID,
+					"testee_id", candidate.TesteeID,
+					"reason", target.SkipReason,
+				)
+				skippedCount++
+				return nil
+			}
+
+			exists, err := assessmentExistsForEntryCandidate(ctx, mysqlDB, deps.Config.Global.OrgID, candidate, target.QuestionnaireCode, target.QuestionnaireVersion)
+			if err != nil {
+				return err
+			}
+			if exists {
+				skippedCount++
+				return nil
+			}
+
+			detail := getQuestionnaireDetail(ctx, deps.APIClient, target.QuestionnaireCode, questionnaireCache, &questionnaireCacheMu, deps.Logger)
+			if detail == nil {
+				skippedCount++
+				return nil
+			}
+			if detail.Type != questionnaireTypeMedicalScale {
+				skippedCount++
+				return nil
+			}
+
+			rng := rand.New(rand.NewSource(int64(candidate.TesteeID) + int64(candidate.EntryID)))
+			answers := buildAnswers(detail, rng)
+			if len(answers) == 0 {
+				skippedCount++
+				return nil
+			}
+
+			submitReq := SubmitAnswerSheetRequest{
+				QuestionnaireCode:    target.QuestionnaireCode,
+				QuestionnaireVersion: target.QuestionnaireVersion,
+				Title:                detail.Title,
+				TesteeID:             candidate.TesteeID,
+				Answers:              answers,
+			}
+			submitResp, err := deps.APIClient.SubmitAnswerSheetAdmin(ctx, buildAdminSubmitAnswerSheetRequest(submitReq))
+			if err != nil {
+				return fmt.Errorf("submit entry-based answersheet entry=%d testee=%d: %w", candidate.EntryID, candidate.TesteeID, err)
+			}
+
+			answerSheetID := parseID(submitResp.ID)
+			if answerSheetID == 0 {
+				return fmt.Errorf("invalid answersheet id after entry-based submit: %s", submitResp.ID)
+			}
+			assessmentRow, err := ensureAssessmentByAnswerSheet(ctx, mysqlDB, localSubmissionService, deps.Config.Global.OrgID, candidate, target, answerSheetID)
+			if err != nil {
+				return fmt.Errorf("wait for assessment by answersheet %d: %w", answerSheetID, err)
+			}
+
+			submittedAt := deriveEntryAssessmentSubmitAt(candidate.BoundAt)
+			interpretedAt := deriveAssessmentInterpretAt(submittedAt)
+			if _, err := updatePlanFixupAnswerSheet(ctx, mongoDB, answerSheetID, submittedAt, submittedAt); err != nil {
+				return err
+			}
+			reportExists, err := updatePlanFixupReport(ctx, mongoDB, assessmentRow.ID, interpretedAt)
+			if err != nil {
+				return err
+			}
+			if err := updatePlanFixupAssessment(ctx, mysqlDB, assessmentRow, planFixupTimes{
+				CompletionAt: submittedAt,
+				InterpretAt:  interpretedAt,
+			}, reportExists); err != nil {
+				return err
+			}
+
+			entryCounts[candidate.EntryID]++
+			createdCount++
+			return nil
+		}(candidate); err != nil {
 			return err
 		}
-		if exists {
-			skippedCount++
-			continue
-		}
-
-		detail := getQuestionnaireDetail(ctx, deps.APIClient, target.QuestionnaireCode, questionnaireCache, &questionnaireCacheMu, deps.Logger)
-		if detail == nil {
-			skippedCount++
-			continue
-		}
-		if detail.Type != questionnaireTypeMedicalScale {
-			skippedCount++
-			continue
-		}
-
-		rng := rand.New(rand.NewSource(int64(candidate.TesteeID) + int64(candidate.EntryID)))
-		answers := buildAnswers(detail, rng)
-		if len(answers) == 0 {
-			skippedCount++
-			continue
-		}
-
-		submitReq := SubmitAnswerSheetRequest{
-			QuestionnaireCode:    target.QuestionnaireCode,
-			QuestionnaireVersion: target.QuestionnaireVersion,
-			Title:                detail.Title,
-			TesteeID:             candidate.TesteeID,
-			Answers:              answers,
-		}
-		submitResp, err := deps.APIClient.SubmitAnswerSheetAdmin(ctx, buildAdminSubmitAnswerSheetRequest(submitReq))
-		if err != nil {
-			return fmt.Errorf("submit entry-based answersheet entry=%d testee=%d: %w", candidate.EntryID, candidate.TesteeID, err)
-		}
-
-		answerSheetID := parseID(submitResp.ID)
-		if answerSheetID == 0 {
-			return fmt.Errorf("invalid answersheet id after entry-based submit: %s", submitResp.ID)
-		}
-		assessmentRow, err := ensureAssessmentByAnswerSheet(ctx, mysqlDB, localSubmissionService, deps.Config.Global.OrgID, candidate, target, answerSheetID)
-		if err != nil {
-			return fmt.Errorf("wait for assessment by answersheet %d: %w", answerSheetID, err)
-		}
-
-		submittedAt := deriveEntryAssessmentSubmitAt(candidate.BoundAt)
-		interpretedAt := deriveAssessmentInterpretAt(submittedAt)
-		if _, err := updatePlanFixupAnswerSheet(ctx, mongoDB, answerSheetID, submittedAt, submittedAt); err != nil {
-			return err
-		}
-		reportExists, err := updatePlanFixupReport(ctx, mongoDB, assessmentRow.ID, interpretedAt)
-		if err != nil {
-			return err
-		}
-		if err := updatePlanFixupAssessment(ctx, mysqlDB, assessmentRow, planFixupTimes{
-			CompletionAt: submittedAt,
-			InterpretAt:  interpretedAt,
-		}, reportExists); err != nil {
-			return err
-		}
-
-		entryCounts[candidate.EntryID]++
-		createdCount++
 	}
+	progress.Complete()
 
 	deps.Logger.Infow("Assessment-by-entry seeding completed",
 		"org_id", deps.Config.Global.OrgID,

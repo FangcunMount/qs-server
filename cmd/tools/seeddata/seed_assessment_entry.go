@@ -80,6 +80,8 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 		return nil
 	}
 
+	progress := newSeedProgressBar("assessment_entries clinicians", len(eligibleClinicians))
+	defer progress.Close()
 	for _, clinicianItem := range eligibleClinicians {
 		anchor, ok := anchors[strings.TrimSpace(clinicianItem.ID)]
 		if !ok || anchor.AnchorCreatedAt.IsZero() {
@@ -89,6 +91,7 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 				"clinician_name", clinicianItem.Name,
 				"assigned_testee_count", clinicianItem.AssignedTesteeCount,
 			)
+			progress.Increment()
 			continue
 		}
 
@@ -158,7 +161,9 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 			"updated", updatedForClinician,
 			"skipped", skippedForClinician,
 		)
+		progress.Increment()
 	}
+	progress.Complete()
 
 	deps.Logger.Infow("Assessment entry seeding completed",
 		"total_clinicians", len(allClinicians),

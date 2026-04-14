@@ -42,17 +42,21 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 	}
 	entryFilter := flexibleIDSet(cfg.EntryIDs)
 	maxIntakes := normalizeMaxIntakesPerEntry(cfg.MaxIntakesPerEntry)
+	activeClinicians := make([]*ClinicianResponse, 0, len(clinicians))
+	for _, item := range clinicians {
+		if item != nil && item.IsActive {
+			activeClinicians = append(activeClinicians, item)
+		}
+	}
 
 	totalEntries := 0
 	totalResolved := 0
 	totalSkipped := 0
 	totalExpired := 0
+	progress := newSeedProgressBar("assessment_entry_flow clinicians", len(activeClinicians))
+	defer progress.Close()
 
-	for _, clinicianItem := range clinicians {
-		if clinicianItem == nil || !clinicianItem.IsActive {
-			continue
-		}
-
+	for _, clinicianItem := range activeClinicians {
 		entries, err := listAllClinicianAssessmentEntries(ctx, deps.APIClient, clinicianItem.ID)
 		if err != nil {
 			return fmt.Errorf("list assessment entries for clinician %s: %w", clinicianItem.ID, err)
@@ -194,7 +198,9 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 			"skipped", skippedForClinician,
 			"max_intakes_per_entry", maxIntakes,
 		)
+		progress.Increment()
 	}
+	progress.Complete()
 
 	deps.Logger.Infow("Assessment entry flow completed",
 		"org_id", deps.Config.Global.OrgID,

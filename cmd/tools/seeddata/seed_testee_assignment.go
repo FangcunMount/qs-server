@@ -318,6 +318,8 @@ func applyTesteeAssignment(
 		return 0, 0, nil
 	}
 	workers := normalizeAssignmentWorkers(opts.WorkerCount, len(jobs))
+	progress := newSeedProgressBar("assign_testees "+assignmentProgressLabel(cfg), len(jobs))
+	defer progress.Close()
 	var assignedCounter atomic.Int64
 	var skippedCounter atomic.Int64
 	locker := newAssignmentKeyLocker()
@@ -338,6 +340,7 @@ func applyTesteeAssignment(
 					unlock := locker.Lock(job.TesteeID)
 					assignErr := applySingleTesteeAssignment(gctx, deps, orgID, cfg, job, relationType, sourceType, &assignedCounter, &skippedCounter)
 					unlock()
+					progress.Increment()
 					if assignErr != nil {
 						return assignErr
 					}
@@ -361,6 +364,7 @@ func applyTesteeAssignment(
 	if err := g.Wait(); err != nil {
 		return 0, 0, err
 	}
+	progress.Complete()
 	return int(assignedCounter.Load()), int(skippedCounter.Load()), nil
 }
 
@@ -614,4 +618,11 @@ func testeeAssignmentLabel(cfg TesteeAssignmentConfig, idx int) string {
 	default:
 		return fmt.Sprintf("testeeAssignment[%d]", idx)
 	}
+}
+
+func assignmentProgressLabel(cfg TesteeAssignmentConfig) string {
+	if key := strings.TrimSpace(cfg.Key); key != "" {
+		return key
+	}
+	return normalizedAssignmentStrategy(cfg.Strategy)
 }
