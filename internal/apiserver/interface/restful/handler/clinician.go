@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"strconv"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -23,6 +25,28 @@ func metaIDPtrToUint64(id *meta.ID) *uint64 {
 
 	value := id.Uint64()
 	return &value
+}
+
+func flexibleTimePtrToTimePtr(v *request.FlexibleTime) *time.Time {
+	if v == nil || v.Time.IsZero() {
+		return nil
+	}
+
+	value := v.Time
+	return &value
+}
+
+func (h *ActorHandler) generateAssessmentEntryQRCodeURL(ctx context.Context, token string) string {
+	if h.qrCodeService == nil {
+		return ""
+	}
+
+	generated, err := h.qrCodeService.GenerateAssessmentEntryQRCode(ctx, token)
+	if err != nil {
+		return ""
+	}
+
+	return generated
 }
 
 // CreateClinician 创建从业者。
@@ -383,19 +407,14 @@ func (h *ActorHandler) CreateClinicianAssessmentEntry(c *gin.Context) {
 		TargetType:    req.TargetType,
 		TargetCode:    req.TargetCode,
 		TargetVersion: req.TargetVersion,
-		ExpiresAt:     req.ExpiresAt,
+		ExpiresAt:     flexibleTimePtrToTimePtr(req.ExpiresAt),
 	})
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	qrCodeURL := ""
-	if h.qrCodeService != nil {
-		if generated, err := h.qrCodeService.GenerateAssessmentEntryQRCode(c.Request.Context(), result.Token); err == nil {
-			qrCodeURL = generated
-		}
-	}
+	qrCodeURL := h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)
 	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
 }
 
@@ -542,19 +561,14 @@ func (h *ActorHandler) CreateMyAssessmentEntry(c *gin.Context) {
 		TargetType:    req.TargetType,
 		TargetCode:    req.TargetCode,
 		TargetVersion: req.TargetVersion,
-		ExpiresAt:     req.ExpiresAt,
+		ExpiresAt:     flexibleTimePtrToTimePtr(req.ExpiresAt),
 	})
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	qrCodeURL := ""
-	if h.qrCodeService != nil {
-		if generated, err := h.qrCodeService.GenerateAssessmentEntryQRCode(c.Request.Context(), result.Token); err == nil {
-			qrCodeURL = generated
-		}
-	}
+	qrCodeURL := h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)
 
 	resp := toAssessmentEntryResponse(result, qrCodeURL)
 	h.SuccessResponseWithMessage(c, "测评入口创建成功", resp)
@@ -591,6 +605,42 @@ func (h *ActorHandler) ListMyAssessmentEntries(c *gin.Context) {
 	}
 
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
+}
+
+// GetMyAssessmentEntry 查询当前从业者测评入口详情。
+// @Summary 查询我的测评入口详情
+// @Description 查询当前从业者持有的单个测评入口详情
+// @Tags Actor-AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path string true "入口ID"
+// @Success 200 {object} core.Response{data=response.AssessmentEntryResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/clinicians/me/assessment-entries/{id} [get]
+func (h *ActorHandler) GetMyAssessmentEntry(c *gin.Context) {
+	clinicianItem, err := h.currentClinician(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.assessmentEntryService.GetByID(c.Request.Context(), entryID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result.ClinicianID != clinicianItem.ID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current clinician"))
+		return
+	}
+
+	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
 }
 
 func (h *ActorHandler) ListMyClinicianRelations(c *gin.Context) {
@@ -719,7 +769,7 @@ func (h *ActorHandler) GetAssessmentEntry(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current organization"))
 		return
 	}
-	h.Success(c, toAssessmentEntryResponse(result, ""))
+	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
 }
 
 func (h *ActorHandler) DeactivateAssessmentEntry(c *gin.Context) {

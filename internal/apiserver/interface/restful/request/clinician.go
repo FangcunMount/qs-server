@@ -1,10 +1,51 @@
 package request
 
 import (
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
+
+type FlexibleTime struct {
+	time.Time
+}
+
+func (t *FlexibleTime) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	layouts := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+	}
+
+	var parsed time.Time
+	var err error
+	for _, layout := range layouts {
+		parsed, err = time.Parse(layout, raw)
+		if err == nil {
+			t.Time = parsed
+			return nil
+		}
+	}
+
+	return err
+}
 
 // CreateClinicianRequest 创建从业者请求。
 type CreateClinicianRequest struct {
@@ -41,10 +82,10 @@ type ListClinicianRequest struct {
 
 // CreateAssessmentEntryRequest 创建测评入口请求。
 type CreateAssessmentEntryRequest struct {
-	TargetType    string     `json:"target_type" binding:"required"`
-	TargetCode    string     `json:"target_code" binding:"required"`
-	TargetVersion string     `json:"target_version"`
-	ExpiresAt     *time.Time `json:"expires_at"`
+	TargetType    string        `json:"target_type" binding:"required"`
+	TargetCode    string        `json:"target_code" binding:"required"`
+	TargetVersion string        `json:"target_version"`
+	ExpiresAt     *FlexibleTime `json:"expires_at"`
 }
 
 // ListAssessmentEntryRequest 测评入口列表请求。

@@ -489,6 +489,14 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			actorHandler.ListMyAssessmentEntries,
 		)...)
+		me.GET("/assessment-entries/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			actorHandler.GetMyAssessmentEntry,
+		)...)
 		me.POST("/assessment-entries/:id/deactivate", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.SubmitGlobalQPS,
