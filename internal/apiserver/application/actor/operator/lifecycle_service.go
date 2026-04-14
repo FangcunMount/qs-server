@@ -65,6 +65,7 @@ func NewLifecycleService(
 // Register 注册新操作者
 func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO) (*OperatorResult, error) {
 	var result *domain.Operator
+	var created bool
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 验证参数
@@ -79,11 +80,12 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 		}
 
 		// 3~5. 创建操作者、分配角色并持久化
-		st, err := s.createAndSaveOperator(txCtx, dto, userID)
+		st, wasCreated, err := s.createAndSaveOperator(txCtx, dto, userID)
 		if err != nil {
 			return err
 		}
 		result = st
+		created = wasCreated
 		return nil
 	})
 
@@ -93,10 +95,13 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 
 	if dto.IsActive && s.assignment != nil && s.snapshot != nil {
 		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
-			if rollbackErr := s.rollbackRegisteredOperator(ctx, result.ID()); rollbackErr != nil {
-				return nil, errors.Wrapf(rollbackErr, "iam role assignment after register failed and operator rollback failed: %v", err)
+			if created {
+				if rollbackErr := s.rollbackRegisteredOperator(ctx, result.ID()); rollbackErr != nil {
+					return nil, errors.Wrapf(rollbackErr, "iam role assignment after register failed and operator rollback failed: %v", err)
+				}
+				return nil, errors.Wrap(err, "iam role assignment after register; local operator rolled back")
 			}
-			return nil, errors.Wrap(err, "iam role assignment after register; local operator rolled back")
+			return nil, errors.Wrap(err, "iam role assignment after ensure operator")
 		}
 	}
 
@@ -336,49 +341,74 @@ func formatOptionalUserID(userID int64) string {
 }
 
 // createAndSaveOperator 在事务内检查是否已存在、创建 Operator、分配角色并保存
-func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto RegisterOperatorDTO, userID int64) (*domain.Operator, error) {
-	// 检查是否已存在
-	_, err := s.repo.FindByUser(txCtx, dto.OrgID, userID)
+func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto RegisterOperatorDTO, userID int64) (*domain.Operator, bool, error) {
+	useIAM := s.assignment != nil && s.snapshot != nil
+
+	st, err := s.repo.FindByUser(txCtx, dto.OrgID, userID)
 	if err == nil {
-		return nil, errors.WithCode(code.ErrUserAlreadyExists, "operator with this user_id already exists")
+		if err := s.syncOperatorProjection(st, dto, useIAM); err != nil {
+			return nil, false, err
+		}
+		if err := s.repo.Update(txCtx, st); err != nil {
+			return nil, false, errors.Wrap(err, "failed to update operator")
+		}
+		return st, false, nil
 	}
 	if !errors.IsCode(err, code.ErrUserNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
-	// 创建操作者
-	st := domain.NewOperator(dto.OrgID, userID, dto.Name)
+	st = domain.NewOperator(dto.OrgID, userID, dto.Name)
+	if err := s.syncOperatorProjection(st, dto, useIAM); err != nil {
+		return nil, false, err
+	}
 
-	useIAM := s.assignment != nil && s.snapshot != nil
-	if useIAM {
-		// 角色由事务外 IAM Grant + 快照同步写入
-	} else {
-		for _, roleName := range dto.Roles {
-			role := domain.Role(roleName)
-			if err := s.validator.ValidateRole(role); err != nil {
-				return nil, err
-			}
-			if err := s.roleAllocator.AssignRole(st, role); err != nil {
-				return nil, err
-			}
+	if err := s.repo.Save(txCtx, st); err != nil {
+		if errors.IsCode(err, code.ErrUserAlreadyExists) {
+			return nil, false, err
 		}
+		return nil, false, errors.Wrap(err, "failed to save operator")
+	}
+
+	return st, true, nil
+}
+
+func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto RegisterOperatorDTO, useIAM bool) error {
+	if err := s.editor.UpdateBasicInfo(st, &dto.Name); err != nil {
+		return err
+	}
+	if err := s.editor.UpdateContactInfo(st, &dto.Email, &dto.Phone); err != nil {
+		return err
+	}
+
+	if dto.IsActive {
+		if err := s.lifecycler.Activate(st); err != nil {
+			return err
+		}
+	} else {
+		if err := s.lifecycler.Deactivate(st, "synced as inactive"); err != nil {
+			return err
+		}
+	}
+
+	if useIAM {
+		return nil
+	}
+
+	roles := make([]domain.Role, 0, len(dto.Roles))
+	for _, roleName := range dto.Roles {
+		role := domain.Role(roleName)
+		if err := s.validator.ValidateRole(role); err != nil {
+			return err
+		}
+		roles = append(roles, role)
 	}
 
 	if !dto.IsActive {
-		if err := s.lifecycler.Deactivate(st, "created as inactive"); err != nil {
-			return nil, err
-		}
+		return s.roleAllocator.ClearRoles(st)
 	}
 
-	// 持久化
-	if err := s.repo.Save(txCtx, st); err != nil {
-		if errors.IsCode(err, code.ErrUserAlreadyExists) {
-			return nil, err
-		}
-		return nil, errors.Wrap(err, "failed to save operator")
-	}
-
-	return st, nil
+	return s.roleAllocator.ReplaceRoles(st, roles)
 }
 
 func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
