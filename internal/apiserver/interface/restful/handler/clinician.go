@@ -479,6 +479,10 @@ func (h *ActorHandler) ListClinicianRelations(c *gin.Context) {
 func (h *ActorHandler) GetMyClinician(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
+		if errors.IsCode(err, code.ErrUserNotFound) {
+			h.Success(c, nil)
+			return
+		}
 		h.Error(c, err)
 		return
 	}

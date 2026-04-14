@@ -57,14 +57,15 @@ func (r *clinicianRepository) FindByID(ctx context.Context, id domain.ID) (*doma
 
 func (r *clinicianRepository) FindByOperator(ctx context.Context, orgID int64, operatorID uint64) (*domain.Clinician, error) {
 	var po ClinicianPO
-	err := r.WithContext(ctx).
+	tx := r.WithContext(ctx).
 		Where("org_id = ? AND operator_id = ? AND deleted_at IS NULL", orgID, operatorID).
-		First(&po).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
-		}
-		return nil, err
+		Limit(1).
+		Find(&po)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	if tx.RowsAffected == 0 {
+		return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
 	}
 	return r.mapper.ToDomain(&po), nil
 }

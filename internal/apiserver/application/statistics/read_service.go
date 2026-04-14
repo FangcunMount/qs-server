@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -593,20 +594,27 @@ func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, ent
 	result.Snapshot = snapshot
 	result.Window = window
 
-	if err := s.db.WithContext(ctx).
-		Model(&statisticsInfra.AssessmentEntryResolveLogPO{}).
-		Select("MAX(resolved_at)").
-		Where("org_id = ? AND entry_id = ?", orgID, entry.ID.Uint64()).
-		Scan(&result.LastResolvedAt).Error; err != nil {
+	lastResolvedAt, err := s.queryNullableMaxTime(
+		s.db.WithContext(ctx).
+			Model(&statisticsInfra.AssessmentEntryResolveLogPO{}).
+			Select("MAX(resolved_at)").
+			Where("org_id = ? AND entry_id = ?", orgID, entry.ID.Uint64()),
+	)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).
-		Model(&actorInfra.ClinicianRelationPO{}).
-		Select("MAX(bound_at)").
-		Where("org_id = ? AND source_type = ? AND source_id = ? AND relation_type = ? AND deleted_at IS NULL", orgID, string(actorDomainRelation.SourceTypeAssessmentEntry), entry.ID.Uint64(), string(actorDomainRelation.RelationTypeCreator)).
-		Scan(&result.LastIntakeAt).Error; err != nil {
+	result.LastResolvedAt = lastResolvedAt
+
+	lastIntakeAt, err := s.queryNullableMaxTime(
+		s.db.WithContext(ctx).
+			Model(&actorInfra.ClinicianRelationPO{}).
+			Select("MAX(bound_at)").
+			Where("org_id = ? AND source_type = ? AND source_id = ? AND relation_type = ? AND deleted_at IS NULL", orgID, string(actorDomainRelation.SourceTypeAssessmentEntry), entry.ID.Uint64(), string(actorDomainRelation.RelationTypeCreator)),
+	)
+	if err != nil {
 		return nil, err
 	}
+	result.LastIntakeAt = lastIntakeAt
 
 	return result, nil
 }
@@ -822,6 +830,19 @@ func scanCountQuery(query *gorm.DB, dest *int64) error {
 	}
 	*dest = row.Count
 	return nil
+}
+
+func (s *readService) queryNullableMaxTime(query *gorm.DB) (*time.Time, error) {
+	var value sql.NullTime
+	if err := query.Scan(&value).Error; err != nil {
+		return nil, err
+	}
+	if !value.Valid {
+		return nil, nil
+	}
+
+	t := value.Time
+	return &t, nil
 }
 
 func derefString(v *string) string {
