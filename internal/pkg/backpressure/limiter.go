@@ -32,10 +32,11 @@ func (l *Limiter) Acquire(ctx context.Context) (context.Context, func(), error) 
 		ctx = context.Background()
 	}
 
+	waitCtx := ctx
 	var cancel context.CancelFunc
 	if l.timeout > 0 {
-		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > l.timeout {
-			ctx, cancel = context.WithTimeout(ctx, l.timeout)
+		if deadline, ok := waitCtx.Deadline(); !ok || time.Until(deadline) > l.timeout {
+			waitCtx, cancel = context.WithTimeout(waitCtx, l.timeout)
 		}
 	}
 
@@ -47,11 +48,13 @@ func (l *Limiter) Acquire(ctx context.Context) (context.Context, func(), error) 
 				cancel()
 			}
 		}
+		// Preserve the original request context for the downstream operation.
+		// The limiter timeout only applies to waiting for a slot, not to the work itself.
 		return ctx, release, nil
-	case <-ctx.Done():
+	case <-waitCtx.Done():
 		if cancel != nil {
 			cancel()
 		}
-		return ctx, func() {}, ctx.Err()
+		return ctx, func() {}, waitCtx.Err()
 	}
 }
