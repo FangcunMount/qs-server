@@ -11,9 +11,22 @@ grpc:
   apiserverAddr: "localhost:9090"
 
 iam:
+  baseUrl: "https://iam.fangcunmount.cn"
   loginUrl: "https://iam.fangcunmount.cn/api/v1/authn/login"
   username: "+8613112345671"
   password: "Admin@123"
+  tenantId: "1"
+  grpc:
+    address: "iam-apiserver:9090"
+    timeout: "15s"
+    retryMax: 3
+    tls:
+      enabled: false
+      caFile: ""
+      certFile: ""
+      keyFile: ""
+      serverName: ""
+      insecureSkipVerify: false
 
 plan:
   mode: "local"
@@ -294,6 +307,26 @@ assessmentByEntry:
   clinicianIds: *seed_clinician_ids
   entryIDs: []
   maxAssessmentsPerEntry: 5
+
+dailySimulation:
+  countPerRun: 20
+  workers: 4
+  runDate: ""
+  clinicianRef: "cln_614995509882401326"
+  clinicianId: ""
+  entryId: ""
+  targetType: "scale"
+  targetCode: "3adyDE"
+  targetVersion: ""
+  userPassword: "DailySim@123"
+  userPhonePrefix: "+86199"
+  userEmailDomain: "fangcunmount.com"
+  guardianRelation: "guardian"
+  testeeSource: "daily_simulation"
+  testeeTags:
+    - "seed"
+    - "daily-simulation"
+  isKeyFocus: false
 
 assessmentStatusProfile:
   pending: 0.10

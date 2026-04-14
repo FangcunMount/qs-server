@@ -53,6 +53,7 @@ const (
 	stepAssessmentEntries   seedStep = "assessment_entries"
 	stepAssessmentEntryFlow seedStep = "assessment_entry_flow"
 	stepAssessmentByEntry   seedStep = "assessment_by_entry"
+	stepDailySimulation     seedStep = "daily_simulation"
 	stepAssessment          seedStep = "assessment"         // 提交答卷并生成测评
 	stepPlan                seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
 	stepPlanCreateTasks     seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
@@ -297,6 +298,8 @@ func main() {
 			err = seedAssessmentEntryFlow(runCtx, deps)
 		case stepAssessmentByEntry:
 			err = seedAssessmentByEntry(runCtx, deps)
+		case stepDailySimulation:
+			err = seedDailySimulation(runCtx, deps)
 		case stepAssessment:
 			err = seedAssessments(runCtx, deps, assessmentOpts)
 		case stepPlan:
@@ -406,6 +409,8 @@ func seedStepFailureMessage(step seedStep) string {
 		return "Assessment entry flow seeding failed"
 	case stepAssessmentByEntry:
 		return "Assessment by entry seeding failed"
+	case stepDailySimulation:
+		return "Daily simulation seeding failed"
 	case stepAssessment:
 		return "Assessment seeding failed"
 	case stepPlan:

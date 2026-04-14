@@ -24,6 +24,7 @@ type iamLoginRequest struct {
 type iamLoginCredentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	TenantID string `json:"tenant_id,omitempty"`
 }
 
 type iamLoginResponse struct {
@@ -33,16 +34,28 @@ type iamLoginResponse struct {
 }
 
 func fetchTokenFromIAM(ctx context.Context, cfg IAMConfig, logger log.Logger) (string, error) {
-	if strings.TrimSpace(cfg.LoginURL) == "" {
+	return fetchTokenFromIAMWithPassword(ctx, cfg.LoginURL, cfg.Username, cfg.Password, cfg.TenantID, "seeddata", logger)
+}
+
+func fetchTokenFromIAMWithPassword(
+	ctx context.Context,
+	loginURL, username, password, tenantID, deviceID string,
+	logger log.Logger,
+) (string, error) {
+	if strings.TrimSpace(loginURL) == "" {
 		return "", fmt.Errorf("iam login url is empty")
 	}
-	if strings.TrimSpace(cfg.Username) == "" || strings.TrimSpace(cfg.Password) == "" {
+	if strings.TrimSpace(username) == "" || strings.TrimSpace(password) == "" {
 		return "", fmt.Errorf("iam username/password is empty")
+	}
+	if strings.TrimSpace(deviceID) == "" {
+		deviceID = "seeddata"
 	}
 
 	credBytes, err := json.Marshal(iamLoginCredentials{
-		Username: cfg.Username,
-		Password: cfg.Password,
+		Username: username,
+		Password: password,
+		TenantID: strings.TrimSpace(tenantID),
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal iam credentials: %w", err)
@@ -51,13 +64,13 @@ func fetchTokenFromIAM(ctx context.Context, cfg IAMConfig, logger log.Logger) (s
 	reqBody, err := json.Marshal(iamLoginRequest{
 		Method:      "password",
 		Credentials: credBytes,
-		DeviceID:    "seeddata",
+		DeviceID:    deviceID,
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal iam login request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.LoginURL, bytes.NewReader(reqBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, bytes.NewReader(reqBody))
 	if err != nil {
 		return "", fmt.Errorf("create iam request: %w", err)
 	}
@@ -99,7 +112,7 @@ func fetchTokenFromIAM(ctx context.Context, cfg IAMConfig, logger log.Logger) (s
 
 	identity := parseSeedTokenIdentity(token)
 	logger.Infow("IAM token acquired",
-		"iam_username", strings.TrimSpace(cfg.Username),
+		"iam_username", strings.TrimSpace(username),
 		"subject", identity.Subject,
 		"user_id", identity.UserID,
 		"account_id", identity.AccountID,

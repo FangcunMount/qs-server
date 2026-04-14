@@ -86,6 +86,7 @@ type SeedConfig struct {
 	AssessmentEntryTargets  []AssessmentEntryTargetConfig `yaml:"assessmentEntryTargets"`
 	AssessmentEntryFlow     AssessmentEntryFlowConfig     `yaml:"assessmentEntryFlow"`
 	AssessmentByEntry       AssessmentByEntryConfig       `yaml:"assessmentByEntry"`
+	DailySimulation         DailySimulationConfig         `yaml:"dailySimulation"`
 	AssessmentStatusProfile AssessmentStatusProfileConfig `yaml:"assessmentStatusProfile"`
 	Testees                 []TesteeConfig                `yaml:"testees"`
 	Questionnaires          []QuestionnaireConfig         `yaml:"questionnaires"`
@@ -108,9 +109,28 @@ type APIConfig struct {
 
 // IAMConfig IAM 登录配置
 type IAMConfig struct {
-	LoginURL string `yaml:"loginUrl"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	BaseURL  string        `yaml:"baseUrl"`
+	LoginURL string        `yaml:"loginUrl"`
+	Username string        `yaml:"username"`
+	Password string        `yaml:"password"`
+	TenantID string        `yaml:"tenantId"`
+	GRPC     IAMGRPCConfig `yaml:"grpc"`
+}
+
+type IAMGRPCConfig struct {
+	Address  string           `yaml:"address"`
+	Timeout  string           `yaml:"timeout"`
+	RetryMax int              `yaml:"retryMax"`
+	TLS      IAMGRPCTLSConfig `yaml:"tls"`
+}
+
+type IAMGRPCTLSConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	CAFile             string `yaml:"caFile"`
+	CertFile           string `yaml:"certFile"`
+	KeyFile            string `yaml:"keyFile"`
+	ServerName         string `yaml:"serverName"`
+	InsecureSkipVerify bool   `yaml:"insecureSkipVerify"`
 }
 
 // LocalRuntimeConfig seeddata 本地 plan runtime 配置。
@@ -276,6 +296,26 @@ type AssessmentByEntryConfig struct {
 	MaxAssessmentsPerEntry int          `yaml:"maxAssessmentsPerEntry"`
 }
 
+// DailySimulationConfig 每日模拟真实用户注册/建档/扫码/填报。
+type DailySimulationConfig struct {
+	CountPerRun      int        `yaml:"countPerRun"`
+	Workers          int        `yaml:"workers"`
+	RunDate          string     `yaml:"runDate"`
+	ClinicianRef     string     `yaml:"clinicianRef"`
+	ClinicianID      FlexibleID `yaml:"clinicianId"`
+	EntryID          FlexibleID `yaml:"entryId"`
+	TargetType       string     `yaml:"targetType"`
+	TargetCode       string     `yaml:"targetCode"`
+	TargetVersion    string     `yaml:"targetVersion"`
+	UserPassword     string     `yaml:"userPassword"`
+	UserPhonePrefix  string     `yaml:"userPhonePrefix"`
+	UserEmailDomain  string     `yaml:"userEmailDomain"`
+	GuardianRelation string     `yaml:"guardianRelation"`
+	TesteeSource     string     `yaml:"testeeSource"`
+	TesteeTags       []string   `yaml:"testeeTags"`
+	IsKeyFocus       bool       `yaml:"isKeyFocus"`
+}
+
 // AssessmentStatusProfileConfig 第二阶段状态分布配置。
 type AssessmentStatusProfileConfig struct {
 	Pending     float64 `yaml:"pending"`
@@ -421,6 +461,7 @@ func LoadSeedConfigWithPreference(filepath string, preferScale bool) (*SeedConfi
 			len(config.Clinicians) > 0 ||
 			len(config.ClinicianGenerators) > 0 ||
 			len(config.TesteeAssignments) > 0 ||
+			!isEmptyDailySimulationConfig(config.DailySimulation) ||
 			len(config.Testees) > 0 ||
 			len(config.Questionnaires) > 0 ||
 			len(config.Scales) > 0 ||
@@ -469,6 +510,25 @@ func LoadSeedConfigWithPreference(filepath string, preferScale bool) (*SeedConfi
 // 判断解读规则组是否为空
 func isEmptyInterpretationGroup(g InterpretationGroupConfig) bool {
 	return g.IsShow == "" && len(g.Items) == 0 && len(g.Interpretation) == 0
+}
+
+func isEmptyDailySimulationConfig(cfg DailySimulationConfig) bool {
+	return cfg.CountPerRun == 0 &&
+		cfg.Workers == 0 &&
+		strings.TrimSpace(cfg.RunDate) == "" &&
+		strings.TrimSpace(cfg.ClinicianRef) == "" &&
+		cfg.ClinicianID.IsZero() &&
+		cfg.EntryID.IsZero() &&
+		strings.TrimSpace(cfg.TargetType) == "" &&
+		strings.TrimSpace(cfg.TargetCode) == "" &&
+		strings.TrimSpace(cfg.TargetVersion) == "" &&
+		strings.TrimSpace(cfg.UserPassword) == "" &&
+		strings.TrimSpace(cfg.UserPhonePrefix) == "" &&
+		strings.TrimSpace(cfg.UserEmailDomain) == "" &&
+		strings.TrimSpace(cfg.GuardianRelation) == "" &&
+		strings.TrimSpace(cfg.TesteeSource) == "" &&
+		len(cfg.TesteeTags) == 0 &&
+		!cfg.IsKeyFocus
 }
 
 // ParseDate 解析日期字符串

@@ -18,6 +18,7 @@ const (
 	testeeAssignmentStrategyRandom     = "random"
 	defaultAssignmentPageSize          = 100
 	defaultAssignmentWorkers           = 8
+	assignmentHeartbeatPages           = 20
 )
 
 type clinicianAssignmentTarget struct {
@@ -300,12 +301,22 @@ func seedPagedTesteeAssignments(
 	page := 1
 	skipped := 0
 	selectedIndex := 0
+	processedPages := 0
 	progress := (*seedProgressBar)(nil)
 	defer func() {
 		if progress != nil {
 			progress.Close()
 		}
 	}()
+	deps.Logger.Infow("Starting paged testee assignment",
+		"assignment", assignmentProgressLabel(cfg),
+		"strategy", normalizedAssignmentStrategy(cfg.Strategy),
+		"relation_type", normalizedAssignmentRelationType(cfg.RelationType),
+		"page_size", pageSize,
+		"offset", cfg.TesteeOffset,
+		"limit", cfg.TesteeLimit,
+		"target_count", len(targets),
+	)
 	for {
 		resp, err := deps.APIClient.ListTesteesByOrg(ctx, orgID, page, pageSize)
 		if err != nil {
@@ -342,6 +353,19 @@ func seedPagedTesteeAssignments(
 			skippedCount += skippedPage
 			resolvedCount += len(items)
 			selectedIndex += len(items)
+		}
+		processedPages++
+		if processedPages == 1 || processedPages%assignmentHeartbeatPages == 0 {
+			deps.Logger.Infow("Paged testee assignment heartbeat",
+				"assignment", assignmentProgressLabel(cfg),
+				"page", page,
+				"processed_pages", processedPages,
+				"resolved_testees", resolvedCount,
+				"assigned", assignedCount,
+				"skipped", skippedCount,
+				"page_items", len(items),
+				"total", resp.Total,
+			)
 		}
 		if reachedLimit {
 			break
@@ -423,7 +447,6 @@ func applyTesteeAssignment(
 	if err := g.Wait(); err != nil {
 		return 0, 0, err
 	}
-	progress.Complete()
 	return int(assignedCounter.Load()), int(skippedCounter.Load()), nil
 }
 

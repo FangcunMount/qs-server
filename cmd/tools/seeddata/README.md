@@ -11,6 +11,7 @@ QS 系统测试数据生成工具。
 - 只想给已分配受试者的 clinician 批量创建测评入口：运行 `--steps assessment_entries`
 - 只想把入口推进到 `resolve + intake`：运行 `--steps assessment_entry_flow`
 - 只想基于入口 intake 结果继续生成真实测评：运行 `--steps assessment_by_entry`
+- 想每天模拟一批新用户注册、建档、扫码并填报：运行 `--steps daily_simulation`
 - 只想批量创建计划 task：运行 `--steps plan_create_tasks`
 - 想在后台长期处理 backlog task：运行 `--steps plan_process_tasks`
 - 想把历史时间修正成“按 planned_at 回放”的拟真结果：运行 `--steps plan_fixup_timestamps`
@@ -27,6 +28,7 @@ QS 系统测试数据生成工具。
 | 批量为已分配受试者的 clinician 创建测评入口 | `assessment_entries` | 否 | apiserver + 本地 MySQL |
 | 批量推进入口 resolve + intake | `assessment_entry_flow` | 否 | apiserver + 本地 MySQL |
 | 基于入口 intake 结果继续生成真实测评 | `assessment_by_entry` | 否 | apiserver + 本地 MySQL + MongoDB |
+| 每天模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation` | 否（推荐 cron） | apiserver + collection-server + IAM REST/gRPC |
 | 只生成测评数据 | `assessment` | 否 | apiserver + collection-server |
 | 只创建 task | `plan_create_tasks` | 否 | 本地 MySQL + MongoDB + Redis |
 | 长期后台处理 task | `plan_process_tasks` | 是 | apiserver API |
@@ -43,6 +45,7 @@ QS 系统测试数据生成工具。
 - `assessment_entries` 需要本地 `local.mysql_dsn`，因为脚本会把入口时间回填成基于 `testee.created_at` 的结果
 - `assessment_entry_flow` 需要本地 `local.mysql_dsn`，因为脚本会回填 `resolve_log` 和入口来源关系时间
 - `assessment_by_entry` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
+- `daily_simulation` 需要 `iam.loginUrl` 或 `iam.baseUrl`，以及可达的 `iam.grpc.address`
 - `plan_create_tasks` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`、`local.redis_*`
 - `plan_fixup_timestamps` 只需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
 - `plan_process_tasks` 不再初始化本地 runtime，不再要求本地 MySQL / MongoDB / Redis
@@ -625,6 +628,22 @@ assessmentByEntry:
   entryIDs: []
   maxAssessmentsPerEntry: 5
 
+dailySimulation:
+  countPerRun: 20
+  workers: 4
+  runDate: ""
+  clinicianRef: "clinician_shi"
+  targetType: "scale"
+  targetCode: "3adyDE"
+  targetVersion: ""
+  userPassword: "DailySim@123"
+  userPhonePrefix: "+86199"
+  userEmailDomain: "fangcunmount.com"
+  guardianRelation: "guardian"
+  testeeSource: "daily_simulation"
+  testeeTags: ["seed", "daily-simulation"]
+  isKeyFocus: false
+
 assessmentStatusProfile:
   pending: 0.10
   submitted: 0.15
@@ -635,4 +654,49 @@ assessmentStatusProfile:
 说明：
 
 - `assessmentEntryFlow`、`assessmentByEntry` 默认按“当前机构全部 clinician / 全部 entry”工作；只有填了筛选条件时才缩小范围
+- `dailySimulation` 默认使用当天日期做稳定用户生成；同一天重复运行会复用同一批 guardian / child / testee，不会无限膨胀
+- `dailySimulation` 如果未指定 `entryId`，会按 `clinicianRef/clinicianId + targetType/targetCode/targetVersion` 自动确保一个 active entry
+- `dailySimulation` 依赖 IAM gRPC；`iam.grpc.address` 必须指向可达的 IAM gRPC 端点
 - `assessmentStatusProfile` 预留给第二阶段 `assessment_fixup_statuses`，本轮步骤不会消费它
+
+## 方案 0.97：每天模拟一批新用户注册、建档、扫码和填报
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "daily_simulation,statistics_backfill"
+```
+
+说明：
+
+- 每个模拟用户都会走一条完整链路：注册 guardian user -> 创建 child -> 创建 testee -> 扫码指定 clinician entry -> intake -> 填写目标问卷/量表
+- `countPerRun` 控制每天新增多少用户
+- `runDate` 为空时默认取当天；同一天重复执行会复用同一批稳定账号和 testee
+- `statistics_backfill` 建议和 `daily_simulation` 一起跑，避免统计中心滞后
+
+### 后台执行脚本
+
+仓库已提供：
+
+```bash
+./scripts/run_daily_simulation.sh
+```
+
+默认行为：
+
+- 运行 `daily_simulation,statistics_backfill`
+- 默认配置文件：`./configs/seeddata.yaml`
+- 默认日志文件：`./logs/seeddata-daily-simulation.log`
+
+可用环境变量：
+
+- `SEEDDATA_CONFIG`
+- `SEEDDATA_STEPS`
+- `SEEDDATA_GO`
+- `SEEDDATA_LOG_FILE`
+
+cron 示例：
+
+```cron
+0 2 * * * cd /path/to/qs-server && ./scripts/run_daily_simulation.sh
+```

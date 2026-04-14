@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -648,6 +649,63 @@ type AssessmentEntryIntakeResponse struct {
 	Assignment *RelationResponse        `json:"assignment,omitempty"`
 }
 
+// IAMChildResponse IAM 儿童响应。
+type IAMChildResponse struct {
+	ID        string     `json:"id"`
+	LegalName string     `json:"legalName"`
+	Gender    *uint8     `json:"gender,omitempty"`
+	DOB       string     `json:"dob,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+}
+
+// IAMChildPageResponse IAM 当前用户儿童分页响应。
+type IAMChildPageResponse struct {
+	Total  int                 `json:"total"`
+	Limit  int                 `json:"limit"`
+	Offset int                 `json:"offset"`
+	Items  []*IAMChildResponse `json:"items"`
+}
+
+// IAMChildRegisterRequest IAM 注册儿童请求。
+type IAMChildRegisterRequest struct {
+	LegalName string `json:"legalName"`
+	Gender    uint8  `json:"gender"`
+	DOB       string `json:"dob"`
+	Relation  string `json:"relation"`
+}
+
+// IAMChildRegisterResponse IAM 注册儿童响应。
+type IAMChildRegisterResponse struct {
+	Child *IAMChildResponse `json:"child"`
+}
+
+// CollectionCreateTesteeRequest 创建 collection 受试者请求。
+type CollectionCreateTesteeRequest struct {
+	IAMUserID  string   `json:"iam_user_id,omitempty"`
+	IAMChildID string   `json:"iam_child_id"`
+	Name       string   `json:"name"`
+	Gender     int32    `json:"gender"`
+	Birthday   string   `json:"birthday,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	IsKeyFocus bool     `json:"is_key_focus,omitempty"`
+}
+
+// CollectionTesteeExistsResponse collection testee exists 响应。
+type CollectionTesteeExistsResponse struct {
+	Exists   bool   `json:"exists"`
+	TesteeID string `json:"testee_id"`
+}
+
+// CollectionAssessmentDetailResponse collection 侧答卷对应测评详情。
+type CollectionAssessmentDetailResponse struct {
+	ID                   string `json:"id"`
+	QuestionnaireCode    string `json:"questionnaire_code"`
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	Status               string `json:"status"`
+}
+
 // AssignClinicianTesteeRequest 建立从业者关系请求（apiserver）。
 type AssignClinicianTesteeRequest struct {
 	OrgID        int64   `json:"org_id"`
@@ -832,6 +890,22 @@ type Answer struct {
 type SubmitAnswerSheetResponse struct {
 	ID      string `json:"id"`
 	Message string `json:"message"`
+}
+
+// AdminAnswerSheetListItem 管理端答卷列表项。
+type AdminAnswerSheetListItem struct {
+	ID                string `json:"id"`
+	QuestionnaireCode string `json:"questionnaire_code"`
+	Version           string `json:"questionnaire_version"`
+	Title             string `json:"title"`
+	WriterID          string `json:"writer_id"`
+	TesteeID          string `json:"testee_id"`
+}
+
+// AdminAnswerSheetListResponse 管理端答卷列表响应。
+type AdminAnswerSheetListResponse struct {
+	Total int64                      `json:"total"`
+	Items []AdminAnswerSheetListItem `json:"items"`
 }
 
 // doRequest 执行 HTTP 请求
@@ -1031,6 +1105,21 @@ func parseRetryAfter(value string) (time.Duration, bool) {
 		return delay, true
 	}
 	return 0, false
+}
+
+func urlQueryEscape(value string) string {
+	return url.QueryEscape(strings.TrimSpace(value))
+}
+
+func isAPIHTTPStatus(err error, status int) bool {
+	if err == nil {
+		return false
+	}
+	statusToken := fmt.Sprintf("http_status=%d", status)
+	if strings.Contains(err.Error(), statusToken) {
+		return true
+	}
+	return strings.Contains(err.Error(), fmt.Sprintf("status=%d", status))
 }
 
 func backoffDelay(attempt int, minDelay, maxDelay time.Duration) time.Duration {
@@ -1474,6 +1563,34 @@ func (c *APIClient) ListTestees(ctx context.Context, offset, limit int) (*ListTe
 	return &listResp, nil
 }
 
+// CreateCollectionTestee 创建 collection 受试者。
+func (c *APIClient) CreateCollectionTestee(ctx context.Context, req CollectionCreateTesteeRequest) (*TesteeResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/testees", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var testeeResp TesteeResponse
+	if err := decodeResponseData(resp, &testeeResp); err != nil {
+		return nil, fmt.Errorf("decode create testee response: %w", err)
+	}
+	return &testeeResp, nil
+}
+
+// TesteeExistsByIAMChildID 检查指定 IAM child 是否已经创建 collection testee。
+func (c *APIClient) TesteeExistsByIAMChildID(ctx context.Context, iamChildID string) (*CollectionTesteeExistsResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/testees/exists?iam_child_id=%s", urlQueryEscape(strings.TrimSpace(iamChildID))), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var existsResp CollectionTesteeExistsResponse
+	if err := decodeResponseData(resp, &existsResp); err != nil {
+		return nil, fmt.Errorf("decode testee exists response: %w", err)
+	}
+	return &existsResp, nil
+}
+
 // ListQuestionnaires 获取问卷列表（collection-server）
 func (c *APIClient) ListQuestionnaires(ctx context.Context, page, pageSize int, status string) (*ListQuestionnairesResponse, error) {
 	path := fmt.Sprintf("/api/v1/questionnaires?page=%d&page_size=%d&status=%s", page, pageSize, status)
@@ -1549,6 +1666,35 @@ func (c *APIClient) GetTesteeByID(ctx context.Context, testeeID string) (*Apiser
 		return nil, fmt.Errorf("decode testee response: %w", err)
 	}
 	return &item, nil
+}
+
+// ListIAMMyChildren 获取当前 IAM 用户名下 children。
+func (c *APIClient) ListIAMMyChildren(ctx context.Context, limit, offset int) (*IAMChildPageResponse, error) {
+	path := fmt.Sprintf("/api/v1/identity/me/children?limit=%d&offset=%d", limit, offset)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var listResp IAMChildPageResponse
+	if err := decodeResponseData(resp, &listResp); err != nil {
+		return nil, fmt.Errorf("decode iam children response: %w", err)
+	}
+	return &listResp, nil
+}
+
+// RegisterIAMChild 注册当前 IAM 用户的 child。
+func (c *APIClient) RegisterIAMChild(ctx context.Context, req IAMChildRegisterRequest) (*IAMChildRegisterResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/identity/children/register", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var registerResp IAMChildRegisterResponse
+	if err := decodeResponseData(resp, &registerResp); err != nil {
+		return nil, fmt.Errorf("decode iam child register response: %w", err)
+	}
+	return &registerResp, nil
 }
 
 // ListStaff 获取员工列表（apiserver）。
@@ -1720,6 +1866,34 @@ func (c *APIClient) CreateClinicianAssessmentEntry(ctx context.Context, clinicia
 	var entryResp AssessmentEntryResponse
 	if err := decodeResponseData(resp, &entryResp); err != nil {
 		return nil, fmt.Errorf("decode clinician assessment entry response: %w", err)
+	}
+	return &entryResp, nil
+}
+
+// GetAssessmentEntry 获取测评入口详情（apiserver）。
+func (c *APIClient) GetAssessmentEntry(ctx context.Context, entryID string) (*AssessmentEntryResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/assessment-entries/%s", strings.TrimSpace(entryID)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var entryResp AssessmentEntryResponse
+	if err := decodeResponseData(resp, &entryResp); err != nil {
+		return nil, fmt.Errorf("decode assessment entry response: %w", err)
+	}
+	return &entryResp, nil
+}
+
+// ReactivateAssessmentEntry 重新激活测评入口（apiserver）。
+func (c *APIClient) ReactivateAssessmentEntry(ctx context.Context, entryID string) (*AssessmentEntryResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/assessment-entries/%s/reactivate", strings.TrimSpace(entryID)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var entryResp AssessmentEntryResponse
+	if err := decodeResponseData(resp, &entryResp); err != nil {
+		return nil, fmt.Errorf("decode reactivated assessment entry response: %w", err)
 	}
 	return &entryResp, nil
 }
@@ -1917,6 +2091,50 @@ func (c *APIClient) SubmitAnswerSheetAdmin(ctx context.Context, req AdminSubmitA
 	}
 
 	return &submitResp, nil
+}
+
+// ListAdminAnswerSheets 查询管理端答卷列表（apiserver）。
+func (c *APIClient) ListAdminAnswerSheets(
+	ctx context.Context,
+	questionnaireCode string,
+	fillerID uint64,
+	page, pageSize int,
+) (*AdminAnswerSheetListResponse, error) {
+	path := fmt.Sprintf(
+		"/api/v1/answersheets?page=%d&page_size=%d&questionnaire_code=%s&filler_id=%d",
+		page,
+		pageSize,
+		urlQueryEscape(questionnaireCode),
+		fillerID,
+	)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var listResp AdminAnswerSheetListResponse
+	if err := decodeResponseData(resp, &listResp); err != nil {
+		return nil, fmt.Errorf("decode admin answersheet list response: %w", err)
+	}
+	return &listResp, nil
+}
+
+// GetAssessmentByAnswerSheetID 查询答卷对应的测评详情（collection-server）。
+// 当测评尚未生成时返回 (nil, nil)。
+func (c *APIClient) GetAssessmentByAnswerSheetID(ctx context.Context, answerSheetID string) (*CollectionAssessmentDetailResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/answersheets/%s/assessment", strings.TrimSpace(answerSheetID)), nil)
+	if err != nil {
+		if isAPIHTTPStatus(err, http.StatusNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var detail CollectionAssessmentDetailResponse
+	if err := decodeResponseData(resp, &detail); err != nil {
+		return nil, fmt.Errorf("decode assessment-by-answersheet response: %w", err)
+	}
+	return &detail, nil
 }
 
 func (c *APIClient) SubmitAnswerSheetAdminWithPolicy(

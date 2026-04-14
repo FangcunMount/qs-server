@@ -28,6 +28,7 @@ bin/
 *.log
 build-errors.log
 logs/
+.seeddata-cache/
 
 # IDE files
 .vscode/
