@@ -302,6 +302,15 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetAssessmentReport,
 		)...)
+		// 测评趋势摘要
+		assessments.GET("/:id/trend-summary", rateLimitedHandlers(
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetAssessmentTrendSummary,
+		)...)
 		// 长轮询等待报告生成
 		assessments.GET("/:id/wait-report", rateLimitedHandlers(
 			rateCfg,

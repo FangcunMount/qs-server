@@ -348,6 +348,53 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// GetAssessmentTrendSummary 获取测评趋势摘要
+// @Summary 获取测评趋势摘要
+// @Description 获取指定测评所属同量表、同版本的历史趋势摘要
+// @Tags 测评
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Success 200 {object} core.Response{data=evaluation.AssessmentTrendSummaryResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/assessments/{id}/trend-summary [get]
+func (h *EvaluationHandler) GetAssessmentTrendSummary(c *gin.Context) {
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
+	if testeeIDStr == "" {
+		h.BadRequestResponse(c, "testee_id is required", nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid testee_id format", err)
+		return
+	}
+
+	idStr := h.GetPathParam(c, "id")
+	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid assessment id", err)
+		return
+	}
+
+	result, err := h.queryService.GetAssessmentTrendSummary(c.Request.Context(), testeeID, assessmentID)
+	if err != nil {
+		h.InternalErrorResponse(c, "get trend summary failed", err)
+		return
+	}
+
+	if result == nil {
+		h.NotFoundResponse(c, "assessment not found", nil)
+		return
+	}
+
+	h.Success(c, result)
+}
+
 // GetHighRiskFactors 获取高风险因子
 // @Summary 获取高风险因子
 // @Description 获取指定测评的高风险因子列表

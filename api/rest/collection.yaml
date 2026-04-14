@@ -491,6 +491,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /assessments/{id}/trend-summary:
+    get:
+      tags:
+      - 测评
+      summary: 获取测评趋势摘要
+      description: 获取指定测评所属同量表、同版本的历史趋势摘要
+      operationId: 获取测评趋势摘要
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentTrendSummaryResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /assessments/{id}/scores:
     get:
       tags:
@@ -1353,6 +1407,105 @@ components:
           type: string
         total_score:
           type: number
+    evaluation.AssessmentTrendMetaResponse:
+      type: object
+      properties:
+        comparable_count:
+          type: integer
+        display_mode:
+          type: string
+        has_multiple_fillers:
+          type: boolean
+        note:
+          type: string
+    evaluation.AssessmentTrendSnapshotResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        questionnaire_version:
+          type: string
+        risk_level:
+          type: string
+        scale_code:
+          type: string
+        scale_name:
+          type: string
+        submitted_at:
+          type: string
+        total_score:
+          type: number
+    evaluation.AssessmentTrendSummaryResponse:
+      type: object
+      properties:
+        current:
+          $ref: '#/components/schemas/evaluation.AssessmentTrendSnapshotResponse'
+        factor_changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.AssessmentFactorChangeResponse'
+        factor_trends:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.AssessmentFactorTrendResponse'
+        meta:
+          $ref: '#/components/schemas/evaluation.AssessmentTrendMetaResponse'
+        previous:
+          $ref: '#/components/schemas/evaluation.AssessmentTrendSnapshotResponse'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.AssessmentTrendTimelinePointResponse'
+    evaluation.AssessmentTrendTimelinePointResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        filler_label:
+          type: string
+        risk_level:
+          type: string
+        submitted_at:
+          type: string
+        total_score:
+          type: number
+    evaluation.AssessmentFactorChangeResponse:
+      type: object
+      properties:
+        current_score:
+          type: number
+        delta:
+          type: number
+        factor_code:
+          type: string
+        factor_name:
+          type: string
+        previous_score:
+          type: number
+        risk_level:
+          type: string
+    evaluation.AssessmentFactorTrendPointResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        risk_level:
+          type: string
+        score:
+          type: number
+        submitted_at:
+          type: string
+    evaluation.AssessmentFactorTrendResponse:
+      type: object
+      properties:
+        factor_code:
+          type: string
+        factor_name:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.AssessmentFactorTrendPointResponse'
     evaluation.DimensionInterpretResponse:
       type: object
       properties:

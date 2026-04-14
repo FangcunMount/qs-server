@@ -19,10 +19,10 @@ type AssessmentSummaryResponse struct {
 
 // AssessmentStatusResponse 测评状态响应（用于长轮询）
 type AssessmentStatusResponse struct {
-	Status     string   `json:"status"`              // pending/submitted/interpreted/failed
+	Status     string   `json:"status"` // pending/submitted/interpreted/failed
 	TotalScore *float64 `json:"total_score,omitempty"`
 	RiskLevel  *string  `json:"risk_level,omitempty"`
-	UpdatedAt  int64    `json:"updated_at"`          // Unix timestamp
+	UpdatedAt  int64    `json:"updated_at"` // Unix timestamp
 }
 
 // AssessmentDetailResponse 测评详情响应
@@ -115,6 +115,69 @@ type TrendPointResponse struct {
 	Score        float64 `json:"score"`
 	RiskLevel    string  `json:"risk_level"`
 	CreatedAt    string  `json:"created_at"`
+}
+
+// AssessmentTrendSnapshotResponse 趋势快照响应
+type AssessmentTrendSnapshotResponse struct {
+	AssessmentID         string  `json:"assessment_id"`
+	ScaleCode            string  `json:"scale_code,omitempty"`
+	ScaleName            string  `json:"scale_name,omitempty"`
+	QuestionnaireVersion string  `json:"questionnaire_version,omitempty"`
+	SubmittedAt          string  `json:"submitted_at,omitempty"`
+	TotalScore           float64 `json:"total_score,omitempty"`
+	RiskLevel            string  `json:"risk_level,omitempty"`
+}
+
+// AssessmentTrendTimelinePointResponse 趋势时间线数据点
+type AssessmentTrendTimelinePointResponse struct {
+	AssessmentID string  `json:"assessment_id"`
+	SubmittedAt  string  `json:"submitted_at,omitempty"`
+	TotalScore   float64 `json:"total_score,omitempty"`
+	RiskLevel    string  `json:"risk_level,omitempty"`
+	FillerLabel  string  `json:"filler_label,omitempty"`
+}
+
+// AssessmentFactorChangeResponse 因子变化响应
+type AssessmentFactorChangeResponse struct {
+	FactorCode    string  `json:"factor_code"`
+	FactorName    string  `json:"factor_name"`
+	CurrentScore  float64 `json:"current_score"`
+	PreviousScore float64 `json:"previous_score"`
+	Delta         float64 `json:"delta"`
+	RiskLevel     string  `json:"risk_level,omitempty"`
+}
+
+// AssessmentFactorTrendPointResponse 因子趋势数据点
+type AssessmentFactorTrendPointResponse struct {
+	AssessmentID string  `json:"assessment_id"`
+	SubmittedAt  string  `json:"submitted_at,omitempty"`
+	Score        float64 `json:"score"`
+	RiskLevel    string  `json:"risk_level,omitempty"`
+}
+
+// AssessmentFactorTrendResponse 因子趋势响应
+type AssessmentFactorTrendResponse struct {
+	FactorCode string                               `json:"factor_code"`
+	FactorName string                               `json:"factor_name"`
+	Points     []AssessmentFactorTrendPointResponse `json:"points"`
+}
+
+// AssessmentTrendMetaResponse 趋势元信息
+type AssessmentTrendMetaResponse struct {
+	ComparableCount    int32  `json:"comparable_count"`
+	HasMultipleFillers bool   `json:"has_multiple_fillers"`
+	DisplayMode        string `json:"display_mode"`
+	Note               string `json:"note,omitempty"`
+}
+
+// AssessmentTrendSummaryResponse 测评趋势摘要响应
+type AssessmentTrendSummaryResponse struct {
+	Current       *AssessmentTrendSnapshotResponse       `json:"current,omitempty"`
+	Previous      *AssessmentTrendSnapshotResponse       `json:"previous,omitempty"`
+	Timeline      []AssessmentTrendTimelinePointResponse `json:"timeline,omitempty"`
+	FactorChanges []AssessmentFactorChangeResponse       `json:"factor_changes,omitempty"`
+	FactorTrends  []AssessmentFactorTrendResponse        `json:"factor_trends,omitempty"`
+	Meta          AssessmentTrendMetaResponse            `json:"meta"`
 }
 
 // GetFactorTrendRequest 获取因子趋势请求
