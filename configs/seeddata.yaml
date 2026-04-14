@@ -207,6 +207,8 @@ clinicians:
 clinicianGenerators:
   - keyPrefix: "seed_doctor"
     staffKeyPrefix: "seed_doctor_staff"
+    nameSourceUrlPattern: "https://www.haodf.com/citiao/jibing-xiaoerduodongzheng/tuijian-doctor.html?p=%d"
+    nameSourcePages: 10
     employeeCodePrefix: "SEED-CLN-"
     phonePrefix: "+86177"
     emailDomain: "fangcunmount.com"

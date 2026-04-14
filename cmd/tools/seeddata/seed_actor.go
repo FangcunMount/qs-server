@@ -9,6 +9,14 @@ import (
 
 const seedActorPageSize = 100
 
+type seedEnsureStatus string
+
+const (
+	seedEnsureCreated seedEnsureStatus = "created"
+	seedEnsureUpdated seedEnsureStatus = "updated"
+	seedEnsureReused  seedEnsureStatus = "reused"
+)
+
 func seedStaffs(ctx context.Context, deps *dependencies) error {
 	orgID := deps.Config.Global.OrgID
 	if orgID == 0 {
@@ -33,18 +41,22 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 	}
 
 	createdCount := 0
+	updatedCount := 0
 	reusedCount := 0
 	for idx, cfg := range staffConfigs {
 		if err := validateStaffConfig(cfg); err != nil {
 			return fmt.Errorf("invalid staff config at index %d: %w", idx, err)
 		}
-		item, created, err := ensureStaff(ctx, deps, orgID, cfg, &existing)
+		item, status, err := ensureStaff(ctx, deps, orgID, cfg, &existing)
 		if err != nil {
 			return fmt.Errorf("seed staff %q failed: %w", staffConfigLabel(cfg, idx), err)
 		}
-		if created {
+		switch status {
+		case seedEnsureCreated:
 			createdCount++
-		} else {
+		case seedEnsureUpdated:
+			updatedCount++
+		default:
 			reusedCount++
 		}
 		deps.Logger.Infow("Staff seed ensured",
@@ -52,13 +64,14 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 			"name", item.Name,
 			"staff_id", item.ID,
 			"user_id", item.UserID,
-			"created", created,
+			"status", status,
 		)
 	}
 
 	deps.Logger.Infow("Staff seeding completed",
 		"configured", len(staffConfigs),
 		"created", createdCount,
+		"updated", updatedCount,
 		"reused", reusedCount,
 	)
 	return nil
@@ -96,6 +109,7 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 	}
 
 	createdCount := 0
+	updatedCount := 0
 	reusedCount := 0
 	for idx, cfg := range clinicianConfigs {
 		if err := validateClinicianConfig(cfg); err != nil {
@@ -107,13 +121,16 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 			return fmt.Errorf("resolve operator for clinician %q failed: %w", clinicianConfigLabel(cfg, idx), err)
 		}
 
-		item, created, err := ensureClinician(ctx, deps, orgID, cfg, operatorID, &existingClinicians)
+		item, status, err := ensureClinician(ctx, deps, orgID, cfg, operatorID, &existingClinicians)
 		if err != nil {
 			return fmt.Errorf("seed clinician %q failed: %w", clinicianConfigLabel(cfg, idx), err)
 		}
-		if created {
+		switch status {
+		case seedEnsureCreated:
 			createdCount++
-		} else {
+		case seedEnsureUpdated:
+			updatedCount++
+		default:
 			reusedCount++
 		}
 		deps.Logger.Infow("Clinician seed ensured",
@@ -121,13 +138,14 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 			"name", item.Name,
 			"clinician_id", item.ID,
 			"operator_id", nullableString(item.OperatorID),
-			"created", created,
+			"status", status,
 		)
 	}
 
 	deps.Logger.Infow("Clinician seeding completed",
 		"configured", len(clinicianConfigs),
 		"created", createdCount,
+		"updated", updatedCount,
 		"reused", reusedCount,
 	)
 	return nil
@@ -225,9 +243,17 @@ func ensureStaff(
 	orgID int64,
 	cfg StaffConfig,
 	existing *[]*StaffResponse,
-) (*StaffResponse, bool, error) {
+) (*StaffResponse, seedEnsureStatus, error) {
 	if matched := findMatchingStaff(*existing, cfg); matched != nil {
-		return matched, false, nil
+		synced, updated, err := syncStaff(ctx, deps.APIClient, matched, cfg)
+		if err != nil {
+			return nil, "", err
+		}
+		replaceStaffInList(existing, synced)
+		if updated {
+			return synced, seedEnsureUpdated, nil
+		}
+		return synced, seedEnsureReused, nil
 	}
 
 	req := CreateStaffRequest{
@@ -242,17 +268,17 @@ func ensureStaff(
 	if !cfg.UserID.IsZero() {
 		userID, err := cfg.UserID.Uint64()
 		if err != nil {
-			return nil, false, fmt.Errorf("parse userId: %w", err)
+			return nil, "", fmt.Errorf("parse userId: %w", err)
 		}
 		req.UserID = &userID
 	}
 
 	created, err := deps.APIClient.CreateStaff(ctx, req)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	*existing = append(*existing, created)
-	return created, true, nil
+	return created, seedEnsureCreated, nil
 }
 
 func ensureClinician(
@@ -262,9 +288,17 @@ func ensureClinician(
 	cfg ClinicianConfig,
 	operatorID string,
 	existing *[]*ClinicianResponse,
-) (*ClinicianResponse, bool, error) {
+) (*ClinicianResponse, seedEnsureStatus, error) {
 	if matched := findMatchingClinician(*existing, cfg, operatorID); matched != nil {
-		return matched, false, nil
+		synced, updated, err := syncClinician(ctx, deps.APIClient, matched, cfg, operatorID)
+		if err != nil {
+			return nil, "", err
+		}
+		replaceClinicianInList(existing, synced)
+		if updated {
+			return synced, seedEnsureUpdated, nil
+		}
+		return synced, seedEnsureReused, nil
 	}
 
 	isActive := true
@@ -284,17 +318,17 @@ func ensureClinician(
 	if operatorID != "" {
 		value, err := strconv.ParseUint(operatorID, 10, 64)
 		if err != nil {
-			return nil, false, fmt.Errorf("parse operator_id %q: %w", operatorID, err)
+			return nil, "", fmt.Errorf("parse operator_id %q: %w", operatorID, err)
 		}
 		req.OperatorID = &value
 	}
 
 	created, err := deps.APIClient.CreateClinician(ctx, req)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	*existing = append(*existing, created)
-	return created, true, nil
+	return created, seedEnsureCreated, nil
 }
 
 func resolveClinicianOperatorID(
@@ -378,6 +412,165 @@ func findMatchingClinician(existing []*ClinicianResponse, cfg ClinicianConfig, o
 		}
 	}
 	return nil
+}
+
+func syncStaff(ctx context.Context, client *APIClient, existing *StaffResponse, cfg StaffConfig) (*StaffResponse, bool, error) {
+	if existing == nil {
+		return nil, false, fmt.Errorf("existing staff is nil")
+	}
+
+	targetName := strings.TrimSpace(cfg.Name)
+	targetEmail := strings.TrimSpace(cfg.Email)
+	targetPhone := strings.TrimSpace(cfg.Phone)
+	targetRoles := append([]string(nil), cfg.Roles...)
+
+	updateReq := UpdateStaffRequest{
+		Roles: targetRoles,
+	}
+	changed := false
+
+	if strings.TrimSpace(existing.Name) != targetName {
+		updateReq.Name = &targetName
+		changed = true
+	}
+	if normalizeEmail(existing.Email) != normalizeEmail(targetEmail) {
+		updateReq.Email = &targetEmail
+		changed = true
+	}
+	if normalizePhone(existing.Phone) != normalizePhone(targetPhone) {
+		updateReq.Phone = &targetPhone
+		changed = true
+	}
+	if !sameStringSet(existing.Roles, targetRoles) {
+		changed = true
+	}
+	if cfg.IsActive != nil && existing.IsActive != *cfg.IsActive {
+		value := *cfg.IsActive
+		updateReq.IsActive = &value
+		changed = true
+	}
+
+	if !changed {
+		return existing, false, nil
+	}
+
+	updated, err := client.UpdateStaff(ctx, existing.ID, updateReq)
+	if err != nil {
+		return nil, false, fmt.Errorf("update staff %s: %w", existing.ID, err)
+	}
+	return updated, true, nil
+}
+
+func syncClinician(ctx context.Context, client *APIClient, existing *ClinicianResponse, cfg ClinicianConfig, operatorID string) (*ClinicianResponse, bool, error) {
+	if existing == nil {
+		return nil, false, fmt.Errorf("existing clinician is nil")
+	}
+
+	changed := false
+	current := existing
+	updateReq := UpdateClinicianRequest{
+		Name:          strings.TrimSpace(cfg.Name),
+		Department:    strings.TrimSpace(cfg.Department),
+		Title:         strings.TrimSpace(cfg.Title),
+		ClinicianType: strings.TrimSpace(cfg.ClinicianType),
+		EmployeeCode:  strings.TrimSpace(cfg.EmployeeCode),
+	}
+	if strings.TrimSpace(existing.Name) != updateReq.Name ||
+		strings.TrimSpace(existing.Department) != updateReq.Department ||
+		strings.TrimSpace(existing.Title) != updateReq.Title ||
+		strings.TrimSpace(existing.ClinicianType) != updateReq.ClinicianType ||
+		strings.TrimSpace(existing.EmployeeCode) != updateReq.EmployeeCode {
+		updated, err := client.UpdateClinician(ctx, existing.ID, updateReq)
+		if err != nil {
+			return nil, false, fmt.Errorf("update clinician %s: %w", existing.ID, err)
+		}
+		current = updated
+		changed = true
+	}
+
+	if cfg.IsActive != nil && current.IsActive != *cfg.IsActive {
+		var (
+			updated *ClinicianResponse
+			err     error
+		)
+		if *cfg.IsActive {
+			updated, err = client.ActivateClinician(ctx, current.ID)
+		} else {
+			updated, err = client.DeactivateClinician(ctx, current.ID)
+		}
+		if err != nil {
+			return nil, false, fmt.Errorf("toggle clinician active state %s: %w", current.ID, err)
+		}
+		current = updated
+		changed = true
+	}
+
+	if operatorID != "" {
+		currentOperatorID := strings.TrimSpace(nullableString(current.OperatorID))
+		if currentOperatorID != operatorID {
+			parsedOperatorID, err := strconv.ParseUint(operatorID, 10, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("parse desired clinician operator_id %q: %w", operatorID, err)
+			}
+			updated, err := client.BindClinicianOperator(ctx, current.ID, parsedOperatorID)
+			if err != nil {
+				return nil, false, fmt.Errorf("bind clinician %s operator %s: %w", current.ID, operatorID, err)
+			}
+			current = updated
+			changed = true
+		}
+	}
+
+	return current, changed, nil
+}
+
+func replaceStaffInList(existing *[]*StaffResponse, updated *StaffResponse) {
+	if existing == nil || updated == nil {
+		return
+	}
+	for idx, item := range *existing {
+		if item != nil && strings.TrimSpace(item.ID) == strings.TrimSpace(updated.ID) {
+			(*existing)[idx] = updated
+			return
+		}
+	}
+	*existing = append(*existing, updated)
+}
+
+func replaceClinicianInList(existing *[]*ClinicianResponse, updated *ClinicianResponse) {
+	if existing == nil || updated == nil {
+		return
+	}
+	for idx, item := range *existing {
+		if item != nil && strings.TrimSpace(item.ID) == strings.TrimSpace(updated.ID) {
+			(*existing)[idx] = updated
+			return
+		}
+	}
+	*existing = append(*existing, updated)
+}
+
+func sameStringSet(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	counts := make(map[string]int, len(left))
+	for _, item := range left {
+		counts[strings.TrimSpace(item)]++
+	}
+	for _, item := range right {
+		key := strings.TrimSpace(item)
+		if counts[key] == 0 {
+			return false
+		}
+		counts[key]--
+	}
+	for _, remaining := range counts {
+		if remaining != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func staffConfigLabel(cfg StaffConfig, idx int) string {

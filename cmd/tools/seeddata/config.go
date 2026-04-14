@@ -210,21 +210,23 @@ type ClinicianConfig struct {
 
 // ClinicianGeneratorConfig 批量生成虚拟临床医师配置。
 type ClinicianGeneratorConfig struct {
-	KeyPrefix          string   `yaml:"keyPrefix"`
-	StaffKeyPrefix     string   `yaml:"staffKeyPrefix"`
-	NamePrefix         string   `yaml:"namePrefix"`
-	EmployeeCodePrefix string   `yaml:"employeeCodePrefix"`
-	PhonePrefix        string   `yaml:"phonePrefix"`
-	EmailDomain        string   `yaml:"emailDomain"`
-	Password           string   `yaml:"password"`
-	StaffRoles         []string `yaml:"staffRoles"`
-	GenerateStaff      *bool    `yaml:"generateStaff"`
-	Count              int      `yaml:"count"`
-	StartIndex         int      `yaml:"startIndex"`
-	Departments        []string `yaml:"departments"`
-	Titles             []string `yaml:"titles"`
-	ClinicianType      string   `yaml:"clinicianType"`
-	IsActive           *bool    `yaml:"isActive"`
+	KeyPrefix            string   `yaml:"keyPrefix"`
+	StaffKeyPrefix       string   `yaml:"staffKeyPrefix"`
+	NamePrefix           string   `yaml:"namePrefix"`
+	NameSourceURLPattern string   `yaml:"nameSourceUrlPattern"`
+	NameSourcePages      int      `yaml:"nameSourcePages"`
+	EmployeeCodePrefix   string   `yaml:"employeeCodePrefix"`
+	PhonePrefix          string   `yaml:"phonePrefix"`
+	EmailDomain          string   `yaml:"emailDomain"`
+	Password             string   `yaml:"password"`
+	StaffRoles           []string `yaml:"staffRoles"`
+	GenerateStaff        *bool    `yaml:"generateStaff"`
+	Count                int      `yaml:"count"`
+	StartIndex           int      `yaml:"startIndex"`
+	Departments          []string `yaml:"departments"`
+	Titles               []string `yaml:"titles"`
+	ClinicianType        string   `yaml:"clinicianType"`
+	IsActive             *bool    `yaml:"isActive"`
 }
 
 // TesteeAssignmentConfig 受试者分配配置。

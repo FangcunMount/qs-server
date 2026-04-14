@@ -1,8 +1,21 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"html"
+	"io"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	pinyin "github.com/mozillazg/go-pinyin"
 )
 
 type generatedClinicianBundle struct {
@@ -10,10 +23,7 @@ type generatedClinicianBundle struct {
 	clinician ClinicianConfig
 }
 
-type generatedNamePart struct {
-	zh string
-	py string
-}
+type clinicianNamePageFetcher func(pageURL string) (string, error)
 
 var (
 	defaultGeneratedClinicianDepartments = []string{
@@ -37,50 +47,13 @@ var (
 	defaultGeneratedClinicianRoles = []string{
 		"qs:staff",
 	}
-	defaultGeneratedClinicianSurnames = []generatedNamePart{
-		{zh: "王", py: "wang"},
-		{zh: "李", py: "li"},
-		{zh: "张", py: "zhang"},
-		{zh: "刘", py: "liu"},
-		{zh: "陈", py: "chen"},
-		{zh: "杨", py: "yang"},
-		{zh: "赵", py: "zhao"},
-		{zh: "黄", py: "huang"},
-		{zh: "周", py: "zhou"},
-		{zh: "吴", py: "wu"},
-		{zh: "徐", py: "xu"},
-		{zh: "孙", py: "sun"},
-		{zh: "胡", py: "hu"},
-		{zh: "朱", py: "zhu"},
-		{zh: "高", py: "gao"},
-		{zh: "林", py: "lin"},
-		{zh: "何", py: "he"},
-		{zh: "郭", py: "guo"},
-		{zh: "马", py: "ma"},
-		{zh: "罗", py: "luo"},
-	}
-	defaultGeneratedClinicianGivenNames = []generatedNamePart{
-		{zh: "嘉宁", py: "jianing"},
-		{zh: "思远", py: "siyuan"},
-		{zh: "晨曦", py: "chenxi"},
-		{zh: "书瑶", py: "shuyao"},
-		{zh: "若琳", py: "ruolin"},
-		{zh: "泽宇", py: "zeyu"},
-		{zh: "雨桐", py: "yutong"},
-		{zh: "子谦", py: "ziqian"},
-		{zh: "怡然", py: "yiran"},
-		{zh: "景行", py: "jingxing"},
-		{zh: "明萱", py: "mingxuan"},
-		{zh: "安琪", py: "anqi"},
-		{zh: "知远", py: "zhiyuan"},
-		{zh: "亦涵", py: "yihan"},
-		{zh: "文博", py: "wenbo"},
-		{zh: "欣妍", py: "xinyan"},
-		{zh: "天佑", py: "tianyou"},
-		{zh: "可馨", py: "kexin"},
-		{zh: "浩然", py: "haoran"},
-		{zh: "语彤", py: "yutong"},
-	}
+	defaultGeneratedClinicianNameSourceURLPattern = "https://www.haodf.com/citiao/jibing-xiaoerduodongzheng/tuijian-doctor.html?p=%d"
+	defaultGeneratedClinicianNameSourceReferer    = "https://www.haodf.com/"
+	defaultGeneratedClinicianHTTPClient           = &http.Client{Timeout: 20 * time.Second}
+	generatedClinicianNameListRegexp              = regexp.MustCompile(`(?s)<ul class="tuijian-list js-tuijian-list".*?</ul>`)
+	generatedClinicianNameRegexp                  = regexp.MustCompile(`<span class="name">([^<]+)</span>`)
+	generatedClinicianZhNameRegexp                = regexp.MustCompile(`^[\p{Han}·]{2,8}$`)
+	generatedClinicianBundleCache                 sync.Map
 )
 
 func effectiveStaffConfigs(config *SeedConfig) ([]StaffConfig, error) {
@@ -164,6 +137,27 @@ func effectiveClinicianConfigs(config *SeedConfig) ([]ClinicianConfig, error) {
 }
 
 func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicianBundle, error) {
+	cacheKey, err := clinicianGeneratorCacheKey(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if cached, ok := generatedClinicianBundleCache.Load(cacheKey); ok {
+		return cloneGeneratedClinicianBundles(cached.([]generatedClinicianBundle)), nil
+	}
+
+	items, err := expandClinicianGeneratorWithFetcher(cfg, fetchGeneratedClinicianNameSourcePage)
+	if err != nil {
+		return nil, err
+	}
+	generatedClinicianBundleCache.Store(cacheKey, cloneGeneratedClinicianBundles(items))
+	return cloneGeneratedClinicianBundles(items), nil
+}
+
+func expandClinicianGeneratorWithFetcher(cfg ClinicianGeneratorConfig, fetcher clinicianNamePageFetcher) ([]generatedClinicianBundle, error) {
+	if fetcher == nil {
+		return nil, fmt.Errorf("name source fetcher is nil")
+	}
+
 	count := cfg.Count
 	if count <= 0 {
 		return nil, fmt.Errorf("count must be greater than 0")
@@ -189,8 +183,8 @@ func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicia
 	if emailDomain == "" {
 		emailDomain = "fangcunmount.com"
 	}
-	password := cfg.Password
-	if strings.TrimSpace(password) == "" {
+	password := strings.TrimSpace(cfg.Password)
+	if password == "" {
 		password = "Doctor@123"
 	}
 	roles := nonEmptyStrings(cfg.StaffRoles)
@@ -215,8 +209,13 @@ func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicia
 	if len(titles) == 0 {
 		titles = defaultGeneratedClinicianTitles
 	}
-	if len(defaultGeneratedClinicianSurnames) == 0 || len(defaultGeneratedClinicianGivenNames) == 0 {
-		return nil, fmt.Errorf("generated clinician name pool is empty")
+
+	names, err := fetchGeneratedClinicianNames(cfg, fetcher)
+	if err != nil {
+		return nil, err
+	}
+	if len(names) < count {
+		return nil, fmt.Errorf("name source only returned %d unique doctor names, need %d", len(names), count)
 	}
 
 	generateStaff := true
@@ -229,14 +228,18 @@ func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicia
 		width = len(fmt.Sprintf("%d", maxNumber))
 	}
 
+	emailUsage := make(map[string]int, count)
 	items := make([]generatedClinicianBundle, 0, count)
 	for i := 0; i < count; i++ {
 		seq := startIndex + i
 		suffix := fmt.Sprintf("%0*d", width, seq)
-		surname := defaultGeneratedClinicianSurnames[i%len(defaultGeneratedClinicianSurnames)]
-		given := defaultGeneratedClinicianGivenNames[(i/len(defaultGeneratedClinicianSurnames))%len(defaultGeneratedClinicianGivenNames)]
-		name := surname.zh + given.zh
-		fullPinyin := surname.py + given.py
+		name := names[i]
+		emailLocal, err := buildGeneratedClinicianEmailLocal(name)
+		if err != nil {
+			return nil, fmt.Errorf("build email local part for name %q: %w", name, err)
+		}
+		emailLocal = uniquifyGeneratedClinicianEmailLocal(emailLocal, emailUsage)
+
 		staffKey := ""
 		if generateStaff {
 			staffKey = fmt.Sprintf("%s_%s", staffKeyPrefix, suffix)
@@ -259,7 +262,7 @@ func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicia
 				Key:      staffKey,
 				Name:     name,
 				Phone:    fmt.Sprintf("%s%08d", phonePrefix, 10000+seq),
-				Email:    fmt.Sprintf("%s@%s", fullPinyin, emailDomain),
+				Email:    fmt.Sprintf("%s@%s", emailLocal, emailDomain),
 				Password: password,
 				Roles:    append([]string(nil), roles...),
 				IsActive: cfg.IsActive,
@@ -270,4 +273,203 @@ func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicia
 		items = append(items, bundle)
 	}
 	return items, nil
+}
+
+func clinicianGeneratorCacheKey(cfg ClinicianGeneratorConfig) (string, error) {
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		return "", fmt.Errorf("marshal clinician generator config: %w", err)
+	}
+	sum := sha1.Sum(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func cloneGeneratedClinicianBundles(items []generatedClinicianBundle) []generatedClinicianBundle {
+	result := make([]generatedClinicianBundle, 0, len(items))
+	for _, item := range items {
+		cloned := generatedClinicianBundle{
+			staff:     item.staff,
+			clinician: item.clinician,
+		}
+		if len(item.staff.Roles) > 0 {
+			cloned.staff.Roles = append([]string(nil), item.staff.Roles...)
+		}
+		result = append(result, cloned)
+	}
+	return result
+}
+
+func fetchGeneratedClinicianNames(cfg ClinicianGeneratorConfig, fetcher clinicianNamePageFetcher) ([]string, error) {
+	urlPattern := strings.TrimSpace(cfg.NameSourceURLPattern)
+	if urlPattern == "" {
+		urlPattern = defaultGeneratedClinicianNameSourceURLPattern
+	}
+	pages := cfg.NameSourcePages
+	if pages <= 0 {
+		pages = estimateGeneratedClinicianNamePages(cfg.Count)
+	}
+
+	seen := make(map[string]struct{}, cfg.Count)
+	names := make([]string, 0, cfg.Count)
+	for page := 1; page <= pages; page++ {
+		pageURL, err := formatGeneratedClinicianSourceURL(urlPattern, page)
+		if err != nil {
+			return nil, err
+		}
+		body, err := fetcher(pageURL)
+		if err != nil {
+			return nil, fmt.Errorf("fetch clinician names from %s: %w", pageURL, err)
+		}
+		pageNames, err := parseGeneratedClinicianNames(body)
+		if err != nil {
+			return nil, fmt.Errorf("parse clinician names from %s: %w", pageURL, err)
+		}
+		for _, name := range pageNames {
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			names = append(names, name)
+			if len(names) >= cfg.Count {
+				return names, nil
+			}
+		}
+	}
+	return names, nil
+}
+
+func estimateGeneratedClinicianNamePages(count int) int {
+	if count <= 0 {
+		return 10
+	}
+	pages := (count + 14) / 15
+	if pages < 10 {
+		pages = 10
+	}
+	return pages
+}
+
+func formatGeneratedClinicianSourceURL(pattern string, page int) (string, error) {
+	if strings.Contains(pattern, "%d") {
+		return fmt.Sprintf(pattern, page), nil
+	}
+
+	parsed, err := url.Parse(pattern)
+	if err != nil {
+		return "", fmt.Errorf("invalid nameSourceUrlPattern %q: %w", pattern, err)
+	}
+	query := parsed.Query()
+	query.Set("p", strconv.Itoa(page))
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
+func fetchGeneratedClinicianNameSourcePage(pageURL string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, pageURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Referer", defaultGeneratedClinicianNameSourceReferer)
+
+	resp, err := defaultGeneratedClinicianHTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response body: %w", err)
+	}
+	return string(body), nil
+}
+
+func parseGeneratedClinicianNames(body string) ([]string, error) {
+	if generatedClinicianSourceBlocked(body) {
+		return nil, fmt.Errorf("haodf source returned anti-bot page")
+	}
+
+	sections := generatedClinicianNameListRegexp.FindAllString(body, -1)
+	if len(sections) == 0 {
+		sections = []string{body}
+	}
+
+	seen := make(map[string]struct{})
+	names := make([]string, 0, 16)
+	for _, section := range sections {
+		for _, match := range generatedClinicianNameRegexp.FindAllStringSubmatch(section, -1) {
+			if len(match) < 2 {
+				continue
+			}
+			name := html.UnescapeString(strings.TrimSpace(match[1]))
+			if name == "" || name == "好大夫在线" {
+				continue
+			}
+			if !generatedClinicianZhNameRegexp.MatchString(name) {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil, fmt.Errorf("no doctor names found in source html")
+	}
+	return names, nil
+}
+
+func generatedClinicianSourceBlocked(body string) bool {
+	lower := strings.ToLower(body)
+	markers := []string{
+		"<title>alipay",
+		"disposeaction",
+		"security strategy",
+		"anti-content",
+	}
+	for _, marker := range markers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildGeneratedClinicianEmailLocal(name string) (string, error) {
+	args := pinyin.NewArgs()
+	args.Style = pinyin.Normal
+	parts := pinyin.LazyPinyin(name, args)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("empty pinyin result")
+	}
+
+	var builder strings.Builder
+	for _, part := range parts {
+		part = strings.ToLower(strings.TrimSpace(part))
+		for _, r := range part {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+				builder.WriteRune(r)
+			}
+		}
+	}
+	if builder.Len() == 0 {
+		return "", fmt.Errorf("empty normalized pinyin result")
+	}
+	return builder.String(), nil
+}
+
+func uniquifyGeneratedClinicianEmailLocal(base string, usage map[string]int) string {
+	usage[base]++
+	if usage[base] == 1 {
+		return base
+	}
+	return fmt.Sprintf("%s%d", base, usage[base])
 }

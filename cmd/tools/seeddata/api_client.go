@@ -495,6 +495,15 @@ type CreateStaffRequest struct {
 	IsActive *bool    `json:"is_active,omitempty"`
 }
 
+// UpdateStaffRequest 更新员工请求（apiserver）。
+type UpdateStaffRequest struct {
+	Roles    []string `json:"roles,omitempty"`
+	Name     *string  `json:"name,omitempty"`
+	Email    *string  `json:"email,omitempty"`
+	Phone    *string  `json:"phone,omitempty"`
+	IsActive *bool    `json:"is_active,omitempty"`
+}
+
 // ClinicianResponse 临床医师响应（apiserver）。
 type ClinicianResponse struct {
 	ID                   string  `json:"id"`
@@ -592,6 +601,20 @@ type CreateClinicianRequest struct {
 	ClinicianType string  `json:"clinician_type"`
 	EmployeeCode  string  `json:"employee_code,omitempty"`
 	IsActive      bool    `json:"is_active"`
+}
+
+// UpdateClinicianRequest 更新临床医师请求（apiserver）。
+type UpdateClinicianRequest struct {
+	Name          string `json:"name"`
+	Department    string `json:"department,omitempty"`
+	Title         string `json:"title,omitempty"`
+	ClinicianType string `json:"clinician_type"`
+	EmployeeCode  string `json:"employee_code,omitempty"`
+}
+
+// BindClinicianOperatorRequest 绑定临床医师与员工请求（apiserver）。
+type BindClinicianOperatorRequest struct {
+	OperatorID uint64 `json:"operator_id"`
 }
 
 // CreateAssessmentEntryRequest 创建测评入口请求（apiserver）。
@@ -1557,6 +1580,20 @@ func (c *APIClient) CreateStaff(ctx context.Context, req CreateStaffRequest) (*S
 	return &staffResp, nil
 }
 
+// UpdateStaff 更新员工（apiserver）。
+func (c *APIClient) UpdateStaff(ctx context.Context, staffID string, req UpdateStaffRequest) (*StaffResponse, error) {
+	resp, err := c.doRequest(ctx, "PUT", fmt.Sprintf("/api/v1/staff/%s", staffID), req)
+	if err != nil {
+		return nil, err
+	}
+
+	var staffResp StaffResponse
+	if err := decodeResponseData(resp, &staffResp); err != nil {
+		return nil, fmt.Errorf("decode updated staff response: %w", err)
+	}
+	return &staffResp, nil
+}
+
 // ListClinicians 获取临床医师列表（apiserver）。
 func (c *APIClient) ListClinicians(ctx context.Context, orgID int64, page, pageSize int) (*ClinicianListResponse, error) {
 	path := fmt.Sprintf("/api/v1/clinicians?org_id=%d&page=%d&page_size=%d", orgID, page, pageSize)
@@ -1582,6 +1619,78 @@ func (c *APIClient) CreateClinician(ctx context.Context, req CreateClinicianRequ
 	var clinicianResp ClinicianResponse
 	if err := decodeResponseData(resp, &clinicianResp); err != nil {
 		return nil, fmt.Errorf("decode clinician response: %w", err)
+	}
+	return &clinicianResp, nil
+}
+
+// UpdateClinician 更新临床医师（apiserver）。
+func (c *APIClient) UpdateClinician(ctx context.Context, clinicianID string, req UpdateClinicianRequest) (*ClinicianResponse, error) {
+	resp, err := c.doRequest(ctx, "PUT", fmt.Sprintf("/api/v1/clinicians/%s", clinicianID), req)
+	if err != nil {
+		return nil, err
+	}
+
+	var clinicianResp ClinicianResponse
+	if err := decodeResponseData(resp, &clinicianResp); err != nil {
+		return nil, fmt.Errorf("decode updated clinician response: %w", err)
+	}
+	return &clinicianResp, nil
+}
+
+// ActivateClinician 激活临床医师（apiserver）。
+func (c *APIClient) ActivateClinician(ctx context.Context, clinicianID string) (*ClinicianResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/clinicians/%s/activate", clinicianID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var clinicianResp ClinicianResponse
+	if err := decodeResponseData(resp, &clinicianResp); err != nil {
+		return nil, fmt.Errorf("decode activated clinician response: %w", err)
+	}
+	return &clinicianResp, nil
+}
+
+// DeactivateClinician 停用临床医师（apiserver）。
+func (c *APIClient) DeactivateClinician(ctx context.Context, clinicianID string) (*ClinicianResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/clinicians/%s/deactivate", clinicianID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var clinicianResp ClinicianResponse
+	if err := decodeResponseData(resp, &clinicianResp); err != nil {
+		return nil, fmt.Errorf("decode deactivated clinician response: %w", err)
+	}
+	return &clinicianResp, nil
+}
+
+// BindClinicianOperator 绑定临床医师到员工（apiserver）。
+func (c *APIClient) BindClinicianOperator(ctx context.Context, clinicianID string, operatorID uint64) (*ClinicianResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/clinicians/%s/bind-operator", clinicianID), BindClinicianOperatorRequest{
+		OperatorID: operatorID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var clinicianResp ClinicianResponse
+	if err := decodeResponseData(resp, &clinicianResp); err != nil {
+		return nil, fmt.Errorf("decode bound clinician response: %w", err)
+	}
+	return &clinicianResp, nil
+}
+
+// UnbindClinicianOperator 解绑临床医师与员工（apiserver）。
+func (c *APIClient) UnbindClinicianOperator(ctx context.Context, clinicianID string) (*ClinicianResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/clinicians/%s/unbind-operator", clinicianID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var clinicianResp ClinicianResponse
+	if err := decodeResponseData(resp, &clinicianResp); err != nil {
+		return nil, fmt.Errorf("decode unbound clinician response: %w", err)
 	}
 	return &clinicianResp, nil
 }
@@ -1854,6 +1963,15 @@ type SubmitAssessmentRequest struct {
 	AssessmentID uint64 `json:"assessment_id"`
 }
 
+// AssessmentListResponse 测评列表响应（apiserver）。
+type AssessmentListResponse struct {
+	Items      []*AssessmentResponse `json:"items"`
+	Total      int                   `json:"total"`
+	Page       int                   `json:"page"`
+	PageSize   int                   `json:"page_size"`
+	TotalPages int                   `json:"total_pages"`
+}
+
 // AssessmentResponse 测评响应（apiserver）
 type AssessmentResponse struct {
 	ID                string   `json:"id"`
@@ -1882,6 +2000,26 @@ func (c *APIClient) CreateAssessment(ctx context.Context, req CreateAssessmentRe
 	}
 
 	return &assessmentResp, nil
+}
+
+// ListAssessmentsByTestee 获取某个受试者的测评列表（apiserver）。
+func (c *APIClient) ListAssessmentsByTestee(ctx context.Context, testeeID string, page, pageSize int) (*AssessmentListResponse, error) {
+	path := fmt.Sprintf("/api/v1/evaluations/assessments?testee_id=%s&page=%d&page_size=%d", testeeID, page, pageSize)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list assessments by testee: testee_id=%s page=%d page_size=%d: %w", testeeID, page, pageSize, err)
+	}
+
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal response data: %w", err)
+	}
+
+	var listResp AssessmentListResponse
+	if err := json.Unmarshal(dataBytes, &listResp); err != nil {
+		return nil, fmt.Errorf("unmarshal assessment list response: %w", err)
+	}
+	return &listResp, nil
 }
 
 // SubmitAssessment 提交测评（apiserver）

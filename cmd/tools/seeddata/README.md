@@ -100,7 +100,8 @@ go run ./cmd/tools/seeddata \
 
 - `staff` 会按配置创建或复用员工账号
 - `clinician` 会按 `operatorRef` 或 `operatorId` 创建或复用临床医师
-- `clinicianGenerators` 可以额外批量生成一组带随机姓名和账号信息的 seed clinician；默认配置示例里已预置 100 个
+- `clinicianGenerators` 可以额外批量生成一组 seed clinician；默认会从好大夫推荐专家页抓取姓名，并配套 staff 账号、手机号和邮箱
+- 可通过 `nameSourceUrlPattern`、`nameSourcePages` 控制抓取来源和页数；默认来源是 `https://www.haodf.com/citiao/jibing-xiaoerduodongzheng/tuijian-doctor.html?p=%d`
 - 如果 `clinician.operatorRef` 指向配置里的某个 staff，`clinician` 步骤会自动确保对应员工账号已存在
 
 ### 方案 0.5：将现有 testee 分配给 clinician
@@ -355,10 +356,12 @@ go run ./cmd/tools/seeddata \
 - 只负责提交答卷并生成测评
 - 不碰 plan task
 - 通过 collection/apiserver 的真实接口完成
+- 现在按 `testee` 做确定性补齐，不再每次随机追加
+- 同一个 testee 每次都会推导出同一批目标量表，并且只提交缺失的 `questionnaire_code`
 
 ### `staff`
 
-- 创建或复用员工账号
+- 创建、复用或更新员工账号
 - 新建账号模式要求：
   - `name`
   - `phone`
@@ -372,18 +375,33 @@ go run ./cmd/tools/seeddata \
   - `userId`
   - `phone`
   - `email`
+- 命中已有 staff 且配置发生漂移时，会同步更新：
+  - `name`
+  - `email`
+  - `phone`
+  - `roles`
+  - `isActive`
 
 ### `clinician`
 
-- 创建或复用临床医师
+- 创建、复用或更新临床医师
 - 支持三种绑定方式：
   - `operatorRef`：引用 `staffs[].key`
   - `operatorId`
   - 仅 `employeeCode`（不绑定员工，仅用于幂等匹配）
-- 也支持通过 `clinicianGenerators` 批量生成 clinician，并默认配套 staff 账号、手机号和邮箱
+- 也支持通过 `clinicianGenerators` 批量生成 clinician，并默认从好大夫推荐专家页抓取姓名，再配套 staff 账号、手机号和邮箱
+- 生成 staff 邮箱默认按“姓名全拼@域名”构造；若全拼重复，会自动追加数字后缀保证唯一
 - 幂等匹配顺序：
   - `operatorId`
   - `employeeCode`
+- 命中已有 clinician 且配置发生漂移时，会同步更新：
+  - `name`
+  - `department`
+  - `title`
+  - `clinicianType`
+  - `employeeCode`
+  - `isActive`
+  - `operator` 绑定（仅当配置显式提供 `operatorRef` / `operatorId`）
 
 ### `assign_testees`
 

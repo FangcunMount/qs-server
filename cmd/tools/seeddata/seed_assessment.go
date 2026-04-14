@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -19,6 +20,8 @@ const (
 
 	testeeQueueSize = 100
 	submitQueueSize = 200
+
+	assessmentListPageSize = 100
 )
 
 type taskOutcome int
@@ -498,11 +501,25 @@ func startSubmitWorkers(
 }
 
 func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *TesteeResponse, rng *rand.Rand) {
-	perTestee := rng.Intn(cfg.maxPerTestee-cfg.minPerTestee+1) + cfg.minPerTestee
+	_ = rng
+	testeeRNG := newAssessmentTesteeRand(testee.ID)
+	perTestee := testeeRNG.Intn(cfg.maxPerTestee-cfg.minPerTestee+1) + cfg.minPerTestee
 	testeeStart := time.Now()
 	cfg.diagnostics.LogTesteeStart(testee.ID, perTestee)
 
-	picks := pickScaleTargets(cfg.targets, perTestee, rng)
+	existingQuestionnaires, err := loadExistingAssessmentQuestionnaires(ctx, cfg.client, testee.ID)
+	if err != nil {
+		cfg.counters.AddErrors(1)
+		cfg.failures.Add(testee.ID, "", err)
+		cfg.counters.MarkTesteeProcessed(true)
+		return
+	}
+
+	picks := filterAssessmentTargetsForBackfill(
+		pickScaleTargets(cfg.targets, perTestee, testeeRNG),
+		existingQuestionnaires,
+		cfg.counters,
+	)
 	var testeeFailed int32
 	resultChans := make([]chan error, 0, len(picks))
 	for _, target := range picks {
@@ -511,7 +528,7 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 			break
 		}
 
-		task, outcome := buildSubmissionTask(ctx, cfg, testee, target, rng)
+		task, outcome := buildSubmissionTask(ctx, cfg, testee, target, testeeRNG)
 		if outcome == taskFailed {
 			atomic.StoreInt32(&testeeFailed, 1)
 			continue
@@ -559,6 +576,63 @@ func processTestee(ctx context.Context, cfg assessmentWorkerConfig, testee *Test
 		duration:           time.Since(testeeStart),
 		success:            atomic.LoadInt32(&testeeFailed) == 0,
 	})
+}
+
+func newAssessmentTesteeRand(testeeID string) *rand.Rand {
+	parsed := parseID(testeeID)
+	if parsed > 0 {
+		return rand.New(rand.NewSource(int64(parsed)))
+	}
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte(strings.TrimSpace(testeeID)))
+	return rand.New(rand.NewSource(int64(hasher.Sum64())))
+}
+
+func loadExistingAssessmentQuestionnaires(ctx context.Context, client *APIClient, testeeID string) (map[string]struct{}, error) {
+	result := make(map[string]struct{})
+	page := 1
+	for {
+		resp, err := client.ListAssessmentsByTestee(ctx, testeeID, page, assessmentListPageSize)
+		if err != nil {
+			return nil, fmt.Errorf("list assessments for testee %s: %w", testeeID, err)
+		}
+		if resp == nil || len(resp.Items) == 0 {
+			break
+		}
+		for _, item := range resp.Items {
+			if item == nil {
+				continue
+			}
+			code := strings.TrimSpace(item.QuestionnaireCode)
+			if code == "" {
+				continue
+			}
+			result[code] = struct{}{}
+		}
+		if resp.TotalPages > 0 && page >= resp.TotalPages {
+			break
+		}
+		page++
+	}
+	return result, nil
+}
+
+func filterAssessmentTargetsForBackfill(targets []scaleTarget, existing map[string]struct{}, counters *assessmentCounters) []scaleTarget {
+	if len(targets) == 0 {
+		return nil
+	}
+	result := make([]scaleTarget, 0, len(targets))
+	for _, target := range targets {
+		if _, exists := existing[strings.TrimSpace(target.QuestionnaireCode)]; exists {
+			if counters != nil {
+				counters.AddSkipped(1)
+			}
+			continue
+		}
+		existing[strings.TrimSpace(target.QuestionnaireCode)] = struct{}{}
+		result = append(result, target)
+	}
+	return result
 }
 
 // buildSubmissionTask prepares one answersheet submission task for a testee.
