@@ -65,7 +65,7 @@ func TestExpandClinicianGenerator(t *testing.T) {
 	if items[0].clinician.Name != "章依文" {
 		t.Fatalf("expected scraped name, got=%s", items[0].clinician.Name)
 	}
-	if items[0].staff.Email != "zhangyiwen@fangcunmount.com" {
+	if items[0].staff.Email != "zhangyiwen007@fangcunmount.com" {
 		t.Fatalf("expected pinyin email, got=%s", items[0].staff.Email)
 	}
 }
@@ -143,7 +143,7 @@ func TestEffectiveStaffConfigsIncludesGeneratorStaffs(t *testing.T) {
 	if items[1].Key != "generated_staff_001" || items[2].Key != "generated_staff_002" {
 		t.Fatalf("unexpected generated staff keys: %+v %+v", items[1], items[2])
 	}
-	if items[1].Email != "zhangyiwen@fangcunmount.com" || items[2].Email != "lifeng@fangcunmount.com" {
+	if items[1].Email != "zhangyiwen001@fangcunmount.com" || items[2].Email != "lifeng002@fangcunmount.com" {
 		t.Fatalf("expected scraped-name emails, got=%+v %+v", items[1], items[2])
 	}
 }

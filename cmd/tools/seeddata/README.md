@@ -390,7 +390,7 @@ go run ./cmd/tools/seeddata \
   - `operatorId`
   - 仅 `employeeCode`（不绑定员工，仅用于幂等匹配）
 - 也支持通过 `clinicianGenerators` 批量生成 clinician，并默认从好大夫推荐专家页抓取姓名，再配套 staff 账号、手机号和邮箱
-- 生成 staff 邮箱默认按“姓名全拼@域名”构造；若全拼重复，会自动追加数字后缀保证唯一
+- 生成 staff 邮箱默认按“姓名全拼 + 固定序号@域名”构造，例如 `zhangyiwen001@fangcunmount.com`，避免和现网真实账号撞邮箱
 - 幂等匹配顺序：
   - `operatorId`
   - `employeeCode`

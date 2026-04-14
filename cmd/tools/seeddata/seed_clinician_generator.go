@@ -228,17 +228,16 @@ func expandClinicianGeneratorWithFetcher(cfg ClinicianGeneratorConfig, fetcher c
 		width = len(fmt.Sprintf("%d", maxNumber))
 	}
 
-	emailUsage := make(map[string]int, count)
 	items := make([]generatedClinicianBundle, 0, count)
 	for i := 0; i < count; i++ {
 		seq := startIndex + i
 		suffix := fmt.Sprintf("%0*d", width, seq)
 		name := names[i]
-		emailLocal, err := buildGeneratedClinicianEmailLocal(name)
+		emailBase, err := buildGeneratedClinicianEmailLocal(name)
 		if err != nil {
 			return nil, fmt.Errorf("build email local part for name %q: %w", name, err)
 		}
-		emailLocal = uniquifyGeneratedClinicianEmailLocal(emailLocal, emailUsage)
+		emailLocal := formatGeneratedClinicianEmailLocal(emailBase, suffix)
 
 		staffKey := ""
 		if generateStaff {
@@ -466,10 +465,6 @@ func buildGeneratedClinicianEmailLocal(name string) (string, error) {
 	return builder.String(), nil
 }
 
-func uniquifyGeneratedClinicianEmailLocal(base string, usage map[string]int) string {
-	usage[base]++
-	if usage[base] == 1 {
-		return base
-	}
-	return fmt.Sprintf("%s%d", base, usage[base])
+func formatGeneratedClinicianEmailLocal(base, suffix string) string {
+	return fmt.Sprintf("%s%s", base, suffix)
 }

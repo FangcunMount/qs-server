@@ -257,6 +257,15 @@ func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto Register
 			Password:       dto.Password,
 		})
 		if err != nil {
+			if dto.UserID == 0 && isUserAlreadyExistsErr(err) {
+				userID, found, lookupErr := s.findExistingUserByPhone(ctx, dto.Phone)
+				if lookupErr != nil {
+					return 0, lookupErr
+				}
+				if found {
+					return userID, nil
+				}
+			}
 			return 0, err
 		}
 		return result.UserID, nil
@@ -266,27 +275,57 @@ func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto Register
 	if userID != 0 {
 		return userID, nil
 	}
+	return s.findOrCreateUserByPhone(ctx, dto)
+}
+
+func (s *lifecycleService) findOrCreateUserByPhone(ctx context.Context, dto RegisterOperatorDTO) (int64, error) {
 	if s.identitySvc == nil || !s.identitySvc.IsEnabled() {
 		return 0, errors.WithCode(code.ErrValidation, "user_id is required or IAM must be enabled to create user")
 	}
 
-	// 按手机号搜索
-	searchReq := &identityv1.SearchUsersRequest{Phones: []string{dto.Phone}}
-	searchResp, err := s.identitySvc.SearchUsers(ctx, searchReq)
-	if err != nil {
+	if userID, found, err := s.findExistingUserByPhone(ctx, dto.Phone); err != nil {
 		return 0, err
-	}
-	if searchResp != nil && len(searchResp.Users) > 0 {
-		uidStr := searchResp.Users[0].Id
-		if uidStr != "" {
-			if uid, err := strconv.ParseInt(uidStr, 10, 64); err == nil {
-				return uid, nil
-			}
-		}
+	} else if found {
+		return userID, nil
 	}
 
 	// 未找到则创建
 	return s.identitySvc.CreateUser(ctx, dto.Name, dto.Email, dto.Phone)
+}
+
+func (s *lifecycleService) findExistingUserByPhone(ctx context.Context, phone string) (int64, bool, error) {
+	if s.identitySvc == nil || !s.identitySvc.IsEnabled() || strings.TrimSpace(phone) == "" {
+		return 0, false, nil
+	}
+
+	searchReq := &identityv1.SearchUsersRequest{Phones: []string{phone}}
+	searchResp, err := s.identitySvc.SearchUsers(ctx, searchReq)
+	if err != nil {
+		return 0, false, err
+	}
+	if searchResp == nil || len(searchResp.Users) == 0 {
+		return 0, false, nil
+	}
+
+	uidStr := strings.TrimSpace(searchResp.Users[0].Id)
+	if uidStr == "" {
+		return 0, false, nil
+	}
+	uid, err := strconv.ParseInt(uidStr, 10, 64)
+	if err != nil {
+		return 0, false, errors.Wrap(err, "failed to parse user id from IAM search result")
+	}
+	return uid, true, nil
+}
+
+func isUserAlreadyExistsErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.IsCode(err, code.ErrUserAlreadyExists) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "user already exists")
 }
 
 func formatOptionalUserID(userID int64) string {

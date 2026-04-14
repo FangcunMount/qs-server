@@ -275,6 +275,21 @@ func ensureStaff(
 
 	created, err := deps.APIClient.CreateStaff(ctx, req)
 	if err != nil {
+		refreshed, refreshErr := listAllStaff(ctx, deps.APIClient, orgID)
+		if refreshErr == nil {
+			*existing = refreshed
+			if matched := findMatchingStaff(*existing, cfg); matched != nil {
+				synced, updated, syncErr := syncStaff(ctx, deps.APIClient, matched, cfg)
+				if syncErr != nil {
+					return nil, "", syncErr
+				}
+				replaceStaffInList(existing, synced)
+				if updated {
+					return synced, seedEnsureUpdated, nil
+				}
+				return synced, seedEnsureReused, nil
+			}
+		}
 		return nil, "", err
 	}
 	*existing = append(*existing, created)
@@ -325,6 +340,21 @@ func ensureClinician(
 
 	created, err := deps.APIClient.CreateClinician(ctx, req)
 	if err != nil {
+		refreshed, refreshErr := listAllClinicians(ctx, deps.APIClient, orgID)
+		if refreshErr == nil {
+			*existing = refreshed
+			if matched := findMatchingClinician(*existing, cfg, operatorID); matched != nil {
+				synced, updated, syncErr := syncClinician(ctx, deps.APIClient, matched, cfg, operatorID)
+				if syncErr != nil {
+					return nil, "", syncErr
+				}
+				replaceClinicianInList(existing, synced)
+				if updated {
+					return synced, seedEnsureUpdated, nil
+				}
+				return synced, seedEnsureReused, nil
+			}
+		}
 		return nil, "", err
 	}
 	*existing = append(*existing, created)
