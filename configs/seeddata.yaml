@@ -33,25 +33,281 @@ global:
   defaultTag: ""
 
 staffs: []
-clinicians: []
-testeeAssignments: []
-assessmentEntryTargets: []
+
+clinicians:
+  - key: "cln_614995509882401326"
+    operatorId: "615060135500329518"
+    name: "史老师"
+    department: "儿童心理健康科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615085224266576430"
+    operatorId: "615085019836199470"
+    name: "曹庆久"
+    department: "儿童精神科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615085307548742190"
+    operatorId: "615085116976280110"
+    name: "黄艳军"
+    department: "神经内科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615085399252939310"
+    operatorId: "615085456379359790"
+    name: "张刚"
+    department: "神经内科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615086081481650734"
+    operatorId: "615086039219843630"
+    name: "赵冬梅"
+    department: "儿童保健科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615086150436008494"
+    operatorId: "615085841080922670"
+    name: "贾军朴"
+    department: "精神卫生科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615086709855498798"
+    operatorId: "615086348927250990"
+    name: "匡桂芳"
+    department: "小儿心理卫生科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615086769280397870"
+    operatorId: "615086561796567598"
+    name: "冀永娟"
+    department: "小儿心理卫生科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615086872040845870"
+    operatorId: "615086415851565614"
+    name: "侯梅"
+    department: "儿童保健科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615086919386149422"
+    operatorId: "615086492355670574"
+    name: "冉妮"
+    department: "儿童保健科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615087637266444846"
+    operatorId: "615087072344027694"
+    name: "黄亚玲"
+    department: "儿科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615087703368675886"
+    operatorId: "615087184600379950"
+    name: "马俊"
+    department: "儿童心理课"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615087755663258158"
+    operatorId: "615087248337023534"
+    name: "郝燕"
+    department: "儿童保健科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615087818779144750"
+    operatorId: "615087574486102574"
+    name: "徐三清"
+    department: "小儿神经内科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615087864044073518"
+    operatorId: "615087319489196590"
+    name: "陈敏"
+    department: "儿童心理课"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088273357812270"
+    operatorId: "615087975310570030"
+    name: "罗蓉"
+    department: "儿童神经科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088307902100014"
+    operatorId: "615088043577061934"
+    name: "陈小璐"
+    department: "儿童神经科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088351405421102"
+    operatorId: "615088121591116334"
+    name: "欧阳颖"
+    department: "儿童神经科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088385312174638"
+    operatorId: "615088206316057134"
+    name: "黄莹"
+    department: "儿童神经科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088855208440366"
+    operatorId: "615088541709382190"
+    name: "王玉华"
+    department: "小儿内科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088909147189806"
+    operatorId: "615088597577511470"
+    name: "杨琳"
+    department: "小儿内科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615088946610713134"
+    operatorId: "615088796706288174"
+    name: "曹庆久"
+    department: "小儿内科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615089195702039086"
+    operatorId: "615088722567770670"
+    name: "蒲丽华"
+    department: "儿童心理健康科"
+    title: "主任医师"
+    clinicianType: "doctor"
+    isActive: true
+  - key: "cln_615089235111719470"
+    operatorId: "615088660139749934"
+    name: "陈燕妮"
+    department: "儿童保健科"
+    title: "副主任医师"
+    clinicianType: "doctor"
+    isActive: true
+
+clinicianGenerators:
+  - keyPrefix: "seed_doctor"
+    staffKeyPrefix: "seed_doctor_staff"
+    employeeCodePrefix: "SEED-CLN-"
+    phonePrefix: "+86177"
+    emailDomain: "fangcunmount.com"
+    password: "Doctor@123"
+    staffRoles: ["qs:staff"]
+    generateStaff: true
+    count: 100
+    startIndex: 1
+    clinicianType: "doctor"
+    departments:
+      - "儿童心理健康科"
+      - "儿童精神科"
+      - "神经内科"
+      - "儿童保健科"
+      - "精神卫生科"
+      - "小儿心理卫生科"
+      - "儿科"
+      - "儿童心理课"
+      - "儿童神经科"
+      - "小儿内科"
+      - "小儿神经内科"
+    titles:
+      - "主任医师"
+      - "副主任医师"
+      - "主治医师"
+    isActive: true
+
+testeeAssignments:
+  - key: "seed_primary_pool_real"
+    strategy: "round_robin"
+    relationType: "primary"
+    clinicianIds: &seed_clinician_ids
+      - "614995509882401326"
+      - "615085224266576430"
+      - "615085307548742190"
+      - "615085399252939310"
+      - "615086081481650734"
+      - "615086150436008494"
+      - "615086709855498798"
+      - "615086769280397870"
+      - "615086872040845870"
+      - "615086919386149422"
+      - "615087637266444846"
+      - "615087703368675886"
+      - "615087755663258158"
+      - "615087818779144750"
+      - "615087864044073518"
+      - "615088273357812270"
+      - "615088307902100014"
+      - "615088351405421102"
+      - "615088385312174638"
+      - "615088855208440366"
+      - "615088909147189806"
+      - "615088946610713134"
+      - "615089195702039086"
+      - "615089235111719470"
+    testeeOffset: 0
+    testeeLimit: 300
+    testeePageSize: 100
+    includeAlreadyAssigned: false
+
+  - key: "seed_primary_pool_generated"
+    strategy: "round_robin"
+    relationType: "primary"
+    clinicianKeyPrefixes:
+      - "seed_doctor_"
+    testeeOffset: 300
+    testeeLimit: 2000
+    testeePageSize: 100
+    includeAlreadyAssigned: false
+
+assessmentEntryTargets:
+  - key: "scale_3adyDE"
+    targetType: "scale"
+    targetCode: "3adyDE"
+    targetVersion: ""
+    expiresAfter: "180d"
+
 assessmentEntryFlow:
   clinicianRefs: []
-  clinicianIds: []
+  clinicianKeyPrefixes:
+    - "seed_doctor_"
+  clinicianIds: *seed_clinician_ids
   entryIDs: []
   maxIntakesPerEntry: 5
   allowTemporaryTestee: false
+
 assessmentByEntry:
   clinicianRefs: []
-  clinicianIds: []
+  clinicianKeyPrefixes:
+    - "seed_doctor_"
+  clinicianIds: *seed_clinician_ids
   entryIDs: []
   maxAssessmentsPerEntry: 5
+
 assessmentStatusProfile:
   pending: 0.10
   submitted: 0.15
   interpreted: 0.70
   failed: 0.05
+
 testees: []
 questionnaires: []
 scales: []

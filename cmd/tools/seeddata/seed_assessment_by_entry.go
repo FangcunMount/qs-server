@@ -65,8 +65,9 @@ func seedAssessmentByEntry(ctx context.Context, deps *dependencies) error {
 
 	cfg := deps.Config.AssessmentByEntry
 	clinicians, err := resolveSeedClinicianScope(ctx, deps, seedClinicianScopeSpec{
-		refs: cfg.ClinicianRefs,
-		ids:  cfg.ClinicianIDs,
+		refs:        cfg.ClinicianRefs,
+		keyPrefixes: cfg.ClinicianKeyPrefixes,
+		ids:         cfg.ClinicianIDs,
 	})
 	if err != nil {
 		return err

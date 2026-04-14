@@ -100,6 +100,7 @@ go run ./cmd/tools/seeddata \
 
 - `staff` 会按配置创建或复用员工账号
 - `clinician` 会按 `operatorRef` 或 `operatorId` 创建或复用临床医师
+- `clinicianGenerators` 可以额外批量生成一组带随机姓名和账号信息的 seed clinician；默认配置示例里已预置 100 个
 - 如果 `clinician.operatorRef` 指向配置里的某个 staff，`clinician` 步骤会自动确保对应员工账号已存在
 
 ### 方案 0.5：将现有 testee 分配给 clinician
@@ -379,6 +380,7 @@ go run ./cmd/tools/seeddata \
   - `operatorRef`：引用 `staffs[].key`
   - `operatorId`
   - 仅 `employeeCode`（不绑定员工，仅用于幂等匹配）
+- 也支持通过 `clinicianGenerators` 批量生成 clinician，并默认配套 staff 账号、手机号和邮箱
 - 幂等匹配顺序：
   - `operatorId`
   - `employeeCode`

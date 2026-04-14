@@ -14,12 +14,16 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 	if orgID == 0 {
 		return fmt.Errorf("global.orgId is required for staff seeding")
 	}
-	if len(deps.Config.Staffs) == 0 {
+	staffConfigs, err := effectiveStaffConfigs(deps.Config)
+	if err != nil {
+		return err
+	}
+	if len(staffConfigs) == 0 {
 		deps.Logger.Infow("No staff configs found, skipping staff seeding")
 		return nil
 	}
 
-	if _, err := indexStaffConfigs(deps.Config.Staffs); err != nil {
+	if _, err := indexStaffConfigs(staffConfigs); err != nil {
 		return err
 	}
 
@@ -30,7 +34,7 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 
 	createdCount := 0
 	reusedCount := 0
-	for idx, cfg := range deps.Config.Staffs {
+	for idx, cfg := range staffConfigs {
 		if err := validateStaffConfig(cfg); err != nil {
 			return fmt.Errorf("invalid staff config at index %d: %w", idx, err)
 		}
@@ -53,7 +57,7 @@ func seedStaffs(ctx context.Context, deps *dependencies) error {
 	}
 
 	deps.Logger.Infow("Staff seeding completed",
-		"configured", len(deps.Config.Staffs),
+		"configured", len(staffConfigs),
 		"created", createdCount,
 		"reused", reusedCount,
 	)
@@ -65,12 +69,20 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 	if orgID == 0 {
 		return fmt.Errorf("global.orgId is required for clinician seeding")
 	}
-	if len(deps.Config.Clinicians) == 0 {
+	clinicianConfigs, err := effectiveClinicianConfigs(deps.Config)
+	if err != nil {
+		return err
+	}
+	if len(clinicianConfigs) == 0 {
 		deps.Logger.Infow("No clinician configs found, skipping clinician seeding")
 		return nil
 	}
 
-	staffIndex, err := indexStaffConfigs(deps.Config.Staffs)
+	staffConfigs, err := effectiveStaffConfigs(deps.Config)
+	if err != nil {
+		return err
+	}
+	staffIndex, err := indexStaffConfigs(staffConfigs)
 	if err != nil {
 		return err
 	}
@@ -85,7 +97,7 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 
 	createdCount := 0
 	reusedCount := 0
-	for idx, cfg := range deps.Config.Clinicians {
+	for idx, cfg := range clinicianConfigs {
 		if err := validateClinicianConfig(cfg); err != nil {
 			return fmt.Errorf("invalid clinician config at index %d: %w", idx, err)
 		}
@@ -114,7 +126,7 @@ func seedClinicians(ctx context.Context, deps *dependencies) error {
 	}
 
 	deps.Logger.Infow("Clinician seeding completed",
-		"configured", len(deps.Config.Clinicians),
+		"configured", len(clinicianConfigs),
 		"created", createdCount,
 		"reused", reusedCount,
 	)

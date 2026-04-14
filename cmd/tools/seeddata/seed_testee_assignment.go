@@ -33,7 +33,11 @@ func seedAssignTestees(ctx context.Context, deps *dependencies) error {
 	if err != nil {
 		return err
 	}
-	clinicianIndex, err := indexClinicianConfigs(deps.Config.Clinicians)
+	clinicianConfigs, err := effectiveClinicianConfigs(deps.Config)
+	if err != nil {
+		return err
+	}
+	clinicianIndex, err := indexClinicianConfigs(clinicianConfigs)
 	if err != nil {
 		return err
 	}
@@ -91,12 +95,12 @@ func validateTesteeAssignmentConfig(cfg TesteeAssignmentConfig) error {
 			return fmt.Errorf("clinicianRef or clinicianId is required for explicit assignment")
 		}
 	case testeeAssignmentStrategyRoundRobin:
-		targetCount := len(nonEmptyStrings(cfg.ClinicianRefs)) + len(nonZeroFlexibleIDs(cfg.ClinicianIDs))
+		targetCount := len(nonEmptyStrings(cfg.ClinicianRefs)) + len(nonEmptyStrings(cfg.ClinicianKeyPrefixes)) + len(nonZeroFlexibleIDs(cfg.ClinicianIDs))
 		if strings.TrimSpace(cfg.ClinicianRef) != "" || !cfg.ClinicianID.IsZero() {
 			targetCount++
 		}
 		if targetCount == 0 {
-			return fmt.Errorf("at least one clinicianRef or clinicianId is required for round_robin assignment")
+			return fmt.Errorf("at least one clinicianRef, clinicianKeyPrefixes, or clinicianId is required for round_robin assignment")
 		}
 	default:
 		return fmt.Errorf("unsupported strategy %q", cfg.Strategy)
@@ -150,6 +154,12 @@ func resolveAssignmentClinicianTargets(
 	}
 	for _, ref := range nonEmptyStrings(cfg.ClinicianRefs) {
 		specs = append(specs, targetSpec{ref: ref})
+	}
+	for _, prefix := range nonEmptyStrings(cfg.ClinicianKeyPrefixes) {
+		matchedRefs := clinicianRefsByPrefix(clinicianIndex, prefix)
+		for _, ref := range matchedRefs {
+			specs = append(specs, targetSpec{ref: ref})
+		}
 	}
 	for _, id := range nonZeroFlexibleIDs(cfg.ClinicianIDs) {
 		specs = append(specs, targetSpec{id: id})

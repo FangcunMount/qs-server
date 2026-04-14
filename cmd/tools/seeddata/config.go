@@ -81,6 +81,7 @@ type SeedConfig struct {
 	// 各个领域的种子数据配置
 	Staffs                  []StaffConfig                 `yaml:"staffs"`
 	Clinicians              []ClinicianConfig             `yaml:"clinicians"`
+	ClinicianGenerators     []ClinicianGeneratorConfig    `yaml:"clinicianGenerators"`
 	TesteeAssignments       []TesteeAssignmentConfig      `yaml:"testeeAssignments"`
 	AssessmentEntryTargets  []AssessmentEntryTargetConfig `yaml:"assessmentEntryTargets"`
 	AssessmentEntryFlow     AssessmentEntryFlowConfig     `yaml:"assessmentEntryFlow"`
@@ -207,6 +208,25 @@ type ClinicianConfig struct {
 	IsActive      *bool      `yaml:"isActive"`
 }
 
+// ClinicianGeneratorConfig 批量生成虚拟临床医师配置。
+type ClinicianGeneratorConfig struct {
+	KeyPrefix          string   `yaml:"keyPrefix"`
+	StaffKeyPrefix     string   `yaml:"staffKeyPrefix"`
+	NamePrefix         string   `yaml:"namePrefix"`
+	EmployeeCodePrefix string   `yaml:"employeeCodePrefix"`
+	PhonePrefix        string   `yaml:"phonePrefix"`
+	EmailDomain        string   `yaml:"emailDomain"`
+	Password           string   `yaml:"password"`
+	StaffRoles         []string `yaml:"staffRoles"`
+	GenerateStaff      *bool    `yaml:"generateStaff"`
+	Count              int      `yaml:"count"`
+	StartIndex         int      `yaml:"startIndex"`
+	Departments        []string `yaml:"departments"`
+	Titles             []string `yaml:"titles"`
+	ClinicianType      string   `yaml:"clinicianType"`
+	IsActive           *bool    `yaml:"isActive"`
+}
+
 // TesteeAssignmentConfig 受试者分配配置。
 type TesteeAssignmentConfig struct {
 	Key                    string       `yaml:"key"`
@@ -216,6 +236,7 @@ type TesteeAssignmentConfig struct {
 	ClinicianRef           string       `yaml:"clinicianRef"`
 	ClinicianID            FlexibleID   `yaml:"clinicianId"`
 	ClinicianRefs          []string     `yaml:"clinicianRefs"`
+	ClinicianKeyPrefixes   []string     `yaml:"clinicianKeyPrefixes"`
 	ClinicianIDs           []FlexibleID `yaml:"clinicianIds"`
 	TesteeIDs              []FlexibleID `yaml:"testeeIds"`
 	TesteeOffset           int          `yaml:"testeeOffset"`
@@ -237,6 +258,7 @@ type AssessmentEntryTargetConfig struct {
 // AssessmentEntryFlowConfig 入口 resolve/intake 批处理配置。
 type AssessmentEntryFlowConfig struct {
 	ClinicianRefs        []string     `yaml:"clinicianRefs"`
+	ClinicianKeyPrefixes []string     `yaml:"clinicianKeyPrefixes"`
 	ClinicianIDs         []FlexibleID `yaml:"clinicianIds"`
 	EntryIDs             []FlexibleID `yaml:"entryIDs"`
 	MaxIntakesPerEntry   int          `yaml:"maxIntakesPerEntry"`
@@ -246,6 +268,7 @@ type AssessmentEntryFlowConfig struct {
 // AssessmentByEntryConfig 基于入口 intake 结果继续创建测评的配置。
 type AssessmentByEntryConfig struct {
 	ClinicianRefs          []string     `yaml:"clinicianRefs"`
+	ClinicianKeyPrefixes   []string     `yaml:"clinicianKeyPrefixes"`
 	ClinicianIDs           []FlexibleID `yaml:"clinicianIds"`
 	EntryIDs               []FlexibleID `yaml:"entryIDs"`
 	MaxAssessmentsPerEntry int          `yaml:"maxAssessmentsPerEntry"`
@@ -394,6 +417,7 @@ func LoadSeedConfigWithPreference(filepath string, preferScale bool) (*SeedConfi
 	if err := yaml.Unmarshal(data, &config); err == nil {
 		if len(config.Staffs) > 0 ||
 			len(config.Clinicians) > 0 ||
+			len(config.ClinicianGenerators) > 0 ||
 			len(config.TesteeAssignments) > 0 ||
 			len(config.Testees) > 0 ||
 			len(config.Questionnaires) > 0 ||
