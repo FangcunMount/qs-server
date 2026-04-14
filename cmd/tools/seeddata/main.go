@@ -106,6 +106,7 @@ func main() {
 		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
 		assessmentSubmitWorkers = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
+		assignmentWorkers       = flag.Int("assignment-workers", 8, "Concurrent workers for testee-to-clinician assignment seeding")
 		testeePageSize          = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
 		testeeOffset            = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
 		testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan task creation (0 = no limit)")
@@ -244,6 +245,9 @@ func main() {
 		CategoryFilter:    *assessmentCategories,
 		Verbose:           *verbose,
 	}
+	assignmentOpts := assignmentSeedOptions{
+		WorkerCount: *assignmentWorkers,
+	}
 	planCreateOpts := planCreateOptions{
 		PlanID:           *planID,
 		PlanTesteeIDsRaw: *planTesteeIDsRaw,
@@ -284,7 +288,7 @@ func main() {
 				logger.Fatalw("Clinician seeding failed", "error", err)
 			}
 		case stepAssignTestees:
-			if err := seedAssignTestees(runCtx, deps); err != nil {
+			if err := seedAssignTestees(runCtx, deps, assignmentOpts); err != nil {
 				logger.Fatalw("Testee assignment seeding failed", "error", err)
 			}
 		case stepActorFixupTimes:

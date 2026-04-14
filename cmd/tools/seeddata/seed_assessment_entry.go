@@ -67,6 +67,7 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 	}
 
 	totalCreated := 0
+	totalUpdated := 0
 	totalSkipped := 0
 	totalMissingAnchor := 0
 
@@ -104,19 +105,29 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 		}
 
 		createdForClinician := 0
+		updatedForClinician := 0
 		skippedForClinician := 0
 		for idx, target := range targets {
-			targetKey := assessmentEntryTargetKey(target.TargetType, target.TargetCode, target.TargetVersion)
-			if _, exists := existingTargets[targetKey]; exists {
-				totalSkipped++
-				skippedForClinician++
-				continue
-			}
-
 			createdAt := deriveAssessmentEntryCreatedAt(anchor.AnchorCreatedAt, idx)
 			expiresAt, err := resolveAssessmentEntryExpiresAt(target, createdAt)
 			if err != nil {
 				return fmt.Errorf("resolve expires_at for clinician %s target %s: %w", clinicianItem.ID, assessmentEntryTargetLabel(target), err)
+			}
+
+			targetKey := assessmentEntryTargetKey(target.TargetType, target.TargetCode, target.TargetVersion)
+			if existingEntry, exists := existingTargets[targetKey]; exists {
+				updated, ensureErr := ensureAssessmentEntryTimes(ctx, mysqlDB, existingEntry.ID, createdAt, expiresAt)
+				if ensureErr != nil {
+					return fmt.Errorf("ensure assessment entry %s timestamps: %w", existingEntry.ID, ensureErr)
+				}
+				if updated {
+					totalUpdated++
+					updatedForClinician++
+				} else {
+					totalSkipped++
+					skippedForClinician++
+				}
+				continue
 			}
 
 			entryResp, err := deps.APIClient.CreateClinicianAssessmentEntry(ctx, clinicianItem.ID, CreateAssessmentEntryRequest{
@@ -144,6 +155,7 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 			"anchor_created_at", anchor.AnchorCreatedAt,
 			"active_testee_count", anchor.ActiveTesteeCount,
 			"created", createdForClinician,
+			"updated", updatedForClinician,
 			"skipped", skippedForClinician,
 		)
 	}
@@ -154,6 +166,7 @@ func seedAssessmentEntries(ctx context.Context, deps *dependencies) error {
 		"missing_anchor_clinicians", totalMissingAnchor,
 		"target_count", len(targets),
 		"created", totalCreated,
+		"updated", totalUpdated,
 		"skipped", totalSkipped,
 	)
 	return nil
@@ -261,12 +274,23 @@ func deriveAssessmentEntryCreatedAt(anchor time.Time, targetIndex int) time.Time
 }
 
 func resolveAssessmentEntryExpiresAt(cfg AssessmentEntryTargetConfig, createdAt time.Time) (*time.Time, error) {
+	return resolveAssessmentEntryExpiresAtAt(cfg, createdAt, time.Now())
+}
+
+func resolveAssessmentEntryExpiresAtAt(cfg AssessmentEntryTargetConfig, createdAt, now time.Time) (*time.Time, error) {
 	if cfg.ExpiresAfter != "" {
 		duration, err := parseSeedRelativeDuration(cfg.ExpiresAfter)
 		if err != nil {
 			return nil, err
 		}
-		value := createdAt.Add(duration)
+		base := createdAt
+		if base.IsZero() {
+			base = now.In(time.Local)
+		}
+		value := base.Add(duration)
+		if !now.IsZero() && !value.After(now) {
+			value = now.In(base.Location()).Add(duration)
+		}
 		return &value, nil
 	}
 	if cfg.ExpiresAt == "" {
@@ -281,6 +305,43 @@ func resolveAssessmentEntryExpiresAt(cfg AssessmentEntryTargetConfig, createdAt 
 		return nil, fmt.Errorf("expiresAt %s is before derived created_at %s", value.Format(time.RFC3339), createdAt.Format(time.RFC3339))
 	}
 	return &value, nil
+}
+
+func ensureAssessmentEntryTimes(ctx context.Context, mysqlDB *gorm.DB, entryID string, createdAt time.Time, expiresAt *time.Time) (bool, error) {
+	currentCreatedAt, currentExpiresAt, err := loadAssessmentEntryTimes(ctx, mysqlDB, entryID)
+	if err != nil {
+		return false, err
+	}
+	if currentCreatedAt.Equal(createdAt) && sameOptionalTime(currentExpiresAt, expiresAt) {
+		return false, nil
+	}
+	if err := backfillAssessmentEntryTimes(ctx, mysqlDB, entryID, createdAt, expiresAt); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func loadAssessmentEntryTimes(ctx context.Context, mysqlDB *gorm.DB, entryID string) (time.Time, *time.Time, error) {
+	var row struct {
+		CreatedAt time.Time  `gorm:"column:created_at"`
+		ExpiresAt *time.Time `gorm:"column:expires_at"`
+	}
+	err := mysqlDB.WithContext(ctx).
+		Table((actorMySQL.AssessmentEntryPO{}).TableName()).
+		Select("created_at, expires_at").
+		Where("id = ? AND deleted_at IS NULL", strings.TrimSpace(entryID)).
+		Take(&row).Error
+	if err != nil {
+		return time.Time{}, nil, fmt.Errorf("load assessment entry timestamps: %w", err)
+	}
+	return row.CreatedAt, row.ExpiresAt, nil
+}
+
+func sameOptionalTime(left, right *time.Time) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return left.Equal(*right)
 }
 
 func backfillAssessmentEntryTimes(ctx context.Context, mysqlDB *gorm.DB, entryID string, createdAt time.Time, expiresAt *time.Time) error {

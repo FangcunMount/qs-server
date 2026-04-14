@@ -110,7 +110,8 @@ go run ./cmd/tools/seeddata \
 ```bash
 go run ./cmd/tools/seeddata \
   --config "$CFG" \
-  --steps "assign_testees"
+  --steps "assign_testees" \
+  --assignment-workers 8
 ```
 
 说明：
@@ -120,6 +121,7 @@ go run ./cmd/tools/seeddata \
   - `explicit`：把指定 testee IDs 分配给某个 clinician
   - `round_robin`：把一批现有 testee 按轮询分给一组 clinician
 - `round_robin` 默认跳过已经存在有效 clinician 关系的 testee，避免重复堆叠
+- `--assignment-workers` 控制分配并发；默认 `8`，会自动按实际 job 数量收缩
 
 ### 方案 0.75：为已分配受试者的 clinician 批量创建测评入口
 

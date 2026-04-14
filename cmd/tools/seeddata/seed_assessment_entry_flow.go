@@ -46,6 +46,7 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 	totalEntries := 0
 	totalResolved := 0
 	totalSkipped := 0
+	totalExpired := 0
 
 	for _, clinicianItem := range clinicians {
 		if clinicianItem == nil || !clinicianItem.IsActive {
@@ -88,6 +89,17 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 				if _, ok := entryFilter[strings.TrimSpace(entry.ID)]; !ok {
 					continue
 				}
+			}
+			if isExpiredAssessmentEntry(entry, time.Now()) {
+				totalSkipped++
+				totalExpired++
+				skippedForClinician++
+				deps.Logger.Warnw("Skipping expired assessment entry during flow seeding",
+					"entry_id", entry.ID,
+					"clinician_id", clinicianItem.ID,
+					"expires_at", entry.ExpiresAt,
+				)
+				continue
 			}
 			totalEntries++
 
@@ -189,10 +201,18 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 		"processed_entries", totalEntries,
 		"resolved_and_intaked", totalResolved,
 		"skipped", totalSkipped,
+		"skipped_expired", totalExpired,
 		"max_intakes_per_entry", maxIntakes,
 		"allow_temporary_testee", cfg.AllowTemporaryTestee,
 	)
 	return nil
+}
+
+func isExpiredAssessmentEntry(entry *AssessmentEntryResponse, now time.Time) bool {
+	if entry == nil || entry.ExpiresAt == nil {
+		return false
+	}
+	return !entry.ExpiresAt.After(now)
 }
 
 func listAllClinicianRelations(ctx context.Context, client *APIClient, clinicianID string) ([]*ClinicianRelationResponse, error) {

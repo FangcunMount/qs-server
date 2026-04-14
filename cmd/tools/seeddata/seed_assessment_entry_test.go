@@ -59,6 +59,21 @@ func TestResolveAssessmentEntryExpiresAt(t *testing.T) {
 		}
 	})
 
+	t.Run("clamps relative expiry into future for historical anchors", func(t *testing.T) {
+		now := time.Date(2026, 4, 14, 18, 0, 0, 0, time.UTC)
+		historicalCreatedAt := time.Date(2021, 12, 30, 23, 19, 13, 0, time.UTC)
+		expiresAt, err := resolveAssessmentEntryExpiresAtAt(AssessmentEntryTargetConfig{
+			ExpiresAfter: "180d",
+		}, historicalCreatedAt, now)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := now.Add(180 * 24 * time.Hour)
+		if expiresAt == nil || !expiresAt.Equal(want) {
+			t.Fatalf("unexpected clamped expires_at: got=%v want=%v", expiresAt, want)
+		}
+	})
+
 	t.Run("rejects absolute expiry before created_at", func(t *testing.T) {
 		_, err := resolveAssessmentEntryExpiresAt(AssessmentEntryTargetConfig{
 			ExpiresAt: "2026-03-31 23:59:59",
@@ -67,6 +82,22 @@ func TestResolveAssessmentEntryExpiresAt(t *testing.T) {
 			t.Fatal("expected expires_at before created_at error")
 		}
 	})
+}
+
+func TestIsExpiredAssessmentEntry(t *testing.T) {
+	now := time.Date(2026, 4, 14, 18, 0, 0, 0, time.UTC)
+	expired := now.Add(-time.Minute)
+	future := now.Add(time.Minute)
+
+	if !isExpiredAssessmentEntry(&AssessmentEntryResponse{ExpiresAt: &expired}, now) {
+		t.Fatal("expected expired entry to be treated as expired")
+	}
+	if isExpiredAssessmentEntry(&AssessmentEntryResponse{ExpiresAt: &future}, now) {
+		t.Fatal("expected future entry to remain active")
+	}
+	if isExpiredAssessmentEntry(&AssessmentEntryResponse{}, now) {
+		t.Fatal("expected nil expires_at to be treated as non-expired")
+	}
 }
 
 func TestDeriveAssessmentEntryCreatedAt(t *testing.T) {

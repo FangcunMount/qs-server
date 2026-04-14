@@ -14,6 +14,10 @@ type assessmentSeedOptions struct {
 	Verbose           bool
 }
 
+type assignmentSeedOptions struct {
+	WorkerCount int
+}
+
 type planCreateOptions struct {
 	PlanID           string
 	PlanTesteeIDsRaw string

@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
 	testeeAssignmentStrategyExplicit   = "explicit"
 	testeeAssignmentStrategyRoundRobin = "round_robin"
 	defaultAssignmentPageSize          = 100
+	defaultAssignmentWorkers           = 8
 )
 
 type clinicianAssignmentTarget struct {
@@ -19,7 +24,17 @@ type clinicianAssignmentTarget struct {
 	EmployeeCode string
 }
 
-func seedAssignTestees(ctx context.Context, deps *dependencies) error {
+type testeeAssignmentJob struct {
+	TesteeID string
+	Target   clinicianAssignmentTarget
+}
+
+type assignmentKeyLocker struct {
+	mu    sync.Mutex
+	locks map[string]*sync.Mutex
+}
+
+func seedAssignTestees(ctx context.Context, deps *dependencies, opts assignmentSeedOptions) error {
 	orgID := deps.Config.Global.OrgID
 	if orgID == 0 {
 		return fmt.Errorf("global.orgId is required for testee assignment seeding")
@@ -74,7 +89,7 @@ func seedAssignTestees(ctx context.Context, deps *dependencies) error {
 			continue
 		}
 
-		assignedCount, skippedCount, err := applyTesteeAssignment(ctx, deps, orgID, cfg, targets, testees)
+		assignedCount, skippedCount, err := applyTesteeAssignment(ctx, deps, orgID, cfg, targets, testees, opts)
 		if err != nil {
 			return fmt.Errorf("apply assignment %q failed: %w", testeeAssignmentLabel(cfg, idx), err)
 		}
@@ -288,62 +303,158 @@ func applyTesteeAssignment(
 	cfg TesteeAssignmentConfig,
 	targets []clinicianAssignmentTarget,
 	testees []*ApiserverTesteeResponse,
+	opts assignmentSeedOptions,
 ) (assignedCount int, skippedCount int, err error) {
-	strategy := normalizedAssignmentStrategy(cfg.Strategy)
 	relationType := normalizedAssignmentRelationType(cfg.RelationType)
 	sourceType := strings.TrimSpace(cfg.SourceType)
 	if sourceType == "" {
 		sourceType = "manual"
 	}
 
+	jobs := buildTesteeAssignmentJobs(cfg, targets, testees)
+	if len(jobs) == 0 {
+		return 0, 0, nil
+	}
+	workers := normalizeAssignmentWorkers(opts.WorkerCount, len(jobs))
+	var assignedCounter atomic.Int64
+	var skippedCounter atomic.Int64
+	locker := newAssignmentKeyLocker()
+
+	jobCh := make(chan testeeAssignmentJob, workers)
+	g, gctx := errgroup.WithContext(ctx)
+
+	for i := 0; i < workers; i++ {
+		g.Go(func() error {
+			for {
+				select {
+				case <-gctx.Done():
+					return nil
+				case job, ok := <-jobCh:
+					if !ok {
+						return nil
+					}
+					unlock := locker.Lock(job.TesteeID)
+					assignErr := applySingleTesteeAssignment(gctx, deps, orgID, cfg, job, relationType, sourceType, &assignedCounter, &skippedCounter)
+					unlock()
+					if assignErr != nil {
+						return assignErr
+					}
+				}
+			}
+		})
+	}
+
+	g.Go(func() error {
+		defer close(jobCh)
+		for _, job := range jobs {
+			select {
+			case <-gctx.Done():
+				return nil
+			case jobCh <- job:
+			}
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return 0, 0, err
+	}
+	return int(assignedCounter.Load()), int(skippedCounter.Load()), nil
+}
+
+func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAssignmentTarget, testees []*ApiserverTesteeResponse) []testeeAssignmentJob {
+	if len(targets) == 0 || len(testees) == 0 {
+		return nil
+	}
+
+	strategy := normalizedAssignmentStrategy(cfg.Strategy)
+	jobs := make([]testeeAssignmentJob, 0, len(testees))
 	switch strategy {
 	case testeeAssignmentStrategyRoundRobin:
-		targetIndex := 0
-		for _, testee := range testees {
-			relations, relationErr := deps.APIClient.GetTesteeClinicians(ctx, testee.ID)
-			if relationErr != nil {
-				return assignedCount, skippedCount, fmt.Errorf("get clinician relations for testee %s: %w", testee.ID, relationErr)
-			}
-			if !cfg.IncludeAlreadyAssigned && hasAnyActiveAccessRelation(relations.Items) {
-				skippedCount++
+		for idx, testee := range testees {
+			if testee == nil || strings.TrimSpace(testee.ID) == "" {
 				continue
 			}
-
-			target := targets[targetIndex%len(targets)]
-			targetIndex++
-			if hasMatchingActiveRelation(relations.Items, target.ID, relationType) {
-				skippedCount++
-				continue
-			}
-			if _, assignErr := assignSingleTestee(ctx, deps.APIClient, orgID, target, testee.ID, relationType, sourceType); assignErr != nil {
-				return assignedCount, skippedCount, assignErr
-			}
-			assignedCount++
+			jobs = append(jobs, testeeAssignmentJob{
+				TesteeID: strings.TrimSpace(testee.ID),
+				Target:   targets[idx%len(targets)],
+			})
 		}
-		return assignedCount, skippedCount, nil
-
 	default:
 		target := targets[0]
 		for _, testee := range testees {
-			relations, relationErr := deps.APIClient.GetTesteeClinicians(ctx, testee.ID)
-			if relationErr != nil {
-				return assignedCount, skippedCount, fmt.Errorf("get clinician relations for testee %s: %w", testee.ID, relationErr)
-			}
-			if !cfg.IncludeAlreadyAssigned && hasAnyActiveAccessRelation(relations.Items) {
-				skippedCount++
+			if testee == nil || strings.TrimSpace(testee.ID) == "" {
 				continue
 			}
-			if hasMatchingActiveRelation(relations.Items, target.ID, relationType) {
-				skippedCount++
-				continue
-			}
-			if _, assignErr := assignSingleTestee(ctx, deps.APIClient, orgID, target, testee.ID, relationType, sourceType); assignErr != nil {
-				return assignedCount, skippedCount, assignErr
-			}
-			assignedCount++
+			jobs = append(jobs, testeeAssignmentJob{
+				TesteeID: strings.TrimSpace(testee.ID),
+				Target:   target,
+			})
 		}
-		return assignedCount, skippedCount, nil
 	}
+	return jobs
+}
+
+func normalizeAssignmentWorkers(workers, jobCount int) int {
+	if workers <= 0 {
+		workers = defaultAssignmentWorkers
+	}
+	if workers <= 0 {
+		workers = 1
+	}
+	if jobCount > 0 && workers > jobCount {
+		return jobCount
+	}
+	return workers
+}
+
+func applySingleTesteeAssignment(
+	ctx context.Context,
+	deps *dependencies,
+	orgID int64,
+	cfg TesteeAssignmentConfig,
+	job testeeAssignmentJob,
+	relationType string,
+	sourceType string,
+	assignedCounter *atomic.Int64,
+	skippedCounter *atomic.Int64,
+) error {
+	relations, relationErr := deps.APIClient.GetTesteeClinicians(ctx, job.TesteeID)
+	if relationErr != nil {
+		return fmt.Errorf("get clinician relations for testee %s: %w", job.TesteeID, relationErr)
+	}
+	if !cfg.IncludeAlreadyAssigned && hasAnyActiveAccessRelation(relations.Items) {
+		skippedCounter.Add(1)
+		return nil
+	}
+	if hasMatchingActiveRelation(relations.Items, job.Target.ID, relationType) {
+		skippedCounter.Add(1)
+		return nil
+	}
+	if _, assignErr := assignSingleTestee(ctx, deps.APIClient, orgID, job.Target, job.TesteeID, relationType, sourceType); assignErr != nil {
+		return assignErr
+	}
+	assignedCounter.Add(1)
+	return nil
+}
+
+func newAssignmentKeyLocker() *assignmentKeyLocker {
+	return &assignmentKeyLocker{
+		locks: make(map[string]*sync.Mutex),
+	}
+}
+
+func (l *assignmentKeyLocker) Lock(key string) func() {
+	key = strings.TrimSpace(key)
+	l.mu.Lock()
+	lock, ok := l.locks[key]
+	if !ok {
+		lock = &sync.Mutex{}
+		l.locks[key] = lock
+	}
+	l.mu.Unlock()
+	lock.Lock()
+	return lock.Unlock
 }
 
 func assignSingleTestee(
