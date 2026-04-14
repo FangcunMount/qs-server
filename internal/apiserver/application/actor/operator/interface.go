@@ -79,6 +79,7 @@ type RegisterOperatorDTO struct {
 	Name     string   // 姓名
 	Email    string   // 邮箱
 	Phone    string   // 手机号
+	Password string   // 初始密码（新建 IAM 运营账号时使用）
 	Roles    []string // 角色列表
 	IsActive bool     // 是否激活
 }

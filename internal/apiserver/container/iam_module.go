@@ -18,6 +18,7 @@ type IAMModule struct {
 	tokenVerifier       *iam.TokenVerifier
 	serviceAuthHelper   *iam.ServiceAuthHelper
 	identityService     *iam.IdentityService
+	operationAccountSvc *iam.OperationAccountService
 	guardianshipSvc     *iam.GuardianshipService
 	wechatAppService    *iam.WeChatAppService
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
@@ -93,6 +94,17 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
+	var operationAccountSvc *iam.OperationAccountService
+	if client.IsEnabled() {
+		operationAccountSvc, err = iam.NewOperationAccountService(client)
+		if err != nil {
+			logger.L(context.Background()).Warnw("Failed to create operation account service",
+				"component", "iam_module",
+				"error", err.Error(),
+			)
+		}
+	}
+
 	// 创建 Guardianship 服务
 	var guardianshipSvc *iam.GuardianshipService
 	if client.IsEnabled() {
@@ -137,6 +149,7 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		tokenVerifier:       tokenVerifier,
 		serviceAuthHelper:   serviceAuthHelper,
 		identityService:     identityService,
+		operationAccountSvc: operationAccountSvc,
 		guardianshipSvc:     guardianshipSvc,
 		wechatAppService:    wechatAppService,
 		authzSnapshotLoader: authzSnapshotLoader,
@@ -171,6 +184,11 @@ func (m *IAMModule) ServiceAuthHelper() *iam.ServiceAuthHelper {
 // 用于用户信息查询
 func (m *IAMModule) IdentityService() *iam.IdentityService {
 	return m.identityService
+}
+
+// OperationAccountService 返回运营账号注册服务。
+func (m *IAMModule) OperationAccountService() *iam.OperationAccountService {
+	return m.operationAccountSvc
 }
 
 // GuardianshipService 返回监护关系服务

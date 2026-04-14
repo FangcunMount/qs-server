@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
@@ -25,6 +26,7 @@ type lifecycleService struct {
 	binder        domain.Binder
 	uow           *mysql.UnitOfWork
 	identitySvc   *iam.IdentityService
+	accountSvc    *iam.OperationAccountService
 	assignment    *iam.AuthzAssignmentClient
 	snapshot      *iam.AuthzSnapshotLoader
 }
@@ -40,6 +42,7 @@ func NewLifecycleService(
 	binder domain.Binder,
 	uow *mysql.UnitOfWork,
 	identitySvc *iam.IdentityService,
+	accountSvc *iam.OperationAccountService,
 	assignment *iam.AuthzAssignmentClient,
 	snapshot *iam.AuthzSnapshotLoader,
 ) OperatorLifecycleService {
@@ -53,6 +56,7 @@ func NewLifecycleService(
 		binder:        binder,
 		uow:           uow,
 		identitySvc:   identitySvc,
+		accountSvc:    accountSvc,
 		assignment:    assignment,
 		snapshot:      snapshot,
 	}
@@ -89,7 +93,10 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 
 	if dto.IsActive && s.assignment != nil && s.snapshot != nil {
 		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
-			return nil, errors.Wrap(err, "iam role assignment after register")
+			if rollbackErr := s.rollbackRegisteredOperator(ctx, result.ID()); rollbackErr != nil {
+				return nil, errors.Wrapf(rollbackErr, "iam role assignment after register failed and operator rollback failed: %v", err)
+			}
+			return nil, errors.Wrap(err, "iam role assignment after register; local operator rolled back")
 		}
 	}
 
@@ -224,14 +231,37 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 			return errors.WithCode(code.ErrValidation, "roles are required when IAM authorization is not enabled")
 		}
 	}
-	if dto.UserID == 0 && dto.Phone == "" {
-		return errors.WithCode(code.ErrValidation, "phone is required when user_id is not provided")
+	if dto.UserID == 0 {
+		if dto.Phone == "" {
+			return errors.WithCode(code.ErrValidation, "phone is required when user_id is not provided")
+		}
+		if strings.TrimSpace(dto.Password) == "" {
+			return errors.WithCode(code.ErrValidation, "password is required when user_id is not provided")
+		}
 	}
 	return nil
 }
 
-// resolveOrCreateUser: 若 DTO 中已有 userID 则直接返回；否则先按 phone 搜索 IAM 用户，找到返回其 ID，未找到则创建新用户并返回
+// resolveOrCreateUser: 优先通过 IAM 注册运营账号（可同时创建 user/account/credential），否则回退到 legacy user-only 创建。
 func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto RegisterOperatorDTO) (int64, error) {
+	if strings.TrimSpace(dto.Password) != "" {
+		if s.accountSvc == nil || !s.accountSvc.IsEnabled() {
+			return 0, errors.WithCode(code.ErrValidation, "IAM operation account service is not enabled")
+		}
+		result, err := s.accountSvc.RegisterOperationAccount(ctx, iam.RegisterOperationAccountInput{
+			ExistingUserID: formatOptionalUserID(dto.UserID),
+			Name:           dto.Name,
+			Phone:          dto.Phone,
+			Email:          dto.Email,
+			ScopedTenantID: strconv.FormatInt(dto.OrgID, 10),
+			Password:       dto.Password,
+		})
+		if err != nil {
+			return 0, err
+		}
+		return result.UserID, nil
+	}
+
 	userID := dto.UserID
 	if userID != 0 {
 		return userID, nil
@@ -257,6 +287,13 @@ func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto Register
 
 	// 未找到则创建
 	return s.identitySvc.CreateUser(ctx, dto.Name, dto.Email, dto.Phone)
+}
+
+func formatOptionalUserID(userID int64) string {
+	if userID == 0 {
+		return ""
+	}
+	return strconv.FormatInt(userID, 10)
 }
 
 // createAndSaveOperator 在事务内检查是否已存在、创建 Operator、分配角色并保存
@@ -319,4 +356,13 @@ func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *do
 	}
 	_, err := iam.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, op.OrgID(), op)
 	return err
+}
+
+func (s *lifecycleService) rollbackRegisteredOperator(ctx context.Context, id domain.ID) error {
+	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.repo.Delete(txCtx, id); err != nil {
+			return errors.Wrap(err, "failed to rollback operator")
+		}
+		return nil
+	})
 }

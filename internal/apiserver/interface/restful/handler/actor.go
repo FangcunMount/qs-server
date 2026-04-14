@@ -1143,6 +1143,7 @@ func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorAp
 		Name:     req.Name,
 		Email:    req.Email,
 		Phone:    req.Phone,
+		Password: req.Password,
 		IsActive: isActive,
 	}
 }

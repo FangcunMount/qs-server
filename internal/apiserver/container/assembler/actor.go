@@ -82,6 +82,12 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 			opAuthz = b
 		}
 	}
+	var operationAccountSvc *iam.OperationAccountService
+	if len(params) > 5 {
+		if svc, ok := params[5].(*iam.OperationAccountService); ok {
+			operationAccountSvc = svc
+		}
+	}
 	var authzAssign *iam.AuthzAssignmentClient
 	var authzSnap *iam.AuthzSnapshotLoader
 	if opAuthz != nil {
@@ -186,6 +192,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		operatorBinder,
 		uow,
 		identitySvc,
+		operationAccountSvc,
 		authzAssign,
 		authzSnap,
 	)

@@ -2,6 +2,8 @@ module github.com/FangcunMount/qs-server
 
 go 1.24.0
 
+replace github.com/FangcunMount/iam-contracts => ../iam-contracts
+
 require (
 	github.com/FangcunMount/component-base v0.4.4
 	github.com/FangcunMount/iam-contracts v0.1.6

@@ -54,6 +54,7 @@ type CreateStaffRequest struct {
 	Name     string   `json:"name" binding:"required"`         // 姓名
 	Email    string   `json:"email" binding:"omitempty,email"` // 邮箱
 	Phone    string   `json:"phone"`                           // 电话
+	Password string   `json:"password"`                        // 新建 IAM 运营账号时的初始密码
 	IsActive *bool    `json:"is_active"`                       // 是否激活
 }
 
