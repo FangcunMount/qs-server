@@ -32,6 +32,26 @@ global:
   orgId: 1
   defaultTag: ""
 
+staffs: []
+clinicians: []
+testeeAssignments: []
+assessmentEntryTargets: []
+assessmentEntryFlow:
+  clinicianRefs: []
+  clinicianIds: []
+  entryIDs: []
+  maxIntakesPerEntry: 5
+  allowTemporaryTestee: false
+assessmentByEntry:
+  clinicianRefs: []
+  clinicianIds: []
+  entryIDs: []
+  maxAssessmentsPerEntry: 5
+assessmentStatusProfile:
+  pending: 0.10
+  submitted: 0.15
+  interpreted: 0.70
+  failed: 0.05
 testees: []
 questionnaires: []
 scales: []

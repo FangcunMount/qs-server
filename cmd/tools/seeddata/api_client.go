@@ -433,9 +433,14 @@ type CollectionListScalesResponse struct {
 
 // ApiserverTesteeResponse 受试者响应（apiserver）
 type ApiserverTesteeResponse struct {
-	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string     `json:"id"`
+	OrgID     string     `json:"org_id,omitempty"`
+	ProfileID *string    `json:"profile_id,omitempty"`
+	Name      string     `json:"name"`
+	Gender    string     `json:"gender,omitempty"`
+	Birthday  *time.Time `json:"birthday,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 // ApiserverTesteeListResponse 受试者列表响应（apiserver）
@@ -453,6 +458,181 @@ type TesteeResponse struct {
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
+}
+
+// StaffResponse 员工响应（apiserver）。
+type StaffResponse struct {
+	ID        string    `json:"id"`
+	OrgID     string    `json:"org_id"`
+	UserID    string    `json:"user_id"`
+	Roles     []string  `json:"roles"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email,omitempty"`
+	Phone     string    `json:"phone,omitempty"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// StaffListResponse 员工列表响应（apiserver）。
+type StaffListResponse struct {
+	Items      []*StaffResponse `json:"items"`
+	Total      int64            `json:"total"`
+	Page       int              `json:"page"`
+	PageSize   int              `json:"page_size"`
+	TotalPages int              `json:"total_pages"`
+}
+
+// CreateStaffRequest 创建员工请求（apiserver）。
+type CreateStaffRequest struct {
+	OrgID    int64    `json:"org_id"`
+	UserID   *uint64  `json:"user_id,omitempty"`
+	Roles    []string `json:"roles"`
+	Name     string   `json:"name"`
+	Email    string   `json:"email,omitempty"`
+	Phone    string   `json:"phone,omitempty"`
+	Password string   `json:"password,omitempty"`
+	IsActive *bool    `json:"is_active,omitempty"`
+}
+
+// ClinicianResponse 临床医师响应（apiserver）。
+type ClinicianResponse struct {
+	ID                   string  `json:"id"`
+	OrgID                string  `json:"org_id"`
+	OperatorID           *string `json:"operator_id,omitempty"`
+	Name                 string  `json:"name"`
+	Department           string  `json:"department,omitempty"`
+	Title                string  `json:"title,omitempty"`
+	ClinicianType        string  `json:"clinician_type"`
+	EmployeeCode         string  `json:"employee_code,omitempty"`
+	IsActive             bool    `json:"is_active"`
+	AssignedTesteeCount  int64   `json:"assigned_testee_count"`
+	AssessmentEntryCount int64   `json:"assessment_entry_count"`
+}
+
+// ClinicianListResponse 临床医师列表响应（apiserver）。
+type ClinicianListResponse struct {
+	Items      []*ClinicianResponse `json:"items"`
+	Total      int64                `json:"total"`
+	Page       int                  `json:"page"`
+	PageSize   int                  `json:"page_size"`
+	TotalPages int                  `json:"total_pages"`
+}
+
+// AssessmentEntryResponse 测评入口响应（apiserver）。
+type AssessmentEntryResponse struct {
+	ID            string     `json:"id"`
+	OrgID         string     `json:"org_id"`
+	ClinicianID   string     `json:"clinician_id"`
+	Token         string     `json:"token"`
+	TargetType    string     `json:"target_type"`
+	TargetCode    string     `json:"target_code"`
+	TargetVersion string     `json:"target_version,omitempty"`
+	IsActive      bool       `json:"is_active"`
+	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
+	QRCodeURL     string     `json:"qrcode_url,omitempty"`
+}
+
+// AssessmentEntryListResponse 测评入口列表响应（apiserver）。
+type AssessmentEntryListResponse struct {
+	Items      []*AssessmentEntryResponse `json:"items"`
+	Total      int64                      `json:"total"`
+	Page       int                        `json:"page"`
+	PageSize   int                        `json:"page_size"`
+	TotalPages int                        `json:"total_pages"`
+}
+
+// RelationResponse 从业者关系响应（apiserver）。
+type RelationResponse struct {
+	ID           string     `json:"id"`
+	OrgID        string     `json:"org_id"`
+	ClinicianID  string     `json:"clinician_id"`
+	TesteeID     string     `json:"testee_id"`
+	RelationType string     `json:"relation_type"`
+	SourceType   string     `json:"source_type"`
+	SourceID     *string    `json:"source_id,omitempty"`
+	IsActive     bool       `json:"is_active"`
+	BoundAt      time.Time  `json:"bound_at"`
+	UnboundAt    *time.Time `json:"unbound_at,omitempty"`
+}
+
+// TesteeClinicianRelationResponse 受试者-从业者关系响应（apiserver）。
+type TesteeClinicianRelationResponse struct {
+	Clinician *ClinicianResponse `json:"clinician"`
+	Relation  *RelationResponse  `json:"relation"`
+}
+
+// TesteeClinicianRelationListResponse 受试者-从业者关系列表响应（apiserver）。
+type TesteeClinicianRelationListResponse struct {
+	Items []*TesteeClinicianRelationResponse `json:"items"`
+}
+
+// ClinicianRelationResponse 从业者关系详情响应（apiserver）。
+type ClinicianRelationResponse struct {
+	Testee   *ApiserverTesteeResponse `json:"testee"`
+	Relation *RelationResponse        `json:"relation"`
+}
+
+// ClinicianRelationListResponse 从业者关系列表响应（apiserver）。
+type ClinicianRelationListResponse struct {
+	Items      []*ClinicianRelationResponse `json:"items"`
+	Total      int64                        `json:"total"`
+	Page       int                          `json:"page"`
+	PageSize   int                          `json:"page_size"`
+	TotalPages int                          `json:"total_pages"`
+}
+
+// CreateClinicianRequest 创建临床医师请求（apiserver）。
+type CreateClinicianRequest struct {
+	OrgID         int64   `json:"org_id"`
+	OperatorID    *uint64 `json:"operator_id,omitempty"`
+	Name          string  `json:"name"`
+	Department    string  `json:"department,omitempty"`
+	Title         string  `json:"title,omitempty"`
+	ClinicianType string  `json:"clinician_type"`
+	EmployeeCode  string  `json:"employee_code,omitempty"`
+	IsActive      bool    `json:"is_active"`
+}
+
+// CreateAssessmentEntryRequest 创建测评入口请求（apiserver）。
+type CreateAssessmentEntryRequest struct {
+	TargetType    string     `json:"target_type"`
+	TargetCode    string     `json:"target_code"`
+	TargetVersion string     `json:"target_version,omitempty"`
+	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
+}
+
+// IntakeAssessmentEntryRequest 公开入口 intake 请求（apiserver）。
+type IntakeAssessmentEntryRequest struct {
+	ProfileID *uint64    `json:"profile_id,omitempty"`
+	Name      string     `json:"name"`
+	Gender    string     `json:"gender,omitempty"`
+	Birthday  *time.Time `json:"birthday,omitempty"`
+}
+
+// AssessmentEntryResolvedResponse 公开入口解析响应（apiserver）。
+type AssessmentEntryResolvedResponse struct {
+	Entry     *AssessmentEntryResponse `json:"entry"`
+	Clinician *ClinicianResponse       `json:"clinician"`
+}
+
+// AssessmentEntryIntakeResponse 公开入口 intake 响应（apiserver）。
+type AssessmentEntryIntakeResponse struct {
+	Entry      *AssessmentEntryResponse `json:"entry"`
+	Clinician  *ClinicianResponse       `json:"clinician"`
+	Testee     *ApiserverTesteeResponse `json:"testee"`
+	Relation   *RelationResponse        `json:"relation,omitempty"`
+	Assignment *RelationResponse        `json:"assignment,omitempty"`
+}
+
+// AssignClinicianTesteeRequest 建立从业者关系请求（apiserver）。
+type AssignClinicianTesteeRequest struct {
+	OrgID        int64   `json:"org_id"`
+	ClinicianID  uint64  `json:"clinician_id"`
+	TesteeID     uint64  `json:"testee_id"`
+	RelationType string  `json:"relation_type,omitempty"`
+	SourceType   string  `json:"source_type,omitempty"`
+	SourceID     *uint64 `json:"source_id,omitempty"`
 }
 
 // ListTesteesResponse 受试者列表响应（collection-server）
@@ -1332,6 +1512,224 @@ func (c *APIClient) ListTesteesByOrg(ctx context.Context, orgID int64, page, pag
 	}
 
 	return &listResp, nil
+}
+
+// GetTesteeByID 获取受试者详情（apiserver）。
+func (c *APIClient) GetTesteeByID(ctx context.Context, testeeID string) (*ApiserverTesteeResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/testees/%s", strings.TrimSpace(testeeID)), nil)
+	if err != nil {
+		return nil, fmt.Errorf("get testee %s: %w", testeeID, err)
+	}
+
+	var item ApiserverTesteeResponse
+	if err := decodeResponseData(resp, &item); err != nil {
+		return nil, fmt.Errorf("decode testee response: %w", err)
+	}
+	return &item, nil
+}
+
+// ListStaff 获取员工列表（apiserver）。
+func (c *APIClient) ListStaff(ctx context.Context, orgID int64, page, pageSize int) (*StaffListResponse, error) {
+	path := fmt.Sprintf("/api/v1/staff?org_id=%d&page=%d&page_size=%d", orgID, page, pageSize)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list staff: org_id=%d page=%d page_size=%d: %w", orgID, page, pageSize, err)
+	}
+
+	var listResp StaffListResponse
+	if err := decodeResponseData(resp, &listResp); err != nil {
+		return nil, fmt.Errorf("decode staff list response: %w", err)
+	}
+	return &listResp, nil
+}
+
+// CreateStaff 创建员工（apiserver）。
+func (c *APIClient) CreateStaff(ctx context.Context, req CreateStaffRequest) (*StaffResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/staff", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var staffResp StaffResponse
+	if err := decodeResponseData(resp, &staffResp); err != nil {
+		return nil, fmt.Errorf("decode staff response: %w", err)
+	}
+	return &staffResp, nil
+}
+
+// ListClinicians 获取临床医师列表（apiserver）。
+func (c *APIClient) ListClinicians(ctx context.Context, orgID int64, page, pageSize int) (*ClinicianListResponse, error) {
+	path := fmt.Sprintf("/api/v1/clinicians?org_id=%d&page=%d&page_size=%d", orgID, page, pageSize)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list clinicians: org_id=%d page=%d page_size=%d: %w", orgID, page, pageSize, err)
+	}
+
+	var listResp ClinicianListResponse
+	if err := decodeResponseData(resp, &listResp); err != nil {
+		return nil, fmt.Errorf("decode clinician list response: %w", err)
+	}
+	return &listResp, nil
+}
+
+// CreateClinician 创建临床医师（apiserver）。
+func (c *APIClient) CreateClinician(ctx context.Context, req CreateClinicianRequest) (*ClinicianResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", "/api/v1/clinicians", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var clinicianResp ClinicianResponse
+	if err := decodeResponseData(resp, &clinicianResp); err != nil {
+		return nil, fmt.Errorf("decode clinician response: %w", err)
+	}
+	return &clinicianResp, nil
+}
+
+// ListClinicianAssessmentEntries 获取临床医师测评入口列表（apiserver）。
+func (c *APIClient) ListClinicianAssessmentEntries(ctx context.Context, clinicianID string, page, pageSize int) (*AssessmentEntryListResponse, error) {
+	path := fmt.Sprintf("/api/v1/clinicians/%s/assessment-entries?page=%d&page_size=%d", clinicianID, page, pageSize)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list clinician assessment entries: clinician_id=%s page=%d page_size=%d: %w", clinicianID, page, pageSize, err)
+	}
+
+	var listResp AssessmentEntryListResponse
+	if err := decodeResponseData(resp, &listResp); err != nil {
+		return nil, fmt.Errorf("decode clinician assessment entry list response: %w", err)
+	}
+	return &listResp, nil
+}
+
+// CreateClinicianAssessmentEntry 创建临床医师测评入口（apiserver）。
+func (c *APIClient) CreateClinicianAssessmentEntry(ctx context.Context, clinicianID string, req CreateAssessmentEntryRequest) (*AssessmentEntryResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/clinicians/%s/assessment-entries", clinicianID), req)
+	if err != nil {
+		return nil, err
+	}
+
+	var entryResp AssessmentEntryResponse
+	if err := decodeResponseData(resp, &entryResp); err != nil {
+		return nil, fmt.Errorf("decode clinician assessment entry response: %w", err)
+	}
+	return &entryResp, nil
+}
+
+// ListClinicianRelations 获取临床医师当前有效的 testee 关系（apiserver）。
+func (c *APIClient) ListClinicianRelations(ctx context.Context, clinicianID string, page, pageSize int) (*ClinicianRelationListResponse, error) {
+	path := fmt.Sprintf("/api/v1/clinicians/%s/relations?page=%d&page_size=%d", clinicianID, page, pageSize)
+	resp, err := c.doRequest(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list clinician relations: clinician_id=%s page=%d page_size=%d: %w", clinicianID, page, pageSize, err)
+	}
+
+	var listResp ClinicianRelationListResponse
+	if err := decodeResponseData(resp, &listResp); err != nil {
+		return nil, fmt.Errorf("decode clinician relation list response: %w", err)
+	}
+	return &listResp, nil
+}
+
+// ResolveAssessmentEntry 公开解析测评入口（apiserver）。
+func (c *APIClient) ResolveAssessmentEntry(ctx context.Context, token string) (*AssessmentEntryResolvedResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/public/assessment-entries/%s", strings.TrimSpace(token)), nil)
+	if err != nil {
+		return nil, fmt.Errorf("resolve assessment entry token=%s: %w", token, err)
+	}
+
+	var result AssessmentEntryResolvedResponse
+	if err := decodeResponseData(resp, &result); err != nil {
+		return nil, fmt.Errorf("decode assessment entry resolve response: %w", err)
+	}
+	return &result, nil
+}
+
+// IntakeAssessmentEntry 公开扫码 intake（apiserver）。
+func (c *APIClient) IntakeAssessmentEntry(ctx context.Context, token string, req IntakeAssessmentEntryRequest) (*AssessmentEntryIntakeResponse, error) {
+	resp, err := c.doRequest(ctx, "POST", fmt.Sprintf("/api/v1/public/assessment-entries/%s/intake", strings.TrimSpace(token)), req)
+	if err != nil {
+		return nil, fmt.Errorf("intake assessment entry token=%s: %w", token, err)
+	}
+
+	var result AssessmentEntryIntakeResponse
+	if err := decodeResponseData(resp, &result); err != nil {
+		return nil, fmt.Errorf("decode assessment entry intake response: %w", err)
+	}
+	return &result, nil
+}
+
+// GetTesteeClinicians 获取受试者当前有效的从业者关系（apiserver）。
+func (c *APIClient) GetTesteeClinicians(ctx context.Context, testeeID string) (*TesteeClinicianRelationListResponse, error) {
+	resp, err := c.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/testees/%s/clinicians", testeeID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var relationResp TesteeClinicianRelationListResponse
+	if err := decodeResponseData(resp, &relationResp); err != nil {
+		return nil, fmt.Errorf("decode testee clinician relations response: %w", err)
+	}
+	return &relationResp, nil
+}
+
+// SyncStatisticsDaily 调用内部统计每日同步接口。
+func (c *APIClient) SyncStatisticsDaily(ctx context.Context) error {
+	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/sync/daily", nil)
+	if err != nil {
+		return fmt.Errorf("sync statistics daily: %w", err)
+	}
+	return nil
+}
+
+// SyncStatisticsAccumulated 调用内部统计累计同步接口。
+func (c *APIClient) SyncStatisticsAccumulated(ctx context.Context) error {
+	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/sync/accumulated", nil)
+	if err != nil {
+		return fmt.Errorf("sync statistics accumulated: %w", err)
+	}
+	return nil
+}
+
+// SyncStatisticsPlan 调用内部统计计划同步接口。
+func (c *APIClient) SyncStatisticsPlan(ctx context.Context) error {
+	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/sync/plan", nil)
+	if err != nil {
+		return fmt.Errorf("sync statistics plan: %w", err)
+	}
+	return nil
+}
+
+// ValidateStatisticsConsistency 调用内部统计一致性校验接口。
+func (c *APIClient) ValidateStatisticsConsistency(ctx context.Context) error {
+	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/validate", nil)
+	if err != nil {
+		return fmt.Errorf("validate statistics consistency: %w", err)
+	}
+	return nil
+}
+
+// AssignClinicianTesteeWithRelationType 按指定关系类型建立受试者分配（apiserver）。
+func (c *APIClient) AssignClinicianTesteeWithRelationType(ctx context.Context, relationType string, req AssignClinicianTesteeRequest) (*RelationResponse, error) {
+	path := "/api/v1/clinician-testee-relations/assign"
+	switch strings.ToLower(strings.TrimSpace(relationType)) {
+	case "primary":
+		path = "/api/v1/clinician-testee-relations/assign-primary"
+	case "collaborator":
+		path = "/api/v1/clinician-testee-relations/assign-collaborator"
+	case "attending", "", "assigned":
+		path = "/api/v1/clinician-testee-relations/assign-attending"
+	}
+
+	resp, err := c.doRequest(ctx, "POST", path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var relationResp RelationResponse
+	if err := decodeResponseData(resp, &relationResp); err != nil {
+		return nil, fmt.Errorf("decode clinician-testee relation response: %w", err)
+	}
+	return &relationResp, nil
 }
 
 // GetQuestionnaireDetail 获取问卷详情（collection-server）

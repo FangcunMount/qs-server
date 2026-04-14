@@ -46,11 +46,19 @@ type seedStep string
 
 // All available seed steps.
 const (
-	stepAssessment       seedStep = "assessment"         // 提交答卷并生成测评
-	stepPlan             seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
-	stepPlanCreateTasks  seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
-	stepPlanProcessTasks seedStep = "plan_process_tasks" // 调度并处理计划任务
-	stepPlanFixupTimes   seedStep = "plan_fixup_timestamps"
+	stepStaff               seedStep = "staff"
+	stepClinician           seedStep = "clinician"
+	stepAssignTestees       seedStep = "assign_testees"
+	stepActorFixupTimes     seedStep = "actor_fixup_timestamps"
+	stepAssessmentEntries   seedStep = "assessment_entries"
+	stepAssessmentEntryFlow seedStep = "assessment_entry_flow"
+	stepAssessmentByEntry   seedStep = "assessment_by_entry"
+	stepAssessment          seedStep = "assessment"         // 提交答卷并生成测评
+	stepPlan                seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
+	stepPlanCreateTasks     seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
+	stepPlanProcessTasks    seedStep = "plan_process_tasks" // 调度并处理计划任务
+	stepPlanFixupTimes      seedStep = "plan_fixup_timestamps"
+	stepStatisticsBackfill  seedStep = "statistics_backfill"
 )
 
 // defaultSteps defines the default execution order of all seed steps.
@@ -267,6 +275,34 @@ func main() {
 
 	for _, step := range steps {
 		switch step {
+		case stepStaff:
+			if err := seedStaffs(runCtx, deps); err != nil {
+				logger.Fatalw("Staff seeding failed", "error", err)
+			}
+		case stepClinician:
+			if err := seedClinicians(runCtx, deps); err != nil {
+				logger.Fatalw("Clinician seeding failed", "error", err)
+			}
+		case stepAssignTestees:
+			if err := seedAssignTestees(runCtx, deps); err != nil {
+				logger.Fatalw("Testee assignment seeding failed", "error", err)
+			}
+		case stepActorFixupTimes:
+			if err := seedActorFixupTimestamps(runCtx, deps); err != nil {
+				logger.Fatalw("Actor timestamp fixup failed", "error", err)
+			}
+		case stepAssessmentEntries:
+			if err := seedAssessmentEntries(runCtx, deps); err != nil {
+				logger.Fatalw("Assessment entry seeding failed", "error", err)
+			}
+		case stepAssessmentEntryFlow:
+			if err := seedAssessmentEntryFlow(runCtx, deps); err != nil {
+				logger.Fatalw("Assessment entry flow seeding failed", "error", err)
+			}
+		case stepAssessmentByEntry:
+			if err := seedAssessmentByEntry(runCtx, deps); err != nil {
+				logger.Fatalw("Assessment by entry seeding failed", "error", err)
+			}
 		case stepAssessment:
 			if err := seedAssessments(runCtx, deps, assessmentOpts); err != nil {
 				logger.Fatalw("Assessment seeding failed", "error", err)
@@ -286,6 +322,10 @@ func main() {
 		case stepPlanFixupTimes:
 			if err := seedPlanFixupTimestamps(runCtx, deps, planFixupOpts); err != nil {
 				logger.Fatalw("Plan timestamp fixup failed", "error", err)
+			}
+		case stepStatisticsBackfill:
+			if err := seedStatisticsBackfill(runCtx, deps); err != nil {
+				logger.Fatalw("Statistics backfill failed", "error", err)
 			}
 		default:
 			logger.Warnw("Skipping unimplemented step", "step", step)

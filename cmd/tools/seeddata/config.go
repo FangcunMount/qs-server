@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -78,9 +79,16 @@ type SeedConfig struct {
 	Local LocalRuntimeConfig `yaml:"local"`
 
 	// 各个领域的种子数据配置
-	Testees        []TesteeConfig        `yaml:"testees"`
-	Questionnaires []QuestionnaireConfig `yaml:"questionnaires"`
-	Scales         []ScaleConfig         `yaml:"scales"`
+	Staffs                  []StaffConfig                 `yaml:"staffs"`
+	Clinicians              []ClinicianConfig             `yaml:"clinicians"`
+	TesteeAssignments       []TesteeAssignmentConfig      `yaml:"testeeAssignments"`
+	AssessmentEntryTargets  []AssessmentEntryTargetConfig `yaml:"assessmentEntryTargets"`
+	AssessmentEntryFlow     AssessmentEntryFlowConfig     `yaml:"assessmentEntryFlow"`
+	AssessmentByEntry       AssessmentByEntryConfig       `yaml:"assessmentByEntry"`
+	AssessmentStatusProfile AssessmentStatusProfileConfig `yaml:"assessmentStatusProfile"`
+	Testees                 []TesteeConfig                `yaml:"testees"`
+	Questionnaires          []QuestionnaireConfig         `yaml:"questionnaires"`
+	Scales                  []ScaleConfig                 `yaml:"scales"`
 }
 
 // GlobalConfig 全局配置
@@ -121,6 +129,134 @@ type RetryConfig struct {
 	MaxRetries int    `yaml:"maxRetries"` // Max retry attempts (not counting the first request)
 	MinDelay   string `yaml:"minDelay"`   // e.g. "200ms"
 	MaxDelay   string `yaml:"maxDelay"`   // e.g. "5s"
+}
+
+// FlexibleID 支持 YAML 字符串或数字格式的 ID 字段。
+type FlexibleID string
+
+// UnmarshalYAML 支持 string / number。
+func (f *FlexibleID) UnmarshalYAML(node *yaml.Node) error {
+	var strVal string
+	if err := node.Decode(&strVal); err == nil {
+		*f = FlexibleID(strings.TrimSpace(strVal))
+		return nil
+	}
+
+	var uintVal uint64
+	if err := node.Decode(&uintVal); err == nil {
+		*f = FlexibleID(strconv.FormatUint(uintVal, 10))
+		return nil
+	}
+
+	var intVal int64
+	if err := node.Decode(&intVal); err == nil {
+		if intVal < 0 {
+			return fmt.Errorf("cannot parse negative id %d", intVal)
+		}
+		*f = FlexibleID(strconv.FormatUint(uint64(intVal), 10))
+		return nil
+	}
+
+	return fmt.Errorf("cannot unmarshal %v into FlexibleID", node.Value)
+}
+
+// String 返回底层字符串值。
+func (f FlexibleID) String() string {
+	return strings.TrimSpace(string(f))
+}
+
+// IsZero 判断 ID 是否为空。
+func (f FlexibleID) IsZero() bool {
+	return f.String() == ""
+}
+
+// Uint64 将 ID 转换为 uint64。
+func (f FlexibleID) Uint64() (uint64, error) {
+	if f.IsZero() {
+		return 0, nil
+	}
+	value, err := strconv.ParseUint(f.String(), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cannot parse '%s' as uint64: %w", f.String(), err)
+	}
+	return value, nil
+}
+
+// StaffConfig 员工账号种子配置。
+type StaffConfig struct {
+	Key      string     `yaml:"key"`
+	UserID   FlexibleID `yaml:"userId"`
+	Name     string     `yaml:"name"`
+	Email    string     `yaml:"email"`
+	Phone    string     `yaml:"phone"`
+	Password string     `yaml:"password"`
+	Roles    []string   `yaml:"roles"`
+	IsActive *bool      `yaml:"isActive"`
+}
+
+// ClinicianConfig 临床医师种子配置。
+type ClinicianConfig struct {
+	Key           string     `yaml:"key"`
+	OperatorRef   string     `yaml:"operatorRef"`
+	OperatorID    FlexibleID `yaml:"operatorId"`
+	Name          string     `yaml:"name"`
+	Department    string     `yaml:"department"`
+	Title         string     `yaml:"title"`
+	ClinicianType string     `yaml:"clinicianType"`
+	EmployeeCode  string     `yaml:"employeeCode"`
+	IsActive      *bool      `yaml:"isActive"`
+}
+
+// TesteeAssignmentConfig 受试者分配配置。
+type TesteeAssignmentConfig struct {
+	Key                    string       `yaml:"key"`
+	Strategy               string       `yaml:"strategy"`
+	RelationType           string       `yaml:"relationType"`
+	SourceType             string       `yaml:"sourceType"`
+	ClinicianRef           string       `yaml:"clinicianRef"`
+	ClinicianID            FlexibleID   `yaml:"clinicianId"`
+	ClinicianRefs          []string     `yaml:"clinicianRefs"`
+	ClinicianIDs           []FlexibleID `yaml:"clinicianIds"`
+	TesteeIDs              []FlexibleID `yaml:"testeeIds"`
+	TesteeOffset           int          `yaml:"testeeOffset"`
+	TesteeLimit            int          `yaml:"testeeLimit"`
+	TesteePageSize         int          `yaml:"testeePageSize"`
+	IncludeAlreadyAssigned bool         `yaml:"includeAlreadyAssigned"`
+}
+
+// AssessmentEntryTargetConfig clinician 共享测评入口目标配置。
+type AssessmentEntryTargetConfig struct {
+	Key           string `yaml:"key"`
+	TargetType    string `yaml:"targetType"`
+	TargetCode    string `yaml:"targetCode"`
+	TargetVersion string `yaml:"targetVersion"`
+	ExpiresAt     string `yaml:"expiresAt"`
+	ExpiresAfter  string `yaml:"expiresAfter"`
+}
+
+// AssessmentEntryFlowConfig 入口 resolve/intake 批处理配置。
+type AssessmentEntryFlowConfig struct {
+	ClinicianRefs        []string     `yaml:"clinicianRefs"`
+	ClinicianIDs         []FlexibleID `yaml:"clinicianIds"`
+	EntryIDs             []FlexibleID `yaml:"entryIDs"`
+	MaxIntakesPerEntry   int          `yaml:"maxIntakesPerEntry"`
+	AllowTemporaryTestee bool         `yaml:"allowTemporaryTestee"`
+}
+
+// AssessmentByEntryConfig 基于入口 intake 结果继续创建测评的配置。
+type AssessmentByEntryConfig struct {
+	ClinicianRefs          []string     `yaml:"clinicianRefs"`
+	ClinicianIDs           []FlexibleID `yaml:"clinicianIds"`
+	EntryIDs               []FlexibleID `yaml:"entryIDs"`
+	MaxAssessmentsPerEntry int          `yaml:"maxAssessmentsPerEntry"`
+}
+
+// AssessmentStatusProfileConfig 第二阶段状态分布配置。
+type AssessmentStatusProfileConfig struct {
+	Pending     float64 `yaml:"pending"`
+	Submitted   float64 `yaml:"submitted"`
+	Interpreted float64 `yaml:"interpreted"`
+	Failed      float64 `yaml:"failed"`
 }
 
 // TesteeConfig 受试者配置
@@ -256,7 +392,13 @@ func LoadSeedConfigWithPreference(filepath string, preferScale bool) (*SeedConfi
 
 	var config SeedConfig
 	if err := yaml.Unmarshal(data, &config); err == nil {
-		if len(config.Testees) > 0 || len(config.Questionnaires) > 0 || len(config.Scales) > 0 || config.Global != (GlobalConfig{}) {
+		if len(config.Staffs) > 0 ||
+			len(config.Clinicians) > 0 ||
+			len(config.TesteeAssignments) > 0 ||
+			len(config.Testees) > 0 ||
+			len(config.Questionnaires) > 0 ||
+			len(config.Scales) > 0 ||
+			config.Global != (GlobalConfig{}) {
 			return &config, nil
 		}
 	}
