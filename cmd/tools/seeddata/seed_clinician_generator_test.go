@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -159,6 +160,51 @@ func TestClinicianRefsByPrefix(t *testing.T) {
 	want := []string{"seed_doctor_001", "seed_doctor_002"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected refs by prefix: got=%v want=%v", got, want)
+	}
+}
+
+func TestExpandClinicianGeneratorUsesLocalSnapshot(t *testing.T) {
+	active := true
+	cfg := ClinicianGeneratorConfig{
+		KeyPrefix:            "generated_clinician",
+		StaffKeyPrefix:       "generated_staff",
+		EmployeeCodePrefix:   "SEED-VCLN-",
+		Count:                2,
+		StartIndex:           1,
+		ClinicianType:        "doctor",
+		IsActive:             &active,
+		NameSourceURLPattern: "://invalid-if-fetch-is-used",
+	}
+
+	cacheKey, err := clinicianGeneratorCacheKey(cfg)
+	if err != nil {
+		t.Fatalf("cache key: %v", err)
+	}
+
+	snapshotDir := t.TempDir()
+	oldResolver := generatedClinicianSnapshotDirResolver
+	generatedClinicianSnapshotDirResolver = func() (string, error) {
+		return snapshotDir, nil
+	}
+	t.Cleanup(func() {
+		generatedClinicianSnapshotDirResolver = oldResolver
+		generatedClinicianBundleCache = sync.Map{}
+	})
+	generatedClinicianBundleCache = sync.Map{}
+
+	if err := saveGeneratedClinicianNamesSnapshot(cacheKey, []string{"章依文", "李锋"}); err != nil {
+		t.Fatalf("save snapshot: %v", err)
+	}
+
+	items, err := expandClinicianGenerator(cfg)
+	if err != nil {
+		t.Fatalf("expand generator using snapshot: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("unexpected item count: got=%d want=2", len(items))
+	}
+	if items[0].clinician.Name != "章依文" || items[1].clinician.Name != "李锋" {
+		t.Fatalf("unexpected names from snapshot: got=%q,%q", items[0].clinician.Name, items[1].clinician.Name)
 	}
 }
 

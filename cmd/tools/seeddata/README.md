@@ -101,6 +101,7 @@ go run ./cmd/tools/seeddata \
 - `staff` 会按配置创建或复用员工账号
 - `clinician` 会按 `operatorRef` 或 `operatorId` 创建或复用临床医师
 - `clinicianGenerators` 可以额外批量生成一组 seed clinician；默认会从好大夫推荐专家页抓取姓名，并配套 staff 账号、手机号和邮箱
+- 首次成功抓取后，会把生成名单快照写到仓库根目录 `.seeddata-cache/`；后续重复运行优先使用本地快照，避免外站波动导致同一批 seed clinician 身份漂移
 - 可通过 `nameSourceUrlPattern`、`nameSourcePages` 控制抓取来源和页数；默认来源是 `https://www.haodf.com/citiao/jibing-xiaoerduodongzheng/tuijian-doctor.html?p=%d`
 - 如果 `clinician.operatorRef` 指向配置里的某个 staff，`clinician` 步骤会自动确保对应员工账号已存在
 
@@ -391,6 +392,7 @@ go run ./cmd/tools/seeddata \
   - 仅 `employeeCode`（不绑定员工，仅用于幂等匹配）
 - 也支持通过 `clinicianGenerators` 批量生成 clinician，并默认从好大夫推荐专家页抓取姓名，再配套 staff 账号、手机号和邮箱
 - 生成 staff 邮箱默认按“姓名全拼 + 固定序号@域名”构造，例如 `zhangyiwen001@fangcunmount.com`，避免和现网真实账号撞邮箱
+- 首次成功抓取后，会把生成名单快照写到仓库根目录 `.seeddata-cache/`；后续重复运行优先使用本地快照，避免外站波动导致同一批 seed clinician 身份漂移
 - 幂等匹配顺序：
   - `operatorId`
   - `employeeCode`
@@ -416,7 +418,7 @@ go run ./cmd/tools/seeddata \
 - `strategy=round_robin`
   - 需要 `clinicianRefs` / `clinicianIds`
   - 可选 `testeeOffset`、`testeeLimit`、`testeePageSize`
-  - 默认跳过已有关联的 testee；若要强制纳入，用 `includeAlreadyAssigned: true`
+  - 默认跳过已存在 active `primary / attending / collaborator` 关系的 testee；若要强制纳入，用 `includeAlreadyAssigned: true`
 
 ### `assessment_entries`
 

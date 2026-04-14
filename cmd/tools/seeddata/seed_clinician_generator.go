@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -54,6 +56,7 @@ var (
 	generatedClinicianNameRegexp                  = regexp.MustCompile(`<span class="name">([^<]+)</span>`)
 	generatedClinicianZhNameRegexp                = regexp.MustCompile(`^[\p{Han}·]{2,8}$`)
 	generatedClinicianBundleCache                 sync.Map
+	generatedClinicianSnapshotDirResolver         = defaultGeneratedClinicianSnapshotDir
 )
 
 func effectiveStaffConfigs(config *SeedConfig) ([]StaffConfig, error) {
@@ -145,10 +148,22 @@ func expandClinicianGenerator(cfg ClinicianGeneratorConfig) ([]generatedClinicia
 		return cloneGeneratedClinicianBundles(cached.([]generatedClinicianBundle)), nil
 	}
 
+	if names, ok, err := loadGeneratedClinicianNamesSnapshot(cacheKey, cfg.Count); err != nil {
+		return nil, err
+	} else if ok {
+		items, buildErr := buildGeneratedClinicianBundles(cfg, names)
+		if buildErr != nil {
+			return nil, buildErr
+		}
+		generatedClinicianBundleCache.Store(cacheKey, cloneGeneratedClinicianBundles(items))
+		return cloneGeneratedClinicianBundles(items), nil
+	}
+
 	items, err := expandClinicianGeneratorWithFetcher(cfg, fetchGeneratedClinicianNameSourcePage)
 	if err != nil {
 		return nil, err
 	}
+	_ = saveGeneratedClinicianNamesSnapshot(cacheKey, generatedClinicianNames(items))
 	generatedClinicianBundleCache.Store(cacheKey, cloneGeneratedClinicianBundles(items))
 	return cloneGeneratedClinicianBundles(items), nil
 }
@@ -158,9 +173,54 @@ func expandClinicianGeneratorWithFetcher(cfg ClinicianGeneratorConfig, fetcher c
 		return nil, fmt.Errorf("name source fetcher is nil")
 	}
 
+	names, err := fetchGeneratedClinicianNames(cfg, fetcher)
+	if err != nil {
+		return nil, err
+	}
+	return buildGeneratedClinicianBundles(cfg, names)
+}
+
+func clinicianGeneratorCacheKey(cfg ClinicianGeneratorConfig) (string, error) {
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		return "", fmt.Errorf("marshal clinician generator config: %w", err)
+	}
+	sum := sha1.Sum(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func cloneGeneratedClinicianBundles(items []generatedClinicianBundle) []generatedClinicianBundle {
+	result := make([]generatedClinicianBundle, 0, len(items))
+	for _, item := range items {
+		cloned := generatedClinicianBundle{
+			staff:     item.staff,
+			clinician: item.clinician,
+		}
+		if len(item.staff.Roles) > 0 {
+			cloned.staff.Roles = append([]string(nil), item.staff.Roles...)
+		}
+		result = append(result, cloned)
+	}
+	return result
+}
+
+func generatedClinicianNames(items []generatedClinicianBundle) []string {
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		if name := strings.TrimSpace(item.clinician.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+func buildGeneratedClinicianBundles(cfg ClinicianGeneratorConfig, names []string) ([]generatedClinicianBundle, error) {
 	count := cfg.Count
 	if count <= 0 {
 		return nil, fmt.Errorf("count must be greater than 0")
+	}
+	if len(names) < count {
+		return nil, fmt.Errorf("name source only returned %d unique doctor names, need %d", len(names), count)
 	}
 
 	keyPrefix := strings.TrimSpace(cfg.KeyPrefix)
@@ -208,14 +268,6 @@ func expandClinicianGeneratorWithFetcher(cfg ClinicianGeneratorConfig, fetcher c
 	titles := nonEmptyStrings(cfg.Titles)
 	if len(titles) == 0 {
 		titles = defaultGeneratedClinicianTitles
-	}
-
-	names, err := fetchGeneratedClinicianNames(cfg, fetcher)
-	if err != nil {
-		return nil, err
-	}
-	if len(names) < count {
-		return nil, fmt.Errorf("name source only returned %d unique doctor names, need %d", len(names), count)
 	}
 
 	generateStaff := true
@@ -274,28 +326,65 @@ func expandClinicianGeneratorWithFetcher(cfg ClinicianGeneratorConfig, fetcher c
 	return items, nil
 }
 
-func clinicianGeneratorCacheKey(cfg ClinicianGeneratorConfig) (string, error) {
-	raw, err := json.Marshal(cfg)
-	if err != nil {
-		return "", fmt.Errorf("marshal clinician generator config: %w", err)
-	}
-	sum := sha1.Sum(raw)
-	return hex.EncodeToString(sum[:]), nil
+type generatedClinicianSnapshot struct {
+	Names []string `json:"names"`
 }
 
-func cloneGeneratedClinicianBundles(items []generatedClinicianBundle) []generatedClinicianBundle {
-	result := make([]generatedClinicianBundle, 0, len(items))
-	for _, item := range items {
-		cloned := generatedClinicianBundle{
-			staff:     item.staff,
-			clinician: item.clinician,
-		}
-		if len(item.staff.Roles) > 0 {
-			cloned.staff.Roles = append([]string(nil), item.staff.Roles...)
-		}
-		result = append(result, cloned)
+func loadGeneratedClinicianNamesSnapshot(cacheKey string, count int) ([]string, bool, error) {
+	path, err := generatedClinicianSnapshotPath(cacheKey)
+	if err != nil {
+		return nil, false, err
 	}
-	return result
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("read clinician generator snapshot %s: %w", path, err)
+	}
+	var snapshot generatedClinicianSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return nil, false, fmt.Errorf("unmarshal clinician generator snapshot %s: %w", path, err)
+	}
+	names := nonEmptyStrings(snapshot.Names)
+	if len(names) < count {
+		return nil, false, nil
+	}
+	return names, true, nil
+}
+
+func saveGeneratedClinicianNamesSnapshot(cacheKey string, names []string) error {
+	path, err := generatedClinicianSnapshotPath(cacheKey)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create clinician generator snapshot dir: %w", err)
+	}
+	payload, err := json.MarshalIndent(generatedClinicianSnapshot{Names: names}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal clinician generator snapshot: %w", err)
+	}
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		return fmt.Errorf("write clinician generator snapshot %s: %w", path, err)
+	}
+	return nil
+}
+
+func generatedClinicianSnapshotPath(cacheKey string) (string, error) {
+	baseDir, err := generatedClinicianSnapshotDirResolver()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(baseDir, "clinician-generator-"+cacheKey+".json"), nil
+}
+
+func defaultGeneratedClinicianSnapshotDir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get working directory for clinician generator snapshot: %w", err)
+	}
+	return filepath.Join(wd, ".seeddata-cache"), nil
 }
 
 func fetchGeneratedClinicianNames(cfg ClinicianGeneratorConfig, fetcher clinicianNamePageFetcher) ([]string, error) {

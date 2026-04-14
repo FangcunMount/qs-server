@@ -35,7 +35,11 @@ func resolveSeedClinicianScope(
 		return existingClinicians, nil
 	}
 
-	staffIndex, err := indexStaffConfigs(deps.Config.Staffs)
+	staffConfigs, err := effectiveStaffConfigs(deps.Config)
+	if err != nil {
+		return nil, err
+	}
+	staffIndex, err := indexStaffConfigs(staffConfigs)
 	if err != nil {
 		return nil, err
 	}

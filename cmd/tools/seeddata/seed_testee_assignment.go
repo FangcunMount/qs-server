@@ -29,7 +29,11 @@ func seedAssignTestees(ctx context.Context, deps *dependencies) error {
 		return nil
 	}
 
-	staffIndex, err := indexStaffConfigs(deps.Config.Staffs)
+	staffConfigs, err := effectiveStaffConfigs(deps.Config)
+	if err != nil {
+		return err
+	}
+	staffIndex, err := indexStaffConfigs(staffConfigs)
 	if err != nil {
 		return err
 	}
@@ -325,6 +329,10 @@ func applyTesteeAssignment(
 			if relationErr != nil {
 				return assignedCount, skippedCount, fmt.Errorf("get clinician relations for testee %s: %w", testee.ID, relationErr)
 			}
+			if !cfg.IncludeAlreadyAssigned && hasAnyActiveAccessRelation(relations.Items) {
+				skippedCount++
+				continue
+			}
 			if hasMatchingActiveRelation(relations.Items, target.ID, relationType) {
 				skippedCount++
 				continue
@@ -374,7 +382,7 @@ func hasAnyActiveAccessRelation(items []*TesteeClinicianRelationResponse) bool {
 		if item == nil || item.Relation == nil {
 			continue
 		}
-		if item.Relation.IsActive {
+		if item.Relation.IsActive && isAccessGrantRelationType(item.Relation.RelationType) {
 			return true
 		}
 	}
