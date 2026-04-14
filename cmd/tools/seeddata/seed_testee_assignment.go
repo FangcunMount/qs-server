@@ -80,32 +80,53 @@ func seedAssignTestees(ctx context.Context, deps *dependencies, opts assignmentS
 		if err != nil {
 			return fmt.Errorf("resolve clinicians for assignment %q failed: %w", testeeAssignmentLabel(cfg, idx), err)
 		}
-		testees, err := resolveAssignmentTestees(ctx, deps.APIClient, orgID, cfg)
+		assignedCount, skippedCount, resolvedCount, err := seedAssignmentTargets(ctx, deps, orgID, cfg, targets, opts)
 		if err != nil {
-			return fmt.Errorf("resolve testees for assignment %q failed: %w", testeeAssignmentLabel(cfg, idx), err)
+			return fmt.Errorf("apply assignment %q failed: %w", testeeAssignmentLabel(cfg, idx), err)
 		}
-		if len(testees) == 0 {
+		if resolvedCount == 0 {
 			deps.Logger.Warnw("No testees resolved for assignment, skipping",
 				"assignment", testeeAssignmentLabel(cfg, idx),
 			)
 			continue
 		}
-
-		assignedCount, skippedCount, err := applyTesteeAssignment(ctx, deps, orgID, cfg, targets, testees, opts)
-		if err != nil {
-			return fmt.Errorf("apply assignment %q failed: %w", testeeAssignmentLabel(cfg, idx), err)
-		}
 		deps.Logger.Infow("Testee assignment completed",
 			"assignment", testeeAssignmentLabel(cfg, idx),
 			"strategy", normalizedAssignmentStrategy(cfg.Strategy),
 			"relation_type", normalizedAssignmentRelationType(cfg.RelationType),
-			"testee_count", len(testees),
+			"testee_count", resolvedCount,
 			"target_count", len(targets),
 			"assigned", assignedCount,
 			"skipped", skippedCount,
 		)
 	}
 	return nil
+}
+
+func seedAssignmentTargets(
+	ctx context.Context,
+	deps *dependencies,
+	orgID int64,
+	cfg TesteeAssignmentConfig,
+	targets []clinicianAssignmentTarget,
+	opts assignmentSeedOptions,
+) (assignedCount int, skippedCount int, resolvedCount int, err error) {
+	if len(cfg.TesteeIDs) > 0 {
+		testees, err := resolveExplicitAssignmentTestees(cfg)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		progress := newSeedProgressBar("assign_testees "+assignmentProgressLabel(cfg), len(testees))
+		defer progress.Close()
+		assignedCount, skippedCount, err := applyTesteeAssignment(ctx, deps, orgID, cfg, targets, testees, 0, opts, progress)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		progress.Complete()
+		return assignedCount, skippedCount, len(testees), nil
+	}
+
+	return seedPagedTesteeAssignments(ctx, deps, orgID, cfg, targets, opts)
 }
 
 func validateTesteeAssignmentConfig(cfg TesteeAssignmentConfig) error {
@@ -248,18 +269,28 @@ func resolveAssignmentClinicianTarget(
 	return toClinicianAssignmentTarget(item), nil
 }
 
-func resolveAssignmentTestees(ctx context.Context, client *APIClient, orgID int64, cfg TesteeAssignmentConfig) ([]*ApiserverTesteeResponse, error) {
-	if len(cfg.TesteeIDs) > 0 {
-		items := make([]*ApiserverTesteeResponse, 0, len(cfg.TesteeIDs))
-		for _, id := range cfg.TesteeIDs {
-			if id.IsZero() {
-				continue
-			}
-			items = append(items, &ApiserverTesteeResponse{ID: id.String()})
-		}
-		return items, nil
+func resolveExplicitAssignmentTestees(cfg TesteeAssignmentConfig) ([]*ApiserverTesteeResponse, error) {
+	if len(cfg.TesteeIDs) == 0 {
+		return nil, nil
 	}
+	items := make([]*ApiserverTesteeResponse, 0, len(cfg.TesteeIDs))
+	for _, id := range cfg.TesteeIDs {
+		if id.IsZero() {
+			continue
+		}
+		items = append(items, &ApiserverTesteeResponse{ID: id.String()})
+	}
+	return items, nil
+}
 
+func seedPagedTesteeAssignments(
+	ctx context.Context,
+	deps *dependencies,
+	orgID int64,
+	cfg TesteeAssignmentConfig,
+	targets []clinicianAssignmentTarget,
+	opts assignmentSeedOptions,
+) (assignedCount int, skippedCount int, resolvedCount int, err error) {
 	pageSize := cfg.TesteePageSize
 	if pageSize <= 0 {
 		pageSize = defaultAssignmentPageSize
@@ -268,34 +299,62 @@ func resolveAssignmentTestees(ctx context.Context, client *APIClient, orgID int6
 	offset := cfg.TesteeOffset
 	page := 1
 	skipped := 0
-	items := make([]*ApiserverTesteeResponse, 0, pageSize)
+	selectedIndex := 0
+	progress := (*seedProgressBar)(nil)
+	defer func() {
+		if progress != nil {
+			progress.Close()
+		}
+	}()
 	for {
-		resp, err := client.ListTesteesByOrg(ctx, orgID, page, pageSize)
+		resp, err := deps.APIClient.ListTesteesByOrg(ctx, orgID, page, pageSize)
 		if err != nil {
-			return nil, err
+			return 0, 0, resolvedCount, err
+		}
+		if progress == nil {
+			progress = newSeedProgressBar("assign_testees "+assignmentProgressLabel(cfg), assignmentProgressTotal(resp.Total, cfg))
 		}
 		if len(resp.Items) == 0 {
 			break
 		}
+		items := make([]*ApiserverTesteeResponse, 0, len(resp.Items))
+		reachedLimit := false
 		for _, item := range resp.Items {
 			if skipped < offset {
 				skipped++
 				continue
 			}
 			if remaining == 0 && cfg.TesteeLimit > 0 {
-				return items, nil
+				reachedLimit = true
+				break
 			}
 			items = append(items, item)
 			if cfg.TesteeLimit > 0 {
 				remaining--
 			}
 		}
+		if len(items) > 0 {
+			assignedPage, skippedPage, applyErr := applyTesteeAssignment(ctx, deps, orgID, cfg, targets, items, selectedIndex, opts, progress)
+			if applyErr != nil {
+				return 0, 0, resolvedCount, applyErr
+			}
+			assignedCount += assignedPage
+			skippedCount += skippedPage
+			resolvedCount += len(items)
+			selectedIndex += len(items)
+		}
+		if reachedLimit {
+			break
+		}
 		if resp.TotalPages > 0 && page >= resp.TotalPages {
 			break
 		}
 		page++
 	}
-	return items, nil
+	if progress != nil {
+		progress.Complete()
+	}
+	return assignedCount, skippedCount, resolvedCount, nil
 }
 
 func applyTesteeAssignment(
@@ -305,7 +364,9 @@ func applyTesteeAssignment(
 	cfg TesteeAssignmentConfig,
 	targets []clinicianAssignmentTarget,
 	testees []*ApiserverTesteeResponse,
+	startIndex int,
 	opts assignmentSeedOptions,
+	progress *seedProgressBar,
 ) (assignedCount int, skippedCount int, err error) {
 	relationType := normalizedAssignmentRelationType(cfg.RelationType)
 	sourceType := strings.TrimSpace(cfg.SourceType)
@@ -313,13 +374,11 @@ func applyTesteeAssignment(
 		sourceType = "manual"
 	}
 
-	jobs := buildTesteeAssignmentJobs(cfg, targets, testees)
+	jobs := buildTesteeAssignmentJobs(cfg, targets, testees, startIndex)
 	if len(jobs) == 0 {
 		return 0, 0, nil
 	}
 	workers := normalizeAssignmentWorkers(opts.WorkerCount, len(jobs))
-	progress := newSeedProgressBar("assign_testees "+assignmentProgressLabel(cfg), len(jobs))
-	defer progress.Close()
 	var assignedCounter atomic.Int64
 	var skippedCounter atomic.Int64
 	locker := newAssignmentKeyLocker()
@@ -368,7 +427,7 @@ func applyTesteeAssignment(
 	return int(assignedCounter.Load()), int(skippedCounter.Load()), nil
 }
 
-func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAssignmentTarget, testees []*ApiserverTesteeResponse) []testeeAssignmentJob {
+func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAssignmentTarget, testees []*ApiserverTesteeResponse, startIndex int) []testeeAssignmentJob {
 	if len(targets) == 0 || len(testees) == 0 {
 		return nil
 	}
@@ -383,7 +442,7 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 			}
 			jobs = append(jobs, testeeAssignmentJob{
 				TesteeID: strings.TrimSpace(testee.ID),
-				Target:   targets[idx%len(targets)],
+				Target:   targets[(startIndex+idx)%len(targets)],
 			})
 		}
 	case testeeAssignmentStrategyRandom:
@@ -625,4 +684,21 @@ func assignmentProgressLabel(cfg TesteeAssignmentConfig) string {
 		return key
 	}
 	return normalizedAssignmentStrategy(cfg.Strategy)
+}
+
+func assignmentProgressTotal(total int64, cfg TesteeAssignmentConfig) int {
+	if len(cfg.TesteeIDs) > 0 {
+		return len(nonZeroFlexibleIDs(cfg.TesteeIDs))
+	}
+	if total <= 0 {
+		return 0
+	}
+	effective := total - int64(max(cfg.TesteeOffset, 0))
+	if effective < 0 {
+		effective = 0
+	}
+	if cfg.TesteeLimit > 0 && effective > int64(cfg.TesteeLimit) {
+		effective = int64(cfg.TesteeLimit)
+	}
+	return int(effective)
 }

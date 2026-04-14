@@ -44,7 +44,7 @@ func TestBuildTesteeAssignmentJobs_RoundRobinPreservesPosition(t *testing.T) {
 		{ID: "t3"},
 	}
 
-	jobs := buildTesteeAssignmentJobs(cfg, targets, testees)
+	jobs := buildTesteeAssignmentJobs(cfg, targets, testees, 0)
 	if len(jobs) != 3 {
 		t.Fatalf("expected 3 jobs, got %d", len(jobs))
 	}
@@ -67,8 +67,8 @@ func TestBuildTesteeAssignmentJobs_RandomIsStable(t *testing.T) {
 		{ID: "t4"},
 	}
 
-	jobsA := buildTesteeAssignmentJobs(cfg, targets, testees)
-	jobsB := buildTesteeAssignmentJobs(cfg, targets, testees)
+	jobsA := buildTesteeAssignmentJobs(cfg, targets, testees, 0)
+	jobsB := buildTesteeAssignmentJobs(cfg, targets, testees, 0)
 	if len(jobsA) != len(jobsB) {
 		t.Fatalf("expected same number of jobs, got %d and %d", len(jobsA), len(jobsB))
 	}
@@ -76,6 +76,27 @@ func TestBuildTesteeAssignmentJobs_RandomIsStable(t *testing.T) {
 		if jobsA[i].Target.ID != jobsB[i].Target.ID {
 			t.Fatalf("expected stable random assignment at index %d, got %s and %s", i, jobsA[i].Target.ID, jobsB[i].Target.ID)
 		}
+	}
+}
+
+func TestBuildTesteeAssignmentJobs_RoundRobinPreservesGlobalOffset(t *testing.T) {
+	cfg := TesteeAssignmentConfig{Strategy: "round_robin"}
+	targets := []clinicianAssignmentTarget{
+		{ID: "c1"},
+		{ID: "c2"},
+		{ID: "c3"},
+	}
+	testees := []*ApiserverTesteeResponse{
+		{ID: "t4"},
+		{ID: "t5"},
+	}
+
+	jobs := buildTesteeAssignmentJobs(cfg, targets, testees, 3)
+	if len(jobs) != 2 {
+		t.Fatalf("expected 2 jobs, got %d", len(jobs))
+	}
+	if jobs[0].Target.ID != "c1" || jobs[1].Target.ID != "c2" {
+		t.Fatalf("unexpected round-robin targets with global offset: %+v", jobs)
 	}
 }
 
