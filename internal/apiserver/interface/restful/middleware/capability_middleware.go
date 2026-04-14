@@ -42,6 +42,28 @@ func RequireCapabilityMiddleware(capability Capability) gin.HandlerFunc {
 	}
 }
 
+// RequireAnyCapabilityMiddleware 要求当前请求具备任一能力。
+func RequireAnyCapabilityMiddleware(capabilities ...Capability) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		snap := GetAuthzSnapshot(c)
+		if snap == nil {
+			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required"))
+			return
+		}
+		for _, capability := range capabilities {
+			if authzapp.SnapshotSatisfiesCapability(snap, capability) {
+				c.Next()
+				return
+			}
+		}
+		abortPermissionDenied(c, errors.WithCode(
+			code.ErrPermissionDenied,
+			"capabilities %v denied by IAM authorization",
+			capabilities,
+		))
+	}
+}
+
 func abortPermissionDenied(c *gin.Context, err error) {
 	core.WriteResponse(c, err, nil)
 	c.Abort()

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"gorm.io/gorm"
 )
 
 // ==================== StatisticsDaily 持久化对象 ====================
@@ -85,6 +87,31 @@ type StatisticsPlanPO struct {
 // TableName 指定表名
 func (StatisticsPlanPO) TableName() string {
 	return "statistics_plan"
+}
+
+// AssessmentEntryResolveLogPO 入口解析日志。
+type AssessmentEntryResolveLogPO struct {
+	ID          uint64         `gorm:"column:id;primaryKey"`
+	OrgID       int64          `gorm:"column:org_id;not null;index:idx_entry_resolve_org_entry_time,priority:1"`
+	ClinicianID uint64         `gorm:"column:clinician_id;not null;index:idx_entry_resolve_clinician_time,priority:1"`
+	EntryID     uint64         `gorm:"column:entry_id;not null;index:idx_entry_resolve_org_entry_time,priority:2"`
+	ResolvedAt  time.Time      `gorm:"column:resolved_at;not null;index:idx_entry_resolve_org_entry_time,priority:3;index:idx_entry_resolve_clinician_time,priority:2"`
+	CreatedAt   time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+// TableName 指定表名。
+func (AssessmentEntryResolveLogPO) TableName() string {
+	return "assessment_entry_resolve_log"
+}
+
+// BeforeCreate GORM hook。
+func (p *AssessmentEntryResolveLogPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = uint64(meta.New())
+	}
+	return nil
 }
 
 // ==================== JSONField 辅助类型 ====================

@@ -16,6 +16,11 @@ type AssessmentEntryService interface {
 	Intake(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error)
 }
 
+// ResolveLogWriter 写入入口解析日志。
+type ResolveLogWriter interface {
+	LogResolve(ctx context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) error
+}
+
 // CreateAssessmentEntryDTO 创建测评入口。
 type CreateAssessmentEntryDTO struct {
 	OrgID         int64

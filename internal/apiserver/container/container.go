@@ -433,7 +433,11 @@ func (c *Container) initStatisticsModule() error {
 	if c.cacheOptions.DisableStatisticsCache {
 		redisClient = nil
 	}
-	if err := statisticsModule.Initialize(c.mysqlDB, redisClient); err != nil {
+	var answerSheetRepo interface{}
+	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
+		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
+	}
+	if err := statisticsModule.Initialize(c.mysqlDB, redisClient, answerSheetRepo); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 

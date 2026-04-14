@@ -24,6 +24,7 @@ type service struct {
 	testeeFactory   domainTestee.Factory
 	validator       domainAssessmentEntry.Validator
 	guardianshipSvc *iam.GuardianshipService
+	resolveLog      ResolveLogWriter
 	uow             *mysql.UnitOfWork
 }
 
@@ -36,6 +37,7 @@ func NewService(
 	testeeFactory domainTestee.Factory,
 	validator domainAssessmentEntry.Validator,
 	guardianshipSvc *iam.GuardianshipService,
+	resolveLog ResolveLogWriter,
 	uow *mysql.UnitOfWork,
 ) AssessmentEntryService {
 	return &service{
@@ -46,6 +48,7 @@ func NewService(
 		testeeFactory:   testeeFactory,
 		validator:       validator,
 		guardianshipSvc: guardianshipSvc,
+		resolveLog:      resolveLog,
 		uow:             uow,
 	}
 }
@@ -154,6 +157,11 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 	entry, clinicianItem, err := s.resolveEntry(ctx, token)
 	if err != nil {
 		return nil, err
+	}
+	if s.resolveLog != nil {
+		if err := s.resolveLog.LogResolve(ctx, entry.OrgID(), uint64(entry.ClinicianID()), entry.ID().Uint64(), time.Now()); err != nil {
+			return nil, errors.Wrap(err, "failed to record assessment entry resolve")
+		}
 	}
 
 	return &ResolvedAssessmentEntryResult{

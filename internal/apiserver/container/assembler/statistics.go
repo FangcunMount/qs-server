@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -28,6 +29,8 @@ type StatisticsModule struct {
 	QuestionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
 	TesteeStatisticsService        statisticsApp.TesteeStatisticsService
 	PlanStatisticsService          statisticsApp.PlanStatisticsService
+	ReadService                    statisticsApp.ReadService
+	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	ValidatorService               statisticsApp.StatisticsValidatorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
@@ -41,6 +44,7 @@ func NewStatisticsModule() *StatisticsModule {
 // Initialize 初始化统计模块
 // params[0]: *gorm.DB
 // params[1]: redis.UniversalClient (Redis缓存客户端)
+// params[2]: answersheet.Repository (问卷答卷仓储，可选)
 func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -56,6 +60,12 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	if len(params) > 1 {
 		if rc, ok := params[1].(redis.UniversalClient); ok && rc != nil {
 			redisClient = rc
+		}
+	}
+	var answerSheetRepo surveyAnswerSheet.Repository
+	if len(params) > 2 {
+		if repo, ok := params[2].(surveyAnswerSheet.Repository); ok && repo != nil {
+			answerSheetRepo = repo
 		}
 	}
 
@@ -75,6 +85,8 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	m.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(mysqlDB, m.Repo, m.Cache)
 	m.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(mysqlDB, m.Repo, m.Cache)
 	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(mysqlDB, m.Repo, m.Cache)
+	m.ReadService = statisticsApp.NewReadService(mysqlDB, answerSheetRepo)
+	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(mysqlDB)
 
 	// 初始化同步和校验服务
 	if m.Cache != nil {
@@ -92,6 +104,8 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 		m.QuestionnaireStatisticsService,
 		m.TesteeStatisticsService,
 		m.PlanStatisticsService,
+		m.ReadService,
+		m.PeriodicStatsService,
 		m.SyncService,
 		m.ValidatorService,
 	)

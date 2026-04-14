@@ -971,6 +971,46 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 	{
 		// ==================== 统计查询 ====================
 		adminStatistics := statistics.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		adminStatistics.GET("/overview", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetOverview,
+		)...)
+		adminStatistics.GET("/clinicians", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.ListClinicianStatistics,
+		)...)
+		adminStatistics.GET("/clinicians/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetClinicianStatistics,
+		)...)
+		adminStatistics.GET("/entries", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.ListAssessmentEntryStatistics,
+		)...)
+		adminStatistics.GET("/entries/:id", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetAssessmentEntryStatistics,
+		)...)
 		adminStatistics.GET("/system", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
@@ -995,6 +1035,14 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			statisticsModule.Handler.GetTesteeStatistics,
 		)...)
+		statistics.GET("/testees/:testee_id/periodic", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetTesteePeriodicStatistics,
+		)...)
 		adminStatistics.GET("/plans/:plan_id", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,
@@ -1002,6 +1050,43 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
 			statisticsModule.Handler.GetPlanStatistics,
+		)...)
+		clinicianStatistics := statistics.Group("/clinicians/me")
+		clinicianStatistics.GET("/overview", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetCurrentClinicianOverview,
+		)...)
+		clinicianStatistics.GET("/entries", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.ListCurrentClinicianEntryStatistics,
+		)...)
+		clinicianStatistics.GET("/testees-summary", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			statisticsModule.Handler.GetCurrentClinicianTesteeSummary,
+		)...)
+		contentStatistics := statistics.Group("", restmiddleware.RequireAnyCapabilityMiddleware(
+			restmiddleware.CapabilityManageQuestionnaires,
+			restmiddleware.CapabilityManageScales,
+		))
+		contentStatistics.POST("/questionnaires/batch", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.SubmitGlobalQPS,
+			r.rateCfg.SubmitGlobalBurst,
+			r.rateCfg.SubmitUserQPS,
+			r.rateCfg.SubmitUserBurst,
+			statisticsModule.Handler.BatchQuestionnaireStatistics,
 		)...)
 
 		// ==================== 定时任务接口 ====================

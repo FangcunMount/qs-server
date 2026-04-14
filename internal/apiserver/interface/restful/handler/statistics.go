@@ -18,6 +18,8 @@ type StatisticsHandler struct {
 	questionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
 	testeeStatisticsService        statisticsApp.TesteeStatisticsService
 	planStatisticsService          statisticsApp.PlanStatisticsService
+	readService                    statisticsApp.ReadService
+	periodicStatsService           statisticsApp.PeriodicStatsService
 	syncService                    statisticsApp.StatisticsSyncService
 	validatorService               statisticsApp.StatisticsValidatorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
@@ -29,6 +31,8 @@ func NewStatisticsHandler(
 	questionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService,
 	testeeStatisticsService statisticsApp.TesteeStatisticsService,
 	planStatisticsService statisticsApp.PlanStatisticsService,
+	readService statisticsApp.ReadService,
+	periodicStatsService statisticsApp.PeriodicStatsService,
 	syncService statisticsApp.StatisticsSyncService,
 	validatorService statisticsApp.StatisticsValidatorService,
 ) *StatisticsHandler {
@@ -37,6 +41,8 @@ func NewStatisticsHandler(
 		questionnaireStatisticsService: questionnaireStatisticsService,
 		testeeStatisticsService:        testeeStatisticsService,
 		planStatisticsService:          planStatisticsService,
+		readService:                    readService,
+		periodicStatsService:           periodicStatsService,
 		syncService:                    syncService,
 		validatorService:               validatorService,
 	}
@@ -45,6 +51,247 @@ func NewStatisticsHandler(
 // SetTesteeAccessService 设置 testee 访问控制服务。
 func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
 	h.testeeAccessService = testeeAccessService
+}
+
+func (h *StatisticsHandler) bindJSON(c *gin.Context, req interface{}) bool {
+	if err := c.ShouldBindJSON(req); err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body: %v", err))
+		return false
+	}
+	return true
+}
+
+func (h *StatisticsHandler) parsePage(c *gin.Context) (int, int, error) {
+	page := 1
+	pageSize := 20
+	if raw := c.Query("page"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, 0, errors.WithCode(code.ErrInvalidArgument, "invalid page: %s", raw)
+		}
+		page = value
+	}
+	if raw := c.Query("page_size"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, 0, errors.WithCode(code.ErrInvalidArgument, "invalid page_size: %s", raw)
+		}
+		pageSize = value
+	}
+	return page, pageSize, nil
+}
+
+func buildStatisticsQueryFilter(c *gin.Context) statisticsApp.QueryFilter {
+	return statisticsApp.QueryFilter{
+		Preset: c.Query("preset"),
+		From:   c.Query("from"),
+		To:     c.Query("to"),
+	}
+}
+
+type questionnaireBatchRequest struct {
+	Codes []string `json:"codes"`
+}
+
+func (h *StatisticsHandler) GetOverview(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.readService.GetOverview(ctx, orgID, buildStatisticsQueryFilter(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) ListClinicianStatistics(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	page, pageSize, err := h.parsePage(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.readService.ListClinicianStatistics(ctx, orgID, buildStatisticsQueryFilter(c), page, pageSize)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) GetClinicianStatistics(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	clinicianID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician id: %s", c.Param("id")))
+		return
+	}
+	stats, err := h.readService.GetClinicianStatistics(ctx, orgID, clinicianID, buildStatisticsQueryFilter(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) ListAssessmentEntryStatistics(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	page, pageSize, err := h.parsePage(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	var clinicianID *uint64
+	if raw := c.Query("clinician_id"); raw != "" {
+		value, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician_id: %s", raw))
+			return
+		}
+		clinicianID = &value
+	}
+	var activeOnly *bool
+	if raw := c.Query("status"); raw != "" {
+		value := raw == "active"
+		activeOnly = &value
+	}
+	stats, err := h.readService.ListAssessmentEntryStatistics(ctx, orgID, clinicianID, activeOnly, buildStatisticsQueryFilter(c), page, pageSize)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) GetAssessmentEntryStatistics(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid entry id: %s", c.Param("id")))
+		return
+	}
+	stats, err := h.readService.GetAssessmentEntryStatistics(ctx, orgID, entryID, buildStatisticsQueryFilter(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) GetCurrentClinicianOverview(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.readService.GetCurrentClinicianStatistics(ctx, orgID, operatorUserID, buildStatisticsQueryFilter(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) ListCurrentClinicianEntryStatistics(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	page, pageSize, err := h.parsePage(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.readService.ListCurrentClinicianEntryStatistics(ctx, orgID, operatorUserID, buildStatisticsQueryFilter(c), page, pageSize)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) GetCurrentClinicianTesteeSummary(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.readService.GetCurrentClinicianTesteeSummary(ctx, orgID, operatorUserID, buildStatisticsQueryFilter(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
+	ctx := c.Request.Context()
+	testeeID, err := strconv.ParseUint(c.Param("testee_id"), 10, 64)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid testee id: %s", c.Param("testee_id")))
+		return
+	}
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.periodicStatsService.GetPeriodicStats(ctx, orgID, testeeID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
+}
+
+func (h *StatisticsHandler) BatchQuestionnaireStatistics(c *gin.Context) {
+	var req questionnaireBatchRequest
+	if !h.bindJSON(c, &req) {
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	stats, err := h.readService.GetQuestionnaireBatchStatistics(c.Request.Context(), orgID, req.Codes)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, stats)
 }
 
 // ============= 统计查询 API =============

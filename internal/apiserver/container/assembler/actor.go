@@ -21,6 +21,7 @@ import (
 	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -117,6 +118,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	m.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB)
 	m.RelationRepo = actorInfra.NewRelationRepository(mysqlDB)
 	m.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB)
+	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsInfra.NewStatisticsRepository(mysqlDB))
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(m.TesteeRepo)
@@ -236,6 +238,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		testeeFactory,
 		assessmentEntryValidator,
 		guardianshipSvc,
+		resolveLogWriter,
 		uow,
 	)
 

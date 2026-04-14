@@ -32,6 +32,24 @@ type PlanStatisticsService interface {
 	GetPlanStatistics(ctx context.Context, orgID int64, planID uint64) (*statistics.PlanStatistics, error)
 }
 
+// ReadService v1 统一统计读服务。
+type ReadService interface {
+	GetOverview(ctx context.Context, orgID int64, filter QueryFilter) (*statistics.StatisticsOverview, error)
+	ListClinicianStatistics(ctx context.Context, orgID int64, filter QueryFilter, page, pageSize int) (*statistics.ClinicianStatisticsList, error)
+	GetClinicianStatistics(ctx context.Context, orgID int64, clinicianID uint64, filter QueryFilter) (*statistics.ClinicianStatistics, error)
+	ListAssessmentEntryStatistics(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool, filter QueryFilter, page, pageSize int) (*statistics.AssessmentEntryStatisticsList, error)
+	GetAssessmentEntryStatistics(ctx context.Context, orgID int64, entryID uint64, filter QueryFilter) (*statistics.AssessmentEntryStatistics, error)
+	GetCurrentClinicianStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*statistics.ClinicianStatistics, error)
+	ListCurrentClinicianEntryStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter, page, pageSize int) (*statistics.AssessmentEntryStatisticsList, error)
+	GetCurrentClinicianTesteeSummary(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*statistics.ClinicianTesteeSummaryStatistics, error)
+	GetQuestionnaireBatchStatistics(ctx context.Context, orgID int64, codes []string) (*statistics.QuestionnaireBatchStatisticsResponse, error)
+}
+
+// PeriodicStatsService 受试者周期性统计服务。
+type PeriodicStatsService interface {
+	GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*statistics.TesteePeriodicStatisticsResponse, error)
+}
+
 // StatisticsSyncService 统计同步服务（定时任务）
 type StatisticsSyncService interface {
 	// SyncDailyStatistics 同步每日统计（Redis → MySQL）
@@ -46,4 +64,11 @@ type StatisticsSyncService interface {
 type StatisticsValidatorService interface {
 	// ValidateConsistency 校验数据一致性（Redis vs MySQL）
 	ValidateConsistency(ctx context.Context, orgID int64) error
+}
+
+// QueryFilter 通用统计查询过滤器。
+type QueryFilter struct {
+	Preset string
+	From   string
+	To     string
 }
