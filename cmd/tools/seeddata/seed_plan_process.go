@@ -548,6 +548,24 @@ func runPlanTaskExecutionPipeline(
 	if submitWorkers <= 0 {
 		submitWorkers = 1
 	}
+	if planExpireRate >= 1 {
+		return runPlanTaskExpireOnlyExecution(
+			ctx,
+			gateway,
+			deps,
+			planID,
+			orgID,
+			jobs,
+			submitWorkers,
+			verbose,
+			reservedOpenTask,
+			skippedCount,
+			expiredCount,
+			recoveredCount,
+			failedTaskExecutionCount,
+			dashboard,
+		)
+	}
 	if waitWorkers <= 0 {
 		waitWorkers = 1
 	}
@@ -699,6 +717,167 @@ func runPlanTaskExecutionPipeline(
 	return nil
 }
 
+func runPlanTaskExpireOnlyExecution(
+	ctx context.Context,
+	gateway planProcessGateway,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	jobs []planTaskJob,
+	workers int,
+	verbose bool,
+	reservedOpenTask *atomic.Bool,
+	skippedCount *atomic.Int64,
+	expiredCount *atomic.Int64,
+	recoveredCount *atomic.Int64,
+	failedTaskExecutionCount *atomic.Int64,
+	dashboard *planSeedDashboard,
+) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+	if workers <= 0 {
+		workers = 1
+	}
+	if workers > len(jobs) {
+		workers = len(jobs)
+	}
+
+	jobCh := make(chan planTaskJob, workers)
+	var workerWG sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case job, ok := <-jobCh:
+					if !ok {
+						return
+					}
+					handlePlanTaskWithoutSubmission(
+						ctx,
+						gateway,
+						deps,
+						planID,
+						orgID,
+						job,
+						1,
+						verbose,
+						reservedOpenTask,
+						skippedCount,
+						expiredCount,
+						recoveredCount,
+						failedTaskExecutionCount,
+						dashboard,
+					)
+				}
+			}
+		}()
+	}
+
+	for _, job := range jobs {
+		select {
+		case <-ctx.Done():
+			close(jobCh)
+			workerWG.Wait()
+			return ctx.Err()
+		case jobCh <- job:
+		}
+	}
+	close(jobCh)
+	workerWG.Wait()
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return nil
+}
+
+func handlePlanTaskWithoutSubmission(
+	ctx context.Context,
+	gateway planProcessGateway,
+	deps *dependencies,
+	planID string,
+	orgID int64,
+	job planTaskJob,
+	planExpireRate float64,
+	verbose bool,
+	reservedOpenTask *atomic.Bool,
+	skippedCount *atomic.Int64,
+	expiredCount *atomic.Int64,
+	recoveredCount *atomic.Int64,
+	failedTaskExecutionCount *atomic.Int64,
+	dashboard *planSeedDashboard,
+) bool {
+	if strings.TrimSpace(job.testeeID) == "" || strings.TrimSpace(job.task.ID) == "" {
+		dashboard.AdvanceTask()
+		return true
+	}
+
+	if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
+		skippedCount.Add(1)
+		if verbose {
+			deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
+				"plan_id", planID,
+				"testee_id", job.testeeID,
+				"task_id", job.task.ID,
+				"seq", job.task.Seq,
+			)
+		}
+		dashboard.AdvanceTask()
+		return true
+	}
+
+	if !shouldExpirePlanTask(job.task, planExpireRate) {
+		return false
+	}
+
+	err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "expire_plan_task", job.task.ID, func() error {
+		finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, gateway, orgID, job.task)
+		if err != nil {
+			return fmt.Errorf("expire task %s for testee %s: %w", job.task.ID, job.testeeID, err)
+		}
+		if recovered && recoveredCount != nil {
+			recoveredCount.Add(1)
+		}
+		switch normalizeTaskStatus(finalTask.Status) {
+		case "expired":
+			expiredCount.Add(1)
+		default:
+			skippedCount.Add(1)
+		}
+		if verbose {
+			deps.Logger.Infow("Plan task expired intentionally",
+				"plan_id", planID,
+				"testee_id", job.testeeID,
+				"task_id", job.task.ID,
+				"seq", job.task.Seq,
+				"expire_rate", planExpireRate,
+				"recovered", recovered,
+				"final_status", finalTask.Status,
+			)
+		}
+		return nil
+	})
+	if err != nil {
+		failedTaskExecutionCount.Add(1)
+		if verbose {
+			deps.Logger.Warnw("Skipping task after recovery attempts failed",
+				"plan_id", planID,
+				"org_id", orgID,
+				"testee_id", job.testeeID,
+				"task_id", job.task.ID,
+				"error", err.Error(),
+			)
+		}
+	}
+	dashboard.AdvanceTask()
+	return true
+}
+
 func processPlanTaskSubmitStage(
 	ctx context.Context,
 	gateway planProcessGateway,
@@ -723,66 +902,22 @@ func processPlanTaskSubmitStage(
 	maxInflightObserved *atomic.Int64,
 	dashboard *planSeedDashboard,
 ) {
-	if strings.TrimSpace(job.testeeID) == "" || strings.TrimSpace(job.task.ID) == "" {
-		dashboard.AdvanceTask()
-		return
-	}
-
-	if reservedOpenTask != nil && reservedOpenTask.CompareAndSwap(false, true) {
-		skippedCount.Add(1)
-		if verbose {
-			deps.Logger.Infow("Leaving one opened plan task unprocessed to keep plan active",
-				"plan_id", planID,
-				"testee_id", job.testeeID,
-				"task_id", job.task.ID,
-				"seq", job.task.Seq,
-			)
-		}
-		dashboard.AdvanceTask()
-		return
-	}
-
-	if shouldExpirePlanTask(job.task, planExpireRate) {
-		err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "expire_plan_task", job.task.ID, func() error {
-			finalTask, recovered, err := expirePlanTaskWithRecovery(ctx, gateway, orgID, job.task)
-			if err != nil {
-				return fmt.Errorf("expire task %s for testee %s: %w", job.task.ID, job.testeeID, err)
-			}
-			if recovered && recoveredCount != nil {
-				recoveredCount.Add(1)
-			}
-			switch normalizeTaskStatus(finalTask.Status) {
-			case "expired":
-				expiredCount.Add(1)
-			default:
-				skippedCount.Add(1)
-			}
-			if verbose {
-				deps.Logger.Infow("Plan task expired intentionally",
-					"plan_id", planID,
-					"testee_id", job.testeeID,
-					"task_id", job.task.ID,
-					"seq", job.task.Seq,
-					"expire_rate", planExpireRate,
-					"recovered", recovered,
-					"final_status", finalTask.Status,
-				)
-			}
-			return nil
-		})
-		if err != nil {
-			failedTaskExecutionCount.Add(1)
-			if verbose {
-				deps.Logger.Warnw("Skipping task after recovery attempts failed",
-					"plan_id", planID,
-					"org_id", orgID,
-					"testee_id", job.testeeID,
-					"task_id", job.task.ID,
-					"error", err.Error(),
-				)
-			}
-		}
-		dashboard.AdvanceTask()
+	if handlePlanTaskWithoutSubmission(
+		ctx,
+		gateway,
+		deps,
+		planID,
+		orgID,
+		job,
+		planExpireRate,
+		verbose,
+		reservedOpenTask,
+		skippedCount,
+		expiredCount,
+		recoveredCount,
+		failedTaskExecutionCount,
+		dashboard,
+	) {
 		return
 	}
 

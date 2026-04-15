@@ -717,6 +717,7 @@ type pagedPlanSeedGatewayStub struct {
 	schedulePendingRequests []SchedulePendingTasksRequest
 	scheduleTaskLists       map[string][]TaskResponse
 	expireTaskStatuses      map[string]string
+	expireTaskCalls         []string
 }
 
 func (s *pagedPlanSeedGatewayStub) GetPlan(ctx context.Context, planID string) (*PlanResponse, error) {
@@ -804,6 +805,7 @@ func (s *pagedPlanSeedGatewayStub) GetTask(ctx context.Context, taskID string) (
 }
 
 func (s *pagedPlanSeedGatewayStub) ExpireTask(ctx context.Context, taskID string) (*TaskResponse, error) {
+	s.expireTaskCalls = append(s.expireTaskCalls, taskID)
 	status := "expired"
 	if s.expireTaskStatuses != nil {
 		if explicit, ok := s.expireTaskStatuses[taskID]; ok && strings.TrimSpace(explicit) != "" {
@@ -811,6 +813,103 @@ func (s *pagedPlanSeedGatewayStub) ExpireTask(ctx context.Context, taskID string
 		}
 	}
 	return &TaskResponse{ID: taskID, Status: status}, nil
+}
+
+func TestRunPlanTaskExecutionPipelineFullExpireBypassesSubmitPipeline(t *testing.T) {
+	planID := "614333603412718126"
+	gateway := &pagedPlanSeedGatewayStub{
+		expireTaskStatuses: map[string]string{
+			"2001": "expired",
+			"2002": "expired",
+		},
+	}
+	deps := &dependencies{Logger: newSeeddataLogger(false)}
+	jobs := []planTaskJob{
+		{
+			testeeID: "1001",
+			task: TaskResponse{
+				ID:       "2001",
+				PlanID:   planID,
+				TesteeID: "1001",
+				Seq:      1,
+				Status:   "opened",
+			},
+		},
+		{
+			testeeID: "1002",
+			task: TaskResponse{
+				ID:       "2002",
+				PlanID:   planID,
+				TesteeID: "1002",
+				Seq:      1,
+				Status:   "opened",
+			},
+		},
+	}
+
+	var (
+		reservedOpenTask         atomic.Bool
+		submittedCount           atomic.Int64
+		skippedCount             atomic.Int64
+		completedCount           atomic.Int64
+		expiredCount             atomic.Int64
+		recoveredCount           atomic.Int64
+		failedTaskExecutionCount atomic.Int64
+		inflightCount            atomic.Int64
+		maxInflightObserved      atomic.Int64
+	)
+
+	err := runPlanTaskExecutionPipeline(
+		context.Background(),
+		gateway,
+		deps,
+		planID,
+		1,
+		"",
+		nil,
+		jobs,
+		2,
+		4,
+		4,
+		8,
+		8,
+		1,
+		false,
+		&reservedOpenTask,
+		&submittedCount,
+		&skippedCount,
+		&completedCount,
+		&expiredCount,
+		&recoveredCount,
+		&failedTaskExecutionCount,
+		nil,
+		nil,
+		&inflightCount,
+		&maxInflightObserved,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("unexpected execution pipeline error: %v", err)
+	}
+
+	if submittedCount.Load() != 0 {
+		t.Fatalf("expected no submitted tasks on full expire path, got %d", submittedCount.Load())
+	}
+	if completedCount.Load() != 0 {
+		t.Fatalf("expected no completed tasks on full expire path, got %d", completedCount.Load())
+	}
+	if expiredCount.Load() != 1 {
+		t.Fatalf("expected one expired task after reserving one opened task, got %d", expiredCount.Load())
+	}
+	if skippedCount.Load() != 1 {
+		t.Fatalf("expected one skipped reserved task, got %d", skippedCount.Load())
+	}
+	if failedTaskExecutionCount.Load() != 0 {
+		t.Fatalf("expected no failed task executions, got %d", failedTaskExecutionCount.Load())
+	}
+	if len(gateway.expireTaskCalls) != 1 {
+		t.Fatalf("expected exactly one expire call on full expire path, got %v", gateway.expireTaskCalls)
+	}
 }
 
 func buildStubTaskListResponse(taskLists map[string][]TaskResponse, req ListTasksRequest) *TaskListResponse {
