@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -163,19 +164,14 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 			continue
 		}
 
-		// 发布领域事件
-		events := task.Events()
-		for _, evt := range events {
-			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				logger.L(ctx).Errorw("Failed to publish task event",
-					"action", "schedule_pending_tasks",
-					"task_id", task.GetID().String(),
-					"event_type", evt.EventType(),
-					"error", err.Error(),
-				)
-			}
-		}
-		task.ClearEvents()
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+			logger.L(ctx).Errorw("Failed to publish task event",
+				"action", "schedule_pending_tasks",
+				"task_id", task.GetID().String(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		})
 
 		openedTasks = append(openedTasks, task)
 	}
@@ -356,17 +352,14 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 			continue
 		}
 
-		for _, evt := range task.Events() {
-			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				logger.L(ctx).Errorw("Failed to publish expired task event",
-					"action", "schedule_pending_tasks",
-					"task_id", task.GetID().String(),
-					"event_type", evt.EventType(),
-					"error", err.Error(),
-				)
-			}
-		}
-		task.ClearEvents()
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+			logger.L(ctx).Errorw("Failed to publish expired task event",
+				"action", "schedule_pending_tasks",
+				"task_id", task.GetID().String(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		})
 
 		expiredCount++
 	}
@@ -412,18 +405,15 @@ func (s *taskSchedulerService) cancelTaskForInactivePlan(
 	if err := s.taskRepo.Save(ctx, task); err != nil {
 		return err
 	}
-	for _, evt := range task.Events() {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish task event while canceling inactive-plan task",
-				"action", "schedule_pending_tasks",
-				"task_id", task.GetID().String(),
-				"plan_id", task.GetPlanID().String(),
-				"plan_status", parentPlan.GetStatus().String(),
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	task.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+		logger.L(ctx).Errorw("Failed to publish task event while canceling inactive-plan task",
+			"action", "schedule_pending_tasks",
+			"task_id", task.GetID().String(),
+			"plan_id", task.GetPlanID().String(),
+			"plan_status", parentPlan.GetStatus().String(),
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 	return nil
 }

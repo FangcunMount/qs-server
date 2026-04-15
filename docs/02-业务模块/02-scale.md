@@ -20,7 +20,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 模块职责 | 管量表元数据、问卷绑定、因子与解读规则、发布生命周期、`scale.*` 事件、已发布量表查询 |
+| 模块职责 | 管量表元数据、问卷绑定、因子与解读规则、发布生命周期、`scale.changed` 事件、已发布量表查询 |
 | 核心对象 | `MedicalScale`、`Factor`、`InterpretationRule`、`ScoringParams` |
 | 主入口 | 后台多走 REST 管理量表；C 端查询走 gRPC；评估时由 `evaluation` 读取量表仓储并调用 `scale.ScoringService` |
 | 关键边界 | 问卷结构与答卷提交在 `survey`；测评实例、引擎和报告在 `evaluation`；`scale` 只提供规则与计分服务 |
@@ -31,7 +31,7 @@
 
 | | 内容 |
 | -- | ---- |
-| **负责（摘要）** | 量表元数据与分类；问卷绑定（code + version）；因子与解读规则；生命周期与发布；`scale.*` 领域事件；已发布量表查询（含 C 端 gRPC） |
+| **负责（摘要）** | 量表元数据与分类；问卷绑定（code + version）；因子与解读规则；生命周期与发布；`scale.changed` 领域事件；已发布量表查询（含 C 端 gRPC） |
 | **不负责（摘要）** | 问卷结构与答卷提交（[survey](./01-survey.md)）；`Assessment` 编排与报告生成（[evaluation](./03-evaluation.md)）；账号与监护（[actor](./05-actor.md) / `collection-server`） |
 | **关联专题** | 三界与引用边界 [05-专题/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)；异步链路 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md)；读侧缓存 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
 
@@ -81,7 +81,7 @@ flowchart LR
 
 #### 运行时图说明
 
-后台配置量表；C 端读已发布量表走 gRPC；`evaluation` 评估时从量表仓储读取规则并调用 `scale.ScoringService`；`worker` 消费 `scale.*` 等事件做二维码、缓存协同等（以 yaml 为准）。
+后台配置量表；C 端读已发布量表走 gRPC；`evaluation` 评估时从量表仓储读取规则并调用 `scale.ScoringService`；`worker` 消费 `scale.changed` 做二维码、缓存协同等（以 yaml 为准）。
 
 ### 主要代码入口（索引）
 

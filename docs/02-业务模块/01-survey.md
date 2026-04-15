@@ -25,7 +25,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 模块职责 | 管问卷生命周期、题目结构、答卷提交、答案校验、`questionnaire.*` / `answersheet.submitted` 事件 |
+| 模块职责 | 管问卷生命周期、题目结构、答卷提交、答案校验、`questionnaire.changed` / `answersheet.submitted` 事件 |
 | 主入口 | 后台多走 REST 管问卷；前台提交经 `collection-server` gRPC 进入 `SaveAnswerSheet` |
 | 核心对象 | `Questionnaire`、`Question`、`AnswerSheet`、`Answer`、`AnswerValue` |
 | 关键边界 | 认证/监护在 `collection-server`；测评、报告和引擎在 `evaluation`；量表规则权威源在 `scale` |
@@ -36,7 +36,7 @@
 
 | | 内容 |
 | -- | ---- |
-| **负责（摘要）** | 问卷生命周期与内容；答卷提交与校验；`questionnaire.*` / `answersheet.submitted` 等领域事件；问卷二维码等 |
+| **负责（摘要）** | 问卷生命周期与内容；答卷提交与校验；`questionnaire.changed` / `answersheet.submitted` 等领域事件；问卷二维码等 |
 | **不负责（摘要）** | 认证与监护（`collection-server`）；测评与报告（[evaluation](./03-evaluation.md)）；标签/统计等下游实现（多由 `worker` 消费事件） |
 | **关联专题** | 三界与引用边界 [05-专题/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)；异步主链 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md)；问卷版本与历史答卷读路径见专题 01 专节；读侧缓存 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
 

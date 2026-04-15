@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -519,16 +520,13 @@ func normalizePagination(page, pageSize int) (int, int) {
 
 // publishEvents 发布聚合根收集的领域事件
 func (s *submissionService) publishEvents(ctx context.Context, a *assessment.Assessment, l *logger.RequestLogger) {
-	if s.eventPublisher == nil {
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, a, func() {
 		l.Warnw("事件发布器未配置，跳过事件发布",
 			"action", "publish_event",
 			"resource", "assessment",
 			"assessment_id", a.ID().Uint64(),
 		)
-		return
-	}
-
-	PublishCollectedEvents(ctx, s.eventPublisher, a, func(evt event.DomainEvent, err error) {
+	}, func(evt event.DomainEvent, err error) {
 		l.Errorw("发布领域事件失败",
 			"action", "publish_event",
 			"resource", "assessment",

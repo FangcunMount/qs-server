@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -285,7 +286,7 @@ func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
 	}
 
-	PublishCollectedEvents(ctx, s.eventPublisher, a, func(evt event.DomainEvent, err error) {
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, a, nil, func(evt event.DomainEvent, err error) {
 		l.Errorw("发布领域事件失败",
 			"action", "retry_assessment",
 			"assessment_id", assessmentID,

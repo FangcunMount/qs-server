@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
+
+	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 func init() {
@@ -19,54 +20,6 @@ func init() {
 	})
 }
 
-// ==================== Payload 定义 ====================
-
-// AssessmentSubmittedPayload 测评提交事件数据
-type AssessmentSubmittedPayload struct {
-	OrgID             int64     `json:"org_id"`
-	AssessmentID      int64     `json:"assessment_id"`
-	TesteeID          uint64    `json:"testee_id"`
-	QuestionnaireCode string    `json:"questionnaire_code"`
-	QuestionnaireVer  string    `json:"questionnaire_version"`
-	AnswerSheetID     string    `json:"answersheet_id"`
-	ScaleCode         string    `json:"scale_code,omitempty"`
-	ScaleVersion      string    `json:"scale_version,omitempty"`
-	SubmittedAt       time.Time `json:"submitted_at"`
-}
-
-// NeedsEvaluation 是否需要评估（有量表才需要）
-func (p AssessmentSubmittedPayload) NeedsEvaluation() bool {
-	return p.ScaleCode != ""
-}
-
-// AssessmentInterpretedPayload 测评解读完成事件数据
-type AssessmentInterpretedPayload struct {
-	OrgID         int64     `json:"org_id"`
-	AssessmentID  int64     `json:"assessment_id"`
-	TesteeID      uint64    `json:"testee_id"`
-	ScaleCode     string    `json:"scale_code"`
-	ScaleVersion  string    `json:"scale_version"`
-	TotalScore    float64   `json:"total_score"`
-	RiskLevel     string    `json:"risk_level"`
-	InterpretedAt time.Time `json:"interpreted_at"`
-}
-
-// IsHighRisk 是否高风险
-func (p AssessmentInterpretedPayload) IsHighRisk() bool {
-	return p.RiskLevel == "high" || p.RiskLevel == "critical"
-}
-
-// AssessmentFailedPayload 测评失败事件数据
-type AssessmentFailedPayload struct {
-	OrgID        int64     `json:"org_id"`
-	AssessmentID int64     `json:"assessment_id"`
-	TesteeID     uint64    `json:"testee_id"`
-	Reason       string    `json:"reason"`
-	FailedAt     time.Time `json:"failed_at"`
-}
-
-// ==================== Handler 实现 ====================
-
 // handleAssessmentSubmitted 处理测评提交事件
 // 业务逻辑：
 // 1. 解析测评提交事件
@@ -75,7 +28,7 @@ type AssessmentFailedPayload struct {
 // 4. 调用 InternalClient 执行评估
 func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data AssessmentSubmittedPayload
+		var data domainAssessment.AssessmentSubmittedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment submitted event: %w", err)
@@ -154,7 +107,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 // 3. 发送预警通知（如有必要）
 func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data AssessmentInterpretedPayload
+		var data domainAssessment.AssessmentInterpretedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
@@ -200,7 +153,7 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 // handleAssessmentFailed 处理测评失败事件
 func handleAssessmentFailed(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data AssessmentFailedPayload
+		var data domainAssessment.AssessmentFailedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment failed event: %w", err)

@@ -15,8 +15,8 @@ It supports multiple event types:
 - questionnaire.changed / scale.changed: Trigger QR code generation on publish
 - answersheet.submitted: Triggers scoring and assessment creation
 - assessment.submitted: Triggers evaluation workflow
-- assessment.interpreted: Triggers statistics and risk logging
-- assessment.failed: Logs and monitors failures`
+- assessment.interpreted / assessment.failed / report.generated: Handle evaluation outcomes
+- task.opened / task.completed / task.expired / task.canceled: Handle task notifications`
 
 // NewApp 创建 Worker App
 func NewApp(basename string) *app.App {

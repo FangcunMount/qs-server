@@ -304,7 +304,7 @@ flowchart TB
 | ---- | ------------- | --------------------------- | --------------------- | ---- |
 | `assessment.submitted` | `assessment-lifecycle` | `assessment_submitted_handler` | [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go) → `GetFactory("statistics_assessment_submitted_handler")` → [statistics_handler.go](../../internal/worker/handlers/statistics_handler.go) | 写 Redis 日/窗口/累计/分布；yaml consumers 为 `qs-worker` 等 |
 | `assessment.interpreted` | `assessment-lifecycle` | `assessment_interpreted_handler` | 同上 → `statistics_assessment_interpreted_handler` | 完成数、风险分布等 |
-| `task.*` / `report.generated` | `task-lifecycle` / `assessment-lifecycle` | `task_*_handler` / `report_generated_handler` | [plan_handler.go](../../internal/worker/handlers/plan_handler.go)、[report_handler.go](../../internal/worker/handlers/report_handler.go) | 当前不承担统计写入；计划维度统计仍以同步聚合为主 |
+| `task.*` / `report.generated` | `task-lifecycle` / `assessment-lifecycle` | `task_*_handler` / `report_generated_handler` | [task_handler.go](../../internal/worker/handlers/task_handler.go)、[report_handler.go](../../internal/worker/handlers/report_handler.go) | 当前不承担统计写入；计划维度统计仍以同步聚合为主 |
 
 **Verify 步骤**：改事件消费行为时，同时核对 **yaml 的 `handler` 名**、**`assessment_handler` 内对子 handler 的调用**、**`statistics_handler` 注册名**、以及本文「运行时」描述。
 

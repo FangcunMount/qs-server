@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -474,30 +475,21 @@ func (s *lifecycleService) executeLifecycleOperation(
 
 // publishEvents 发布聚合根收集的领域事件
 func (s *lifecycleService) publishEvents(ctx context.Context, m *scale.MedicalScale) {
-	if s.eventPublisher == nil {
-		return
-	}
-
-	events := m.Events()
-	for _, evt := range events {
-		// 事件发布失败不影响主流程
-		_ = s.eventPublisher.Publish(ctx, evt)
-	}
-
-	// 清空已发布的事件
-	m.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, m, nil, nil)
 }
 
 func (s *lifecycleService) publishScaleChanged(ctx context.Context, m *scale.MedicalScale, action scale.ChangeAction) {
 	if s.eventPublisher == nil || m == nil {
 		return
 	}
-	_ = s.eventPublisher.Publish(ctx, scale.NewScaleChangedEvent(
-		m.GetID().Uint64(),
-		m.GetCode().String(),
-		"",
-		m.GetTitle(),
-		action,
-		time.Now(),
-	))
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(
+		scale.NewScaleChangedEvent(
+			m.GetID().Uint64(),
+			m.GetCode().String(),
+			"",
+			m.GetTitle(),
+			action,
+			time.Now(),
+		),
+	), nil, nil)
 }

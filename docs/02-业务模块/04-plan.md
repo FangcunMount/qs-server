@@ -31,7 +31,7 @@
 
 | | 内容 |
 | -- | ---- |
-| **负责（摘要）** | 计划模板与周期策略；受试者入组与任务批量生成；任务调度开放（入口 token/URL）；任务完成/过期/取消与 `plan.*`/`task.*` 事件；后台查询 |
+| **负责（摘要）** | 计划模板与周期策略；受试者入组与任务批量生成；任务调度开放（入口 token/URL）；任务完成/过期/取消与 `task.*` 事件；后台查询 |
 | **不负责（摘要）** | 问卷与答卷（[survey](./01-survey.md)）；量表规则（[scale](./02-scale.md)）；测评实例与报告编排（[evaluation](./03-evaluation.md)）；账号 IAM（[actor](./05-actor.md)）；通知/统计落地（多由 `worker` 等消费事件） |
 | **关联专题** | 异步链路 [05-专题/02](../05-专题分析/02-异步评估链路：从答卷提交到报告生成.md)；三界与引用 [05-专题/01](../05-专题分析/01-测评业务模型：survey、scale、evaluation%20为什么分离.md)；读侧 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) |
 
@@ -74,7 +74,7 @@ flowchart LR
     admin -->|REST| plan
     cron -->|internal REST| plan
     plan -->|ExistsByCode| scale
-    plan -->|publish plan.* / task.*| worker
+    plan -->|publish task.*| worker
     survey -->|答卷| evaluation
     evaluation -.->|assessmentID / origin| plan
 ```
@@ -140,7 +140,7 @@ erDiagram
 
 | 概念 | 职责 | 与相邻概念的关系 |
 | ---- | ---- | ---------------- |
-| `AssessmentPlan` | 聚合根：机构、量表编码、周期、`PlanStatus` | 模板；创建后进入 `active`，但当前不再发布单独的 `plan.*` 事件 |
+| `AssessmentPlan` | 聚合根：机构、量表编码、周期、`PlanStatus` | 模板；创建后进入 `active`，但当前不再发布单独的计划级生命周期事件 |
 | `AssessmentTask` | 实体：`planID` + `seq` + `testeeID` + 时间点 + `TaskStatus` + 入口 + `assessmentID` | 入组时批量生成；`orgID`/`scaleCode` 冗余 |
 | `TaskGenerator` | 按 `scheduleType` 与 `startDate` 计算各 `seq` 的 `plannedAt` | 与 [task_generator.go](../../internal/apiserver/domain/plan/task_generator.go) 策略一致 |
 | `PlanEnrollment` | 入组与终止参与 | 调 `TaskGenerator`，不直接写仓储（应用层持久化） |
@@ -254,7 +254,7 @@ flowchart TB
 
 #### 从计划模板到待执行任务
 
-创建 `AssessmentPlan` 后不会再发布单独的 `plan.*` 事件，**尚未**有任务。受试者入组时 `EnrollmentService` 调 `PlanEnrollment.EnrollTestee`，按 `startDate` 与 `TaskGenerator` **一次性**生成该受试者全部 `pending` 任务并持久化。
+创建 `AssessmentPlan` 后不会再发布单独的计划级生命周期事件，**尚未**有任务。受试者入组时 `EnrollmentService` 调 `PlanEnrollment.EnrollTestee`，按 `startDate` 与 `TaskGenerator` **一次性**生成该受试者全部 `pending` 任务并持久化。
 
 #### 从待执行到开放入口
 

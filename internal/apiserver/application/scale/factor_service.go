@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -336,14 +337,16 @@ func (s *factorService) publishScaleUpdated(ctx context.Context, m *scale.Medica
 	if s.eventPublisher == nil || m == nil {
 		return
 	}
-	_ = s.eventPublisher.Publish(ctx, scale.NewScaleChangedEvent(
-		m.GetID().Uint64(),
-		m.GetCode().String(),
-		"",
-		m.GetTitle(),
-		scale.ChangeActionUpdated,
-		time.Now(),
-	))
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(
+		scale.NewScaleChangedEvent(
+			m.GetID().Uint64(),
+			m.GetCode().String(),
+			"",
+			m.GetTitle(),
+			scale.ChangeActionUpdated,
+			time.Now(),
+		),
+	), nil, nil)
 }
 
 // ============= 辅助函数 =============

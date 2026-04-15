@@ -317,7 +317,7 @@ sequenceDiagram
 | `assessment.failed` | `qs.evaluation.lifecycle` | `assessment_failed_handler` | 失败路径 | logging / monitoring 等；当前 worker 侧以失败日志为主 |
 | `report.generated` | `qs.evaluation.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
 
-主异步闭环以 **`report.generated`** 为报告就绪信号；当前运行时契约中已经没有 `report.exported`。
+主异步闭环以 **`report.generated`** 为报告就绪信号；报告导出不再作为运行时事件契约的一部分。
 
 ---
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 )
@@ -28,7 +29,7 @@ func init() {
 //   - 每日统计（stats:daily）
 func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data AssessmentSubmittedPayload
+		var data domainAssessment.AssessmentSubmittedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment submitted event: %w", err)
@@ -113,7 +114,7 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 //   - 每日统计（完成数）
 func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data AssessmentInterpretedPayload
+		var data domainAssessment.AssessmentInterpretedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment interpreted event: %w", err)

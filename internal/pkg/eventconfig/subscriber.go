@@ -56,18 +56,9 @@ func (s *Subscriber) RegisterHandlers() error {
 	}
 
 	for eventType, eventCfg := range cfg.Events {
-		if eventCfg.Handler == "" {
-			continue
-		}
-
 		handler, err := s.handlerFactory(eventCfg.Handler)
 		if err != nil {
-			s.logger.Warn("handler not found, skipping",
-				slog.String("event_type", eventType),
-				slog.String("handler", eventCfg.Handler),
-				slog.String("error", err.Error()),
-			)
-			continue
+			return fmt.Errorf("event %q references unavailable handler %q: %w", eventType, eventCfg.Handler, err)
 		}
 
 		s.handlers[eventType] = handler
@@ -95,11 +86,9 @@ func (s *Subscriber) GetTopicsToSubscribe() []TopicSubscription {
 		}
 
 		subs = append(subs, TopicSubscription{
-			TopicName:   topicCfg.Name,
-			TopicKey:    topicKey,
-			Group:       topicCfg.Consumer.Group,
-			Concurrency: topicCfg.Consumer.Concurrency,
-			EventTypes:  events,
+			TopicName:  topicCfg.Name,
+			TopicKey:   topicKey,
+			EventTypes: events,
 		})
 	}
 
@@ -108,11 +97,9 @@ func (s *Subscriber) GetTopicsToSubscribe() []TopicSubscription {
 
 // TopicSubscription Topic 订阅信息
 type TopicSubscription struct {
-	TopicName   string
-	TopicKey    string
-	Group       string
-	Concurrency int
-	EventTypes  []string
+	TopicName  string
+	TopicKey   string
+	EventTypes []string
 }
 
 // Dispatch 分发事件到对应的处理器

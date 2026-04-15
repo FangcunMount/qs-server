@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -651,18 +652,7 @@ func (s *lifecycleService) logSuccess(ctx context.Context, action string, code s
 
 // publishEvents 发布聚合根收集的领域事件
 func (s *lifecycleService) publishEvents(ctx context.Context, q *questionnaire.Questionnaire) {
-	if s.eventPublisher == nil {
-		return
-	}
-
-	events := q.Events()
-	for _, evt := range events {
-		// 事件发布失败不影响主流程
-		_ = s.eventPublisher.Publish(ctx, evt)
-	}
-
-	// 清空已发布的事件
-	q.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, q, nil, nil)
 }
 
 func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {

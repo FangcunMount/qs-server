@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -80,18 +81,14 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 5. 发布领域事件
-	events := task.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish task event",
-				"action", "open_task",
-				"task_id", taskID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	task.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+		logger.L(ctx).Errorw("Failed to publish task event",
+			"action", "open_task",
+			"task_id", taskID,
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 
 	logger.L(ctx).Infow("Task opened successfully",
 		"action", "open_task",
@@ -149,18 +146,14 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	}
 
 	// 5. 发布领域事件
-	events := task.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish task event",
-				"action", "complete_task",
-				"task_id", taskID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	task.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+		logger.L(ctx).Errorw("Failed to publish task event",
+			"action", "complete_task",
+			"task_id", taskID,
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 
 	logger.L(ctx).Infow("Task completed successfully",
 		"action", "complete_task",
@@ -206,18 +199,14 @@ func (s *taskManagementService) ExpireTask(ctx context.Context, orgID int64, tas
 	}
 
 	// 4. 发布领域事件
-	events := task.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish task event",
-				"action", "expire_task",
-				"task_id", taskID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	task.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+		logger.L(ctx).Errorw("Failed to publish task event",
+			"action", "expire_task",
+			"task_id", taskID,
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 
 	logger.L(ctx).Infow("Task expired successfully",
 		"action", "expire_task",
@@ -262,18 +251,14 @@ func (s *taskManagementService) CancelTask(ctx context.Context, orgID int64, tas
 	}
 
 	// 4. 发布领域事件
-	events := task.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish task event",
-				"action", "cancel_task",
-				"task_id", taskID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	task.ClearEvents()
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+		logger.L(ctx).Errorw("Failed to publish task event",
+			"action", "cancel_task",
+			"task_id", taskID,
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 
 	logger.L(ctx).Infow("Task canceled successfully",
 		"action", "cancel_task",

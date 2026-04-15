@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
@@ -16,30 +16,9 @@ func init() {
 	})
 }
 
-// ==================== Payload 定义 ====================
-
-// ReportGeneratedPayload 报告生成事件数据
-type ReportGeneratedPayload struct {
-	ReportID     string    `json:"report_id"`
-	AssessmentID string    `json:"assessment_id"`
-	TesteeID     uint64    `json:"testee_id"`
-	ScaleCode    string    `json:"scale_code"`
-	ScaleVersion string    `json:"scale_version"`
-	TotalScore   float64   `json:"total_score"`
-	RiskLevel    string    `json:"risk_level"`
-	GeneratedAt  time.Time `json:"generated_at"`
-}
-
-// IsHighRisk 是否高风险
-func (p ReportGeneratedPayload) IsHighRisk() bool {
-	return p.RiskLevel == "high" || p.RiskLevel == "critical"
-}
-
-// ==================== Handler 实现 ====================
-
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data ReportGeneratedPayload
+		var data domainReport.ReportGeneratedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse report generated event: %w", err)
@@ -62,7 +41,7 @@ func handleReportGenerated(deps *Dependencies) HandlerFunc {
 }
 
 // logReportGenerated 记录报告生成日志
-func logReportGenerated(deps *Dependencies, env *EventEnvelope, data ReportGeneratedPayload) {
+func logReportGenerated(deps *Dependencies, env *EventEnvelope, data domainReport.ReportGeneratedData) {
 	deps.Logger.Info("processing report generated",
 		slog.String("event_id", env.ID),
 		slog.String("report_id", data.ReportID),
@@ -74,8 +53,8 @@ func logReportGenerated(deps *Dependencies, env *EventEnvelope, data ReportGener
 }
 
 // handleHighRiskAlert 处理高风险预警
-func handleHighRiskAlert(deps *Dependencies, data ReportGeneratedPayload) {
-	if !data.IsHighRisk() {
+func handleHighRiskAlert(deps *Dependencies, data domainReport.ReportGeneratedData) {
+	if !isHighRiskRiskLevel(data.RiskLevel) {
 		return
 	}
 
@@ -88,7 +67,7 @@ func handleHighRiskAlert(deps *Dependencies, data ReportGeneratedPayload) {
 }
 
 // extractHighRiskFactors 从报告中提取高风险因子
-func extractHighRiskFactors(ctx context.Context, deps *Dependencies, data ReportGeneratedPayload) []string {
+func extractHighRiskFactors(ctx context.Context, deps *Dependencies, data domainReport.ReportGeneratedData) []string {
 	if deps.EvaluationClient == nil {
 		return nil
 	}
@@ -140,9 +119,13 @@ func isHighRiskDimension(riskLevel string) bool {
 	return riskLevel == "high" || riskLevel == "severe"
 }
 
+func isHighRiskRiskLevel(riskLevel string) bool {
+	return riskLevel == "high" || riskLevel == "critical"
+}
+
 // tagTesteeWithReportData 根据报告数据给受试者打标签
-func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data ReportGeneratedPayload, highRiskFactors []string) {
-	markKeyFocus := data.IsHighRisk()
+func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data domainReport.ReportGeneratedData, highRiskFactors []string) {
+	markKeyFocus := isHighRiskRiskLevel(data.RiskLevel)
 
 	resp, err := deps.InternalClient.TagTestee(
 		ctx,

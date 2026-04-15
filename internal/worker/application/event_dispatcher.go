@@ -149,8 +149,6 @@ func (d *EventDispatcher) PrintSubscriptionInfo() {
 	for _, sub := range subs {
 		d.logger.Info("topic subscription",
 			slog.String("topic", sub.TopicName),
-			slog.String("group", sub.Group),
-			slog.Int("concurrency", sub.Concurrency),
 			slog.Int("event_count", len(sub.EventTypes)),
 		)
 		for _, eventType := range sub.EventTypes {

@@ -107,7 +107,7 @@ sequenceDiagram
 | `task.opened` | `task_opened_handler` | **Internal**：`SendTaskOpenedMiniProgramNotification` |
 | `task.completed` / `task.expired` / `task.canceled` | 各 `task_*_handler` | 通过 `Notifier` 发送完成/过期/取消通知 |
 
-**当前没有 `plan.*` 事件**：计划生命周期本身已回归同步业务逻辑，异步副作用统一沉到 `task.*`。
+**当前没有计划级生命周期事件**：计划生命周期本身已回归同步业务逻辑，异步副作用统一沉到 `task.*`。
 
 ---
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -349,19 +350,14 @@ func (s *lifecycleService) PausePlan(ctx context.Context, orgID int64, planID st
 		}
 		savedTaskCount++
 
-		// 发布任务事件
-		events := task.Events()
-		for _, evt := range events {
-			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				logger.L(ctx).Errorw("Failed to publish task event",
-					"action", "pause_plan",
-					"task_id", task.GetID().String(),
-					"event_type", evt.EventType(),
-					"error", err.Error(),
-				)
-			}
-		}
-		task.ClearEvents()
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+			logger.L(ctx).Errorw("Failed to publish task event",
+				"action", "pause_plan",
+				"task_id", task.GetID().String(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		})
 	}
 
 	logger.L(ctx).Infow("Plan paused successfully",
@@ -506,18 +502,14 @@ func (s *lifecycleService) FinishPlan(ctx context.Context, orgID int64, planID s
 		}
 		savedTaskCount++
 
-		events := task.Events()
-		for _, evt := range events {
-			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				logger.L(ctx).Errorw("Failed to publish task event",
-					"action", "finish_plan",
-					"task_id", task.GetID().String(),
-					"event_type", evt.EventType(),
-					"error", err.Error(),
-				)
-			}
-		}
-		task.ClearEvents()
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+			logger.L(ctx).Errorw("Failed to publish task event",
+				"action", "finish_plan",
+				"task_id", task.GetID().String(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		})
 	}
 
 	logger.L(ctx).Infow("Plan finished successfully",
@@ -585,18 +577,14 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 		}
 		savedTaskCount++
 
-		events := task.Events()
-		for _, evt := range events {
-			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				logger.L(ctx).Errorw("Failed to publish task event",
-					"action", "cancel_plan",
-					"task_id", task.GetID().String(),
-					"event_type", evt.EventType(),
-					"error", err.Error(),
-				)
-			}
-		}
-		task.ClearEvents()
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+			logger.L(ctx).Errorw("Failed to publish task event",
+				"action", "cancel_plan",
+				"task_id", task.GetID().String(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		})
 	}
 
 	logger.L(ctx).Infow("Plan canceled successfully",

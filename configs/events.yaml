@@ -1,79 +1,39 @@
 # ============================================================================
 # 领域事件配置
 # ============================================================================
-# 本文件定义事件类型、Topic 映射、消费者配置等
-# 发布端和订阅端共用此配置，确保一致性
+# 本文件只描述当前运行时真实生效的事件契约与 Topic 映射。
+# 发布端和订阅端共用此配置，确保事件类型、Topic 和 handler 名称一致。
 # ============================================================================
 
-# 版本号（用于配置兼容性检查）
 version: "1.0"
 
-# ============================================================================
-# Topic 定义
-# ============================================================================
 topics:
   questionnaire-lifecycle:
     name: "qs.survey.lifecycle"
     description: "问卷和量表生命周期事件"
-    # 消费者配置
-    consumer:
-      group: "qs-worker"
-      concurrency: 2
-      retry:
-        max_attempts: 3
-        initial_interval: 1s
-        max_interval: 30s
 
   assessment-lifecycle:
     name: "qs.evaluation.lifecycle"
     description: "测评生命周期事件"
-    consumer:
-      group: "qs-worker"
-      concurrency: 4
-      retry:
-        max_attempts: 5
-        initial_interval: 500ms
-        max_interval: 1m
-
-  plan-lifecycle:
-    name: "qs.plan.lifecycle"
-    description: "测评计划生命周期事件"
-    consumer:
-      group: "qs-worker"
-      concurrency: 2
-      retry:
-        max_attempts: 3
-        initial_interval: 1s
-        max_interval: 30s
 
   task-lifecycle:
     name: "qs.plan.task"
     description: "测评任务生命周期事件"
-    consumer:
-      group: "qs-worker"
-      concurrency: 4
-      retry:
-        max_attempts: 5
-        initial_interval: 500ms
-        max_interval: 1m
 
-# ============================================================================
-# 事件定义
-# ============================================================================
-# 每个事件映射到一个 Topic，并指定处理器
 events:
-  # --------------------------------------------------------------------------
-  # Survey 领域
-  # --------------------------------------------------------------------------
   questionnaire.changed:
     topic: questionnaire-lifecycle
     aggregate: Questionnaire
     domain: survey/questionnaire
     description: "问卷生命周期变化"
     handler: questionnaire_changed_handler
-    consumers:
-      - collection-server
-      - search-service
+
+  scale.changed:
+    topic: questionnaire-lifecycle
+    aggregate: MedicalScale
+    domain: scale
+    description: "量表生命周期变化"
+    handler: scale_changed_handler
 
   answersheet.submitted:
     topic: assessment-lifecycle
@@ -81,37 +41,13 @@ events:
     domain: survey/answersheet
     description: "答卷已提交"
     handler: answersheet_submitted_handler
-    consumers:
-      - qs-worker
-      - notification-service
 
-  # --------------------------------------------------------------------------
-  # Scale 领域
-  # --------------------------------------------------------------------------
-  scale.changed:
-    topic: questionnaire-lifecycle
-    aggregate: MedicalScale
-    domain: scale
-    description: "量表生命周期变化"
-    handler: scale_changed_handler
-    consumers:
-      - collection-server
-      - qs-worker
-
-  # --------------------------------------------------------------------------
-  # Evaluation 领域
-  # --------------------------------------------------------------------------
   assessment.submitted:
     topic: assessment-lifecycle
     aggregate: Assessment
     domain: evaluation/assessment
     description: "测评已提交"
     handler: assessment_submitted_handler
-    consumers:
-      - qs-worker
-      - notification-service
-    # 高优先级事件，需要快速处理
-    priority: high
 
   assessment.interpreted:
     topic: assessment-lifecycle
@@ -119,10 +55,6 @@ events:
     domain: evaluation/assessment
     description: "测评已解读"
     handler: assessment_interpreted_handler
-    consumers:
-      - notification-service
-      - alert-service
-      - qs-worker  # 统计服务在worker中处理
 
   assessment.failed:
     topic: assessment-lifecycle
@@ -130,9 +62,6 @@ events:
     domain: evaluation/assessment
     description: "测评失败"
     handler: assessment_failed_handler
-    consumers:
-      - logging-service
-      - monitoring-service
 
   report.generated:
     topic: assessment-lifecycle
@@ -140,10 +69,6 @@ events:
     domain: evaluation/report
     description: "报告已生成（在 assessment.interpreted 之后发布）"
     handler: report_generated_handler
-    consumers:
-      - qs-worker  # 给受试者打标签、提取高风险因子
-      - notification-service
-      - alert-service
 
   task.opened:
     topic: task-lifecycle
@@ -151,8 +76,6 @@ events:
     domain: plan
     description: "任务已开放"
     handler: task_opened_handler
-    consumers:
-      - qs-worker  # 小程序通知由 worker -> internal gRPC -> apiserver 处理；事件驱动统计 TODO
 
   task.completed:
     topic: task-lifecycle
@@ -160,9 +83,6 @@ events:
     domain: plan
     description: "任务已完成"
     handler: task_completed_handler
-    consumers:
-      - qs-worker  # 通知、报告生成等 TODO；事件驱动统计 TODO
-      - alert-service  # 检查风险等级
 
   task.expired:
     topic: task-lifecycle
@@ -170,8 +90,6 @@ events:
     domain: plan
     description: "任务已过期"
     handler: task_expired_handler
-    consumers:
-      - qs-worker  # 通知等 TODO；事件驱动统计 TODO
 
   task.canceled:
     topic: task-lifecycle
@@ -179,54 +97,3 @@ events:
     domain: plan
     description: "任务已取消"
     handler: task_canceled_handler
-    consumers:
-      - qs-worker  # 通知等 TODO；事件驱动统计 TODO
-
-# ============================================================================
-# 处理器定义
-# ============================================================================
-# 定义处理器的元信息，实际实现在代码中
-handlers:
-  questionnaire_changed_handler:
-    package: questionnaire
-    description: "处理问卷生命周期变化事件"
-
-  scale_changed_handler:
-    package: scale
-    description: "处理量表生命周期变化事件"
-
-  answersheet_submitted_handler:
-    package: assessment
-    description: "处理答卷提交事件"
-
-  assessment_submitted_handler:
-    package: assessment
-    description: "处理测评提交事件，触发评估流程"
-
-  assessment_interpreted_handler:
-    package: assessment
-    description: "处理测评解读完成事件"
-
-  assessment_failed_handler:
-    package: assessment
-    description: "处理测评失败事件，记录错误"
-
-  report_generated_handler:
-    package: report
-    description: "处理报告生成事件：给受试者打标签、提取高风险因子、发送预警"
-
-  task_opened_handler:
-    package: plan
-    description: "处理任务开放事件（小程序通知；事件驱动统计 TODO）"
-
-  task_completed_handler:
-    package: plan
-    description: "处理任务完成事件（通知与报告链路 TODO；事件驱动统计 TODO）"
-
-  task_expired_handler:
-    package: plan
-    description: "处理任务过期事件（通知 TODO；事件驱动统计 TODO）"
-
-  task_canceled_handler:
-    package: plan
-    description: "处理任务取消事件（日志与统计 TODO）"

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 )
@@ -35,24 +36,6 @@ var defaultAnswerSheetProcessingGateHooks = answerSheetProcessingGateHooks{
 	acquire: acquireProcessingLock,
 	release: releaseProcessingLock,
 }
-
-// ==================== Payload 定义 ====================
-
-// AnswerSheetSubmittedPayload 答卷提交事件数据
-// 对应发布端 answersheet.AnswerSheetSubmittedData
-type AnswerSheetSubmittedPayload struct {
-	AnswerSheetID        string    `json:"answersheet_id"`
-	QuestionnaireCode    string    `json:"questionnaire_code"`
-	QuestionnaireVersion string    `json:"questionnaire_version"`
-	TesteeID             uint64    `json:"testee_id"` // 受试者ID
-	OrgID                uint64    `json:"org_id"`    // 组织ID
-	FillerID             uint64    `json:"filler_id"`
-	FillerType           string    `json:"filler_type"`
-	TaskID               string    `json:"task_id"`
-	SubmittedAt          time.Time `json:"submitted_at"`
-}
-
-// ==================== Handler 实现 ====================
 
 // handleAnswerSheetSubmitted 返回答卷提交处理函数
 // 业务逻辑：
@@ -94,8 +77,8 @@ func handleAnswerSheetSubmittedWithHooks(
 }
 
 // 解析答卷数据
-func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, uint64, *AnswerSheetSubmittedPayload, error) {
-	var data AnswerSheetSubmittedPayload
+func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, uint64, *domainAnswerSheet.AnswerSheetSubmittedData, error) {
+	var data domainAnswerSheet.AnswerSheetSubmittedData
 	env, err := ParseEventData(payload, &data)
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to parse answersheet submitted event: %w", err)
@@ -249,7 +232,7 @@ func calculateAnswerSheetScore(ctx context.Context, deps *Dependencies, answerSh
 }
 
 // 创建测评
-func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, answerSheetID uint64, data *AnswerSheetSubmittedPayload) error {
+func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, answerSheetID uint64, data *domainAnswerSheet.AnswerSheetSubmittedData) error {
 	if deps.InternalClient == nil {
 		return fmt.Errorf("internal client is not available")
 	}

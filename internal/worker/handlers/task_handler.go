@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
+	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
 
@@ -38,43 +38,9 @@ func init() {
 	})
 }
 
-// TaskOpenedPayload 任务开放事件数据
-type TaskOpenedPayload struct {
-	TaskID   string    `json:"task_id"`
-	PlanID   string    `json:"plan_id"`
-	TesteeID string    `json:"testee_id"`
-	EntryURL string    `json:"entry_url"`
-	OpenAt   time.Time `json:"open_at"`
-}
-
-// TaskCompletedPayload 任务完成事件数据
-type TaskCompletedPayload struct {
-	TaskID       string    `json:"task_id"`
-	PlanID       string    `json:"plan_id"`
-	TesteeID     string    `json:"testee_id"`
-	AssessmentID string    `json:"assessment_id"`
-	CompletedAt  time.Time `json:"completed_at"`
-}
-
-// TaskExpiredPayload 任务过期事件数据
-type TaskExpiredPayload struct {
-	TaskID    string    `json:"task_id"`
-	PlanID    string    `json:"plan_id"`
-	TesteeID  string    `json:"testee_id"`
-	ExpiredAt time.Time `json:"expired_at"`
-}
-
-// TaskCanceledPayload 任务取消事件数据
-type TaskCanceledPayload struct {
-	TaskID     string    `json:"task_id"`
-	PlanID     string    `json:"plan_id"`
-	TesteeID   string    `json:"testee_id"`
-	CanceledAt time.Time `json:"canceled_at"`
-}
-
 func handleTaskOpened(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data TaskOpenedPayload
+		var data domainPlan.TaskOpenedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse task opened event: %w", err)
@@ -130,7 +96,7 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 
 func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data TaskCompletedPayload
+		var data domainPlan.TaskCompletedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse task completed event: %w", err)
@@ -167,7 +133,7 @@ func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 
 func handleTaskExpired(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data TaskExpiredPayload
+		var data domainPlan.TaskExpiredData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse task expired event: %w", err)
@@ -202,7 +168,7 @@ func handleTaskExpired(deps *Dependencies) HandlerFunc {
 
 func handleTaskCanceled(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data TaskCanceledPayload
+		var data domainPlan.TaskCanceledData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse task canceled event: %w", err)

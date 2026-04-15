@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -483,35 +484,19 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 
 // publishEvents 发布聚合根收集的领域事件
 func (s *submissionService) publishEvents(ctx context.Context, sheet *answersheet.AnswerSheet, l *logger.RequestLogger) {
-	if s.eventPublisher == nil {
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, sheet, func() {
 		l.Warnw("事件发布器未配置，跳过事件发布",
 			"action", "publish_event",
 			"resource", "answersheet",
 			"answersheet_id", sheet.ID().Uint64(),
 		)
-		return
-	}
-
-	events := sheet.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			l.Errorw("发布领域事件失败",
-				"action", "publish_event",
-				"resource", "answersheet",
-				"answersheet_id", sheet.ID().Uint64(),
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		} else {
-			l.Infow("发布领域事件成功",
-				"action", "publish_event",
-				"resource", "answersheet",
-				"answersheet_id", sheet.ID().Uint64(),
-				"event_type", evt.EventType(),
-			)
-		}
-	}
-
-	// 清空已发布的事件
-	sheet.ClearEvents()
+	}, func(evt event.DomainEvent, err error) {
+		l.Errorw("发布领域事件失败",
+			"action", "publish_event",
+			"resource", "answersheet",
+			"answersheet_id", sheet.ID().Uint64(),
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 }

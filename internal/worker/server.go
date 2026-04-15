@@ -182,7 +182,6 @@ func (s *workerServer) subscribeHandlers() error {
 		}
 		s.logger.Info("subscribed to topic",
 			slog.String("topic", topicName),
-			slog.String("group", sub.Group),
 			slog.Int("event_count", len(sub.EventTypes)),
 			slog.String("channel", s.config.Worker.ServiceName),
 		)

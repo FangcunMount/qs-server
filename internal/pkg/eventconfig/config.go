@@ -9,55 +9,30 @@ package eventconfig
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config 事件配置根结构
 type Config struct {
-	Version  string                 `yaml:"version"`
-	Topics   map[string]TopicConfig `yaml:"topics"`
-	Events   map[string]EventConfig `yaml:"events"`
-	Handlers map[string]HandlerMeta `yaml:"handlers"`
+	Version string                 `yaml:"version"`
+	Topics  map[string]TopicConfig `yaml:"topics"`
+	Events  map[string]EventConfig `yaml:"events"`
 }
 
 // TopicConfig Topic 配置
 type TopicConfig struct {
-	Name        string         `yaml:"name"`
-	Description string         `yaml:"description"`
-	Consumer    ConsumerConfig `yaml:"consumer"`
-}
-
-// ConsumerConfig 消费者配置
-type ConsumerConfig struct {
-	Group       string      `yaml:"group"`
-	Concurrency int         `yaml:"concurrency"`
-	Retry       RetryConfig `yaml:"retry"`
-}
-
-// RetryConfig 重试配置
-type RetryConfig struct {
-	MaxAttempts     int           `yaml:"max_attempts"`
-	InitialInterval time.Duration `yaml:"initial_interval"`
-	MaxInterval     time.Duration `yaml:"max_interval"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
 }
 
 // EventConfig 事件配置
 type EventConfig struct {
-	Topic       string   `yaml:"topic"`       // Topic 引用（对应 Topics 中的 key）
-	Aggregate   string   `yaml:"aggregate"`   // 聚合类型
-	Domain      string   `yaml:"domain"`      // 所属领域
-	Description string   `yaml:"description"` // 事件描述
-	Handler     string   `yaml:"handler"`     // 处理器引用
-	Consumers   []string `yaml:"consumers"`   // 消费者列表
-	Priority    string   `yaml:"priority"`    // 优先级（high, normal, low）
-}
-
-// HandlerMeta 处理器元信息
-type HandlerMeta struct {
-	Package     string `yaml:"package"`     // 所在包
-	Description string `yaml:"description"` // 描述
+	Topic       string `yaml:"topic"`       // Topic 引用（对应 Topics 中的 key）
+	Aggregate   string `yaml:"aggregate"`   // 聚合类型
+	Domain      string `yaml:"domain"`      // 所属领域
+	Description string `yaml:"description"` // 事件描述
+	Handler     string `yaml:"handler"`     // 处理器引用
 }
 
 // Load 从文件加载事件配置
@@ -86,15 +61,22 @@ func Parse(data []byte) (*Config, error) {
 
 // Validate 验证配置完整性
 func (c *Config) Validate() error {
+	referencedTopics := make(map[string]struct{}, len(c.Topics))
+
 	// 验证事件引用的 Topic 存在
 	for eventType, eventCfg := range c.Events {
 		if _, ok := c.Topics[eventCfg.Topic]; !ok {
 			return fmt.Errorf("event %q references unknown topic %q", eventType, eventCfg.Topic)
 		}
-		if eventCfg.Handler != "" {
-			if _, ok := c.Handlers[eventCfg.Handler]; !ok {
-				return fmt.Errorf("event %q references unknown handler %q", eventType, eventCfg.Handler)
-			}
+		if eventCfg.Handler == "" {
+			return fmt.Errorf("event %q has empty handler", eventType)
+		}
+		referencedTopics[eventCfg.Topic] = struct{}{}
+	}
+
+	for topicKey := range c.Topics {
+		if _, ok := referencedTopics[topicKey]; !ok {
+			return fmt.Errorf("topic %q has no events", topicKey)
 		}
 	}
 	return nil

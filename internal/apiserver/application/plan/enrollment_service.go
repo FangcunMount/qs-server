@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -204,19 +205,14 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, orgID int64
 		}
 		savedTaskCount++
 
-		// 发布任务事件
-		events := task.Events()
-		for _, evt := range events {
-			if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-				logger.L(ctx).Errorw("Failed to publish task event",
-					"action", "terminate_enrollment",
-					"task_id", task.GetID().String(),
-					"event_type", evt.EventType(),
-					"error", err.Error(),
-				)
-			}
-		}
-		task.ClearEvents()
+		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
+			logger.L(ctx).Errorw("Failed to publish task event",
+				"action", "terminate_enrollment",
+				"task_id", task.GetID().String(),
+				"event_type", evt.EventType(),
+				"error", err.Error(),
+			)
+		})
 	}
 
 	logger.L(ctx).Infow("Enrollment terminated successfully",

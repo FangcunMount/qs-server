@@ -55,3 +55,16 @@ func TestRemovedEventTypesAbsent(t *testing.T) {
 		}
 	}
 }
+
+func TestTopicsAreNotDangling(t *testing.T) {
+	cfg, err := Load("../../../configs/events.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	for topicKey := range cfg.Topics {
+		if events := cfg.GetEventsByTopic(topicKey); len(events) == 0 {
+			t.Fatalf("topic %q has no bound events", topicKey)
+		}
+	}
+}
