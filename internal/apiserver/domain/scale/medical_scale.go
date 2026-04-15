@@ -400,9 +400,6 @@ func (m *MedicalScale) updateQuestionnaire(qCode meta.Code, qVersion string) err
 	if qCode.IsEmpty() {
 		return errors.WithCode(code.ErrInvalidArgument, "questionnaire code cannot be empty")
 	}
-	if qVersion == "" {
-		return errors.WithCode(code.ErrInvalidArgument, "questionnaire version cannot be empty")
-	}
 	m.questionnaireCode = qCode
 	m.questionnaireVersion = qVersion
 	return nil

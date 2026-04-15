@@ -9,6 +9,7 @@ import (
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
@@ -143,7 +144,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	questionMgr := questionnaire.QuestionManager{}
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, validator, lifecycle, m.eventPublisher)
+	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, nil, validator, lifecycle, m.eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
 	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc)
 
@@ -157,6 +158,32 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	)
 
 	return nil
+}
+
+// SetScaleRepository 设置量表仓储，用于问卷发布时同步量表问卷版本。
+func (m *SurveyModule) SetScaleRepository(scaleRepo domainScale.Repository) {
+	if m == nil || m.Questionnaire == nil {
+		return
+	}
+
+	validator := questionnaire.Validator{}
+	lifecycle := questionnaire.NewLifecycle()
+	m.Questionnaire.LifecycleService = quesApp.NewLifecycleService(
+		m.Questionnaire.Repo,
+		scaleRepo,
+		validator,
+		lifecycle,
+		m.eventPublisher,
+	)
+
+	if m.Questionnaire.Handler != nil {
+		m.Questionnaire.Handler = handler.NewQuestionnaireHandler(
+			m.Questionnaire.LifecycleService,
+			m.Questionnaire.ContentService,
+			m.Questionnaire.QueryService,
+			nil,
+		)
+	}
 }
 
 // SetQRCodeService 设置二维码服务（用于跨模块依赖注入）

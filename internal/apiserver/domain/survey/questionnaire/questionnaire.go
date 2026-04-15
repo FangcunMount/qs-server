@@ -24,6 +24,10 @@ type Questionnaire struct {
 	version Version // 问卷版本号
 	status  Status  // 问卷状态： 草稿/已发布/已归档
 
+	// —— 版本记录角色
+	recordRole        RecordRole
+	isActivePublished bool
+
 	// —— 问题列表
 	questions   []Question // 问卷中的所有问题
 	questionCnt int        // 问题数量（可从聚合查询获得）
@@ -67,6 +71,9 @@ func NewQuestionnaire(c meta.Code, t string, opts ...QuestionnaireOption) (*Ques
 	if !q.typ.IsValid() {
 		return nil, errors.WithCode(code.ErrQuestionnaireInvalidInput, "invalid questionnaire type")
 	}
+	if q.recordRole == "" {
+		q.recordRole = RecordRoleHead
+	}
 
 	return q, nil
 }
@@ -80,6 +87,12 @@ func WithVersion(v Version) QuestionnaireOption  { return func(q *Questionnaire)
 func WithStatus(s Status) QuestionnaireOption    { return func(q *Questionnaire) { q.status = s } }
 func WithType(t QuestionnaireType) QuestionnaireOption {
 	return func(q *Questionnaire) { q.typ = t }
+}
+func WithRecordRole(role RecordRole) QuestionnaireOption {
+	return func(q *Questionnaire) { q.recordRole = role }
+}
+func WithActivePublished(active bool) QuestionnaireOption {
+	return func(q *Questionnaire) { q.isActivePublished = active }
 }
 func WithQuestions(ques []Question) QuestionnaireOption {
 	return func(q *Questionnaire) {
@@ -116,11 +129,22 @@ func (q *Questionnaire) GetType() QuestionnaireType {
 	}
 	return q.typ
 }
-func (q *Questionnaire) GetTitle() string        { return q.title }
-func (q *Questionnaire) GetDescription() string  { return q.desc }
-func (q *Questionnaire) GetImgUrl() string       { return q.imgUrl }
-func (q *Questionnaire) GetVersion() Version     { return q.version }
-func (q *Questionnaire) GetStatus() Status       { return q.status }
+func (q *Questionnaire) GetTitle() string       { return q.title }
+func (q *Questionnaire) GetDescription() string { return q.desc }
+func (q *Questionnaire) GetImgUrl() string      { return q.imgUrl }
+func (q *Questionnaire) GetVersion() Version    { return q.version }
+func (q *Questionnaire) GetStatus() Status      { return q.status }
+func (q *Questionnaire) GetRecordRole() RecordRole {
+	if q.recordRole == "" {
+		return RecordRoleHead
+	}
+	return q.recordRole
+}
+func (q *Questionnaire) IsHead() bool { return q.GetRecordRole() == RecordRoleHead }
+func (q *Questionnaire) IsPublishedSnapshot() bool {
+	return q.GetRecordRole() == RecordRolePublishedSnapshot
+}
+func (q *Questionnaire) IsActivePublished() bool { return q.isActivePublished }
 func (q *Questionnaire) GetCreatedBy() meta.ID   { return q.createdBy }
 func (q *Questionnaire) GetCreatedAt() time.Time { return q.createdAt }
 func (q *Questionnaire) GetUpdatedBy() meta.ID   { return q.updatedBy }
@@ -164,6 +188,14 @@ func (q *Questionnaire) SetCreatedBy(id meta.ID) {
 
 func (q *Questionnaire) SetUpdatedBy(id meta.ID) {
 	q.updatedBy = id
+}
+
+func (q *Questionnaire) SetRecordRole(role RecordRole) {
+	q.recordRole = NormalizeRecordRole(role.String())
+}
+
+func (q *Questionnaire) SetActivePublished(active bool) {
+	q.isActivePublished = active
 }
 
 // GetQuestionByCode 根据问题编码获取问题

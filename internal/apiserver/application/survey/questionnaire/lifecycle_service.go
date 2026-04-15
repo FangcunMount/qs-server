@@ -6,16 +6,19 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // lifecycleService 问卷生命周期服务实现
 // 行为者：问卷设计者/管理员
 type lifecycleService struct {
 	repo           questionnaire.Repository
+	scaleRepo      domainScale.Repository
 	validator      questionnaire.Validator
 	lifecycle      questionnaire.Lifecycle
 	eventPublisher event.EventPublisher
@@ -24,12 +27,14 @@ type lifecycleService struct {
 // NewLifecycleService 创建问卷生命周期服务
 func NewLifecycleService(
 	repo questionnaire.Repository,
+	scaleRepo domainScale.Repository,
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
 	eventPublisher event.EventPublisher,
 ) QuestionnaireLifecycleService {
 	return &lifecycleService{
 		repo:           repo,
+		scaleRepo:      scaleRepo,
 		validator:      validator,
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
@@ -229,6 +234,9 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateQuesti
 	if err := s.checkArchivedStatus(ctx, q, dto.Code, "update_basic_info", "编辑"); err != nil {
 		return nil, err
 	}
+	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
+	}
 
 	// 4. 更新基本信息
 	l.Debugw("更新基本信息",
@@ -327,6 +335,15 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	if err := s.persistQuestionnaire(ctx, q, code, "publish", "状态"); err != nil {
 		return nil, err
 	}
+	if err := s.repo.CreatePublishedSnapshot(ctx, q, true); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存发布快照失败")
+	}
+	if err := s.repo.SetActivePublishedVersion(ctx, code, q.GetVersion().String()); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "切换发布快照失败")
+	}
+	if err := s.syncScaleQuestionnaireVersion(ctx, code, q.GetVersion().String()); err != nil {
+		return nil, err
+	}
 
 	// 7. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, q)
@@ -364,7 +381,11 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 	if err := s.checkArchivedStatus(ctx, q, code, "unpublish", "下架"); err != nil {
 		return nil, err
 	}
-	if q.IsDraft() {
+	publishedQ, err := s.repo.FindPublishedByCode(ctx, code)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取已发布问卷失败")
+	}
+	if q.IsDraft() && publishedQ == nil {
 		l.Warnw("问卷是草稿状态，不需要下架",
 			"action", "unpublish",
 			"code", code,
@@ -380,19 +401,22 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 		"code", code,
 		"current_status", q.GetStatus().String(),
 	)
-	if err := s.lifecycle.Unpublish(ctx, q); err != nil {
-		l.Errorw("下架问卷失败",
-			"action", "unpublish",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, err
+	if q.IsPublished() {
+		if err := s.lifecycle.Unpublish(ctx, q); err != nil {
+			l.Errorw("下架问卷失败",
+				"action", "unpublish",
+				"code", code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return nil, err
+		}
+		if err := s.persistQuestionnaire(ctx, q, code, "unpublish", "状态"); err != nil {
+			return nil, err
+		}
 	}
-
-	// 5. 持久化
-	if err := s.persistQuestionnaire(ctx, q, code, "unpublish", "状态"); err != nil {
-		return nil, err
+	if err := s.repo.ClearActivePublishedVersion(ctx, code); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
 	}
 
 	// 6. 发布聚合根收集的领域事件
@@ -457,6 +481,9 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 	if err := s.persistQuestionnaire(ctx, q, code, "archive", "状态"); err != nil {
 		return nil, err
 	}
+	if err := s.repo.ClearActivePublishedVersion(ctx, code); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
+	}
 
 	// 6. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, q)
@@ -500,19 +527,43 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 		return errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "只能删除草稿状态的问卷")
 	}
 
-	// 4. 删除问卷
-	l.Debugw("执行硬删除",
-		"action", "delete",
-		"code", code,
-	)
-	if err := s.repo.HardDelete(ctx, code); err != nil {
-		l.Errorw("删除问卷失败",
+	hasSnapshots, err := s.repo.HasPublishedSnapshots(ctx, code)
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "查询发布快照失败")
+	}
+	if !hasSnapshots {
+		l.Debugw("删除整个问卷族",
 			"action", "delete",
 			"code", code,
-			"result", "failed",
-			"error", err.Error(),
 		)
-		return errors.WrapC(err, errorCode.ErrDatabase, "删除问卷失败")
+		if err := s.repo.HardDeleteFamily(ctx, code); err != nil {
+			l.Errorw("删除问卷失败",
+				"action", "delete",
+				"code", code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrDatabase, "删除问卷失败")
+		}
+		s.logSuccess(ctx, "delete", code, startTime)
+		return nil
+	}
+
+	latestPublished, err := s.repo.FindLatestPublishedByCode(ctx, code)
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "加载历史发布快照失败")
+	}
+	if err := s.repo.HardDelete(ctx, code); err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "删除工作版本失败")
+	}
+	if latestPublished != nil {
+		restored, err := cloneQuestionnaireAsHead(latestPublished)
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "恢复工作版本失败")
+		}
+		if err := s.repo.Update(ctx, restored); err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "恢复工作版本失败")
+		}
 	}
 
 	s.logSuccess(ctx, "delete", code, startTime)
@@ -612,4 +663,42 @@ func (s *lifecycleService) publishEvents(ctx context.Context, q *questionnaire.Q
 
 	// 清空已发布的事件
 	q.ClearEvents()
+}
+
+func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
+	if s.scaleRepo == nil || questionnaireCode == "" || version == "" {
+		return nil
+	}
+
+	q, err := s.repo.FindByCode(ctx, questionnaireCode)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil
+		}
+		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "查询问卷失败")
+	}
+	if q == nil || q.GetType() != questionnaire.TypeMedicalScale {
+		return nil
+	}
+
+	item, err := s.scaleRepo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil
+		}
+		return errors.WrapC(err, errorCode.ErrDatabase, "查询关联量表失败")
+	}
+	if item == nil || item.GetQuestionnaireVersion() == version {
+		return nil
+	}
+
+	baseInfo := domainScale.BaseInfo{}
+	if err := baseInfo.UpdateQuestionnaire(item, item.GetQuestionnaireCode(), version); err != nil {
+		return errors.WrapC(err, errorCode.ErrInvalidArgument, "同步量表问卷版本失败")
+	}
+	if err := s.scaleRepo.Update(ctx, item); err != nil {
+		return errors.WrapC(err, errorCode.ErrDatabase, "保存量表问卷版本失败")
+	}
+
+	return nil
 }

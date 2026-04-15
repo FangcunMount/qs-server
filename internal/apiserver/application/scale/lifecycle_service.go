@@ -10,6 +10,7 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // lifecycleService 量表生命周期服务实现
@@ -75,6 +76,12 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 	applicableAges := make([]scale.ApplicableAge, 0, len(dto.ApplicableAges))
 	for _, ageStr := range dto.ApplicableAges {
 		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
+	}
+
+	if dto.QuestionnaireCode != "" {
+		if err := s.validateMedicalScaleQuestionnaireBinding(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, code.String()); err != nil {
+			return nil, err
+		}
 	}
 
 	// 7. 创建量表领域模型
@@ -179,6 +186,10 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 	}
 
 	// 3. 更新关联的问卷
+	if err := s.validateMedicalScaleQuestionnaireBinding(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, m.GetCode().String()); err != nil {
+		return nil, err
+	}
+
 	if err := s.baseInfo.UpdateQuestionnaire(m, meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新关联问卷失败")
 	}
@@ -327,7 +338,15 @@ func (s *lifecycleService) getScaleAndValidateEditable(ctx context.Context, code
 // ensureQuestionnaireVersion 确保量表有关联的问卷版本
 // 如果版本为空，自动从问卷仓库获取最新版本
 func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scaleCode string, m *scale.MedicalScale) error {
-	if m.GetQuestionnaireVersion() != "" || m.GetQuestionnaireCode().IsEmpty() {
+	if m.GetQuestionnaireCode().IsEmpty() {
+		return nil
+	}
+
+	if err := s.validateMedicalScaleQuestionnaireBinding(ctx, m.GetQuestionnaireCode().Value(), m.GetQuestionnaireVersion(), scaleCode); err != nil {
+		return err
+	}
+
+	if m.GetQuestionnaireVersion() != "" {
 		return nil
 	}
 
@@ -338,7 +357,7 @@ func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scale
 	)
 
 	// 从问卷仓库获取问卷
-	q, err := s.questionnaireRepo.FindByCode(ctx, questionnaireCode)
+	q, err := s.questionnaireRepo.FindPublishedByCode(ctx, questionnaireCode)
 	if err != nil {
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
 	}
@@ -363,6 +382,62 @@ func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scale
 	}
 
 	return nil
+}
+
+func (s *lifecycleService) validateMedicalScaleQuestionnaireBinding(
+	ctx context.Context,
+	questionnaireCode string,
+	questionnaireVersion string,
+	currentScaleCode string,
+) error {
+	if questionnaireCode == "" {
+		return nil
+	}
+
+	q, err := s.questionnaireRepo.FindByCode(ctx, questionnaireCode)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
+		}
+		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
+	}
+	if q == nil {
+		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
+	}
+	if q.GetType() != domainQuestionnaire.TypeMedicalScale {
+		return errors.WithCode(errorCode.ErrInvalidArgument, "量表只能关联 MedicalScale 类型问卷")
+	}
+
+	if questionnaireVersion != "" {
+		versioned, err := s.questionnaireRepo.FindByCodeVersion(ctx, questionnaireCode, questionnaireVersion)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷版本不存在")
+			}
+			return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷版本失败")
+		}
+		if versioned == nil {
+			return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷版本不存在")
+		}
+		if versioned.GetType() != domainQuestionnaire.TypeMedicalScale {
+			return errors.WithCode(errorCode.ErrInvalidArgument, "量表只能关联 MedicalScale 类型问卷")
+		}
+	}
+
+	boundScale, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil
+		}
+		return errors.WrapC(err, errorCode.ErrDatabase, "查询问卷关联量表失败")
+	}
+	if boundScale == nil {
+		return nil
+	}
+	if currentScaleCode != "" && boundScale.GetCode().String() == currentScaleCode {
+		return nil
+	}
+	return errors.WithCode(errorCode.ErrInvalidArgument, "该问卷已关联其他量表")
 }
 
 // lifecycleOperation 生命周期操作函数类型

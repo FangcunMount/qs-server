@@ -80,6 +80,9 @@ func (s *contentService) AddQuestion(ctx context.Context, dto AddQuestionDTO) (*
 	if err := s.checkArchivedStatus(ctx, q, dto.QuestionnaireCode, "add_question"); err != nil {
 		return nil, err
 	}
+	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
+	}
 
 	// 4. 构建问题领域对象
 	question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil, nil)
@@ -159,6 +162,9 @@ func (s *contentService) UpdateQuestion(ctx context.Context, dto UpdateQuestionD
 	if err := s.checkArchivedStatus(ctx, q, dto.QuestionnaireCode, "update_question"); err != nil {
 		return nil, err
 	}
+	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
+	}
 
 	// 4. 构建新的问题对象
 	newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil, nil)
@@ -226,6 +232,9 @@ func (s *contentService) RemoveQuestion(ctx context.Context, questionnaireCode, 
 	if err := s.checkArchivedStatus(ctx, q, questionnaireCode, "remove_question"); err != nil {
 		return nil, err
 	}
+	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
+	}
 
 	// 4. 删除问题
 	if err := s.questionMgr.RemoveQuestion(q, meta.NewCode(questionCode)); err != nil {
@@ -285,6 +294,9 @@ func (s *contentService) ReorderQuestions(ctx context.Context, questionnaireCode
 	// 3. 判断问卷状态
 	if err := s.checkArchivedStatus(ctx, q, questionnaireCode, "reorder_questions"); err != nil {
 		return nil, err
+	}
+	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
 	}
 
 	// 4. 转换 string 编码为 meta.Code
@@ -349,6 +361,9 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 	// 3. 判断问卷状态
 	if err := s.checkArchivedStatus(ctx, q, questionnaireCode, "batch_update_questions"); err != nil {
 		return nil, err
+	}
+	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
 	}
 
 	// 4. 转换 DTO 为领域对象

@@ -62,14 +62,18 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 
 	l.Debugw("答卷加载成功", "answersheet_id", answerSheetID, "questionnaire_code", sheet.QuestionnaireRef().Code(), "answer_count", len(sheet.Answers()))
 
-	// 2. 加载问卷
-	qnr, err := s.questionnaireRepo.FindByCode(ctx, sheet.QuestionnaireRef().Code())
+	// 2. 加载问卷精确版本
+	qCode, qVersion, _ := sheet.QuestionnaireInfo()
+	qnr, err := s.questionnaireRepo.FindByCodeVersion(ctx, qCode, qVersion)
 	if err != nil {
-		l.Errorw("加载问卷失败", "questionnaire_code", sheet.QuestionnaireRef().Code(), "error", err.Error())
+		l.Errorw("加载问卷失败", "questionnaire_code", qCode, "questionnaire_version", qVersion, "error", err.Error())
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
 	}
+	if qnr == nil {
+		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在或版本不匹配")
+	}
 
-	l.Debugw("问卷加载成功", "questionnaire_code", qnr.GetCode().Value(), "question_count", len(qnr.GetQuestions()))
+	l.Debugw("问卷加载成功", "questionnaire_code", qnr.GetCode().Value(), "questionnaire_version", qnr.GetVersion().Value(), "question_count", len(qnr.GetQuestions()))
 
 	// 3. 计算分数
 	scoredSheet, err := s.scoringService.CalculateAnswerSheetScore(ctx, sheet, qnr)

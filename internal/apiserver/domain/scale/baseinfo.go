@@ -154,9 +154,6 @@ func (BaseInfo) UpdateQuestionnaire(m *MedicalScale, questionnaireCode meta.Code
 	if questionnaireCode.IsEmpty() {
 		return errors.WithCode(code.ErrInvalidArgument, "问卷编码不能为空")
 	}
-	if questionnaireVersion == "" {
-		return errors.WithCode(code.ErrInvalidArgument, "问卷版本不能为空")
-	}
 
 	return m.updateQuestionnaire(questionnaireCode, questionnaireVersion)
 }

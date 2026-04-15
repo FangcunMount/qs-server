@@ -5,9 +5,11 @@ go 1.24.0
 require (
 	github.com/FangcunMount/component-base v0.4.4
 	github.com/FangcunMount/iam-contracts v0.1.7
+	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
+	github.com/mozillazg/go-pinyin v0.21.0
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/spf13/cobra v1.9.1
@@ -27,6 +29,7 @@ require (
 )
 
 require (
+	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20220106215444-fb4bf637b56d // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
@@ -47,7 +50,6 @@ require (
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/jwx/v2 v2.1.6 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
-	github.com/mozillazg/go-pinyin v0.21.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.55.0 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
@@ -55,6 +57,7 @@ require (
 	github.com/tidwall/gjson v1.14.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/yuin/gopher-lua v0.0.0-20220504180219-658193537a64 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect

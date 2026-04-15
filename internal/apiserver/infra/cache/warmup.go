@@ -163,7 +163,7 @@ func (s *WarmupService) listAllPublishedQuestionnaires(ctx context.Context) ([]s
 	page := 1
 	var codes []string
 	for {
-		items, err := s.questionnaireRepo.FindBaseList(ctx, page, pageSize, map[string]interface{}{
+		items, err := s.questionnaireRepo.FindBasePublishedList(ctx, page, pageSize, map[string]interface{}{
 			"status": questionnaire.STATUS_PUBLISHED.String(),
 		})
 		if err != nil {

@@ -59,3 +59,15 @@ func (Versioning) IncrementMajorVersion(q *Questionnaire) error {
 	// 更新版本
 	return q.updateVersion(newVersion)
 }
+
+// ForkDraftFromPublished 将当前已发布 head 派生为草稿工作版本。
+// 该操作不触发下架事件，对外可答状态由 published snapshot 承载。
+func (Versioning) ForkDraftFromPublished(q *Questionnaire) error {
+	if q == nil || !q.IsPublished() {
+		return nil
+	}
+	if err := q.updateVersion(q.version.IncrementMinor()); err != nil {
+		return err
+	}
+	return q.updateStatus(STATUS_DRAFT)
+}

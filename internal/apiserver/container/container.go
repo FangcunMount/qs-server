@@ -181,6 +181,9 @@ func (c *Container) Initialize() error {
 	if err := c.initScaleModule(); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
+	if c.SurveyModule != nil && c.ScaleModule != nil {
+		c.SurveyModule.SetScaleRepository(c.ScaleModule.Repo)
+	}
 
 	// 初始化 Actor 模块
 	if err := c.initActorModule(); err != nil {

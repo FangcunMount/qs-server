@@ -71,6 +71,31 @@ func DefaultQuestionnaireType() QuestionnaireType {
 	return TypeSurvey
 }
 
+// RecordRole 问卷记录角色
+type RecordRole string
+
+const (
+	RecordRoleHead              RecordRole = "head"
+	RecordRolePublishedSnapshot RecordRole = "published_snapshot"
+)
+
+// String 获取角色字符串
+func (r RecordRole) String() string {
+	return string(r)
+}
+
+// NormalizeRecordRole 将空值归一化为 head，兼容历史数据
+func NormalizeRecordRole(value string) RecordRole {
+	switch RecordRole(value) {
+	case RecordRolePublishedSnapshot:
+		return RecordRolePublishedSnapshot
+	case RecordRoleHead:
+		fallthrough
+	default:
+		return RecordRoleHead
+	}
+}
+
 // Version 问卷版本
 type Version string
 

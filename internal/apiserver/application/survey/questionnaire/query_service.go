@@ -130,18 +130,21 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 		return nil, err
 	}
 
-	// 2. 获取问卷
-	q, err := s.findQuestionnaireByCode(ctx, code, "get_published_by_code")
+	// 2. 获取已发布问卷
+	q, err := s.repo.FindPublishedByCode(ctx, code)
 	if err != nil {
-		return nil, err
+		l.Errorw("获取已发布问卷失败",
+			"action", "get_published_by_code",
+			"code", code,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取已发布问卷失败")
 	}
-
-	// 3. 检查问卷状态
-	if !q.IsPublished() {
+	if q == nil {
 		l.Warnw("问卷未发布",
 			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
+			"result", "not_found",
 		)
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷未发布")
 	}
@@ -198,7 +201,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	// 3. 获取问卷摘要列表（轻量级查询）
-	questionnaires, err := s.repo.FindBaseList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	questionnaires, err := s.repo.FindBasePublishedList(ctx, dto.Page, dto.PageSize, dto.Conditions)
 	if err != nil {
 		l.Errorw("查询已发布问卷摘要列表失败",
 			"action", "list_published",
@@ -209,7 +212,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	// 4. 获取总数
-	total, err := s.repo.CountWithConditions(ctx, dto.Conditions)
+	total, err := s.repo.CountPublishedWithConditions(ctx, dto.Conditions)
 	if err != nil {
 		l.Errorw("获取已发布问卷总数失败",
 			"action", "list_published",

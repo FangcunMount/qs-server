@@ -244,20 +244,31 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 	qnr, err := s.questionnaireRepo.FindByCodeVersion(ctx, qCode, qVersion)
 	if err != nil {
-		l.Warnw("加载问卷失败，将使用降级计分策略",
+		l.Errorw("加载问卷失败，评估终止",
 			"questionnaire_code", qCode,
 			"questionnaire_version", qVersion,
 			"error", err.Error(),
 		)
-		// 问卷加载失败不影响评估流程，只是无法使用 cnt 等高级计分规则
-		qnr = nil
-	} else {
-		l.Debugw("问卷数据加载成功",
-			"questionnaire_code", qCode,
-			"question_count", len(qnr.GetQuestions()),
-			"result", "success",
-		)
+		s.markAsFailed(ctx, a, "加载问卷失败: "+err.Error())
+		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "加载问卷失败")
 	}
+	if qnr == nil {
+		err = errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在或版本不匹配")
+		l.Errorw("加载问卷失败，未命中答卷要求的精确版本",
+			"questionnaire_code", qCode,
+			"questionnaire_version", qVersion,
+			"error", err.Error(),
+		)
+		s.markAsFailed(ctx, a, "加载问卷失败: "+err.Error())
+		return err
+	}
+
+	l.Debugw("问卷数据加载成功",
+		"questionnaire_code", qCode,
+		"questionnaire_version", qVersion,
+		"question_count", len(qnr.GetQuestions()),
+		"result", "success",
+	)
 
 	// 5. 创建评估上下文
 	evalCtx := pipeline.NewContext(a, medicalScale, answerSheet)

@@ -8,31 +8,26 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	redis "github.com/redis/go-redis/v9"
 )
 
 const (
-	// QuestionnaireCachePrefix 问卷缓存键前缀
-	QuestionnaireCachePrefix = "questionnaire:"
+	QuestionnaireCachePrefix          = "questionnaire:"
+	QuestionnairePublishedCachePrefix = "questionnaire:published:"
 )
 
-// DefaultQuestionnaireCacheTTL 默认问卷缓存 TTL（可被配置覆盖）
 var DefaultQuestionnaireCacheTTL = 12 * time.Hour
 
-// CachedQuestionnaireRepository 带缓存的问卷 Repository 装饰器
-// 实现 questionnaire.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedQuestionnaireRepository struct {
-	repo   questionnaire.Repository
+	repo   domainQuestionnaire.Repository
 	client redis.UniversalClient
 	ttl    time.Duration
 	mapper *questionnaireInfra.QuestionnaireMapper
 }
 
-// NewCachedQuestionnaireRepository 创建带缓存的问卷 Repository
-// 如果 client 为 nil，则降级为直接调用 repo（不缓存）
-func NewCachedQuestionnaireRepository(repo questionnaire.Repository, client redis.UniversalClient) questionnaire.Repository {
+func NewCachedQuestionnaireRepository(repo domainQuestionnaire.Repository, client redis.UniversalClient) domainQuestionnaire.Repository {
 	return &CachedQuestionnaireRepository{
 		repo:   repo,
 		client: client,
@@ -41,321 +36,279 @@ func NewCachedQuestionnaireRepository(repo questionnaire.Repository, client redi
 	}
 }
 
-// WithTTL 设置缓存 TTL
 func (r *CachedQuestionnaireRepository) WithTTL(ttl time.Duration) *CachedQuestionnaireRepository {
 	r.ttl = ttl
 	return r
 }
 
-// buildCacheKey 构建缓存键
-func (r *CachedQuestionnaireRepository) buildCacheKey(code, version string) string {
-	code = strings.ToLower(code)
-	if version != "" {
-		return addNamespace(fmt.Sprintf("%s%s:%s", QuestionnaireCachePrefix, code, version))
-	}
-	return addNamespace(fmt.Sprintf("%s%s", QuestionnaireCachePrefix, code))
-}
-
-// Create 创建问卷（同时写入缓存）
-func (r *CachedQuestionnaireRepository) Create(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
+func (r *CachedQuestionnaireRepository) Create(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	if err := r.repo.Create(ctx, qDomain); err != nil {
 		return err
 	}
-
-	// 创建成功后写入缓存
 	if r.client != nil {
-		code := qDomain.GetCode().Value()
-		version := qDomain.GetVersion().Value()
-		if err := r.setCache(ctx, code, version, qDomain); err != nil {
-			// 缓存写入失败不影响创建，仅记录日志
-		}
+		_ = r.setCache(ctx, r.headKey(qDomain.GetCode().Value()), qDomain, r.ttl)
 	}
-
 	return nil
 }
 
-// FindByCode 根据编码查询问卷（优先从缓存读取）
-func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
-	l := logger.L(ctx)
-
-	l.Debugw("Questionnaire cache lookup", "action", "find_by_code", "code", code, "cache_enabled", r.client != nil)
-
-	// 1. 尝试从缓存读取（使用 code 作为 key，version 为空）
-	if r.client != nil {
-		if cached, err := r.getCache(ctx, code, ""); err == nil {
-			if cached != nil {
-				l.Debugw("Questionnaire cache hit", "action", "find_by_code", "code", code)
-				return cached, nil
-			}
-			l.Debugw("Questionnaire cache hit nil", "action", "find_by_code", "code", code)
-			return nil, nil
-		} else if err != ErrCacheNotFound {
-			l.Errorw("Questionnaire cache error", "action", "find_by_code", "code", code, "error", err.Error())
-			return nil, err
-		}
-		l.Debugw("Questionnaire cache miss", "action", "find_by_code", "code", code)
+func (r *CachedQuestionnaireRepository) CreatePublishedSnapshot(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire, active bool) error {
+	if err := r.repo.CreatePublishedSnapshot(ctx, qDomain, active); err != nil {
+		return err
 	}
+	if r.client != nil {
+		_ = r.setCache(ctx, r.versionKey(qDomain.GetCode().Value(), qDomain.GetVersion().Value()), qDomain, r.ttl)
+		if active {
+			_ = r.setCache(ctx, r.publishedKey(qDomain.GetCode().Value()), qDomain, r.ttl)
+		}
+	}
+	return nil
+}
 
-	// 2. 缓存未命中，从数据库查询
-	val, err, _ := Group.Do("questionnaire:"+code, func() (interface{}, error) {
-		l.Debugw("Questionnaire fallback to Mongo", "action", "find_by_code", "code", code)
+func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
+	return r.loadWithCache(ctx, r.headKey(code), "questionnaire:head:"+strings.ToLower(code), func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
 		return r.repo.FindByCode(ctx, code)
 	})
-	if err != nil {
-		return nil, err
-	}
-	qDomain, _ := val.(*questionnaire.Questionnaire)
-	if qDomain == nil {
-		return nil, nil
-	}
-
-	// 3. 写入缓存（异步，不阻塞）
-	if r.client != nil {
-		go func() {
-			_ = r.setCache(context.Background(), code, qDomain.GetVersion().Value(), qDomain)
-		}()
-	}
-
-	return qDomain, nil
 }
 
-// FindByCodeVersion 根据编码和版本查询问卷（优先从缓存读取）
-func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
-	l := logger.L(ctx)
+func (r *CachedQuestionnaireRepository) FindPublishedByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
+	return r.loadWithCache(ctx, r.publishedKey(code), "questionnaire:published:"+strings.ToLower(code), func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+		return r.repo.FindPublishedByCode(ctx, code)
+	})
+}
 
-	l.Debugw("Questionnaire cache lookup", "action", "find_by_code_version", "code", code, "version", version, "cache_enabled", r.client != nil)
+func (r *CachedQuestionnaireRepository) FindLatestPublishedByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
+	return r.repo.FindLatestPublishedByCode(ctx, code)
+}
 
-	// 1. 尝试从缓存读取
-	if r.client != nil {
-		if cached, err := r.getCache(ctx, code, version); err == nil {
-			if cached != nil {
-				l.Debugw("Questionnaire cache hit", "action", "find_by_code_version", "code", code, "version", version)
-				return cached, nil
-			}
-			l.Debugw("Questionnaire cache hit nil", "action", "find_by_code_version", "code", code, "version", version)
-			return nil, nil
-		} else if err != ErrCacheNotFound {
-			l.Errorw("Questionnaire cache error", "action", "find_by_code_version", "code", code, "version", version, "error", err.Error())
-			return nil, err
-		}
-		l.Debugw("Questionnaire cache miss", "action", "find_by_code_version", "code", code, "version", version)
+func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, code, version string) (*domainQuestionnaire.Questionnaire, error) {
+	if version == "" {
+		return nil, nil
 	}
-
-	// 2. 缓存未命中，从数据库查询
-	val, err, _ := Group.Do("questionnaire:"+code+":"+version, func() (interface{}, error) {
-		l.Debugw("Questionnaire fallback to Mongo", "action", "find_by_code_version", "code", code, "version", version)
+	key := r.versionKey(code, version)
+	return r.loadWithCache(ctx, key, "questionnaire:version:"+strings.ToLower(code)+":"+version, func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
 		return r.repo.FindByCodeVersion(ctx, code, version)
 	})
-	if err != nil {
-		return nil, err
-	}
-	qDomain, _ := val.(*questionnaire.Questionnaire)
-	if qDomain == nil {
-		if r.client != nil {
-			_ = r.setNilCache(ctx, code, version)
-		}
-		return nil, nil
-	}
-
-	// 3. 写入缓存（异步，不阻塞）
-	if r.client != nil {
-		go func() {
-			_ = r.setCache(context.Background(), code, version, qDomain)
-		}()
-	}
-
-	return qDomain, nil
 }
 
-// FindBaseByCode 根据编码查询问卷基础信息
-func (r *CachedQuestionnaireRepository) FindBaseByCode(ctx context.Context, code string) (*questionnaire.Questionnaire, error) {
+func (r *CachedQuestionnaireRepository) FindBaseByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
 	return r.repo.FindBaseByCode(ctx, code)
 }
 
-// FindBaseByCodeVersion 根据编码和版本查询问卷基础信息
-func (r *CachedQuestionnaireRepository) FindBaseByCodeVersion(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
+func (r *CachedQuestionnaireRepository) FindBasePublishedByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
+	return r.repo.FindBasePublishedByCode(ctx, code)
+}
+
+func (r *CachedQuestionnaireRepository) FindBaseByCodeVersion(ctx context.Context, code, version string) (*domainQuestionnaire.Questionnaire, error) {
 	return r.repo.FindBaseByCodeVersion(ctx, code, version)
 }
 
-// LoadQuestions 加载问卷问题详情
-func (r *CachedQuestionnaireRepository) LoadQuestions(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
+func (r *CachedQuestionnaireRepository) LoadQuestions(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	return r.repo.LoadQuestions(ctx, qDomain)
 }
 
-// FindBaseList 查询问卷基础列表
-func (r *CachedQuestionnaireRepository) FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*questionnaire.Questionnaire, error) {
-	// 列表查询不缓存（条件多样，缓存命中率低）
+func (r *CachedQuestionnaireRepository) FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
 	return r.repo.FindBaseList(ctx, page, pageSize, conditions)
 }
 
-// CountWithConditions 统计问卷数量
+func (r *CachedQuestionnaireRepository) FindBasePublishedList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
+	return r.repo.FindBasePublishedList(ctx, page, pageSize, conditions)
+}
+
 func (r *CachedQuestionnaireRepository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
 	return r.repo.CountWithConditions(ctx, conditions)
 }
 
-// Update 更新问卷（同时失效缓存）
-func (r *CachedQuestionnaireRepository) Update(ctx context.Context, qDomain *questionnaire.Questionnaire) error {
+func (r *CachedQuestionnaireRepository) CountPublishedWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
+	return r.repo.CountPublishedWithConditions(ctx, conditions)
+}
+
+func (r *CachedQuestionnaireRepository) Update(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	if err := r.repo.Update(ctx, qDomain); err != nil {
 		return err
 	}
-
-	// 更新成功后失效缓存（删除所有版本的缓存）
 	if r.client != nil {
-		code := qDomain.GetCode().Value()
-		if err := r.deleteCacheByCode(ctx, code); err != nil {
-			// 缓存删除失败不影响更新
-		}
+		_ = r.deleteCacheByCode(ctx, qDomain.GetCode().Value())
 	}
-
 	return nil
 }
 
-// Remove 删除问卷（同时失效缓存）
+func (r *CachedQuestionnaireRepository) SetActivePublishedVersion(ctx context.Context, code, version string) error {
+	if err := r.repo.SetActivePublishedVersion(ctx, code, version); err != nil {
+		return err
+	}
+	if r.client != nil {
+		_ = r.deleteCacheByCode(ctx, code)
+	}
+	return nil
+}
+
+func (r *CachedQuestionnaireRepository) ClearActivePublishedVersion(ctx context.Context, code string) error {
+	if err := r.repo.ClearActivePublishedVersion(ctx, code); err != nil {
+		return err
+	}
+	if r.client != nil {
+		_ = r.deleteCacheByCode(ctx, code)
+	}
+	return nil
+}
+
 func (r *CachedQuestionnaireRepository) Remove(ctx context.Context, code string) error {
 	if err := r.repo.Remove(ctx, code); err != nil {
 		return err
 	}
-
-	// 删除成功后失效缓存
 	if r.client != nil {
-		if err := r.deleteCacheByCode(ctx, code); err != nil {
-			// 缓存删除失败不影响删除
-		}
+		_ = r.deleteCacheByCode(ctx, code)
 	}
-
 	return nil
 }
 
-// HardDelete 物理删除问卷（同时失效缓存）
 func (r *CachedQuestionnaireRepository) HardDelete(ctx context.Context, code string) error {
 	if err := r.repo.HardDelete(ctx, code); err != nil {
 		return err
 	}
-
-	// 删除成功后失效缓存
 	if r.client != nil {
-		if err := r.deleteCacheByCode(ctx, code); err != nil {
-			// 缓存删除失败不影响删除
-		}
+		_ = r.deleteCacheByCode(ctx, code)
 	}
-
 	return nil
 }
 
-// ExistsByCode 检查编码是否存在
+func (r *CachedQuestionnaireRepository) HardDeleteFamily(ctx context.Context, code string) error {
+	if err := r.repo.HardDeleteFamily(ctx, code); err != nil {
+		return err
+	}
+	if r.client != nil {
+		_ = r.deleteCacheByCode(ctx, code)
+	}
+	return nil
+}
+
 func (r *CachedQuestionnaireRepository) ExistsByCode(ctx context.Context, code string) (bool, error) {
 	return r.repo.ExistsByCode(ctx, code)
 }
 
-// ==================== 缓存操作 ====================
+func (r *CachedQuestionnaireRepository) HasPublishedSnapshots(ctx context.Context, code string) (bool, error) {
+	return r.repo.HasPublishedSnapshots(ctx, code)
+}
 
-// getCache 从缓存获取问卷
-func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, code, version string) (*questionnaire.Questionnaire, error) {
-	key := r.buildCacheKey(code, version)
+func (r *CachedQuestionnaireRepository) headKey(code string) string {
+	return addNamespace(QuestionnaireCachePrefix + strings.ToLower(code))
+}
+
+func (r *CachedQuestionnaireRepository) publishedKey(code string) string {
+	return addNamespace(QuestionnairePublishedCachePrefix + strings.ToLower(code))
+}
+
+func (r *CachedQuestionnaireRepository) versionKey(code, version string) string {
+	return addNamespace(fmt.Sprintf("%s%s:%s", QuestionnaireCachePrefix, strings.ToLower(code), version))
+}
+
+func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string) (*domainQuestionnaire.Questionnaire, error) {
 	result := r.client.Get(ctx, key)
 	if result.Err() == redis.Nil {
-		logger.L(ctx).Debugw("Questionnaire cache miss", "action", "get_cache", "code", code, "version", version)
-		return nil, ErrCacheNotFound // 缓存未命中
+		return nil, ErrCacheNotFound
 	}
 	if result.Err() != nil {
-		logger.L(ctx).Errorw("Questionnaire cache error", "action", "get_cache", "code", code, "version", version, "error", result.Err().Error())
 		return nil, result.Err()
 	}
 
 	dataBytes, err := result.Bytes()
 	if err != nil {
-		logger.L(ctx).Errorw("Questionnaire cache error", "action", "get_cache", "code", code, "version", version, "error", err.Error())
 		return nil, err
 	}
 	if len(dataBytes) == 0 {
-		logger.L(ctx).Debugw("Questionnaire cache hit nil", "action", "get_cache", "code", code, "version", version)
-		return nil, nil // 空值缓存，表示不存在
+		return nil, nil
 	}
+
 	data := decompressIfNeeded(dataBytes)
-	// 反序列化为 PO
 	var po questionnaireInfra.QuestionnairePO
 	if err := json.Unmarshal(data, &po); err != nil {
-		logger.L(ctx).Warnw("failed to unmarshal cached questionnaire", "code", code, "version", version, "error", err)
+		logger.L(ctx).Warnw("failed to unmarshal cached questionnaire", "key", key, "error", err)
 		return nil, err
 	}
-
-	// 通过 mapper 转换为 domain
-	domain := r.mapper.ToBO(&po)
-	return domain, nil
+	return r.mapper.ToBO(&po), nil
 }
 
-// setCache 写入缓存
-func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, code, version string, qDomain *questionnaire.Questionnaire) error {
-	key := r.buildCacheKey(code, version)
-	// 通过 mapper 转换为 PO
+func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string, qDomain *domainQuestionnaire.Questionnaire, ttl time.Duration) error {
 	po := r.mapper.ToPO(qDomain)
-	// 序列化 PO（PO 有 JSON tag）
 	data, err := json.Marshal(po)
 	if err != nil {
 		return err
 	}
-
-	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(r.ttl)).Err()
+	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(ttl)).Err()
 }
 
-// setNilCache 设置空值缓存，防止穿透，短 TTL
-func (r *CachedQuestionnaireRepository) setNilCache(ctx context.Context, code, version string) error {
-	key := r.buildCacheKey(code, version)
-	return r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
-}
-
-// deleteCacheByCode 删除指定编码的所有版本缓存
-func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, code string) error {
-	pattern := fmt.Sprintf("%s%s:*", QuestionnaireCachePrefix, code)
-	// 也删除不带版本的 key
-	keyWithoutVersion := r.buildCacheKey(code, "")
-
-	// 删除不带版本的 key
-	if err := r.client.Del(ctx, keyWithoutVersion).Err(); err != nil {
-		logger.L(ctx).Warnw("failed to delete cache key", "key", keyWithoutVersion, "error", err)
-	}
-
-	// 使用 SCAN 删除所有匹配的 key
-	iter := r.client.Scan(ctx, 0, pattern, 100).Iterator()
-	for iter.Next(ctx) {
-		key := iter.Val()
-		if err := r.client.Del(ctx, key).Err(); err != nil {
-			logger.L(ctx).Warnw("failed to delete cache key", "key", key, "error", err)
+func (r *CachedQuestionnaireRepository) loadWithCache(
+	ctx context.Context,
+	key string,
+	groupKey string,
+	fallback func(context.Context) (*domainQuestionnaire.Questionnaire, error),
+) (*domainQuestionnaire.Questionnaire, error) {
+	if r.client != nil {
+		cached, err := r.getCache(ctx, key)
+		if err == nil {
+			return cached, nil
+		}
+		if err != ErrCacheNotFound {
+			return nil, err
 		}
 	}
-	if err := iter.Err(); err != nil {
-		return err
+
+	val, err, _ := Group.Do(groupKey, func() (interface{}, error) {
+		return fallback(ctx)
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	qDomain, _ := val.(*domainQuestionnaire.Questionnaire)
+	if r.client != nil {
+		if qDomain == nil {
+			_ = r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
+			return nil, nil
+		}
+		go func(q *domainQuestionnaire.Questionnaire) {
+			_ = r.setCache(context.Background(), key, q, r.ttl)
+		}(qDomain)
+	}
+	return qDomain, nil
 }
 
-// WarmupCache 预热缓存（批量加载问卷）
+func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, code string) error {
+	patterns := []string{
+		r.headKey(code),
+		r.publishedKey(code),
+		addNamespace(fmt.Sprintf("%s%s:*", QuestionnaireCachePrefix, strings.ToLower(code))),
+	}
+
+	for _, pattern := range patterns[:2] {
+		if err := r.client.Del(ctx, pattern).Err(); err != nil {
+			logger.L(ctx).Warnw("failed to delete questionnaire cache key", "key", pattern, "error", err)
+		}
+	}
+
+	iter := r.client.Scan(ctx, 0, patterns[2], 100).Iterator()
+	for iter.Next(ctx) {
+		_ = r.client.Del(ctx, iter.Val()).Err()
+	}
+	return iter.Err()
+}
+
+// WarmupCache 预热工作版本和当前已发布版本缓存
 func (r *CachedQuestionnaireRepository) WarmupCache(ctx context.Context, codes []string) error {
 	if r.client == nil {
-		return nil // Redis 不可用时跳过
+		return nil
 	}
 
 	for _, code := range codes {
-		// 检查缓存是否已存在
-		key := r.buildCacheKey(code, "")
-		if r.client.Exists(ctx, key).Val() > 0 {
-			continue // 已缓存，跳过
+		if r.client.Exists(ctx, r.headKey(code)).Val() == 0 {
+			if qDomain, err := r.repo.FindByCode(ctx, code); err == nil && qDomain != nil {
+				_ = r.setCache(ctx, r.headKey(code), qDomain, r.ttl)
+			}
 		}
-
-		// 从数据库加载并写入缓存
-		qDomain, err := r.repo.FindByCode(ctx, code)
-		if err != nil {
-			// 记录错误但继续处理其他问卷
-			continue
-		}
-		if qDomain == nil {
-			continue
-		}
-
-		if err := r.setCache(ctx, code, qDomain.GetVersion().Value(), qDomain); err != nil {
-			// 记录错误但继续处理
-			continue
+		if r.client.Exists(ctx, r.publishedKey(code)).Val() == 0 {
+			if qDomain, err := r.repo.FindPublishedByCode(ctx, code); err == nil && qDomain != nil {
+				_ = r.setCache(ctx, r.publishedKey(code), qDomain, r.ttl)
+			}
 		}
 	}
 

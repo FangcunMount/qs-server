@@ -148,29 +148,31 @@ func (s *submissionService) fetchAndValidateQuestionnaire(
 ) (*questionnaire.Questionnaire, map[string]questionnaire.Question, error) {
 	l.Debugw("开始获取问卷信息", "questionnaire_code", dto.QuestionnaireCode, "action", "read", "resource", "questionnaire")
 
-	qnr, err := s.questionnaireRepo.FindByCode(ctx, dto.QuestionnaireCode)
-	if err != nil {
-		l.Errorw("获取问卷信息失败", "questionnaire_code", dto.QuestionnaireCode, "action", "read", "resource", "questionnaire", "result", "failed", "error", err.Error())
-		return nil, nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
-	}
-
-	l.Debugw("问卷信息获取成功", "questionnaire_code", dto.QuestionnaireCode, "questionnaire_title", qnr.GetTitle(), "question_count", len(qnr.GetQuestions()), "result", "success")
-
-	// 验证版本号
-	qnrVer := qnr.GetVersion().Value()
+	var qnr *questionnaire.Questionnaire
+	var err error
 	if dto.QuestionnaireVer == "" {
-		dto.QuestionnaireVer = qnrVer
-		l.Debugw("使用最新问卷版本", "questionnaire_code", dto.QuestionnaireCode, "version", qnrVer)
-	} else if qnrVer != dto.QuestionnaireVer {
-		l.Warnw("问卷版本不匹配", "questionnaire_code", dto.QuestionnaireCode, "expected_version", dto.QuestionnaireVer, "actual_version", qnrVer, "result", "failed")
-		return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("问卷版本不匹配，期望: %s, 实际: %s", dto.QuestionnaireVer, qnrVer))
+		qnr, err = s.questionnaireRepo.FindPublishedByCode(ctx, dto.QuestionnaireCode)
+		if err != nil {
+			l.Errorw("获取已发布问卷失败", "questionnaire_code", dto.QuestionnaireCode, "action", "read", "resource", "questionnaire", "result", "failed", "error", err.Error())
+			return nil, nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+		}
+		if qnr == nil {
+			return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "当前没有可提交的已发布问卷版本")
+		}
+		dto.QuestionnaireVer = qnr.GetVersion().Value()
+		l.Debugw("使用当前已发布问卷版本", "questionnaire_code", dto.QuestionnaireCode, "version", dto.QuestionnaireVer)
+	} else {
+		qnr, err = s.questionnaireRepo.FindByCodeVersion(ctx, dto.QuestionnaireCode, dto.QuestionnaireVer)
+		if err != nil {
+			l.Errorw("获取指定问卷版本失败", "questionnaire_code", dto.QuestionnaireCode, "questionnaire_version", dto.QuestionnaireVer, "action", "read", "resource", "questionnaire", "result", "failed", "error", err.Error())
+			return nil, nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+		}
+		if qnr == nil || !qnr.IsPublished() {
+			return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "只能提交已发布的问卷版本")
+		}
 	}
 
-	// 验证问卷是否已发布
-	if !qnr.IsPublished() {
-		l.Warnw("问卷未发布，无法提交答卷", "questionnaire_code", dto.QuestionnaireCode, "status", qnr.GetStatus().String(), "result", "failed")
-		return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "只能对已发布的问卷提交答卷")
-	}
+	l.Debugw("问卷信息获取成功", "questionnaire_code", dto.QuestionnaireCode, "questionnaire_title", qnr.GetTitle(), "question_count", len(qnr.GetQuestions()), "questionnaire_version", dto.QuestionnaireVer, "result", "success")
 
 	// 构建问题映射表
 	questionMap := make(map[string]questionnaire.Question, len(qnr.GetQuestions()))
@@ -178,7 +180,7 @@ func (s *submissionService) fetchAndValidateQuestionnaire(
 		questionMap[q.GetCode().Value()] = q
 	}
 
-	l.Debugw("问卷验证通过", "questionnaire_code", dto.QuestionnaireCode, "version", qnrVer, "question_count", len(questionMap))
+	l.Debugw("问卷验证通过", "questionnaire_code", dto.QuestionnaireCode, "version", dto.QuestionnaireVer, "question_count", len(questionMap))
 	return qnr, questionMap, nil
 }
 

@@ -97,7 +97,15 @@ func (b *CacheKeyBuilder) BuildScaleListKey() string {
 
 // BuildQuestionnaireKey 构建问卷缓存键
 func (b *CacheKeyBuilder) BuildQuestionnaireKey(code, version string) string {
+	if version == "" {
+		return addNamespace("questionnaire:" + code)
+	}
 	return addNamespace("questionnaire:" + code + ":" + version)
+}
+
+// BuildPublishedQuestionnaireKey 构建当前已发布问卷缓存键
+func (b *CacheKeyBuilder) BuildPublishedQuestionnaireKey(code string) string {
+	return addNamespace("questionnaire:published:" + code)
 }
 
 // BuildAssessmentDetailKey 构建测评详情缓存键

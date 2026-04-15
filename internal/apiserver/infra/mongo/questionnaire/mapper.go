@@ -18,13 +18,15 @@ func NewQuestionnaireMapper() *QuestionnaireMapper {
 // ToPO 将领域模型转换为MongoDB持久化对象
 func (m *QuestionnaireMapper) ToPO(bo *questionnaire.Questionnaire) *QuestionnairePO {
 	po := &QuestionnairePO{
-		Code:        bo.GetCode().Value(),
-		Title:       bo.GetTitle(),
-		Description: bo.GetDescription(),
-		ImgUrl:      bo.GetImgUrl(),
-		Version:     bo.GetVersion().Value(),
-		Status:      bo.GetStatus().String(),
-		Type:        bo.GetType().String(),
+		Code:              bo.GetCode().Value(),
+		Title:             bo.GetTitle(),
+		Description:       bo.GetDescription(),
+		ImgUrl:            bo.GetImgUrl(),
+		Version:           bo.GetVersion().Value(),
+		Status:            bo.GetStatus().String(),
+		Type:              bo.GetType().String(),
+		RecordRole:        bo.GetRecordRole().String(),
+		IsActivePublished: bo.IsActivePublished(),
 	}
 	po.CreatedAt = bo.GetCreatedAt()
 	po.CreatedBy = bo.GetCreatedBy().Uint64()
@@ -102,6 +104,8 @@ func (m *QuestionnaireMapper) ToBO(po *QuestionnairePO) *questionnaire.Questionn
 		questionnaire.WithVersion(questionnaire.NewVersion(po.Version)),
 		questionnaire.WithStatus(questionnaire.Status(po.Status)),
 		questionnaire.WithType(questionnaire.NormalizeQuestionnaireType(po.Type)),
+		questionnaire.WithRecordRole(questionnaire.NormalizeRecordRole(po.RecordRole)),
+		questionnaire.WithActivePublished(po.IsActivePublished),
 		questionnaire.WithQuestionCount(po.QuestionCount),
 		questionnaire.WithCreatedBy(meta.FromUint64(po.CreatedBy)),
 		questionnaire.WithCreatedAt(po.CreatedAt),
