@@ -64,8 +64,12 @@ func TestAllocateTesteeCreatedAtCounts_NormalizesWeights(t *testing.T) {
 func TestBuildWeightedTesteeCreatedAtTargets_PreservesGlobalBoundaries(t *testing.T) {
 	start := time.Date(2019, 3, 25, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 4, 15, 23, 59, 59, 0, time.UTC)
+	rows := make([]testeeCreatedAtFixupRow, 0, 102)
+	for idx := 0; idx < 102; idx++ {
+		rows = append(rows, testeeCreatedAtFixupRow{ID: uint64(idx + 1)})
+	}
 
-	targets, allocation, err := buildWeightedTesteeCreatedAtTargets(102, start, end, testeeCreatedAtFixupYearWeights)
+	targets, allocation, err := buildWeightedTesteeCreatedAtTargets(rows, start, end, testeeCreatedAtFixupYearWeights)
 	if err != nil {
 		t.Fatalf("buildWeightedTesteeCreatedAtTargets returned error: %v", err)
 	}
@@ -80,6 +84,53 @@ func TestBuildWeightedTesteeCreatedAtTargets_PreservesGlobalBoundaries(t *testin
 	}
 	if allocation[2019] != 5 || allocation[2026] != 2 {
 		t.Fatalf("unexpected allocation edges: %+v", allocation)
+	}
+}
+
+func TestDeriveDeterministicBucketTimestamps_IsStableAndJittered(t *testing.T) {
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC)
+	rows := []testeeCreatedAtFixupRow{
+		{ID: 101},
+		{ID: 102},
+		{ID: 103},
+		{ID: 104},
+		{ID: 105},
+	}
+
+	firstRun, err := deriveDeterministicBucketTimestamps(2024, rows, start, end)
+	if err != nil {
+		t.Fatalf("deriveDeterministicBucketTimestamps returned error: %v", err)
+	}
+	secondRun, err := deriveDeterministicBucketTimestamps(2024, rows, start, end)
+	if err != nil {
+		t.Fatalf("deriveDeterministicBucketTimestamps returned error on second run: %v", err)
+	}
+
+	if len(firstRun) != len(rows) {
+		t.Fatalf("expected %d timestamps, got %d", len(rows), len(firstRun))
+	}
+	for idx := range firstRun {
+		if !firstRun[idx].Equal(secondRun[idx]) {
+			t.Fatalf("expected deterministic timestamp at index %d, got %s and %s", idx, firstRun[idx].Format(time.RFC3339), secondRun[idx].Format(time.RFC3339))
+		}
+		if idx > 0 && firstRun[idx].Before(firstRun[idx-1]) {
+			t.Fatalf("expected non-decreasing timestamps, got %s before %s", firstRun[idx].Format(time.RFC3339), firstRun[idx-1].Format(time.RFC3339))
+		}
+	}
+	if !firstRun[0].Equal(start) {
+		t.Fatalf("expected first timestamp at bucket start %s, got %s", start.Format(time.RFC3339), firstRun[0].Format(time.RFC3339))
+	}
+	if !firstRun[len(firstRun)-1].Equal(end) {
+		t.Fatalf("expected last timestamp at bucket end %s, got %s", end.Format(time.RFC3339), firstRun[len(firstRun)-1].Format(time.RFC3339))
+	}
+
+	evenMidpoint, err := deriveEvenlyDistributedTimestamp(2, len(rows), start, end)
+	if err != nil {
+		t.Fatalf("deriveEvenlyDistributedTimestamp returned error: %v", err)
+	}
+	if firstRun[2].Equal(evenMidpoint) {
+		t.Fatalf("expected jittered middle timestamp to differ from evenly distributed midpoint %s", evenMidpoint.Format(time.RFC3339))
 	}
 }
 

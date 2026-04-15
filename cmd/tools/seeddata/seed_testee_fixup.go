@@ -80,7 +80,7 @@ func seedTesteeFixupCreatedAt(ctx context.Context, deps *dependencies) error {
 	}
 
 	totalBatches := (len(rows) + testeeCreatedAtFixupBatchSize - 1) / testeeCreatedAtFixupBatchSize
-	targets, allocation, err := buildWeightedTesteeCreatedAtTargets(len(rows), testeeCreatedAtFixupRangeStart, testeeCreatedAtFixupRangeEnd, testeeCreatedAtFixupYearWeights)
+	targets, allocation, err := buildWeightedTesteeCreatedAtTargets(rows, testeeCreatedAtFixupRangeStart, testeeCreatedAtFixupRangeEnd, testeeCreatedAtFixupYearWeights)
 	if err != nil {
 		return err
 	}
@@ -223,10 +223,11 @@ func deriveEvenlyDistributedTimestamp(index, total int, start, end time.Time) (t
 }
 
 func buildWeightedTesteeCreatedAtTargets(
-	total int,
+	rows []testeeCreatedAtFixupRow,
 	rangeStart, rangeEnd time.Time,
 	weights []testeeCreatedAtYearWeight,
 ) ([]time.Time, map[int]int, error) {
+	total := len(rows)
 	if total < 0 {
 		return nil, nil, fmt.Errorf("total must be non-negative")
 	}
@@ -245,21 +246,84 @@ func buildWeightedTesteeCreatedAtTargets(
 
 	targets := make([]time.Time, 0, total)
 	allocation := make(map[int]int, len(buckets))
+	rowOffset := 0
 	for _, bucket := range buckets {
 		count := counts[bucket.Year]
 		allocation[bucket.Year] = count
-		for idx := 0; idx < count; idx++ {
-			target, err := deriveEvenlyDistributedTimestamp(idx, count, bucket.Start, bucket.End)
-			if err != nil {
-				return nil, nil, fmt.Errorf("derive weighted timestamp for year %d: %w", bucket.Year, err)
-			}
-			targets = append(targets, target)
+		if count == 0 {
+			continue
 		}
+		if rowOffset+count > len(rows) {
+			return nil, nil, fmt.Errorf("row allocation overflow for year %d: offset=%d count=%d total=%d", bucket.Year, rowOffset, count, len(rows))
+		}
+		bucketTargets, err := deriveDeterministicBucketTimestamps(bucket.Year, rows[rowOffset:rowOffset+count], bucket.Start, bucket.End)
+		if err != nil {
+			return nil, nil, fmt.Errorf("derive weighted timestamp for year %d: %w", bucket.Year, err)
+		}
+		targets = append(targets, bucketTargets...)
+		rowOffset += count
 	}
 	if len(targets) != total {
 		return nil, nil, fmt.Errorf("weighted target count mismatch: got %d want %d", len(targets), total)
 	}
 	return targets, allocation, nil
+}
+
+func deriveDeterministicBucketTimestamps(
+	year int,
+	rows []testeeCreatedAtFixupRow,
+	start, end time.Time,
+) ([]time.Time, error) {
+	count := len(rows)
+	if count == 0 {
+		return nil, nil
+	}
+	if start.IsZero() || end.IsZero() {
+		return nil, fmt.Errorf("start and end must be non-zero")
+	}
+	if end.Before(start) {
+		return nil, fmt.Errorf("end %s is before start %s", end.Format(time.RFC3339), start.Format(time.RFC3339))
+	}
+	if count == 1 {
+		return []time.Time{start.Round(0)}, nil
+	}
+
+	targets := make([]time.Time, count)
+	span := end.Sub(start)
+	targets[0] = start.Round(0)
+	targets[count-1] = end.Round(0)
+	for idx := 1; idx < count-1; idx++ {
+		baseRatio := float64(idx) / float64(count-1)
+		halfStep := 0.5 / float64(count-1)
+		low := baseRatio - halfStep
+		high := baseRatio + halfStep
+		unit := stableSeedUnitFloat(uint64(year), rows[idx].ID, uint64(idx), uint64(count))
+		ratio := low + unit*(high-low)
+		if ratio < 0 {
+			ratio = 0
+		}
+		if ratio > 1 {
+			ratio = 1
+		}
+		offset := time.Duration(math.Round(float64(span) * ratio))
+		targets[idx] = start.Add(offset).Round(0)
+	}
+	return targets, nil
+}
+
+func stableSeedUnitFloat(parts ...uint64) float64 {
+	var seed uint64 = 0x9e3779b97f4a7c15
+	for _, part := range parts {
+		seed ^= mixSeedUint64(part + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2))
+	}
+	return float64(seed>>11) / float64(uint64(1)<<53)
+}
+
+func mixSeedUint64(value uint64) uint64 {
+	value += 0x9e3779b97f4a7c15
+	value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9
+	value = (value ^ (value >> 27)) * 0x94d049bb133111eb
+	return value ^ (value >> 31)
 }
 
 type testeeCreatedAtYearBucket struct {

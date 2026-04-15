@@ -172,7 +172,7 @@ go run ./cmd/tools/seeddata \
   - `2024: 25`
   - `2025: 13`
   - `2026: 2`
-- 每个年份内部再均匀分布；`2019` 从 `2019-03-25` 开始，`2026` 到 `2026-04-15` 结束
+- 每个年份内部会做稳定随机分散，不再是完全等间距；`2019` 从 `2019-03-25` 开始，`2026` 到 `2026-04-15` 结束
 - 如果某条记录的 `updated_at < created_at`，会自动把 `updated_at` 追平到新的 `created_at`
 - 这一步只改 `testee` 表；如果你要让 actor / entry / plan 相关时间也与新 `created_at` 对齐，后续继续跑 `actor_fixup_timestamps` 以及相关 fixup step
 
