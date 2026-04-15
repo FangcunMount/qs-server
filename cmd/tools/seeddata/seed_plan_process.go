@@ -563,6 +563,8 @@ func runPlanTaskExecutionPipeline(
 			expiredCount,
 			recoveredCount,
 			failedTaskExecutionCount,
+			submitController,
+			submitDispatchController,
 			dashboard,
 		)
 	}
@@ -731,6 +733,8 @@ func runPlanTaskExpireOnlyExecution(
 	expiredCount *atomic.Int64,
 	recoveredCount *atomic.Int64,
 	failedTaskExecutionCount *atomic.Int64,
+	submitController *seedPlanSubmitController,
+	submitDispatchController *seedPlanSubmitDispatchController,
 	dashboard *planSeedDashboard,
 ) error {
 	if len(jobs) == 0 {
@@ -771,6 +775,8 @@ func runPlanTaskExpireOnlyExecution(
 						expiredCount,
 						recoveredCount,
 						failedTaskExecutionCount,
+						submitController,
+						submitDispatchController,
 						dashboard,
 					)
 				}
@@ -810,6 +816,8 @@ func handlePlanTaskWithoutSubmission(
 	expiredCount *atomic.Int64,
 	recoveredCount *atomic.Int64,
 	failedTaskExecutionCount *atomic.Int64,
+	submitController *seedPlanSubmitController,
+	submitDispatchController *seedPlanSubmitDispatchController,
 	dashboard *planSeedDashboard,
 ) bool {
 	if strings.TrimSpace(job.testeeID) == "" || strings.TrimSpace(job.task.ID) == "" {
@@ -833,6 +841,15 @@ func handlePlanTaskWithoutSubmission(
 
 	if !shouldExpirePlanTask(job.task, planExpireRate) {
 		return false
+	}
+
+	if err := submitController.Wait(ctx); err != nil {
+		dashboard.AdvanceTask()
+		return true
+	}
+	if err := submitDispatchController.Wait(ctx); err != nil {
+		dashboard.AdvanceTask()
+		return true
 	}
 
 	err := runSeedPlanOperationWithRecovery(ctx, deps.Logger, verbose, "expire_plan_task", job.task.ID, func() error {
@@ -863,6 +880,9 @@ func handlePlanTaskWithoutSubmission(
 		return nil
 	})
 	if err != nil {
+		if isSeedPlanRecoverableError(err) {
+			submitController.OnRecoverableError(deps.Logger, planID, orgID, job.task.ID, err)
+		}
 		failedTaskExecutionCount.Add(1)
 		if verbose {
 			deps.Logger.Warnw("Skipping task after recovery attempts failed",
@@ -873,6 +893,8 @@ func handlePlanTaskWithoutSubmission(
 				"error", err.Error(),
 			)
 		}
+	} else {
+		submitController.OnSuccess()
 	}
 	dashboard.AdvanceTask()
 	return true
@@ -916,6 +938,8 @@ func processPlanTaskSubmitStage(
 		expiredCount,
 		recoveredCount,
 		failedTaskExecutionCount,
+		nil,
+		nil,
 		dashboard,
 	) {
 		return

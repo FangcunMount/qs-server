@@ -277,12 +277,12 @@ func (c *seedPlanSubmitController) OnRecoverableError(
 			break
 		}
 	}
-	logger.Warnw("Seed plan submit cooldown activated",
+	logger.Warnw("Seed plan task operation cooldown activated",
 		"plan_id", planID,
 		"org_id", orgID,
 		"task_id", taskID,
 		"cooldown_seconds", int(delay.Seconds()),
-		"recoverable_submit_failures", streak,
+		"recoverable_failures", streak,
 		"error", err.Error(),
 	)
 }
