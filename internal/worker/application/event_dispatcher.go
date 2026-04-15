@@ -34,7 +34,7 @@ type HandlerDependencies struct {
 	Logger            *slog.Logger
 	AnswerSheetClient *grpcclient.AnswerSheetClient
 	EvaluationClient  *grpcclient.EvaluationClient
-	InternalClient    *grpcclient.InternalClient
+	InternalClient    handlers.InternalClient
 	RedisCache        redis.UniversalClient
 	Notifier          port.TaskNotifier
 }

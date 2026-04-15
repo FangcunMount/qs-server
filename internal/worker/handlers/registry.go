@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 	redis "github.com/redis/go-redis/v9"
@@ -28,12 +29,39 @@ import (
 // HandlerFunc 处理器函数类型
 type HandlerFunc func(ctx context.Context, eventType string, payload []byte) error
 
+// InternalClient 抽象 Worker 侧已使用的内部 gRPC 能力，便于 handler 级测试替换。
+type InternalClient interface {
+	CreateAssessmentFromAnswerSheet(
+		ctx context.Context,
+		req *pb.CreateAssessmentFromAnswerSheetRequest,
+	) (*pb.CreateAssessmentFromAnswerSheetResponse, error)
+	CalculateAnswerSheetScore(
+		ctx context.Context,
+		req *pb.CalculateAnswerSheetScoreRequest,
+	) (*pb.CalculateAnswerSheetScoreResponse, error)
+	EvaluateAssessment(ctx context.Context, assessmentID uint64) (*pb.EvaluateAssessmentResponse, error)
+	TagTestee(ctx context.Context, req *pb.TagTesteeRequest) (*pb.TagTesteeResponse, error)
+	GenerateQuestionnaireQRCode(
+		ctx context.Context,
+		code, version string,
+	) (*pb.GenerateQuestionnaireQRCodeResponse, error)
+	GenerateScaleQRCode(ctx context.Context, code string) (*pb.GenerateScaleQRCodeResponse, error)
+	SendTaskOpenedMiniProgramNotification(
+		ctx context.Context,
+		orgID int64,
+		taskID string,
+		testeeID uint64,
+		entryURL string,
+		openAt time.Time,
+	) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error)
+}
+
 // Dependencies 处理器依赖
 type Dependencies struct {
 	Logger            *slog.Logger
 	AnswerSheetClient *grpcclient.AnswerSheetClient
 	EvaluationClient  *grpcclient.EvaluationClient
-	InternalClient    *grpcclient.InternalClient
+	InternalClient    InternalClient
 	RedisCache        redis.UniversalClient
 	Notifier          port.TaskNotifier
 }

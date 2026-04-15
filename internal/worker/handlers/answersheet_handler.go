@@ -18,6 +18,24 @@ func init() {
 	})
 }
 
+type answerSheetProcessingGateMode string
+
+const (
+	answerSheetProcessingGateModeLocked        answerSheetProcessingGateMode = "locked"
+	answerSheetProcessingGateModeDuplicateSkip answerSheetProcessingGateMode = "duplicate_skip"
+	answerSheetProcessingGateModeDegraded      answerSheetProcessingGateMode = "degraded"
+)
+
+type answerSheetProcessingGateHooks struct {
+	acquire func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (string, bool, error)
+	release func(ctx context.Context, deps *Dependencies, answerSheetID uint64, token string) error
+}
+
+var defaultAnswerSheetProcessingGateHooks = answerSheetProcessingGateHooks{
+	acquire: acquireProcessingLock,
+	release: releaseProcessingLock,
+}
+
 // ==================== Payload 定义 ====================
 
 // AnswerSheetSubmittedPayload 答卷提交事件数据
@@ -42,56 +60,51 @@ type AnswerSheetSubmittedPayload struct {
 // 2. 调用 InternalClient 创建 Assessment
 // 3. 如果关联量表，Assessment 会自动提交并触发评估
 func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
+	return handleAnswerSheetSubmittedWithHooks(deps, defaultAnswerSheetProcessingGateHooks)
+}
+
+func handleAnswerSheetSubmittedWithHooks(
+	deps *Dependencies,
+	hooks answerSheetProcessingGateHooks,
+) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		answerSheetID, data, err := parseAnswerSheetData(deps, payload)
+		env, answerSheetID, data, err := parseAnswerSheetData(deps, payload)
 		if err != nil {
 			return fmt.Errorf("failed to parse answersheet submitted event: %w", err)
 		}
 
-		// 分布式锁，防止同一答卷并发/重放创建测评
-		token, _, err := acquireProcessingLock(ctx, deps, answerSheetID)
-		if err != nil {
-			return fmt.Errorf("failed to acquire processing lock: %w", err)
-		}
-		defer func() {
-			if err := releaseProcessingLock(ctx, deps, answerSheetID, token); err != nil {
-				deps.Logger.Warn("failed to release processing lock",
+		return withAnswerSheetProcessingGate(ctx, deps, env.ID, answerSheetID, hooks, func(runCtx context.Context) error {
+			// Step 1: 计算答卷分数（在 Survey 域完成）
+			if err := calculateAnswerSheetScore(runCtx, deps, answerSheetID); err != nil {
+				deps.Logger.Error("failed to calculate answersheet score",
 					slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
 					slog.String("error", err.Error()),
 				)
+				return fmt.Errorf("failed to calculate answersheet score: %w", err)
 			}
-		}()
 
-		// Step 1: 计算答卷分数（在 Survey 域完成）
-		if err := calculateAnswerSheetScore(ctx, deps, answerSheetID); err != nil {
-			deps.Logger.Error("failed to calculate answersheet score",
-				slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
-				slog.String("error", err.Error()),
-			)
-			return fmt.Errorf("failed to calculate answersheet score: %w", err)
-		}
+			// Step 2: 创建 Assessment（在 Evaluation 域完成）
+			if err := createAssessmentFromAnswerSheet(runCtx, deps, answerSheetID, data); err != nil {
+				return fmt.Errorf("failed to create assessment from answersheet: %w", err)
+			}
 
-		// Step 2: 创建 Assessment（在 Evaluation 域完成）
-		if err := createAssessmentFromAnswerSheet(ctx, deps, answerSheetID, data); err != nil {
-			return fmt.Errorf("failed to create assessment from answersheet: %w", err)
-		}
-
-		return nil
+			return nil
+		})
 	}
 }
 
 // 解析答卷数据
-func parseAnswerSheetData(deps *Dependencies, payload []byte) (uint64, *AnswerSheetSubmittedPayload, error) {
+func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, uint64, *AnswerSheetSubmittedPayload, error) {
 	var data AnswerSheetSubmittedPayload
 	env, err := ParseEventData(payload, &data)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to parse answersheet submitted event: %w", err)
+		return nil, 0, nil, fmt.Errorf("failed to parse answersheet submitted event: %w", err)
 	}
 
 	// 解析答卷 ID
 	answerSheetID, err := strconv.ParseUint(data.AnswerSheetID, 10, 64)
 	if err != nil || answerSheetID == 0 {
-		return 0, nil, fmt.Errorf("invalid answersheet_id format or value: %w", err)
+		return nil, 0, nil, fmt.Errorf("invalid answersheet_id format or value: %w", err)
 	}
 
 	deps.Logger.Debug("answersheet submitted detail",
@@ -106,48 +119,113 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (uint64, *AnswerSh
 		"task_id", data.TaskID,
 		"submitted_at", data.SubmittedAt,
 	)
-	return answerSheetID, &data, nil
+	return env, answerSheetID, &data, nil
 }
 
-// 分布式锁，防止同一答卷并发/重放创建测评
+// withAnswerSheetProcessingGate 使用 best-effort Redis 闸门抑制重复工作。
+// 真正正确性仍由下游幂等查询和数据库唯一索引保证。
+func withAnswerSheetProcessingGate(
+	ctx context.Context,
+	deps *Dependencies,
+	eventID string,
+	answerSheetID uint64,
+	hooks answerSheetProcessingGateHooks,
+	fn func(context.Context) error,
+) error {
+	if hooks.acquire == nil {
+		hooks.acquire = acquireProcessingLock
+	}
+	if hooks.release == nil {
+		hooks.release = releaseProcessingLock
+	}
+
+	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
+	lockKey := answerSheetProcessingLockKey(answerSheetID)
+
+	if deps.RedisCache == nil {
+		deps.Logger.Warn("answersheet processing gate degraded",
+			slog.String("event_id", eventID),
+			slog.String("answersheet_id", answerSheetIDStr),
+			slog.String("lock_key", lockKey),
+			slog.String("lock_mode", string(answerSheetProcessingGateModeDegraded)),
+			slog.String("reason", "redis_unavailable"),
+		)
+		return fn(ctx)
+	}
+
+	token, acquired, err := hooks.acquire(ctx, deps, answerSheetID)
+	if err != nil {
+		deps.Logger.Warn("answersheet processing gate degraded",
+			slog.String("event_id", eventID),
+			slog.String("answersheet_id", answerSheetIDStr),
+			slog.String("lock_key", lockKey),
+			slog.String("lock_mode", string(answerSheetProcessingGateModeDegraded)),
+			slog.String("reason", "acquire_failed"),
+			slog.String("error", err.Error()),
+		)
+		return fn(ctx)
+	}
+	if !acquired {
+		deps.Logger.Info("answersheet processing skipped as duplicate",
+			slog.String("event_id", eventID),
+			slog.String("answersheet_id", answerSheetIDStr),
+			slog.String("lock_key", lockKey),
+			slog.String("lock_mode", string(answerSheetProcessingGateModeDuplicateSkip)),
+		)
+		return nil
+	}
+
+	deps.Logger.Debug("answersheet processing gate acquired",
+		slog.String("event_id", eventID),
+		slog.String("answersheet_id", answerSheetIDStr),
+		slog.String("lock_key", lockKey),
+		slog.String("lock_mode", string(answerSheetProcessingGateModeLocked)),
+	)
+
+	defer func() {
+		if err := hooks.release(ctx, deps, answerSheetID, token); err != nil {
+			deps.Logger.Warn("failed to release answersheet processing gate",
+				slog.String("event_id", eventID),
+				slog.String("answersheet_id", answerSheetIDStr),
+				slog.String("lock_key", lockKey),
+				slog.String("lock_mode", string(answerSheetProcessingGateModeLocked)),
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
+
+	return fn(ctx)
+}
+
+// acquireProcessingLock 获取答卷处理的 best-effort Redis lease lock。
 func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64) (string, bool, error) {
 	if deps.RedisCache == nil {
 		return "", false, nil
 	}
-	// 锁的key为 answersheet:processing:${answerSheetID}
-	lockKey := fmt.Sprintf("answersheet:processing:%d", answerSheetID)
+	lockKey := answerSheetProcessingLockKey(answerSheetID)
 	lockTTL := 5 * time.Minute
 
-	// 获取分布式锁
 	token, acquired, err := redislock.Acquire(ctx, deps.RedisCache, lockKey, lockTTL)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to acquire processing lock: %w", err)
 	}
-	// 如果获取失败，则返回false
-	if !acquired {
-		deps.Logger.Info("skip duplicated answersheet processing",
-			slog.String("answersheet_id", strconv.FormatUint(answerSheetID, 10)),
-		)
-		return "", false, nil
-	}
-
-	deps.Logger.Debug("acquired processing lock",
-		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
-		"token", token,
-	)
-	return token, true, nil
+	return token, acquired, nil
 }
 
-// 释放分布式锁
+// releaseProcessingLock 释放答卷处理的 Redis lease lock。
 func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64, token string) error {
 	if deps.RedisCache == nil {
 		return nil
 	}
-	lockKey := fmt.Sprintf("answersheet:processing:%d", answerSheetID)
+	lockKey := answerSheetProcessingLockKey(answerSheetID)
 	if err := redislock.Release(ctx, deps.RedisCache, lockKey, token); err != nil {
 		return fmt.Errorf("failed to release processing lock: %w", err)
 	}
 	return nil
+}
+
+func answerSheetProcessingLockKey(answerSheetID uint64) string {
+	return fmt.Sprintf("answersheet:processing:%d", answerSheetID)
 }
 
 // 计算答卷分数
