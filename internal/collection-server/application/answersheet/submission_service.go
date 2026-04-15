@@ -243,6 +243,7 @@ func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, o
 	result, err := s.answerSheetClient.SaveAnswerSheet(ctx, &grpcclient.SaveAnswerSheetInput{
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
+		IdempotencyKey:       req.IdempotencyKey,
 		Title:                req.Title,
 		WriterID:             writerID,
 		TesteeID:             req.TesteeID,

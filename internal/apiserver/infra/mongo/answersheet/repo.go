@@ -15,16 +15,24 @@ import (
 // Repository 答卷MongoDB存储库
 type Repository struct {
 	mongoBase.BaseRepository
-	mapper *AnswerSheetMapper
+	mapper          *AnswerSheetMapper
+	idempotencyColl *mongo.Collection
+	outboxColl      *mongo.Collection
 }
 
 // NewRepository 创建答卷MongoDB存储库
-func NewRepository(db *mongo.Database) answersheet.Repository {
+func NewRepository(db *mongo.Database) (*Repository, error) {
 	po := &AnswerSheetPO{}
-	return &Repository{
-		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),
-		mapper:         NewAnswerSheetMapper(),
+	repo := &Repository{
+		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName()),
+		mapper:          NewAnswerSheetMapper(),
+		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
+		outboxColl:      db.Collection((&AnswerSheetSubmittedOutboxPO{}).CollectionName()),
 	}
+	if err := repo.ensureIndexes(context.Background()); err != nil {
+		return nil, err
+	}
+	return repo, nil
 }
 
 // Create 创建答卷

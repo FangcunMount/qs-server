@@ -70,6 +70,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	dto := answersheet.SubmitAnswerSheetDTO{
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  questionnaireVer,
+		IdempotencyKey:    req.IdempotencyKey,
 		TesteeID:          req.TesteeId, // 受试者ID（传递给测评层）
 		OrgID:             req.OrgId,    // 机构ID（传递给测评层）
 		FillerID:          req.WriterId, // proto 中使用 writer_id

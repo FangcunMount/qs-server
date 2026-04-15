@@ -7,37 +7,35 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // submissionService 答卷提交服务实现
 // 行为者：答题者
 type submissionService struct {
 	repo              answersheet.Repository
+	durableStore      SubmissionDurableStore
 	questionnaireRepo questionnaire.Repository
 	batchValidator    *validation.BatchValidator
-	eventPublisher    event.EventPublisher
 }
 
 // NewSubmissionService 创建答卷提交服务
 func NewSubmissionService(
 	repo answersheet.Repository,
+	durableStore SubmissionDurableStore,
 	questionnaireRepo questionnaire.Repository,
 	batchValidator *validation.BatchValidator,
-	eventPublisher event.EventPublisher,
 ) AnswerSheetSubmissionService {
 	return &submissionService{
 		repo:              repo,
+		durableStore:      durableStore,
 		questionnaireRepo: questionnaireRepo,
 		batchValidator:    batchValidator,
-		eventPublisher:    eventPublisher,
 	}
 }
 
@@ -317,16 +315,28 @@ func (s *submissionService) createAndSaveAnswerSheet(
 
 	// 持久化
 	l.Infow("开始保存答卷", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode)
-	if err := s.repo.Create(ctx, sheet); err != nil {
+	storedSheet, existing, err := s.durableStore.CreateDurably(ctx, sheet, DurableSubmitMeta{
+		IdempotencyKey: dto.IdempotencyKey,
+		WriterID:       dto.FillerID,
+		TesteeID:       dto.TesteeID,
+		OrgID:          dto.OrgID,
+		TaskID:         dto.TaskID,
+	})
+	if err != nil {
 		l.Errorw("保存答卷失败", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
 	}
+	if existing {
+		l.Infow("答卷提交命中业务幂等键，返回已存在答卷",
+			"action", "create",
+			"resource", "answersheet",
+			"idempotency_key", dto.IdempotencyKey,
+			"answersheet_id", storedSheet.ID().Uint64(),
+			"result", "idempotent_hit",
+		)
+	}
 
-	// 发布领域事件
-	sheet.RaiseSubmittedEvent(dto.TesteeID, dto.OrgID, dto.TaskID)
-	s.publishEvents(ctx, sheet, l)
-
-	return sheet, nil
+	return storedSheet, nil
 }
 
 // GetMyAnswerSheet 获取我的答卷
@@ -480,23 +490,4 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 	)
 
 	return toSummaryListResult(sheets, total), nil
-}
-
-// publishEvents 发布聚合根收集的领域事件
-func (s *submissionService) publishEvents(ctx context.Context, sheet *answersheet.AnswerSheet, l *logger.RequestLogger) {
-	eventing.PublishCollectedEvents(ctx, s.eventPublisher, sheet, func() {
-		l.Warnw("事件发布器未配置，跳过事件发布",
-			"action", "publish_event",
-			"resource", "answersheet",
-			"answersheet_id", sheet.ID().Uint64(),
-		)
-	}, func(evt event.DomainEvent, err error) {
-		l.Errorw("发布领域事件失败",
-			"action", "publish_event",
-			"resource", "answersheet",
-			"answersheet_id", sheet.ID().Uint64(),
-			"event_type", evt.EventType(),
-			"error", err.Error(),
-		)
-	})
 }

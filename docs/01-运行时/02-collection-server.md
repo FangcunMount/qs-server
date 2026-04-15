@@ -10,7 +10,7 @@
 | ---- | ---- |
 | 进程角色 | `collection-server` 是前台 BFF，负责鉴权、限流、排队、监护等入口层能力，不持有主业务写模型 |
 | 最重要的上下游 | 上游是客户端 REST；核心下游是 `qs-apiserver` gRPC，辅以 Redis 和 IAM |
-| 提交答卷的关键认识 | `SubmitQueued` 是统一入口；是否真正进队列由 `submit_queue` 配置决定，关闭时等价于同步直调 gRPC |
+| 提交答卷的关键认识 | `SubmitQueued` 是统一入口；`request_id` 只负责队列状态查询，业务幂等以可选 `idempotency_key` 透传给 apiserver 的 durable 提交链为准 |
 | 与主服务的边界 | 它不直连 MySQL / Mongo 主库，不在本进程内完成问卷、测评等主业务持久化 |
 | 本地状态 | Redis 主要服务于排队、会话类辅助和部分缓存，不改变“主状态在 apiserver”的边界 |
 | MQ 边界 | 本进程**不**消费 QS 业务事件总线；只会通过 `iam.authz-sync.*` 订阅 IAM 的授权版本通知 |
@@ -20,8 +20,9 @@
 
 1. **这是 BFF，不是第二个业务主服务**：它做的是入口层治理和转发收敛，不是领域状态权威。  
 2. **答卷提交要区分两条路径**：启用队列时先入进程内有界队列；未启用时直接同步走 gRPC。  
-3. **Redis 在这里的职责偏辅助**：主要用于排队与前台侧支撑，不代表业务真值落在本进程。  
-4. **排障顺序**：先看路由和中间件，再看 Handler / Service，最后看 gRPC client 和 queue 配置。  
+3. **`request_id` 不再承担 durable 幂等语义**：它只用于 `202` 后的队列状态查询；若调用方提供 `idempotency_key`，`collection-server` 会原样透传给 apiserver。  
+4. **Redis 在这里的职责偏辅助**：主要用于排队与前台侧支撑，不代表业务真值落在本进程。  
+5. **排障顺序**：先看路由和中间件，再看 Handler / Service，最后看 gRPC client 和 queue 配置。  
 
 **组件定位**：**前台 BFF** 进程；**不**直连 MySQL/Mongo 主库；对外 **REST**，对内通过 **gRPC** 调用 **apiserver**；本地 **Redis** + **IAM** 支撑排队、会话类辅助与身份。  
 限流与排队机制见 [03-缓存与限流](../03-基础设施/03-缓存与限流.md)；REST 契约见 [04-REST](../04-接口与运维/01-REST契约.md)。
@@ -144,7 +145,8 @@ sequenceDiagram
     end
 ```
 
-**关键点**：队列路径下 **真正调 apiserver 的仍是 `submitSync`**，只是可能发生在 **队列 worker** 中；**满队** 返回 **429**、**短等待未结束** 可能 **202 + `request_id` 轮询**，语义以 [submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) 为准。
+**关键点**：队列路径下 **真正调 apiserver 的仍是 `submitSync`**，只是可能发生在 **队列 worker** 中；**满队** 返回 **429**、**短等待未结束** 可能 **202 + `request_id` 轮询**，语义以 [submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) 为准。  
+**幂等边界**：`request_id` 只服务本进程内的排队状态机；若客户端传 `idempotency_key`，`collection-server` 只负责透传，真正的 durable 幂等和 outbox 一致性在 `qs-apiserver`。
 
 ---
 

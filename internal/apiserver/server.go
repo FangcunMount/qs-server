@@ -279,6 +279,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 
 	// 启动统计同步定时任务（Redis -> MySQL），最终一致
 	s.startStatisticsSyncScheduler()
+	s.startAnswerSheetSubmittedOutboxRelay()
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
@@ -448,6 +449,45 @@ func (s *apiServer) startStatisticsSyncScheduler() {
 
 	log.Infof("statistics sync scheduler started (org_ids=%v, daily=%s, accum=%s, plan=%s, initial_delay=%s)",
 		opts.OrgIDs, opts.DailyInterval, opts.AccumulatedInterval, opts.PlanInterval, opts.InitialDelay)
+}
+
+// startAnswerSheetSubmittedOutboxRelay 启动 answersheet.submitted outbox relay。
+func (s *apiServer) startAnswerSheetSubmittedOutboxRelay() {
+	if s.container == nil || s.container.SurveyModule == nil || s.container.SurveyModule.AnswerSheet == nil {
+		return
+	}
+
+	relay := s.container.SurveyModule.AnswerSheet.SubmittedEventRelay
+	if relay == nil {
+		return
+	}
+
+	const interval = 2 * time.Second
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
+		cancel()
+		return nil
+	}))
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			if err := relay.DispatchDue(ctx); err != nil {
+				log.Warnf("answersheet submitted outbox relay failed: %v", err)
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+
+	log.Infof("answersheet submitted outbox relay started (interval=%s)", interval)
 }
 
 // buildGenericServer 构建通用服务器

@@ -25,7 +25,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 模块职责 | 管问卷生命周期、题目结构、答卷提交、答案校验、`questionnaire.changed` / `answersheet.submitted` 事件 |
+| 模块职责 | 管问卷生命周期、题目结构、答卷提交、答案校验，以及答卷 durable 幂等记录 / `answersheet.submitted` outbox 写入 |
 | 主入口 | 后台多走 REST 管问卷；前台提交经 `collection-server` gRPC 进入 `SaveAnswerSheet` |
 | 核心对象 | `Questionnaire`、`Question`、`AnswerSheet`、`Answer`、`AnswerValue` |
 | 关键边界 | 认证/监护在 `collection-server`；测评、报告和引擎在 `evaluation`；量表规则权威源在 `scale` |
@@ -46,8 +46,8 @@
 
 - **问卷生命周期**：创建、保存草稿、发布、取消发布、归档、删除（及对应状态与版本规则，见领域 `Lifecycle` / `Versioning`）。
 - **问卷内容管理**：题目增删改、批量更新、重排；题型通过工厂与注册机制扩展。
-- **答卷提交**：校验问卷 **已发布**、**版本与 DTO 对齐**（`FindByCode` 取当前文档再比对版本）、答案合法性（`validation` + 适配器），持久化 `AnswerSheet`。
-- **事件与异步衔接**：发布 `answersheet.submitted`；问卷发布/下架/归档等生命周期事件；答卷分数在异步链路中由 Internal gRPC 触发补算（见 [03-evaluation](./03-evaluation.md) / worker）。
+- **答卷提交**：校验问卷 **已发布**、**版本与 DTO 对齐**（`FindByCodeVersion` / `FindPublishedByCode`）、答案合法性（`validation` + 适配器），并以 Mongo 事务一次性写入 `AnswerSheet`、业务幂等记录和 `answersheet.submitted` outbox。
+- **事件与异步衔接**：答卷提交时不再直接同步 publish，而是由 apiserver 内部 relay 从 outbox 补发 `answersheet.submitted`；问卷发布/下架/归档等生命周期事件仍按原方式进入事件总线；答卷分数在异步链路中由 Internal gRPC 触发补算（见 [03-evaluation](./03-evaluation.md) / worker）。
 - **二维码等协同**：问卷侧能力与 `scale` 等模块的事件、worker 协同以代码及 `events.yaml` 为准。
 
 #### 不负责什么（细项）

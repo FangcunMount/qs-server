@@ -58,9 +58,10 @@ type AnswerSheetSubModule struct {
 	Handler *handler.AnswerSheetHandler
 
 	// service 层 - 按行为者组织
-	SubmissionService asApp.AnswerSheetSubmissionService
-	ManagementService asApp.AnswerSheetManagementService
-	ScoringService    asApp.AnswerSheetScoringService // 新增：计分服务
+	SubmissionService   asApp.AnswerSheetSubmissionService
+	ManagementService   asApp.AnswerSheetManagementService
+	ScoringService      asApp.AnswerSheetScoringService // 新增：计分服务
+	SubmittedEventRelay asApp.SubmittedEventRelay
 }
 
 // NewSurveyModule 创建 Survey 模块
@@ -204,7 +205,11 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	sub := m.AnswerSheet
 
 	// 初始化 repository 层
-	sub.Repo = asMongoInfra.NewRepository(mongoDB)
+	baseRepo, err := asMongoInfra.NewRepository(mongoDB)
+	if err != nil {
+		return err
+	}
+	sub.Repo = baseRepo
 
 	// 获取问卷仓储（答卷服务需要依赖问卷仓储进行验证）
 	quesRepo := m.Questionnaire.Repo
@@ -216,9 +221,10 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	scoringDomainService := answersheet.NewScoringService()
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, quesRepo, batchValidator, m.eventPublisher)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, baseRepo, quesRepo, batchValidator)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
+	sub.SubmittedEventRelay = asApp.NewSubmittedEventRelay(baseRepo, m.eventPublisher)
 
 	// 初始化 handler 层
 	sub.Handler = handler.NewAnswerSheetHandler(

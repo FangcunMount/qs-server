@@ -63,12 +63,13 @@ message Answer {
 message SaveAnswerSheetRequest {
   string questionnaire_code = 1;
   string questionnaire_version = 2;
-  string title = 3;
-  uint64 writer_id = 4;
-  uint64 testee_id = 5;
-  repeated Answer answers = 6;
-  uint64 org_id = 7;  // 机构ID
-  string task_id = 8; // 计划任务ID（可选）
+  string idempotency_key = 3;
+  string title = 4;
+  uint64 writer_id = 5;
+  uint64 testee_id = 6;
+  repeated Answer answers = 7;
+  uint64 org_id = 8;  // 机构ID
+  string task_id = 9; // 计划任务ID（可选）
 }
 
 // 保存答卷响应

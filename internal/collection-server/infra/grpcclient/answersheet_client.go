@@ -12,6 +12,7 @@ import (
 type SaveAnswerSheetInput struct {
 	QuestionnaireCode    string
 	QuestionnaireVersion string
+	IdempotencyKey       string
 	Title                string
 	WriterID             uint64
 	TesteeID             uint64
@@ -93,6 +94,7 @@ func (c *AnswerSheetClient) SaveAnswerSheet(ctx context.Context, input *SaveAnsw
 	req := &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
+		IdempotencyKey:       input.IdempotencyKey,
 		Title:                input.Title,
 		WriterId:             input.WriterID,
 		TesteeId:             input.TesteeID,

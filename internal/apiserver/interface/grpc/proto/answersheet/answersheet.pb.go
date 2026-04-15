@@ -361,12 +361,13 @@ type SaveAnswerSheetRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	Title                string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	WriterId             uint64                 `protobuf:"varint,4,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
-	TesteeId             uint64                 `protobuf:"varint,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	Answers              []*Answer              `protobuf:"bytes,6,rep,name=answers,proto3" json:"answers,omitempty"`
-	OrgId                uint64                 `protobuf:"varint,7,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`   // 机构ID
-	TaskId               string                 `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"` // 计划任务ID（可选）
+	IdempotencyKey       string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Title                string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	WriterId             uint64                 `protobuf:"varint,5,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
+	TesteeId             uint64                 `protobuf:"varint,6,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Answers              []*Answer              `protobuf:"bytes,7,rep,name=answers,proto3" json:"answers,omitempty"`
+	OrgId                uint64                 `protobuf:"varint,8,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`   // 机构ID
+	TaskId               string                 `protobuf:"bytes,9,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"` // 计划任务ID（可选）
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -411,6 +412,13 @@ func (x *SaveAnswerSheetRequest) GetQuestionnaireCode() string {
 func (x *SaveAnswerSheetRequest) GetQuestionnaireVersion() string {
 	if x != nil {
 		return x.QuestionnaireVersion
+	}
+	return ""
+}
+
+func (x *SaveAnswerSheetRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
 	}
 	return ""
 }
@@ -905,16 +913,17 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value\"\xab\x02\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\"\xd4\x02\n" +
 	"\x16SaveAnswerSheetRequest\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12\x14\n" +
-	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1b\n" +
-	"\twriter_id\x18\x04 \x01(\x04R\bwriterId\x12\x1b\n" +
-	"\ttestee_id\x18\x05 \x01(\x04R\btesteeId\x12-\n" +
-	"\aanswers\x18\x06 \x03(\v2\x13.answersheet.AnswerR\aanswers\x12\x15\n" +
-	"\x06org_id\x18\a \x01(\x04R\x05orgId\x12\x17\n" +
-	"\atask_id\x18\b \x01(\tR\x06taskId\"C\n" +
+	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x14\n" +
+	"\x05title\x18\x04 \x01(\tR\x05title\x12\x1b\n" +
+	"\twriter_id\x18\x05 \x01(\x04R\bwriterId\x12\x1b\n" +
+	"\ttestee_id\x18\x06 \x01(\x04R\btesteeId\x12-\n" +
+	"\aanswers\x18\a \x03(\v2\x13.answersheet.AnswerR\aanswers\x12\x15\n" +
+	"\x06org_id\x18\b \x01(\x04R\x05orgId\x12\x17\n" +
+	"\atask_id\x18\t \x01(\tR\x06taskId\"C\n" +
 	"\x17SaveAnswerSheetResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
