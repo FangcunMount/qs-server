@@ -26,9 +26,6 @@ func init() {
 // 1. 幂等性检查
 // 2. 更新Redis预聚合数据
 //   - 每日统计（stats:daily）
-//   - 滑动窗口统计（stats:window）
-//   - 累计统计（stats:accum）
-//   - 分布统计（stats:dist）
 func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
 		var data AssessmentSubmittedPayload
@@ -79,9 +76,6 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			)
 			return nil
 		}
-		originType := ""
-		// assessment.submitted 事件当前没有 origin_type，来源分布统计因此暂时跳过。
-
 		// 获取当前日期
 		now := time.Now()
 		today := now
@@ -93,44 +87,6 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 				slog.String("error", err.Error()),
 			)
 			// 继续处理其他统计，不因单个失败而中断
-		}
-
-		// 2. 更新滑动窗口统计
-		windows := []string{"last7d", "last15d", "last30d"}
-		for _, window := range windows {
-			if err := cache.IncrementWindowCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, data.QuestionnaireCode, window); err != nil {
-				deps.Logger.Error("failed to increment window count",
-					slog.String("event_id", env.ID),
-					slog.String("window", window),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
-
-		// 3. 更新累计统计
-		if err := cache.IncrementAccumCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, data.QuestionnaireCode, "total_submissions"); err != nil {
-			deps.Logger.Error("failed to increment accum count",
-				slog.String("event_id", env.ID),
-				slog.String("error", err.Error()),
-			)
-		}
-
-		// 4. 更新来源分布统计
-		if originType != "" {
-			if err := cache.IncrementDistribution(ctx, orgID, statistics.StatisticTypeQuestionnaire, data.QuestionnaireCode, "origin", originType); err != nil {
-				deps.Logger.Error("failed to increment origin distribution",
-					slog.String("event_id", env.ID),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
-
-		// 5. 更新受试者统计
-		if err := cache.IncrementAccumCount(ctx, orgID, statistics.StatisticTypeTestee, fmt.Sprintf("%d", data.TesteeID), "total_assessments"); err != nil {
-			deps.Logger.Error("failed to increment testee accum count",
-				slog.String("event_id", env.ID),
-				slog.String("error", err.Error()),
-			)
 		}
 
 		// 标记事件已处理（TTL=7天）
@@ -155,8 +111,6 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 // 1. 幂等性检查
 // 2. 更新Redis预聚合数据
 //   - 每日统计（完成数）
-//   - 累计统计（完成数）
-//   - 风险分布统计
 func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
 		var data AssessmentInterpretedPayload
@@ -222,45 +176,6 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 					slog.String("error", err.Error()),
 				)
 			}
-		}
-
-		// 2. 更新累计统计（完成数）
-		if questionnaireCode != "" {
-			if err := cache.IncrementAccumCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, questionnaireCode, "total_completions"); err != nil {
-				deps.Logger.Error("failed to increment accum completion count",
-					slog.String("event_id", env.ID),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
-
-		// 3. 更新风险分布统计
-		if data.RiskLevel != "" {
-			// 问卷维度风险分布
-			if questionnaireCode != "" {
-				if err := cache.IncrementDistribution(ctx, orgID, statistics.StatisticTypeQuestionnaire, questionnaireCode, "risk", data.RiskLevel); err != nil {
-					deps.Logger.Error("failed to increment risk distribution",
-						slog.String("event_id", env.ID),
-						slog.String("error", err.Error()),
-					)
-				}
-			}
-
-			// 受试者维度风险分布
-			if err := cache.IncrementDistribution(ctx, orgID, statistics.StatisticTypeTestee, fmt.Sprintf("%d", data.TesteeID), "risk", data.RiskLevel); err != nil {
-				deps.Logger.Error("failed to increment testee risk distribution",
-					slog.String("event_id", env.ID),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
-
-		// 4. 更新受试者统计（完成数）
-		if err := cache.IncrementAccumCount(ctx, orgID, statistics.StatisticTypeTestee, fmt.Sprintf("%d", data.TesteeID), "completed_assessments"); err != nil {
-			deps.Logger.Error("failed to increment testee completed count",
-				slog.String("event_id", env.ID),
-				slog.String("error", err.Error()),
-			)
 		}
 
 		// 标记事件已处理（TTL=7天）

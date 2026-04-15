@@ -43,8 +43,6 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64) erro
 
 	statTypes := []statistics.StatisticType{
 		statistics.StatisticTypeQuestionnaire,
-		statistics.StatisticTypeTestee,
-		statistics.StatisticTypePlan,
 	}
 
 	totalSynced := 0
@@ -121,39 +119,30 @@ func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64
 		return nil
 	}
 
-	statTypes := []statistics.StatisticType{
-		statistics.StatisticTypeQuestionnaire,
-		statistics.StatisticTypeTestee,
-	}
-
-	for _, statType := range statTypes {
-		keys, err := s.cache.ScanDailyKeys(ctx, orgID, statType)
-		if err != nil {
-			l.Errorw("扫描统计键失败",
-				"org_id", orgID,
-				"stat_type", statType,
-				"error", err.Error(),
-			)
-			continue
-		}
-
-		statKeys := make(map[string]bool)
+	keys, err := s.cache.ScanDailyKeys(ctx, orgID, statistics.StatisticTypeQuestionnaire)
+	if err != nil {
+		l.Errorw("扫描统计键失败",
+			"org_id", orgID,
+			"stat_type", statistics.StatisticTypeQuestionnaire,
+			"error", err.Error(),
+		)
+	} else {
+		statKeys := make(map[string]struct{})
 		for _, key := range keys {
 			parts := parseDailyKey(key)
 			if len(parts) == 6 {
-				statKeys[parts[4]] = true
+				statKeys[parts[4]] = struct{}{}
 			}
 		}
 
 		for statKey := range statKeys {
-			if err := s.repo.AggregateDailyToAccumulated(ctx, orgID, statType, statKey); err != nil {
+			if err := s.repo.AggregateDailyToAccumulated(ctx, orgID, statistics.StatisticTypeQuestionnaire, statKey); err != nil {
 				l.Errorw("聚合累计统计失败",
 					"org_id", orgID,
-					"stat_type", statType,
+					"stat_type", statistics.StatisticTypeQuestionnaire,
 					"stat_key", statKey,
 					"error", err.Error(),
 				)
-				continue
 			}
 		}
 	}

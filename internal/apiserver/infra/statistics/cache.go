@@ -12,10 +12,7 @@ import (
 
 const (
 	// 统计类键生命周期
-	DefaultDailyStatsTTL  = 90 * 24 * time.Hour
-	DefaultWindowStatsTTL = 90 * 24 * time.Hour
-	DefaultDistStatsTTL   = 90 * 24 * time.Hour
-	DefaultAccumStatsTTL  = 0 // 0 表示不过期，累计类由落库/重建保障
+	DefaultDailyStatsTTL = 90 * 24 * time.Hour
 )
 
 // normalizeDate 将日期统一到本地时区的 00:00:00，避免跨日边界差异
@@ -86,118 +83,6 @@ func (c *StatisticsCache) GetDailyCount(
 	}
 
 	return submissionCount, completionCount, nil
-}
-
-// ==================== 滑动窗口统计 ====================
-
-// IncrementWindowCount 递增滑动窗口计数
-func (c *StatisticsCache) IncrementWindowCount(
-	ctx context.Context,
-	orgID int64,
-	statType statistics.StatisticType,
-	statKey string,
-	window string, // "last7d", "last15d", "last30d"
-) error {
-	key := fmt.Sprintf("stats:window:%d:%s:%s:%s", orgID, statType, statKey, window)
-	if err := c.client.Incr(ctx, key).Err(); err != nil {
-		return err
-	}
-	return c.ensureTTL(ctx, key, DefaultWindowStatsTTL)
-}
-
-// GetWindowCount 获取滑动窗口计数
-func (c *StatisticsCache) GetWindowCount(
-	ctx context.Context,
-	orgID int64,
-	statType statistics.StatisticType,
-	statKey string,
-	window string,
-) (int64, error) {
-	key := fmt.Sprintf("stats:window:%d:%s:%s:%s", orgID, statType, statKey, window)
-	result := c.client.Get(ctx, key)
-	if result.Err() == redis.Nil {
-		return 0, nil
-	}
-	return result.Int64()
-}
-
-// ==================== 累计统计 ====================
-
-// IncrementAccumCount 递增累计计数
-func (c *StatisticsCache) IncrementAccumCount(
-	ctx context.Context,
-	orgID int64,
-	statType statistics.StatisticType,
-	statKey string,
-	metric string, // "total_submissions", "total_completions"
-) error {
-	key := fmt.Sprintf("stats:accum:%d:%s:%s:%s", orgID, statType, statKey, metric)
-	if err := c.client.Incr(ctx, key).Err(); err != nil {
-		return err
-	}
-	// 如果需要生命周期，可调整 DefaultAccumStatsTTL
-	if DefaultAccumStatsTTL > 0 {
-		return c.ensureTTL(ctx, key, DefaultAccumStatsTTL)
-	}
-	return nil
-}
-
-// GetAccumCount 获取累计计数
-func (c *StatisticsCache) GetAccumCount(
-	ctx context.Context,
-	orgID int64,
-	statType statistics.StatisticType,
-	statKey string,
-	metric string,
-) (int64, error) {
-	key := fmt.Sprintf("stats:accum:%d:%s:%s:%s", orgID, statType, statKey, metric)
-	result := c.client.Get(ctx, key)
-	if result.Err() == redis.Nil {
-		return 0, nil
-	}
-	return result.Int64()
-}
-
-// ==================== 分布统计 ====================
-
-// IncrementDistribution 递增分布统计
-func (c *StatisticsCache) IncrementDistribution(
-	ctx context.Context,
-	orgID int64,
-	statType statistics.StatisticType,
-	statKey string,
-	dimension string, // "origin", "risk", "status"
-	value string, // 分布值
-) error {
-	key := fmt.Sprintf("stats:dist:%d:%s:%s:%s", orgID, statType, statKey, dimension)
-	if err := c.client.HIncrBy(ctx, key, value, 1).Err(); err != nil {
-		return err
-	}
-	return c.ensureTTL(ctx, key, DefaultDistStatsTTL)
-}
-
-// GetDistribution 获取分布统计
-func (c *StatisticsCache) GetDistribution(
-	ctx context.Context,
-	orgID int64,
-	statType statistics.StatisticType,
-	statKey string,
-	dimension string,
-) (map[string]int64, error) {
-	key := fmt.Sprintf("stats:dist:%d:%s:%s:%s", orgID, statType, statKey, dimension)
-	result := c.client.HGetAll(ctx, key)
-	if result.Err() != nil {
-		return nil, result.Err()
-	}
-
-	values := result.Val()
-	distribution := make(map[string]int64)
-	for k, v := range values {
-		count, _ := strconv.ParseInt(v, 10, 64)
-		distribution[k] = count
-	}
-
-	return distribution, nil
 }
 
 // ==================== 幂等性检查 ====================

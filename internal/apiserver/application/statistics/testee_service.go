@@ -57,31 +57,7 @@ func (s *testeeStatisticsService) GetTesteeStatistics(
 		}
 	}
 
-	// 2. 其次从MySQL统计表查询
-	if s.repo != nil {
-		statKey := fmt.Sprintf("%d", testeeID)
-		po, err := s.repo.GetAccumulatedStatistics(ctx, orgID, statistics.StatisticTypeTestee, statKey)
-		if err == nil && po != nil {
-			stats := s.convertAccumulatedPOToTesteeStatistics(po, orgID, testeeID)
-
-			// 缓存结果（TTL=5分钟）
-			if s.cache != nil {
-				if data, err := json.Marshal(stats); err == nil {
-					cacheKey := fmt.Sprintf("testee:%d:%d", orgID, testeeID)
-					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
-						l.Warnw("写入受试者统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
-					}
-				} else {
-					l.Warnw("序列化受试者统计结果失败", "error", err)
-				}
-			}
-
-			l.Debugw("从MySQL统计表获取受试者统计")
-			return stats, nil
-		}
-	}
-
-	// 3. 最后从原始表实时聚合
+	// 2. 从原始表实时聚合
 	l.Debugw("从原始表实时聚合受试者统计")
 	result := &statistics.TesteeStatistics{
 		OrgID:            orgID,
@@ -159,37 +135,4 @@ func (s *testeeStatisticsService) GetTesteeStatistics(
 	}
 
 	return result, nil
-}
-
-// convertAccumulatedPOToTesteeStatistics 转换累计统计PO为受试者统计领域对象
-func (s *testeeStatisticsService) convertAccumulatedPOToTesteeStatistics(
-	po *statisticsInfra.StatisticsAccumulatedPO,
-	orgID int64,
-	testeeID uint64,
-) *statistics.TesteeStatistics {
-	result := &statistics.TesteeStatistics{
-		OrgID:               orgID,
-		TesteeID:            testeeID,
-		TotalAssessments:    po.TotalSubmissions,
-		RiskDistribution:    make(map[string]int64),
-		FirstAssessmentDate: po.FirstOccurredAt,
-		LastAssessmentDate:  po.LastOccurredAt,
-	}
-
-	// 解析分布数据
-	if po.Distribution != nil {
-		if riskDist, ok := po.Distribution["risk"].(map[string]interface{}); ok {
-			for k, v := range riskDist {
-				if count, ok := v.(float64); ok {
-					result.RiskDistribution[k] = int64(count)
-				}
-			}
-		}
-	}
-
-	// 已完成数从total_completions获取
-	result.CompletedAssessments = po.TotalCompletions
-	result.PendingAssessments = po.TotalSubmissions - po.TotalCompletions
-
-	return result
 }

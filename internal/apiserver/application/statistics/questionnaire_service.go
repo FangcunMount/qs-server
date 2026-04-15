@@ -63,6 +63,15 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 		if err == nil && po != nil {
 			// 转换为领域对象
 			stats := s.convertAccumulatedPOToQuestionnaireStatistics(po, orgID, questionnaireCode)
+			stats.DailyTrend = s.getDailyTrend(ctx, orgID, questionnaireCode)
+			if len(stats.OriginDistribution) == 0 {
+				originDistribution, originErr := s.getOriginDistribution(ctx, orgID, questionnaireCode)
+				if originErr != nil {
+					l.Warnw("查询问卷来源分布失败", "questionnaire_code", questionnaireCode, "error", originErr)
+				} else {
+					stats.OriginDistribution = originDistribution
+				}
+			}
 
 			// 缓存结果（TTL=5分钟）
 			if s.cache != nil {
@@ -149,22 +158,11 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 	result.Last30DaysCount = last30dCount
 
 	// 来源分布
-	var originCounts []struct {
-		OriginType string
-		Count      int64
-	}
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Select("origin_type, COUNT(*) as count").
-		Where("org_id = ? AND questionnaire_code = ? AND deleted_at IS NULL", orgID, questionnaireCode).
-		Group("origin_type").
-		Scan(&originCounts).Error; err != nil {
+	originDistribution, err := s.getOriginDistribution(ctx, orgID, questionnaireCode)
+	if err != nil {
 		return nil, err
 	}
-
-	for _, oc := range originCounts {
-		result.OriginDistribution[oc.OriginType] = oc.Count
-	}
+	result.OriginDistribution = originDistribution
 
 	// 趋势数据（从 statistics_daily 表查询）
 	result.DailyTrend = s.getDailyTrend(ctx, orgID, questionnaireCode)
@@ -246,4 +244,30 @@ func (s *questionnaireStatisticsService) getDailyTrend(
 	}
 
 	return trend
+}
+
+func (s *questionnaireStatisticsService) getOriginDistribution(
+	ctx context.Context,
+	orgID int64,
+	questionnaireCode string,
+) (map[string]int64, error) {
+	var originCounts []struct {
+		OriginType string
+		Count      int64
+	}
+	if err := s.db.WithContext(ctx).
+		Table("assessment").
+		Select("origin_type, COUNT(*) as count").
+		Where("org_id = ? AND questionnaire_code = ? AND deleted_at IS NULL", orgID, questionnaireCode).
+		Group("origin_type").
+		Scan(&originCounts).Error; err != nil {
+		return nil, err
+	}
+
+	distribution := make(map[string]int64)
+	for _, oc := range originCounts {
+		distribution[oc.OriginType] = oc.Count
+	}
+
+	return distribution, nil
 }
