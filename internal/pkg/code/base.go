@@ -30,6 +30,9 @@ ErrInvalidArgument
 
 // ErrInvalidMessage - 400: Invalid message.
 ErrInvalidMessage
+
+// ErrUnsupportedOperation - 501: Operation is not supported.
+ErrUnsupportedOperation
 )
 
 // common: database errors.
@@ -114,6 +117,7 @@ func init() {
 	register(ErrPageNotFound, 404, "Page not found")
 	register(ErrInvalidArgument, 400, "Invalid argument")
 	register(ErrInvalidMessage, 400, "Invalid message")
+	register(ErrUnsupportedOperation, 501, "Operation is not supported")
 
 	// database errors
 	register(ErrDatabase, 500, "Database error")

@@ -185,7 +185,7 @@ erDiagram
 | ---- | ---- | -------- |
 | 应用服务 | Submission / Management、ReportQuery / ScoreQuery | `application/evaluation/assessment/` |
 | 应用服务 | `engine.Service` 与 pipeline Handlers | `application/evaluation/engine/` |
-| 应用服务 | ReportGeneration / Export / Suggestion | `application/evaluation/report/` |
+| 应用服务 | ReportGeneration / Export / Suggestion | `application/evaluation/report/`（其中 Export 入口当前显式收口为 unsupported） |
 | 领域服务 | `AssessmentCreator` 等 | `domain/evaluation/assessment/` |
 | 领域模型 | `Assessment`、`InterpretReport`、`AssessmentScore` | `domain/evaluation/` |
 

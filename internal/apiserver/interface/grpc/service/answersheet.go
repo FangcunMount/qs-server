@@ -162,12 +162,9 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 }
 
 // SaveAnswerSheetScores 保存答卷分数（内部接口）
-// @Description 评分系统保存答卷分数
-// Note: 这个接口应该由评分系统调用，不是 C 端接口
+// @Description 当前不支持通过 gRPC 回写答卷分数；计分流程由内部计分链直接持久化
 func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
-	// TODO: 实现评分功能
-	// 这里暂时返回未实现的错误
-	return nil, status.Error(codes.Unimplemented, "评分功能暂未实现")
+	return nil, status.Error(codes.Unimplemented, "答卷分数回写接口当前不支持")
 }
 
 // toProtoAnswerSheet 转换为 protobuf 答卷

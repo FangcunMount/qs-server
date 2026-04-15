@@ -42,10 +42,6 @@ type CreateAssessmentRequest struct {
 
 	// 可选字段
 	MedicalScaleRef *MedicalScaleRef
-
-	// 是否自动提交（默认 false）
-	// 显式设为 true 时会在创建后立即迁移到 submitted
-	AutoSubmit bool
 }
 
 // NewCreateAssessmentRequest 创建请求构造函数
@@ -62,19 +58,12 @@ func NewCreateAssessmentRequest(
 		QuestionnaireRef: questionnaireRef,
 		AnswerSheetRef:   answerSheetRef,
 		Origin:           origin,
-		AutoSubmit:       false, // 默认仅创建 pending 测评
 	}
 }
 
 // WithMedicalScale 设置关联量表
 func (r CreateAssessmentRequest) WithMedicalScale(ref MedicalScaleRef) CreateAssessmentRequest {
 	r.MedicalScaleRef = &ref
-	return r
-}
-
-// WithoutAutoSubmit 不自动提交
-func (r CreateAssessmentRequest) WithoutAutoSubmit() CreateAssessmentRequest {
-	r.AutoSubmit = false
 	return r
 }
 
@@ -183,7 +172,7 @@ func (c *DefaultAssessmentCreator) Create(
 		return nil, err
 	}
 
-	// 3. 创建测评
+// 3. 创建 pending 测评
 	opts := make([]AssessmentOption, 0)
 	if req.MedicalScaleRef != nil {
 		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))
@@ -199,13 +188,6 @@ func (c *DefaultAssessmentCreator) Create(
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	// 4. 自动提交（如果启用）
-	if req.AutoSubmit {
-		if err := assessment.Submit(); err != nil {
-			return nil, err
-		}
 	}
 
 	return assessment, nil
@@ -325,7 +307,7 @@ func (c *SimpleAssessmentCreator) Create(
 		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))
 	}
 
-	// 2. 创建测评
+	// 2. 创建 pending 测评
 	assessment, err := NewAssessment(
 		req.OrgID,
 		req.TesteeID,
@@ -336,13 +318,6 @@ func (c *SimpleAssessmentCreator) Create(
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	// 3. 自动提交（如果启用）
-	if req.AutoSubmit {
-		if err := assessment.Submit(); err != nil {
-			return nil, err
-		}
 	}
 
 	return assessment, nil

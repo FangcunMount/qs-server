@@ -171,9 +171,8 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// 当前不注册任何策略，完全依赖因子解读配置中的建议
 	var suggestionGenerator report.SuggestionGenerator = nil
 
-	// 创建 ReportExporter（领域服务）- 暂使用 nil，后续在 infra 层实现
-	// TODO: 在 infra 层实现真正的 ReportExporter
-	var reportExporter report.ReportExporter = nil
+	// 当前导出能力保留入口，但显式收口为 unsupported，避免主路径继续装配空实现。
+	reportExporter := reportApp.NewUnsupportedReportExporter()
 
 	// ====================  初始化评估引擎 ====================
 	// 创建等待队列注册表（用于长轮询，在创建 EvaluationService 和 Handler 时使用）
@@ -350,7 +349,7 @@ func (m *EvaluationModule) Cleanup() error {
 
 // CheckHealth 检查模块健康状态
 func (m *EvaluationModule) CheckHealth() error {
-	// TODO: 实现健康检查
+	// 当前模块依赖仓储装配期校验；无额外运行时健康探针。
 	return nil
 }
 

@@ -1187,7 +1187,7 @@ func (r *Router) registerAdminRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			r.placeholder,
+			r.unsupportedFeature,
 		)...)
 		admin.GET("/statistics", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -1195,7 +1195,7 @@ func (r *Router) registerAdminRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			r.placeholder,
+			r.unsupportedFeature,
 		)...)
 		admin.GET("/logs", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -1203,16 +1203,16 @@ func (r *Router) registerAdminRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			r.placeholder,
+			r.unsupportedFeature,
 		)...)
 	}
 }
 
-// placeholder 占位符处理器（用于未实现的功能）
-func (r *Router) placeholder(c *gin.Context) {
+// unsupportedFeature 明确标识当前保留但未支持的入口。
+func (r *Router) unsupportedFeature(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{
 		"code":    501,
-		"message": "功能尚未实现",
+		"message": "功能当前不支持",
 		"path":    c.Request.URL.Path,
 		"method":  c.Request.Method,
 	})

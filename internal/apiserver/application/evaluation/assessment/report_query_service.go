@@ -77,7 +77,5 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 
 // ExportPDF 导出PDF报告
 func (s *reportQueryService) ExportPDF(ctx context.Context, assessmentID uint64) ([]byte, error) {
-	// TODO: 实现PDF导出功能
-	// 可以使用第三方库如 go-wkhtmltopdf 或 gofpdf
-	return nil, errors.WithCode(errorCode.ErrInvalidArgument, "PDF导出功能暂未实现")
+	return nil, errors.WithCode(errorCode.ErrUnsupportedOperation, "PDF导出当前不支持")
 }

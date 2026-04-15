@@ -279,8 +279,6 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 
 	// 启动统计同步定时任务（Redis -> MySQL），最终一致
 	s.startStatisticsSyncScheduler()
-	// 启动内建 plan 调度器
-	s.startPlanScheduler()
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {

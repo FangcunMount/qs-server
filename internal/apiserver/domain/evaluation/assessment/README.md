@@ -184,12 +184,12 @@ type InterpretStrategy interface {
 
 #### 6.1 AssessmentCreator（测评创建器）
 
-**职责**：创建测评聚合根，封装跨聚合的验证逻辑，执行答卷提交
+**职责**：创建测评聚合根，封装跨聚合的验证逻辑，返回 `pending` 测评
 
 ```go
 type AssessmentCreator interface {
-    // Create 创建并提交测评
-    // 内部执行：验证 → 创建 Assessment → 提交 → 返回
+    // Create 创建 pending 测评
+    // 内部执行：验证 → 创建 Assessment → 返回
     Create(ctx context.Context, req *CreateAssessmentRequest) (*Assessment, error)
 }
 

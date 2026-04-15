@@ -21,6 +21,9 @@ func NewReportExportService(
 	reportRepo domainReport.ReportRepository,
 	exporter domainReport.ReportExporter,
 ) ReportExportService {
+	if exporter == nil {
+		exporter = NewUnsupportedReportExporter()
+	}
 	return &reportExportService{
 		reportRepo: reportRepo,
 		exporter:   exporter,
@@ -38,6 +41,9 @@ func (s *reportExportService) ExportPDF(ctx context.Context, reportID uint64, op
 	exportOptions := toExportOptions(options)
 	reader, err := s.exporter.Export(ctx, report, domainReport.ExportFormatPDF, exportOptions)
 	if err != nil {
+		if errors.IsCode(err, errorCode.ErrUnsupportedOperation) {
+			return nil, err
+		}
 		return nil, errors.WrapC(err, errorCode.ErrInterpretReportGenerationFailed, "导出PDF失败")
 	}
 
@@ -55,6 +61,9 @@ func (s *reportExportService) ExportHTML(ctx context.Context, reportID uint64, o
 	exportOptions := toExportOptions(options)
 	reader, err := s.exporter.Export(ctx, report, domainReport.ExportFormatHTML, exportOptions)
 	if err != nil {
+		if errors.IsCode(err, errorCode.ErrUnsupportedOperation) {
+			return nil, err
+		}
 		return nil, errors.WrapC(err, errorCode.ErrInterpretReportGenerationFailed, "导出HTML失败")
 	}
 
