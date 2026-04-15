@@ -24,7 +24,7 @@ type iamLoginRequest struct {
 type iamLoginCredentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	TenantID string `json:"tenant_id,omitempty"`
+	TenantID uint64 `json:"tenant_id,omitempty"`
 }
 
 type iamLoginResponse struct {
@@ -52,10 +52,19 @@ func fetchTokenFromIAMWithPassword(
 		deviceID = "seeddata"
 	}
 
+	var parsedTenantID uint64
+	if rawTenantID := strings.TrimSpace(tenantID); rawTenantID != "" {
+		parsed, err := strconv.ParseUint(rawTenantID, 10, 64)
+		if err != nil {
+			return "", fmt.Errorf("parse iam tenant_id %q: %w", rawTenantID, err)
+		}
+		parsedTenantID = parsed
+	}
+
 	credBytes, err := json.Marshal(iamLoginCredentials{
 		Username: username,
 		Password: password,
-		TenantID: strings.TrimSpace(tenantID),
+		TenantID: parsedTenantID,
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal iam credentials: %w", err)
