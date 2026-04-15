@@ -42,13 +42,13 @@ service InternalService {
   // ==================== 小程序码生成操作 ====================
   
   // 生成问卷小程序码
-  // 场景：worker 处理 questionnaire.published 事件后调用
+  // 场景：worker 处理 questionnaire.changed(published) 事件后调用
   // 流程：生成小程序码并保存，返回二维码 URL
   rpc GenerateQuestionnaireQRCode(GenerateQuestionnaireQRCodeRequest) 
       returns (GenerateQuestionnaireQRCodeResponse);
   
   // 生成量表小程序码
-  // 场景：worker 处理 scale.published 事件后调用
+  // 场景：worker 处理 scale.changed(published) 事件后调用
   // 流程：生成小程序码并保存，返回二维码 URL
   rpc GenerateScaleQRCode(GenerateScaleQRCodeRequest) 
       returns (GenerateScaleQRCodeResponse);

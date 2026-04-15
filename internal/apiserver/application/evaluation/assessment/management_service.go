@@ -11,18 +11,21 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // managementService 测评管理服务实现
 // 行为者：管理员 (Staff/Admin)
 type managementService struct {
-	repo assessment.Repository
+	repo           assessment.Repository
+	eventPublisher event.EventPublisher
 }
 
 // NewManagementService 创建测评管理服务
-func NewManagementService(repo assessment.Repository) AssessmentManagementService {
+func NewManagementService(repo assessment.Repository, eventPublisher event.EventPublisher) AssessmentManagementService {
 	return &managementService{
-		repo: repo,
+		repo:           repo,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -281,6 +284,15 @@ func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
 	}
+
+	PublishCollectedEvents(ctx, s.eventPublisher, a, func(evt event.DomainEvent, err error) {
+		l.Errorw("发布领域事件失败",
+			"action", "retry_assessment",
+			"assessment_id", assessmentID,
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 
 	duration := time.Since(startTime)
 	l.Infow("重试测评完成",

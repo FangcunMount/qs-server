@@ -2,7 +2,6 @@ package plan
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -119,25 +118,6 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		}
 	}
 
-	// 5. 发布应用层 enrollment 事件
-	enrolledEvent := plan.NewPlanTesteeEnrolledEvent(
-		planID,
-		testeeID,
-		dto.OrgID,
-		enrollmentResult.Idempotent,
-		len(enrollmentResult.TasksToSave),
-		time.Now(),
-	)
-	if err := s.eventPublisher.Publish(ctx, enrolledEvent); err != nil {
-		logger.L(ctx).Errorw("Failed to publish plan enrollment event",
-			"action", "enroll_testee",
-			"plan_id", dto.PlanID,
-			"testee_id", dto.TesteeID,
-			"event_type", enrolledEvent.EventType(),
-			"error", err.Error(),
-		)
-	}
-
 	logger.L(ctx).Infow("Testee enrolled successfully",
 		"action", "enroll_testee",
 		"plan_id", dto.PlanID,
@@ -237,23 +217,6 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, orgID int64
 			}
 		}
 		task.ClearEvents()
-	}
-
-	terminatedEvent := plan.NewPlanTesteeTerminatedEvent(
-		planIDDomain,
-		testeeIDDomain,
-		orgID,
-		savedTaskCount,
-		time.Now(),
-	)
-	if err := s.eventPublisher.Publish(ctx, terminatedEvent); err != nil {
-		logger.L(ctx).Errorw("Failed to publish plan enrollment terminated event",
-			"action", "terminate_enrollment",
-			"plan_id", planID,
-			"testee_id", testeeID,
-			"event_type", terminatedEvent.EventType(),
-			"error", err.Error(),
-		)
 	}
 
 	logger.L(ctx).Infow("Enrollment terminated successfully",

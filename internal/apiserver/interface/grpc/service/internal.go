@@ -601,7 +601,7 @@ func (s *InternalService) TagTestee(
 // ==================== 小程序码生成操作 ====================
 
 // GenerateQuestionnaireQRCode 生成问卷小程序码
-// 场景：worker 处理 questionnaire.published 事件后调用
+// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 func (s *InternalService) GenerateQuestionnaireQRCode(
 	ctx context.Context,
 	req *pb.GenerateQuestionnaireQRCodeRequest,
@@ -663,7 +663,7 @@ func (s *InternalService) GenerateQuestionnaireQRCode(
 }
 
 // GenerateScaleQRCode 生成量表小程序码
-// 场景：worker 处理 scale.published 事件后调用
+// 场景：worker 处理 scale.changed(published) 事件后调用
 func (s *InternalService) GenerateScaleQRCode(
 	ctx context.Context,
 	req *pb.GenerateScaleQRCodeRequest,

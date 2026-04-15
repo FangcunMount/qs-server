@@ -53,11 +53,11 @@ type InternalServiceClient interface {
 	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
 	TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error)
 	// 生成问卷小程序码
-	// 场景：worker 处理 questionnaire.published 事件后调用
+	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateQuestionnaireQRCode(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error)
 	// 生成量表小程序码
-	// 场景：worker 处理 scale.published 事件后调用
+	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
 	// 发送 task.opened 小程序订阅消息
@@ -182,11 +182,11 @@ type InternalServiceServer interface {
 	// 流程：根据解读结果（风险等级、量表类型等）自动给受试者打标签
 	TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error)
 	// 生成问卷小程序码
-	// 场景：worker 处理 questionnaire.published 事件后调用
+	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error)
 	// 生成量表小程序码
-	// 场景：worker 处理 scale.published 事件后调用
+	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
 	// 发送 task.opened 小程序订阅消息

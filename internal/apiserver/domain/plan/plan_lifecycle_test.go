@@ -243,38 +243,44 @@ func TestPlanLifecycleResumeReusesCanceledTasks(t *testing.T) {
 	}
 }
 
-func TestAssessmentPlanLifecycleEvents(t *testing.T) {
+func TestAssessmentPlanLifecycleEmitsNoPlanEvents(t *testing.T) {
 	p, err := NewAssessmentPlan(1, "scale-code", PlanScheduleByWeek, 1, 2)
 	if err != nil {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
 
-	assertSingleEventType(t, p.Events(), EventTypePlanCreated)
-	p.ClearEvents()
+	if len(p.Events()) != 0 {
+		t.Fatalf("expected no plan lifecycle events on create, got %d", len(p.Events()))
+	}
 
 	if err := p.pause(); err != nil {
 		t.Fatalf("pause returned error: %v", err)
 	}
-	assertSingleEventType(t, p.Events(), EventTypePlanPaused)
-	p.ClearEvents()
+	if len(p.Events()) != 0 {
+		t.Fatalf("expected no plan lifecycle events on pause, got %d", len(p.Events()))
+	}
 
 	if err := p.resume(); err != nil {
 		t.Fatalf("resume returned error: %v", err)
 	}
-	assertSingleEventType(t, p.Events(), EventTypePlanResumed)
-	p.ClearEvents()
+	if len(p.Events()) != 0 {
+		t.Fatalf("expected no plan lifecycle events on resume, got %d", len(p.Events()))
+	}
 
 	p.finish()
-	assertSingleEventType(t, p.Events(), EventTypePlanFinished)
+	if len(p.Events()) != 0 {
+		t.Fatalf("expected no plan lifecycle events on finish, got %d", len(p.Events()))
+	}
 
 	canceledPlan, err := NewAssessmentPlan(1, "scale-code", PlanScheduleByWeek, 1, 1)
 	if err != nil {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
-	canceledPlan.ClearEvents()
 
 	canceledPlan.cancel()
-	assertSingleEventType(t, canceledPlan.Events(), EventTypePlanCanceled)
+	if len(canceledPlan.Events()) != 0 {
+		t.Fatalf("expected no plan lifecycle events on cancel, got %d", len(canceledPlan.Events()))
+	}
 }
 
 func TestTaskLifecycleCancelRaisesCanceledEvent(t *testing.T) {
@@ -303,9 +309,7 @@ func TestAssessmentPlanRestoreFromRepositoryClearsEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
-	if len(p.Events()) == 0 {
-		t.Fatalf("expected new plan to have created event")
-	}
+	p.pause()
 
 	p.RestoreFromRepository(p.GetID(), PlanStatusActive)
 

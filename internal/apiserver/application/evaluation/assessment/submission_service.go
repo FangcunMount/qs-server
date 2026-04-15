@@ -528,26 +528,13 @@ func (s *submissionService) publishEvents(ctx context.Context, a *assessment.Ass
 		return
 	}
 
-	events := a.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			l.Errorw("发布领域事件失败",
-				"action", "publish_event",
-				"resource", "assessment",
-				"assessment_id", a.ID().Uint64(),
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		} else {
-			l.Infow("发布领域事件成功",
-				"action", "publish_event",
-				"resource", "assessment",
-				"assessment_id", a.ID().Uint64(),
-				"event_type", evt.EventType(),
-			)
-		}
-	}
-
-	// 清空已发布的事件
-	a.ClearEvents()
+	PublishCollectedEvents(ctx, s.eventPublisher, a, func(evt event.DomainEvent, err error) {
+		l.Errorw("发布领域事件失败",
+			"action", "publish_event",
+			"resource", "assessment",
+			"assessment_id", a.ID().Uint64(),
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 }

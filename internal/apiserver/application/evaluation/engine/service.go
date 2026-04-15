@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -391,4 +392,11 @@ func (s *service) markAsFailed(ctx context.Context, a *assessment.Assessment, re
 
 	_ = a.MarkAsFailed(reason)
 	_ = s.assessmentRepo.Save(ctx, a)
+	assessmentApp.PublishCollectedEvents(ctx, s.eventPublisher, a, func(evt event.DomainEvent, err error) {
+		l.Warnw("failed to publish assessment failed event",
+			"assessment_id", a.ID().Uint64(),
+			"event_type", evt.EventType(),
+			"error", err.Error(),
+		)
+	})
 }

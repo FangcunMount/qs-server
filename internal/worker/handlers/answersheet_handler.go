@@ -58,7 +58,7 @@ type AnswerSheetSubmittedPayload struct {
 // 业务逻辑：
 // 1. 解析答卷提交事件
 // 2. 调用 InternalClient 创建 Assessment
-// 3. 如果关联量表，Assessment 会自动提交并触发评估
+// 3. 创建 Assessment；如果关联量表，由内部服务显式提交并触发评估
 func handleAnswerSheetSubmitted(deps *Dependencies) HandlerFunc {
 	return handleAnswerSheetSubmittedWithHooks(deps, defaultAnswerSheetProcessingGateHooks)
 }

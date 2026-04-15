@@ -13,8 +13,6 @@ import (
 const (
 	// EventTypeGenerated 报告已生成
 	EventTypeGenerated = eventconfig.ReportGenerated
-	// EventTypeExported 报告已导出
-	EventTypeExported = eventconfig.ReportExported
 )
 
 // AggregateType 聚合根类型
@@ -34,21 +32,10 @@ type ReportGeneratedData struct {
 	GeneratedAt  time.Time `json:"generated_at"`
 }
 
-// ReportExportedData 报告已导出事件数据
-type ReportExportedData struct {
-	ReportID   string    `json:"report_id"`
-	ExportType string    `json:"export_type"` // pdf, docx, html
-	ExportedBy uint64    `json:"exported_by"` // 导出人ID
-	ExportedAt time.Time `json:"exported_at"`
-}
-
 // ==================== 事件类型别名 ====================
 
 // ReportGeneratedEvent 报告已生成事件
 type ReportGeneratedEvent = event.Event[ReportGeneratedData]
-
-// ReportExportedEvent 报告已导出事件
-type ReportExportedEvent = event.Event[ReportExportedData]
 
 // ==================== 事件构造函数 ====================
 
@@ -73,23 +60,6 @@ func NewReportGeneratedEvent(
 			TotalScore:   totalScore,
 			RiskLevel:    riskLevel,
 			GeneratedAt:  generatedAt,
-		},
-	)
-}
-
-// NewReportExportedEvent 创建报告已导出事件
-func NewReportExportedEvent(
-	reportID string,
-	exportType string,
-	exportedBy uint64,
-	exportedAt time.Time,
-) ReportExportedEvent {
-	return event.New(EventTypeExported, AggregateType, reportID,
-		ReportExportedData{
-			ReportID:   reportID,
-			ExportType: exportType,
-			ExportedBy: exportedBy,
-			ExportedAt: exportedAt,
 		},
 	)
 }

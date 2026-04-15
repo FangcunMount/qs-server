@@ -294,17 +294,18 @@ func (q *Questionnaire) updateVersion(newVersion Version) error {
 // ===================== 生命周期包内方法（供 Lifecycle 服务调用）=====================
 
 // publish 发布问卷（包内方法）
-// 更新状态并触发 QuestionnairePublishedEvent
+// 更新状态并触发 QuestionnaireChangedEvent
 func (q *Questionnaire) publish() error {
 	if err := q.updateStatus(STATUS_PUBLISHED); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	q.addEvent(NewQuestionnairePublishedEvent(
+	q.addEvent(NewQuestionnaireChangedEvent(
 		string(q.code),
 		q.version.String(),
 		q.title,
+		ChangeActionPublished,
 		time.Now(),
 	))
 
@@ -312,16 +313,18 @@ func (q *Questionnaire) publish() error {
 }
 
 // unpublish 下架问卷（包内方法）
-// 更新状态并触发 QuestionnaireUnpublishedEvent
+// 更新状态并触发 QuestionnaireChangedEvent
 func (q *Questionnaire) unpublish() error {
 	if err := q.updateStatus(STATUS_DRAFT); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	q.addEvent(NewQuestionnaireUnpublishedEvent(
+	q.addEvent(NewQuestionnaireChangedEvent(
 		string(q.code),
 		q.version.String(),
+		q.title,
+		ChangeActionUnpublished,
 		time.Now(),
 	))
 
@@ -329,16 +332,18 @@ func (q *Questionnaire) unpublish() error {
 }
 
 // archive 归档问卷（包内方法）
-// 更新状态并触发 QuestionnaireArchivedEvent
+// 更新状态并触发 QuestionnaireChangedEvent
 func (q *Questionnaire) archive() error {
 	if err := q.updateStatus(STATUS_ARCHIVED); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	q.addEvent(NewQuestionnaireArchivedEvent(
+	q.addEvent(NewQuestionnaireChangedEvent(
 		string(q.code),
 		q.version.String(),
+		q.title,
+		ChangeActionArchived,
 		time.Now(),
 	))
 

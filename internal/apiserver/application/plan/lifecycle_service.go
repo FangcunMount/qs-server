@@ -285,45 +285,10 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"plan_id", p.GetID().String(),
 	)
 
-	// 7. 发布领域事件
-	events := p.Events()
-	eventCount := len(events)
-	logger.L(ctx).Infow("CreatePlan publishing events",
-		"action", "create_plan",
-		"plan_id", p.GetID().String(),
-		"events_count", eventCount,
-	)
-	for i, evt := range events {
-		logger.L(ctx).Infow("CreatePlan publishing event",
-			"action", "create_plan",
-			"plan_id", p.GetID().String(),
-			"event_index", i,
-			"event_type", evt.EventType(),
-		)
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("CreatePlan failed to publish event",
-				"action", "create_plan",
-				"plan_id", p.GetID().String(),
-				"event_index", i,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		} else {
-			logger.L(ctx).Infow("CreatePlan event published",
-				"action", "create_plan",
-				"plan_id", p.GetID().String(),
-				"event_index", i,
-				"event_type", evt.EventType(),
-			)
-		}
-	}
-	p.ClearEvents()
-
 	logger.L(ctx).Infow("CreatePlan completed successfully",
 		"action", "create_plan",
 		"plan_id", p.GetID().String(),
 		"org_id", dto.OrgID,
-		"events_published", eventCount,
 	)
 
 	return toPlanResult(p), nil
@@ -398,20 +363,6 @@ func (s *lifecycleService) PausePlan(ctx context.Context, orgID int64, planID st
 		}
 		task.ClearEvents()
 	}
-
-	// 5. 发布计划事件
-	events := p.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish plan event",
-				"action", "pause_plan",
-				"plan_id", planID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	p.ClearEvents()
 
 	logger.L(ctx).Infow("Plan paused successfully",
 		"action", "pause_plan",
@@ -494,20 +445,6 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 		savedTaskCount++
 	}
 
-	// 5. 发布计划事件
-	events := p.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish plan event",
-				"action", "resume_plan",
-				"plan_id", planID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	p.ClearEvents()
-
 	logger.L(ctx).Infow("Plan resumed successfully",
 		"action", "resume_plan",
 		"plan_id", planID,
@@ -582,19 +519,6 @@ func (s *lifecycleService) FinishPlan(ctx context.Context, orgID int64, planID s
 		}
 		task.ClearEvents()
 	}
-
-	events := p.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish plan event",
-				"action", "finish_plan",
-				"plan_id", planID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	p.ClearEvents()
 
 	logger.L(ctx).Infow("Plan finished successfully",
 		"action", "finish_plan",
@@ -674,20 +598,6 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 		}
 		task.ClearEvents()
 	}
-
-	// 5. 发布领域事件
-	events := p.Events()
-	for _, evt := range events {
-		if err := s.eventPublisher.Publish(ctx, evt); err != nil {
-			logger.L(ctx).Errorw("Failed to publish plan event",
-				"action", "cancel_plan",
-				"plan_id", planID,
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		}
-	}
-	p.ClearEvents()
 
 	logger.L(ctx).Infow("Plan canceled successfully",
 		"action", "cancel_plan",

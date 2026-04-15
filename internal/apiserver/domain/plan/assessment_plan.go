@@ -100,13 +100,6 @@ func NewAssessmentPlan(
 	}
 	plan.triggerTime = normalizedTriggerTime
 
-	// 发布计划创建事件
-	plan.addEvent(NewPlanCreatedEvent(
-		plan.id,
-		plan.scaleCode,
-		time.Now(),
-	))
-
 	return plan, nil
 }
 
@@ -226,11 +219,6 @@ func (p *AssessmentPlan) pause() error {
 		return ErrPlanNotActive
 	}
 	p.status = PlanStatusPaused
-	p.addEvent(NewPlanPausedEvent(
-		p.id,
-		p.scaleCode,
-		time.Now(),
-	))
 	return nil
 }
 
@@ -240,11 +228,6 @@ func (p *AssessmentPlan) resume() error {
 		return ErrPlanNotPaused
 	}
 	p.status = PlanStatusActive
-	p.addEvent(NewPlanResumedEvent(
-		p.id,
-		p.scaleCode,
-		time.Now(),
-	))
 	return nil
 }
 
@@ -254,11 +237,6 @@ func (p *AssessmentPlan) finish() {
 		return
 	}
 	p.status = PlanStatusFinished
-	p.addEvent(NewPlanFinishedEvent(
-		p.id,
-		p.scaleCode,
-		time.Now(),
-	))
 }
 
 // cancel 取消计划（包内方法）
@@ -267,11 +245,6 @@ func (p *AssessmentPlan) cancel() {
 		return
 	}
 	p.status = PlanStatusCanceled
-	p.addEvent(NewPlanCanceledEvent(
-		p.id,
-		p.scaleCode,
-		time.Now(),
-	))
 }
 
 // ==================== 领域事件相关方法 ====================

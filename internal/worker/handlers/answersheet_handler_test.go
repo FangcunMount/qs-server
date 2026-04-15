@@ -16,8 +16,10 @@ import (
 )
 
 type fakeWorkerInternalClient struct {
-	calculateCalls int
-	createCalls    int
+	calculateCalls           int
+	createCalls              int
+	questionnaireQRCodeCalls int
+	scaleQRCodeCalls         int
 }
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
@@ -65,6 +67,7 @@ func (f *fakeWorkerInternalClient) GenerateQuestionnaireQRCode(
 	_ context.Context,
 	_, _ string,
 ) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	f.questionnaireQRCodeCalls++
 	return &pb.GenerateQuestionnaireQRCodeResponse{}, nil
 }
 
@@ -72,6 +75,7 @@ func (f *fakeWorkerInternalClient) GenerateScaleQRCode(
 	_ context.Context,
 	_ string,
 ) (*pb.GenerateScaleQRCodeResponse, error) {
+	f.scaleQRCodeCalls++
 	return &pb.GenerateScaleQRCodeResponse{}, nil
 }
 

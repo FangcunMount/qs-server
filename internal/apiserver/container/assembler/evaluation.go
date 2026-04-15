@@ -249,7 +249,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
-	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo)
+	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo, m.eventPublisher)
 
 	// 报告查询服务 - 服务于报告查询者
 	m.ReportQueryService = assessmentApp.NewReportQueryService(m.ReportRepo)

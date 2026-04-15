@@ -2,27 +2,31 @@ package scale
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // factorService 量表因子编辑服务实现
 // 行为者：量表因子编辑者
 type factorService struct {
-	repo          scale.Repository
-	factorManager scale.FactorManager
-	listCache     *ScaleListCache
+	repo           scale.Repository
+	factorManager  scale.FactorManager
+	listCache      *ScaleListCache
+	eventPublisher event.EventPublisher
 }
 
 // NewFactorService 创建量表因子编辑服务
-func NewFactorService(repo scale.Repository, listCache *ScaleListCache) ScaleFactorService {
+func NewFactorService(repo scale.Repository, listCache *ScaleListCache, eventPublisher event.EventPublisher) ScaleFactorService {
 	return &factorService{
-		repo:          repo,
-		factorManager: scale.FactorManager{},
-		listCache:     listCache,
+		repo:           repo,
+		factorManager:  scale.FactorManager{},
+		listCache:      listCache,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -67,6 +71,7 @@ func (s *factorService) AddFactor(ctx context.Context, dto AddFactorDTO) (*Scale
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.publishScaleUpdated(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -110,6 +115,7 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.publishScaleUpdated(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -146,6 +152,7 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.publishScaleUpdated(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -207,6 +214,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.publishScaleUpdated(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -255,6 +263,7 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto Upda
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.publishScaleUpdated(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -310,6 +319,7 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
+	s.publishScaleUpdated(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -320,6 +330,20 @@ func (s *factorService) refreshListCache(ctx context.Context) {
 		return
 	}
 	logScaleListCacheError(ctx, s.listCache.Rebuild(ctx))
+}
+
+func (s *factorService) publishScaleUpdated(ctx context.Context, m *scale.MedicalScale) {
+	if s.eventPublisher == nil || m == nil {
+		return
+	}
+	_ = s.eventPublisher.Publish(ctx, scale.NewScaleChangedEvent(
+		m.GetID().Uint64(),
+		m.GetCode().String(),
+		"",
+		m.GetTitle(),
+		scale.ChangeActionUpdated,
+		time.Now(),
+	))
 }
 
 // ============= 辅助函数 =============

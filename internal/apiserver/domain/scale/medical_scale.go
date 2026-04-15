@@ -436,18 +436,19 @@ func (m *MedicalScale) updateFactors(factors []*Factor) {
 // ===================== 生命周期包内方法（供 Lifecycle 服务调用）=================
 
 // publish 发布量表（包内方法）
-// 更新状态并触发 ScalePublishedEvent
+// 更新状态并触发 ScaleChangedEvent
 func (m *MedicalScale) publish() error {
 	if err := m.updateStatus(StatusPublished); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	m.addEvent(NewScalePublishedEvent(
+	m.addEvent(NewScaleChangedEvent(
 		uint64(m.id),
 		string(m.scaleCode),
 		"", // version 暂无
 		m.title,
+		ChangeActionPublished,
 		time.Now(),
 	))
 
@@ -455,17 +456,19 @@ func (m *MedicalScale) publish() error {
 }
 
 // unpublish 下架量表（包内方法）
-// 更新状态并触发 ScaleUnpublishedEvent
+// 更新状态并触发 ScaleChangedEvent
 func (m *MedicalScale) unpublish() error {
 	if err := m.updateStatus(StatusDraft); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	m.addEvent(NewScaleUnpublishedEvent(
+	m.addEvent(NewScaleChangedEvent(
 		uint64(m.id),
 		string(m.scaleCode),
 		"",
+		m.title,
+		ChangeActionUnpublished,
 		time.Now(),
 	))
 
@@ -473,17 +476,19 @@ func (m *MedicalScale) unpublish() error {
 }
 
 // archive 归档量表（包内方法）
-// 更新状态并触发 ScaleArchivedEvent
+// 更新状态并触发 ScaleChangedEvent
 func (m *MedicalScale) archive() error {
 	if err := m.updateStatus(StatusArchived); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	m.addEvent(NewScaleArchivedEvent(
+	m.addEvent(NewScaleChangedEvent(
 		uint64(m.id),
 		string(m.scaleCode),
 		"",
+		m.title,
+		ChangeActionArchived,
 		time.Now(),
 	))
 

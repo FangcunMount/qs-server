@@ -8,7 +8,7 @@ import "context"
 // 变更来源：小程序码生成策略、存储方案的变化
 type QRCodeService interface {
 	// GenerateQuestionnaireQRCode 生成问卷小程序码
-	// 场景：worker 处理 questionnaire.published 事件后调用
+	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：
 	//   1. 构建 scene 参数（包含问卷编码和版本）
 	//   2. 调用基础设施层生成小程序码
@@ -17,7 +17,7 @@ type QRCodeService interface {
 	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
 
 	// GenerateScaleQRCode 生成量表小程序码
-	// 场景：worker 处理 scale.published 事件后调用
+	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：
 	//   1. 构建 scene 参数（包含量表编码）
 	//   2. 调用基础设施层生成小程序码

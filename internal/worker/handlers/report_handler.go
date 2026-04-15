@@ -14,9 +14,6 @@ func init() {
 	Register("report_generated_handler", func(deps *Dependencies) HandlerFunc {
 		return handleReportGenerated(deps)
 	})
-	Register("report_exported_handler", func(deps *Dependencies) HandlerFunc {
-		return handleReportExported(deps)
-	})
 }
 
 // ==================== Payload 定义 ====================
@@ -36,14 +33,6 @@ type ReportGeneratedPayload struct {
 // IsHighRisk 是否高风险
 func (p ReportGeneratedPayload) IsHighRisk() bool {
 	return p.RiskLevel == "high" || p.RiskLevel == "critical"
-}
-
-// ReportExportedPayload 报告导出事件数据
-type ReportExportedPayload struct {
-	ReportID   string    `json:"report_id"`
-	ExportType string    `json:"export_type"` // pdf, docx, html
-	ExportedBy uint64    `json:"exported_by"`
-	ExportedAt time.Time `json:"exported_at"`
 }
 
 // ==================== Handler 实现 ====================
@@ -180,24 +169,4 @@ func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data Repor
 		slog.Any("tags_added", resp.TagsAdded),
 		slog.Bool("key_focus_marked", resp.KeyFocusMarked),
 	)
-}
-
-func handleReportExported(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data ReportExportedPayload
-		env, err := ParseEventData(payload, &data)
-		if err != nil {
-			return fmt.Errorf("failed to parse report exported event: %w", err)
-		}
-
-		deps.Logger.Info("processing report exported",
-			slog.String("event_id", env.ID),
-			slog.String("report_id", data.ReportID),
-			slog.String("export_type", data.ExportType),
-			slog.Uint64("exported_by", data.ExportedBy),
-			slog.Time("exported_at", data.ExportedAt),
-		)
-
-		return nil
-	}
 }

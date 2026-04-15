@@ -113,7 +113,7 @@ func (p *enrollmentEventPublisherStub) PublishAll(ctx context.Context, events []
 	return nil
 }
 
-func TestEnrollmentServicePublishesPlanTesteeEnrolledEvent(t *testing.T) {
+func TestEnrollmentServiceDoesNotPublishPlanEventOnEnroll(t *testing.T) {
 	ctx := context.Background()
 	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByWeek, 1, 2)
 	if err != nil {
@@ -144,23 +144,8 @@ func TestEnrollmentServicePublishesPlanTesteeEnrolledEvent(t *testing.T) {
 	if len(taskRepo.savedBatch) != 2 {
 		t.Fatalf("expected SaveBatch to persist 2 tasks, got %d", len(taskRepo.savedBatch))
 	}
-	if len(publisher.events) != 1 {
-		t.Fatalf("expected one published event, got %d", len(publisher.events))
-	}
-
-	evt, ok := publisher.events[0].(domainPlan.PlanTesteeEnrolledEvent)
-	if !ok {
-		t.Fatalf("unexpected event type: %T", publisher.events[0])
-	}
-	payload := evt.Payload()
-	if evt.EventType() != domainPlan.EventTypePlanTesteeEnrolled {
-		t.Fatalf("unexpected event type: %s", evt.EventType())
-	}
-	if payload.PlanID != planAggregate.GetID().String() || payload.TesteeID != "3001" || payload.OrgID != 9 {
-		t.Fatalf("unexpected enrolled payload: %#v", payload)
-	}
-	if payload.Idempotent || payload.CreatedTaskCount != 2 {
-		t.Fatalf("unexpected enrolled payload details: %#v", payload)
+	if len(publisher.events) != 0 {
+		t.Fatalf("expected no plan lifecycle event on enroll, got %d", len(publisher.events))
 	}
 }
 
@@ -249,7 +234,7 @@ func TestEnrollmentServiceSchedulesGeneratedTasksUsingPlanTriggerTime(t *testing
 	}
 }
 
-func TestEnrollmentServicePublishesIdempotentEnrollEvent(t *testing.T) {
+func TestEnrollmentServiceIdempotentEnrollPublishesNoPlanEvent(t *testing.T) {
 	ctx := context.Background()
 	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByWeek, 1, 2)
 	if err != nil {
@@ -287,21 +272,12 @@ func TestEnrollmentServicePublishesIdempotentEnrollEvent(t *testing.T) {
 	if len(taskRepo.savedBatch) != 0 {
 		t.Fatalf("expected no SaveBatch call for idempotent enroll, got %d tasks", len(taskRepo.savedBatch))
 	}
-	if len(publisher.events) != 1 {
-		t.Fatalf("expected one published event, got %d", len(publisher.events))
-	}
-
-	evt, ok := publisher.events[0].(domainPlan.PlanTesteeEnrolledEvent)
-	if !ok {
-		t.Fatalf("unexpected event type: %T", publisher.events[0])
-	}
-	payload := evt.Payload()
-	if !payload.Idempotent || payload.CreatedTaskCount != 0 {
-		t.Fatalf("unexpected idempotent payload: %#v", payload)
+	if len(publisher.events) != 0 {
+		t.Fatalf("expected no plan lifecycle event for idempotent enroll, got %d", len(publisher.events))
 	}
 }
 
-func TestEnrollmentServicePublishesPlanTesteeTerminatedEvent(t *testing.T) {
+func TestEnrollmentServiceTerminatePublishesOnlyTaskCanceledEvents(t *testing.T) {
 	ctx := context.Background()
 	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByWeek, 1, 2)
 	if err != nil {
@@ -335,22 +311,12 @@ func TestEnrollmentServicePublishesPlanTesteeTerminatedEvent(t *testing.T) {
 	if len(taskRepo.saved) != 2 {
 		t.Fatalf("expected 2 saved tasks, got %d", len(taskRepo.saved))
 	}
-	if len(publisher.events) != 3 {
-		t.Fatalf("expected 3 published events (2 task.canceled + 1 enrollment), got %d", len(publisher.events))
+	if len(publisher.events) != 2 {
+		t.Fatalf("expected 2 published task.canceled events, got %d", len(publisher.events))
 	}
-
-	lastEvent, ok := publisher.events[len(publisher.events)-1].(domainPlan.PlanTesteeTerminatedEvent)
-	if !ok {
-		t.Fatalf("unexpected last event type: %T", publisher.events[len(publisher.events)-1])
-	}
-	payload := lastEvent.Payload()
-	if lastEvent.EventType() != domainPlan.EventTypePlanTesteeTerminated {
-		t.Fatalf("unexpected event type: %s", lastEvent.EventType())
-	}
-	if payload.PlanID != planAggregate.GetID().String() || payload.TesteeID != "3003" || payload.OrgID != 9 {
-		t.Fatalf("unexpected terminated payload: %#v", payload)
-	}
-	if payload.AffectedTaskCount != 2 {
-		t.Fatalf("unexpected affected_task_count: %#v", payload)
+	for i, evt := range publisher.events {
+		if evt.EventType() != domainPlan.EventTypeTaskCanceled {
+			t.Fatalf("expected event %d to be task.canceled, got %s", i, evt.EventType())
+		}
 	}
 }

@@ -65,34 +65,15 @@ events:
   # --------------------------------------------------------------------------
   # Survey 领域
   # --------------------------------------------------------------------------
-  questionnaire.published:
+  questionnaire.changed:
     topic: questionnaire-lifecycle
     aggregate: Questionnaire
     domain: survey/questionnaire
-    description: "问卷已发布"
-    handler: questionnaire_published_handler
+    description: "问卷生命周期变化"
+    handler: questionnaire_changed_handler
     consumers:
       - collection-server
       - search-service
-
-  questionnaire.unpublished:
-    topic: questionnaire-lifecycle
-    aggregate: Questionnaire
-    domain: survey/questionnaire
-    description: "问卷已下架"
-    handler: questionnaire_unpublished_handler
-    consumers:
-      - collection-server
-      - search-service
-
-  questionnaire.archived:
-    topic: questionnaire-lifecycle
-    aggregate: Questionnaire
-    domain: survey/questionnaire
-    description: "问卷已归档"
-    handler: questionnaire_archived_handler
-    consumers:
-      - collection-server
 
   answersheet.submitted:
     topic: assessment-lifecycle
@@ -107,41 +88,12 @@ events:
   # --------------------------------------------------------------------------
   # Scale 领域
   # --------------------------------------------------------------------------
-  scale.published:
+  scale.changed:
     topic: questionnaire-lifecycle
     aggregate: MedicalScale
     domain: scale
-    description: "量表已发布"
-    handler: scale_published_handler
-    consumers:
-      - collection-server
-      - qs-worker
-
-  scale.unpublished:
-    topic: questionnaire-lifecycle
-    aggregate: MedicalScale
-    domain: scale
-    description: "量表已下架"
-    handler: scale_unpublished_handler
-    consumers:
-      - collection-server
-      - qs-worker
-
-  scale.updated:
-    topic: questionnaire-lifecycle
-    aggregate: MedicalScale
-    domain: scale
-    description: "量表已更新"
-    handler: scale_updated_handler
-    consumers:
-      - qs-worker
-
-  scale.archived:
-    topic: questionnaire-lifecycle
-    aggregate: MedicalScale
-    domain: scale
-    description: "量表已归档"
-    handler: scale_archived_handler
+    description: "量表生命周期变化"
+    handler: scale_changed_handler
     consumers:
       - collection-server
       - qs-worker
@@ -193,84 +145,6 @@ events:
       - notification-service
       - alert-service
 
-  # 说明：本仓库无独立 statistics-service 进程。测评维度的 Redis 预聚合由 qs-worker 内
-  # assessment_* handler 转调 statistics_assessment_*；plan/task 与 report.exported 的 handler
-  # 中事件驱动统计仍为 TODO，statistics_plan 等由 qs-apiserver POST /statistics/sync/plan 等同步。
-  report.exported:
-    topic: assessment-lifecycle
-    aggregate: Report
-    domain: evaluation/report
-    description: "报告已导出"
-    handler: report_exported_handler
-    consumers:
-      - qs-worker  # report_exported_handler；当前仅日志占位，无统计副作用
-
-  # --------------------------------------------------------------------------
-  # Plan 领域
-  # --------------------------------------------------------------------------
-  plan.created:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "计划已创建"
-    handler: plan_created_handler
-    consumers:
-      - qs-worker
-
-  plan.testee_enrolled:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "受试者已加入计划"
-    handler: plan_testee_enrolled_handler
-    consumers:
-      - qs-worker
-
-  plan.testee_terminated:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "受试者已终止计划参与"
-    handler: plan_testee_terminated_handler
-    consumers:
-      - qs-worker
-
-  plan.paused:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "计划已暂停"
-    handler: plan_paused_handler
-    consumers:
-      - qs-worker
-
-  plan.resumed:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "计划已恢复"
-    handler: plan_resumed_handler
-    consumers:
-      - qs-worker
-
-  plan.canceled:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "计划已取消"
-    handler: plan_canceled_handler
-    consumers:
-      - qs-worker
-
-  plan.finished:
-    topic: plan-lifecycle
-    aggregate: AssessmentPlan
-    domain: plan
-    description: "计划已完成"
-    handler: plan_finished_handler
-    consumers:
-      - qs-worker
-
   task.opened:
     topic: task-lifecycle
     aggregate: AssessmentTask
@@ -313,33 +187,13 @@ events:
 # ============================================================================
 # 定义处理器的元信息，实际实现在代码中
 handlers:
-  questionnaire_published_handler:
+  questionnaire_changed_handler:
     package: questionnaire
-    description: "处理问卷发布事件，更新缓存"
+    description: "处理问卷生命周期变化事件"
 
-  questionnaire_unpublished_handler:
-    package: questionnaire
-    description: "处理问卷下架事件，清除缓存"
-
-  questionnaire_archived_handler:
-    package: questionnaire
-    description: "处理问卷归档事件"
-
-  scale_published_handler:
+  scale_changed_handler:
     package: scale
-    description: "处理量表发布事件，预加载计算规则"
-
-  scale_unpublished_handler:
-    package: scale
-    description: "处理量表下架事件"
-
-  scale_updated_handler:
-    package: scale
-    description: "处理量表更新事件，重新加载计算规则"
-
-  scale_archived_handler:
-    package: scale
-    description: "处理量表归档事件"
+    description: "处理量表生命周期变化事件"
 
   answersheet_submitted_handler:
     package: assessment
@@ -360,38 +214,6 @@ handlers:
   report_generated_handler:
     package: report
     description: "处理报告生成事件：给受试者打标签、提取高风险因子、发送预警"
-
-  report_exported_handler:
-    package: report
-    description: "处理报告导出事件（当前仅日志；统计不走本事件，见 apiserver /statistics/sync）"
-
-  plan_created_handler:
-    package: plan
-    description: "处理计划创建事件（日志等；事件驱动统计 TODO，计划聚合见 apiserver /statistics/sync/plan）"
-
-  plan_testee_enrolled_handler:
-    package: plan
-    description: "处理受试者加入计划事件（日志占位）"
-
-  plan_testee_terminated_handler:
-    package: plan
-    description: "处理受试者终止计划参与事件（日志占位）"
-
-  plan_paused_handler:
-    package: plan
-    description: "处理计划暂停事件（日志与统计 TODO）"
-
-  plan_resumed_handler:
-    package: plan
-    description: "处理计划恢复事件（日志与统计 TODO）"
-
-  plan_canceled_handler:
-    package: plan
-    description: "处理计划取消事件（日志与统计 TODO）"
-
-  plan_finished_handler:
-    package: plan
-    description: "处理计划完成事件（日志与统计 TODO）"
 
   task_opened_handler:
     package: plan

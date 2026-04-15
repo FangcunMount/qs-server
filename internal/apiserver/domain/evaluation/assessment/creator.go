@@ -43,8 +43,8 @@ type CreateAssessmentRequest struct {
 	// 可选字段
 	MedicalScaleRef *MedicalScaleRef
 
-	// 是否自动提交（默认 true）
-	// 设为 false 可以创建 pending 状态的测评，便于测试或特殊场景
+	// 是否自动提交（默认 false）
+	// 显式设为 true 时会在创建后立即迁移到 submitted
 	AutoSubmit bool
 }
 
@@ -62,7 +62,7 @@ func NewCreateAssessmentRequest(
 		QuestionnaireRef: questionnaireRef,
 		AnswerSheetRef:   answerSheetRef,
 		Origin:           origin,
-		AutoSubmit:       true, // 默认自动提交
+		AutoSubmit:       false, // 默认仅创建 pending 测评
 	}
 }
 

@@ -2,6 +2,7 @@ package scale
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -161,6 +162,7 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表基本信息失败")
 	}
 
+	s.publishScaleChanged(ctx, m, scale.ChangeActionUpdated)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -199,6 +201,7 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表关联问卷失败")
 	}
 
+	s.publishScaleChanged(ctx, m, scale.ChangeActionUpdated)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -483,4 +486,18 @@ func (s *lifecycleService) publishEvents(ctx context.Context, m *scale.MedicalSc
 
 	// 清空已发布的事件
 	m.ClearEvents()
+}
+
+func (s *lifecycleService) publishScaleChanged(ctx context.Context, m *scale.MedicalScale, action scale.ChangeAction) {
+	if s.eventPublisher == nil || m == nil {
+		return
+	}
+	_ = s.eventPublisher.Publish(ctx, scale.NewScaleChangedEvent(
+		m.GetID().Uint64(),
+		m.GetCode().String(),
+		"",
+		m.GetTitle(),
+		action,
+		time.Now(),
+	))
 }

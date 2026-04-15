@@ -12,8 +12,10 @@ const commandDesc = `The QS Worker consumes domain events from message queue and
 background tasks such as assessment evaluation, notification sending, and statistics collection.
 
 It supports multiple event types:
+- questionnaire.changed / scale.changed: Trigger QR code generation on publish
+- answersheet.submitted: Triggers scoring and assessment creation
 - assessment.submitted: Triggers evaluation workflow
-- assessment.interpreted: Triggers notification and alert
+- assessment.interpreted: Triggers statistics and risk logging
 - assessment.failed: Logs and monitors failures`
 
 // NewApp 创建 Worker App
