@@ -42,7 +42,7 @@
 - **量表生命周期**：创建、编辑基本信息、绑定问卷（编码 + 版本）、发布、下架（回草稿）、归档、删除（仅草稿可删）。
 - **因子与解读**：因子增删改、批量替换、解读规则维护；发布前校验「至少一因子、总分因子唯一、非总分因子须挂题、解读规则非空」等（见 [validator.go](../../internal/apiserver/domain/scale/validator.go)）。
 - **规则消费契约**：向 `evaluation` 提供可加载的 `MedicalScale` + `Factor`；领域层 `ScoringService.CalculateFactorScore` 在运行时用 **答卷 + 问卷** 计算因子分（见 [scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go)）。
-- **事件与外围协同**：`scale.published` / `unpublished` / `updated` / `archived`；`worker` / `collection-server` 等消费者见 [configs/events.yaml](../../configs/events.yaml)。
+- **事件与外围协同**：统一发布 `scale.changed`，由 `action=published | unpublished | updated | archived` 区分；`worker` / `collection-server` 等消费者见 [configs/events.yaml](../../configs/events.yaml)。
 - **查询与列表**：后台 REST + C 端 gRPC；已发布量表列表可经应用层缓存刷新（见 [global_list_cache.go](../../internal/apiserver/application/scale/global_list_cache.go)）。
 
 #### 不负责什么（细项）
@@ -257,28 +257,24 @@ flowchart TB
 
 #### 输出
 
-- `scale.published`
-- `scale.unpublished`
-- `scale.updated`
-- `scale.archived`
+- `scale.changed`
+- `action = published | unpublished | updated | archived`
   - 定义与事件载荷：[events.go](../../internal/apiserver/domain/scale/events.go)；类型常量来自 [eventconfig](../../internal/pkg/eventconfig/types.go)（与 yaml 字符串一致）。
 
 **与 `configs/events.yaml` 对照（Verify）**：
 
 | 事件类型 | Topic（yaml 字段 `topic`） | handler（yaml） | consumers（摘录） |
 | -------- | -------------------------- | ----------------- | ------------------- |
-| `scale.published` | `questionnaire-lifecycle` | `scale_published_handler` | `collection-server`、`qs-worker` |
-| `scale.unpublished` | `questionnaire-lifecycle` | `scale_unpublished_handler` | 同上 |
-| `scale.updated` | `questionnaire-lifecycle` | `scale_updated_handler` | `qs-worker` |
-| `scale.archived` | `questionnaire-lifecycle` | `scale_archived_handler` | `collection-server`、`qs-worker` |
+| `scale.changed` | `questionnaire-lifecycle` | `scale_changed_handler` | `collection-server`、`qs-worker` |
 
 改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker 侧注册。
 
-#### `scale.updated`：契约意图与代码核对
+#### `scale.changed`：当前语义与发布点
 
-- **契约侧**：[configs/events.yaml](../../configs/events.yaml) 将 `scale.updated` 挂在 `questionnaire-lifecycle`，handler `scale_updated_handler`，消费者当前为 **`qs-worker`**（用于缓存协同等，以 yaml 为准）。
-- **语义意图**：表示「量表内容已变更」、但**未必**发生发布/下架/归档（与 `scale.published` 等生命周期事件区分）。
-- **代码核对（Verify）**：`NewScaleUpdatedEvent` 仅在 [events.go](../../internal/apiserver/domain/scale/events.go) 定义；**当前仓库内未检索到调用点**。`MedicalScale` 领域层仅对 **发布 / 下架 / 归档** 通过 `addEvent` 收集事件（见 [medical_scale.go](../../internal/apiserver/domain/scale/medical_scale.go) 中 `publish` / `unpublish` / `archive`）。若业务强依赖 `scale.updated` 投递，须确认是否应在「保存草稿/更新因子」等应用路径**补发布**，或以实际 MQ 观测为准。
+- **契约侧**：[configs/events.yaml](../../configs/events.yaml) 现在只保留一个 `scale.changed`，由 `action` 区分生命周期动作和内容更新。
+- **领域层**：`MedicalScale` 聚合自身会在 **发布 / 下架 / 归档** 时通过 `addEvent` 收集 `scale.changed`（见 [medical_scale.go](../../internal/apiserver/domain/scale/medical_scale.go)）。
+- **应用层**：基本信息修改、问卷绑定修改、因子变更会在应用服务里直接发布 `scale.changed(action=updated)`，见 [lifecycle_service.go](../../internal/apiserver/application/scale/lifecycle_service.go) 与 [factor_service.go](../../internal/apiserver/application/scale/factor_service.go)。
+- **worker 侧行为**：只有 `action=published` 会触发二维码生成；`unpublished / updated / archived` 当前仅日志。
 
 ### 核心链路：规则配置与评估消费
 
@@ -302,8 +298,8 @@ sequenceDiagram
     Admin->>Scale: Publish
     Scale->>Scale: ValidateForPublish
     Scale->>Repo: 更新状态为 Published
-    Scale->>MQ: publish scale.published
-    MQ-->>Worker: scale.published
+    Scale->>MQ: publish scale.changed(action=published)
+    MQ-->>Worker: scale.changed
     Worker->>Worker: 二维码等协同
     Eval->>Repo: 读取量表规则
     Eval->>Scale: ScoringService / 因子配置
@@ -420,7 +416,7 @@ sequenceDiagram
 - 变更 REST：同步 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 与 Handler。
 - 变更 gRPC：同步 [scale.proto](../../internal/apiserver/interface/grpc/proto/scale/scale.proto) 与 `collection-server` 调用方。
 - 变更事件或 Topic：同步 [configs/events.yaml](../../configs/events.yaml)、领域 `events.go`、发布点与 worker。
-- 若开始实际发布 `scale.updated`：同步应用层发布点、`MedicalScale` 事件收集与 worker handler，并与本文「`scale.updated`」小节对齐。
+- 若未来扩展 `scale.changed` 的 `action` 枚举：同步 `events.go`、应用层发布点、worker handler 分支和本文这节说明。
 - 变更因子计分语义或 `cnt` 参数：同步 `evaluation` 管道与本文「核心横切」表。
 
 ---

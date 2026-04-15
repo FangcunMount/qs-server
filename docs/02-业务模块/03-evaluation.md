@@ -314,11 +314,10 @@ sequenceDiagram
 | `answersheet.submitted` | `qs.evaluation.lifecycle` | `answersheet_submitted_handler` | 答卷提交流程 | `qs-worker` 等 |
 | `assessment.submitted` | `qs.evaluation.lifecycle` | `assessment_submitted_handler` | 提交测评 | `qs-worker` 等 |
 | `assessment.interpreted` | `qs.evaluation.lifecycle` | `assessment_interpreted_handler` | 引擎 | 多消费者 |
-| `assessment.failed` | `qs.evaluation.lifecycle` | `assessment_failed_handler` | 失败路径 | logging 等 |
+| `assessment.failed` | `qs.evaluation.lifecycle` | `assessment_failed_handler` | 失败路径 | logging / monitoring 等；当前 worker 侧以失败日志为主 |
 | `report.generated` | `qs.evaluation.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
-| `report.exported` | `qs.evaluation.lifecycle` | `report_exported_handler` | 导出 | `qs-worker` |
 
-主异步闭环以 **`report.generated`** 为报告就绪信号；`report.exported` 存在但非本文主链路重点。
+主异步闭环以 **`report.generated`** 为报告就绪信号；当前运行时契约中已经没有 `report.exported`。
 
 ---
 

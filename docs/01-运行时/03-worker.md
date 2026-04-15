@@ -100,10 +100,14 @@ sequenceDiagram
 | `answersheet.submitted` | `answersheet_submitted_handler` | **Internal**：`CalculateAnswerSheetScore` → `CreateAssessmentFromAnswerSheet` |
 | `assessment.submitted` | `assessment_submitted_handler` | 内联 **statistics** handler；需评估时 **Internal**：`EvaluateAssessment` |
 | `assessment.interpreted` | `assessment_interpreted_handler` | 内联 **statistics**；无固定必选 Internal |
+| `assessment.failed` | `assessment_failed_handler` | 记录失败日志；当前未接更强告警动作 |
 | `report.generated` | `report_generated_handler` | **Evaluation**：`GetAssessmentReport`；**Internal**：`TagTestee` |
-| `questionnaire.published` | `questionnaire_published_handler` | **Internal**：`GenerateQuestionnaireQRCode`（有客户端时） |
-| `scale.published` | `scale_published_handler` | **Internal**：`GenerateScaleQRCode`（有客户端时） |
-| `plan.*` / `task.*` / `report.exported` / `assessment.failed` 等 | 各 `*_handler` | 多为日志、占位或内联统计；**是否调 gRPC 以代码为准** |
+| `questionnaire.changed` | `questionnaire_changed_handler` | `action=published` 时 **Internal**：`GenerateQuestionnaireQRCode`；其他 action 仅日志 |
+| `scale.changed` | `scale_changed_handler` | `action=published` 时 **Internal**：`GenerateScaleQRCode`；其他 action 仅日志 |
+| `task.opened` | `task_opened_handler` | **Internal**：`SendTaskOpenedMiniProgramNotification` |
+| `task.completed` / `task.expired` / `task.canceled` | 各 `task_*_handler` | 通过 `Notifier` 发送完成/过期/取消通知 |
+
+**当前没有 `plan.*` 事件**：计划生命周期本身已回归同步业务逻辑，异步副作用统一沉到 `task.*`。
 
 ---
 

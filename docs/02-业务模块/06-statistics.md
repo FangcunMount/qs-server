@@ -48,7 +48,7 @@
 
 - **领域事件输出**：本模块**不**发布稳定的 `statistics.*` 业务事件；对外是查询与运维接口。
 - **Mongo 问卷/答卷计数**：系统统计兜底路径中问卷数、答卷数、今日新增答卷等仍为占位或未接 Mongo（见 [system_service.go](../../internal/apiserver/application/statistics/system_service.go) 注释）。
-- **plan / task / report.exported 的「统计更新」**：[`events.yaml`](../../configs/events.yaml) 仅列真实消费者（如 `qs-worker`）；对应 handler 内事件驱动统计仍为 **TODO**（[plan_handler.go](../../internal/worker/handlers/plan_handler.go)、[report_handler.go](../../internal/worker/handlers/report_handler.go)），**计划维度的 `statistics_plan` 以 apiserver `POST /statistics/sync/plan` 等同步为主**。
+- **task.* 的「统计更新」**：当前 `task_*_handler` 主要做通知，不承担统计写入；**计划维度的 `statistics_plan` 以 apiserver `POST /statistics/sync/plan` 等同步为主**。`report.generated` 当前也不承担统计写入。
 
 ### 契约入口
 
@@ -304,7 +304,7 @@ flowchart TB
 | ---- | ------------- | --------------------------- | --------------------- | ---- |
 | `assessment.submitted` | `assessment-lifecycle` | `assessment_submitted_handler` | [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go) → `GetFactory("statistics_assessment_submitted_handler")` → [statistics_handler.go](../../internal/worker/handlers/statistics_handler.go) | 写 Redis 日/窗口/累计/分布；yaml consumers 为 `qs-worker` 等 |
 | `assessment.interpreted` | `assessment-lifecycle` | `assessment_interpreted_handler` | 同上 → `statistics_assessment_interpreted_handler` | 完成数、风险分布等 |
-| `plan.created` / `task.*` / `report.exported` | 各 Topic | `plan_created_handler` 等 | [plan_handler.go](../../internal/worker/handlers/plan_handler.go)、[report_handler.go](../../internal/worker/handlers/report_handler.go) | consumers 与 yaml 一致（无 `statistics-service`）；**事件侧统计更新多为 TODO** |
+| `task.*` / `report.generated` | `task-lifecycle` / `assessment-lifecycle` | `task_*_handler` / `report_generated_handler` | [plan_handler.go](../../internal/worker/handlers/plan_handler.go)、[report_handler.go](../../internal/worker/handlers/report_handler.go) | 当前不承担统计写入；计划维度统计仍以同步聚合为主 |
 
 **Verify 步骤**：改事件消费行为时，同时核对 **yaml 的 `handler` 名**、**`assessment_handler` 内对子 handler 的调用**、**`statistics_handler` 注册名**、以及本文「运行时」描述。
 

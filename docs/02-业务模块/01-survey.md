@@ -290,9 +290,8 @@ flowchart TB
 #### 输出
 
 - 问卷生命周期事件
-  - `questionnaire.published`
-  - `questionnaire.unpublished`
-  - `questionnaire.archived`
+  - `questionnaire.changed`
+  - `action = published | unpublished | archived`
   - 定义：
     [internal/apiserver/domain/survey/questionnaire/events.go](../../internal/apiserver/domain/survey/questionnaire/events.go)
 - 答卷提交事件
@@ -304,9 +303,7 @@ flowchart TB
 
 | 事件类型 | Topic（`topics.*.name`） | handler（yaml） | 备注 |
 | -------- | ------------------------ | ----------------- | ---- |
-| `questionnaire.published` | `qs.survey.lifecycle` | `questionnaire_published_handler` | 与量表生命周期共用 Topic |
-| `questionnaire.unpublished` | `qs.survey.lifecycle` | `questionnaire_unpublished_handler` | |
-| `questionnaire.archived` | `qs.survey.lifecycle` | `questionnaire_archived_handler` | |
+| `questionnaire.changed` | `qs.survey.lifecycle` | `questionnaire_changed_handler` | `action=published` 时 worker 生成二维码；其他 action 仅日志 |
 | `answersheet.submitted` | **`qs.evaluation.lifecycle`** | `answersheet_submitted_handler` | 与测评链共用 Topic，消费者含 `qs-worker` |
 
 改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker [registry.go](../../internal/worker/handlers/registry.go)。
@@ -321,7 +318,7 @@ flowchart TB
 
 #### 问卷管理链路
 
-后台管理端通过 REST 进入 `QuestionnaireHandler`，再由 `LifecycleService`、`ContentService` 和 `QueryService` 编排问卷聚合与仓储。问卷发布、取消发布和归档时，会发布对应领域事件。
+后台管理端通过 REST 进入 `QuestionnaireHandler`，再由 `LifecycleService`、`ContentService` 和 `QueryService` 编排问卷聚合与仓储。问卷发布、取消发布和归档时，会统一发布 `questionnaire.changed`，由 `action` 区分具体生命周期动作。
 
 #### 答卷提交链路
 

@@ -43,7 +43,7 @@
 - **受试者入组**：`EnrollTestee(planID, testeeID, startDate)`，由 [TaskGenerator](../../internal/apiserver/domain/plan/task_generator.go) 一次性生成该受试者全部 `pending` 任务。
 - **任务调度**：`SchedulePendingTasks(before)` 扫描 `plannedAt <= before` 的 `pending` 任务，生成入口并 `Open`，发布 `task.opened`（见 [task_scheduler_service.go](../../internal/apiserver/application/plan/task_scheduler_service.go)）。
 - **任务管理**：开放、完成（绑定 `assessmentID`）、过期、取消等（[task_management_service.go](../../internal/apiserver/application/plan/task_management_service.go)、[task_lifecycle.go](../../internal/apiserver/domain/plan/task_lifecycle.go)）。
-- **事件**：`plan.created`、`task.opened`、`task.completed`、`task.expired`（[events.go](../../internal/apiserver/domain/plan/events.go)）；与 [configs/events.yaml](../../configs/events.yaml) 对读。
+- **事件**：当前只保留 `task.opened`、`task.completed`、`task.expired`、`task.canceled`（[events.go](../../internal/apiserver/domain/plan/events.go)）；计划生命周期本身不再单独事件化，与 [configs/events.yaml](../../configs/events.yaml) 对读。
 
 #### 不负责什么（细项）
 
@@ -140,7 +140,7 @@ erDiagram
 
 | 概念 | 职责 | 与相邻概念的关系 |
 | ---- | ---- | ---------------- |
-| `AssessmentPlan` | 聚合根：机构、量表编码、周期、`PlanStatus` | 模板；创建后 `active` 并发 `plan.created`（见 [assessment_plan.go](../../internal/apiserver/domain/plan/assessment_plan.go)） |
+| `AssessmentPlan` | 聚合根：机构、量表编码、周期、`PlanStatus` | 模板；创建后进入 `active`，但当前不再发布单独的 `plan.*` 事件 |
 | `AssessmentTask` | 实体：`planID` + `seq` + `testeeID` + 时间点 + `TaskStatus` + 入口 + `assessmentID` | 入组时批量生成；`orgID`/`scaleCode` 冗余 |
 | `TaskGenerator` | 按 `scheduleType` 与 `startDate` 计算各 `seq` 的 `plannedAt` | 与 [task_generator.go](../../internal/apiserver/domain/plan/task_generator.go) 策略一致 |
 | `PlanEnrollment` | 入组与终止参与 | 调 `TaskGenerator`，不直接写仓储（应用层持久化） |
@@ -230,23 +230,23 @@ flowchart TB
 
 #### 输出
 
-- `plan.created`
 - `task.opened`
 - `task.completed`
 - `task.expired`
+- `task.canceled`
 
-定义与载荷见 [events.go](../../internal/apiserver/domain/plan/events.go)（聚合类型 `AssessmentPlan` / `AssessmentTask`）。
+定义与载荷见 [events.go](../../internal/apiserver/domain/plan/events.go)（当前只保留 `AssessmentTask` 相关事件）。计划生命周期变化本身不再单独事件化。
 
 **与 `configs/events.yaml` 对照（Verify）**：
 
 | 事件类型 | Topic（yaml 字段 `topic`） | handler（yaml） | consumers（摘录） |
 | -------- | -------------------------- | ----------------- | ------------------- |
-| `plan.created` | `plan-lifecycle` | `plan_created_handler` | `qs-worker` |
 | `task.opened` | `task-lifecycle` | `task_opened_handler` | `qs-worker` |
 | `task.completed` | `task-lifecycle` | `task_completed_handler` | `qs-worker`、`alert-service` |
 | `task.expired` | `task-lifecycle` | `task_expired_handler` | `qs-worker` |
+| `task.canceled` | `task-lifecycle` | `task_canceled_handler` | `qs-worker` |
 
-**载荷边界（与代码一致）**：事件为轻量信号；`plan.created` 含 `plan_id` / `scale_code` / `created_at`；`task.opened` 含 `task_id` / `plan_id` / `testee_id` / `entry_url` / `open_at`；`task.completed` 含 `assessment_id`；更多字段需回查仓储。
+**载荷边界（与代码一致）**：事件为轻量信号；`task.opened` 含 `task_id` / `plan_id` / `testee_id` / `entry_url` / `open_at`；`task.completed` 含 `assessment_id`；`task.expired` / `task.canceled` 只携带任务、计划、受试者和时间。更多字段需回查仓储。
 
 改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker 侧注册（如 [registry.go](../../internal/worker/handlers/registry.go)）。
 
@@ -254,7 +254,7 @@ flowchart TB
 
 #### 从计划模板到待执行任务
 
-创建 `AssessmentPlan` 后发布 `plan.created`，**尚未**有任务。受试者入组时 `EnrollmentService` 调 `PlanEnrollment.EnrollTestee`，按 `startDate` 与 `TaskGenerator` **一次性**生成该受试者全部 `pending` 任务并持久化。
+创建 `AssessmentPlan` 后不会再发布单独的 `plan.*` 事件，**尚未**有任务。受试者入组时 `EnrollmentService` 调 `PlanEnrollment.EnrollTestee`，按 `startDate` 与 `TaskGenerator` **一次性**生成该受试者全部 `pending` 任务并持久化。
 
 #### 从待执行到开放入口
 
@@ -270,7 +270,6 @@ sequenceDiagram
 
     Admin->>L: CreatePlan
     L->>Repo: Save AssessmentPlan
-    L->>MQ: plan.created
     Admin->>E: EnrollTestee
     E->>Repo: Load Plan + SaveBatch tasks
     Admin->>S: SchedulePendingTasks(before)
