@@ -46,21 +46,23 @@ type seedStep string
 
 // All available seed steps.
 const (
-	stepStaff               seedStep = "staff"
-	stepClinician           seedStep = "clinician"
-	stepAssignTestees       seedStep = "assign_testees"
-	stepTesteeFixupCreated  seedStep = "testee_fixup_created_at"
-	stepActorFixupTimes     seedStep = "actor_fixup_timestamps"
-	stepAssessmentEntries   seedStep = "assessment_entries"
-	stepAssessmentEntryFlow seedStep = "assessment_entry_flow"
-	stepAssessmentByEntry   seedStep = "assessment_by_entry"
-	stepDailySimulation     seedStep = "daily_simulation"
-	stepAssessment          seedStep = "assessment"         // 提交答卷并生成测评
-	stepPlan                seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
-	stepPlanCreateTasks     seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
-	stepPlanProcessTasks    seedStep = "plan_process_tasks" // 调度并处理计划任务
-	stepPlanFixupTimes      seedStep = "plan_fixup_timestamps"
-	stepStatisticsBackfill  seedStep = "statistics_backfill"
+	stepStaff                seedStep = "staff"
+	stepClinician            seedStep = "clinician"
+	stepAssignTestees        seedStep = "assign_testees"
+	stepTesteeFixupCreated   seedStep = "testee_fixup_created_at"
+	stepActorFixupTimes      seedStep = "actor_fixup_timestamps"
+	stepAssessmentEntries    seedStep = "assessment_entries"
+	stepAssessmentEntryFlow  seedStep = "assessment_entry_flow"
+	stepAssessmentByEntry    seedStep = "assessment_by_entry"
+	stepAssessmentEntryFixup seedStep = "assessment_entry_fixup_timestamps"
+	stepAssessmentFixup      seedStep = "assessment_fixup_timestamps"
+	stepDailySimulation      seedStep = "daily_simulation"
+	stepAssessment           seedStep = "assessment"         // 提交答卷并生成测评
+	stepPlan                 seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
+	stepPlanCreateTasks      seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
+	stepPlanProcessTasks     seedStep = "plan_process_tasks" // 调度并处理计划任务
+	stepPlanFixupTimes       seedStep = "plan_fixup_timestamps"
+	stepStatisticsBackfill   seedStep = "statistics_backfill"
 )
 
 // defaultSteps defines the default execution order of all seed steps.
@@ -301,6 +303,10 @@ func main() {
 			err = seedAssessmentEntryFlow(runCtx, deps)
 		case stepAssessmentByEntry:
 			err = seedAssessmentByEntry(runCtx, deps)
+		case stepAssessmentEntryFixup:
+			err = seedAssessmentEntryFixupTimestamps(runCtx, deps)
+		case stepAssessmentFixup:
+			err = seedAssessmentFixupTimestamps(runCtx, deps)
 		case stepDailySimulation:
 			err = seedDailySimulation(runCtx, deps)
 		case stepAssessment:
@@ -414,6 +420,10 @@ func seedStepFailureMessage(step seedStep) string {
 		return "Assessment entry flow seeding failed"
 	case stepAssessmentByEntry:
 		return "Assessment by entry seeding failed"
+	case stepAssessmentEntryFixup:
+		return "Assessment entry timestamp fixup failed"
+	case stepAssessmentFixup:
+		return "Assessment timestamp fixup failed"
 	case stepDailySimulation:
 		return "Daily simulation seeding failed"
 	case stepAssessment:

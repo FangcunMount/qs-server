@@ -30,6 +30,11 @@ var (
 	}
 )
 
+const (
+	testeeCreatedAtWeekdayBaseWeight = 2.0
+	testeeCreatedAtWeekendBaseWeight = 1.0
+)
+
 type testeeCreatedAtYearWeight struct {
 	Year   int
 	Weight int
@@ -284,21 +289,194 @@ func deriveDeterministicBucketTimestamps(
 	if end.Before(start) {
 		return nil, fmt.Errorf("end %s is before start %s", end.Format(time.RFC3339), start.Format(time.RFC3339))
 	}
+	daySlots, err := buildTesteeCreatedAtDaySlots(year, start, end)
+	if err != nil {
+		return nil, err
+	}
+	dayCounts, err := allocateTesteeCreatedAtDayCounts(count, daySlots)
+	if err != nil {
+		return nil, err
+	}
+
+	targets := make([]time.Time, 0, count)
+	rowOffset := 0
+	for idx, slot := range daySlots {
+		dayCount := dayCounts[idx]
+		if dayCount == 0 {
+			continue
+		}
+		if rowOffset+dayCount > len(rows) {
+			return nil, fmt.Errorf("day allocation overflow for year %d: offset=%d count=%d total=%d", year, rowOffset, dayCount, len(rows))
+		}
+		dayTargets, err := deriveDeterministicDayTimestamps(year, idx, rows[rowOffset:rowOffset+dayCount], slot.Start, slot.End)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, dayTargets...)
+		rowOffset += dayCount
+	}
+	if len(targets) != count {
+		return nil, fmt.Errorf("derived timestamp count mismatch for year %d: got %d want %d", year, len(targets), count)
+	}
+	targets[0] = start.Round(0)
+	targets[len(targets)-1] = end.Round(0)
+	return targets, nil
+}
+
+type testeeCreatedAtDaySlot struct {
+	Start  time.Time
+	End    time.Time
+	Weight float64
+}
+
+func buildTesteeCreatedAtDaySlots(year int, start, end time.Time) ([]testeeCreatedAtDaySlot, error) {
+	if start.IsZero() || end.IsZero() {
+		return nil, fmt.Errorf("start and end must be non-zero")
+	}
+	if end.Before(start) {
+		return nil, fmt.Errorf("end %s is before start %s", end.Format(time.RFC3339), start.Format(time.RFC3339))
+	}
+
+	dayStart := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
+	dayEndBoundary := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, end.Location())
+
+	slots := make([]testeeCreatedAtDaySlot, 0, int(dayEndBoundary.Sub(dayStart)/(24*time.Hour))+1)
+	weekIndex := 0
+	for current := dayStart; !current.After(dayEndBoundary); current = current.Add(24 * time.Hour) {
+		if current.After(dayStart) && current.Weekday() == time.Monday {
+			weekIndex++
+		}
+		slotStart := current
+		slotEnd := current.Add(24*time.Hour - time.Second)
+		if slotStart.Before(start) {
+			slotStart = start
+		}
+		if slotEnd.After(end) {
+			slotEnd = end
+		}
+		if slotEnd.Before(slotStart) {
+			continue
+		}
+		slots = append(slots, testeeCreatedAtDaySlot{
+			Start:  slotStart.Round(0),
+			End:    slotEnd.Round(0),
+			Weight: deriveTesteeCreatedAtDayWeight(year, current, weekIndex),
+		})
+	}
+	if len(slots) == 0 {
+		return nil, fmt.Errorf("no day slots generated for year %d", year)
+	}
+	return slots, nil
+}
+
+func deriveTesteeCreatedAtDayWeight(year int, day time.Time, weekIndex int) float64 {
+	base := testeeCreatedAtWeekendBaseWeight
+	if isTesteeCreatedAtWeekday(day.Weekday()) {
+		base = testeeCreatedAtWeekdayBaseWeight
+	}
+
+	weeklySwing := 0.7 + stableSeedUnitFloat(uint64(year), uint64(weekIndex), 0x51)*0.6
+	dailySwing := 0.0
+	if isTesteeCreatedAtWeekday(day.Weekday()) {
+		dailySwing = 0.55 + stableSeedUnitFloat(uint64(year), uint64(day.Month()), uint64(day.Day()), 0x91)*0.9
+	} else {
+		dailySwing = 0.8 + stableSeedUnitFloat(uint64(year), uint64(day.Month()), uint64(day.Day()), 0xA3)*0.4
+	}
+	return base * weeklySwing * dailySwing
+}
+
+func isTesteeCreatedAtWeekday(day time.Weekday) bool {
+	return day >= time.Monday && day <= time.Friday
+}
+
+func allocateTesteeCreatedAtDayCounts(total int, slots []testeeCreatedAtDaySlot) ([]int, error) {
+	if total < 0 {
+		return nil, fmt.Errorf("total must be non-negative")
+	}
+	if len(slots) == 0 {
+		return nil, fmt.Errorf("slots must not be empty")
+	}
+	if total == 0 {
+		return make([]int, len(slots)), nil
+	}
+
+	type remainderItem struct {
+		Index     int
+		BaseCount int
+		Remainder float64
+	}
+
+	totalWeight := 0.0
+	for _, slot := range slots {
+		if slot.Weight <= 0 {
+			return nil, fmt.Errorf("slot weight must be positive")
+		}
+		totalWeight += slot.Weight
+	}
+	if totalWeight <= 0 {
+		return nil, fmt.Errorf("total slot weight must be positive")
+	}
+
+	items := make([]remainderItem, 0, len(slots))
+	allocated := 0
+	for idx, slot := range slots {
+		exact := float64(total) * slot.Weight / totalWeight
+		base := int(math.Floor(exact))
+		items = append(items, remainderItem{
+			Index:     idx,
+			BaseCount: base,
+			Remainder: exact - float64(base),
+		})
+		allocated += base
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Remainder == items[j].Remainder {
+			return items[i].Index < items[j].Index
+		}
+		return items[i].Remainder > items[j].Remainder
+	})
+
+	for idx := 0; idx < total-allocated; idx++ {
+		items[idx%len(items)].BaseCount++
+	}
+
+	counts := make([]int, len(slots))
+	for _, item := range items {
+		counts[item.Index] = item.BaseCount
+	}
+	return counts, nil
+}
+
+func deriveDeterministicDayTimestamps(
+	year int,
+	dayIndex int,
+	rows []testeeCreatedAtFixupRow,
+	start, end time.Time,
+) ([]time.Time, error) {
+	count := len(rows)
+	if count == 0 {
+		return nil, nil
+	}
+	if start.IsZero() || end.IsZero() {
+		return nil, fmt.Errorf("start and end must be non-zero")
+	}
+	if end.Before(start) {
+		return nil, fmt.Errorf("end %s is before start %s", end.Format(time.RFC3339), start.Format(time.RFC3339))
+	}
 	if count == 1 {
-		return []time.Time{start.Round(0)}, nil
+		unit := stableSeedUnitFloat(uint64(year), uint64(dayIndex), rows[0].ID, 1)
+		offset := time.Duration(math.Round(float64(end.Sub(start)) * unit))
+		return []time.Time{start.Add(offset).Round(0)}, nil
 	}
 
 	targets := make([]time.Time, count)
 	span := end.Sub(start)
-	targets[0] = start.Round(0)
-	targets[count-1] = end.Round(0)
-	for idx := 1; idx < count-1; idx++ {
-		baseRatio := float64(idx) / float64(count-1)
-		halfStep := 0.5 / float64(count-1)
-		low := baseRatio - halfStep
-		high := baseRatio + halfStep
-		unit := stableSeedUnitFloat(uint64(year), rows[idx].ID, uint64(idx), uint64(count))
-		ratio := low + unit*(high-low)
+	for idx := range rows {
+		baseRatio := float64(idx) / float64(count)
+		high := float64(idx+1) / float64(count)
+		unit := stableSeedUnitFloat(uint64(year), uint64(dayIndex), rows[idx].ID, uint64(idx), uint64(count))
+		ratio := baseRatio + unit*(high-baseRatio)
 		if ratio < 0 {
 			ratio = 0
 		}
@@ -308,6 +486,9 @@ func deriveDeterministicBucketTimestamps(
 		offset := time.Duration(math.Round(float64(span) * ratio))
 		targets[idx] = start.Add(offset).Round(0)
 	}
+	sort.SliceStable(targets, func(i, j int) bool {
+		return targets[i].Before(targets[j])
+	})
 	return targets, nil
 }
 

@@ -134,6 +134,79 @@ func TestDeriveDeterministicBucketTimestamps_IsStableAndJittered(t *testing.T) {
 	}
 }
 
+func TestDeriveDeterministicBucketTimestamps_PrefersWeekdaysAndAddsDailyVolatility(t *testing.T) {
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 3, 31, 23, 59, 59, 0, time.UTC)
+	rows := make([]testeeCreatedAtFixupRow, 0, 900)
+	for idx := 0; idx < 900; idx++ {
+		rows = append(rows, testeeCreatedAtFixupRow{ID: uint64(1000 + idx)})
+	}
+
+	targets, err := deriveDeterministicBucketTimestamps(2024, rows, start, end)
+	if err != nil {
+		t.Fatalf("deriveDeterministicBucketTimestamps returned error: %v", err)
+	}
+
+	weekdayTotal := 0
+	weekendTotal := 0
+	weekdayDays := 0
+	weekendDays := 0
+	weekdayCounts := make(map[int]int)
+	dailyCounts := make(map[string]int)
+	for _, ts := range targets {
+		dayKey := ts.Format("2006-01-02")
+		dailyCounts[dayKey]++
+	}
+	for day := start; !day.After(end); day = day.Add(24 * time.Hour) {
+		count := dailyCounts[day.Format("2006-01-02")]
+		if isTesteeCreatedAtWeekday(day.Weekday()) {
+			weekdayTotal += count
+			weekdayDays++
+			weekdayCounts[count]++
+		} else {
+			weekendTotal += count
+			weekendDays++
+		}
+	}
+	if weekdayDays == 0 || weekendDays == 0 {
+		t.Fatalf("expected both weekday and weekend days in range")
+	}
+
+	avgWeekday := float64(weekdayTotal) / float64(weekdayDays)
+	avgWeekend := float64(weekendTotal) / float64(weekendDays)
+	if avgWeekday <= avgWeekend*1.7 {
+		t.Fatalf("expected weekday load to be significantly higher than weekend load, got weekday %.2f weekend %.2f", avgWeekday, avgWeekend)
+	}
+	if len(weekdayCounts) < 4 {
+		t.Fatalf("expected visible weekday volatility, got only %d distinct weekday daily counts", len(weekdayCounts))
+	}
+}
+
+func TestAllocateTesteeCreatedAtDayCounts_UsesAllRows(t *testing.T) {
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 14, 23, 59, 59, 0, time.UTC)
+	slots, err := buildTesteeCreatedAtDaySlots(2024, start, end)
+	if err != nil {
+		t.Fatalf("buildTesteeCreatedAtDaySlots returned error: %v", err)
+	}
+
+	counts, err := allocateTesteeCreatedAtDayCounts(140, slots)
+	if err != nil {
+		t.Fatalf("allocateTesteeCreatedAtDayCounts returned error: %v", err)
+	}
+	if len(counts) != len(slots) {
+		t.Fatalf("expected %d day counts, got %d", len(slots), len(counts))
+	}
+
+	total := 0
+	for _, count := range counts {
+		total += count
+	}
+	if total != 140 {
+		t.Fatalf("expected day counts to sum to 140, got %d", total)
+	}
+}
+
 func TestDeriveEvenlyDistributedTimestamp_UsesMidpointForMiddleItem(t *testing.T) {
 	start := time.Date(2021, 5, 18, 0, 0, 0, 0, time.UTC)
 	end := start.Add(10 * time.Hour)

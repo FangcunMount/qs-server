@@ -12,6 +12,8 @@ QS 系统测试数据生成工具。
 - 只想给已分配受试者的 clinician 批量创建测评入口：运行 `--steps assessment_entries`
 - 只想把入口推进到 `resolve + intake`：运行 `--steps assessment_entry_flow`
 - 只想基于入口 intake 结果继续生成真实测评：运行 `--steps assessment_by_entry`
+- 想单独修 entry 链和 entry-based assessment 链：运行 `--steps assessment_entry_fixup_timestamps`
+- 想单独修剩余独立 adhoc assessment 链：运行 `--steps assessment_fixup_timestamps`
 - 想每天模拟一批新用户注册、建档、扫码并填报：运行 `--steps daily_simulation`
 - 只想批量创建计划 task：运行 `--steps plan_create_tasks`
 - 想在后台长期处理 backlog task：运行 `--steps plan_process_tasks`
@@ -30,6 +32,8 @@ QS 系统测试数据生成工具。
 | 批量为已分配受试者的 clinician 创建测评入口 | `assessment_entries` | 否 | apiserver + 本地 MySQL |
 | 批量推进入口 resolve + intake | `assessment_entry_flow` | 否 | apiserver + 本地 MySQL |
 | 基于入口 intake 结果继续生成真实测评 | `assessment_by_entry` | 否 | apiserver + 本地 MySQL + MongoDB |
+| 统一修正 entry / entry-based assessment 时间 | `assessment_entry_fixup_timestamps` | 否 | 本地 MySQL + MongoDB |
+| 统一修正独立 adhoc assessment 时间 | `assessment_fixup_timestamps` | 否 | 本地 MySQL + MongoDB |
 | 每天模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation` | 否（推荐 cron） | apiserver + collection-server + IAM REST/gRPC |
 | 只生成测评数据 | `assessment` | 否 | apiserver + collection-server |
 | 只创建 task | `plan_create_tasks` | 否 | 本地 MySQL + MongoDB + Redis |
@@ -48,6 +52,8 @@ QS 系统测试数据生成工具。
 - `assessment_entries` 需要本地 `local.mysql_dsn`，因为脚本会把入口时间回填成基于 `testee.created_at` 的结果
 - `assessment_entry_flow` 需要本地 `local.mysql_dsn`，因为脚本会回填 `resolve_log` 和入口来源关系时间
 - `assessment_by_entry` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
+- `assessment_entry_fixup_timestamps` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
+- `assessment_fixup_timestamps` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
 - `daily_simulation` 需要 `iam.loginUrl` 或 `iam.baseUrl`，以及可达的 `iam.grpc.address`
 - `plan_create_tasks` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`、`local.redis_*`
 - `plan_fixup_timestamps` 只需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
@@ -78,6 +84,8 @@ actor_fixup_timestamps \
 assessment_entries \
 assessment_entry_flow \
 assessment_by_entry \
+assessment_entry_fixup_timestamps \
+assessment_fixup_timestamps \
 assessment \
 plan_create_tasks \
 plan_process_tasks \
@@ -92,6 +100,8 @@ statistics_backfill
 - `actor_fixup_timestamps` 负责回填 actor 侧历史时间
 - `assessment_entry_flow` 负责回填 `resolve / intake / assessment_entry` 来源关系时间
 - `assessment_by_entry` 负责回填 answersheet / assessment / report 时间
+- `assessment_entry_fixup_timestamps` 负责把已有 entry 链和 entry-based assessment 链修到围绕 `testee.created_at` 的时间轴
+- `assessment_fixup_timestamps` 负责把剩余 adhoc 非 plan assessment 修到围绕 `testee.created_at` 的时间轴
 
 ## 按方案运行
 
@@ -172,7 +182,9 @@ go run ./cmd/tools/seeddata \
   - `2024: 25`
   - `2025: 13`
   - `2026: 2`
-- 每个年份内部会做稳定随机分散，不再是完全等间距；`2019` 从 `2019-03-25` 开始，`2026` 到 `2026-04-15` 结束
+- 每个年份内部会先按天做稳定加权分布，再在每天内部做稳定随机分散，不再是完全等间距
+- 工作日的日分布权重大约是周末的 2 倍，同时工作日之间会保留稳定波动，不会形成“每天都差不多”的平铺效果
+- `2019` 从 `2019-03-25` 开始，`2026` 到 `2026-04-15` 结束
 - 如果某条记录的 `updated_at < created_at`，会自动把 `updated_at` 追平到新的 `created_at`
 - 这一步只改 `testee` 表；如果你要让 actor / entry / plan 相关时间也与新 `created_at` 对齐，后续继续跑 `actor_fixup_timestamps` 以及相关 fixup step
 
@@ -226,6 +238,46 @@ go run ./cmd/tools/seeddata \
 - `questionnaire` target 只有在类型为 `MedicalScale` 时才会推进
 - 纯 survey 问卷会被记录为 skip
 - answersheet / assessment / report 时间会回填到入口链路时间轴
+
+### 方案 0.96：统一修正 entry / entry-based assessment 时间轴
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "assessment_entry_fixup_timestamps" \
+  --local-mysql-dsn "$MYSQL_DSN" \
+  --local-mongo-uri "$MONGO_URI" \
+  --local-mongo-database "$MONGO_DB"
+```
+
+说明：
+
+- 只处理当前机构下的已有历史数据，不创建新 entry / assessment
+- 会按新的 `testee.created_at` 重排：
+  - `assessment_entry.created_at / expires_at`
+  - `assessment_entry_resolve_log`
+  - `source_type=assessment_entry` 的 active creator / access relation
+- entry-based assessment 会优先按 `entry target + testee` 进行稳定匹配
+- 只会修 entry 相关 assessment，不会触碰剩余独立 adhoc assessment
+
+### 方案 0.97：统一修正独立 adhoc assessment 时间轴
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "assessment_fixup_timestamps" \
+  --local-mysql-dsn "$MYSQL_DSN" \
+  --local-mongo-uri "$MONGO_URI" \
+  --local-mongo-database "$MONGO_DB"
+```
+
+说明：
+
+- 只处理当前机构下的非 plan assessment
+- 会先识别并排除 entry-based assessment，避免和 `assessment_entry_fixup_timestamps` 重叠
+- 剩余 assessment 会作为独立 adhoc assessment，单独回放到围绕 `testee.created_at` 的时间轴
+- 只修 answersheet / assessment / interpret_report，不回写 entry / relation / resolve log
+- plan 链不在这一步覆盖范围内；plan 相关时间仍由 `plan_fixup_timestamps` 处理
 
 ### 方案 1：只生成测评
 
@@ -499,6 +551,27 @@ go run ./cmd/tools/seeddata \
 - 只处理 `assessment_entry` 来源的 active creator relation
 - 通过真实 answersheet 提交链路触发 assessment
 - 会等待 assessment 落库，再回填 answersheet / assessment / report 时间
+
+### `assessment_entry_fixup_timestamps`
+
+- 只依赖本地 MySQL + MongoDB
+- 不创建新数据，只修已有历史链路
+- 修复范围：
+  - `assessment_entry`
+  - `assessment_entry_resolve_log`
+  - `source_type=assessment_entry` 的 active relation
+- entry 会按 clinician 维度重排到围绕最早 active testee `created_at` 的固定时间轴
+- entry-based assessment 会优先按 `entry target + testee` 做稳定匹配
+- 不覆盖剩余独立 adhoc assessment
+
+### `assessment_fixup_timestamps`
+
+- 只依赖本地 MySQL + MongoDB
+- 只修已有独立 adhoc assessment 历史链路
+- 会先识别并排除 entry-based assessment，避免和 `assessment_entry_fixup_timestamps` 重叠
+- 剩余非 plan assessment 会单独回放到围绕 `testee.created_at` 的时间轴
+- 只更新 answersheet / assessment / interpret_report
+- 不覆盖 plan task 链；plan 相关时间仍走 `plan_fixup_timestamps`
 
 ### `plan_create_tasks`
 
