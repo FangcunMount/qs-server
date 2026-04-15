@@ -118,23 +118,42 @@ func seedPlanFixupTimestamps(ctx context.Context, deps *dependencies, opts planF
 		}
 	}()
 
+	totalTasks, err := countPlanFixupTasks(ctx, mysqlDB, planIDUint, deps.Config.Global.OrgID, scopeTesteeIDs)
+	if err != nil {
+		return err
+	}
+	totalBatches := 0
+	if totalTasks > 0 {
+		totalBatches = (totalTasks + planFixupBatchSize - 1) / planFixupBatchSize
+	}
+
 	deps.Logger.Infow("Plan timestamp fixup started",
 		"plan_id", planID,
 		"scope_testee_count", len(scopeTesteeIDs),
+		"total_tasks", totalTasks,
+		"total_batches", totalBatches,
 		"batch_size", planFixupBatchSize,
 		"completion_offset", planFixupCompletionOffset.String(),
 		"interpret_offset", planFixupInterpretOffset.String(),
 		"default_expire_ttl", planFixupDefaultExpireTTL.String(),
 	)
 
-	stats, err := runPlanTimestampFixup(ctx, mysqlDB, mongoDB, deps.Logger, planIDUint, deps.Config.Global.OrgID, scopeTesteeIDs, opts.Verbose)
+	batchProgress := newSeedProgressBar("plan_fixup batches", totalBatches)
+	defer batchProgress.Close()
+	taskProgress := newSeedProgressBar("plan_fixup tasks", totalTasks)
+	defer taskProgress.Close()
+
+	stats, err := runPlanTimestampFixup(ctx, mysqlDB, mongoDB, deps.Logger, planIDUint, deps.Config.Global.OrgID, scopeTesteeIDs, opts.Verbose, batchProgress, taskProgress)
 	if err != nil {
 		return err
 	}
+	batchProgress.Complete()
+	taskProgress.Complete()
 
 	deps.Logger.Infow("Plan timestamp fixup completed",
 		"plan_id", planID,
 		"scope_testee_count", len(scopeTesteeIDs),
+		"total_tasks", totalTasks,
 		"tasks_processed", stats.TasksProcessed,
 		"tasks_updated", stats.TasksUpdated,
 		"assessments_updated", stats.AssessmentsUpdated,
@@ -159,6 +178,8 @@ func runPlanTimestampFixup(
 	orgID int64,
 	scopeTesteeIDs []uint64,
 	verbose bool,
+	batchProgress *seedProgressBar,
+	taskProgress *seedProgressBar,
 ) (*planFixupStats, error) {
 	stats := &planFixupStats{}
 	var lastID uint64
@@ -182,8 +203,35 @@ func runPlanTimestampFixup(
 			if err := applyPlanTaskTimestampFixup(ctx, mysqlDB, mongoDB, logger, task, assessments, stats, verbose); err != nil {
 				return nil, err
 			}
+			taskProgress.Increment()
 		}
+		batchProgress.Increment()
 	}
+}
+
+func countPlanFixupTasks(
+	ctx context.Context,
+	mysqlDB *gorm.DB,
+	planID uint64,
+	orgID int64,
+	scopeTesteeIDs []uint64,
+) (int, error) {
+	query := mysqlDB.WithContext(ctx).
+		Table((planMySQL.AssessmentTaskPO{}).TableName()).
+		Where("org_id = ? AND plan_id = ? AND deleted_at IS NULL", orgID, planID).
+		Where("status IN ?", []string{"opened", "completed", "expired"})
+	if len(scopeTesteeIDs) > 0 {
+		query = query.Where("testee_id IN ?", scopeTesteeIDs)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return 0, fmt.Errorf("count plan fixup tasks: %w", err)
+	}
+	if total <= 0 {
+		return 0, nil
+	}
+	return int(total), nil
 }
 
 func loadPlanFixupTaskBatch(
