@@ -296,13 +296,6 @@ func (t *AssessmentTask) addEvent(evt event.DomainEvent) {
 	t.events = append(t.events, evt)
 }
 
-// ==================== 仓储层辅助方法 ====================
-
-// setID 设置ID（仅供仓储层使用）
-func (t *AssessmentTask) setID(id AssessmentTaskID) {
-	t.id = id
-}
-
 // RestoreFromRepository 从仓储恢复状态（仅供仓储层使用）
 func (t *AssessmentTask) RestoreFromRepository(
 	id AssessmentTaskID,

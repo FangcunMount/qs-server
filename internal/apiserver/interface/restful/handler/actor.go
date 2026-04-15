@@ -150,7 +150,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/by-profile-id [get]
 func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	_, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -165,7 +165,7 @@ func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	orgID, err = h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -508,7 +508,7 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees [get]
 func (h *ActorHandler) ListTestees(c *gin.Context) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	_, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -524,7 +524,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	orgID, err = h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
 	if err != nil {
 		h.Error(c, err)
 		return

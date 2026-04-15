@@ -196,16 +196,6 @@ func (m *QuestionnaireMapper) mapValidationRulesPOToBO(rulesPO []ValidationRuleP
 	return rules
 }
 
-// mapCalculationRulePOToBO 将计算规则PO转换为计算规则BO
-func (m *QuestionnaireMapper) mapCalculationRulePOToBO(rulePO CalculationRulePO) *calculation.CalculationRule {
-	if rulePO.Formula == "" {
-		return nil
-	}
-
-	formulaType := calculation.FormulaType(rulePO.Formula)
-	return calculation.NewCalculationRule(formulaType, []string{})
-}
-
 // mapShowController 将显示控制器BO转换为PO
 func (m *QuestionnaireMapper) mapShowController(sc *questionnaire.ShowController) *ShowControllerPO {
 	if sc == nil || sc.IsEmpty() {

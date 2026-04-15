@@ -133,14 +133,6 @@ func (v *validator) ValidateProfileBinding(ctx context.Context, testee *Testee, 
 	return nil
 }
 
-// ValidateOrgID 验证机构ID（已废弃，保留用于兼容）
-func (v *validator) ValidateOrgID(orgID int64) error {
-	if orgID <= 0 {
-		return errors.WithCode(code.ErrValidation, "orgID must be positive")
-	}
-	return nil
-}
-
 // ValidateName 验证姓名
 func (v *validator) ValidateName(name string, required bool) error {
 	if required && name == "" {

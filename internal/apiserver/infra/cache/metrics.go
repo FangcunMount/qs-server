@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -10,8 +9,6 @@ import (
 // MetricsCollector 缓存指标收集器
 // 用于收集缓存操作的统计信息
 type MetricsCollector struct {
-	mu sync.RWMutex
-
 	// 操作计数
 	hits   int64 // 命中次数
 	misses int64 // 未命中次数
@@ -20,10 +17,6 @@ type MetricsCollector struct {
 	// 延迟统计
 	totalLatency   int64 // 总延迟（纳秒）
 	operationCount int64 // 操作总数
-
-	// 内存使用（需要从 Redis 获取）
-	memoryUsage int64
-	keyCount    int64
 }
 
 // NewMetricsCollector 创建指标收集器

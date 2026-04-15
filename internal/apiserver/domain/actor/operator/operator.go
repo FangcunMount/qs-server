@@ -129,16 +129,6 @@ func (s *Operator) HasAnyRole(roles ...Role) bool {
 	return false
 }
 
-// updateContactInfo 更新联系信息（包内方法，应通过 Editor 或 IAMSynchronizer 调用）
-func (s *Operator) updateContactInfo(email, phone string) {
-	if email != "" {
-		s.email = email
-	}
-	if phone != "" {
-		s.phone = phone
-	}
-}
-
 // activate 激活（包内方法，应通过 Editor 调用）
 func (s *Operator) activate() {
 	s.isActive = true

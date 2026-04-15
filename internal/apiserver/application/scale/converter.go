@@ -210,20 +210,6 @@ func toFactorResult(f *scale.Factor) FactorResult {
 	return result
 }
 
-// toScaleListResult 将量表列表转换为结果对象
-func toScaleListResult(items []*scale.MedicalScale, total int64) *ScaleListResult {
-	result := &ScaleListResult{
-		Items: make([]*ScaleResult, 0, len(items)),
-		Total: total,
-	}
-
-	for _, item := range items {
-		result.Items = append(result.Items, toScaleResult(item))
-	}
-
-	return result
-}
-
 // toSummaryListResult 将量表摘要列表转换为结果对象
 func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total int64, identitySvc *iam.IdentityService) *ScaleSummaryListResult {
 	userNames := resolveSummaryUserNames(ctx, items, identitySvc)

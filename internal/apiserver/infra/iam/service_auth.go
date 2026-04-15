@@ -155,7 +155,7 @@ func DialWithServiceAuth(authHelper *ServiceAuthHelper, target string, opts ...g
 	// 添加 PerRPCCredentials 到 dial options
 	opts = append(opts, grpc.WithPerRPCCredentials(authHelper))
 
-	conn, err := grpc.Dial(target, opts...)
+	conn, err := grpc.NewClient(target, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %s: %w", target, err)
 	}

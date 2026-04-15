@@ -129,17 +129,6 @@ func (t *Testee) GetAge() int {
 	return age
 }
 
-// updateBasicInfo 更新基本信息（包内方法，应通过 Editor 调用）
-func (t *Testee) updateBasicInfo(name string, gender Gender, birthday *time.Time) {
-	if name != "" {
-		t.name = name
-	}
-	t.gender = gender
-	if birthday != nil {
-		t.birthday = birthday
-	}
-}
-
 // === 标签管理方法 ===
 
 // Tags 获取标签列表（返回副本，防止外部修改）
@@ -195,26 +184,11 @@ func (t *Testee) removeTag(tag Tag) {
 	}
 }
 
-// clearTags 清空所有标签（包内方法，应通过 Tagger 调用）
-func (t *Testee) clearTags() {
-	t.tags = make([]Tag, 0)
-}
-
 // === 关注度管理 ===
 
 // IsKeyFocus 是否重点关注对象
 func (t *Testee) IsKeyFocus() bool {
 	return t.isKeyFocus
-}
-
-// markAsKeyFocus 标记为重点关注（包内方法，应通过 Editor 调用）
-func (t *Testee) markAsKeyFocus() {
-	t.isKeyFocus = true
-}
-
-// unmarkAsKeyFocus 取消重点关注（包内方法，应通过 Editor 调用）
-func (t *Testee) unmarkAsKeyFocus() {
-	t.isKeyFocus = false
 }
 
 // === 数据来源 ===

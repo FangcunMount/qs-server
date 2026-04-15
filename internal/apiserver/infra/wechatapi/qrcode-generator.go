@@ -159,7 +159,7 @@ func (g *QRCodeGenerator) GenerateUnlimitedQRCode(
 	}
 
 	// 如果提供了 lineColor，转换为 qrcode.Color
-	if lineColor != nil && len(lineColor) > 0 {
+	if len(lineColor) > 0 {
 		color := &qrcode.Color{
 			R: fmt.Sprintf("%d", lineColor["r"]),
 			G: fmt.Sprintf("%d", lineColor["g"]),

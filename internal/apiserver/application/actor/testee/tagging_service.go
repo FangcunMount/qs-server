@@ -143,28 +143,6 @@ func (s *taggingService) removeOldRiskTags(ctx context.Context, testeeID uint64,
 	return removed, nil
 }
 
-// removeOldFactorRiskTags 移除旧的因子风险标签
-func (s *taggingService) removeOldFactorRiskTags(ctx context.Context, testeeID uint64, currentTags []string) ([]string, error) {
-	var removed []string
-
-	for _, currentTag := range currentTags {
-		if strings.HasPrefix(currentTag, "factor_") && strings.HasSuffix(currentTag, "_high") {
-			if err := s.managementService.RemoveTag(ctx, testeeID, currentTag); err != nil {
-				logger.L(ctx).Warnw("移除旧因子风险标签失败",
-					"testee_id", testeeID,
-					"tag", currentTag,
-					"error", err.Error(),
-				)
-				// 继续处理其他标签，不中断流程
-			} else {
-				removed = append(removed, currentTag)
-			}
-		}
-	}
-
-	return removed, nil
-}
-
 // addRiskLevelTags 根据风险等级添加标签
 func (s *taggingService) addRiskLevelTags(ctx context.Context, testeeID uint64, riskLevel string) ([]string, error) {
 	var added []string
@@ -213,29 +191,6 @@ func (s *taggingService) addRiskLevelTags(ctx context.Context, testeeID uint64, 
 	}
 
 	return added, nil
-}
-
-// addScaleTag 添加量表类型标签（历史标签，保留不删除）
-func (s *taggingService) addScaleTag(ctx context.Context, testeeID uint64, scaleCode string, currentTags []string) (string, error) {
-	tag := "scale_" + strings.ToLower(scaleCode)
-
-	// 检查是否已有该标签（历史标签，不重复添加）
-	for _, currentTag := range currentTags {
-		if currentTag == tag {
-			return "", nil // 已存在，不重复添加
-		}
-	}
-
-	if err := s.managementService.AddTag(ctx, testeeID, tag); err != nil {
-		logger.L(ctx).Warnw("添加量表标签失败",
-			"testee_id", testeeID,
-			"tag", tag,
-			"error", err.Error(),
-		)
-		return "", err
-	}
-
-	return tag, nil
 }
 
 // updateKeyFocusStatus 更新重点关注状态

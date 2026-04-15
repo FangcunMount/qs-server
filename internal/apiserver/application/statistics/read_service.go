@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -861,8 +860,3 @@ func ptrMetaIDFromUint64(v *uint64) *meta.ID {
 }
 
 // sortClinicianStatistics 统一排序结果，保留同页内稳定输出。
-func sortClinicianStatistics(items []*domainStatistics.ClinicianStatistics) {
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].Clinician.ID > items[j].Clinician.ID
-	})
-}

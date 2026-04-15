@@ -96,20 +96,6 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 	return result
 }
 
-// toAnswerSheetListResult 将答卷列表转换为结果对象
-func toAnswerSheetListResult(items []*answersheet.AnswerSheet, total int64) *AnswerSheetListResult {
-	result := &AnswerSheetListResult{
-		Items: make([]*AnswerSheetResult, 0, len(items)),
-		Total: total,
-	}
-
-	for _, item := range items {
-		result.Items = append(result.Items, toAnswerSheetResult(item))
-	}
-
-	return result
-}
-
 // toSummaryListResult 将答卷摘要列表转换为结果对象
 func toSummaryListResult(items []*answersheet.AnswerSheetSummary, total int64) *AnswerSheetSummaryListResult {
 	result := &AnswerSheetSummaryListResult{

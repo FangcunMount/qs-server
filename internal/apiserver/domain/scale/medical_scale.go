@@ -1,7 +1,6 @@
 package scale
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -345,11 +344,6 @@ func (m *MedicalScale) GetNonTotalScoreFactors() []*Factor {
 
 // ===================== 包内私有方法（供领域服务调用）=================
 
-// setID 设置ID（仅供仓储层使用）
-func (m *MedicalScale) setID(id meta.ID) {
-	m.id = id
-}
-
 // updateBasicInfo 更新基本信息
 func (m *MedicalScale) updateBasicInfo(title, description string) error {
 	if title == "" {
@@ -513,9 +507,4 @@ func (m *MedicalScale) addEvent(evt event.DomainEvent) {
 		m.events = make([]event.DomainEvent, 0)
 	}
 	m.events = append(m.events, evt)
-}
-
-// idString 获取 ID 字符串（用于事件）
-func (m *MedicalScale) idString() string {
-	return strconv.FormatUint(uint64(m.id), 10)
 }

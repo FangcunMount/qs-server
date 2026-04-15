@@ -210,30 +210,6 @@ func (f *Factor) FindInterpretRule(score float64) *InterpretationRule {
 
 // ===================== 包内私有方法（供领域服务调用）=================
 
-// updateTitle 更新因子标题
-func (f *Factor) updateTitle(title string) error {
-	if title == "" {
-		return errors.WithCode(code.ErrInvalidArgument, "factor title cannot be empty")
-	}
-	f.title = title
-	return nil
-}
-
-// updateQuestionCodes 更新关联的题目编码
-func (f *Factor) updateQuestionCodes(codes []meta.Code) {
-	f.questionCodes = codes
-}
-
-// updateScoringStrategy 更新计分策略
-func (f *Factor) updateScoringStrategy(strategy ScoringStrategyCode, params *ScoringParams) {
-	f.scoringStrategy = strategy
-	if params == nil {
-		f.scoringParams = NewScoringParams()
-	} else {
-		f.scoringParams = params
-	}
-}
-
 // updateInterpretRules 更新解读规则
 func (f *Factor) updateInterpretRules(rules []InterpretationRule) {
 	f.interpretRules = rules

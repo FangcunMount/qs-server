@@ -259,21 +259,6 @@ func (p *AssessmentPlan) ClearEvents() {
 	p.events = make([]event.DomainEvent, 0)
 }
 
-// addEvent 添加领域事件（私有方法）
-func (p *AssessmentPlan) addEvent(evt event.DomainEvent) {
-	if p.events == nil {
-		p.events = make([]event.DomainEvent, 0)
-	}
-	p.events = append(p.events, evt)
-}
-
-// ==================== 仓储层辅助方法 ====================
-
-// setID 设置ID（仅供仓储层使用）
-func (p *AssessmentPlan) setID(id AssessmentPlanID) {
-	p.id = id
-}
-
 // RestoreFromRepository 从仓储恢复状态（仅供仓储层使用）
 func (p *AssessmentPlan) RestoreFromRepository(
 	id AssessmentPlanID,

@@ -910,9 +910,9 @@ func (h *PlanHandler) ListTasksByPlan(c *gin.Context) {
 	if scope.IsAdmin {
 		tasks, err = h.queryService.ListTasksByPlan(c.Request.Context(), orgID, planID)
 	} else {
-		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
-		if err != nil {
-			h.Error(c, err)
+		allowedTesteeIDs, accessErr := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
+		if accessErr != nil {
+			h.Error(c, accessErr)
 			return
 		}
 		tasks, err = h.queryService.ListTasksByPlanInScope(c.Request.Context(), orgID, planID, allowedTesteeIDsToStrings(allowedTesteeIDs))
