@@ -7,6 +7,7 @@ QS 系统测试数据生成工具。
 - 只想批量生成测评：运行 `--steps assessment`
 - 只想批量创建员工账号与临床医师：运行 `--steps staff,clinician`
 - 只想把现有 testee 分配给 clinician：运行 `--steps assign_testees`
+- 只想把 testee.created_at 按年份权重分布到 `2019-03-25 ~ 2026-04-15`：运行 `--steps testee_fixup_created_at`
 - 只想把 actor 历史时间回填成贴近 `testee.created_at` 的拟真时间：运行 `--steps actor_fixup_timestamps`
 - 只想给已分配受试者的 clinician 批量创建测评入口：运行 `--steps assessment_entries`
 - 只想把入口推进到 `resolve + intake`：运行 `--steps assessment_entry_flow`
@@ -24,6 +25,7 @@ QS 系统测试数据生成工具。
 | --- | --- | --- | --- |
 | 批量创建员工账号与临床医师 | `staff,clinician` | 否 | apiserver + IAM |
 | 批量分配现有 testee 给 clinician | `assign_testees` | 否 | apiserver |
+| 按年份权重回填 testee.created_at | `testee_fixup_created_at` | 否 | 本地 MySQL |
 | 修正 actor 历史时间 | `actor_fixup_timestamps` | 否 | 本地 MySQL |
 | 批量为已分配受试者的 clinician 创建测评入口 | `assessment_entries` | 否 | apiserver + 本地 MySQL |
 | 批量推进入口 resolve + intake | `assessment_entry_flow` | 否 | apiserver + 本地 MySQL |
@@ -42,6 +44,7 @@ QS 系统测试数据生成工具。
 - `api.baseUrl`、`api.token` 或 `iam.*` 必须可用
 - `assessment` 需要 `collectionBaseUrl`
 - `actor_fixup_timestamps` 需要本地 `local.mysql_dsn`
+- `testee_fixup_created_at` 需要本地 `local.mysql_dsn`
 - `assessment_entries` 需要本地 `local.mysql_dsn`，因为脚本会把入口时间回填成基于 `testee.created_at` 的结果
 - `assessment_entry_flow` 需要本地 `local.mysql_dsn`，因为脚本会回填 `resolve_log` 和入口来源关系时间
 - `assessment_by_entry` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
@@ -70,6 +73,7 @@ export REDIS_DB=0
 ```bash
 staff,clinician \
 assign_testees \
+testee_fixup_created_at \
 actor_fixup_timestamps \
 assessment_entries \
 assessment_entry_flow \
@@ -145,6 +149,34 @@ go run ./cmd/tools/seeddata \
 - 如果配置 `expiresAfter`，会基于这个入口时间锚点计算 `expires_at`
 
 ### 方案 0.8：回填 actor 历史时间
+
+如果你需要先把 testee 的创建时间按年份权重铺到一个更长的历史区间，再让后续 actor / entry / plan 时间都跟着变得更拟真，先运行：
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "testee_fixup_created_at" \
+  --local-mysql-dsn "$MYSQL_DSN"
+```
+
+说明：
+
+- 只更新当前机构、未删除 testee 的 `created_at`
+- 会按当前 `created_at / id` 顺序稳定排序，然后分布到 `2019-03-25 00:00:00 ~ 2026-04-15 23:59:59`
+- 分布按年份权重归一化：
+  - `2019: 5`
+  - `2020: 6`
+  - `2021: 11`
+  - `2022: 18`
+  - `2023: 22`
+  - `2024: 25`
+  - `2025: 13`
+  - `2026: 2`
+- 每个年份内部再均匀分布；`2019` 从 `2019-03-25` 开始，`2026` 到 `2026-04-15` 结束
+- 如果某条记录的 `updated_at < created_at`，会自动把 `updated_at` 追平到新的 `created_at`
+- 这一步只改 `testee` 表；如果你要让 actor / entry / plan 相关时间也与新 `created_at` 对齐，后续继续跑 `actor_fixup_timestamps` 以及相关 fixup step
+
+### 方案 0.85：回填 actor 历史时间
 
 ```bash
 go run ./cmd/tools/seeddata \

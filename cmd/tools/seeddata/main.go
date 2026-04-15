@@ -49,6 +49,7 @@ const (
 	stepStaff               seedStep = "staff"
 	stepClinician           seedStep = "clinician"
 	stepAssignTestees       seedStep = "assign_testees"
+	stepTesteeFixupCreated  seedStep = "testee_fixup_created_at"
 	stepActorFixupTimes     seedStep = "actor_fixup_timestamps"
 	stepAssessmentEntries   seedStep = "assessment_entries"
 	stepAssessmentEntryFlow seedStep = "assessment_entry_flow"
@@ -290,6 +291,8 @@ func main() {
 			err = seedClinicians(runCtx, deps)
 		case stepAssignTestees:
 			err = seedAssignTestees(runCtx, deps, assignmentOpts)
+		case stepTesteeFixupCreated:
+			err = seedTesteeFixupCreatedAt(runCtx, deps)
 		case stepActorFixupTimes:
 			err = seedActorFixupTimestamps(runCtx, deps)
 		case stepAssessmentEntries:
@@ -401,6 +404,8 @@ func seedStepFailureMessage(step seedStep) string {
 		return "Clinician seeding failed"
 	case stepAssignTestees:
 		return "Testee assignment seeding failed"
+	case stepTesteeFixupCreated:
+		return "Testee created_at fixup failed"
 	case stepActorFixupTimes:
 		return "Actor timestamp fixup failed"
 	case stepAssessmentEntries:
