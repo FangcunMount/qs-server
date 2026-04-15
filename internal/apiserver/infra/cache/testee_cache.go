@@ -165,15 +165,6 @@ func (r *CachedTesteeRepository) deleteCache(ctx context.Context, id testee.ID) 
 	return r.client.Del(ctx, key).Err()
 }
 
-// setNilCache 设置空值缓存，防止穿透
-func (r *CachedTesteeRepository) setNilCache(ctx context.Context, id testee.ID) error {
-	if r.client == nil {
-		return nil
-	}
-	key := r.buildCacheKey(id)
-	return r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
-}
-
 // 实现其他 Repository 方法（透传，不缓存）
 func (r *CachedTesteeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*testee.Testee, error) {
 	return r.repo.FindByProfile(ctx, orgID, profileID)

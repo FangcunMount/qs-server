@@ -225,23 +225,19 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 
 	// ==================== 初始化 Assessment 应用服务 ====================
 
-	// 创建状态缓存（如果 Redis 可用）
-	var statusCache *assessmentCache.AssessmentStatusCache
 	var myAssessmentListCache *assessmentCache.MyAssessmentListCache
 	if redisClient != nil {
 		// 创建 RedisCache 实例（实现 Cache 接口）
 		redisCache := assessmentCache.NewRedisCache(redisClient)
-		statusCache = assessmentCache.NewAssessmentStatusCache(redisCache)
 		myAssessmentListCache = assessmentCache.NewMyAssessmentListCache(redisCache)
 	}
 
 	// 提交服务 - 服务于答题者 (Testee)
-	if statusCache != nil {
-		m.SubmissionService = assessmentApp.NewSubmissionServiceWithCache(
+	if myAssessmentListCache != nil {
+		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
 			m.AssessmentRepo,
 			assessmentCreator,
 			m.eventPublisher,
-			statusCache,
 			myAssessmentListCache,
 		)
 	} else {
@@ -253,14 +249,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
-	if statusCache != nil {
-		m.ManagementService = assessmentApp.NewManagementServiceWithCache(
-			m.AssessmentRepo,
-			statusCache,
-		)
-	} else {
-		m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo)
-	}
+	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo)
 
 	// 报告查询服务 - 服务于报告查询者
 	m.ReportQueryService = assessmentApp.NewReportQueryService(m.ReportRepo)
@@ -280,10 +269,6 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		m.EvaluationService,
 	)
 
-	// 注入状态缓存（如果可用）
-	if statusCache != nil {
-		m.Handler.SetStatusCache(statusCache)
-	}
 	if m.testeeAccessService != nil {
 		m.Handler.SetTesteeAccessService(m.testeeAccessService)
 	}

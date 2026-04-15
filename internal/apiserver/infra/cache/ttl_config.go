@@ -11,7 +11,6 @@ type TTLOptions struct {
 	Scale            time.Duration
 	Questionnaire    time.Duration
 	AssessmentDetail time.Duration
-	AssessmentStatus time.Duration
 	Testee           time.Duration
 	Plan             time.Duration
 	Negative         time.Duration
@@ -35,9 +34,6 @@ func ApplyTTLOptions(opts TTLOptions) {
 	}
 	if opts.AssessmentDetail > 0 {
 		DefaultAssessmentDetailCacheTTL = opts.AssessmentDetail
-	}
-	if opts.AssessmentStatus > 0 {
-		AssessmentStatusCacheTTL = opts.AssessmentStatus
 	}
 	if opts.Testee > 0 {
 		DefaultTesteeCacheTTL = opts.Testee

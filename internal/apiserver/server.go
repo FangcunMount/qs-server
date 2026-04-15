@@ -166,7 +166,6 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			Scale:            s.config.Cache.TTL.Scale,
 			Questionnaire:    s.config.Cache.TTL.Questionnaire,
 			AssessmentDetail: s.config.Cache.TTL.AssessmentDetail,
-			AssessmentStatus: s.config.Cache.TTL.AssessmentStatus,
 			Testee:           s.config.Cache.TTL.Testee,
 			Plan:             s.config.Cache.TTL.Plan,
 			Negative:         s.config.Cache.TTL.Negative,

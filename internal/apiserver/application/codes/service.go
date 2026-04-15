@@ -2,25 +2,16 @@ package codes
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	redis "github.com/redis/go-redis/v9"
 )
 
-// redisKeySeq returns redis key for sequence counter
-func redisKeySeq(kind string) string {
-	return fmt.Sprintf("codes:%s:seq", kind)
-}
-
-// codesService 基于 Redis 的简单实现，保证计数器自增唯一
-type codesService struct {
-	redis redis.UniversalClient
-}
+// codesService 基于 internal/pkg/meta 的简单实现。
+type codesService struct{}
 
 // NewService 创建 CodesService 实例
-func NewService(redisClient redis.UniversalClient) CodesService {
-	return &codesService{redis: redisClient}
+func NewService() CodesService {
+	return &codesService{}
 }
 
 // Apply 实现 CodesService.Apply

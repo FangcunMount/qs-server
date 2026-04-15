@@ -100,16 +100,6 @@ func (b *CacheKeyBuilder) BuildQuestionnaireKey(code, version string) string {
 	return addNamespace("questionnaire:" + code + ":" + version)
 }
 
-// BuildQuestionnaireListKey 构建问卷全局列表缓存键
-func (b *CacheKeyBuilder) BuildQuestionnaireListKey() string {
-	return addNamespace("questionnaire:list:v1")
-}
-
-// BuildAssessmentStatusKey 构建测评状态缓存键
-func (b *CacheKeyBuilder) BuildAssessmentStatusKey(id uint64) string {
-	return addNamespace(fmt.Sprintf("assessment:status:%d", id))
-}
-
 // BuildAssessmentDetailKey 构建测评详情缓存键
 func (b *CacheKeyBuilder) BuildAssessmentDetailKey(id uint64) string {
 	return addNamespace(fmt.Sprintf("assessment:detail:%d", id))

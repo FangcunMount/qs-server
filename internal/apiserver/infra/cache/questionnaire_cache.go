@@ -114,8 +114,6 @@ func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code str
 		go func() {
 			_ = r.setCache(context.Background(), code, qDomain.GetVersion().Value(), qDomain)
 		}()
-	} else if r.client != nil && qDomain == nil {
-		_ = r.setNilCache(context.Background(), code, "")
 	}
 
 	return qDomain, nil

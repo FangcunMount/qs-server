@@ -24,8 +24,6 @@ type collectionServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
 	// 配置
 	config *config.Config
-	// 数据库管理器
-	dbManager *DatabaseManager
 	// Container 主容器
 	container *container.Container
 	// gRPC 客户端管理器
@@ -68,23 +66,10 @@ func createCollectionServer(cfg *config.Config) (*collectionServer, error) {
 
 // PrepareRun 准备运行 Collection 服务器
 func (s *collectionServer) PrepareRun() preparedCollectionServer {
-	// 1. 初始化数据库管理器（Redis）
-	s.dbManager = NewDatabaseManager(s.config)
-	if err := s.dbManager.Initialize(); err != nil {
-		log.Fatalf("Failed to initialize database manager: %v", err)
-	}
-	cacheRedis, err := s.dbManager.GetRedisClient()
-	if err != nil {
-		log.Warnf("Cache Redis not available: %v", err)
-	}
+	// 1. 创建容器
+	s.container = container.NewContainer(s.config.Options)
 
-	// 2. 创建容器
-	s.container = container.NewContainer(
-		s.config.Options,
-		cacheRedis,
-	)
-
-	// 3. 初始化 IAM 模块（须在 gRPC 连 apiserver 之前，以便挂载 ServiceAuth PerRPC）
+	// 2. 初始化 IAM 模块（须在 gRPC 连 apiserver 之前，以便挂载 ServiceAuth PerRPC）
 	ctx := context.Background()
 	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
 	if err != nil {
@@ -98,7 +83,7 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		perRPC = h
 	}
 
-	// 4. 创建 gRPC 客户端管理器（可选 PerRPC 服务 JWT）
+	// 3. 创建 gRPC 客户端管理器（可选 PerRPC 服务 JWT）
 	s.grpcManager, err = CreateGRPCClientManager(
 		s.config.GRPCClient.Endpoint,
 		s.config.GRPCClient.Timeout,
@@ -115,20 +100,20 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	}
 	log.Infof("✅ gRPC client manager initialized (endpoint: %s)", s.config.GRPCClient.Endpoint)
 
-	// 5. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
+	// 4. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
 	grpcRegistry := NewGRPCClientRegistry(s.grpcManager, s.container)
 	if err := grpcRegistry.RegisterClients(); err != nil {
 		log.Fatalf("Failed to register gRPC clients: %v", err)
 	}
 
-	// 6. 初始化容器中的所有组件
+	// 5. 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
 	s.startAuthzVersionSync()
 	log.Infof("Router registering with middlewares: %v", s.config.GenericServerRunOptions.Middlewares)
 
-	// 7. 安装全局并发限制中间件（避免过载）
+	// 6. 安装全局并发限制中间件（避免过载）
 	if s.config.Concurrency != nil && s.config.Concurrency.MaxConcurrency > 0 {
 		s.genericAPIServer.Engine.Use(concurrencyLimitMiddleware(s.config.Concurrency.MaxConcurrency))
 		log.Infof("Installed concurrency limiter: max=%d", s.config.Concurrency.MaxConcurrency)
@@ -141,9 +126,6 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-		if s.dbManager != nil {
-			_ = s.dbManager.Close()
-		}
 		if s.grpcManager != nil {
 			_ = s.grpcManager.Close()
 		}

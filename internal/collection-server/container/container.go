@@ -11,14 +11,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	redis "github.com/redis/go-redis/v9"
 )
 
 // Container 主容器，负责管理所有组件
 type Container struct {
 	initialized bool
 	opts        *options.Options
-	redisCache  redis.UniversalClient
 
 	// IAM 模块
 	IAMModule *IAMModule
@@ -47,10 +45,9 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, redisCache redis.UniversalClient) *Container {
+func NewContainer(opts *options.Options) *Container {
 	return &Container{
 		opts:        opts,
-		redisCache:  redisCache,
 		initialized: false,
 	}
 }

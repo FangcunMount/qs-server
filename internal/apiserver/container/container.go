@@ -115,7 +115,6 @@ type ContainerCacheTTLOptions struct {
 	Scale            time.Duration
 	Questionnaire    time.Duration
 	AssessmentDetail time.Duration
-	AssessmentStatus time.Duration
 	Testee           time.Duration
 	Plan             time.Duration
 	Negative         time.Duration
@@ -142,7 +141,6 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 		Scale:            opts.Cache.TTL.Scale,
 		Questionnaire:    opts.Cache.TTL.Questionnaire,
 		AssessmentDetail: opts.Cache.TTL.AssessmentDetail,
-		AssessmentStatus: opts.Cache.TTL.AssessmentStatus,
 		Testee:           opts.Cache.TTL.Testee,
 		Plan:             opts.Cache.TTL.Plan,
 		Negative:         opts.Cache.TTL.Negative,
@@ -454,14 +452,8 @@ func (c *Container) initCodesService() {
 	if c.CodesService != nil {
 		return
 	}
-	if c.redisCache != nil {
-		c.CodesService = codesapp.NewService(c.redisCache)
-		c.printf("🔑 CodesService initialized using redisCache\n")
-		return
-	}
-	// 无 redis 时使用 nil 或者 NewService 会回退到时间戳实现
-	c.CodesService = codesapp.NewService(nil)
-	c.printf("🔑 CodesService initialized using fallback (no redis)\n")
+	c.CodesService = codesapp.NewService()
+	c.printf("🔑 CodesService initialized\n")
 }
 
 // initQRCodeGenerator 初始化小程序码生成器（基础设施层）

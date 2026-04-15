@@ -10,7 +10,6 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
@@ -25,7 +24,6 @@ type EvaluationHandler struct {
 	scoreQueryService   assessmentApp.ScoreQueryService
 	evaluationService   engine.Service
 	testeeAccessService actorAccessApp.TesteeAccessService
-	statusCache         *cache.AssessmentStatusCache
 	waiterRegistry      *waiter.WaiterRegistry
 }
 
@@ -48,11 +46,6 @@ func NewEvaluationHandler(
 // SetTesteeAccessService 设置 testee 访问控制服务。
 func (h *EvaluationHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
 	h.testeeAccessService = testeeAccessService
-}
-
-// SetStatusCache 设置状态缓存（可选）
-func (h *EvaluationHandler) SetStatusCache(statusCache *cache.AssessmentStatusCache) {
-	h.statusCache = statusCache
 }
 
 // SetWaiterRegistry 设置等待队列注册表（可选）
