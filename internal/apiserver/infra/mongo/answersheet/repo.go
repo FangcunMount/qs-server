@@ -9,6 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -17,7 +18,7 @@ type Repository struct {
 	mongoBase.BaseRepository
 	mapper          *AnswerSheetMapper
 	idempotencyColl *mongo.Collection
-	outboxColl      *mongo.Collection
+	outboxStore     *mongoEventOutbox.Store
 }
 
 // NewRepository 创建答卷MongoDB存储库
@@ -27,8 +28,12 @@ func NewRepository(db *mongo.Database) (*Repository, error) {
 		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName()),
 		mapper:          NewAnswerSheetMapper(),
 		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
-		outboxColl:      db.Collection((&AnswerSheetSubmittedOutboxPO{}).CollectionName()),
 	}
+	outboxStore, err := mongoEventOutbox.NewStore(db)
+	if err != nil {
+		return nil, err
+	}
+	repo.outboxStore = outboxStore
 	if err := repo.ensureIndexes(context.Background()); err != nil {
 		return nil, err
 	}

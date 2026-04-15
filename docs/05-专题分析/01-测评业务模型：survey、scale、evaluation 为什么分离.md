@@ -196,7 +196,7 @@ flowchart TB
 | 2 | `FactorScoreHandler` | 因子分（从答卷与规则聚合） |
 | 3 | `RiskLevelHandler` | 风险等级并写分数仓储 |
 | 4 | `InterpretationHandler` | 解读与报告 |
-| 5 | `EventPublishHandler` | 发布领域/应用事件（无 `eventPublisher` 时仍可依赖仓储侧行为，见代码注释） |
+| 5 | `WaiterNotifyHandler` | 本地 waiter 通知；真正事件出站由 MySQL / Mongo outbox 按持久化边界负责 |
 
 这说明 **evaluation 运行时**并不是「只读 Assessment 一张表」，而是**显式组合**三界数据；三界拆分避免的是**模型污染与错误扩展点**，不是「引擎不访问其它域」。
 
@@ -313,7 +313,7 @@ flowchart TB
 2. `FactorScoreHandler` — 因子分  
 3. `RiskLevelHandler` — 风险等级并持久化分数  
 4. `InterpretationHandler` — 解读与报告  
-5. `EventPublishHandler` — 事件发布（可带 `WaiterRegistry` 等选项）
+5. `WaiterNotifyHandler` — 本地 waiter 通知；真正的事件出站由 MySQL / Mongo outbox 按持久化边界负责
 
 链的抽象见 [pipeline/chain.go](../../internal/apiserver/application/evaluation/engine/pipeline/chain.go)（`Chain.AddHandler` / `Execute`）。
 

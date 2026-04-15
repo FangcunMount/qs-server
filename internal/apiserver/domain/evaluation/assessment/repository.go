@@ -16,6 +16,10 @@ type Repository interface {
 	// Save 保存测评（新增或更新）
 	Save(ctx context.Context, assessment *Assessment) error
 
+	// SaveWithEvents 保存测评并将聚合上的领域事件暂存到可靠出站存储。
+	// 该方法用于 submitted/failed 等需要事务型 outbox 的状态迁移。
+	SaveWithEvents(ctx context.Context, assessment *Assessment) error
+
 	// FindByID 根据ID查找
 	FindByID(ctx context.Context, id ID) (*Assessment, error)
 

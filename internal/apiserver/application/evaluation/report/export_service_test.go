@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type reportRepoStub struct {
@@ -15,6 +16,9 @@ type reportRepoStub struct {
 }
 
 func (r *reportRepoStub) Save(context.Context, *domainReport.InterpretReport) error { return nil }
+func (r *reportRepoStub) SaveWithTesteeAndEvents(context.Context, *domainReport.InterpretReport, testee.ID, []event.DomainEvent) error {
+	return nil
+}
 func (r *reportRepoStub) Update(context.Context, *domainReport.InterpretReport) error {
 	return nil
 }

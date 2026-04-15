@@ -1,0 +1,207 @@
+package eventoutbox
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/pkg/event"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	statusPending    = "pending"
+	statusPublishing = "publishing"
+	statusPublished  = "published"
+	statusFailed     = "failed"
+
+	defaultPublishingStaleFor = 1 * time.Minute
+)
+
+// OutboxPO stores domain events until they are durably published.
+type OutboxPO struct {
+	EventID       string    `bson:"event_id"`
+	EventType     string    `bson:"event_type"`
+	AggregateType string    `bson:"aggregate_type"`
+	AggregateID   string    `bson:"aggregate_id"`
+	TopicName     string    `bson:"topic_name"`
+	PayloadJSON   string    `bson:"payload_json"`
+	Status        string    `bson:"status"`
+	AttemptCount  int       `bson:"attempt_count"`
+	NextAttemptAt time.Time `bson:"next_attempt_at"`
+	LastError     string    `bson:"last_error,omitempty"`
+	CreatedAt     time.Time `bson:"created_at"`
+	UpdatedAt     time.Time `bson:"updated_at"`
+	PublishedAt   time.Time `bson:"published_at,omitempty"`
+}
+
+func (OutboxPO) CollectionName() string {
+	return "domain_event_outbox"
+}
+
+type Store struct {
+	coll               *mongo.Collection
+	publishingStaleFor time.Duration
+}
+
+func NewStore(db *mongo.Database) (*Store, error) {
+	store := &Store{
+		coll:               db.Collection((&OutboxPO{}).CollectionName()),
+		publishingStaleFor: defaultPublishingStaleFor,
+	}
+	if err := store.ensureIndexes(context.Background()); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func (s *Store) ensureIndexes(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if _, err := s.coll.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "event_id", Value: 1}},
+			Options: options.Index().SetName("uk_event_id").SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "next_attempt_at", Value: 1}},
+			Options: options.Index().SetName("idx_status_next_attempt_at"),
+		},
+	}); err != nil {
+		return fmt.Errorf("create mongo outbox indexes: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) StageEventsTx(ctx mongo.SessionContext, events []event.DomainEvent) error {
+	docs, err := s.buildDocuments(events)
+	if err != nil {
+		return err
+	}
+	if len(docs) == 0 {
+		return nil
+	}
+
+	items := make([]interface{}, 0, len(docs))
+	for _, doc := range docs {
+		items = append(items, doc)
+	}
+	_, err = s.coll.InsertMany(ctx, items)
+	return err
+}
+
+func (s *Store) buildDocuments(events []event.DomainEvent) ([]*OutboxPO, error) {
+	if len(events) == 0 {
+		return nil, nil
+	}
+
+	now := time.Now()
+	docs := make([]*OutboxPO, 0, len(events))
+	for _, evt := range events {
+		topicName, ok := eventconfig.Global().GetTopicForEvent(evt.EventType())
+		if !ok {
+			return nil, fmt.Errorf("event %q not found in event config", evt.EventType())
+		}
+		payload, err := outboxcodec.Encode(evt)
+		if err != nil {
+			return nil, err
+		}
+
+		docs = append(docs, &OutboxPO{
+			EventID:       evt.EventID(),
+			EventType:     evt.EventType(),
+			AggregateType: evt.AggregateType(),
+			AggregateID:   evt.AggregateID(),
+			TopicName:     topicName,
+			PayloadJSON:   payload,
+			Status:        statusPending,
+			AttemptCount:  0,
+			NextAttemptAt: now,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		})
+	}
+
+	return docs, nil
+}
+
+func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	staleBefore := now.Add(-s.publishingStaleFor)
+	for len(claimed) < limit {
+		filter := bson.M{
+			"$or": []bson.M{
+				{"status": statusPending, "next_attempt_at": bson.M{"$lte": now}},
+				{"status": statusFailed, "next_attempt_at": bson.M{"$lte": now}},
+				{"status": statusPublishing, "updated_at": bson.M{"$lte": staleBefore}},
+			},
+		}
+		update := bson.M{
+			"$set": bson.M{
+				"status":     statusPublishing,
+				"updated_at": now,
+			},
+		}
+		opts := options.FindOneAndUpdate().
+			SetSort(bson.D{{Key: "created_at", Value: 1}}).
+			SetReturnDocument(options.After)
+
+		var po OutboxPO
+		if err := s.coll.FindOneAndUpdate(ctx, filter, update, opts).Decode(&po); err != nil {
+			if err == mongo.ErrNoDocuments {
+				break
+			}
+			return nil, err
+		}
+
+		evt, err := outboxcodec.Decode(po.PayloadJSON)
+		if err != nil {
+			_ = s.MarkEventFailed(ctx, po.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
+			continue
+		}
+
+		claimed = append(claimed, appEventing.PendingOutboxEvent{
+			EventID: po.EventID,
+			Event:   evt,
+		})
+	}
+
+	return claimed, nil
+}
+
+func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
+	_, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
+		"$set": bson.M{
+			"status":       statusPublished,
+			"published_at": publishedAt,
+			"updated_at":   publishedAt,
+		},
+	})
+	return err
+}
+
+func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
+	_, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
+		"$set": bson.M{
+			"status":          statusFailed,
+			"last_error":      lastError,
+			"next_attempt_at": nextAttemptAt,
+			"updated_at":      time.Now(),
+		},
+		"$inc": bson.M{
+			"attempt_count": 1,
+		},
+	})
+	return err
+}

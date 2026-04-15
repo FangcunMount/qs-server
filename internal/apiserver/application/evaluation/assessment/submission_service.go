@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -18,23 +17,21 @@ import (
 // submissionService 测评提交服务实现
 // 行为者：答题者 (Testee)
 type submissionService struct {
-	repo           assessment.Repository
-	creator        assessment.AssessmentCreator
-	eventPublisher event.EventPublisher
-	listCache      *cache.MyAssessmentListCache
+	repo      assessment.Repository
+	creator   assessment.AssessmentCreator
+	listCache *cache.MyAssessmentListCache
 }
 
 // NewSubmissionService 创建测评提交服务
 func NewSubmissionService(
 	repo assessment.Repository,
 	creator assessment.AssessmentCreator,
-	eventPublisher event.EventPublisher,
+	_ event.EventPublisher,
 ) AssessmentSubmissionService {
 	return &submissionService{
-		repo:           repo,
-		creator:        creator,
-		eventPublisher: eventPublisher,
-		listCache:      nil,
+		repo:      repo,
+		creator:   creator,
+		listCache: nil,
 	}
 }
 
@@ -42,14 +39,13 @@ func NewSubmissionService(
 func NewSubmissionServiceWithListCache(
 	repo assessment.Repository,
 	creator assessment.AssessmentCreator,
-	eventPublisher event.EventPublisher,
+	_ event.EventPublisher,
 	listCache *cache.MyAssessmentListCache,
 ) AssessmentSubmissionService {
 	return &submissionService{
-		repo:           repo,
-		creator:        creator,
-		eventPublisher: eventPublisher,
-		listCache:      listCache,
+		repo:      repo,
+		creator:   creator,
+		listCache: listCache,
 	}
 }
 
@@ -196,7 +192,7 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		"assessment_id", assessmentID,
 		"new_status", a.Status().String(),
 	)
-	if err := s.repo.Save(ctx, a); err != nil {
+	if err := s.repo.SaveWithEvents(ctx, a); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", assessmentID,
 			"action", "submit_assessment",
@@ -205,10 +201,6 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
 	}
-
-	// 4. 发布领域事件
-	// 说明：领域事件已在 Submit() 内部添加到聚合根，这里统一发布
-	s.publishEvents(ctx, a, l)
 
 	duration := time.Since(startTime)
 	l.Infow("提交测评成功",
@@ -519,20 +511,3 @@ func normalizePagination(page, pageSize int) (int, int) {
 }
 
 // publishEvents 发布聚合根收集的领域事件
-func (s *submissionService) publishEvents(ctx context.Context, a *assessment.Assessment, l *logger.RequestLogger) {
-	eventing.PublishCollectedEvents(ctx, s.eventPublisher, a, func() {
-		l.Warnw("事件发布器未配置，跳过事件发布",
-			"action", "publish_event",
-			"resource", "assessment",
-			"assessment_id", a.ID().Uint64(),
-		)
-	}, func(evt event.DomainEvent, err error) {
-		l.Errorw("发布领域事件失败",
-			"action", "publish_event",
-			"resource", "assessment",
-			"assessment_id", a.ID().Uint64(),
-			"event_type", evt.EventType(),
-			"error", err.Error(),
-		)
-	})
-}

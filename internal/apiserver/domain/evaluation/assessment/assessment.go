@@ -219,7 +219,10 @@ func (a *Assessment) Submit() error {
 
 // ApplyEvaluation 应用评估结果
 // 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了量表
-// 后置条件：状态变为 interpreted，记录评估结果，发布 AssessmentInterpretedEvent
+// 后置条件：状态变为 interpreted，记录评估结果
+//
+// 注意：assessment.interpreted 的可靠出站绑定在报告成功落库的 Mongo 边界，
+// 因此这里不直接添加领域事件。
 func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
 	if !a.status.IsSubmitted() {
 		return NewInvalidStatusError("apply evaluation", a.status)
@@ -237,25 +240,14 @@ func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
 	a.status = StatusInterpreted
 	a.interpretedAt = &now
 
-	// 发布领域事件
-	a.addEvent(NewAssessmentInterpretedEvent(
-		a.orgID,
-		a.id,
-		a.testeeRef,
-		*a.medicalScaleRef,
-		result.TotalScore,
-		result.RiskLevel,
-		now,
-	))
-
 	return nil
 }
 
 // MarkAsFailed 标记评估失败
-// 前置条件：只有 submitted 状态可以标记失败
+// 前置条件：只有 submitted 或 interpreted 状态可以标记失败
 // 后置条件：状态变为 failed，记录失败原因，发布 AssessmentFailedEvent
 func (a *Assessment) MarkAsFailed(reason string) error {
-	if !a.status.IsSubmitted() {
+	if !a.status.IsSubmitted() && !a.status.IsInterpreted() {
 		return NewInvalidStatusError("mark as failed", a.status)
 	}
 	if reason == "" {
@@ -266,6 +258,9 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 	a.status = StatusFailed
 	a.failedAt = &now
 	a.failureReason = &reason
+	a.interpretedAt = nil
+	a.totalScore = nil
+	a.riskLevel = nil
 
 	// 发布领域事件
 	a.addEvent(NewAssessmentFailedEvent(

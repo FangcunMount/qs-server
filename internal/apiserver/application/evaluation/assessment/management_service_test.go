@@ -9,17 +9,29 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type managementRepoStub struct {
-	assessment *domain.Assessment
-	saved      *domain.Assessment
+	assessment      *domain.Assessment
+	saved           *domain.Assessment
+	savedWithEvents *domain.Assessment
+	savedEventTypes []string
 }
 
 func (r *managementRepoStub) Save(_ context.Context, a *domain.Assessment) error {
 	r.saved = a
 	r.assessment = a
+	return nil
+}
+
+func (r *managementRepoStub) SaveWithEvents(_ context.Context, a *domain.Assessment) error {
+	r.savedWithEvents = a
+	r.assessment = a
+	r.savedEventTypes = r.savedEventTypes[:0]
+	for _, evt := range a.Events() {
+		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
+	}
+	a.ClearEvents()
 	return nil
 }
 
@@ -68,24 +80,6 @@ func (r *managementRepoStub) FindByOrgIDAndTesteeIDs(context.Context, int64, []t
 	return nil, 0, nil
 }
 
-type managementEventPublisherStub struct {
-	events []event.DomainEvent
-}
-
-func (p *managementEventPublisherStub) Publish(_ context.Context, evt event.DomainEvent) error {
-	p.events = append(p.events, evt)
-	return nil
-}
-
-func (p *managementEventPublisherStub) PublishAll(ctx context.Context, events []event.DomainEvent) error {
-	for _, evt := range events {
-		if err := p.Publish(ctx, evt); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
 	id := domain.NewID(9001)
 	testeeID := testee.NewID(3001)
@@ -111,8 +105,7 @@ func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
 	)
 
 	repo := &managementRepoStub{assessment: a}
-	publisher := &managementEventPublisherStub{}
-	svc := NewManagementService(repo, publisher)
+	svc := NewManagementService(repo, nil)
 
 	result, err := svc.Retry(context.Background(), 9, id.Uint64())
 	if err != nil {
@@ -122,16 +115,16 @@ func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
 	if result.Status != domain.StatusSubmitted.String() {
 		t.Fatalf("expected submitted result status, got %s", result.Status)
 	}
-	if repo.saved == nil {
-		t.Fatalf("expected retried assessment to be saved")
+	if repo.savedWithEvents == nil {
+		t.Fatalf("expected retried assessment to be saved with outbox events")
 	}
-	if !repo.saved.Status().IsSubmitted() {
-		t.Fatalf("expected saved assessment to be submitted, got %s", repo.saved.Status())
+	if !repo.savedWithEvents.Status().IsSubmitted() {
+		t.Fatalf("expected saved assessment to be submitted, got %s", repo.savedWithEvents.Status())
 	}
-	if len(publisher.events) != 1 {
-		t.Fatalf("expected one published event, got %d", len(publisher.events))
+	if len(repo.savedEventTypes) != 1 {
+		t.Fatalf("expected one staged event, got %d", len(repo.savedEventTypes))
 	}
-	if publisher.events[0].EventType() != domain.EventTypeSubmitted {
-		t.Fatalf("expected assessment.submitted event, got %s", publisher.events[0].EventType())
+	if repo.savedEventTypes[0] != domain.EventTypeSubmitted {
+		t.Fatalf("expected assessment.submitted event, got %s", repo.savedEventTypes[0])
 	}
 }

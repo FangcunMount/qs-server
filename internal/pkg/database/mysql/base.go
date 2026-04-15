@@ -39,6 +39,14 @@ func NewBaseRepository[T Syncable](db *gorm.DB) BaseRepository[T] {
 	return BaseRepository[T]{db: db}
 }
 
+// WithTx attaches a transaction handle to the context for repository helpers.
+func WithTx(ctx context.Context, tx *gorm.DB) context.Context {
+	if tx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, txKey{}, tx)
+}
+
 // SetErrorTranslator registers a function to translate DB errors into
 // domain/business errors. This allows repositories to map driver-specific
 // messages (unique constraint, duplicate entry) to structured errors.
@@ -75,7 +83,7 @@ func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync fu
 		entity.SetCreatedBy(meta.FromUint64(userID))
 		entity.SetUpdatedBy(meta.FromUint64(userID))
 	}
-	result := r.db.WithContext(ctx).Create(entity)
+	result := r.WithContext(ctx).Create(entity)
 	if result.Error != nil {
 		if r.errTranslator != nil {
 			return r.errTranslator(result.Error)
@@ -98,7 +106,7 @@ func (r *BaseRepository[T]) UpdateAndSync(ctx context.Context, entity T, sync fu
 	if userID > 0 {
 		entity.SetUpdatedBy(meta.FromUint64(userID))
 	}
-	result := r.db.WithContext(ctx).Updates(entity)
+	result := r.WithContext(ctx).Updates(entity)
 	if result.Error != nil {
 		if r.errTranslator != nil {
 			return r.errTranslator(result.Error)

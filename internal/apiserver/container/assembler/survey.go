@@ -6,6 +6,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -224,7 +225,7 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, baseRepo, quesRepo, batchValidator)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
-	sub.SubmittedEventRelay = asApp.NewSubmittedEventRelay(baseRepo, m.eventPublisher)
+	sub.SubmittedEventRelay = appEventing.NewOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)
 
 	// 初始化 handler 层
 	sub.Handler = handler.NewAnswerSheetHandler(

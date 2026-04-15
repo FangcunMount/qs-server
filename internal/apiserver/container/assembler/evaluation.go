@@ -14,6 +14,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -23,6 +24,7 @@ import (
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -36,9 +38,10 @@ type EvaluationModule struct {
 	Handler *handler.EvaluationHandler
 
 	// ==================== Repository 层 ====================
-	AssessmentRepo assessment.Repository
-	ScoreRepo      assessment.ScoreRepository
-	ReportRepo     report.ReportRepository
+	AssessmentRepo        assessment.Repository
+	ScoreRepo             assessment.ScoreRepository
+	ReportRepo            report.ReportRepository
+	AssessmentOutboxRelay appEventing.OutboxRelay
 
 	// ==================== Assessment 应用服务 ====================
 	// 按行为者组织的测评服务
@@ -158,7 +161,12 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	}
 
 	m.ScoreRepo = mysqlEval.NewScoreRepository(mysqlDB)
-	m.ReportRepo = mongoEval.NewReportRepository(mongoDB)
+	reportRepo, err := mongoEval.NewReportRepository(mongoDB)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
+	}
+	m.ReportRepo = reportRepo
+	m.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStore(mysqlDB), m.eventPublisher)
 
 	// ==================== 初始化领域服务 ====================
 
@@ -186,9 +194,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
-		serviceOpts := []engine.ServiceOption{
-			engine.WithEventPublisher(m.eventPublisher), // 传递事件发布器
-		}
+		serviceOpts := []engine.ServiceOption{}
 		if waiterRegistry != nil {
 			serviceOpts = append(serviceOpts, engine.WithWaiterRegistry(waiterRegistry))
 		}

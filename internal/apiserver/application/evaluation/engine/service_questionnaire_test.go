@@ -12,6 +12,7 @@ import (
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type fakeAssessmentRepo struct {
@@ -22,6 +23,13 @@ type fakeAssessmentRepo struct {
 func (r *fakeAssessmentRepo) Save(_ context.Context, assessment *domainAssessment.Assessment) error {
 	r.assessment = assessment
 	r.saveCalls++
+	return nil
+}
+
+func (r *fakeAssessmentRepo) SaveWithEvents(_ context.Context, assessment *domainAssessment.Assessment) error {
+	r.assessment = assessment
+	r.saveCalls++
+	assessment.ClearEvents()
 	return nil
 }
 
@@ -210,6 +218,9 @@ func (r *noopScoreRepo) DeleteByAssessmentID(_ context.Context, _ domainAssessme
 type noopReportRepo struct{}
 
 func (r *noopReportRepo) Save(_ context.Context, _ *domainReport.InterpretReport) error { return nil }
+func (r *noopReportRepo) SaveWithTesteeAndEvents(_ context.Context, _ *domainReport.InterpretReport, _ testee.ID, _ []event.DomainEvent) error {
+	return nil
+}
 func (r *noopReportRepo) FindByID(_ context.Context, _ domainReport.ID) (*domainReport.InterpretReport, error) {
 	return nil, nil
 }

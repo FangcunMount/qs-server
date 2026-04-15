@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
@@ -16,7 +17,8 @@ import (
 // assessmentRepository 测评仓储实现
 type assessmentRepository struct {
 	mysql.BaseRepository[*AssessmentPO]
-	mapper *AssessmentMapper
+	mapper      *AssessmentMapper
+	outboxStore *mysqlEventOutbox.Store
 }
 
 // NewAssessmentRepository 创建测评仓储
@@ -24,6 +26,7 @@ func NewAssessmentRepository(db *gorm.DB) assessment.Repository {
 	repo := &assessmentRepository{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db),
 		mapper:         NewAssessmentMapper(),
+		outboxStore:    mysqlEventOutbox.NewStore(db),
 	}
 	// 设置错误转换器
 	repo.SetErrorTranslator(translateAssessmentError)
@@ -50,6 +53,30 @@ func (r *assessmentRepository) Save(ctx context.Context, a *assessment.Assessmen
 	return r.UpdateAndSync(ctx, po, func(po *AssessmentPO) {
 		r.mapper.SyncID(po, a)
 	})
+}
+
+// SaveWithEvents 保存测评并将聚合上的事件落到 MySQL outbox。
+func (r *assessmentRepository) SaveWithEvents(ctx context.Context, a *assessment.Assessment) error {
+	if a == nil {
+		return nil
+	}
+
+	err := r.BaseRepository.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txCtx := mysql.WithTx(ctx, tx)
+		if err := r.Save(txCtx, a); err != nil {
+			return err
+		}
+		if len(a.Events()) == 0 {
+			return nil
+		}
+		return r.outboxStore.StageEventsTx(tx, a.Events())
+	})
+	if err != nil {
+		return err
+	}
+
+	a.ClearEvents()
+	return nil
 }
 
 // FindByID 根据ID查找

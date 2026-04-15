@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -10,6 +12,7 @@ import (
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // InterpretationHandler 测评分析解读处理器
@@ -361,8 +364,8 @@ func (h *InterpretationHandler) generateAndSaveReport(ctx context.Context, evalC
 	reportID, _ := rpt.ID().Value()
 	l.Debugw("Report built successfully", "report_id", reportID)
 
-	// 保存报告
-	if err := h.reportRepo.Save(ctx, rpt); err != nil {
+	// 保存报告，并在报告成功落库时可靠暂存评估成功事件。
+	if err := h.reportRepo.SaveWithTesteeAndEvents(ctx, rpt, evalCtx.Assessment.TesteeID(), h.buildSuccessEvents(evalCtx, rpt)); err != nil {
 		reportID, _ := rpt.ID().Value()
 		assessmentID, _ := evalCtx.Assessment.ID().Value()
 		l.Errorw("Failed to save report",
@@ -379,6 +382,53 @@ func (h *InterpretationHandler) generateAndSaveReport(ctx context.Context, evalC
 	evalCtx.Report = rpt
 
 	return nil
+}
+
+func (h *InterpretationHandler) buildSuccessEvents(evalCtx *Context, rpt *domainReport.InterpretReport) []event.DomainEvent {
+	now := time.Now()
+	assessmentRef := evalCtx.Assessment.MedicalScaleRef()
+	if assessmentRef == nil {
+		return nil
+	}
+
+	scaleVersion := ""
+	if evalCtx.MedicalScale != nil {
+		scaleVersion = evalCtx.MedicalScale.GetQuestionnaireVersion()
+	} else if !evalCtx.Assessment.QuestionnaireRef().IsEmpty() {
+		scaleVersion = evalCtx.Assessment.QuestionnaireRef().Version()
+	}
+
+	scaleRef := assessment.NewMedicalScaleRef(
+		assessmentRef.ID(),
+		assessmentRef.Code(),
+		scaleVersion,
+	)
+
+	assessmentID := evalCtx.Assessment.ID().Uint64()
+	reportID := rpt.ID().Uint64()
+	testeeID := uint64(evalCtx.Assessment.TesteeID())
+
+	return []event.DomainEvent{
+		assessment.NewAssessmentInterpretedEvent(
+			evalCtx.Assessment.OrgID(),
+			evalCtx.Assessment.ID(),
+			evalCtx.Assessment.TesteeID(),
+			scaleRef,
+			evalCtx.EvaluationResult.TotalScore,
+			evalCtx.EvaluationResult.RiskLevel,
+			now,
+		),
+		domainReport.NewReportGeneratedEvent(
+			strconv.FormatUint(reportID, 10),
+			strconv.FormatUint(assessmentID, 10),
+			testeeID,
+			rpt.ScaleCode(),
+			scaleVersion,
+			rpt.TotalScore(),
+			string(rpt.RiskLevel()),
+			now,
+		),
+	}
 }
 
 // ==================== 日志辅助方法 ====================

@@ -82,6 +82,15 @@ func (r *CachedAssessmentRepository) Save(ctx context.Context, domain *assessmen
 	return err
 }
 
+// SaveWithEvents 保存测评并暂存事件（同时失效缓存）。
+func (r *CachedAssessmentRepository) SaveWithEvents(ctx context.Context, domain *assessment.Assessment) error {
+	err := r.repo.SaveWithEvents(ctx, domain)
+	if err == nil && domain != nil {
+		r.deleteCache(ctx, domain.ID())
+	}
+	return err
+}
+
 // Delete 删除测评（同时失效缓存）
 func (r *CachedAssessmentRepository) Delete(ctx context.Context, id assessment.ID) error {
 	err := r.repo.Delete(ctx, id)

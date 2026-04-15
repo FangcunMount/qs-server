@@ -2,10 +2,9 @@ package answersheet
 
 import (
 	"context"
-	"time"
 
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // DurableSubmitMeta carries submission metadata that must survive durable writes.
@@ -23,15 +22,8 @@ type SubmissionDurableStore interface {
 	CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error)
 }
 
-// PendingSubmittedEvent represents a due answersheet.submitted outbox record.
-type PendingSubmittedEvent struct {
-	EventID string
-	Event   event.DomainEvent
-}
+// SubmittedEventRelay keeps a compatibility name for the shared outbox relay.
+type SubmittedEventRelay = appEventing.OutboxRelay
 
-// SubmittedEventOutboxStore manages due answersheet.submitted outbox records.
-type SubmittedEventOutboxStore interface {
-	ClaimDueSubmittedEvents(ctx context.Context, limit int, now time.Time) ([]PendingSubmittedEvent, error)
-	MarkSubmittedEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error
-	MarkSubmittedEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error
-}
+// SubmittedEventOutboxStore keeps a compatibility name for the shared outbox store.
+type SubmittedEventOutboxStore = appEventing.OutboxStore

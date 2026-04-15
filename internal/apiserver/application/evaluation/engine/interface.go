@@ -10,7 +10,7 @@
 //  2. FactorScoreHandler - 因子分数计算（从答卷读取预计算分数，按因子聚合，计算总分）
 //  3. RiskLevelHandler - 风险等级计算（计算因子/整体风险等级，保存得分）
 //  4. InterpretationHandler - 测评分析解读、保存（生成结论建议，保存报告）
-//  5. EventPublishHandler - 事件发布（发布 AssessmentInterpretedEvent）
+//  5. WaiterNotifyHandler - 本地 waiter 通知（不承担事件投递）
 package engine
 
 import "context"

@@ -11,20 +11,29 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // ReportRepository 报告 MongoDB 仓储
 type ReportRepository struct {
 	base.BaseRepository
-	mapper *ReportMapper
+	mapper      *ReportMapper
+	outboxStore *mongoEventOutbox.Store
 }
 
 // NewReportRepository 创建报告仓储
-func NewReportRepository(db *mongo.Database) *ReportRepository {
+func NewReportRepository(db *mongo.Database) (*ReportRepository, error) {
+	outboxStore, err := mongoEventOutbox.NewStore(db)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ReportRepository{
 		BaseRepository: base.NewBaseRepository(db, (&InterpretReportPO{}).CollectionName()),
 		mapper:         NewReportMapper(),
-	}
+		outboxStore:    outboxStore,
+	}, nil
 }
 
 // 确保实现了接口
@@ -34,61 +43,49 @@ var _ report.ReportRepository = (*ReportRepository)(nil)
 
 // Save 保存报告
 func (r *ReportRepository) Save(ctx context.Context, rpt *report.InterpretReport) error {
-	// 检查是否存在
-	exists, err := r.ExistsByID(ctx, rpt.ID())
-	if err != nil {
-		return fmt.Errorf("检查报告是否存在失败: %w", err)
-	}
-
-	if exists {
-		return r.Update(ctx, rpt)
-	}
-
-	// 创建新报告
-	// 注意：这里需要 testeeID，但 InterpretReport 不直接包含
-	// 需要从外部传入或通过其他方式获取
-	// 暂时使用 0，后续需要优化
-	po := r.mapper.ToPO(rpt, 0)
-	base.ApplyAuditCreate(ctx, po)
-	po.BeforeInsert()
-
-	// 确保 DomainID 与报告 ID 一致
-	po.DomainID = rpt.ID()
-
-	_, err = r.InsertOne(ctx, po)
-	if err != nil {
-		return fmt.Errorf("插入报告失败: %w", err)
-	}
-
-	return nil
+	return r.SaveWithTesteeAndEvents(ctx, rpt, 0, nil)
 }
 
 // SaveWithTestee 带受试者信息保存报告
 func (r *ReportRepository) SaveWithTestee(ctx context.Context, rpt *report.InterpretReport, testeeID testee.ID) error {
-	// 检查是否存在
-	exists, err := r.ExistsByID(ctx, rpt.ID())
-	if err != nil {
-		return fmt.Errorf("检查报告是否存在失败: %w", err)
+	return r.SaveWithTesteeAndEvents(ctx, rpt, testeeID, nil)
+}
+
+// SaveWithTesteeAndEvents 保存报告并在同一 Mongo 持久化边界内暂存事件。
+func (r *ReportRepository) SaveWithTesteeAndEvents(
+	ctx context.Context,
+	rpt *report.InterpretReport,
+	testeeID testee.ID,
+	events []event.DomainEvent,
+) error {
+	if rpt == nil {
+		return nil
 	}
 
-	if exists {
-		return r.Update(ctx, rpt)
-	}
+	return r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
+		exists, err := r.existsByIDTx(txCtx, rpt.ID())
+		if err != nil {
+			return fmt.Errorf("检查报告是否存在失败: %w", err)
+		}
 
-	// 创建新报告
-	po := r.mapper.ToPO(rpt, uint64(testeeID))
-	base.ApplyAuditCreate(ctx, po)
-	po.BeforeInsert()
+		if exists {
+			if err := r.updateTx(txCtx, ctx, rpt); err != nil {
+				return err
+			}
+		} else {
+			if err := r.insertTx(txCtx, ctx, rpt, testeeID); err != nil {
+				return err
+			}
+		}
 
-	// 确保 DomainID 与报告 ID 一致
-	po.DomainID = rpt.ID()
+		if len(events) > 0 {
+			if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
+				return fmt.Errorf("暂存报告事件失败: %w", err)
+			}
+		}
 
-	_, err = r.InsertOne(ctx, po)
-	if err != nil {
-		return fmt.Errorf("插入报告失败: %w", err)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // FindByID 根据ID查找报告
@@ -178,47 +175,7 @@ func (r *ReportRepository) findByFilter(ctx context.Context, filter bson.M, pagi
 
 // Update 更新报告
 func (r *ReportRepository) Update(ctx context.Context, rpt *report.InterpretReport) error {
-	// 获取现有报告以获取 testeeID
-	existing, err := r.FindByID(ctx, rpt.ID())
-	if err != nil {
-		return fmt.Errorf("查找现有报告失败: %w", err)
-	}
-	_ = existing // 暂时未使用
-
-	po := r.mapper.ToPO(rpt, 0) // testeeID 在更新时不修改
-	base.ApplyAuditUpdate(ctx, po)
-	po.BeforeUpdate()
-
-	filter := bson.M{
-		"domain_id":  rpt.ID().Uint64(),
-		"deleted_at": nil,
-	}
-
-	// 构建更新内容（不更新 testee_id）
-	update := bson.M{
-		"$set": bson.M{
-			"scale_name":  po.ScaleName,
-			"scale_code":  po.ScaleCode,
-			"total_score": po.TotalScore,
-			"risk_level":  po.RiskLevel,
-			"conclusion":  po.Conclusion,
-			"dimensions":  po.Dimensions,
-			"suggestions": po.Suggestions,
-			"updated_at":  po.UpdatedAt,
-			"updated_by":  po.UpdatedBy,
-		},
-	}
-
-	result, err := r.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf("更新报告失败: %w", err)
-	}
-
-	if result.MatchedCount == 0 {
-		return report.ErrReportNotFound
-	}
-
-	return nil
+	return r.updateTx(nil, ctx, rpt)
 }
 
 // Delete 删除报告（软删除）
@@ -264,4 +221,85 @@ func (r *ReportRepository) ExistsByID(ctx context.Context, id report.ID) (bool, 
 
 func (r *ReportRepository) nowTime() interface{} {
 	return bson.M{"$currentDate": true}
+}
+
+func (r *ReportRepository) insertTx(ctx mongo.SessionContext, auditCtx context.Context, rpt *report.InterpretReport, testeeID testee.ID) error {
+	po := r.mapper.ToPO(rpt, uint64(testeeID))
+	base.ApplyAuditCreate(auditCtx, po)
+	po.BeforeInsert()
+	po.DomainID = rpt.ID()
+
+	if _, err := r.Collection().InsertOne(ctx, po); err != nil {
+		return fmt.Errorf("插入报告失败: %w", err)
+	}
+	return nil
+}
+
+func (r *ReportRepository) updateTx(txCtx mongo.SessionContext, auditCtx context.Context, rpt *report.InterpretReport) error {
+	po := r.mapper.ToPO(rpt, 0)
+	base.ApplyAuditUpdate(auditCtx, po)
+	po.BeforeUpdate()
+
+	filter := bson.M{
+		"domain_id":  rpt.ID().Uint64(),
+		"deleted_at": nil,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"scale_name":  po.ScaleName,
+			"scale_code":  po.ScaleCode,
+			"total_score": po.TotalScore,
+			"risk_level":  po.RiskLevel,
+			"conclusion":  po.Conclusion,
+			"dimensions":  po.Dimensions,
+			"suggestions": po.Suggestions,
+			"updated_at":  po.UpdatedAt,
+			"updated_by":  po.UpdatedBy,
+		},
+	}
+
+	if txCtx != nil {
+		result, err := r.Collection().UpdateOne(txCtx, filter, update)
+		if err != nil {
+			return fmt.Errorf("更新报告失败: %w", err)
+		}
+		if result.MatchedCount == 0 {
+			return report.ErrReportNotFound
+		}
+		return nil
+	}
+
+	result, err := r.UpdateOne(auditCtx, filter, update)
+	if err != nil {
+		return fmt.Errorf("更新报告失败: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return report.ErrReportNotFound
+	}
+	return nil
+}
+
+func (r *ReportRepository) existsByIDTx(ctx mongo.SessionContext, id report.ID) (bool, error) {
+	filter := bson.M{
+		"domain_id":  id.Uint64(),
+		"deleted_at": nil,
+	}
+	count, err := r.Collection().CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *ReportRepository) withTransaction(ctx context.Context, fn func(txCtx mongo.SessionContext) error) error {
+	session, err := r.DB().Client().StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(ctx)
+
+	_, err = session.WithTransaction(ctx, func(txCtx mongo.SessionContext) (interface{}, error) {
+		return nil, fn(txCtx)
+	})
+	return err
 }

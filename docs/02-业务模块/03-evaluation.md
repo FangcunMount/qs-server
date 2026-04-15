@@ -25,7 +25,7 @@
 | 核心对象 | `Assessment`、`AssessmentScore`、`InterpretReport` |
 | 核心事件 | `assessment.submitted`、`assessment.interpreted`、`assessment.failed`、`report.generated` |
 | 存储分层 | `Assessment` / `AssessmentScore` 在 MySQL；`InterpretReport` 在 MongoDB |
-| 运行时边界 | worker 负责订阅和驱动，真正的评估与写库仍在 `qs-apiserver` 内完成 |
+| 运行时边界 | worker 负责订阅和驱动，真正的评估与写库仍在 `qs-apiserver` 内完成；`assessment.submitted` / `assessment.failed` 走 MySQL outbox，`assessment.interpreted` / `report.generated` 走 Mongo report-save outbox |
 
 ### 模块边界
 
@@ -283,7 +283,7 @@ sequenceDiagram
 | 1 | 计分回写答卷 | `CalculateAnswerSheetScore` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go) |
 | 2 | 建测评并提交 | `CreateAssessmentFromAnswerSheet` → `assessment.submitted` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go) |
 | 3 | 执行评估 | `EvaluateAssessment` | [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)；[engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go) |
-| 4 | 流水线结束 | `assessment.interpreted`、`report.generated` | [pipeline/chain.go](../../internal/apiserver/application/evaluation/engine/pipeline/chain.go)；[report/events.go](../../internal/apiserver/domain/evaluation/report/events.go) |
+| 4 | 流水线结束 | `assessment.interpreted`、`report.generated` | 这两类成功事件在 **报告保存成功** 时一起进入 Mongo outbox，而不是在 MySQL assessment save 后直接 publish |
 
 #### 分支说明
 
@@ -339,7 +339,13 @@ sequenceDiagram
 
 #### 处理器顺序
 
-以仓库实现为准：`ValidationHandler` → `FactorScoreHandler` → `RiskLevelHandler` → `InterpretationHandler` → `EventPublishHandler`。
+以仓库实现为准：`ValidationHandler` → `FactorScoreHandler` → `RiskLevelHandler` → `InterpretationHandler` → `WaiterNotifyHandler`。
+
+当前可靠出站边界：
+
+- `assessment.submitted` / `assessment.failed`：Assessment 状态更新与 MySQL outbox 同事务
+- `assessment.interpreted` / `report.generated`：报告保存与 Mongo outbox 同事务
+- 这并不表示整个事件系统都 outbox 化；本轮只硬化了评估主链
 
 #### 入口
 

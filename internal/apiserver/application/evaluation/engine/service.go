@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -16,7 +15,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // service 评估引擎服务实现
@@ -32,9 +30,6 @@ type service struct {
 	// 领域服务依赖
 	reportBuilder report.ReportBuilder
 
-	// 事件发布器（可选）
-	eventPublisher event.EventPublisher
-
 	// 等待队列注册表（可选，用于长轮询）
 	waiterRegistry *waiter.WaiterRegistry
 
@@ -44,13 +39,6 @@ type service struct {
 
 // ServiceOption 服务选项
 type ServiceOption func(*service)
-
-// WithEventPublisher 设置事件发布器
-func WithEventPublisher(publisher event.EventPublisher) ServiceOption {
-	return func(s *service) {
-		s.eventPublisher = publisher
-	}
-}
 
 // WithWaiterRegistry 设置等待队列注册表
 func WithWaiterRegistry(waiterRegistry *waiter.WaiterRegistry) ServiceOption {
@@ -108,14 +96,10 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	// 4. 测评分析解读处理器
 	chain.AddHandler(pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder))
 
-	// 5. 事件发布处理器
-	// 注意：如果未设置 eventPublisher，则不会发布 assessment.interpreted 事件到消息队列
-	// 但领域事件仍会添加到聚合根，供仓储层使用
-	eventPublishOpts := []pipeline.EventPublishHandlerOption{}
+	// 5. 本地 waiter 通知处理器
 	if s.waiterRegistry != nil {
-		eventPublishOpts = append(eventPublishOpts, pipeline.WithWaiterRegistry(s.waiterRegistry))
+		chain.AddHandler(pipeline.NewWaiterNotifyHandler(s.waiterRegistry))
 	}
-	chain.AddHandler(pipeline.NewEventPublishHandler(s.eventPublisher, eventPublishOpts...))
 
 	return chain
 }
@@ -390,13 +374,17 @@ func (s *service) markAsFailed(ctx context.Context, a *assessment.Assessment, re
 		"action", "mark_failed",
 	)
 
-	_ = a.MarkAsFailed(reason)
-	_ = s.assessmentRepo.Save(ctx, a)
-	eventing.PublishCollectedEvents(ctx, s.eventPublisher, a, nil, func(evt event.DomainEvent, err error) {
-		l.Warnw("failed to publish assessment failed event",
+	if err := a.MarkAsFailed(reason); err != nil {
+		l.Warnw("failed to transition assessment to failed",
 			"assessment_id", a.ID().Uint64(),
-			"event_type", evt.EventType(),
 			"error", err.Error(),
 		)
-	})
+		return
+	}
+	if err := s.assessmentRepo.SaveWithEvents(ctx, a); err != nil {
+		l.Warnw("failed to persist failed assessment with outbox",
+			"assessment_id", a.ID().Uint64(),
+			"error", err.Error(),
+		)
+	}
 }
