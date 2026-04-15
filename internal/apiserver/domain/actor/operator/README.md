@@ -398,7 +398,7 @@ if err != nil {
 | **身份来源** | 可选绑定 IAM（User/Child） | 必须绑定 IAM User |
 | **核心数据** | 测评统计、标签、关注度 | 业务角色 |
 | **主要操作** | 标签管理、统计更新 | 角色管理、权限检查 |
-| **领域服务** | Validator, Binder, Editor, StatsUpdater | Validator, RoleManager, Editor, IAMSynchronizer |
+| **领域服务** | Validator, Binder, Editor | Validator, RoleManager, Editor, IAMSynchronizer |
 | **多租户** | orgID 隔离 | orgID 隔离（同一IAM用户可在多机构） |
 
 ---

@@ -2,8 +2,9 @@ package cache
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
 // Cache 统一缓存接口
@@ -87,58 +88,51 @@ func NewCacheKeyBuilder() *CacheKeyBuilder {
 
 // BuildScaleKey 构建量表缓存键
 func (b *CacheKeyBuilder) BuildScaleKey(code string) string {
-	return addNamespace("scale:" + code)
+	return rediskey.NewBuilder().BuildScaleKey(code)
 }
 
 // BuildScaleListKey 构建量表全局列表缓存键
 func (b *CacheKeyBuilder) BuildScaleListKey() string {
-	return addNamespace("scale:list:v1")
+	return rediskey.NewBuilder().BuildScaleListKey()
 }
 
 // BuildQuestionnaireKey 构建问卷缓存键
 func (b *CacheKeyBuilder) BuildQuestionnaireKey(code, version string) string {
-	if version == "" {
-		return addNamespace("questionnaire:" + code)
-	}
-	return addNamespace("questionnaire:" + code + ":" + version)
+	return rediskey.NewBuilder().BuildQuestionnaireKey(code, version)
 }
 
 // BuildPublishedQuestionnaireKey 构建当前已发布问卷缓存键
 func (b *CacheKeyBuilder) BuildPublishedQuestionnaireKey(code string) string {
-	return addNamespace("questionnaire:published:" + code)
+	return rediskey.NewBuilder().BuildPublishedQuestionnaireKey(code)
 }
 
 // BuildAssessmentDetailKey 构建测评详情缓存键
 func (b *CacheKeyBuilder) BuildAssessmentDetailKey(id uint64) string {
-	return addNamespace(fmt.Sprintf("assessment:detail:%d", id))
+	return rediskey.NewBuilder().BuildAssessmentDetailKey(id)
 }
 
 // BuildAssessmentListKey 构建“我的测评列表”缓存键
 // suffix 可用于携带筛选条件哈希，格式示例：":abc123"
 func (b *CacheKeyBuilder) BuildAssessmentListKey(userID uint64, suffix string) string {
-	key := fmt.Sprintf("assess:list:%d:v1", userID)
-	if suffix != "" {
-		key += suffix
-	}
-	return addNamespace(key)
+	return rediskey.NewBuilder().BuildAssessmentListKey(userID, suffix)
 }
 
 // BuildTesteeInfoKey 构建受试者信息缓存键
 func (b *CacheKeyBuilder) BuildTesteeInfoKey(id uint64) string {
-	return addNamespace(fmt.Sprintf("testee:info:%d", id))
+	return rediskey.NewBuilder().BuildTesteeInfoKey(id)
 }
 
 // BuildPlanInfoKey 构建计划信息缓存键
 func (b *CacheKeyBuilder) BuildPlanInfoKey(id uint64) string {
-	return addNamespace(fmt.Sprintf("plan:info:%d", id))
+	return rediskey.NewBuilder().BuildPlanInfoKey(id)
 }
 
 // BuildStatsQueryKey 构建统计查询缓存键
 func (b *CacheKeyBuilder) BuildStatsQueryKey(statType, key string) string {
-	return addNamespace("stats:query:" + statType + ":" + key)
+	return rediskey.NewBuilder().BuildStatsQueryKey(statType + ":" + key)
 }
 
 // BuildEventProcessedKey 构建事件幂等性缓存键
 func (b *CacheKeyBuilder) BuildEventProcessedKey(eventID string) string {
-	return "event:processed:" + eventID
+	return rediskey.NewBuilder().BuildEventProcessedKey(eventID)
 }

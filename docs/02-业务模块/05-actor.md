@@ -24,7 +24,7 @@
 | 主入口 | 后台主要走 REST；C 端主要走 `ActorService` gRPC；worker 可通过 internal gRPC `TagTestee` 回写标签 |
 | 核心对象 | `Testee`、`Operator`、`Clinician`、`ClinicianTesteeRelation`、`AssessmentEntry`、`TesteeRef`、`OperatorRef`、`ClinicianRef`、`FillerRef` |
 | 与 IAM 的关系 | IAM 提供身份与档案源，`actor` 负责在业务域里完成绑定、投影与补充状态，不把 IAM 当聚合本身 |
-| 后台可见性 | 受保护接口以 JWT `org_id` 为准；`qs:admin` 可看机构全量，其他后台用户按 `ClinicianTesteeRelation` 收口 |
+| 后台可见性 | 受保护接口以 JWT `org_id` 为准；兼容 `org_id` / `iam_child_id` 只留在 REST/gRPC 边界做归一化；`qs:admin` 可看机构全量，其他后台用户按 `ClinicianTesteeRelation` 收口 |
 | 后台动作权限 | `actor` 只提供统一角色守卫；计划写操作收口到 `qs:evaluation_plan_manager` / `qs:admin`，评估后台动作收口到 `qs:evaluator` / `qs:admin`，统计同步与校验收口到 `qs:admin` |
 | 关键边界 | 不负责登录、JWT、系统级授权，也不负责问卷、测评、计划等业务主流程 |
 | 存储分层 | 主存储在 MySQL；受试者读路径可经 Redis 装饰仓储加速 |
@@ -52,7 +52,7 @@
 
 #### 不负责什么（细项）
 
-- **JWT / 会话**：由中间件与 Handler 上下文提供 `user_id` / `org_id` 等，**不**作为 `actor` 聚合内持久化状态；后台受保护接口统一信任 JWT `org_id`，旧 `org_id` query/body 仅作兼容校验（见「核心模式」）。
+- **JWT / 会话**：由中间件与 Handler 上下文提供 `user_id` / `org_id` 等，**不**作为 `actor` 聚合内持久化状态；后台受保护接口统一信任 JWT `org_id`，旧 `org_id` / `iam_child_id` 仅在 REST/gRPC 边界做兼容归一化与校验（见「核心模式」）。
 - **领域事件总线**：当前 **无** 与 `survey`/`plan` 同级的稳定 `actor.*` MQ 事件落地（代码中多为注释占位，见「核心契约」）。
 
 ### 契约入口

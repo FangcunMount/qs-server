@@ -9,6 +9,7 @@ import (
 
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 )
 
@@ -208,7 +209,7 @@ func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetI
 }
 
 func answerSheetProcessingLockKey(answerSheetID uint64) string {
-	return fmt.Sprintf("answersheet:processing:%d", answerSheetID)
+	return rediskey.NewBuilder().BuildAnswerSheetProcessingLockKey(answerSheetID)
 }
 
 // 计算答卷分数

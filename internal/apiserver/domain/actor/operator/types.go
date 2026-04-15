@@ -33,6 +33,3 @@ const (
 	// RoleOperator 普通员工：只能查看受试者
 	RoleOperator Role = "qs:staff"
 )
-
-// RoleStaff 是 RoleOperator 的兼容别名，保留旧命名。
-const RoleStaff Role = RoleOperator

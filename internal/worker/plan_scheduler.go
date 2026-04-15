@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
@@ -133,8 +134,9 @@ func (r *workerPlanSchedulerRunner) start(ctx context.Context) <-chan struct{} {
 		return done
 	}
 
+	lockKey := rediskey.NewBuilder().BuildLockKey(r.opts.LockKey)
 	log.Infof("worker plan scheduler started (org_ids=%v, interval=%s, initial_delay=%s, lock_key=%s, lock_ttl=%s)",
-		r.opts.OrgIDs, r.opts.Interval, r.opts.InitialDelay, r.opts.LockKey, r.opts.LockTTL)
+		r.opts.OrgIDs, r.opts.Interval, r.opts.InitialDelay, lockKey, r.opts.LockTTL)
 
 	go func() {
 		defer close(done)
@@ -163,23 +165,25 @@ func (r *workerPlanSchedulerRunner) executeTick(ctx context.Context) {
 }
 
 func (r *workerPlanSchedulerRunner) runOnce(ctx context.Context) error {
-	token, acquired, err := r.acquireLock(ctx, r.opts.LockKey, r.opts.LockTTL)
+	lockKey := rediskey.NewBuilder().BuildLockKey(r.opts.LockKey)
+
+	token, acquired, err := r.acquireLock(ctx, lockKey, r.opts.LockTTL)
 	if err != nil {
 		return fmt.Errorf("failed to acquire worker plan scheduler lock: %w", err)
 	}
 	if !acquired {
 		log.Infof("worker plan scheduler tick skipped (lock_key=%s, org_ids=%v, reason=lock_not_acquired)",
-			r.opts.LockKey, r.opts.OrgIDs)
+			lockKey, r.opts.OrgIDs)
 		return nil
 	}
 
 	defer func() {
-		if err := r.releaseLock(context.Background(), r.opts.LockKey, token); err != nil {
-			log.Warnf("failed to release worker plan scheduler lock (lock_key=%s): %v", r.opts.LockKey, err)
+		if err := r.releaseLock(context.Background(), lockKey, token); err != nil {
+			log.Warnf("failed to release worker plan scheduler lock (lock_key=%s): %v", lockKey, err)
 		}
 	}()
 
-	log.Infof("worker plan scheduler tick acquired lock (lock_key=%s, org_ids=%v)", r.opts.LockKey, r.opts.OrgIDs)
+	log.Infof("worker plan scheduler tick acquired lock (lock_key=%s, org_ids=%v)", lockKey, r.opts.OrgIDs)
 
 	totalOpened := 0
 	totalExpired := 0
@@ -192,7 +196,7 @@ func (r *workerPlanSchedulerRunner) runOnce(ctx context.Context) error {
 		})
 		if err != nil {
 			failedOrgs++
-			log.Warnf("worker plan scheduler tick failed for org (org_id=%d, lock_key=%s): %v", orgID, r.opts.LockKey, err)
+			log.Warnf("worker plan scheduler tick failed for org (org_id=%d, lock_key=%s): %v", orgID, lockKey, err)
 			continue
 		}
 
@@ -205,7 +209,7 @@ func (r *workerPlanSchedulerRunner) runOnce(ctx context.Context) error {
 	}
 
 	log.Infof("worker plan scheduler tick completed (lock_key=%s, org_ids=%v, opened_count=%d, expired_count=%d, failed_org_count=%d)",
-		r.opts.LockKey, r.opts.OrgIDs, totalOpened, totalExpired, failedOrgs)
+		lockKey, r.opts.OrgIDs, totalOpened, totalExpired, failedOrgs)
 
 	return nil
 }

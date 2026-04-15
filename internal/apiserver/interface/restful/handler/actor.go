@@ -171,7 +171,7 @@ func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
 		return
 	}
 
-	profileIDStr := req.ProfileID
+	profileIDStr := req.CanonicalProfileID()
 	if profileIDStr == "" {
 		h.BadRequestResponse(c, "profile_id is required", nil)
 		return
@@ -1065,7 +1065,7 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 		ID:         idStr,
 		OrgID:      orgIDStr,
 		ProfileID:  profileIDStr,
-		IAMChildID: profileIDStr, // 向后兼容：使用 ProfileID 填充
+		IAMChildID: response.LegacyIAMChildIDAlias(profileIDStr),
 		Name:       result.Name,
 		Gender:     gender,
 		Birthday:   result.Birthday,

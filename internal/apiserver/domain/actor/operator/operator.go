@@ -37,14 +37,6 @@ func NewOperator(orgID int64, userID int64, name string) *Operator {
 	}
 }
 
-// Staff 是 Operator 的兼容别名，保留给仍使用旧命名的调用方。
-type Staff = Operator
-
-// NewStaff 兼容旧构造函数，内部委托到 NewOperator。
-func NewStaff(orgID int64, userID int64, name string) *Operator {
-	return NewOperator(orgID, userID, name)
-}
-
 // === Getters ===
 
 // ID 获取员工ID

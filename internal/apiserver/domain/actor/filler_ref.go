@@ -21,9 +21,6 @@ const (
 	FillerTypeOperator FillerType = "staff"
 )
 
-// FillerTypeStaff 是 FillerTypeOperator 的兼容别名。
-const FillerTypeStaff FillerType = FillerTypeOperator
-
 // String 返回字符串表示
 func (f FillerType) String() string {
 	return string(f)
@@ -62,11 +59,6 @@ func (f *FillerRef) IsSelf() bool {
 // IsGuardian 是否监护人代填
 func (f *FillerRef) IsGuardian() bool {
 	return f.fillerType == FillerTypeGuardian
-}
-
-// IsStaff 是否员工代填
-func (f *FillerRef) IsStaff() bool {
-	return f.fillerType == FillerTypeOperator
 }
 
 // IsOperator 是否操作者代填

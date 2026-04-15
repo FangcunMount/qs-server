@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -143,6 +144,15 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 	}
 	if !mr.Exists(answerSheetProcessingLockKey(answerSheetID)) {
 		t.Fatalf("expected duplicate lock key to remain set")
+	}
+}
+
+func TestAnswerSheetProcessingLockKeyUsesNamespace(t *testing.T) {
+	rediskey.ApplyNamespace("worker-test")
+	defer rediskey.ApplyNamespace("")
+
+	if got := answerSheetProcessingLockKey(42); got != "worker-test:answersheet:processing:42" {
+		t.Fatalf("unexpected namespaced lock key: %s", got)
 	}
 }
 

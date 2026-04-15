@@ -236,11 +236,6 @@ func (t *Testee) HasAssessmentHistory() bool {
 	return t.assessmentStats != nil && t.assessmentStats.TotalCount() > 0
 }
 
-// updateAssessmentStats 更新测评统计快照（包内方法，应通过 StatsUpdater 调用）
-func (t *Testee) updateAssessmentStats(stats *AssessmentStats) {
-	t.assessmentStats = stats
-}
-
 // === 仓储层需要的方法（用于重建聚合根）===
 
 // SetID 设置ID（仅用于从数据库加载）

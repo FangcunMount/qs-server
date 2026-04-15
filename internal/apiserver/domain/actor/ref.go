@@ -61,21 +61,8 @@ func NewOperatorRef(operatorID operator.ID, userID int64, name string) *Operator
 	}
 }
 
-// StaffRef 是 OperatorRef 的兼容别名，保留给旧调用方。
-type StaffRef = OperatorRef
-
-// NewStaffRef 创建员工引用
-func NewStaffRef(operatorID operator.ID, userID int64, name string) *StaffRef {
-	return NewOperatorRef(operatorID, userID, name)
-}
-
 // OperatorID 获取操作者ID
 func (r *OperatorRef) OperatorID() operator.ID {
-	return r.operatorID
-}
-
-// StaffID 获取员工ID
-func (r *OperatorRef) StaffID() operator.ID {
 	return r.operatorID
 }
 

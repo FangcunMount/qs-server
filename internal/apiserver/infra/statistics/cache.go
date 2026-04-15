@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -24,12 +25,14 @@ func normalizeDate(t time.Time) time.Time {
 // StatisticsCache 统计缓存（Redis操作封装）
 type StatisticsCache struct {
 	client redis.UniversalClient
+	keys   *rediskey.Builder
 }
 
 // NewStatisticsCache 创建统计缓存
 func NewStatisticsCache(client redis.UniversalClient) *StatisticsCache {
 	return &StatisticsCache{
 		client: client,
+		keys:   rediskey.NewBuilder(),
 	}
 }
 
@@ -45,7 +48,7 @@ func (c *StatisticsCache) IncrementDailyCount(
 	metric string, // "submission" or "completion"
 ) error {
 	date = normalizeDate(date)
-	key := fmt.Sprintf("stats:daily:%d:%s:%s:%s", orgID, statType, statKey, date.Format("2006-01-02"))
+	key := c.keys.BuildStatsDailyKey(orgID, string(statType), statKey, date.Format("2006-01-02"))
 	field := fmt.Sprintf("%s_count", metric)
 	if err := c.client.HIncrBy(ctx, key, field, 1).Err(); err != nil {
 		return err
@@ -62,7 +65,7 @@ func (c *StatisticsCache) GetDailyCount(
 	date time.Time,
 ) (submissionCount, completionCount int64, err error) {
 	date = normalizeDate(date)
-	key := fmt.Sprintf("stats:daily:%d:%s:%s:%s", orgID, statType, statKey, date.Format("2006-01-02"))
+	key := c.keys.BuildStatsDailyKey(orgID, string(statType), statKey, date.Format("2006-01-02"))
 
 	values, err := c.client.HMGet(ctx, key, "submission_count", "completion_count").Result()
 	if err != nil {
@@ -89,7 +92,7 @@ func (c *StatisticsCache) GetDailyCount(
 
 // IsEventProcessed 检查事件是否已处理
 func (c *StatisticsCache) IsEventProcessed(ctx context.Context, eventID string) (bool, error) {
-	key := fmt.Sprintf("event:processed:%s", eventID)
+	key := c.keys.BuildEventProcessedKey(eventID)
 	result := c.client.Exists(ctx, key)
 	if result.Err() != nil {
 		return false, result.Err()
@@ -99,7 +102,7 @@ func (c *StatisticsCache) IsEventProcessed(ctx context.Context, eventID string) 
 
 // MarkEventProcessed 标记事件已处理
 func (c *StatisticsCache) MarkEventProcessed(ctx context.Context, eventID string, ttl time.Duration) error {
-	key := fmt.Sprintf("event:processed:%s", eventID)
+	key := c.keys.BuildEventProcessedKey(eventID)
 	return c.client.Set(ctx, key, "1", ttl).Err()
 }
 
@@ -107,7 +110,7 @@ func (c *StatisticsCache) MarkEventProcessed(ctx context.Context, eventID string
 
 // GetQueryCache 获取查询结果缓存
 func (c *StatisticsCache) GetQueryCache(ctx context.Context, cacheKey string) (string, error) {
-	key := fmt.Sprintf("stats:query:%s", cacheKey)
+	key := c.keys.BuildStatsQueryKey(cacheKey)
 	result := c.client.Get(ctx, key)
 	if result.Err() == redis.Nil {
 		return "", nil
@@ -117,7 +120,7 @@ func (c *StatisticsCache) GetQueryCache(ctx context.Context, cacheKey string) (s
 
 // SetQueryCache 设置查询结果缓存
 func (c *StatisticsCache) SetQueryCache(ctx context.Context, cacheKey string, value string, ttl time.Duration) error {
-	key := fmt.Sprintf("stats:query:%s", cacheKey)
+	key := c.keys.BuildStatsQueryKey(cacheKey)
 	return c.client.Set(ctx, key, value, ttl).Err()
 }
 
@@ -125,7 +128,7 @@ func (c *StatisticsCache) SetQueryCache(ctx context.Context, cacheKey string, va
 
 // ScanDailyKeys 扫描所有每日统计键
 func (c *StatisticsCache) ScanDailyKeys(ctx context.Context, orgID int64, statType statistics.StatisticType) ([]string, error) {
-	pattern := fmt.Sprintf("stats:daily:%d:%s:*", orgID, statType)
+	pattern := c.keys.BuildStatsDailyPattern(orgID, string(statType))
 	var keys []string
 	var cursor uint64
 

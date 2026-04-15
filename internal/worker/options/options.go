@@ -79,13 +79,15 @@ type PlanSchedulerOptions struct {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
-	DisableStatisticsCache bool `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	DisableStatisticsCache bool   `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	Namespace              string `json:"namespace" mapstructure:"namespace"`
 }
 
 // NewCacheOptions 创建缓存控制配置
 func NewCacheOptions() *CacheOptions {
 	return &CacheOptions{
 		DisableStatisticsCache: true,
+		Namespace:              "",
 	}
 }
 
@@ -278,4 +280,6 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
 		"Disable Redis-based statistics caching in worker event handlers")
+	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace,
+		"Optional Redis key namespace prefix shared by cache, statistics, lock, and SDK keys.")
 }

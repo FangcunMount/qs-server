@@ -11,7 +11,7 @@
 | 运行时主用途 | **对象缓存 / 列表缓存、统计查询缓存、统计 daily 中转、事件幂等、分布式互斥锁、微信 SDK token 缓存** |
 | 主要使用方 | **`qs-apiserver`** 负责大部分缓存；**`qs-worker`** 负责统计幂等、问卷 daily 预聚合、answersheet 锁、plan scheduler 锁 |
 | 已清理的旧用法 | 运行时代码里已不再写 `stats:window:*`、`stats:accum:*`、`stats:dist:*`；问卷列表缓存、测评状态缓存、`CodesService` 的假 Redis 依赖、`collection-server` 运行时 Redis 装配都已移除 |
-| 命名空间 | `internal/apiserver/infra/cache` 这组缓存会走 `cache.namespace`；**统计 key、锁 key、`wechat:cache:*` 不走统一 namespace** |
+| 命名空间 | Redis key 统一由 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/) 生成；`cache.namespace` 会同时作用于缓存、统计、锁和微信 SDK 缓存 |
 | 设计边界 | 锁是**单 Redis lease lock**，属于 best-effort 分布式锁；不是强一致协调系统 |
 | 部署现实 | `apiserver` 默认可用统计 Redis；`worker` 默认 `cache.disable_statistics_cache=true`，所以统计预聚合和幂等键只有在显式开启时才会产生 |
 
@@ -34,7 +34,7 @@
 ### 通用规则
 
 - 这组缓存主要实现于 [internal/apiserver/infra/cache](../../internal/apiserver/infra/cache)
-- key 默认会经过 `addNamespace(...)`；命名空间入口见 [namespace.go](../../internal/apiserver/infra/cache/namespace.go)
+- Redis key 统一由 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/) 生成；`infra/cache/namespace.go` 现在只是对统一 namespace 入口的薄封装
 - TTL 支持全局覆盖与抖动，见 [ttl_config.go](../../internal/apiserver/infra/cache/ttl_config.go)
 - 问卷、量表、测评详情等对象缓存都使用 repository 装饰器方式接入
 - 列表缓存额外带一层进程内短 TTL 内存缓存，减少热点 Redis `GET` 和 JSON 解码
@@ -149,9 +149,9 @@
 
 ## 当前边界与注意事项
 
-1. **命名空间不一致**：对象缓存和列表缓存走 `cache.namespace`，但统计 key、锁 key、`wechat:cache:*` 不走统一 namespace。
-2. **统计 Redis 是否生效取决于部署**：`worker` 默认关闭统计 Redis，所以很多环境里只有 `stats:query:*` 在工作。
-3. **锁不是强一致协调系统**：当前锁实现适合“抑制重复工作 / 选主”，不适合需要 fencing 或长时间持有的任务。
+1. **统计 Redis 是否生效取决于部署**：`worker` 默认关闭统计 Redis，所以很多环境里只有 `stats:query:*` 在工作。
+2. **锁不是强一致协调系统**：当前锁实现适合“抑制重复工作 / 选主”，不适合需要 fencing 或长时间持有的任务。
+3. **namespace 需要跨进程一致配置**：`apiserver` 和 `worker` 现在都支持 `cache.namespace`；如果两边配置不同，会落到不同前缀下。
 4. **`collection-server` 只剩 Redis 配置兼容**：运行时已不再初始化 Redis client；保留配置主要是为了不破坏外部配置面。
 5. **文档以当前代码为准**：若与旧专题文档或旧统计文档不一致，以本页和源码为准。
 

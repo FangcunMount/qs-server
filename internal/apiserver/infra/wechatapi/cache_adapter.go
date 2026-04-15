@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/silenceper/wechat/v2/cache"
 )
@@ -13,7 +14,7 @@ import (
 // 用于微信 SDK 的 access_token 缓存
 type RedisCacheAdapter struct {
 	client redis.UniversalClient
-	prefix string // 缓存键前缀，避免与其他缓存冲突
+	keys   *rediskey.Builder
 }
 
 // NewRedisCacheAdapter 创建 Redis 缓存适配器
@@ -24,13 +25,13 @@ func NewRedisCacheAdapter(client redis.UniversalClient) cache.Cache {
 	}
 	return &RedisCacheAdapter{
 		client: client,
-		prefix: "wechat:cache:", // 微信 SDK 缓存键前缀
+		keys:   rediskey.NewBuilder(),
 	}
 }
 
 // buildKey 构建完整的缓存键
 func (a *RedisCacheAdapter) buildKey(key string) string {
-	return a.prefix + key
+	return a.keys.BuildWeChatCacheKey(key)
 }
 
 // Get 获取缓存值

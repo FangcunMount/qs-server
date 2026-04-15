@@ -42,8 +42,9 @@ type ListTesteeRequest struct {
 
 // GetTesteeByProfileIDRequest 根据 profile_id 查询受试者请求
 type GetTesteeByProfileIDRequest struct {
-	OrgID     int64  `form:"org_id"`     // 兼容字段：机构ID
-	ProfileID string `form:"profile_id"` // 用户档案ID（ProfileID）
+	OrgID      int64  `form:"org_id"`       // 兼容字段：机构ID
+	ProfileID  string `form:"profile_id"`   // 用户档案ID（ProfileID）
+	IAMChildID string `form:"iam_child_id"` // 兼容字段：IAM儿童ID
 }
 
 // CreateStaffRequest 创建员工请求

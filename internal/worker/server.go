@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -74,6 +75,9 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	s.dbManager = NewDatabaseManager(s.config)
 	if err = s.dbManager.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize database manager: %v", err)
+	}
+	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil {
+		rediskey.ApplyNamespace(s.config.Options.Cache.Namespace)
 	}
 	cacheRedis, err := s.dbManager.GetRedisClient()
 	if err != nil {
