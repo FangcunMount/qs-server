@@ -498,7 +498,32 @@ func (s *submissionService) invalidateMyListCache(ctx context.Context, userID ui
 	if s.listCache == nil || userID == 0 {
 		return
 	}
-	s.listCache.Invalidate(ctx, userID)
+
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	// 列表缓存失效属于最佳努力，不应把主写路径拖到 gRPC 超时边缘。
+	cacheCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	if err := s.listCache.Invalidate(cacheCtx, userID); err != nil {
+		l.Warnw("失效我的测评列表缓存失败",
+			"action", "invalidate_my_assessment_list_cache",
+			"user_id", userID,
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"error", err.Error(),
+		)
+		return
+	}
+
+	duration := time.Since(startTime)
+	if duration > 200*time.Millisecond {
+		l.Warnw("失效我的测评列表缓存较慢",
+			"action", "invalidate_my_assessment_list_cache",
+			"user_id", userID,
+			"duration_ms", duration.Milliseconds(),
+		)
+	}
 }
 
 // normalizePagination 规范化分页参数

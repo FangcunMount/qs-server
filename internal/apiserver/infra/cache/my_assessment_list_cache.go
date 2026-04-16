@@ -107,12 +107,14 @@ func (c *MyAssessmentListCache) Set(
 }
 
 // Invalidate 删除某个用户所有列表缓存（按前缀）
-func (c *MyAssessmentListCache) Invalidate(ctx context.Context, userID uint64) {
+func (c *MyAssessmentListCache) Invalidate(ctx context.Context, userID uint64) error {
 	if c == nil || c.cache == nil {
-		return
+		return nil
 	}
 	pattern := c.keyBuilder.BuildAssessmentListKey(userID, "*")
-	_ = c.cache.DeletePattern(ctx, pattern)
+	if err := c.cache.DeletePattern(ctx, pattern); err != nil {
+		return err
+	}
 
 	// 清理节点内缓存
 	prefix := pattern[:len(pattern)-1] // 去掉末尾 *
@@ -123,6 +125,8 @@ func (c *MyAssessmentListCache) Invalidate(ctx context.Context, userID uint64) {
 		}
 	}
 	c.memoryMutex.Unlock()
+
+	return nil
 }
 
 func (c *MyAssessmentListCache) buildKey(
