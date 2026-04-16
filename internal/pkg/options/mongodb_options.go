@@ -1,7 +1,6 @@
 package options
 
 import (
-	"net/url"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -69,55 +68,6 @@ func (o *MongoDBOptions) Validate() []error {
 	errs := []error{}
 
 	return errs
-}
-
-// BuildURI 根据当前配置构建 MongoDB 连接 URI。
-// 优先使用显式 url；否则使用分离字段构建标准 mongodb:// URI。
-func (o *MongoDBOptions) BuildURI() string {
-	if o == nil {
-		return ""
-	}
-	if o.URL != "" {
-		return o.URL
-	}
-	if o.Host == "" {
-		return ""
-	}
-
-	u := &url.URL{
-		Scheme: "mongodb",
-		Host:   o.Host,
-	}
-	if o.Database != "" {
-		u.Path = "/" + o.Database
-	}
-	if o.Username != "" {
-		if o.Password != "" {
-			u.User = url.UserPassword(o.Username, o.Password)
-		} else {
-			u.User = url.User(o.Username)
-		}
-	}
-
-	q := u.Query()
-	if o.ReplicaSet != "" {
-		q.Set("replicaSet", o.ReplicaSet)
-	}
-	if o.DirectConnection {
-		q.Set("directConnection", "true")
-	}
-	if o.UseSSL {
-		q.Set("tls", "true")
-	}
-	if o.SSLInsecureSkipVerify {
-		q.Set("tlsInsecure", "true")
-	}
-	if o.SSLAllowInvalidHostnames {
-		q.Set("tlsAllowInvalidHostnames", "true")
-	}
-	u.RawQuery = q.Encode()
-
-	return u.String()
 }
 
 // AddFlags adds flags related to mongodb storage for a specific APIServer to the specified FlagSet.

@@ -14,7 +14,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
-	localmongo "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 )
 
 // DatabaseManager 数据库管理器
@@ -179,38 +178,27 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		return nil
 	}
 
-	// 默认情况下保持重构前的稳定行为；只有显式提供 mongodb.url 时
-	// 才切换到 URI 模式。这样不会因为示例配置里的 replica-set/direct-connection
-	// 字段误触发新逻辑，影响现有部署。
-	if opts.URL == "" {
-		mongoConfig := &database.MongoConfig{
-			Host:                     opts.Host,
-			Username:                 opts.Username,
-			Password:                 opts.Password,
-			Database:                 opts.Database,
-			UseSSL:                   opts.UseSSL,
-			SSLInsecureSkipVerify:    opts.SSLInsecureSkipVerify,
-			SSLAllowInvalidHostnames: opts.SSLAllowInvalidHostnames,
-			SSLCAFile:                opts.SSLCAFile,
-			SSLPEMKeyfile:            opts.SSLPEMKeyfile,
-			EnableLogger:             opts.EnableLogger,
-			SlowThreshold:            opts.SlowThreshold,
-		}
-		mongoConn := database.NewMongoDBConnection(mongoConfig)
-		return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)
+	mongoConfig := &database.MongoConfig{
+		URL:                      opts.URL,
+		Host:                     opts.Host,
+		Username:                 opts.Username,
+		Password:                 opts.Password,
+		Database:                 opts.Database,
+		ReplicaSet:               opts.ReplicaSet,
+		DirectConnection:         opts.DirectConnection,
+		UseSSL:                   opts.UseSSL,
+		SSLInsecureSkipVerify:    opts.SSLInsecureSkipVerify,
+		SSLAllowInvalidHostnames: opts.SSLAllowInvalidHostnames,
+		SSLCAFile:                opts.SSLCAFile,
+		SSLPEMKeyfile:            opts.SSLPEMKeyfile,
+		EnableLogger:             opts.EnableLogger,
+		SlowThreshold:            opts.SlowThreshold,
+		LogCommandDetail:         opts.LogCommandDetail,
+		LogReplyDetail:           opts.LogReplyDetail,
+		LogStarted:               opts.LogStarted,
 	}
-
-	mongoURI := opts.BuildURI()
-	if mongoURI == "" {
-		return fmt.Errorf("mongodb.url is empty")
-	}
-
-	mongoConn := localmongo.NewConnection(&localmongo.ConnectionConfig{
-		URI:           mongoURI,
-		EnableLogger:  opts.EnableLogger,
-		SlowThreshold: opts.SlowThreshold,
-	})
-	return dm.registry.Register(database.MongoDB, map[string]string{"uri": mongoURI}, mongoConn)
+	mongoConn := database.NewMongoDBConnection(mongoConfig)
+	return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)
 }
 
 // GetMySQLDB 获取MySQL数据库连接
