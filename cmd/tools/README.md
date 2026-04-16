@@ -16,6 +16,7 @@ with `go run`.
    - `casbin` &ndash; loads core Casbin policies and role inheritance rules
    - `jwks` &ndash; seeds JWKS key material for JWT validation
    - `wechatapp` &ndash; creates WeChat application configurations (Mini Programs & Official Accounts)
+2. `backfill-pending-assessments` &ndash; scans `assessment.status='pending'`, submits matching rows in batches, and stages `assessment.submitted` events into MySQL outbox so the normal worker evaluation pipeline can continue from there.
 
 ## Example usage
 
@@ -51,6 +52,25 @@ go run ./cmd/tools/seed-authz-resources
 go run ./cmd/tools/seed-role-assignments
 go run ./cmd/tools/seed-casbin
 go run ./cmd/tools/seed-jwks
+```
+
+### Backfill pending assessments
+
+```bash
+# Dry-run: count pending assessments that still need downstream evaluation
+go run ./cmd/tools/backfill-pending-assessments \
+  --dsn "user:pass@tcp(127.0.0.1:3306)/qs?parseTime=true&loc=Local" \
+  --events-config configs/events.yaml
+
+# Apply in controlled batches for one org and one historical window
+go run ./cmd/tools/backfill-pending-assessments \
+  --dsn "user:pass@tcp(127.0.0.1:3306)/qs?parseTime=true&loc=Local" \
+  --events-config configs/events.yaml \
+  --apply \
+  --org-id 1 \
+  --created-before "2026-04-16T00:00:00+08:00" \
+  --batch-size 100 \
+  --sleep 200ms
 ```
 
 Run the commands in the above order after creating an empty schema to rebuild
