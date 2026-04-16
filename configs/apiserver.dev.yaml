@@ -215,8 +215,8 @@ mongodb:
   username: "app_user"              # 用户名
   password: "d3v_App@M0ngo"      # 密码
   database: "qs"   # 数据库名称
-  replica-set: "rs0"                   # 单节点副本集可设为 rs0
-  direct-connection: true          # 单节点副本集建议开启 true
+  replica-set: ""                   # 仅在显式使用 mongodb.url 时作为文档说明保留
+  direct-connection: false          # 仅在显式使用 mongodb.url 时作为文档说明保留
   use-ssl: false                    # 是否使用SSL
   ssl-insecure-skip-verify: false   # 是否跳过SSL证书验证
   ssl-allow-invalid-hostnames: false # 是否允许无效的主机名

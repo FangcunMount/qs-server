@@ -227,8 +227,8 @@ mongodb:
   username: "app_user"
   password: ""
   database: "qs"
-  replica-set: "rs0"                 # 单节点副本集可设为 rs0
-  direct-connection: true        # 单节点副本集建议开启 true
+  replica-set: ""                 # 仅在显式使用 mongodb.url 时作为文档说明保留
+  direct-connection: false        # 仅在显式使用 mongodb.url 时作为文档说明保留
   use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false

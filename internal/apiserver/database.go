@@ -170,8 +170,7 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 	}
 
 	opts := dm.config.MongoDBOptions
-	mongoURI := opts.BuildURI()
-	if mongoURI == "" {
+	if opts.URL == "" && opts.Host == "" {
 		logger.L(ctx).Infow("MongoDB host not configured, skipping MongoDB initialization",
 			"component", "MongoDB",
 			"action", "initialize",
@@ -180,9 +179,10 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		return nil
 	}
 
-	// 默认情况下保持重构前的稳定行为；只有显式启用 URI / replica set / direct connection
-	// 时才切换到本地 URI 模式，支持单节点副本集事务。
-	if opts.URL == "" && opts.ReplicaSet == "" && !opts.DirectConnection {
+	// 默认情况下保持重构前的稳定行为；只有显式提供 mongodb.url 时
+	// 才切换到 URI 模式。这样不会因为示例配置里的 replica-set/direct-connection
+	// 字段误触发新逻辑，影响现有部署。
+	if opts.URL == "" {
 		mongoConfig := &database.MongoConfig{
 			Host:                     opts.Host,
 			Username:                 opts.Username,
@@ -198,6 +198,11 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		}
 		mongoConn := database.NewMongoDBConnection(mongoConfig)
 		return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)
+	}
+
+	mongoURI := opts.BuildURI()
+	if mongoURI == "" {
+		return fmt.Errorf("mongodb.url is empty")
 	}
 
 	mongoConn := localmongo.NewConnection(&localmongo.ConnectionConfig{
