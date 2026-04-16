@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/util/homedir"
+	"github.com/FangcunMount/qs-server/pkg/configmask"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -72,5 +73,5 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 
 // printConfigStage prints current viper settings with a stage label.
 func printConfigStage(stage string) {
-	fmt.Printf("%v %s: %+v\n", progressMessage, stage, viper.AllSettings())
+	fmt.Printf("%v %s: %s\n", progressMessage, stage, configmask.String(viper.AllSettings()))
 }

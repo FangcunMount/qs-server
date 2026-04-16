@@ -169,7 +169,8 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		return nil
 	}
 
-	mongoURI := dm.config.MongoDBOptions.BuildURI()
+	opts := dm.config.MongoDBOptions
+	mongoURI := opts.BuildURI()
 	if mongoURI == "" {
 		logger.L(ctx).Infow("MongoDB host not configured, skipping MongoDB initialization",
 			"component", "MongoDB",
@@ -179,10 +180,30 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		return nil
 	}
 
+	// 默认情况下保持重构前的稳定行为；只有显式启用 URI / replica set / direct connection
+	// 时才切换到本地 URI 模式，支持单节点副本集事务。
+	if opts.URL == "" && opts.ReplicaSet == "" && !opts.DirectConnection {
+		mongoConfig := &database.MongoConfig{
+			Host:                     opts.Host,
+			Username:                 opts.Username,
+			Password:                 opts.Password,
+			Database:                 opts.Database,
+			UseSSL:                   opts.UseSSL,
+			SSLInsecureSkipVerify:    opts.SSLInsecureSkipVerify,
+			SSLAllowInvalidHostnames: opts.SSLAllowInvalidHostnames,
+			SSLCAFile:                opts.SSLCAFile,
+			SSLPEMKeyfile:            opts.SSLPEMKeyfile,
+			EnableLogger:             opts.EnableLogger,
+			SlowThreshold:            opts.SlowThreshold,
+		}
+		mongoConn := database.NewMongoDBConnection(mongoConfig)
+		return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)
+	}
+
 	mongoConn := localmongo.NewConnection(&localmongo.ConnectionConfig{
 		URI:           mongoURI,
-		EnableLogger:  dm.config.MongoDBOptions.EnableLogger,
-		SlowThreshold: dm.config.MongoDBOptions.SlowThreshold,
+		EnableLogger:  opts.EnableLogger,
+		SlowThreshold: opts.SlowThreshold,
 	})
 	return dm.registry.Register(database.MongoDB, map[string]string{"uri": mongoURI}, mongoConn)
 }

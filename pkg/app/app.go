@@ -12,6 +12,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/FangcunMount/qs-server/pkg/term"
 	"github.com/FangcunMount/qs-server/pkg/version"
@@ -216,7 +217,7 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 		}
 
 		// 打印选项信息
-		fmt.Printf("Options: %+v\n", a.options)
+		fmt.Printf("Options: %s\n", configmask.String(a.options))
 
 		// 打印 secure 配置
 		fmt.Printf("Secure Config: %+v\n", viper.Get("secure"))
@@ -231,7 +232,7 @@ func (a *App) runCommand(cmd *cobra.Command, args []string) error {
 			log.Infof("%v Version: %s", progressMessage, version.Get().String())
 		}
 		if !a.noConfig {
-			log.Infof("%v Config: %+v", progressMessage, viper.AllSettings())
+			log.Infof("%v Config: %s", progressMessage, configmask.String(viper.AllSettings()))
 		}
 	}
 
@@ -293,7 +294,7 @@ func addCmdTemplate(cmd *cobra.Command, namedFlagSets cliflag.NamedFlagSets) {
 
 // printViperConfig 输出当前 viper 读取到的配置以及关键环境变量，用于调试覆盖行为
 func printViperConfig(envPrefix string) {
-	fmt.Printf("Viper Config (AllSettings): %+v\n", viper.AllSettings())
+	fmt.Printf("Viper Config (AllSettings): %s\n", configmask.String(viper.AllSettings()))
 
 	fmt.Printf("Using env prefix: %s_\n", envPrefix)
 
@@ -321,7 +322,7 @@ func printViperConfig(envPrefix string) {
 	}
 	for _, key := range keys {
 		envKey := envPrefix + "_" + key
-		fmt.Printf("ENV %s=%s\n", envKey, os.Getenv(envKey))
+		fmt.Printf("ENV %s=%s\n", envKey, configmask.MaskEnvValue(key, os.Getenv(envKey)))
 	}
 }
 

@@ -1,11 +1,11 @@
 package options
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
 )
@@ -398,6 +398,5 @@ func (o *Options) Complete() error {
 
 // String 返回配置的字符串表示
 func (o *Options) String() string {
-	data, _ := json.Marshal(o)
-	return string(data)
+	return configmask.String(o)
 }
