@@ -913,10 +913,6 @@ func (c *APIClient) doRequest(ctx context.Context, method, path string, body int
 	return c.doRequestWithRetryAndTimeout(ctx, method, path, body, true, c.httpClient.Timeout)
 }
 
-func (c *APIClient) doRequestWithRetry(ctx context.Context, method, path string, body interface{}, allowRefresh bool) (*Response, error) {
-	return c.doRequestWithRetryAndTimeout(ctx, method, path, body, allowRefresh, c.httpClient.Timeout)
-}
-
 func (c *APIClient) doRequestWithRetryAndTimeout(ctx context.Context, method, path string, body interface{}, allowRefresh bool, timeout time.Duration) (*Response, error) {
 	return c.doRequestWithRetryTimeoutAndLimit(ctx, method, path, body, allowRefresh, timeout, c.retryMax)
 }
@@ -1075,7 +1071,7 @@ func defaultRetryConfig() (int, time.Duration, time.Duration) {
 func shouldRetryNetErr(err error) bool {
 	var netErr net.Error
 	if errors.As(err, &netErr) {
-		return netErr.Timeout() || netErr.Temporary()
+		return netErr.Timeout()
 	}
 	return false
 }
@@ -1953,42 +1949,6 @@ func (c *APIClient) GetTesteeClinicians(ctx context.Context, testeeID string) (*
 		return nil, fmt.Errorf("decode testee clinician relations response: %w", err)
 	}
 	return &relationResp, nil
-}
-
-// SyncStatisticsDaily 调用内部统计每日同步接口。
-func (c *APIClient) SyncStatisticsDaily(ctx context.Context) error {
-	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/sync/daily", nil)
-	if err != nil {
-		return fmt.Errorf("sync statistics daily: %w", err)
-	}
-	return nil
-}
-
-// SyncStatisticsAccumulated 调用内部统计累计同步接口。
-func (c *APIClient) SyncStatisticsAccumulated(ctx context.Context) error {
-	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/sync/accumulated", nil)
-	if err != nil {
-		return fmt.Errorf("sync statistics accumulated: %w", err)
-	}
-	return nil
-}
-
-// SyncStatisticsPlan 调用内部统计计划同步接口。
-func (c *APIClient) SyncStatisticsPlan(ctx context.Context) error {
-	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/sync/plan", nil)
-	if err != nil {
-		return fmt.Errorf("sync statistics plan: %w", err)
-	}
-	return nil
-}
-
-// ValidateStatisticsConsistency 调用内部统计一致性校验接口。
-func (c *APIClient) ValidateStatisticsConsistency(ctx context.Context) error {
-	_, err := c.doRequest(ctx, "POST", "/internal/v1/statistics/validate", nil)
-	if err != nil {
-		return fmt.Errorf("validate statistics consistency: %w", err)
-	}
-	return nil
 }
 
 // AssignClinicianTesteeWithRelationType 按指定关系类型建立受试者分配（apiserver）。

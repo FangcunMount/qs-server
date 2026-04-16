@@ -111,21 +111,6 @@ func flexibleIDSet(values []FlexibleID) map[string]struct{} {
 	return result
 }
 
-func stringSet(values []string) map[string]struct{} {
-	if len(values) == 0 {
-		return nil
-	}
-	result := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		result[value] = struct{}{}
-	}
-	return result
-}
-
 func sortClinicianRelationsByTesteeCreatedAt(items []*ClinicianRelationResponse) {
 	sort.SliceStable(items, func(i, j int) bool {
 		left := items[i]
@@ -141,19 +126,6 @@ func sortClinicianRelationsByTesteeCreatedAt(items []*ClinicianRelationResponse)
 		}
 		return parseID(left.Testee.ID) < parseID(right.Testee.ID)
 	})
-}
-
-func isAssessmentEntryRelation(item *RelationResponse, entryID string) bool {
-	if item == nil {
-		return false
-	}
-	if !strings.EqualFold(strings.TrimSpace(item.SourceType), "assessment_entry") {
-		return false
-	}
-	if item.SourceID == nil {
-		return false
-	}
-	return strings.TrimSpace(*item.SourceID) == strings.TrimSpace(entryID)
 }
 
 func isAccessGrantRelationType(relationType string) bool {

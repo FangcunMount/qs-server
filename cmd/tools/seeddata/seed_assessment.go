@@ -720,36 +720,6 @@ func submitAnswerSheetWithRetry(ctx context.Context, client *APIClient, req Subm
 	})
 }
 
-// logQuestionnaireDetail 打印问卷详细信息
-func logQuestionnaireDetail(logger interface{ Infow(string, ...interface{}) }, detail *QuestionnaireDetailResponse, target scaleTarget) {
-	questions := make([]map[string]interface{}, 0, len(detail.Questions))
-	for _, q := range detail.Questions {
-		options := make([]map[string]string, 0, len(q.Options))
-		for _, opt := range q.Options {
-			options = append(options, map[string]string{
-				"code":    opt.Code,
-				"content": opt.Content,
-				"score":   fmt.Sprintf("%d", opt.Score),
-			})
-		}
-		questions = append(questions, map[string]interface{}{
-			"code":    q.Code,
-			"type":    q.Type,
-			"title":   truncateString(q.Title, 50),
-			"options": options,
-		})
-	}
-
-	logger.Infow("Questionnaire detail",
-		"questionnaire_code", detail.Code,
-		"questionnaire_version", detail.Version,
-		"title", detail.Title,
-		"type", detail.Type,
-		"question_count", len(detail.Questions),
-		"questions", questions,
-	)
-}
-
 func enqueueTestees(ctx context.Context, taskCh chan<- *TesteeResponse, testees []*TesteeResponse) error {
 	for _, testee := range testees {
 		select {

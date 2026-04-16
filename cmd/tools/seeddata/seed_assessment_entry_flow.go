@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	actorMySQL "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
-	"gorm.io/gorm"
 )
 
 func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
@@ -17,19 +14,6 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 	if deps.Config.Global.OrgID == 0 {
 		return fmt.Errorf("global.orgId is required for assessment_entry_flow")
 	}
-	if strings.TrimSpace(deps.Config.Local.MySQLDSN) == "" {
-		return fmt.Errorf("seeddata local.mysql_dsn is required for assessment_entry_flow")
-	}
-
-	mysqlDB, err := openLocalSeedMySQL(deps.Config.Local.MySQLDSN)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := closeLocalSeedMySQL(mysqlDB); closeErr != nil {
-			deps.Logger.Warnw("Failed to close local mysql after assessment entry flow", "error", closeErr.Error())
-		}
-	}()
 
 	cfg := deps.Config.AssessmentEntryFlow
 	clinicians, err := resolveSeedClinicianScope(ctx, deps, seedClinicianScopeSpec{
@@ -107,11 +91,6 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 			}
 			totalEntries++
 
-			entryCreatedAt, err := loadAssessmentEntryCreatedAt(ctx, mysqlDB, entry.ID)
-			if err != nil {
-				return fmt.Errorf("load created_at for assessment entry %s: %w", entry.ID, err)
-			}
-
 			processedForEntry := 0
 			for _, candidate := range accessCandidates {
 				if processedForEntry >= maxIntakes {
@@ -147,12 +126,8 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 					continue
 				}
 
-				resolveAt := deriveEntryResolveAt(entryCreatedAt, testeeDetail.CreatedAt)
 				if _, err := deps.APIClient.ResolveAssessmentEntry(ctx, entry.Token); err != nil {
 					return fmt.Errorf("resolve assessment entry %s for testee %s: %w", entry.ID, testeeID, err)
-				}
-				if err := backfillAssessmentEntryResolveLogTimes(ctx, mysqlDB, deps.Config.Global.OrgID, entry.ID, clinicianItem.ID, resolveAt); err != nil {
-					return fmt.Errorf("backfill resolve log for entry %s: %w", entry.ID, err)
 				}
 
 				intakeReq, err := buildAssessmentEntryIntakeRequest(testeeDetail, cfg.AllowTemporaryTestee)
@@ -171,18 +146,7 @@ func seedAssessmentEntryFlow(ctx context.Context, deps *dependencies) error {
 				if err != nil {
 					return fmt.Errorf("intake assessment entry %s for testee %s: %w", entry.ID, testeeID, err)
 				}
-
-				intakeAt := deriveEntryIntakeAt(resolveAt)
-				if intakeResp != nil && isAssessmentEntryRelation(intakeResp.Relation, entry.ID) {
-					if err := updateAssessmentEntryRelationTimes(ctx, mysqlDB, intakeResp.Relation.ID, intakeAt); err != nil {
-						return err
-					}
-				}
-				if intakeResp != nil && isAssessmentEntryRelation(intakeResp.Assignment, entry.ID) {
-					if err := updateAssessmentEntryRelationTimes(ctx, mysqlDB, intakeResp.Assignment.ID, deriveEntryAccessRelationAt(intakeAt)); err != nil {
-						return err
-					}
-				}
+				_ = intakeResp
 
 				creatorByEntryAndTestee[creatorKey] = struct{}{}
 				totalResolved++
@@ -264,72 +228,4 @@ func buildAssessmentEntryIntakeRequest(testee *ApiserverTesteeResponse, allowTem
 		return IntakeAssessmentEntryRequest{}, fmt.Errorf("testee has no usable profile_id")
 	}
 	return req, nil
-}
-
-func loadAssessmentEntryCreatedAt(ctx context.Context, mysqlDB *gorm.DB, entryID string) (time.Time, error) {
-	var row struct {
-		CreatedAt time.Time `gorm:"column:created_at"`
-	}
-	err := mysqlDB.WithContext(ctx).
-		Table((actorMySQL.AssessmentEntryPO{}).TableName()).
-		Select("created_at").
-		Where("id = ? AND deleted_at IS NULL", strings.TrimSpace(entryID)).
-		Take(&row).Error
-	if err != nil {
-		return time.Time{}, fmt.Errorf("load assessment_entry created_at: %w", err)
-	}
-	return row.CreatedAt, nil
-}
-
-func backfillAssessmentEntryResolveLogTimes(
-	ctx context.Context,
-	mysqlDB *gorm.DB,
-	orgID int64,
-	entryID string,
-	clinicianID string,
-	resolvedAt time.Time,
-) error {
-	var row struct {
-		ID uint64 `gorm:"column:id"`
-	}
-	err := mysqlDB.WithContext(ctx).
-		Table("assessment_entry_resolve_log").
-		Select("id").
-		Where("org_id = ? AND entry_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, strings.TrimSpace(entryID), strings.TrimSpace(clinicianID)).
-		Order("id DESC").
-		Take(&row).Error
-	if err != nil {
-		return fmt.Errorf("load latest assessment_entry_resolve_log row: %w", err)
-	}
-	err = mysqlDB.WithContext(ctx).
-		Table("assessment_entry_resolve_log").
-		Where("id = ?", row.ID).
-		Updates(map[string]interface{}{
-			"resolved_at": resolvedAt,
-			"created_at":  resolvedAt,
-			"updated_at":  resolvedAt,
-		}).Error
-	if err != nil {
-		return fmt.Errorf("update assessment_entry_resolve_log %d timestamps: %w", row.ID, err)
-	}
-	return nil
-}
-
-func updateAssessmentEntryRelationTimes(ctx context.Context, mysqlDB *gorm.DB, relationID string, boundAt time.Time) error {
-	relationID = strings.TrimSpace(relationID)
-	if relationID == "" {
-		return nil
-	}
-	err := mysqlDB.WithContext(ctx).
-		Table((actorMySQL.ClinicianRelationPO{}).TableName()).
-		Where("id = ? AND deleted_at IS NULL", relationID).
-		Updates(map[string]interface{}{
-			"bound_at":   boundAt,
-			"created_at": boundAt,
-			"updated_at": boundAt,
-		}).Error
-	if err != nil {
-		return fmt.Errorf("update assessment entry relation %s timestamps: %w", relationID, err)
-	}
-	return nil
 }

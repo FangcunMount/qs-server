@@ -32,6 +32,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -110,8 +111,6 @@ func main() {
 		assessmentMax                  = flag.Int("assessment-max", 10, "Maximum assessments per testee")
 		assessmentWorkers              = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
 		assessmentSubmitWorkers        = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
-		assessmentFixupInterpretedFrom = flag.String("assessment-fixup-interpreted-from", "", "Only fix standalone non-plan assessments with interpreted_at on or after this time (supports YYYY-MM-DD / YYYY-MM-DD HH:MM:SS / RFC3339)")
-		assessmentFixupInterpretedTo   = flag.String("assessment-fixup-interpreted-to", "", "Only fix standalone non-plan assessments with interpreted_at up to this time; date-only values include the full day")
 		assignmentWorkers              = flag.Int("assignment-workers", 8, "Concurrent workers for testee-to-clinician assignment seeding")
 		testeePageSize                 = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
 		testeeOffset                   = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
@@ -240,10 +239,6 @@ func main() {
 	if containsSeedStep(steps, stepAssessment) && (*assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin) {
 		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
 	}
-	assessmentFixupScope, err := parseAssessmentFixupInterpretedAtScope(*assessmentFixupInterpretedFrom, *assessmentFixupInterpretedTo)
-	if err != nil {
-		logger.Fatalw("Invalid assessment fixup interpreted_at range", "error", err)
-	}
 	configureSeeddataGlobalLog(*verbose, shouldQuietSeedPlanComponentLogs(steps))
 
 	assessmentOpts := assessmentSeedOptions{
@@ -259,10 +254,6 @@ func main() {
 	}
 	assignmentOpts := assignmentSeedOptions{
 		WorkerCount: *assignmentWorkers,
-	}
-	assessmentFixupOpts := assessmentFixupOptions{
-		InterpretedAtScope: assessmentFixupScope,
-		Verbose:            *verbose,
 	}
 	planCreateOpts := planCreateOptions{
 		PlanID:           *planID,
@@ -314,9 +305,9 @@ func main() {
 		case stepAssessmentByEntry:
 			err = seedAssessmentByEntry(runCtx, deps)
 		case stepAssessmentEntryFixup:
-			err = seedAssessmentEntryFixupTimestamps(runCtx, deps)
+			err = legacySeedStepRemovedError(stepAssessmentEntryFixup)
 		case stepAssessmentFixup:
-			err = seedAssessmentFixupTimestamps(runCtx, deps, assessmentFixupOpts)
+			err = legacySeedStepRemovedError(stepAssessmentFixup)
 		case stepDailySimulation:
 			err = seedDailySimulation(runCtx, deps)
 		case stepAssessment:
@@ -451,4 +442,8 @@ func seedStepFailureMessage(step seedStep) string {
 	default:
 		return "Seed step failed"
 	}
+}
+
+func legacySeedStepRemovedError(step seedStep) error {
+	return fmt.Errorf("%s has been removed in the behavior_footprint + assessment_episode seed model; regenerate data via real business steps (assessment_entry_flow, assessment_by_entry, assessment, daily_simulation) and use statistics_backfill to rebuild analytics projections", step)
 }

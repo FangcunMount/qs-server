@@ -2,6 +2,10 @@
 
 QS 系统测试数据生成工具。
 
+如果你想先快速理解整个工具的职责边界、每个 step 是做什么的、应该怎么选步骤，先看：
+
+- [GUIDE.md](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/GUIDE.md)
+
 ## 30 秒结论
 
 - 只想批量生成测评：运行 `--steps assessment`
@@ -10,15 +14,13 @@ QS 系统测试数据生成工具。
 - 只想把 testee.created_at 按年份权重分布到 `2019-03-25 ~ 2026-04-15`：运行 `--steps testee_fixup_created_at`
 - 只想把 actor 历史时间回填成贴近 `testee.created_at` 的拟真时间：运行 `--steps actor_fixup_timestamps`
 - 只想给已分配受试者的 clinician 批量创建测评入口：运行 `--steps assessment_entries`
-- 只想把入口推进到 `resolve + intake`：运行 `--steps assessment_entry_flow`
-- 只想基于入口 intake 结果继续生成真实测评：运行 `--steps assessment_by_entry`
-- 想单独修 entry 链和 entry-based assessment 链：运行 `--steps assessment_entry_fixup_timestamps`
-- 想单独修剩余独立 adhoc assessment 链：运行 `--steps assessment_fixup_timestamps`
+- 只想基于现有 testee 生成入口打开 / intake 行为足迹：运行 `--steps assessment_entry_flow`
+- 只想基于入口接入结果继续生成 `answersheet -> assessment_episode -> report`：运行 `--steps assessment_by_entry`
 - 想每天模拟一批新用户注册、建档、扫码并填报：运行 `--steps daily_simulation`
 - 只想批量创建计划 task：运行 `--steps plan_create_tasks`
 - 想在后台长期处理 backlog task：运行 `--steps plan_process_tasks`
 - 想把历史时间修正成“按 planned_at 回放”的拟真结果：运行 `--steps plan_fixup_timestamps`
-- 只想主动刷新统计读模型：运行 `--steps statistics_backfill`
+- 只想按最新模型重建统计投影：运行 `--steps statistics_backfill`
 - `plan` 只是兼容旧入口，等价于单次执行 `plan_create_tasks`，再执行 one-shot `plan_process_tasks`
 
 ## 先选方案
@@ -30,16 +32,14 @@ QS 系统测试数据生成工具。
 | 按年份权重回填 testee.created_at | `testee_fixup_created_at` | 否 | 本地 MySQL |
 | 修正 actor 历史时间 | `actor_fixup_timestamps` | 否 | 本地 MySQL |
 | 批量为已分配受试者的 clinician 创建测评入口 | `assessment_entries` | 否 | apiserver + 本地 MySQL |
-| 批量推进入口 resolve + intake | `assessment_entry_flow` | 否 | apiserver + 本地 MySQL |
-| 基于入口 intake 结果继续生成真实测评 | `assessment_by_entry` | 否 | apiserver + 本地 MySQL + MongoDB |
-| 统一修正 entry / entry-based assessment 时间 | `assessment_entry_fixup_timestamps` | 否 | 本地 MySQL + MongoDB |
-| 统一修正独立 adhoc assessment 时间 | `assessment_fixup_timestamps` | 否 | 本地 MySQL + MongoDB |
+| 基于现有 testee 生成入口打开 / intake 行为足迹 | `assessment_entry_flow` | 否 | apiserver |
+| 基于入口接入结果继续生成真实测评服务过程 | `assessment_by_entry` | 否 | apiserver + collection-server + 本地 MySQL |
 | 每天模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation` | 否（推荐 cron） | apiserver + collection-server + IAM REST/gRPC |
 | 只生成测评数据 | `assessment` | 否 | apiserver + collection-server |
 | 只创建 task | `plan_create_tasks` | 否 | 本地 MySQL + MongoDB + Redis |
 | 长期后台处理 task | `plan_process_tasks` | 是 | apiserver API |
 | 修正 task/assessment/report 时间 | `plan_fixup_timestamps` | 否 | 本地 MySQL + MongoDB |
-| 主动刷新统计读模型 | `statistics_backfill` | 否 | apiserver internal API |
+| 按 `behavior_footprint + assessment_episode` 重建统计投影 | `statistics_backfill` | 否 | apiserver + 本地 MySQL |
 | 一次性 create + process | `plan` | 否 | create 走本地依赖，process 走 apiserver API |
 
 ## 运行前准备
@@ -50,14 +50,13 @@ QS 系统测试数据生成工具。
 - `actor_fixup_timestamps` 需要本地 `local.mysql_dsn`
 - `testee_fixup_created_at` 需要本地 `local.mysql_dsn`
 - `assessment_entries` 需要本地 `local.mysql_dsn`，因为脚本会把入口时间回填成基于 `testee.created_at` 的结果
-- `assessment_entry_flow` 需要本地 `local.mysql_dsn`，因为脚本会回填 `resolve_log` 和入口来源关系时间
-- `assessment_by_entry` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
-- `assessment_entry_fixup_timestamps` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
-- `assessment_fixup_timestamps` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
+- `assessment_entry_flow` 只走真实入口公开 API，不再依赖本地 MySQL
+- `assessment_by_entry` 需要本地 `local.mysql_dsn`，用于从现有 creator relation 挑 candidate 并等待 assessment 落库
 - `daily_simulation` 需要 `iam.loginUrl` 或 `iam.baseUrl`，以及可达的 `iam.grpc.address`
 - `plan_create_tasks` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`、`local.redis_*`
 - `plan_fixup_timestamps` 只需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
 - `plan_process_tasks` 不再初始化本地 runtime，不再要求本地 MySQL / MongoDB / Redis
+- `statistics_backfill` 需要本地 `local.mysql_dsn`，因为它会直接重建 `analytics_projection_*`
 
 ## 公共变量
 
@@ -84,8 +83,6 @@ actor_fixup_timestamps \
 assessment_entries \
 assessment_entry_flow \
 assessment_by_entry \
-assessment_entry_fixup_timestamps \
-assessment_fixup_timestamps \
 assessment \
 plan_create_tasks \
 plan_process_tasks \
@@ -98,10 +95,16 @@ statistics_backfill
 - 所有与 testee 直接相关的时间都从 `testee.created_at` 推导
 - 不使用随机时间
 - `actor_fixup_timestamps` 负责回填 actor 侧历史时间
-- `assessment_entry_flow` 负责回填 `resolve / intake / assessment_entry` 来源关系时间
-- `assessment_by_entry` 负责回填 answersheet / assessment / report 时间
-- `assessment_entry_fixup_timestamps` 负责把已有 entry 链和 entry-based assessment 链修到围绕 `testee.created_at` 的时间轴
-- `assessment_fixup_timestamps` 负责把剩余 adhoc 非 plan assessment 修到围绕 `testee.created_at` 的时间轴
+- `assessment_entry_flow` 负责通过真实公开入口 API 生成 `entry_opened` / `intake_confirmed` 等行为足迹
+- `assessment_by_entry` 负责通过真实答卷提交链路生成 `answersheet_submitted -> assessment_episode -> report_generated`
+- `statistics_backfill` 负责按最新模型从 `behavior_footprint + assessment_episode` 重建 `analytics_projection_*`
+
+已删除的旧步骤：
+
+- `assessment_entry_fixup_timestamps`
+- `assessment_fixup_timestamps`
+
+这两个步骤会直接修改历史 `resolve_log / relation / answersheet / assessment / report` 时间，在最新 `behavior_footprint + assessment_episode + analytics_projection_*` 模型下会让统计失真，seeddata 已不再支持。
 
 ## 按方案运行
 
@@ -209,8 +212,7 @@ go run ./cmd/tools/seeddata \
 ```bash
 go run ./cmd/tools/seeddata \
   --config "$CFG" \
-  --steps "assessment_entry_flow" \
-  --local-mysql-dsn "$MYSQL_DSN"
+  --steps "assessment_entry_flow"
 ```
 
 说明：
@@ -218,7 +220,14 @@ go run ./cmd/tools/seeddata \
 - 默认扫描当前机构下 active clinician 的 active entry
 - 每个 entry 默认取最早的 5 个已分配 testee 做 `resolve + intake`
 - 若 testee 没有 `profile_id`，默认跳过；只有 `allowTemporaryTestee=true` 才允许临时建档
-- 成功后会回填 `assessment_entry_resolve_log` 和入口来源 relation 时间
+- 只走真实公开入口 API：
+  - `GET /api/v1/public/assessment-entries/{token}`
+  - `POST /api/v1/public/assessment-entries/{token}/intake`
+- 不再回填 `assessment_entry_resolve_log`
+- 最新模型下，这一步的产出是异步的：
+  - `footprint.entry_opened`
+  - `footprint.intake_confirmed`
+  - 视业务事实还会产出 `footprint.testee_profile_created` / `footprint.care_relationship_established`
 
 ### 方案 0.95：从入口 intake 结果继续生成真实测评
 
@@ -226,9 +235,7 @@ go run ./cmd/tools/seeddata \
 go run ./cmd/tools/seeddata \
   --config "$CFG" \
   --steps "assessment_by_entry" \
-  --local-mysql-dsn "$MYSQL_DSN" \
-  --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB"
+  --local-mysql-dsn "$MYSQL_DSN"
 ```
 
 说明：
@@ -237,52 +244,14 @@ go run ./cmd/tools/seeddata \
 - `scale` target 会正常推进
 - `questionnaire` target 只有在类型为 `MedicalScale` 时才会推进
 - 纯 survey 问卷会被记录为 skip
-- answersheet / assessment / report 时间会回填到入口链路时间轴
-
-### 方案 0.96：统一修正 entry / entry-based assessment 时间轴
-
-```bash
-go run ./cmd/tools/seeddata \
-  --config "$CFG" \
-  --steps "assessment_entry_fixup_timestamps" \
-  --local-mysql-dsn "$MYSQL_DSN" \
-  --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB"
-```
-
-说明：
-
-- 只处理当前机构下的已有历史数据，不创建新 entry / assessment
-- 会按新的 `testee.created_at` 重排：
-  - `assessment_entry.created_at / expires_at`
-  - `assessment_entry_resolve_log`
-  - `source_type=assessment_entry` 的 active creator / access relation
-- entry-based assessment 会优先按 `entry target + testee` 进行稳定匹配
-- 只会修 entry 相关 assessment，不会触碰剩余独立 adhoc assessment
-
-### 方案 0.97：统一修正独立 adhoc assessment 时间轴
-
-```bash
-go run ./cmd/tools/seeddata \
-  --config "$CFG" \
-  --steps "assessment_fixup_timestamps" \
-  --assessment-fixup-interpreted-from "2026-03-01" \
-  --assessment-fixup-interpreted-to "2026-04-16" \
-  --local-mysql-dsn "$MYSQL_DSN" \
-  --local-mongo-uri "$MONGO_URI" \
-  --local-mongo-database "$MONGO_DB"
-```
-
-说明：
-
-- 只处理当前机构下的非 plan assessment
-- 会先识别并排除 entry-based assessment，避免和 `assessment_entry_fixup_timestamps` 重叠
-- 剩余 assessment 会作为独立 adhoc assessment，单独回放到围绕 `testee.created_at` 的时间轴
-- 独立 adhoc assessment 的 `submitted_at / interpreted_at` 会被限制在 `min(testee.created_at + 30d, 全局历史上限)` 之内，避免被压到时间轴尾部
-- 可选通过 `--assessment-fixup-interpreted-from / --assessment-fixup-interpreted-to` 只修命中某个 `interpreted_at` 时间段的 assessment
-- 时间过滤只作用于 `assessment_fixup_timestamps`，不影响 `assessment_entry_fixup_timestamps`
-- 只修 answersheet / assessment / interpret_report，不回写 entry / relation / resolve log
-- plan 链不在这一步覆盖范围内；plan 相关时间仍由 `plan_fixup_timestamps` 处理
+- 通过真实管理员提交答卷链路触发：
+  - `footprint.answersheet_submitted`
+  - `footprint.assessment_created`
+  - `footprint.report_generated`
+- 不再本地补建 assessment，也不再手工回写 answersheet / assessment / report 时间
+- 对最新模型来说，这一步会自然形成：
+  - `assessment_episode`
+  - `analytics_projection_*`
 
 ### 方案 1：只生成测评
 
@@ -432,18 +401,29 @@ go run ./cmd/tools/seeddata \
 - `plan` 不会自动串联 `plan_fixup_timestamps`
 - 如果你需要历史时间拟真，要在 `plan` 之后手动再跑一次 `plan_fixup_timestamps`
 
-### 方案 6：主动刷新统计读模型
+### 方案 6：按最新模型重建统计投影
 
 ```bash
 go run ./cmd/tools/seeddata \
   --config "$CFG" \
+  --local-mysql-dsn "$MYSQL_DSN" \
   --steps "statistics_backfill"
 ```
 
 说明：
 
-- 固定顺序是 `daily -> accumulated -> plan -> validate`
-- 完成后会主动预热 overview / clinicians / entries / periodic / plan 统计接口
+- 不再调用旧的 internal sync API
+- 会先等待 analytics projector 基本空闲，再直接按最新模型重建：
+  - `behavior_footprint`
+  - `assessment_episode`
+  - `analytics_projection_org_daily`
+  - `analytics_projection_clinician_daily`
+  - `analytics_projection_entry_daily`
+- 固定行为是：
+  - 检查 `analytics_projector_checkpoint(status=processing)`
+  - 读取 `analytics_pending_event`
+  - 清空并重建 `analytics_projection_*`
+  - 预热 overview / clinicians / entries / periodic / plan 统计接口
 
 ## 步骤边界
 
@@ -549,36 +529,34 @@ go run ./cmd/tools/seeddata \
   - `POST /api/v1/public/assessment-entries/{token}/intake`
 - 只从已有 access relation 中挑 testee
 - 若 `entry + testee` 已存在 active creator relation，则直接跳过
-- 会回填 `resolve_log` 和入口来源 relation 时间
+- 不回填任何旧日志或 relation 时间
+- 负责生成真实的行为足迹入口：
+  - `footprint.entry_opened`
+  - `footprint.intake_confirmed`
+  - 可选的 `footprint.testee_profile_created`
+  - 可选的 `footprint.care_relationship_established`
 
 ### `assessment_by_entry`
 
 - 只处理 `assessment_entry` 来源的 active creator relation
 - 通过真实 answersheet 提交链路触发 assessment
-- 会等待 assessment 落库，再回填 answersheet / assessment / report 时间
+- 会等待 assessment 落库
+- 不再本地补建 assessment，也不再手工回写 answersheet / assessment / report 时间
+- 负责生成真实的测评服务过程：
+  - `footprint.answersheet_submitted`
+  - `assessment_episode`
+  - `footprint.assessment_created`
+  - `footprint.report_generated`
 
 ### `assessment_entry_fixup_timestamps`
 
-- 只依赖本地 MySQL + MongoDB
-- 不创建新数据，只修已有历史链路
-- 修复范围：
-  - `assessment_entry`
-  - `assessment_entry_resolve_log`
-  - `source_type=assessment_entry` 的 active relation
-- entry 会按 clinician 维度重排到围绕最早 active testee `created_at` 的固定时间轴
-- entry-based assessment 会优先按 `entry target + testee` 做稳定匹配
-- 不覆盖剩余独立 adhoc assessment
+- 已删除
+- 原因：直接改 `assessment_entry_resolve_log / relation / assessment / report` 时间会污染最新的 `behavior_footprint + assessment_episode + analytics_projection_*`
 
 ### `assessment_fixup_timestamps`
 
-- 只依赖本地 MySQL + MongoDB
-- 只修已有独立 adhoc assessment 历史链路
-- 会先识别并排除 entry-based assessment，避免和 `assessment_entry_fixup_timestamps` 重叠
-- 剩余非 plan assessment 会单独回放到围绕 `testee.created_at` 的时间轴
-- 独立 adhoc assessment 的 `submitted_at / interpreted_at` 会落在 `testee.created_at + 30 天` 内；若该窗口超过全局历史上限，则自动截到全局历史上限
-- 可选用 `--assessment-fixup-interpreted-from / --assessment-fixup-interpreted-to` 只修某个 `interpreted_at` 时间窗口命中的 assessment；日期格式 `YYYY-MM-DD` 会按整天展开
-- 只更新 answersheet / assessment / interpret_report
-- 不覆盖 plan task 链；plan 相关时间仍走 `plan_fixup_timestamps`
+- 已删除
+- 原因：直接改历史 assessment/report 时间不会同步修复行为足迹和测评服务过程，会让统计与业务真相分叉
 
 ### `plan_create_tasks`
 
@@ -784,7 +762,7 @@ go run ./cmd/tools/seeddata \
 - 每个模拟用户都会走一条完整链路：注册 guardian user -> 创建 child -> 创建 testee -> 扫码指定 clinician entry -> intake -> 填写目标问卷/量表
 - `countPerRun` 控制每天新增多少用户
 - `runDate` 为空时默认取当天；同一天重复执行会复用同一批稳定账号和 testee
-- `statistics_backfill` 建议和 `daily_simulation` 一起跑，避免统计中心滞后
+- `statistics_backfill` 建议和 `daily_simulation` 一起跑，用当前 `behavior_footprint + assessment_episode` 重建统计投影
 
 ### 后台执行脚本
 
