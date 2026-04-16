@@ -231,28 +231,14 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 
 	// ==================== 初始化 Assessment 应用服务 ====================
 
-	var myAssessmentListCache *assessmentCache.MyAssessmentListCache
-	if redisClient != nil {
-		// 创建 RedisCache 实例（实现 Cache 接口）
-		redisCache := assessmentCache.NewRedisCache(redisClient)
-		myAssessmentListCache = assessmentCache.NewMyAssessmentListCache(redisCache)
-	}
-
 	// 提交服务 - 服务于答题者 (Testee)
-	if myAssessmentListCache != nil {
-		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
-			m.AssessmentRepo,
-			assessmentCreator,
-			m.eventPublisher,
-			myAssessmentListCache,
-		)
-	} else {
-		m.SubmissionService = assessmentApp.NewSubmissionService(
-			m.AssessmentRepo,
-			assessmentCreator,
-			m.eventPublisher,
-		)
-	}
+	// “我的测评列表”缓存按需构建收益有限，但写路径需要同步失效，容易把主链路拖到超时边缘。
+	// 当前直接禁用这层缓存，读路径回退到数据库查询。
+	m.SubmissionService = assessmentApp.NewSubmissionService(
+		m.AssessmentRepo,
+		assessmentCreator,
+		m.eventPublisher,
+	)
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
 	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo, m.eventPublisher)
