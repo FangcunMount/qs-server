@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	_ "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -98,11 +98,11 @@ func main() {
 
 	startTime := time.Now()
 	var (
-		lastID     = opts.afterID
-		submitted  int
-		failed     int
-		batchNo    int
-		remaining  = opts.maxCount
+		lastID    = opts.afterID
+		submitted int
+		failed    int
+		batchNo   int
+		remaining = opts.maxCount
 	)
 
 	for {
@@ -132,7 +132,7 @@ func main() {
 		batchStart := time.Now()
 
 		for _, po := range batch {
-			lastID = po.ID
+			lastID = uint64(po.ID.Uint64())
 
 			a := mapper.ToDomain(po)
 			if a == nil {
