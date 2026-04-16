@@ -23,6 +23,7 @@ const (
 	assessmentFixupStandaloneInitialOffset = 48 * time.Hour
 	assessmentFixupStandaloneMinGap        = 14 * 24 * time.Hour
 	assessmentFixupStandaloneGapJitter     = 42 * 24 * time.Hour
+	assessmentFixupStandaloneWindow        = 30 * 24 * time.Hour
 )
 
 type assessmentFixupEntryRow struct {
@@ -99,6 +100,12 @@ type assessmentFixupStats struct {
 	MissingReports                 int
 }
 
+type assessmentFixupInterpretedAtScope struct {
+	From        *time.Time
+	To          *time.Time
+	ToExclusive bool
+}
+
 func seedAssessmentEntryFixupTimestamps(ctx context.Context, deps *dependencies) error {
 	if deps == nil {
 		return fmt.Errorf("dependencies are nil")
@@ -125,7 +132,7 @@ func seedAssessmentEntryFixupTimestamps(ctx context.Context, deps *dependencies)
 	if err != nil {
 		return err
 	}
-	nonPlanAssessments, err := loadNonPlanAssessmentsForFixup(ctx, mysqlDB, orgID)
+	nonPlanAssessments, err := loadNonPlanAssessmentsForFixup(ctx, mysqlDB, orgID, assessmentFixupInterpretedAtScope{})
 	if err != nil {
 		return err
 	}
@@ -180,7 +187,7 @@ func seedAssessmentEntryFixupTimestamps(ctx context.Context, deps *dependencies)
 	return nil
 }
 
-func seedAssessmentFixupTimestamps(ctx context.Context, deps *dependencies) error {
+func seedAssessmentFixupTimestamps(ctx context.Context, deps *dependencies, opts assessmentFixupOptions) error {
 	if deps == nil {
 		return fmt.Errorf("dependencies are nil")
 	}
@@ -190,7 +197,7 @@ func seedAssessmentFixupTimestamps(ctx context.Context, deps *dependencies) erro
 	}
 	defer closeFn()
 
-	nonPlanAssessments, err := loadNonPlanAssessmentsForFixup(ctx, mysqlDB, orgID)
+	nonPlanAssessments, err := loadNonPlanAssessmentsForFixup(ctx, mysqlDB, orgID, opts.InterpretedAtScope)
 	if err != nil {
 		return err
 	}
@@ -208,6 +215,9 @@ func seedAssessmentFixupTimestamps(ctx context.Context, deps *dependencies) erro
 		"non_plan_assessment_count", len(nonPlanAssessments),
 		"entry_count", len(entries),
 		"entry_relation_count", len(relations),
+		"interpreted_at_from", formatAssessmentFixupScopeTime(opts.InterpretedAtScope.From),
+		"interpreted_at_to", formatAssessmentFixupScopeTime(opts.InterpretedAtScope.To),
+		"interpreted_at_to_exclusive", opts.InterpretedAtScope.ToExclusive,
 	)
 
 	stats := &assessmentFixupStats{}
@@ -235,6 +245,9 @@ func seedAssessmentFixupTimestamps(ctx context.Context, deps *dependencies) erro
 		"excluded_entry_assessments", len(matchedAssessmentIDs),
 		"standalone_assessment_count", len(standaloneAssessments),
 		"standalone_assessments_updated", stats.StandaloneAssessmentsUpdated,
+		"interpreted_at_from", formatAssessmentFixupScopeTime(opts.InterpretedAtScope.From),
+		"interpreted_at_to", formatAssessmentFixupScopeTime(opts.InterpretedAtScope.To),
+		"interpreted_at_to_exclusive", opts.InterpretedAtScope.ToExclusive,
 		"assessments_updated", stats.AssessmentsUpdated,
 		"answersheets_updated", stats.AnswerSheetsUpdated,
 		"reports_updated", stats.ReportsUpdated,
@@ -284,19 +297,106 @@ func loadAssessmentEntryResolveLogsForFixup(ctx context.Context, mysqlDB *gorm.D
 	return rows, nil
 }
 
-func loadNonPlanAssessmentsForFixup(ctx context.Context, mysqlDB *gorm.DB, orgID int64) ([]assessmentFixupAssessmentRow, error) {
+func loadNonPlanAssessmentsForFixup(
+	ctx context.Context,
+	mysqlDB *gorm.DB,
+	orgID int64,
+	scope assessmentFixupInterpretedAtScope,
+) ([]assessmentFixupAssessmentRow, error) {
 	rows := make([]assessmentFixupAssessmentRow, 0, 1024)
-	if err := mysqlDB.WithContext(ctx).
+	db := mysqlDB.WithContext(ctx).
 		Table((evaluationMySQL.AssessmentPO{}).TableName()+" AS a").
 		Select("a.id, a.testee_id, a.answer_sheet_id, a.questionnaire_code, a.questionnaire_version, a.medical_scale_code, a.status, a.created_at, a.updated_at, a.submitted_at, a.interpreted_at, a.failed_at, t.created_at AS testee_created_at").
 		Joins("JOIN "+(actorMySQL.TesteePO{}).TableName()+" AS t ON t.id = a.testee_id AND t.deleted_at IS NULL").
 		Joins("LEFT JOIN "+(planMySQL.AssessmentTaskPO{}).TableName()+" AS task ON task.assessment_id = a.id AND task.deleted_at IS NULL").
-		Where("a.org_id = ? AND a.deleted_at IS NULL AND task.id IS NULL", orgID).
+		Where("a.org_id = ? AND a.deleted_at IS NULL AND task.id IS NULL", orgID)
+	if scope.From != nil {
+		db = db.Where("a.interpreted_at >= ?", *scope.From)
+	}
+	if scope.To != nil {
+		if scope.ToExclusive {
+			db = db.Where("a.interpreted_at < ?", *scope.To)
+		} else {
+			db = db.Where("a.interpreted_at <= ?", *scope.To)
+		}
+	}
+	if err := db.
 		Order("a.testee_id ASC, a.created_at ASC, a.id ASC").
 		Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("load non-plan assessments for fixup: %w", err)
 	}
 	return rows, nil
+}
+
+func parseAssessmentFixupInterpretedAtScope(fromRaw, toRaw string) (assessmentFixupInterpretedAtScope, error) {
+	scope := assessmentFixupInterpretedAtScope{}
+
+	fromRaw = strings.TrimSpace(fromRaw)
+	toRaw = strings.TrimSpace(toRaw)
+	if fromRaw == "" && toRaw == "" {
+		return scope, nil
+	}
+
+	if fromRaw != "" {
+		parsed, err := parseFlexibleSeedTimeInLocal(fromRaw)
+		if err != nil {
+			return scope, fmt.Errorf("parse assessment_fixup interpreted_from %q: %w", fromRaw, err)
+		}
+		scope.From = &parsed
+	}
+	if toRaw != "" {
+		parsed, err := parseFlexibleSeedTimeInLocal(toRaw)
+		if err != nil {
+			return scope, fmt.Errorf("parse assessment_fixup interpreted_to %q: %w", toRaw, err)
+		}
+		if isDateOnlySeedTime(toRaw) {
+			parsed = parsed.Add(24 * time.Hour)
+			scope.ToExclusive = true
+		}
+		scope.To = &parsed
+	}
+	if scope.From != nil && scope.To != nil {
+		if scope.ToExclusive {
+			if !scope.From.Before(*scope.To) {
+				return scope, fmt.Errorf("assessment_fixup interpreted_at range is empty: from=%s to=%s", scope.From.Format(time.RFC3339), scope.To.Format(time.RFC3339))
+			}
+		} else if scope.From.After(*scope.To) {
+			return scope, fmt.Errorf("assessment_fixup interpreted_at range is invalid: from=%s to=%s", scope.From.Format(time.RFC3339), scope.To.Format(time.RFC3339))
+		}
+	}
+	return scope, nil
+}
+
+func parseFlexibleSeedTimeInLocal(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	layoutsInLocal := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+	}
+	for _, layout := range layoutsInLocal {
+		if parsed, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+			return parsed, nil
+		}
+	}
+	for _, layout := range []string{time.RFC3339, time.RFC3339Nano} {
+		if parsed, err := time.Parse(layout, raw); err == nil {
+			return parsed, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unsupported time format %q", raw)
+}
+
+func isDateOnlySeedTime(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	return len(raw) == len("2006-01-02") && !strings.ContainsAny(raw, "T :")
+}
+
+func formatAssessmentFixupScopeTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }
 
 func openAssessmentFixupStores(
@@ -720,7 +820,7 @@ func fixStandaloneAssessments(
 			return items[i].ID < items[j].ID
 		})
 
-		submitTimes := deriveStandaloneAssessmentSubmitTimes(items[0].TesteeCreatedAt, items, testeeCreatedAtFixupRangeEnd)
+		submitTimes := deriveStandaloneAssessmentSubmitTimes(items[0].TesteeCreatedAt, items, deriveStandaloneAssessmentSubmitCeiling(items[0].TesteeCreatedAt))
 		for idx, row := range items {
 			interpretAt := deriveAssessmentInterpretAt(submitTimes[idx])
 			if _, err := applyAssessmentTimestampFixup(ctx, mysqlDB, mongoDB, row, submitTimes[idx], interpretAt, stats); err != nil {
@@ -731,6 +831,24 @@ func fixStandaloneAssessments(
 		}
 	}
 	return nil
+}
+
+func deriveStandaloneAssessmentSubmitCeiling(testeeCreatedAt time.Time) time.Time {
+	if testeeCreatedAt.IsZero() {
+		return testeeCreatedAtFixupRangeEnd.Add(-seedAssessmentInterpretOffset).Round(0)
+	}
+
+	ceiling := testeeCreatedAt.Round(0).Add(assessmentFixupStandaloneWindow)
+	if !testeeCreatedAtFixupRangeEnd.IsZero() && ceiling.After(testeeCreatedAtFixupRangeEnd) {
+		ceiling = testeeCreatedAtFixupRangeEnd.Round(0)
+	}
+	if !ceiling.IsZero() {
+		ceiling = ceiling.Add(-seedAssessmentInterpretOffset).Round(0)
+	}
+	if ceiling.Before(testeeCreatedAt.Round(0)) {
+		return testeeCreatedAt.Round(0)
+	}
+	return ceiling
 }
 
 func applyAssessmentTimestampFixup(

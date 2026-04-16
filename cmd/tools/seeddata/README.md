@@ -266,6 +266,8 @@ go run ./cmd/tools/seeddata \
 go run ./cmd/tools/seeddata \
   --config "$CFG" \
   --steps "assessment_fixup_timestamps" \
+  --assessment-fixup-interpreted-from "2026-03-01" \
+  --assessment-fixup-interpreted-to "2026-04-16" \
   --local-mysql-dsn "$MYSQL_DSN" \
   --local-mongo-uri "$MONGO_URI" \
   --local-mongo-database "$MONGO_DB"
@@ -276,6 +278,9 @@ go run ./cmd/tools/seeddata \
 - 只处理当前机构下的非 plan assessment
 - 会先识别并排除 entry-based assessment，避免和 `assessment_entry_fixup_timestamps` 重叠
 - 剩余 assessment 会作为独立 adhoc assessment，单独回放到围绕 `testee.created_at` 的时间轴
+- 独立 adhoc assessment 的 `submitted_at / interpreted_at` 会被限制在 `min(testee.created_at + 30d, 全局历史上限)` 之内，避免被压到时间轴尾部
+- 可选通过 `--assessment-fixup-interpreted-from / --assessment-fixup-interpreted-to` 只修命中某个 `interpreted_at` 时间段的 assessment
+- 时间过滤只作用于 `assessment_fixup_timestamps`，不影响 `assessment_entry_fixup_timestamps`
 - 只修 answersheet / assessment / interpret_report，不回写 entry / relation / resolve log
 - plan 链不在这一步覆盖范围内；plan 相关时间仍由 `plan_fixup_timestamps` 处理
 
@@ -570,6 +575,8 @@ go run ./cmd/tools/seeddata \
 - 只修已有独立 adhoc assessment 历史链路
 - 会先识别并排除 entry-based assessment，避免和 `assessment_entry_fixup_timestamps` 重叠
 - 剩余非 plan assessment 会单独回放到围绕 `testee.created_at` 的时间轴
+- 独立 adhoc assessment 的 `submitted_at / interpreted_at` 会落在 `testee.created_at + 30 天` 内；若该窗口超过全局历史上限，则自动截到全局历史上限
+- 可选用 `--assessment-fixup-interpreted-from / --assessment-fixup-interpreted-to` 只修某个 `interpreted_at` 时间窗口命中的 assessment；日期格式 `YYYY-MM-DD` 会按整天展开
 - 只更新 answersheet / assessment / interpret_report
 - 不覆盖 plan task 链；plan 相关时间仍走 `plan_fixup_timestamps`
 

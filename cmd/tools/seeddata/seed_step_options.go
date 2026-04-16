@@ -18,6 +18,11 @@ type assignmentSeedOptions struct {
 	WorkerCount int
 }
 
+type assessmentFixupOptions struct {
+	InterpretedAtScope assessmentFixupInterpretedAtScope
+	Verbose            bool
+}
+
 type planCreateOptions struct {
 	PlanID           string
 	PlanTesteeIDsRaw string

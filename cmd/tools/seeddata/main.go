@@ -83,39 +83,41 @@ type dependencies struct {
 func main() {
 	// 解析命令行参数
 	var (
-		apiBaseURL              = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
-		collectionBaseURL       = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
-		apiToken                = flag.String("api-token", "", "API authentication token")
-		configFile              = flag.String("config", "", "Base seed data config file (testees, legacy data)")
-		stepsRaw                = flag.String("steps", "", "Comma-separated steps to run (default: all)")
-		planID                  = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
-		planWorkers             = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
-		planSubmitWorkers       = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
-		planWaitWorkers         = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
-		planMaxInFlightTasks    = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
-		planSubmitQueueSize     = flag.Int("plan-submit-queue-size", 0, "Buffered queue size before plan task answersheet submission dispatch (defaults based on submit workers and inflight limit)")
-		planSubmitQPS           = flag.Float64("plan-submit-qps", 0, "Global dequeue rate for plan task answersheet submission queue (0 = derive from submit workers)")
-		planSubmitBurst         = flag.Int("plan-submit-burst", 0, "Burst size for plan task answersheet submission queue dispatch (0 = derive from submit workers)")
-		planExpireRate          = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
-		planTesteeIDsRaw        = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
-		localMySQLDSN           = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override")
-		localMongoURI           = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override")
-		localMongoDatabase      = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override")
-		localRedisAddr          = flag.String("local-redis-addr", "", "Local seed_plan Redis address override")
-		localRedisUsername      = flag.String("local-redis-username", "", "Local seed_plan Redis username override")
-		localRedisPassword      = flag.String("local-redis-password", "", "Local seed_plan Redis password override")
-		localRedisDB            = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override")
-		localPlanEntryBaseURL   = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override")
-		assessmentMin           = flag.Int("assessment-min", 5, "Minimum assessments per testee")
-		assessmentMax           = flag.Int("assessment-max", 10, "Maximum assessments per testee")
-		assessmentWorkers       = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
-		assessmentSubmitWorkers = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
-		assignmentWorkers       = flag.Int("assignment-workers", 8, "Concurrent workers for testee-to-clinician assignment seeding")
-		testeePageSize          = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
-		testeeOffset            = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
-		testeeLimit             = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan task creation (0 = no limit)")
-		assessmentCategories    = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
-		verbose                 = flag.Bool("verbose", false, "Enable verbose logging")
+		apiBaseURL                     = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
+		collectionBaseURL              = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
+		apiToken                       = flag.String("api-token", "", "API authentication token")
+		configFile                     = flag.String("config", "", "Base seed data config file (testees, legacy data)")
+		stepsRaw                       = flag.String("steps", "", "Comma-separated steps to run (default: all)")
+		planID                         = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
+		planWorkers                    = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
+		planSubmitWorkers              = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
+		planWaitWorkers                = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
+		planMaxInFlightTasks           = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
+		planSubmitQueueSize            = flag.Int("plan-submit-queue-size", 0, "Buffered queue size before plan task answersheet submission dispatch (defaults based on submit workers and inflight limit)")
+		planSubmitQPS                  = flag.Float64("plan-submit-qps", 0, "Global dequeue rate for plan task answersheet submission queue (0 = derive from submit workers)")
+		planSubmitBurst                = flag.Int("plan-submit-burst", 0, "Burst size for plan task answersheet submission queue dispatch (0 = derive from submit workers)")
+		planExpireRate                 = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
+		planTesteeIDsRaw               = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
+		localMySQLDSN                  = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override")
+		localMongoURI                  = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override")
+		localMongoDatabase             = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override")
+		localRedisAddr                 = flag.String("local-redis-addr", "", "Local seed_plan Redis address override")
+		localRedisUsername             = flag.String("local-redis-username", "", "Local seed_plan Redis username override")
+		localRedisPassword             = flag.String("local-redis-password", "", "Local seed_plan Redis password override")
+		localRedisDB                   = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override")
+		localPlanEntryBaseURL          = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override")
+		assessmentMin                  = flag.Int("assessment-min", 5, "Minimum assessments per testee")
+		assessmentMax                  = flag.Int("assessment-max", 10, "Maximum assessments per testee")
+		assessmentWorkers              = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
+		assessmentSubmitWorkers        = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
+		assessmentFixupInterpretedFrom = flag.String("assessment-fixup-interpreted-from", "", "Only fix standalone non-plan assessments with interpreted_at on or after this time (supports YYYY-MM-DD / YYYY-MM-DD HH:MM:SS / RFC3339)")
+		assessmentFixupInterpretedTo   = flag.String("assessment-fixup-interpreted-to", "", "Only fix standalone non-plan assessments with interpreted_at up to this time; date-only values include the full day")
+		assignmentWorkers              = flag.Int("assignment-workers", 8, "Concurrent workers for testee-to-clinician assignment seeding")
+		testeePageSize                 = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
+		testeeOffset                   = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
+		testeeLimit                    = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan task creation (0 = no limit)")
+		assessmentCategories           = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
+		verbose                        = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
 	steps := parseSteps(*stepsRaw)
@@ -238,6 +240,10 @@ func main() {
 	if containsSeedStep(steps, stepAssessment) && (*assessmentMin <= 0 || *assessmentMax <= 0 || *assessmentMax < *assessmentMin) {
 		logger.Fatalw("Invalid assessment range", "min", *assessmentMin, "max", *assessmentMax)
 	}
+	assessmentFixupScope, err := parseAssessmentFixupInterpretedAtScope(*assessmentFixupInterpretedFrom, *assessmentFixupInterpretedTo)
+	if err != nil {
+		logger.Fatalw("Invalid assessment fixup interpreted_at range", "error", err)
+	}
 	configureSeeddataGlobalLog(*verbose, shouldQuietSeedPlanComponentLogs(steps))
 
 	assessmentOpts := assessmentSeedOptions{
@@ -253,6 +259,10 @@ func main() {
 	}
 	assignmentOpts := assignmentSeedOptions{
 		WorkerCount: *assignmentWorkers,
+	}
+	assessmentFixupOpts := assessmentFixupOptions{
+		InterpretedAtScope: assessmentFixupScope,
+		Verbose:            *verbose,
 	}
 	planCreateOpts := planCreateOptions{
 		PlanID:           *planID,
@@ -306,7 +316,7 @@ func main() {
 		case stepAssessmentEntryFixup:
 			err = seedAssessmentEntryFixupTimestamps(runCtx, deps)
 		case stepAssessmentFixup:
-			err = seedAssessmentFixupTimestamps(runCtx, deps)
+			err = seedAssessmentFixupTimestamps(runCtx, deps, assessmentFixupOpts)
 		case stepDailySimulation:
 			err = seedDailySimulation(runCtx, deps)
 		case stepAssessment:
