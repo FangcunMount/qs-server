@@ -588,6 +588,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/clinicians/me/assessment-entries/{id}": {
+            "get": {
+                "description": "查询当前从业者持有的单个测评入口详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor-AssessmentEntry"
+                ],
+                "summary": "查询我的测评入口详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "入口ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentEntryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/clinicians/me/testees": {
             "get": {
                 "description": "查询当前从业者可访问的受试者列表，底层复用与 /api/v1/testees 相同的访问范围收口逻辑",
@@ -4177,6 +4231,62 @@ const docTemplate = `{
                     }
                 }
             },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Actor"
+                ],
+                "summary": "更新员工",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "员工ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新员工请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateStaffRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.StaffResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "produces": [
                     "application/json"
@@ -4466,6 +4576,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "档案ID（等同于IAM儿童ID）",
                         "name": "profile_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "按 Clinician 过滤受试者",
+                        "name": "clinician_id",
                         "in": "query"
                     },
                     {
@@ -5509,7 +5625,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "expires_at": {
-                    "type": "string"
+                    "$ref": "#/definitions/request.FlexibleTime"
                 },
                 "target_code": {
                     "type": "string"
@@ -5545,7 +5661,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "operator_id": {
-                    "type": "integer"
+                    "$ref": "#/definitions/meta.ID"
                 },
                 "org_id": {
                     "type": "integer"
@@ -5675,6 +5791,10 @@ const docTemplate = `{
                     "description": "兼容字段：机构ID",
                     "type": "integer"
                 },
+                "password": {
+                    "description": "新建 IAM 运营账号时的初始密码",
+                    "type": "string"
+                },
                 "phone": {
                     "description": "电话",
                     "type": "string"
@@ -5688,7 +5808,11 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "description": "IAM用户ID（优先使用）",
-                    "type": "integer"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/meta.ID"
+                        }
+                    ]
                 }
             }
         },
@@ -5764,6 +5888,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.FlexibleTime": {
+            "type": "object",
+            "properties": {
+                "time.Time": {
                     "type": "string"
                 }
             }
@@ -5984,6 +6116,34 @@ const docTemplate = `{
                 },
                 "questionnaire_version": {
                     "type": "string"
+                }
+            }
+        },
+        "request.UpdateStaffRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "description": "邮箱",
+                    "type": "string"
+                },
+                "is_active": {
+                    "description": "是否激活",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "phone": {
+                    "description": "电话",
+                    "type": "string"
+                },
+                "roles": {
+                    "description": "角色列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -6384,6 +6544,12 @@ const docTemplate = `{
         "response.ClinicianResponse": {
             "type": "object",
             "properties": {
+                "assessment_entry_count": {
+                    "type": "integer"
+                },
+                "assigned_testee_count": {
+                    "type": "integer"
+                },
                 "clinician_type": {
                     "type": "string"
                 },
@@ -6821,6 +6987,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "testee_id": {
+                    "type": "string"
+                },
+                "unbound_at": {
                     "type": "string"
                 }
             }

@@ -126,7 +126,7 @@ definitions:
   request.CreateAssessmentEntryRequest:
     properties:
       expires_at:
-        type: string
+        $ref: '#/definitions/request.FlexibleTime'
       target_code:
         type: string
       target_type:
@@ -150,7 +150,7 @@ definitions:
       name:
         type: string
       operator_id:
-        type: integer
+        $ref: '#/definitions/meta.ID'
       org_id:
         type: integer
       title:
@@ -239,6 +239,9 @@ definitions:
       org_id:
         description: 兼容字段：机构ID
         type: integer
+      password:
+        description: 新建 IAM 运营账号时的初始密码
+        type: string
       phone:
         description: 电话
         type: string
@@ -248,8 +251,9 @@ definitions:
           type: string
         type: array
       user_id:
+        allOf:
+        - $ref: '#/definitions/meta.ID'
         description: IAM用户ID（优先使用）
-        type: integer
     required:
     - name
     type: object
@@ -302,6 +306,11 @@ definitions:
       scoring_strategy:
         type: string
       title:
+        type: string
+    type: object
+  request.FlexibleTime:
+    properties:
+      time.Time:
         type: string
     type: object
   request.IntakeByAssessmentEntryRequest:
@@ -446,6 +455,26 @@ definitions:
         type: string
       questionnaire_version:
         type: string
+    type: object
+  request.UpdateStaffRequest:
+    properties:
+      email:
+        description: 邮箱
+        type: string
+      is_active:
+        description: 是否激活
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      phone:
+        description: 电话
+        type: string
+      roles:
+        description: 角色列表
+        items:
+          type: string
+        type: array
     type: object
   request.UpdateTesteeRequest:
     properties:
@@ -717,6 +746,10 @@ definitions:
     type: object
   response.ClinicianResponse:
     properties:
+      assessment_entry_count:
+        type: integer
+      assigned_testee_count:
+        type: integer
       clinician_type:
         type: string
       department:
@@ -1016,6 +1049,8 @@ definitions:
       source_type:
         type: string
       testee_id:
+        type: string
+      unbound_at:
         type: string
     type: object
   response.ReportListResponse:
@@ -2138,6 +2173,39 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 创建我的测评入口
+      tags:
+      - Actor-AssessmentEntry
+  /api/v1/clinicians/me/assessment-entries/{id}:
+    get:
+      description: 查询当前从业者持有的单个测评入口详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 入口ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentEntryResponse'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询我的测评入口详情
       tags:
       - Actor-AssessmentEntry
   /api/v1/clinicians/me/testees:
@@ -4419,6 +4487,40 @@ paths:
       summary: 获取员工详情
       tags:
       - Actor
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 更新员工请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateStaffRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.StaffResponse'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 更新员工
+      tags:
+      - Actor
   /api/v1/statistics/plans/{plan_id}:
     get:
       consumes:
@@ -4576,6 +4678,10 @@ paths:
       - description: 档案ID（等同于IAM儿童ID）
         in: query
         name: profile_id
+        type: string
+      - description: 按 Clinician 过滤受试者
+        in: query
+        name: clinician_id
         type: string
       - default: 1
         description: 页码

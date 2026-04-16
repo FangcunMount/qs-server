@@ -10,7 +10,7 @@
 | ---- | ---- |
 | 运行时主用途 | **对象缓存 / 列表缓存、统计查询缓存、统计 daily 中转、事件幂等、分布式互斥锁、微信 SDK token 缓存** |
 | 主要使用方 | **`qs-apiserver`** 负责大部分缓存；**`qs-worker`** 负责统计幂等、问卷 daily 预聚合、answersheet 锁、plan scheduler 锁 |
-| 已清理的旧用法 | 运行时代码里已不再写 `stats:window:*`、`stats:accum:*`、`stats:dist:*`；问卷列表缓存、测评状态缓存、`CodesService` 的假 Redis 依赖、`collection-server` 运行时 Redis 装配都已移除 |
+| 已清理的旧用法 | 运行时代码里已不再写旧的 window / accumulated / distribution 统计键族；问卷列表缓存、测评状态缓存、`CodesService` 的假 Redis 依赖、`collection-server` 运行时 Redis 装配都已移除 |
 | 命名空间 | Redis key 统一由 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/) 生成；`cache.namespace` 会同时作用于缓存、统计、锁和微信 SDK 缓存 |
 | 设计边界 | 锁是**单 Redis lease lock**，属于 best-effort 分布式锁；不是强一致协调系统 |
 | 部署现实 | `apiserver` 默认可用统计 Redis；`worker` 默认 `cache.disable_statistics_cache=true`，所以统计预聚合和幂等键只有在显式开启时才会产生 |
@@ -25,9 +25,9 @@
 
 代码锚点：
 
-- `apiserver` 注入 Redis 到各模块见 [internal/apiserver/container/container.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/container/container.go)
-- `worker` Redis 初始化与按配置禁用统计 Redis 见 [internal/worker/server.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/worker/server.go)
-- `collection-server` 当前不再初始化 Redis，见 [internal/collection-server/server.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/collection-server/server.go)
+- `apiserver` 注入 Redis 到各模块见 [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
+- `worker` Redis 初始化与按配置禁用统计 Redis 见 [internal/worker/server.go](../../internal/worker/server.go)
+- `collection-server` 当前不再初始化 Redis，见 [internal/collection-server/server.go](../../internal/collection-server/server.go)
 
 ## 运行时缓存
 
@@ -55,13 +55,13 @@
 
 主要代码：
 
-- [internal/apiserver/infra/cache/scale_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/cache/scale_cache.go)
-- [internal/apiserver/infra/cache/questionnaire_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/cache/questionnaire_cache.go)
-- [internal/apiserver/infra/cache/assessment_detail_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/cache/assessment_detail_cache.go)
-- [internal/apiserver/infra/cache/testee_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/cache/testee_cache.go)
-- [internal/apiserver/infra/cache/plan_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/cache/plan_cache.go)
-- [internal/apiserver/application/scale/global_list_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/application/scale/global_list_cache.go)
-- [internal/apiserver/infra/cache/my_assessment_list_cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/cache/my_assessment_list_cache.go)
+- [internal/apiserver/infra/cache/scale_cache.go](../../internal/apiserver/infra/cache/scale_cache.go)
+- [internal/apiserver/infra/cache/questionnaire_cache.go](../../internal/apiserver/infra/cache/questionnaire_cache.go)
+- [internal/apiserver/infra/cache/assessment_detail_cache.go](../../internal/apiserver/infra/cache/assessment_detail_cache.go)
+- [internal/apiserver/infra/cache/testee_cache.go](../../internal/apiserver/infra/cache/testee_cache.go)
+- [internal/apiserver/infra/cache/plan_cache.go](../../internal/apiserver/infra/cache/plan_cache.go)
+- [internal/apiserver/application/scale/global_list_cache.go](../../internal/apiserver/application/scale/global_list_cache.go)
+- [internal/apiserver/infra/cache/my_assessment_list_cache.go](../../internal/apiserver/infra/cache/my_assessment_list_cache.go)
 
 ### 预热
 
@@ -82,13 +82,13 @@
 
 主要代码：
 
-- 写 / 读封装在 [internal/apiserver/infra/statistics/cache.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/statistics/cache.go)
-- worker 写入在 [internal/worker/handlers/statistics_handler.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/worker/handlers/statistics_handler.go)
-- 同步 / 校验在 [internal/apiserver/application/statistics/sync_service.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/application/statistics/sync_service.go) 和 [internal/apiserver/application/statistics/validator_service.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/application/statistics/validator_service.go)
+- 写 / 读封装在 [internal/apiserver/infra/statistics/cache.go](../../internal/apiserver/infra/statistics/cache.go)
+- worker 写入在 [internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)
+- 同步 / 校验在 [internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) 和 [internal/apiserver/application/statistics/validator_service.go](../../internal/apiserver/application/statistics/validator_service.go)
 
 ### 当前边界
 
-- 运行时代码里已不再写 `stats:window:*`、`stats:accum:*`、`stats:dist:*`
+- 运行时代码里已不再写旧的 window / accumulated / distribution 统计键族
 - `system`、`plan`、`testee` 统计现在主要依赖 **`stats:query:*` + MySQL / 原始表回源**
 - `questionnaire` 是唯一还保留 Redis daily 中转链的统计类型
 - `worker` 默认 `cache.disable_statistics_cache=true`，见 [internal/worker/options/options.go](../../internal/worker/options/options.go)；如果不显式开启，`event:processed:*` 和 `stats:daily:*` 实际不会产生
@@ -116,7 +116,7 @@
 - `duplicate_skip`：锁已被占用则直接确认消息成功，不再做重复工作
 - `degraded`：Redis 不可用或加锁失败时继续处理，由下游幂等兜底
 
-实现见 [internal/worker/handlers/answersheet_handler.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/worker/handlers/answersheet_handler.go)。
+实现见 [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)。
 
 ### `plan scheduler` 锁的当前语义
 
@@ -125,7 +125,7 @@
 - Redis 不可用时，scheduler 直接不启动
 - 由于没有续租，当前更适合轻量级的 HA 选主，而不是强一致任务协调
 
-实现见 [internal/worker/plan_scheduler.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/worker/plan_scheduler.go)；`apiserver` 本地 scheduler 已废弃，见 [internal/apiserver/plan_scheduler.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/plan_scheduler.go)。
+实现见 [internal/worker/plan_scheduler.go](../../internal/worker/plan_scheduler.go)。`apiserver` 本地 scheduler 已经退出当前运行时，不再有对应的活跃代码路径。
 
 ## 第三方 SDK 缓存
 
@@ -135,7 +135,7 @@
 | -------- | ----------- | -------- |
 | `wechat:cache:{sdkKey}` | 微信 SDK 通过 `RedisCacheAdapter` 间接读写 | Redis client 为 `nil` 时退回内存缓存 |
 
-代码见 [internal/apiserver/infra/wechatapi/cache_adapter.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/internal/apiserver/infra/wechatapi/cache_adapter.go)。
+代码见 [internal/apiserver/infra/wechatapi/cache_adapter.go](../../internal/apiserver/infra/wechatapi/cache_adapter.go)。
 
 ## 工具与非主服务运行时用途
 

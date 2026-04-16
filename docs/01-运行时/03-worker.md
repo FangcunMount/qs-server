@@ -20,6 +20,7 @@
 1. **worker 只负责驱动，不负责收口状态**：业务真值仍在 `qs-apiserver`，worker 只是消费事件并发起内部 RPC。  
 2. **`event_type` 是主索引**：排障时先确认消息上的 `event_type`，再对照 yaml 的 handler 键和代码注册。  
 3. **Ack/Nack 取决于 Dispatch 结果**：理解投递语义时，要从 `createDispatchHandler` 这一层看成功、失败和重试。  
+4. **并发和 backlog 共享只看 worker 配置**：当前真正影响 NSQ in-flight 的是 `worker.concurrency`；多实例共享同一 backlog 取决于相同的 `worker.service-name`。  
 4. **Redis 是侧载能力**：锁、统计和幂等辅助可能用到 Redis，但这不等于 worker 成了独立业务服务。  
 
 **组件定位**：**MQ 消费进程**；根据 [`configs/events.yaml`](../../configs/events.yaml) 订阅 Topic；将消息按 **event_type** 分发给 handler；通过 **gRPC** 回调 **apiserver** 完成业务写。**不**暴露业务 HTTP；**不**装配完整领域容器。  
@@ -121,13 +122,23 @@ sequenceDiagram
 | **DispatchEvent 返回 error** | **`msg.Nack()`**（是否重投由 **MQ 与 messaging 实现**决定） |
 | **既无 metadata `event_type`、payload 也无法解析为信封** | **`msg.Ack()`**（避免毒消息永久堆积） |
 
-**请勿默认「至少一次」**：  
+**请勿默认「至少一次」**：
 
-- 成功路径是 **Ack 一次**；**Nack 后是否再次投递**依赖 **NSQ / RabbitMQ** 及 **component-base** 对 `Nack` 的映射，**本仓库 worker 文档不承诺**全局 **at-least-once** 或固定 **重试次数**。  
-- [`events.yaml`](../../configs/events.yaml) Topic 下的 **`consumer.retry`** 等字段为**配置结构的一部分**；是否在订阅层实现**退避重试**，以实现与部署为准，**勿与业务幂等等价**。  
+- 成功路径是 **Ack 一次**；**Nack 后是否再次投递**依赖底层 MQ 与 `component-base` 的实现映射，本文不把它包装成统一的“固定重试次数”承诺。
+- 当前 `events.yaml` 已经没有旧版 consumer 重试 / 并发字段；不要再按旧 schema 理解 worker 的投递语义。
 - **未见**独立的 **死信队列（DLQ）** 抽象；持久化失败类问题依赖 **日志、MQ 控制台、重放**，而非本文定义的 DLQ。
 
 **业务侧**：部分 handler 使用 **Redis 幂等键**（如统计去重），与 **MQ 投递语义** 是两层问题；设计幂等仍以 **02 / handler 代码** 为准。
+
+### 并发与同 channel 扩 worker
+
+当前 worker 的 NSQ in-flight 上限来自 `worker.concurrency`，代码锚点在 [server.go](../../internal/worker/server.go) 创建 subscriber 的路径。
+
+多实例要共同消费同一个 NSQ backlog，关键是：
+
+- 使用相同的 `worker.service-name`
+
+因为这个值会作为订阅 channel 名传给 MQ。也就是说，“同 channel 扩 worker”靠的是**副本数增加 + 相同 service-name**，不是在 `events.yaml` 里再配一套 per-topic 并发。
 
 ## 它和其它组件怎么交互
 

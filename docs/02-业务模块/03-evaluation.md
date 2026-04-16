@@ -260,6 +260,8 @@ sequenceDiagram
     participant W as qs-worker
     participant I as InternalService
     participant Sub as SubmissionService
+    participant MyRel as MySQL outbox relay
+    participant MRel as Mongo outbox relay
     participant Eng as engine.Service
     participant P as Pipeline
     participant MQ as MQ qs.evaluation.lifecycle
@@ -268,14 +270,16 @@ sequenceDiagram
     W->>I: CalculateAnswerSheetScore
     W->>I: CreateAssessmentFromAnswerSheet
     I->>Sub: Create / Submit
-    Sub->>MQ: assessment.submitted
+    Sub->>MyRel: SaveWithEvents
+    MyRel->>MQ: assessment.submitted
 
     Note over W: assessment.submitted
     W->>I: EvaluateAssessment
     I->>Eng: Evaluate
-    Eng->>P: Validation → FactorScore → RiskLevel → Interpretation → EventPublish
-    P->>MQ: assessment.interpreted
-    P->>MQ: report.generated
+    Eng->>P: Validation → FactorScore → RiskLevel → Interpretation → WaiterNotify
+    P->>MRel: 报告保存成功后写 Mongo outbox
+    MRel->>MQ: assessment.interpreted
+    MRel->>MQ: report.generated
 ```
 
 | 步骤 | 动作 | RPC / 事件 | 实现锚点 |
@@ -283,7 +287,7 @@ sequenceDiagram
 | 1 | 计分回写答卷 | `CalculateAnswerSheetScore` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go) |
 | 2 | 建测评并提交 | `CreateAssessmentFromAnswerSheet` → `assessment.submitted` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go) |
 | 3 | 执行评估 | `EvaluateAssessment` | [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)；[engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go) |
-| 4 | 流水线结束 | `assessment.interpreted`、`report.generated` | 这两类成功事件在 **报告保存成功** 时一起进入 Mongo outbox，而不是在 MySQL assessment save 后直接 publish |
+| 4 | 流水线结束 | `assessment.interpreted`、`report.generated` | 这两类成功事件在 **报告保存成功** 时一起进入 Mongo outbox，而不是在 MySQL assessment save 后 direct publish |
 
 #### 分支说明
 
@@ -309,13 +313,13 @@ sequenceDiagram
 
 事件类型字符串与 [`configs/events.yaml`](../../configs/events.yaml)、[eventconfig](../../internal/pkg/eventconfig) 对齐。
 
-| 事件类型 | Topic（name） | handler（yaml） | 发布侧（概念） | consumers（yaml 节选） |
-| -------- | -------------- | ----------------- | -------------- | ------------------------ |
-| `answersheet.submitted` | `qs.evaluation.lifecycle` | `answersheet_submitted_handler` | 答卷提交流程 | `qs-worker` 等 |
-| `assessment.submitted` | `qs.evaluation.lifecycle` | `assessment_submitted_handler` | 提交测评 | `qs-worker` 等 |
-| `assessment.interpreted` | `qs.evaluation.lifecycle` | `assessment_interpreted_handler` | 引擎 | 多消费者 |
-| `assessment.failed` | `qs.evaluation.lifecycle` | `assessment_failed_handler` | 失败路径 | logging / monitoring 等；当前 worker 侧以失败日志为主 |
-| `report.generated` | `qs.evaluation.lifecycle` | `report_generated_handler` | 引擎 | `qs-worker` 等 |
+| 事件类型 | Topic（name） | handler（yaml） | 当前出站边界 |
+| -------- | -------------- | ----------------- | -------------- |
+| `answersheet.submitted` | `qs.evaluation.lifecycle` | `answersheet_submitted_handler` | Mongo durable submit + Mongo outbox |
+| `assessment.submitted` | `qs.evaluation.lifecycle` | `assessment_submitted_handler` | MySQL outbox |
+| `assessment.interpreted` | `qs.evaluation.lifecycle` | `assessment_interpreted_handler` | 报告保存成功后进入 Mongo outbox |
+| `assessment.failed` | `qs.evaluation.lifecycle` | `assessment_failed_handler` | MySQL outbox |
+| `report.generated` | `qs.evaluation.lifecycle` | `report_generated_handler` | 报告保存成功后进入 Mongo outbox |
 
 主异步闭环以 **`report.generated`** 为报告就绪信号；报告导出不再作为运行时事件契约的一部分。
 

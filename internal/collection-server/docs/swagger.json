@@ -757,6 +757,83 @@
                 }
             }
         },
+        "/api/v1/assessments/{id}/trend-summary": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "获取指定测评所属同量表、同版本的历史趋势摘要",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评"
+                ],
+                "summary": "获取测评趋势摘要",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentTrendSummaryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/assessments/{id}/wait-report": {
             "get": {
                 "security": [
@@ -1543,6 +1620,70 @@
                 }
             }
         },
+        "/api/v1/testees/{id}/care-context": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "获取当前受试者关联的临床人员和入口来源摘要",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "获取受试者照护上下文",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/testee.TesteeCareContextResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "检查服务健康状态",
@@ -1643,6 +1784,9 @@
                     "items": {
                         "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer"
                     }
+                },
+                "idempotency_key": {
+                    "type": "string"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -1782,6 +1926,63 @@
                 }
             }
         },
+        "evaluation.AssessmentFactorChangeResponse": {
+            "type": "object",
+            "properties": {
+                "current_score": {
+                    "type": "number"
+                },
+                "delta": {
+                    "type": "number"
+                },
+                "factor_code": {
+                    "type": "string"
+                },
+                "factor_name": {
+                    "type": "string"
+                },
+                "previous_score": {
+                    "type": "number"
+                },
+                "risk_level": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.AssessmentFactorTrendPointResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "submitted_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.AssessmentFactorTrendResponse": {
+            "type": "object",
+            "properties": {
+                "factor_code": {
+                    "type": "string"
+                },
+                "factor_name": {
+                    "type": "string"
+                },
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentFactorTrendPointResponse"
+                    }
+                }
+            }
+        },
         "evaluation.AssessmentReportResponse": {
             "type": "object",
             "properties": {
@@ -1873,6 +2074,101 @@
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "total_score": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.AssessmentTrendMetaResponse": {
+            "type": "object",
+            "properties": {
+                "comparable_count": {
+                    "type": "integer"
+                },
+                "display_mode": {
+                    "type": "string"
+                },
+                "has_multiple_fillers": {
+                    "type": "boolean"
+                },
+                "note": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.AssessmentTrendSnapshotResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "scale_code": {
+                    "type": "string"
+                },
+                "scale_name": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "total_score": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.AssessmentTrendSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "current": {
+                    "$ref": "#/definitions/evaluation.AssessmentTrendSnapshotResponse"
+                },
+                "factor_changes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentFactorChangeResponse"
+                    }
+                },
+                "factor_trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentFactorTrendResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/evaluation.AssessmentTrendMetaResponse"
+                },
+                "previous": {
+                    "$ref": "#/definitions/evaluation.AssessmentTrendSnapshotResponse"
+                },
+                "timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentTrendTimelinePointResponse"
+                    }
+                }
+            }
+        },
+        "evaluation.AssessmentTrendTimelinePointResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "filler_label": {
+                    "type": "string"
+                },
+                "risk_level": {
                     "type": "string"
                 },
                 "submitted_at": {
@@ -2547,6 +2843,31 @@
                 "total": {
                     "description": "总数",
                     "type": "integer"
+                }
+            }
+        },
+        "testee.TesteeCareContextResponse": {
+            "type": "object",
+            "properties": {
+                "clinician_name": {
+                    "description": "当前跟进临床人员姓名",
+                    "type": "string"
+                },
+                "clinician_role": {
+                    "description": "当前跟进临床人员角色/类型",
+                    "type": "string"
+                },
+                "entry_source_type": {
+                    "description": "入口来源类型",
+                    "type": "string"
+                },
+                "entry_title": {
+                    "description": "入口标题",
+                    "type": "string"
+                },
+                "relation_type": {
+                    "description": "与受试者的关系类型",
+                    "type": "string"
                 }
             }
         },

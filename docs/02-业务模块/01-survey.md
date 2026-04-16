@@ -80,14 +80,14 @@ flowchart LR
     admin -->|REST| survey
     client -->|REST| bff
     bff -->|gRPC| survey
-    survey -->|publish events| worker
+    survey -->|Mongo outbox relay / direct publish| worker
     worker -->|internal gRPC| survey
     worker -->|internal gRPC| evaluation
 ```
 
 #### 运行时图说明
 
-后台直接调 `apiserver` REST；收集端经 `collection-server` gRPC 提交答卷；`survey` 发布事件后由 `worker` 异步触发分数回写与下游测评链路。
+后台直接调 `apiserver` REST；收集端经 `collection-server` gRPC 提交答卷；答卷提交现在通过 Mongo durable submit 一次性写入答卷、幂等记录和 outbox，再由 apiserver relay 补发 `answersheet.submitted`；问卷生命周期事件仍保持 direct publish。
 
 ### 主要代码入口（索引）
 
@@ -306,7 +306,7 @@ flowchart TB
 | `questionnaire.changed` | `qs.survey.lifecycle` | `questionnaire_changed_handler` | `action=published` 时 worker 生成二维码；其他 action 仅日志 |
 | `answersheet.submitted` | **`qs.evaluation.lifecycle`** | `answersheet_submitted_handler` | 与测评链共用 Topic，消费者含 `qs-worker` |
 
-改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker [registry.go](../../internal/worker/handlers/registry.go)。
+改事件名或 handler 绑定时须同步 **yaml**、领域 `events.go`、发布点与 worker [registry.go](../../internal/worker/handlers/registry.go)。
 
 #### 前台提交流程的真正入口
 
@@ -328,6 +328,8 @@ sequenceDiagram
     participant BFF as collection-server
     participant Survey as survey.SubmissionService
     participant Repo as AnswerSheet Repo
+    participant Mongo as Mongo durable submit
+    participant Relay as apiserver relay
     participant MQ as MQ
     participant Worker as qs-worker
     participant Internal as apiserver InternalService
@@ -337,8 +339,9 @@ sequenceDiagram
     BFF->>BFF: 校验认证与监护关系
     BFF->>Survey: gRPC SaveAnswerSheet
     Survey->>Survey: 校验问卷版本与答案
-    Survey->>Repo: 保存答卷
-    Survey->>MQ: 发布 answersheet.submitted
+    Survey->>Mongo: 同事务写答卷 + 幂等记录 + outbox
+    Mongo-->>Survey: 提交成功
+    Relay->>MQ: 补发 answersheet.submitted
     MQ-->>Worker: 投递事件
     Worker->>Internal: CalculateAnswerSheetScore
     Internal->>Survey: CalculateAndSave
@@ -346,7 +349,7 @@ sequenceDiagram
     Internal->>Eval: 创建 Assessment
 ```
 
-这条链路里，`survey` 同步完成“校验并保存答卷”，异步完成“补算答卷分数”。测评创建与执行已经进入 `evaluation` 的职责边界。
+这条链路里，`survey` 同步完成“校验并保存答卷”，并在同一个 Mongo 持久化边界里写入 durable idempotency 与 outbox；真正的 `answersheet.submitted` 由 apiserver relay 异步补发。后续“补算答卷分数、创建测评、推进评估”都已经进入异步链路与 `evaluation` 的职责边界。
 
 ### 题型扩展：全局组织与两侧分工
 

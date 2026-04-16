@@ -11,7 +11,7 @@
 | 进程角色 | `qs-apiserver` 是主业务进程，持有领域状态与持久化真值，对外提供后台 REST 和 gRPC Server |
 | 上下游关系 | 上游包括后台客户端、`collection-server`、`qs-worker`；下游包括 MySQL、MongoDB、Redis、IAM 和 MQ |
 | 最重要的运行时认识 | 同步请求和异步回调最终都收口到本进程执行业务写；worker 不是第二套主业务容器 |
-| 异步边界 | 事件由本进程发布，长耗时后续由 worker 消费后再通过 gRPC 回调本进程完成 |
+| 异步边界 | 事件最终由本进程发布；其中评估主链关键事件已通过 outbox relay 出站，长耗时后续由 worker 消费后再通过 gRPC 回调本进程完成 |
 | 同进程后台 | 缓存预热、统计同步 ticker 等后台任务在本进程内运行，但不改变“主状态收口”的事实 |
 | 排障入口 | 先看 `server.go` 的装配与 `PrepareRun`，再看 `container/assembler` 和 Router / GRPCRegistry |
 
@@ -36,7 +36,7 @@
 | **角色** | 主服务：装配 survey / scale / actor / evaluation / plan / statistics 等，执行业务写与复杂读 |
 | **上游** | 客户端（REST）、**collection**（gRPC）、**worker**（gRPC） |
 | **下游** | MySQL、MongoDB、Redis、IAM SDK、MQ Broker |
-| **异步边界** | 发布事件由本进程完成；**长耗时后续步骤**由 worker 消费后再 **gRPC 回调** 本进程（见 [04-进程间通信](./04-进程间通信.md)） |
+| **异步边界** | 发布事件最终由本进程完成；评估主链关键事件会先写 outbox，再由 relay 出站；**长耗时后续步骤**由 worker 消费后再 **gRPC 回调** 本进程（见 [04-进程间通信](./04-进程间通信.md)） |
 
 ---
 
@@ -115,7 +115,7 @@ sequenceDiagram
 
 **统计同步 ticker**：`startStatisticsSyncScheduler` 内为三轮 `SyncDaily/Accumulated/Plan` **单独注册**一条 `ShutdownCallback`，仅对 ticker 使用的 **context 调用 `cancel()`**，使 goroutine 在 `select` 上退出。**与主回调同属** `GracefulShutdown`；若关心「cancel 与关库的先后」，以 **回调注册顺序** 与 **`github.com/FangcunMount/component-base/pkg/shutdown` 的实际 invocation 顺序**为准（排障时可打日志核对）。
 
-**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 `PrepareRun` 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container `initEventPublisher`](../../internal/apiserver/container/container.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
+**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 `PrepareRun` 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container `initEventPublisher`](../../internal/apiserver/container/container.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。与此同时，`PrepareRun` 还会按配置启动 **Mongo outbox relay** 与 **assessment MySQL outbox relay**，用于补发 `answersheet.submitted` 和评估主链关键事件。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
 
 **IAM 授权版本同步**：与业务事件总线分离，`apiserver` 通过 **`iam.authz-sync.*`** 创建独立订阅者，消费 **`iam.authz.version`** 控制面主题以推进本地授权快照失效，见 [server.go `startAuthzVersionSync`](../../internal/apiserver/server.go) 与 [version_sync.go](../../internal/pkg/iamauth/version_sync.go)。
 
@@ -129,13 +129,13 @@ sequenceDiagram
 
 | 领域 / 场景 | 典型行为 | 代码锚点（示例） |
 | ----------- | -------- | ---------------- |
-| **答卷** | 聚合根 `Events()` 在提交成功后批量发布 | [survey/answersheet `submission_service.publishEvents`](../../internal/apiserver/application/survey/answersheet/submission_service.go) |
-| **问卷** | 生命周期操作后发布 `questionnaire.changed` | [questionnaire `lifecycle_service.publishEvents`](../../internal/apiserver/application/survey/questionnaire/lifecycle_service.go) |
-| **量表** | 生命周期操作后发布 `scale.changed`；更新与因子变更也会主动发 `action=updated` | [scale `lifecycle_service.publishEvents`](../../internal/apiserver/application/scale/lifecycle_service.go)、[factor_service `publishScaleUpdated`](../../internal/apiserver/application/scale/factor_service.go) |
+| **答卷** | `answersheet.submitted` 通过 **Mongo durable submit + Mongo outbox relay** 出站，而不是 direct publish | [survey/answersheet `submission_service.go`](../../internal/apiserver/application/survey/answersheet/submission_service.go)、[durable_submit.go](../../internal/apiserver/infra/mongo/answersheet/durable_submit.go) |
+| **问卷** | 生命周期操作后 best-effort 发布 `questionnaire.changed` | [questionnaire `lifecycle_service.go`](../../internal/apiserver/application/survey/questionnaire/lifecycle_service.go) |
+| **量表** | 生命周期操作后 best-effort 发布 `scale.changed`；更新与因子变更也会主动发 `action=updated` | [scale `lifecycle_service.go`](../../internal/apiserver/application/scale/lifecycle_service.go)、[factor_service `publishScaleUpdated`](../../internal/apiserver/application/scale/factor_service.go) |
 | **测评** | `Create` 只建 `pending`；`Submit` / `Retry` 通过 **MySQL outbox** 产出 `assessment.submitted`；评估失败通过 **MySQL outbox** 产出 `assessment.failed`；评估成功在**报告落 Mongo 成功**时一次性写入 `assessment.interpreted` / `report.generated` 的 Mongo outbox | [evaluation/assessment `submission_service.go`](../../internal/apiserver/application/evaluation/assessment/submission_service.go)、[management_service `Retry`](../../internal/apiserver/application/evaluation/assessment/management_service.go)、[engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)、[engine/pipeline `interpretation.go`](../../internal/apiserver/application/evaluation/engine/pipeline/interpretation.go) |
-| **计划** | 不再发布计划级生命周期事件；仅任务开放/完成/过期/取消路径发布 `task.*` | [`task_management_service`](../../internal/apiserver/application/plan/task_management_service.go)、[`task_scheduler_service`](../../internal/apiserver/application/plan/task_scheduler_service.go)、[plan `lifecycle_service`](../../internal/apiserver/application/plan/lifecycle_service.go) |
+| **计划** | 不再发布计划级生命周期事件；仅任务开放/完成/过期/取消路径 best-effort 发布 `task.*` | [`task_management_service`](../../internal/apiserver/application/plan/task_management_service.go)、[`task_scheduler_service`](../../internal/apiserver/application/plan/task_scheduler_service.go)、[plan `lifecycle_service`](../../internal/apiserver/application/plan/lifecycle_service.go) |
 
-**关键点**：多数路径在 **持久化成功之后** 再发事件；部分实现注明 **发布失败不阻塞主流程**（以各 `Publish` 调用处错误处理为准）。
+**关键点**：当前不要把所有事件讲成同一可靠性等级。评估主链关键事件已经 outbox 化；`questionnaire.changed`、`scale.changed`、`task.*` 仍是保存后 best-effort publish。
 
 ---
 

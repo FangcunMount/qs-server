@@ -333,7 +333,7 @@ flowchart TB
 
 #### 输出（领域事件）
 
-**当前状态**：[`configs/events.yaml`](../../configs/events.yaml) **无** `actor.*` / `testee.*` / `operator.*` 条目；领域代码中 **打标、操作者激活** 等处存在 **注释掉的 `events.Publish(...)` 占位**（如 [testee/counter.go](../../internal/apiserver/domain/actor/testee/counter.go)、[lifecycler.go](../../internal/apiserver/domain/actor/operator/lifecycler.go)）。
+**当前状态**：[`configs/events.yaml`](../../configs/events.yaml) **无** `actor.*` / `testee.*` / `operator.*` 条目；领域代码中 **操作者激活/停用** 等处仍保留 **注释掉的 `events.Publish(...)` 占位**（见 [lifecycler.go](../../internal/apiserver/domain/actor/operator/lifecycler.go)）。
 
 **Verify**：若未来引入 MQ 事件，须新增 yaml、领域事件类型与发布点，并更新本文。
 
