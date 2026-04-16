@@ -23,7 +23,7 @@ server:
 # -------------------------------------------------------
 worker:
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
-  concurrency: 256             # 提高消费并发，与 4C4G apiserver 档位匹配
+  concurrency: 48              # 3 副本合计约 144 inflight，避免显著高于 apiserver MySQL 背压上限 160
   max-retries: 3              # 最大重试次数
 
 # ============================================================

@@ -1432,6 +1432,15 @@ jobs:
               fi
             fi
 
+            # 清理历史遗留 worker 容器：
+            # 1. 旧的单实例容器名：qs-worker
+            # 2. 之前临时 compose project 生成的容器：qs-deploy-worker-<runid>-qs-worker-*
+            echo "Cleaning up legacy worker containers..."
+            LEGACY_WORKERS=$($SUDO docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 == "qs-worker" || $2 ~ /^qs-deploy-worker-[0-9]+-qs-worker-[0-9]+$/ {print $1}')
+            if [ -n "${LEGACY_WORKERS}" ]; then
+              echo "${LEGACY_WORKERS}" | xargs -r $SUDO docker rm -f
+            fi
+
             # 启动（使用 compose 扩到多个 worker 实例）
             cd /opt/qs-server/${CONTAINER_NAME}
             $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker
