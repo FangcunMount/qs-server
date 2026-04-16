@@ -61,7 +61,6 @@ services:
 
   qs-worker:
     image: ${DOCKER_IMAGE_QS_WORKER:-ghcr.io/fangcunmount/qs-worker:latest}
-    container_name: qs-worker
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
     mem_limit: "512m"

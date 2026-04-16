@@ -98,7 +98,6 @@ services:
         GIT_COMMIT: ${GIT_COMMIT}
         GIT_BRANCH: ${GIT_BRANCH:-main}
     image: qs-worker:${VERSION:-latest}
-    container_name: qs-worker
     restart: unless-stopped
     command: ["/app/qs-worker", "--config=/app/configs/worker.prod.yaml"]
     volumes:

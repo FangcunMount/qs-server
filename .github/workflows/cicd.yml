@@ -1122,6 +1122,7 @@ jobs:
       SERVICE_NAME: qs-worker
       IMAGE_NAME: qs-worker
       CONTAINER_NAME: qs-worker
+      WORKER_REPLICAS: "3"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -1266,7 +1267,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,WORKER_REPLICAS,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
           script: |
             set -Eeuo pipefail
 
@@ -1343,8 +1344,13 @@ jobs:
             }
 
             echo "=========================================="
-            echo "Deploying ${CONTAINER_NAME}"
+            echo "Deploying ${CONTAINER_NAME} (replicas=${WORKER_REPLICAS})"
             echo "=========================================="
+
+            if ! [[ "${WORKER_REPLICAS}" =~ ^[0-9]+$ ]] || [ "${WORKER_REPLICAS}" -lt 1 ]; then
+              echo "❌ WORKER_REPLICAS must be a positive integer, got: ${WORKER_REPLICAS}" >&2
+              exit 1
+            fi
 
             # 目录准备
             $SUDO mkdir -p /opt/qs-server/${CONTAINER_NAME}/configs/env
@@ -1404,6 +1410,7 @@ jobs:
             fi
 
             export DOCKER_IMAGE_QS_WORKER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
+            export COMPOSE_PROJECT_NAME="qs-worker"
 
             GHCR_LOGIN_OK=0
             if [ -n "${GITHUB_TOKEN:-}" ]; then
@@ -1426,29 +1433,36 @@ jobs:
               fi
             fi
 
-            # 停旧容器
-            if $SUDO docker ps -a --format '{{.Names}}' | grep -w ${CONTAINER_NAME} > /dev/null 2>&1; then
-              $SUDO docker stop ${CONTAINER_NAME} || true
-              $SUDO docker rm ${CONTAINER_NAME} || true
-            fi
-
-            # 启动 (使用 compose，Worker 无端口/TLS)
+            # 启动（使用 compose 扩到多个 worker 实例）
             cd /opt/qs-server/${CONTAINER_NAME}
             $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker
-            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d qs-worker
+            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale qs-worker="${WORKER_REPLICAS}" qs-worker
 
             # Worker 无 HTTP 健康检查，检查容器是否正常运行
             echo "Waiting for container to start..."
             sleep 10
-            
-            if $SUDO docker ps --filter "name=${CONTAINER_NAME}" --filter "status=running" | grep -q ${CONTAINER_NAME}; then
-              echo "✅ Container is running"
-              $SUDO docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Status}}"
-              echo "📋 Recent logs:"
-              $SUDO docker logs --tail 20 ${CONTAINER_NAME}
+
+            RUNNING_COUNT=$($SUDO docker ps \
+              --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=qs-worker" \
+              --filter "status=running" \
+              --format '{{.Names}}' | wc -l | tr -d ' ')
+
+            if [ "${RUNNING_COUNT}" -ge "${WORKER_REPLICAS}" ]; then
+              echo "✅ Worker replicas are running (${RUNNING_COUNT}/${WORKER_REPLICAS})"
+              $SUDO docker ps \
+                --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
+                --filter "label=com.docker.compose.service=qs-worker" \
+                --format "table {{.Names}}\t{{.Status}}"
+              echo "📋 Recent logs (all worker replicas):"
+              $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 qs-worker
             else
-              echo "❌ Container failed to start"
-              $SUDO docker logs --tail 100 ${CONTAINER_NAME} || true
+              echo "❌ Worker replicas failed to reach expected count (${RUNNING_COUNT}/${WORKER_REPLICAS})"
+              $SUDO docker ps -a \
+                --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
+                --filter "label=com.docker.compose.service=qs-worker" \
+                --format "table {{.Names}}\t{{.Status}}"
+              $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 qs-worker || true
               exit 1
             fi
 
