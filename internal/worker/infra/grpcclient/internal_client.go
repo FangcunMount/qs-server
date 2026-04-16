@@ -127,6 +127,21 @@ func (c *InternalClient) GenerateScaleQRCode(
 	return resp, nil
 }
 
+func (c *InternalClient) ProjectBehaviorEvent(
+	ctx context.Context,
+	req *pb.ProjectBehaviorEventRequest,
+) (*pb.ProjectBehaviorEventResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.ProjectBehaviorEvent(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to project behavior event: %w", err)
+	}
+
+	return resp, nil
+}
+
 // SendTaskOpenedMiniProgramNotification 发送 task.opened 小程序订阅消息。
 func (c *InternalClient) SendTaskOpenedMiniProgramNotification(
 	ctx context.Context,

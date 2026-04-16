@@ -199,6 +199,10 @@ func (r *GRPCRegistry) registerInternalService() error {
 		log.Warn("PlanModule is not initialized, skipping internal service registration")
 		return nil
 	}
+	if r.container.StatisticsModule == nil {
+		log.Warn("StatisticsModule is not initialized, skipping internal service registration")
+		return nil
+	}
 
 	// 使用 SurveyModule、EvaluationModule、ScaleModule、ActorModule 中的服务
 	var authzSnapshot *iaminfra.AuthzSnapshotLoader
@@ -220,6 +224,7 @@ func (r *GRPCRegistry) registerInternalService() error {
 		r.container.ActorModule.OperatorQueryService,
 		r.container.ActorModule.OperatorRepo,
 		authzSnapshot,
+		r.container.StatisticsModule.BehaviorProjectorService,
 		r.container.QRCodeService, // 可能为 nil
 		r.container.MiniProgramTaskNotificationService,
 	)

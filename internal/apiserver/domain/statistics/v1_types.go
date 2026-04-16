@@ -32,14 +32,17 @@ type OrgOverviewSnapshot struct {
 }
 
 // OrgOverviewWindow 机构概览窗口指标。
+// 注意：
+// - EntryCreatedCount 属于供给侧资源指标，表示这段时间新发布了多少入口，不属于 C 端旅程节点。
+// - 其余 entry/intake/assigned/assessment 字段属于接入行为和测评服务过程指标。
 type OrgOverviewWindow struct {
-	NewTestees               int64 `json:"new_testees"`
-	EntryCreatedCount        int64 `json:"entry_created_count"`
-	EntryResolvedCount       int64 `json:"entry_resolved_count"`
-	EntryIntakeCount         int64 `json:"entry_intake_count"`
-	RelationAssignedCount    int64 `json:"relation_assigned_count"`
-	AssessmentCreatedCount   int64 `json:"assessment_created_count"`
-	AssessmentCompletedCount int64 `json:"assessment_completed_count"`
+	NewTestees               int64 `json:"new_testees"`                // 入口旅程里新建的受试者人数
+	EntryCreatedCount        int64 `json:"entry_created_count"`        // 供给侧：新建入口数
+	EntryResolvedCount       int64 `json:"entry_resolved_count"`       // 旅程侧：被用户成功打开的入口次数
+	EntryIntakeCount         int64 `json:"entry_intake_count"`         // 旅程侧：完成 intake 的次数
+	RelationAssignedCount    int64 `json:"relation_assigned_count"`    // 旅程侧：建立照护关系的唯一受试者数
+	AssessmentCreatedCount   int64 `json:"assessment_created_count"`   // 旅程侧：形成测评的次数
+	AssessmentCompletedCount int64 `json:"assessment_completed_count"` // 旅程侧：结果就绪的次数
 }
 
 // OrgOverviewTrend 机构概览趋势。
@@ -79,6 +82,7 @@ type ClinicianStatisticsSnapshot struct {
 }
 
 // ClinicianStatisticsWindow 从业者窗口指标。
+// 这里全部是接入行为和测评服务过程指标，不含供给侧入口创建量。
 type ClinicianStatisticsWindow struct {
 	IntakeCount              int64 `json:"intake_count"`
 	AssignedCount            int64 `json:"assigned_count"`
@@ -86,6 +90,7 @@ type ClinicianStatisticsWindow struct {
 }
 
 // ClinicianStatisticsFunnel 从业者入口漏斗。
+// CreatedCount 是供给侧资源量，其余节点是接入行为和测评服务过程量。
 type ClinicianStatisticsFunnel struct {
 	CreatedCount    int64 `json:"created_count"`
 	ResolvedCount   int64 `json:"resolved_count"`
@@ -118,7 +123,8 @@ type AssessmentEntryStatisticsMeta struct {
 	ClinicianName string     `json:"clinician_name,omitempty"`
 }
 
-// AssessmentEntryStatisticsCounts 入口漏斗计数。
+// AssessmentEntryStatisticsCounts 单入口旅程计数。
+// 这里不再表达供给侧“入口已发布”，只表达用户打开入口之后的旅程。
 type AssessmentEntryStatisticsCounts struct {
 	ResolveCount    int64 `json:"resolve_count"`
 	IntakeCount     int64 `json:"intake_count"`

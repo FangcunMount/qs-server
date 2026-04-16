@@ -13,6 +13,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
 	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
@@ -47,14 +48,14 @@ type ActorModule struct {
 	TesteeTaggingService      testeeApp.TesteeTaggingService      // 标签服务 - 系统自动（事件驱动）
 
 	// operator service 层（按行为者组织）
-	OperatorLifecycleService     operatorApp.OperatorLifecycleService     // 生命周期服务 - 人事/行政
-	OperatorAuthorizationService operatorApp.OperatorAuthorizationService // 权限管理服务 - IT管理员
-	OperatorQueryService         operatorApp.OperatorQueryService         // 查询服务 - 通用
-	ClinicianLifecycleService    clinicianApp.ClinicianLifecycleService
-	ClinicianQueryService        clinicianApp.ClinicianQueryService
-	ClinicianRelationshipService clinicianApp.ClinicianRelationshipService
-	AssessmentEntryService       assessmentEntryApp.AssessmentEntryService
-	TesteeAccessService          actorAccessApp.TesteeAccessService
+	OperatorLifecycleService     operatorApp.OperatorLifecycleService      // 生命周期服务 - 人事/行政
+	OperatorAuthorizationService operatorApp.OperatorAuthorizationService  // 权限管理服务 - IT管理员
+	OperatorQueryService         operatorApp.OperatorQueryService          // 查询服务 - 通用
+	ClinicianLifecycleService    clinicianApp.ClinicianLifecycleService    // 生命周期服务 - 人事/行政部门
+	ClinicianQueryService        clinicianApp.ClinicianQueryService        // 查询服务 - 通用
+	ClinicianRelationshipService clinicianApp.ClinicianRelationshipService // 关系服务 - 建立从业者-受试者关系、查询名下受试者
+	AssessmentEntryService       assessmentEntryApp.AssessmentEntryService // 创建测评入口、解析 token、扫码 intake
+	TesteeAccessService          actorAccessApp.TesteeAccessService        // 解析后台访问范围：admin bypass / ClinicianTesteeRelation
 }
 
 // NewActorModule 创建 Actor 模块
@@ -121,6 +122,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
+	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlDB)
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(m.TesteeRepo)
@@ -223,6 +225,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		m.RelationRepo,
 		m.ClinicianRepo,
 		m.TesteeRepo,
+		behaviorEvents,
 		uow,
 	)
 	m.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
@@ -242,6 +245,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		guardianshipSvc,
 		resolveLogWriter,
 		intakeLogWriter,
+		behaviorEvents,
 		uow,
 	)
 

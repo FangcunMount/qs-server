@@ -18,6 +18,7 @@ import (
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domaintestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -46,6 +47,7 @@ type InternalService struct {
 	operatorQueryService      operatorApp.OperatorQueryService
 	operatorRepo              domainoperator.Repository
 	authzSnapshot             *iaminfra.AuthzSnapshotLoader
+	behaviorProjectorService  statisticsApp.BehaviorProjectorService
 	// 小程序码生成服务（可选）
 	qrCodeService qrcodeApp.QRCodeService
 	// 小程序 task 消息服务（可选）
@@ -67,6 +69,7 @@ func NewInternalService(
 	operatorQueryService operatorApp.OperatorQueryService,
 	operatorRepo domainoperator.Repository,
 	authzSnapshot *iaminfra.AuthzSnapshotLoader,
+	behaviorProjectorService statisticsApp.BehaviorProjectorService,
 	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 ) *InternalService {
@@ -89,6 +92,7 @@ func NewInternalService(
 		operatorQueryService:               operatorQueryService,
 		operatorRepo:                       operatorRepo,
 		authzSnapshot:                      authzSnapshot,
+		behaviorProjectorService:           behaviorProjectorService,
 		qrCodeService:                      qrService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 	}
@@ -97,6 +101,41 @@ func NewInternalService(
 // RegisterService 注册 gRPC 服务
 func (s *InternalService) RegisterService(server *grpc.Server) {
 	pb.RegisterInternalServiceServer(server, s)
+}
+
+func (s *InternalService) ProjectBehaviorEvent(
+	ctx context.Context,
+	req *pb.ProjectBehaviorEventRequest,
+) (*pb.ProjectBehaviorEventResponse, error) {
+	if s.behaviorProjectorService == nil {
+		return nil, status.Error(codes.FailedPrecondition, "behavior projector service is not available")
+	}
+	if req == nil || req.EventId == "" || req.EventType == "" || req.OrgId == 0 || req.OccurredAt == nil {
+		return nil, status.Error(codes.InvalidArgument, "event_id, event_type, org_id and occurred_at are required")
+	}
+
+	result, err := s.behaviorProjectorService.ProjectBehaviorEvent(ctx, statisticsApp.BehaviorProjectEventInput{
+		EventID:           req.EventId,
+		EventType:         req.EventType,
+		OrgID:             req.OrgId,
+		ClinicianID:       req.ClinicianId,
+		SourceClinicianID: req.SourceClinicianId,
+		EntryID:           req.EntryId,
+		TesteeID:          req.TesteeId,
+		AnswerSheetID:     req.AnswersheetId,
+		AssessmentID:      req.AssessmentId,
+		ReportID:          req.ReportId,
+		FailureReason:     req.FailureReason,
+		OccurredAt:        req.OccurredAt.AsTime(),
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &pb.ProjectBehaviorEventResponse{
+		Status:  string(result.Status),
+		Message: "ok",
+	}, nil
 }
 
 // CalculateAnswerSheetScore 计算答卷分数

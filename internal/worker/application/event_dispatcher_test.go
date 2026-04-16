@@ -19,8 +19,8 @@ func TestEventDispatcherInitializesCurrentRuntimeTopics(t *testing.T) {
 	}
 
 	subs := dispatcher.GetTopicSubscriptions()
-	if len(subs) != 3 {
-		t.Fatalf("expected 3 topic subscriptions, got %d", len(subs))
+	if len(subs) != 4 {
+		t.Fatalf("expected 4 topic subscriptions, got %d", len(subs))
 	}
 
 	cfg, err := eventconfig.Load("../../../configs/events.yaml")

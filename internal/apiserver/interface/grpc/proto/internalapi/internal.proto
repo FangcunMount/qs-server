@@ -53,6 +53,12 @@ service InternalService {
   rpc GenerateScaleQRCode(GenerateScaleQRCodeRequest) 
       returns (GenerateScaleQRCodeResponse);
 
+  // 投影行为足迹事件
+  // 场景：worker 处理 qs.analytics.behavior 事件后调用
+  // 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
+  rpc ProjectBehaviorEvent(ProjectBehaviorEventRequest)
+      returns (ProjectBehaviorEventResponse);
+
   // 发送 task.opened 小程序订阅消息
   // 场景：worker 处理 task.opened 事件后调用
   // 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
@@ -359,6 +365,28 @@ message GenerateScaleQRCodeResponse {
   bool success = 1;                  // 是否成功
   string qrcode_url = 2;             // 二维码 URL
   string message = 3;                // 描述信息
+}
+
+// ==================== ProjectBehaviorEvent ====================
+
+message ProjectBehaviorEventRequest {
+  string event_id = 1;
+  string event_type = 2;
+  int64 org_id = 3;
+  uint64 clinician_id = 4;
+  uint64 entry_id = 5;
+  uint64 testee_id = 6;
+  uint64 assessment_id = 7;
+  uint64 report_id = 8;
+  google.protobuf.Timestamp occurred_at = 9;
+  uint64 answersheet_id = 10;
+  uint64 source_clinician_id = 11;
+  string failure_reason = 12;
+}
+
+message ProjectBehaviorEventResponse {
+  string status = 1;                 // completed / pending
+  string message = 2;
 }
 
 // ==================== SendTaskOpenedMiniProgramNotification ====================

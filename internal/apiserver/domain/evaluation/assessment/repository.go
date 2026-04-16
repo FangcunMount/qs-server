@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // ==================== Assessment Repository ====================
@@ -19,6 +20,10 @@ type Repository interface {
 	// SaveWithEvents 保存测评并将聚合上的领域事件暂存到可靠出站存储。
 	// 该方法用于 submitted/failed 等需要事务型 outbox 的状态迁移。
 	SaveWithEvents(ctx context.Context, assessment *Assessment) error
+
+	// SaveWithAdditionalEvents 保存测评，并在同一事务里额外暂存补充事件。
+	// 该方法用于 create 等聚合本身不产事件、但需要可靠出站补充事件的场景。
+	SaveWithAdditionalEvents(ctx context.Context, assessment *Assessment, additional []event.DomainEvent) error
 
 	// FindByID 根据ID查找
 	FindByID(ctx context.Context, id ID) (*Assessment, error)

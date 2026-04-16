@@ -26,6 +26,14 @@ type IntakeLogWriter interface {
 	LogIntake(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) error
 }
 
+// BehaviorEventStager 将 assessment entry 行为事件可靠暂存到 outbox。
+type BehaviorEventStager interface {
+	StageEntryOpened(ctx context.Context, orgID int64, clinicianID, entryID uint64, occurredAt time.Time) error
+	StageIntakeConfirmed(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) error
+	StageTesteeProfileCreated(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) error
+	StageCareRelationshipEstablished(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) error
+}
+
 // CreateAssessmentEntryDTO 创建测评入口。
 type CreateAssessmentEntryDTO struct {
 	OrgID         int64

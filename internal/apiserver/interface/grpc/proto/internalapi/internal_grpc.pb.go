@@ -25,6 +25,7 @@ const (
 	InternalService_TagTestee_FullMethodName                             = "/internalapi.InternalService/TagTestee"
 	InternalService_GenerateQuestionnaireQRCode_FullMethodName           = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
 	InternalService_GenerateScaleQRCode_FullMethodName                   = "/internalapi.InternalService/GenerateScaleQRCode"
+	InternalService_ProjectBehaviorEvent_FullMethodName                  = "/internalapi.InternalService/ProjectBehaviorEvent"
 	InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName = "/internalapi.InternalService/SendTaskOpenedMiniProgramNotification"
 	InternalService_BootstrapOperator_FullMethodName                     = "/internalapi.InternalService/BootstrapOperator"
 )
@@ -60,6 +61,10 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
+	// 投影行为足迹事件
+	// 场景：worker 处理 qs.analytics.behavior 事件后调用
+	// 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
+	ProjectBehaviorEvent(ctx context.Context, in *ProjectBehaviorEventRequest, opts ...grpc.CallOption) (*ProjectBehaviorEventResponse, error)
 	// 发送 task.opened 小程序订阅消息
 	// 场景：worker 处理 task.opened 事件后调用
 	// 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
@@ -138,6 +143,16 @@ func (c *internalServiceClient) GenerateScaleQRCode(ctx context.Context, in *Gen
 	return out, nil
 }
 
+func (c *internalServiceClient) ProjectBehaviorEvent(ctx context.Context, in *ProjectBehaviorEventRequest, opts ...grpc.CallOption) (*ProjectBehaviorEventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectBehaviorEventResponse)
+	err := c.cc.Invoke(ctx, InternalService_ProjectBehaviorEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *internalServiceClient) SendTaskOpenedMiniProgramNotification(ctx context.Context, in *SendTaskOpenedMiniProgramNotificationRequest, opts ...grpc.CallOption) (*SendTaskOpenedMiniProgramNotificationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SendTaskOpenedMiniProgramNotificationResponse)
@@ -189,6 +204,10 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
+	// 投影行为足迹事件
+	// 场景：worker 处理 qs.analytics.behavior 事件后调用
+	// 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
+	ProjectBehaviorEvent(context.Context, *ProjectBehaviorEventRequest) (*ProjectBehaviorEventResponse, error)
 	// 发送 task.opened 小程序订阅消息
 	// 场景：worker 处理 task.opened 事件后调用
 	// 流程：解析收件人（本人优先，监护人兜底）并发送小程序订阅消息
@@ -224,6 +243,9 @@ func (UnimplementedInternalServiceServer) GenerateQuestionnaireQRCode(context.Co
 }
 func (UnimplementedInternalServiceServer) GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateScaleQRCode not implemented")
+}
+func (UnimplementedInternalServiceServer) ProjectBehaviorEvent(context.Context, *ProjectBehaviorEventRequest) (*ProjectBehaviorEventResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProjectBehaviorEvent not implemented")
 }
 func (UnimplementedInternalServiceServer) SendTaskOpenedMiniProgramNotification(context.Context, *SendTaskOpenedMiniProgramNotificationRequest) (*SendTaskOpenedMiniProgramNotificationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendTaskOpenedMiniProgramNotification not implemented")
@@ -360,6 +382,24 @@ func _InternalService_GenerateScaleQRCode_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_ProjectBehaviorEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProjectBehaviorEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).ProjectBehaviorEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_ProjectBehaviorEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).ProjectBehaviorEvent(ctx, req.(*ProjectBehaviorEventRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InternalService_SendTaskOpenedMiniProgramNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SendTaskOpenedMiniProgramNotificationRequest)
 	if err := dec(in); err != nil {
@@ -426,6 +466,10 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateScaleQRCode",
 			Handler:    _InternalService_GenerateScaleQRCode_Handler,
+		},
+		{
+			MethodName: "ProjectBehaviorEvent",
+			Handler:    _InternalService_ProjectBehaviorEvent_Handler,
 		},
 		{
 			MethodName: "SendTaskOpenedMiniProgramNotification",

@@ -16,6 +16,10 @@ topics:
     name: "qs.evaluation.lifecycle"
     description: "测评生命周期事件"
 
+  analytics-behavior:
+    name: "qs.analytics.behavior"
+    description: "行为足迹与测评服务过程投影事件"
+
   task-lifecycle:
     name: "qs.plan.task"
     description: "测评任务生命周期事件"
@@ -69,6 +73,62 @@ events:
     domain: evaluation/report
     description: "报告已生成（在 assessment.interpreted 之后发布）"
     handler: report_generated_handler
+
+  footprint.entry_opened:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "用户成功打开入口"
+    handler: behavior_projector_handler
+
+  footprint.intake_confirmed:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "用户完成一次接入"
+    handler: behavior_projector_handler
+
+  footprint.testee_profile_created:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "新建受试者档案"
+    handler: behavior_projector_handler
+
+  footprint.care_relationship_established:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "建立看护/服务关系"
+    handler: behavior_projector_handler
+
+  footprint.care_relationship_transferred:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "转移看护/服务关系"
+    handler: behavior_projector_handler
+
+  footprint.answersheet_submitted:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "提交答卷"
+    handler: behavior_projector_handler
+
+  footprint.assessment_created:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "形成测评"
+    handler: behavior_projector_handler
+
+  footprint.report_generated:
+    topic: analytics-behavior
+    aggregate: BehaviorFootprint
+    domain: statistics/behavior
+    description: "产出报告"
+    handler: behavior_projector_handler
 
   task.opened:
     topic: task-lifecycle

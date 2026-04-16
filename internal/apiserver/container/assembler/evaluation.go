@@ -36,6 +36,7 @@ import (
 type EvaluationModule struct {
 	// ==================== Interface 层 ====================
 	Handler *handler.EvaluationHandler
+	mysqlDB *gorm.DB
 
 	// ==================== Repository 层 ====================
 	AssessmentRepo        assessment.Repository
@@ -101,6 +102,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if !ok || mysqlDB == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
 	}
+	m.mysqlDB = mysqlDB
 
 	mongoDB, ok := params[1].(*mongo.Database)
 	if !ok || mongoDB == nil {
@@ -152,7 +154,6 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(mysqlDB)
-
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepository(baseAssessmentRepo, redisClient)
@@ -302,6 +303,9 @@ func (m *EvaluationModule) SetScaleRepository(
 	// 当前不注册任何策略，完全依赖因子解读配置中的建议
 	var suggestionGenerator report.SuggestionGenerator = nil
 	reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
+	if m.mysqlDB == nil {
+		return
+	}
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,
 		m.ScoreRepo,

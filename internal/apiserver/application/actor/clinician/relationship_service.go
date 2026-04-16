@@ -13,10 +13,11 @@ import (
 )
 
 type relationshipService struct {
-	relationRepo  domainRelation.Repository
-	clinicianRepo domainClinician.Repository
-	testeeRepo    domainTestee.Repository
-	uow           *mysql.UnitOfWork
+	relationRepo   domainRelation.Repository
+	clinicianRepo  domainClinician.Repository
+	testeeRepo     domainTestee.Repository
+	behaviorEvents BehaviorEventStager
+	uow            *mysql.UnitOfWork
 }
 
 // NewRelationshipService 创建从业者关系服务。
@@ -24,13 +25,15 @@ func NewRelationshipService(
 	relationRepo domainRelation.Repository,
 	clinicianRepo domainClinician.Repository,
 	testeeRepo domainTestee.Repository,
+	behaviorEvents BehaviorEventStager,
 	uow *mysql.UnitOfWork,
 ) ClinicianRelationshipService {
 	return &relationshipService{
-		relationRepo:  relationRepo,
-		clinicianRepo: clinicianRepo,
-		testeeRepo:    testeeRepo,
-		uow:           uow,
+		relationRepo:   relationRepo,
+		clinicianRepo:  clinicianRepo,
+		testeeRepo:     testeeRepo,
+		behaviorEvents: behaviorEvents,
+		uow:            uow,
 	}
 }
 
@@ -63,103 +66,48 @@ func (s *relationshipService) TransferPrimary(ctx context.Context, dto TransferP
 	if sourceType == "" {
 		sourceType = string(domainRelation.SourceTypeTransfer)
 	}
-	return s.assignRelation(ctx, AssignTesteeDTO{
-		OrgID:        dto.OrgID,
-		ClinicianID:  dto.ToClinicianID,
-		TesteeID:     dto.TesteeID,
-		RelationType: string(domainRelation.RelationTypePrimary),
-		SourceType:   sourceType,
-		SourceID:     dto.SourceID,
+	var result *domainRelation.ClinicianTesteeRelation
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		var fromClinicianID uint64
+		existingPrimary, err := s.relationRepo.FindActivePrimaryByTestee(txCtx, dto.OrgID, domainTestee.ID(dto.TesteeID))
+		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+			return errors.Wrap(err, "failed to find active primary relation before transfer")
+		}
+		if err == nil && existingPrimary != nil {
+			fromClinicianID = existingPrimary.ClinicianID().Uint64()
+		}
+		result, err = s.assignRelationTx(txCtx, AssignTesteeDTO{
+			OrgID:        dto.OrgID,
+			ClinicianID:  dto.ToClinicianID,
+			TesteeID:     dto.TesteeID,
+			RelationType: string(domainRelation.RelationTypePrimary),
+			SourceType:   sourceType,
+			SourceID:     dto.SourceID,
+		})
+		if err != nil {
+			return err
+		}
+		if s.behaviorEvents != nil {
+			if err := s.behaviorEvents.StageCareRelationshipTransferred(txCtx, dto.OrgID, fromClinicianID, dto.ToClinicianID, dto.TesteeID, time.Now()); err != nil {
+				return errors.Wrap(err, "failed to stage care relationship transferred event")
+			}
+		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return toRelationResult(result), nil
 }
 
 func (s *relationshipService) assignRelation(ctx context.Context, dto AssignTesteeDTO) (*RelationResult, error) {
 	var result *domainRelation.ClinicianTesteeRelation
-
-	relationshipType, err := normalizeAssignmentRelationType(dto.RelationType)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		sourceType := domainRelation.SourceType(dto.SourceType)
-		if sourceType == "" {
-			sourceType = domainRelation.SourceTypeManual
-		}
-
-		clinicianItem, err := s.clinicianRepo.FindByID(txCtx, domainClinician.ID(dto.ClinicianID))
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.assignRelationTx(txCtx, dto)
 		if err != nil {
-			return errors.Wrap(err, "failed to find clinician")
+			return err
 		}
-		if clinicianItem.OrgID() != dto.OrgID {
-			return errors.WithCode(code.ErrInvalidArgument, "clinician does not belong to the requested organization")
-		}
-
-		testeeItem, err := s.testeeRepo.FindByID(txCtx, domainTestee.ID(dto.TesteeID))
-		if err != nil {
-			return errors.Wrap(err, "failed to find testee")
-		}
-		if testeeItem.OrgID() != dto.OrgID {
-			return errors.WithCode(code.ErrInvalidArgument, "testee does not belong to the requested organization")
-		}
-
-		now := time.Now()
-		if relationshipType == domainRelation.RelationTypePrimary {
-			existingPrimaryRelation, err := s.relationRepo.FindActivePrimaryByTestee(
-				txCtx,
-				dto.OrgID,
-				domainTestee.ID(dto.TesteeID),
-			)
-			if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
-				return errors.Wrap(err, "failed to find active primary relation")
-			}
-			if err == nil && existingPrimaryRelation != nil {
-				if existingPrimaryRelation.ClinicianID() == domainClinician.ID(dto.ClinicianID) {
-					result = existingPrimaryRelation
-					return nil
-				}
-				existingPrimaryRelation.Unbind(now)
-				if err := s.relationRepo.Update(txCtx, existingPrimaryRelation); err != nil {
-					return errors.Wrap(err, "failed to unbind existing primary relation")
-				}
-			}
-		}
-
-		existingRelation, err := s.relationRepo.FindActiveByTypes(
-			txCtx,
-			dto.OrgID,
-			domainClinician.ID(dto.ClinicianID),
-			domainTestee.ID(dto.TesteeID),
-			domainRelation.AccessGrantRelationTypes(),
-		)
-		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
-			return errors.Wrap(err, "failed to find existing access relation")
-		}
-		if err == nil && existingRelation != nil {
-			if existingRelation.RelationType() == relationshipType {
-				result = existingRelation
-				return nil
-			}
-			existingRelation.Unbind(now)
-			if err := s.relationRepo.Update(txCtx, existingRelation); err != nil {
-				return errors.Wrap(err, "failed to replace existing access relation")
-			}
-		}
-
-		result = domainRelation.NewClinicianTesteeRelation(
-			dto.OrgID,
-			domainClinician.ID(dto.ClinicianID),
-			domainTestee.ID(dto.TesteeID),
-			relationshipType,
-			sourceType,
-			dto.SourceID,
-			true,
-			now,
-			nil,
-		)
-		if err := s.relationRepo.Save(txCtx, result); err != nil {
-			return errors.Wrap(err, "failed to save relation")
-		}
+		result = item
 		return nil
 	})
 	if err != nil {
@@ -167,6 +115,91 @@ func (s *relationshipService) assignRelation(ctx context.Context, dto AssignTest
 	}
 
 	return toRelationResult(result), nil
+}
+
+func (s *relationshipService) assignRelationTx(ctx context.Context, dto AssignTesteeDTO) (*domainRelation.ClinicianTesteeRelation, error) {
+	relationshipType, err := normalizeAssignmentRelationType(dto.RelationType)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceType := domainRelation.SourceType(dto.SourceType)
+	if sourceType == "" {
+		sourceType = domainRelation.SourceTypeManual
+	}
+
+	clinicianItem, err := s.clinicianRepo.FindByID(ctx, domainClinician.ID(dto.ClinicianID))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find clinician")
+	}
+	if clinicianItem.OrgID() != dto.OrgID {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "clinician does not belong to the requested organization")
+	}
+
+	testeeItem, err := s.testeeRepo.FindByID(ctx, domainTestee.ID(dto.TesteeID))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find testee")
+	}
+	if testeeItem.OrgID() != dto.OrgID {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "testee does not belong to the requested organization")
+	}
+
+	now := time.Now()
+	if relationshipType == domainRelation.RelationTypePrimary {
+		existingPrimaryRelation, err := s.relationRepo.FindActivePrimaryByTestee(
+			ctx,
+			dto.OrgID,
+			domainTestee.ID(dto.TesteeID),
+		)
+		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+			return nil, errors.Wrap(err, "failed to find active primary relation")
+		}
+		if err == nil && existingPrimaryRelation != nil {
+			if existingPrimaryRelation.ClinicianID() == domainClinician.ID(dto.ClinicianID) {
+				return existingPrimaryRelation, nil
+			}
+			existingPrimaryRelation.Unbind(now)
+			if err := s.relationRepo.Update(ctx, existingPrimaryRelation); err != nil {
+				return nil, errors.Wrap(err, "failed to unbind existing primary relation")
+			}
+		}
+	}
+
+	existingRelation, err := s.relationRepo.FindActiveByTypes(
+		ctx,
+		dto.OrgID,
+		domainClinician.ID(dto.ClinicianID),
+		domainTestee.ID(dto.TesteeID),
+		domainRelation.AccessGrantRelationTypes(),
+	)
+	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+		return nil, errors.Wrap(err, "failed to find existing access relation")
+	}
+	if err == nil && existingRelation != nil {
+		if existingRelation.RelationType() == relationshipType {
+			return existingRelation, nil
+		}
+		existingRelation.Unbind(now)
+		if err := s.relationRepo.Update(ctx, existingRelation); err != nil {
+			return nil, errors.Wrap(err, "failed to replace existing access relation")
+		}
+	}
+
+	result := domainRelation.NewClinicianTesteeRelation(
+		dto.OrgID,
+		domainClinician.ID(dto.ClinicianID),
+		domainTestee.ID(dto.TesteeID),
+		relationshipType,
+		sourceType,
+		dto.SourceID,
+		true,
+		now,
+		nil,
+	)
+	if err := s.relationRepo.Save(ctx, result); err != nil {
+		return nil, errors.Wrap(err, "failed to save relation")
+	}
+	return result, nil
 }
 
 func (s *relationshipService) UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error) {

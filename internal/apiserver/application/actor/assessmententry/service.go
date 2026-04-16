@@ -26,6 +26,7 @@ type service struct {
 	guardianshipSvc *iam.GuardianshipService
 	resolveLog      ResolveLogWriter
 	intakeLog       IntakeLogWriter
+	behaviorEvents  BehaviorEventStager
 	uow             *mysql.UnitOfWork
 }
 
@@ -40,6 +41,7 @@ func NewService(
 	guardianshipSvc *iam.GuardianshipService,
 	resolveLog ResolveLogWriter,
 	intakeLog IntakeLogWriter,
+	behaviorEvents BehaviorEventStager,
 	uow *mysql.UnitOfWork,
 ) AssessmentEntryService {
 	return &service{
@@ -52,6 +54,7 @@ func NewService(
 		guardianshipSvc: guardianshipSvc,
 		resolveLog:      resolveLog,
 		intakeLog:       intakeLog,
+		behaviorEvents:  behaviorEvents,
 		uow:             uow,
 	}
 }
@@ -157,14 +160,26 @@ func (s *service) ListByClinician(ctx context.Context, dto ListAssessmentEntryDT
 }
 
 func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmentEntryResult, error) {
-	entry, clinicianItem, err := s.resolveEntry(ctx, token)
+	var (
+		entry         *domainAssessmentEntry.AssessmentEntry
+		clinicianItem *domainClinician.Clinician
+	)
+	resolvedAt := time.Now()
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		entry, clinicianItem, err = s.resolveEntry(txCtx, token)
+		if err != nil {
+			return err
+		}
+		if s.behaviorEvents != nil {
+			if err := s.behaviorEvents.StageEntryOpened(txCtx, entry.OrgID(), uint64(entry.ClinicianID()), entry.ID().Uint64(), resolvedAt); err != nil {
+				return errors.Wrap(err, "failed to stage assessment entry opened behavior event")
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	if s.resolveLog != nil {
-		if err := s.resolveLog.LogResolve(ctx, entry.OrgID(), uint64(entry.ClinicianID()), entry.ID().Uint64(), time.Now()); err != nil {
-			return nil, errors.Wrap(err, "failed to record assessment entry resolve")
-		}
 	}
 
 	return &ResolvedAssessmentEntryResult{
@@ -182,6 +197,7 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 		assignment        *RelationSummaryResult
 		testeeCreated     bool
 		assignmentCreated bool
+		intakeAt          = time.Now()
 	)
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -294,18 +310,24 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 
 		assignment = toRelationSummaryResult(assignedRelation)
 
-		if s.intakeLog != nil {
-			if err := s.intakeLog.LogIntake(
-				txCtx,
-				entry.OrgID(),
-				uint64(entry.ClinicianID()),
-				entry.ID().Uint64(),
-				testeeItem.ID().Uint64(),
-				time.Now(),
-				testeeCreated,
-				assignmentCreated,
-			); err != nil {
-				return errors.Wrap(err, "failed to record assessment entry intake")
+		if s.behaviorEvents != nil {
+			orgID := entry.OrgID()
+			clinicianID := uint64(entry.ClinicianID())
+			entryID := entry.ID().Uint64()
+			testeeID := testeeItem.ID().Uint64()
+
+			if err := s.behaviorEvents.StageIntakeConfirmed(txCtx, orgID, clinicianID, entryID, testeeID, intakeAt); err != nil {
+				return errors.Wrap(err, "failed to stage intake confirmed behavior event")
+			}
+			if testeeCreated {
+				if err := s.behaviorEvents.StageTesteeProfileCreated(txCtx, orgID, clinicianID, entryID, testeeID, intakeAt); err != nil {
+					return errors.Wrap(err, "failed to stage testee profile created behavior event")
+				}
+			}
+			if assignmentCreated {
+				if err := s.behaviorEvents.StageCareRelationshipEstablished(txCtx, orgID, clinicianID, entryID, testeeID, intakeAt); err != nil {
+					return errors.Wrap(err, "failed to stage care relationship established behavior event")
+				}
 			}
 		}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -120,7 +121,11 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 		"assessment_id", a.ID().Uint64(),
 		"action", "save",
 	)
-	if err := s.repo.Save(ctx, a); err != nil {
+	occurredAt := time.Now()
+	additionalEvents := []event.DomainEvent{
+		domainStatistics.NewFootprintAssessmentCreatedEvent(int64(dto.OrgID), dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
+	}
+	if err := s.repo.SaveWithAdditionalEvents(ctx, a, additionalEvents); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", a.ID().Uint64(),
 			"action", "create_assessment",

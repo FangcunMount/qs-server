@@ -47,6 +47,15 @@ func WithTx(ctx context.Context, tx *gorm.DB) context.Context {
 	return context.WithValue(ctx, txKey{}, tx)
 }
 
+// TxFromContext extracts a transaction handle from context when present.
+func TxFromContext(ctx context.Context) (*gorm.DB, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+	tx, ok := ctx.Value(txKey{}).(*gorm.DB)
+	return tx, ok && tx != nil
+}
+
 // SetErrorTranslator registers a function to translate DB errors into
 // domain/business errors. This allows repositories to map driver-specific
 // messages (unique constraint, duplicate entry) to structured errors.
@@ -64,7 +73,7 @@ func (r *BaseRepository[T]) DB() *gorm.DB {
 // Otherwise, it uses the default DB connection.
 func (r *BaseRepository[T]) WithContext(ctx context.Context) *gorm.DB {
 	// 尝试从 context 中提取事务
-	if tx, ok := ctx.Value(txKey{}).(*gorm.DB); ok && tx != nil {
+	if tx, ok := TxFromContext(ctx); ok {
 		return tx.WithContext(ctx)
 	}
 	return r.db.WithContext(ctx)

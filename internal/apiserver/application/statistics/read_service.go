@@ -31,6 +31,33 @@ type readService struct {
 	answerSheetRepo surveyAnswerSheet.Repository
 }
 
+// 供给侧资源窗口：入口是否被创建/发布，和用户旅程无关。
+type orgSupplyWindow struct {
+	EntryCreatedCount int64
+}
+
+// 行为/服务过程窗口：从打开入口到结果就绪。
+type orgBehaviorWindow struct {
+	EntryOpenedCount       int64
+	IntakeConfirmedCount   int64
+	NewTestees             int64
+	CareEstablishedCount   int64
+	AssessmentCreatedCount int64
+	ReportGeneratedCount   int64
+}
+
+type clinicianSupplyWindow struct {
+	EntryCreatedCount int64
+}
+
+type clinicianBehaviorWindow struct {
+	EntryOpenedCount       int64
+	IntakeConfirmedCount   int64
+	CareEstablishedCount   int64
+	AssessmentCreatedCount int64
+	ReportGeneratedCount   int64
+}
+
 // NewReadService 创建统一统计读服务。
 func NewReadService(db *gorm.DB, answerSheetRepo surveyAnswerSheet.Repository) ReadService {
 	return &readService{db: db, answerSheetRepo: answerSheetRepo}
@@ -43,7 +70,7 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 	}
 
 	snapshot := domainStatistics.OrgOverviewSnapshot{}
-	window := domainStatistics.OrgOverviewWindow{}
+	var window domainStatistics.OrgOverviewWindow
 
 	if err := s.db.WithContext(ctx).Model(&actorInfra.TesteePO{}).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
@@ -72,83 +99,14 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		return nil, err
 	}
 
-	if err := s.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Where("created_at >= ? AND created_at < ?", timeRange.From, timeRange.To).
-		Count(&window.EntryCreatedCount).Error; err != nil {
-		return nil, err
-	}
-	if err := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryResolveLogPO{}).
-		Where("org_id = ?", orgID).
-		Where("resolved_at >= ? AND resolved_at < ?", timeRange.From, timeRange.To).
-		Count(&window.EntryResolvedCount).Error; err != nil {
-		return nil, err
-	}
-	if err := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To).
-		Count(&window.EntryIntakeCount).Error; err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log").
-		Select("COUNT(DISTINCT testee_id) AS count").
-		Where("org_id = ? AND testee_created = ? AND deleted_at IS NULL", orgID, true).
-		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
-		&window.NewTestees); err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log").
-		Select("COUNT(DISTINCT testee_id) AS count").
-		Where("org_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, true).
-		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
-		&window.RelationAssignedCount); err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log l").
-		Select("COUNT(DISTINCT a.id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
-		Where("l.org_id = ? AND l.deleted_at IS NULL", orgID).
-		Where("a.created_at >= ? AND a.created_at < ?", timeRange.From, timeRange.To),
-		&window.AssessmentCreatedCount); err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log l").
-		Select("COUNT(DISTINCT a.id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
-		Where("l.org_id = ? AND l.deleted_at IS NULL", orgID).
-		Where("a.status = ? AND a.interpreted_at >= ? AND a.interpreted_at < ?", "interpreted", timeRange.From, timeRange.To),
-		&window.AssessmentCompletedCount); err != nil {
+	if window, err = s.queryOrgOverviewWindow(ctx, orgID, timeRange.From, timeRange.To); err != nil {
 		return nil, err
 	}
 
 	trend := domainStatistics.OrgOverviewTrend{
-		Assessments: s.queryDailyDistinctCounts(
-			s.db.WithContext(ctx).
-				Table("assessment_entry_intake_log l").
-				Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
-				Where("l.org_id = ? AND l.deleted_at IS NULL", orgID).
-				Where("a.created_at >= ? AND a.created_at < ?", timeRange.From, timeRange.To),
-			"a.created_at",
-			"a.id",
-		),
-		Intakes: s.queryDailyCounts(ctx,
-			"assessment_entry_intake_log",
-			"intake_at",
-			"org_id = ? AND deleted_at IS NULL AND intake_at >= ? AND intake_at < ?",
-			orgID, timeRange.From, timeRange.To,
-		),
-		Assignments: s.queryDailyDistinctCounts(
-			s.db.WithContext(ctx).
-				Table("assessment_entry_intake_log").
-				Where("org_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, true).
-				Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
-			"intake_at",
-			"testee_id",
-		),
+		Assessments: s.queryOrgProjectionDailyCounts(ctx, orgID, "assessment_created_count", timeRange.From, timeRange.To),
+		Intakes:     s.queryOrgProjectionDailyCounts(ctx, orgID, "intake_confirmed_count", timeRange.From, timeRange.To),
+		Assignments: s.queryOrgProjectionDailyCounts(ctx, orgID, "care_relationship_established_count", timeRange.From, timeRange.To),
 	}
 	trend.Assessments = fillMissingDailyCounts(timeRange.From, timeRange.To, trend.Assessments)
 	trend.Intakes = fillMissingDailyCounts(timeRange.From, timeRange.To, trend.Intakes)
@@ -462,60 +420,8 @@ func (s *readService) buildClinicianStatistics(ctx context.Context, orgID int64,
 		return nil, err
 	}
 
-	window := domainStatistics.ClinicianStatisticsWindow{}
-	if err := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
-		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinician.ID).
-		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To).
-		Count(&window.IntakeCount).Error; err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log").
-		Select("COUNT(DISTINCT testee_id) AS count").
-		Where("org_id = ? AND clinician_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, clinician.ID, true).
-		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
-		&window.AssignedCount); err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log l").
-		Select("COUNT(DISTINCT a.id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
-		Where("l.org_id = ? AND l.clinician_id = ? AND l.deleted_at IS NULL", orgID, clinician.ID).
-		Where("a.status = ? AND a.interpreted_at >= ? AND a.interpreted_at < ?", "interpreted", timeRange.From, timeRange.To),
-		&window.CompletedAssessmentCount); err != nil {
-		return nil, err
-	}
-
-	funnel := domainStatistics.ClinicianStatisticsFunnel{}
-	if err := s.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
-		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinician.ID).
-		Where("created_at >= ? AND created_at < ?", timeRange.From, timeRange.To).
-		Count(&funnel.CreatedCount).Error; err != nil {
-		return nil, err
-	}
-	if err := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryResolveLogPO{}).
-		Where("org_id = ? AND clinician_id = ?", orgID, clinician.ID).
-		Where("resolved_at >= ? AND resolved_at < ?", timeRange.From, timeRange.To).
-		Count(&funnel.ResolvedCount).Error; err != nil {
-		return nil, err
-	}
-	funnel.IntakeCount = window.IntakeCount
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log").
-		Select("COUNT(DISTINCT testee_id) AS count").
-		Where("org_id = ? AND clinician_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, clinician.ID, true).
-		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
-		&funnel.AssignedCount); err != nil {
-		return nil, err
-	}
-	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log l").
-		Select("COUNT(DISTINCT a.id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
-		Where("l.org_id = ? AND l.clinician_id = ? AND l.deleted_at IS NULL", orgID, clinician.ID).
-		Where("a.created_at >= ? AND a.created_at < ?", timeRange.From, timeRange.To),
-		&funnel.AssessmentCount); err != nil {
+	window, funnel, err := s.queryClinicianProjectionStats(ctx, orgID, clinician.ID.Uint64(), timeRange.From, timeRange.To)
+	if err != nil {
 		return nil, err
 	}
 
@@ -611,9 +517,14 @@ func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, ent
 
 	lastResolvedAt, err := s.queryNullableMaxTime(
 		s.db.WithContext(ctx).
-			Model(&statisticsInfra.AssessmentEntryResolveLogPO{}).
-			Select("MAX(resolved_at)").
-			Where("org_id = ? AND entry_id = ?", orgID, entry.ID.Uint64()),
+			Model(&statisticsInfra.BehaviorFootprintPO{}).
+			Select("MAX(occurred_at)").
+			Where("org_id = ? AND subject_type = ? AND subject_id = ? AND event_name = ? AND deleted_at IS NULL",
+				orgID,
+				"assessment_entry",
+				entry.ID.Uint64(),
+				string(domainStatistics.BehaviorEventEntryOpened),
+			),
 	)
 	if err != nil {
 		return nil, err
@@ -622,9 +533,13 @@ func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, ent
 
 	lastIntakeAt, err := s.queryNullableMaxTime(
 		s.db.WithContext(ctx).
-			Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
-			Select("MAX(intake_at)").
-			Where("org_id = ? AND entry_id = ? AND deleted_at IS NULL", orgID, entry.ID.Uint64()),
+			Model(&statisticsInfra.BehaviorFootprintPO{}).
+			Select("MAX(occurred_at)").
+			Where("org_id = ? AND entry_id = ? AND event_name = ? AND deleted_at IS NULL",
+				orgID,
+				entry.ID.Uint64(),
+				string(domainStatistics.BehaviorEventIntakeConfirmed),
+			),
 	)
 	if err != nil {
 		return nil, err
@@ -635,100 +550,204 @@ func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, ent
 }
 
 func (s *readService) queryEntryCounts(ctx context.Context, orgID int64, entryID uint64, from, to *time.Time) (domainStatistics.AssessmentEntryStatisticsCounts, error) {
-	counts := domainStatistics.AssessmentEntryStatisticsCounts{}
-
-	resolveQuery := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryResolveLogPO{}).
-		Where("org_id = ? AND entry_id = ?", orgID, entryID)
+	type projectionRow struct {
+		EntryOpenedCount       sql.NullInt64
+		IntakeConfirmedCount   sql.NullInt64
+		CareEstablishedCount   sql.NullInt64
+		AssessmentCreatedCount sql.NullInt64
+	}
+	query := s.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsProjectionEntryDailyPO{}).
+		Select(`
+			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
+			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
+			COALESCE(SUM(care_relationship_established_count), 0) AS care_established_count,
+			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count
+		`).
+		Where("org_id = ? AND entry_id = ? AND deleted_at IS NULL",
+			orgID,
+			entryID,
+		)
 	if from != nil && to != nil {
-		resolveQuery = resolveQuery.Where("resolved_at >= ? AND resolved_at < ?", *from, *to)
+		query = query.Where("stat_date >= ? AND stat_date < ?", beginningOfDay(*from), beginningOfDay(*to))
 	}
-	if err := resolveQuery.Count(&counts.ResolveCount).Error; err != nil {
-		return counts, err
+	var row projectionRow
+	if err := query.Scan(&row).Error; err != nil {
+		return domainStatistics.AssessmentEntryStatisticsCounts{}, err
 	}
-
-	intakeQuery := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
-		Where("org_id = ? AND entry_id = ? AND deleted_at IS NULL", orgID, entryID)
-	if from != nil && to != nil {
-		intakeQuery = intakeQuery.Where("intake_at >= ? AND intake_at < ?", *from, *to)
-	}
-	if err := intakeQuery.Count(&counts.IntakeCount).Error; err != nil {
-		return counts, err
-	}
-
-	assignedQuery := s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log").
-		Select("COUNT(DISTINCT testee_id) AS count").
-		Where("org_id = ? AND entry_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, entryID, true)
-	if from != nil && to != nil {
-		assignedQuery = assignedQuery.Where("intake_at >= ? AND intake_at < ?", *from, *to)
-	}
-	if err := scanCountQuery(assignedQuery, &counts.AssignedCount); err != nil {
-		return counts, err
-	}
-
-	assessmentQuery := s.db.WithContext(ctx).
-		Table("assessment_entry_intake_log l").
-		Select("COUNT(DISTINCT a.id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
-		Where("l.org_id = ? AND l.entry_id = ? AND l.deleted_at IS NULL", orgID, entryID)
-	if from != nil && to != nil {
-		assessmentQuery = assessmentQuery.Where("a.created_at >= ? AND a.created_at < ?", *from, *to)
-	}
-	if err := scanCountQuery(assessmentQuery, &counts.AssessmentCount); err != nil {
-		return counts, err
-	}
-
-	return counts, nil
+	return domainStatistics.AssessmentEntryStatisticsCounts{
+		ResolveCount:    row.EntryOpenedCount.Int64,
+		IntakeCount:     row.IntakeConfirmedCount.Int64,
+		AssignedCount:   row.CareEstablishedCount.Int64,
+		AssessmentCount: row.AssessmentCreatedCount.Int64,
+	}, nil
 }
 
-func (s *readService) queryDailyCounts(ctx context.Context, tableName, timeColumn, whereClause string, args ...interface{}) []domainStatistics.DailyCount {
+func (s *readService) queryOrgOverviewWindow(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.OrgOverviewWindow, error) {
+	supply, err := s.queryOrgSupplyWindow(ctx, orgID, from, to)
+	if err != nil {
+		return domainStatistics.OrgOverviewWindow{}, err
+	}
+	behavior, err := s.queryOrgBehaviorWindow(ctx, orgID, from, to)
+	if err != nil {
+		return domainStatistics.OrgOverviewWindow{}, err
+	}
+	return domainStatistics.OrgOverviewWindow{
+		NewTestees:               behavior.NewTestees,
+		EntryCreatedCount:        supply.EntryCreatedCount,
+		EntryResolvedCount:       behavior.EntryOpenedCount,
+		EntryIntakeCount:         behavior.IntakeConfirmedCount,
+		RelationAssignedCount:    behavior.CareEstablishedCount,
+		AssessmentCreatedCount:   behavior.AssessmentCreatedCount,
+		AssessmentCompletedCount: behavior.ReportGeneratedCount,
+	}, nil
+}
+
+func (s *readService) queryClinicianProjectionStats(ctx context.Context, orgID int64, clinicianID uint64, from, to time.Time) (domainStatistics.ClinicianStatisticsWindow, domainStatistics.ClinicianStatisticsFunnel, error) {
+	supply, behavior, err := s.queryClinicianSupplyAndBehaviorWindow(ctx, orgID, clinicianID, from, to)
+	if err != nil {
+		return domainStatistics.ClinicianStatisticsWindow{}, domainStatistics.ClinicianStatisticsFunnel{}, err
+	}
+	window := domainStatistics.ClinicianStatisticsWindow{
+		IntakeCount:              behavior.IntakeConfirmedCount,
+		AssignedCount:            behavior.CareEstablishedCount,
+		CompletedAssessmentCount: behavior.ReportGeneratedCount,
+	}
+	funnel := domainStatistics.ClinicianStatisticsFunnel{
+		CreatedCount:    supply.EntryCreatedCount,
+		ResolvedCount:   behavior.EntryOpenedCount,
+		IntakeCount:     behavior.IntakeConfirmedCount,
+		AssignedCount:   behavior.CareEstablishedCount,
+		AssessmentCount: behavior.AssessmentCreatedCount,
+	}
+	return window, funnel, nil
+}
+
+func (s *readService) queryOrgProjectionDailyCounts(ctx context.Context, orgID int64, field string, from, to time.Time) []domainStatistics.DailyCount {
 	type row struct {
 		StatDate time.Time
 		Count    int64
 	}
 	var rows []row
 	if err := s.db.WithContext(ctx).
-		Table(tableName).
-		Select(fmt.Sprintf("DATE(%s) AS stat_date, COUNT(*) AS count", timeColumn)).
-		Where(whereClause, args...).
-		Group(fmt.Sprintf("DATE(%s)", timeColumn)).
+		Model(&statisticsInfra.AnalyticsProjectionOrgDailyPO{}).
+		Select(fmt.Sprintf("stat_date, COALESCE(%s, 0) AS count", field)).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID,
+			beginningOfDay(from),
+			beginningOfDay(to),
+		).
 		Order("stat_date ASC").
 		Scan(&rows).Error; err != nil {
 		return []domainStatistics.DailyCount{}
 	}
-
 	result := make([]domainStatistics.DailyCount, 0, len(rows))
 	for _, item := range rows {
-		result = append(result, domainStatistics.DailyCount{
-			Date:  item.StatDate,
-			Count: item.Count,
-		})
+		result = append(result, domainStatistics.DailyCount{Date: item.StatDate, Count: item.Count})
 	}
 	return result
 }
 
-func (s *readService) queryDailyDistinctCounts(query *gorm.DB, timeColumn, distinctColumn string) []domainStatistics.DailyCount {
-	type row struct {
-		StatDate time.Time
-		Count    int64
+func (s *readService) queryOrgSupplyWindow(ctx context.Context, orgID int64, from, to time.Time) (orgSupplyWindow, error) {
+	var window orgSupplyWindow
+	if err := s.db.WithContext(ctx).
+		Model(&actorInfra.AssessmentEntryPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Where("created_at >= ? AND created_at < ?", from, to).
+		Count(&window.EntryCreatedCount).Error; err != nil {
+		return orgSupplyWindow{}, err
 	}
-	var rows []row
-	if err := query.
-		Select(fmt.Sprintf("DATE(%s) AS stat_date, COUNT(DISTINCT %s) AS count", timeColumn, distinctColumn)).
-		Group(fmt.Sprintf("DATE(%s)", timeColumn)).
-		Order("stat_date ASC").
-		Scan(&rows).Error; err != nil {
-		return []domainStatistics.DailyCount{}
+	return window, nil
+}
+
+func (s *readService) queryOrgBehaviorWindow(ctx context.Context, orgID int64, from, to time.Time) (orgBehaviorWindow, error) {
+	type projectionRow struct {
+		EntryOpenedCount       sql.NullInt64
+		IntakeConfirmedCount   sql.NullInt64
+		NewTestees             sql.NullInt64
+		CareEstablishedCount   sql.NullInt64
+		AssessmentCreatedCount sql.NullInt64
+		ReportGeneratedCount   sql.NullInt64
+	}
+	var row projectionRow
+	err := s.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsProjectionOrgDailyPO{}).
+		Select(`
+			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
+			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
+			COALESCE(SUM(testee_profile_created_count), 0) AS new_testees,
+			COALESCE(SUM(care_relationship_established_count), 0) AS care_established_count,
+			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count,
+			COALESCE(SUM(report_generated_count), 0) AS report_generated_count
+		`).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID,
+			beginningOfDay(from),
+			beginningOfDay(to),
+		).
+		Scan(&row).Error
+	if err != nil {
+		return orgBehaviorWindow{}, err
+	}
+	return orgBehaviorWindow{
+		EntryOpenedCount:       row.EntryOpenedCount.Int64,
+		IntakeConfirmedCount:   row.IntakeConfirmedCount.Int64,
+		NewTestees:             row.NewTestees.Int64,
+		CareEstablishedCount:   row.CareEstablishedCount.Int64,
+		AssessmentCreatedCount: row.AssessmentCreatedCount.Int64,
+		ReportGeneratedCount:   row.ReportGeneratedCount.Int64,
+	}, nil
+}
+
+func (s *readService) queryClinicianSupplyAndBehaviorWindow(ctx context.Context, orgID int64, clinicianID uint64, from, to time.Time) (clinicianSupplyWindow, clinicianBehaviorWindow, error) {
+	var supply clinicianSupplyWindow
+	if err := s.db.WithContext(ctx).
+		Model(&actorInfra.AssessmentEntryPO{}).
+		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinicianID).
+		Where("created_at >= ? AND created_at < ?", from, to).
+		Count(&supply.EntryCreatedCount).Error; err != nil {
+		return clinicianSupplyWindow{}, clinicianBehaviorWindow{}, err
 	}
 
-	result := make([]domainStatistics.DailyCount, 0, len(rows))
-	for _, item := range rows {
-		result = append(result, domainStatistics.DailyCount{
-			Date:  item.StatDate,
-			Count: item.Count,
-		})
+	type projectionRow struct {
+		EntryOpenedCount       sql.NullInt64
+		IntakeConfirmedCount   sql.NullInt64
+		CareEstablishedCount   sql.NullInt64
+		AssessmentCreatedCount sql.NullInt64
+		ReportGeneratedCount   sql.NullInt64
 	}
-	return result
+	var row projectionRow
+	err := s.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsProjectionClinicianDailyPO{}).
+		Select(`
+			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
+			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
+			COALESCE(SUM(care_relationship_established_count), 0) AS care_established_count,
+			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count,
+			COALESCE(SUM(report_generated_count), 0) AS report_generated_count
+		`).
+		Where("org_id = ? AND clinician_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID,
+			clinicianID,
+			beginningOfDay(from),
+			beginningOfDay(to),
+		).
+		Scan(&row).Error
+	if err != nil {
+		return clinicianSupplyWindow{}, clinicianBehaviorWindow{}, err
+	}
+	behavior := clinicianBehaviorWindow{
+		EntryOpenedCount:       row.EntryOpenedCount.Int64,
+		IntakeConfirmedCount:   row.IntakeConfirmedCount.Int64,
+		CareEstablishedCount:   row.CareEstablishedCount.Int64,
+		AssessmentCreatedCount: row.AssessmentCreatedCount.Int64,
+		ReportGeneratedCount:   row.ReportGeneratedCount.Int64,
+	}
+	return supply, behavior, nil
+}
+
+func beginningOfDay(v time.Time) time.Time {
+	return time.Date(v.Year(), v.Month(), v.Day(), 0, 0, 0, 0, v.Location())
 }
 
 func normalizeQueryFilter(filter QueryFilter) (domainStatistics.StatisticsTimeRange, error) {

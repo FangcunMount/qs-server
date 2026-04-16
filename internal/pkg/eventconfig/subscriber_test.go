@@ -28,8 +28,8 @@ func TestSubscriberGetTopicsToSubscribe(t *testing.T) {
 	}
 
 	subs := sub.GetTopicsToSubscribe()
-	if len(subs) != 3 {
-		t.Fatalf("expected 3 topic subscriptions, got %d", len(subs))
+	if len(subs) != 4 {
+		t.Fatalf("expected 4 topic subscriptions, got %d", len(subs))
 	}
 
 	for _, sub := range subs {

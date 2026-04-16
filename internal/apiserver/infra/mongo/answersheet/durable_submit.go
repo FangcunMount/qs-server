@@ -8,9 +8,11 @@ import (
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	appAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -100,7 +102,15 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 			return err
 		}
 
-		if err := r.outboxStore.StageEventsTx(txCtx, sheet.Events()); err != nil {
+		events := append([]event.DomainEvent{}, sheet.Events()...)
+		events = append(events, domainStatistics.NewFootprintAnswerSheetSubmittedEvent(
+			int64(metaInfo.OrgID),
+			metaInfo.TesteeID,
+			sheet.ID().Uint64(),
+			sheet.FilledAt(),
+		))
+
+		if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
 			return err
 		}
 

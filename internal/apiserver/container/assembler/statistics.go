@@ -33,6 +33,7 @@ type StatisticsModule struct {
 	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	ValidatorService               statisticsApp.StatisticsValidatorService
+	BehaviorProjectorService       statisticsApp.BehaviorProjectorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
 }
 
@@ -87,6 +88,7 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(mysqlDB, m.Repo, m.Cache)
 	m.ReadService = statisticsApp.NewReadService(mysqlDB, answerSheetRepo)
 	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(mysqlDB)
+	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(mysqlDB, m.Repo)
 
 	// 初始化同步和校验服务
 	if m.Cache != nil {

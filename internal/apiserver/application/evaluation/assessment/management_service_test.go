@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type managementRepoStub struct {
@@ -29,6 +30,20 @@ func (r *managementRepoStub) SaveWithEvents(_ context.Context, a *domain.Assessm
 	r.assessment = a
 	r.savedEventTypes = r.savedEventTypes[:0]
 	for _, evt := range a.Events() {
+		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
+	}
+	a.ClearEvents()
+	return nil
+}
+
+func (r *managementRepoStub) SaveWithAdditionalEvents(_ context.Context, a *domain.Assessment, additional []event.DomainEvent) error {
+	r.savedWithEvents = a
+	r.assessment = a
+	r.savedEventTypes = r.savedEventTypes[:0]
+	for _, evt := range a.Events() {
+		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
+	}
+	for _, evt := range additional {
 		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
 	}
 	a.ClearEvents()

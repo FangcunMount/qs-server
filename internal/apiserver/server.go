@@ -281,6 +281,7 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	s.startStatisticsSyncScheduler()
 	s.startMongoOutboxRelay()
 	s.startAssessmentOutboxRelay()
+	s.startBehaviorPendingReconcile()
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
@@ -528,6 +529,48 @@ func (s *apiServer) startAssessmentOutboxRelay() {
 	}()
 
 	log.Infof("assessment outbox relay started (interval=%s)", interval)
+}
+
+// startBehaviorPendingReconcile 启动 behavior pending 事件归因重试任务。
+func (s *apiServer) startBehaviorPendingReconcile() {
+	if s.container == nil || s.container.StatisticsModule == nil {
+		return
+	}
+
+	projector := s.container.StatisticsModule.BehaviorProjectorService
+	if projector == nil {
+		return
+	}
+
+	const (
+		interval = 10 * time.Second
+		limit    = 100
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
+		cancel()
+		return nil
+	}))
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			if _, err := projector.ReconcilePendingBehaviorEvents(ctx, limit); err != nil {
+				log.Warnf("behavior pending reconcile failed: %v", err)
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+
+	log.Infof("behavior pending reconcile started (interval=%s, limit=%d)", interval, limit)
 }
 
 // buildGenericServer 构建通用服务器

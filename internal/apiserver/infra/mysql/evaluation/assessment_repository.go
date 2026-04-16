@@ -11,6 +11,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/pkg/event"
 	"gorm.io/gorm"
 )
 
@@ -57,6 +58,11 @@ func (r *assessmentRepository) Save(ctx context.Context, a *assessment.Assessmen
 
 // SaveWithEvents 保存测评并将聚合上的事件落到 MySQL outbox。
 func (r *assessmentRepository) SaveWithEvents(ctx context.Context, a *assessment.Assessment) error {
+	return r.SaveWithAdditionalEvents(ctx, a, nil)
+}
+
+// SaveWithAdditionalEvents 保存测评并在同一事务里暂存聚合事件与补充事件。
+func (r *assessmentRepository) SaveWithAdditionalEvents(ctx context.Context, a *assessment.Assessment, additional []event.DomainEvent) error {
 	if a == nil {
 		return nil
 	}
@@ -66,10 +72,13 @@ func (r *assessmentRepository) SaveWithEvents(ctx context.Context, a *assessment
 		if err := r.Save(txCtx, a); err != nil {
 			return err
 		}
-		if len(a.Events()) == 0 {
+		eventsToStage := make([]event.DomainEvent, 0, len(a.Events())+len(additional))
+		eventsToStage = append(eventsToStage, a.Events()...)
+		eventsToStage = append(eventsToStage, additional...)
+		if len(eventsToStage) == 0 {
 			return nil
 		}
-		return r.outboxStore.StageEventsTx(tx, a.Events())
+		return r.outboxStore.StageEventsTx(tx, eventsToStage)
 	})
 	if err != nil {
 		return err

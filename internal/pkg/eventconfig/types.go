@@ -39,6 +39,26 @@ const (
 	ReportGenerated = "report.generated"
 )
 
+// Analytics / Behavior 领域
+const (
+	// FootprintEntryOpened 用户成功打开入口
+	FootprintEntryOpened = "footprint.entry_opened"
+	// FootprintIntakeConfirmed 完成一次接入
+	FootprintIntakeConfirmed = "footprint.intake_confirmed"
+	// FootprintTesteeProfileCreated 新建受试者档案
+	FootprintTesteeProfileCreated = "footprint.testee_profile_created"
+	// FootprintCareRelationshipEstablished 建立看护/服务关系
+	FootprintCareRelationshipEstablished = "footprint.care_relationship_established"
+	// FootprintCareRelationshipTransferred 转移看护关系
+	FootprintCareRelationshipTransferred = "footprint.care_relationship_transferred"
+	// FootprintAnswerSheetSubmitted 提交答卷
+	FootprintAnswerSheetSubmitted = "footprint.answersheet_submitted"
+	// FootprintAssessmentCreated 形成测评
+	FootprintAssessmentCreated = "footprint.assessment_created"
+	// FootprintReportGenerated 产出报告
+	FootprintReportGenerated = "footprint.report_generated"
+)
+
 // Scale 领域
 const (
 	// ScaleChanged 量表生命周期变化
@@ -71,6 +91,15 @@ func EventTypes() []string {
 		AssessmentFailed,
 		// Report
 		ReportGenerated,
+		// Behavior footprint
+		FootprintEntryOpened,
+		FootprintIntakeConfirmed,
+		FootprintTesteeProfileCreated,
+		FootprintCareRelationshipEstablished,
+		FootprintCareRelationshipTransferred,
+		FootprintAnswerSheetSubmitted,
+		FootprintAssessmentCreated,
+		FootprintReportGenerated,
 		// Scale
 		ScaleChanged,
 		// Task

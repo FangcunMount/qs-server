@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func init() {
@@ -167,6 +169,20 @@ func handleAssessmentFailed(deps *Dependencies) HandlerFunc {
 			slog.String("reason", data.Reason),
 			slog.Time("failed_at", data.FailedAt),
 		)
+
+		if deps.InternalClient != nil {
+			if _, err := deps.InternalClient.ProjectBehaviorEvent(ctx, &pb.ProjectBehaviorEventRequest{
+				EventId:       env.ID,
+				EventType:     eventType,
+				OrgId:         data.OrgID,
+				TesteeId:      data.TesteeID,
+				AssessmentId:  uint64(data.AssessmentID),
+				FailureReason: data.Reason,
+				OccurredAt:    timestamppb.New(data.FailedAt),
+			}); err != nil {
+				return fmt.Errorf("failed to project assessment failed behavior: %w", err)
+			}
+		}
 
 		return nil
 	}

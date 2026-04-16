@@ -33,6 +33,13 @@ func (r *fakeAssessmentRepo) SaveWithEvents(_ context.Context, assessment *domai
 	return nil
 }
 
+func (r *fakeAssessmentRepo) SaveWithAdditionalEvents(_ context.Context, assessment *domainAssessment.Assessment, _ []event.DomainEvent) error {
+	r.assessment = assessment
+	r.saveCalls++
+	assessment.ClearEvents()
+	return nil
+}
+
 func (r *fakeAssessmentRepo) FindByID(_ context.Context, _ domainAssessment.ID) (*domainAssessment.Assessment, error) {
 	return r.assessment, nil
 }

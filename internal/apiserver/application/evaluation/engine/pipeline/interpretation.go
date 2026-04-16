@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/interpretation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -426,6 +427,13 @@ func (h *InterpretationHandler) buildSuccessEvents(evalCtx *Context, rpt *domain
 			scaleVersion,
 			rpt.TotalScore(),
 			string(rpt.RiskLevel()),
+			now,
+		),
+		domainStatistics.NewFootprintReportGeneratedEvent(
+			evalCtx.Assessment.OrgID(),
+			testeeID,
+			assessmentID,
+			reportID,
 			now,
 		),
 	}

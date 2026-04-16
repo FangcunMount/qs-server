@@ -80,6 +80,13 @@ func (f *fakeWorkerInternalClient) GenerateScaleQRCode(
 	return &pb.GenerateScaleQRCodeResponse{}, nil
 }
 
+func (f *fakeWorkerInternalClient) ProjectBehaviorEvent(
+	_ context.Context,
+	_ *pb.ProjectBehaviorEventRequest,
+) (*pb.ProjectBehaviorEventResponse, error) {
+	return &pb.ProjectBehaviorEventResponse{Status: "completed"}, nil
+}
+
 func (f *fakeWorkerInternalClient) SendTaskOpenedMiniProgramNotification(
 	_ context.Context,
 	_ int64,

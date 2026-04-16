@@ -27,6 +27,11 @@ func (r *interpretationAssessmentRepoStub) SaveWithEvents(_ context.Context, a *
 	a.ClearEvents()
 	return nil
 }
+func (r *interpretationAssessmentRepoStub) SaveWithAdditionalEvents(_ context.Context, a *domainAssessment.Assessment, _ []event.DomainEvent) error {
+	r.saved = a
+	a.ClearEvents()
+	return nil
+}
 
 func (r *interpretationAssessmentRepoStub) FindByID(context.Context, domainAssessment.ID) (*domainAssessment.Assessment, error) {
 	return nil, nil
@@ -170,14 +175,17 @@ func TestInterpretationHandlerStagesInterpretedAndReportGeneratedInOrder(t *test
 	if reportRepo.testeeID != testeeID {
 		t.Fatalf("expected report save to carry testee id %d, got %d", testeeID, reportRepo.testeeID)
 	}
-	if len(reportRepo.stagedTypes) != 2 {
-		t.Fatalf("expected two staged events, got %d", len(reportRepo.stagedTypes))
+	if len(reportRepo.stagedTypes) != 3 {
+		t.Fatalf("expected three staged events, got %d", len(reportRepo.stagedTypes))
 	}
 	if reportRepo.stagedTypes[0] != domainAssessment.EventTypeInterpreted {
 		t.Fatalf("expected first staged event to be assessment.interpreted, got %s", reportRepo.stagedTypes[0])
 	}
 	if reportRepo.stagedTypes[1] != domainReport.EventTypeGenerated {
 		t.Fatalf("expected second staged event to be report.generated, got %s", reportRepo.stagedTypes[1])
+	}
+	if reportRepo.stagedTypes[2] != "footprint.report_generated" {
+		t.Fatalf("expected third staged event to be footprint.report_generated, got %s", reportRepo.stagedTypes[2])
 	}
 }
 
