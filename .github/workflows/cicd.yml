@@ -1410,7 +1410,6 @@ jobs:
             fi
 
             export DOCKER_IMAGE_QS_WORKER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
-            export COMPOSE_PROJECT_NAME="qs-worker"
 
             GHCR_LOGIN_OK=0
             if [ -n "${GITHUB_TOKEN:-}" ]; then
@@ -1435,34 +1434,45 @@ jobs:
 
             # 启动（使用 compose 扩到多个 worker 实例）
             cd /opt/qs-server/${CONTAINER_NAME}
-            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker
-            $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale qs-worker="${WORKER_REPLICAS}" qs-worker
+            $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" pull qs-worker
+            $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale qs-worker="${WORKER_REPLICAS}" qs-worker
 
             # Worker 无 HTTP 健康检查，检查容器是否正常运行
             echo "Waiting for container to start..."
             sleep 10
 
-            RUNNING_COUNT=$($SUDO docker ps \
-              --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
-              --filter "label=com.docker.compose.service=qs-worker" \
-              --filter "status=running" \
-              --format '{{.Names}}' | wc -l | tr -d ' ')
+            RUNNING_COUNT=$($SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q qs-worker | wc -l | tr -d ' ')
 
             if [ "${RUNNING_COUNT}" -ge "${WORKER_REPLICAS}" ]; then
               echo "✅ Worker replicas are running (${RUNNING_COUNT}/${WORKER_REPLICAS})"
-              $SUDO docker ps \
-                --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
-                --filter "label=com.docker.compose.service=qs-worker" \
-                --format "table {{.Names}}\t{{.Status}}"
+              $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps qs-worker
+              FIRST_WORKER=$($SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q qs-worker | head -n1)
+              if [ -z "${FIRST_WORKER}" ]; then
+                echo "❌ No running worker container found for connectivity check"
+                exit 1
+              fi
+              echo "⏳ Verifying worker can resolve and reach qs-apiserver:9090 ..."
+              READY=0
+              for _ in $(seq 1 20); do
+                if $SUDO docker exec "${FIRST_WORKER}" sh -lc 'getent hosts qs-apiserver >/dev/null 2>&1 && nc -z qs-apiserver 9090 >/dev/null 2>&1'; then
+                  READY=1
+                  break
+                fi
+                sleep 3
+              done
+              if [ "${READY}" -ne 1 ]; then
+                echo "❌ Worker cannot resolve or reach qs-apiserver:9090 from inside container"
+                $SUDO docker exec "${FIRST_WORKER}" sh -lc 'echo "--- /etc/resolv.conf ---"; cat /etc/resolv.conf; echo "--- getent ---"; getent hosts qs-apiserver || true; echo "--- nc ---"; nc -vz qs-apiserver 9090 || true'
+                $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 qs-worker || true
+                exit 1
+              fi
+              echo "✅ Worker can resolve and reach qs-apiserver:9090"
               echo "📋 Recent logs (all worker replicas):"
-              $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 qs-worker
+              $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 qs-worker
             else
               echo "❌ Worker replicas failed to reach expected count (${RUNNING_COUNT}/${WORKER_REPLICAS})"
-              $SUDO docker ps -a \
-                --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
-                --filter "label=com.docker.compose.service=qs-worker" \
-                --format "table {{.Names}}\t{{.Status}}"
-              $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 qs-worker || true
+              $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps qs-worker || true
+              $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 qs-worker || true
               exit 1
             fi
 
