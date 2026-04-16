@@ -72,12 +72,6 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		return nil, err
 	}
 
-	if err := s.db.WithContext(ctx).Model(&actorInfra.TesteePO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Where("created_at >= ? AND created_at < ?", timeRange.From, timeRange.To).
-		Count(&window.NewTestees).Error; err != nil {
-		return nil, err
-	}
 	if err := s.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Where("created_at >= ? AND created_at < ?", timeRange.From, timeRange.To).
@@ -90,49 +84,70 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		Count(&window.EntryResolvedCount).Error; err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).Model(&actorInfra.ClinicianRelationPO{}).
-		Where("org_id = ? AND relation_type = ? AND source_type = ? AND deleted_at IS NULL", orgID, string(actorDomainRelation.RelationTypeCreator), string(actorDomainRelation.SourceTypeAssessmentEntry)).
-		Where("bound_at >= ? AND bound_at < ?", timeRange.From, timeRange.To).
+	if err := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To).
 		Count(&window.EntryIntakeCount).Error; err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).Model(&actorInfra.ClinicianRelationPO{}).
-		Where("org_id = ? AND relation_type IN ? AND deleted_at IS NULL", orgID, accessGrantRelationTypes).
-		Where("bound_at >= ? AND bound_at < ?", timeRange.From, timeRange.To).
-		Count(&window.RelationAssignedCount).Error; err != nil {
+	if err := scanCountQuery(s.db.WithContext(ctx).
+		Table("assessment_entry_intake_log").
+		Select("COUNT(DISTINCT testee_id) AS count").
+		Where("org_id = ? AND testee_created = ? AND deleted_at IS NULL", orgID, true).
+		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
+		&window.NewTestees); err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Where("created_at >= ? AND created_at < ?", timeRange.From, timeRange.To).
-		Count(&window.AssessmentCreatedCount).Error; err != nil {
+	if err := scanCountQuery(s.db.WithContext(ctx).
+		Table("assessment_entry_intake_log").
+		Select("COUNT(DISTINCT testee_id) AS count").
+		Where("org_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, true).
+		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
+		&window.RelationAssignedCount); err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
-		Where("org_id = ? AND status = ? AND deleted_at IS NULL", orgID, "interpreted").
-		Where("interpreted_at >= ? AND interpreted_at < ?", timeRange.From, timeRange.To).
-		Count(&window.AssessmentCompletedCount).Error; err != nil {
+	if err := scanCountQuery(s.db.WithContext(ctx).
+		Table("assessment_entry_intake_log l").
+		Select("COUNT(DISTINCT a.id) AS count").
+		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
+		Where("l.org_id = ? AND l.deleted_at IS NULL", orgID).
+		Where("a.created_at >= ? AND a.created_at < ?", timeRange.From, timeRange.To),
+		&window.AssessmentCreatedCount); err != nil {
+		return nil, err
+	}
+	if err := scanCountQuery(s.db.WithContext(ctx).
+		Table("assessment_entry_intake_log l").
+		Select("COUNT(DISTINCT a.id) AS count").
+		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
+		Where("l.org_id = ? AND l.deleted_at IS NULL", orgID).
+		Where("a.status = ? AND a.interpreted_at >= ? AND a.interpreted_at < ?", "interpreted", timeRange.From, timeRange.To),
+		&window.AssessmentCompletedCount); err != nil {
 		return nil, err
 	}
 
 	trend := domainStatistics.OrgOverviewTrend{
-		Assessments: s.queryDailyCounts(ctx,
-			"assessment",
-			"created_at",
-			"org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?",
-			orgID, timeRange.From, timeRange.To,
+		Assessments: s.queryDailyDistinctCounts(
+			s.db.WithContext(ctx).
+				Table("assessment_entry_intake_log l").
+				Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
+				Where("l.org_id = ? AND l.deleted_at IS NULL", orgID).
+				Where("a.created_at >= ? AND a.created_at < ?", timeRange.From, timeRange.To),
+			"a.created_at",
+			"a.id",
 		),
 		Intakes: s.queryDailyCounts(ctx,
-			"clinician_relation",
-			"bound_at",
-			"org_id = ? AND relation_type = ? AND source_type = ? AND deleted_at IS NULL AND bound_at >= ? AND bound_at < ?",
-			orgID, string(actorDomainRelation.RelationTypeCreator), string(actorDomainRelation.SourceTypeAssessmentEntry), timeRange.From, timeRange.To,
+			"assessment_entry_intake_log",
+			"intake_at",
+			"org_id = ? AND deleted_at IS NULL AND intake_at >= ? AND intake_at < ?",
+			orgID, timeRange.From, timeRange.To,
 		),
-		Assignments: s.queryDailyCounts(ctx,
-			"clinician_relation",
-			"bound_at",
-			"org_id = ? AND relation_type IN ? AND deleted_at IS NULL AND bound_at >= ? AND bound_at < ?",
-			orgID, accessGrantRelationTypes, timeRange.From, timeRange.To,
+		Assignments: s.queryDailyDistinctCounts(
+			s.db.WithContext(ctx).
+				Table("assessment_entry_intake_log").
+				Where("org_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, true).
+				Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
+			"intake_at",
+			"testee_id",
 		),
 	}
 	trend.Assessments = fillMissingDailyCounts(timeRange.From, timeRange.To, trend.Assessments)
@@ -448,25 +463,26 @@ func (s *readService) buildClinicianStatistics(ctx context.Context, orgID int64,
 	}
 
 	window := domainStatistics.ClinicianStatisticsWindow{}
-	if err := s.db.WithContext(ctx).Model(&actorInfra.ClinicianRelationPO{}).
-		Where("org_id = ? AND clinician_id = ? AND relation_type = ? AND source_type = ? AND deleted_at IS NULL", orgID, clinician.ID, string(actorDomainRelation.RelationTypeCreator), string(actorDomainRelation.SourceTypeAssessmentEntry)).
-		Where("bound_at >= ? AND bound_at < ?", timeRange.From, timeRange.To).
+	if err := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
+		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinician.ID).
+		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To).
 		Count(&window.IntakeCount).Error; err != nil {
 		return nil, err
 	}
-	if err := s.db.WithContext(ctx).Model(&actorInfra.ClinicianRelationPO{}).
-		Where("org_id = ? AND clinician_id = ? AND relation_type IN ? AND deleted_at IS NULL", orgID, clinician.ID, accessGrantRelationTypes).
-		Where("bound_at >= ? AND bound_at < ?", timeRange.From, timeRange.To).
-		Count(&window.AssignedCount).Error; err != nil {
+	if err := scanCountQuery(s.db.WithContext(ctx).
+		Table("assessment_entry_intake_log").
+		Select("COUNT(DISTINCT testee_id) AS count").
+		Where("org_id = ? AND clinician_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, clinician.ID, true).
+		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
+		&window.AssignedCount); err != nil {
 		return nil, err
 	}
 	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("assessment a").
+		Table("assessment_entry_intake_log l").
 		Select("COUNT(DISTINCT a.id) AS count").
-		Joins("JOIN clinician_relation r ON r.testee_id = a.testee_id AND r.org_id = a.org_id").
-		Where("a.org_id = ? AND a.status = ? AND a.deleted_at IS NULL", orgID, "interpreted").
-		Where("r.clinician_id = ? AND r.is_active = ? AND r.deleted_at IS NULL AND r.relation_type IN ?", clinician.ID, true, accessGrantRelationTypes).
-		Where("a.interpreted_at >= ? AND a.interpreted_at < ?", timeRange.From, timeRange.To),
+		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
+		Where("l.org_id = ? AND l.clinician_id = ? AND l.deleted_at IS NULL", orgID, clinician.ID).
+		Where("a.status = ? AND a.interpreted_at >= ? AND a.interpreted_at < ?", "interpreted", timeRange.From, timeRange.To),
 		&window.CompletedAssessmentCount); err != nil {
 		return nil, err
 	}
@@ -486,18 +502,18 @@ func (s *readService) buildClinicianStatistics(ctx context.Context, orgID int64,
 	}
 	funnel.IntakeCount = window.IntakeCount
 	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("clinician_relation").
+		Table("assessment_entry_intake_log").
 		Select("COUNT(DISTINCT testee_id) AS count").
-		Where("org_id = ? AND clinician_id = ? AND relation_type IN ? AND source_type = ? AND deleted_at IS NULL", orgID, clinician.ID, accessGrantRelationTypes, string(actorDomainRelation.SourceTypeAssessmentEntry)).
-		Where("bound_at >= ? AND bound_at < ?", timeRange.From, timeRange.To),
+		Where("org_id = ? AND clinician_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, clinician.ID, true).
+		Where("intake_at >= ? AND intake_at < ?", timeRange.From, timeRange.To),
 		&funnel.AssignedCount); err != nil {
 		return nil, err
 	}
 	if err := scanCountQuery(s.db.WithContext(ctx).
-		Table("clinician_relation r").
-		Select("COUNT(DISTINCT r.testee_id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = r.testee_id AND a.org_id = r.org_id AND a.deleted_at IS NULL AND a.created_at >= r.bound_at").
-		Where("r.org_id = ? AND r.clinician_id = ? AND r.relation_type = ? AND r.source_type = ? AND r.deleted_at IS NULL", orgID, clinician.ID, string(actorDomainRelation.RelationTypeCreator), string(actorDomainRelation.SourceTypeAssessmentEntry)).
+		Table("assessment_entry_intake_log l").
+		Select("COUNT(DISTINCT a.id) AS count").
+		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
+		Where("l.org_id = ? AND l.clinician_id = ? AND l.deleted_at IS NULL", orgID, clinician.ID).
 		Where("a.created_at >= ? AND a.created_at < ?", timeRange.From, timeRange.To),
 		&funnel.AssessmentCount); err != nil {
 		return nil, err
@@ -606,9 +622,9 @@ func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, ent
 
 	lastIntakeAt, err := s.queryNullableMaxTime(
 		s.db.WithContext(ctx).
-			Model(&actorInfra.ClinicianRelationPO{}).
-			Select("MAX(bound_at)").
-			Where("org_id = ? AND source_type = ? AND source_id = ? AND relation_type = ? AND deleted_at IS NULL", orgID, string(actorDomainRelation.SourceTypeAssessmentEntry), entry.ID.Uint64(), string(actorDomainRelation.RelationTypeCreator)),
+			Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
+			Select("MAX(intake_at)").
+			Where("org_id = ? AND entry_id = ? AND deleted_at IS NULL", orgID, entry.ID.Uint64()),
 	)
 	if err != nil {
 		return nil, err
@@ -630,29 +646,31 @@ func (s *readService) queryEntryCounts(ctx context.Context, orgID int64, entryID
 		return counts, err
 	}
 
-	intakeQuery := s.db.WithContext(ctx).Model(&actorInfra.ClinicianRelationPO{}).
-		Where("org_id = ? AND source_type = ? AND source_id = ? AND relation_type = ? AND deleted_at IS NULL", orgID, string(actorDomainRelation.SourceTypeAssessmentEntry), entryID, string(actorDomainRelation.RelationTypeCreator))
+	intakeQuery := s.db.WithContext(ctx).Model(&statisticsInfra.AssessmentEntryIntakeLogPO{}).
+		Where("org_id = ? AND entry_id = ? AND deleted_at IS NULL", orgID, entryID)
 	if from != nil && to != nil {
-		intakeQuery = intakeQuery.Where("bound_at >= ? AND bound_at < ?", *from, *to)
+		intakeQuery = intakeQuery.Where("intake_at >= ? AND intake_at < ?", *from, *to)
 	}
 	if err := intakeQuery.Count(&counts.IntakeCount).Error; err != nil {
 		return counts, err
 	}
 
-	assignedQuery := s.db.WithContext(ctx).Model(&actorInfra.ClinicianRelationPO{}).
-		Where("org_id = ? AND source_type = ? AND source_id = ? AND relation_type IN ? AND deleted_at IS NULL", orgID, string(actorDomainRelation.SourceTypeAssessmentEntry), entryID, accessGrantRelationTypes)
+	assignedQuery := s.db.WithContext(ctx).
+		Table("assessment_entry_intake_log").
+		Select("COUNT(DISTINCT testee_id) AS count").
+		Where("org_id = ? AND entry_id = ? AND assignment_created = ? AND deleted_at IS NULL", orgID, entryID, true)
 	if from != nil && to != nil {
-		assignedQuery = assignedQuery.Where("bound_at >= ? AND bound_at < ?", *from, *to)
+		assignedQuery = assignedQuery.Where("intake_at >= ? AND intake_at < ?", *from, *to)
 	}
-	if err := assignedQuery.Count(&counts.AssignedCount).Error; err != nil {
+	if err := scanCountQuery(assignedQuery, &counts.AssignedCount); err != nil {
 		return counts, err
 	}
 
 	assessmentQuery := s.db.WithContext(ctx).
-		Table("clinician_relation r").
-		Select("COUNT(DISTINCT r.testee_id) AS count").
-		Joins("JOIN assessment a ON a.testee_id = r.testee_id AND a.org_id = r.org_id AND a.deleted_at IS NULL AND a.created_at >= r.bound_at").
-		Where("r.org_id = ? AND r.source_type = ? AND r.source_id = ? AND r.relation_type = ? AND r.deleted_at IS NULL", orgID, string(actorDomainRelation.SourceTypeAssessmentEntry), entryID, string(actorDomainRelation.RelationTypeCreator))
+		Table("assessment_entry_intake_log l").
+		Select("COUNT(DISTINCT a.id) AS count").
+		Joins("JOIN assessment a ON a.testee_id = l.testee_id AND a.org_id = l.org_id AND a.deleted_at IS NULL AND a.created_at >= l.intake_at").
+		Where("l.org_id = ? AND l.entry_id = ? AND l.deleted_at IS NULL", orgID, entryID)
 	if from != nil && to != nil {
 		assessmentQuery = assessmentQuery.Where("a.created_at >= ? AND a.created_at < ?", *from, *to)
 	}
@@ -673,6 +691,30 @@ func (s *readService) queryDailyCounts(ctx context.Context, tableName, timeColum
 		Table(tableName).
 		Select(fmt.Sprintf("DATE(%s) AS stat_date, COUNT(*) AS count", timeColumn)).
 		Where(whereClause, args...).
+		Group(fmt.Sprintf("DATE(%s)", timeColumn)).
+		Order("stat_date ASC").
+		Scan(&rows).Error; err != nil {
+		return []domainStatistics.DailyCount{}
+	}
+
+	result := make([]domainStatistics.DailyCount, 0, len(rows))
+	for _, item := range rows {
+		result = append(result, domainStatistics.DailyCount{
+			Date:  item.StatDate,
+			Count: item.Count,
+		})
+	}
+	return result
+}
+
+func (s *readService) queryDailyDistinctCounts(query *gorm.DB, timeColumn, distinctColumn string) []domainStatistics.DailyCount {
+	type row struct {
+		StatDate time.Time
+		Count    int64
+	}
+	var rows []row
+	if err := query.
+		Select(fmt.Sprintf("DATE(%s) AS stat_date, COUNT(DISTINCT %s) AS count", timeColumn, distinctColumn)).
 		Group(fmt.Sprintf("DATE(%s)", timeColumn)).
 		Order("stat_date ASC").
 		Scan(&rows).Error; err != nil {

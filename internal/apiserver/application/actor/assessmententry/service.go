@@ -25,6 +25,7 @@ type service struct {
 	validator       domainAssessmentEntry.Validator
 	guardianshipSvc *iam.GuardianshipService
 	resolveLog      ResolveLogWriter
+	intakeLog       IntakeLogWriter
 	uow             *mysql.UnitOfWork
 }
 
@@ -38,6 +39,7 @@ func NewService(
 	validator domainAssessmentEntry.Validator,
 	guardianshipSvc *iam.GuardianshipService,
 	resolveLog ResolveLogWriter,
+	intakeLog IntakeLogWriter,
 	uow *mysql.UnitOfWork,
 ) AssessmentEntryService {
 	return &service{
@@ -49,6 +51,7 @@ func NewService(
 		validator:       validator,
 		guardianshipSvc: guardianshipSvc,
 		resolveLog:      resolveLog,
+		intakeLog:       intakeLog,
 		uow:             uow,
 	}
 }
@@ -172,11 +175,13 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 
 func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error) {
 	var (
-		entry         *domainAssessmentEntry.AssessmentEntry
-		clinicianItem *domainClinician.Clinician
-		testeeItem    *domainTestee.Testee
-		relationItem  *domainRelation.ClinicianTesteeRelation
-		assignment    *RelationSummaryResult
+		entry             *domainAssessmentEntry.AssessmentEntry
+		clinicianItem     *domainClinician.Clinician
+		testeeItem        *domainTestee.Testee
+		relationItem      *domainRelation.ClinicianTesteeRelation
+		assignment        *RelationSummaryResult
+		testeeCreated     bool
+		assignmentCreated bool
 	)
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -193,6 +198,16 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 		}
 
 		if dto.ProfileID != nil && *dto.ProfileID > 0 {
+			_, existingErr := s.testeeRepo.FindByProfile(txCtx, entry.OrgID(), *dto.ProfileID)
+			switch {
+			case existingErr == nil:
+				testeeCreated = false
+			case errors.IsCode(existingErr, code.ErrUserNotFound):
+				testeeCreated = true
+			default:
+				return errors.Wrap(existingErr, "failed to check existing testee by profile")
+			}
+
 			testeeItem, err = s.testeeFactory.GetOrCreateByProfile(
 				txCtx,
 				entry.OrgID(),
@@ -205,6 +220,7 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 				return errors.Wrap(err, "failed to get or create testee by profile")
 			}
 		} else {
+			testeeCreated = true
 			testeeItem, err = s.testeeFactory.CreateTemporary(
 				txCtx,
 				entry.OrgID(),
@@ -259,6 +275,7 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 				return errors.Wrap(err, "failed to find access relation")
 			}
 
+			assignmentCreated = true
 			assignedRelation = domainRelation.NewClinicianTesteeRelation(
 				entry.OrgID(),
 				entry.ClinicianID(),
@@ -276,6 +293,21 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 		}
 
 		assignment = toRelationSummaryResult(assignedRelation)
+
+		if s.intakeLog != nil {
+			if err := s.intakeLog.LogIntake(
+				txCtx,
+				entry.OrgID(),
+				uint64(entry.ClinicianID()),
+				entry.ID().Uint64(),
+				testeeItem.ID().Uint64(),
+				time.Now(),
+				testeeCreated,
+				assignmentCreated,
+			); err != nil {
+				return errors.Wrap(err, "failed to record assessment entry intake")
+			}
+		}
 
 		return nil
 	})

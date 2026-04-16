@@ -118,7 +118,9 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	m.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB)
 	m.RelationRepo = actorInfra.NewRelationRepository(mysqlDB)
 	m.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB)
-	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsInfra.NewStatisticsRepository(mysqlDB))
+	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB)
+	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
+	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(m.TesteeRepo)
@@ -239,6 +241,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		assessmentEntryValidator,
 		guardianshipSvc,
 		resolveLogWriter,
+		intakeLogWriter,
 		uow,
 	)
 

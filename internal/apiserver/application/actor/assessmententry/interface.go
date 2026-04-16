@@ -21,6 +21,11 @@ type ResolveLogWriter interface {
 	LogResolve(ctx context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) error
 }
 
+// IntakeLogWriter 写入入口 intake 成功日志。
+type IntakeLogWriter interface {
+	LogIntake(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) error
+}
+
 // CreateAssessmentEntryDTO 创建测评入口。
 type CreateAssessmentEntryDTO struct {
 	OrgID         int64

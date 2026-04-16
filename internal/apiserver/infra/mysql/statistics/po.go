@@ -114,6 +114,34 @@ func (p *AssessmentEntryResolveLogPO) BeforeCreate(_ *gorm.DB) error {
 	return nil
 }
 
+// AssessmentEntryIntakeLogPO 入口 intake 成功日志。
+type AssessmentEntryIntakeLogPO struct {
+	ID                uint64         `gorm:"column:id;primaryKey"`
+	OrgID             int64          `gorm:"column:org_id;not null;index:idx_entry_intake_org_entry_time,priority:1;index:idx_entry_intake_org_testee_time,priority:1"`
+	ClinicianID       uint64         `gorm:"column:clinician_id;not null;index:idx_entry_intake_clinician_time,priority:1"`
+	EntryID           uint64         `gorm:"column:entry_id;not null;index:idx_entry_intake_org_entry_time,priority:2"`
+	TesteeID          uint64         `gorm:"column:testee_id;not null;index:idx_entry_intake_org_testee_time,priority:2"`
+	TesteeCreated     bool           `gorm:"column:testee_created;not null;default:false"`
+	AssignmentCreated bool           `gorm:"column:assignment_created;not null;default:false"`
+	IntakeAt          time.Time      `gorm:"column:intake_at;not null;index:idx_entry_intake_org_entry_time,priority:3;index:idx_entry_intake_clinician_time,priority:2;index:idx_entry_intake_org_testee_time,priority:3"`
+	CreatedAt         time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt         time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+// TableName 指定表名。
+func (AssessmentEntryIntakeLogPO) TableName() string {
+	return "assessment_entry_intake_log"
+}
+
+// BeforeCreate GORM hook。
+func (p *AssessmentEntryIntakeLogPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = uint64(meta.New())
+	}
+	return nil
+}
+
 // ==================== JSONField 辅助类型 ====================
 
 // JSONField JSON字段类型
