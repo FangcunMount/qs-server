@@ -491,6 +491,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /assessments/{id}/scores:
+    get:
+      tags:
+      - 测评
+      summary: 获取测评得分详情
+      description: 获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段
+      operationId: 获取测评得分详情
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/evaluation.FactorScoreResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /assessments/{id}/trend-summary:
     get:
       tags:
@@ -529,56 +579,6 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '404':
           description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '429':
-          description: Too Many Requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /assessments/{id}/scores:
-    get:
-      tags:
-      - 测评
-      summary: 获取测评得分详情
-      description: 获取测评的因子得分详情。响应中的每个因子得分包含 max_score（最大分，可选）字段
-      operationId: 获取测评得分详情
-      parameters:
-      - type: integer
-        description: 测评ID
-        name: id
-        in: path
-        required: true
-      - type: integer
-        description: 受试者ID
-        name: testee_id
-        in: query
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      type: array
-                      items:
-                        $ref: '#/components/schemas/evaluation.FactorScoreResponse'
-        '400':
-          description: Bad Request
           content:
             application/json:
               schema:
@@ -1176,6 +1176,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /testees/{id}/care-context:
+    get:
+      tags:
+      - 受试者
+      summary: 获取受试者照护上下文
+      description: 获取当前受试者关联的临床人员和入口来源摘要
+      operationId: 获取受试者照护上下文
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/testee.TesteeCareContextResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /health:
     get:
       tags:
@@ -1247,6 +1290,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer'
+        idempotency_key:
+          type: string
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -1340,6 +1385,43 @@ components:
           type: string
         total_score:
           type: number
+    evaluation.AssessmentFactorChangeResponse:
+      type: object
+      properties:
+        current_score:
+          type: number
+        delta:
+          type: number
+        factor_code:
+          type: string
+        factor_name:
+          type: string
+        previous_score:
+          type: number
+        risk_level:
+          type: string
+    evaluation.AssessmentFactorTrendPointResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        risk_level:
+          type: string
+        score:
+          type: number
+        submitted_at:
+          type: string
+    evaluation.AssessmentFactorTrendResponse:
+      type: object
+      properties:
+        factor_code:
+          type: string
+        factor_name:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.AssessmentFactorTrendPointResponse'
     evaluation.AssessmentReportResponse:
       type: object
       properties:
@@ -1469,43 +1551,6 @@ components:
           type: string
         total_score:
           type: number
-    evaluation.AssessmentFactorChangeResponse:
-      type: object
-      properties:
-        current_score:
-          type: number
-        delta:
-          type: number
-        factor_code:
-          type: string
-        factor_name:
-          type: string
-        previous_score:
-          type: number
-        risk_level:
-          type: string
-    evaluation.AssessmentFactorTrendPointResponse:
-      type: object
-      properties:
-        assessment_id:
-          type: string
-        risk_level:
-          type: string
-        score:
-          type: number
-        submitted_at:
-          type: string
-    evaluation.AssessmentFactorTrendResponse:
-      type: object
-      properties:
-        factor_code:
-          type: string
-        factor_name:
-          type: string
-        points:
-          type: array
-          items:
-            $ref: '#/components/schemas/evaluation.AssessmentFactorTrendPointResponse'
     evaluation.DimensionInterpretResponse:
       type: object
       properties:
@@ -1947,6 +1992,24 @@ components:
         total:
           description: 总数
           type: integer
+    testee.TesteeCareContextResponse:
+      type: object
+      properties:
+        clinician_name:
+          description: 当前跟进临床人员姓名
+          type: string
+        clinician_role:
+          description: 当前跟进临床人员角色/类型
+          type: string
+        entry_source_type:
+          description: 入口来源类型
+          type: string
+        entry_title:
+          description: 入口标题
+          type: string
+        relation_type:
+          description: 与受试者的关系类型
+          type: string
     testee.TesteeExistsResponse:
       type: object
       properties:

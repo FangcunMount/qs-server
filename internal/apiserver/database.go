@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	localmongo "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 )
 
 // DatabaseManager 数据库管理器
@@ -159,23 +160,17 @@ func (dm *DatabaseManager) initRedis(ctx context.Context) error {
 
 // initMongoDB 初始化MongoDB连接
 func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
-	// 直接传递分离参数，由 MongoConfig.BuildURL() 构建连接 URL
-	mongoConfig := &database.MongoConfig{
-		Host:                     dm.config.MongoDBOptions.Host,
-		Username:                 dm.config.MongoDBOptions.Username,
-		Password:                 dm.config.MongoDBOptions.Password,
-		Database:                 dm.config.MongoDBOptions.Database,
-		UseSSL:                   dm.config.MongoDBOptions.UseSSL,
-		SSLInsecureSkipVerify:    dm.config.MongoDBOptions.SSLInsecureSkipVerify,
-		SSLAllowInvalidHostnames: dm.config.MongoDBOptions.SSLAllowInvalidHostnames,
-		SSLCAFile:                dm.config.MongoDBOptions.SSLCAFile,
-		SSLPEMKeyfile:            dm.config.MongoDBOptions.SSLPEMKeyfile,
-		// 日志配置
-		EnableLogger:  dm.config.MongoDBOptions.EnableLogger,
-		SlowThreshold: dm.config.MongoDBOptions.SlowThreshold,
+	if dm.config.MongoDBOptions == nil {
+		logger.L(ctx).Infow("MongoDB options not configured, skipping MongoDB initialization",
+			"component", "MongoDB",
+			"action", "initialize",
+			"result", "skipped",
+		)
+		return nil
 	}
 
-	if mongoConfig.Host == "" {
+	mongoURI := dm.config.MongoDBOptions.BuildURI()
+	if mongoURI == "" {
 		logger.L(ctx).Infow("MongoDB host not configured, skipping MongoDB initialization",
 			"component", "MongoDB",
 			"action", "initialize",
@@ -184,8 +179,12 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		return nil
 	}
 
-	mongoConn := database.NewMongoDBConnection(mongoConfig)
-	return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)
+	mongoConn := localmongo.NewConnection(&localmongo.ConnectionConfig{
+		URI:           mongoURI,
+		EnableLogger:  dm.config.MongoDBOptions.EnableLogger,
+		SlowThreshold: dm.config.MongoDBOptions.SlowThreshold,
+	})
+	return dm.registry.Register(database.MongoDB, map[string]string{"uri": mongoURI}, mongoConn)
 }
 
 // GetMySQLDB 获取MySQL数据库连接

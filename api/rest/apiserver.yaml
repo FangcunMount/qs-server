@@ -445,6 +445,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/me/assessment-entries/{id}:
+    get:
+      tags:
+      - Actor-AssessmentEntry
+      summary: 查询我的测评入口详情
+      description: 查询当前从业者持有的单个测评入口详情
+      operationId: 查询我的测评入口详情
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 入口ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentEntryResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /clinicians/me/testees:
     get:
       tags:
@@ -2858,6 +2894,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+    put:
+      tags:
+      - Actor
+      summary: 更新员工
+      operationId: 更新员工
+      parameters:
+      - type: string
+        description: 员工ID
+        name: id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/request.UpdateStaffRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.StaffResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     delete:
       tags:
       - Actor
@@ -3047,6 +3118,10 @@ paths:
       - type: string
         description: 档案ID（等同于IAM儿童ID）
         name: profile_id
+        in: query
+      - type: string
+        description: 按 Clinician 过滤受试者
+        name: clinician_id
         in: query
       - type: integer
         default: 1
@@ -3753,7 +3828,7 @@ components:
       - target_type
       properties:
         expires_at:
-          type: string
+          $ref: '#/components/schemas/request.FlexibleTime'
         target_code:
           type: string
         target_type:
@@ -3777,7 +3852,7 @@ components:
         name:
           type: string
         operator_id:
-          type: integer
+          $ref: '#/components/schemas/meta.ID'
         org_id:
           type: integer
         title:
@@ -3865,6 +3940,9 @@ components:
         org_id:
           description: 兼容字段：机构ID
           type: integer
+        password:
+          description: 新建 IAM 运营账号时的初始密码
+          type: string
         phone:
           description: 电话
           type: string
@@ -3875,7 +3953,8 @@ components:
             type: string
         user_id:
           description: IAM用户ID（优先使用）
-          type: integer
+          allOf:
+          - $ref: '#/components/schemas/meta.ID'
     request.EnrollTesteeRequest:
       type: object
       properties:
@@ -3926,6 +4005,11 @@ components:
         scoring_strategy:
           type: string
         title:
+          type: string
+    request.FlexibleTime:
+      type: object
+      properties:
+        time.Time:
           type: string
     request.IntakeByAssessmentEntryRequest:
       type: object
@@ -4070,6 +4154,26 @@ components:
           type: string
         questionnaire_version:
           type: string
+    request.UpdateStaffRequest:
+      type: object
+      properties:
+        email:
+          description: 邮箱
+          type: string
+        is_active:
+          description: 是否激活
+          type: boolean
+        name:
+          description: 姓名
+          type: string
+        phone:
+          description: 电话
+          type: string
+        roles:
+          description: 角色列表
+          type: array
+          items:
+            type: string
     request.UpdateTesteeRequest:
       type: object
       properties:
@@ -4341,6 +4445,10 @@ components:
     response.ClinicianResponse:
       type: object
       properties:
+        assessment_entry_count:
+          type: integer
+        assigned_testee_count:
+          type: integer
         clinician_type:
           type: string
         department:
@@ -4640,6 +4748,8 @@ components:
         source_type:
           type: string
         testee_id:
+          type: string
+        unbound_at:
           type: string
     response.ReportListResponse:
       type: object

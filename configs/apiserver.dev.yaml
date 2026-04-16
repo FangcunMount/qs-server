@@ -207,11 +207,16 @@ backpressure:
 # -------------------------------------------------------
 # 支持两种方式：分离参数（推荐）或直接 URL
 mongodb:
+  # 如需直接提供完整连接串，可使用 url，优先级高于下面的分离字段。
+  # Docker 单节点副本集示例：
+  # url: "mongodb://app_user:d3v_App@M0ngo@mongo:27017/qs?replicaSet=rs0&directConnection=true"
+  url: ""
   host: "127.0.0.1:27018"           # MongoDB 主机地址
   username: "app_user"              # 用户名
   password: "d3v_App@M0ngo"      # 密码
   database: "qs"   # 数据库名称
-  # url: ""                         # 可选，如果设置则优先使用
+  replica-set: "rs0"                   # 单节点副本集可设为 rs0
+  direct-connection: true          # 单节点副本集建议开启 true
   use-ssl: false                    # 是否使用SSL
   ssl-insecure-skip-verify: false   # 是否跳过SSL证书验证
   ssl-allow-invalid-hostnames: false # 是否允许无效的主机名

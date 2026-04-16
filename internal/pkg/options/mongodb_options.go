@@ -1,6 +1,7 @@
 package options
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -9,11 +10,18 @@ import (
 // MongoDBOptions defines options for mongodb database.
 // 与 component-base/pkg/database.MongoConfig 保持一致的结构
 type MongoDBOptions struct {
+	// 直接连接 URL（优先级最高）
+	URL string `json:"url,omitempty" mapstructure:"url"`
+
 	// 分离的连接参数（推荐使用，便于通过环境变量配置）
 	Host     string `json:"host,omitempty"     mapstructure:"host"`     // 主机地址，格式: host:port
 	Username string `json:"username,omitempty" mapstructure:"username"` // 用户名
 	Password string `json:"-"                  mapstructure:"password"` // 密码（不输出到JSON）
 	Database string `json:"database,omitempty" mapstructure:"database"` // 数据库名
+
+	// 事务 / 拓扑配置
+	ReplicaSet       string `json:"replica-set,omitempty"      mapstructure:"replica-set"`
+	DirectConnection bool   `json:"direct-connection,omitempty" mapstructure:"direct-connection"`
 
 	// SSL 配置
 	UseSSL                   bool   `json:"use-ssl,omitempty"                  mapstructure:"use-ssl"`
@@ -35,10 +43,13 @@ type MongoDBOptions struct {
 // NewMongoDBOptions create a `zero` value instance.
 func NewMongoDBOptions() *MongoDBOptions {
 	return &MongoDBOptions{
+		URL:                      "",
 		Host:                     "127.0.0.1:27017",
 		Username:                 "",
 		Password:                 "",
 		Database:                 "",
+		ReplicaSet:               "",
+		DirectConnection:         false,
 		UseSSL:                   false,
 		SSLInsecureSkipVerify:    false,
 		SSLAllowInvalidHostnames: false,
@@ -60,8 +71,60 @@ func (o *MongoDBOptions) Validate() []error {
 	return errs
 }
 
+// BuildURI 根据当前配置构建 MongoDB 连接 URI。
+// 优先使用显式 url；否则使用分离字段构建标准 mongodb:// URI。
+func (o *MongoDBOptions) BuildURI() string {
+	if o == nil {
+		return ""
+	}
+	if o.URL != "" {
+		return o.URL
+	}
+	if o.Host == "" {
+		return ""
+	}
+
+	u := &url.URL{
+		Scheme: "mongodb",
+		Host:   o.Host,
+	}
+	if o.Database != "" {
+		u.Path = "/" + o.Database
+	}
+	if o.Username != "" {
+		if o.Password != "" {
+			u.User = url.UserPassword(o.Username, o.Password)
+		} else {
+			u.User = url.User(o.Username)
+		}
+	}
+
+	q := u.Query()
+	if o.ReplicaSet != "" {
+		q.Set("replicaSet", o.ReplicaSet)
+	}
+	if o.DirectConnection {
+		q.Set("directConnection", "true")
+	}
+	if o.UseSSL {
+		q.Set("tls", "true")
+	}
+	if o.SSLInsecureSkipVerify {
+		q.Set("tlsInsecure", "true")
+	}
+	if o.SSLAllowInvalidHostnames {
+		q.Set("tlsAllowInvalidHostnames", "true")
+	}
+	u.RawQuery = q.Encode()
+
+	return u.String()
+}
+
 // AddFlags adds flags related to mongodb storage for a specific APIServer to the specified FlagSet.
 func (o *MongoDBOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&o.URL, "mongodb.url", o.URL, ""+
+		"Full MongoDB connection URI. If set, it takes precedence over separated host/credential fields.")
+
 	fs.StringVar(&o.Host, "mongodb.host", o.Host, ""+
 		"MongoDB service host address (format: host:port).")
 
@@ -73,6 +136,12 @@ func (o *MongoDBOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.Database, "mongodb.database", o.Database, ""+
 		"Database name for the server to use.")
+
+	fs.StringVar(&o.ReplicaSet, "mongodb.replica-set", o.ReplicaSet, ""+
+		"Replica set name for MongoDB transactions (for example: rs0).")
+
+	fs.BoolVar(&o.DirectConnection, "mongodb.direct-connection", o.DirectConnection, ""+
+		"Force directConnection=true for single-node replica set deployments.")
 
 	fs.BoolVar(&o.UseSSL, "mongodb.use-ssl", o.UseSSL, ""+
 		"Enable SSL for mongodb connection.")
