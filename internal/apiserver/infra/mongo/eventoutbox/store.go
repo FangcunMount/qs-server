@@ -73,6 +73,33 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "next_attempt_at", Value: 1}},
 			Options: options.Index().SetName("idx_status_next_attempt_at"),
 		},
+		{
+			Keys: bson.D{
+				{Key: "created_at", Value: 1},
+				{Key: "next_attempt_at", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_pending_created_at_next_attempt_at").
+				SetPartialFilterExpression(bson.M{"status": statusPending}),
+		},
+		{
+			Keys: bson.D{
+				{Key: "next_attempt_at", Value: 1},
+				{Key: "created_at", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_failed_next_attempt_at_created_at").
+				SetPartialFilterExpression(bson.M{"status": statusFailed}),
+		},
+		{
+			Keys: bson.D{
+				{Key: "updated_at", Value: 1},
+				{Key: "created_at", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_publishing_updated_at_created_at").
+				SetPartialFilterExpression(bson.M{"status": statusPublishing}),
+		},
 	}); err != nil {
 		return fmt.Errorf("create mongo outbox indexes: %w", err)
 	}
@@ -139,45 +166,164 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 
 	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
 	staleBefore := now.Add(-s.publishingStaleFor)
-	for len(claimed) < limit {
-		filter := bson.M{
-			"$or": []bson.M{
-				{"status": statusPending, "next_attempt_at": bson.M{"$lte": now}},
-				{"status": statusFailed, "next_attempt_at": bson.M{"$lte": now}},
-				{"status": statusPublishing, "updated_at": bson.M{"$lte": staleBefore}},
-			},
-		}
-		update := bson.M{
-			"$set": bson.M{
-				"status":     statusPublishing,
-				"updated_at": now,
-			},
-		}
-		opts := options.FindOneAndUpdate().
-			SetSort(bson.D{{Key: "created_at", Value: 1}}).
-			SetReturnDocument(options.After)
 
-		var po OutboxPO
-		if err := s.coll.FindOneAndUpdate(ctx, filter, update, opts).Decode(&po); err != nil {
-			if err == mongo.ErrNoDocuments {
-				break
-			}
+	// Recover a small amount of failed/stale work first so these rows do not
+	// starve forever behind a large pending backlog.
+	failedQuota := minInt(limit-len(claimed), 2)
+	if failedQuota > 0 {
+		items, err := s.claimDueByNextAttempt(ctx, statusFailed, failedQuota, now)
+		if err != nil {
 			return nil, err
 		}
+		claimed = append(claimed, items...)
+	}
 
-		evt, err := outboxcodec.Decode(po.PayloadJSON)
+	staleQuota := minInt(limit-len(claimed), 2)
+	if staleQuota > 0 {
+		items, err := s.claimStalePublishing(ctx, staleQuota, now, staleBefore)
 		if err != nil {
-			_ = s.MarkEventFailed(ctx, po.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
-			continue
+			return nil, err
 		}
+		claimed = append(claimed, items...)
+	}
 
-		claimed = append(claimed, appEventing.PendingOutboxEvent{
-			EventID: po.EventID,
-			Event:   evt,
-		})
+	pendingQuota := limit - len(claimed)
+	if pendingQuota > 0 {
+		items, err := s.claimPending(ctx, pendingQuota, now)
+		if err != nil {
+			return nil, err
+		}
+		claimed = append(claimed, items...)
+	}
+
+	// If pending did not fill the batch, let failed rows use the remaining
+	// capacity before touching stale publishing again.
+	remaining := limit - len(claimed)
+	if remaining > 0 {
+		items, err := s.claimDueByNextAttempt(ctx, statusFailed, remaining, now)
+		if err != nil {
+			return nil, err
+		}
+		claimed = append(claimed, items...)
+	}
+
+	remaining = limit - len(claimed)
+	if remaining > 0 {
+		items, err := s.claimStalePublishing(ctx, remaining, now, staleBefore)
+		if err != nil {
+			return nil, err
+		}
+		claimed = append(claimed, items...)
 	}
 
 	return claimed, nil
+}
+
+func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	for len(claimed) < limit {
+		item, found, err := s.claimOne(ctx, bson.M{
+			"status":          statusPending,
+			"next_attempt_at": bson.M{"$lte": now},
+		}, bson.D{{Key: "created_at", Value: 1}}, now)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			break
+		}
+		claimed = append(claimed, item)
+	}
+
+	return claimed, nil
+}
+
+func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	for len(claimed) < limit {
+		item, found, err := s.claimOne(ctx, bson.M{
+			"status":          status,
+			"next_attempt_at": bson.M{"$lte": now},
+		}, bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "created_at", Value: 1}}, now)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			break
+		}
+		claimed = append(claimed, item)
+	}
+
+	return claimed, nil
+}
+
+func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleBefore time.Time) ([]appEventing.PendingOutboxEvent, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	for len(claimed) < limit {
+		item, found, err := s.claimOne(ctx, bson.M{
+			"status":     statusPublishing,
+			"updated_at": bson.M{"$lte": staleBefore},
+		}, bson.D{{Key: "updated_at", Value: 1}, {Key: "created_at", Value: 1}}, now)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			break
+		}
+		claimed = append(claimed, item)
+	}
+
+	return claimed, nil
+}
+
+func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, now time.Time) (appEventing.PendingOutboxEvent, bool, error) {
+	update := bson.M{
+		"$set": bson.M{
+			"status":     statusPublishing,
+			"updated_at": now,
+		},
+	}
+	opts := options.FindOneAndUpdate().
+		SetSort(sort).
+		SetReturnDocument(options.After)
+
+	var po OutboxPO
+	if err := s.coll.FindOneAndUpdate(ctx, filter, update, opts).Decode(&po); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return appEventing.PendingOutboxEvent{}, false, nil
+		}
+		return appEventing.PendingOutboxEvent{}, false, err
+	}
+
+	evt, err := outboxcodec.Decode(po.PayloadJSON)
+	if err != nil {
+		_ = s.MarkEventFailed(ctx, po.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
+		return appEventing.PendingOutboxEvent{}, false, nil
+	}
+
+	return appEventing.PendingOutboxEvent{
+		EventID: po.EventID,
+		Event:   evt,
+	}, true, nil
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
