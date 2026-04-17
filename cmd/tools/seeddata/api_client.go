@@ -465,11 +465,11 @@ func (r *ApiserverTesteeResponse) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("parse birthday: %w", err)
 	}
-	createdAt, err := parseFlexibleSeedRequiredTime(raw.CreatedAt)
+	createdAt, err := parseFlexibleSeedOptionalTimeValue(raw.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("parse created_at: %w", err)
 	}
-	updatedAt, err := parseFlexibleSeedRequiredTime(raw.UpdatedAt)
+	updatedAt, err := parseFlexibleSeedOptionalTimeValue(raw.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("parse updated_at: %w", err)
 	}
@@ -571,11 +571,11 @@ func (r *StaffResponse) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	createdAt, err := parseFlexibleSeedRequiredTime(raw.CreatedAt)
+	createdAt, err := parseFlexibleSeedOptionalTimeValue(raw.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("parse created_at: %w", err)
 	}
-	updatedAt, err := parseFlexibleSeedRequiredTime(raw.UpdatedAt)
+	updatedAt, err := parseFlexibleSeedOptionalTimeValue(raw.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("parse updated_at: %w", err)
 	}
@@ -892,6 +892,14 @@ func parseFlexibleSeedRequiredTime(raw string) (time.Time, error) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return time.Time{}, fmt.Errorf("time is empty")
+	}
+	return parseFlexibleSeedTime(value)
+}
+
+func parseFlexibleSeedOptionalTimeValue(raw string) (time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return time.Time{}, nil
 	}
 	return parseFlexibleSeedTime(value)
 }

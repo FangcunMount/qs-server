@@ -101,3 +101,40 @@ func TestDecodeResponseDataRejectsInvalidFlexibleTime(t *testing.T) {
 		t.Fatal("expected decodeResponseData to fail for invalid created_at")
 	}
 }
+
+func TestDecodeResponseDataStaffListAllowsEmptyTimestamps(t *testing.T) {
+	resp := &Response{
+		Data: map[string]interface{}{
+			"items": []interface{}{
+				map[string]interface{}{
+					"id":         "staff-1",
+					"org_id":     "1",
+					"user_id":    "2",
+					"roles":      []interface{}{"admin"},
+					"name":       "Alice",
+					"is_active":  true,
+					"created_at": "",
+					"updated_at": "",
+				},
+			},
+			"total":       1,
+			"page":        1,
+			"page_size":   20,
+			"total_pages": 1,
+		},
+	}
+
+	var result StaffListResponse
+	if err := decodeResponseData(resp, &result); err != nil {
+		t.Fatalf("decodeResponseData returned error: %v", err)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(result.Items))
+	}
+	if !result.Items[0].CreatedAt.IsZero() {
+		t.Fatalf("expected zero created_at, got %v", result.Items[0].CreatedAt)
+	}
+	if !result.Items[0].UpdatedAt.IsZero() {
+		t.Fatalf("expected zero updated_at, got %v", result.Items[0].UpdatedAt)
+	}
+}
