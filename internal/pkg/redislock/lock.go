@@ -4,43 +4,22 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-	redis "github.com/redis/go-redis/v9"
+	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
+	goredis "github.com/redis/go-redis/v9"
 )
 
-var releaseScript = redis.NewScript(`
-if redis.call("GET", KEYS[1]) == ARGV[1] then
-	return redis.call("DEL", KEYS[1])
-else
-	return 0
-end
-`)
-
 // Acquire 获取分布式锁，返回 token、是否获取成功以及错误。
-func Acquire(ctx context.Context, client redis.UniversalClient, key string, ttl time.Duration) (string, bool, error) {
+func Acquire(ctx context.Context, client goredis.UniversalClient, key string, ttl time.Duration) (string, bool, error) {
 	if client == nil {
 		return "", false, nil
 	}
-
-	token := uuid.NewString()
-	ok, err := client.SetNX(ctx, key, token, ttl).Result()
-	if err != nil {
-		return "", false, err
-	}
-	if !ok {
-		return "", false, nil
-	}
-	return token, true, nil
+	return rediskit.AcquireLease(ctx, client, key, ttl)
 }
 
 // Release 释放分布式锁，仅当 token 匹配时才删除。
-func Release(ctx context.Context, client redis.UniversalClient, key, token string) error {
+func Release(ctx context.Context, client goredis.UniversalClient, key, token string) error {
 	if client == nil || token == "" {
 		return nil
 	}
-	_, err := releaseScript.Run(ctx, client, []string{key}, token).Result()
-	if err == redis.Nil {
-		return nil
-	}
-	return err
+	return rediskit.ReleaseLease(ctx, client, key, token)
 }

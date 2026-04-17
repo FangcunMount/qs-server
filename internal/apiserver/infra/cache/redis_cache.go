@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -124,31 +125,8 @@ func (c *RedisCache) DeletePattern(ctx context.Context, pattern string) error {
 	if c.client == nil {
 		return fmt.Errorf("redis client is nil")
 	}
-
-	var cursor uint64
-	var deletedCount int
-
-	for {
-		var keys []string
-		var err error
-		keys, cursor, err = c.client.Scan(ctx, cursor, pattern, 100).Result()
-		if err != nil {
-			return err
-		}
-
-		if len(keys) > 0 {
-			if err := c.client.Del(ctx, keys...).Err(); err != nil {
-				return err
-			}
-			deletedCount += len(keys)
-		}
-
-		if cursor == 0 {
-			break
-		}
-	}
-
-	return nil
+	_, err := rediskit.DeleteByPattern(ctx, c.client, pattern, rediskit.DeleteByPatternOptions{})
+	return err
 }
 
 // Ping 健康检查

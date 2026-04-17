@@ -1,9 +1,9 @@
 package cache
 
 import (
-	"math/rand"
-	"sync"
 	"time"
+
+	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
 )
 
 // TTLOptions 用于全局覆盖默认 TTL
@@ -18,11 +18,6 @@ type TTLOptions struct {
 
 // TTLJitterRatio 控制 TTL 抖动，默认 10%（0-1）
 var TTLJitterRatio = 0.1
-
-var (
-	jitterRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-	jitterMu   sync.Mutex
-)
 
 // ApplyTTLOptions 覆盖默认 TTL（仅在启动时调用一次）
 func ApplyTTLOptions(opts TTLOptions) {
@@ -59,19 +54,5 @@ func ApplyTTLJitterRatio(ratio float64) {
 
 // JitterTTL 根据全局抖动比例对 TTL 进行抖动，避免同时失效
 func JitterTTL(ttl time.Duration) time.Duration {
-	if ttl <= 0 || TTLJitterRatio <= 0 {
-		return ttl
-	}
-	maxJitter := time.Duration(float64(ttl) * TTLJitterRatio)
-	if maxJitter <= 0 {
-		return ttl
-	}
-	jitterMu.Lock()
-	delta := jitterRand.Int63n(int64(maxJitter*2)+1) - int64(maxJitter)
-	jitterMu.Unlock()
-	result := ttl + time.Duration(delta)
-	if result <= 0 {
-		return time.Second
-	}
-	return result
+	return rediskit.JitterTTL(ttl, TTLJitterRatio)
 }

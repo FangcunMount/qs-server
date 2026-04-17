@@ -2,7 +2,8 @@ package rediskey
 
 import (
 	"fmt"
-	"strings"
+
+	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
 )
 
 var namespace string
@@ -10,15 +11,12 @@ var namespace string
 // ApplyNamespace 设置全局 Redis key 命名空间（可选）。
 // 传入空字符串表示不使用命名空间。
 func ApplyNamespace(ns string) {
-	namespace = strings.Trim(ns, ":")
+	namespace = rediskit.NormalizeNamespace(ns)
 }
 
 // AddNamespace 在 key 前增加命名空间（如果设置了）。
 func AddNamespace(key string) string {
-	if namespace == "" {
-		return key
-	}
-	return namespace + ":" + key
+	return rediskit.NewKeyspace(namespace).Prefix(key)
 }
 
 // Builder 统一管理 Redis key 的构建规则。
