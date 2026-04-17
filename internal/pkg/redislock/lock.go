@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
+	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 	goredis "github.com/redis/go-redis/v9"
 )
 

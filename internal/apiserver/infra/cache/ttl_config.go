@@ -3,7 +3,7 @@ package cache
 import (
 	"time"
 
-	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
+	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
 
 // TTLOptions 用于全局覆盖默认 TTL

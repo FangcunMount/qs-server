@@ -3,7 +3,7 @@ package rediskey
 import (
 	"fmt"
 
-	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
+	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
 
 var namespace string

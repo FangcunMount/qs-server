@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	rediskit "github.com/FangcunMount/qs-server/pkg/redis"
+	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -125,7 +125,7 @@ func (c *RedisCache) DeletePattern(ctx context.Context, pattern string) error {
 	if c.client == nil {
 		return fmt.Errorf("redis client is nil")
 	}
-	_, err := rediskit.DeleteByPattern(ctx, c.client, pattern, rediskit.DeleteByPatternOptions{})
+	_, err := rediskit.DeleteByPattern(ctx, c.client, pattern, rediskit.DefaultDeleteByPatternOptions())
 	return err
 }
 
