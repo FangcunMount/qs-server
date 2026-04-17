@@ -155,88 +155,104 @@ func rebuildJourneyRuntimeTables(ctx context.Context, mysqlDB *gorm.DB, orgID in
 	statements := []struct {
 		name string
 		sql  string
+		args []interface{}
 		dest *int64
 	}{
 		{
 			name: "delete behavior_footprint",
 			sql:  fmt.Sprintf("DELETE FROM %s WHERE org_id = ?", tables.BehaviorFootprint),
+			args: []interface{}{orgID},
 			dest: &stats.DeletedFootprints,
 		},
 		{
 			name: "delete assessment_episode",
 			sql:  fmt.Sprintf("DELETE FROM %s WHERE org_id = ?", tables.AssessmentEpisode),
+			args: []interface{}{orgID},
 			dest: &stats.DeletedEpisodes,
 		},
 		{
 			name: "insert entry_opened footprints",
 			sql:  buildJourneyHistoryEntryOpenedSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.EntryOpenedInserted,
 		},
 		{
 			name: "insert intake_confirmed footprints",
 			sql:  buildJourneyHistoryIntakeConfirmedSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.IntakeConfirmedInserted,
 		},
 		{
 			name: "insert testee_profile_created footprints",
 			sql:  buildJourneyHistoryTesteeProfileCreatedSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.TesteeProfileCreatedInserted,
 		},
 		{
 			name: "insert care_relationship_established footprints from intake",
 			sql:  buildJourneyHistoryCareEstablishedFromIntakeSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.CareEstablishedFromIntakeInserted,
 		},
 		{
 			name: "insert care_relationship_established footprints from relation",
 			sql:  buildJourneyHistoryCareEstablishedFromRelationSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.CareEstablishedFromRelationInserted,
 		},
 		{
 			name: "insert care_relationship_transferred footprints",
 			sql:  buildJourneyHistoryCareTransferredSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.CareTransferredInserted,
 		},
 		{
 			name: "insert assessment_episode",
 			sql:  buildJourneyHistoryAssessmentEpisodesSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.EpisodesInserted,
 		},
 		{
 			name: "attribute assessment_episode from creator relation",
 			sql:  buildJourneyHistoryEpisodeAttributionFromCreatorSQL(tables),
+			args: []interface{}{orgID, orgID},
 			dest: &stats.EpisodesAttributedFromCreator,
 		},
 		{
 			name: "attribute assessment_episode from intake log",
 			sql:  buildJourneyHistoryEpisodeAttributionFromIntakeSQL(tables),
+			args: []interface{}{orgID, orgID},
 			dest: &stats.EpisodesAttributedFromIntake,
 		},
 		{
 			name: "attribute assessment_episode from clinician relation",
 			sql:  buildJourneyHistoryEpisodeAttributionFromRelationSQL(tables),
+			args: []interface{}{orgID, orgID},
 			dest: &stats.EpisodesAttributedFromRelation,
 		},
 		{
 			name: "insert answersheet_submitted footprints",
 			sql:  buildJourneyHistoryAnswerSheetSubmittedSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.AnswerSheetSubmittedInserted,
 		},
 		{
 			name: "insert assessment_created footprints",
 			sql:  buildJourneyHistoryAssessmentCreatedSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.AssessmentCreatedInserted,
 		},
 		{
 			name: "insert report_generated footprints",
 			sql:  buildJourneyHistoryReportGeneratedSQL(tables),
+			args: []interface{}{orgID},
 			dest: &stats.ReportGeneratedInserted,
 		},
 	}
 
 	err := mysqlDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, stmt := range statements {
-			result := tx.Exec(stmt.sql, orgID)
+			result := tx.Exec(stmt.sql, stmt.args...)
 			if result.Error != nil {
 				return fmt.Errorf("%s: %w", stmt.name, result.Error)
 			}
