@@ -384,7 +384,7 @@ func (h *StatisticsHandler) GetQuestionnaireStatistics(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param testee_id path uint64 true "受试者ID"
-// @Success 200 {object} core.Response{data=statistics.TesteeStatistics}
+// @Success 200 {object} core.Response{data=response.TesteeStatisticsResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/statistics/testees/{testee_id} [get]
 func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
@@ -423,7 +423,7 @@ func (h *StatisticsHandler) GetTesteeStatistics(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, stats)
+	h.Success(c, response.NewTesteeStatisticsResponse(stats))
 }
 
 // GetPlanStatistics 获取计划统计

@@ -444,6 +444,47 @@ type ApiserverTesteeResponse struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 }
 
+func (r *ApiserverTesteeResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		ID        string  `json:"id"`
+		OrgID     string  `json:"org_id,omitempty"`
+		ProfileID *string `json:"profile_id,omitempty"`
+		Name      string  `json:"name"`
+		Gender    string  `json:"gender,omitempty"`
+		Birthday  *string `json:"birthday,omitempty"`
+		CreatedAt string  `json:"created_at"`
+		UpdatedAt string  `json:"updated_at"`
+	}
+
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	birthday, err := parseFlexibleSeedNullableTime(raw.Birthday)
+	if err != nil {
+		return fmt.Errorf("parse birthday: %w", err)
+	}
+	createdAt, err := parseFlexibleSeedRequiredTime(raw.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("parse created_at: %w", err)
+	}
+	updatedAt, err := parseFlexibleSeedRequiredTime(raw.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("parse updated_at: %w", err)
+	}
+
+	r.ID = raw.ID
+	r.OrgID = raw.OrgID
+	r.ProfileID = raw.ProfileID
+	r.Name = raw.Name
+	r.Gender = raw.Gender
+	r.Birthday = birthday
+	r.CreatedAt = createdAt
+	r.UpdatedAt = updatedAt
+	return nil
+}
+
 // ApiserverTesteeListResponse 受试者列表响应（apiserver）
 type ApiserverTesteeListResponse struct {
 	Items      []*ApiserverTesteeResponse `json:"items"`
@@ -461,6 +502,42 @@ type TesteeResponse struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
+func (r *TesteeResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		CreatedAt string `json:"created_at,omitempty"`
+		UpdatedAt string `json:"updated_at,omitempty"`
+	}
+
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	var createdAt time.Time
+	var updatedAt time.Time
+	var err error
+	if strings.TrimSpace(raw.CreatedAt) != "" {
+		createdAt, err = parseFlexibleSeedRequiredTime(raw.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("parse created_at: %w", err)
+		}
+	}
+	if strings.TrimSpace(raw.UpdatedAt) != "" {
+		updatedAt, err = parseFlexibleSeedRequiredTime(raw.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("parse updated_at: %w", err)
+		}
+	}
+
+	r.ID = raw.ID
+	r.Name = raw.Name
+	r.CreatedAt = createdAt
+	r.UpdatedAt = updatedAt
+	return nil
+}
+
 // StaffResponse 员工响应（apiserver）。
 type StaffResponse struct {
 	ID        string    `json:"id"`
@@ -473,6 +550,47 @@ type StaffResponse struct {
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (r *StaffResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		ID        string   `json:"id"`
+		OrgID     string   `json:"org_id"`
+		UserID    string   `json:"user_id"`
+		Roles     []string `json:"roles"`
+		Name      string   `json:"name"`
+		Email     string   `json:"email,omitempty"`
+		Phone     string   `json:"phone,omitempty"`
+		IsActive  bool     `json:"is_active"`
+		CreatedAt string   `json:"created_at"`
+		UpdatedAt string   `json:"updated_at"`
+	}
+
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	createdAt, err := parseFlexibleSeedRequiredTime(raw.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("parse created_at: %w", err)
+	}
+	updatedAt, err := parseFlexibleSeedRequiredTime(raw.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("parse updated_at: %w", err)
+	}
+
+	r.ID = raw.ID
+	r.OrgID = raw.OrgID
+	r.UserID = raw.UserID
+	r.Roles = raw.Roles
+	r.Name = raw.Name
+	r.Email = raw.Email
+	r.Phone = raw.Phone
+	r.IsActive = raw.IsActive
+	r.CreatedAt = createdAt
+	r.UpdatedAt = updatedAt
+	return nil
 }
 
 // StaffListResponse 员工列表响应（apiserver）。
@@ -543,6 +661,43 @@ type AssessmentEntryResponse struct {
 	QRCodeURL     string     `json:"qrcode_url,omitempty"`
 }
 
+func (r *AssessmentEntryResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		ID            string  `json:"id"`
+		OrgID         string  `json:"org_id"`
+		ClinicianID   string  `json:"clinician_id"`
+		Token         string  `json:"token"`
+		TargetType    string  `json:"target_type"`
+		TargetCode    string  `json:"target_code"`
+		TargetVersion string  `json:"target_version,omitempty"`
+		IsActive      bool    `json:"is_active"`
+		ExpiresAt     *string `json:"expires_at,omitempty"`
+		QRCodeURL     string  `json:"qrcode_url,omitempty"`
+	}
+
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	expiresAt, err := parseFlexibleSeedNullableTime(raw.ExpiresAt)
+	if err != nil {
+		return fmt.Errorf("parse expires_at: %w", err)
+	}
+
+	r.ID = raw.ID
+	r.OrgID = raw.OrgID
+	r.ClinicianID = raw.ClinicianID
+	r.Token = raw.Token
+	r.TargetType = raw.TargetType
+	r.TargetCode = raw.TargetCode
+	r.TargetVersion = raw.TargetVersion
+	r.IsActive = raw.IsActive
+	r.ExpiresAt = expiresAt
+	r.QRCodeURL = raw.QRCodeURL
+	return nil
+}
+
 // AssessmentEntryListResponse 测评入口列表响应（apiserver）。
 type AssessmentEntryListResponse struct {
 	Items      []*AssessmentEntryResponse `json:"items"`
@@ -564,6 +719,47 @@ type RelationResponse struct {
 	IsActive     bool       `json:"is_active"`
 	BoundAt      time.Time  `json:"bound_at"`
 	UnboundAt    *time.Time `json:"unbound_at,omitempty"`
+}
+
+func (r *RelationResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		ID           string  `json:"id"`
+		OrgID        string  `json:"org_id"`
+		ClinicianID  string  `json:"clinician_id"`
+		TesteeID     string  `json:"testee_id"`
+		RelationType string  `json:"relation_type"`
+		SourceType   string  `json:"source_type"`
+		SourceID     *string `json:"source_id,omitempty"`
+		IsActive     bool    `json:"is_active"`
+		BoundAt      string  `json:"bound_at"`
+		UnboundAt    *string `json:"unbound_at,omitempty"`
+	}
+
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	boundAt, err := parseFlexibleSeedRequiredTime(raw.BoundAt)
+	if err != nil {
+		return fmt.Errorf("parse bound_at: %w", err)
+	}
+	unboundAt, err := parseFlexibleSeedNullableTime(raw.UnboundAt)
+	if err != nil {
+		return fmt.Errorf("parse unbound_at: %w", err)
+	}
+
+	r.ID = raw.ID
+	r.OrgID = raw.OrgID
+	r.ClinicianID = raw.ClinicianID
+	r.TesteeID = raw.TesteeID
+	r.RelationType = raw.RelationType
+	r.SourceType = raw.SourceType
+	r.SourceID = raw.SourceID
+	r.IsActive = raw.IsActive
+	r.BoundAt = boundAt
+	r.UnboundAt = unboundAt
+	return nil
 }
 
 // TesteeClinicianRelationResponse 受试者-从业者关系响应（apiserver）。
@@ -657,6 +853,62 @@ type IAMChildResponse struct {
 	DOB       string     `json:"dob,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+}
+
+func (r *IAMChildResponse) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		ID        string  `json:"id"`
+		LegalName string  `json:"legalName"`
+		Gender    *uint8  `json:"gender,omitempty"`
+		DOB       string  `json:"dob,omitempty"`
+		CreatedAt *string `json:"createdAt,omitempty"`
+		UpdatedAt *string `json:"updatedAt,omitempty"`
+	}
+
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	createdAt, err := parseFlexibleSeedNullableTime(raw.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("parse createdAt: %w", err)
+	}
+	updatedAt, err := parseFlexibleSeedNullableTime(raw.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("parse updatedAt: %w", err)
+	}
+
+	r.ID = raw.ID
+	r.LegalName = raw.LegalName
+	r.Gender = raw.Gender
+	r.DOB = raw.DOB
+	r.CreatedAt = createdAt
+	r.UpdatedAt = updatedAt
+	return nil
+}
+
+func parseFlexibleSeedRequiredTime(raw string) (time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return time.Time{}, fmt.Errorf("time is empty")
+	}
+	return parseFlexibleSeedTime(value)
+}
+
+func parseFlexibleSeedNullableTime(raw *string) (*time.Time, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	value := strings.TrimSpace(*raw)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := parseFlexibleSeedTime(value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }
 
 // IAMChildPageResponse IAM 当前用户儿童分页响应。
