@@ -164,7 +164,7 @@ cache:
     questionnaire: "2h"      # 问卷缓存时间
     assessment_detail: "1h"    # 测评详情缓存时间
     assessment_status: "30m"   # 测评状态缓存时间
-    testee: "12h"              # 受试者缓存时间
+    testee: "30m"              # 受试者缓存时间
     plan: "12h"                # 计划缓存时间
   ttl_jitter_ratio: 0.1       # 缓存时间抖动比例
   statistics_warmup:          # 统计查询结果缓存预热配置

@@ -84,6 +84,10 @@ func (b *Builder) BuildEventProcessedKey(eventID string) string {
 	return AddNamespace("event:processed:" + eventID)
 }
 
+func (b *Builder) BuildEventProcessedBucketKey(date string) string {
+	return AddNamespace("event:processed:bucket:" + date)
+}
+
 func (b *Builder) BuildAnswerSheetProcessingLockKey(answerSheetID uint64) string {
 	return AddNamespace(fmt.Sprintf("answersheet:processing:%d", answerSheetID))
 }

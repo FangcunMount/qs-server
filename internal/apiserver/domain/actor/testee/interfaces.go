@@ -23,6 +23,9 @@ type Repository interface {
 	// FindByID 根据ID查找受试者
 	FindByID(ctx context.Context, id ID) (*Testee, error)
 
+	// FindByIDs 根据多个 ID 批量查找受试者。
+	FindByIDs(ctx context.Context, ids []ID) ([]*Testee, error)
+
 	// FindByProfile 根据用户档案ID查找受试者
 	FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*Testee, error)
 

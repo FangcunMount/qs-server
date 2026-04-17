@@ -67,6 +67,27 @@ func (r *testeeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.
 	return r.mapper.ToDomain(po), nil
 }
 
+func (r *testeeRepository) FindByIDs(ctx context.Context, ids []testee.ID) ([]*testee.Testee, error) {
+	if len(ids) == 0 {
+		return []*testee.Testee{}, nil
+	}
+
+	rawIDs := make([]uint64, 0, len(ids))
+	for _, id := range ids {
+		rawIDs = append(rawIDs, uint64(id))
+	}
+
+	var pos []*TesteePO
+	err := r.WithContext(ctx).
+		Where("id IN ? AND deleted_at IS NULL", rawIDs).
+		Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return r.mapper.ToDomains(pos), nil
+}
+
 // FindByProfile 根据用户档案ID查找受试者
 // 注意：当前 ProfileID 对应 IAM.Child.ID
 func (r *testeeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*testee.Testee, error) {

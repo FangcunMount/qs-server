@@ -8,7 +8,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 运行时主用途 | **对象缓存 / 列表缓存、统计查询缓存、统计 daily 中转、事件幂等、分布式互斥锁、微信 SDK token 缓存** |
+| 运行时主用途 | **对象缓存 / 列表缓存、统计查询缓存、统计 daily 中转、事件幂等分桶、分布式互斥锁、微信 SDK token 缓存** |
 | 主要使用方 | **`qs-apiserver`** 负责大部分缓存；**`qs-worker`** 负责统计幂等、问卷 daily 预聚合、answersheet 锁、plan scheduler 锁 |
 | 已清理的旧用法 | 运行时代码里已不再写旧的 window / accumulated / distribution 统计键族；问卷列表缓存、测评状态缓存、`CodesService` 的假 Redis 依赖、`collection-server` 运行时 Redis 装配都已移除 |
 | 命名空间 | Redis key 统一由 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/) 生成；`cache.namespace` 会同时作用于缓存、统计、锁和微信 SDK 缓存 |
@@ -48,7 +48,7 @@
 | 问卷当前已发布缓存 | `questionnaire:published:{code}` | `CreatePublishedSnapshot(active=true)` 写入；`FindPublishedByCode` miss 回填；发布激活切换时失效 | 面向提交和公开读取的当前已发布问卷 | `12h` |
 | 问卷精确版本缓存 | `questionnaire:{code}:{version}` | 发布快照写入；`FindByCodeVersion` miss 回填；按 `code` 家族失效 | 答卷、评估、历史回放按精确版本读取 | `12h`；空值 negative cache `5m` |
 | 测评详情缓存 | `assessment:detail:{id}` | `FindByID` miss 回填；`Save` / `Delete` 失效 | 测评详情、评估链路按 ID 查询 | `2h` |
-| 受试者缓存 | `testee:info:{id}` | `FindByID` miss 回填；`Save` / `Update` / `Delete` 失效 | 访问校验、受试者查询、关系管理 | `2h` |
+| 受试者缓存 | `testee:info:{id}` | **仅单条 `FindByID`** miss 回填；`Save` / `Update` / `Delete` 失效；批量 `FindByIDs` / 关系列表不写 Redis | 访问校验、受试者单条详情 | `30m` |
 | 计划缓存 | `plan:info:{id}` | `FindByID` miss 回填；`Save` 失效 | 计划查询、计划相关命令服务 | `2h` |
 | 已发布量表列表缓存 | `scale:list:v1` | 量表 / 因子变更后 `Rebuild`；查询 miss 也可触发重建 | 已发布量表列表查询 | Redis `10m` + 本地内存 `30s` |
 | 我的测评列表缓存 | `assess:list:{user}:v1:{hash}` | 列表查询 miss 回填；创建 / 提交后按用户前缀失效 | “我的测评列表”查询 | Redis `10m` + 本地内存 `30s` |
@@ -77,7 +77,7 @@
 | Key family | 谁在写 | 谁在读 | TTL | 用途 |
 | ---------- | ------ | ------ | --- | ---- |
 | `stats:query:{cacheKey}` | `system/questionnaire/testee/plan` 统计服务在 miss 后回填 | 同一批统计查询服务先读缓存，再回源 MySQL / 原始表 | `5m` | 统计查询结果缓存 |
-| `event:processed:{eventID}` | worker 统计 handler 处理成功后写入 | 同一 handler 在处理前检查 | `7d` | 统计事件幂等 |
+| `event:processed:bucket:{yyyy-mm-dd}` | worker 统计 handler 通过 Lua `SADD` 分桶写入 | 同一 handler 在处理前检查最近 7 个自然日分桶；兼容期内还会先查旧的 `event:processed:{eventID}` | `8d` | 统计事件幂等 |
 | `stats:daily:{org}:questionnaire:{code}:{date}` | worker 统计 handler 对问卷提交数 / 完成数做 `HINCRBY` | `SyncDailyStatistics`、`SyncAccumulatedStatistics`、`ValidateConsistency` | `90d` | 问卷 daily 中转站 |
 
 主要代码：
@@ -91,8 +91,21 @@
 - 运行时代码里已不再写旧的 window / accumulated / distribution 统计键族
 - `system`、`plan`、`testee` 统计现在主要依赖 **`stats:query:*` + MySQL / 原始表回源**
 - `questionnaire` 是唯一还保留 Redis daily 中转链的统计类型
+- `event:processed:*` 已重构为按天分桶的 `Set`，不再按事件生成独立顶层 key；兼容期只读旧单 key，不再新增旧格式 key
 - `worker` 默认 `cache.disable_statistics_cache=true`，见 [internal/worker/options/options.go](../../internal/worker/options/options.go)；如果不显式开启，`event:processed:*` 和 `stats:daily:*` 实际不会产生
 - `apiserver` 统计模块在 Redis 不可用时会降级，只保留无 Redis 的查询路径，见 [internal/apiserver/container/assembler/statistics.go](../../internal/apiserver/container/assembler/statistics.go)
+
+### 兼容期清理旧 `event:processed:{eventID}` 键
+
+重构上线后，旧单 key 会立即停止增长，但历史 key 仍会在 TTL 窗口内滞留。若需要一次性提前回收，可只删除**非 bucket** 的旧 key：
+
+```bash
+redis-cli --scan --pattern 'event:processed:*' \
+| grep -v '^event:processed:bucket:' \
+| xargs -r -L 500 redis-cli UNLINK
+```
+
+如果启用了 `cache.namespace`，请把 pattern 改成对应前缀，例如 `prod:event:processed:*`。
 
 ## 锁
 

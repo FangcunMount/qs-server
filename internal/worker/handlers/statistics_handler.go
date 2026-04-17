@@ -54,15 +54,18 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 		// 创建统计缓存实例
 		cache := statisticsCache.NewStatisticsCache(deps.RedisCache)
 
-		// 幂等性检查
-		processed, err := cache.IsEventProcessed(ctx, env.ID)
+		now := time.Now()
+
+		// 幂等性检查 + 原子 claim
+		claimed, err := cache.TryMarkEventProcessed(ctx, env.ID, now)
 		if err != nil {
-			deps.Logger.Error("failed to check event processed status",
+			deps.Logger.Error("failed to claim event processed marker",
 				slog.String("event_id", env.ID),
 				slog.String("error", err.Error()),
 			)
-			// 继续处理，不因检查失败而中断
-		} else if processed {
+			return nil
+		}
+		if !claimed {
 			deps.Logger.Info("event already processed, skipping",
 				slog.String("event_id", env.ID),
 			)
@@ -77,25 +80,13 @@ func handleStatisticsAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			)
 			return nil
 		}
-		// 获取当前日期
-		now := time.Now()
-		today := now
-
 		// 1. 更新每日统计（提交数）
-		if err := cache.IncrementDailyCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, data.QuestionnaireCode, today, "submission"); err != nil {
+		if err := cache.IncrementDailyCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, data.QuestionnaireCode, now, "submission"); err != nil {
 			deps.Logger.Error("failed to increment daily count",
 				slog.String("event_id", env.ID),
 				slog.String("error", err.Error()),
 			)
 			// 继续处理其他统计，不因单个失败而中断
-		}
-
-		// 标记事件已处理（TTL=7天）
-		if err := cache.MarkEventProcessed(ctx, env.ID, 7*24*time.Hour); err != nil {
-			deps.Logger.Error("failed to mark event as processed",
-				slog.String("event_id", env.ID),
-				slog.String("error", err.Error()),
-			)
 		}
 
 		deps.Logger.Info("statistics updated for assessment submitted",
@@ -140,14 +131,18 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 		// 创建统计缓存实例
 		cache := statisticsCache.NewStatisticsCache(deps.RedisCache)
 
-		// 幂等性检查
-		processed, err := cache.IsEventProcessed(ctx, env.ID)
+		now := time.Now()
+
+		// 幂等性检查 + 原子 claim
+		claimed, err := cache.TryMarkEventProcessed(ctx, env.ID, now)
 		if err != nil {
-			deps.Logger.Error("failed to check event processed status",
+			deps.Logger.Error("failed to claim event processed marker",
 				slog.String("event_id", env.ID),
 				slog.String("error", err.Error()),
 			)
-		} else if processed {
+			return nil
+		}
+		if !claimed {
 			deps.Logger.Info("event already processed, skipping",
 				slog.String("event_id", env.ID),
 			)
@@ -165,26 +160,14 @@ func handleStatisticsAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 		// ScaleCode 通常等同于 QuestionnaireCode（量表就是问卷）
 		questionnaireCode := data.ScaleCode
 
-		// 获取当前日期
-		now := time.Now()
-		today := now
-
 		// 1. 更新每日统计（完成数）
 		if questionnaireCode != "" {
-			if err := cache.IncrementDailyCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, questionnaireCode, today, "completion"); err != nil {
+			if err := cache.IncrementDailyCount(ctx, orgID, statistics.StatisticTypeQuestionnaire, questionnaireCode, now, "completion"); err != nil {
 				deps.Logger.Error("failed to increment daily completion count",
 					slog.String("event_id", env.ID),
 					slog.String("error", err.Error()),
 				)
 			}
-		}
-
-		// 标记事件已处理（TTL=7天）
-		if err := cache.MarkEventProcessed(ctx, env.ID, 7*24*time.Hour); err != nil {
-			deps.Logger.Error("failed to mark event as processed",
-				slog.String("event_id", env.ID),
-				slog.String("error", err.Error()),
-			)
 		}
 
 		deps.Logger.Debug("statistics updated for assessment interpreted",

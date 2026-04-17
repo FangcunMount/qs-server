@@ -18,7 +18,7 @@ const (
 )
 
 // DefaultTesteeCacheTTL 默认受试者缓存 TTL（可被配置覆盖）
-var DefaultTesteeCacheTTL = 2 * time.Hour
+var DefaultTesteeCacheTTL = 30 * time.Minute
 
 // NegativeCacheTTL 空值缓存 TTL（可被配置覆盖）
 var NegativeCacheTTL = 5 * time.Minute
@@ -83,6 +83,10 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 	}
 
 	return domain, nil
+}
+
+func (r *CachedTesteeRepository) FindByIDs(ctx context.Context, ids []testee.ID) ([]*testee.Testee, error) {
+	return r.repo.FindByIDs(ctx, ids)
 }
 
 // Save 保存受试者（同时失效缓存）

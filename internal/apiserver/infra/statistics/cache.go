@@ -13,8 +13,30 @@ import (
 
 const (
 	// 统计类键生命周期
-	DefaultDailyStatsTTL = 90 * 24 * time.Hour
+	DefaultDailyStatsTTL     = 90 * 24 * time.Hour
+	eventProcessedWindowDays = 7
+	eventProcessedBucketTTL  = 8 * 24 * time.Hour
 )
+
+var tryMarkEventProcessedScript = redis.NewScript(`
+if redis.call("EXISTS", KEYS[1]) == 1 then
+	return 0
+end
+
+for i = 2, #KEYS do
+	if redis.call("SISMEMBER", KEYS[i], ARGV[1]) == 1 then
+		return 0
+	end
+end
+
+local added = redis.call("SADD", KEYS[2], ARGV[1])
+if added == 1 then
+	redis.call("EXPIRE", KEYS[2], tonumber(ARGV[2]))
+	return 1
+end
+
+return 0
+`)
 
 // normalizeDate 将日期统一到本地时区的 00:00:00，避免跨日边界差异
 func normalizeDate(t time.Time) time.Time {
@@ -34,6 +56,20 @@ func NewStatisticsCache(client redis.UniversalClient) *StatisticsCache {
 		client: client,
 		keys:   rediskey.NewBuilder(),
 	}
+}
+
+func (c *StatisticsCache) TryMarkEventProcessed(ctx context.Context, eventID string, now time.Time) (bool, error) {
+	result, err := tryMarkEventProcessedScript.Run(
+		ctx,
+		c.client,
+		c.eventProcessedKeys(eventID, now),
+		eventID,
+		int(eventProcessedBucketTTL/time.Second),
+	).Int()
+	if err != nil {
+		return false, fmt.Errorf("try mark event processed: %w", err)
+	}
+	return result == 1, nil
 }
 
 // ==================== 每日统计 ====================
@@ -155,4 +191,14 @@ func (c *StatisticsCache) ensureTTL(ctx context.Context, key string, ttl time.Du
 	}
 	// 直接刷新 TTL（滑动窗口），不区分新老键，确保历史无 TTL 键被覆盖
 	return c.client.Expire(ctx, key, ttl).Err()
+}
+
+func (c *StatisticsCache) eventProcessedKeys(eventID string, now time.Time) []string {
+	keys := make([]string, 0, 1+eventProcessedWindowDays)
+	keys = append(keys, c.keys.BuildEventProcessedKey(eventID))
+	for dayOffset := 0; dayOffset < eventProcessedWindowDays; dayOffset++ {
+		dateKey := normalizeDate(now).AddDate(0, 0, -dayOffset).Format("2006-01-02")
+		keys = append(keys, c.keys.BuildEventProcessedBucketKey(dateKey))
+	}
+	return keys
 }

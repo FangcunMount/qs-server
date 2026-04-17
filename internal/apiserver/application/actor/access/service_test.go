@@ -161,6 +161,12 @@ func (s *stubTesteeRepository) Update(ctx context.Context, testee *domainTestee.
 func (s *stubTesteeRepository) FindByID(ctx context.Context, id domainTestee.ID) (*domainTestee.Testee, error) {
 	return s.item, nil
 }
+func (s *stubTesteeRepository) FindByIDs(ctx context.Context, ids []domainTestee.ID) ([]*domainTestee.Testee, error) {
+	if s.item == nil {
+		return []*domainTestee.Testee{}, nil
+	}
+	return []*domainTestee.Testee{s.item}, nil
+}
 func (s *stubTesteeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*domainTestee.Testee, error) {
 	panic("unexpected call")
 }

@@ -280,7 +280,7 @@ func NewCacheOptions() *CacheOptions {
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
 			AssessmentStatus: 30 * time.Minute,
-			Testee:           2 * time.Hour,
+			Testee:           30 * time.Minute,
 			Plan:             2 * time.Hour,
 			Negative:         5 * time.Minute,
 		},
@@ -309,7 +309,7 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
 			AssessmentStatus: 30 * time.Minute,
-			Testee:           2 * time.Hour,
+			Testee:           30 * time.Minute,
 			Plan:             2 * time.Hour,
 		}
 	}

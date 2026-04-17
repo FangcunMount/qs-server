@@ -251,14 +251,16 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 		return nil, errors.Wrap(err, "failed to count relations")
 	}
 
+	testeesByID, err := s.loadTesteesByID(ctx, extractRelationTesteeIDs(relations))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to batch load assigned testees")
+	}
+
 	items := make([]*AssignedTesteeResult, 0, len(relations))
 	for _, item := range relations {
-		testeeItem, err := s.testeeRepo.FindByID(ctx, item.TesteeID())
-		if err != nil {
-			if errors.IsCode(err, code.ErrUserNotFound) {
-				continue
-			}
-			return nil, errors.Wrap(err, "failed to find assigned testee")
+		testeeItem := testeesByID[item.TesteeID()]
+		if testeeItem == nil {
+			continue
 		}
 		items = append(items, toAssignedTesteeResult(testeeItem))
 	}
@@ -358,14 +360,16 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 		}
 	}
 
+	testeesByID, err := s.loadTesteesByID(ctx, extractRelationTesteeIDs(relations))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to batch load clinician relation testees")
+	}
+
 	items := make([]*ClinicianRelationResult, 0, len(relations))
 	for _, relationItem := range relations {
-		testeeItem, err := s.testeeRepo.FindByID(ctx, relationItem.TesteeID())
-		if err != nil {
-			if errors.IsCode(err, code.ErrUserNotFound) {
-				continue
-			}
-			return nil, errors.Wrap(err, "failed to find testee")
+		testeeItem := testeesByID[relationItem.TesteeID()]
+		if testeeItem == nil {
+			continue
 		}
 		items = append(items, &ClinicianRelationResult{
 			Relation: toRelationResult(relationItem),
@@ -387,4 +391,41 @@ func normalizeAssignmentRelationType(raw string) (domainRelation.RelationType, e
 		return "", errors.WithCode(code.ErrInvalidArgument, "unsupported clinician relation type")
 	}
 	return relationType, nil
+}
+
+func extractRelationTesteeIDs(relations []*domainRelation.ClinicianTesteeRelation) []domainTestee.ID {
+	ids := make([]domainTestee.ID, 0, len(relations))
+	seen := make(map[domainTestee.ID]struct{}, len(relations))
+	for _, relationItem := range relations {
+		if relationItem == nil {
+			continue
+		}
+		testeeID := relationItem.TesteeID()
+		if _, ok := seen[testeeID]; ok {
+			continue
+		}
+		seen[testeeID] = struct{}{}
+		ids = append(ids, testeeID)
+	}
+	return ids
+}
+
+func (s *relationshipService) loadTesteesByID(ctx context.Context, ids []domainTestee.ID) (map[domainTestee.ID]*domainTestee.Testee, error) {
+	if len(ids) == 0 {
+		return map[domainTestee.ID]*domainTestee.Testee{}, nil
+	}
+
+	items, err := s.testeeRepo.FindByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[domainTestee.ID]*domainTestee.Testee, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		result[item.ID()] = item
+	}
+	return result, nil
 }

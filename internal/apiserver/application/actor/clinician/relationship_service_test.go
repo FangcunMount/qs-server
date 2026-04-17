@@ -82,9 +82,108 @@ func TestTransferPrimaryUnbindsExistingPrimary(t *testing.T) {
 	}
 }
 
+func TestListAssignedTesteesBatchLoadsTestees(t *testing.T) {
+	relationRepo := &relationshipServiceRelationRepo{
+		activeByClinician: []*domainRelation.ClinicianTesteeRelation{
+			makeActiveRelation(10, 21),
+			makeActiveRelation(10, 20),
+		},
+	}
+	testeeRepo := &relationshipServiceTesteeRepo{
+		byID: map[domainTestee.ID]*domainTestee.Testee{
+			20: makeTestee(20),
+			21: makeTestee(21),
+		},
+	}
+	svc := &relationshipService{
+		relationRepo: relationRepo,
+		testeeRepo:   testeeRepo,
+	}
+
+	result, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{
+		OrgID:       1,
+		ClinicianID: 10,
+		Offset:      0,
+		Limit:       10,
+	})
+	if err != nil {
+		t.Fatalf("expected list assigned testees to succeed: %v", err)
+	}
+	if testeeRepo.findByIDsCalls != 1 {
+		t.Fatalf("expected FindByIDs to be called once, got %d", testeeRepo.findByIDsCalls)
+	}
+	if testeeRepo.findByIDCalls != 0 {
+		t.Fatalf("expected FindByID not to be called, got %d", testeeRepo.findByIDCalls)
+	}
+	if len(result.Items) != 2 {
+		t.Fatalf("expected 2 assigned testees, got %d", len(result.Items))
+	}
+	if result.Items[0].ID != 21 || result.Items[1].ID != 20 {
+		t.Fatalf("expected relation order to be preserved, got %+v", result.Items)
+	}
+}
+
+func TestListClinicianRelationsBatchLoadsTestees(t *testing.T) {
+	relationRepo := &relationshipServiceRelationRepo{
+		activeByClinician: []*domainRelation.ClinicianTesteeRelation{
+			makeActiveRelation(10, 30),
+			makeActiveRelation(10, 31),
+		},
+	}
+	testeeRepo := &relationshipServiceTesteeRepo{
+		byID: map[domainTestee.ID]*domainTestee.Testee{
+			30: makeTestee(30),
+			31: makeTestee(31),
+		},
+	}
+	svc := &relationshipService{
+		relationRepo: relationRepo,
+		testeeRepo:   testeeRepo,
+	}
+
+	result, err := svc.ListClinicianRelations(context.Background(), ListClinicianRelationDTO{
+		OrgID:       1,
+		ClinicianID: 10,
+		ActiveOnly:  true,
+		Offset:      0,
+		Limit:       10,
+	})
+	if err != nil {
+		t.Fatalf("expected list clinician relations to succeed: %v", err)
+	}
+	if testeeRepo.findByIDsCalls != 1 {
+		t.Fatalf("expected FindByIDs to be called once, got %d", testeeRepo.findByIDsCalls)
+	}
+	if testeeRepo.findByIDCalls != 0 {
+		t.Fatalf("expected FindByID not to be called, got %d", testeeRepo.findByIDCalls)
+	}
+	if len(result.Items) != 2 {
+		t.Fatalf("expected 2 clinician relations, got %d", len(result.Items))
+	}
+	if result.Items[0].Testee.ID != 30 || result.Items[1].Testee.ID != 31 {
+		t.Fatalf("expected relation order to be preserved, got %+v", result.Items)
+	}
+}
+
 func makeActiveClinician(id uint64) *domainClinician.Clinician {
 	item := domainClinician.NewClinician(1, nil, "clinician", "", "", domainClinician.TypeCounselor, "", true)
 	item.SetID(domainClinician.ID(id))
+	return item
+}
+
+func makeActiveRelation(clinicianID, testeeID uint64) *domainRelation.ClinicianTesteeRelation {
+	item := domainRelation.NewClinicianTesteeRelation(
+		1,
+		domainClinician.ID(clinicianID),
+		domainTestee.ID(testeeID),
+		domainRelation.RelationTypeAttending,
+		domainRelation.SourceTypeManual,
+		nil,
+		true,
+		time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC),
+		nil,
+	)
+	item.SetID(domainRelation.ID(testeeID))
 	return item
 }
 
@@ -98,6 +197,8 @@ type relationshipServiceRelationRepo struct {
 	saved                 *domainRelation.ClinicianTesteeRelation
 	updated               *domainRelation.ClinicianTesteeRelation
 	activePrimaryByTestee *domainRelation.ClinicianTesteeRelation
+	activeByClinician     []*domainRelation.ClinicianTesteeRelation
+	historyByClinician    []*domainRelation.ClinicianTesteeRelation
 }
 
 func (s *relationshipServiceRelationRepo) Save(ctx context.Context, item *domainRelation.ClinicianTesteeRelation) error {
@@ -130,15 +231,15 @@ func (s *relationshipServiceRelationRepo) FindActiveByTypes(ctx context.Context,
 }
 
 func (s *relationshipServiceRelationRepo) ListActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType, offset, limit int) ([]*domainRelation.ClinicianTesteeRelation, error) {
-	return nil, nil
+	return s.activeByClinician, nil
 }
 
 func (s *relationshipServiceRelationRepo) ListHistoryByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
-	return nil, nil
+	return s.historyByClinician, nil
 }
 
 func (s *relationshipServiceRelationRepo) CountActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType) (int64, error) {
-	return 0, nil
+	return int64(len(s.activeByClinician)), nil
 }
 
 func (s *relationshipServiceRelationRepo) ListActiveByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) ([]*domainRelation.ClinicianTesteeRelation, error) {
@@ -190,7 +291,10 @@ func (s *relationshipServiceClinicianRepo) Delete(ctx context.Context, id domain
 }
 
 type relationshipServiceTesteeRepo struct {
-	item *domainTestee.Testee
+	item           *domainTestee.Testee
+	byID           map[domainTestee.ID]*domainTestee.Testee
+	findByIDCalls  int
+	findByIDsCalls int
 }
 
 func (s *relationshipServiceTesteeRepo) Save(ctx context.Context, testee *domainTestee.Testee) error {
@@ -202,7 +306,33 @@ func (s *relationshipServiceTesteeRepo) Update(ctx context.Context, testee *doma
 }
 
 func (s *relationshipServiceTesteeRepo) FindByID(ctx context.Context, id domainTestee.ID) (*domainTestee.Testee, error) {
+	s.findByIDCalls++
+	if s.byID != nil {
+		item := s.byID[id]
+		if item == nil {
+			return nil, cbErrors.WithCode(code.ErrUserNotFound, "testee not found")
+		}
+		return item, nil
+	}
 	return s.item, nil
+}
+
+func (s *relationshipServiceTesteeRepo) FindByIDs(ctx context.Context, ids []domainTestee.ID) ([]*domainTestee.Testee, error) {
+	s.findByIDsCalls++
+	if s.byID == nil {
+		if s.item == nil {
+			return []*domainTestee.Testee{}, nil
+		}
+		return []*domainTestee.Testee{s.item}, nil
+	}
+
+	items := make([]*domainTestee.Testee, 0, len(ids))
+	for i := len(ids) - 1; i >= 0; i-- {
+		if item := s.byID[ids[i]]; item != nil {
+			items = append(items, item)
+		}
+	}
+	return items, nil
 }
 
 func (s *relationshipServiceTesteeRepo) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*domainTestee.Testee, error) {

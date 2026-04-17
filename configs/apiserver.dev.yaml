@@ -159,7 +159,7 @@ cache:
     questionnaire: "8h"
     assessment_detail: "1h30m"
     assessment_status: "20m"
-    testee: "1h"
+    testee: "30m"
     plan: "1h"
   ttl_jitter_ratio: 0.1
 
