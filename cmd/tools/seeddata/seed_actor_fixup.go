@@ -55,7 +55,13 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 		return nil
 	}
 
+	schedule, err := normalizeActorWaveSchedule(deps.Config.ActorTimeline)
+	if err != nil {
+		return err
+	}
+
 	anchors := make(map[uint64]actorFixupClinicianAnchor, len(rows))
+	allocators := make(map[uint64]*actorWaveAllocator, len(rows))
 	relationsUpdated := 0
 	relationsSkipped := 0
 	relationProgress := newSeedProgressBar("actor_fixup relations", len(rows))
@@ -73,7 +79,7 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 			continue
 		}
 
-		boundAt, err := deriveRelationBoundAt(row.TesteeCreatedAt, row.RelationType)
+		minBoundAt, err := deriveRelationBoundAt(row.TesteeCreatedAt, row.RelationType)
 		if err != nil {
 			relationsSkipped++
 			deps.Logger.Warnw("Skipping relation timestamp fixup because relation type is unsupported",
@@ -85,6 +91,12 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 			relationProgress.Increment()
 			continue
 		}
+		allocator := allocators[row.ClinicianID]
+		if allocator == nil {
+			allocator = newActorWaveAllocator(minBoundAt, schedule)
+			allocators[row.ClinicianID] = allocator
+		}
+		boundAt := allocator.NextAtOrAfter(minBoundAt)
 		if err := updateActorFixupRelation(ctx, mysqlDB, row.RelationID, boundAt); err != nil {
 			return err
 		}
@@ -133,6 +145,12 @@ func seedActorFixupTimestamps(ctx context.Context, deps *dependencies) error {
 
 	deps.Logger.Infow("Actor timestamp fixup completed",
 		"org_id", deps.Config.Global.OrgID,
+		"wave_interval", schedule.WaveInterval.String(),
+		"wave_weeks", schedule.WaveWeeks,
+		"wave_days", schedule.WaveDays,
+		"day_start_hour", schedule.DayStartHour,
+		"day_end_hour", schedule.DayEndHour,
+		"slot_interval", schedule.SlotInterval.String(),
 		"relations_loaded", len(rows),
 		"relations_updated", relationsUpdated,
 		"relations_skipped", relationsSkipped,

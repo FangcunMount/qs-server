@@ -253,6 +253,8 @@ testeeAssignments:
   - key: "seed_primary_pool_all"
     strategy: "random"
     relationType: "primary"
+    focusTargetCount: 10
+    focusTargetRatio: 0.85
     clinicianIds: &seed_clinician_ids
       - "614995509882401326"
       - "615085224266576430"
@@ -283,6 +285,14 @@ testeeAssignments:
     testeeOffset: 0
     testeePageSize: 100
     includeAlreadyAssigned: false
+
+actorTimeline:
+  waveInterval: "90d"
+  waveWeeks: 4
+  waveDaysOfWeek: [1, 3, 5]
+  dayStartHour: 9
+  dayEndHour: 18
+  slotInterval: "10m"
 
 assessmentEntryTargets:
   - key: "scale_3adyDE"

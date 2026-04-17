@@ -57,6 +57,7 @@ const (
 	stepAssessmentByEntry    seedStep = "assessment_by_entry"
 	stepAssessmentEntryFixup seedStep = "assessment_entry_fixup_timestamps"
 	stepAssessmentFixup      seedStep = "assessment_fixup_timestamps"
+	stepAssessmentRetime     seedStep = "assessment_retime_timestamps"
 	stepDailySimulation      seedStep = "daily_simulation"
 	stepAssessment           seedStep = "assessment"         // 提交答卷并生成测评
 	stepPlan                 seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
@@ -84,39 +85,46 @@ type dependencies struct {
 func main() {
 	// 解析命令行参数
 	var (
-		apiBaseURL                     = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
-		collectionBaseURL              = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
-		apiToken                       = flag.String("api-token", "", "API authentication token")
-		configFile                     = flag.String("config", "", "Base seed data config file (testees, legacy data)")
-		stepsRaw                       = flag.String("steps", "", "Comma-separated steps to run (default: all)")
-		planID                         = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
-		planWorkers                    = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
-		planSubmitWorkers              = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
-		planWaitWorkers                = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
-		planMaxInFlightTasks           = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
-		planSubmitQueueSize            = flag.Int("plan-submit-queue-size", 0, "Buffered queue size before plan task answersheet submission dispatch (defaults based on submit workers and inflight limit)")
-		planSubmitQPS                  = flag.Float64("plan-submit-qps", 0, "Global dequeue rate for plan task answersheet submission queue (0 = derive from submit workers)")
-		planSubmitBurst                = flag.Int("plan-submit-burst", 0, "Burst size for plan task answersheet submission queue dispatch (0 = derive from submit workers)")
-		planExpireRate                 = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
-		planTesteeIDsRaw               = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
-		localMySQLDSN                  = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override")
-		localMongoURI                  = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override")
-		localMongoDatabase             = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override")
-		localRedisAddr                 = flag.String("local-redis-addr", "", "Local seed_plan Redis address override")
-		localRedisUsername             = flag.String("local-redis-username", "", "Local seed_plan Redis username override")
-		localRedisPassword             = flag.String("local-redis-password", "", "Local seed_plan Redis password override")
-		localRedisDB                   = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override")
-		localPlanEntryBaseURL          = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override")
-		assessmentMin                  = flag.Int("assessment-min", 5, "Minimum assessments per testee")
-		assessmentMax                  = flag.Int("assessment-max", 10, "Maximum assessments per testee")
-		assessmentWorkers              = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
-		assessmentSubmitWorkers        = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
-		assignmentWorkers              = flag.Int("assignment-workers", 8, "Concurrent workers for testee-to-clinician assignment seeding")
-		testeePageSize                 = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
-		testeeOffset                   = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
-		testeeLimit                    = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan task creation (0 = no limit)")
-		assessmentCategories           = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
-		verbose                        = flag.Bool("verbose", false, "Enable verbose logging")
+		apiBaseURL                    = flag.String("api-base-url", "", "API base URL (e.g., http://localhost:18082)")
+		collectionBaseURL             = flag.String("collection-base-url", "", "Collection server API base URL (defaults to api-base-url)")
+		apiToken                      = flag.String("api-token", "", "API authentication token")
+		configFile                    = flag.String("config", "", "Base seed data config file (testees, legacy data)")
+		stepsRaw                      = flag.String("steps", "", "Comma-separated steps to run (default: all)")
+		planID                        = flag.String("plan-id", defaultPlanID, "Plan ID for plan backfill step")
+		planWorkers                   = flag.Int("plan-workers", 1, "Concurrent workers for plan backfill enrollment and task execution")
+		planSubmitWorkers             = flag.Int("plan-submit-workers", 0, "Concurrent workers for plan task answersheet submission (defaults to --plan-workers)")
+		planWaitWorkers               = flag.Int("plan-wait-workers", 0, "Concurrent workers for waiting plan task completion (defaults to --plan-workers)")
+		planMaxInFlightTasks          = flag.Int("plan-max-inflight-tasks", 0, "Maximum in-flight submitted plan tasks waiting for worker/apiserver completion (defaults based on submit/wait workers)")
+		planSubmitQueueSize           = flag.Int("plan-submit-queue-size", 0, "Buffered queue size before plan task answersheet submission dispatch (defaults based on submit workers and inflight limit)")
+		planSubmitQPS                 = flag.Float64("plan-submit-qps", 0, "Global dequeue rate for plan task answersheet submission queue (0 = derive from submit workers)")
+		planSubmitBurst               = flag.Int("plan-submit-burst", 0, "Burst size for plan task answersheet submission queue dispatch (0 = derive from submit workers)")
+		planExpireRate                = flag.Float64("plan-expire-rate", 0.2, "Ratio of opened plan tasks to expire instead of submit (0.0-1.0)")
+		planTesteeIDsRaw              = flag.String("plan-testee-ids", "", "Comma-separated testee IDs to include in plan backfill (overrides random sampling)")
+		localMySQLDSN                 = flag.String("local-mysql-dsn", "", "Local seed_plan MySQL DSN override")
+		localMongoURI                 = flag.String("local-mongo-uri", "", "Local seed_plan MongoDB URI override")
+		localMongoDatabase            = flag.String("local-mongo-database", "", "Local seed_plan MongoDB database override")
+		localRedisAddr                = flag.String("local-redis-addr", "", "Local seed_plan Redis address override")
+		localRedisUsername            = flag.String("local-redis-username", "", "Local seed_plan Redis username override")
+		localRedisPassword            = flag.String("local-redis-password", "", "Local seed_plan Redis password override")
+		localRedisDB                  = flag.Int("local-redis-db", -1, "Local seed_plan Redis DB override")
+		localPlanEntryBaseURL         = flag.String("local-plan-entry-base-url", "", "Local seed_plan plan entry base URL override")
+		assessmentMin                 = flag.Int("assessment-min", 5, "Minimum assessments per testee")
+		assessmentMax                 = flag.Int("assessment-max", 10, "Maximum assessments per testee")
+		assessmentWorkers             = flag.Int("assessment-workers", 10, "Concurrent workers for assessment seeding")
+		assessmentSubmitWorkers       = flag.Int("assessment-submit-workers", 10, "Concurrent workers for assessment submission")
+		assessmentRetimeTesteeIDsRaw  = flag.String("assessment-retime-testee-ids", "", "Comma-separated testee IDs to include in assessment retime step")
+		assessmentRetimeCreatedAfter  = flag.String("assessment-retime-created-after", "", "Only retime assessments created_at on/after this timestamp (RFC3339 or YYYY-MM-DD)")
+		assessmentRetimeCreatedBefore = flag.String("assessment-retime-created-before", "", "Only retime assessments created_at on/before this timestamp (RFC3339 or YYYY-MM-DD)")
+		assessmentRetimeOffset        = flag.String("assessment-retime-offset", "30d", "Target offset from testee.created_at for retimed assessment chains")
+		assessmentRetimeLimit         = flag.Int("assessment-retime-limit", 0, "Maximum number of assessments to retime (0 = no limit)")
+		assessmentRetimeAll           = flag.Bool("assessment-retime-all", false, "Allow retiming all matched assessments without a created_at/testee scope filter")
+		assessmentRetimeDryRun        = flag.Bool("assessment-retime-dry-run", false, "Preview assessment retime matches without writing data")
+		assignmentWorkers             = flag.Int("assignment-workers", 8, "Concurrent workers for testee-to-clinician assignment seeding")
+		testeePageSize                = flag.Int("testee-page-size", 1, "Page size when listing testees for assessment seeding")
+		testeeOffset                  = flag.Int("testee-offset", 0, "Starting offset when listing testees for assessment seeding")
+		testeeLimit                   = flag.Int("testee-limit", 0, "Maximum number of testees to load/process for assessment and plan task creation (0 = no limit)")
+		assessmentCategories          = flag.String("assessment-scale-categories", "", "Comma-separated scale categories to include (defaults to all)")
+		verbose                       = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
 	steps := parseSteps(*stepsRaw)
@@ -283,6 +291,16 @@ func main() {
 		ScopeTesteeIDs: parsePlanTesteeIDs(*planTesteeIDsRaw),
 		Verbose:        *verbose,
 	}
+	assessmentRetimeOpts := assessmentRetimeOptions{
+		ScopeTesteeIDs: parsePlanTesteeIDs(*assessmentRetimeTesteeIDsRaw),
+		CreatedAfter:   *assessmentRetimeCreatedAfter,
+		CreatedBefore:  *assessmentRetimeCreatedBefore,
+		Offset:         *assessmentRetimeOffset,
+		Limit:          *assessmentRetimeLimit,
+		AllowAll:       *assessmentRetimeAll,
+		DryRun:         *assessmentRetimeDryRun,
+		Verbose:        *verbose,
+	}
 
 	for _, step := range steps {
 		logger.Infow("Running seed step", "step", step)
@@ -306,8 +324,8 @@ func main() {
 			err = seedAssessmentByEntry(runCtx, deps)
 		case stepAssessmentEntryFixup:
 			err = legacySeedStepRemovedError(stepAssessmentEntryFixup)
-		case stepAssessmentFixup:
-			err = legacySeedStepRemovedError(stepAssessmentFixup)
+		case stepAssessmentFixup, stepAssessmentRetime:
+			err = seedAssessmentRetimeTimestamps(runCtx, deps, assessmentRetimeOpts)
 		case stepDailySimulation:
 			err = seedDailySimulation(runCtx, deps)
 		case stepAssessment:
@@ -425,6 +443,8 @@ func seedStepFailureMessage(step seedStep) string {
 		return "Assessment entry timestamp fixup failed"
 	case stepAssessmentFixup:
 		return "Assessment timestamp fixup failed"
+	case stepAssessmentRetime:
+		return "Assessment retime failed"
 	case stepDailySimulation:
 		return "Daily simulation seeding failed"
 	case stepAssessment:

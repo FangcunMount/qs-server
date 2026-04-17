@@ -83,6 +83,7 @@ type SeedConfig struct {
 	Clinicians              []ClinicianConfig             `yaml:"clinicians"`
 	ClinicianGenerators     []ClinicianGeneratorConfig    `yaml:"clinicianGenerators"`
 	TesteeAssignments       []TesteeAssignmentConfig      `yaml:"testeeAssignments"`
+	ActorTimeline           ActorTimelineConfig           `yaml:"actorTimeline"`
 	AssessmentEntryTargets  []AssessmentEntryTargetConfig `yaml:"assessmentEntryTargets"`
 	AssessmentEntryFlow     AssessmentEntryFlowConfig     `yaml:"assessmentEntryFlow"`
 	AssessmentByEntry       AssessmentByEntryConfig       `yaml:"assessmentByEntry"`
@@ -264,7 +265,19 @@ type TesteeAssignmentConfig struct {
 	TesteeOffset           int          `yaml:"testeeOffset"`
 	TesteeLimit            int          `yaml:"testeeLimit"`
 	TesteePageSize         int          `yaml:"testeePageSize"`
+	FocusTargetCount       int          `yaml:"focusTargetCount"`
+	FocusTargetRatio       FlexFloat    `yaml:"focusTargetRatio"`
 	IncludeAlreadyAssigned bool         `yaml:"includeAlreadyAssigned"`
+}
+
+// ActorTimelineConfig actor/relation 时间分布配置。
+type ActorTimelineConfig struct {
+	WaveInterval   string `yaml:"waveInterval"`
+	WaveWeeks      int    `yaml:"waveWeeks"`
+	DayStartHour   int    `yaml:"dayStartHour"`
+	DayEndHour     int    `yaml:"dayEndHour"`
+	SlotInterval   string `yaml:"slotInterval"`
+	WaveDaysOfWeek []int  `yaml:"waveDaysOfWeek"`
 }
 
 // AssessmentEntryTargetConfig clinician 共享测评入口目标配置。

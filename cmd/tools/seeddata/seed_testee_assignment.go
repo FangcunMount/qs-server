@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,6 +155,15 @@ func validateTesteeAssignmentConfig(cfg TesteeAssignmentConfig) error {
 	}
 	if cfg.TesteeOffset < 0 {
 		return fmt.Errorf("testeeOffset cannot be negative")
+	}
+	if cfg.FocusTargetCount < 0 {
+		return fmt.Errorf("focusTargetCount cannot be negative")
+	}
+	if cfg.FocusTargetCount > 0 {
+		ratio := cfg.FocusTargetRatio.Float64()
+		if ratio <= 0 || ratio >= 1 {
+			return fmt.Errorf("focusTargetRatio must be between 0 and 1 when focusTargetCount is set")
+		}
 	}
 	return nil
 }
@@ -456,6 +466,10 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 	}
 
 	strategy := normalizedAssignmentStrategy(cfg.Strategy)
+	selectionPool := buildWeightedAssignmentTargetPool(cfg, targets)
+	if len(selectionPool) == 0 {
+		selectionPool = targets
+	}
 	jobs := make([]testeeAssignmentJob, 0, len(testees))
 	switch strategy {
 	case testeeAssignmentStrategyRoundRobin:
@@ -465,7 +479,7 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 			}
 			jobs = append(jobs, testeeAssignmentJob{
 				TesteeID: strings.TrimSpace(testee.ID),
-				Target:   targets[(startIndex+idx)%len(targets)],
+				Target:   selectionPool[(startIndex+idx)%len(selectionPool)],
 			})
 		}
 	case testeeAssignmentStrategyRandom:
@@ -473,14 +487,14 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 			if testee == nil || strings.TrimSpace(testee.ID) == "" {
 				continue
 			}
-			targetIdx := stableRandomAssignmentIndex(cfg.Key, strings.TrimSpace(testee.ID), len(targets))
+			targetIdx := stableRandomAssignmentIndex(cfg.Key, strings.TrimSpace(testee.ID), len(selectionPool))
 			jobs = append(jobs, testeeAssignmentJob{
 				TesteeID: strings.TrimSpace(testee.ID),
-				Target:   targets[targetIdx],
+				Target:   selectionPool[targetIdx],
 			})
 		}
 	default:
-		target := targets[0]
+		target := selectionPool[0]
 		for _, testee := range testees {
 			if testee == nil || strings.TrimSpace(testee.ID) == "" {
 				continue
@@ -492,6 +506,49 @@ func buildTesteeAssignmentJobs(cfg TesteeAssignmentConfig, targets []clinicianAs
 		}
 	}
 	return jobs
+}
+
+func buildWeightedAssignmentTargetPool(cfg TesteeAssignmentConfig, targets []clinicianAssignmentTarget) []clinicianAssignmentTarget {
+	if len(targets) <= 1 {
+		return targets
+	}
+	focusCount := cfg.FocusTargetCount
+	if focusCount <= 0 || focusCount >= len(targets) {
+		return targets
+	}
+	focusRatio := cfg.FocusTargetRatio.Float64()
+	if focusRatio <= 0 || focusRatio >= 1 {
+		return targets
+	}
+
+	focusTargets := targets[:focusCount]
+	otherTargets := targets[focusCount:]
+	if len(otherTargets) == 0 {
+		return targets
+	}
+
+	focusPerTarget := focusRatio / float64(len(focusTargets))
+	otherPerTarget := (1 - focusRatio) / float64(len(otherTargets))
+	if focusPerTarget <= 0 || otherPerTarget <= 0 {
+		return targets
+	}
+
+	const resolution = 100
+	focusRepeats := max(1, int(math.Round(focusPerTarget*resolution)))
+	otherRepeats := max(1, int(math.Round(otherPerTarget*resolution)))
+
+	pool := make([]clinicianAssignmentTarget, 0, len(focusTargets)*focusRepeats+len(otherTargets)*otherRepeats)
+	for _, target := range focusTargets {
+		for i := 0; i < focusRepeats; i++ {
+			pool = append(pool, target)
+		}
+	}
+	for _, target := range otherTargets {
+		for i := 0; i < otherRepeats; i++ {
+			pool = append(pool, target)
+		}
+	}
+	return pool
 }
 
 func stableRandomAssignmentIndex(assignmentKey, testeeID string, targetCount int) int {

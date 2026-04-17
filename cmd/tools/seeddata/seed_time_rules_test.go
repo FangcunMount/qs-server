@@ -98,3 +98,33 @@ func TestNormalizeEntryLimits(t *testing.T) {
 		t.Fatalf("unexpected default max assessments: got=%d want=%d", got, seedByEntryDefaultMaxCount)
 	}
 }
+
+func TestActorWaveAllocatorProducesWavePattern(t *testing.T) {
+	schedule := actorWaveSchedule{
+		WaveInterval: 90 * 24 * time.Hour,
+		WaveWeeks:    1,
+		DayStartHour: 9,
+		DayEndHour:   10,
+		SlotInterval: 30 * time.Minute,
+		WaveDays:     []time.Weekday{time.Monday},
+	}
+	base := time.Date(2026, 4, 7, 8, 0, 0, 0, time.Local) // Tuesday
+	allocator := newActorWaveAllocator(base, schedule)
+
+	first := allocator.NextAtOrAfter(base)
+	second := allocator.NextAtOrAfter(base)
+	third := allocator.NextAtOrAfter(base)
+
+	if first.Weekday() != time.Monday || first.Hour() != 9 || first.Minute() != 0 {
+		t.Fatalf("unexpected first slot: %v", first)
+	}
+	if second.Weekday() != time.Monday || second.Hour() != 9 || second.Minute() != 30 {
+		t.Fatalf("unexpected second slot: %v", second)
+	}
+	if third.Sub(second) < 80*24*time.Hour {
+		t.Fatalf("expected third slot to jump to next wave, got gap=%v third=%v", third.Sub(second), third)
+	}
+	if third.Weekday() != time.Monday || third.Hour() != 9 || third.Minute() != 0 {
+		t.Fatalf("unexpected third slot: %v", third)
+	}
+}

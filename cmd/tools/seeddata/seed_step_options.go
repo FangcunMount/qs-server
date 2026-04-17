@@ -49,6 +49,17 @@ type planFixupOptions struct {
 	Verbose        bool
 }
 
+type assessmentRetimeOptions struct {
+	ScopeTesteeIDs []string
+	CreatedAfter   string
+	CreatedBefore  string
+	Offset         string
+	Limit          int
+	AllowAll       bool
+	DryRun         bool
+	Verbose        bool
+}
+
 func (o planProcessOptions) withScope(scopeTesteeIDs []string, continuous bool) planProcessOptions {
 	o.ScopeTesteeIDs = append([]string(nil), scopeTesteeIDs...)
 	o.Continuous = continuous
