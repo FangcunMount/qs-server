@@ -48,6 +48,7 @@
 - `assessment_entries`
 - `assessment_entry_flow`
 - `assessment_by_entry`
+- `journey_rebuild_history`
 - `daily_simulation`
 - `daily_simulation_daemon`
 - `assessment`
@@ -61,7 +62,7 @@
 
 ## 3. 先看最重要的几个 step
 
-如果你只需要记住最常用的一组，先记这 6 个：
+如果你只需要记住最常用的一组，先记这 7 个：
 
 1. `staff,clinician`
    - 建员工和临床医师
@@ -73,13 +74,21 @@
    - 生成“入口打开 + intake”行为足迹
 5. `assessment_by_entry`
    - 从入口结果继续推进到真实测评与报告
-6. `statistics_backfill`
+6. `journey_rebuild_history`
+   - 不重放 API，直接从历史表重建 `behavior_footprint + assessment_episode`
+7. `statistics_backfill`
    - 按最新模型重建统计投影
 
 如果你只想补“测评服务过程”，一般重点是：
 
 ```bash
 assessment_entry_flow -> assessment_by_entry -> statistics_backfill
+```
+
+如果你不想重新走入口 / 提交链路，而是想基于现有历史表直接补建事实层，重点是：
+
+```bash
+journey_rebuild_history -> statistics_backfill
 ```
 
 ## 4. 每个 step 是干什么的
@@ -460,6 +469,7 @@ assessment_entry_flow -> assessment_by_entry -> statistics_backfill
 | [seed_assessment_entry.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment_entry.go) | `assessment_entries` |
 | [seed_assessment_entry_flow.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment_entry_flow.go) | `assessment_entry_flow` |
 | [seed_assessment_by_entry.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment_by_entry.go) | `assessment_by_entry` |
+| [seed_journey_rebuild_history.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_journey_rebuild_history.go) | `journey_rebuild_history` |
 | [seed_daily_simulation.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_daily_simulation.go) | `daily_simulation` |
 | [seed_daily_simulation_daemon.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_daily_simulation_daemon.go) | `daily_simulation_daemon` |
 | [seed_assessment.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment.go) | `assessment` 主流程 |
@@ -702,7 +712,7 @@ statistics_backfill
 
 - **资源构建工具**：`staff`、`clinician`、`assign_testees`、`assessment_entries`
 - **业务事实生成工具**：`assessment_entry_flow`、`assessment_by_entry`、`daily_simulation`、`daily_simulation_daemon`、`assessment`
-- **离线修正 / 重建工具**：`testee_fixup_created_at`、`actor_fixup_timestamps`、`plan_fixup_timestamps`、`statistics_backfill`
+- **离线修正 / 重建工具**：`testee_fixup_created_at`、`actor_fixup_timestamps`、`plan_fixup_timestamps`、`journey_rebuild_history`、`statistics_backfill`
 
 如果你不知道该跑什么，优先问自己一句：
 

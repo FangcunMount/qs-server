@@ -2,6 +2,8 @@ package handler
 
 import (
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -22,7 +24,6 @@ type StatisticsHandler struct {
 	readService                    statisticsApp.ReadService
 	periodicStatsService           statisticsApp.PeriodicStatsService
 	syncService                    statisticsApp.StatisticsSyncService
-	validatorService               statisticsApp.StatisticsValidatorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
 }
 
@@ -35,7 +36,6 @@ func NewStatisticsHandler(
 	readService statisticsApp.ReadService,
 	periodicStatsService statisticsApp.PeriodicStatsService,
 	syncService statisticsApp.StatisticsSyncService,
-	validatorService statisticsApp.StatisticsValidatorService,
 ) *StatisticsHandler {
 	return &StatisticsHandler{
 		systemStatisticsService:        systemStatisticsService,
@@ -45,7 +45,6 @@ func NewStatisticsHandler(
 		readService:                    readService,
 		periodicStatsService:           periodicStatsService,
 		syncService:                    syncService,
-		validatorService:               validatorService,
 	}
 }
 
@@ -88,6 +87,35 @@ func buildStatisticsQueryFilter(c *gin.Context) statisticsApp.QueryFilter {
 		From:   c.Query("from"),
 		To:     c.Query("to"),
 	}
+}
+
+func parseStatisticsSyncDateRange(c *gin.Context) (statisticsApp.SyncDailyOptions, error) {
+	startRaw := strings.TrimSpace(c.Query("start_date"))
+	endRaw := strings.TrimSpace(c.Query("end_date"))
+	if startRaw == "" && endRaw == "" {
+		return statisticsApp.SyncDailyOptions{}, nil
+	}
+	if startRaw == "" || endRaw == "" {
+		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "start_date 和 end_date 必须同时提供")
+	}
+
+	start, err := time.ParseInLocation("2006-01-02", startRaw, time.Local)
+	if err != nil {
+		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "start_date 格式无效，必须为 YYYY-MM-DD")
+	}
+	endInclusive, err := time.ParseInLocation("2006-01-02", endRaw, time.Local)
+	if err != nil {
+		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "end_date 格式无效，必须为 YYYY-MM-DD")
+	}
+	endExclusive := endInclusive.AddDate(0, 0, 1)
+	if !start.Before(endExclusive) {
+		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "start_date 不能晚于 end_date")
+	}
+
+	return statisticsApp.SyncDailyOptions{
+		StartDate: &start,
+		EndDate:   &endExclusive,
+	}, nil
 }
 
 type questionnaireBatchRequest struct {
@@ -476,11 +504,13 @@ func (h *StatisticsHandler) GetPlanStatistics(c *gin.Context) {
 
 // SyncDailyStatistics 同步每日统计（内部系统动作）
 // @Summary 同步每日统计
-// @Description 将Redis中的每日统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
+// @Description 从 MySQL 原始表重建每日统计；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param start_date query string false "补算开始日期（格式：YYYY-MM-DD）"
+// @Param end_date query string false "补算结束日期（格式：YYYY-MM-DD，包含当天）"
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
 // @Router /internal/v1/statistics/sync/daily [post]
@@ -493,7 +523,13 @@ func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 		return
 	}
 
-	if err := h.syncService.SyncDailyStatistics(ctx, orgID); err != nil {
+	opts, err := parseStatisticsSyncDateRange(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	if err := h.syncService.SyncDailyStatistics(ctx, orgID, opts); err != nil {
 		logger.L(ctx).Errorw("同步每日统计失败",
 			"action", "sync_daily_statistics",
 			"org_id", orgID,
@@ -508,7 +544,7 @@ func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 
 // SyncAccumulatedStatistics 同步累计统计（定时任务调用）
 // @Summary 同步累计统计
-// @Description 将Redis中的累计统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
+// @Description 从 MySQL 原始表与每日统计表重建累计统计；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
@@ -540,7 +576,7 @@ func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
 
 // SyncPlanStatistics 同步计划统计（定时任务调用）
 // @Summary 同步计划统计
-// @Description 同步计划统计数据到MySQL（定时任务调用）；仅 qs:admin 可访问
+// @Description 从 assessment_task 重建计划统计数据到 MySQL；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
@@ -568,36 +604,4 @@ func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 	}
 
 	h.Success(c, gin.H{"message": "计划统计同步完成"})
-}
-
-// ValidateConsistency 校验数据一致性（定时任务调用）
-// @Summary 校验数据一致性
-// @Description 校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）；仅 qs:admin 可访问
-// @Tags Statistics-Sync
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
-// @Success 200 {object} core.Response
-// @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/statistics/validate [post]
-func (h *StatisticsHandler) ValidateConsistency(c *gin.Context) {
-	ctx := c.Request.Context()
-	logger.L(ctx).Infow("校验数据一致性", "action", "validate_consistency")
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	if err := h.validatorService.ValidateConsistency(ctx, orgID); err != nil {
-		logger.L(ctx).Errorw("校验数据一致性失败",
-			"action", "validate_consistency",
-			"org_id", orgID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, gin.H{"message": "数据一致性校验完成"})
 }

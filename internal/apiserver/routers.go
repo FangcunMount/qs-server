@@ -1166,14 +1166,6 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitUserBurst,
 		statisticsModule.Handler.SyncPlanStatistics,
 	)...)
-	statistics.POST("/validate", r.rateLimitedHandlers(
-		r.rateCfg,
-		r.rateCfg.SubmitGlobalQPS,
-		r.rateCfg.SubmitGlobalBurst,
-		r.rateCfg.SubmitUserQPS,
-		r.rateCfg.SubmitUserBurst,
-		statisticsModule.Handler.ValidateConsistency,
-	)...)
 }
 
 // registerAdminRoutes 注册管理员路由

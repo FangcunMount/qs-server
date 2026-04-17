@@ -59,6 +59,9 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 		if err == nil && po != nil {
 			// 转换为领域对象
 			stats := s.convertAccumulatedPOToSystemStatistics(po, orgID)
+			if err := s.fillRealtimeTodayFields(ctx, orgID, stats); err != nil {
+				return nil, err
+			}
 
 			// 缓存结果（TTL=5分钟）
 			if s.cache != nil {
@@ -129,28 +132,9 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	}
 
 	// 今日新增
-	todayStart, tomorrowStart := currentDayBounds(time.Now())
-	var todayCount int64
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
-		Count(&todayCount).Error; err != nil {
+	if err := s.fillRealtimeTodayFields(ctx, orgID, result); err != nil {
 		return nil, err
 	}
-	result.TodayNewAssessments = todayCount
-
-	// 今日新增受试者
-	var todayNewTestees int64
-	if err := s.db.WithContext(ctx).
-		Table("testee").
-		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
-		Count(&todayNewTestees).Error; err != nil {
-		return nil, err
-	}
-	result.TodayNewTestees = todayNewTestees
-
-	// 今日新增答卷（MongoDB，暂时设为 0）
-	result.TodayNewAnswerSheets = 0
 
 	// 近30天趋势（从 statistics_daily 表查询）
 	result.AssessmentTrend = s.getDailyTrend(ctx, orgID)
@@ -216,6 +200,34 @@ func (s *systemStatisticsService) convertAccumulatedPOToSystemStatistics(
 	result.AssessmentTrend = s.getDailyTrend(context.Background(), orgID)
 
 	return result
+}
+
+func (s *systemStatisticsService) fillRealtimeTodayFields(
+	ctx context.Context,
+	orgID int64,
+	result *statistics.SystemStatistics,
+) error {
+	todayStart, tomorrowStart := currentDayBounds(time.Now())
+
+	var todayCount int64
+	if err := s.db.WithContext(ctx).
+		Table("assessment").
+		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
+		Count(&todayCount).Error; err != nil {
+		return err
+	}
+	result.TodayNewAssessments = todayCount
+
+	var todayNewTestees int64
+	if err := s.db.WithContext(ctx).
+		Table("testee").
+		Where("org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", orgID, todayStart, tomorrowStart).
+		Count(&todayNewTestees).Error; err != nil {
+		return err
+	}
+	result.TodayNewTestees = todayNewTestees
+	result.TodayNewAnswerSheets = 0
+	return nil
 }
 
 // getDailyTrend 获取每日趋势数据（近30天）

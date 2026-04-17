@@ -16,6 +16,7 @@ QS 系统测试数据生成工具。
 - 只想给已分配受试者的 clinician 批量创建测评入口：运行 `--steps assessment_entries`
 - 只想基于现有 testee 生成入口打开 / intake 行为足迹：运行 `--steps assessment_entry_flow`
 - 只想基于入口接入结果继续生成 `answersheet -> assessment_episode -> report`：运行 `--steps assessment_by_entry`
+- 只想基于现有历史表重建 `behavior_footprint + assessment_episode`：运行 `--steps journey_rebuild_history`
 - 想每天模拟一批新用户注册、建档、扫码并填报：运行 `--steps daily_simulation`
 - 想让 daily simulation 常驻后台、每天自动跑一批新用户：运行 `--steps daily_simulation_daemon`
 - 只想批量创建计划 task：运行 `--steps plan_create_tasks`
@@ -35,6 +36,7 @@ QS 系统测试数据生成工具。
 | 批量为已分配受试者的 clinician 创建测评入口 | `assessment_entries` | 否 | apiserver + 本地 MySQL |
 | 基于现有 testee 生成入口打开 / intake 行为足迹 | `assessment_entry_flow` | 否 | apiserver |
 | 基于入口接入结果继续生成真实测评服务过程 | `assessment_by_entry` | 否 | apiserver + collection-server + 本地 MySQL |
+| 基于现有历史表重建 `behavior_footprint + assessment_episode` | `journey_rebuild_history` | 否 | 本地 MySQL |
 | 每天模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation` | 否（推荐 cron） | apiserver + collection-server + IAM REST/gRPC |
 | 常驻后台，每天自动模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation_daemon` | 是 | apiserver + collection-server + IAM REST/gRPC |
 | 只生成测评数据 | `assessment` | 否 | apiserver + collection-server |
@@ -54,6 +56,7 @@ QS 系统测试数据生成工具。
 - `assessment_entries` 需要本地 `local.mysql_dsn`，因为脚本会把入口时间回填成基于 `testee.created_at` 的结果
 - `assessment_entry_flow` 只走真实入口公开 API，不再依赖本地 MySQL
 - `assessment_by_entry` 需要本地 `local.mysql_dsn`，用于从现有 creator relation 挑 candidate 并等待 assessment 落库
+- `journey_rebuild_history` 需要本地 `local.mysql_dsn`，因为它会直接重建 `behavior_footprint + assessment_episode`
 - `daily_simulation` 需要 `iam.loginUrl` 或 `iam.baseUrl`，以及可达的 `iam.grpc.address`
 - `daily_simulation_daemon` 与 `daily_simulation` 依赖相同，但会长期驻留进程，并使用本地状态文件避免同一天重复跑成功批次
 - `plan_create_tasks` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`、`local.redis_*`
@@ -86,6 +89,7 @@ actor_fixup_timestamps \
 assessment_entries \
 assessment_entry_flow \
 assessment_by_entry \
+journey_rebuild_history \
 assessment \
 plan_create_tasks \
 plan_process_tasks \
@@ -100,6 +104,7 @@ statistics_backfill
 - `actor_fixup_timestamps` 负责回填 actor 侧历史时间
 - `assessment_entry_flow` 负责通过真实公开入口 API 生成 `entry_opened` / `intake_confirmed` 等行为足迹
 - `assessment_by_entry` 负责通过真实答卷提交链路生成 `answersheet_submitted -> assessment_episode -> report_generated`
+- `journey_rebuild_history` 负责基于现有历史表离线重建 `behavior_footprint + assessment_episode`
 - `statistics_backfill` 负责按最新模型从 `behavior_footprint + assessment_episode` 重建 `analytics_projection_*`
 
 已删除的旧步骤：

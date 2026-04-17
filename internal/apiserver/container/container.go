@@ -35,11 +35,12 @@ var modulePool = make(map[string]assembler.Module)
 // 组合所有业务模块和基础设施组件
 type Container struct {
 	// 基础设施
-	mysqlDB      *gorm.DB
-	mongoDB      *mongo.Database
-	redisCache   redis.UniversalClient
-	cacheOptions ContainerCacheOptions
-	planEntryURL string
+	mysqlDB                    *gorm.DB
+	mongoDB                    *mongo.Database
+	redisCache                 redis.UniversalClient
+	cacheOptions               ContainerCacheOptions
+	planEntryURL               string
+	statisticsRepairWindowDays int
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -95,6 +96,8 @@ type ContainerOptions struct {
 	Cache ContainerCacheOptions
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
+	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
+	StatisticsRepairWindowDays int
 	// Silent suppresses container stdout bootstrap/cleanup prints.
 	Silent bool
 }
@@ -134,6 +137,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 
 	c.cacheOptions = opts.Cache
 	c.planEntryURL = opts.PlanEntryBaseURL
+	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.silent = opts.Silent
 
 	// 应用缓存 TTL 覆盖（仅在启动时设置一次，全局生效）
@@ -438,7 +442,7 @@ func (c *Container) initStatisticsModule() error {
 	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
 		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
 	}
-	if err := statisticsModule.Initialize(c.mysqlDB, redisClient, answerSheetRepo); err != nil {
+	if err := statisticsModule.Initialize(c.mysqlDB, redisClient, answerSheetRepo, c.statisticsRepairWindowDays); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 

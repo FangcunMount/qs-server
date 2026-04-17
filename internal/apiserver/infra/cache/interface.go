@@ -131,8 +131,3 @@ func (b *CacheKeyBuilder) BuildPlanInfoKey(id uint64) string {
 func (b *CacheKeyBuilder) BuildStatsQueryKey(statType, key string) string {
 	return rediskey.NewBuilder().BuildStatsQueryKey(statType + ":" + key)
 }
-
-// BuildEventProcessedKey 构建事件幂等性缓存键
-func (b *CacheKeyBuilder) BuildEventProcessedKey(eventID string) string {
-	return rediskey.NewBuilder().BuildEventProcessedKey(eventID)
-}

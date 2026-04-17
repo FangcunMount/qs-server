@@ -66,24 +66,8 @@ func (b *Builder) BuildPlanInfoKey(id uint64) string {
 	return AddNamespace(fmt.Sprintf("plan:info:%d", id))
 }
 
-func (b *Builder) BuildStatsDailyKey(orgID int64, statType, statKey, date string) string {
-	return AddNamespace(fmt.Sprintf("stats:daily:%d:%s:%s:%s", orgID, statType, statKey, date))
-}
-
-func (b *Builder) BuildStatsDailyPattern(orgID int64, statType string) string {
-	return AddNamespace(fmt.Sprintf("stats:daily:%d:%s:*", orgID, statType))
-}
-
 func (b *Builder) BuildStatsQueryKey(cacheKey string) string {
 	return AddNamespace("stats:query:" + cacheKey)
-}
-
-func (b *Builder) BuildEventProcessedKey(eventID string) string {
-	return AddNamespace("event:processed:" + eventID)
-}
-
-func (b *Builder) BuildEventProcessedBucketKey(date string) string {
-	return AddNamespace("event:processed:bucket:" + date)
 }
 
 func (b *Builder) BuildAnswerSheetProcessingLockKey(answerSheetID uint64) string {

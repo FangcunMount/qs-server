@@ -2,7 +2,6 @@ package apiserver
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -10,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
@@ -195,6 +195,12 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 				CompressPayload:        s.config.Cache.CompressPayload,
 			},
 			PlanEntryBaseURL: s.config.Plan.EntryBaseURL,
+			StatisticsRepairWindowDays: func() int {
+				if s.config.StatisticsSync == nil {
+					return 0
+				}
+				return s.config.StatisticsSync.RepairWindowDays
+			}(),
 		},
 	)
 	// 初始化 IAM 模块（优先）
@@ -386,7 +392,7 @@ func (s preparedAPIServer) Run() error {
 	return <-errChan
 }
 
-// startStatisticsSyncScheduler 启动统计同步定时任务（Redis -> MySQL）
+// startStatisticsSyncScheduler 启动统计同步定时任务（夜间批处理）。
 func (s *apiServer) startStatisticsSyncScheduler() {
 	opts := s.config.StatisticsSync
 	if opts == nil || !opts.Enable {
@@ -404,53 +410,75 @@ func (s *apiServer) startStatisticsSyncScheduler() {
 		return nil
 	}))
 
-	startTicker := func(name string, interval time.Duration, fn func(context.Context) error) {
-		if interval <= 0 {
-			log.Warnf("skip statistics sync %s: interval <= 0", name)
-			return
-		}
-		go func() {
-			// 统一初始延迟
-			if opts.InitialDelay > 0 {
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(opts.InitialDelay):
-				}
-			}
-			ticker := time.NewTicker(interval)
-			defer ticker.Stop()
-
-			for {
-				if err := fn(context.Background()); err != nil {
-					log.Warnf("statistics sync %s failed: %v", name, err)
-				}
-
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-				}
-			}
-		}()
+	runAt, err := parseStatisticsSyncRunAt(opts.RunAt)
+	if err != nil {
+		log.Warnf("statistics sync scheduler disabled: invalid run_at %q: %v", opts.RunAt, err)
+		return
 	}
 
 	syncSvc := s.container.StatisticsModule.SyncService
-	for _, orgID := range opts.OrgIDs {
-		scheduledOrgID := orgID
-		startTicker(fmt.Sprintf("daily(org=%d)", scheduledOrgID), opts.DailyInterval, func(ctx context.Context) error {
-			return syncSvc.SyncDailyStatistics(ctx, scheduledOrgID)
-		})
-		startTicker(fmt.Sprintf("accumulated(org=%d)", scheduledOrgID), opts.AccumulatedInterval, func(ctx context.Context) error {
-			return syncSvc.SyncAccumulatedStatistics(ctx, scheduledOrgID)
-		})
-		startTicker(fmt.Sprintf("plan(org=%d)", scheduledOrgID), opts.PlanInterval, func(ctx context.Context) error {
-			return syncSvc.SyncPlanStatistics(ctx, scheduledOrgID)
-		})
-	}
+	go func() {
+		for {
+			now := time.Now().In(time.Local)
+			nextRun := nextStatisticsSyncRun(now, runAt.hour, runAt.minute)
+			timer := time.NewTimer(time.Until(nextRun))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
 
-	log.Infof("statistics sync scheduler started (org_ids=%v, daily=%s, accum=%s, plan=%s, initial_delay=%s)",
-		opts.OrgIDs, opts.DailyInterval, opts.AccumulatedInterval, opts.PlanInterval, opts.InitialDelay)
+			for _, orgID := range opts.OrgIDs {
+				orgCtx := context.Background()
+				start, end := statisticsSyncRepairWindow(time.Now().In(time.Local), opts.RepairWindowDays)
+				dailyOpts := statisticsApp.SyncDailyOptions{StartDate: &start, EndDate: &end}
+				if err := syncSvc.SyncDailyStatistics(orgCtx, orgID, dailyOpts); err != nil {
+					log.Warnf("statistics nightly daily sync failed (org=%d): %v", orgID, err)
+					continue
+				}
+				if err := syncSvc.SyncAccumulatedStatistics(orgCtx, orgID); err != nil {
+					log.Warnf("statistics nightly accumulated sync failed (org=%d): %v", orgID, err)
+					continue
+				}
+				if err := syncSvc.SyncPlanStatistics(orgCtx, orgID); err != nil {
+					log.Warnf("statistics nightly plan sync failed (org=%d): %v", orgID, err)
+				}
+			}
+		}
+	}()
+
+	log.Infof("statistics sync scheduler started (org_ids=%v, run_at=%s, repair_window_days=%d)",
+		opts.OrgIDs, opts.RunAt, opts.RepairWindowDays)
+}
+
+type statisticsSyncClock struct {
+	hour   int
+	minute int
+}
+
+func parseStatisticsSyncRunAt(raw string) (statisticsSyncClock, error) {
+	parsed, err := time.ParseInLocation("15:04", raw, time.Local)
+	if err != nil {
+		return statisticsSyncClock{}, err
+	}
+	return statisticsSyncClock{hour: parsed.Hour(), minute: parsed.Minute()}, nil
+}
+
+func nextStatisticsSyncRun(now time.Time, hour, minute int) time.Time {
+	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+	if !next.After(now) {
+		next = next.AddDate(0, 0, 1)
+	}
+	return next
+}
+
+func statisticsSyncRepairWindow(now time.Time, repairWindowDays int) (time.Time, time.Time) {
+	if repairWindowDays <= 0 {
+		repairWindowDays = 7
+	}
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return todayStart.AddDate(0, 0, -repairWindowDays), todayStart
 }
 
 // startMongoOutboxRelay 启动 Mongo outbox relay（answersheet/report success events）。

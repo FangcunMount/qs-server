@@ -55,6 +55,7 @@ const (
 	stepAssessmentEntries     seedStep = "assessment_entries"
 	stepAssessmentEntryFlow   seedStep = "assessment_entry_flow"
 	stepAssessmentByEntry     seedStep = "assessment_by_entry"
+	stepJourneyRebuildHistory seedStep = "journey_rebuild_history"
 	stepAssessmentEntryFixup  seedStep = "assessment_entry_fixup_timestamps"
 	stepAssessmentFixup       seedStep = "assessment_fixup_timestamps"
 	stepAssessmentRetime      seedStep = "assessment_retime_timestamps"
@@ -323,6 +324,8 @@ func main() {
 			err = seedAssessmentEntryFlow(runCtx, deps)
 		case stepAssessmentByEntry:
 			err = seedAssessmentByEntry(runCtx, deps)
+		case stepJourneyRebuildHistory:
+			err = seedJourneyRebuildHistory(runCtx, deps)
 		case stepAssessmentEntryFixup:
 			err = legacySeedStepRemovedError(stepAssessmentEntryFixup)
 		case stepAssessmentFixup, stepAssessmentRetime:
@@ -442,6 +445,8 @@ func seedStepFailureMessage(step seedStep) string {
 		return "Assessment entry flow seeding failed"
 	case stepAssessmentByEntry:
 		return "Assessment by entry seeding failed"
+	case stepJourneyRebuildHistory:
+		return "Journey rebuild history failed"
 	case stepAssessmentEntryFixup:
 		return "Assessment entry timestamp fixup failed"
 	case stepAssessmentFixup:

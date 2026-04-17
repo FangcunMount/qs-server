@@ -358,23 +358,19 @@ type StatisticsWarmupOptions struct {
 
 // StatisticsSyncOptions 统计同步定时任务配置
 type StatisticsSyncOptions struct {
-	Enable              bool          `json:"enable" mapstructure:"enable"`
-	OrgIDs              []int64       `json:"org_ids" mapstructure:"org_ids"`
-	InitialDelay        time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
-	DailyInterval       time.Duration `json:"daily_interval" mapstructure:"daily_interval"`
-	AccumulatedInterval time.Duration `json:"accumulated_interval" mapstructure:"accumulated_interval"`
-	PlanInterval        time.Duration `json:"plan_interval" mapstructure:"plan_interval"`
+	Enable           bool    `json:"enable" mapstructure:"enable"`
+	OrgIDs           []int64 `json:"org_ids" mapstructure:"org_ids"`
+	RunAt            string  `json:"run_at" mapstructure:"run_at"`
+	RepairWindowDays int     `json:"repair_window_days" mapstructure:"repair_window_days"`
 }
 
-// NewStatisticsSyncOptions 默认开启，10 分钟一次
+// NewStatisticsSyncOptions 默认开启，每日凌晨 00:30 同步一次。
 func NewStatisticsSyncOptions() *StatisticsSyncOptions {
 	return &StatisticsSyncOptions{
-		Enable:              true,
-		OrgIDs:              []int64{1},
-		InitialDelay:        time.Minute,
-		DailyInterval:       10 * time.Minute,
-		AccumulatedInterval: 10 * time.Minute,
-		PlanInterval:        30 * time.Minute,
+		Enable:           true,
+		OrgIDs:           []int64{1},
+		RunAt:            "00:30",
+		RepairWindowDays: 7,
 	}
 }
 
@@ -383,12 +379,10 @@ func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
 	if s == nil {
 		return
 	}
-	fs.BoolVar(&s.Enable, "statistics_sync.enable", s.Enable, "Enable scheduled sync from Redis to MySQL for statistics.")
+	fs.BoolVar(&s.Enable, "statistics_sync.enable", s.Enable, "Enable scheduled nightly statistics sync.")
 	fs.Int64SliceVar(&s.OrgIDs, "statistics_sync.org-ids", s.OrgIDs, "Organization IDs included in scheduled statistics sync.")
-	fs.DurationVar(&s.InitialDelay, "statistics_sync.initial-delay", s.InitialDelay, "Initial delay before starting statistics sync schedulers.")
-	fs.DurationVar(&s.DailyInterval, "statistics_sync.daily-interval", s.DailyInterval, "Interval for syncing daily statistics.")
-	fs.DurationVar(&s.AccumulatedInterval, "statistics_sync.accumulated-interval", s.AccumulatedInterval, "Interval for syncing accumulated statistics.")
-	fs.DurationVar(&s.PlanInterval, "statistics_sync.plan-interval", s.PlanInterval, "Interval for syncing plan statistics.")
+	fs.StringVar(&s.RunAt, "statistics_sync.run-at", s.RunAt, "Daily wall-clock time for statistics sync, in HH:MM format.")
+	fs.IntVar(&s.RepairWindowDays, "statistics_sync.repair-window-days", s.RepairWindowDays, "Number of completed days to rebuild when running scheduled daily statistics sync.")
 }
 
 // Complete 完成配置选项

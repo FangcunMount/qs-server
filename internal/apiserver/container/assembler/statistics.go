@@ -32,7 +32,6 @@ type StatisticsModule struct {
 	ReadService                    statisticsApp.ReadService
 	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
-	ValidatorService               statisticsApp.StatisticsValidatorService
 	BehaviorProjectorService       statisticsApp.BehaviorProjectorService
 	testeeAccessService            actorAccessApp.TesteeAccessService
 }
@@ -46,6 +45,7 @@ func NewStatisticsModule() *StatisticsModule {
 // params[0]: *gorm.DB
 // params[1]: redis.UniversalClient (Redis缓存客户端)
 // params[2]: answersheet.Repository (问卷答卷仓储，可选)
+// params[3]: int repair window days（统计批处理默认回补窗口，可选）
 func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -69,6 +69,12 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 			answerSheetRepo = repo
 		}
 	}
+	repairWindowDays := 0
+	if len(params) > 3 {
+		if value, ok := params[3].(int); ok {
+			repairWindowDays = value
+		}
+	}
 
 	// 初始化 repository 层
 	m.Repo = statisticsInfra.NewStatisticsRepository(mysqlDB)
@@ -89,16 +95,7 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	m.ReadService = statisticsApp.NewReadService(mysqlDB, answerSheetRepo)
 	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(mysqlDB)
 	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(mysqlDB, m.Repo)
-
-	// 初始化同步和校验服务
-	if m.Cache != nil {
-		m.SyncService = statisticsApp.NewSyncService(m.Repo, m.Cache, mysqlDB)
-		m.ValidatorService = statisticsApp.NewValidatorService(m.Repo, m.Cache)
-	} else {
-		// Redis不可用时，同步服务无法工作
-		m.SyncService = nil
-		m.ValidatorService = nil
-	}
+	m.SyncService = statisticsApp.NewSyncService(mysqlDB, repairWindowDays)
 
 	// 初始化 handler 层
 	m.Handler = handler.NewStatisticsHandler(
@@ -109,7 +106,6 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 		m.ReadService,
 		m.PeriodicStatsService,
 		m.SyncService,
-		m.ValidatorService,
 	)
 	if m.testeeAccessService != nil {
 		m.Handler.SetTesteeAccessService(m.testeeAccessService)

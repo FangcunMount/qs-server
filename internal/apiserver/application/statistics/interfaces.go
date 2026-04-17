@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
@@ -50,20 +51,21 @@ type PeriodicStatsService interface {
 	GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*statistics.TesteePeriodicStatisticsResponse, error)
 }
 
+// SyncDailyOptions 每日统计同步窗口。
+// StartDate/EndDate 使用本地时区日界线，EndDate 为开区间。
+type SyncDailyOptions struct {
+	StartDate *time.Time
+	EndDate   *time.Time
+}
+
 // StatisticsSyncService 统计同步服务（定时任务）
 type StatisticsSyncService interface {
-	// SyncDailyStatistics 同步每日统计（Redis → MySQL）
-	SyncDailyStatistics(ctx context.Context, orgID int64) error
-	// SyncAccumulatedStatistics 同步累计统计（Redis → MySQL）
+	// SyncDailyStatistics 同步每日统计（原始表 → MySQL）
+	SyncDailyStatistics(ctx context.Context, orgID int64, opts SyncDailyOptions) error
+	// SyncAccumulatedStatistics 同步累计统计（MySQL 重建）
 	SyncAccumulatedStatistics(ctx context.Context, orgID int64) error
 	// SyncPlanStatistics 同步计划统计
 	SyncPlanStatistics(ctx context.Context, orgID int64) error
-}
-
-// StatisticsValidatorService 统计校验服务（定时任务）
-type StatisticsValidatorService interface {
-	// ValidateConsistency 校验数据一致性（Redis vs MySQL）
-	ValidateConsistency(ctx context.Context, orgID int64) error
 }
 
 // QueryFilter 通用统计查询过滤器。

@@ -9,12 +9,6 @@ func TestBuilderWithoutNamespace(t *testing.T) {
 	if got := builder.BuildStatsQueryKey("system:1"); got != "stats:query:system:1" {
 		t.Fatalf("unexpected stats query key: %s", got)
 	}
-	if got := builder.BuildEventProcessedKey("evt-1"); got != "event:processed:evt-1" {
-		t.Fatalf("unexpected event processed key: %s", got)
-	}
-	if got := builder.BuildEventProcessedBucketKey("2026-04-17"); got != "event:processed:bucket:2026-04-17" {
-		t.Fatalf("unexpected event processed bucket key: %s", got)
-	}
 	if got := builder.BuildAnswerSheetProcessingLockKey(42); got != "answersheet:processing:42" {
 		t.Fatalf("unexpected answersheet lock key: %s", got)
 	}
@@ -31,17 +25,8 @@ func TestBuilderWithNamespace(t *testing.T) {
 	defer ApplyNamespace("")
 
 	builder := NewBuilder()
-	if got := builder.BuildStatsDailyKey(1, "questionnaire", "PHQ9", "2026-04-15"); got != "dev:stats:daily:1:questionnaire:PHQ9:2026-04-15" {
-		t.Fatalf("unexpected namespaced stats daily key: %s", got)
-	}
-	if got := builder.BuildStatsDailyPattern(1, "questionnaire"); got != "dev:stats:daily:1:questionnaire:*" {
-		t.Fatalf("unexpected namespaced stats daily pattern: %s", got)
-	}
-	if got := builder.BuildEventProcessedKey("evt-1"); got != "dev:event:processed:evt-1" {
-		t.Fatalf("unexpected namespaced event processed key: %s", got)
-	}
-	if got := builder.BuildEventProcessedBucketKey("2026-04-17"); got != "dev:event:processed:bucket:2026-04-17" {
-		t.Fatalf("unexpected namespaced event processed bucket key: %s", got)
+	if got := builder.BuildStatsQueryKey("system:1"); got != "dev:stats:query:system:1" {
+		t.Fatalf("unexpected namespaced stats query key: %s", got)
 	}
 	if got := builder.BuildAnswerSheetProcessingLockKey(42); got != "dev:answersheet:processing:42" {
 		t.Fatalf("unexpected namespaced answersheet lock key: %s", got)
