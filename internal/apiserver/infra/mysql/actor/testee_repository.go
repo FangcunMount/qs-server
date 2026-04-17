@@ -111,6 +111,8 @@ func (r *testeeRepository) FindByOrgAndName(ctx context.Context, orgID int64, na
 	var pos []*TesteePO
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND name LIKE ? AND deleted_at IS NULL", orgID, "%"+name+"%").
+		Order("created_at DESC").
+		Order("id DESC").
 		Find(&pos).Error
 
 	if err != nil {
@@ -121,10 +123,15 @@ func (r *testeeRepository) FindByOrgAndName(ctx context.Context, orgID int64, na
 }
 
 // ListByOrg 列出机构下的受试者
-func (r *testeeRepository) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*testee.Testee, error) {
+func (r *testeeRepository) ListByOrg(
+	ctx context.Context,
+	orgID int64,
+	filter testee.ListFilter,
+	offset, limit int,
+) ([]*testee.Testee, error) {
 	var pos []*TesteePO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
+	err := r.filteredByOrg(ctx, orgID, filter).
+		Order("created_at DESC").
 		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
@@ -153,6 +160,7 @@ func (r *testeeRepository) ListByOrgAndIDs(
 	query := r.filteredByOrgAndIDs(ctx, orgID, ids, filter)
 
 	err := query.
+		Order("created_at DESC").
 		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
@@ -166,45 +174,13 @@ func (r *testeeRepository) ListByOrgAndIDs(
 
 // ListByTags 根据标签查找受试者
 func (r *testeeRepository) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*testee.Testee, error) {
-	var pos []*TesteePO
-
-	// 构建JSON查询条件
-	query := r.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NULL", orgID)
-
-	// 对每个标签添加JSON_CONTAINS条件
-	for _, tag := range tags {
-		query = query.Where("JSON_CONTAINS(tags, ?)", `"`+tag+`"`)
-	}
-
-	err := query.
-		Order("id DESC").
-		Offset(offset).
-		Limit(limit).
-		Find(&pos).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomains(pos), nil
+	return r.ListByOrg(ctx, orgID, testee.ListFilter{Tags: tags}, offset, limit)
 }
 
 // ListKeyFocus 列出重点关注的受试者
 func (r *testeeRepository) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*testee.Testee, error) {
-	var pos []*TesteePO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND is_key_focus = ? AND deleted_at IS NULL", orgID, true).
-		Order("id DESC").
-		Offset(offset).
-		Limit(limit).
-		Find(&pos).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomains(pos), nil
+	keyFocus := true
+	return r.ListByOrg(ctx, orgID, testee.ListFilter{KeyFocus: &keyFocus}, offset, limit)
 }
 
 // ListByProfileIDs 根据多个用户档案ID查找受试者列表
@@ -216,6 +192,7 @@ func (r *testeeRepository) ListByProfileIDs(ctx context.Context, profileIDs []ui
 	var pos []*TesteePO
 	err := r.WithContext(ctx).
 		Where("profile_id IN ? AND deleted_at IS NULL", profileIDs).
+		Order("created_at DESC").
 		Order("id DESC").
 		Offset(offset).
 		Limit(limit).
@@ -234,11 +211,10 @@ func (r *testeeRepository) Delete(ctx context.Context, id testee.ID) error {
 }
 
 // Count 统计机构下的受试者数量
-func (r *testeeRepository) Count(ctx context.Context, orgID int64) (int64, error) {
+func (r *testeeRepository) Count(ctx context.Context, orgID int64, filter testee.ListFilter) (int64, error) {
 	var count int64
-	err := r.WithContext(ctx).
+	err := r.filteredByOrg(ctx, orgID, filter).
 		Model(&TesteePO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Count(&count).Error
 
 	return count, err
@@ -257,6 +233,17 @@ func (r *testeeRepository) CountByOrgAndIDs(ctx context.Context, orgID int64, id
 	return count, err
 }
 
+func (r *testeeRepository) filteredByOrg(
+	ctx context.Context,
+	orgID int64,
+	filter testee.ListFilter,
+) *gorm.DB {
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
+
+	return r.applyFilter(query, filter)
+}
+
 func (r *testeeRepository) filteredByOrgAndIDs(
 	ctx context.Context,
 	orgID int64,
@@ -271,6 +258,10 @@ func (r *testeeRepository) filteredByOrgAndIDs(
 	query := r.WithContext(ctx).
 		Where("org_id = ? AND id IN ? AND deleted_at IS NULL", orgID, rawIDs)
 
+	return r.applyFilter(query, filter)
+}
+
+func (r *testeeRepository) applyFilter(query *gorm.DB, filter testee.ListFilter) *gorm.DB {
 	if filter.Name != "" {
 		query = query.Where("name LIKE ?", "%"+filter.Name+"%")
 	}
@@ -279,6 +270,12 @@ func (r *testeeRepository) filteredByOrgAndIDs(
 	}
 	for _, tag := range filter.Tags {
 		query = query.Where("JSON_CONTAINS(tags, ?)", `"`+tag+`"`)
+	}
+	if filter.CreatedAtStart != nil {
+		query = query.Where("created_at >= ?", *filter.CreatedAtStart)
+	}
+	if filter.CreatedAtEnd != nil {
+		query = query.Where("created_at < ?", *filter.CreatedAtEnd)
 	}
 
 	return query

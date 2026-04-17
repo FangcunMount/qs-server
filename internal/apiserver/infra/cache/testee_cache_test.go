@@ -87,7 +87,7 @@ func (s *testeeRepoStub) FindByProfile(ctx context.Context, orgID int64, profile
 func (s *testeeRepoStub) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
-func (s *testeeRepoStub) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *testeeRepoStub) ListByOrg(ctx context.Context, orgID int64, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 func (s *testeeRepoStub) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
@@ -102,8 +102,10 @@ func (s *testeeRepoStub) ListKeyFocus(ctx context.Context, orgID int64, offset, 
 func (s *testeeRepoStub) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
-func (s *testeeRepoStub) Delete(ctx context.Context, id domainTestee.ID) error  { return nil }
-func (s *testeeRepoStub) Count(ctx context.Context, orgID int64) (int64, error) { return 0, nil }
+func (s *testeeRepoStub) Delete(ctx context.Context, id domainTestee.ID) error { return nil }
+func (s *testeeRepoStub) Count(ctx context.Context, orgID int64, filter domainTestee.ListFilter) (int64, error) {
+	return 0, nil
+}
 func (s *testeeRepoStub) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter) (int64, error) {
 	return 0, nil
 }

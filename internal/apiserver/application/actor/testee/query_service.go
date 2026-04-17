@@ -50,20 +50,18 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 	var err error
 	var totalCount int64
 
+	filter := domain.ListFilter{
+		Name:           dto.Name,
+		Tags:           dto.Tags,
+		KeyFocus:       dto.KeyFocus,
+		CreatedAtStart: dto.CreatedAtStart,
+		CreatedAtEnd:   dto.CreatedAtEnd,
+	}
+
 	if dto.RestrictToAccessScope {
 		testeeIDs := make([]domain.ID, 0, len(dto.AccessibleTesteeIDs))
 		for _, id := range dto.AccessibleTesteeIDs {
 			testeeIDs = append(testeeIDs, domain.ID(id))
-		}
-
-		var keyFocus *bool
-		if dto.KeyFocus != nil && *dto.KeyFocus {
-			keyFocus = dto.KeyFocus
-		}
-		filter := domain.ListFilter{
-			Name:     dto.Name,
-			Tags:     dto.Tags,
-			KeyFocus: keyFocus,
 		}
 
 		testees, err = s.repo.ListByOrgAndIDs(ctx, dto.OrgID, testeeIDs, filter, dto.Offset, dto.Limit)
@@ -76,39 +74,13 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 			return nil, errors.Wrap(err, "failed to count restricted testees")
 		}
 	} else {
-		// 根据不同的过滤条件调用不同的查询方法
-		if dto.KeyFocus != nil && *dto.KeyFocus {
-			testees, err = s.repo.ListKeyFocus(ctx, dto.OrgID, dto.Offset, dto.Limit)
-		} else if len(dto.Tags) > 0 {
-			testees, err = s.repo.ListByTags(ctx, dto.OrgID, dto.Tags, dto.Offset, dto.Limit)
-		} else if dto.Name != "" {
-			// 名称搜索 - 注意：FindByOrgAndName 返回全部结果，需手动分页
-			allTestees, findErr := s.repo.FindByOrgAndName(ctx, dto.OrgID, dto.Name)
-			if findErr != nil {
-				err = findErr
-			} else {
-				// 手动分页
-				start := dto.Offset
-				end := dto.Offset + dto.Limit
-				if start >= len(allTestees) {
-					testees = []*domain.Testee{}
-				} else {
-					if end > len(allTestees) {
-						end = len(allTestees)
-					}
-					testees = allTestees[start:end]
-				}
-			}
-		} else {
-			testees, err = s.repo.ListByOrg(ctx, dto.OrgID, dto.Offset, dto.Limit)
-		}
+		testees, err = s.repo.ListByOrg(ctx, dto.OrgID, filter, dto.Offset, dto.Limit)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to list testees")
 		}
 
-		// 获取总数
-		totalCount, err = s.repo.Count(ctx, dto.OrgID)
+		totalCount, err = s.repo.Count(ctx, dto.OrgID, filter)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to count testees")
 		}
@@ -130,29 +102,13 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 
 // ListKeyFocus 列出重点关注的受试者
 func (s *queryService) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) (*TesteeListResult, error) {
-	testees, err := s.repo.ListKeyFocus(ctx, orgID, offset, limit)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to list key focus testees")
-	}
-
-	// 获取总数（这里应该是重点关注的总数，但当前 repo 没有这个方法，暂用全部计数）
-	totalCount, err := s.repo.Count(ctx, orgID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to count testees")
-	}
-
-	// 转换为 DTO
-	items := make([]*TesteeResult, len(testees))
-	for i, testee := range testees {
-		items[i] = toTesteeResult(testee)
-	}
-
-	return &TesteeListResult{
-		Items:      items,
-		TotalCount: totalCount,
-		Offset:     offset,
-		Limit:      limit,
-	}, nil
+	keyFocus := true
+	return s.ListTestees(ctx, ListTesteeDTO{
+		OrgID:    orgID,
+		KeyFocus: &keyFocus,
+		Offset:   offset,
+		Limit:    limit,
+	})
 }
 
 // ListByProfileIDs 根据多个用户档案ID查询受试者列表

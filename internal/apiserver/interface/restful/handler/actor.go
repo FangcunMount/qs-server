@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -504,6 +505,8 @@ func (h *ActorHandler) UpdateTestee(c *gin.Context) {
 // @Param is_key_focus query bool false "是否重点关注"
 // @Param profile_id query string false "档案ID（等同于IAM儿童ID）"
 // @Param clinician_id query string false "按 Clinician 过滤受试者"
+// @Param created_start_date query string false "报到开始日期（格式：YYYY-MM-DD，按 created_at 过滤）"
+// @Param created_end_date query string false "报到结束日期（格式：YYYY-MM-DD，按 created_at 过滤）"
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} core.Response{data=response.TesteeListResponse}
@@ -527,6 +530,11 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		return
 	}
 	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	createdAtStart, createdAtEnd, err := parseInclusiveLocalDateRange(req.CreatedStartDate, req.CreatedEndDate)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -566,6 +574,10 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 				return
 			}
 		}
+		if !testeeMatchesListFilter(result, req, createdAtStart, createdAtEnd) {
+			h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, req.Page, req.PageSize))
+			return
+		}
 
 		h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{result}, 1, req.Page, req.PageSize))
 		return
@@ -579,12 +591,14 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 
 	// 使用查询服务 - 统一通过 ListTestees 方法处理所有查询
 	dto := testeeApp.ListTesteeDTO{
-		OrgID:    orgID,
-		Name:     req.Name,
-		Tags:     req.Tags,
-		KeyFocus: req.IsKeyFocus,
-		Offset:   (req.Page - 1) * req.PageSize,
-		Limit:    req.PageSize,
+		OrgID:          orgID,
+		Name:           req.Name,
+		Tags:           req.Tags,
+		KeyFocus:       req.IsKeyFocus,
+		CreatedAtStart: createdAtStart,
+		CreatedAtEnd:   createdAtEnd,
+		Offset:         (req.Page - 1) * req.PageSize,
+		Limit:          req.PageSize,
 	}
 	if req.ClinicianID != nil {
 		if _, err := h.requireClinicianInOrg(c, orgID, *req.ClinicianID); err != nil {
@@ -626,6 +640,67 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 	}
 
 	h.Success(c, toTesteeListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
+}
+
+func parseInclusiveLocalDateRange(startRaw, endRaw string) (*time.Time, *time.Time, error) {
+	var start, end *time.Time
+	if strings.TrimSpace(startRaw) != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(startRaw), time.Local)
+		if err != nil {
+			return nil, nil, errors.WithCode(code.ErrInvalidArgument, "created_start_date 格式无效，必须为 YYYY-MM-DD")
+		}
+		start = &parsed
+	}
+	if strings.TrimSpace(endRaw) != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(endRaw), time.Local)
+		if err != nil {
+			return nil, nil, errors.WithCode(code.ErrInvalidArgument, "created_end_date 格式无效，必须为 YYYY-MM-DD")
+		}
+		nextDay := parsed.AddDate(0, 0, 1)
+		end = &nextDay
+	}
+	if start != nil && end != nil && !start.Before(*end) {
+		return nil, nil, errors.WithCode(code.ErrInvalidArgument, "created_start_date 不能晚于 created_end_date")
+	}
+	return start, end, nil
+}
+
+func createdAtInRange(createdAt time.Time, start, end *time.Time) bool {
+	if start != nil && createdAt.Before(*start) {
+		return false
+	}
+	if end != nil && !createdAt.Before(*end) {
+		return false
+	}
+	return true
+}
+
+func testeeMatchesListFilter(
+	result *testeeApp.TesteeResult,
+	req request.ListTesteeRequest,
+	createdAtStart, createdAtEnd *time.Time,
+) bool {
+	if result == nil {
+		return false
+	}
+	if req.Name != "" && !strings.Contains(strings.ToLower(result.Name), strings.ToLower(req.Name)) {
+		return false
+	}
+	if req.IsKeyFocus != nil && result.IsKeyFocus != *req.IsKeyFocus {
+		return false
+	}
+	if len(req.Tags) > 0 {
+		tagSet := make(map[string]struct{}, len(result.Tags))
+		for _, tag := range result.Tags {
+			tagSet[tag] = struct{}{}
+		}
+		for _, want := range req.Tags {
+			if _, ok := tagSet[want]; !ok {
+				return false
+			}
+		}
+	}
+	return createdAtInRange(result.CreatedAt, createdAtStart, createdAtEnd)
 }
 
 // ========== Staff API ==========

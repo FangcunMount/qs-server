@@ -173,7 +173,7 @@ func (s *stubTesteeRepository) FindByProfile(ctx context.Context, orgID int64, p
 func (s *stubTesteeRepository) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) ListByOrg(ctx context.Context, orgID int64, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
 func (s *stubTesteeRepository) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
@@ -191,7 +191,7 @@ func (s *stubTesteeRepository) ListByProfileIDs(ctx context.Context, profileIDs 
 func (s *stubTesteeRepository) Delete(ctx context.Context, id domainTestee.ID) error {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) Count(ctx context.Context, orgID int64) (int64, error) {
+func (s *stubTesteeRepository) Count(ctx context.Context, orgID int64, filter domainTestee.ListFilter) (int64, error) {
 	panic("unexpected call")
 }
 func (s *stubTesteeRepository) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter) (int64, error) {

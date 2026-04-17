@@ -343,7 +343,7 @@ func (s *relationshipServiceTesteeRepo) FindByOrgAndName(ctx context.Context, or
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) ListByOrg(ctx context.Context, orgID int64, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
@@ -367,7 +367,7 @@ func (s *relationshipServiceTesteeRepo) Delete(ctx context.Context, id domainTes
 	return nil
 }
 
-func (s *relationshipServiceTesteeRepo) Count(ctx context.Context, orgID int64) (int64, error) {
+func (s *relationshipServiceTesteeRepo) Count(ctx context.Context, orgID int64, filter domainTestee.ListFilter) (int64, error) {
 	return 0, nil
 }
 

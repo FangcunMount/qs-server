@@ -155,6 +155,8 @@ type ListTesteeDTO struct {
 	Name                  string   // 姓名（模糊搜索）
 	Tags                  []string // 标签过滤
 	KeyFocus              *bool    // 是否重点关注
+	CreatedAtStart        *time.Time
+	CreatedAtEnd          *time.Time
 	AccessibleTesteeIDs   []uint64 // 可访问的受试者范围（可选）
 	RestrictToAccessScope bool     // 是否按可访问范围过滤
 	Offset                int      // 偏移量
