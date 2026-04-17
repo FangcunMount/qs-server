@@ -17,6 +17,7 @@ QS 系统测试数据生成工具。
 - 只想基于现有 testee 生成入口打开 / intake 行为足迹：运行 `--steps assessment_entry_flow`
 - 只想基于入口接入结果继续生成 `answersheet -> assessment_episode -> report`：运行 `--steps assessment_by_entry`
 - 想每天模拟一批新用户注册、建档、扫码并填报：运行 `--steps daily_simulation`
+- 想让 daily simulation 常驻后台、每天自动跑一批新用户：运行 `--steps daily_simulation_daemon`
 - 只想批量创建计划 task：运行 `--steps plan_create_tasks`
 - 想在后台长期处理 backlog task：运行 `--steps plan_process_tasks`
 - 想把历史时间修正成“按 planned_at 回放”的拟真结果：运行 `--steps plan_fixup_timestamps`
@@ -35,6 +36,7 @@ QS 系统测试数据生成工具。
 | 基于现有 testee 生成入口打开 / intake 行为足迹 | `assessment_entry_flow` | 否 | apiserver |
 | 基于入口接入结果继续生成真实测评服务过程 | `assessment_by_entry` | 否 | apiserver + collection-server + 本地 MySQL |
 | 每天模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation` | 否（推荐 cron） | apiserver + collection-server + IAM REST/gRPC |
+| 常驻后台，每天自动模拟一批新用户注册 / 建档 / 扫码 / 填报 | `daily_simulation_daemon` | 是 | apiserver + collection-server + IAM REST/gRPC |
 | 只生成测评数据 | `assessment` | 否 | apiserver + collection-server |
 | 只创建 task | `plan_create_tasks` | 否 | 本地 MySQL + MongoDB + Redis |
 | 长期后台处理 task | `plan_process_tasks` | 是 | apiserver API |
@@ -53,6 +55,7 @@ QS 系统测试数据生成工具。
 - `assessment_entry_flow` 只走真实入口公开 API，不再依赖本地 MySQL
 - `assessment_by_entry` 需要本地 `local.mysql_dsn`，用于从现有 creator relation 挑 candidate 并等待 assessment 落库
 - `daily_simulation` 需要 `iam.loginUrl` 或 `iam.baseUrl`，以及可达的 `iam.grpc.address`
+- `daily_simulation_daemon` 与 `daily_simulation` 依赖相同，但会长期驻留进程，并使用本地状态文件避免同一天重复跑成功批次
 - `plan_create_tasks` 需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`、`local.redis_*`
 - `plan_fixup_timestamps` 只需要本地 `local.mysql_dsn`、`local.mongo_uri`、`local.mongo_database`
 - `plan_process_tasks` 不再初始化本地 runtime，不再要求本地 MySQL / MongoDB / Redis
@@ -719,10 +722,24 @@ assessmentByEntry:
   maxAssessmentsPerEntry: 5
 
 dailySimulation:
+  countMin: 10
+  countMax: 50
   countPerRun: 20
-  workers: 4
+  workers: 6
   runDate: ""
-  clinicianRef: "clinician_shi"
+  runAt: "10:00"
+  retryDelay: "30m"
+  stateFile: ".seeddata-cache/daily-simulation-daemon-state.json"
+  clinicianRef: ""
+  clinicianIds:
+    - "614995509882401326"
+    - "615085224266576430"
+    - "615085307548742190"
+    - "615085399252939310"
+    - "615086081481650734"
+  clinicianKeyPrefixes: ["seed_doctor_"]
+  focusCliniciansPerRunMin: 3
+  focusCliniciansPerRunMax: 5
   targetType: "scale"
   targetCode: "3adyDE"
   targetVersion: ""
@@ -745,7 +762,10 @@ assessmentStatusProfile:
 
 - `assessmentEntryFlow`、`assessmentByEntry` 默认按“当前机构全部 clinician / 全部 entry”工作；只有填了筛选条件时才缩小范围
 - `dailySimulation` 默认使用当天日期做稳定用户生成；同一天重复运行会复用同一批 guardian / child / testee，不会无限膨胀
-- `dailySimulation` 如果未指定 `entryId`，会按 `clinicianRef/clinicianId + targetType/targetCode/targetVersion` 自动确保一个 active entry
+- `dailySimulation` 如果未指定 `entryId`，会按 `clinicianRef/clinicianId/clinicianIds + targetType/targetCode/targetVersion` 自动确保 active entry
+- `countMin/countMax` 用于每天稳定随机出一批新用户数量；若不填，则退回 `countPerRun`
+- `focusCliniciansPerRunMin/focusCliniciansPerRunMax` 用于每天从配置的重点 clinician 池里稳定选择 3～5 个活跃 clinician
+- `runAt/retryDelay/stateFile` 只被 `daily_simulation_daemon` 使用
 - `dailySimulation` 依赖 IAM gRPC；`iam.grpc.address` 必须指向可达的 IAM gRPC 端点
 - `assessmentStatusProfile` 预留给第二阶段 `assessment_fixup_statuses`，本轮步骤不会消费它
 
@@ -789,4 +809,33 @@ cron 示例：
 
 ```cron
 0 2 * * * cd /path/to/qs-server && ./scripts/run_daily_simulation.sh
+```
+
+## 方案 0.98：常驻后台，每天自动跑 daily simulation
+
+```bash
+go run ./cmd/tools/seeddata \
+  --config "$CFG" \
+  --steps "daily_simulation_daemon"
+```
+
+说明：
+
+- 这是一个常驻进程，不会自动退出
+- 每天到 `dailySimulation.runAt` 才会真正执行一批模拟
+- 每天会在 `countMin ~ countMax` 间稳定随机一个用户数
+- 每天会在重点 clinician 池里稳定挑 `focusCliniciansPerRunMin ~ focusCliniciansPerRunMax` 个 clinician 分摊新增用户
+- 成功跑完后会把日期写入 `dailySimulation.stateFile`，避免同一天重复成功执行
+- 批次失败不会退出进程，而是按 `dailySimulation.retryDelay` 等待后重试
+
+后台脚本：
+
+```bash
+./scripts/run_daily_simulation_daemon.sh
+```
+
+推荐启动方式：
+
+```bash
+nohup ./scripts/run_daily_simulation_daemon.sh >/dev/null 2>&1 &
 ```

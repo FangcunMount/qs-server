@@ -49,6 +49,7 @@
 - `assessment_entry_flow`
 - `assessment_by_entry`
 - `daily_simulation`
+- `daily_simulation_daemon`
 - `assessment`
 - `plan`
 - `plan_create_tasks`
@@ -290,6 +291,30 @@ assessment_entry_flow -> assessment_by_entry -> statistics_backfill
 
 这是最接近“日常运营造数”的步骤。
 
+### `daily_simulation_daemon`
+
+用途：
+- 常驻后台，每天自动跑一批新的 daily simulation
+
+典型场景：
+- 演示环境需要每天自动新增 10～50 个用户
+- 希望每天只集中到 3～5 个重点 clinician，而不是固定单个 clinician
+
+依赖：
+- `apiserver`
+- `collection-server`
+- IAM REST/gRPC
+
+实现入口：
+- [seed_daily_simulation_daemon.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_daily_simulation_daemon.go)
+
+它额外做的事：
+- 按 `dailySimulation.runAt` 每天调度一次
+- 按 `countMin/countMax` 稳定随机当天用户数
+- 按 `focusCliniciansPerRunMin/focusCliniciansPerRunMax` 从重点 clinician 池里稳定挑选当天活跃 clinician
+- 用 `stateFile` 记录最近成功日期，避免同一天重复成功执行
+- 失败后按 `retryDelay` 常驻重试
+
 ### `assessment`
 
 用途：
@@ -436,6 +461,7 @@ assessment_entry_flow -> assessment_by_entry -> statistics_backfill
 | [seed_assessment_entry_flow.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment_entry_flow.go) | `assessment_entry_flow` |
 | [seed_assessment_by_entry.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment_by_entry.go) | `assessment_by_entry` |
 | [seed_daily_simulation.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_daily_simulation.go) | `daily_simulation` |
+| [seed_daily_simulation_daemon.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_daily_simulation_daemon.go) | `daily_simulation_daemon` |
 | [seed_assessment.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_assessment.go) | `assessment` 主流程 |
 | [seed_answersheet_builder.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_answersheet_builder.go) | 生成答卷内容 |
 | [seed_answersheet_submit.go](/Users/yangshujie/workspace/golang/src/github.com/fangcun-mount/qs-server/cmd/tools/seeddata/seed_answersheet_submit.go) | 提交答卷与重试策略 |
@@ -675,7 +701,7 @@ statistics_backfill
 现在的 seeddata 可以理解成三类工具：
 
 - **资源构建工具**：`staff`、`clinician`、`assign_testees`、`assessment_entries`
-- **业务事实生成工具**：`assessment_entry_flow`、`assessment_by_entry`、`daily_simulation`、`assessment`
+- **业务事实生成工具**：`assessment_entry_flow`、`assessment_by_entry`、`daily_simulation`、`daily_simulation_daemon`、`assessment`
 - **离线修正 / 重建工具**：`testee_fixup_created_at`、`actor_fixup_timestamps`、`plan_fixup_timestamps`、`statistics_backfill`
 
 如果你不知道该跑什么，优先问自己一句：

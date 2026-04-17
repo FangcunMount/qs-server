@@ -311,22 +311,32 @@ type AssessmentByEntryConfig struct {
 
 // DailySimulationConfig 每日模拟真实用户注册/建档/扫码/填报。
 type DailySimulationConfig struct {
-	CountPerRun      int        `yaml:"countPerRun"`
-	Workers          int        `yaml:"workers"`
-	RunDate          string     `yaml:"runDate"`
-	ClinicianRef     string     `yaml:"clinicianRef"`
-	ClinicianID      FlexibleID `yaml:"clinicianId"`
-	EntryID          FlexibleID `yaml:"entryId"`
-	TargetType       string     `yaml:"targetType"`
-	TargetCode       string     `yaml:"targetCode"`
-	TargetVersion    string     `yaml:"targetVersion"`
-	UserPassword     string     `yaml:"userPassword"`
-	UserPhonePrefix  string     `yaml:"userPhonePrefix"`
-	UserEmailDomain  string     `yaml:"userEmailDomain"`
-	GuardianRelation string     `yaml:"guardianRelation"`
-	TesteeSource     string     `yaml:"testeeSource"`
-	TesteeTags       []string   `yaml:"testeeTags"`
-	IsKeyFocus       bool       `yaml:"isKeyFocus"`
+	CountPerRun              int          `yaml:"countPerRun"`
+	CountMin                 int          `yaml:"countMin"`
+	CountMax                 int          `yaml:"countMax"`
+	Workers                  int          `yaml:"workers"`
+	RunDate                  string       `yaml:"runDate"`
+	RunAt                    string       `yaml:"runAt"`
+	RetryDelay               string       `yaml:"retryDelay"`
+	StateFile                string       `yaml:"stateFile"`
+	ClinicianRef             string       `yaml:"clinicianRef"`
+	ClinicianID              FlexibleID   `yaml:"clinicianId"`
+	ClinicianRefs            []string     `yaml:"clinicianRefs"`
+	ClinicianIDs             []FlexibleID `yaml:"clinicianIds"`
+	ClinicianKeyPrefixes     []string     `yaml:"clinicianKeyPrefixes"`
+	FocusCliniciansPerRunMin int          `yaml:"focusCliniciansPerRunMin"`
+	FocusCliniciansPerRunMax int          `yaml:"focusCliniciansPerRunMax"`
+	EntryID                  FlexibleID   `yaml:"entryId"`
+	TargetType               string       `yaml:"targetType"`
+	TargetCode               string       `yaml:"targetCode"`
+	TargetVersion            string       `yaml:"targetVersion"`
+	UserPassword             string       `yaml:"userPassword"`
+	UserPhonePrefix          string       `yaml:"userPhonePrefix"`
+	UserEmailDomain          string       `yaml:"userEmailDomain"`
+	GuardianRelation         string       `yaml:"guardianRelation"`
+	TesteeSource             string       `yaml:"testeeSource"`
+	TesteeTags               []string     `yaml:"testeeTags"`
+	IsKeyFocus               bool         `yaml:"isKeyFocus"`
 }
 
 // AssessmentStatusProfileConfig 第二阶段状态分布配置。
@@ -527,10 +537,20 @@ func isEmptyInterpretationGroup(g InterpretationGroupConfig) bool {
 
 func isEmptyDailySimulationConfig(cfg DailySimulationConfig) bool {
 	return cfg.CountPerRun == 0 &&
+		cfg.CountMin == 0 &&
+		cfg.CountMax == 0 &&
 		cfg.Workers == 0 &&
 		strings.TrimSpace(cfg.RunDate) == "" &&
+		strings.TrimSpace(cfg.RunAt) == "" &&
+		strings.TrimSpace(cfg.RetryDelay) == "" &&
+		strings.TrimSpace(cfg.StateFile) == "" &&
 		strings.TrimSpace(cfg.ClinicianRef) == "" &&
 		cfg.ClinicianID.IsZero() &&
+		len(cfg.ClinicianRefs) == 0 &&
+		len(cfg.ClinicianIDs) == 0 &&
+		len(cfg.ClinicianKeyPrefixes) == 0 &&
+		cfg.FocusCliniciansPerRunMin == 0 &&
+		cfg.FocusCliniciansPerRunMax == 0 &&
 		cfg.EntryID.IsZero() &&
 		strings.TrimSpace(cfg.TargetType) == "" &&
 		strings.TrimSpace(cfg.TargetCode) == "" &&

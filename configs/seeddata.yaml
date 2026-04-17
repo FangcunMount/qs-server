@@ -319,11 +319,21 @@ assessmentByEntry:
   maxAssessmentsPerEntry: 5
 
 dailySimulation:
+  countMin: 10
+  countMax: 50
   countPerRun: 20
-  workers: 4
+  workers: 6
   runDate: ""
-  clinicianRef: "cln_614995509882401326"
+  runAt: "10:00"
+  retryDelay: "30m"
+  stateFile: ".seeddata-cache/daily-simulation-daemon-state.json"
+  clinicianRef: ""
   clinicianId: ""
+  clinicianIds: *seed_clinician_ids
+  clinicianKeyPrefixes:
+    - "seed_doctor_"
+  focusCliniciansPerRunMin: 3
+  focusCliniciansPerRunMax: 5
   entryId: ""
   targetType: "scale"
   targetCode: "3adyDE"

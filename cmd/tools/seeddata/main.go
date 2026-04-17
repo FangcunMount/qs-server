@@ -47,24 +47,25 @@ type seedStep string
 
 // All available seed steps.
 const (
-	stepStaff                seedStep = "staff"
-	stepClinician            seedStep = "clinician"
-	stepAssignTestees        seedStep = "assign_testees"
-	stepTesteeFixupCreated   seedStep = "testee_fixup_created_at"
-	stepActorFixupTimes      seedStep = "actor_fixup_timestamps"
-	stepAssessmentEntries    seedStep = "assessment_entries"
-	stepAssessmentEntryFlow  seedStep = "assessment_entry_flow"
-	stepAssessmentByEntry    seedStep = "assessment_by_entry"
-	stepAssessmentEntryFixup seedStep = "assessment_entry_fixup_timestamps"
-	stepAssessmentFixup      seedStep = "assessment_fixup_timestamps"
-	stepAssessmentRetime     seedStep = "assessment_retime_timestamps"
-	stepDailySimulation      seedStep = "daily_simulation"
-	stepAssessment           seedStep = "assessment"         // 提交答卷并生成测评
-	stepPlan                 seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
-	stepPlanCreateTasks      seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
-	stepPlanProcessTasks     seedStep = "plan_process_tasks" // 调度并处理计划任务
-	stepPlanFixupTimes       seedStep = "plan_fixup_timestamps"
-	stepStatisticsBackfill   seedStep = "statistics_backfill"
+	stepStaff                 seedStep = "staff"
+	stepClinician             seedStep = "clinician"
+	stepAssignTestees         seedStep = "assign_testees"
+	stepTesteeFixupCreated    seedStep = "testee_fixup_created_at"
+	stepActorFixupTimes       seedStep = "actor_fixup_timestamps"
+	stepAssessmentEntries     seedStep = "assessment_entries"
+	stepAssessmentEntryFlow   seedStep = "assessment_entry_flow"
+	stepAssessmentByEntry     seedStep = "assessment_by_entry"
+	stepAssessmentEntryFixup  seedStep = "assessment_entry_fixup_timestamps"
+	stepAssessmentFixup       seedStep = "assessment_fixup_timestamps"
+	stepAssessmentRetime      seedStep = "assessment_retime_timestamps"
+	stepDailySimulation       seedStep = "daily_simulation"
+	stepDailySimulationDaemon seedStep = "daily_simulation_daemon"
+	stepAssessment            seedStep = "assessment"         // 提交答卷并生成测评
+	stepPlan                  seedStep = "plan"               // 兼容旧入口：先造 task，再处理 task
+	stepPlanCreateTasks       seedStep = "plan_create_tasks"  // 批量创建/补齐计划任务
+	stepPlanProcessTasks      seedStep = "plan_process_tasks" // 调度并处理计划任务
+	stepPlanFixupTimes        seedStep = "plan_fixup_timestamps"
+	stepStatisticsBackfill    seedStep = "statistics_backfill"
 )
 
 // defaultSteps defines the default execution order of all seed steps.
@@ -328,6 +329,8 @@ func main() {
 			err = seedAssessmentRetimeTimestamps(runCtx, deps, assessmentRetimeOpts)
 		case stepDailySimulation:
 			err = seedDailySimulation(runCtx, deps)
+		case stepDailySimulationDaemon:
+			err = seedDailySimulationDaemon(runCtx, deps)
 		case stepAssessment:
 			err = seedAssessments(runCtx, deps, assessmentOpts)
 		case stepPlan:
@@ -447,6 +450,8 @@ func seedStepFailureMessage(step seedStep) string {
 		return "Assessment retime failed"
 	case stepDailySimulation:
 		return "Daily simulation seeding failed"
+	case stepDailySimulationDaemon:
+		return "Daily simulation daemon failed"
 	case stepAssessment:
 		return "Assessment seeding failed"
 	case stepPlan:
