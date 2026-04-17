@@ -8,24 +8,28 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 计划查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	planRepo domainPlan.AssessmentPlanRepository
-	taskRepo domainPlan.AssessmentTaskRepository
+	planRepo  domainPlan.AssessmentPlanRepository
+	taskRepo  domainPlan.AssessmentTaskRepository
+	scaleRepo domainScale.Repository
 }
 
 // NewQueryService 创建计划查询服务
 func NewQueryService(
 	planRepo domainPlan.AssessmentPlanRepository,
 	taskRepo domainPlan.AssessmentTaskRepository,
+	scaleRepo domainScale.Repository,
 ) PlanQueryService {
 	return &queryService{
-		planRepo: planRepo,
-		taskRepo: taskRepo,
+		planRepo:  planRepo,
+		taskRepo:  taskRepo,
+		scaleRepo: scaleRepo,
 	}
 }
 
@@ -46,7 +50,9 @@ func (s *queryService) GetPlan(ctx context.Context, orgID int64, planID string) 
 		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
 	}
 
-	return toPlanResult(p), nil
+	result := toPlanResult(p)
+	result.ScaleTitle = s.resolveScaleTitle(ctx, p.GetScaleCode())
+	return result, nil
 }
 
 // ListPlans 查询计划列表
@@ -69,9 +75,12 @@ func (s *queryService) ListPlans(ctx context.Context, dto ListPlansDTO) (*PlanLi
 	}
 
 	// 3. 转换为结果
+	scaleTitles := s.resolveScaleTitles(ctx, collectPlanScaleCodes(plans))
 	items := make([]*PlanResult, 0, len(plans))
 	for _, plan := range plans {
-		items = append(items, toPlanResult(plan))
+		item := toPlanResult(plan)
+		item.ScaleTitle = scaleTitles[plan.GetScaleCode()]
+		items = append(items, item)
 	}
 
 	return &PlanListResult{
@@ -99,7 +108,9 @@ func (s *queryService) GetTask(ctx context.Context, orgID int64, taskID string) 
 		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "任务不属于当前机构")
 	}
 
-	return toTaskResult(task), nil
+	result := toTaskResult(task)
+	result.ScaleTitle = s.resolveScaleTitle(ctx, task.GetScaleCode())
+	return result, nil
 }
 
 // ListTasks 查询任务列表
@@ -164,10 +175,7 @@ func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskLi
 	}
 
 	// 4. 转换为结果
-	items := make([]*TaskResult, 0, len(tasks))
-	for _, task := range tasks {
-		items = append(items, toTaskResult(task))
-	}
+	items := s.toTaskResultsWithScaleTitles(ctx, tasks)
 
 	return &TaskListResult{
 		Items:    items,
@@ -227,7 +235,7 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 	}
 
 	return &TaskWindowResult{
-		Items:    toTaskResults(tasks),
+		Items:    s.toTaskResultsWithScaleTitles(ctx, tasks),
 		Page:     dto.Page,
 		PageSize: dto.PageSize,
 		HasMore:  hasMore,
@@ -251,7 +259,7 @@ func (s *queryService) ListTasksByPlan(ctx context.Context, orgID int64, planID 
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
 	}
 
-	return toTaskResults(tasks), nil
+	return s.toTaskResultsWithScaleTitles(ctx, tasks), nil
 }
 
 // ListTasksByPlanInScope 查询计划下指定可访问范围内的任务。
@@ -277,7 +285,7 @@ func (s *queryService) ListTasksByPlanInScope(ctx context.Context, orgID int64, 
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
 	}
-	return toTaskResults(tasks), nil
+	return s.toTaskResultsWithScaleTitles(ctx, tasks), nil
 }
 
 func (s *queryService) ensurePlanInOrg(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID) error {
@@ -305,7 +313,7 @@ func (s *queryService) ListTasksByTestee(ctx context.Context, testeeID string) (
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
 	}
 
-	return toTaskResults(tasks), nil
+	return s.toTaskResultsWithScaleTitles(ctx, tasks), nil
 }
 
 // ListPlansByTestee 查询受试者参与的所有计划
@@ -323,9 +331,12 @@ func (s *queryService) ListPlansByTestee(ctx context.Context, testeeID string) (
 	}
 
 	// 3. 转换为结果
+	scaleTitles := s.resolveScaleTitles(ctx, collectPlanScaleCodes(plans))
 	results := make([]*PlanResult, 0, len(plans))
 	for _, plan := range plans {
-		results = append(results, toPlanResult(plan))
+		result := toPlanResult(plan)
+		result.ScaleTitle = scaleTitles[plan.GetScaleCode()]
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -350,5 +361,75 @@ func (s *queryService) ListTasksByTesteeAndPlan(ctx context.Context, testeeID st
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
 	}
 
-	return toTaskResults(tasks), nil
+	return s.toTaskResultsWithScaleTitles(ctx, tasks), nil
+}
+
+func (s *queryService) toTaskResultsWithScaleTitles(ctx context.Context, tasks []*domainPlan.AssessmentTask) []*TaskResult {
+	results := toTaskResults(tasks)
+	if len(results) == 0 {
+		return results
+	}
+	scaleTitles := s.resolveScaleTitles(ctx, collectTaskScaleCodes(tasks))
+	for idx, task := range tasks {
+		results[idx].ScaleTitle = scaleTitles[task.GetScaleCode()]
+	}
+	return results
+}
+
+func (s *queryService) resolveScaleTitle(ctx context.Context, scaleCode string) string {
+	if scaleCode == "" {
+		return ""
+	}
+	return s.resolveScaleTitles(ctx, []string{scaleCode})[scaleCode]
+}
+
+func (s *queryService) resolveScaleTitles(ctx context.Context, scaleCodes []string) map[string]string {
+	titles := make(map[string]string, len(scaleCodes))
+	if s == nil || s.scaleRepo == nil || len(scaleCodes) == 0 {
+		return titles
+	}
+
+	seen := make(map[string]struct{}, len(scaleCodes))
+	for _, code := range scaleCodes {
+		code = strings.TrimSpace(code)
+		if code == "" {
+			continue
+		}
+		if _, ok := seen[code]; ok {
+			continue
+		}
+		seen[code] = struct{}{}
+
+		scaleItem, err := s.scaleRepo.FindByCode(ctx, code)
+		if err != nil || scaleItem == nil {
+			continue
+		}
+		title := strings.TrimSpace(scaleItem.GetTitle())
+		if title != "" {
+			titles[code] = title
+		}
+	}
+	return titles
+}
+
+func collectPlanScaleCodes(plans []*domainPlan.AssessmentPlan) []string {
+	codes := make([]string, 0, len(plans))
+	for _, item := range plans {
+		if item == nil {
+			continue
+		}
+		codes = append(codes, item.GetScaleCode())
+	}
+	return codes
+}
+
+func collectTaskScaleCodes(tasks []*domainPlan.AssessmentTask) []string {
+	codes := make([]string, 0, len(tasks))
+	for _, item := range tasks {
+		if item == nil {
+			continue
+		}
+		codes = append(codes, item.GetScaleCode())
+	}
+	return codes
 }

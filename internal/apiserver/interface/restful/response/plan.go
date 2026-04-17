@@ -2,22 +2,26 @@ package response
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 )
 
 // ============= Plan Response =============
 
 // PlanResponse 计划响应
 type PlanResponse struct {
-	ID            string   `json:"id"`                       // 计划ID
-	OrgID         int64    `json:"org_id"`                   // 机构ID
-	ScaleCode     string   `json:"scale_code"`               // 量表编码（如 "3adyDE"）
-	ScheduleType  string   `json:"schedule_type"`            // 周期类型：by_week/by_day/fixed_date/custom
-	TriggerTime   string   `json:"trigger_time"`             // 触发时间：HH:MM:SS
-	Interval      int      `json:"interval"`                 // 间隔（周/天，用于 by_week/by_day）
-	TotalTimes    int      `json:"total_times"`              // 总次数（用于 by_week/by_day）
-	FixedDates    []string `json:"fixed_dates,omitempty"`    // 固定日期列表（用于 fixed_date）
-	RelativeWeeks []int    `json:"relative_weeks,omitempty"` // 相对周次列表（用于 custom）
-	Status        string   `json:"status"`                   // 状态：active/paused/finished/canceled
+	ID                string   `json:"id"`                            // 计划ID
+	OrgID             int64    `json:"org_id"`                        // 机构ID
+	ScaleCode         string   `json:"scale_code"`                    // 量表编码（如 "3adyDE"）
+	ScaleTitle        string   `json:"scale_title,omitempty"`         // 量表标题
+	ScheduleType      string   `json:"schedule_type"`                 // 周期类型：by_week/by_day/fixed_date/custom
+	ScheduleTypeLabel string   `json:"schedule_type_label,omitempty"` // 周期类型中文
+	TriggerTime       string   `json:"trigger_time"`                  // 触发时间：HH:MM:SS
+	Interval          int      `json:"interval"`                      // 间隔（周/天，用于 by_week/by_day）
+	TotalTimes        int      `json:"total_times"`                   // 总次数（用于 by_week/by_day）
+	FixedDates        []string `json:"fixed_dates,omitempty"`         // 固定日期列表（用于 fixed_date）
+	RelativeWeeks     []int    `json:"relative_weeks,omitempty"`      // 相对周次列表（用于 custom）
+	Status            string   `json:"status"`                        // 状态：active/paused/finished/canceled
+	StatusLabel       string   `json:"status_label,omitempty"`        // 状态中文
 }
 
 // TaskResponse 任务响应
@@ -28,11 +32,13 @@ type TaskResponse struct {
 	OrgID        int64   `json:"org_id"`                  // 机构ID
 	TesteeID     string  `json:"testee_id"`               // 受试者ID
 	ScaleCode    string  `json:"scale_code"`              // 量表编码（如 "3adyDE"）
+	ScaleTitle   string  `json:"scale_title,omitempty"`   // 量表标题
 	PlannedAt    string  `json:"planned_at"`              // 计划时间点
 	OpenAt       *string `json:"open_at,omitempty"`       // 实际开放时间
 	ExpireAt     *string `json:"expire_at,omitempty"`     // 截止时间
 	CompletedAt  *string `json:"completed_at,omitempty"`  // 完成时间
 	Status       string  `json:"status"`                  // 状态：pending/opened/completed/expired/canceled
+	StatusLabel  string  `json:"status_label,omitempty"`  // 状态中文
 	AssessmentID *string `json:"assessment_id,omitempty"` // 关联的测评ID
 	EntryToken   string  `json:"entry_token,omitempty"`   // 入口令牌
 	EntryURL     string  `json:"entry_url,omitempty"`     // 入口URL
@@ -88,16 +94,19 @@ func NewPlanResponse(result *plan.PlanResult) *PlanResponse {
 	}
 
 	return &PlanResponse{
-		ID:            result.ID,
-		OrgID:         result.OrgID,
-		ScaleCode:     result.ScaleCode,
-		ScheduleType:  result.ScheduleType,
-		TriggerTime:   result.TriggerTime,
-		Interval:      result.Interval,
-		TotalTimes:    result.TotalTimes,
-		FixedDates:    result.FixedDates,
-		RelativeWeeks: result.RelativeWeeks,
-		Status:        result.Status,
+		ID:                result.ID,
+		OrgID:             result.OrgID,
+		ScaleCode:         result.ScaleCode,
+		ScaleTitle:        result.ScaleTitle,
+		ScheduleType:      result.ScheduleType,
+		ScheduleTypeLabel: domainPlan.PlanScheduleType(result.ScheduleType).DisplayName(),
+		TriggerTime:       result.TriggerTime,
+		Interval:          result.Interval,
+		TotalTimes:        result.TotalTimes,
+		FixedDates:        result.FixedDates,
+		RelativeWeeks:     result.RelativeWeeks,
+		Status:            result.Status,
+		StatusLabel:       domainPlan.PlanStatus(result.Status).DisplayName(),
 	}
 }
 
@@ -114,11 +123,13 @@ func NewTaskResponse(result *plan.TaskResult) *TaskResponse {
 		OrgID:        result.OrgID,
 		TesteeID:     result.TesteeID,
 		ScaleCode:    result.ScaleCode,
+		ScaleTitle:   result.ScaleTitle,
 		PlannedAt:    result.PlannedAt,
 		OpenAt:       result.OpenAt,
 		ExpireAt:     result.ExpireAt,
 		CompletedAt:  result.CompletedAt,
 		Status:       result.Status,
+		StatusLabel:  domainPlan.TaskStatus(result.Status).DisplayName(),
 		AssessmentID: result.AssessmentID,
 		EntryToken:   result.EntryToken,
 		EntryURL:     result.EntryURL,

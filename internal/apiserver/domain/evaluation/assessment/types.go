@@ -44,6 +44,22 @@ func (s Status) String() string {
 	return string(s)
 }
 
+// DisplayName 返回状态的中文展示名称。
+func (s Status) DisplayName() string {
+	switch s {
+	case StatusPending:
+		return "待处理"
+	case StatusSubmitted:
+		return "已提交"
+	case StatusInterpreted:
+		return "已解读"
+	case StatusFailed:
+		return "失败"
+	default:
+		return string(s)
+	}
+}
+
 // IsValid 检查状态是否有效
 func (s Status) IsValid() bool {
 	switch s {
@@ -95,6 +111,18 @@ const (
 // String 返回来源类型的字符串表示
 func (o OriginType) String() string {
 	return string(o)
+}
+
+// DisplayName 返回来源类型的中文展示名称。
+func (o OriginType) DisplayName() string {
+	switch o {
+	case OriginAdhoc:
+		return "临时测评"
+	case OriginPlan:
+		return "计划测评"
+	default:
+		return string(o)
+	}
 }
 
 // IsValid 检查来源类型是否有效

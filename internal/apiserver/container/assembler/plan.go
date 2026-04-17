@@ -123,7 +123,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 		m.PlanRepo,
 		m.TaskRepo,
 	)
-	m.QueryService = planApp.NewQueryService(m.PlanRepo, m.TaskRepo)
+	m.QueryService = planApp.NewQueryService(m.PlanRepo, m.TaskRepo, scaleRepo)
 
 	// 初始化 handler 层
 	m.Handler = handler.NewPlanHandler(

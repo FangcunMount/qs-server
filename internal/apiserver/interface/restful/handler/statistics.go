@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
@@ -273,7 +274,7 @@ func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	h.Success(c, response.NewPeriodicStatsResponse(stats))
 }
 
 func (h *StatisticsHandler) BatchQuestionnaireStatistics(c *gin.Context) {

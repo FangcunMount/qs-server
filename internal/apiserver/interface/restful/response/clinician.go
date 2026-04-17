@@ -1,7 +1,5 @@
 package response
 
-import "time"
-
 // ClinicianResponse 从业者响应。
 type ClinicianResponse struct {
 	ID                   string  `json:"id"`
@@ -11,8 +9,10 @@ type ClinicianResponse struct {
 	Department           string  `json:"department,omitempty"`
 	Title                string  `json:"title,omitempty"`
 	ClinicianType        string  `json:"clinician_type"`
+	ClinicianTypeLabel   string  `json:"clinician_type_label,omitempty"`
 	EmployeeCode         string  `json:"employee_code,omitempty"`
 	IsActive             bool    `json:"is_active"`
+	IsActiveLabel        string  `json:"is_active_label,omitempty"`
 	AssignedTesteeCount  int64   `json:"assigned_testee_count"`
 	AssessmentEntryCount int64   `json:"assessment_entry_count"`
 }
@@ -28,16 +28,18 @@ type ClinicianListResponse struct {
 
 // AssessmentEntryResponse 测评入口响应。
 type AssessmentEntryResponse struct {
-	ID            string     `json:"id"`
-	OrgID         string     `json:"org_id"`
-	ClinicianID   string     `json:"clinician_id"`
-	Token         string     `json:"token"`
-	TargetType    string     `json:"target_type"`
-	TargetCode    string     `json:"target_code"`
-	TargetVersion string     `json:"target_version,omitempty"`
-	IsActive      bool       `json:"is_active"`
-	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
-	QRCodeURL     string     `json:"qrcode_url,omitempty"`
+	ID              string  `json:"id"`
+	OrgID           string  `json:"org_id"`
+	ClinicianID     string  `json:"clinician_id"`
+	Token           string  `json:"token"`
+	TargetType      string  `json:"target_type"`
+	TargetTypeLabel string  `json:"target_type_label,omitempty"`
+	TargetCode      string  `json:"target_code"`
+	TargetVersion   string  `json:"target_version,omitempty"`
+	IsActive        bool    `json:"is_active"`
+	IsActiveLabel   string  `json:"is_active_label,omitempty"`
+	ExpiresAt       *string `json:"expires_at,omitempty"`
+	QRCodeURL       string  `json:"qrcode_url,omitempty"`
 }
 
 // AssessmentEntryListResponse 测评入口列表响应。
@@ -51,12 +53,13 @@ type AssessmentEntryListResponse struct {
 
 // ClinicianSummaryResponse 从业者摘要响应。
 type ClinicianSummaryResponse struct {
-	ID            string  `json:"id"`
-	OperatorID    *string `json:"operator_id,omitempty"`
-	Name          string  `json:"name"`
-	Department    string  `json:"department,omitempty"`
-	Title         string  `json:"title,omitempty"`
-	ClinicianType string  `json:"clinician_type"`
+	ID                 string  `json:"id"`
+	OperatorID         *string `json:"operator_id,omitempty"`
+	Name               string  `json:"name"`
+	Department         string  `json:"department,omitempty"`
+	Title              string  `json:"title,omitempty"`
+	ClinicianType      string  `json:"clinician_type"`
+	ClinicianTypeLabel string  `json:"clinician_type_label,omitempty"`
 }
 
 // AssessmentEntryResolvedResponse 测评入口解析响应。
@@ -76,16 +79,19 @@ type AssessmentEntryIntakeResponse struct {
 
 // RelationResponse 从业者关系响应。
 type RelationResponse struct {
-	ID           string     `json:"id"`
-	OrgID        string     `json:"org_id"`
-	ClinicianID  string     `json:"clinician_id"`
-	TesteeID     string     `json:"testee_id"`
-	RelationType string     `json:"relation_type"`
-	SourceType   string     `json:"source_type"`
-	SourceID     *string    `json:"source_id,omitempty"`
-	IsActive     bool       `json:"is_active"`
-	BoundAt      time.Time  `json:"bound_at"`
-	UnboundAt    *time.Time `json:"unbound_at,omitempty"`
+	ID                string  `json:"id"`
+	OrgID             string  `json:"org_id"`
+	ClinicianID       string  `json:"clinician_id"`
+	TesteeID          string  `json:"testee_id"`
+	RelationType      string  `json:"relation_type"`
+	RelationTypeLabel string  `json:"relation_type_label,omitempty"`
+	SourceType        string  `json:"source_type"`
+	SourceTypeLabel   string  `json:"source_type_label,omitempty"`
+	SourceID          *string `json:"source_id,omitempty"`
+	IsActive          bool    `json:"is_active"`
+	IsActiveLabel     string  `json:"is_active_label,omitempty"`
+	BoundAt           string  `json:"bound_at,omitempty"`
+	UnboundAt         *string `json:"unbound_at,omitempty"`
 }
 
 // TesteeClinicianRelationResponse 受试者-从业者关系响应。

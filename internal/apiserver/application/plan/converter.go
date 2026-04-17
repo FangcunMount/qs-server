@@ -17,6 +17,7 @@ type PlanResult struct {
 	ID            string   // 计划ID
 	OrgID         int64    // 机构ID
 	ScaleCode     string   // 量表编码
+	ScaleTitle    string   // 量表标题
 	ScheduleType  string   // 周期类型
 	TriggerTime   string   // 触发时间
 	Interval      int      // 间隔
@@ -34,6 +35,7 @@ type TaskResult struct {
 	OrgID        int64   // 机构ID
 	TesteeID     string  // 受试者ID
 	ScaleCode    string  // 量表编码
+	ScaleTitle   string  // 量表标题
 	PlannedAt    string  // 计划时间点
 	OpenAt       *string // 开放时间
 	ExpireAt     *string // 截止时间

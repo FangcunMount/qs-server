@@ -313,22 +313,24 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 		if err == nil && scoreResult != nil {
 			for _, factorScore := range scoreResult.FactorScores {
 				factors = append(factors, response.ScaleFactorResponse{
-					FactorCode: factorScore.FactorCode,
-					FactorName: factorScore.FactorName,
-					RawScore:   factorScore.RawScore,
-					RiskLevel:  factorScore.RiskLevel,
+					FactorCode:     factorScore.FactorCode,
+					FactorName:     factorScore.FactorName,
+					RawScore:       factorScore.RawScore,
+					RiskLevel:      factorScore.RiskLevel,
+					RiskLevelLabel: response.LabelForRiskLevel(factorScore.RiskLevel),
 				})
 			}
 		}
 
 		// 构建测评记录
 		testRecord := response.ScaleTestResponse{
-			AssessmentID: strconv.FormatUint(assessment.ID, 10),
-			TestDate:     testDate,
-			TotalScore:   totalScore,
-			RiskLevel:    riskLevel,
-			Result:       "", // TODO: 从报告中获取结果描述
-			Factors:      factors,
+			AssessmentID:   strconv.FormatUint(assessment.ID, 10),
+			TestDate:       response.FormatDateTimeValue(testDate),
+			TotalScore:     totalScore,
+			RiskLevel:      riskLevel,
+			RiskLevelLabel: response.LabelForRiskLevel(riskLevel),
+			Result:         "", // TODO: 从报告中获取结果描述
+			Factors:        factors,
 		}
 
 		scaleTrend.Tests = append(scaleTrend.Tests, testRecord)
@@ -340,7 +342,7 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 		// 按测试日期升序排序
 		for i := 0; i < len(scaleTrend.Tests)-1; i++ {
 			for j := i + 1; j < len(scaleTrend.Tests); j++ {
-				if scaleTrend.Tests[i].TestDate.After(scaleTrend.Tests[j].TestDate) {
+				if scaleTrend.Tests[i].TestDate > scaleTrend.Tests[j].TestDate {
 					scaleTrend.Tests[i], scaleTrend.Tests[j] = scaleTrend.Tests[j], scaleTrend.Tests[i]
 				}
 			}
@@ -1042,15 +1044,7 @@ func toUpdateTesteeProfileDTO(testeeID uint64, req *request.UpdateTesteeRequest)
 
 // toTesteeResponse 将应用层结果转换为响应
 func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
-	var gender string
-	switch result.Gender {
-	case 1:
-		gender = "male"
-	case 2:
-		gender = "female"
-	default:
-		gender = "unknown"
-	}
+	gender := response.GenderCodeFromValue(result.Gender)
 
 	// 转换 ID 字段为字符串
 	idStr := fmt.Sprintf("%d", result.ID)
@@ -1062,26 +1056,31 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 	}
 
 	resp := &response.TesteeResponse{
-		ID:         idStr,
-		OrgID:      orgIDStr,
-		ProfileID:  profileIDStr,
-		IAMChildID: response.LegacyIAMChildIDAlias(profileIDStr),
-		Name:       result.Name,
-		Gender:     gender,
-		Birthday:   result.Birthday,
-		Tags:       result.Tags,
-		Source:     result.Source,
-		IsKeyFocus: result.IsKeyFocus,
-		CreatedAt:  result.CreatedAt,
-		UpdatedAt:  result.UpdatedAt,
+		ID:              idStr,
+		OrgID:           orgIDStr,
+		ProfileID:       profileIDStr,
+		IAMChildID:      response.LegacyIAMChildIDAlias(profileIDStr),
+		Name:            result.Name,
+		Gender:          gender,
+		GenderLabel:     response.LabelForGender(gender),
+		Birthday:        response.FormatDatePtr(result.Birthday),
+		Tags:            result.Tags,
+		TagsLabel:       response.LabelTags(result.Tags),
+		Source:          result.Source,
+		SourceLabel:     response.LabelForTesteeSource(result.Source),
+		IsKeyFocus:      result.IsKeyFocus,
+		IsKeyFocusLabel: response.LabelForKeyFocus(result.IsKeyFocus),
+		CreatedAt:       response.FormatDateTimeValue(result.CreatedAt),
+		UpdatedAt:       response.FormatDateTimeValue(result.UpdatedAt),
 	}
 
 	// 测评统计信息
-	if result.LastAssessmentAt != nil {
+	if result.LastAssessmentAt != nil || result.TotalAssessments > 0 || result.LastRiskLevel != "" {
 		resp.AssessmentStats = &response.AssessmentStatsResponse{
-			TotalCount:       result.TotalAssessments,
-			LastAssessmentAt: result.LastAssessmentAt,
-			LastRiskLevel:    result.LastRiskLevel,
+			TotalCount:         result.TotalAssessments,
+			LastAssessmentAt:   response.FormatDateTimePtr(result.LastAssessmentAt),
+			LastRiskLevel:      result.LastRiskLevel,
+			LastRiskLevelLabel: response.LabelForRiskLevel(result.LastRiskLevel),
 		}
 	}
 

@@ -21,6 +21,29 @@ const (
 	RelationTypeCollaborator RelationType = "collaborator" // 兼容预留：协作
 )
 
+// String 返回关系类型的原始字符串值。
+func (r RelationType) String() string {
+	return string(r)
+}
+
+// DisplayName 返回关系类型的中文展示名称。
+func (r RelationType) DisplayName() string {
+	switch r {
+	case RelationTypeAssigned:
+		return "跟进"
+	case RelationTypeCreator:
+		return "来源"
+	case RelationTypePrimary:
+		return "主责"
+	case RelationTypeAttending:
+		return "跟进"
+	case RelationTypeCollaborator:
+		return "协作"
+	default:
+		return string(r)
+	}
+}
+
 // SourceType 关系来源类型。
 type SourceType string
 
@@ -30,6 +53,27 @@ const (
 	SourceTypeImport          SourceType = "import"           // 导入
 	SourceTypeTransfer        SourceType = "transfer"         // 转诊
 )
+
+// String 返回来源类型的原始字符串值。
+func (s SourceType) String() string {
+	return string(s)
+}
+
+// DisplayName 返回来源类型的中文展示名称。
+func (s SourceType) DisplayName() string {
+	switch s {
+	case SourceTypeAssessmentEntry:
+		return "测评入口"
+	case SourceTypeManual:
+		return "手动分配"
+	case SourceTypeImport:
+		return "导入"
+	case SourceTypeTransfer:
+		return "主责转移"
+	default:
+		return string(s)
+	}
+}
 
 var accessGrantRelationTypes = []RelationType{
 	RelationTypeAssigned,

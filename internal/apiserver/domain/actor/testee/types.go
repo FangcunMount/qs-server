@@ -36,6 +36,18 @@ func (g Gender) String() string {
 	}
 }
 
+// DisplayName 返回性别的中文展示名称。
+func (g Gender) DisplayName() string {
+	switch g {
+	case GenderMale:
+		return "男"
+	case GenderFemale:
+		return "女"
+	default:
+		return "未知"
+	}
+}
+
 // Tag 标签类型
 type Tag string
 
@@ -43,9 +55,87 @@ func (t Tag) String() string {
 	return string(t)
 }
 
+// DisplayName 返回标签的中文展示名称。
+func (t Tag) DisplayName() string {
+	switch t {
+	case "risk_high":
+		return "高风险"
+	case "risk_medium":
+		return "中风险"
+	case "risk_low":
+		return "低风险"
+	case "risk_severe":
+		return "严重风险"
+	case "key_focus":
+		return "重点关注"
+	case "daily_simulation":
+		return "日常模拟"
+	case "seeddata":
+		return "种子数据"
+	default:
+		return string(t)
+	}
+}
+
 func (t Tag) IsValid() bool {
 	// 规则：只允许字母、数字、下划线、中文
 	return regexp.MustCompile(`^[\w\p{Han}]+$`).MatchString(string(t))
+}
+
+// Source 数据来源类型。
+type Source string
+
+const (
+	SourceUnknown         Source = "unknown"
+	SourceManual          Source = "manual"
+	SourceImport          Source = "import"
+	SourceAssessmentEntry Source = "assessment_entry"
+	SourceRegistration    Source = "registration"
+	SourceSelfRegistered  Source = "self_registered"
+	SourceSelfRegister    Source = "self_register"
+	SourceIntake          Source = "intake"
+	SourceScreening       Source = "screening"
+	SourceWechat          Source = "wechat"
+	SourceWX              Source = "wx"
+	SourceDailySimulation Source = "daily_simulation"
+	SourceSeeddata        Source = "seeddata"
+	SourceProfile         Source = "profile"
+)
+
+func (s Source) String() string {
+	return string(s)
+}
+
+// DisplayName 返回数据来源的中文展示名称。
+func (s Source) DisplayName() string {
+	switch s {
+	case SourceManual:
+		return "手动创建"
+	case SourceImport:
+		return "导入"
+	case SourceAssessmentEntry:
+		return "测评入口"
+	case SourceRegistration:
+		return "用户注册"
+	case SourceSelfRegistered, SourceSelfRegister:
+		return "自主注册"
+	case SourceIntake:
+		return "接入流程"
+	case SourceScreening:
+		return "筛查"
+	case SourceWechat, SourceWX:
+		return "微信"
+	case SourceDailySimulation:
+		return "日常模拟"
+	case SourceSeeddata:
+		return "种子数据"
+	case SourceProfile:
+		return "档案导入"
+	case SourceUnknown:
+		return "未知来源"
+	default:
+		return string(s)
+	}
 }
 
 // AssessmentStats 测评统计快照（值对象）

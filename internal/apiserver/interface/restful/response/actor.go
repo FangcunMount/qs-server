@@ -1,23 +1,25 @@
 package response
 
-import "time"
-
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
-	ID              string                   `json:"id"`                         // ID
-	OrgID           string                   `json:"org_id"`                     // 机构ID
-	ProfileID       *string                  `json:"profile_id,omitempty"`       // 用户档案ID（新字段）
-	IAMChildID      *string                  `json:"iam_child_id,omitempty"`     // IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
-	Name            string                   `json:"name"`                       // 姓名
-	Gender          string                   `json:"gender,omitempty"`           // 性别
-	Birthday        *time.Time               `json:"birthday,omitempty"`         // 出生日期
-	Tags            []string                 `json:"tags"`                       // 标签
-	Source          string                   `json:"source,omitempty"`           // 来源
-	IsKeyFocus      bool                     `json:"is_key_focus"`               // 是否重点关注
-	AssessmentStats *AssessmentStatsResponse `json:"assessment_stats,omitempty"` // 测评统计
-	Guardians       []GuardianResponse       `json:"guardians,omitempty"`        // 监护人信息列表
-	CreatedAt       time.Time                `json:"created_at"`                 // 创建时间
-	UpdatedAt       time.Time                `json:"updated_at"`                 // 更新时间
+	ID              string                   `json:"id"`                           // ID
+	OrgID           string                   `json:"org_id"`                       // 机构ID
+	ProfileID       *string                  `json:"profile_id,omitempty"`         // 用户档案ID（新字段）
+	IAMChildID      *string                  `json:"iam_child_id,omitempty"`       // IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
+	Name            string                   `json:"name"`                         // 姓名
+	Gender          string                   `json:"gender,omitempty"`             // 性别
+	GenderLabel     string                   `json:"gender_label,omitempty"`       // 性别中文
+	Birthday        *string                  `json:"birthday,omitempty"`           // 出生日期
+	Tags            []string                 `json:"tags"`                         // 标签
+	TagsLabel       []string                 `json:"tags_label,omitempty"`         // 标签中文
+	Source          string                   `json:"source,omitempty"`             // 来源
+	SourceLabel     string                   `json:"source_label,omitempty"`       // 来源中文
+	IsKeyFocus      bool                     `json:"is_key_focus"`                 // 是否重点关注
+	IsKeyFocusLabel string                   `json:"is_key_focus_label,omitempty"` // 是否重点关注中文
+	AssessmentStats *AssessmentStatsResponse `json:"assessment_stats,omitempty"`   // 测评统计
+	Guardians       []GuardianResponse       `json:"guardians,omitempty"`          // 监护人信息列表
+	CreatedAt       string                   `json:"created_at,omitempty"`         // 创建时间
+	UpdatedAt       string                   `json:"updated_at,omitempty"`         // 更新时间
 }
 
 // GuardianResponse 监护人信息响应
@@ -29,9 +31,10 @@ type GuardianResponse struct {
 
 // AssessmentStatsResponse 测评统计响应
 type AssessmentStatsResponse struct {
-	TotalCount       int        `json:"total_count"`                  // 总次数
-	LastAssessmentAt *time.Time `json:"last_assessment_at,omitempty"` // 最后测评时间
-	LastRiskLevel    string     `json:"last_risk_level,omitempty"`    // 最后风险等级
+	TotalCount         int     `json:"total_count"`                     // 总次数
+	LastAssessmentAt   *string `json:"last_assessment_at,omitempty"`    // 最后测评时间
+	LastRiskLevel      string  `json:"last_risk_level,omitempty"`       // 最后风险等级
+	LastRiskLevelLabel string  `json:"last_risk_level_label,omitempty"` // 最后风险等级中文
 }
 
 // TesteeListResponse 受试者列表响应
@@ -45,16 +48,16 @@ type TesteeListResponse struct {
 
 // StaffResponse 员工响应
 type StaffResponse struct {
-	ID        string    `json:"id"`              // ID
-	OrgID     string    `json:"org_id"`          // 机构ID
-	UserID    string    `json:"user_id"`         // 用户ID
-	Roles     []string  `json:"roles"`           // 角色列表
-	Name      string    `json:"name"`            // 姓名
-	Email     string    `json:"email,omitempty"` // 邮箱
-	Phone     string    `json:"phone,omitempty"` // 电话
-	IsActive  bool      `json:"is_active"`       // 是否激活
-	CreatedAt time.Time `json:"created_at"`      // 创建时间
-	UpdatedAt time.Time `json:"updated_at"`      // 更新时间
+	ID        string   `json:"id"`                   // ID
+	OrgID     string   `json:"org_id"`               // 机构ID
+	UserID    string   `json:"user_id"`              // 用户ID
+	Roles     []string `json:"roles"`                // 角色列表
+	Name      string   `json:"name"`                 // 姓名
+	Email     string   `json:"email,omitempty"`      // 邮箱
+	Phone     string   `json:"phone,omitempty"`      // 电话
+	IsActive  bool     `json:"is_active"`            // 是否激活
+	CreatedAt string   `json:"created_at,omitempty"` // 创建时间
+	UpdatedAt string   `json:"updated_at,omitempty"` // 更新时间
 }
 
 // StaffListResponse 员工列表响应

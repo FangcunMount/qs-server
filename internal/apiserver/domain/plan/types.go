@@ -53,6 +53,22 @@ func (s PlanStatus) String() string {
 	return string(s)
 }
 
+// DisplayName 返回计划状态的中文展示名称。
+func (s PlanStatus) DisplayName() string {
+	switch s {
+	case PlanStatusActive:
+		return "进行中"
+	case PlanStatusPaused:
+		return "已暂停"
+	case PlanStatusFinished:
+		return "已完成"
+	case PlanStatusCanceled:
+		return "已取消"
+	default:
+		return string(s)
+	}
+}
+
 // IsValid 检查状态是否有效
 func (s PlanStatus) IsValid() bool {
 	switch s {
@@ -109,6 +125,22 @@ func (t PlanScheduleType) String() string {
 	return string(t)
 }
 
+// DisplayName 返回调度类型的中文展示名称。
+func (t PlanScheduleType) DisplayName() string {
+	switch t {
+	case PlanScheduleByWeek:
+		return "按周间隔"
+	case PlanScheduleByDay:
+		return "按天间隔"
+	case PlanScheduleFixedDate:
+		return "固定日期"
+	case PlanScheduleCustom:
+		return "自定义周次"
+	default:
+		return string(t)
+	}
+}
+
 // IsValid 检查周期类型是否有效
 func (t PlanScheduleType) IsValid() bool {
 	switch t {
@@ -140,6 +172,24 @@ const (
 // String 返回状态的字符串表示
 func (s TaskStatus) String() string {
 	return string(s)
+}
+
+// DisplayName 返回任务状态的中文展示名称。
+func (s TaskStatus) DisplayName() string {
+	switch s {
+	case TaskStatusPending:
+		return "待开放"
+	case TaskStatusOpened:
+		return "已开放"
+	case TaskStatusCompleted:
+		return "已完成"
+	case TaskStatusExpired:
+		return "已过期"
+	case TaskStatusCanceled:
+		return "已取消"
+	default:
+		return string(s)
+	}
 }
 
 // IsValid 检查状态是否有效

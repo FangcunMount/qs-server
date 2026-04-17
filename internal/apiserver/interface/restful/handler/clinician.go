@@ -918,8 +918,10 @@ func toClinicianResponse(item *clinicianApp.ClinicianResult) *response.Clinician
 		Department:           item.Department,
 		Title:                item.Title,
 		ClinicianType:        item.ClinicianType,
+		ClinicianTypeLabel:   response.LabelForClinicianType(item.ClinicianType),
 		EmployeeCode:         item.EmployeeCode,
 		IsActive:             item.IsActive,
+		IsActiveLabel:        map[bool]string{true: "启用", false: "停用"}[item.IsActive],
 		AssignedTesteeCount:  item.AssignedTesteeCount,
 		AssessmentEntryCount: item.AssessmentEntryCount,
 	}
@@ -951,16 +953,18 @@ func toAssessmentEntryResponse(item *assessmentEntryApp.AssessmentEntryResult, q
 	}
 
 	return &response.AssessmentEntryResponse{
-		ID:            strconv.FormatUint(item.ID, 10),
-		OrgID:         strconv.FormatInt(item.OrgID, 10),
-		ClinicianID:   strconv.FormatUint(item.ClinicianID, 10),
-		Token:         item.Token,
-		TargetType:    item.TargetType,
-		TargetCode:    item.TargetCode,
-		TargetVersion: item.TargetVersion,
-		IsActive:      item.IsActive,
-		ExpiresAt:     item.ExpiresAt,
-		QRCodeURL:     qrCodeURL,
+		ID:              strconv.FormatUint(item.ID, 10),
+		OrgID:           strconv.FormatInt(item.OrgID, 10),
+		ClinicianID:     strconv.FormatUint(item.ClinicianID, 10),
+		Token:           item.Token,
+		TargetType:      item.TargetType,
+		TargetTypeLabel: response.LabelForTargetType(item.TargetType),
+		TargetCode:      item.TargetCode,
+		TargetVersion:   item.TargetVersion,
+		IsActive:        item.IsActive,
+		IsActiveLabel:   map[bool]string{true: "启用", false: "停用"}[item.IsActive],
+		ExpiresAt:       response.FormatDateTimePtr(item.ExpiresAt),
+		QRCodeURL:       qrCodeURL,
 	}
 }
 
@@ -996,12 +1000,13 @@ func toClinicianSummaryResponse(item *assessmentEntryApp.ClinicianSummaryResult)
 	}
 
 	return &response.ClinicianSummaryResponse{
-		ID:            strconv.FormatUint(item.ID, 10),
-		OperatorID:    operatorID,
-		Name:          item.Name,
-		Department:    item.Department,
-		Title:         item.Title,
-		ClinicianType: item.ClinicianType,
+		ID:                 strconv.FormatUint(item.ID, 10),
+		OperatorID:         operatorID,
+		Name:               item.Name,
+		Department:         item.Department,
+		Title:              item.Title,
+		ClinicianType:      item.ClinicianType,
+		ClinicianTypeLabel: response.LabelForClinicianType(item.ClinicianType),
 	}
 }
 
@@ -1028,16 +1033,19 @@ func toRelationResponse(item *assessmentEntryApp.RelationSummaryResult) *respons
 	}
 
 	return &response.RelationResponse{
-		ID:           strconv.FormatUint(item.ID, 10),
-		OrgID:        strconv.FormatInt(item.OrgID, 10),
-		ClinicianID:  strconv.FormatUint(item.ClinicianID, 10),
-		TesteeID:     strconv.FormatUint(item.TesteeID, 10),
-		RelationType: item.RelationType,
-		SourceType:   item.SourceType,
-		SourceID:     sourceID,
-		IsActive:     item.IsActive,
-		BoundAt:      item.BoundAt,
-		UnboundAt:    item.UnboundAt,
+		ID:                strconv.FormatUint(item.ID, 10),
+		OrgID:             strconv.FormatInt(item.OrgID, 10),
+		ClinicianID:       strconv.FormatUint(item.ClinicianID, 10),
+		TesteeID:          strconv.FormatUint(item.TesteeID, 10),
+		RelationType:      item.RelationType,
+		RelationTypeLabel: response.LabelForRelationType(item.RelationType),
+		SourceType:        item.SourceType,
+		SourceTypeLabel:   response.LabelForRelationSource(item.SourceType),
+		SourceID:          sourceID,
+		IsActive:          item.IsActive,
+		IsActiveLabel:     map[bool]string{true: "有效", false: "失效"}[item.IsActive],
+		BoundAt:           response.FormatDateTimeValue(item.BoundAt),
+		UnboundAt:         response.FormatDateTimePtr(item.UnboundAt),
 	}
 }
 
@@ -1060,15 +1068,7 @@ func toTesteeSummaryResponse(item *assessmentEntryApp.TesteeSummaryResult) *resp
 		return nil
 	}
 
-	var gender string
-	switch item.Gender {
-	case 1:
-		gender = "male"
-	case 2:
-		gender = "female"
-	default:
-		gender = "unknown"
-	}
+	gender := response.GenderCodeFromValue(item.Gender)
 
 	var profileID *string
 	if item.ProfileID != nil {
@@ -1077,16 +1077,20 @@ func toTesteeSummaryResponse(item *assessmentEntryApp.TesteeSummaryResult) *resp
 	}
 
 	return &response.TesteeResponse{
-		ID:         strconv.FormatUint(item.ID, 10),
-		OrgID:      strconv.FormatInt(item.OrgID, 10),
-		ProfileID:  profileID,
-		IAMChildID: response.LegacyIAMChildIDAlias(profileID),
-		Name:       item.Name,
-		Gender:     gender,
-		Birthday:   item.Birthday,
-		Tags:       item.Tags,
-		Source:     item.Source,
-		IsKeyFocus: item.IsKeyFocus,
+		ID:              strconv.FormatUint(item.ID, 10),
+		OrgID:           strconv.FormatInt(item.OrgID, 10),
+		ProfileID:       profileID,
+		IAMChildID:      response.LegacyIAMChildIDAlias(profileID),
+		Name:            item.Name,
+		Gender:          gender,
+		GenderLabel:     response.LabelForGender(gender),
+		Birthday:        response.FormatDatePtr(item.Birthday),
+		Tags:            item.Tags,
+		TagsLabel:       response.LabelTags(item.Tags),
+		Source:          item.Source,
+		SourceLabel:     response.LabelForTesteeSource(item.Source),
+		IsKeyFocus:      item.IsKeyFocus,
+		IsKeyFocusLabel: response.LabelForKeyFocus(item.IsKeyFocus),
 	}
 }
 
@@ -1102,16 +1106,19 @@ func toRelationResponseFromClinicianResult(item *clinicianApp.RelationResult) *r
 	}
 
 	return &response.RelationResponse{
-		ID:           strconv.FormatUint(item.ID, 10),
-		OrgID:        strconv.FormatInt(item.OrgID, 10),
-		ClinicianID:  strconv.FormatUint(item.ClinicianID, 10),
-		TesteeID:     strconv.FormatUint(item.TesteeID, 10),
-		RelationType: item.RelationType,
-		SourceType:   item.SourceType,
-		SourceID:     sourceID,
-		IsActive:     item.IsActive,
-		BoundAt:      item.BoundAt,
-		UnboundAt:    item.UnboundAt,
+		ID:                strconv.FormatUint(item.ID, 10),
+		OrgID:             strconv.FormatInt(item.OrgID, 10),
+		ClinicianID:       strconv.FormatUint(item.ClinicianID, 10),
+		TesteeID:          strconv.FormatUint(item.TesteeID, 10),
+		RelationType:      item.RelationType,
+		RelationTypeLabel: response.LabelForRelationType(item.RelationType),
+		SourceType:        item.SourceType,
+		SourceTypeLabel:   response.LabelForRelationSource(item.SourceType),
+		SourceID:          sourceID,
+		IsActive:          item.IsActive,
+		IsActiveLabel:     map[bool]string{true: "有效", false: "失效"}[item.IsActive],
+		BoundAt:           response.FormatDateTimeValue(item.BoundAt),
+		UnboundAt:         response.FormatDateTimePtr(item.UnboundAt),
 	}
 }
 
@@ -1120,15 +1127,7 @@ func toAssignedTesteeResponse(item *clinicianApp.AssignedTesteeResult) *response
 		return nil
 	}
 
-	var gender string
-	switch item.Gender {
-	case 1:
-		gender = "male"
-	case 2:
-		gender = "female"
-	default:
-		gender = "unknown"
-	}
+	gender := response.GenderCodeFromValue(item.Gender)
 
 	var profileID *string
 	if item.ProfileID != nil {
@@ -1137,16 +1136,20 @@ func toAssignedTesteeResponse(item *clinicianApp.AssignedTesteeResult) *response
 	}
 
 	return &response.TesteeResponse{
-		ID:         strconv.FormatUint(item.ID, 10),
-		OrgID:      strconv.FormatInt(item.OrgID, 10),
-		ProfileID:  profileID,
-		IAMChildID: response.LegacyIAMChildIDAlias(profileID),
-		Name:       item.Name,
-		Gender:     gender,
-		Birthday:   item.Birthday,
-		Tags:       item.Tags,
-		Source:     item.Source,
-		IsKeyFocus: item.IsKeyFocus,
+		ID:              strconv.FormatUint(item.ID, 10),
+		OrgID:           strconv.FormatInt(item.OrgID, 10),
+		ProfileID:       profileID,
+		IAMChildID:      response.LegacyIAMChildIDAlias(profileID),
+		Name:            item.Name,
+		Gender:          gender,
+		GenderLabel:     response.LabelForGender(gender),
+		Birthday:        response.FormatDatePtr(item.Birthday),
+		Tags:            item.Tags,
+		TagsLabel:       response.LabelTags(item.Tags),
+		Source:          item.Source,
+		SourceLabel:     response.LabelForTesteeSource(item.Source),
+		IsKeyFocus:      item.IsKeyFocus,
+		IsKeyFocusLabel: response.LabelForKeyFocus(item.IsKeyFocus),
 	}
 }
 

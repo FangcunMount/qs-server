@@ -2,7 +2,6 @@ package response
 
 import (
 	"fmt"
-	"time"
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
@@ -12,21 +11,24 @@ import (
 
 // AssessmentResponse 测评响应
 type AssessmentResponse struct {
-	ID                   string   `json:"id"`                     // 测评ID
-	OrgID                string   `json:"org_id"`                 // 组织ID
-	TesteeID             string   `json:"testee_id"`              // 受试者ID
-	QuestionnaireCode    string   `json:"questionnaire_code"`     // 问卷编码（唯一标识）
-	QuestionnaireVersion string   `json:"questionnaire_version"`  // 问卷版本
-	AnswerSheetID        string   `json:"answer_sheet_id"`        // 答卷ID
-	MedicalScaleID       *string  `json:"medical_scale_id"`       // 量表ID
-	MedicalScaleCode     *string  `json:"medical_scale_code"`     // 量表编码
-	MedicalScaleName     *string  `json:"medical_scale_name"`     // 量表名称
-	OriginType           string   `json:"origin_type"`            // 来源类型
-	OriginID             *string  `json:"origin_id"`              // 来源ID
-	Status               string   `json:"status"`                 // 状态
-	TotalScore           *float64 `json:"total_score,omitempty"`  // 总分
-	RiskLevel            *string  `json:"risk_level,omitempty"`   // 风险等级
-	SubmittedAt          *string  `json:"submitted_at,omitempty"` // 提交时间
+	ID                   string   `json:"id"`                          // 测评ID
+	OrgID                string   `json:"org_id"`                      // 组织ID
+	TesteeID             string   `json:"testee_id"`                   // 受试者ID
+	QuestionnaireCode    string   `json:"questionnaire_code"`          // 问卷编码（唯一标识）
+	QuestionnaireVersion string   `json:"questionnaire_version"`       // 问卷版本
+	AnswerSheetID        string   `json:"answer_sheet_id"`             // 答卷ID
+	MedicalScaleID       *string  `json:"medical_scale_id"`            // 量表ID
+	MedicalScaleCode     *string  `json:"medical_scale_code"`          // 量表编码
+	MedicalScaleName     *string  `json:"medical_scale_name"`          // 量表名称
+	OriginType           string   `json:"origin_type"`                 // 来源类型
+	OriginTypeLabel      string   `json:"origin_type_label,omitempty"` // 来源类型中文
+	OriginID             *string  `json:"origin_id"`                   // 来源ID
+	Status               string   `json:"status"`                      // 状态
+	StatusLabel          string   `json:"status_label,omitempty"`      // 状态中文
+	TotalScore           *float64 `json:"total_score,omitempty"`       // 总分
+	RiskLevel            *string  `json:"risk_level,omitempty"`        // 风险等级
+	RiskLevelLabel       string   `json:"risk_level_label,omitempty"`  // 风险等级中文
+	SubmittedAt          *string  `json:"submitted_at,omitempty"`      // 提交时间
 	InterpretedAt        *string  `json:"interpreted_at,omitempty"`
 	FailedAt             *string  `json:"failed_at,omitempty"`
 	FailureReason        *string  `json:"failure_reason,omitempty"`
@@ -53,22 +55,24 @@ type BatchEvaluationResponse struct {
 
 // ScoreResponse 得分响应
 type ScoreResponse struct {
-	AssessmentID string             `json:"assessment_id"` // 测评ID
-	TotalScore   float64            `json:"total_score"`   // 总分
-	RiskLevel    string             `json:"risk_level"`    // 整体风险等级
-	FactorScores []*FactorScoreItem `json:"factor_scores"` // 因子得分列表
+	AssessmentID   string             `json:"assessment_id"`              // 测评ID
+	TotalScore     float64            `json:"total_score"`                // 总分
+	RiskLevel      string             `json:"risk_level"`                 // 整体风险等级
+	RiskLevelLabel string             `json:"risk_level_label,omitempty"` // 整体风险等级中文
+	FactorScores   []*FactorScoreItem `json:"factor_scores"`              // 因子得分列表
 }
 
 // FactorScoreItem 因子得分项
 type FactorScoreItem struct {
-	FactorCode   string   `json:"factor_code"`         // 因子编码
-	FactorName   string   `json:"factor_name"`         // 因子名称
-	RawScore     float64  `json:"raw_score"`           // 原始分
-	MaxScore     *float64 `json:"max_score,omitempty"` // 最大分
-	RiskLevel    string   `json:"risk_level"`          // 风险等级
-	Conclusion   string   `json:"conclusion"`          // 结论
-	Suggestion   string   `json:"suggestion"`          // 建议
-	IsTotalScore bool     `json:"is_total_score"`      // 是否为总分因子
+	FactorCode     string   `json:"factor_code"`                // 因子编码
+	FactorName     string   `json:"factor_name"`                // 因子名称
+	RawScore       float64  `json:"raw_score"`                  // 原始分
+	MaxScore       *float64 `json:"max_score,omitempty"`        // 最大分
+	RiskLevel      string   `json:"risk_level"`                 // 风险等级
+	RiskLevelLabel string   `json:"risk_level_label,omitempty"` // 风险等级中文
+	Conclusion     string   `json:"conclusion"`                 // 结论
+	Suggestion     string   `json:"suggestion"`                 // 建议
+	IsTotalScore   bool     `json:"is_total_score"`             // 是否为总分因子
 }
 
 // FactorTrendResponse 因子趋势响应
@@ -81,9 +85,10 @@ type FactorTrendResponse struct {
 
 // TrendDataPoint 趋势数据点
 type TrendDataPoint struct {
-	AssessmentID string  `json:"assessment_id"` // 测评ID
-	RawScore     float64 `json:"raw_score"`     // 得分
-	RiskLevel    string  `json:"risk_level"`    // 风险等级
+	AssessmentID   string  `json:"assessment_id"`              // 测评ID
+	RawScore       float64 `json:"raw_score"`                  // 得分
+	RiskLevel      string  `json:"risk_level"`                 // 风险等级
+	RiskLevelLabel string  `json:"risk_level_label,omitempty"` // 风险等级中文
 }
 
 // HighRiskFactorsResponse 高风险因子响应
@@ -98,26 +103,28 @@ type HighRiskFactorsResponse struct {
 
 // ReportResponse 报告响应
 type ReportResponse struct {
-	AssessmentID string           `json:"assessment_id"` // 测评ID
-	ScaleName    string           `json:"scale_name"`    // 量表名称
-	ScaleCode    string           `json:"scale_code"`    // 量表编码
-	TotalScore   float64          `json:"total_score"`   // 总分
-	RiskLevel    string           `json:"risk_level"`    // 风险等级
-	Conclusion   string           `json:"conclusion"`    // 总结论
-	Dimensions   []*DimensionItem `json:"dimensions"`    // 维度解读列表
-	Suggestions  []SuggestionItem `json:"suggestions"`   // 建议列表
-	CreatedAt    string           `json:"created_at"`    // 创建时间
+	AssessmentID   string           `json:"assessment_id"`              // 测评ID
+	ScaleName      string           `json:"scale_name"`                 // 量表名称
+	ScaleCode      string           `json:"scale_code"`                 // 量表编码
+	TotalScore     float64          `json:"total_score"`                // 总分
+	RiskLevel      string           `json:"risk_level"`                 // 风险等级
+	RiskLevelLabel string           `json:"risk_level_label,omitempty"` // 风险等级中文
+	Conclusion     string           `json:"conclusion"`                 // 总结论
+	Dimensions     []*DimensionItem `json:"dimensions"`                 // 维度解读列表
+	Suggestions    []SuggestionItem `json:"suggestions"`                // 建议列表
+	CreatedAt      string           `json:"created_at"`                 // 创建时间
 }
 
 // DimensionItem 维度解读项
 type DimensionItem struct {
-	FactorCode  string   `json:"factor_code"`          // 因子编码
-	FactorName  string   `json:"factor_name"`          // 因子名称
-	RawScore    float64  `json:"raw_score"`            // 原始分
-	MaxScore    *float64 `json:"max_score,omitempty"`  // 最大分
-	RiskLevel   string   `json:"risk_level"`           // 风险等级
-	Description string   `json:"description"`          // 解读描述
-	Suggestion  string   `json:"suggestion,omitempty"` // 维度建议
+	FactorCode     string   `json:"factor_code"`                // 因子编码
+	FactorName     string   `json:"factor_name"`                // 因子名称
+	RawScore       float64  `json:"raw_score"`                  // 原始分
+	MaxScore       *float64 `json:"max_score,omitempty"`        // 最大分
+	RiskLevel      string   `json:"risk_level"`                 // 风险等级
+	RiskLevelLabel string   `json:"risk_level_label,omitempty"` // 风险等级中文
+	Description    string   `json:"description"`                // 解读描述
+	Suggestion     string   `json:"suggestion,omitempty"`       // 维度建议
 }
 
 // SuggestionItem 建议项
@@ -174,24 +181,26 @@ func NewAssessmentResponse(result *assessment.AssessmentResult) *AssessmentRespo
 		MedicalScaleCode:     result.MedicalScaleCode,
 		MedicalScaleName:     result.MedicalScaleName,
 		OriginType:           result.OriginType,
+		OriginTypeLabel:      LabelForAssessmentOriginType(result.OriginType),
 		OriginID:             result.OriginID,
 		Status:               result.Status,
+		StatusLabel:          LabelForAssessmentStatus(result.Status),
 		TotalScore:           result.TotalScore,
 		RiskLevel:            result.RiskLevel,
 	}
 
 	// 格式化时间
 	if result.SubmittedAt != nil {
-		t := result.SubmittedAt.Format(time.RFC3339)
-		resp.SubmittedAt = &t
+		resp.SubmittedAt = FormatDateTimePtr(result.SubmittedAt)
 	}
 	if result.InterpretedAt != nil {
-		t := result.InterpretedAt.Format(time.RFC3339)
-		resp.InterpretedAt = &t
+		resp.InterpretedAt = FormatDateTimePtr(result.InterpretedAt)
 	}
 	if result.FailedAt != nil {
-		t := result.FailedAt.Format(time.RFC3339)
-		resp.FailedAt = &t
+		resp.FailedAt = FormatDateTimePtr(result.FailedAt)
+	}
+	if result.RiskLevel != nil {
+		resp.RiskLevelLabel = LabelForRiskLevel(*result.RiskLevel)
 	}
 	resp.FailureReason = result.FailureReason
 
@@ -247,22 +256,24 @@ func NewScoreResponse(result *assessment.ScoreResult) *ScoreResponse {
 	factorScores := make([]*FactorScoreItem, 0, len(result.FactorScores))
 	for _, f := range result.FactorScores {
 		factorScores = append(factorScores, &FactorScoreItem{
-			FactorCode:   f.FactorCode,
-			FactorName:   f.FactorName,
-			RawScore:     f.RawScore,
-			MaxScore:     f.MaxScore,
-			RiskLevel:    f.RiskLevel,
-			Conclusion:   f.Conclusion,
-			Suggestion:   f.Suggestion,
-			IsTotalScore: f.IsTotalScore,
+			FactorCode:     f.FactorCode,
+			FactorName:     f.FactorName,
+			RawScore:       f.RawScore,
+			MaxScore:       f.MaxScore,
+			RiskLevel:      f.RiskLevel,
+			RiskLevelLabel: LabelForRiskLevel(f.RiskLevel),
+			Conclusion:     f.Conclusion,
+			Suggestion:     f.Suggestion,
+			IsTotalScore:   f.IsTotalScore,
 		})
 	}
 
 	return &ScoreResponse{
-		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
-		TotalScore:   result.TotalScore,
-		RiskLevel:    result.RiskLevel,
-		FactorScores: factorScores,
+		AssessmentID:   fmt.Sprintf("%d", result.AssessmentID),
+		TotalScore:     result.TotalScore,
+		RiskLevel:      result.RiskLevel,
+		RiskLevelLabel: LabelForRiskLevel(result.RiskLevel),
+		FactorScores:   factorScores,
 	}
 }
 
@@ -275,9 +286,10 @@ func NewFactorTrendResponse(result *assessment.FactorTrendResult) *FactorTrendRe
 	dataPoints := make([]*TrendDataPoint, 0, len(result.DataPoints))
 	for _, dp := range result.DataPoints {
 		dataPoints = append(dataPoints, &TrendDataPoint{
-			AssessmentID: fmt.Sprintf("%d", dp.AssessmentID),
-			RawScore:     dp.RawScore,
-			RiskLevel:    dp.RiskLevel,
+			AssessmentID:   fmt.Sprintf("%d", dp.AssessmentID),
+			RawScore:       dp.RawScore,
+			RiskLevel:      dp.RiskLevel,
+			RiskLevelLabel: LabelForRiskLevel(dp.RiskLevel),
 		})
 	}
 
@@ -298,13 +310,14 @@ func NewHighRiskFactorsResponse(result *assessment.HighRiskFactorsResult) *HighR
 	factors := make([]*FactorScoreItem, 0, len(result.HighRiskFactors))
 	for _, f := range result.HighRiskFactors {
 		factors = append(factors, &FactorScoreItem{
-			FactorCode:   f.FactorCode,
-			FactorName:   f.FactorName,
-			RawScore:     f.RawScore,
-			RiskLevel:    f.RiskLevel,
-			Conclusion:   f.Conclusion,
-			Suggestion:   f.Suggestion,
-			IsTotalScore: f.IsTotalScore,
+			FactorCode:     f.FactorCode,
+			FactorName:     f.FactorName,
+			RawScore:       f.RawScore,
+			RiskLevel:      f.RiskLevel,
+			RiskLevelLabel: LabelForRiskLevel(f.RiskLevel),
+			Conclusion:     f.Conclusion,
+			Suggestion:     f.Suggestion,
+			IsTotalScore:   f.IsTotalScore,
 		})
 	}
 
@@ -325,26 +338,28 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 	dimensions := make([]*DimensionItem, 0, len(result.Dimensions))
 	for _, d := range result.Dimensions {
 		dimensions = append(dimensions, &DimensionItem{
-			FactorCode:  d.FactorCode,
-			FactorName:  d.FactorName,
-			RawScore:    d.RawScore,
-			MaxScore:    d.MaxScore,
-			RiskLevel:   d.RiskLevel,
-			Description: d.Description,
-			Suggestion:  d.Suggestion,
+			FactorCode:     d.FactorCode,
+			FactorName:     d.FactorName,
+			RawScore:       d.RawScore,
+			MaxScore:       d.MaxScore,
+			RiskLevel:      d.RiskLevel,
+			RiskLevelLabel: LabelForRiskLevel(d.RiskLevel),
+			Description:    d.Description,
+			Suggestion:     d.Suggestion,
 		})
 	}
 
 	return &ReportResponse{
-		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
-		ScaleName:    result.ScaleName,
-		ScaleCode:    result.ScaleCode,
-		TotalScore:   result.TotalScore,
-		RiskLevel:    result.RiskLevel,
-		Conclusion:   result.Conclusion,
-		Dimensions:   dimensions,
-		Suggestions:  toSuggestionItems(result.Suggestions),
-		CreatedAt:    result.CreatedAt.Format(time.RFC3339),
+		AssessmentID:   fmt.Sprintf("%d", result.AssessmentID),
+		ScaleName:      result.ScaleName,
+		ScaleCode:      result.ScaleCode,
+		TotalScore:     result.TotalScore,
+		RiskLevel:      result.RiskLevel,
+		RiskLevelLabel: LabelForRiskLevel(result.RiskLevel),
+		Conclusion:     result.Conclusion,
+		Dimensions:     dimensions,
+		Suggestions:    toSuggestionItems(result.Suggestions),
+		CreatedAt:      FormatDateTimeValue(result.CreatedAt),
 	}
 }
 

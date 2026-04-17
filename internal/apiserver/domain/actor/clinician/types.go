@@ -19,3 +19,24 @@ const (
 	TypeTherapist Type = "therapist" // 治疗师
 	TypeOther     Type = "other"     // 其他
 )
+
+// String 返回从业者类型的原始字符串值。
+func (t Type) String() string {
+	return string(t)
+}
+
+// DisplayName 返回从业者类型的中文展示名称。
+func (t Type) DisplayName() string {
+	switch t {
+	case TypeDoctor:
+		return "医生"
+	case TypeCounselor:
+		return "咨询师"
+	case TypeTherapist:
+		return "治疗师"
+	case TypeOther:
+		return "其他"
+	default:
+		return string(t)
+	}
+}

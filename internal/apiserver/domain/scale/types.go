@@ -157,6 +157,24 @@ func (r RiskLevel) String() string {
 	return string(r)
 }
 
+// DisplayName 返回风险等级的中文展示名称。
+func (r RiskLevel) DisplayName() string {
+	switch r {
+	case RiskLevelNone:
+		return "正常"
+	case RiskLevelLow:
+		return "低风险"
+	case RiskLevelMedium:
+		return "中风险"
+	case RiskLevelHigh:
+		return "高风险"
+	case RiskLevelSevere:
+		return "严重风险"
+	default:
+		return string(r)
+	}
+}
+
 // IsValid 检查风险等级是否有效
 func (r RiskLevel) IsValid() bool {
 	switch r {

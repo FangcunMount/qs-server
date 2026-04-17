@@ -2,7 +2,6 @@ package statistics
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -156,7 +155,7 @@ func (s *periodicStatsService) GetPeriodicStats(ctx context.Context, orgID int64
 
 		projects = append(projects, domainStatistics.TesteePeriodicProjectStatistics{
 			ProjectID:      planID,
-			ProjectName:    fmt.Sprintf("计划 %s", planID),
+			ProjectName:    scaleName,
 			ScaleName:      scaleName,
 			TotalWeeks:     totalWeeks,
 			CompletedWeeks: completed,

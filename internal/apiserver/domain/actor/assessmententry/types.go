@@ -17,3 +17,20 @@ const (
 	TargetTypeQuestionnaire TargetType = "questionnaire" // 问卷
 	TargetTypeScale         TargetType = "scale"         // 量表
 )
+
+// String 返回目标类型的原始字符串值。
+func (t TargetType) String() string {
+	return string(t)
+}
+
+// DisplayName 返回目标类型的中文展示名称。
+func (t TargetType) DisplayName() string {
+	switch t {
+	case TargetTypeQuestionnaire:
+		return "问卷"
+	case TargetTypeScale:
+		return "量表"
+	default:
+		return string(t)
+	}
+}

@@ -26,7 +26,7 @@ type Testee struct {
 
 	// === 业务标签与关注 ===
 	tags       []Tag  // 业务标签：["high_risk", "adhd_suspect", "vip"]
-	source     string // 数据来源：online_form / clinic_import / imported
+	source     Source // 数据来源
 	isKeyFocus bool   // 是否重点关注对象
 
 	// === 测评统计快照（读模型优化）===
@@ -46,7 +46,7 @@ func NewTestee(
 		name:     name,
 		gender:   gender,
 		birthday: birthday,
-		source:   "unknown",
+		source:   SourceUnknown,
 		tags:     make([]Tag, 0),
 	}
 }
@@ -195,7 +195,7 @@ func (t *Testee) IsKeyFocus() bool {
 
 // Source 获取数据来源
 func (t *Testee) Source() string {
-	return t.source
+	return t.source.String()
 }
 
 // === 测评统计查询（只读）===
@@ -219,7 +219,7 @@ func (t *Testee) SetID(id ID) {
 
 // SetSource 设置数据来源（仅用于从数据库加载）
 func (t *Testee) SetSource(source string) {
-	t.source = source
+	t.source = Source(source)
 }
 
 // SetCreatedAt 设置创建时间（仅用于从数据库加载）。

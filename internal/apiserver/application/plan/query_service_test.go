@@ -7,6 +7,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type taskWindowRepoStub struct {
@@ -19,6 +21,77 @@ type taskWindowRepoStub struct {
 	lastWindowBefore    *time.Time
 	lastWindowPage      int
 	lastWindowPageSize  int
+}
+
+type scaleRepoStub struct {
+	byCode map[string]*domainScale.MedicalScale
+}
+
+type planListRepoStub struct {
+	plans []*domainPlan.AssessmentPlan
+	total int64
+}
+
+func (r *planListRepoStub) FindByID(context.Context, domainPlan.AssessmentPlanID) (*domainPlan.AssessmentPlan, error) {
+	return nil, nil
+}
+
+func (r *planListRepoStub) FindByScaleCode(context.Context, string) ([]*domainPlan.AssessmentPlan, error) {
+	return nil, nil
+}
+
+func (r *planListRepoStub) FindActivePlans(context.Context) ([]*domainPlan.AssessmentPlan, error) {
+	return nil, nil
+}
+
+func (r *planListRepoStub) FindByTesteeID(context.Context, testee.ID) ([]*domainPlan.AssessmentPlan, error) {
+	return nil, nil
+}
+
+func (r *planListRepoStub) FindList(context.Context, int64, string, string, int, int) ([]*domainPlan.AssessmentPlan, int64, error) {
+	if r == nil {
+		return nil, 0, nil
+	}
+	return r.plans, r.total, nil
+}
+
+func (r *planListRepoStub) Save(context.Context, *domainPlan.AssessmentPlan) error {
+	return nil
+}
+
+func (r *scaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error {
+	return nil
+}
+
+func (r *scaleRepoStub) FindByCode(_ context.Context, code string) (*domainScale.MedicalScale, error) {
+	if r == nil {
+		return nil, nil
+	}
+	return r.byCode[code], nil
+}
+
+func (r *scaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
+	return nil, nil
+}
+
+func (r *scaleRepoStub) FindSummaryList(context.Context, int, int, map[string]interface{}) ([]*domainScale.MedicalScale, error) {
+	return nil, nil
+}
+
+func (r *scaleRepoStub) CountWithConditions(context.Context, map[string]interface{}) (int64, error) {
+	return 0, nil
+}
+
+func (r *scaleRepoStub) Update(context.Context, *domainScale.MedicalScale) error {
+	return nil
+}
+
+func (r *scaleRepoStub) Remove(context.Context, string) error {
+	return nil
+}
+
+func (r *scaleRepoStub) ExistsByCode(context.Context, string) (bool, error) {
+	return false, nil
 }
 
 func (r *taskWindowRepoStub) FindByID(context.Context, domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error) {
@@ -99,7 +172,7 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 		windowTasks:   []*domainPlan.AssessmentTask{task},
 		windowHasMore: true,
 	}
-	service := NewQueryService(&schedulerPlanRepoByIDStub{plan: planAggregate}, repo)
+	service := NewQueryService(&schedulerPlanRepoByIDStub{plan: planAggregate}, repo, nil)
 
 	result, err := service.ListTaskWindow(context.Background(), ListTaskWindowDTO{
 		OrgID:         1,
@@ -138,7 +211,7 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 }
 
 func TestQueryServiceListTaskWindowRejectsInvalidStatus(t *testing.T) {
-	service := NewQueryService(&schedulerPlanRepoByIDStub{}, &taskWindowRepoStub{})
+	service := NewQueryService(&schedulerPlanRepoByIDStub{}, &taskWindowRepoStub{}, nil)
 
 	_, err := service.ListTaskWindow(context.Background(), ListTaskWindowDTO{
 		OrgID:  1,
@@ -147,5 +220,43 @@ func TestQueryServiceListTaskWindowRejectsInvalidStatus(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected invalid status error")
+	}
+}
+
+func TestQueryServiceListPlansResolvesScaleTitle(t *testing.T) {
+	planAggregate, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+
+	scaleItem, err := domainScale.NewMedicalScale(meta.Code("scale-code"), "抑郁自评量表")
+	if err != nil {
+		t.Fatalf("NewMedicalScale returned error: %v", err)
+	}
+
+	planRepo := &planListRepoStub{
+		plans: []*domainPlan.AssessmentPlan{planAggregate},
+		total: 1,
+	}
+
+	service := NewQueryService(planRepo, &taskWindowRepoStub{}, &scaleRepoStub{
+		byCode: map[string]*domainScale.MedicalScale{
+			"scale-code": scaleItem,
+		},
+	})
+
+	result, err := service.ListPlans(context.Background(), ListPlansDTO{
+		OrgID:    1,
+		Page:     1,
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("ListPlans returned error: %v", err)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(result.Items))
+	}
+	if result.Items[0].ScaleTitle != "抑郁自评量表" {
+		t.Fatalf("expected scale title to be resolved, got %q", result.Items[0].ScaleTitle)
 	}
 }
