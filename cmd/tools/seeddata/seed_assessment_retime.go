@@ -416,15 +416,15 @@ func applyAssessmentRetime(
 		}
 
 		if hasReportAt {
-			condition := "assessment_id = ?"
-			args := []interface{}{row.AssessmentID}
-			if reportID > 0 && reportID != row.AssessmentID {
-				condition = "(assessment_id = ? OR report_id = ?)"
-				args = append(args, reportID)
-			}
-			updated, err = updateAssessmentRetimeBehaviorFootprint(ctx, tx, row.OrgID, statisticsDomain.BehaviorEventReportGenerated, condition, args, times.TerminalAt)
+			updated, err = updateAssessmentRetimeBehaviorFootprint(ctx, tx, row.OrgID, statisticsDomain.BehaviorEventReportGenerated, "assessment_id = ?", row.AssessmentID, times.TerminalAt)
 			if err != nil {
 				return err
+			}
+			if updated == 0 && reportID > 0 && reportID != row.AssessmentID {
+				updated, err = updateAssessmentRetimeBehaviorFootprint(ctx, tx, row.OrgID, statisticsDomain.BehaviorEventReportGenerated, "report_id = ?", reportID, times.TerminalAt)
+				if err != nil {
+					return err
+				}
 			}
 			if updated > 0 {
 				stats.ReportGeneratedFootprintsUpdated += updated

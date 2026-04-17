@@ -39,9 +39,12 @@ flowchart LR
     model[01 业务模型分离\n为什么拆成 survey / scale / evaluation]
     async[02 异步评估链路\n为什么同步提交 + 异步评估]
     protection[03 保护层与读侧\n为什么要限流 / 背压 / 缓存 / 预聚合]
+    projector[04 行为投影与assessment_episode\n为什么会有 projector / pending reconcile]
 
     model --> async
     async --> protection
+    async --> projector
+    protection --> projector
 ```
 
 | 顺序 | 文档 | 先回答什么问题 |
@@ -49,6 +52,7 @@ flowchart LR
 | 1 | [01-测评业务模型：survey、scale、evaluation 为什么分离.md](./01-测评业务模型：survey、scale、evaluation%20为什么分离.md) | 为什么主业务一定要拆成采集、规则、产出三界 |
 | 2 | [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md) | 为什么提交答卷同步返回，而计分和报告走异步链 |
 | 3 | [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) | 为什么系统稳定性依赖保护层和读侧，而不是单一缓存 |
+| 4 | [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md) | 当前行为 projector 到底在做什么，为什么会有 pending reconcile |
 
 ## 与其他层如何分工
 
@@ -67,6 +71,7 @@ flowchart LR
 1. [01-测评业务模型：survey、scale、evaluation 为什么分离.md](./01-测评业务模型：survey、scale、evaluation%20为什么分离.md)
 2. [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md)
 3. [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)
+4. [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md)
 
 配合阅读：
 

@@ -11,24 +11,24 @@ import (
 // BehaviorFootprintPO 行为足迹事件。
 type BehaviorFootprintPO struct {
 	ID                string         `gorm:"column:id;size:128;primaryKey"`
-	OrgID             int64          `gorm:"column:org_id;not null;index:idx_behavior_footprint_org_time,priority:1"`
+	OrgID             int64          `gorm:"column:org_id;not null;index:idx_bf_org_testee_event_del_time,priority:1;index:idx_bf_org_entry_event_del_time,priority:1;index:idx_bf_org_answersheet_event_del,priority:1;index:idx_bf_org_assessment_event_del,priority:1"`
 	SubjectType       string         `gorm:"column:subject_type;size:64;not null"`
 	SubjectID         uint64         `gorm:"column:subject_id;not null;default:0"`
 	ActorType         string         `gorm:"column:actor_type;size:64;not null"`
 	ActorID           uint64         `gorm:"column:actor_id;not null;default:0"`
-	EntryID           uint64         `gorm:"column:entry_id;not null;default:0;index"`
-	ClinicianID       uint64         `gorm:"column:clinician_id;not null;default:0;index"`
+	EntryID           uint64         `gorm:"column:entry_id;not null;default:0;index:idx_bf_org_entry_event_del_time,priority:2"`
+	ClinicianID       uint64         `gorm:"column:clinician_id;not null;default:0"`
 	SourceClinicianID uint64         `gorm:"column:source_clinician_id;not null;default:0"`
-	TesteeID          uint64         `gorm:"column:testee_id;not null;default:0;index"`
-	AnswerSheetID     uint64         `gorm:"column:answersheet_id;not null;default:0;index"`
-	AssessmentID      uint64         `gorm:"column:assessment_id;not null;default:0;index"`
-	ReportID          uint64         `gorm:"column:report_id;not null;default:0;index"`
-	EventName         string         `gorm:"column:event_name;size:64;not null;index:idx_behavior_footprint_org_time,priority:2"`
-	OccurredAt        time.Time      `gorm:"column:occurred_at;not null;index:idx_behavior_footprint_org_time,priority:3"`
+	TesteeID          uint64         `gorm:"column:testee_id;not null;default:0;index:idx_bf_org_testee_event_del_time,priority:2"`
+	AnswerSheetID     uint64         `gorm:"column:answersheet_id;not null;default:0;index:idx_bf_org_answersheet_event_del,priority:2"`
+	AssessmentID      uint64         `gorm:"column:assessment_id;not null;default:0;index:idx_bf_org_assessment_event_del,priority:2"`
+	ReportID          uint64         `gorm:"column:report_id;not null;default:0"`
+	EventName         string         `gorm:"column:event_name;size:64;not null;index:idx_bf_org_testee_event_del_time,priority:3;index:idx_bf_org_entry_event_del_time,priority:3;index:idx_bf_org_answersheet_event_del,priority:3;index:idx_bf_org_assessment_event_del,priority:3"`
+	OccurredAt        time.Time      `gorm:"column:occurred_at;not null;index:idx_bf_org_testee_event_del_time,priority:5;index:idx_bf_org_entry_event_del_time,priority:5"`
 	Properties        JSONField      `gorm:"column:properties_json;type:json"`
 	CreatedAt         time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt         time.Time      `gorm:"column:updated_at;autoUpdateTime"`
-	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;index:idx_bf_org_testee_event_del_time,priority:4;index:idx_bf_org_entry_event_del_time,priority:4;index:idx_bf_org_answersheet_event_del,priority:4;index:idx_bf_org_assessment_event_del,priority:4"`
 }
 
 func (BehaviorFootprintPO) TableName() string { return "behavior_footprint" }
@@ -84,15 +84,15 @@ func behaviorFootprintFromDomain(footprint *domainStatistics.BehaviorFootprint) 
 // AssessmentEpisodePO 测评服务过程。
 type AssessmentEpisodePO struct {
 	EpisodeID           uint64         `gorm:"column:episode_id;primaryKey"`
-	OrgID               int64          `gorm:"column:org_id;not null;index:idx_assessment_episode_org_testee,priority:1"`
-	EntryID             *uint64        `gorm:"column:entry_id;index"`
-	ClinicianID         *uint64        `gorm:"column:clinician_id;index"`
-	TesteeID            uint64         `gorm:"column:testee_id;not null;index:idx_assessment_episode_org_testee,priority:2"`
-	AnswerSheetID       uint64         `gorm:"column:answersheet_id;not null;uniqueIndex"`
-	AssessmentID        *uint64        `gorm:"column:assessment_id;index"`
-	ReportID            *uint64        `gorm:"column:report_id;index"`
+	OrgID               int64          `gorm:"column:org_id;not null;index:idx_ae_org_testee_del_submitted,priority:1;index:idx_ae_org_assessment_del,priority:1"`
+	EntryID             *uint64        `gorm:"column:entry_id"`
+	ClinicianID         *uint64        `gorm:"column:clinician_id"`
+	TesteeID            uint64         `gorm:"column:testee_id;not null;index:idx_ae_org_testee_del_submitted,priority:2"`
+	AnswerSheetID       uint64         `gorm:"column:answersheet_id;not null;uniqueIndex:uk_assessment_episode_answersheet_id"`
+	AssessmentID        *uint64        `gorm:"column:assessment_id;index:idx_ae_org_assessment_del,priority:2"`
+	ReportID            *uint64        `gorm:"column:report_id"`
 	AttributedIntakeAt  *time.Time     `gorm:"column:attributed_intake_at"`
-	SubmittedAt         time.Time      `gorm:"column:submitted_at;not null"`
+	SubmittedAt         time.Time      `gorm:"column:submitted_at;not null;index:idx_ae_org_testee_del_submitted,priority:4"`
 	AssessmentCreatedAt *time.Time     `gorm:"column:assessment_created_at"`
 	ReportGeneratedAt   *time.Time     `gorm:"column:report_generated_at"`
 	FailedAt            *time.Time     `gorm:"column:failed_at"`
@@ -100,7 +100,7 @@ type AssessmentEpisodePO struct {
 	FailureReason       string         `gorm:"column:failure_reason;type:text"`
 	CreatedAt           time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt           time.Time      `gorm:"column:updated_at;autoUpdateTime"`
-	DeletedAt           gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	DeletedAt           gorm.DeletedAt `gorm:"column:deleted_at;index:idx_ae_org_testee_del_submitted,priority:3;index:idx_ae_org_assessment_del,priority:3"`
 }
 
 func (AssessmentEpisodePO) TableName() string { return "assessment_episode" }

@@ -519,9 +519,8 @@ func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, ent
 		s.db.WithContext(ctx).
 			Model(&statisticsInfra.BehaviorFootprintPO{}).
 			Select("MAX(occurred_at)").
-			Where("org_id = ? AND subject_type = ? AND subject_id = ? AND event_name = ? AND deleted_at IS NULL",
+			Where("org_id = ? AND entry_id = ? AND event_name = ? AND deleted_at IS NULL",
 				orgID,
-				"assessment_entry",
 				entry.ID.Uint64(),
 				string(domainStatistics.BehaviorEventEntryOpened),
 			),
