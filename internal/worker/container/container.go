@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/worker/application"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
@@ -20,7 +21,8 @@ type Container struct {
 	initialized bool
 	opts        *options.Options
 	logger      *slog.Logger
-	redisCache  redis.UniversalClient
+	lockRedis   redis.UniversalClient
+	lockBuilder *rediskey.Builder
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient *grpcclient.AnswerSheetClient
@@ -32,11 +34,20 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, redisCache redis.UniversalClient) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, lockRedis redis.UniversalClient) *Container {
+	lockNamespace := ""
+	if opts != nil && opts.Cache != nil {
+		suffix := ""
+		if opts.Cache.Lock != nil {
+			suffix = opts.Cache.Lock.NamespaceSuffix
+		}
+		lockNamespace = rediskey.ComposeNamespace(opts.Cache.Namespace, suffix)
+	}
 	return &Container{
 		opts:        opts,
 		logger:      logger,
-		redisCache:  redisCache,
+		lockRedis:   lockRedis,
+		lockBuilder: rediskey.NewBuilderWithNamespace(lockNamespace),
 		initialized: false,
 	}
 }
@@ -70,7 +81,8 @@ func (c *Container) initEventDispatcher() error {
 		AnswerSheetClient: c.answerSheetClient,
 		EvaluationClient:  c.evaluationClient,
 		InternalClient:    c.internalClient,
-		RedisCache:        c.redisCache,
+		LockRedis:         c.lockRedis,
+		LockKeyBuilder:    c.lockBuilder,
 		Notifier:          c.buildNotifier(),
 	}
 
@@ -178,7 +190,7 @@ func (c *Container) Options() *options.Options {
 	return c.opts
 }
 
-// RedisCache 获取缓存 Redis 客户端
-func (c *Container) RedisCache() redis.UniversalClient {
-	return c.redisCache
+// LockRedis 获取 worker 锁 Redis 客户端。
+func (c *Container) LockRedis() redis.UniversalClient {
+	return c.lockRedis
 }

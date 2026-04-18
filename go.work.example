@@ -1,9 +1,10 @@
 go 1.24
 
-// 本地与 ../iam-contracts 联调：复制为 go.work（已 .gitignore）后执行 go work sync
+// 本地与 ../iam-contracts、../component-base 联调：复制为 go.work（已 .gitignore）后执行 go work sync
 //   cp go.work.example go.work
 
 use (
 	.
 	../iam-contracts
+	../component-base
 )

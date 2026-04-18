@@ -109,6 +109,23 @@ func (c *InternalClient) GenerateQuestionnaireQRCode(
 	return resp, nil
 }
 
+func (c *InternalClient) HandleQuestionnairePublishedPostActions(
+	ctx context.Context,
+	code, version string,
+) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.HandleQuestionnairePublishedPostActions(ctx, &pb.GenerateQuestionnaireQRCodeRequest{
+		Code:    code,
+		Version: version,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to handle questionnaire publish post-actions: %w", err)
+	}
+	return resp, nil
+}
+
 // GenerateScaleQRCode 生成量表小程序码
 func (c *InternalClient) GenerateScaleQRCode(
 	ctx context.Context,
@@ -124,6 +141,22 @@ func (c *InternalClient) GenerateScaleQRCode(
 		return nil, fmt.Errorf("failed to generate scale QR code: %w", err)
 	}
 
+	return resp, nil
+}
+
+func (c *InternalClient) HandleScalePublishedPostActions(
+	ctx context.Context,
+	code string,
+) (*pb.GenerateScaleQRCodeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.HandleScalePublishedPostActions(ctx, &pb.GenerateScaleQRCodeRequest{
+		Code: code,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to handle scale publish post-actions: %w", err)
+	}
 	return resp, nil
 }
 

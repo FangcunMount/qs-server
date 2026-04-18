@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/silenceper/wechat/v2/cache"
@@ -17,15 +18,18 @@ type RedisCacheAdapter struct {
 	keys   *rediskey.Builder
 }
 
-// NewRedisCacheAdapter 创建 Redis 缓存适配器
-func NewRedisCacheAdapter(client redis.UniversalClient) cache.Cache {
+// NewRedisCacheAdapterWithBuilder 创建带显式 key builder 的 Redis 缓存适配器。
+func NewRedisCacheAdapterWithBuilder(client redis.UniversalClient, builder *rediskey.Builder) cache.Cache {
 	if client == nil {
 		// 如果 Redis 客户端为 nil，返回内存缓存
 		return cache.NewMemory()
 	}
+	if builder == nil {
+		panic("redis builder is required")
+	}
 	return &RedisCacheAdapter{
 		client: client,
-		keys:   rediskey.NewBuilder(),
+		keys:   builder,
 	}
 }
 
@@ -44,12 +48,14 @@ func (a *RedisCacheAdapter) Get(key string) interface{} {
 	fullKey := a.buildKey(key)
 	val, err := a.client.Get(ctx, fullKey).Result()
 	if err == redis.Nil {
+		cacheobservability.ObserveFamilySuccess("apiserver", "sdk_token")
 		return nil
 	}
 	if err != nil {
-		// 获取失败时返回 nil，不阻塞流程
+		cacheobservability.ObserveFamilyFailure("apiserver", "sdk_token", err)
 		return nil
 	}
+	cacheobservability.ObserveFamilySuccess("apiserver", "sdk_token")
 	return val
 }
 
@@ -73,7 +79,12 @@ func (a *RedisCacheAdapter) Set(key string, val interface{}, timeout time.Durati
 		strVal = fmt.Sprintf("%v", v)
 	}
 
-	return a.client.Set(ctx, fullKey, strVal, timeout).Err()
+	if err := a.client.Set(ctx, fullKey, strVal, timeout).Err(); err != nil {
+		cacheobservability.ObserveFamilyFailure("apiserver", "sdk_token", err)
+		return nil
+	}
+	cacheobservability.ObserveFamilySuccess("apiserver", "sdk_token")
+	return nil
 }
 
 // IsExist 检查键是否存在
@@ -86,8 +97,10 @@ func (a *RedisCacheAdapter) IsExist(key string) bool {
 	fullKey := a.buildKey(key)
 	result := a.client.Exists(ctx, fullKey)
 	if result.Err() != nil {
+		cacheobservability.ObserveFamilyFailure("apiserver", "sdk_token", result.Err())
 		return false
 	}
+	cacheobservability.ObserveFamilySuccess("apiserver", "sdk_token")
 	return result.Val() > 0
 }
 
@@ -99,5 +112,10 @@ func (a *RedisCacheAdapter) Delete(key string) error {
 
 	ctx := context.Background()
 	fullKey := a.buildKey(key)
-	return a.client.Del(ctx, fullKey).Err()
+	if err := a.client.Del(ctx, fullKey).Err(); err != nil {
+		cacheobservability.ObserveFamilyFailure("apiserver", "sdk_token", err)
+		return nil
+	}
+	cacheobservability.ObserveFamilySuccess("apiserver", "sdk_token")
+	return nil
 }

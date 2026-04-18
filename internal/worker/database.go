@@ -1,26 +1,27 @@
 package worker
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
 )
 
 // DatabaseManager 数据库管理器
 type DatabaseManager struct {
-	registry   *database.Registry
-	config     *config.Config
-	cacheRedis *database.RedisConnection
+	config        *config.Config
+	redisProfiles *database.NamedRedisRegistry
 }
 
 // NewDatabaseManager 创建数据库管理器
 func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 	return &DatabaseManager{
-		registry: database.NewRegistry(),
-		config:   cfg,
+		config: cfg,
 	}
 }
 
@@ -28,86 +29,111 @@ func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 func (m *DatabaseManager) Initialize() error {
 	log.Info("Initializing database connections...")
 
-	// 初始化Redis连接
 	if err := m.initRedis(); err != nil {
 		return fmt.Errorf("failed to initialize Redis: %w", err)
-	}
-
-	// 初始化数据库连接
-	if err := m.registry.Init(); err != nil {
-		return fmt.Errorf("failed to initialize database connections: %w", err)
 	}
 
 	log.Info("All database connections initialized successfully")
 	return nil
 }
 
-// initRedis 初始化Redis连接（双实例架构）
+// initRedis 初始化默认 Redis 与可选 named profiles。
 func (m *DatabaseManager) initRedis() error {
-	if m.config.Redis == nil {
+	defaultConfig := toWorkerDatabaseRedisConfig(m.config.Redis)
+	redisProfiles := make(map[string]*database.RedisConfig)
+	for name, cfg := range m.config.RedisProfiles {
+		databaseCfg := toWorkerDatabaseRedisConfig(cfg)
+		if databaseCfg == nil || (databaseCfg.Host == "" && len(databaseCfg.Addrs) == 0) {
+			continue
+		}
+		redisProfiles[name] = databaseCfg
+	}
+
+	if defaultConfig == nil && len(redisProfiles) == 0 {
 		log.Warn("Redis not configured, skipping")
 		return nil
 	}
 
-	redisCfg := m.config.Redis
-	if redisCfg == nil || (redisCfg.Host == "" && len(redisCfg.Addrs) == 0) {
-		log.Warn("Redis not configured, skipping")
-		return nil
+	m.redisProfiles = database.NewNamedRedisRegistry(defaultConfig, redisProfiles)
+	if err := m.redisProfiles.Connect(); err != nil {
+		return err
 	}
 
-	cacheConfig := &database.RedisConfig{
-		Host:                  redisCfg.Host,
-		Port:                  redisCfg.Port,
-		Addrs:                 redisCfg.Addrs,
-		Username:              redisCfg.Username,
-		Password:              redisCfg.Password,
-		Database:              redisCfg.Database,
-		MaxIdle:               redisCfg.MaxIdle,
-		MaxActive:             redisCfg.MaxActive,
-		Timeout:               redisCfg.Timeout,
-		MinIdleConns:          redisCfg.MinIdleConns,
-		PoolTimeout:           redisCfg.PoolTimeout,
-		DialTimeout:           redisCfg.DialTimeout,
-		ReadTimeout:           redisCfg.ReadTimeout,
-		WriteTimeout:          redisCfg.WriteTimeout,
-		EnableCluster:         redisCfg.EnableCluster,
-		UseSSL:                redisCfg.UseSSL,
-		SSLInsecureSkipVerify: redisCfg.SSLInsecureSkipVerify,
-	}
-
-	cacheConn := database.NewRedisConnection(cacheConfig)
-	if err := m.registry.Register(database.Redis, cacheConfig, cacheConn); err != nil {
-		return fmt.Errorf("failed to register redis: %w", err)
-	}
-	m.cacheRedis = cacheConn
-	log.Info("Redis initialized successfully")
-
+	log.Infof("Redis initialized successfully (profile_count=%d)", len(redisProfiles))
 	return nil
 }
 
-// GetRedisClient 获取缓存 Redis 客户端
+// GetRedisClient 获取默认 Redis 客户端。
 func (m *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
-	client, err := m.registry.GetClient(database.Redis)
-	if err != nil {
-		return nil, err
-	}
+	return m.GetRedisClientByProfile("")
+}
 
-	redisClient, ok := client.(redis.UniversalClient)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast client to redis.UniversalClient")
+// GetRedisClientByProfile 获取指定 profile 的 Redis 客户端。
+// 未配置的 profile 回退默认 Redis；已配置但不可用的 profile 返回错误。
+func (m *DatabaseManager) GetRedisClientByProfile(profile string) (redis.UniversalClient, error) {
+	if m.redisProfiles == nil {
+		return nil, fmt.Errorf("redis is not configured")
 	}
+	return m.redisProfiles.GetClient(profile)
+}
 
-	return redisClient, nil
+// GetRedisProfileStatus 返回指定 profile 当前的可用性状态。
+func (m *DatabaseManager) GetRedisProfileStatus(profile string) database.RedisProfileStatus {
+	if m == nil || m.redisProfiles == nil {
+		return database.RedisProfileStatus{
+			Name:  profile,
+			State: database.RedisProfileStateMissing,
+		}
+	}
+	return m.redisProfiles.ProfileStatus(profile)
+}
+
+// HealthCheck 数据库健康检查。
+func (m *DatabaseManager) HealthCheck() error {
+	if m.redisProfiles == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return m.redisProfiles.HealthCheck(ctx)
 }
 
 // Close 关闭所有数据库连接
 func (m *DatabaseManager) Close() error {
 	log.Info("Closing database connections...")
 
-	if err := m.registry.Close(); err != nil {
-		log.Warnf("Failed to close registry: %v", err)
+	if m.redisProfiles != nil {
+		if err := m.redisProfiles.Close(); err != nil {
+			log.Warnf("Failed to close redis profiles: %v", err)
+			return err
+		}
 	}
 
 	log.Info("All database connections closed")
 	return nil
+}
+
+func toWorkerDatabaseRedisConfig(opts *options.RedisOptions) *database.RedisConfig {
+	if opts == nil {
+		return nil
+	}
+	return &database.RedisConfig{
+		Host:                  opts.Host,
+		Port:                  opts.Port,
+		Addrs:                 opts.Addrs,
+		Username:              opts.Username,
+		Password:              opts.Password,
+		Database:              opts.Database,
+		MaxIdle:               opts.MaxIdle,
+		MaxActive:             opts.MaxActive,
+		Timeout:               opts.Timeout,
+		MinIdleConns:          opts.MinIdleConns,
+		PoolTimeout:           opts.PoolTimeout,
+		DialTimeout:           opts.DialTimeout,
+		ReadTimeout:           opts.ReadTimeout,
+		WriteTimeout:          opts.WriteTimeout,
+		EnableCluster:         opts.EnableCluster,
+		UseSSL:                opts.UseSSL,
+		SSLInsecureSkipVerify: opts.SSLInsecureSkipVerify,
+	}
 }

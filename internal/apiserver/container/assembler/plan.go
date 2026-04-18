@@ -17,6 +17,7 @@ import (
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -49,6 +50,9 @@ func NewPlanModule() *PlanModule {
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: scale.Repository (可选，用于通过 code 查找 scale)
 // params[3]: redis.UniversalClient (可选，用于缓存装饰器)
+// params[4]: string (可选，用于对象缓存 namespace)
+// params[5]: planCache.CachePolicy (可选，用于计划详情缓存策略)
+// params[6]: string (可选，用于入口基础地址)
 func (m *PlanModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -80,10 +84,23 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
+	var cacheNamespace string
+	if len(params) > 4 {
+		if ns, ok := params[4].(string); ok {
+			cacheNamespace = ns
+		}
+	}
+	var planPolicy planCache.CachePolicy
+	if len(params) > 5 {
+		if policy, ok := params[5].(planCache.CachePolicy); ok {
+			planPolicy = policy
+		}
+	}
+	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
-		m.PlanRepo = planCache.NewCachedPlanRepository(basePlanRepo, redisClient)
+		m.PlanRepo = planCache.NewCachedPlanRepositoryWithBuilderAndPolicy(basePlanRepo, redisClient, cacheBuilder, planPolicy)
 	} else {
 		m.PlanRepo = basePlanRepo
 	}
@@ -91,8 +108,8 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 	m.TaskRepo = planInfra.NewTaskRepository(mysqlDB)
 
 	entryBaseURL := "https://collect.fangcunmount.cn/entry"
-	if len(params) > 4 {
-		if baseURL, ok := params[4].(string); ok && strings.TrimSpace(baseURL) != "" {
+	if len(params) > 6 {
+		if baseURL, ok := params[6].(string); ok && strings.TrimSpace(baseURL) != "" {
 			entryBaseURL = strings.TrimSpace(baseURL)
 		}
 	}

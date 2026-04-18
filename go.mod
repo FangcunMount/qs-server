@@ -3,7 +3,7 @@ module github.com/FangcunMount/qs-server
 go 1.24.0
 
 require (
-	github.com/FangcunMount/component-base v0.4.7
+	github.com/FangcunMount/component-base v0.5.0
 	github.com/FangcunMount/iam-contracts v0.1.7
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/google/uuid v1.6.0
@@ -97,7 +97,7 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-	github.com/prometheus/client_golang v1.22.0 // indirect
+	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect

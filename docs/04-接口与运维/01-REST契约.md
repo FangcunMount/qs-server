@@ -24,6 +24,7 @@
 | 路由真值 | 运行时实际暴露仍以各进程 `routers.go` 为准，导出文件必须与之持续对齐 |
 | 最易混点 | `/api/rest/*` 是静态挂载的导出文档，不是业务 API 前缀 |
 | 排障入口 | 先查 OpenAPI 文件和 `Makefile` 生成链，再回到 `routers.go` 和具体 handler |
+| 缓存治理面板 | `qs-apiserver` 额外提供 `/internal/v1/cache/governance/status` 与 `/internal/v1/cache/governance/hotset`，用于查看 family 路由状态、最近一次 warmup 与热点预览 |
 
 ### 基础设施边界
 
@@ -73,6 +74,7 @@ flowchart LR
 | apiserver 路由 | [internal/apiserver/routers.go](../../internal/apiserver/routers.go) |
 | collection 路由 | [internal/collection-server/routers.go](../../internal/collection-server/routers.go) |
 | 静态挂载 OpenAPI / Swagger UI | 各进程 `server` / `app` 装配（与 [Makefile](../../Makefile) 产物路径一致） |
+| 缓存治理 internal 路由 | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/routers.go](../../internal/apiserver/routers.go) |
 
 ---
 
@@ -110,6 +112,53 @@ flowchart LR
 | ------ | ---- |
 | 统计/计划等运维 REST | apiserver `statistics`、`plans` 路由组（[routers.go](../../internal/apiserver/routers.go)） |
 | 与异步链路关系 | 运维触发的同步 ≠ MQ 消费；事件见 [03-基础设施/01-事件系统](../03-基础设施/01-事件系统.md) |
+
+### 缓存治理 internal 面板（What / Where / Verify）
+
+`qs-apiserver` 当前提供一组 **internal-only** 缓存治理接口，挂在：
+
+- `GET /internal/v1/cache/governance/status`
+- `GET /internal/v1/cache/governance/hotset?kind=...&limit=...`
+- `POST /internal/v1/cache/governance/repair-complete`
+
+这组路由的职责不同：
+
+- `status`：查看当前进程对 `static/object/query/meta/sdk/lock` family 的解析结果、namespace、profile、degraded mode，以及最近一次 warmup run 快照
+- `hotset`：按 `kind` 查看 top-N 热点 scope 与 score，只做治理预览，不暴露时序或聚合能力
+- `repair-complete`：给 `seeddata / repair` 任务结束后触发缓存联动，不是只读面板
+
+**Verify**：
+
+- 路由注册以 [internal/apiserver/routers.go](../../internal/apiserver/routers.go) 为准
+- 返回结构与查询参数校验以 [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 为准
+- `status` / `hotset` 口径来自缓存治理服务与 runtime family registry，不是 OpenAPI 静态文件推导出来的文档状态
+
+### Prometheus 观测面（What / Where / Verify）
+
+缓存治理的主观测面不是 internal REST，而是 `/metrics`。当前缓存相关的核心指标包括：
+
+- `qs_cache_get_total`
+- `qs_cache_write_total`
+- `qs_cache_operation_duration_seconds`
+- `qs_cache_payload_bytes`
+- `qs_cache_family_available`
+- `qs_cache_family_degraded_total`
+- `qs_cache_warmup_runs_total`
+- `qs_cache_warmup_items_total`
+- `qs_cache_warmup_duration_seconds`
+- `qs_cache_hotset_records_total`
+- `qs_cache_warmup_hot_reads_total`
+- `qs_cache_hotset_size`
+- `qs_query_cache_version_total`
+- `qs_cache_lock_acquire_total`
+- `qs_cache_lock_release_total`
+- `qs_cache_lock_degraded_total`
+
+这些指标的定义与低基数标签约束在：
+
+- [internal/pkg/cacheobservability](../../internal/pkg/cacheobservability/)
+
+`worker` **没有**对应的 internal 面板；其 `lock_cache` 降级状态只通过 `/metrics` 与结构化日志暴露。
 
 ---
 

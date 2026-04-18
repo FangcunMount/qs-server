@@ -122,11 +122,11 @@ func (s *testeeStatisticsService) GetTesteeStatistics(
 		result.LastAssessmentDate = timeInfo.LastAssessmentDate
 	}
 
-	// 缓存结果（TTL=5分钟）
+	// 缓存结果（TTL 由 query family policy 控制）
 	if s.cache != nil {
 		if data, err := json.Marshal(result); err == nil {
 			cacheKey := fmt.Sprintf("testee:%d:%d", orgID, testeeID)
-			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
 				l.Warnw("写入受试者统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
 			}
 		} else {

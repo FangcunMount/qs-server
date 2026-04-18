@@ -113,11 +113,46 @@ redis:
   enable-cluster: false
   use-ssl: false
 
+redis_profiles:
+  static_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 1
+  object_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 2
+  query_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 3
+  sdk_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 4
+  lock_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 5
+
 # -------------------------------------------------------
 # 4.5 缓存控制
 # -------------------------------------------------------
 cache:
   disable_statistics_cache: false  # 若想暂停统计缓存，请设为 true
+  lock:
+    redis_profile: "lock_cache"
+    namespace_suffix: "cache:lock"
 
 # ============================================================
 # 5. 系统配置

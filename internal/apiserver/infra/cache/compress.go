@@ -1,46 +1,40 @@
 package cache
 
 import (
-	"bytes"
-	"compress/gzip"
-	"io"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 )
 
-// EnableCompression 控制是否对缓存值进行 gzip 压缩
+// EnableCompression 控制是否对缓存值进行 gzip 压缩。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CacheCatalog / CachePolicy 控制压缩行为。
 var EnableCompression bool
 
-// ApplyCompressionFlag 在启动时配置全局压缩开关
+// ApplyCompressionFlag 在启动时配置全局压缩开关。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CacheCatalog / CachePolicy 控制压缩行为。
 func ApplyCompressionFlag(enable bool) {
 	EnableCompression = enable
+	cachepolicy.EnableCompression = enable
 }
 
-// compressIfEnabled gzip 压缩（可选）
+func compressData(data []byte, enable bool) []byte {
+	return cachepolicy.CompressData(data, enable)
+}
+
+// compressIfEnabled gzip 压缩（可选）。
+//
+// Deprecated: 仅保留给旧缓存调用点；新缓存应直接使用 CachePolicy.CompressValue。
 func compressIfEnabled(data []byte) []byte {
-	if !EnableCompression || len(data) == 0 {
-		return data
-	}
-	var buf bytes.Buffer
-	w := gzip.NewWriter(&buf)
-	if _, err := w.Write(data); err != nil {
-		return data
-	}
-	_ = w.Close()
-	return buf.Bytes()
+	return compressData(data, EnableCompression)
 }
 
-// decompressIfNeeded 尝试解压 gzip，不是 gzip 时返回原数据
+// decompressIfNeeded 尝试解压 gzip，不是 gzip 时返回原数据。
+// 作为兼容层保留，供老缓存和“兼容旧压缩值”场景复用。
 func decompressIfNeeded(data []byte) []byte {
-	if len(data) == 0 {
-		return data
-	}
-	r, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return data
-	}
-	defer r.Close()
-	out, err := io.ReadAll(r)
-	if err != nil {
-		return data
-	}
-	return out
+	return cachepolicy.DecompressData(data)
+}
+
+// DecompressForCompatibility 对缓存值做向后兼容解压。
+func DecompressForCompatibility(data []byte) []byte {
+	return decompressIfNeeded(data)
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
@@ -207,54 +206,5 @@ func (s *WarmupService) WarmupQuestionnaireCache(ctx context.Context, hotQuestio
 	}
 
 	l.Infow("问卷缓存预热完成", "count", len(hotQuestionnaireCodes))
-	return nil
-}
-
-// WarmupStatisticsCache 预热统计查询结果缓存
-// 注意：统计查询结果缓存 TTL 较短（5分钟），预热主要用于减少首次查询延迟
-// 建议：只在有明确需求时使用（如已知活跃组织、常用问卷等）
-func WarmupStatisticsCache(
-	ctx context.Context,
-	config StatisticsWarmupConfig,
-	systemService statisticsApp.SystemStatisticsService,
-	questionnaireService statisticsApp.QuestionnaireStatisticsService,
-	planService statisticsApp.PlanStatisticsService,
-) error {
-	l := logger.L(ctx)
-	l.Infow("开始预热统计查询结果缓存", "org_count", len(config.OrgIDs))
-
-	// 预热系统统计（所有组织）
-	for _, orgID := range config.OrgIDs {
-		if _, err := systemService.GetSystemStatistics(ctx, orgID); err != nil {
-			l.Warnw("预热系统统计失败", "org_id", orgID, "error", err)
-			// 继续处理其他组织，不中断
-		}
-	}
-
-	// 预热问卷统计（如果配置了问卷编码）
-	if len(config.QuestionnaireCodes) > 0 {
-		for _, orgID := range config.OrgIDs {
-			for _, code := range config.QuestionnaireCodes {
-				if _, err := questionnaireService.GetQuestionnaireStatistics(ctx, orgID, code); err != nil {
-					l.Warnw("预热问卷统计失败", "org_id", orgID, "questionnaire_code", code, "error", err)
-					// 继续处理，不中断
-				}
-			}
-		}
-	}
-
-	// 预热计划统计（如果配置了计划ID）
-	if len(config.PlanIDs) > 0 {
-		for _, orgID := range config.OrgIDs {
-			for _, planID := range config.PlanIDs {
-				if _, err := planService.GetPlanStatistics(ctx, orgID, planID); err != nil {
-					l.Warnw("预热计划统计失败", "org_id", orgID, "plan_id", planID, "error", err)
-					// 继续处理，不中断
-				}
-			}
-		}
-	}
-
-	l.Infow("统计查询结果缓存预热完成")
 	return nil
 }

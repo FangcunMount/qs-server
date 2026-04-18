@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -16,14 +17,16 @@ type queryService struct {
 	repo        scale.Repository
 	identitySvc *iam.IdentityService
 	listCache   *ScaleListCache
+	hotset      cacheinfra.HotsetRecorder
 }
 
 // NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository, identitySvc *iam.IdentityService, listCache *ScaleListCache) ScaleQueryService {
+func NewQueryService(repo scale.Repository, identitySvc *iam.IdentityService, listCache *ScaleListCache, hotset cacheinfra.HotsetRecorder) ScaleQueryService {
 	return &queryService{
 		repo:        repo,
 		identitySvc: identitySvc,
 		listCache:   listCache,
+		hotset:      hotset,
 	}
 }
 
@@ -39,6 +42,7 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*ScaleResult
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
+	s.recordHotset(ctx, cacheinfra.NewStaticScaleWarmupTarget(code))
 
 	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
@@ -104,6 +108,7 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Sc
 	if !m.IsPublished() {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表未发布")
 	}
+	s.recordHotset(ctx, cacheinfra.NewStaticScaleWarmupTarget(code))
 
 	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
@@ -155,6 +160,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 			_ = s.listCache.Rebuild(context.Background())
 		}()
 	}
+	s.recordHotset(ctx, cacheinfra.NewStaticScaleListWarmupTarget())
 
 	return result, nil
 }
@@ -183,4 +189,11 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]Fact
 	}
 	logger.L(ctx).Infow("GetFactors: 转换因子列表", "result", result)
 	return result, nil
+}
+
+func (s *queryService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+	if s == nil || s.hotset == nil {
+		return
+	}
+	_ = s.hotset.Record(ctx, target)
 }

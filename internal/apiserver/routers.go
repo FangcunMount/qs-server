@@ -124,6 +124,7 @@ func (r *Router) registerInternalRoutes(engine *gin.Engine) {
 
 	r.registerPlanInternalRoutes(internalV1)
 	r.registerStatisticsInternalRoutes(internalV1)
+	r.registerCacheGovernanceInternalRoutes(internalV1)
 }
 
 func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePrefix string) {
@@ -1165,6 +1166,39 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
 		statisticsModule.Handler.SyncPlanStatistics,
+	)...)
+}
+
+func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGroup) {
+	statisticsModule := r.container.StatisticsModule
+	if statisticsModule == nil || statisticsModule.Handler == nil {
+		return
+	}
+
+	governance := internalV1.Group("/cache/governance", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	governance.POST("/repair-complete", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		statisticsModule.Handler.RepairComplete,
+	)...)
+	governance.GET("/status", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.QueryGlobalQPS,
+		r.rateCfg.QueryGlobalBurst,
+		r.rateCfg.QueryUserQPS,
+		r.rateCfg.QueryUserBurst,
+		statisticsModule.Handler.CacheGovernanceStatus,
+	)...)
+	governance.GET("/hotset", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.QueryGlobalQPS,
+		r.rateCfg.QueryGlobalBurst,
+		r.rateCfg.QueryUserQPS,
+		r.rateCfg.QueryUserBurst,
+		statisticsModule.Handler.CacheGovernanceHotset,
 	)...)
 }
 

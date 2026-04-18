@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -35,12 +36,27 @@ var modulePool = make(map[string]assembler.Module)
 // 组合所有业务模块和基础设施组件
 type Container struct {
 	// 基础设施
-	mysqlDB                    *gorm.DB
-	mongoDB                    *mongo.Database
-	redisCache                 redis.UniversalClient
-	cacheOptions               ContainerCacheOptions
-	planEntryURL               string
-	statisticsRepairWindowDays int
+	mysqlDB                      *gorm.DB
+	mongoDB                      *mongo.Database
+	redisCache                   redis.UniversalClient
+	staticRedisCache             redis.UniversalClient
+	objectRedisCache             redis.UniversalClient
+	queryRedisCache              redis.UniversalClient
+	metaRedisCache               redis.UniversalClient
+	sdkRedisCache                redis.UniversalClient
+	cacheOptions                 ContainerCacheOptions
+	cacheCatalog                 *scaleCache.CacheCatalog
+	hotsetRecorder               scaleCache.HotsetRecorder
+	hotsetInspector              scaleCache.HotsetInspector
+	WarmupCoordinator            cachegov.Coordinator
+	CacheGovernanceStatusService cachegov.StatusService
+	planEntryURL                 string
+	statisticsRepairWindowDays   int
+	staticCacheNamespace         string
+	objectCacheNamespace         string
+	queryCacheNamespace          string
+	metaCacheNamespace           string
+	sdkCacheNamespace            string
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -72,6 +88,34 @@ type Container struct {
 	silent      bool
 }
 
+func firstPositiveDuration(values ...time.Duration) time.Duration {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func firstPositiveFloat(values ...float64) float64 {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func ensureContainerCacheRoute(route ContainerCacheRouteOptions, defaultProfile, defaultNamespace string) ContainerCacheRouteOptions {
+	if route.RedisProfile == "" {
+		route.RedisProfile = defaultProfile
+	}
+	if route.NamespaceSuffix == "" {
+		route.NamespaceSuffix = defaultNamespace
+	}
+	return route
+}
+
 // NewContainer 创建容器
 func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
 	return &Container{
@@ -94,6 +138,16 @@ type ContainerOptions struct {
 	Env string
 	// Cache 缓存控制选项
 	Cache ContainerCacheOptions
+	// StaticRedisClient 静态/半静态对象缓存 Redis client。
+	StaticRedisClient redis.UniversalClient
+	// QueryRedisClient 查询结果缓存 Redis client。
+	QueryRedisClient redis.UniversalClient
+	// ObjectRedisClient 对象视图缓存 Redis client。
+	ObjectRedisClient redis.UniversalClient
+	// SDKRedisClient SDK token/cache Redis client。
+	SDKRedisClient redis.UniversalClient
+	// MetaRedisClient query version token 等缓存元数据 Redis client。
+	MetaRedisClient redis.UniversalClient
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
@@ -109,15 +163,52 @@ type ContainerCacheOptions struct {
 	TTL                    ContainerCacheTTLOptions
 	TTLJitterRatio         float64
 	StatisticsWarmup       *scaleCache.StatisticsWarmupConfig
+	Warmup                 ContainerWarmupOptions
 	Namespace              string
 	CompressPayload        bool
+	Static                 ContainerCacheRouteOptions
+	Object                 ContainerCacheRouteOptions
+	Query                  ContainerCacheRouteOptions
+	Meta                   ContainerCacheRouteOptions
+	SDK                    ContainerCacheRouteOptions
+	Lock                   ContainerCacheRouteOptions
+}
+
+type ContainerWarmupOptions struct {
+	Enable          bool
+	StartupStatic   bool
+	StartupQuery    bool
+	HotsetEnable    bool
+	HotsetTopN      int64
+	MaxItemsPerKind int64
+}
+
+// ContainerCacheRouteOptions 分类缓存路由配置。
+type ContainerCacheRouteOptions struct {
+	RedisProfile    string
+	NamespaceSuffix string
+	TTL             time.Duration
+	NegativeTTL     time.Duration
+	TTLJitterRatio  float64
+	Compress        *bool
+	Singleflight    *bool
+	Negative        *bool
+}
+
+func resolvePolicySwitch(explicit *bool, defaultValue bool) scaleCache.PolicySwitch {
+	if explicit != nil {
+		return scaleCache.PolicySwitchFromBool(*explicit)
+	}
+	return scaleCache.PolicySwitchFromBool(defaultValue)
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
 type ContainerCacheTTLOptions struct {
 	Scale            time.Duration
+	ScaleList        time.Duration
 	Questionnaire    time.Duration
 	AssessmentDetail time.Duration
+	AssessmentList   time.Duration
 	Testee           time.Duration
 	Plan             time.Duration
 	Negative         time.Duration
@@ -139,19 +230,135 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.silent = opts.Silent
+	c.staticRedisCache = opts.StaticRedisClient
+	c.queryRedisCache = opts.QueryRedisClient
+	c.objectRedisCache = opts.ObjectRedisClient
+	c.metaRedisCache = opts.MetaRedisClient
+	c.sdkRedisCache = opts.SDKRedisClient
 
-	// 应用缓存 TTL 覆盖（仅在启动时设置一次，全局生效）
-	scaleCache.ApplyTTLOptions(scaleCache.TTLOptions{
-		Scale:            opts.Cache.TTL.Scale,
-		Questionnaire:    opts.Cache.TTL.Questionnaire,
-		AssessmentDetail: opts.Cache.TTL.AssessmentDetail,
-		Testee:           opts.Cache.TTL.Testee,
-		Plan:             opts.Cache.TTL.Plan,
-		Negative:         opts.Cache.TTL.Negative,
+	opts.Cache.Static = ensureContainerCacheRoute(opts.Cache.Static, "static_cache", "cache:static")
+	opts.Cache.Object = ensureContainerCacheRoute(opts.Cache.Object, "object_cache", "cache:object")
+	opts.Cache.Query = ensureContainerCacheRoute(opts.Cache.Query, "query_cache", "cache:query")
+	opts.Cache.Meta = ensureContainerCacheRoute(opts.Cache.Meta, "meta_cache", "cache:meta")
+	opts.Cache.SDK = ensureContainerCacheRoute(opts.Cache.SDK, "sdk_cache", "cache:sdk")
+	opts.Cache.Lock = ensureContainerCacheRoute(opts.Cache.Lock, "lock_cache", "cache:lock")
+
+	c.cacheCatalog = scaleCache.NewCacheCatalogWithPolicies(opts.Cache.Namespace, map[scaleCache.CacheFamily]scaleCache.CatalogRoute{
+		scaleCache.CacheFamilyDefault: {
+			RedisProfile:    "",
+			NamespaceSuffix: "",
+			AllowWarmup:     false,
+		},
+		scaleCache.CacheFamilyStatic: {
+			RedisProfile:    opts.Cache.Static.RedisProfile,
+			NamespaceSuffix: opts.Cache.Static.NamespaceSuffix,
+			AllowWarmup:     true,
+		},
+		scaleCache.CacheFamilyObject: {
+			RedisProfile:    opts.Cache.Object.RedisProfile,
+			NamespaceSuffix: opts.Cache.Object.NamespaceSuffix,
+		},
+		scaleCache.CacheFamilyQuery: {
+			RedisProfile:    opts.Cache.Query.RedisProfile,
+			NamespaceSuffix: opts.Cache.Query.NamespaceSuffix,
+			AllowWarmup:     true,
+		},
+		scaleCache.CacheFamilyMeta: {
+			RedisProfile:    opts.Cache.Meta.RedisProfile,
+			NamespaceSuffix: opts.Cache.Meta.NamespaceSuffix,
+		},
+		scaleCache.CacheFamilySDK: {
+			RedisProfile:    opts.Cache.SDK.RedisProfile,
+			NamespaceSuffix: opts.Cache.SDK.NamespaceSuffix,
+		},
+		scaleCache.CacheFamilyLock: {
+			RedisProfile:    opts.Cache.Lock.RedisProfile,
+			NamespaceSuffix: opts.Cache.Lock.NamespaceSuffix,
+		},
+	}, map[scaleCache.CacheFamily]scaleCache.CachePolicy{
+		scaleCache.CacheFamilyStatic: {
+			Compress:     resolvePolicySwitch(opts.Cache.Static.Compress, opts.Cache.CompressPayload),
+			Singleflight: resolvePolicySwitch(opts.Cache.Static.Singleflight, true),
+			Negative:     resolvePolicySwitch(opts.Cache.Static.Negative, false),
+			NegativeTTL:  opts.Cache.Static.NegativeTTL,
+			JitterRatio:  firstPositiveFloat(opts.Cache.Static.TTLJitterRatio, opts.Cache.TTLJitterRatio),
+		},
+		scaleCache.CacheFamilyObject: {
+			Compress:     resolvePolicySwitch(opts.Cache.Object.Compress, opts.Cache.CompressPayload),
+			Singleflight: resolvePolicySwitch(opts.Cache.Object.Singleflight, true),
+			Negative:     resolvePolicySwitch(opts.Cache.Object.Negative, false),
+			NegativeTTL:  firstPositiveDuration(opts.Cache.Object.NegativeTTL, opts.Cache.TTL.Negative),
+			JitterRatio:  firstPositiveFloat(opts.Cache.Object.TTLJitterRatio, opts.Cache.TTLJitterRatio),
+		},
+		scaleCache.CacheFamilyQuery: {
+			TTL:          opts.Cache.Query.TTL,
+			NegativeTTL:  firstPositiveDuration(opts.Cache.Query.NegativeTTL, opts.Cache.TTL.Negative),
+			Compress:     resolvePolicySwitch(opts.Cache.Query.Compress, opts.Cache.CompressPayload),
+			Singleflight: resolvePolicySwitch(opts.Cache.Query.Singleflight, false),
+			Negative:     resolvePolicySwitch(opts.Cache.Query.Negative, false),
+			JitterRatio:  firstPositiveFloat(opts.Cache.Query.TTLJitterRatio, opts.Cache.TTLJitterRatio),
+		},
+		scaleCache.CacheFamilySDK: {
+			Compress:     resolvePolicySwitch(opts.Cache.SDK.Compress, false),
+			Singleflight: resolvePolicySwitch(opts.Cache.SDK.Singleflight, false),
+			Negative:     resolvePolicySwitch(opts.Cache.SDK.Negative, false),
+			NegativeTTL:  opts.Cache.SDK.NegativeTTL,
+			JitterRatio:  firstPositiveFloat(opts.Cache.SDK.TTLJitterRatio, opts.Cache.TTLJitterRatio),
+		},
+		scaleCache.CacheFamilyLock: {
+			Compress:     resolvePolicySwitch(opts.Cache.Lock.Compress, false),
+			Singleflight: resolvePolicySwitch(opts.Cache.Lock.Singleflight, false),
+			Negative:     resolvePolicySwitch(opts.Cache.Lock.Negative, false),
+			NegativeTTL:  opts.Cache.Lock.NegativeTTL,
+			JitterRatio:  firstPositiveFloat(opts.Cache.Lock.TTLJitterRatio, opts.Cache.TTLJitterRatio),
+		},
+	}, map[scaleCache.CachePolicyKey]scaleCache.CachePolicy{
+		scaleCache.PolicyScale: {
+			TTL: opts.Cache.TTL.Scale,
+		},
+		scaleCache.PolicyScaleList: {
+			TTL:          opts.Cache.TTL.ScaleList,
+			Singleflight: scaleCache.PolicySwitchDisabled,
+		},
+		scaleCache.PolicyQuestionnaire: {
+			TTL:         opts.Cache.TTL.Questionnaire,
+			NegativeTTL: opts.Cache.TTL.Negative,
+			Negative:    scaleCache.PolicySwitchEnabled,
+		},
+		scaleCache.PolicyAssessmentDetail: {
+			TTL:          opts.Cache.TTL.AssessmentDetail,
+			Singleflight: scaleCache.PolicySwitchEnabled,
+		},
+		scaleCache.PolicyAssessmentList: {
+			TTL:          opts.Cache.TTL.AssessmentList,
+			Singleflight: scaleCache.PolicySwitchDisabled,
+		},
+		scaleCache.PolicyTestee: {
+			TTL:         opts.Cache.TTL.Testee,
+			NegativeTTL: opts.Cache.TTL.Negative,
+			Negative:    scaleCache.PolicySwitchEnabled,
+		},
+		scaleCache.PolicyPlan: {
+			TTL:          opts.Cache.TTL.Plan,
+			Singleflight: scaleCache.PolicySwitchEnabled,
+		},
+		scaleCache.PolicyStatsQuery: {
+			Singleflight: scaleCache.PolicySwitchDisabled,
+		},
 	})
-	scaleCache.ApplyTTLJitterRatio(opts.Cache.TTLJitterRatio)
-	scaleCache.ApplyNamespace(opts.Cache.Namespace)
-	scaleCache.ApplyCompressionFlag(opts.Cache.CompressPayload)
+	c.staticCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyStatic)
+	c.objectCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyObject)
+	c.queryCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyQuery)
+	c.metaCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyMeta)
+	c.sdkCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilySDK)
+	c.hotsetRecorder = scaleCache.NewRedisHotsetStore(c.metaRedisCache, c.cacheCatalog.Builder(scaleCache.CacheFamilyMeta), scaleCache.HotsetOptions{
+		Enable:          opts.Cache.Warmup.HotsetEnable,
+		TopN:            opts.Cache.Warmup.HotsetTopN,
+		MaxItemsPerKind: opts.Cache.Warmup.MaxItemsPerKind,
+	})
+	if inspector, ok := c.hotsetRecorder.(scaleCache.HotsetInspector); ok {
+		c.hotsetInspector = inspector
+	}
 
 	return c
 }
@@ -216,6 +423,9 @@ func (c *Container) Initialize() error {
 	if err := c.initStatisticsModule(); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
+	if err := c.initWarmupCoordinator(); err != nil {
+		return fmt.Errorf("failed to initialize cache governance warmup coordinator: %w", err)
+	}
 
 	if c.ActorModule != nil && c.ActorModule.TesteeAccessService != nil {
 		if c.EvaluationModule != nil {
@@ -253,6 +463,12 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 	if !c.initialized {
 		return fmt.Errorf("container not initialized")
 	}
+	if c.WarmupCoordinator != nil {
+		if err := c.WarmupCoordinator.WarmStartup(ctx); err != nil {
+			return fmt.Errorf("cache governance startup warmup failed: %w", err)
+		}
+		return nil
+	}
 
 	// 预热量表缓存
 	if c.ScaleModule != nil && c.ScaleModule.Repo != nil {
@@ -278,13 +494,20 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 	// 建议：只在有明确需求时使用（如已知活跃组织、常用问卷等）
 	// 可以通过配置或环境变量控制是否启用
 	if c.StatisticsModule != nil && c.cacheOptions.StatisticsWarmup != nil && len(c.cacheOptions.StatisticsWarmup.OrgIDs) > 0 {
-		if err := scaleCache.WarmupStatisticsCache(ctx, *c.cacheOptions.StatisticsWarmup,
-			c.StatisticsModule.SystemStatisticsService,
-			c.StatisticsModule.QuestionnaireStatisticsService,
-			c.StatisticsModule.PlanStatisticsService,
-		); err != nil {
-			// 预热失败不影响服务启动，仅记录日志
-			return fmt.Errorf("statistics cache warmup failed: %w", err)
+		for _, orgID := range c.cacheOptions.StatisticsWarmup.OrgIDs {
+			if _, err := c.StatisticsModule.SystemStatisticsService.GetSystemStatistics(ctx, orgID); err != nil {
+				return fmt.Errorf("statistics cache warmup failed: %w", err)
+			}
+			for _, code := range c.cacheOptions.StatisticsWarmup.QuestionnaireCodes {
+				if _, err := c.StatisticsModule.QuestionnaireStatisticsService.GetQuestionnaireStatistics(ctx, orgID, code); err != nil {
+					return fmt.Errorf("statistics cache warmup failed: %w", err)
+				}
+			}
+			for _, planID := range c.cacheOptions.StatisticsWarmup.PlanIDs {
+				if _, err := c.StatisticsModule.PlanStatisticsService.GetPlanStatistics(ctx, orgID, planID); err != nil {
+					return fmt.Errorf("statistics cache warmup failed: %w", err)
+				}
+			}
 		}
 	}
 
@@ -317,7 +540,15 @@ func (c *Container) initSurveyModule() error {
 		identitySvc = c.IAMModule.IdentityService()
 	}
 	// 传入 Redis 客户端（用于问卷缓存装饰器）
-	if err := surveyModule.Initialize(c.mongoDB, c.eventPublisher, c.redisCache, identitySvc); err != nil {
+	if err := surveyModule.Initialize(
+		c.mongoDB,
+		c.eventPublisher,
+		c.staticRedisCache,
+		c.staticCacheNamespace,
+		identitySvc,
+		c.cacheCatalog.Policy(scaleCache.PolicyQuestionnaire),
+		c.hotsetRecorder,
+	); err != nil {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
@@ -341,7 +572,17 @@ func (c *Container) initScaleModule() error {
 		questionnaireRepo = c.SurveyModule.Questionnaire.Repo
 	}
 	// 传入 Redis 客户端（用于缓存装饰器）
-	if err := scaleModule.Initialize(c.mongoDB, c.eventPublisher, questionnaireRepo, c.redisCache, identitySvc); err != nil {
+	if err := scaleModule.Initialize(
+		c.mongoDB,
+		c.eventPublisher,
+		questionnaireRepo,
+		c.staticRedisCache,
+		c.staticCacheNamespace,
+		identitySvc,
+		c.cacheCatalog.Policy(scaleCache.PolicyScale),
+		c.cacheCatalog.Policy(scaleCache.PolicyScaleList),
+		c.hotsetRecorder,
+	); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 
@@ -371,7 +612,16 @@ func (c *Container) initActorModule() error {
 		}
 	}
 
-	if err := actorModule.Initialize(c.mysqlDB, guardianshipSvc, identitySvc, c.redisCache, opAuthz, operationAccountSvc); err != nil {
+	if err := actorModule.Initialize(
+		c.mysqlDB,
+		guardianshipSvc,
+		identitySvc,
+		c.objectRedisCache,
+		c.objectCacheNamespace,
+		c.cacheCatalog.Policy(scaleCache.PolicyTestee),
+		opAuthz,
+		operationAccountSvc,
+	); err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
 	}
 
@@ -388,9 +638,17 @@ func (c *Container) initEvaluationModule() error {
 	// 传入 ScaleRepo、AnswerSheetRepo、QuestionnaireRepo、EventPublisher 和 Redis 客户端
 	// 注意：参数顺序必须与 EvaluationModule.Initialize 中的 params 索引一致
 	// params[0]: MySQL, params[1]: MongoDB, params[2]: ScaleRepo, params[3]: AnswerSheetRepo, params[4]: QuestionnaireRepo, params[5]: EventPublisher, params[6]: Redis
-	redisClient := c.redisCache
+	redisClient := c.objectRedisCache
 	if c.cacheOptions.DisableEvaluationCache {
 		redisClient = nil
+	}
+	queryRedisClient := c.queryRedisCache
+	if c.cacheOptions.DisableEvaluationCache {
+		queryRedisClient = nil
+	}
+	var versionStore scaleCache.VersionTokenStore
+	if queryRedisClient != nil && c.metaRedisCache != nil {
+		versionStore = scaleCache.NewRedisVersionTokenStoreWithKind(c.metaRedisCache, string(scaleCache.PolicyAssessmentList))
 	}
 	if err := evaluationModule.Initialize(
 		c.mysqlDB,
@@ -400,6 +658,12 @@ func (c *Container) initEvaluationModule() error {
 		c.SurveyModule.Questionnaire.Repo, // params[4]: QuestionnaireRepo
 		c.eventPublisher,                  // params[5]: EventPublisher
 		redisClient,                       // params[6]: Redis 客户端（用于缓存）
+		c.objectCacheNamespace,            // params[7]: Object cache namespace
+		c.cacheCatalog.Policy(scaleCache.PolicyAssessmentDetail),
+		queryRedisClient,
+		c.queryCacheNamespace,
+		c.cacheCatalog.Policy(scaleCache.PolicyAssessmentList),
+		versionStore,
 	); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
@@ -419,7 +683,15 @@ func (c *Container) initPlanModule() error {
 	if c.ScaleModule != nil {
 		scaleRepo = c.ScaleModule.Repo
 	}
-	if err := planModule.Initialize(c.mysqlDB, c.eventPublisher, scaleRepo, c.redisCache, c.planEntryURL); err != nil {
+	if err := planModule.Initialize(
+		c.mysqlDB,
+		c.eventPublisher,
+		scaleRepo,
+		c.objectRedisCache,
+		c.objectCacheNamespace,
+		c.cacheCatalog.Policy(scaleCache.PolicyPlan),
+		c.planEntryURL,
+	); err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
 	}
 
@@ -442,7 +714,18 @@ func (c *Container) initStatisticsModule() error {
 	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
 		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
 	}
-	if err := statisticsModule.Initialize(c.mysqlDB, redisClient, answerSheetRepo, c.statisticsRepairWindowDays); err != nil {
+	if !c.cacheOptions.DisableStatisticsCache {
+		redisClient = c.queryRedisCache
+	}
+	if err := statisticsModule.Initialize(
+		c.mysqlDB,
+		redisClient,
+		c.queryCacheNamespace,
+		answerSheetRepo,
+		c.statisticsRepairWindowDays,
+		c.cacheCatalog.Policy(scaleCache.PolicyStatsQuery),
+		c.hotsetRecorder,
+	); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 
@@ -451,6 +734,180 @@ func (c *Container) initStatisticsModule() error {
 
 	c.printf("📦 Statistics module initialized\n")
 	return nil
+}
+
+func (c *Container) initWarmupCoordinator() error {
+	if c == nil {
+		return nil
+	}
+	var warmScale func(context.Context, string) error
+	var warmQuestionnaire func(context.Context, string) error
+	var warmScaleList func(context.Context) error
+	if c.staticRedisCache != nil {
+		warmScale = c.warmScaleCacheTarget
+		warmQuestionnaire = c.warmQuestionnaireCacheTarget
+		warmScaleList = c.warmScaleListTarget
+	}
+	var warmStatsSystem func(context.Context, int64) error
+	var warmStatsQuestionnaire func(context.Context, int64, string) error
+	var warmStatsPlan func(context.Context, int64, uint64) error
+	if c.queryRedisCache != nil && !c.cacheOptions.DisableStatisticsCache {
+		warmStatsSystem = c.warmSystemStatsTarget
+		warmStatsQuestionnaire = c.warmQuestionnaireStatsTarget
+		warmStatsPlan = c.warmPlanStatsTarget
+	}
+	c.WarmupCoordinator = cachegov.NewCoordinator(cachegov.Config{
+		Enable:          c.cacheOptions.Warmup.Enable,
+		StartupStatic:   c.cacheOptions.Warmup.StartupStatic,
+		StartupQuery:    c.cacheOptions.Warmup.StartupQuery,
+		HotsetEnable:    c.cacheOptions.Warmup.HotsetEnable,
+		HotsetTopN:      c.cacheOptions.Warmup.HotsetTopN,
+		MaxItemsPerKind: c.cacheOptions.Warmup.MaxItemsPerKind,
+	}, cachegov.Dependencies{
+		Catalog:                         c.cacheCatalog,
+		StatisticsSeeds:                 c.cacheOptions.StatisticsWarmup,
+		Hotset:                          c.hotsetRecorder,
+		ListPublishedScaleCodes:         c.listPublishedScaleCodes,
+		ListPublishedQuestionnaireCodes: c.listPublishedQuestionnaireCodes,
+		LookupScaleQuestionnaireCode:    c.lookupScaleQuestionnaireCode,
+		WarmScale:                       warmScale,
+		WarmQuestionnaire:               warmQuestionnaire,
+		WarmScaleList:                   warmScaleList,
+		WarmStatsSystem:                 warmStatsSystem,
+		WarmStatsQuestionnaire:          warmStatsQuestionnaire,
+		WarmStatsPlan:                   warmStatsPlan,
+	})
+	if c.StatisticsModule != nil {
+		c.StatisticsModule.SetWarmupCoordinator(c.WarmupCoordinator)
+	}
+	c.CacheGovernanceStatusService = cachegov.NewStatusService("apiserver", nil, c.hotsetInspector, c.WarmupCoordinator)
+	return nil
+}
+
+func (c *Container) listPublishedScaleCodes(ctx context.Context) ([]string, error) {
+	if c == nil || c.ScaleModule == nil || c.ScaleModule.Repo == nil {
+		return nil, nil
+	}
+	const pageSize = 200
+	page := 1
+	codes := make([]string, 0)
+	for {
+		items, err := c.ScaleModule.Repo.FindSummaryList(ctx, page, pageSize, map[string]interface{}{
+			"status": scale.StatusPublished.Value(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(items) == 0 {
+			break
+		}
+		for _, item := range items {
+			if item == nil {
+				continue
+			}
+			codes = append(codes, item.GetCode().String())
+		}
+		if len(items) < pageSize {
+			break
+		}
+		page++
+	}
+	return codes, nil
+}
+
+func (c *Container) listPublishedQuestionnaireCodes(ctx context.Context) ([]string, error) {
+	if c == nil || c.SurveyModule == nil || c.SurveyModule.Questionnaire == nil || c.SurveyModule.Questionnaire.Repo == nil {
+		return nil, nil
+	}
+	const pageSize = 200
+	page := 1
+	codes := make([]string, 0)
+	for {
+		items, err := c.SurveyModule.Questionnaire.Repo.FindBasePublishedList(ctx, page, pageSize, map[string]interface{}{
+			"status": "published",
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(items) == 0 {
+			break
+		}
+		for _, item := range items {
+			if item == nil {
+				continue
+			}
+			codes = append(codes, item.GetCode().String())
+		}
+		if len(items) < pageSize {
+			break
+		}
+		page++
+	}
+	return codes, nil
+}
+
+func (c *Container) lookupScaleQuestionnaireCode(ctx context.Context, code string) (string, error) {
+	if c == nil || c.ScaleModule == nil || c.ScaleModule.Repo == nil {
+		return "", nil
+	}
+	item, err := c.ScaleModule.Repo.FindByCode(ctx, code)
+	if err != nil || item == nil {
+		return "", err
+	}
+	return item.GetQuestionnaireCode().String(), nil
+}
+
+func (c *Container) warmScaleCacheTarget(ctx context.Context, code string) error {
+	if c == nil || c.ScaleModule == nil || c.ScaleModule.Repo == nil || strings.TrimSpace(code) == "" {
+		return nil
+	}
+	if cachedRepo, ok := c.ScaleModule.Repo.(*scaleCache.CachedScaleRepository); ok {
+		return cachedRepo.WarmupCache(ctx, []string{code})
+	}
+	_, err := c.ScaleModule.Repo.FindByCode(ctx, code)
+	return err
+}
+
+func (c *Container) warmQuestionnaireCacheTarget(ctx context.Context, code string) error {
+	if c == nil || c.SurveyModule == nil || c.SurveyModule.Questionnaire == nil || c.SurveyModule.Questionnaire.Repo == nil || strings.TrimSpace(code) == "" {
+		return nil
+	}
+	if cachedRepo, ok := c.SurveyModule.Questionnaire.Repo.(*scaleCache.CachedQuestionnaireRepository); ok {
+		return cachedRepo.WarmupCache(ctx, []string{code})
+	}
+	_, err := c.SurveyModule.Questionnaire.Repo.FindBaseByCode(ctx, code)
+	return err
+}
+
+func (c *Container) warmScaleListTarget(ctx context.Context) error {
+	if c == nil || c.ScaleModule == nil || c.ScaleModule.ListCache == nil {
+		return nil
+	}
+	return c.ScaleModule.ListCache.Rebuild(ctx)
+}
+
+func (c *Container) warmSystemStatsTarget(ctx context.Context, orgID int64) error {
+	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.SystemStatisticsService == nil {
+		return nil
+	}
+	_, err := c.StatisticsModule.SystemStatisticsService.GetSystemStatistics(ctx, orgID)
+	return err
+}
+
+func (c *Container) warmQuestionnaireStatsTarget(ctx context.Context, orgID int64, code string) error {
+	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.QuestionnaireStatisticsService == nil {
+		return nil
+	}
+	_, err := c.StatisticsModule.QuestionnaireStatisticsService.GetQuestionnaireStatistics(ctx, orgID, code)
+	return err
+}
+
+func (c *Container) warmPlanStatsTarget(ctx context.Context, orgID int64, planID uint64) error {
+	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.PlanStatisticsService == nil {
+		return nil
+	}
+	_, err := c.StatisticsModule.PlanStatisticsService.GetPlanStatistics(ctx, orgID, planID)
+	return err
 }
 
 // initCodesService 初始化 CodesService
@@ -467,9 +924,9 @@ func (c *Container) initCodesService() {
 func (c *Container) initQRCodeGenerator() {
 	// 创建微信 SDK 缓存适配器（使用 Redis，如果 Redis 不可用则使用内存缓存）
 	var wechatCache cache.Cache
-	if c.redisCache != nil {
+	if c.sdkRedisCache != nil {
 		// 使用 Redis 缓存适配器
-		wechatCache = wechatapi.NewRedisCacheAdapter(c.redisCache)
+		wechatCache = wechatapi.NewRedisCacheAdapterWithBuilder(c.sdkRedisCache, c.cacheCatalog.Builder(scaleCache.CacheFamilySDK))
 	} else {
 		// 降级使用内存缓存
 		wechatCache = cache.NewMemory()
@@ -709,6 +1166,13 @@ func (c *Container) GetLoadedModules() []string {
 	}
 
 	return modules
+}
+
+func (c *Container) HotsetInspector() scaleCache.HotsetInspector {
+	if c == nil {
+		return nil
+	}
+	return c.hotsetInspector
 }
 
 // PrintContainerInfo 打印容器信息

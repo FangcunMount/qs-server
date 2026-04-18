@@ -26,6 +26,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
 // ActorModule Actor 模块（测评对象和工作人员）
@@ -78,15 +79,28 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		}
 	}
 
-	var opAuthz *iam.OperatorAuthzBundle
+	var cacheNamespace string
 	if len(params) > 4 {
-		if b, ok := params[4].(*iam.OperatorAuthzBundle); ok {
+		if ns, ok := params[4].(string); ok {
+			cacheNamespace = ns
+		}
+	}
+	var testeePolicy testeeCache.CachePolicy
+	if len(params) > 5 {
+		if policy, ok := params[5].(testeeCache.CachePolicy); ok {
+			testeePolicy = policy
+		}
+	}
+
+	var opAuthz *iam.OperatorAuthzBundle
+	if len(params) > 6 {
+		if b, ok := params[6].(*iam.OperatorAuthzBundle); ok {
 			opAuthz = b
 		}
 	}
 	var operationAccountSvc *iam.OperationAccountService
-	if len(params) > 5 {
-		if svc, ok := params[5].(*iam.OperationAccountService); ok {
+	if len(params) > 7 {
+		if svc, ok := params[7].(*iam.OperationAccountService); ok {
 			operationAccountSvc = svc
 		}
 	}
@@ -103,11 +117,12 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	// 初始化 repository 层
 	// 初始化基础 Repository
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB)
+	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if len(params) > 3 {
 		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
-			m.TesteeRepo = testeeCache.NewCachedTesteeRepository(baseTesteeRepo, rc)
+			m.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderAndPolicy(baseTesteeRepo, rc, cacheBuilder, testeePolicy)
 		} else {
 			m.TesteeRepo = baseTesteeRepo
 		}

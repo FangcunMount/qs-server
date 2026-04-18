@@ -20,6 +20,7 @@ import (
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -76,8 +77,11 @@ func NewSurveyModule() *SurveyModule {
 // Initialize 初始化 Survey 模块
 // params[0]: *mongo.Database
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
-// params[2]: redis.UniversalClient (可选，用于缓存装饰器)
-// params[3]: *iam.IdentityService (可选，用于姓名补全)
+// params[2]: redis.UniversalClient (可选，用于问卷缓存装饰器)
+// params[3]: string (可选，用于问卷缓存 namespace)
+// params[4]: *iam.IdentityService (可选，用于姓名补全)
+// params[5]: questionnaireCache.CachePolicy (可选，用于问卷缓存策略)
+// params[6]: questionnaireCache.HotsetRecorder (可选，用于热点治理)
 func (m *SurveyModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -105,16 +109,34 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
+	var cacheNamespace string
+	if len(params) > 3 {
+		if ns, ok := params[3].(string); ok {
+			cacheNamespace = ns
+		}
+	}
 	// 获取 IAM IdentityService（可选参数，用于姓名补全）
 	var identitySvc *iam.IdentityService
-	if len(params) > 3 {
-		if svc, ok := params[3].(*iam.IdentityService); ok {
+	if len(params) > 4 {
+		if svc, ok := params[4].(*iam.IdentityService); ok {
 			identitySvc = svc
+		}
+	}
+	var questionnairePolicy questionnaireCache.CachePolicy
+	if len(params) > 5 {
+		if policy, ok := params[5].(questionnaireCache.CachePolicy); ok {
+			questionnairePolicy = policy
+		}
+	}
+	var hotset questionnaireCache.HotsetRecorder
+	if len(params) > 6 {
+		if recorder, ok := params[6].(questionnaireCache.HotsetRecorder); ok {
+			hotset = recorder
 		}
 	}
 
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(mongoDB, redisClient, identitySvc); err != nil {
+	if err := m.initQuestionnaireSubModule(mongoDB, redisClient, cacheNamespace, identitySvc, questionnairePolicy, hotset); err != nil {
 		return err
 	}
 
@@ -127,15 +149,16 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, identitySvc *iam.IdentityService) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheNamespace string, identitySvc *iam.IdentityService, policy questionnaireCache.CachePolicy, hotset questionnaireCache.HotsetRecorder) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := quesMongoInfra.NewRepository(mongoDB)
+	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
-		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepository(baseRepo, redisClient)
+		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(baseRepo, redisClient, cacheBuilder, policy)
 	} else {
 		sub.Repo = baseRepo
 	}
@@ -148,7 +171,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, nil, validator, lifecycle, m.eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
-	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc)
+	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc, hotset)
 
 	// 初始化 handler 层
 	// 注意：QRCodeService 在容器初始化后才创建，需要通过 SetQRCodeService 方法单独设置

@@ -14,13 +14,14 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	options "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 // DatabaseManager 数据库管理器
 type DatabaseManager struct {
-	registry   *database.Registry
-	config     *config.Config
-	cacheRedis *database.RedisConnection
+	registry      *database.Registry
+	config        *config.Config
+	redisProfiles *database.NamedRedisRegistry
 }
 
 // NewDatabaseManager 创建数据库管理器
@@ -57,6 +58,11 @@ func (dm *DatabaseManager) Initialize() error {
 	// 初始化数据库连接
 	if err := dm.registry.Init(); err != nil {
 		return fmt.Errorf("failed to initialize database connections: %w", err)
+	}
+	if dm.redisProfiles != nil && dm.redisProfiles.HasConnections() {
+		if err := dm.redisProfiles.Connect(); err != nil {
+			return fmt.Errorf("failed to initialize redis profiles: %w", err)
+		}
 	}
 
 	// 执行数据库迁移
@@ -111,27 +117,15 @@ func (dm *DatabaseManager) initMySQL(ctx context.Context) error {
 
 // initRedis 初始化Redis连接
 func (dm *DatabaseManager) initRedis(ctx context.Context) error {
-	redisConfig := &database.RedisConfig{
-		Host:                  dm.config.RedisOptions.Host,
-		Port:                  dm.config.RedisOptions.Port,
-		Addrs:                 dm.config.RedisOptions.Addrs,
-		Username:              dm.config.RedisOptions.Username,
-		Password:              dm.config.RedisOptions.Password,
-		Database:              dm.config.RedisOptions.Database,
-		MaxIdle:               dm.config.RedisOptions.MaxIdle,
-		MaxActive:             dm.config.RedisOptions.MaxActive,
-		Timeout:               dm.config.RedisOptions.Timeout,
-		MinIdleConns:          dm.config.RedisOptions.MinIdleConns,
-		PoolTimeout:           dm.config.RedisOptions.PoolTimeout,
-		DialTimeout:           dm.config.RedisOptions.DialTimeout,
-		ReadTimeout:           dm.config.RedisOptions.ReadTimeout,
-		WriteTimeout:          dm.config.RedisOptions.WriteTimeout,
-		EnableCluster:         dm.config.RedisOptions.EnableCluster,
-		UseSSL:                dm.config.RedisOptions.UseSSL,
-		SSLInsecureSkipVerify: dm.config.RedisOptions.SSLInsecureSkipVerify,
+	redisConfig := toDatabaseRedisConfig(dm.config.RedisOptions)
+	redisProfiles := make(map[string]*database.RedisConfig)
+	for name, cfg := range dm.config.RedisProfiles {
+		if databaseCfg := toDatabaseRedisConfig(cfg); databaseCfg != nil && (databaseCfg.Host != "" || len(databaseCfg.Addrs) > 0) {
+			redisProfiles[name] = databaseCfg
+		}
 	}
 
-	if redisConfig.Host == "" && len(redisConfig.Addrs) == 0 {
+	if redisConfig == nil && len(redisProfiles) == 0 {
 		logger.L(ctx).Infow("Redis host not configured, skipping Redis initialization",
 			"component", "Redis",
 			"action", "initialize",
@@ -140,18 +134,15 @@ func (dm *DatabaseManager) initRedis(ctx context.Context) error {
 		return nil
 	}
 
-	cacheConn := database.NewRedisConnection(redisConfig)
-	if err := dm.registry.Register(database.Redis, redisConfig, cacheConn); err != nil {
-		return fmt.Errorf("failed to register redis: %w", err)
-	}
-	dm.cacheRedis = cacheConn
+	dm.redisProfiles = database.NewNamedRedisRegistry(redisConfig, redisProfiles)
 	logger.L(ctx).Infow("Redis initialized successfully",
 		"component", "Redis",
 		"action", "initialize",
 		"result", "success",
-		"host", redisConfig.Host,
-		"port", redisConfig.Port,
-		"database", redisConfig.Database,
+		"host", redisHostForLog(redisConfig),
+		"port", redisPortForLog(redisConfig),
+		"database", redisDatabaseForLog(redisConfig),
+		"profile_count", len(redisProfiles),
 	)
 
 	return nil
@@ -257,17 +248,27 @@ func (dm *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
 
 // GetRedisClient 获取Redis客户端
 func (dm *DatabaseManager) GetRedisClient() (redis.UniversalClient, error) {
-	client, err := dm.registry.GetClient(database.Redis)
-	if err != nil {
-		return nil, err
-	}
+	return dm.GetRedisClientByProfile("")
+}
 
-	redisClient, ok := client.(redis.UniversalClient)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast client to redis.UniversalClient")
+// GetRedisClientByProfile 获取指定 profile 的 Redis 客户端。
+// 未配置的 profile 会回退默认 Redis；已配置但不可用的 profile 会返回错误。
+func (dm *DatabaseManager) GetRedisClientByProfile(profile string) (redis.UniversalClient, error) {
+	if dm.redisProfiles == nil {
+		return nil, fmt.Errorf("redis is not configured")
 	}
+	return dm.redisProfiles.GetClient(profile)
+}
 
-	return redisClient, nil
+// GetRedisProfileStatus 返回指定 profile 当前的可用性状态。
+func (dm *DatabaseManager) GetRedisProfileStatus(profile string) database.RedisProfileStatus {
+	if dm == nil || dm.redisProfiles == nil {
+		return database.RedisProfileStatus{
+			Name:  profile,
+			State: database.RedisProfileStateMissing,
+		}
+	}
+	return dm.redisProfiles.ProfileStatus(profile)
 }
 
 // GetMongoClient 获取MongoDB客户端
@@ -306,7 +307,15 @@ func (dm *DatabaseManager) HealthCheck() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	return dm.registry.HealthCheck(ctx)
+	if err := dm.registry.HealthCheck(ctx); err != nil {
+		return err
+	}
+	if dm.redisProfiles != nil {
+		if err := dm.redisProfiles.HealthCheck(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Close 关闭所有数据库连接
@@ -316,12 +325,73 @@ func (dm *DatabaseManager) Close() error {
 		"component", "DatabaseManager",
 		"action", "close",
 	)
-	return dm.registry.Close()
+	var lastErr error
+	if err := dm.registry.Close(); err != nil {
+		lastErr = err
+	}
+	if dm.redisProfiles != nil {
+		if err := dm.redisProfiles.Close(); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
 }
 
 // GetRegistry 获取数据库注册器（用于测试和调试）
 func (dm *DatabaseManager) GetRegistry() *database.Registry {
 	return dm.registry
+}
+
+func toDatabaseRedisConfig(opts *options.RedisOptions) *database.RedisConfig {
+	if opts == nil {
+		return nil
+	}
+	return &database.RedisConfig{
+		Host:                  opts.Host,
+		Port:                  opts.Port,
+		Addrs:                 opts.Addrs,
+		Username:              opts.Username,
+		Password:              opts.Password,
+		Database:              opts.Database,
+		MaxIdle:               opts.MaxIdle,
+		MaxActive:             opts.MaxActive,
+		Timeout:               opts.Timeout,
+		MinIdleConns:          opts.MinIdleConns,
+		PoolTimeout:           opts.PoolTimeout,
+		DialTimeout:           opts.DialTimeout,
+		ReadTimeout:           opts.ReadTimeout,
+		WriteTimeout:          opts.WriteTimeout,
+		EnableCluster:         opts.EnableCluster,
+		UseSSL:                opts.UseSSL,
+		SSLInsecureSkipVerify: opts.SSLInsecureSkipVerify,
+	}
+}
+
+func redisHostForLog(cfg *database.RedisConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	if cfg.Host != "" {
+		return cfg.Host
+	}
+	if len(cfg.Addrs) > 0 {
+		return cfg.Addrs[0]
+	}
+	return ""
+}
+
+func redisPortForLog(cfg *database.RedisConfig) int {
+	if cfg == nil {
+		return 0
+	}
+	return cfg.Port
+}
+
+func redisDatabaseForLog(cfg *database.RedisConfig) int {
+	if cfg == nil {
+		return 0
+	}
+	return cfg.Database
 }
 
 // runMigrations 执行数据库迁移

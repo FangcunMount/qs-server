@@ -31,6 +31,8 @@ type Options struct {
 	PlanScheduler *PlanSchedulerOptions `json:"plan_scheduler" mapstructure:"plan_scheduler"`
 	// Redis 配置（单实例）
 	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
+	// 可选 Redis profiles（默认按同实例分 DB 配置）
+	RedisProfiles map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
 	// Cache 控制缓存输出
 	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
 }
@@ -79,8 +81,15 @@ type PlanSchedulerOptions struct {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
-	DisableStatisticsCache bool   `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
-	Namespace              string `json:"namespace" mapstructure:"namespace"`
+	DisableStatisticsCache bool               `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	Namespace              string             `json:"namespace" mapstructure:"namespace"`
+	Lock                   *CacheRouteOptions `json:"lock" mapstructure:"lock"`
+}
+
+// CacheRouteOptions worker 侧缓存/锁 keyspace 路由配置。
+type CacheRouteOptions struct {
+	RedisProfile    string `json:"redis_profile" mapstructure:"redis_profile"`
+	NamespaceSuffix string `json:"namespace_suffix" mapstructure:"namespace_suffix"`
 }
 
 // NewCacheOptions 创建缓存控制配置
@@ -88,6 +97,10 @@ func NewCacheOptions() *CacheOptions {
 	return &CacheOptions{
 		DisableStatisticsCache: true,
 		Namespace:              "",
+		Lock: &CacheRouteOptions{
+			RedisProfile:    "lock_cache",
+			NamespaceSuffix: "cache:lock",
+		},
 	}
 }
 
@@ -143,6 +156,7 @@ func NewOptions() *Options {
 		},
 		PlanScheduler: NewPlanSchedulerOptions(),
 		Redis:         genericoptions.NewRedisOptions(),
+		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		Cache:         NewCacheOptions(),
 	}
 }
@@ -238,6 +252,11 @@ func (o *Options) Validate() []error {
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
+	if o.Cache != nil && o.Cache.Lock != nil && o.Cache.Lock.RedisProfile != "" && len(o.RedisProfiles) > 0 {
+		if _, ok := o.RedisProfiles[o.Cache.Lock.RedisProfile]; !ok {
+			errs = append(errs, fmt.Errorf("cache.lock.redis_profile references missing redis_profiles entry %q", o.Cache.Lock.RedisProfile))
+		}
+	}
 	if o.PlanScheduler != nil && o.PlanScheduler.Enable {
 		if len(o.PlanScheduler.OrgIDs) == 0 {
 			errs = append(errs, fmt.Errorf("plan_scheduler.org_ids cannot be empty when enabled"))
@@ -281,4 +300,14 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 		"Disable Redis-based statistics caching in worker event handlers")
 	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace,
 		"Optional Redis key namespace prefix shared by cache, statistics, lock, and SDK keys.")
+	if c.Lock == nil {
+		c.Lock = &CacheRouteOptions{
+			RedisProfile:    "lock_cache",
+			NamespaceSuffix: "cache:lock",
+		}
+	}
+	fs.StringVar(&c.Lock.RedisProfile, "cache.lock.redis-profile", c.Lock.RedisProfile,
+		"Redis profile used by worker lock/lease keys.")
+	fs.StringVar(&c.Lock.NamespaceSuffix, "cache.lock.namespace-suffix", c.Lock.NamespaceSuffix,
+		"Nested Redis namespace suffix used for worker lease/lock keys.")
 }

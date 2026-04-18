@@ -153,17 +153,91 @@ redis:
   write-timeout: 5
   enable-cluster: false
   use-ssl: false
+
+redis_profiles:
+  static_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 1
+  object_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 2
+  query_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 3
+  meta_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 6
+  sdk_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 4
+  lock_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 5
+
 # ----------------------------------------------------------------------------
 # 3.4 缓存控制
 # ----------------------------------------------------------------------------
 cache:
   disable_evaluation_cache: false # 开启测评结果缓存
   disable_statistics_cache: false # 开启统计缓存
+  static:
+    redis_profile: "static_cache" # 若未配置 redis_profiles.static_cache，则回退到默认 redis
+    namespace_suffix: "cache:static"
+    compress: false
+    singleflight: true
+    negative: false
+  object:
+    redis_profile: "object_cache" # assessment/testee/plan 等对象视图缓存
+    namespace_suffix: "cache:object"
+    compress: false
+    singleflight: true
+    negative: false
+  query:
+    redis_profile: "query_cache" # 若未配置 redis_profiles.query_cache，则回退到默认 redis
+    namespace_suffix: "cache:query"
+    ttl: "5m"
+    compress: false
+    singleflight: false
+    negative: false
+  meta:
+    redis_profile: "meta_cache" # query/list cache version token
+    namespace_suffix: "cache:meta"
+  sdk:
+    redis_profile: "sdk_cache" # wechat sdk token/cache
+    namespace_suffix: "cache:sdk"
+    compress: false
+    singleflight: false
+    negative: false
+  lock:
+    redis_profile: "lock_cache" # lock/lease keys
+    namespace_suffix: "cache:lock"
+    compress: false
+    singleflight: false
+    negative: false
   ttl:                        # 缓存时间，可配置
     scale: "2h"              # 量表缓存时间
+    scale_list: "10m"        # 量表列表缓存时间
     questionnaire: "2h"      # 问卷缓存时间
     assessment_detail: "1h"    # 测评详情缓存时间
-    assessment_status: "30m"   # 测评状态缓存时间
+    assessment_list: "10m"     # 我的测评列表缓存时间
     testee: "30m"              # 受试者缓存时间
     plan: "12h"                # 计划缓存时间
   ttl_jitter_ratio: 0.1       # 缓存时间抖动比例
@@ -172,6 +246,15 @@ cache:
     org_ids: [1]              # 组织ID列表（从配置读取，默认预热所有组织）
     questionnaire_codes: []    # 问卷编码列表（从配置读取，默认预热所有问卷）
     plan_ids: []              # 计划ID列表（从配置读取，默认预热所有计划）
+  warmup:
+    enable: true
+    startup:
+      static: true
+      query: true
+    hotset:
+      enable: true
+      top_n: 20
+      max_items_per_kind: 200
 
 # ----------------------------------------------------------------------------
 # 3.4 限流配置

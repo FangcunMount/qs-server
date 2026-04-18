@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
@@ -48,6 +49,7 @@ type InternalService struct {
 	operatorRepo              domainoperator.Repository
 	authzSnapshot             *iaminfra.AuthzSnapshotLoader
 	behaviorProjectorService  statisticsApp.BehaviorProjectorService
+	warmupCoordinator         cachegov.Coordinator
 	// 小程序码生成服务（可选）
 	qrCodeService qrcodeApp.QRCodeService
 	// 小程序 task 消息服务（可选）
@@ -70,6 +72,7 @@ func NewInternalService(
 	operatorRepo domainoperator.Repository,
 	authzSnapshot *iaminfra.AuthzSnapshotLoader,
 	behaviorProjectorService statisticsApp.BehaviorProjectorService,
+	warmupCoordinator cachegov.Coordinator,
 	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 ) *InternalService {
@@ -93,6 +96,7 @@ func NewInternalService(
 		operatorRepo:                       operatorRepo,
 		authzSnapshot:                      authzSnapshot,
 		behaviorProjectorService:           behaviorProjectorService,
+		warmupCoordinator:                  warmupCoordinator,
 		qrCodeService:                      qrService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 	}
@@ -645,6 +649,33 @@ func (s *InternalService) GenerateQuestionnaireQRCode(
 	ctx context.Context,
 	req *pb.GenerateQuestionnaireQRCodeRequest,
 ) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	return s.generateQuestionnaireQRCode(ctx, req)
+}
+
+func (s *InternalService) HandleQuestionnairePublishedPostActions(
+	ctx context.Context,
+	req *pb.GenerateQuestionnaireQRCodeRequest,
+) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	resp, err := s.generateQuestionnaireQRCode(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if s.warmupCoordinator != nil {
+		if warmErr := s.warmupCoordinator.HandleQuestionnairePublished(ctx, req.GetCode(), req.GetVersion()); warmErr != nil {
+			logger.L(ctx).Warnw("questionnaire publish post-actions warmup failed",
+				"code", req.GetCode(),
+				"version", req.GetVersion(),
+				"error", warmErr,
+			)
+		}
+	}
+	return resp, nil
+}
+
+func (s *InternalService) generateQuestionnaireQRCode(
+	ctx context.Context,
+	req *pb.GenerateQuestionnaireQRCodeRequest,
+) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
 	l := logger.L(ctx)
 
 	l.Infow("gRPC: 收到生成问卷小程序码请求",
@@ -704,6 +735,32 @@ func (s *InternalService) GenerateQuestionnaireQRCode(
 // GenerateScaleQRCode 生成量表小程序码
 // 场景：worker 处理 scale.changed(published) 事件后调用
 func (s *InternalService) GenerateScaleQRCode(
+	ctx context.Context,
+	req *pb.GenerateScaleQRCodeRequest,
+) (*pb.GenerateScaleQRCodeResponse, error) {
+	return s.generateScaleQRCode(ctx, req)
+}
+
+func (s *InternalService) HandleScalePublishedPostActions(
+	ctx context.Context,
+	req *pb.GenerateScaleQRCodeRequest,
+) (*pb.GenerateScaleQRCodeResponse, error) {
+	resp, err := s.generateScaleQRCode(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if s.warmupCoordinator != nil {
+		if warmErr := s.warmupCoordinator.HandleScalePublished(ctx, req.GetCode()); warmErr != nil {
+			logger.L(ctx).Warnw("scale publish post-actions warmup failed",
+				"code", req.GetCode(),
+				"error", warmErr,
+			)
+		}
+	}
+	return resp, nil
+}
+
+func (s *InternalService) generateScaleQRCode(
 	ctx context.Context,
 	req *pb.GenerateScaleQRCodeRequest,
 ) (*pb.GenerateScaleQRCodeResponse, error) {

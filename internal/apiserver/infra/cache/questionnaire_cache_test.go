@@ -10,6 +10,7 @@ import (
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
 type questionnaireRepoStub struct {
@@ -209,10 +210,7 @@ func TestCachedQuestionnaireRepositoryFindByCodeVersionCachesExactVersionAndNega
 }
 
 func TestCachedQuestionnaireRepositoryDeleteCacheByCodeRemovesAllKeys(t *testing.T) {
-	ApplyNamespace("test-ns")
-	defer ApplyNamespace("")
-
-	cachedRepo, _, _, cleanup := newQuestionnaireCacheTestRepo(t)
+	cachedRepo, _, _, cleanup := newQuestionnaireCacheTestRepoWithNamespace(t, "test-ns")
 	defer cleanup()
 
 	ctx := context.Background()
@@ -261,7 +259,46 @@ func TestCachedQuestionnaireRepositoryWarmupCacheWritesHeadAndPublishedKeys(t *t
 	}
 }
 
+func TestCachedQuestionnaireRepositorySupportsExplicitBuilderNamespace(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	head := newTestQuestionnaire(t, "Q-001", "1.0.2", domainQuestionnaire.RecordRoleHead, false)
+	published := newTestQuestionnaire(t, "Q-001", "1.0.1", domainQuestionnaire.RecordRolePublishedSnapshot, true)
+	repo := &questionnaireRepoStub{
+		head: map[string]*domainQuestionnaire.Questionnaire{
+			"Q-001": head,
+		},
+		published: map[string]*domainQuestionnaire.Questionnaire{
+			"Q-001": published,
+		},
+		versioned: map[string]*domainQuestionnaire.Questionnaire{
+			"Q-001:1.0.1": published,
+			"Q-001:1.0.2": head,
+		},
+	}
+
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace("prod:cache:static"), CachePolicy{
+		Negative: PolicySwitchEnabled,
+	}).(*CachedQuestionnaireRepository)
+	if _, err := cachedRepo.FindPublishedByCode(context.Background(), "Q-001"); err != nil {
+		t.Fatalf("FindPublishedByCode() error = %v", err)
+	}
+
+	waitFor(t, func() bool {
+		return hasRedisKey(t, cachedRepo.client, "prod:cache:static:questionnaire:published:q-001")
+	})
+}
+
 func newQuestionnaireCacheTestRepo(t *testing.T) (*CachedQuestionnaireRepository, *miniredis.Miniredis, *questionnaireRepoStub, func()) {
+	return newQuestionnaireCacheTestRepoWithNamespace(t, "")
+}
+
+func newQuestionnaireCacheTestRepoWithNamespace(t *testing.T, namespace string) (*CachedQuestionnaireRepository, *miniredis.Miniredis, *questionnaireRepoStub, func()) {
 	t.Helper()
 
 	mr := miniredis.RunT(t)
@@ -282,12 +319,13 @@ func newQuestionnaireCacheTestRepo(t *testing.T) (*CachedQuestionnaireRepository
 			"Q-001:1.0.2": head,
 		},
 	}
-	cachedRepo := NewCachedQuestionnaireRepository(repo, client).(*CachedQuestionnaireRepository)
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace(namespace), CachePolicy{
+		Negative: PolicySwitchEnabled,
+	}).(*CachedQuestionnaireRepository)
 
 	cleanup := func() {
 		_ = client.Close()
 		mr.Close()
-		ApplyNamespace("")
 	}
 	return cachedRepo, mr, repo, cleanup
 }

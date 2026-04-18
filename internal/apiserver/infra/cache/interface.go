@@ -79,55 +79,84 @@ type CacheManager interface {
 
 // CacheKeyBuilder 缓存键构建器
 // 统一管理缓存键的构建规则
-type CacheKeyBuilder struct{}
+type CacheKeyBuilder struct {
+	builder *rediskey.Builder
+}
 
-// NewCacheKeyBuilder 创建缓存键构建器
-func NewCacheKeyBuilder() *CacheKeyBuilder {
-	return &CacheKeyBuilder{}
+// NewCacheKeyBuilderWithNamespace 创建绑定显式 namespace 的缓存键构建器。
+func NewCacheKeyBuilderWithNamespace(namespace string) *CacheKeyBuilder {
+	return &CacheKeyBuilder{builder: rediskey.NewBuilderWithNamespace(namespace)}
+}
+
+func (b *CacheKeyBuilder) redisBuilder() *rediskey.Builder {
+	if b == nil || b.builder == nil {
+		panic("cache key builder is required")
+	}
+	return b.builder
 }
 
 // BuildScaleKey 构建量表缓存键
 func (b *CacheKeyBuilder) BuildScaleKey(code string) string {
-	return rediskey.NewBuilder().BuildScaleKey(code)
+	return b.redisBuilder().BuildScaleKey(code)
 }
 
 // BuildScaleListKey 构建量表全局列表缓存键
 func (b *CacheKeyBuilder) BuildScaleListKey() string {
-	return rediskey.NewBuilder().BuildScaleListKey()
+	return b.redisBuilder().BuildScaleListKey()
 }
 
 // BuildQuestionnaireKey 构建问卷缓存键
 func (b *CacheKeyBuilder) BuildQuestionnaireKey(code, version string) string {
-	return rediskey.NewBuilder().BuildQuestionnaireKey(code, version)
+	return b.redisBuilder().BuildQuestionnaireKey(code, version)
 }
 
 // BuildPublishedQuestionnaireKey 构建当前已发布问卷缓存键
 func (b *CacheKeyBuilder) BuildPublishedQuestionnaireKey(code string) string {
-	return rediskey.NewBuilder().BuildPublishedQuestionnaireKey(code)
+	return b.redisBuilder().BuildPublishedQuestionnaireKey(code)
 }
 
 // BuildAssessmentDetailKey 构建测评详情缓存键
 func (b *CacheKeyBuilder) BuildAssessmentDetailKey(id uint64) string {
-	return rediskey.NewBuilder().BuildAssessmentDetailKey(id)
+	return b.redisBuilder().BuildAssessmentDetailKey(id)
 }
 
 // BuildAssessmentListKey 构建“我的测评列表”缓存键
 // suffix 可用于携带筛选条件哈希，格式示例：":abc123"
 func (b *CacheKeyBuilder) BuildAssessmentListKey(userID uint64, suffix string) string {
-	return rediskey.NewBuilder().BuildAssessmentListKey(userID, suffix)
+	return b.redisBuilder().BuildAssessmentListKey(userID, suffix)
+}
+
+// BuildQueryVersionKey 构建 query version token 键。
+func (b *CacheKeyBuilder) BuildQueryVersionKey(kind, scope string) string {
+	return b.redisBuilder().BuildQueryVersionKey(kind, scope)
+}
+
+// BuildVersionedQueryKey 构建带 version token 的 query 结果键。
+func (b *CacheKeyBuilder) BuildVersionedQueryKey(kind, scope string, version uint64, hash string) string {
+	return b.redisBuilder().BuildVersionedQueryKey(kind, scope, version, hash)
+}
+
+// BuildAssessmentListVersionKey 构建“我的测评列表”version token 键。
+func (b *CacheKeyBuilder) BuildAssessmentListVersionKey(userID uint64) string {
+	return b.redisBuilder().BuildAssessmentListVersionKey(userID)
+}
+
+// BuildAssessmentListVersionedKey 构建带 version token 的“我的测评列表”结果键。
+func (b *CacheKeyBuilder) BuildAssessmentListVersionedKey(userID, version uint64, hash string) string {
+	return b.redisBuilder().BuildAssessmentListVersionedKey(userID, version, hash)
 }
 
 // BuildTesteeInfoKey 构建受试者信息缓存键
 func (b *CacheKeyBuilder) BuildTesteeInfoKey(id uint64) string {
-	return rediskey.NewBuilder().BuildTesteeInfoKey(id)
+	return b.redisBuilder().BuildTesteeInfoKey(id)
 }
 
 // BuildPlanInfoKey 构建计划信息缓存键
 func (b *CacheKeyBuilder) BuildPlanInfoKey(id uint64) string {
-	return rediskey.NewBuilder().BuildPlanInfoKey(id)
+	return b.redisBuilder().BuildPlanInfoKey(id)
 }
 
 // BuildStatsQueryKey 构建统计查询缓存键
 func (b *CacheKeyBuilder) BuildStatsQueryKey(statType, key string) string {
-	return rediskey.NewBuilder().BuildStatsQueryKey(statType + ":" + key)
+	return b.redisBuilder().BuildStatsQueryKey(statType + ":" + key)
 }

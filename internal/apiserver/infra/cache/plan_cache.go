@@ -3,13 +3,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -18,7 +17,9 @@ const (
 	PlanCachePrefix = "plan:info:"
 )
 
-// DefaultPlanCacheTTL 默认计划缓存 TTL（可被配置覆盖）
+// DefaultPlanCacheTTL 默认计划缓存 TTL（兼容旧构造路径保留）。
+//
+// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
 var DefaultPlanCacheTTL = 2 * time.Hour
 
 // CachedPlanRepository 带缓存的计划 Repository 装饰器
@@ -28,47 +29,43 @@ type CachedPlanRepository struct {
 	client redis.UniversalClient
 	ttl    time.Duration
 	mapper *planInfra.PlanMapper
+	keys   *rediskey.Builder
+	policy CachePolicy
 }
 
-// NewCachedPlanRepository 创建带缓存的计划 Repository
-// 如果 client 为 nil，则降级为直接调用 repo（不缓存）
-func NewCachedPlanRepository(repo plan.AssessmentPlanRepository, client redis.UniversalClient) plan.AssessmentPlanRepository {
+// NewCachedPlanRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的计划缓存 Repository。
+func NewCachedPlanRepositoryWithBuilderAndPolicy(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy CachePolicy) plan.AssessmentPlanRepository {
+	if builder == nil {
+		panic("redis builder is required")
+	}
 	return &CachedPlanRepository{
 		repo:   repo,
 		client: client,
-		ttl:    DefaultPlanCacheTTL,
+		ttl:    policy.TTLOr(DefaultPlanCacheTTL),
 		mapper: planInfra.NewPlanMapper(),
+		keys:   builder,
+		policy: policy,
 	}
 }
 
 // buildCacheKey 构建缓存键
 func (r *CachedPlanRepository) buildCacheKey(id plan.AssessmentPlanID) string {
-	return addNamespace(fmt.Sprintf("%s%s", PlanCachePrefix, id.String()))
+	return r.keys.BuildPlanInfoKey(id.Uint64())
 }
 
 // FindByID 根据ID查询计划（优先从缓存读取）
 func (r *CachedPlanRepository) FindByID(ctx context.Context, id plan.AssessmentPlanID) (*plan.AssessmentPlan, error) {
-	// 1. 尝试从缓存读取
-	if r.client != nil {
-		if cached, err := r.getCache(ctx, id); err == nil && cached != nil {
-			logger.L(ctx).Debugw("从Redis缓存获取计划信息", "plan_id", id.String())
-			return cached, nil
-		}
-	}
-
-	// 2. 缓存未命中，从数据库查询
-	domain, err := r.repo.FindByID(ctx, id)
+	domain, err := ReadThrough(ctx, ReadThroughOptions[plan.AssessmentPlan]{
+		PolicyKey: PolicyPlan,
+		CacheKey:  r.buildCacheKey(id),
+		Policy:    r.policy,
+		GetCached: func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.getCache(ctx, id) },
+		Load:      func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.repo.FindByID(ctx, id) },
+		SetCached: func(ctx context.Context, value *plan.AssessmentPlan) error { return r.setCache(ctx, id, value) },
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// 3. 写入缓存（异步，不阻塞）
-	if domain != nil && r.client != nil {
-		if err := r.setCache(ctx, id, domain); err != nil {
-			logger.L(ctx).Warnw("写入计划缓存失败", "plan_id", id.String(), "error", err.Error())
-		}
-	}
-
 	return domain, nil
 }
 
@@ -84,7 +81,7 @@ func (r *CachedPlanRepository) Save(ctx context.Context, domain *plan.Assessment
 // getCache 从缓存获取
 func (r *CachedPlanRepository) getCache(ctx context.Context, id plan.AssessmentPlanID) (*plan.AssessmentPlan, error) {
 	if r.client == nil {
-		return nil, nil
+		return nil, ErrCacheNotFound
 	}
 
 	key := r.buildCacheKey(id)
@@ -96,8 +93,10 @@ func (r *CachedPlanRepository) getCache(ctx context.Context, id plan.AssessmentP
 		return nil, err
 	}
 
+	data := r.policy.DecompressValue(cachedData)
+	observePayload(PolicyPlan, len(data), len(cachedData))
 	var po planInfra.AssessmentPlanPO
-	if err := json.Unmarshal(cachedData, &po); err != nil {
+	if err := json.Unmarshal(data, &po); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +116,9 @@ func (r *CachedPlanRepository) setCache(ctx context.Context, id plan.AssessmentP
 		return err
 	}
 
-	return r.client.Set(ctx, key, data, JitterTTL(r.ttl)).Err()
+	payload := r.policy.CompressValue(data)
+	observePayload(PolicyPlan, len(data), len(payload))
+	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存
@@ -127,7 +128,13 @@ func (r *CachedPlanRepository) deleteCache(ctx context.Context, id plan.Assessme
 	}
 
 	key := r.buildCacheKey(id)
-	return r.client.Del(ctx, key).Err()
+	err := r.client.Del(ctx, key).Err()
+	if err != nil {
+		observeInvalidate(PolicyPlan, "error")
+		return err
+	}
+	observeInvalidate(PolicyPlan, "ok")
+	return nil
 }
 
 // 实现其他 Repository 方法（透传，不缓存）

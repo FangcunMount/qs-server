@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
@@ -35,7 +36,8 @@ type HandlerDependencies struct {
 	AnswerSheetClient *grpcclient.AnswerSheetClient
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    handlers.InternalClient
-	RedisCache        redis.UniversalClient
+	LockRedis         redis.UniversalClient
+	LockKeyBuilder    *rediskey.Builder
 	Notifier          port.TaskNotifier
 }
 
@@ -75,7 +77,8 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 		AnswerSheetClient: d.deps.AnswerSheetClient,
 		EvaluationClient:  d.deps.EvaluationClient,
 		InternalClient:    d.deps.InternalClient,
-		RedisCache:        d.deps.RedisCache,
+		LockRedis:         d.deps.LockRedis,
+		LockKeyBuilder:    d.deps.LockKeyBuilder,
 		Notifier:          d.deps.Notifier,
 	}
 

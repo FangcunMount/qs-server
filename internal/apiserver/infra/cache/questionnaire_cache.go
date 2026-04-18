@@ -3,13 +3,13 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -18,6 +18,9 @@ const (
 	QuestionnairePublishedCachePrefix = "questionnaire:published:"
 )
 
+// DefaultQuestionnaireCacheTTL 默认问卷缓存 TTL（兼容旧构造路径保留）。
+//
+// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
 var DefaultQuestionnaireCacheTTL = 12 * time.Hour
 
 type CachedQuestionnaireRepository struct {
@@ -25,14 +28,21 @@ type CachedQuestionnaireRepository struct {
 	client redis.UniversalClient
 	ttl    time.Duration
 	mapper *questionnaireInfra.QuestionnaireMapper
+	keys   *rediskey.Builder
+	policy CachePolicy
 }
 
-func NewCachedQuestionnaireRepository(repo domainQuestionnaire.Repository, client redis.UniversalClient) domainQuestionnaire.Repository {
+func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy CachePolicy) domainQuestionnaire.Repository {
+	if builder == nil {
+		panic("redis builder is required")
+	}
 	return &CachedQuestionnaireRepository{
 		repo:   repo,
 		client: client,
-		ttl:    DefaultQuestionnaireCacheTTL,
+		ttl:    policy.TTLOr(DefaultQuestionnaireCacheTTL),
 		mapper: questionnaireInfra.NewQuestionnaireMapper(),
+		keys:   builder,
+		policy: policy,
 	}
 }
 
@@ -65,13 +75,13 @@ func (r *CachedQuestionnaireRepository) CreatePublishedSnapshot(ctx context.Cont
 }
 
 func (r *CachedQuestionnaireRepository) FindByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
-	return r.loadWithCache(ctx, r.headKey(code), "questionnaire:head:"+strings.ToLower(code), func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+	return r.loadWithCache(ctx, r.headKey(code), func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
 		return r.repo.FindByCode(ctx, code)
 	})
 }
 
 func (r *CachedQuestionnaireRepository) FindPublishedByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
-	return r.loadWithCache(ctx, r.publishedKey(code), "questionnaire:published:"+strings.ToLower(code), func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+	return r.loadWithCache(ctx, r.publishedKey(code), func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
 		return r.repo.FindPublishedByCode(ctx, code)
 	})
 }
@@ -85,7 +95,7 @@ func (r *CachedQuestionnaireRepository) FindByCodeVersion(ctx context.Context, c
 		return nil, nil
 	}
 	key := r.versionKey(code, version)
-	return r.loadWithCache(ctx, key, "questionnaire:version:"+strings.ToLower(code)+":"+version, func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+	return r.loadWithCache(ctx, key, func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
 		return r.repo.FindByCodeVersion(ctx, code, version)
 	})
 }
@@ -191,18 +201,21 @@ func (r *CachedQuestionnaireRepository) HasPublishedSnapshots(ctx context.Contex
 }
 
 func (r *CachedQuestionnaireRepository) headKey(code string) string {
-	return addNamespace(QuestionnaireCachePrefix + strings.ToLower(code))
+	return r.keys.BuildQuestionnaireKey(strings.ToLower(code), "")
 }
 
 func (r *CachedQuestionnaireRepository) publishedKey(code string) string {
-	return addNamespace(QuestionnairePublishedCachePrefix + strings.ToLower(code))
+	return r.keys.BuildPublishedQuestionnaireKey(strings.ToLower(code))
 }
 
 func (r *CachedQuestionnaireRepository) versionKey(code, version string) string {
-	return addNamespace(fmt.Sprintf("%s%s:%s", QuestionnaireCachePrefix, strings.ToLower(code), version))
+	return r.keys.BuildQuestionnaireKey(strings.ToLower(code), version)
 }
 
 func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string) (*domainQuestionnaire.Questionnaire, error) {
+	if r.client == nil {
+		return nil, ErrCacheNotFound
+	}
 	result := r.client.Get(ctx, key)
 	if result.Err() == redis.Nil {
 		return nil, ErrCacheNotFound
@@ -219,7 +232,8 @@ func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string
 		return nil, nil
 	}
 
-	data := decompressIfNeeded(dataBytes)
+	data := r.policy.DecompressValue(dataBytes)
+	observePayload(PolicyQuestionnaire, len(data), len(dataBytes))
 	var po questionnaireInfra.QuestionnairePO
 	if err := json.Unmarshal(data, &po); err != nil {
 		logger.L(ctx).Warnw("failed to unmarshal cached questionnaire", "key", key, "error", err)
@@ -229,66 +243,68 @@ func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string
 }
 
 func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string, qDomain *domainQuestionnaire.Questionnaire, ttl time.Duration) error {
+	if r.client == nil {
+		return nil
+	}
 	po := r.mapper.ToPO(qDomain)
 	data, err := json.Marshal(po)
 	if err != nil {
 		return err
 	}
-	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(ttl)).Err()
+	payload := r.policy.CompressValue(data)
+	observePayload(PolicyQuestionnaire, len(data), len(payload))
+	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(ttl)).Err()
 }
 
 func (r *CachedQuestionnaireRepository) loadWithCache(
 	ctx context.Context,
 	key string,
-	groupKey string,
 	fallback func(context.Context) (*domainQuestionnaire.Questionnaire, error),
 ) (*domainQuestionnaire.Questionnaire, error) {
-	if r.client != nil {
-		cached, err := r.getCache(ctx, key)
-		if err == nil {
-			return cached, nil
-		}
-		if err != ErrCacheNotFound {
-			return nil, err
-		}
-	}
-
-	val, err, _ := Group.Do(groupKey, func() (interface{}, error) {
-		return fallback(ctx)
+	return ReadThrough(ctx, ReadThroughOptions[domainQuestionnaire.Questionnaire]{
+		PolicyKey: PolicyQuestionnaire,
+		CacheKey:  key,
+		Policy:    r.policy,
+		GetCached: func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
+			return r.getCache(ctx, key)
+		},
+		Load: fallback,
+		SetCached: func(ctx context.Context, value *domainQuestionnaire.Questionnaire) error {
+			return r.setCache(ctx, key, value, r.ttl)
+		},
+		SetNegativeCached: func(ctx context.Context) error {
+			if r.client == nil {
+				return nil
+			}
+			return r.client.Set(ctx, key, []byte{}, r.policy.JitterTTL(r.policy.NegativeTTLOr(NegativeCacheTTL))).Err()
+		},
+		AsyncSetCached: true,
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	qDomain, _ := val.(*domainQuestionnaire.Questionnaire)
-	if r.client != nil {
-		if qDomain == nil {
-			_ = r.client.Set(ctx, key, []byte{}, JitterTTL(NegativeCacheTTL)).Err()
-			return nil, nil
-		}
-		go func(q *domainQuestionnaire.Questionnaire) {
-			_ = r.setCache(context.Background(), key, q, r.ttl)
-		}(qDomain)
-	}
-	return qDomain, nil
 }
 
 func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, code string) error {
 	patterns := []string{
 		r.headKey(code),
 		r.publishedKey(code),
-		addNamespace(fmt.Sprintf("%s%s:*", QuestionnaireCachePrefix, strings.ToLower(code))),
+		r.keys.BuildQuestionnaireKey(strings.ToLower(code), "*"),
 	}
 
 	for _, pattern := range patterns[:2] {
 		if err := r.client.Del(ctx, pattern).Err(); err != nil {
+			observeInvalidate(PolicyQuestionnaire, "error")
 			logger.L(ctx).Warnw("failed to delete questionnaire cache key", "key", pattern, "error", err)
+		} else {
+			observeInvalidate(PolicyQuestionnaire, "ok")
 		}
 	}
 
 	iter := r.client.Scan(ctx, 0, patterns[2], 100).Iterator()
 	for iter.Next(ctx) {
-		_ = r.client.Del(ctx, iter.Val()).Err()
+		if err := r.client.Del(ctx, iter.Val()).Err(); err != nil {
+			observeInvalidate(PolicyQuestionnaire, "error")
+		} else {
+			observeInvalidate(PolicyQuestionnaire, "ok")
+		}
 	}
 	return iter.Err()
 }

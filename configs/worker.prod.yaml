@@ -113,12 +113,47 @@ redis:
   enable-cluster: false
   use-ssl: false
 
+redis_profiles:
+  static_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 1
+  object_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 2
+  query_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 3
+  sdk_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 4
+  lock_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 5
+
 # ============================================================
 # 5. 缓存控制
 # ============================================================
 cache:
   disable_statistics_cache: false  # 生产环境默认为 false，设置为 true 以跳过统计缓存
   disable_evaluation_cache: false  # 生产环境默认为 false，设置为 true 以跳过测评结果缓存
+  lock:
+    redis_profile: "lock_cache"
+    namespace_suffix: "cache:lock"
 
 # ============================================================
 # 5. 系统配置

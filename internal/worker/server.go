@@ -7,18 +7,21 @@ import (
 	"os/signal"
 	"syscall"
 
+	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/nsqio/go-nsq"
+	redis "github.com/redis/go-redis/v9"
 )
 
 // workerServer 定义了 Worker 服务器的基本结构
@@ -31,6 +34,10 @@ type workerServer struct {
 	logger *slog.Logger
 	// 数据库管理器
 	dbManager *DatabaseManager
+	// lock/lease 专用 Redis 客户端
+	lockRedis redis.UniversalClient
+	// family 状态注册表
+	familyStatus *cacheobservability.FamilyStatusRegistry
 	// Container 主容器
 	container *container.Container
 	// gRPC 客户端管理器
@@ -56,9 +63,10 @@ func createWorkerServer(cfg *config.Config) (*workerServer, error) {
 
 	// 创建 Worker 服务器实例
 	server := &workerServer{
-		gs:     gs,
-		config: cfg,
-		logger: logger,
+		gs:           gs,
+		config:       cfg,
+		logger:       logger,
+		familyStatus: cacheobservability.NewFamilyStatusRegistry("worker"),
 	}
 
 	log.Infof("✅ Worker server created (service: %s, concurrency: %d)",
@@ -76,18 +84,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	if err = s.dbManager.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize database manager: %v", err)
 	}
-	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil {
-		rediskey.ApplyNamespace(s.config.Options.Cache.Namespace)
-	}
-	cacheRedis, err := s.dbManager.GetRedisClient()
-	if err != nil {
-		log.Warnf("Cache Redis not available: %v", err)
-	}
-	// 如果配置要求禁用统计缓存，则不传递 Redis cache 客户端
-	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil && s.config.Options.Cache.DisableStatisticsCache {
-		log.Infof("Statistics cache disabled via configuration, skipping Redis cache client")
-		cacheRedis = nil
-	}
+	s.lockRedis = s.resolveLockRedisClient()
 
 	// 2. 创建 gRPC 客户端管理器
 	s.grpcManager, err = CreateGRPCClientManager(
@@ -103,7 +100,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	s.container = container.NewContainer(
 		s.config.Options,
 		s.logger,
-		cacheRedis,
+		s.lockRedis,
 	)
 
 	// 4. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
@@ -171,6 +168,91 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	return preparedWorkerServer{s}
 }
 
+func (s *workerServer) lockKeyBuilder() *rediskey.Builder {
+	if s == nil || s.config == nil || s.config.Options == nil || s.config.Options.Cache == nil {
+		return rediskey.NewBuilder()
+	}
+	suffix := ""
+	if s.config.Options.Cache.Lock != nil {
+		suffix = s.config.Options.Cache.Lock.NamespaceSuffix
+	}
+	return rediskey.NewBuilderWithNamespace(
+		rediskey.ComposeNamespace(s.config.Options.Cache.Namespace, suffix),
+	)
+}
+
+func (s *workerServer) resolveLockRedisClient() redis.UniversalClient {
+	if s == nil || s.dbManager == nil {
+		return nil
+	}
+
+	profile := ""
+	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil && s.config.Options.Cache.Lock != nil {
+		profile = s.config.Options.Cache.Lock.RedisProfile
+	}
+	namespace := ""
+	if s.config != nil && s.config.Options != nil && s.config.Options.Cache != nil && s.config.Options.Cache.Lock != nil {
+		namespace = rediskey.ComposeNamespace(s.config.Options.Cache.Namespace, s.config.Options.Cache.Lock.NamespaceSuffix)
+	}
+	updateStatus := func(mode string, configured, available, degraded bool, err error) {
+		if s.familyStatus == nil {
+			return
+		}
+		s.familyStatus.Update(cacheobservability.FamilyStatus{
+			Component:   "worker",
+			Family:      "lock_lease",
+			Profile:     profile,
+			Namespace:   namespace,
+			AllowWarmup: false,
+			Configured:  configured,
+			Available:   available,
+			Degraded:    degraded,
+			Mode:        mode,
+			LastError:   errorString(err),
+		})
+	}
+
+	if profile == "" {
+		client, err := s.dbManager.GetRedisClient()
+		if err != nil {
+			log.Warnf("worker lock Redis not available: %v", err)
+			updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, err)
+			return nil
+		}
+		log.Infof("worker lock Redis using default profile")
+		updateStatus(cacheobservability.FamilyModeDefault, true, true, false, nil)
+		return client
+	}
+
+	status := s.dbManager.GetRedisProfileStatus(profile)
+	switch status.State {
+	case cbdatabase.RedisProfileStateMissing:
+		client, err := s.dbManager.GetRedisClient()
+		if err != nil {
+			log.Warnf("worker lock Redis default fallback unavailable (profile=%s): %v", profile, err)
+			updateStatus(cacheobservability.FamilyModeDegraded, false, false, true, err)
+			return nil
+		}
+		log.Infof("worker lock Redis profile missing, falling back to default (profile=%s)", profile)
+		updateStatus(cacheobservability.FamilyModeFallbackDefault, false, true, false, nil)
+		return client
+	case cbdatabase.RedisProfileStateUnavailable:
+		log.Warnf("worker lock Redis profile unavailable, running degraded without HA lock (profile=%s, error=%v)", profile, status.Err)
+		updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, status.Err)
+		return nil
+	default:
+		client, err := s.dbManager.GetRedisClientByProfile(profile)
+		if err != nil {
+			log.Warnf("worker lock Redis profile unavailable, running degraded without HA lock (profile=%s, error=%v)", profile, err)
+			updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, err)
+			return nil
+		}
+		log.Infof("worker lock Redis using named profile (profile=%s)", profile)
+		updateStatus(cacheobservability.FamilyModeNamedProfile, true, true, false, nil)
+		return client
+	}
+}
+
 // subscribeHandlers 订阅所有 Topic 处理器
 func (s *workerServer) subscribeHandlers() error {
 	subscriptions := s.container.GetTopicSubscriptions()
@@ -236,6 +318,13 @@ func (s *workerServer) createDispatchHandler(topicName string) messaging.Handler
 		msg.Ack()
 		return nil
 	}
+}
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 // createTopics 在 NSQ 中预创建 Topics

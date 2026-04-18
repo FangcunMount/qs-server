@@ -3,13 +3,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	assessmentInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -19,7 +18,9 @@ const (
 	AssessmentDetailCachePrefix = "assessment:detail:"
 )
 
-// DefaultAssessmentDetailCacheTTL 默认测评详情缓存 TTL（可被配置覆盖）
+// DefaultAssessmentDetailCacheTTL 默认测评详情缓存 TTL（兼容旧构造路径保留）。
+//
+// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
 var DefaultAssessmentDetailCacheTTL = 2 * time.Hour
 
 // CachedAssessmentRepository 带缓存的测评 Repository 装饰器
@@ -29,47 +30,43 @@ type CachedAssessmentRepository struct {
 	client redis.UniversalClient
 	ttl    time.Duration
 	mapper *assessmentInfra.AssessmentMapper
+	keys   *rediskey.Builder
+	policy CachePolicy
 }
 
-// NewCachedAssessmentRepository 创建带缓存的测评 Repository
-// 如果 client 为 nil，则降级为直接调用 repo（不缓存）
-func NewCachedAssessmentRepository(repo assessment.Repository, client redis.UniversalClient) assessment.Repository {
+// NewCachedAssessmentRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的测评缓存 Repository。
+func NewCachedAssessmentRepositoryWithBuilderAndPolicy(repo assessment.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy CachePolicy) assessment.Repository {
+	if builder == nil {
+		panic("redis builder is required")
+	}
 	return &CachedAssessmentRepository{
 		repo:   repo,
 		client: client,
-		ttl:    DefaultAssessmentDetailCacheTTL,
+		ttl:    policy.TTLOr(DefaultAssessmentDetailCacheTTL),
 		mapper: assessmentInfra.NewAssessmentMapper(),
+		keys:   builder,
+		policy: policy,
 	}
 }
 
 // buildCacheKey 构建缓存键
 func (r *CachedAssessmentRepository) buildCacheKey(id assessment.ID) string {
-	return addNamespace(fmt.Sprintf("%s%d", AssessmentDetailCachePrefix, id.Uint64()))
+	return r.keys.BuildAssessmentDetailKey(id.Uint64())
 }
 
 // FindByID 根据ID查询测评（优先从缓存读取）
 func (r *CachedAssessmentRepository) FindByID(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
-	// 1. 尝试从缓存读取
-	if r.client != nil {
-		if cached, err := r.getCache(ctx, id); err == nil && cached != nil {
-			logger.L(ctx).Debugw("从Redis缓存获取测评详情", "assessment_id", id.Uint64())
-			return cached, nil
-		}
-	}
-
-	// 2. 缓存未命中，从数据库查询
-	domain, err := r.repo.FindByID(ctx, id)
+	domain, err := ReadThrough(ctx, ReadThroughOptions[assessment.Assessment]{
+		PolicyKey: PolicyAssessmentDetail,
+		CacheKey:  r.buildCacheKey(id),
+		Policy:    r.policy,
+		GetCached: func(ctx context.Context) (*assessment.Assessment, error) { return r.getCache(ctx, id) },
+		Load:      func(ctx context.Context) (*assessment.Assessment, error) { return r.repo.FindByID(ctx, id) },
+		SetCached: func(ctx context.Context, value *assessment.Assessment) error { return r.setCache(ctx, id, value) },
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// 3. 写入缓存（异步，不阻塞）
-	if domain != nil && r.client != nil {
-		if err := r.setCache(ctx, id, domain); err != nil {
-			logger.L(ctx).Warnw("写入测评详情缓存失败", "assessment_id", id.Uint64(), "error", err.Error())
-		}
-	}
-
 	return domain, nil
 }
 
@@ -112,7 +109,7 @@ func (r *CachedAssessmentRepository) Delete(ctx context.Context, id assessment.I
 // getCache 从缓存获取
 func (r *CachedAssessmentRepository) getCache(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
 	if r.client == nil {
-		return nil, nil
+		return nil, ErrCacheNotFound
 	}
 
 	key := r.buildCacheKey(id)
@@ -124,9 +121,10 @@ func (r *CachedAssessmentRepository) getCache(ctx context.Context, id assessment
 		return nil, err
 	}
 
-	cachedData = decompressIfNeeded(cachedData)
+	data := r.policy.DecompressValue(cachedData)
+	observePayload(PolicyAssessmentDetail, len(data), len(cachedData))
 	var po assessmentInfra.AssessmentPO
-	if err := json.Unmarshal(cachedData, &po); err != nil {
+	if err := json.Unmarshal(data, &po); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +144,9 @@ func (r *CachedAssessmentRepository) setCache(ctx context.Context, id assessment
 		return err
 	}
 
-	return r.client.Set(ctx, key, compressIfEnabled(data), JitterTTL(r.ttl)).Err()
+	payload := r.policy.CompressValue(data)
+	observePayload(PolicyAssessmentDetail, len(data), len(payload))
+	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
 }
 
 // deleteCache 删除缓存
@@ -156,7 +156,13 @@ func (r *CachedAssessmentRepository) deleteCache(ctx context.Context, id assessm
 	}
 
 	key := r.buildCacheKey(id)
-	return r.client.Del(ctx, key).Err()
+	err := r.client.Del(ctx, key).Err()
+	if err != nil {
+		observeInvalidate(PolicyAssessmentDetail, "error")
+		return err
+	}
+	observeInvalidate(PolicyAssessmentDetail, "ok")
+	return nil
 }
 
 // 实现其他 Repository 方法（透传，不缓存）

@@ -411,6 +411,13 @@ type SchedulePendingTasksRequest struct {
 	TesteeIDs []string `json:"testee_ids,omitempty"`
 }
 
+type RepairCompleteRequest struct {
+	RepairKind         string   `json:"repair_kind"`
+	OrgIDs             []int64  `json:"org_ids,omitempty"`
+	QuestionnaireCodes []string `json:"questionnaire_codes,omitempty"`
+	PlanIDs            []uint64 `json:"plan_ids,omitempty"`
+}
+
 // CollectionScaleSummary 量表摘要（collection-server）
 type CollectionScaleSummary struct {
 	Code                 string   `json:"code"`
@@ -1796,6 +1803,11 @@ func (c *APIClient) ExpireTask(ctx context.Context, taskID string) (*TaskRespons
 		return nil, fmt.Errorf("decode expired task response: %w", err)
 	}
 	return &taskResp, nil
+}
+
+func (c *APIClient) NotifyRepairComplete(ctx context.Context, req RepairCompleteRequest) error {
+	_, err := c.doRequest(ctx, "POST", "/internal/v1/cache/governance/repair-complete", req)
+	return err
 }
 
 // ListTestees 获取受试者列表（collection-server）

@@ -18,6 +18,12 @@ func TestBuilderWithoutNamespace(t *testing.T) {
 	if got := builder.BuildWeChatCacheKey("access_token"); got != "wechat:cache:access_token" {
 		t.Fatalf("unexpected wechat key: %s", got)
 	}
+	if got := builder.BuildQueryVersionKey("assessment:list", "42"); got != "query:version:assessment:list:42" {
+		t.Fatalf("unexpected query version key: %s", got)
+	}
+	if got := builder.BuildVersionedQueryKey("assessment:list", "42", 3, "deadbeef"); got != "query:assessment:list:42:v3:deadbeef" {
+		t.Fatalf("unexpected versioned query key: %s", got)
+	}
 }
 
 func TestBuilderWithNamespace(t *testing.T) {
@@ -36,5 +42,21 @@ func TestBuilderWithNamespace(t *testing.T) {
 	}
 	if got := builder.BuildWeChatCacheKey("access_token"); got != "dev:wechat:cache:access_token" {
 		t.Fatalf("unexpected namespaced wechat key: %s", got)
+	}
+	if got := builder.BuildAssessmentListVersionKey(42); got != "dev:query:version:assessment:list:42" {
+		t.Fatalf("unexpected namespaced assessment list version key: %s", got)
+	}
+}
+
+func TestBuilderWithExplicitNamespace(t *testing.T) {
+	ApplyNamespace("dev")
+	defer ApplyNamespace("")
+
+	builder := NewBuilderWithNamespace("prod:cache:query")
+	if got := builder.BuildStatsQueryKey("system:1"); got != "prod:cache:query:stats:query:system:1" {
+		t.Fatalf("unexpected explicit namespaced stats query key: %s", got)
+	}
+	if got := builder.BuildScaleKey("SDS"); got != "prod:cache:query:scale:SDS" {
+		t.Fatalf("unexpected explicit namespaced scale key: %s", got)
 	}
 }

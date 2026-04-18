@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	redis "github.com/redis/go-redis/v9"
 )
 
 const (
 	defaultScaleListPageSize = 200
+	// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
 	defaultScaleListCacheTTL = 10 * time.Minute
 )
 
@@ -26,27 +27,37 @@ type ScaleListCache struct {
 	redis       redis.UniversalClient
 	identitySvc *iam.IdentityService
 	keyBuilder  *cache.CacheKeyBuilder
+	policy      cache.CachePolicy
 	pageSize    int
 	// 节点内短 TTL 内存缓存，减少 Redis GET/JSON 解码成本
-	memory      map[string]memoryEntry
-	memoryTTL   time.Duration
-	memoryMutex sync.RWMutex
+	memory *cache.LocalHotCache[*ScaleSummaryListResult]
 }
 
-// NewScaleListCache 创建全局量表列表缓存实例
-func NewScaleListCache(redisClient redis.UniversalClient, repo domainScale.Repository, identitySvc *iam.IdentityService) *ScaleListCache {
+const defaultScaleListLocalMaxEntries = 64
+
+// NewScaleListCacheWithPolicyAndKeyBuilder 创建带显式 key builder/policy 的全局量表列表缓存实例。
+func NewScaleListCacheWithPolicyAndKeyBuilder(
+	redisClient redis.UniversalClient,
+	repo domainScale.Repository,
+	identitySvc *iam.IdentityService,
+	keyBuilder *cache.CacheKeyBuilder,
+	policy cache.CachePolicy,
+) *ScaleListCache {
 	if redisClient == nil || repo == nil {
 		return nil
+	}
+	if keyBuilder == nil {
+		panic("cache key builder is required")
 	}
 
 	return &ScaleListCache{
 		repo:        repo,
 		redis:       redisClient,
 		identitySvc: identitySvc,
-		keyBuilder:  cache.NewCacheKeyBuilder(),
+		keyBuilder:  keyBuilder,
+		policy:      policy,
 		pageSize:    defaultScaleListPageSize,
-		memory:      make(map[string]memoryEntry),
-		memoryTTL:   30 * time.Second,
+		memory:      cache.NewLocalHotCache[*ScaleSummaryListResult](30*time.Second, defaultScaleListLocalMaxEntries),
 	}
 }
 
@@ -68,7 +79,12 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 
 	key := c.keyBuilder.BuildScaleListKey()
 	if total == 0 {
-		return c.redis.Del(ctx, key).Err()
+		if err := c.redis.Del(ctx, key).Err(); err != nil {
+			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+			return err
+		}
+		cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+		return nil
 	}
 
 	items, err := c.fetchAll(ctx, conditions, total)
@@ -89,10 +105,14 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 		return err
 	}
 
-	// 重建后清空节点内缓存
 	c.resetMemory()
 
-	return c.redis.Set(ctx, key, data, cache.JitterTTL(defaultScaleListCacheTTL)).Err()
+	if err := c.redis.Set(ctx, key, c.policy.CompressValue(data), c.policy.JitterTTL(c.policy.TTLOr(defaultScaleListCacheTTL))).Err(); err != nil {
+		cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+		return err
+	}
+	cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+	return nil
 }
 
 // GetPage 从缓存读取已发布量表列表并按页切片
@@ -110,11 +130,19 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 	key := c.keyBuilder.BuildScaleListKey()
 	data, err := c.redis.Get(ctx, key).Bytes()
 	if err != nil {
+		if err != redis.Nil {
+			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+		} else {
+			cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+		}
 		return nil, false
 	}
+	cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+	data = c.policy.DecompressValue(data)
 
 	var payload scaleSummaryListCache
 	if err := json.Unmarshal(data, &payload); err != nil {
+		cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
 		return nil, false
 	}
 
@@ -264,42 +292,27 @@ func logScaleListCacheError(ctx context.Context, err error) {
 
 // ==================== 节点内缓存 ====================
 
-type memoryEntry struct {
-	result *ScaleSummaryListResult
-	expire time.Time
-}
-
 func (c *ScaleListCache) buildMemoryKey(page, pageSize int) string {
 	return fmt.Sprintf("page=%d:page_size=%d", page, pageSize)
 }
 
 func (c *ScaleListCache) getMemory(key string) (*ScaleSummaryListResult, bool) {
-	c.memoryMutex.RLock()
-	entry, ok := c.memory[key]
-	c.memoryMutex.RUnlock()
-	if !ok {
+	if c == nil || c.memory == nil {
 		return nil, false
 	}
-	if time.Now().After(entry.expire) {
-		c.memoryMutex.Lock()
-		delete(c.memory, key)
-		c.memoryMutex.Unlock()
-		return nil, false
-	}
-	return entry.result, true
+	return c.memory.Get(key)
 }
 
 func (c *ScaleListCache) setMemory(key string, result *ScaleSummaryListResult) {
-	c.memoryMutex.Lock()
-	c.memory[key] = memoryEntry{
-		result: result,
-		expire: time.Now().Add(c.memoryTTL),
+	if c == nil || c.memory == nil {
+		return
 	}
-	c.memoryMutex.Unlock()
+	c.memory.Set(key, result)
 }
 
 func (c *ScaleListCache) resetMemory() {
-	c.memoryMutex.Lock()
-	c.memory = make(map[string]memoryEntry)
-	c.memoryMutex.Unlock()
+	if c == nil || c.memory == nil {
+		return
+	}
+	c.memory.Clear()
 }

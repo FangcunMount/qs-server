@@ -31,9 +31,9 @@ func handleScaleChanged(deps *Dependencies) HandlerFunc {
 				}
 			},
 			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *domainScale.ScaleChangedData) error {
-				resp, err := deps.InternalClient.GenerateScaleQRCode(ctx, data.Code)
+				resp, err := deps.InternalClient.HandleScalePublishedPostActions(ctx, data.Code)
 				if err != nil {
-					deps.Logger.Warn("failed to generate scale QR code",
+					deps.Logger.Warn("failed to handle scale publish post-actions",
 						slog.String("event_id", env.ID),
 						slog.String("code", data.Code),
 						slog.String("action", string(data.Action)),
@@ -42,7 +42,7 @@ func handleScaleChanged(deps *Dependencies) HandlerFunc {
 					return nil
 				}
 				if resp.Success {
-					deps.Logger.Info("scale QR code generated",
+					deps.Logger.Info("scale publish post-actions completed",
 						slog.String("event_id", env.ID),
 						slog.String("code", data.Code),
 						slog.String("qrcode_url", resp.QrcodeUrl),
@@ -50,7 +50,7 @@ func handleScaleChanged(deps *Dependencies) HandlerFunc {
 					return nil
 				}
 
-				deps.Logger.Warn("scale QR code generation failed",
+				deps.Logger.Warn("scale publish post-actions failed",
 					slog.String("event_id", env.ID),
 					slog.String("code", data.Code),
 					slog.String("message", resp.Message),

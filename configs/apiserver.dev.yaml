@@ -148,20 +148,107 @@ redis:
   enable-cluster: false
   use-ssl: false
 
+redis_profiles:
+  static_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 1
+  object_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 2
+  query_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 3
+  meta_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 6
+  sdk_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 4
+  lock_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 5
+
 # -------------------------------------------------------
 # 3.5 缓存控制
 # -------------------------------------------------------
 cache:
   disable_evaluation_cache: false  # 是否暂停测评结果的 Redis 缓存
   disable_statistics_cache: false  # 是否暂停统计的 Redis 缓存
+  static:
+    redis_profile: "static_cache"  # 若未配置 redis_profiles.static_cache，则回退到默认 redis
+    namespace_suffix: "cache:static"
+    compress: false
+    singleflight: true
+    negative: false
+  object:
+    redis_profile: "object_cache"  # assessment/testee/plan 等对象视图缓存
+    namespace_suffix: "cache:object"
+    compress: false
+    singleflight: true
+    negative: false
+  query:
+    redis_profile: "query_cache"   # 若未配置 redis_profiles.query_cache，则回退到默认 redis
+    namespace_suffix: "cache:query"
+    ttl: "5m"
+    compress: false
+    singleflight: false
+    negative: false
+  meta:
+    redis_profile: "meta_cache"    # query/list cache 的 version token
+    namespace_suffix: "cache:meta"
+  sdk:
+    redis_profile: "sdk_cache"     # wechat sdk token/cache
+    namespace_suffix: "cache:sdk"
+    compress: false
+    singleflight: false
+    negative: false
+  lock:
+    redis_profile: "lock_cache"    # lock/lease keys
+    namespace_suffix: "cache:lock"
+    compress: false
+    singleflight: false
+    negative: false
   ttl:
     scale: "6h"
+    scale_list: "10m"
     questionnaire: "8h"
     assessment_detail: "1h30m"
-    assessment_status: "20m"
+    assessment_list: "10m"
     testee: "30m"
     plan: "1h"
   ttl_jitter_ratio: 0.1
+  statistics_warmup:
+    enable: false
+    org_ids: [1]
+    questionnaire_codes: []
+    plan_ids: []
+  warmup:
+    enable: true
+    startup:
+      static: true
+      query: true
+    hotset:
+      enable: true
+      top_n: 20
+      max_items_per_kind: 200
 
 # -------------------------------------------------------
 # 3.5 限流配置

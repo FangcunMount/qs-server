@@ -6,7 +6,9 @@ import (
 	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
 
-// TTLOptions 用于全局覆盖默认 TTL
+// TTLOptions 用于全局覆盖默认 TTL。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CacheCatalog / CachePolicy 配置 TTL。
 type TTLOptions struct {
 	Scale            time.Duration
 	Questionnaire    time.Duration
@@ -16,10 +18,14 @@ type TTLOptions struct {
 	Negative         time.Duration
 }
 
-// TTLJitterRatio 控制 TTL 抖动，默认 10%（0-1）
+// TTLJitterRatio 控制 TTL 抖动，默认 10%（0-1）。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CacheCatalog / CachePolicy 配置 TTL 抖动。
 var TTLJitterRatio = 0.1
 
-// ApplyTTLOptions 覆盖默认 TTL（仅在启动时调用一次）
+// ApplyTTLOptions 覆盖默认 TTL（仅在启动时调用一次）。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CacheCatalog / CachePolicy 配置 TTL。
 func ApplyTTLOptions(opts TTLOptions) {
 	if opts.Scale > 0 {
 		DefaultScaleCacheTTL = opts.Scale
@@ -41,7 +47,9 @@ func ApplyTTLOptions(opts TTLOptions) {
 	}
 }
 
-// ApplyTTLJitterRatio 覆盖全局 TTL 抖动比例（0-1）
+// ApplyTTLJitterRatio 覆盖全局 TTL 抖动比例（0-1）。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CacheCatalog / CachePolicy 配置 TTL 抖动。
 func ApplyTTLJitterRatio(ratio float64) {
 	if ratio < 0 {
 		ratio = 0
@@ -52,7 +60,9 @@ func ApplyTTLJitterRatio(ratio float64) {
 	TTLJitterRatio = ratio
 }
 
-// JitterTTL 根据全局抖动比例对 TTL 进行抖动，避免同时失效
+// JitterTTL 根据全局抖动比例对 TTL 进行抖动，避免同时失效。
+//
+// Deprecated: 仅保留给旧初始化路径；新缓存应通过 CachePolicy.JitterTTL。
 func JitterTTL(ttl time.Duration) time.Duration {
 	return rediskit.JitterTTL(ttl, TTLJitterRatio)
 }

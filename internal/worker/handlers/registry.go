@@ -21,6 +21,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 	redis "github.com/redis/go-redis/v9"
@@ -46,6 +47,11 @@ type InternalClient interface {
 		code, version string,
 	) (*pb.GenerateQuestionnaireQRCodeResponse, error)
 	GenerateScaleQRCode(ctx context.Context, code string) (*pb.GenerateScaleQRCodeResponse, error)
+	HandleQuestionnairePublishedPostActions(
+		ctx context.Context,
+		code, version string,
+	) (*pb.GenerateQuestionnaireQRCodeResponse, error)
+	HandleScalePublishedPostActions(ctx context.Context, code string) (*pb.GenerateScaleQRCodeResponse, error)
 	ProjectBehaviorEvent(
 		ctx context.Context,
 		req *pb.ProjectBehaviorEventRequest,
@@ -66,7 +72,8 @@ type Dependencies struct {
 	AnswerSheetClient *grpcclient.AnswerSheetClient
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    InternalClient
-	RedisCache        redis.UniversalClient
+	LockRedis         redis.UniversalClient
+	LockKeyBuilder    *rediskey.Builder
 	Notifier          port.TaskNotifier
 }
 

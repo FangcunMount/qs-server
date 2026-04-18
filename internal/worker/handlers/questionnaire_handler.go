@@ -30,9 +30,9 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 				}
 			},
 			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *domainQuestionnaire.QuestionnaireChangedData) error {
-				resp, err := deps.InternalClient.GenerateQuestionnaireQRCode(ctx, data.Code, data.Version)
+				resp, err := deps.InternalClient.HandleQuestionnairePublishedPostActions(ctx, data.Code, data.Version)
 				if err != nil {
-					deps.Logger.Warn("failed to generate questionnaire QR code",
+					deps.Logger.Warn("failed to handle questionnaire publish post-actions",
 						slog.String("event_id", env.ID),
 						slog.String("code", data.Code),
 						slog.String("action", string(data.Action)),
@@ -41,7 +41,7 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 					return nil
 				}
 				if resp.Success {
-					deps.Logger.Info("questionnaire QR code generated",
+					deps.Logger.Info("questionnaire publish post-actions completed",
 						slog.String("event_id", env.ID),
 						slog.String("code", data.Code),
 						slog.String("qrcode_url", resp.QrcodeUrl),
@@ -49,7 +49,7 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 					return nil
 				}
 
-				deps.Logger.Warn("questionnaire QR code generation failed",
+				deps.Logger.Warn("questionnaire publish post-actions failed",
 					slog.String("event_id", env.ID),
 					slog.String("code", data.Code),
 					slog.String("message", resp.Message),

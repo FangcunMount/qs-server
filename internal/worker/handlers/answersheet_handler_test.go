@@ -72,12 +72,28 @@ func (f *fakeWorkerInternalClient) GenerateQuestionnaireQRCode(
 	return &pb.GenerateQuestionnaireQRCodeResponse{}, nil
 }
 
+func (f *fakeWorkerInternalClient) HandleQuestionnairePublishedPostActions(
+	_ context.Context,
+	_, _ string,
+) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
+	f.questionnaireQRCodeCalls++
+	return &pb.GenerateQuestionnaireQRCodeResponse{Success: true}, nil
+}
+
 func (f *fakeWorkerInternalClient) GenerateScaleQRCode(
 	_ context.Context,
 	_ string,
 ) (*pb.GenerateScaleQRCodeResponse, error) {
 	f.scaleQRCodeCalls++
 	return &pb.GenerateScaleQRCodeResponse{}, nil
+}
+
+func (f *fakeWorkerInternalClient) HandleScalePublishedPostActions(
+	_ context.Context,
+	_ string,
+) (*pb.GenerateScaleQRCodeResponse, error) {
+	f.scaleQRCodeCalls++
+	return &pb.GenerateScaleQRCodeResponse{Success: true}, nil
 }
 
 func (f *fakeWorkerInternalClient) ProjectBehaviorEvent(
@@ -131,11 +147,11 @@ func TestHandleAnswerSheetSubmitted_LockedExecutesAndReleases(t *testing.T) {
 func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 	mr := miniredis.RunT(t)
 	redisClient := newAnswerSheetTestRedisClientWithAddr(t, mr.Addr())
+	client := &fakeWorkerInternalClient{}
 
 	answerSheetID := uint64(456)
-	mr.Set(answerSheetProcessingLockKey(answerSheetID), "busy")
+	mr.Set(answerSheetProcessingLockKey(newAnswerSheetHandlerTestDeps(client, redisClient), answerSheetID), "busy")
 
-	client := &fakeWorkerInternalClient{}
 	deps := newAnswerSheetHandlerTestDeps(client, redisClient)
 	handler := handleAnswerSheetSubmitted(deps)
 
@@ -149,16 +165,18 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 	if client.createCalls != 0 {
 		t.Fatalf("expected no create calls, got %d", client.createCalls)
 	}
-	if !mr.Exists(answerSheetProcessingLockKey(answerSheetID)) {
+	if !mr.Exists(answerSheetProcessingLockKey(deps, answerSheetID)) {
 		t.Fatalf("expected duplicate lock key to remain set")
 	}
 }
 
 func TestAnswerSheetProcessingLockKeyUsesNamespace(t *testing.T) {
-	rediskey.ApplyNamespace("worker-test")
-	defer rediskey.ApplyNamespace("")
-
-	if got := answerSheetProcessingLockKey(42); got != "worker-test:answersheet:processing:42" {
+	deps := &Dependencies{
+		LockKeyBuilder: rediskey.NewBuilderWithNamespace(
+			rediskey.ComposeNamespace("worker-test", "cache:lock"),
+		),
+	}
+	if got := answerSheetProcessingLockKey(deps, 42); got != "worker-test:cache:lock:answersheet:processing:42" {
 		t.Fatalf("unexpected namespaced lock key: %s", got)
 	}
 }
@@ -249,7 +267,10 @@ func newAnswerSheetHandlerTestDeps(client InternalClient, redisClient redis.Univ
 	return &Dependencies{
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		InternalClient: client,
-		RedisCache:     redisClient,
+		LockRedis:      redisClient,
+		LockKeyBuilder: rediskey.NewBuilderWithNamespace(
+			rediskey.ComposeNamespace("worker-test", "cache:lock"),
+		),
 	}
 }
 

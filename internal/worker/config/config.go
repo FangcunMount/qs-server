@@ -29,6 +29,8 @@ type Config struct {
 	PlanScheduler *PlanSchedulerConfig
 	// Redis 配置
 	Redis *genericoptions.RedisOptions
+	// 可选 Redis profiles 配置
+	RedisProfiles map[string]*genericoptions.RedisOptions
 }
 
 // LogConfig 日志配置
@@ -151,6 +153,7 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 			LockKey:      opts.PlanScheduler.LockKey,
 			LockTTL:      opts.PlanScheduler.LockTTL,
 		},
-		Redis: opts.Redis,
+		Redis:         opts.Redis,
+		RedisProfiles: opts.RedisProfiles,
 	}, nil
 }

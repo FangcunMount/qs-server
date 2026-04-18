@@ -3276,14 +3276,17 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"operatorId\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12\x14\n" +
-	"\x05roles\x18\x04 \x03(\tR\x05roles2\xae\b\n" +
+	"\x05roles\x18\x04 \x03(\tR\x05roles2\xb3\n" +
+	"\n" +
 	"\x0fInternalService\x12z\n" +
 	"\x19CalculateAnswerSheetScore\x12-.internalapi.CalculateAnswerSheetScoreRequest\x1a..internalapi.CalculateAnswerSheetScoreResponse\x12\x8c\x01\n" +
 	"\x1fCreateAssessmentFromAnswerSheet\x123.internalapi.CreateAssessmentFromAnswerSheetRequest\x1a4.internalapi.CreateAssessmentFromAnswerSheetResponse\x12e\n" +
 	"\x12EvaluateAssessment\x12&.internalapi.EvaluateAssessmentRequest\x1a'.internalapi.EvaluateAssessmentResponse\x12J\n" +
 	"\tTagTestee\x12\x1d.internalapi.TagTesteeRequest\x1a\x1e.internalapi.TagTesteeResponse\x12\x80\x01\n" +
-	"\x1bGenerateQuestionnaireQRCode\x12/.internalapi.GenerateQuestionnaireQRCodeRequest\x1a0.internalapi.GenerateQuestionnaireQRCodeResponse\x12h\n" +
-	"\x13GenerateScaleQRCode\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponse\x12k\n" +
+	"\x1bGenerateQuestionnaireQRCode\x12/.internalapi.GenerateQuestionnaireQRCodeRequest\x1a0.internalapi.GenerateQuestionnaireQRCodeResponse\x12\x8c\x01\n" +
+	"'HandleQuestionnairePublishedPostActions\x12/.internalapi.GenerateQuestionnaireQRCodeRequest\x1a0.internalapi.GenerateQuestionnaireQRCodeResponse\x12h\n" +
+	"\x13GenerateScaleQRCode\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponse\x12t\n" +
+	"\x1fHandleScalePublishedPostActions\x12'.internalapi.GenerateScaleQRCodeRequest\x1a(.internalapi.GenerateScaleQRCodeResponse\x12k\n" +
 	"\x14ProjectBehaviorEvent\x12(.internalapi.ProjectBehaviorEventRequest\x1a).internalapi.ProjectBehaviorEventResponse\x12\x9e\x01\n" +
 	"%SendTaskOpenedMiniProgramNotification\x129.internalapi.SendTaskOpenedMiniProgramNotificationRequest\x1a:.internalapi.SendTaskOpenedMiniProgramNotificationResponse\x12b\n" +
 	"\x11BootstrapOperator\x12%.internalapi.BootstrapOperatorRequest\x1a&.internalapi.BootstrapOperatorResponse2\x84\b\n" +
@@ -3390,45 +3393,49 @@ var file_internalapi_internal_proto_depIdxs = []int32{
 	32, // 16: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
 	34, // 17: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
 	36, // 18: internalapi.InternalService.GenerateQuestionnaireQRCode:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
-	38, // 19: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
-	40, // 20: internalapi.InternalService.ProjectBehaviorEvent:input_type -> internalapi.ProjectBehaviorEventRequest
-	42, // 21: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:input_type -> internalapi.SendTaskOpenedMiniProgramNotificationRequest
-	44, // 22: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
-	4,  // 23: internalapi.PlanCommandService.CreatePlan:input_type -> internalapi.CreatePlanRequest
-	6,  // 24: internalapi.PlanCommandService.PausePlan:input_type -> internalapi.PausePlanRequest
-	8,  // 25: internalapi.PlanCommandService.ResumePlan:input_type -> internalapi.ResumePlanRequest
-	10, // 26: internalapi.PlanCommandService.FinishPlan:input_type -> internalapi.FinishPlanRequest
-	12, // 27: internalapi.PlanCommandService.CancelPlan:input_type -> internalapi.CancelPlanRequest
-	14, // 28: internalapi.PlanCommandService.EnrollTestee:input_type -> internalapi.EnrollTesteeRequest
-	16, // 29: internalapi.PlanCommandService.TerminateEnrollment:input_type -> internalapi.TerminateEnrollmentRequest
-	18, // 30: internalapi.PlanCommandService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
-	20, // 31: internalapi.PlanCommandService.OpenTask:input_type -> internalapi.OpenTaskRequest
-	22, // 32: internalapi.PlanCommandService.CompleteTask:input_type -> internalapi.CompleteTaskRequest
-	24, // 33: internalapi.PlanCommandService.ExpireTask:input_type -> internalapi.ExpireTaskRequest
-	26, // 34: internalapi.PlanCommandService.CancelTask:input_type -> internalapi.CancelTaskRequest
-	29, // 35: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
-	31, // 36: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
-	33, // 37: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
-	35, // 38: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
-	37, // 39: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
-	39, // 40: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
-	41, // 41: internalapi.InternalService.ProjectBehaviorEvent:output_type -> internalapi.ProjectBehaviorEventResponse
-	43, // 42: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:output_type -> internalapi.SendTaskOpenedMiniProgramNotificationResponse
-	45, // 43: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
-	5,  // 44: internalapi.PlanCommandService.CreatePlan:output_type -> internalapi.CreatePlanResponse
-	7,  // 45: internalapi.PlanCommandService.PausePlan:output_type -> internalapi.PausePlanResponse
-	9,  // 46: internalapi.PlanCommandService.ResumePlan:output_type -> internalapi.ResumePlanResponse
-	11, // 47: internalapi.PlanCommandService.FinishPlan:output_type -> internalapi.FinishPlanResponse
-	13, // 48: internalapi.PlanCommandService.CancelPlan:output_type -> internalapi.CancelPlanResponse
-	15, // 49: internalapi.PlanCommandService.EnrollTestee:output_type -> internalapi.EnrollTesteeResponse
-	17, // 50: internalapi.PlanCommandService.TerminateEnrollment:output_type -> internalapi.TerminateEnrollmentResponse
-	19, // 51: internalapi.PlanCommandService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
-	21, // 52: internalapi.PlanCommandService.OpenTask:output_type -> internalapi.OpenTaskResponse
-	23, // 53: internalapi.PlanCommandService.CompleteTask:output_type -> internalapi.CompleteTaskResponse
-	25, // 54: internalapi.PlanCommandService.ExpireTask:output_type -> internalapi.ExpireTaskResponse
-	27, // 55: internalapi.PlanCommandService.CancelTask:output_type -> internalapi.CancelTaskResponse
-	35, // [35:56] is the sub-list for method output_type
-	14, // [14:35] is the sub-list for method input_type
+	36, // 19: internalapi.InternalService.HandleQuestionnairePublishedPostActions:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
+	38, // 20: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
+	38, // 21: internalapi.InternalService.HandleScalePublishedPostActions:input_type -> internalapi.GenerateScaleQRCodeRequest
+	40, // 22: internalapi.InternalService.ProjectBehaviorEvent:input_type -> internalapi.ProjectBehaviorEventRequest
+	42, // 23: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:input_type -> internalapi.SendTaskOpenedMiniProgramNotificationRequest
+	44, // 24: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
+	4,  // 25: internalapi.PlanCommandService.CreatePlan:input_type -> internalapi.CreatePlanRequest
+	6,  // 26: internalapi.PlanCommandService.PausePlan:input_type -> internalapi.PausePlanRequest
+	8,  // 27: internalapi.PlanCommandService.ResumePlan:input_type -> internalapi.ResumePlanRequest
+	10, // 28: internalapi.PlanCommandService.FinishPlan:input_type -> internalapi.FinishPlanRequest
+	12, // 29: internalapi.PlanCommandService.CancelPlan:input_type -> internalapi.CancelPlanRequest
+	14, // 30: internalapi.PlanCommandService.EnrollTestee:input_type -> internalapi.EnrollTesteeRequest
+	16, // 31: internalapi.PlanCommandService.TerminateEnrollment:input_type -> internalapi.TerminateEnrollmentRequest
+	18, // 32: internalapi.PlanCommandService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
+	20, // 33: internalapi.PlanCommandService.OpenTask:input_type -> internalapi.OpenTaskRequest
+	22, // 34: internalapi.PlanCommandService.CompleteTask:input_type -> internalapi.CompleteTaskRequest
+	24, // 35: internalapi.PlanCommandService.ExpireTask:input_type -> internalapi.ExpireTaskRequest
+	26, // 36: internalapi.PlanCommandService.CancelTask:input_type -> internalapi.CancelTaskRequest
+	29, // 37: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
+	31, // 38: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
+	33, // 39: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
+	35, // 40: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
+	37, // 41: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	37, // 42: internalapi.InternalService.HandleQuestionnairePublishedPostActions:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	39, // 43: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
+	39, // 44: internalapi.InternalService.HandleScalePublishedPostActions:output_type -> internalapi.GenerateScaleQRCodeResponse
+	41, // 45: internalapi.InternalService.ProjectBehaviorEvent:output_type -> internalapi.ProjectBehaviorEventResponse
+	43, // 46: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:output_type -> internalapi.SendTaskOpenedMiniProgramNotificationResponse
+	45, // 47: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
+	5,  // 48: internalapi.PlanCommandService.CreatePlan:output_type -> internalapi.CreatePlanResponse
+	7,  // 49: internalapi.PlanCommandService.PausePlan:output_type -> internalapi.PausePlanResponse
+	9,  // 50: internalapi.PlanCommandService.ResumePlan:output_type -> internalapi.ResumePlanResponse
+	11, // 51: internalapi.PlanCommandService.FinishPlan:output_type -> internalapi.FinishPlanResponse
+	13, // 52: internalapi.PlanCommandService.CancelPlan:output_type -> internalapi.CancelPlanResponse
+	15, // 53: internalapi.PlanCommandService.EnrollTestee:output_type -> internalapi.EnrollTesteeResponse
+	17, // 54: internalapi.PlanCommandService.TerminateEnrollment:output_type -> internalapi.TerminateEnrollmentResponse
+	19, // 55: internalapi.PlanCommandService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
+	21, // 56: internalapi.PlanCommandService.OpenTask:output_type -> internalapi.OpenTaskResponse
+	23, // 57: internalapi.PlanCommandService.CompleteTask:output_type -> internalapi.CompleteTaskResponse
+	25, // 58: internalapi.PlanCommandService.ExpireTask:output_type -> internalapi.ExpireTaskResponse
+	27, // 59: internalapi.PlanCommandService.CancelTask:output_type -> internalapi.CancelTaskResponse
+	37, // [37:60] is the sub-list for method output_type
+	14, // [14:37] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
 	14, // [14:14] is the sub-list for extension extendee
 	0,  // [0:14] is the sub-list for field type_name

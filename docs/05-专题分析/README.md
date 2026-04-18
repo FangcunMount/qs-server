@@ -40,11 +40,14 @@ flowchart LR
     async[02 异步评估链路\n为什么同步提交 + 异步评估]
     protection[03 保护层与读侧\n为什么要限流 / 背压 / 缓存 / 预聚合]
     projector[04 行为投影与assessment_episode\n为什么会有 projector / pending reconcile]
+    cache[05 缓存体系设计\n为什么缓存必须按 family 统一治理]
 
     model --> async
     async --> protection
     async --> projector
     protection --> projector
+    protection --> cache
+    projector --> cache
 ```
 
 | 顺序 | 文档 | 先回答什么问题 |
@@ -53,6 +56,7 @@ flowchart LR
 | 2 | [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md) | 为什么提交答卷同步返回，而计分和报告走异步链 |
 | 3 | [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) | 为什么系统稳定性依赖保护层和读侧，而不是单一缓存 |
 | 4 | [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md) | 当前行为 projector 到底在做什么，为什么会有 pending reconcile |
+| 5 | [05-缓存体系设计：从零散缓存到统一缓存平台.md](./05-缓存体系设计：从零散缓存到统一缓存平台.md) | 为什么 `qs-server` 的缓存必须按 family、TTL、预热、锁和观测统一治理 |
 
 ## 与其他层如何分工
 
@@ -72,6 +76,7 @@ flowchart LR
 2. [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md)
 3. [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)
 4. [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md)
+5. [05-缓存体系设计：从零散缓存到统一缓存平台.md](./05-缓存体系设计：从零散缓存到统一缓存平台.md)
 
 配合阅读：
 

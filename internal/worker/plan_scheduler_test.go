@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -109,6 +110,7 @@ func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
 		&workerconfig.PlanSchedulerConfig{Enable: false},
 		client,
 		planClient,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
 		func(context.Context, string, string) error { return nil },
@@ -120,6 +122,7 @@ func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
 		opts,
 		nil,
 		planClient,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
 		func(context.Context, string, string) error { return nil },
@@ -131,6 +134,7 @@ func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
 		opts,
 		client,
 		nil,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
 		func(context.Context, string, string) error { return nil },
@@ -142,6 +146,7 @@ func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
 		opts,
 		client,
 		planClient,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return errors.New("ping failed") },
 		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
 		func(context.Context, string, string) error { return nil },
@@ -165,6 +170,7 @@ func TestWorkerPlanSchedulerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 		newTestWorkerPlanSchedulerConfig(11, 22, 33),
 		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
 		client,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		lock.acquire,
 		lock.release,
@@ -205,6 +211,7 @@ func TestWorkerPlanSchedulerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 		newTestWorkerPlanSchedulerConfig(1, 2, 3),
 		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
 		client,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		lock.acquire,
 		lock.release,
@@ -227,6 +234,7 @@ func TestWorkerPlanSchedulerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 		newTestWorkerPlanSchedulerConfig(1, 2),
 		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
 		client,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		func(context.Context, string, time.Duration) (string, bool, error) { return "", false, nil },
 		func(context.Context, string, string) error { return nil },
@@ -237,6 +245,16 @@ func TestWorkerPlanSchedulerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 	}
 	if calls := client.callOrder(); len(calls) != 0 {
 		t.Fatalf("expected no scheduler calls when lock not acquired, got %v", calls)
+	}
+}
+
+func TestWorkerPlanSchedulerLockKeyUsesLockNamespace(t *testing.T) {
+	runner := &workerPlanSchedulerRunner{
+		opts:        newTestWorkerPlanSchedulerConfig(1),
+		lockBuilder: newTestWorkerLockBuilder(),
+	}
+	if got := runner.lockKey(); got != "worker-test:cache:lock:qs:plan-scheduler:test" {
+		t.Fatalf("unexpected lock key: %s", got)
 	}
 }
 
@@ -258,6 +276,7 @@ func TestWorkerPlanSchedulerStartStopsOnContextCancel(t *testing.T) {
 		opts,
 		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
 		client,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		lock.acquire,
 		lock.release,
@@ -356,6 +375,7 @@ func TestWorkerPlanSchedulerMultiInstanceOnlyOneExecutes(t *testing.T) {
 		opts,
 		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
 		client1,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		lock.acquire,
 		lock.release,
@@ -364,6 +384,7 @@ func TestWorkerPlanSchedulerMultiInstanceOnlyOneExecutes(t *testing.T) {
 		opts,
 		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
 		client2,
+		newTestWorkerLockBuilder(),
 		func(context.Context) error { return nil },
 		lock.acquire,
 		lock.release,
@@ -415,4 +436,10 @@ func newTestWorkerPlanSchedulerConfig(orgIDs ...int64) *workerconfig.PlanSchedul
 		LockKey:      "qs:plan-scheduler:test",
 		LockTTL:      30 * time.Second,
 	}
+}
+
+func newTestWorkerLockBuilder() *rediskey.Builder {
+	return rediskey.NewBuilderWithNamespace(
+		rediskey.ComposeNamespace("worker-test", "cache:lock"),
+	)
 }

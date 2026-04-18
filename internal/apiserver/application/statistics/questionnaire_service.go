@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ type questionnaireStatisticsService struct {
 	repo       *statisticsInfra.StatisticsRepository
 	cache      *statisticsCache.StatisticsCache
 	aggregator *statistics.Aggregator
+	hotset     cacheinfra.HotsetRecorder
 }
 
 // NewQuestionnaireStatisticsService 创建问卷/量表统计服务
@@ -26,12 +28,14 @@ func NewQuestionnaireStatisticsService(
 	db *gorm.DB,
 	repo *statisticsInfra.StatisticsRepository,
 	cache *statisticsCache.StatisticsCache,
+	hotset cacheinfra.HotsetRecorder,
 ) QuestionnaireStatisticsService {
 	return &questionnaireStatisticsService{
 		db:         db,
 		repo:       repo,
 		cache:      cache,
 		aggregator: statistics.NewAggregator(),
+		hotset:     hotset,
 	}
 }
 
@@ -52,6 +56,7 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 			var stats statistics.QuestionnaireStatistics
 			if err := json.Unmarshal([]byte(cached), &stats); err == nil {
 				l.Debugw("从Redis缓存获取问卷统计", "cache_key", cacheKey)
+				s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 				return &stats, nil
 			}
 		}
@@ -73,11 +78,11 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 				}
 			}
 
-			// 缓存结果（TTL=5分钟）
+			// 缓存结果（TTL 由 query family policy 控制）
 			if s.cache != nil {
 				if data, err := json.Marshal(stats); err == nil {
 					cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
 						l.Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
 					}
 				} else {
@@ -86,6 +91,7 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 			}
 
 			l.Debugw("从MySQL统计表获取问卷统计")
+			s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 			return stats, nil
 		}
 	}
@@ -167,11 +173,11 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 	// 趋势数据（从 statistics_daily 表查询）
 	result.DailyTrend = s.getDailyTrend(ctx, orgID, questionnaireCode)
 
-	// 缓存结果（TTL=5分钟）
+	// 缓存结果（TTL 由 query family policy 控制）
 	if s.cache != nil {
 		if data, err := json.Marshal(result); err == nil {
 			cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
 				l.Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
 			}
 		} else {
@@ -179,6 +185,7 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 		}
 	}
 
+	s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 	return result, nil
 }
 
@@ -244,6 +251,13 @@ func (s *questionnaireStatisticsService) getDailyTrend(
 	}
 
 	return trend
+}
+
+func (s *questionnaireStatisticsService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+	if s == nil || s.hotset == nil {
+		return
+	}
+	_ = s.hotset.Record(ctx, target)
 }
 
 func (s *questionnaireStatisticsService) getOriginDistribution(

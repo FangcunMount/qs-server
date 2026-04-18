@@ -19,15 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InternalService_CalculateAnswerSheetScore_FullMethodName             = "/internalapi.InternalService/CalculateAnswerSheetScore"
-	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName       = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
-	InternalService_EvaluateAssessment_FullMethodName                    = "/internalapi.InternalService/EvaluateAssessment"
-	InternalService_TagTestee_FullMethodName                             = "/internalapi.InternalService/TagTestee"
-	InternalService_GenerateQuestionnaireQRCode_FullMethodName           = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
-	InternalService_GenerateScaleQRCode_FullMethodName                   = "/internalapi.InternalService/GenerateScaleQRCode"
-	InternalService_ProjectBehaviorEvent_FullMethodName                  = "/internalapi.InternalService/ProjectBehaviorEvent"
-	InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName = "/internalapi.InternalService/SendTaskOpenedMiniProgramNotification"
-	InternalService_BootstrapOperator_FullMethodName                     = "/internalapi.InternalService/BootstrapOperator"
+	InternalService_CalculateAnswerSheetScore_FullMethodName               = "/internalapi.InternalService/CalculateAnswerSheetScore"
+	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName         = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
+	InternalService_EvaluateAssessment_FullMethodName                      = "/internalapi.InternalService/EvaluateAssessment"
+	InternalService_TagTestee_FullMethodName                               = "/internalapi.InternalService/TagTestee"
+	InternalService_GenerateQuestionnaireQRCode_FullMethodName             = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
+	InternalService_HandleQuestionnairePublishedPostActions_FullMethodName = "/internalapi.InternalService/HandleQuestionnairePublishedPostActions"
+	InternalService_GenerateScaleQRCode_FullMethodName                     = "/internalapi.InternalService/GenerateScaleQRCode"
+	InternalService_HandleScalePublishedPostActions_FullMethodName         = "/internalapi.InternalService/HandleScalePublishedPostActions"
+	InternalService_ProjectBehaviorEvent_FullMethodName                    = "/internalapi.InternalService/ProjectBehaviorEvent"
+	InternalService_SendTaskOpenedMiniProgramNotification_FullMethodName   = "/internalapi.InternalService/SendTaskOpenedMiniProgramNotification"
+	InternalService_BootstrapOperator_FullMethodName                       = "/internalapi.InternalService/BootstrapOperator"
 )
 
 // InternalServiceClient is the client API for InternalService service.
@@ -57,10 +59,12 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateQuestionnaireQRCode(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error)
+	HandleQuestionnairePublishedPostActions(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error)
 	// 生成量表小程序码
 	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
+	HandleScalePublishedPostActions(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error)
 	// 投影行为足迹事件
 	// 场景：worker 处理 qs.analytics.behavior 事件后调用
 	// 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
@@ -133,10 +137,30 @@ func (c *internalServiceClient) GenerateQuestionnaireQRCode(ctx context.Context,
 	return out, nil
 }
 
+func (c *internalServiceClient) HandleQuestionnairePublishedPostActions(ctx context.Context, in *GenerateQuestionnaireQRCodeRequest, opts ...grpc.CallOption) (*GenerateQuestionnaireQRCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateQuestionnaireQRCodeResponse)
+	err := c.cc.Invoke(ctx, InternalService_HandleQuestionnairePublishedPostActions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *internalServiceClient) GenerateScaleQRCode(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateScaleQRCodeResponse)
 	err := c.cc.Invoke(ctx, InternalService_GenerateScaleQRCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) HandleScalePublishedPostActions(ctx context.Context, in *GenerateScaleQRCodeRequest, opts ...grpc.CallOption) (*GenerateScaleQRCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateScaleQRCodeResponse)
+	err := c.cc.Invoke(ctx, InternalService_HandleScalePublishedPostActions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -200,10 +224,12 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error)
+	HandleQuestionnairePublishedPostActions(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error)
 	// 生成量表小程序码
 	// 场景：worker 处理 scale.changed(published) 事件后调用
 	// 流程：生成小程序码并保存，返回二维码 URL
 	GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
+	HandleScalePublishedPostActions(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error)
 	// 投影行为足迹事件
 	// 场景：worker 处理 qs.analytics.behavior 事件后调用
 	// 流程：幂等写入行为足迹、测评服务过程和日投影，必要时进入 pending 重试
@@ -241,8 +267,14 @@ func (UnimplementedInternalServiceServer) TagTestee(context.Context, *TagTesteeR
 func (UnimplementedInternalServiceServer) GenerateQuestionnaireQRCode(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateQuestionnaireQRCode not implemented")
 }
+func (UnimplementedInternalServiceServer) HandleQuestionnairePublishedPostActions(context.Context, *GenerateQuestionnaireQRCodeRequest) (*GenerateQuestionnaireQRCodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleQuestionnairePublishedPostActions not implemented")
+}
 func (UnimplementedInternalServiceServer) GenerateScaleQRCode(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateScaleQRCode not implemented")
+}
+func (UnimplementedInternalServiceServer) HandleScalePublishedPostActions(context.Context, *GenerateScaleQRCodeRequest) (*GenerateScaleQRCodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleScalePublishedPostActions not implemented")
 }
 func (UnimplementedInternalServiceServer) ProjectBehaviorEvent(context.Context, *ProjectBehaviorEventRequest) (*ProjectBehaviorEventResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProjectBehaviorEvent not implemented")
@@ -364,6 +396,24 @@ func _InternalService_GenerateQuestionnaireQRCode_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InternalService_HandleQuestionnairePublishedPostActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateQuestionnaireQRCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).HandleQuestionnairePublishedPostActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_HandleQuestionnairePublishedPostActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).HandleQuestionnairePublishedPostActions(ctx, req.(*GenerateQuestionnaireQRCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InternalService_GenerateScaleQRCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GenerateScaleQRCodeRequest)
 	if err := dec(in); err != nil {
@@ -378,6 +428,24 @@ func _InternalService_GenerateScaleQRCode_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InternalServiceServer).GenerateScaleQRCode(ctx, req.(*GenerateScaleQRCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_HandleScalePublishedPostActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateScaleQRCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).HandleScalePublishedPostActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_HandleScalePublishedPostActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).HandleScalePublishedPostActions(ctx, req.(*GenerateScaleQRCodeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -464,8 +532,16 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _InternalService_GenerateQuestionnaireQRCode_Handler,
 		},
 		{
+			MethodName: "HandleQuestionnairePublishedPostActions",
+			Handler:    _InternalService_HandleQuestionnairePublishedPostActions_Handler,
+		},
+		{
 			MethodName: "GenerateScaleQRCode",
 			Handler:    _InternalService_GenerateScaleQRCode_Handler,
+		},
+		{
+			MethodName: "HandleScalePublishedPostActions",
+			Handler:    _InternalService_HandleScalePublishedPostActions_Handler,
 		},
 		{
 			MethodName: "ProjectBehaviorEvent",

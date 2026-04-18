@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"gorm.io/gorm"
@@ -19,6 +19,7 @@ type planStatisticsService struct {
 	repo       *statisticsInfra.StatisticsRepository
 	cache      *statisticsCache.StatisticsCache
 	aggregator *statistics.Aggregator
+	hotset     cacheinfra.HotsetRecorder
 }
 
 // NewPlanStatisticsService 创建计划统计服务
@@ -26,12 +27,14 @@ func NewPlanStatisticsService(
 	db *gorm.DB,
 	repo *statisticsInfra.StatisticsRepository,
 	cache *statisticsCache.StatisticsCache,
+	hotset cacheinfra.HotsetRecorder,
 ) PlanStatisticsService {
 	return &planStatisticsService{
 		db:         db,
 		repo:       repo,
 		cache:      cache,
 		aggregator: statistics.NewAggregator(),
+		hotset:     hotset,
 	}
 }
 
@@ -52,6 +55,7 @@ func (s *planStatisticsService) GetPlanStatistics(
 			var stats statistics.PlanStatistics
 			if err := json.Unmarshal([]byte(cached), &stats); err == nil {
 				l.Debugw("从Redis缓存获取计划统计", "cache_key", cacheKey)
+				s.recordHotset(ctx, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
 				return &stats, nil
 			}
 		}
@@ -63,11 +67,11 @@ func (s *planStatisticsService) GetPlanStatistics(
 		if err == nil && po != nil {
 			stats := s.convertPlanPOToPlanStatistics(po)
 
-			// 缓存结果（TTL=5分钟）
+			// 缓存结果（TTL 由 query family policy 控制）
 			if s.cache != nil {
 				if data, err := json.Marshal(stats); err == nil {
 					cacheKey := fmt.Sprintf("plan:%d:%d", orgID, planID)
-					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
 						l.Warnw("写入计划统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
 					}
 				} else {
@@ -76,6 +80,7 @@ func (s *planStatisticsService) GetPlanStatistics(
 			}
 
 			l.Debugw("从MySQL统计表获取计划统计")
+			s.recordHotset(ctx, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
 			return stats, nil
 		}
 	}
@@ -134,11 +139,11 @@ func (s *planStatisticsService) GetPlanStatistics(
 	result.EnrolledTestees = testeeStats.EnrolledTestees
 	result.ActiveTestees = testeeStats.ActiveTestees
 
-	// 缓存结果（TTL=5分钟）
+	// 缓存结果（TTL 由 query family policy 控制）
 	if s.cache != nil {
 		if data, err := json.Marshal(result); err == nil {
 			cacheKey := fmt.Sprintf("plan:%d:%d", orgID, planID)
-			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 5*time.Minute); err != nil {
+			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
 				l.Warnw("写入计划统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
 			}
 		} else {
@@ -146,6 +151,7 @@ func (s *planStatisticsService) GetPlanStatistics(
 		}
 	}
 
+	s.recordHotset(ctx, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
 	return result, nil
 }
 
@@ -167,4 +173,11 @@ func (s *planStatisticsService) convertPlanPOToPlanStatistics(
 	result.CompletionRate = s.aggregator.CalculateCompletionRate(po.TotalTasks, po.CompletedTasks)
 
 	return result
+}
+
+func (s *planStatisticsService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+	if s == nil || s.hotset == nil {
+		return
+	}
+	_ = s.hotset.Record(ctx, target)
 }

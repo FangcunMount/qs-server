@@ -28,6 +28,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -92,7 +93,13 @@ func NewEvaluationModule() *EvaluationModule {
 // params[3]: answersheet.Repository (可选，用于 EvaluationService)
 // params[4]: questionnaire.Repository (可选，用于 EvaluationService 的 cnt 计分规则)
 // params[5]: event.EventPublisher (可选，用于事件发布)
-// params[6]: redis.UniversalClient (可选，用于缓存装饰器)
+// params[6]: redis.UniversalClient (可选，用于对象缓存装饰器)
+// params[7]: string (可选，用于对象缓存 namespace)
+// params[8]: assessmentCache.CachePolicy (可选，用于测评详情缓存策略)
+// params[9]: redis.UniversalClient (可选，用于 query cache，如我的测评列表)
+// params[10]: string (可选，用于 query cache namespace)
+// params[11]: assessmentCache.CachePolicy (可选，用于我的测评列表缓存策略)
+// params[12]: assessmentCache.VersionTokenStore (可选，用于 versioned query invalidation)
 func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if len(params) < 2 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
@@ -150,13 +157,50 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
+	var cacheNamespace string
+	if len(params) > 7 {
+		if ns, ok := params[7].(string); ok {
+			cacheNamespace = ns
+		}
+	}
+	var assessmentPolicy assessmentCache.CachePolicy
+	if len(params) > 8 {
+		if policy, ok := params[8].(assessmentCache.CachePolicy); ok {
+			assessmentPolicy = policy
+		}
+	}
+	var queryRedisClient redis.UniversalClient
+	if len(params) > 9 {
+		if rc, ok := params[9].(redis.UniversalClient); ok && rc != nil {
+			queryRedisClient = rc
+		}
+	}
+	var queryCacheNamespace string
+	if len(params) > 10 {
+		if ns, ok := params[10].(string); ok {
+			queryCacheNamespace = ns
+		}
+	}
+	var assessmentListPolicy assessmentCache.CachePolicy
+	if len(params) > 11 {
+		if policy, ok := params[11].(assessmentCache.CachePolicy); ok {
+			assessmentListPolicy = policy
+		}
+	}
+	var versionStore assessmentCache.VersionTokenStore
+	if len(params) > 12 {
+		if store, ok := params[12].(assessmentCache.VersionTokenStore); ok {
+			versionStore = store
+		}
+	}
 
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(mysqlDB)
+	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
-		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepository(baseAssessmentRepo, redisClient)
+		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderAndPolicy(baseAssessmentRepo, redisClient, cacheBuilder, assessmentPolicy)
 	} else {
 		m.AssessmentRepo = baseAssessmentRepo
 	}
@@ -232,13 +276,26 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ==================== 初始化 Assessment 应用服务 ====================
 
 	// 提交服务 - 服务于答题者 (Testee)
-	// “我的测评列表”缓存按需构建收益有限，但写路径需要同步失效，容易把主链路拖到超时边缘。
-	// 当前直接禁用这层缓存，读路径回退到数据库查询。
-	m.SubmissionService = assessmentApp.NewSubmissionService(
-		m.AssessmentRepo,
-		assessmentCreator,
-		m.eventPublisher,
-	)
+	if queryRedisClient != nil && versionStore != nil {
+		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderAndPolicy(
+			assessmentCache.NewRedisCache(queryRedisClient),
+			versionStore,
+			assessmentCache.NewCacheKeyBuilderWithNamespace(queryCacheNamespace),
+			assessmentListPolicy,
+		)
+		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
+			m.AssessmentRepo,
+			assessmentCreator,
+			m.eventPublisher,
+			listCache,
+		)
+	} else {
+		m.SubmissionService = assessmentApp.NewSubmissionService(
+			m.AssessmentRepo,
+			assessmentCreator,
+			m.eventPublisher,
+		)
+	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
 	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo, m.eventPublisher)

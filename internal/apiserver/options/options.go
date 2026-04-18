@@ -12,24 +12,25 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                     *log.Options                           `json:"log"       mapstructure:"log"`
-	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server"    mapstructure:"server"`
-	GRPCOptions             *genericoptions.GRPCOptions            `json:"grpc"      mapstructure:"grpc"`
-	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure"  mapstructure:"insecure"`
-	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"    mapstructure:"secure"`
-	MySQLOptions            *genericoptions.MySQLOptions           `json:"mysql"     mapstructure:"mysql"`
-	MigrationOptions        *genericoptions.MigrationOptions       `json:"migration" mapstructure:"migration"`
-	RedisOptions            *genericoptions.RedisOptions           `json:"redis"     mapstructure:"redis"`
-	MongoDBOptions          *genericoptions.MongoDBOptions         `json:"mongodb"   mapstructure:"mongodb"`
-	MessagingOptions        *genericoptions.MessagingOptions       `json:"messaging" mapstructure:"messaging"`
-	IAMOptions              *genericoptions.IAMOptions             `json:"iam"       mapstructure:"iam"`
-	WeChatOptions           *genericoptions.WeChatOptions          `json:"wechat"    mapstructure:"wechat"`
-	Plan                    *PlanOptions                           `json:"plan"      mapstructure:"plan"`
-	PlanScheduler           *PlanSchedulerOptions                  `json:"plan_scheduler" mapstructure:"plan_scheduler"`
-	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
-	Backpressure            *BackpressureOptions                   `json:"backpressure" mapstructure:"backpressure"`
-	Cache                   *CacheOptions                          `json:"cache"     mapstructure:"cache"`
-	StatisticsSync          *StatisticsSyncOptions                 `json:"statistics_sync" mapstructure:"statistics_sync"`
+	Log                     *log.Options                            `json:"log"       mapstructure:"log"`
+	GenericServerRunOptions *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
+	GRPCOptions             *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
+	InsecureServing         *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
+	SecureServing           *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
+	MySQLOptions            *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
+	MigrationOptions        *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
+	RedisOptions            *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
+	RedisProfiles           map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	MongoDBOptions          *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
+	MessagingOptions        *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
+	IAMOptions              *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
+	WeChatOptions           *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
+	Plan                    *PlanOptions                            `json:"plan"      mapstructure:"plan"`
+	PlanScheduler           *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
+	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	Backpressure            *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
+	Cache                   *CacheOptions                           `json:"cache"     mapstructure:"cache"`
+	StatisticsSync          *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -43,6 +44,7 @@ func NewOptions() *Options {
 		MySQLOptions:            genericoptions.NewMySQLOptions(),
 		MigrationOptions:        genericoptions.NewMigrationOptions(),
 		RedisOptions:            genericoptions.NewRedisOptions(),
+		RedisProfiles:           map[string]*genericoptions.RedisOptions{},
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
 		MessagingOptions:        genericoptions.NewMessagingOptions(),
 		IAMOptions:              genericoptions.NewIAMOptions(),
@@ -266,8 +268,15 @@ type CacheOptions struct {
 	TTL                    *CacheTTLOptions         `json:"ttl" mapstructure:"ttl"`
 	TTLJitterRatio         float64                  `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
 	StatisticsWarmup       *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
+	Warmup                 *WarmupOptions           `json:"warmup" mapstructure:"warmup"`
 	Namespace              string                   `json:"namespace" mapstructure:"namespace"`
 	CompressPayload        bool                     `json:"compress_payload" mapstructure:"compress_payload"`
+	Static                 *CacheRouteOptions       `json:"static" mapstructure:"static"`
+	Object                 *CacheRouteOptions       `json:"object" mapstructure:"object"`
+	Query                  *CacheRouteOptions       `json:"query" mapstructure:"query"`
+	Meta                   *CacheRouteOptions       `json:"meta" mapstructure:"meta"`
+	SDK                    *CacheRouteOptions       `json:"sdk" mapstructure:"sdk"`
+	Lock                   *CacheRouteOptions       `json:"lock" mapstructure:"lock"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -277,9 +286,10 @@ func NewCacheOptions() *CacheOptions {
 		DisableStatisticsCache: false,
 		TTL: &CacheTTLOptions{
 			Scale:            24 * time.Hour,
+			ScaleList:        10 * time.Minute,
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
-			AssessmentStatus: 30 * time.Minute,
+			AssessmentList:   10 * time.Minute,
 			Testee:           30 * time.Minute,
 			Plan:             2 * time.Hour,
 			Negative:         5 * time.Minute,
@@ -287,11 +297,48 @@ func NewCacheOptions() *CacheOptions {
 		TTLJitterRatio:  0.1,
 		Namespace:       "",
 		CompressPayload: false,
+		Static: &CacheRouteOptions{
+			RedisProfile:    "static_cache",
+			NamespaceSuffix: "cache:static",
+		},
+		Object: &CacheRouteOptions{
+			RedisProfile:    "object_cache",
+			NamespaceSuffix: "cache:object",
+		},
+		Query: &CacheRouteOptions{
+			RedisProfile:    "query_cache",
+			NamespaceSuffix: "cache:query",
+			TTL:             5 * time.Minute,
+		},
+		Meta: &CacheRouteOptions{
+			RedisProfile:    "meta_cache",
+			NamespaceSuffix: "cache:meta",
+		},
+		SDK: &CacheRouteOptions{
+			RedisProfile:    "sdk_cache",
+			NamespaceSuffix: "cache:sdk",
+		},
+		Lock: &CacheRouteOptions{
+			RedisProfile:    "lock_cache",
+			NamespaceSuffix: "cache:lock",
+		},
 		StatisticsWarmup: &StatisticsWarmupOptions{
 			Enable:             false,
 			OrgIDs:             []int64{1},
 			QuestionnaireCodes: []string{},
 			PlanIDs:            []uint64{},
+		},
+		Warmup: &WarmupOptions{
+			Enable: true,
+			Startup: &WarmupStartupOptions{
+				Static: true,
+				Query:  true,
+			},
+			Hotset: &WarmupHotsetOptions{
+				Enable:          true,
+				TopN:            20,
+				MaxItemsPerKind: 200,
+			},
 		},
 	}
 }
@@ -306,9 +353,10 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	if c.TTL == nil {
 		c.TTL = &CacheTTLOptions{
 			Scale:            24 * time.Hour,
+			ScaleList:        10 * time.Minute,
 			Questionnaire:    12 * time.Hour,
 			AssessmentDetail: 2 * time.Hour,
-			AssessmentStatus: 30 * time.Minute,
+			AssessmentList:   10 * time.Minute,
 			Testee:           30 * time.Minute,
 			Plan:             2 * time.Hour,
 		}
@@ -318,15 +366,67 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
 		"Disable Redis caching for statistics data")
 	fs.DurationVar(&c.TTL.Scale, "cache.ttl.scale", c.TTL.Scale, "TTL for scale cache entries.")
+	fs.DurationVar(&c.TTL.ScaleList, "cache.ttl.scale-list", c.TTL.ScaleList, "TTL for published scale list cache entries.")
 	fs.DurationVar(&c.TTL.Questionnaire, "cache.ttl.questionnaire", c.TTL.Questionnaire, "TTL for questionnaire cache entries.")
 	fs.DurationVar(&c.TTL.AssessmentDetail, "cache.ttl.assessment-detail", c.TTL.AssessmentDetail, "TTL for assessment detail cache entries.")
-	fs.DurationVar(&c.TTL.AssessmentStatus, "cache.ttl.assessment-status", c.TTL.AssessmentStatus, "TTL for assessment status cache entries.")
+	fs.DurationVar(&c.TTL.AssessmentList, "cache.ttl.assessment-list", c.TTL.AssessmentList, "TTL for my-assessment-list cache entries.")
 	fs.DurationVar(&c.TTL.Testee, "cache.ttl.testee", c.TTL.Testee, "TTL for testee cache entries.")
 	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
 	fs.DurationVar(&c.TTL.Negative, "cache.ttl.negative", c.TTL.Negative, "TTL for negative cache entries (cache penetration protection).")
 	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
 	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace, "Optional Redis key namespace prefix (e.g., env name).")
 	fs.BoolVar(&c.CompressPayload, "cache.compress-payload", c.CompressPayload, "Compress cache payloads (gzip) to save memory/bandwidth.")
+	if c.Static == nil {
+		c.Static = &CacheRouteOptions{
+			RedisProfile:    "static_cache",
+			NamespaceSuffix: "cache:static",
+		}
+	}
+	if c.Query == nil {
+		c.Query = &CacheRouteOptions{
+			RedisProfile:    "query_cache",
+			NamespaceSuffix: "cache:query",
+		}
+	}
+	if c.Object == nil {
+		c.Object = &CacheRouteOptions{
+			RedisProfile:    "object_cache",
+			NamespaceSuffix: "cache:object",
+		}
+	}
+	if c.SDK == nil {
+		c.SDK = &CacheRouteOptions{
+			RedisProfile:    "sdk_cache",
+			NamespaceSuffix: "cache:sdk",
+		}
+	}
+	if c.Meta == nil {
+		c.Meta = &CacheRouteOptions{
+			RedisProfile:    "meta_cache",
+			NamespaceSuffix: "cache:meta",
+		}
+	}
+	if c.Lock == nil {
+		c.Lock = &CacheRouteOptions{
+			RedisProfile:    "lock_cache",
+			NamespaceSuffix: "cache:lock",
+		}
+	}
+	fs.StringVar(&c.Static.RedisProfile, "cache.static.redis-profile", c.Static.RedisProfile, "Redis profile used by static scale/questionnaire caches.")
+	fs.StringVar(&c.Static.NamespaceSuffix, "cache.static.namespace-suffix", c.Static.NamespaceSuffix, "Namespace suffix used by static scale/questionnaire caches.")
+	fs.StringVar(&c.Object.RedisProfile, "cache.object.redis-profile", c.Object.RedisProfile, "Redis profile used by object-view caches.")
+	fs.StringVar(&c.Object.NamespaceSuffix, "cache.object.namespace-suffix", c.Object.NamespaceSuffix, "Namespace suffix used by object-view caches.")
+	fs.StringVar(&c.Query.RedisProfile, "cache.query.redis-profile", c.Query.RedisProfile, "Redis profile used by query-result caches.")
+	fs.StringVar(&c.Query.NamespaceSuffix, "cache.query.namespace-suffix", c.Query.NamespaceSuffix, "Namespace suffix used by query-result caches.")
+	fs.DurationVar(&c.Query.TTL, "cache.query.ttl", c.Query.TTL, "Default TTL used by query-result cache entries.")
+	fs.DurationVar(&c.Query.NegativeTTL, "cache.query.negative-ttl", c.Query.NegativeTTL, "Default negative-cache TTL used by query-result caches.")
+	fs.Float64Var(&c.Query.TTLJitterRatio, "cache.query.ttl-jitter-ratio", c.Query.TTLJitterRatio, "TTL jitter ratio override for query-result caches (0 uses the global cache.ttl-jitter-ratio).")
+	fs.StringVar(&c.Meta.RedisProfile, "cache.meta.redis-profile", c.Meta.RedisProfile, "Redis profile used by cache metadata such as query version tokens.")
+	fs.StringVar(&c.Meta.NamespaceSuffix, "cache.meta.namespace-suffix", c.Meta.NamespaceSuffix, "Namespace suffix used by cache metadata such as query version tokens.")
+	fs.StringVar(&c.SDK.RedisProfile, "cache.sdk.redis-profile", c.SDK.RedisProfile, "Redis profile used by SDK token caches.")
+	fs.StringVar(&c.SDK.NamespaceSuffix, "cache.sdk.namespace-suffix", c.SDK.NamespaceSuffix, "Namespace suffix used by SDK token caches.")
+	fs.StringVar(&c.Lock.RedisProfile, "cache.lock.redis-profile", c.Lock.RedisProfile, "Redis profile used by lock/lease keys.")
+	fs.StringVar(&c.Lock.NamespaceSuffix, "cache.lock.namespace-suffix", c.Lock.NamespaceSuffix, "Namespace suffix used by lock/lease keys.")
 	if c.StatisticsWarmup == nil {
 		c.StatisticsWarmup = &StatisticsWarmupOptions{
 			Enable:             false,
@@ -335,14 +435,53 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			PlanIDs:            []uint64{},
 		}
 	}
+	if c.Warmup == nil {
+		c.Warmup = &WarmupOptions{
+			Enable: true,
+			Startup: &WarmupStartupOptions{
+				Static: true,
+				Query:  true,
+			},
+			Hotset: &WarmupHotsetOptions{
+				Enable:          true,
+				TopN:            20,
+				MaxItemsPerKind: 200,
+			},
+		}
+	}
+	if c.Warmup.Startup == nil {
+		c.Warmup.Startup = &WarmupStartupOptions{Static: true, Query: true}
+	}
+	if c.Warmup.Hotset == nil {
+		c.Warmup.Hotset = &WarmupHotsetOptions{Enable: true, TopN: 20, MaxItemsPerKind: 200}
+	}
+	fs.BoolVar(&c.Warmup.Enable, "cache.warmup.enable", c.Warmup.Enable, "Enable cache governance warmup orchestration.")
+	fs.BoolVar(&c.Warmup.Startup.Static, "cache.warmup.startup-static", c.Warmup.Startup.Static, "Enable startup warmup for static cache family.")
+	fs.BoolVar(&c.Warmup.Startup.Query, "cache.warmup.startup-query", c.Warmup.Startup.Query, "Enable startup warmup for query cache family.")
+	fs.BoolVar(&c.Warmup.Hotset.Enable, "cache.warmup.hotset-enable", c.Warmup.Hotset.Enable, "Enable internal hotset recording and selection for warmup governance.")
+	fs.Int64Var(&c.Warmup.Hotset.TopN, "cache.warmup.hotset-top-n", c.Warmup.Hotset.TopN, "Top-N hot targets loaded from meta_cache per warmup kind.")
+	fs.Int64Var(&c.Warmup.Hotset.MaxItemsPerKind, "cache.warmup.hotset-max-items-per-kind", c.Warmup.Hotset.MaxItemsPerKind, "Maximum hotset members retained per warmup kind.")
+}
+
+// CacheRouteOptions 分类缓存路由配置。
+type CacheRouteOptions struct {
+	RedisProfile    string        `json:"redis_profile" mapstructure:"redis_profile"`
+	NamespaceSuffix string        `json:"namespace_suffix" mapstructure:"namespace_suffix"`
+	TTL             time.Duration `json:"ttl" mapstructure:"ttl"`
+	NegativeTTL     time.Duration `json:"negative_ttl" mapstructure:"negative_ttl"`
+	TTLJitterRatio  float64       `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	Compress        *bool         `json:"compress,omitempty" mapstructure:"compress"`
+	Singleflight    *bool         `json:"singleflight,omitempty" mapstructure:"singleflight"`
+	Negative        *bool         `json:"negative,omitempty" mapstructure:"negative"`
 }
 
 // CacheTTLOptions 缓存 TTL 配置
 type CacheTTLOptions struct {
 	Scale            time.Duration `json:"scale" mapstructure:"scale"`
+	ScaleList        time.Duration `json:"scale_list" mapstructure:"scale_list"`
 	Questionnaire    time.Duration `json:"questionnaire" mapstructure:"questionnaire"`
 	AssessmentDetail time.Duration `json:"assessment_detail" mapstructure:"assessment_detail"`
-	AssessmentStatus time.Duration `json:"assessment_status" mapstructure:"assessment_status"`
+	AssessmentList   time.Duration `json:"assessment_list" mapstructure:"assessment_list"`
 	Testee           time.Duration `json:"testee" mapstructure:"testee"`
 	Plan             time.Duration `json:"plan" mapstructure:"plan"`
 	Negative         time.Duration `json:"negative" mapstructure:"negative"`
@@ -354,6 +493,23 @@ type StatisticsWarmupOptions struct {
 	OrgIDs             []int64  `json:"org_ids" mapstructure:"org_ids"`
 	QuestionnaireCodes []string `json:"questionnaire_codes" mapstructure:"questionnaire_codes"`
 	PlanIDs            []uint64 `json:"plan_ids" mapstructure:"plan_ids"`
+}
+
+type WarmupOptions struct {
+	Enable  bool                  `json:"enable" mapstructure:"enable"`
+	Startup *WarmupStartupOptions `json:"startup" mapstructure:"startup"`
+	Hotset  *WarmupHotsetOptions  `json:"hotset" mapstructure:"hotset"`
+}
+
+type WarmupStartupOptions struct {
+	Static bool `json:"static" mapstructure:"static"`
+	Query  bool `json:"query" mapstructure:"query"`
+}
+
+type WarmupHotsetOptions struct {
+	Enable          bool  `json:"enable" mapstructure:"enable"`
+	TopN            int64 `json:"top_n" mapstructure:"top_n"`
+	MaxItemsPerKind int64 `json:"max_items_per_kind" mapstructure:"max_items_per_kind"`
 }
 
 // StatisticsSyncOptions 统计同步定时任务配置

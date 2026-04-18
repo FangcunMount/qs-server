@@ -4,11 +4,13 @@ import (
 	"context"
 	"time"
 
+	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -16,11 +18,14 @@ import (
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -39,6 +44,8 @@ type apiServer struct {
 	redisCache redis.UniversalClient
 	// Container 主容器
 	container *container.Container
+	// Redis family 状态注册表
+	familyStatus *cacheobservability.FamilyStatusRegistry
 	// IAM authz_version 同步订阅者
 	authzVersionSubscriber messaging.Subscriber
 	// 配置
@@ -78,6 +85,7 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		redisCache:       nil,
 		grpcServer:       nil, // 延迟初始化
 		config:           cfg,
+		familyStatus:     cacheobservability.NewFamilyStatusRegistry("apiserver"),
 	}
 
 	return server, nil
@@ -136,6 +144,44 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		)
 	}
 	s.redisCache = redisCache
+	if s.config.Cache.Static == nil {
+		s.config.Cache.Static = &apiserveroptions.CacheRouteOptions{RedisProfile: "static_cache", NamespaceSuffix: "cache:static"}
+	}
+	if s.config.Cache.Object == nil {
+		s.config.Cache.Object = &apiserveroptions.CacheRouteOptions{RedisProfile: "object_cache", NamespaceSuffix: "cache:object"}
+	}
+	if s.config.Cache.Query == nil {
+		s.config.Cache.Query = &apiserveroptions.CacheRouteOptions{RedisProfile: "query_cache", NamespaceSuffix: "cache:query"}
+	}
+	if s.config.Cache.Meta == nil {
+		s.config.Cache.Meta = &apiserveroptions.CacheRouteOptions{RedisProfile: "meta_cache", NamespaceSuffix: "cache:meta"}
+	}
+	if s.config.Cache.SDK == nil {
+		s.config.Cache.SDK = &apiserveroptions.CacheRouteOptions{RedisProfile: "sdk_cache", NamespaceSuffix: "cache:sdk"}
+	}
+	if s.config.Cache.Lock == nil {
+		s.config.Cache.Lock = &apiserveroptions.CacheRouteOptions{RedisProfile: "lock_cache", NamespaceSuffix: "cache:lock"}
+	}
+	staticRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyStatic, *s.config.Cache.Static)
+	queryRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyQuery, *s.config.Cache.Query)
+	objectRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyObject, *s.config.Cache.Object)
+	metaRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyMeta, *s.config.Cache.Meta)
+	sdkRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilySDK, *s.config.Cache.SDK)
+	_ = s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyLock, *s.config.Cache.Lock)
+	if s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Hotset != nil && s.config.Cache.Warmup.Hotset.Enable && metaRedisCache == nil {
+		logger.L(context.Background()).Warnw("meta_cache unavailable while hotset governance is enabled; hotset recording and hot-target warmup will degrade",
+			"component", "apiserver",
+			"family", string(scaleCache.CacheFamilyMeta),
+			"profile", s.config.Cache.Meta.RedisProfile,
+		)
+	}
+	if metaRedisCache == nil {
+		logger.L(context.Background()).Warnw("meta_cache unavailable; version-token query caches will run uncached where required",
+			"component", "apiserver",
+			"family", string(scaleCache.CacheFamilyMeta),
+			"profile", s.config.Cache.Meta.RedisProfile,
+		)
+	}
 
 	// 创建消息队列 publisher（用于事件发布）
 	var mqPublisher messaging.Publisher
@@ -164,8 +210,10 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	if s.config.Cache != nil && s.config.Cache.TTL != nil {
 		cacheTTLOpts = container.ContainerCacheTTLOptions{
 			Scale:            s.config.Cache.TTL.Scale,
+			ScaleList:        s.config.Cache.TTL.ScaleList,
 			Questionnaire:    s.config.Cache.TTL.Questionnaire,
 			AssessmentDetail: s.config.Cache.TTL.AssessmentDetail,
+			AssessmentList:   s.config.Cache.TTL.AssessmentList,
 			Testee:           s.config.Cache.TTL.Testee,
 			Plan:             s.config.Cache.TTL.Plan,
 			Negative:         s.config.Cache.TTL.Negative,
@@ -191,10 +239,83 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 				TTL:                    cacheTTLOpts,
 				TTLJitterRatio:         cacheTTLJitter,
 				StatisticsWarmup:       statsWarmupCfg,
-				Namespace:              s.config.Cache.Namespace,
-				CompressPayload:        s.config.Cache.CompressPayload,
+				Warmup: container.ContainerWarmupOptions{
+					Enable:        s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Enable,
+					StartupStatic: s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Startup != nil && s.config.Cache.Warmup.Startup.Static,
+					StartupQuery:  s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Startup != nil && s.config.Cache.Warmup.Startup.Query,
+					HotsetEnable:  s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Hotset != nil && s.config.Cache.Warmup.Hotset.Enable,
+					HotsetTopN: func() int64 {
+						if s.config.Cache == nil || s.config.Cache.Warmup == nil || s.config.Cache.Warmup.Hotset == nil {
+							return 0
+						}
+						return s.config.Cache.Warmup.Hotset.TopN
+					}(),
+					MaxItemsPerKind: func() int64 {
+						if s.config.Cache == nil || s.config.Cache.Warmup == nil || s.config.Cache.Warmup.Hotset == nil {
+							return 0
+						}
+						return s.config.Cache.Warmup.Hotset.MaxItemsPerKind
+					}(),
+				},
+				Namespace:       s.config.Cache.Namespace,
+				CompressPayload: s.config.Cache.CompressPayload,
+				Static: container.ContainerCacheRouteOptions{
+					RedisProfile:    s.config.Cache.Static.RedisProfile,
+					NamespaceSuffix: s.config.Cache.Static.NamespaceSuffix,
+					NegativeTTL:     s.config.Cache.Static.NegativeTTL,
+					TTLJitterRatio:  s.config.Cache.Static.TTLJitterRatio,
+					Compress:        s.config.Cache.Static.Compress,
+					Singleflight:    s.config.Cache.Static.Singleflight,
+					Negative:        s.config.Cache.Static.Negative,
+				},
+				Object: container.ContainerCacheRouteOptions{
+					RedisProfile:    s.config.Cache.Object.RedisProfile,
+					NamespaceSuffix: s.config.Cache.Object.NamespaceSuffix,
+					NegativeTTL:     s.config.Cache.Object.NegativeTTL,
+					TTLJitterRatio:  s.config.Cache.Object.TTLJitterRatio,
+					Compress:        s.config.Cache.Object.Compress,
+					Singleflight:    s.config.Cache.Object.Singleflight,
+					Negative:        s.config.Cache.Object.Negative,
+				},
+				Query: container.ContainerCacheRouteOptions{
+					RedisProfile:    s.config.Cache.Query.RedisProfile,
+					NamespaceSuffix: s.config.Cache.Query.NamespaceSuffix,
+					TTL:             s.config.Cache.Query.TTL,
+					NegativeTTL:     s.config.Cache.Query.NegativeTTL,
+					TTLJitterRatio:  s.config.Cache.Query.TTLJitterRatio,
+					Compress:        s.config.Cache.Query.Compress,
+					Singleflight:    s.config.Cache.Query.Singleflight,
+					Negative:        s.config.Cache.Query.Negative,
+				},
+				Meta: container.ContainerCacheRouteOptions{
+					RedisProfile:    s.config.Cache.Meta.RedisProfile,
+					NamespaceSuffix: s.config.Cache.Meta.NamespaceSuffix,
+				},
+				SDK: container.ContainerCacheRouteOptions{
+					RedisProfile:    s.config.Cache.SDK.RedisProfile,
+					NamespaceSuffix: s.config.Cache.SDK.NamespaceSuffix,
+					NegativeTTL:     s.config.Cache.SDK.NegativeTTL,
+					TTLJitterRatio:  s.config.Cache.SDK.TTLJitterRatio,
+					Compress:        s.config.Cache.SDK.Compress,
+					Singleflight:    s.config.Cache.SDK.Singleflight,
+					Negative:        s.config.Cache.SDK.Negative,
+				},
+				Lock: container.ContainerCacheRouteOptions{
+					RedisProfile:    s.config.Cache.Lock.RedisProfile,
+					NamespaceSuffix: s.config.Cache.Lock.NamespaceSuffix,
+					NegativeTTL:     s.config.Cache.Lock.NegativeTTL,
+					TTLJitterRatio:  s.config.Cache.Lock.TTLJitterRatio,
+					Compress:        s.config.Cache.Lock.Compress,
+					Singleflight:    s.config.Cache.Lock.Singleflight,
+					Negative:        s.config.Cache.Lock.Negative,
+				},
 			},
-			PlanEntryBaseURL: s.config.Plan.EntryBaseURL,
+			StaticRedisClient: staticRedisCache,
+			ObjectRedisClient: objectRedisCache,
+			QueryRedisClient:  queryRedisCache,
+			MetaRedisClient:   metaRedisCache,
+			SDKRedisClient:    sdkRedisCache,
+			PlanEntryBaseURL:  s.config.Plan.EntryBaseURL,
 			StatisticsRepairWindowDays: func() int {
 				if s.config.StatisticsSync == nil {
 					return 0
@@ -218,6 +339,12 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize hexagonal architecture container: %v", err)
+	}
+	if s.container != nil {
+		s.container.CacheGovernanceStatusService = cachegov.NewStatusService("apiserver", s.familyStatus, s.container.HotsetInspector(), s.container.WarmupCoordinator)
+		if s.container.StatisticsModule != nil && s.container.StatisticsModule.Handler != nil {
+			s.container.StatisticsModule.Handler.SetCacheGovernanceStatusService(s.container.CacheGovernanceStatusService)
+		}
 	}
 
 	s.startAuthzVersionSync()
@@ -321,6 +448,118 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}))
 
 	return preparedAPIServer{s}
+}
+
+func (s *apiServer) resolveRedisFamilyClient(ctx context.Context, family scaleCache.CacheFamily, route apiserveroptions.CacheRouteOptions) redis.UniversalClient {
+	if s == nil || s.dbManager == nil {
+		return nil
+	}
+	profile := route.RedisProfile
+	namespace := rediskey.ComposeNamespace(s.config.Cache.Namespace, route.NamespaceSuffix)
+	allowWarmup := family == scaleCache.CacheFamilyStatic || family == scaleCache.CacheFamilyQuery
+
+	updateStatus := func(mode string, configured, available, degraded bool, err error) {
+		if s.familyStatus == nil {
+			return
+		}
+		s.familyStatus.Update(cacheobservability.FamilyStatus{
+			Component:   "apiserver",
+			Family:      string(family),
+			Profile:     profile,
+			Namespace:   namespace,
+			AllowWarmup: allowWarmup,
+			Configured:  configured,
+			Available:   available,
+			Degraded:    degraded,
+			Mode:        mode,
+			LastError:   errorString(err),
+		})
+	}
+
+	if profile == "" {
+		client, err := s.dbManager.GetRedisClient()
+		if err != nil {
+			logger.L(ctx).Warnw("Redis family unavailable",
+				"component", "apiserver",
+				"family", string(family),
+				"profile", profile,
+				"mode", "default",
+				"error", err.Error(),
+			)
+			updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, err)
+			return nil
+		}
+		logger.L(ctx).Infow("Redis family using default Redis",
+			"component", "apiserver",
+			"family", string(family),
+			"mode", "default",
+		)
+		updateStatus(cacheobservability.FamilyModeDefault, true, true, false, nil)
+		return client
+	}
+
+	status := s.dbManager.GetRedisProfileStatus(profile)
+	switch status.State {
+	case cbdatabase.RedisProfileStateMissing:
+		client, err := s.dbManager.GetRedisClient()
+		if err != nil {
+			logger.L(ctx).Warnw("Redis family default fallback unavailable",
+				"component", "apiserver",
+				"family", string(family),
+				"profile", profile,
+				"mode", "fallback_default",
+				"error", err.Error(),
+			)
+			updateStatus(cacheobservability.FamilyModeDegraded, false, false, true, err)
+			return nil
+		}
+		logger.L(ctx).Infow("Redis family profile missing, falling back to default",
+			"component", "apiserver",
+			"family", string(family),
+			"profile", profile,
+			"mode", "fallback_default",
+		)
+		updateStatus(cacheobservability.FamilyModeFallbackDefault, false, true, false, nil)
+		return client
+	case cbdatabase.RedisProfileStateUnavailable:
+		logger.L(ctx).Warnw("Redis family degraded because profile is unavailable",
+			"component", "apiserver",
+			"family", string(family),
+			"profile", profile,
+			"mode", "degraded",
+			"error", errorString(status.Err),
+		)
+		updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, status.Err)
+		return nil
+	default:
+		client, err := s.dbManager.GetRedisClientByProfile(profile)
+		if err != nil {
+			logger.L(ctx).Warnw("Redis family degraded because profile is unavailable",
+				"component", "apiserver",
+				"family", string(family),
+				"profile", profile,
+				"mode", "degraded",
+				"error", err.Error(),
+			)
+			updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, err)
+			return nil
+		}
+		logger.L(ctx).Infow("Redis family using named profile",
+			"component", "apiserver",
+			"family", string(family),
+			"profile", profile,
+			"mode", "named_profile",
+		)
+		updateStatus(cacheobservability.FamilyModeNamedProfile, true, true, false, nil)
+		return client
+	}
+}
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func (s *apiServer) startAuthzVersionSync() {
@@ -443,6 +682,12 @@ func (s *apiServer) startStatisticsSyncScheduler() {
 				}
 				if err := syncSvc.SyncPlanStatistics(orgCtx, orgID); err != nil {
 					log.Warnf("statistics nightly plan sync failed (org=%d): %v", orgID, err)
+					continue
+				}
+				if s.container != nil && s.container.WarmupCoordinator != nil {
+					if err := s.container.WarmupCoordinator.HandleStatisticsSync(orgCtx, orgID); err != nil {
+						log.Warnf("statistics nightly cache warmup failed (org=%d): %v", orgID, err)
+					}
 				}
 			}
 		}

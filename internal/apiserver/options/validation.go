@@ -74,5 +74,52 @@ func (o *Options) Validate() []error {
 		}
 	}
 
+	if o.Cache != nil {
+		if o.Cache.TTLJitterRatio < 0 || o.Cache.TTLJitterRatio > 1 {
+			errs = append(errs, fmt.Errorf("cache.ttl_jitter_ratio must be between 0 and 1"))
+		}
+		validateCacheRoute := func(name string, route *CacheRouteOptions) {
+			if route == nil {
+				return
+			}
+			if route.TTL < 0 {
+				errs = append(errs, fmt.Errorf("cache.%s.ttl cannot be negative", name))
+			}
+			if route.NegativeTTL < 0 {
+				errs = append(errs, fmt.Errorf("cache.%s.negative_ttl cannot be negative", name))
+			}
+			if route.TTLJitterRatio < 0 || route.TTLJitterRatio > 1 {
+				errs = append(errs, fmt.Errorf("cache.%s.ttl_jitter_ratio must be between 0 and 1", name))
+			}
+			if route.RedisProfile != "" && len(o.RedisProfiles) > 0 {
+				if _, ok := o.RedisProfiles[route.RedisProfile]; !ok {
+					errs = append(errs, fmt.Errorf("cache.%s.redis_profile references missing redis_profiles entry %q", name, route.RedisProfile))
+				}
+			}
+		}
+		validateCacheRoute("static", o.Cache.Static)
+		validateCacheRoute("object", o.Cache.Object)
+		validateCacheRoute("query", o.Cache.Query)
+		validateCacheRoute("meta", o.Cache.Meta)
+		validateCacheRoute("sdk", o.Cache.SDK)
+		validateCacheRoute("lock", o.Cache.Lock)
+
+		if o.Cache.Warmup != nil && o.Cache.Warmup.Hotset != nil && o.Cache.Warmup.Hotset.Enable {
+			if o.Cache.Warmup.Hotset.TopN <= 0 {
+				errs = append(errs, fmt.Errorf("cache.warmup.hotset.top_n must be greater than 0 when enabled"))
+			}
+			if o.Cache.Warmup.Hotset.MaxItemsPerKind <= 0 {
+				errs = append(errs, fmt.Errorf("cache.warmup.hotset.max_items_per_kind must be greater than 0 when enabled"))
+			}
+		}
+		if o.Cache.Meta != nil && o.Cache.Meta.RedisProfile != "" && o.Cache.Warmup != nil && o.Cache.Warmup.Hotset != nil && o.Cache.Warmup.Hotset.Enable {
+			if len(o.RedisProfiles) > 0 {
+				if _, ok := o.RedisProfiles[o.Cache.Meta.RedisProfile]; !ok {
+					errs = append(errs, fmt.Errorf("cache.meta.redis_profile %q is required when hotset governance is enabled", o.Cache.Meta.RedisProfile))
+				}
+			}
+		}
+	}
+
 	return errs
 }

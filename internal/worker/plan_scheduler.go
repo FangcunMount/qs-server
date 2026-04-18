@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
@@ -33,13 +34,7 @@ func (s *workerServer) startPlanScheduler() {
 		return
 	}
 
-	redisClient, err := s.dbManager.GetRedisClient()
-	if err != nil {
-		log.Warnf("worker plan scheduler not started (HA lock unavailable: %v)", err)
-		return
-	}
-
-	runner := newWorkerPlanSchedulerRunner(opts, redisClient, s.grpcManager.PlanClient())
+	runner := newWorkerPlanSchedulerRunner(opts, s.lockRedis, s.grpcManager.PlanClient(), s.lockKeyBuilder())
 	if runner == nil {
 		log.Warnf("worker plan scheduler disabled at runtime because required dependencies are unavailable")
 		return
@@ -57,6 +52,7 @@ type workerPlanSchedulerRunner struct {
 	opts        *workerconfig.PlanSchedulerConfig
 	redisClient redis.UniversalClient
 	client      planSchedulerClient
+	lockBuilder *rediskey.Builder
 	pingRedis   func(ctx context.Context) error
 	acquireLock func(ctx context.Context, key string, ttl time.Duration) (string, bool, error)
 	releaseLock func(ctx context.Context, key, token string) error
@@ -66,11 +62,13 @@ func newWorkerPlanSchedulerRunner(
 	opts *workerconfig.PlanSchedulerConfig,
 	redisClient redis.UniversalClient,
 	client planSchedulerClient,
+	lockBuilder *rediskey.Builder,
 ) *workerPlanSchedulerRunner {
 	return newWorkerPlanSchedulerRunnerWithHooks(
 		opts,
 		redisClient,
 		client,
+		lockBuilder,
 		func(ctx context.Context) error {
 			if redisClient == nil {
 				return fmt.Errorf("redis client is nil")
@@ -90,6 +88,7 @@ func newWorkerPlanSchedulerRunnerWithHooks(
 	opts *workerconfig.PlanSchedulerConfig,
 	redisClient redis.UniversalClient,
 	client planSchedulerClient,
+	lockBuilder *rediskey.Builder,
 	pingRedis func(ctx context.Context) error,
 	acquireLock func(ctx context.Context, key string, ttl time.Duration) (string, bool, error),
 	releaseLock func(ctx context.Context, key, token string) error,
@@ -98,10 +97,12 @@ func newWorkerPlanSchedulerRunnerWithHooks(
 		return nil
 	}
 	if client == nil {
+		cacheobservability.ObserveLockDegraded("plan_scheduler_leader", "client_unavailable")
 		log.Warnf("worker plan scheduler not started (plan client unavailable)")
 		return nil
 	}
 	if redisClient == nil {
+		cacheobservability.ObserveLockDegraded("plan_scheduler_leader", "redis_unavailable")
 		log.Warnf("worker plan scheduler not started (HA lock unavailable: redis client unavailable)")
 		return nil
 	}
@@ -109,6 +110,7 @@ func newWorkerPlanSchedulerRunnerWithHooks(
 		pingRedis = func(context.Context) error { return nil }
 	}
 	if err := pingRedis(context.Background()); err != nil {
+		cacheobservability.ObserveLockDegraded("plan_scheduler_leader", "ping_failed")
 		log.Warnf("worker plan scheduler not started (HA lock unavailable: %v)", err)
 		return nil
 	}
@@ -121,6 +123,7 @@ func newWorkerPlanSchedulerRunnerWithHooks(
 		opts:        opts,
 		redisClient: redisClient,
 		client:      client,
+		lockBuilder: lockBuilder,
 		pingRedis:   pingRedis,
 		acquireLock: acquireLock,
 		releaseLock: releaseLock,
@@ -134,7 +137,7 @@ func (r *workerPlanSchedulerRunner) start(ctx context.Context) <-chan struct{} {
 		return done
 	}
 
-	lockKey := rediskey.NewBuilder().BuildLockKey(r.opts.LockKey)
+	lockKey := r.lockKey()
 	log.Infof("worker plan scheduler started (org_ids=%v, interval=%s, initial_delay=%s, lock_key=%s, lock_ttl=%s)",
 		r.opts.OrgIDs, r.opts.Interval, r.opts.InitialDelay, lockKey, r.opts.LockTTL)
 
@@ -165,21 +168,32 @@ func (r *workerPlanSchedulerRunner) executeTick(ctx context.Context) {
 }
 
 func (r *workerPlanSchedulerRunner) runOnce(ctx context.Context) error {
-	lockKey := rediskey.NewBuilder().BuildLockKey(r.opts.LockKey)
+	lockKey := r.lockKey()
 
 	token, acquired, err := r.acquireLock(ctx, lockKey, r.opts.LockTTL)
 	if err != nil {
+		cacheobservability.ObserveLockAcquire("plan_scheduler_leader", "error")
+		cacheobservability.ObserveFamilyFailure("worker", "lock_lease", err)
 		return fmt.Errorf("failed to acquire worker plan scheduler lock: %w", err)
 	}
 	if !acquired {
+		cacheobservability.ObserveLockAcquire("plan_scheduler_leader", "contention")
+		cacheobservability.ObserveFamilySuccess("worker", "lock_lease")
 		log.Infof("worker plan scheduler tick skipped (lock_key=%s, org_ids=%v, reason=lock_not_acquired)",
 			lockKey, r.opts.OrgIDs)
 		return nil
 	}
+	cacheobservability.ObserveLockAcquire("plan_scheduler_leader", "ok")
+	cacheobservability.ObserveFamilySuccess("worker", "lock_lease")
 
 	defer func() {
 		if err := r.releaseLock(context.Background(), lockKey, token); err != nil {
+			cacheobservability.ObserveLockRelease("plan_scheduler_leader", "error")
+			cacheobservability.ObserveFamilyFailure("worker", "lock_lease", err)
 			log.Warnf("failed to release worker plan scheduler lock (lock_key=%s): %v", lockKey, err)
+		} else {
+			cacheobservability.ObserveLockRelease("plan_scheduler_leader", "ok")
+			cacheobservability.ObserveFamilySuccess("worker", "lock_lease")
 		}
 	}()
 
@@ -212,6 +226,16 @@ func (r *workerPlanSchedulerRunner) runOnce(ctx context.Context) error {
 		lockKey, r.opts.OrgIDs, totalOpened, totalExpired, failedOrgs)
 
 	return nil
+}
+
+func (r *workerPlanSchedulerRunner) lockKey() string {
+	if r == nil {
+		return ""
+	}
+	if r.lockBuilder == nil {
+		r.lockBuilder = rediskey.NewBuilder()
+	}
+	return r.lockBuilder.BuildLockKey(r.opts.LockKey)
 }
 
 func waitWorkerPlanSchedulerDelay(ctx context.Context, delay time.Duration) bool {
