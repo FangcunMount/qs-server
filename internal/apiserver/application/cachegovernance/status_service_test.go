@@ -54,6 +54,17 @@ func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *test
 		Mode:        cacheobservability.FamilyModeNamedProfile,
 	})
 	registry.Update(cacheobservability.FamilyStatus{
+		Family:      "static_meta",
+		Profile:     "static_cache",
+		Namespace:   "prod:cache:static",
+		AllowWarmup: true,
+		Configured:  true,
+		Available:   false,
+		Degraded:    true,
+		Mode:        cacheobservability.FamilyModeDegraded,
+		LastError:   "redis unavailable",
+	})
+	registry.Update(cacheobservability.FamilyStatus{
 		Component:   "worker",
 		Family:      "lock_lease",
 		Profile:     "lock_cache",
@@ -90,14 +101,35 @@ func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *test
 	if err != nil {
 		t.Fatalf("GetStatus() error = %v", err)
 	}
-	if len(got.Families) != 1 {
-		t.Fatalf("GetStatus().Families len = %d, want 1", len(got.Families))
+	if got.GeneratedAt.IsZero() {
+		t.Fatal("GetStatus().GeneratedAt is zero")
 	}
-	if got.Families[0].Component != "apiserver" {
-		t.Fatalf("GetStatus().Families[0].Component = %q, want apiserver", got.Families[0].Component)
+	if len(got.Families) != 2 {
+		t.Fatalf("GetStatus().Families len = %d, want 2", len(got.Families))
 	}
-	if got.Families[0].Family != "query_result" {
-		t.Fatalf("GetStatus().Families[0].Family = %q, want query_result", got.Families[0].Family)
+	if got.Families[0].Family != "static_meta" || got.Families[1].Family != "query_result" {
+		t.Fatalf("GetStatus().Families order = [%q,%q], want [static_meta,query_result]", got.Families[0].Family, got.Families[1].Family)
+	}
+	if got.Families[0].Component != "apiserver" || got.Families[1].Component != "apiserver" {
+		t.Fatalf("GetStatus().Families components = [%q,%q], want both apiserver", got.Families[0].Component, got.Families[1].Component)
+	}
+	if got.Summary.FamilyTotal != 2 {
+		t.Fatalf("GetStatus().Summary.FamilyTotal = %d, want 2", got.Summary.FamilyTotal)
+	}
+	if got.Summary.AvailableCount != 1 {
+		t.Fatalf("GetStatus().Summary.AvailableCount = %d, want 1", got.Summary.AvailableCount)
+	}
+	if got.Summary.DegradedCount != 1 {
+		t.Fatalf("GetStatus().Summary.DegradedCount = %d, want 1", got.Summary.DegradedCount)
+	}
+	if got.Summary.UnavailableCount != 1 {
+		t.Fatalf("GetStatus().Summary.UnavailableCount = %d, want 1", got.Summary.UnavailableCount)
+	}
+	if !got.Summary.WarmupEnabled {
+		t.Fatal("GetStatus().Summary.WarmupEnabled = false, want true")
+	}
+	if !got.Summary.HotsetEnabled {
+		t.Fatal("GetStatus().Summary.HotsetEnabled = false, want true")
 	}
 	if !got.Warmup.Enabled {
 		t.Fatal("GetStatus().Warmup.Enabled = false, want true")

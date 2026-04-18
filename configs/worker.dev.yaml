@@ -21,6 +21,11 @@
 server:
   mode: debug  # server mode: release, debug, test
 
+metrics:
+  enable: true
+  bind_address: "0.0.0.0"
+  bind_port: 9092
+
 # -------------------------------------------------------
 # 1.2 Worker 配置
 # -------------------------------------------------------

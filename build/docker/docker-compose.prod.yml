@@ -68,6 +68,8 @@ services:
     networks:
       - qs-network
       - infra-network
+    expose:
+      - "9092"
     env_file:
       - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:

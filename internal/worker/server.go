@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -38,6 +39,8 @@ type workerServer struct {
 	lockRedis redis.UniversalClient
 	// family 状态注册表
 	familyStatus *cacheobservability.FamilyStatusRegistry
+	// metrics/health listener
+	metricsServer *metricsServer
 	// Container 主容器
 	container *container.Container
 	// gRPC 客户端管理器
@@ -114,6 +117,13 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
 
+	if s.config != nil && s.config.Metrics != nil && s.config.Metrics.Enable {
+		s.metricsServer = newMetricsServer(s.config.Metrics.BindAddress, s.config.Metrics.BindPort)
+		if err = s.metricsServer.Start(); err != nil {
+			log.Fatalf("Failed to start worker metrics server: %v", err)
+		}
+	}
+
 	// 6. 启动内建 plan scheduler（通过 gRPC 调用 apiserver 写侧命令）
 	s.startPlanScheduler()
 
@@ -154,6 +164,13 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		}
 		if s.dbManager != nil {
 			_ = s.dbManager.Close()
+		}
+		if s.metricsServer != nil {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.metricsServer.Shutdown(shutdownCtx); err != nil {
+				log.Warnf("shutdown worker metrics server failed: %v", err)
+			}
 		}
 
 		// 清理容器资源

@@ -100,6 +100,8 @@ services:
     image: qs-worker:${VERSION:-latest}
     restart: unless-stopped
     command: ["/app/qs-worker", "--config=/app/configs/worker.prod.yaml"]
+    ports:
+      - "19092:9092"
     volumes:
       - ../../configs/worker.prod.yaml:/app/configs/worker.prod.yaml:ro
       - worker-logs:/app/logs

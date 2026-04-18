@@ -2,6 +2,8 @@ package cachegovernance
 
 import (
 	"context"
+	"sort"
+	"time"
 
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
@@ -13,8 +15,19 @@ type StatusService interface {
 }
 
 type StatusSnapshot struct {
-	Families []cacheobservability.FamilyStatus `json:"families"`
-	Warmup   WarmupStatusSnapshot              `json:"warmup"`
+	GeneratedAt time.Time                         `json:"generated_at"`
+	Summary     StatusSummary                     `json:"summary"`
+	Families    []cacheobservability.FamilyStatus `json:"families"`
+	Warmup      WarmupStatusSnapshot              `json:"warmup"`
+}
+
+type StatusSummary struct {
+	FamilyTotal      int  `json:"family_total"`
+	AvailableCount   int  `json:"available_count"`
+	DegradedCount    int  `json:"degraded_count"`
+	UnavailableCount int  `json:"unavailable_count"`
+	WarmupEnabled    bool `json:"warmup_enabled"`
+	HotsetEnabled    bool `json:"hotset_enabled"`
 }
 
 type HotsetSnapshot struct {
@@ -45,7 +58,9 @@ func NewStatusService(component string, status *cacheobservability.FamilyStatusR
 
 func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapshot, error) {
 	_ = ctx
-	result := &StatusSnapshot{}
+	result := &StatusSnapshot{
+		GeneratedAt: time.Now(),
+	}
 	if s == nil {
 		return result, nil
 	}
@@ -58,10 +73,19 @@ func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapsho
 			}
 			result.Families = append(result.Families, item)
 		}
+		sort.SliceStable(result.Families, func(i, j int) bool {
+			left := familyDisplayOrder(result.Families[i].Family)
+			right := familyDisplayOrder(result.Families[j].Family)
+			if left == right {
+				return result.Families[i].Family < result.Families[j].Family
+			}
+			return left < right
+		})
 	}
 	if s.coord != nil {
 		result.Warmup = s.coord.Snapshot()
 	}
+	result.Summary = summarizeStatus(result.Families, result.Warmup)
 	return result, nil
 }
 
@@ -123,5 +147,44 @@ func warmupKindFamily(kind cacheinfra.WarmupKind) cacheinfra.CacheFamily {
 		return cacheinfra.CacheFamilyQuery
 	default:
 		return cacheinfra.CacheFamilyDefault
+	}
+}
+
+func summarizeStatus(families []cacheobservability.FamilyStatus, warmup WarmupStatusSnapshot) StatusSummary {
+	summary := StatusSummary{
+		FamilyTotal:   len(families),
+		WarmupEnabled: warmup.Enabled,
+		HotsetEnabled: warmup.Hotset.Enable,
+	}
+	for _, family := range families {
+		if family.Available && !family.Degraded {
+			summary.AvailableCount++
+		}
+		if family.Degraded {
+			summary.DegradedCount++
+		}
+		if !family.Available {
+			summary.UnavailableCount++
+		}
+	}
+	return summary
+}
+
+func familyDisplayOrder(family string) int {
+	switch family {
+	case string(cacheinfra.CacheFamilyStatic):
+		return 0
+	case string(cacheinfra.CacheFamilyObject):
+		return 1
+	case string(cacheinfra.CacheFamilyQuery):
+		return 2
+	case string(cacheinfra.CacheFamilyMeta):
+		return 3
+	case string(cacheinfra.CacheFamilySDK):
+		return 4
+	case string(cacheinfra.CacheFamilyLock):
+		return 5
+	default:
+		return 99
 	}
 }

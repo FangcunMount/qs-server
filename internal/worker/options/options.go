@@ -15,6 +15,7 @@ import (
 type Options struct {
 	Log                     *log.Options                     `json:"log"      mapstructure:"log"`
 	GenericServerRunOptions *genericoptions.ServerRunOptions `json:"server"   mapstructure:"server"`
+	Metrics                 *MetricsOptions                  `json:"metrics"  mapstructure:"metrics"`
 	// MySQL 配置
 	MySQL *genericoptions.MySQLOptions `json:"mysql" mapstructure:"mysql"`
 	// MongoDB 配置
@@ -35,6 +36,13 @@ type Options struct {
 	RedisProfiles map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
 	// Cache 控制缓存输出
 	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
+}
+
+// MetricsOptions worker 观测端口配置。
+type MetricsOptions struct {
+	Enable      bool   `json:"enable" mapstructure:"enable"`
+	BindAddress string `json:"bind_address" mapstructure:"bind_address"`
+	BindPort    int    `json:"bind_port" mapstructure:"bind_port"`
 }
 
 // MessagingOptions 消息队列配置
@@ -135,8 +143,13 @@ func NewOptions() *Options {
 	return &Options{
 		Log:                     log.NewOptions(),
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		MySQL:                   genericoptions.NewMySQLOptions(),
-		MongoDB:                 genericoptions.NewMongoDBOptions(),
+		Metrics: &MetricsOptions{
+			Enable:      true,
+			BindAddress: "0.0.0.0",
+			BindPort:    9092,
+		},
+		MySQL:   genericoptions.NewMySQLOptions(),
+		MongoDB: genericoptions.NewMongoDBOptions(),
 		Messaging: &MessagingOptions{
 			Provider:       "nsq",
 			NSQAddr:        "localhost:4150",
@@ -165,6 +178,13 @@ func NewOptions() *Options {
 func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Log.AddFlags(fss.FlagSet("log"))
 	o.GenericServerRunOptions.AddFlags(fss.FlagSet("server"))
+	if o.Metrics == nil {
+		o.Metrics = &MetricsOptions{
+			Enable:      true,
+			BindAddress: "0.0.0.0",
+			BindPort:    9092,
+		}
+	}
 	o.MySQL.AddFlags(fss.FlagSet("mysql"))
 	o.MongoDB.AddFlags(fss.FlagSet("mongodb"))
 
@@ -193,6 +213,14 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"gRPC CA certificate file")
 	grpcFS.StringVar(&o.GRPC.TLSServerName, "grpc.tls-server-name", o.GRPC.TLSServerName,
 		"gRPC server name override for TLS verification")
+
+	metricsFS := fss.FlagSet("metrics")
+	metricsFS.BoolVar(&o.Metrics.Enable, "metrics.enable", o.Metrics.Enable,
+		"Enable the lightweight worker metrics and health server")
+	metricsFS.StringVar(&o.Metrics.BindAddress, "metrics.bind-address", o.Metrics.BindAddress,
+		"Bind address for the worker metrics server")
+	metricsFS.IntVar(&o.Metrics.BindPort, "metrics.bind-port", o.Metrics.BindPort,
+		"Bind port for the worker metrics server")
 
 	// Worker flags
 	workerFS := fss.FlagSet("worker")
@@ -248,6 +276,14 @@ func (o *Options) Validate() []error {
 	// Redis 校验（单实例主机端口）
 	if o.Redis.Host == "" && len(o.Redis.Addrs) == 0 {
 		errs = append(errs, fmt.Errorf("redis.host cannot be empty"))
+	}
+	if o.Metrics != nil && o.Metrics.Enable {
+		if o.Metrics.BindAddress == "" {
+			errs = append(errs, fmt.Errorf("metrics.bind_address cannot be empty when metrics are enabled"))
+		}
+		if o.Metrics.BindPort <= 0 {
+			errs = append(errs, fmt.Errorf("metrics.bind_port must be greater than 0 when metrics are enabled"))
+		}
 	}
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))

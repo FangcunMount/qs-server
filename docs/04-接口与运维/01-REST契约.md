@@ -124,6 +124,7 @@ flowchart LR
 这组路由的职责不同：
 
 - `status`：查看当前进程对 `static/object/query/meta/sdk/lock` family 的解析结果、namespace、profile、degraded mode，以及最近一次 warmup run 快照
+- `status`：查看当前进程对 `static/object/query/meta/sdk/lock` family 的解析结果、namespace、profile、degraded mode，以及最近一次 warmup run 快照；当前响应还包含 `generated_at` 与 `summary`，适合 operating BFF 直接透传给只读治理页
 - `hotset`：按 `kind` 查看 top-N 热点 scope 与 score，只做治理预览，不暴露时序或聚合能力
 - `repair-complete`：给 `seeddata / repair` 任务结束后触发缓存联动，不是只读面板
 

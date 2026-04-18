@@ -13,6 +13,8 @@ type Config struct {
 	Options *options.Options
 	// Log 日志配置
 	Log *LogConfig
+	// Metrics 观测服务配置
+	Metrics *MetricsConfig
 	// MySQL 数据库配置
 	MySQL *MySQLConfig
 	// MongoDB 配置
@@ -37,6 +39,13 @@ type Config struct {
 type LogConfig struct {
 	Level  string
 	Format string
+}
+
+// MetricsConfig worker metrics/health listener 配置。
+type MetricsConfig struct {
+	Enable      bool
+	BindAddress string
+	BindPort    int
 }
 
 // MySQLConfig MySQL 配置
@@ -106,6 +115,11 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 		Log: &LogConfig{
 			Level:  opts.Log.Level,
 			Format: opts.Log.Format,
+		},
+		Metrics: &MetricsConfig{
+			Enable:      opts.Metrics.Enable,
+			BindAddress: opts.Metrics.BindAddress,
+			BindPort:    opts.Metrics.BindPort,
 		},
 		MySQL: &MySQLConfig{
 			Host:     opts.MySQL.Host,
