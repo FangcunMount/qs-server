@@ -97,6 +97,7 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 		Conclusion:   r.Conclusion(),
 		Dimensions:   dimensions,
 		Suggestions:  toSuggestionDTOs(r.Suggestions()),
+		CreatedAt:    r.CreatedAt(),
 	}
 }
 

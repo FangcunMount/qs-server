@@ -10,6 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // EvaluationHandler 测评处理器
@@ -62,6 +64,10 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 
 	result, err := h.queryService.GetMyAssessment(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
+		if isGRPCNotFound(err) {
+			h.NotFoundResponse(c, "assessment not found", nil)
+			return
+		}
 		h.InternalErrorResponse(c, "get assessment failed", err)
 		return
 	}
@@ -460,6 +466,10 @@ func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
 
 	result, err := h.queryService.GetMyAssessmentByAnswerSheetID(c.Request.Context(), answerSheetID)
 	if err != nil {
+		if isGRPCNotFound(err) {
+			h.NotFoundResponse(c, "assessment not found", nil)
+			return
+		}
 		h.InternalErrorResponse(c, "get assessment by answer sheet failed", err)
 		return
 	}
@@ -470,4 +480,8 @@ func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
 	}
 
 	h.Success(c, result)
+}
+
+func isGRPCNotFound(err error) bool {
+	return status.Code(err) == codes.NotFound
 }

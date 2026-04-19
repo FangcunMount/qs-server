@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -12,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // EvaluationService 测评 gRPC 服务 - C端接口
@@ -57,7 +59,7 @@ func (s *EvaluationService) GetMyAssessment(ctx context.Context, req *pb.GetMyAs
 
 	result, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toAssessmentQueryGRPCError(err)
 	}
 
 	if result == nil {
@@ -77,7 +79,7 @@ func (s *EvaluationService) GetMyAssessmentByAnswerSheetID(ctx context.Context, 
 
 	result, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswerSheetId)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toAssessmentQueryGRPCError(err)
 	}
 
 	if result == nil {
@@ -106,10 +108,10 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 	}
 
 	dto := assessmentApp.ListMyAssessmentsDTO{
-		TesteeID: req.TesteeId,
-		Page:     page,
-		PageSize: pageSize,
-		Status:   req.Status,
+		TesteeID:  req.TesteeId,
+		Page:      page,
+		PageSize:  pageSize,
+		Status:    req.Status,
 		ScaleCode: req.ScaleCode,
 		RiskLevel: req.RiskLevel,
 	}
@@ -160,6 +162,20 @@ func parseAssessmentListDate(raw string, endExclusive bool) (*time.Time, error) 
 		return &parsed, nil
 	}
 	return nil, status.Error(codes.InvalidArgument, "invalid date format")
+}
+
+func toAssessmentQueryGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	coder := pkgerrors.ParseCoder(err)
+	switch coder.Code() {
+	case errorCode.ErrAssessmentNotFound:
+		return status.Error(codes.NotFound, err.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
+	}
 }
 
 // ==================== 得分查询接口 ====================
