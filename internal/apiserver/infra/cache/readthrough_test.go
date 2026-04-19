@@ -17,6 +17,7 @@ func TestReadThroughUsesPolicyScopedSingleflight(t *testing.T) {
 	t.Parallel()
 
 	var loadCount atomic.Int32
+	var cacheMissCount atomic.Int32
 	release := make(chan struct{})
 	started := make(chan struct{}, 1)
 
@@ -30,6 +31,7 @@ func TestReadThroughUsesPolicyScopedSingleflight(t *testing.T) {
 			CacheKey:  "assessment:detail:42",
 			Policy:    policy,
 			GetCached: func(context.Context) (*readThroughValue, error) {
+				cacheMissCount.Add(1)
 				return nil, ErrCacheNotFound
 			},
 			Load: func(context.Context) (*readThroughValue, error) {
@@ -47,24 +49,30 @@ func TestReadThroughUsesPolicyScopedSingleflight(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan *readThroughValue, 2)
 	errors := make(chan error, 2)
-	begin := make(chan struct{})
-	for i := 0; i < 2; i++ {
+	start := func() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			<-begin
 			value, err := run()
 			results <- value
 			errors <- err
 		}()
 	}
-	close(begin)
+
+	start()
 
 	select {
 	case <-started:
 	case <-time.After(2 * time.Second):
 		t.Fatal("loader was not invoked")
 	}
+
+	start()
+	waitFor(t, func() bool {
+		return cacheMissCount.Load() == 2
+	})
+	time.Sleep(20 * time.Millisecond)
+
 	close(release)
 	wg.Wait()
 	close(results)
