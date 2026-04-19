@@ -123,16 +123,16 @@ func (s *service) GenerateQuestionnaireQRCode(ctx context.Context, code, version
 		return "", fmt.Errorf("获取微信应用配置失败: %w", err)
 	}
 
-	// 构建 scene 参数：包含问卷编码和版本
+	// 构建 scene 参数：前端填写页实际消费 q，v 仅作为附加信息保留
 	// scene 最大 32 个字符，只能包含字母、数字、下划线
-	scene := fmt.Sprintf("code=%s&v=%s", code, version)
+	scene := fmt.Sprintf("q=%s&v=%s", code, version)
 	if len(scene) > 32 {
-		// 如果超过 32 字符，只使用编码
-		scene = code
-		l.Warnw("scene 参数超过 32 字符，仅使用编码",
+		// 如果超过 32 字符，仅保留前端必需的 q 参数
+		scene = fmt.Sprintf("q=%s", code)
+		l.Warnw("scene 参数超过 32 字符，仅保留问卷编码",
 			"code", code,
 			"version", version,
-			"original_scene", fmt.Sprintf("code=%s&v=%s", code, version),
+			"original_scene", fmt.Sprintf("q=%s&v=%s", code, version),
 		)
 	}
 
