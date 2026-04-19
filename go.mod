@@ -9,7 +9,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
-	github.com/mozillazg/go-pinyin v0.21.0
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/spf13/cobra v1.9.1
@@ -146,5 +145,5 @@ require (
 	golang.org/x/sync v0.18.0
 	golang.org/x/time v0.12.0
 	google.golang.org/grpc v1.77.0
-	gorm.io/driver/mysql v1.6.0
+	gorm.io/driver/mysql v1.6.0 // indirect
 )

@@ -1,0 +1,36 @@
+name: seeddata-runner
+
+on:
+  push:
+    paths:
+      - "tools/seeddata-runner/**"
+      - ".github/workflows/seeddata-runner.yml"
+  pull_request:
+    paths:
+      - "tools/seeddata-runner/**"
+      - ".github/workflows/seeddata-runner.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: tools/seeddata-runner/go.mod
+
+      - name: Boundary check
+        run: |
+          if rg -n 'github.com/FangcunMount/qs-server/(internal|pkg)/' tools/seeddata-runner -g'*.go'; then
+            echo "seeddata-runner must not import qs-server internal/pkg packages" >&2
+            exit 1
+          fi
+
+      - name: Test
+        working-directory: tools/seeddata-runner
+        run: |
+          go mod download
+          go test ./...

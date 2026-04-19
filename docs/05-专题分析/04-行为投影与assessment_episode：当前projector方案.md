@@ -539,12 +539,7 @@ WHERE org_id = 1 AND assessment_id = ? ...
 
 ### 3. 历史重建可行
 
-现在已经有：
-
-- `journey_rebuild_history`
-- `statistics_backfill`
-
-能基于历史表重建 runtime facts 和 projection。
+历史上曾经通过 `journey_rebuild_history` 与 `statistics_backfill` 基于历史表重建 runtime facts 和 projection；这两类一次性 seeddata/backfill 步骤现在已经移除，后续如需重建应走新的专用运维方案。
 
 ---
 

@@ -1,3 +1,7 @@
+global:
+  orgId: 1
+  defaultTag: ""
+
 api:
   baseUrl: "https://qs.fangcunmount.cn"
   collectionBaseUrl: "https://collect.fangcunmount.cn"
@@ -7,14 +11,11 @@ api:
     minDelay: "200ms"
     maxDelay: "5s"
 
-grpc:
-  apiserverAddr: "localhost:9090"
-
 iam:
   baseUrl: "https://iam.fangcunmount.cn"
   loginUrl: "https://iam.fangcunmount.cn/api/v1/authn/login"
-  username: "+8613112345671"
-  password: "Admin@123"
+  username: ""
+  password: ""
   tenantId: "1"
   grpc:
     address: "iam-apiserver:9090"
@@ -28,128 +29,6 @@ iam:
       serverName: ""
       insecureSkipVerify: false
 
-plan:
-  mode: "local"
-
-local:
-  mysql_dsn: ""
-  mongo_uri: ""
-  mongo_database: ""
-  redis_addr: ""
-  redis_username: ""
-  redis_password: ""
-  redis_db: 0
-  plan_entry_base_url: "https://collect.fangcunmount.cn/entry"
-
-global:
-  orgId: 1
-  defaultTag: ""
-
-staffs: []
-
-clinicians:
-  - key: "cln_614995509882401326"
-    operatorId: "615060135500329518"
-    name: "史老师"
-    department: "儿童心理健康科"
-    title: "主任医师"
-    clinicianType: "doctor"
-    isActive: true
-
-clinicianGenerators:
-  - keyPrefix: "seed_doctor"
-    staffKeyPrefix: "seed_doctor_staff"
-    nameSourceUrlPattern: "https://www.haodf.com/citiao/jibing-xiaoerduodongzheng/tuijian-doctor.html?p=%d"
-    nameSourcePages: 10
-    employeeCodePrefix: "SEED-CLN-"
-    phonePrefix: "+86177"
-    emailDomain: "fangcunmount.com"
-    password: "Doctor@123"
-    staffRoles: ["qs:staff"]
-    generateStaff: true
-    count: 100
-    startIndex: 1
-    clinicianType: "doctor"
-    departments:
-      - "儿童心理健康科"
-      - "儿童精神科"
-      - "神经内科"
-      - "儿童保健科"
-      - "精神卫生科"
-      - "小儿心理卫生科"
-      - "儿科"
-      - "儿童心理课"
-      - "儿童神经科"
-      - "小儿内科"
-      - "小儿神经内科"
-    titles:
-      - "主任医师"
-      - "副主任医师"
-      - "主治医师"
-    isActive: true
-
-testeeAssignments:
-  - key: "seed_primary_pool_all"
-    strategy: "random"
-    relationType: "primary"
-    focusTargetCount: 10
-    focusTargetRatio: 0.85
-    clinicianIds: &seed_clinician_ids
-      - 614995509882401326
-      - 615086081481650734
-      - 615086709855498798
-      - 615086769280397870
-      - 615086872040845870
-      - 615086919386149422
-      - 615087703368675886
-      - 615087755663258158
-      - 615087818779144750
-      - 615087864044073518
-      - 615088273357812270
-      - 615088307902100014
-      - 615088351405421102
-      - 615088385312174638
-      - 615088855208440366
-      - 615089195702039086
-      - 615089235111719470
-    clinicianKeyPrefixes:
-      - "seed_doctor_"
-    testeeOffset: 0
-    testeePageSize: 100
-    includeAlreadyAssigned: false
-
-actorTimeline:
-  waveInterval: "90d"
-  waveWeeks: 4
-  waveDaysOfWeek: [1, 3, 5]
-  dayStartHour: 9
-  dayEndHour: 18
-  slotInterval: "10m"
-
-assessmentEntryTargets:
-  - key: "scale_3adyDE"
-    targetType: "scale"
-    targetCode: "3adyDE"
-    targetVersion: ""
-    expiresAfter: "180d"
-
-assessmentEntryFlow:
-  clinicianRefs: []
-  clinicianKeyPrefixes:
-    - "seed_doctor_"
-  clinicianIds: *seed_clinician_ids
-  entryIDs: []
-  maxIntakesPerEntry: 5
-  allowTemporaryTestee: false
-
-assessmentByEntry:
-  clinicianRefs: []
-  clinicianKeyPrefixes:
-    - "seed_doctor_"
-  clinicianIds: *seed_clinician_ids
-  entryIDs: []
-  maxAssessmentsPerEntry: 5
-
 dailySimulation:
   countMin: 10
   countMax: 50
@@ -159,13 +38,26 @@ dailySimulation:
   runAt: "10:00"
   retryDelay: "30m"
   stateFile: ".seeddata-cache/daily-simulation-daemon-state.json"
-  clinicianRef: ""
-  clinicianId: ""
-  clinicianIds: *seed_clinician_ids
-  clinicianKeyPrefixes:
-    - "seed_doctor_"
-  focusCliniciansPerRunMin: 3
-  focusCliniciansPerRunMax: 5
+  clinicianIds:
+    - 614995509882401326
+    - 615086081481650734
+    - 615086709855498798
+    - 615086769280397870
+    - 615086872040845870
+    - 615086919386149422
+    - 615087703368675886
+    - 615087755663258158
+    - 615087818779144750
+    - 615087864044073518
+    - 615088273357812270
+    - 615088307902100014
+    - 615088351405421102
+    - 615088385312174638
+    - 615088855208440366
+    - 615089195702039086
+    - 615089235111719470
+  focusCliniciansPerRunMin: 3 # 每日模拟医生数量最小值
+  focusCliniciansPerRunMax: 5 # 每日模拟医生数量最大值
   entryId: ""
   targetType: "scale"
   targetCode: "3adyDE"
@@ -179,13 +71,17 @@ dailySimulation:
     - "seed"
     - "daily-simulation"
   isKeyFocus: false
+  planIds:
+    - "614333603412718126"
+    - "614187067651404334"
+  journeyMix:
+    registerOnlyWeight: 15  # 只注册账号
+    createTesteeWeight: 20  # 创建受试者
+    resolveEntryWeight: 15  # 解析入口
+    submitAnswerWeight: 50  # 提交答卷
 
-assessmentStatusProfile:
-  pending: 0.10
-  submitted: 0.15
-  interpreted: 0.70
-  failed: 0.05
-
-testees: []
-questionnaires: []
-scales: []
+planSubmit:
+  planIds:
+    - "614333603412718126"
+    - "614187067651404334"
+  workers: 1

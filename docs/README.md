@@ -116,8 +116,7 @@ flowchart LR
 
 | 路径 | 用途（概要） |
 | ---- | ------------ |
-| [cmd/tools/seeddata](../cmd/tools/seeddata) | 种子数据 / 联调灌数（配置见 [configs/seeddata.yaml](../configs/seeddata.yaml)） |
-| [cmd/tools/redis-stats-ttl-fix](../cmd/tools/redis-stats-ttl-fix) | Redis 统计相关 TTL 修复类工具 |
+| [tools/seeddata-runner](../tools/seeddata-runner) | 独立 seeddata 子模块，负责 mock 用户与 plan open-task 提交（配置见 [tools/seeddata-runner/configs/seeddata.yaml](../tools/seeddata-runner/configs/seeddata.yaml)） |
 
 具体子命令与参数以各 `main.go` 及 `-h` 为准。
 

@@ -156,9 +156,7 @@ redis-cli --scan --pattern 'event:processed:*' \
 
 | 路径 | 用途 |
 | ---- | ---- |
-| [cmd/tools/redis-stats-ttl-fix](../../cmd/tools/redis-stats-ttl-fix) | 扫描 `stats:daily:*` 并补 TTL |
-| [cmd/tools/seeddata/plan_seed_gateway.go](../../cmd/tools/seeddata/plan_seed_gateway.go) | `seeddata` 的本地 plan 链路会连接本地 Redis，复用计划相关运行时能力 |
-| [cmd/tools/internal/common/common.go](../../cmd/tools/internal/common/common.go) | CLI / seeddata 打开 Redis 连接的公共 helper |
+| [tools/seeddata-runner](../../tools/seeddata-runner) | 仓库内独立 seeddata 子模块；仅保留 `daily_simulation_daemon` 与 `plan_submit_open_tasks_daemon` 两个后台脚本入口；当前不再依赖本地 Redis runtime |
 
 ## 当前边界与注意事项
 

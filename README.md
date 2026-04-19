@@ -161,7 +161,7 @@ make lint
 make coverage
 ```
 
-- **种子数据等工具**：[cmd/tools/seeddata](cmd/tools/seeddata)（配置 [configs/seeddata.yaml](configs/seeddata.yaml)）。
+- **种子数据等工具**：[tools/seeddata-runner](tools/seeddata-runner)（配置 [tools/seeddata-runner/configs/seeddata.yaml](tools/seeddata-runner/configs/seeddata.yaml)）。
 
 ---
 
