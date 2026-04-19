@@ -59,12 +59,15 @@ grpc_client:
 # 3.1 Redis
 # -------------------------------------------------------
 # 用途：缓存、会话、限流等临时数据
+# DB 分配约定（生产）：
+#   - DB 0: IAM 业务
+#   - DB 1: QS 业务默认 Redis
 redis:
   host: "127.0.0.1"
   port: 6379
   username: ""
   password: ""
-  database: 0
+  database: 1
   max-idle: 200
   max-active: 800
   timeout: 300

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/database"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/alicebob/miniredis/v2"
@@ -19,10 +20,10 @@ func TestWorkerDatabaseManagerGetRedisClientByProfile(t *testing.T) {
 	opts := workeroptions.NewOptions()
 	opts.Redis.Host = host
 	opts.Redis.Port = port
-	lockOpts := workeroptions.NewOptions().Redis
-	lockOpts.Host = host
-	lockOpts.Port = port
-	lockOpts.Database = 5
+	opts.Redis.Database = 1
+	lockOpts := &genericoptions.RedisOptions{
+		Database: 5,
+	}
 	opts.RedisProfiles["lock_cache"] = lockOpts
 
 	badOpts := workeroptions.NewOptions().Redis

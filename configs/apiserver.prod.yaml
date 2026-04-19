@@ -137,12 +137,16 @@ migration:
 # ----------------------------------------------------------------------------
 # 3.3 Redis 配置（单实例）
 # ----------------------------------------------------------------------------
+# DB 分配约定（生产）：
+#   - DB 0: IAM 业务
+#   - DB 1: QS 业务默认 Redis
+#   - DB 2+: 缓存/锁/元数据专用
 redis:
   host: "127.0.0.1"
   port: 6379
   username: ""
   password: ""
-  database: 0
+  database: 1
   max-idle: 200
   max-active: 800
   timeout: 300
@@ -156,41 +160,17 @@ redis:
 
 redis_profiles:
   static_cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
-    database: 1
-  object_cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
     database: 2
-  query_cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
+  object_cache:
     database: 3
-  meta_cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
-    database: 6
-  sdk_cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
+  query_cache:
     database: 4
-  lock_cache:
-    host: "127.0.0.1"
-    port: 6379
-    username: ""
-    password: ""
+  meta_cache:
+    database: 7
+  sdk_cache:
     database: 5
+  lock_cache:
+    database: 6
 
 # ----------------------------------------------------------------------------
 # 3.4 缓存控制
@@ -199,7 +179,7 @@ cache:
   disable_evaluation_cache: false # 开启测评结果缓存
   disable_statistics_cache: false # 开启统计缓存
   static:
-    redis_profile: "static_cache" # 若未配置 redis_profiles.static_cache，则回退到默认 redis
+    redis_profile: "static_cache" # 仅覆盖 DB；host/port/user/password 继承默认 redis
     namespace_suffix: "cache:static"
     compress: false
     singleflight: true
@@ -211,7 +191,7 @@ cache:
     singleflight: true
     negative: false
   query:
-    redis_profile: "query_cache" # 若未配置 redis_profiles.query_cache，则回退到默认 redis
+    redis_profile: "query_cache" # 仅覆盖 DB；host/port/user/password 继承默认 redis
     namespace_suffix: "cache:query"
     ttl: "5m"
     compress: false

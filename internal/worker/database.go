@@ -42,7 +42,7 @@ func (m *DatabaseManager) initRedis() error {
 	defaultConfig := toWorkerDatabaseRedisConfig(m.config.Redis)
 	redisProfiles := make(map[string]*database.RedisConfig)
 	for name, cfg := range m.config.RedisProfiles {
-		databaseCfg := toWorkerDatabaseRedisConfig(cfg)
+		databaseCfg := mergeWorkerDatabaseRedisConfig(defaultConfig, toWorkerDatabaseRedisConfig(cfg))
 		if databaseCfg == nil || (databaseCfg.Host == "" && len(databaseCfg.Addrs) == 0) {
 			continue
 		}
@@ -136,4 +136,83 @@ func toWorkerDatabaseRedisConfig(opts *options.RedisOptions) *database.RedisConf
 		UseSSL:                opts.UseSSL,
 		SSLInsecureSkipVerify: opts.SSLInsecureSkipVerify,
 	}
+}
+
+func mergeWorkerDatabaseRedisConfig(base, override *database.RedisConfig) *database.RedisConfig {
+	if override == nil {
+		return cloneWorkerDatabaseRedisConfig(base)
+	}
+	if base == nil {
+		return cloneWorkerDatabaseRedisConfig(override)
+	}
+
+	merged := cloneWorkerDatabaseRedisConfig(base)
+	if merged == nil {
+		merged = &database.RedisConfig{}
+	}
+
+	if override.Host != "" {
+		merged.Host = override.Host
+	}
+	if override.Port != 0 {
+		merged.Port = override.Port
+	}
+	if len(override.Addrs) > 0 {
+		merged.Addrs = append([]string(nil), override.Addrs...)
+	}
+	if override.Username != "" {
+		merged.Username = override.Username
+	}
+	if override.Password != "" {
+		merged.Password = override.Password
+	}
+
+	merged.Database = override.Database
+
+	if override.MaxIdle != 0 {
+		merged.MaxIdle = override.MaxIdle
+	}
+	if override.MaxActive != 0 {
+		merged.MaxActive = override.MaxActive
+	}
+	if override.Timeout != 0 {
+		merged.Timeout = override.Timeout
+	}
+	if override.MinIdleConns != 0 {
+		merged.MinIdleConns = override.MinIdleConns
+	}
+	if override.PoolTimeout != 0 {
+		merged.PoolTimeout = override.PoolTimeout
+	}
+	if override.DialTimeout != 0 {
+		merged.DialTimeout = override.DialTimeout
+	}
+	if override.ReadTimeout != 0 {
+		merged.ReadTimeout = override.ReadTimeout
+	}
+	if override.WriteTimeout != 0 {
+		merged.WriteTimeout = override.WriteTimeout
+	}
+	if override.EnableCluster {
+		merged.EnableCluster = true
+	}
+	if override.UseSSL {
+		merged.UseSSL = true
+	}
+	if override.SSLInsecureSkipVerify {
+		merged.SSLInsecureSkipVerify = true
+	}
+
+	return merged
+}
+
+func cloneWorkerDatabaseRedisConfig(cfg *database.RedisConfig) *database.RedisConfig {
+	if cfg == nil {
+		return nil
+	}
+	copyCfg := *cfg
+	if len(cfg.Addrs) > 0 {
+		copyCfg.Addrs = append([]string(nil), cfg.Addrs...)
+	}
+	return &copyCfg
 }
