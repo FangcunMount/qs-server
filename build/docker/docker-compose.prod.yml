@@ -9,6 +9,12 @@ services:
     networks:
       - qs-network
       - infra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.job=qs-apiserver"
+      - "prometheus.component=qs-apiserver"
+      - "prometheus.metrics_port=8080"
+      - "prometheus.metrics_path=/metrics"
     ports:
       - "8081:8080"
       - "9445:8443"
@@ -68,6 +74,12 @@ services:
     networks:
       - qs-network
       - infra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.job=qs-worker"
+      - "prometheus.component=qs-worker"
+      - "prometheus.metrics_port=9092"
+      - "prometheus.metrics_path=/metrics"
     expose:
       - "9092"
     env_file:
