@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -866,6 +867,17 @@ func (s *InternalService) SendTaskOpenedMiniProgramNotification(
 			Message: err.Error(),
 		}, nil
 	}
+
+	l.Infow("发送 task.opened 小程序通知完成",
+		"action", "send_task_opened_mini_program_notification",
+		"task_id", req.GetTaskId(),
+		"testee_id", req.GetTesteeId(),
+		"sent_count", result.SentCount,
+		"skipped", result.Skipped,
+		"recipient_source", result.RecipientSource,
+		"recipient_open_ids", strings.Join(result.RecipientOpenIDs, ","),
+		"message", result.Message,
+	)
 
 	return &pb.SendTaskOpenedMiniProgramNotificationResponse{
 		Success:          result.SentCount > 0,

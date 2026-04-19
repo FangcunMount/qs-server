@@ -115,6 +115,7 @@ func NewMiniProgramTaskNotificationService(
 }
 
 func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDTO) (*TaskOpenedResult, error) {
+	l := logger.L(ctx)
 	result := &TaskOpenedResult{
 		TemplateID: s.taskOpenedTemplateID(),
 	}
@@ -144,6 +145,12 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 		return nil, err
 	}
 	if len(recipients) == 0 {
+		l.Warnw("task.opened mini program notification skipped because no recipients were resolved",
+			"action", "send_task_opened_miniprogram_notification",
+			"task_id", dto.TaskID,
+			"testee_id", dto.TesteeID,
+			"template_id", result.TemplateID,
+		)
 		result.Skipped = true
 		result.Message = "no mini program recipients resolved"
 		return result, nil
@@ -159,6 +166,18 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 	result.RecipientOpenIDs = recipients
 	result.RecipientSource = source
 
+	l.Infow("task.opened mini program notification prepared",
+		"action", "send_task_opened_miniprogram_notification",
+		"task_id", dto.TaskID,
+		"testee_id", dto.TesteeID,
+		"template_id", result.TemplateID,
+		"recipient_source", source,
+		"recipient_count", len(recipients),
+		"recipient_open_ids", strings.Join(recipients, ","),
+		"page", page,
+		"template_data", fmt.Sprintf("%v", data),
+	)
+
 	var sent int
 	var sendErrs []string
 	for _, openID := range recipients {
@@ -170,19 +189,68 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 			Lang:             "zh_CN",
 			Data:             data,
 		}); err != nil {
+			l.Warnw("task.opened mini program notification delivery failed",
+				"action", "send_task_opened_miniprogram_notification",
+				"task_id", dto.TaskID,
+				"testee_id", dto.TesteeID,
+				"template_id", result.TemplateID,
+				"recipient_open_id", openID,
+				"page", page,
+				"error", err.Error(),
+			)
 			sendErrs = append(sendErrs, fmt.Sprintf("%s: %v", openID, err))
 			continue
 		}
+		l.Infow("task.opened mini program notification delivered",
+			"action", "send_task_opened_miniprogram_notification",
+			"task_id", dto.TaskID,
+			"testee_id", dto.TesteeID,
+			"template_id", result.TemplateID,
+			"recipient_open_id", openID,
+			"page", page,
+		)
 		sent++
 	}
 
 	result.SentCount = sent
 	if sent == 0 {
+		l.Errorw("task.opened mini program notification failed for all recipients",
+			"action", "send_task_opened_miniprogram_notification",
+			"task_id", dto.TaskID,
+			"testee_id", dto.TesteeID,
+			"template_id", result.TemplateID,
+			"recipient_source", source,
+			"recipient_count", len(recipients),
+			"recipient_open_ids", strings.Join(recipients, ","),
+			"errors", strings.Join(sendErrs, "; "),
+		)
 		return result, fmt.Errorf("send task opened message failed: %s", strings.Join(sendErrs, "; "))
 	}
 	if len(sendErrs) > 0 {
 		result.Message = "partial delivery: " + strings.Join(sendErrs, "; ")
+		l.Warnw("task.opened mini program notification partially delivered",
+			"action", "send_task_opened_miniprogram_notification",
+			"task_id", dto.TaskID,
+			"testee_id", dto.TesteeID,
+			"template_id", result.TemplateID,
+			"recipient_source", source,
+			"recipient_count", len(recipients),
+			"sent_count", sent,
+			"recipient_open_ids", strings.Join(recipients, ","),
+			"errors", strings.Join(sendErrs, "; "),
+		)
+		return result, nil
 	}
+	l.Infow("task.opened mini program notification delivered to all recipients",
+		"action", "send_task_opened_miniprogram_notification",
+		"task_id", dto.TaskID,
+		"testee_id", dto.TesteeID,
+		"template_id", result.TemplateID,
+		"recipient_source", source,
+		"recipient_count", len(recipients),
+		"sent_count", sent,
+		"recipient_open_ids", strings.Join(recipients, ","),
+	)
 	return result, nil
 }
 

@@ -117,9 +117,7 @@ func (s *GenericAPIServer) Run() error {
 		log.Infof("Start to listening the incoming requests on http address: %s", s.InsecureServingInfo.Address)
 
 		if err := s.insecureServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err.Error())
-
-			return err
+			return fmt.Errorf("http server listen on %s failed: %w", s.InsecureServingInfo.Address, err)
 		}
 
 		log.Infof("Server on %s stopped", s.InsecureServingInfo.Address)
@@ -138,9 +136,7 @@ func (s *GenericAPIServer) Run() error {
 		log.Infof("Start to listening the incoming requests on https address: %s", s.SecureServingInfo.Address())
 
 		if err := s.secureServer.ListenAndServeTLS(cert, key); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err.Error())
-
-			return err
+			return fmt.Errorf("https server listen on %s failed: %w", s.SecureServingInfo.Address(), err)
 		}
 
 		log.Infof("Server on %s stopped", s.SecureServingInfo.Address())
@@ -153,12 +149,12 @@ func (s *GenericAPIServer) Run() error {
 	defer cancel()
 	if s.healthz {
 		if err := s.ping(ctx); err != nil {
-			return err
+			return fmt.Errorf("http health check failed: %w", err)
 		}
 	}
 
 	if err := eg.Wait(); err != nil {
-		log.Fatal(err.Error())
+		return fmt.Errorf("api server stopped unexpectedly: %w", err)
 	}
 
 	return nil
@@ -189,6 +185,12 @@ func (s *GenericAPIServer) ping(ctx context.Context) error {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("can not ping http server within the specified time interval: %w", ctx.Err())
+		default:
+		}
+
 		// 创建一个 GET 请求
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -204,15 +206,16 @@ func (s *GenericAPIServer) ping(ctx context.Context) error {
 
 			return nil
 		}
+		if resp != nil {
+			resp.Body.Close()
+		}
 
 		// 等待 1 秒后继续下一个 ping
 		log.Info("Waiting for the router, retry in 1 second.")
-		time.Sleep(1 * time.Second)
-
 		select {
 		case <-ctx.Done():
-			log.Fatal("can not ping http server within the specified time interval.")
-		default:
+			return fmt.Errorf("can not ping http server within the specified time interval: %w", ctx.Err())
+		case <-time.After(1 * time.Second):
 		}
 	}
 	// return fmt.Errorf("the router has no response, or it might took too long to start up")
