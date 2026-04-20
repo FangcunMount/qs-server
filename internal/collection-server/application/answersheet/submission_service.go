@@ -11,7 +11,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+type actorLookupClient interface {
+	GetTestee(ctx context.Context, testeeID uint64) (*grpcclient.TesteeResponse, error)
+	TesteeExists(ctx context.Context, orgID, iamChildID uint64) (exists bool, testeeID uint64, err error)
+}
 
 // SubmissionService 答卷提交服务
 // 作为 BFF 层的薄服务，主要职责：
@@ -20,7 +27,7 @@ import (
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
 	answerSheetClient   *grpcclient.AnswerSheetClient
-	actorClient         *grpcclient.ActorClient
+	actorClient         actorLookupClient
 	guardianshipService *iam.GuardianshipService
 	queue               *SubmitQueue
 }
@@ -100,7 +107,7 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	}
 
 	// 2. 校验监护关系权限，并获取 testee 信息（用于获取 OrgID）
-	testee, err := s.validateGuardianship(ctx, writerID, req.TesteeID)
+	testee, resolvedTesteeID, err := s.validateGuardianship(ctx, writerID, req.TesteeID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +120,7 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	if testee != nil {
 		orgID = testee.OrgID
 	}
-	result, err := s.callSaveAnswerSheet(ctx, writerID, orgID, req, answers)
+	result, err := s.callSaveAnswerSheet(ctx, writerID, orgID, resolvedTesteeID, req, answers)
 	if err != nil {
 		return nil, err
 	}
@@ -141,41 +148,74 @@ func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64)
 	return nil
 }
 
-// validateGuardianship 校验监护关系权限，返回 testee 信息（用于获取 OrgID）
-func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, testeeID uint64) (*grpcclient.TesteeResponse, error) {
+// validateGuardianship 校验监护关系权限，返回 canonical testee 信息与 canonical testee ID。
+func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, testeeID uint64) (*grpcclient.TesteeResponse, uint64, error) {
 	l := logger.L(ctx)
 
-	// 查询受试者信息（需要获取 OrgID 和 IAMChildID）
-	testee, err := s.actorClient.GetTestee(ctx, testeeID)
+	// 查询受试者信息（需要获取 OrgID 和 IAMChildID）。
+	// 兼容某些上游把 profile_id 误传成 testee_id 的情况。
+	testee, resolvedTesteeID, err := s.resolveCanonicalTestee(ctx, testeeID)
 	if err != nil {
 		l.Errorw("查询受试者信息失败",
 			"action", "submit_answersheet",
 			"testee_id", testeeID,
 			"error", err.Error(),
 		)
-		return nil, fmt.Errorf("查询受试者信息失败: %w", err)
+		return nil, 0, err
 	}
 
 	// 如果 IAM 服务未启用，直接返回 testee
 	if s.guardianshipService == nil || !s.guardianshipService.IsEnabled() {
-		return testee, nil
+		return testee, resolvedTesteeID, nil
 	}
 
 	// 如果受试者未绑定 IAM 用户，跳过权限校验
 	if testee.IAMChildID == "" {
 		l.Warnw("受试者未绑定IAM用户，跳过权限校验",
-			"testee_id", testeeID,
+			"testee_id", resolvedTesteeID,
 			"testee_name", testee.Name,
 		)
-		return testee, nil
+		return testee, resolvedTesteeID, nil
 	}
 
 	// 验证监护关系
-	if err := s.checkGuardianRelation(ctx, writerID, testeeID, testee.IAMChildID, testee.Name); err != nil {
-		return nil, err
+	if err := s.checkGuardianRelation(ctx, writerID, resolvedTesteeID, testee.IAMChildID, testee.Name); err != nil {
+		return nil, 0, err
 	}
 
-	return testee, nil
+	return testee, resolvedTesteeID, nil
+}
+
+func (s *SubmissionService) resolveCanonicalTestee(ctx context.Context, rawTesteeID uint64) (*grpcclient.TesteeResponse, uint64, error) {
+	testee, err := s.actorClient.GetTestee(ctx, rawTesteeID)
+	if err == nil {
+		return testee, rawTesteeID, nil
+	}
+	if status.Code(err) != codes.NotFound || s.guardianshipService == nil {
+		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
+	}
+
+	orgID := s.guardianshipService.GetDefaultOrgID()
+	exists, canonicalTesteeID, existsErr := s.actorClient.TesteeExists(ctx, orgID, rawTesteeID)
+	if existsErr != nil {
+		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
+	}
+	if !exists || canonicalTesteeID == 0 {
+		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
+	}
+
+	canonicalTestee, canonicalErr := s.actorClient.GetTestee(ctx, canonicalTesteeID)
+	if canonicalErr != nil {
+		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", canonicalErr)
+	}
+
+	logger.L(ctx).Warnw("提交答卷时检测到 profile_id 被误作 testee_id，已自动回退到 canonical testee_id",
+		"action", "submit_answersheet",
+		"submitted_testee_id", rawTesteeID,
+		"canonical_testee_id", canonicalTesteeID,
+		"org_id", orgID,
+	)
+	return canonicalTestee, canonicalTesteeID, nil
 }
 
 // checkGuardianRelation 检查监护关系
@@ -231,12 +271,12 @@ func (s *SubmissionService) convertAnswers(answers []Answer) []grpcclient.Answer
 }
 
 // callSaveAnswerSheet 调用 gRPC 服务保存答卷
-func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, orgID uint64, req *SubmitAnswerSheetRequest, answers []grpcclient.AnswerInput) (*grpcclient.SaveAnswerSheetOutput, error) {
+func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, orgID, testeeID uint64, req *SubmitAnswerSheetRequest, answers []grpcclient.AnswerInput) (*grpcclient.SaveAnswerSheetOutput, error) {
 	l := logger.L(ctx)
 
 	l.Debugw("调用 gRPC 服务提交答卷",
 		"questionnaire_code", req.QuestionnaireCode,
-		"testee_id", req.TesteeID,
+		"testee_id", testeeID,
 		"org_id", orgID,
 	)
 
@@ -246,7 +286,7 @@ func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, o
 		IdempotencyKey:       req.IdempotencyKey,
 		Title:                req.Title,
 		WriterID:             writerID,
-		TesteeID:             req.TesteeID,
+		TesteeID:             testeeID,
 		TaskID:               req.TaskID,
 		OrgID:                orgID,
 		Answers:              answers,
