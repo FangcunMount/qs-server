@@ -2,14 +2,20 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
+	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	questionnaireDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // AnswerSheetService 答卷 gRPC 服务 - C端接口
@@ -56,10 +62,14 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	// 转换请求为 DTO
 	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
 	for _, a := range req.Answers {
+		rawValue, err := decodeAnswerValue(questionnaireDomain.QuestionType(a.QuestionType), a.Value)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("问题 %s 的答案格式不正确: %v", a.QuestionCode, err))
+		}
 		answers = append(answers, answersheet.AnswerDTO{
 			QuestionCode: a.QuestionCode,
 			QuestionType: a.QuestionType,
-			Value:        a.Value, // proto 中使用 JSON 字符串
+			Value:        rawValue,
 		})
 	}
 
@@ -81,7 +91,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	// 调用应用服务
 	result, err := s.submissionService.Submit(ctx, dto)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toAnswerSheetGRPCError(err)
 	}
 
 	// 转换响应
@@ -215,5 +225,62 @@ func (s *AnswerSheetService) valueToString(value interface{}) string {
 	default:
 		// 对于复杂类型，可以使用 JSON 序列化
 		return fmt.Sprintf("%v", v)
+	}
+}
+
+func decodeAnswerValue(questionType questionnaireDomain.QuestionType, raw string) (interface{}, error) {
+	switch questionType {
+	case questionnaireDomain.TypeCheckbox:
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return []string{}, nil
+		}
+		var values []string
+		if err := json.Unmarshal([]byte(raw), &values); err == nil {
+			return values, nil
+		}
+		return []string{raw}, nil
+	case questionnaireDomain.TypeNumber:
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return nil, fmt.Errorf("empty numeric answer")
+		}
+		var value float64
+		if err := json.Unmarshal([]byte(raw), &value); err == nil {
+			return value, nil
+		}
+		var encoded string
+		if err := json.Unmarshal([]byte(raw), &encoded); err == nil {
+			raw = encoded
+		}
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return nil, fmt.Errorf("expected numeric value, got %q", raw)
+		}
+		return value, nil
+	default:
+		var value string
+		if err := json.Unmarshal([]byte(raw), &value); err == nil {
+			return value, nil
+		}
+		return raw, nil
+	}
+}
+
+func toAnswerSheetGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	coder := pkgerrors.ParseCoder(err)
+	switch coder.Code() {
+	case errorCode.ErrInvalidArgument, errorCode.ErrValidation, errorCode.ErrBind, errorCode.ErrAnswerSheetInvalid:
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errorCode.ErrQuestionnaireNotFound, errorCode.ErrAnswerSheetNotFound:
+		return status.Error(codes.NotFound, err.Error())
+	case errorCode.ErrPermissionDenied:
+		return status.Error(codes.PermissionDenied, err.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
 	}
 }

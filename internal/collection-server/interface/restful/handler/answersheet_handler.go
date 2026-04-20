@@ -10,6 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 	uuid "github.com/satori/go.uuid"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 // AnswerSheetHandler 答卷处理器
@@ -73,7 +75,7 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 			})
 			return
 		}
-		h.InternalErrorResponse(c, "save answer sheet failed", err)
+		h.respondSubmitError(c, err)
 		return
 	}
 
@@ -90,6 +92,44 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 	}
 
 	h.Success(c, result)
+}
+
+func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {
+	st, ok := grpcstatus.FromError(err)
+	if !ok {
+		h.InternalErrorResponse(c, "save answer sheet failed", err)
+		return
+	}
+
+	switch st.Code() {
+	case codes.InvalidArgument:
+		c.JSON(http.StatusBadRequest, core.ErrResponse{
+			Code:    http.StatusBadRequest,
+			Message: st.Message(),
+		})
+	case codes.PermissionDenied:
+		c.JSON(http.StatusForbidden, core.ErrResponse{
+			Code:    http.StatusForbidden,
+			Message: st.Message(),
+		})
+	case codes.NotFound:
+		c.JSON(http.StatusNotFound, core.ErrResponse{
+			Code:    http.StatusNotFound,
+			Message: st.Message(),
+		})
+	case codes.Unauthenticated:
+		c.JSON(http.StatusUnauthorized, core.ErrResponse{
+			Code:    http.StatusUnauthorized,
+			Message: st.Message(),
+		})
+	case codes.ResourceExhausted:
+		c.JSON(http.StatusTooManyRequests, core.ErrResponse{
+			Code:    http.StatusTooManyRequests,
+			Message: st.Message(),
+		})
+	default:
+		h.InternalErrorResponse(c, "save answer sheet failed", err)
+	}
 }
 
 // SubmitStatus 查询提交状态
