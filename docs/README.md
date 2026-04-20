@@ -116,7 +116,7 @@ flowchart LR
 
 | 路径 | 用途（概要） |
 | ---- | ------------ |
-| [tools/seeddata-runner](../tools/seeddata-runner) | 独立 seeddata 子模块，负责 mock 用户与 plan open-task 提交（配置见 [tools/seeddata-runner/configs/seeddata.yaml](../tools/seeddata-runner/configs/seeddata.yaml)） |
+| `../seeddata-runner` | 同层独立 seeddata 仓库，负责 mock 用户与 plan open-task 提交（配置见 `../seeddata-runner/configs/seeddata.yaml`） |
 
 具体子命令与参数以各 `main.go` 及 `-h` 为准。
 

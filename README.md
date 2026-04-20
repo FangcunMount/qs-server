@@ -161,7 +161,7 @@ make lint
 make coverage
 ```
 
-- **种子数据等工具**：[tools/seeddata-runner](tools/seeddata-runner)（配置 [tools/seeddata-runner/configs/seeddata.yaml](tools/seeddata-runner/configs/seeddata.yaml)）。
+- **种子数据等工具**：同层独立仓库 `../seeddata-runner`（配置 `../seeddata-runner/configs/seeddata.yaml`，兼容入口仍保留 [scripts/run_seeddata_daemon.sh](scripts/run_seeddata_daemon.sh)）。
 
 ---
 

@@ -156,7 +156,7 @@ redis-cli --scan --pattern 'event:processed:*' \
 
 | 路径 | 用途 |
 | ---- | ---- |
-| [tools/seeddata-runner](../../tools/seeddata-runner) | 仓库内独立 seeddata 子模块；仅保留 `daily_simulation_daemon` 与 `plan_submit_open_tasks_daemon` 两个后台脚本入口；当前不再依赖本地 Redis runtime |
+| `../seeddata-runner` | 同层独立 seeddata 仓库；仅保留 `daily_simulation_daemon` 与 `plan_submit_open_tasks_daemon` 两个后台脚本入口；当前不再依赖本地 Redis runtime |
 
 ## 当前边界与注意事项
 
