@@ -20,13 +20,33 @@ type UserClaimsContextKey struct{}
 
 // UserClaims 简化的用户声明
 type UserClaims struct {
-	UserID   string
-	TenantID string
-	Roles    []string
+	UserID    string
+	AccountID string
+	TenantID  string
+	SessionID string
+	TokenID   string
+	Roles     []string
+	AMR       []string
+	Metadata  *auth.VerifyMetadata
+}
+
+func normalizeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
+	if opts == nil {
+		return &auth.VerifyOptions{IncludeMetadata: true}
+	}
+	merged := *opts
+	merged.IncludeMetadata = true
+	return &merged
 }
 
 // JWTAuthMiddleware JWT 认证中间件（使用 SDK TokenVerifier 本地 JWKS 验签）
 func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
+	return JWTAuthMiddlewareWithOptions(verifier, nil)
+}
+
+// JWTAuthMiddlewareWithOptions JWT 认证中间件（显式控制 VerifyOptions）。
+func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.VerifyOptions) gin.HandlerFunc {
+	verifyOpts := normalizeVerifyOptions(opts)
 	return func(c *gin.Context) {
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
 		// 检查 verifier 是否可用
@@ -54,7 +74,7 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		}
 
 		// 使用 SDK TokenVerifier 验证（本地 JWKS 优先，远程降级）
-		result, err := verifier.Verify(c.Request.Context(), token, nil)
+		result, err := verifier.Verify(c.Request.Context(), token, verifyOpts)
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware result", "result", result)
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware err", "err", err)
 		if err != nil {
@@ -87,15 +107,14 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 			return
 		}
 
-		claims := &UserClaims{
-			UserID:   resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-			TenantID: resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
-			Roles:    tokenClaims.Roles,
-		}
+		claims := buildUserClaims(result)
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware claims", "claims", claims)
 		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
+		if claims.Metadata != nil {
+			c.Set("token_metadata", claims.Metadata)
+		}
 		ctx := context.WithValue(c.Request.Context(), UserClaimsContextKey{}, claims)
 		c.Request = c.Request.WithContext(ctx)
 
@@ -105,6 +124,12 @@ func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 
 // OptionalJWTAuthMiddleware 可选的 JWT 认证中间件（使用 SDK TokenVerifier）
 func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
+	return OptionalJWTAuthMiddlewareWithOptions(verifier, nil)
+}
+
+// OptionalJWTAuthMiddlewareWithOptions 可选的 JWT 认证中间件（显式控制 VerifyOptions）。
+func OptionalJWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.VerifyOptions) gin.HandlerFunc {
+	verifyOpts := normalizeVerifyOptions(opts)
 	return func(c *gin.Context) {
 		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
 		// 提取 Token
@@ -125,7 +150,7 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 		}
 
 		// 使用 SDK TokenVerifier 验证
-		result, err := verifier.Verify(c.Request.Context(), token, nil)
+		result, err := verifier.Verify(c.Request.Context(), token, verifyOpts)
 		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware result", "result", result)
 		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware err", "err", err)
 		if err != nil || !result.Valid {
@@ -143,14 +168,13 @@ func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
 			return
 		}
 
-		claims := &UserClaims{
-			UserID:   resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-			TenantID: resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
-			Roles:    tokenClaims.Roles,
-		}
+		claims := buildUserClaims(result)
 		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
+		if claims.Metadata != nil {
+			c.Set("token_metadata", claims.Metadata)
+		}
 		ctx := context.WithValue(c.Request.Context(), UserClaimsContextKey{}, claims)
 		c.Request = c.Request.WithContext(ctx)
 
@@ -280,6 +304,33 @@ func GetTenantID(c *gin.Context) string {
 	return ""
 }
 
+// GetAccountID 从上下文获取账户 ID
+func GetAccountID(c *gin.Context) string {
+	claims := GetUserClaims(c)
+	if claims != nil {
+		return claims.AccountID
+	}
+	return ""
+}
+
+// GetSessionID 从上下文获取会话 ID
+func GetSessionID(c *gin.Context) string {
+	claims := GetUserClaims(c)
+	if claims != nil {
+		return claims.SessionID
+	}
+	return ""
+}
+
+// GetTokenID 从上下文获取令牌 ID
+func GetTokenID(c *gin.Context) string {
+	claims := GetUserClaims(c)
+	if claims != nil {
+		return claims.TokenID
+	}
+	return ""
+}
+
 // GetRoles 从上下文获取角色列表
 func GetRoles(c *gin.Context) []string {
 	claims := GetUserClaims(c)
@@ -358,6 +409,23 @@ func sortedExtraKeys(raw *auth.TokenClaims) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func buildUserClaims(result *auth.VerifyResult) *UserClaims {
+	if result == nil || result.Claims == nil {
+		return nil
+	}
+	tokenClaims := result.Claims
+	return &UserClaims{
+		UserID:    resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
+		AccountID: tokenClaims.AccountID,
+		TenantID:  resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
+		SessionID: tokenClaims.SessionID,
+		TokenID:   tokenClaims.TokenID,
+		Roles:     tokenClaims.Roles,
+		AMR:       tokenClaims.AMR,
+		Metadata:  result.Metadata,
+	}
 }
 
 // resolveUserID 优先使用标准 UserID 字段，缺失时从 Extra 兼容提取。

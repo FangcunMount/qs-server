@@ -43,11 +43,12 @@ type TLSOptions struct {
 }
 
 type JWTOptions struct {
-	Issuer         string
-	Audience       []string
-	Algorithms     []string
-	ClockSkew      time.Duration
-	RequiredClaims []string
+	Issuer                  string
+	Audience                []string
+	Algorithms              []string
+	ClockSkew               time.Duration
+	RequiredClaims          []string
+	ForceRemoteVerification bool
 }
 
 type JWKSOptions struct {

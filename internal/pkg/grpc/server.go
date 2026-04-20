@@ -147,7 +147,11 @@ func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) [
 		authInterceptor := NewIAMAuthInterceptor(tokenVerifier, &config.Auth)
 		interceptorChain = append(interceptorChain,
 			authInterceptor.UnaryServerInterceptor())
-		log.Info("gRPC server: IAM authentication interceptor enabled (local JWKS verification)")
+		if config.Auth.ForceRemoteVerification {
+			log.Info("gRPC server: IAM authentication interceptor enabled (authoritative remote verification)")
+		} else {
+			log.Info("gRPC server: IAM authentication interceptor enabled (local JWKS verification)")
+		}
 	} else if config.Auth.Enabled {
 		log.Warn("gRPC server: auth enabled but TokenVerifier not provided, skipping authentication")
 	}

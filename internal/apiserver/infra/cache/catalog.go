@@ -124,7 +124,7 @@ func (c *CacheCatalog) Namespace(family CacheFamily) string {
 	if c == nil {
 		return ""
 	}
-	return rediskey.ComposeNamespace(c.root.Namespace, c.Route(family).NamespaceSuffix)
+	return rediskey.ComposeNamespace(string(c.root.Namespace()), c.Route(family).NamespaceSuffix)
 }
 
 // Builder 返回 family 对应 redis key builder。

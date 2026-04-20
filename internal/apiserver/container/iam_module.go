@@ -274,11 +274,12 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	// JWT 配置
 	if opts.JWT != nil {
 		iamOpts.JWT = &iam.JWTOptions{
-			Issuer:         opts.JWT.Issuer,
-			Audience:       opts.JWT.Audience,
-			Algorithms:     opts.JWT.Algorithms,
-			ClockSkew:      opts.JWT.ClockSkew,
-			RequiredClaims: opts.JWT.RequiredClaims,
+			Issuer:                  opts.JWT.Issuer,
+			Audience:                opts.JWT.Audience,
+			Algorithms:              opts.JWT.Algorithms,
+			ClockSkew:               opts.JWT.ClockSkew,
+			RequiredClaims:          opts.JWT.RequiredClaims,
+			ForceRemoteVerification: opts.JWT.ForceRemoteVerification,
 		}
 	}
 

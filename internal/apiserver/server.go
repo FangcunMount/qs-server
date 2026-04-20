@@ -899,6 +899,7 @@ func buildGRPCServer(cfg *config.Config, container *container.Container) (*grpcp
 		if container.ActorModule != nil {
 			operatorRepo = container.ActorModule.OperatorRepo
 		}
+		// 授权快照拦截器只负责权限视图，不替代前面的 JWT 权威在线校验。
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
 			NewAuthzSnapshotUnaryInterceptor(loader, operatorRepo))
 		log.Info("gRPC server: IAM authorization snapshot interceptor enabled (after JWT auth)")
@@ -947,6 +948,9 @@ func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcpkg.Config) error {
 	// 应用认证配置
 	if opts.Auth != nil {
 		grpcConfig.Auth.Enabled = opts.Auth.Enabled
+	}
+	if cfg.IAMOptions != nil && cfg.IAMOptions.JWT != nil {
+		grpcConfig.Auth.ForceRemoteVerification = cfg.IAMOptions.JWT.ForceRemoteVerification
 	}
 
 	// 应用 ACL 配置

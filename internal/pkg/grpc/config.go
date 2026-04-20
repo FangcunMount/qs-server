@@ -59,12 +59,13 @@ type MTLSConfig struct {
 
 // AuthConfig 应用层认证配置
 type AuthConfig struct {
-	Enabled               bool
-	EnableBearer          bool
-	EnableHMAC            bool
-	EnableAPIKey          bool
-	HMACTimestampValidity time.Duration
-	RequireIdentityMatch  bool // 要求凭证身份与 mTLS 身份一致
+	Enabled                 bool
+	EnableBearer            bool
+	EnableHMAC              bool
+	EnableAPIKey            bool
+	HMACTimestampValidity   time.Duration
+	RequireIdentityMatch    bool // 要求凭证身份与 mTLS 身份一致
+	ForceRemoteVerification bool // 强制使用 IAM 在线权威校验
 }
 
 // ACLConfig ACL 配置
@@ -99,12 +100,13 @@ func NewConfig() *Config {
 		},
 
 		Auth: AuthConfig{
-			Enabled:               false,
-			EnableBearer:          false,
-			EnableHMAC:            false,
-			EnableAPIKey:          false,
-			HMACTimestampValidity: 5 * time.Minute,
-			RequireIdentityMatch:  false,
+			Enabled:                 false,
+			EnableBearer:            false,
+			EnableHMAC:              false,
+			EnableAPIKey:            false,
+			HMACTimestampValidity:   5 * time.Minute,
+			RequireIdentityMatch:    false,
+			ForceRemoteVerification: false,
 		},
 
 		ACL: ACLConfig{

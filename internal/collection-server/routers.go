@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
@@ -113,17 +114,40 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 		return
 	}
 
-	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddleware(tokenVerifier)))
+	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddlewareWithOptions(tokenVerifier, r.iamVerifyOptions())))
 	// 与 apiserver 对齐：tenant_id、org_id、IAM 授权快照（collection 无 Operator，不做 ActiveOperator 校验）
 	api.Use(withAuthSkip(skip, middleware.UserIdentityMiddleware()))
 	api.Use(withAuthSkip(skip, middleware.RequireTenantIDMiddleware()))
 	api.Use(withAuthSkip(skip, middleware.RequireNumericOrgScopeMiddleware()))
 	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
+		// 授权快照只负责权限视图，不替代 JWT 的权威在线校验。
 		api.Use(withAuthSkip(skip, middleware.AuthzSnapshotMiddleware(loader, nil)))
 	} else {
 		fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable for collection-server (need gRPC)\n")
 	}
-	fmt.Printf("🔐 JWT + IAM authz snapshot middleware enabled for /api/v1 (local JWKS verification)\n")
+	fmt.Printf("🔐 JWT + IAM authz snapshot middleware enabled for /api/v1 (%s)\n", r.iamVerificationMode())
+}
+
+func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
+	if r == nil || r.container == nil || r.container.IAMModule == nil || r.container.IAMModule.Client() == nil {
+		return &auth.VerifyOptions{IncludeMetadata: true}
+	}
+	cfg := r.container.IAMModule.Client().Config()
+	if cfg == nil || cfg.JWT == nil {
+		return &auth.VerifyOptions{IncludeMetadata: true}
+	}
+	return &auth.VerifyOptions{
+		ForceRemote:     cfg.JWT.ForceRemoteVerification,
+		IncludeMetadata: true,
+	}
+}
+
+func (r *Router) iamVerificationMode() string {
+	opts := r.iamVerifyOptions()
+	if opts.ForceRemote {
+		return "authoritative remote verification"
+	}
+	return "local JWKS verification"
 }
 
 // withAuthSkip

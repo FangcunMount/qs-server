@@ -19,6 +19,14 @@ type IAMAuthInterceptor struct {
 	enabled     bool
 	skipMethods map[string]bool // 跳过认证的方法列表
 	requiremTLS bool            // 是否同时要求 mTLS
+	forceRemote bool
+}
+
+func buildVerifyOptions(forceRemote bool) *auth.VerifyOptions {
+	return &auth.VerifyOptions{
+		ForceRemote:     forceRemote,
+		IncludeMetadata: true,
+	}
 }
 
 // NewIAMAuthInterceptor 创建 IAM 认证拦截器
@@ -37,6 +45,7 @@ func NewIAMAuthInterceptor(verifier *auth.TokenVerifier, config *AuthConfig) *IA
 		enabled:     config.Enabled,
 		skipMethods: skipMethods,
 		requiremTLS: config.RequireIdentityMatch,
+		forceRemote: config.ForceRemoteVerification,
 	}
 }
 
@@ -69,7 +78,7 @@ func (i *IAMAuthInterceptor) UnaryServerInterceptor() grpc.UnaryServerIntercepto
 		}
 
 		// 2. 使用 SDK TokenVerifier 验证（本地 JWKS 优先，远程降级）
-		result, err := i.verifier.Verify(ctx, token, nil)
+		result, err := i.verifier.Verify(ctx, token, buildVerifyOptions(i.forceRemote))
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "token verification failed: %v", err)
 		}
@@ -91,7 +100,7 @@ func (i *IAMAuthInterceptor) UnaryServerInterceptor() grpc.UnaryServerIntercepto
 		}
 
 		// 4. 将用户信息注入 context
-		ctx = i.injectUserContext(ctx, claims)
+		ctx = i.injectUserContext(ctx, result)
 
 		// 5. 调用下一个处理器
 		return handler(ctx, req)
@@ -171,14 +180,27 @@ func (i *IAMAuthInterceptor) verifyIdentityMatch(ctx context.Context, claims *au
 }
 
 // injectUserContext 将用户信息注入 context
-func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, claims *auth.TokenClaims) context.Context {
+func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth.VerifyResult) context.Context {
+	if result == nil || result.Claims == nil {
+		return ctx
+	}
+	claims := result.Claims
+
 	// 注入用户信息到 context，供后续业务逻辑使用
 	ctx = context.WithValue(ctx, "user_id", claims.UserID)
+	ctx = context.WithValue(ctx, "account_id", claims.AccountID)
 	ctx = context.WithValue(ctx, "tenant_id", claims.TenantID)
+	ctx = context.WithValue(ctx, "session_id", claims.SessionID)
+	ctx = context.WithValue(ctx, "token_id", claims.TokenID)
 
 	// 注入角色
 	if len(claims.Roles) > 0 {
 		ctx = context.WithValue(ctx, "roles", claims.Roles)
+	}
+
+	// 注入认证方式
+	if len(claims.AMR) > 0 {
+		ctx = context.WithValue(ctx, "amr", claims.AMR)
 	}
 
 	// 注入自定义声明（Extra）
@@ -188,6 +210,10 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, claims *auth
 		if username, ok := claims.Extra["username"].(string); ok {
 			ctx = context.WithValue(ctx, "username", username)
 		}
+	}
+
+	if result.Metadata != nil {
+		ctx = context.WithValue(ctx, "token_metadata", result.Metadata)
 	}
 
 	return ctx

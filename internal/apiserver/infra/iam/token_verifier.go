@@ -16,6 +16,22 @@ type TokenVerifier struct {
 	jwksManager *auth.JWKSManager
 }
 
+func defaultVerifyOptions() *auth.VerifyOptions {
+	return &auth.VerifyOptions{
+		IncludeMetadata: true,
+	}
+}
+
+func mergeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
+	if opts == nil {
+		return defaultVerifyOptions()
+	}
+	merged := *opts
+	// QS 默认希望把会话和令牌元数据一并透出，避免后续调用方再重复补参数。
+	merged.IncludeMetadata = true
+	return &merged
+}
+
 // NewTokenVerifier 创建 Token 验证器（使用 SDK）
 // SDK 内部实现：
 // 1. JWKS 本地验签（优先，高性能）
@@ -89,7 +105,7 @@ func (v *TokenVerifier) Verify(ctx context.Context, token string) (*auth.VerifyR
 	if v.verifier == nil {
 		return nil, fmt.Errorf("token verifier not initialized")
 	}
-	return v.verifier.Verify(ctx, token, nil)
+	return v.verifier.Verify(ctx, token, defaultVerifyOptions())
 }
 
 // VerifyWithOptions 验证 Token（带选项）
@@ -97,7 +113,18 @@ func (v *TokenVerifier) VerifyWithOptions(ctx context.Context, token string, opt
 	if v.verifier == nil {
 		return nil, fmt.Errorf("token verifier not initialized")
 	}
-	return v.verifier.Verify(ctx, token, opts)
+	return v.verifier.Verify(ctx, token, mergeVerifyOptions(opts))
+}
+
+// VerifyRemotely 强制使用 IAM 在线校验。
+func (v *TokenVerifier) VerifyRemotely(ctx context.Context, token string) (*auth.VerifyResult, error) {
+	if v.verifier == nil {
+		return nil, fmt.Errorf("token verifier not initialized")
+	}
+	return v.verifier.Verify(ctx, token, &auth.VerifyOptions{
+		ForceRemote:     true,
+		IncludeMetadata: true,
+	})
 }
 
 // SDKVerifier 返回底层的 SDK TokenVerifier

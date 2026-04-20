@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -131,7 +132,8 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
 		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
 		if tokenVerifier != nil {
-			group.Use(middleware.JWTAuthMiddleware(tokenVerifier))
+			verifyOpts := r.iamVerifyOptions()
+			group.Use(middleware.JWTAuthMiddlewareWithOptions(tokenVerifier, verifyOpts))
 			group.Use(restmiddleware.UserIdentityMiddleware())
 			group.Use(restmiddleware.RequireTenantIDMiddleware())
 			group.Use(restmiddleware.RequireNumericOrgScopeMiddleware())
@@ -139,6 +141,7 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.container.ActorModule.OperatorRepo))
 			}
 			if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
+				// 授权快照只负责权限视图，不替代 JWT 的权威在线校验。
 				var operatorRepo domainoperator.Repository
 				if r.container.ActorModule != nil {
 					operatorRepo = r.container.ActorModule.OperatorRepo
@@ -147,7 +150,7 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 			} else {
 				fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable (need gRPC); authorization snapshot disabled for %s\n", routePrefix)
 			}
-			fmt.Printf("🔐 JWT authentication middleware enabled for %s (local JWKS verification)\n", routePrefix)
+			fmt.Printf("🔐 JWT authentication middleware enabled for %s (%s)\n", routePrefix, r.iamVerificationMode())
 			return
 		}
 		fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled for %s!\n", routePrefix)
@@ -155,6 +158,28 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 	}
 
 	fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected for %s!\n", routePrefix)
+}
+
+func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
+	if r == nil || r.container == nil || r.container.IAMModule == nil || r.container.IAMModule.Client() == nil {
+		return &auth.VerifyOptions{IncludeMetadata: true}
+	}
+	cfg := r.container.IAMModule.Client().Config()
+	if cfg == nil || cfg.JWT == nil {
+		return &auth.VerifyOptions{IncludeMetadata: true}
+	}
+	return &auth.VerifyOptions{
+		ForceRemote:     cfg.JWT.ForceRemoteVerification,
+		IncludeMetadata: true,
+	}
+}
+
+func (r *Router) iamVerificationMode() string {
+	opts := r.iamVerifyOptions()
+	if opts.ForceRemote {
+		return "authoritative remote verification"
+	}
+	return "local JWKS verification"
 }
 
 // registerUserProtectedRoutes 注册用户相关的受保护路由

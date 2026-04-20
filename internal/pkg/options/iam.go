@@ -62,11 +62,12 @@ type IAMTLSOptions struct {
 
 // IAMJWTOptions JWT 验证配置
 type IAMJWTOptions struct {
-	Issuer         string        `json:"issuer"           mapstructure:"issuer"`
-	Audience       []string      `json:"audience"         mapstructure:"audience"`
-	Algorithms     []string      `json:"algorithms"       mapstructure:"algorithms"`
-	ClockSkew      time.Duration `json:"clock-skew"       mapstructure:"clock-skew"`
-	RequiredClaims []string      `json:"required-claims"  mapstructure:"required-claims"`
+	Issuer                  string        `json:"issuer"                      mapstructure:"issuer"`
+	Audience                []string      `json:"audience"                    mapstructure:"audience"`
+	Algorithms              []string      `json:"algorithms"                  mapstructure:"algorithms"`
+	ClockSkew               time.Duration `json:"clock-skew"                  mapstructure:"clock-skew"`
+	RequiredClaims          []string      `json:"required-claims"             mapstructure:"required-claims"`
+	ForceRemoteVerification bool          `json:"force-remote-verification"   mapstructure:"force-remote-verification"`
 }
 
 // IAMJWKSOptions JWKS 配置
@@ -116,11 +117,12 @@ func NewIAMOptions() *IAMOptions {
 		},
 
 		JWT: &IAMJWTOptions{
-			Issuer:         "https://iam.example.com",
-			Audience:       []string{"qs"},
-			Algorithms:     []string{"RS256", "ES256"},
-			ClockSkew:      60 * time.Second,
-			RequiredClaims: []string{"user_id", "tenant_id"},
+			Issuer:                  "https://iam.example.com",
+			Audience:                []string{"qs"},
+			Algorithms:              []string{"RS256", "ES256"},
+			ClockSkew:               60 * time.Second,
+			RequiredClaims:          []string{"user_id", "tenant_id"},
+			ForceRemoteVerification: false,
 		},
 
 		JWKS: &IAMJWKSOptions{
@@ -248,6 +250,8 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"JWT allowed audience list")
 	fs.DurationVar(&o.JWT.ClockSkew, "iam.jwt.clock-skew", o.JWT.ClockSkew,
 		"JWT clock skew tolerance")
+	fs.BoolVar(&o.JWT.ForceRemoteVerification, "iam.jwt.force-remote-verification", o.JWT.ForceRemoteVerification,
+		"Force authoritative remote IAM verification for user bearer tokens")
 
 	// JWKS 配置
 	fs.StringVar(&o.JWKS.URL, "iam.jwks.url", o.JWKS.URL,

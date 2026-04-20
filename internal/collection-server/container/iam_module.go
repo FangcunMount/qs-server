@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 // IAMModule IAM 集成模块
@@ -217,11 +217,12 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	// JWT 配置
 	if opts.JWT != nil {
 		iamOpts.JWT = &iam.JWTOptions{
-			Issuer:         opts.JWT.Issuer,
-			Audience:       opts.JWT.Audience,
-			Algorithms:     opts.JWT.Algorithms,
-			ClockSkew:      opts.JWT.ClockSkew,
-			RequiredClaims: opts.JWT.RequiredClaims,
+			Issuer:                  opts.JWT.Issuer,
+			Audience:                opts.JWT.Audience,
+			Algorithms:              opts.JWT.Algorithms,
+			ClockSkew:               opts.JWT.ClockSkew,
+			RequiredClaims:          opts.JWT.RequiredClaims,
+			ForceRemoteVerification: opts.JWT.ForceRemoteVerification,
 		}
 	}
 
