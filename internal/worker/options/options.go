@@ -2,7 +2,6 @@ package options
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -29,8 +28,6 @@ type Options struct {
 	Worker *WorkerOptions `json:"worker" mapstructure:"worker"`
 	// Notification 配置
 	Notification *NotificationOptions `json:"notification" mapstructure:"notification"`
-	// PlanScheduler 配置
-	PlanScheduler *PlanSchedulerOptions `json:"plan_scheduler" mapstructure:"plan_scheduler"`
 	// Redis 配置（单实例）
 	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
 	// 可选 Redis profiles（默认按同实例分 DB 配置）
@@ -80,16 +77,6 @@ type NotificationOptions struct {
 	SharedSecret string `json:"shared_secret" mapstructure:"shared-secret"`
 }
 
-// PlanSchedulerOptions worker 内建 plan 调度器配置。
-type PlanSchedulerOptions struct {
-	Enable       bool          `json:"enable" mapstructure:"enable"`
-	OrgIDs       []int64       `json:"org_ids" mapstructure:"org_ids"`
-	InitialDelay time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
-	Interval     time.Duration `json:"interval" mapstructure:"interval"`
-	LockKey      string        `json:"lock_key" mapstructure:"lock_key"`
-	LockTTL      time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
-}
-
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
 	DisableStatisticsCache bool               `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
@@ -112,17 +99,6 @@ func NewCacheOptions() *CacheOptions {
 			RedisProfile:    "lock_cache",
 			NamespaceSuffix: "cache:lock",
 		},
-	}
-}
-
-func NewPlanSchedulerOptions() *PlanSchedulerOptions {
-	return &PlanSchedulerOptions{
-		Enable:       false,
-		OrgIDs:       []int64{1},
-		InitialDelay: time.Minute,
-		Interval:     time.Minute,
-		LockKey:      "qs:plan-scheduler:leader",
-		LockTTL:      50 * time.Second,
 	}
 }
 
@@ -170,7 +146,6 @@ func NewOptions() *Options {
 		Notification: &NotificationOptions{
 			TimeoutMs: 5000,
 		},
-		PlanScheduler: NewPlanSchedulerOptions(),
 		Redis:         genericoptions.NewRedisOptions(),
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:  defaultRedisRuntimeOptions(),
@@ -261,20 +236,6 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	notificationFS.StringVar(&o.Notification.SharedSecret, "notification.shared-secret", o.Notification.SharedSecret,
 		"Optional shared secret used to sign outbound webhook notifications with HMAC-SHA256")
 
-	planSchedulerFS := fss.FlagSet("plan_scheduler")
-	planSchedulerFS.BoolVar(&o.PlanScheduler.Enable, "plan_scheduler.enable", o.PlanScheduler.Enable,
-		"Enable the built-in plan task scheduler in qs-worker")
-	planSchedulerFS.Int64SliceVar(&o.PlanScheduler.OrgIDs, "plan_scheduler.org-ids", o.PlanScheduler.OrgIDs,
-		"Organization IDs included in the built-in worker plan scheduler")
-	planSchedulerFS.DurationVar(&o.PlanScheduler.InitialDelay, "plan_scheduler.initial-delay", o.PlanScheduler.InitialDelay,
-		"Initial delay before starting the worker plan scheduler")
-	planSchedulerFS.DurationVar(&o.PlanScheduler.Interval, "plan_scheduler.interval", o.PlanScheduler.Interval,
-		"Interval for scanning plan tasks in the worker scheduler")
-	planSchedulerFS.StringVar(&o.PlanScheduler.LockKey, "plan_scheduler.lock-key", o.PlanScheduler.LockKey,
-		"Redis distributed lock key used by the worker plan scheduler")
-	planSchedulerFS.DurationVar(&o.PlanScheduler.LockTTL, "plan_scheduler.lock-ttl", o.PlanScheduler.LockTTL,
-		"Redis distributed lock TTL used by the worker plan scheduler")
-
 	// Redis flags
 	o.Redis.AddFlags(fss.FlagSet("redis"))
 	o.RedisRuntime.AddFlags(fss.FlagSet("redis_runtime"))
@@ -313,26 +274,6 @@ func (o *Options) Validate() []error {
 		o.RedisProfiles,
 		"redis_runtime",
 	)...)
-	if o.PlanScheduler != nil && o.PlanScheduler.Enable {
-		if len(o.PlanScheduler.OrgIDs) == 0 {
-			errs = append(errs, fmt.Errorf("plan_scheduler.org_ids cannot be empty when enabled"))
-		}
-		if o.PlanScheduler.InitialDelay < 0 {
-			errs = append(errs, fmt.Errorf("plan_scheduler.initial_delay cannot be negative"))
-		}
-		if o.PlanScheduler.Interval <= 0 {
-			errs = append(errs, fmt.Errorf("plan_scheduler.interval must be greater than 0 when enabled"))
-		}
-		if o.PlanScheduler.LockKey == "" {
-			errs = append(errs, fmt.Errorf("plan_scheduler.lock_key cannot be empty when enabled"))
-		}
-		if o.PlanScheduler.LockTTL <= 0 {
-			errs = append(errs, fmt.Errorf("plan_scheduler.lock_ttl must be greater than 0 when enabled"))
-		}
-		if o.PlanScheduler.Interval > 0 && o.PlanScheduler.LockTTL > o.PlanScheduler.Interval {
-			errs = append(errs, fmt.Errorf("plan_scheduler.lock_ttl must be less than or equal to plan_scheduler.interval"))
-		}
-	}
 
 	return errs
 }

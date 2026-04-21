@@ -12,51 +12,53 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                     *log.Options                            `json:"log"       mapstructure:"log"`
-	GenericServerRunOptions *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
-	GRPCOptions             *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
-	InsecureServing         *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
-	SecureServing           *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
-	MySQLOptions            *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
-	MigrationOptions        *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
-	RedisOptions            *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
-	RedisProfiles           map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
-	RedisRuntime            *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
-	MongoDBOptions          *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
-	MessagingOptions        *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
-	IAMOptions              *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
-	WeChatOptions           *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
-	Plan                    *PlanOptions                            `json:"plan"      mapstructure:"plan"`
-	PlanScheduler           *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
-	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
-	Backpressure            *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
-	Cache                   *CacheOptions                           `json:"cache"     mapstructure:"cache"`
-	StatisticsSync          *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
+	Log                      *log.Options                            `json:"log"       mapstructure:"log"`
+	GenericServerRunOptions  *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
+	GRPCOptions              *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
+	InsecureServing          *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
+	SecureServing            *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
+	MySQLOptions             *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
+	MigrationOptions         *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
+	RedisOptions             *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
+	RedisProfiles            map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	RedisRuntime             *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	MongoDBOptions           *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
+	MessagingOptions         *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
+	IAMOptions               *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
+	WeChatOptions            *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
+	Plan                     *PlanOptions                            `json:"plan"      mapstructure:"plan"`
+	PlanScheduler            *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
+	BehaviorPendingReconcile *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
+	RateLimit                *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	Backpressure             *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
+	Cache                    *CacheOptions                           `json:"cache"     mapstructure:"cache"`
+	StatisticsSync           *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{
-		Log:                     log.NewOptions(),
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		GRPCOptions:             genericoptions.NewGRPCOptions(),
-		InsecureServing:         genericoptions.NewInsecureServingOptions(),
-		SecureServing:           genericoptions.NewSecureServingOptions(),
-		MySQLOptions:            genericoptions.NewMySQLOptions(),
-		MigrationOptions:        genericoptions.NewMigrationOptions(),
-		RedisOptions:            genericoptions.NewRedisOptions(),
-		RedisProfiles:           map[string]*genericoptions.RedisOptions{},
-		RedisRuntime:            defaultRedisRuntimeOptions(),
-		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
-		MessagingOptions:        genericoptions.NewMessagingOptions(),
-		IAMOptions:              genericoptions.NewIAMOptions(),
-		WeChatOptions:           genericoptions.NewWeChatOptions(),
-		Plan:                    NewPlanOptions(),
-		PlanScheduler:           NewPlanSchedulerOptions(),
-		RateLimit:               NewRateLimitOptions(),
-		Backpressure:            NewBackpressureOptions(),
-		Cache:                   NewCacheOptions(),
-		StatisticsSync:          NewStatisticsSyncOptions(),
+		Log:                      log.NewOptions(),
+		GenericServerRunOptions:  genericoptions.NewServerRunOptions(),
+		GRPCOptions:              genericoptions.NewGRPCOptions(),
+		InsecureServing:          genericoptions.NewInsecureServingOptions(),
+		SecureServing:            genericoptions.NewSecureServingOptions(),
+		MySQLOptions:             genericoptions.NewMySQLOptions(),
+		MigrationOptions:         genericoptions.NewMigrationOptions(),
+		RedisOptions:             genericoptions.NewRedisOptions(),
+		RedisProfiles:            map[string]*genericoptions.RedisOptions{},
+		RedisRuntime:             defaultRedisRuntimeOptions(),
+		MongoDBOptions:           genericoptions.NewMongoDBOptions(),
+		MessagingOptions:         genericoptions.NewMessagingOptions(),
+		IAMOptions:               genericoptions.NewIAMOptions(),
+		WeChatOptions:            genericoptions.NewWeChatOptions(),
+		Plan:                     NewPlanOptions(),
+		PlanScheduler:            NewPlanSchedulerOptions(),
+		BehaviorPendingReconcile: NewBehaviorPendingReconcileOptions(),
+		RateLimit:                NewRateLimitOptions(),
+		Backpressure:             NewBackpressureOptions(),
+		Cache:                    NewCacheOptions(),
+		StatisticsSync:           NewStatisticsSyncOptions(),
 	}
 }
 
@@ -191,6 +193,38 @@ func (p *PlanSchedulerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&p.LockTTL, "plan_scheduler.lock-ttl", p.LockTTL, "Redis distributed lock TTL used by the built-in plan scheduler.")
 }
 
+// BehaviorPendingReconcileOptions 控制 pending behavior 事件归因补偿任务。
+type BehaviorPendingReconcileOptions struct {
+	Enable     bool          `json:"enable" mapstructure:"enable"`
+	Interval   time.Duration `json:"interval" mapstructure:"interval"`
+	BatchLimit int           `json:"batch_limit" mapstructure:"batch_limit"`
+	LockKey    string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL    time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+}
+
+// NewBehaviorPendingReconcileOptions 创建默认 behavior pending reconcile 配置。
+func NewBehaviorPendingReconcileOptions() *BehaviorPendingReconcileOptions {
+	return &BehaviorPendingReconcileOptions{
+		Enable:     true,
+		Interval:   10 * time.Second,
+		BatchLimit: 100,
+		LockKey:    "qs:behavior-pending-reconcile:leader",
+		LockTTL:    30 * time.Second,
+	}
+}
+
+// AddFlags 注册 behavior pending reconcile 相关参数。
+func (b *BehaviorPendingReconcileOptions) AddFlags(fs *pflag.FlagSet) {
+	if b == nil {
+		return
+	}
+	fs.BoolVar(&b.Enable, "behavior_pending_reconcile.enable", b.Enable, "Enable scheduled pending behavior reconcile.")
+	fs.DurationVar(&b.Interval, "behavior_pending_reconcile.interval", b.Interval, "Interval for scanning pending behavior events.")
+	fs.IntVar(&b.BatchLimit, "behavior_pending_reconcile.batch-limit", b.BatchLimit, "Maximum pending behavior events to process in one reconcile tick.")
+	fs.StringVar(&b.LockKey, "behavior_pending_reconcile.lock-key", b.LockKey, "Redis distributed lock key used by the pending behavior reconcile scheduler.")
+	fs.DurationVar(&b.LockTTL, "behavior_pending_reconcile.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by the pending behavior reconcile scheduler.")
+}
+
 // RateLimitOptions 限流配置
 type RateLimitOptions struct {
 	Enabled                bool    `json:"enabled" mapstructure:"enabled"`
@@ -252,6 +286,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
+	o.BehaviorPendingReconcile.AddFlags(fss.FlagSet("behavior_pending_reconcile"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))

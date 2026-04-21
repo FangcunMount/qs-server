@@ -15,7 +15,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
@@ -140,10 +139,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		}
 	}
 
-	// 6. 启动内建 plan scheduler（通过 gRPC 调用 apiserver 写侧命令）
-	s.startPlanScheduler()
-
-	// 7. 预创建 NSQ Topics（可选，避免 TOPIC_NOT_FOUND 日志）
+	// 6. 预创建 NSQ Topics（可选，避免 TOPIC_NOT_FOUND 日志）
 	if s.config.Messaging.Provider == "nsq" {
 		if err = s.createTopics(); err != nil {
 			// Topic 创建失败不是致命错误，只记录警告
@@ -151,7 +147,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		}
 	}
 
-	// 8. 创建消息订阅者
+	// 7. 创建消息订阅者
 	maxInFlight := 1
 	if s.config != nil && s.config.Worker != nil && s.config.Worker.Concurrency > 0 {
 		maxInFlight = s.config.Worker.Concurrency
@@ -162,7 +158,7 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	}
 	log.Infof("✅ Message subscriber created (provider: %s)", s.config.Messaging.Provider)
 
-	// 9. 订阅所有处理器
+	// 8. 订阅所有处理器
 	if err = s.subscribeHandlers(); err != nil {
 		log.Fatalf("Failed to subscribe handlers: %v", err)
 	}
@@ -199,13 +195,6 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	}))
 
 	return preparedWorkerServer{s}
-}
-
-func (s *workerServer) lockKeyBuilder() *rediskey.Builder {
-	if s == nil || s.lockHandle == nil || s.lockHandle.Builder == nil {
-		return rediskey.NewBuilder()
-	}
-	return s.lockHandle.Builder
 }
 
 // subscribeHandlers 订阅所有 Topic 处理器

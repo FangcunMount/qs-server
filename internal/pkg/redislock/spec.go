@@ -19,10 +19,11 @@ func (s Spec) Identity(key string) Identity {
 
 // Specs 定义系统内置的分布式锁规格集合。
 var Specs = struct {
-	AnswersheetProcessing Spec
-	PlanSchedulerLeader   Spec
-	StatisticsSync        Spec
-	CollectionSubmit      Spec
+	AnswersheetProcessing    Spec
+	PlanSchedulerLeader      Spec
+	StatisticsSync           Spec
+	BehaviorPendingReconcile Spec
+	CollectionSubmit         Spec
 }{
 	AnswersheetProcessing: Spec{
 		Name:        "answersheet_processing",
@@ -38,6 +39,11 @@ var Specs = struct {
 		Name:        "statistics_sync",
 		Description: "用于 apiserver 统计同步任务串行化执行的分布式锁。",
 		DefaultTTL:  30 * time.Minute,
+	},
+	BehaviorPendingReconcile: Spec{
+		Name:        "behavior_pending_reconcile",
+		Description: "用于 apiserver behavior pending reconcile 多实例串行化执行的分布式锁。",
+		DefaultTTL:  30 * time.Second,
 	},
 	CollectionSubmit: Spec{
 		Name:        "collection_submit",

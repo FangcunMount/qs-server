@@ -65,6 +65,77 @@ func TestOptionsValidatePlanScheduler(t *testing.T) {
 	}
 }
 
+func TestOptionsValidateBehaviorPendingReconcile(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Options)
+		wantErr string
+	}{
+		{
+			name: "disabled reconcile skips validation",
+			mutate: func(opts *Options) {
+				opts.BehaviorPendingReconcile.Enable = false
+				opts.BehaviorPendingReconcile.Interval = 0
+				opts.BehaviorPendingReconcile.BatchLimit = 0
+				opts.BehaviorPendingReconcile.LockKey = ""
+				opts.BehaviorPendingReconcile.LockTTL = 0
+			},
+		},
+		{
+			name: "enabled reconcile requires positive interval",
+			mutate: func(opts *Options) {
+				opts.BehaviorPendingReconcile.Interval = 0
+			},
+			wantErr: "behavior_pending_reconcile.interval must be greater than 0",
+		},
+		{
+			name: "enabled reconcile requires positive batch limit",
+			mutate: func(opts *Options) {
+				opts.BehaviorPendingReconcile.BatchLimit = 0
+			},
+			wantErr: "behavior_pending_reconcile.batch_limit must be greater than 0",
+		},
+		{
+			name: "enabled reconcile requires lock key",
+			mutate: func(opts *Options) {
+				opts.BehaviorPendingReconcile.LockKey = ""
+			},
+			wantErr: "behavior_pending_reconcile.lock_key cannot be empty when enabled",
+		},
+		{
+			name: "enabled reconcile requires positive lock ttl",
+			mutate: func(opts *Options) {
+				opts.BehaviorPendingReconcile.LockTTL = 0
+			},
+			wantErr: "behavior_pending_reconcile.lock_ttl must be greater than 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewOptions()
+			tt.mutate(opts)
+
+			errs := opts.Validate()
+			if tt.wantErr == "" {
+				for _, err := range errs {
+					if strings.Contains(err.Error(), "behavior_pending_reconcile.") {
+						t.Fatalf("unexpected behavior pending reconcile validation error: %v", err)
+					}
+				}
+				return
+			}
+
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tt.wantErr) {
+					return
+				}
+			}
+			t.Fatalf("expected validation error containing %q, got %v", tt.wantErr, errs)
+		})
+	}
+}
+
 func TestOptionsValidateCacheRoutes(t *testing.T) {
 	tests := []struct {
 		name    string

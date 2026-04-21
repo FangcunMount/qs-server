@@ -10,18 +10,22 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	runtimescheduler "github.com/FangcunMount/qs-server/internal/apiserver/runtime/scheduler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
@@ -41,6 +45,10 @@ type apiServer struct {
 	redisCache redis.UniversalClient
 	// 共享 Redis family runtime
 	redisRuntime *redisplane.Runtime
+	// lock/lease Redis runtime handle
+	lockHandle *redisplane.Handle
+	// apiserver 内建 scheduler 共享锁管理器
+	lockManager *redislock.Manager
 	// Container 主容器
 	container *container.Container
 	// Redis family 状态注册表
@@ -152,6 +160,8 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	metaHandle := handles[redisplane.FamilyMeta]
 	sdkHandle := handles[redisplane.FamilySDK]
 	lockHandle := handles[redisplane.FamilyLock]
+	s.lockHandle = lockHandle
+	s.lockManager = redislock.NewManager("apiserver", "lock_lease", lockHandle)
 	metaRedisCache := redisHandleClient(metaHandle)
 	_ = redisHandleClient(lockHandle)
 	if s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Hotset != nil && s.config.Cache.Warmup.Hotset.Enable && metaRedisCache == nil {
@@ -383,11 +393,9 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		}
 	}()
 
-	// 启动统计同步定时任务（Redis -> MySQL），最终一致
-	s.startStatisticsSyncScheduler()
+	s.startSchedulers()
 	s.startMongoOutboxRelay()
 	s.startAssessmentOutboxRelay()
-	s.startBehaviorPendingReconcile()
 
 	// 添加关闭回调
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
@@ -506,15 +514,50 @@ func (s preparedAPIServer) Run() error {
 	return <-errChan
 }
 
-// startStatisticsSyncScheduler 启动统计同步定时任务（夜间批处理）。
-func (s *apiServer) startStatisticsSyncScheduler() {
-	opts := s.config.StatisticsSync
-	if opts == nil || !opts.Enable {
-		log.Infof("statistics sync scheduler disabled")
+// startSchedulers 启动 apiserver 内建调度器。
+func (s *apiServer) startSchedulers() {
+	if s == nil || s.gs == nil || s.container == nil {
 		return
 	}
-	if s.container == nil || s.container.StatisticsModule == nil || s.container.StatisticsModule.SyncService == nil {
-		log.Warnf("statistics sync scheduler not started (module or sync service unavailable)")
+
+	var (
+		lockBuilder       *rediskey.Builder
+		planCommand       planApp.PlanCommandService
+		statisticsSyncSvc statisticsApp.StatisticsSyncService
+		behaviorProjector statisticsApp.BehaviorProjectorService
+	)
+	if s.lockHandle != nil {
+		lockBuilder = s.lockHandle.Builder
+	}
+	if s.container.PlanModule != nil {
+		planCommand = s.container.PlanModule.CommandService
+	}
+	if s.container.StatisticsModule != nil {
+		statisticsSyncSvc = s.container.StatisticsModule.SyncService
+		behaviorProjector = s.container.StatisticsModule.BehaviorProjectorService
+	}
+
+	manager := runtimescheduler.NewManager(
+		runtimescheduler.NewPlanRunner(
+			s.config.PlanScheduler,
+			s.lockManager,
+			planCommand,
+			lockBuilder,
+		),
+		runtimescheduler.NewStatisticsSyncRunner(
+			s.config.StatisticsSync,
+			statisticsSyncSvc,
+			s.container.WarmupCoordinator,
+		),
+		runtimescheduler.NewBehaviorPendingReconcileRunner(
+			s.config.BehaviorPendingReconcile,
+			behaviorProjector,
+			s.lockManager,
+			lockBuilder,
+		),
+	)
+	if manager.Len() == 0 {
+		log.Infof("no built-in apiserver schedulers enabled")
 		return
 	}
 
@@ -524,81 +567,8 @@ func (s *apiServer) startStatisticsSyncScheduler() {
 		return nil
 	}))
 
-	runAt, err := parseStatisticsSyncRunAt(opts.RunAt)
-	if err != nil {
-		log.Warnf("statistics sync scheduler disabled: invalid run_at %q: %v", opts.RunAt, err)
-		return
-	}
-
-	syncSvc := s.container.StatisticsModule.SyncService
-	go func() {
-		for {
-			now := time.Now().In(time.Local)
-			nextRun := nextStatisticsSyncRun(now, runAt.hour, runAt.minute)
-			timer := time.NewTimer(time.Until(nextRun))
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
-
-			for _, orgID := range opts.OrgIDs {
-				orgCtx := context.Background()
-				start, end := statisticsSyncRepairWindow(time.Now().In(time.Local), opts.RepairWindowDays)
-				dailyOpts := statisticsApp.SyncDailyOptions{StartDate: &start, EndDate: &end}
-				if err := syncSvc.SyncDailyStatistics(orgCtx, orgID, dailyOpts); err != nil {
-					log.Warnf("statistics nightly daily sync failed (org=%d): %v", orgID, err)
-					continue
-				}
-				if err := syncSvc.SyncAccumulatedStatistics(orgCtx, orgID); err != nil {
-					log.Warnf("statistics nightly accumulated sync failed (org=%d): %v", orgID, err)
-					continue
-				}
-				if err := syncSvc.SyncPlanStatistics(orgCtx, orgID); err != nil {
-					log.Warnf("statistics nightly plan sync failed (org=%d): %v", orgID, err)
-					continue
-				}
-				if s.container != nil && s.container.WarmupCoordinator != nil {
-					if err := s.container.WarmupCoordinator.HandleStatisticsSync(orgCtx, orgID); err != nil {
-						log.Warnf("statistics nightly cache warmup failed (org=%d): %v", orgID, err)
-					}
-				}
-			}
-		}
-	}()
-
-	log.Infof("statistics sync scheduler started (org_ids=%v, run_at=%s, repair_window_days=%d)",
-		opts.OrgIDs, opts.RunAt, opts.RepairWindowDays)
-}
-
-type statisticsSyncClock struct {
-	hour   int
-	minute int
-}
-
-func parseStatisticsSyncRunAt(raw string) (statisticsSyncClock, error) {
-	parsed, err := time.ParseInLocation("15:04", raw, time.Local)
-	if err != nil {
-		return statisticsSyncClock{}, err
-	}
-	return statisticsSyncClock{hour: parsed.Hour(), minute: parsed.Minute()}, nil
-}
-
-func nextStatisticsSyncRun(now time.Time, hour, minute int) time.Time {
-	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-	if !next.After(now) {
-		next = next.AddDate(0, 0, 1)
-	}
-	return next
-}
-
-func statisticsSyncRepairWindow(now time.Time, repairWindowDays int) (time.Time, time.Time) {
-	if repairWindowDays <= 0 {
-		repairWindowDays = 7
-	}
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return todayStart.AddDate(0, 0, -repairWindowDays), todayStart
+	manager.Start(ctx)
+	log.Infof("apiserver scheduler manager started (runner_count=%d)", manager.Len())
 }
 
 // startMongoOutboxRelay 启动 Mongo outbox relay（answersheet/report success events）。
@@ -677,48 +647,6 @@ func (s *apiServer) startAssessmentOutboxRelay() {
 	}()
 
 	log.Infof("assessment outbox relay started (interval=%s)", interval)
-}
-
-// startBehaviorPendingReconcile 启动 behavior pending 事件归因重试任务。
-func (s *apiServer) startBehaviorPendingReconcile() {
-	if s.container == nil || s.container.StatisticsModule == nil {
-		return
-	}
-
-	projector := s.container.StatisticsModule.BehaviorProjectorService
-	if projector == nil {
-		return
-	}
-
-	const (
-		interval = 10 * time.Second
-		limit    = 100
-	)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-		cancel()
-		return nil
-	}))
-
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		for {
-			if _, err := projector.ReconcilePendingBehaviorEvents(ctx, limit); err != nil {
-				log.Warnf("behavior pending reconcile failed: %v", err)
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
-	}()
-
-	log.Infof("behavior pending reconcile started (interval=%s, limit=%d)", interval, limit)
 }
 
 // buildGenericServer 构建通用服务器

@@ -77,6 +77,20 @@ func (o *Options) Validate() []error {
 			errs = append(errs, fmt.Errorf("plan_scheduler.lock_ttl must be less than or equal to plan_scheduler.interval"))
 		}
 	}
+	if o.BehaviorPendingReconcile != nil && o.BehaviorPendingReconcile.Enable {
+		if o.BehaviorPendingReconcile.Interval <= 0 {
+			errs = append(errs, fmt.Errorf("behavior_pending_reconcile.interval must be greater than 0"))
+		}
+		if o.BehaviorPendingReconcile.BatchLimit <= 0 {
+			errs = append(errs, fmt.Errorf("behavior_pending_reconcile.batch_limit must be greater than 0"))
+		}
+		if o.BehaviorPendingReconcile.LockKey == "" {
+			errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_key cannot be empty when enabled"))
+		}
+		if o.BehaviorPendingReconcile.LockTTL <= 0 {
+			errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_ttl must be greater than 0"))
+		}
+	}
 
 	if o.Cache != nil {
 		if o.Cache.TTLJitterRatio < 0 || o.Cache.TTLJitterRatio > 1 {
