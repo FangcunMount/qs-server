@@ -82,9 +82,9 @@ flowchart LR
 
 | 维度 | collection-server | qs-apiserver |
 | ---- | ----------------- | ------------ |
-| **调用方** | 小程序、前台收集端 | 管理后台、运维、Crontab |
+| **调用方** | 小程序、前台收集端 | 管理后台、运维 |
 | **典型资源** | `questionnaires`、`scales`、`testees`、`answersheets`、`assessments`（前台子集） | 同上领域在后台的完整生命周期 + `plans`、`statistics`、`staff`、`codes` 等 |
-| **典型动作** | `POST /answersheets`、报告/状态查询、`GET .../wait-report` | `POST .../publish`、统计 `sync/*`、`plans/tasks/schedule`、`statistics/validate` |
+| **典型动作** | `POST /answersheets`、报告/状态查询、`GET .../wait-report` | `POST .../publish`、统计 `sync/*` 手工补跑、`plans/tasks/schedule` 手工触发 |
 
 **结论**：REST **按调用方拆分**，不在 collection 复制一套后台生命周期实现；详细列表以 **OpenAPI + `routers.go`** 为准。
 

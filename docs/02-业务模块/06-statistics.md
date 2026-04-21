@@ -228,12 +228,13 @@ worker 默认：
 | `/internal/v1/statistics/sync/daily` | 同步 daily |
 | `/internal/v1/statistics/sync/accumulated` | 同步 accumulated |
 | `/internal/v1/statistics/sync/plan` | 同步 plan |
-| `/internal/v1/statistics/validate` | 一致性校验与修复 |
 
 代码锚点：
 
 - [../../internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go)
 - [../../internal/apiserver/routers.go](../../internal/apiserver/routers.go)
+
+说明：历史上曾有 `statistics/validate` 入口，但它已经不在当前 router 注册路径中，不应再按现行能力描述。
 
 ---
 
