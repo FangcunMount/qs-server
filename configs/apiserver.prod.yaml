@@ -120,8 +120,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 20        # 保留一定热连接，减少高峰期建连抖动
-  max-open-connections: 180       # 1C2G / 600 连接上限下的保守提档
+  max-idle-connections: 10        # 2C4G 临时降配阶段降低热连接占用
+  max-open-connections: 80        # 收紧连接池，和下游背压预算一起控制数据库并发
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
@@ -147,10 +147,10 @@ redis:
   username: ""
   password: ""
   database: 1
-  max-idle: 200
-  max-active: 800
+  max-idle: 40
+  max-active: 200
   timeout: 300
-  min-idle-conns: 50
+  min-idle-conns: 10
   pool-timeout: 10
   dial-timeout: 5
   read-timeout: 5
@@ -248,7 +248,7 @@ cache:
     negative: "5m"             # 负缓存时间（穿透保护）
   ttl_jitter_ratio: 0.1       # 缓存时间抖动比例
   statistics_warmup:          # 统计查询结果缓存预热配置
-    enable: true              # 开启统计查询结果缓存预热
+    enable: false             # 2C4G 临时降配阶段关闭统计预热，改为按需加载
     org_ids: [1]              # 组织ID列表（从配置读取，默认预热所有组织）
     questionnaire_codes: []    # 问卷编码列表（从配置读取，默认预热所有问卷）
     plan_ids: []              # 计划ID列表（从配置读取，默认预热所有计划）
@@ -256,9 +256,9 @@ cache:
     enable: true
     startup:
       static: true
-      query: true
+      query: false
     hotset:
-      enable: true
+      enable: false
       top_n: 20
       max_items_per_kind: 200
 
@@ -269,14 +269,14 @@ plan_scheduler:
   enable: true                  # 启用计划调度器
   org_ids: [1]                  # 组织ID列表（从配置读取，默认调度所有组织）
   initial_delay: "1m"           # 启动后首次调度延迟，避免与其他服务启动冲突
-  interval: "2m"                # 调度间隔，生产环境建议 10 分钟
+  interval: "10m"               # 2C4G 临时降配阶段回到保守扫描频率
   lock_key: "qs:plan-scheduler:leader" # 分布式锁键，确保单实例执行
   lock_ttl: "2m"                # 锁过期时间，略长于调度间隔，避免死锁
 
 behavior_pending_reconcile:
   enable: true                  # 启用行为待处理项调和任务
-  interval: "1m"                # 调和间隔，生产环境建议 5 分钟
-  batch_limit: 100              # 每次调和处理的待处理项数量，避免一次处理过多导致性能问题
+  interval: "5m"                # 2C4G 临时降配阶段回到保守扫描频率
+  batch_limit: 50               # 降低单次调和负载，减少瞬时 CPU/DB 峰值
   lock_key: "qs:behavior-pending-reconcile:leader"  # 分布式锁键，确保单实例执行
   lock_ttl: "5m"                # 锁过期时间，略长于调和间隔，避免死锁
 
@@ -316,15 +316,15 @@ rate_limit:
 backpressure:
   mysql:
     enabled: true
-    max_inflight: 160
+    max_inflight: 80
     timeout_ms: 2500
   mongo:
     enabled: true
-    max_inflight: 200
+    max_inflight: 100
     timeout_ms: 2000
   iam:
     enabled: true
-    max_inflight: 100
+    max_inflight: 40
     timeout_ms: 2000
 
 # ----------------------------------------------------------------------------

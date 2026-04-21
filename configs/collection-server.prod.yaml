@@ -42,7 +42,7 @@ grpc_client:
   endpoint: "qs-apiserver:9090"  # Docker 容器服务名
   timeout: 30
   insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
-  max_inflight: 300
+  max_inflight: 80
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
@@ -68,10 +68,10 @@ redis:
   username: ""
   password: ""
   database: 1
-  max-idle: 200
-  max-active: 800
+  max-idle: 40
+  max-active: 120
   timeout: 300
-  min-idle-conns: 50
+  min-idle-conns: 10
   pool-timeout: 10
   dial-timeout: 5
   read-timeout: 5
@@ -120,8 +120,8 @@ rate_limit:
 # -------------------------------------------------------
 submit_queue:
   enabled: true
-  queue_size: 2000
-  worker_count: 16
+  queue_size: 500
+  worker_count: 8
   wait_timeout_ms: 200
 
 # ============================================================
@@ -180,13 +180,13 @@ iam:
   user-cache:
     enabled: true
     ttl: 5m
-    max-size: 10000
+    max-size: 5000
   
   # 监护关系缓存
   guardianship-cache:
     enabled: true
     ttl: 10m
-    max-size: 50000
+    max-size: 20000
 
 # ============================================================
 # 5. 系统配置
@@ -225,11 +225,11 @@ log:
 # ============================================================
 # 控制 Go 运行时的 GC/内存行为与并发
 runtime:
-  # 将 GOMEMLIMIT 设置为容器配额的 80-85% 以避免 OOM（容器 mem_limit=1GiB）
-  go-mem-limit: "700MiB"
+  # 将 GOMEMLIMIT 设置为容器配额的 80-85% 以避免 OOM（容器 mem_limit=384MiB）
+  go-mem-limit: "320MiB"
   # 更积极的 GC，降低峰值内存
   gogc: 50
 
 # 并发/连接池调优
 concurrency:
-  max-concurrency: 100
+  max-concurrency: 40

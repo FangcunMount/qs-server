@@ -39,6 +39,11 @@ on:
           - apiserver
           - collection
           - worker
+      worker_replicas:
+        description: 'Worker 副本数（留空则读取 QS_WORKER_REPLICAS，缺失时默认为 1）'
+        required: false
+        type: string
+        default: ''
       docs_verify:
         description: '运行文档校验 (docs-verify)'
         required: false
@@ -1119,10 +1124,10 @@ jobs:
     env:
       WWW_UID: ${{ secrets.WWW_UID || '1000' }}
       WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '1' }}
       SERVICE_NAME: qs-worker
       IMAGE_NAME: qs-worker
       CONTAINER_NAME: qs-worker
-      WORKER_REPLICAS: "3"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -1262,12 +1267,13 @@ jobs:
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
+          WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
         with:
           host: ${{ secrets.SVRA_HOST }}
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,WORKER_REPLICAS,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS
           script: |
             set -Eeuo pipefail
 
@@ -1343,15 +1349,6 @@ jobs:
               return "$rc"
             }
 
-            echo "=========================================="
-            echo "Deploying ${CONTAINER_NAME} (replicas=${WORKER_REPLICAS})"
-            echo "=========================================="
-
-            if ! [[ "${WORKER_REPLICAS}" =~ ^[0-9]+$ ]] || [ "${WORKER_REPLICAS}" -lt 1 ]; then
-              echo "❌ WORKER_REPLICAS must be a positive integer, got: ${WORKER_REPLICAS}" >&2
-              exit 1
-            fi
-
             # 目录准备
             $SUDO mkdir -p /opt/qs-server/${CONTAINER_NAME}/configs/env
             $SUDO mkdir -p /data/logs/qs-server/${CONTAINER_NAME}
@@ -1381,6 +1378,15 @@ jobs:
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
+
+            echo "=========================================="
+            echo "Deploying ${CONTAINER_NAME} (replicas=${WORKER_REPLICAS})"
+            echo "=========================================="
+
+            if ! [[ "${WORKER_REPLICAS}" =~ ^[0-9]+$ ]] || [ "${WORKER_REPLICAS}" -lt 1 ]; then
+              echo "❌ WORKER_REPLICAS must be a positive integer, got: ${WORKER_REPLICAS}" >&2
+              exit 1
+            fi
 
             # 网络（创建 qs-network，检查 infra-network）
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then

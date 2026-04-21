@@ -28,7 +28,7 @@ metrics:
 # -------------------------------------------------------
 worker:
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
-  concurrency: 48              # 3 副本合计约 144 inflight，避免显著高于 apiserver MySQL 背压上限 160
+  concurrency: 16              # serverA 临时降配为单实例 worker，将 NSQ maxInFlight 控制在 16，避免显著高于 apiserver MySQL 背压上限 80
   max-retries: 3              # 最大重试次数
 
 # ============================================================
@@ -68,8 +68,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 20
-  max-open-connections: 100
+  max-idle-connections: 5
+  max-open-connections: 30
   max-connection-life-time: "1h"
   log-level: 2  # 生产环境只记录 Error
 
@@ -111,10 +111,10 @@ redis:
   username: ""
   password: ""
   database: 1
-  max-idle: 200
-  max-active: 800
+  max-idle: 20
+  max-active: 100
   timeout: 300
-  min-idle-conns: 50
+  min-idle-conns: 5
   pool-timeout: 10
   dial-timeout: 5
   read-timeout: 5
