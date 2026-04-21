@@ -1,181 +1,302 @@
-# Redis 使用情况
+# Redis 当前实现与治理总览
 
-**本文回答**：`qs-server` 当前到底把 Redis 用在了哪些地方，分别是谁在写、谁在读、TTL 和 key 形态是什么，以及哪些属于主服务运行时、哪些只是工具或本地联调用途。
+**本文回答**：`qs-server` 当前到底怎样使用 Redis，三进程分别依赖哪些 Redis family，运行时暴露了哪些治理接口，以及应该从哪几篇文档进入 Redis 体系。
 
 ## 30 秒结论
 
-先看一屏结论：
+| 维度 | 当前结论 |
+| ---- | -------- |
+| 真值层入口 | **先读 [12-Redis文档中心](./12-Redis文档中心.md)** 建立四层地图；再读本文看当前实现与运行边界；最后按需进入 [11-Redis三层设计与落地手册](./11-Redis三层设计与落地手册.md) 与 [13-Redis缓存业务清单](./13-Redis缓存业务清单.md) |
+| Foundation | Foundation 已沉到 `component-base/pkg/redis` + `component-base/pkg/database`；`qs-server` 不再自己实现 runtime / keyspace / typed store / lease 原语 |
+| Cache 层 | **只在 `apiserver` 完整存在**：`static_meta / object_view / query_result / meta_hotset / sdk_token` |
+| Lock 层 | **三进程共享 `lock_lease`**；锁入口统一收口到 [`internal/pkg/redislock`](../../internal/pkg/redislock/) 的 `Manager + LockSpec` |
+| Collection 侧 Redis | `collection-server` 已重新接入 Redis，但仅用于 **`ops_runtime + lock_lease`**，不承担领域读缓存，也不承担 durable queue |
+| Governance | 三进程都已经暴露 `/readyz` 与 `/governance/redis`；`apiserver` 额外暴露 `/cache/governance/status`、`/cache/governance/hotset`、`/cache/governance/warmup-targets`、`/cache/governance/repair-complete` |
+| 历史文档处理 | Redis 历史设计稿与阶段记录已迁入 [`docs/_archive`](../_archive/README.md)，不再作为现行真值层入口 |
 
-| 维度 | 结论 |
-| ---- | ---- |
-| 运行时主用途 | **对象缓存 / 列表缓存、统计查询缓存、统计 daily 中转、事件幂等分桶、分布式互斥锁、微信 SDK token 缓存** |
-| 主要使用方 | **`qs-apiserver`** 负责大部分缓存；**`qs-worker`** 负责统计幂等、问卷 daily 预聚合、answersheet 锁、plan scheduler 锁 |
-| 已清理的旧用法 | 运行时代码里已不再写旧的 window / accumulated / distribution 统计键族；问卷列表缓存、测评状态缓存、`CodesService` 的假 Redis 依赖、`collection-server` 运行时 Redis 装配都已移除 |
-| 命名空间 | Redis key 统一由 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/) 生成；`cache.namespace` 会同时作用于缓存、统计、锁和微信 SDK 缓存 |
-| 设计边界 | 锁是**单 Redis lease lock**，属于 best-effort 分布式锁；不是强一致协调系统 |
-| 部署现实 | `apiserver` 默认可用统计 Redis；`worker` 默认 `cache.disable_statistics_cache=true`，所以统计预聚合和幂等键只有在显式开启时才会产生 |
+## 先读哪几篇
+
+Redis 相关文档现在收口成一个中心页和三篇现行真值文：
+
+1. **总入口 / 阅读地图**：[12-Redis文档中心](./12-Redis文档中心.md)
+2. **当前实现与运行边界**：本文
+3. **三层设计、建模与接入手册**：[11-Redis三层设计与落地手册](./11-Redis三层设计与落地手册.md)
+4. **业务缓存清单**：[13-Redis缓存业务清单](./13-Redis缓存业务清单.md)
+
+如果要接 operating 或排查治理接口，再读：
+
+- [04-接口与运维/06-operating 缓存治理页接入.md](../04-接口与运维/06-operating%20缓存治理页接入.md)
+
+如果只是想看历史设计演进，再读：
+
+- [07-Redis代码总览（源码审计版）](../_archive/03-基础设施/07-Redis代码总览（源码审计版）.md)
+- [08-Redis分层重构设计](../_archive/03-基础设施/08-Redis分层重构设计.md)
+- [09-Redis跨仓重构路线](../_archive/03-基础设施/09-Redis跨仓重构路线.md)
+- [10-apiserver缓存实现层重构](../_archive/03-基础设施/10-apiserver缓存实现层重构.md)
+- [05-缓存体系设计：从零散缓存到统一缓存平台](../_archive/05-专题分析/05-缓存体系设计：从零散缓存到统一缓存平台.md)
+
+这些历史文档仍可提供术语和演进背景，但**现状以本文和代码为准**。
 
 ## Redis 在三进程里的位置
 
-| 进程 | 当前 Redis 角色 |
-| ---- | --------------- |
-| `qs-apiserver` | 通用缓存、列表缓存、统计查询结果缓存、微信 SDK 缓存 |
-| `qs-worker` | 统计事件幂等、问卷 daily 预聚合、`answersheet` 处理闸门、plan scheduler 选主锁 |
-| `collection-server` | **当前运行时不再连接 / 使用 Redis**；仅保留配置项兼容 |
+| 进程 | 当前 Redis 角色 | 说明 |
+| ---- | --------------- | ---- |
+| `qs-apiserver` | Cache 主进程 + Governance 主进程 + Statistics / SDK / Lock 消费方 | 承担对象缓存、查询缓存、hotset、手工预热、statistics sync 锁、微信 SDK 缓存 |
+| `qs-worker` | Lock 消费方 | 当前只运行 `lock_lease` family；主要承担 answersheet 处理闸门等 worker 侧互斥 |
+| `collection-server` | Operational Redis 消费方 | 只接 `ops_runtime + lock_lease`，用于限流、提交幂等与 in-flight guard；不做领域读缓存 |
 
 代码锚点：
 
-- `apiserver` 注入 Redis 到各模块见 [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
-- `worker` Redis 初始化与按配置禁用统计 Redis 见 [internal/worker/server.go](../../internal/worker/server.go)
-- `collection-server` 当前不再初始化 Redis，见 [internal/collection-server/server.go](../../internal/collection-server/server.go)
+- `apiserver` 启动与 runtime 注入：
+  [internal/apiserver/server.go](../../internal/apiserver/server.go)
+  [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
+- `worker` 启动与 lock manager：
+  [internal/worker/server.go](../../internal/worker/server.go)
+- `collection-server` runtime 装配：
+  [internal/collection-server/server.go](../../internal/collection-server/server.go)
 
-## 运行时缓存
+## 当前 family 模型
 
-### 通用规则
+逻辑 family 统一定义在：
+[internal/pkg/redisplane/catalog.go](../../internal/pkg/redisplane/catalog.go)
 
-- 这组缓存主要实现于 [internal/apiserver/infra/cache](../../internal/apiserver/infra/cache)
-- Redis key 统一由 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/) 生成；`infra/cache/namespace.go` 现在只是对统一 namespace 入口的薄封装
-- TTL 支持全局覆盖与抖动，见 [ttl_config.go](../../internal/apiserver/infra/cache/ttl_config.go)
-- 问卷、量表、测评详情等对象缓存都使用 repository 装饰器方式接入
-- 列表缓存额外带一层进程内短 TTL 内存缓存，减少热点 Redis `GET` 和 JSON 解码
+| Family | 主要进程 | 典型用途 |
+| ------ | -------- | -------- |
+| `static_meta` | `apiserver` | 量表、问卷、已发布量表列表等静态或半静态缓存 |
+| `object_view` | `apiserver` | `assessment detail`、`testee info`、`plan info` 等单对象视图缓存 |
+| `query_result` | `apiserver` | 统计查询缓存、版本化 query/list 缓存 |
+| `meta_hotset` | `apiserver` | hotset 排行、version token、warmup 元数据 |
+| `sdk_token` | `apiserver` | 微信 SDK token / ticket 等第三方 SDK 缓存 |
+| `lock_lease` | `apiserver` / `worker` / `collection-server` | 共享 lease lock family |
+| `ops_runtime` | `collection-server` | 限流、提交幂等、in-flight guard 等操作性 Redis |
 
-### 缓存清单
+### family 路由配置
 
-| 缓存 | Key / Pattern | 谁在写 | 谁在读 | TTL |
-| ---- | ------------- | ------ | ------ | --- |
-| 量表单条缓存 | `scale:{code}` | `Create` 写入；`FindByCode` miss 回填；`Update` / `Remove` 失效 | 所有通过 `ScaleRepo.FindByCode` 取量表的链路 | `24h` |
-| 问卷工作版本缓存 | `questionnaire:{code}` | `Create` 写入；`FindByCode` miss 回填；`Update` / `Remove` / `HardDelete*` 失效 | 后台详情、编辑流按 `code` 读当前工作版本 | `12h` |
-| 问卷当前已发布缓存 | `questionnaire:published:{code}` | `CreatePublishedSnapshot(active=true)` 写入；`FindPublishedByCode` miss 回填；发布激活切换时失效 | 面向提交和公开读取的当前已发布问卷 | `12h` |
-| 问卷精确版本缓存 | `questionnaire:{code}:{version}` | 发布快照写入；`FindByCodeVersion` miss 回填；按 `code` 家族失效 | 答卷、评估、历史回放按精确版本读取 | `12h`；空值 negative cache `5m` |
-| 测评详情缓存 | `assessment:detail:{id}` | `FindByID` miss 回填；`Save` / `Delete` 失效 | 测评详情、评估链路按 ID 查询 | `2h` |
-| 受试者缓存 | `testee:info:{id}` | **仅单条 `FindByID`** miss 回填；`Save` / `Update` / `Delete` 失效；批量 `FindByIDs` / 关系列表不写 Redis | 访问校验、受试者单条详情 | `30m` |
-| 计划缓存 | `plan:info:{id}` | `FindByID` miss 回填；`Save` 失效 | 计划查询、计划相关命令服务 | `2h` |
-| 已发布量表列表缓存 | `scale:list:v1` | 量表 / 因子变更后 `Rebuild`；查询 miss 也可触发重建 | 已发布量表列表查询 | Redis `10m` + 本地内存 `30s` |
-| 我的测评列表缓存 | `assess:list:{user}:v1:{hash}` | 列表查询 miss 回填；创建 / 提交后按用户前缀失效 | “我的测评列表”查询 | Redis `10m` + 本地内存 `30s` |
+当前 family 路由统一使用：
 
-主要代码：
+- `redis`
+- `redis_profiles`
+- `redis_runtime`
 
-- [internal/apiserver/infra/cache/scale_cache.go](../../internal/apiserver/infra/cache/scale_cache.go)
-- [internal/apiserver/infra/cache/questionnaire_cache.go](../../internal/apiserver/infra/cache/questionnaire_cache.go)
-- [internal/apiserver/infra/cache/assessment_detail_cache.go](../../internal/apiserver/infra/cache/assessment_detail_cache.go)
-- [internal/apiserver/infra/cache/testee_cache.go](../../internal/apiserver/infra/cache/testee_cache.go)
-- [internal/apiserver/infra/cache/plan_cache.go](../../internal/apiserver/infra/cache/plan_cache.go)
-- [internal/apiserver/application/scale/global_list_cache.go](../../internal/apiserver/application/scale/global_list_cache.go)
-- [internal/apiserver/infra/cache/my_assessment_list_cache.go](../../internal/apiserver/infra/cache/my_assessment_list_cache.go)
+配置与校验入口：
 
-### 预热
+- apiserver：
+  [internal/apiserver/options/options.go](../../internal/apiserver/options/options.go)
+- worker：
+  [internal/worker/options/options.go](../../internal/worker/options/options.go)
+- collection-server：
+  [internal/collection-server/options/options.go](../../internal/collection-server/options/options.go)
 
-`apiserver` 启动后会异步预热已发布量表与问卷；如果打开 `cache.statistics_warmup`，还会预热统计查询结果缓存。
+生产配置样例：
 
-- 入口见 [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go) `WarmupCache`
-- 实现见 [internal/apiserver/infra/cache/warmup.go](../../internal/apiserver/infra/cache/warmup.go)
+- [configs/apiserver.prod.yaml](../../configs/apiserver.prod.yaml)
+- [configs/worker.prod.yaml](../../configs/worker.prod.yaml)
+- [configs/collection-server.prod.yaml](../../configs/collection-server.prod.yaml)
 
-## 统计侧 Redis
+## Cache 层：当前实现边界
 
-统计侧 Redis 现在已经收口，不再承担一整套复杂预聚合模型；运行时代码里只保留 3 类 key family。
+### 1. `apiserver` 是唯一完整 Cache 层消费者
 
-| Key family | 谁在写 | 谁在读 | TTL | 用途 |
-| ---------- | ------ | ------ | --- | ---- |
-| `stats:query:{cacheKey}` | `system/questionnaire/testee/plan` 统计服务在 miss 后回填 | 同一批统计查询服务先读缓存，再回源 MySQL / 原始表 | `5m` | 统计查询结果缓存 |
-| `event:processed:bucket:{yyyy-mm-dd}` | worker 统计 handler 通过 Lua `SADD` 分桶写入 | 同一 handler 在处理前检查最近 7 个自然日分桶；兼容期内还会先查旧的 `event:processed:{eventID}` | `8d` | 统计事件幂等 |
-| `stats:daily:{org}:questionnaire:{code}:{date}` | worker 统计 handler 对问卷提交数 / 完成数做 `HINCRBY` | `SyncDailyStatistics`、`SyncAccumulatedStatistics`、`ValidateConsistency` | `90d` | 问卷 daily 中转站 |
+当前 `apiserver` 中仍然属于现行 Cache 层的实现，主要落在：
 
-主要代码：
+- [internal/apiserver/infra/cache](../../internal/apiserver/infra/cache)
+- [internal/apiserver/infra/cachepolicy](../../internal/apiserver/infra/cachepolicy)
+- [internal/apiserver/application/cachegovernance](../../internal/apiserver/application/cachegovernance)
 
-- 写 / 读封装在 [internal/apiserver/infra/statistics/cache.go](../../internal/apiserver/infra/statistics/cache.go)
-- worker 写入在 [internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)
-- 同步 / 校验在 [internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) 和 [internal/apiserver/application/statistics/validator_service.go](../../internal/apiserver/application/statistics/validator_service.go)
+其中：
 
-### 当前边界
+- `infra/cache`：只保留具体缓存实现、read-through、versioned query、hotset、本地热点缓存、repository decorator。
+- `cachepolicy`：对象级缓存策略唯一入口。
+- `cachegovernance`：预热、状态聚合、治理命令与查询。
 
-- 运行时代码里已不再写旧的 window / accumulated / distribution 统计键族
-- `system`、`plan`、`testee` 统计现在主要依赖 **`stats:query:*` + MySQL / 原始表回源**
-- `questionnaire` 是唯一还保留 Redis daily 中转链的统计类型
-- `event:processed:*` 已重构为按天分桶的 `Set`，不再按事件生成独立顶层 key；兼容期只读旧单 key，不再新增旧格式 key
-- `worker` 默认 `cache.disable_statistics_cache=true`，见 [internal/worker/options/options.go](../../internal/worker/options/options.go)；如果不显式开启，`event:processed:*` 和 `stats:daily:*` 实际不会产生
-- `apiserver` 统计模块在 Redis 不可用时会降级，只保留无 Redis 的查询路径，见 [internal/apiserver/container/assembler/statistics.go](../../internal/apiserver/container/assembler/statistics.go)
+### 2. 当前对象与查询缓存
 
-### 兼容期清理旧 `event:processed:{eventID}` 键
+当前主缓存对象包括：
 
-重构上线后，旧单 key 会立即停止增长，但历史 key 仍会在 TTL 窗口内滞留。若需要一次性提前回收，可只删除**非 bucket** 的旧 key：
+- 量表与问卷缓存：
+  [scale_cache.go](../../internal/apiserver/infra/cache/scale_cache.go)
+  [questionnaire_cache.go](../../internal/apiserver/infra/cache/questionnaire_cache.go)
+- 单对象缓存：
+  [assessment_detail_cache.go](../../internal/apiserver/infra/cache/assessment_detail_cache.go)
+  [testee_cache.go](../../internal/apiserver/infra/cache/testee_cache.go)
+  [plan_cache.go](../../internal/apiserver/infra/cache/plan_cache.go)
+- 列表与 query 缓存：
+  [global_list_cache.go](../../internal/apiserver/application/scale/global_list_cache.go)
+  [my_assessment_list_cache.go](../../internal/apiserver/infra/cache/my_assessment_list_cache.go)
+  [internal/apiserver/infra/statistics/cache.go](../../internal/apiserver/infra/statistics/cache.go)
 
-```bash
-redis-cli --scan --pattern 'event:processed:*' \
-| grep -v '^event:processed:bucket:' \
-| xargs -r -L 500 redis-cli UNLINK
-```
+当前原则：
 
-如果启用了 `cache.namespace`，请把 pattern 改成对应前缀，例如 `prod:event:processed:*`。
+- 对象缓存优先 `decorator + read-through + 写后失效`
+- query/list 缓存优先 `version token + versioned key`
+- 热点 query 和列表允许再叠一层短 TTL 本地热点缓存
+- Redis key 统一走 [`internal/pkg/rediskey`](../../internal/pkg/rediskey/)
 
-## 锁
+### 3. `collection-server` 当前不做领域读缓存
 
-项目里当前真正的 Redis 锁只有 2 把，底层都复用 [internal/pkg/redislock/lock.go](../../internal/pkg/redislock/lock.go)：
+虽然 `collection-server` 已重新接入 Redis，但它只在：
 
-- 获取锁：`SETNX key token EX ttl`
-- 释放锁：Lua compare-and-del
+- 分布式限流
+- 提交幂等 / 重复抑制
+- in-flight guard
 
-它们属于**单 Redis 的 lease lock**，可以视作 best-effort 分布式锁，但不是强一致协调系统：没有续租、没有 fencing token、没有 quorum。
+这些操作性场景使用 Redis，不承担：
 
-| 锁 | Key | 谁在用 | TTL | 作用 |
-| -- | --- | ------ | --- | ---- |
-| answersheet 处理闸门 | `answersheet:processing:{answerSheetID}` | worker `answersheet_submitted_handler` | `5m` | 抑制重复计分和重复创建测评 |
-| plan scheduler 选主锁 | `qs:plan-scheduler:leader`（可配置） | worker 内建 plan scheduler | 默认 `50s` | 多 worker 只允许一个实例推进 plan task 调度 |
+- 领域对象读缓存
+- query/list 读缓存
+- durable queue / Redis Streams 队列
 
-### `answersheet` 锁的当前语义
+相关实现：
 
-`answersheet` 这把锁已经被重构成“外层处理闸门 + 下游幂等兜底”：
+- [internal/collection-server/infra/redisops](../../internal/collection-server/infra/redisops)
 
-- `locked`：拿到锁后执行“计分 + 创建测评”
-- `duplicate_skip`：锁已被占用则直接确认消息成功，不再做重复工作
-- `degraded`：Redis 不可用或加锁失败时继续处理，由下游幂等兜底
+## Warmup 与治理接口
 
-实现见 [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)。
+### 当前 warmup 触发器
 
-### `plan scheduler` 锁的当前语义
+`apiserver` 当前已经不是“只有启动时手写几段预热”的模式，而是统一由 `WarmupCoordinator` 编排：
 
-- worker 开启 `plan_scheduler.enable=true` 后，每次 tick 先抢 leader 锁
-- 没抢到锁时直接跳过本轮 tick
-- Redis 不可用时，scheduler 直接不启动
-- 由于没有续租，当前更适合轻量级的 HA 选主，而不是强一致任务协调
+- startup
+- scale publish
+- questionnaire publish
+- statistics sync
+- repair complete
+- manual warmup
 
-实现见 [internal/worker/plan_scheduler.go](../../internal/worker/plan_scheduler.go)。`apiserver` 本地 scheduler 已经退出当前运行时，不再有对应的活跃代码路径。
+入口与实现：
 
-## 第三方 SDK 缓存
+- [internal/apiserver/container/container.go](../../internal/apiserver/container/container.go)
+- [internal/apiserver/application/cachegovernance/coordinator.go](../../internal/apiserver/application/cachegovernance/coordinator.go)
 
-微信 SDK 使用 Redis 保存 token / ticket 等缓存：
+### 当前 manual warmup
 
-| Key 前缀 | 谁在写 / 读 | 降级策略 |
-| -------- | ----------- | -------- |
-| `wechat:cache:{sdkKey}` | 微信 SDK 通过 `RedisCacheAdapter` 间接读写 | Redis client 为 `nil` 时退回内存缓存 |
+标准治理命令已经存在：
 
-代码见 [internal/apiserver/infra/wechatapi/cache_adapter.go](../../internal/apiserver/infra/wechatapi/cache_adapter.go)。
+- `POST /internal/v1/cache/governance/warmup-targets`
 
-## 工具与非主服务运行时用途
+支持的 target kind 当前为：
 
-这几处也会连接 Redis，但不属于线上主服务的常规运行时路径：
+- `static.scale`
+- `static.questionnaire`
+- `static.scale_list`
+- `query.stats_system`
+- `query.stats_questionnaire`
+- `query.stats_plan`
 
-| 路径 | 用途 |
-| ---- | ---- |
-| `../seeddata-runner` | 同层独立 seeddata 仓库；仅保留 `daily_simulation_daemon` 与 `plan_submit_open_tasks_daemon` 两个后台脚本入口；当前不再依赖本地 Redis runtime |
+接口与模型：
+
+- [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go)
+- [internal/apiserver/application/cachegovernance/manual_warmup.go](../../internal/apiserver/application/cachegovernance/manual_warmup.go)
+
+### 当前治理查询面
+
+`apiserver`：
+
+- `GET /readyz`
+- `GET /governance/redis`
+- `GET /internal/v1/cache/governance/status`
+- `GET /internal/v1/cache/governance/hotset`
+- `POST /internal/v1/cache/governance/repair-complete`
+- `POST /internal/v1/cache/governance/warmup-targets`
+
+`worker`：
+
+- `GET /readyz`
+- `GET /governance/redis`
+- `/metrics`
+
+`collection-server`：
+
+- `GET /readyz`
+- `GET /governance/redis`
+
+代码锚点：
+
+- apiserver：
+  [internal/apiserver/routers.go](../../internal/apiserver/routers.go)
+- worker：
+  [internal/worker/metrics_server.go](../../internal/worker/metrics_server.go)
+- collection-server：
+  [internal/collection-server/routers.go](../../internal/collection-server/routers.go)
+
+## Lock 层：当前实现边界
+
+### 当前 LockSpec
+
+共享锁规格已经收口到：
+[internal/pkg/redislock/spec.go](../../internal/pkg/redislock/spec.go)
+
+当前内建锁规格：
+
+| Spec | 默认 TTL | 主要使用方 | 说明 |
+| ---- | -------- | ---------- | ---- |
+| `answersheet_processing` | `5m` | `worker` | 抑制重复处理答卷 |
+| `plan_scheduler_leader` | `50s` | `apiserver` | 调度器选主 |
+| `statistics_sync_leader` | `30m` | `apiserver` | statistics sync 调度器多实例选主 |
+| `statistics_sync` | `30m` | `apiserver` | nightly statistics sync 互斥 |
+| `behavior_pending_reconcile` | `30s` | `apiserver` | behavior pending reconcile 多实例串行化执行 |
+| `collection_submit` | `5m` | `collection-server` | 提交幂等与 in-flight guard |
+
+调用入口统一为：
+
+- `AcquireSpec`
+- `ReleaseSpec`
+
+代码锚点：
+
+- [internal/pkg/redislock/lock.go](../../internal/pkg/redislock/lock.go)
+- [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)
+- [internal/apiserver/runtime/scheduler/plan_scheduler.go](../../internal/apiserver/runtime/scheduler/plan_scheduler.go)
+- [internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go)
+- [internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go)
+- [internal/apiserver/runtime/scheduler/behavior_pending_reconcile.go](../../internal/apiserver/runtime/scheduler/behavior_pending_reconcile.go)
+- [internal/collection-server/infra/redisops/submit_guard.go](../../internal/collection-server/infra/redisops/submit_guard.go)
+
+### 当前锁边界
+
+当前锁仍然是：
+
+- 单 Redis lease lock
+- token ownership release
+- 无续租
+- 无 fencing token
+
+也就是说，它们适合：
+
+- 重复工作抑制
+- leader election
+- 轻量互斥保护
+
+不适合：
+
+- 长时间持锁的大任务
+- 需要 fencing token 的强顺序写场景
+- 用 Redis 锁代替业务真相和数据库约束
 
 ## 当前边界与注意事项
 
-1. **统计 Redis 是否生效取决于部署**：`worker` 默认关闭统计 Redis，所以很多环境里只有 `stats:query:*` 在工作。
-2. **锁不是强一致协调系统**：当前锁实现适合“抑制重复工作 / 选主”，不适合需要 fencing 或长时间持有的任务。
-3. **namespace 需要跨进程一致配置**：`apiserver` 和 `worker` 现在都支持 `cache.namespace`；如果两边配置不同，会落到不同前缀下。
-4. **`collection-server` 只剩 Redis 配置兼容**：运行时已不再初始化 Redis client；保留配置主要是为了不破坏外部配置面。
-5. **文档以当前代码为准**：若与旧专题文档或旧统计文档不一致，以本页和源码为准。
+1. **现行真值层已经收口**：Redis 现状看本文，建模与“从 0 到 1”接入看 [11-Redis三层设计与落地手册](./11-Redis三层设计与落地手册.md)。
+2. **`collection-server` 的 Redis 角色已经变化**：它不再是“完全不用 Redis”，而是仅消费 `ops_runtime + lock_lease`。
+3. **`manual warmup` 与 `LockSpec` 都已落地**：再阅读旧设计稿时，必须注意其中关于“尚未实现”的描述已经失效。
+4. **旧的 `infra/cache` 路由 / catalog 文档已过时**：当前 family 路由以 `redisplane` 为准，对象策略以 `cachepolicy` 为准。
+5. **历史设计稿仍可提供背景**：但如果旧文和本文冲突，以本文和代码为准。
 
 ## 代码索引
 
-- 通用缓存接口与 key builder：
-  [internal/apiserver/infra/cache/interface.go](../../internal/apiserver/infra/cache/interface.go)
-- 通用 Redis cache 封装：
-  [internal/apiserver/infra/cache/redis_cache.go](../../internal/apiserver/infra/cache/redis_cache.go)
-- 统计 Redis 封装：
-  [internal/apiserver/infra/statistics/cache.go](../../internal/apiserver/infra/statistics/cache.go)
-- 锁实现：
-  [internal/pkg/redislock/lock.go](../../internal/pkg/redislock/lock.go)
+- Redis runtime：
+  [internal/pkg/redisplane](../../internal/pkg/redisplane)
+- Redis key builder：
+  [internal/pkg/rediskey](../../internal/pkg/rediskey)
+- Lock 层：
+  [internal/pkg/redislock](../../internal/pkg/redislock)
+- Governance 指标与快照：
+  [internal/pkg/cacheobservability](../../internal/pkg/cacheobservability)
+- apiserver Cache 层：
+  [internal/apiserver/infra/cache](../../internal/apiserver/infra/cache)
+  [internal/apiserver/infra/cachepolicy](../../internal/apiserver/infra/cachepolicy)
+  [internal/apiserver/application/cachegovernance](../../internal/apiserver/application/cachegovernance)
+- collection-server Redis ops：
+  [internal/collection-server/infra/redisops](../../internal/collection-server/infra/redisops)
 
 ---
 

@@ -1,6 +1,6 @@
 # statistics
 
-**本文回答**：`qs-server` 当前的 `statistics` 模块到底负责什么、查询链路怎么分层、Redis 现在还剩哪些统计 key family、worker 和 apiserver 在统计链路上如何分工、哪些旧设计已经退出运行时。
+**本文回答**：`qs-server` 当前的 `statistics` 模块到底负责什么、查询链路怎么分层、Redis 在统计模块里还承担什么角色、夜间同步如何运行，以及哪些旧的 Redis 预聚合设计已经退出运行时。
 
 ---
 
@@ -13,13 +13,13 @@
 - 对外提供系统级、问卷级、受试者级、计划级统计查询
 - 在需要时从原始业务表回源聚合
 - 维护 MySQL 统计读模型
-- 读取 worker 写入的问卷 daily 中转键，做同步与一致性校验
+- 通过 `apiserver` 内部定时任务重建统计表，并在必要时触发统计缓存预热
 
 当前实现已经从早期“复杂 Redis 预聚合体系”收口成：
 
 - 查询结果缓存
-- 统计事件幂等
-- 问卷 daily 中转
+- MySQL 统计读模型
+- 由 Redis 分布式锁保护的夜间重建任务
 
 ### 一屏结论
 
@@ -28,11 +28,11 @@
 | 模块定位 | 读侧统计模块，不是主业务写入域 |
 | 主要查询 | system / questionnaire / testee / plan |
 | 查询优先级 | 查询结果缓存 -> MySQL 统计表 -> 原始表回源 |
-| worker 角色 | 只在 `assessment.*` 事件消费时写统计 Redis |
-| Redis 统计键 | 只保留 `stats:query:*`、`event:processed:*`、`stats:daily:questionnaire:*` |
+| worker 角色 | 不再承担统计 Redis 增量写入；worker 与统计模块只保留间接事件来源关系 |
+| Redis 统计键 | 统计模块直接使用的只剩 `stats:query:*` |
+| Redis 锁 | `statistics_sync_leader` / `statistics_sync` 由 `apiserver` 统计同步任务使用，但它们属于共享锁层，不属于统计缓存 key family |
 | 已退出运行时的旧键 | 旧的 window / accumulated / distribution 统计键族 |
-| 当前唯一保留 Redis daily 中转的类型 | `questionnaire` |
-| 部署现实 | worker 默认 `cache.disable_statistics_cache=true`，所以 daily / 幂等键只有在显式开启统计 Redis 时才会产生 |
+| 部署现实 | `cache.disable_statistics_cache=false` 时才启用统计查询结果缓存；夜间同步是否运行由 `statistics_sync.*` 和 Redis 锁共同决定 |
 
 ---
 
@@ -42,9 +42,8 @@
 
 - system / questionnaire / testee / plan 统计查询
 - Redis 查询结果缓存
-- 读取问卷 daily 中转键，同步到 MySQL `statistics_daily`
-- 基于 `statistics_daily` 聚合问卷累计统计
-- Redis 与 MySQL 间的一致性校验与修复
+- 从原始业务表重建 `statistics_daily / statistics_accumulated / statistics_plan`
+- 通过调度器执行统计同步，并在完成后触发统计缓存预热
 
 ### 不负责什么
 
@@ -62,30 +61,29 @@
 
 ```mermaid
 flowchart LR
-    Worker["qs-worker"]
     Redis[(Redis)]
     MySQL[(MySQL statistics_*)]
     Raw["业务原始表"]
 
     subgraph API["qs-apiserver / statistics"]
         Query["查询服务"]
-        Sync["Sync / Validate"]
+        Sync["Sync / Rebuild"]
     end
 
-    Worker -->|assessment.submitted / interpreted| Redis
     Query -->|stats:query:*| Redis
     Query -->|statistics_*| MySQL
     Query -->|必要时回源| Raw
-    Sync -->|stats:daily:* / event:processed:*| Redis
-    Sync -->|statistics_daily / accumulated / plan| MySQL
+    Sync -->|读取原始表| Raw
+    Sync -->|重建 statistics_*| MySQL
+    Sync -->|statistics_sync_* 锁| Redis
 ```
 
 ### 角色分工
 
 | 进程 | 对统计的职责 |
 | ---- | ------------ |
-| `qs-worker` | 消费测评事件后写统计 Redis（问卷 daily + 幂等键） |
-| `qs-apiserver` | 提供查询、同步、校验；写查询结果缓存；落 MySQL 统计表 |
+| `qs-worker` | 不直接承载统计 Redis 写入；只通过事件链路间接影响后续统计结果 |
+| `qs-apiserver` | 提供查询、维护查询结果缓存、重建 MySQL 统计表，并运行统计同步调度器 |
 
 ---
 
@@ -118,25 +116,29 @@ flowchart LR
 
 ---
 
-## 当前统计 Redis 只剩 3 类 key family
+## 当前统计模块直接使用的 Redis 只剩 1 类 key family
 
 ### 运行时保留的 key family
 
 | Key family | 谁在写 | 谁在读 | TTL | 用途 |
 | ---------- | ------ | ------ | --- | ---- |
 | `stats:query:{cacheKey}` | `qs-apiserver` 查询 miss 后回填 | 同一批统计查询服务 | `5m` | 查询结果缓存 |
-| `event:processed:{eventID}` | `qs-worker` 统计 handler 处理成功后写入 | 同一 handler 处理前检查 | `7d` | 统计事件幂等 |
-| `stats:daily:{org}:questionnaire:{code}:{date}` | `qs-worker` 对问卷提交数 / 完成数做 `HINCRBY` | sync / validate 服务 | `90d` | 问卷 daily 中转站 |
 
 代码锚点：
 
 - 统计 Redis 封装：[../../internal/apiserver/infra/statistics/cache.go](../../internal/apiserver/infra/statistics/cache.go)
-- worker 写入：[../../internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)
+- 查询服务使用点：
+  [../../internal/apiserver/application/statistics/system_service.go](../../internal/apiserver/application/statistics/system_service.go)
+  [../../internal/apiserver/application/statistics/questionnaire_service.go](../../internal/apiserver/application/statistics/questionnaire_service.go)
+  [../../internal/apiserver/application/statistics/testee_service.go](../../internal/apiserver/application/statistics/testee_service.go)
+  [../../internal/apiserver/application/statistics/plan_service.go](../../internal/apiserver/application/statistics/plan_service.go)
 
 ### 当前已经退出运行时的旧 key family
 
 以下设计不应再写成“当前系统仍在用”：
 
+- `event:processed:*`
+- `stats:daily:questionnaire:*`
 - 旧的 window 统计键族
 - 旧的 accumulated 统计键族
 - 旧的 distribution 统计键族
@@ -145,41 +147,43 @@ flowchart LR
 
 ---
 
-## worker 如何写统计 Redis
+## 统计同步如何运行
 
-### 当前只在两个事件上写
+### 当前由 apiserver 内部调度器触发
 
-worker 统计写入只挂在这两个事件的消费链上：
+统计同步不再依赖 worker 写 Redis daily 中转，而是由 `apiserver` 内部调度器按日触发：
 
-- `assessment.submitted`
-- `assessment.interpreted`
+- [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go)
+- [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go)
 
-但注意：这是 **assessment 主 handler 内部再调用 statistics handler**，不是 `events.yaml` 里额外再配置一套独立统计消费者。
+调度器会先通过共享锁层获取：
 
-### 写入内容
+- `statistics_sync_leader`
+- `statistics_sync`
 
-| 事件 | 写入内容 |
-| ---- | -------- |
-| `assessment.submitted` | 问卷 daily `submission_count`；事件幂等键 |
-| `assessment.interpreted` | 问卷 daily `completion_count`；事件幂等键 |
+然后再执行统计表重建与统计缓存预热。
+
+### 当前同步内容
+
+| 服务 | 当前作用 | 代码锚点 |
+| ---- | -------- | -------- |
+| `StatisticsSyncRunner` | 定时触发 nightly sync，获取 leader / task lock，并在完成后触发统计 warmup | [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
+| `StatisticsSyncService.SyncDailyStatistics` | 从原始业务表重建 `statistics_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
+| `StatisticsSyncService.SyncAccumulatedStatistics` | 基于 `statistics_daily` 与原始表重建 `statistics_accumulated` | 同上 |
+| `StatisticsSyncService.SyncPlanStatistics` | 从 `assessment_task` 等业务表重建 `statistics_plan` | 同上 |
+| `WarmupCoordinator.HandleStatisticsSync` | 在 nightly sync 之后执行统计查询缓存预热 | [../../internal/apiserver/application/cachegovernance/coordinator.go](../../internal/apiserver/application/cachegovernance/coordinator.go) |
+
+### 当前配置边界
+
+- `cache.disable_statistics_cache=true` 时，统计查询结果缓存会被关闭
+- `statistics_sync.enable=false` 时，不会启动 nightly sync 调度器
+- `statistics_sync.lock_key / lock_ttl` 控制调度器抢锁行为
+- 统计同步后的预热由 `cache.statistics_warmup` 和 `cache.warmup.*` 共同控制
 
 代码锚点：
 
-- [../../internal/worker/handlers/assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)
-- [../../internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)
-
-### 当前部署边界
-
-worker 默认：
-
-- `cache.disable_statistics_cache=true`
-
-也就是说，很多环境里如果没有显式开启这项配置，`event:processed:*` 和 `stats:daily:*` 实际不会产生。
-
-代码锚点：
-
-- [../../internal/worker/options/options.go](../../internal/worker/options/options.go)
-- [../../internal/worker/server.go](../../internal/worker/server.go)
+- [../../internal/apiserver/options/options.go](../../internal/apiserver/options/options.go)
+- [../../internal/apiserver/server.go](../../internal/apiserver/server.go)
 
 ---
 
@@ -197,16 +201,17 @@ worker 默认：
 
 | 服务 | 当前作用 | 代码锚点 |
 | ---- | -------- | -------- |
-| `StatisticsSyncService.SyncDailyStatistics` | 扫描 `stats:daily:questionnaire:*`，落 MySQL `statistics_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
-| `StatisticsSyncService.SyncAccumulatedStatistics` | 基于问卷 daily 聚合 `statistics_accumulated` | 同上 |
+| `StatisticsSyncService.SyncDailyStatistics` | 从原始业务表重建 `statistics_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
+| `StatisticsSyncService.SyncAccumulatedStatistics` | 基于 `statistics_daily` / 原始业务表重建 `statistics_accumulated` | 同上 |
 | `StatisticsSyncService.SyncPlanStatistics` | 从业务表聚合计划统计到 `statistics_plan` | 同上 |
-| `StatisticsValidatorService.ValidateConsistency` | 用 Redis daily 汇总结果修复问卷 accumulated | [../../internal/apiserver/application/statistics/validator_service.go](../../internal/apiserver/application/statistics/validator_service.go) |
+| `StatisticsSyncRunner` | 负责 nightly 调度、获取 Redis 锁、触发 warmup | [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
 
 ### 当前最重要的现实边界
 
-- Redis daily 中转只对 `questionnaire` 成立
-- `plan` 统计不是从 Redis daily 来的，而是独立同步
-- `testee` 统计不再依赖旧的 Redis 累计链路
+- `statistics` 模块当前不再依赖 worker 写入 Redis daily 中转
+- `plan` 统计一直是独立重建，不走 Redis daily
+- `testee` 统计不依赖 MySQL accumulated，也不依赖旧 Redis 累计链路
+- Redis 在统计模块中的职责已经收口为“查询结果缓存 + 调度锁”
 
 ---
 
@@ -283,11 +288,12 @@ worker 默认：
 
 - [../../internal/apiserver/infra/mysql/statistics/](../../internal/apiserver/infra/mysql/statistics/)
 - [../../internal/apiserver/infra/statistics/cache.go](../../internal/apiserver/infra/statistics/cache.go)
+- [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go)
 
-### worker 统计写入
+### 调度与重建
 
-- [../../internal/worker/handlers/statistics_handler.go](../../internal/worker/handlers/statistics_handler.go)
-- [../../internal/worker/handlers/assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)
+- [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go)
+- [../../internal/apiserver/application/cachegovernance/coordinator.go](../../internal/apiserver/application/cachegovernance/coordinator.go)
 
 ---
 

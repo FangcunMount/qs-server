@@ -33,7 +33,7 @@ var Specs = struct {
 	},
 	PlanSchedulerLeader: Spec{
 		Name:        "plan_scheduler_leader",
-		Description: "用于 worker 计划调度器多实例抢占 leader 的分布式锁。",
+		Description: "用于 apiserver 计划调度器多实例抢占 leader 的分布式锁。",
 		DefaultTTL:  50 * time.Second,
 	},
 	StatisticsSyncLeader: Spec{
