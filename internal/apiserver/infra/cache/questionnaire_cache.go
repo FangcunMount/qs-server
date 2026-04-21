@@ -8,20 +8,16 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
 const (
-	QuestionnaireCachePrefix          = "questionnaire:"
-	QuestionnairePublishedCachePrefix = "questionnaire:published:"
+	defaultQuestionnaireCacheTTL         = 12 * time.Hour
+	defaultNegativeQuestionnaireCacheTTL = 5 * time.Minute
 )
-
-// DefaultQuestionnaireCacheTTL 默认问卷缓存 TTL（兼容旧构造路径保留）。
-//
-// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
-var DefaultQuestionnaireCacheTTL = 12 * time.Hour
 
 type CachedQuestionnaireRepository struct {
 	repo   domainQuestionnaire.Repository
@@ -29,17 +25,17 @@ type CachedQuestionnaireRepository struct {
 	ttl    time.Duration
 	mapper *questionnaireInfra.QuestionnaireMapper
 	keys   *rediskey.Builder
-	policy CachePolicy
+	policy cachepolicy.CachePolicy
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy CachePolicy) domainQuestionnaire.Repository {
+func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedQuestionnaireRepository{
 		repo:   repo,
 		client: client,
-		ttl:    policy.TTLOr(DefaultQuestionnaireCacheTTL),
+		ttl:    policy.TTLOr(defaultQuestionnaireCacheTTL),
 		mapper: questionnaireInfra.NewQuestionnaireMapper(),
 		keys:   builder,
 		policy: policy,
@@ -233,7 +229,7 @@ func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string
 	}
 
 	data := r.policy.DecompressValue(dataBytes)
-	observePayload(PolicyQuestionnaire, len(data), len(dataBytes))
+	observePayload(cachepolicy.PolicyQuestionnaire, len(data), len(dataBytes))
 	var po questionnaireInfra.QuestionnairePO
 	if err := json.Unmarshal(data, &po); err != nil {
 		logger.L(ctx).Warnw("failed to unmarshal cached questionnaire", "key", key, "error", err)
@@ -252,7 +248,7 @@ func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string
 		return err
 	}
 	payload := r.policy.CompressValue(data)
-	observePayload(PolicyQuestionnaire, len(data), len(payload))
+	observePayload(cachepolicy.PolicyQuestionnaire, len(data), len(payload))
 	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(ttl)).Err()
 }
 
@@ -262,7 +258,7 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 	fallback func(context.Context) (*domainQuestionnaire.Questionnaire, error),
 ) (*domainQuestionnaire.Questionnaire, error) {
 	return ReadThrough(ctx, ReadThroughOptions[domainQuestionnaire.Questionnaire]{
-		PolicyKey: PolicyQuestionnaire,
+		PolicyKey: cachepolicy.PolicyQuestionnaire,
 		CacheKey:  key,
 		Policy:    r.policy,
 		GetCached: func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
@@ -276,7 +272,7 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 			if r.client == nil {
 				return nil
 			}
-			return r.client.Set(ctx, key, []byte{}, r.policy.JitterTTL(r.policy.NegativeTTLOr(NegativeCacheTTL))).Err()
+			return r.client.Set(ctx, key, []byte{}, r.policy.JitterTTL(r.policy.NegativeTTLOr(defaultNegativeQuestionnaireCacheTTL))).Err()
 		},
 		AsyncSetCached: true,
 	})
@@ -291,19 +287,19 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 
 	for _, pattern := range patterns[:2] {
 		if err := r.client.Del(ctx, pattern).Err(); err != nil {
-			observeInvalidate(PolicyQuestionnaire, "error")
+			observeInvalidate(cachepolicy.PolicyQuestionnaire, "error")
 			logger.L(ctx).Warnw("failed to delete questionnaire cache key", "key", pattern, "error", err)
 		} else {
-			observeInvalidate(PolicyQuestionnaire, "ok")
+			observeInvalidate(cachepolicy.PolicyQuestionnaire, "ok")
 		}
 	}
 
 	iter := r.client.Scan(ctx, 0, patterns[2], 100).Iterator()
 	for iter.Next(ctx) {
 		if err := r.client.Del(ctx, iter.Val()).Err(); err != nil {
-			observeInvalidate(PolicyQuestionnaire, "error")
+			observeInvalidate(cachepolicy.PolicyQuestionnaire, "error")
 		} else {
-			observeInvalidate(PolicyQuestionnaire, "ok")
+			observeInvalidate(cachepolicy.PolicyQuestionnaire, "ok")
 		}
 	}
 	return iter.Err()

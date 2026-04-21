@@ -23,7 +23,7 @@ type submitJob struct {
 	respCh    chan submitResult
 }
 
-type submitFunc func(context.Context, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error)
+type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error)
 
 // SubmitQueue queues submit requests for asynchronous processing.
 type SubmitQueue struct {
@@ -124,7 +124,7 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 func (q *SubmitQueue) worker() {
 	for job := range q.jobs {
 		q.setStatus(job.requestID, SubmitStatusProcessing, "")
-		resp, err := q.submit(job.ctx, job.writerID, job.req)
+		resp, err := q.submit(job.ctx, job.requestID, job.writerID, job.req)
 		if err != nil {
 			q.setStatus(job.requestID, SubmitStatusFailed, "")
 		} else if resp != nil {

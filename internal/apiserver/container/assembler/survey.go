@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	questionnaireCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
@@ -78,9 +79,9 @@ func NewSurveyModule() *SurveyModule {
 // params[0]: *mongo.Database
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: redis.UniversalClient (可选，用于问卷缓存装饰器)
-// params[3]: string (可选，用于问卷缓存 namespace)
+// params[3]: *rediskey.Builder (可选，用于问卷缓存 key builder)
 // params[4]: *iam.IdentityService (可选，用于姓名补全)
-// params[5]: questionnaireCache.CachePolicy (可选，用于问卷缓存策略)
+// params[5]: cachepolicy.CachePolicy (可选，用于问卷缓存策略)
 // params[6]: questionnaireCache.HotsetRecorder (可选，用于热点治理)
 func (m *SurveyModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
@@ -109,10 +110,10 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
-	var cacheNamespace string
+	var cacheBuilder *rediskey.Builder
 	if len(params) > 3 {
-		if ns, ok := params[3].(string); ok {
-			cacheNamespace = ns
+		if builder, ok := params[3].(*rediskey.Builder); ok {
+			cacheBuilder = builder
 		}
 	}
 	// 获取 IAM IdentityService（可选参数，用于姓名补全）
@@ -122,9 +123,9 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 			identitySvc = svc
 		}
 	}
-	var questionnairePolicy questionnaireCache.CachePolicy
+	var questionnairePolicy cachepolicy.CachePolicy
 	if len(params) > 5 {
-		if policy, ok := params[5].(questionnaireCache.CachePolicy); ok {
+		if policy, ok := params[5].(cachepolicy.CachePolicy); ok {
 			questionnairePolicy = policy
 		}
 	}
@@ -136,7 +137,7 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 	}
 
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(mongoDB, redisClient, cacheNamespace, identitySvc, questionnairePolicy, hotset); err != nil {
+	if err := m.initQuestionnaireSubModule(mongoDB, redisClient, cacheBuilder, identitySvc, questionnairePolicy, hotset); err != nil {
 		return err
 	}
 
@@ -149,13 +150,11 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheNamespace string, identitySvc *iam.IdentityService, policy questionnaireCache.CachePolicy, hotset questionnaireCache.HotsetRecorder) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset questionnaireCache.HotsetRecorder) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := quesMongoInfra.NewRepository(mongoDB)
-	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
-
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(baseRepo, redisClient, cacheBuilder, policy)

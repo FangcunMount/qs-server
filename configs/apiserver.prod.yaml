@@ -172,6 +172,36 @@ redis_profiles:
   lock_cache:
     database: 6
 
+redis_runtime:
+  namespace: ""
+  families:
+    static_meta:
+      redis_profile: "static_cache"
+      namespace_suffix: "cache:static"
+      allow_fallback_default: true
+      allow_warmup: true
+    object_view:
+      redis_profile: "object_cache"
+      namespace_suffix: "cache:object"
+      allow_fallback_default: true
+    query_result:
+      redis_profile: "query_cache"
+      namespace_suffix: "cache:query"
+      allow_fallback_default: true
+      allow_warmup: true
+    meta_hotset:
+      redis_profile: "meta_cache"
+      namespace_suffix: "cache:meta"
+      allow_fallback_default: true
+    sdk_token:
+      redis_profile: "sdk_cache"
+      namespace_suffix: "cache:sdk"
+      allow_fallback_default: true
+    lock_lease:
+      redis_profile: "lock_cache"
+      namespace_suffix: "cache:lock"
+      allow_fallback_default: true
+
 # ----------------------------------------------------------------------------
 # 3.4 缓存控制
 # ----------------------------------------------------------------------------
@@ -179,36 +209,24 @@ cache:
   disable_evaluation_cache: false # 开启测评结果缓存
   disable_statistics_cache: false # 开启统计缓存
   static:
-    redis_profile: "static_cache" # 仅覆盖 DB；host/port/user/password 继承默认 redis
-    namespace_suffix: "cache:static"
     compress: false
     singleflight: true
     negative: false
   object:
-    redis_profile: "object_cache" # assessment/testee/plan 等对象视图缓存
-    namespace_suffix: "cache:object"
     compress: false
     singleflight: true
     negative: false
   query:
-    redis_profile: "query_cache" # 仅覆盖 DB；host/port/user/password 继承默认 redis
-    namespace_suffix: "cache:query"
     ttl: "5m"
     compress: false
     singleflight: false
     negative: false
   meta:
-    redis_profile: "meta_cache" # query/list cache version token
-    namespace_suffix: "cache:meta"
   sdk:
-    redis_profile: "sdk_cache" # wechat sdk token/cache
-    namespace_suffix: "cache:sdk"
     compress: false
     singleflight: false
     negative: false
   lock:
-    redis_profile: "lock_cache" # lock/lease keys
-    namespace_suffix: "cache:lock"
     compress: false
     singleflight: false
     negative: false

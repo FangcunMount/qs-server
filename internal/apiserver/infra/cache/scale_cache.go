@@ -8,20 +8,13 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
-const (
-	// ScaleCachePrefix 量表缓存键前缀
-	ScaleCachePrefix = "scale:"
-)
-
-// DefaultScaleCacheTTL 默认量表缓存 TTL（兼容旧构造路径保留）。
-//
-// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
-var DefaultScaleCacheTTL = 24 * time.Hour
+const defaultScaleCacheTTL = 24 * time.Hour
 
 // CachedScaleRepository 带缓存的量表 Repository 装饰器
 // 实现 scale.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -31,18 +24,18 @@ type CachedScaleRepository struct {
 	ttl    time.Duration
 	mapper *scaleInfra.ScaleMapper
 	keys   *rediskey.Builder
-	policy CachePolicy
+	policy cachepolicy.CachePolicy
 }
 
 // NewCachedScaleRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的量表缓存 Repository。
-func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy CachePolicy) scale.Repository {
+func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) scale.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedScaleRepository{
 		repo:   repo,
 		client: client,
-		ttl:    policy.TTLOr(DefaultScaleCacheTTL),
+		ttl:    policy.TTLOr(defaultScaleCacheTTL),
 		mapper: scaleInfra.NewScaleMapper(),
 		keys:   builder,
 		policy: policy,
@@ -81,7 +74,7 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
 	key := r.buildCacheKey(code)
 	return ReadThrough(ctx, ReadThroughOptions[scale.MedicalScale]{
-		PolicyKey:      PolicyScale,
+		PolicyKey:      cachepolicy.PolicyScale,
 		CacheKey:       key,
 		Policy:         r.policy,
 		GetCached:      func(ctx context.Context) (*scale.MedicalScale, error) { return r.getCache(ctx, code) },
@@ -175,7 +168,7 @@ func (r *CachedScaleRepository) getCache(ctx context.Context, code string) (*sca
 	}
 	// 4. 反序列化为 PO
 	data := r.policy.DecompressValue(dataBytes)
-	observePayload(PolicyScale, len(data), len(dataBytes))
+	observePayload(cachepolicy.PolicyScale, len(data), len(dataBytes))
 	var po scaleInfra.ScalePO
 	if err := json.Unmarshal(data, &po); err != nil {
 		logger.L(ctx).Warnw("failed to unmarshal cached scale", "code", code, "error", err)
@@ -202,7 +195,7 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 	}
 
 	payload := r.policy.CompressValue(data)
-	observePayload(PolicyScale, len(data), len(payload))
+	observePayload(cachepolicy.PolicyScale, len(data), len(payload))
 	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
 }
 
@@ -214,10 +207,10 @@ func (r *CachedScaleRepository) deleteCache(ctx context.Context, code string) er
 	key := r.buildCacheKey(code)
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
-		observeInvalidate(PolicyScale, "error")
+		observeInvalidate(cachepolicy.PolicyScale, "error")
 		return err
 	}
-	observeInvalidate(PolicyScale, "ok")
+	observeInvalidate(cachepolicy.PolicyScale, "ok")
 	return nil
 }
 

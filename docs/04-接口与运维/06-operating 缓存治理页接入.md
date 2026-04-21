@@ -38,10 +38,11 @@
 
 ## BFF 接口建议
 
-Operating BFF 建议只暴露 3 个页面专用接口：
+Operating BFF 建议暴露 4 个页面专用接口：
 
 - `GET /ops/api/cache-governance/status`
 - `GET /ops/api/cache-governance/hotset?kind=...&limit=...`
+- `POST /ops/api/cache-governance/warmup-targets`
 - `GET /ops/api/cache-governance/links`
 
 职责固定为：
@@ -53,6 +54,10 @@ Operating BFF 建议只暴露 3 个页面专用接口：
   - 调 `GET /internal/v1/cache/governance/hotset`
   - 白名单校验 `kind`
   - 限制 `limit <= 100`
+- `warmup-targets`
+  - 调 `POST /internal/v1/cache/governance/warmup-targets`
+  - 由 BFF 做 `kind/scope/org` 白名单校验
+  - 浏览器不直接拿 internal token
 - `links`
   - 返回 Grafana 深链接
 
@@ -70,8 +75,7 @@ Operating BFF 建议只暴露 3 个页面专用接口：
   - `available_count`
   - `degraded_count`
   - `unavailable_count`
-  - `warmup_enabled`
-  - `hotset_enabled`
+  - `ready`
 - `families[]`
   - `family`
   - `profile`
@@ -130,10 +134,11 @@ Operating BFF 建议只暴露 3 个页面专用接口：
 - warmup 是否启用
 - hotset 是否启用
 
-同时放两个主按钮：
+同时放三个主按钮：
 
 - `查看 Grafana 缓存总览`
 - `查看 Grafana Worker 锁治理`
+- `手工预热`
 
 ### 2. Family 状态表
 
@@ -206,11 +211,79 @@ Grafana 侧只保留低基数变量，如：
 
 ## 权限与边界
 
-Operating 页固定为只读治理页：
+Operating 页固定为“读为主、命令受控”的治理页：
 
 - 不暴露 `repair-complete`
-- 不暴露手动 warmup / invalidate
-- 不暴露任何 mutate 动作
+- 不暴露 invalidate / delete 之类破坏性缓存操作
+- 允许暴露受控的 `手工预热`
+
+## 手工预热接入方式
+
+Operating 后台如需直接接入手工预热，推荐固定为：
+
+- `operating-frontend`
+  - 只负责选择目标、展示结果
+- `operating-backend/BFF`
+  - 负责把页面目标转换成 `warmup-targets` 请求
+  - 负责带 internal token 调 `qs-apiserver`
+- `qs-apiserver`
+  - 执行真实 warmup，并返回逐 target 结果
+
+浏览器不要直接调 `qs-apiserver /internal/v1/cache/governance/warmup-targets`。
+
+### BFF 建议暴露的命令接口
+
+- `POST /ops/api/cache-governance/warmup-targets`
+
+请求体建议直接沿用 `qs-apiserver` 契约：
+
+```json
+{
+  "targets": [
+    { "kind": "static.scale", "scope": "scale:S-001" },
+    { "kind": "static.questionnaire", "scope": "questionnaire:Q-001" },
+    { "kind": "query.stats_system", "scope": "org:1" }
+  ]
+}
+```
+
+当前 `qs-apiserver` 支持的 `kind` 白名单：
+
+- `static.scale`
+- `static.questionnaire`
+- `static.scale_list`
+- `query.stats_system`
+- `query.stats_questionnaire`
+- `query.stats_plan`
+
+### BFF 需要做的最小校验
+
+- `targets` 不能为空
+- `kind` 必须在白名单内
+- `query.*` 的 `scope` 必须属于当前 operating 操作者所在机构
+- `static.*` 允许跨机构视图触发，因为它们对应静态资源缓存
+
+### 返回结果如何直接驱动页面
+
+`qs-apiserver` 返回结构已经适合页面直接展示：
+
+- `trigger`
+- `started_at`
+- `finished_at`
+- `summary`
+  - `target_count`
+  - `ok_count`
+  - `skipped_count`
+  - `error_count`
+  - `result`
+- `items[]`
+  - `family`
+  - `kind`
+  - `scope`
+  - `status`
+  - `message`
+
+页面建议把 `items[]` 直接渲染成命令执行结果表，而不是只展示一个总状态。
 
 worker 继续没有 internal 面板；其缓存治理状态只能通过：
 

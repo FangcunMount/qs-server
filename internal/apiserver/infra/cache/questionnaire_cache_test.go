@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 
@@ -282,8 +283,8 @@ func TestCachedQuestionnaireRepositorySupportsExplicitBuilderNamespace(t *testin
 		},
 	}
 
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace("prod:cache:static"), CachePolicy{
-		Negative: PolicySwitchEnabled,
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{
+		Negative: cachepolicy.PolicySwitchEnabled,
 	}).(*CachedQuestionnaireRepository)
 	if _, err := cachedRepo.FindPublishedByCode(context.Background(), "Q-001"); err != nil {
 		t.Fatalf("FindPublishedByCode() error = %v", err)
@@ -319,8 +320,8 @@ func newQuestionnaireCacheTestRepoWithNamespace(t *testing.T, namespace string) 
 			"Q-001:1.0.2": head,
 		},
 	}
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace(namespace), CachePolicy{
-		Negative: PolicySwitchEnabled,
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace(namespace), cachepolicy.CachePolicy{
+		Negative: cachepolicy.PolicySwitchEnabled,
 	}).(*CachedQuestionnaireRepository)
 
 	cleanup := func() {

@@ -12,6 +12,8 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -120,10 +122,10 @@ func TestHandleAnswerSheetSubmitted_LockedExecutesAndReleases(t *testing.T) {
 
 	released := false
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
-		acquire: func(context.Context, *Dependencies, uint64) (string, bool, error) {
-			return "token-1", true, nil
+		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "token-1"}, true, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, string) error {
+		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
 			released = true
 			return nil
 		},
@@ -186,11 +188,11 @@ func TestHandleAnswerSheetSubmitted_DegradedWithoutRedisContinues(t *testing.T) 
 	deps := newAnswerSheetHandlerTestDeps(client, nil)
 
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
-		acquire: func(context.Context, *Dependencies, uint64) (string, bool, error) {
+		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
 			t.Fatal("acquire should not be called when redis client is nil")
-			return "", false, nil
+			return nil, false, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, string) error {
+		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
 			t.Fatal("release should not be called when redis client is nil")
 			return nil
 		},
@@ -214,10 +216,10 @@ func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T
 
 	releaseCalled := false
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
-		acquire: func(context.Context, *Dependencies, uint64) (string, bool, error) {
-			return "", false, errors.New("boom")
+		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+			return nil, false, errors.New("boom")
 		},
-		release: func(context.Context, *Dependencies, uint64, string) error {
+		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
 			releaseCalled = true
 			return nil
 		},
@@ -243,10 +245,10 @@ func TestHandleAnswerSheetSubmitted_ReleaseErrorDoesNotFail(t *testing.T) {
 	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
 
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
-		acquire: func(context.Context, *Dependencies, uint64) (string, bool, error) {
-			return "token-2", true, nil
+		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "token-2"}, true, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, string) error {
+		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
 			return errors.New("release failed")
 		},
 	})
@@ -264,13 +266,22 @@ func TestHandleAnswerSheetSubmitted_ReleaseErrorDoesNotFail(t *testing.T) {
 }
 
 func newAnswerSheetHandlerTestDeps(client InternalClient, redisClient redis.UniversalClient) *Dependencies {
+	lockBuilder := rediskey.NewBuilderWithNamespace(
+		rediskey.ComposeNamespace("worker-test", "cache:lock"),
+	)
+	var lockManager *redislock.Manager
+	if redisClient != nil {
+		lockManager = redislock.NewManager("worker", "lock_lease", &redisplane.Handle{
+			Client:  redisClient,
+			Builder: lockBuilder,
+		})
+	}
 	return &Dependencies{
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		InternalClient: client,
 		LockRedis:      redisClient,
-		LockKeyBuilder: rediskey.NewBuilderWithNamespace(
-			rediskey.ComposeNamespace("worker-test", "cache:lock"),
-		),
+		LockManager:    lockManager,
+		LockKeyBuilder: lockBuilder,
 	}
 }
 

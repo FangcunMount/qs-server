@@ -1,5 +1,86 @@
 basePath: /api/v1
 definitions:
+  cache.WarmupKind:
+    enum:
+    - static.scale
+    - static.questionnaire
+    - static.scale_list
+    - query.stats_system
+    - query.stats_questionnaire
+    - query.stats_plan
+    type: string
+    x-enum-varnames:
+    - WarmupKindStaticScale
+    - WarmupKindStaticQuestionnaire
+    - WarmupKindStaticScaleList
+    - WarmupKindQueryStatsSystem
+    - WarmupKindQueryStatsQuestionnaire
+    - WarmupKindQueryStatsPlan
+  cachegovernance.ManualWarmupItemResult:
+    properties:
+      family:
+        type: string
+      kind:
+        $ref: '#/definitions/cache.WarmupKind'
+      message:
+        type: string
+      scope:
+        type: string
+      status:
+        $ref: '#/definitions/cachegovernance.ManualWarmupItemStatus'
+    type: object
+  cachegovernance.ManualWarmupItemStatus:
+    enum:
+    - ok
+    - skipped
+    - error
+    type: string
+    x-enum-varnames:
+    - ManualWarmupItemStatusOK
+    - ManualWarmupItemStatusSkipped
+    - ManualWarmupItemStatusError
+  cachegovernance.ManualWarmupRequest:
+    properties:
+      targets:
+        items:
+          $ref: '#/definitions/cachegovernance.ManualWarmupTarget'
+        type: array
+    type: object
+  cachegovernance.ManualWarmupResult:
+    properties:
+      finished_at:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/cachegovernance.ManualWarmupItemResult'
+        type: array
+      started_at:
+        type: string
+      summary:
+        $ref: '#/definitions/cachegovernance.ManualWarmupSummary'
+      trigger:
+        type: string
+    type: object
+  cachegovernance.ManualWarmupSummary:
+    properties:
+      error_count:
+        type: integer
+      ok_count:
+        type: integer
+      result:
+        type: string
+      skipped_count:
+        type: integer
+      target_count:
+        type: integer
+    type: object
+  cachegovernance.ManualWarmupTarget:
+    properties:
+      kind:
+        $ref: '#/definitions/cache.WarmupKind'
+      scope:
+        type: string
+    type: object
   core.ErrResponse:
     properties:
       code:
@@ -606,6 +687,8 @@ definitions:
         type: string
       is_active:
         type: boolean
+      is_active_label:
+        type: string
       org_id:
         type: string
       qrcode_url:
@@ -613,6 +696,8 @@ definitions:
       target_code:
         type: string
       target_type:
+        type: string
+      target_type_label:
         type: string
       target_version:
         type: string
@@ -671,6 +756,9 @@ definitions:
       origin_type:
         description: 来源类型
         type: string
+      origin_type_label:
+        description: 来源类型中文
+        type: string
       questionnaire_code:
         description: 问卷编码（唯一标识）
         type: string
@@ -680,8 +768,14 @@ definitions:
       risk_level:
         description: 风险等级
         type: string
+      risk_level_label:
+        description: 风险等级中文
+        type: string
       status:
         description: 状态
+        type: string
+      status_label:
+        description: 状态中文
         type: string
       submitted_at:
         description: 提交时间
@@ -700,6 +794,9 @@ definitions:
         type: string
       last_risk_level:
         description: 最后风险等级
+        type: string
+      last_risk_level_label:
+        description: 最后风险等级中文
         type: string
       total_count:
         description: 总次数
@@ -752,6 +849,8 @@ definitions:
         type: integer
       clinician_type:
         type: string
+      clinician_type_label:
+        type: string
       department:
         type: string
       employee_code:
@@ -760,6 +859,8 @@ definitions:
         type: string
       is_active:
         type: boolean
+      is_active_label:
+        type: string
       name:
         type: string
       operator_id:
@@ -772,6 +873,8 @@ definitions:
   response.ClinicianSummaryResponse:
     properties:
       clinician_type:
+        type: string
+      clinician_type_label:
         type: string
       department:
         type: string
@@ -803,6 +906,9 @@ definitions:
         type: number
       risk_level:
         description: 风险等级
+        type: string
+      risk_level_label:
+        description: 风险等级中文
         type: string
       suggestion:
         description: 维度建议
@@ -879,6 +985,9 @@ definitions:
         type: number
       risk_level:
         description: 风险等级
+        type: string
+      risk_level_label:
+        description: 风险等级中文
         type: string
       suggestion:
         description: 建议
@@ -977,11 +1086,20 @@ definitions:
       scale_code:
         description: 量表编码（如 "3adyDE"）
         type: string
+      scale_title:
+        description: 量表标题
+        type: string
       schedule_type:
         description: 周期类型：by_week/by_day/fixed_date/custom
         type: string
+      schedule_type_label:
+        description: 周期类型中文
+        type: string
       status:
         description: 状态：active/paused/finished/canceled
+        type: string
+      status_label:
+        description: 状态中文
         type: string
       total_times:
         description: 总次数（用于 by_week/by_day）
@@ -1040,13 +1158,19 @@ definitions:
         type: string
       is_active:
         type: boolean
+      is_active_label:
+        type: string
       org_id:
         type: string
       relation_type:
         type: string
+      relation_type_label:
+        type: string
       source_id:
         type: string
       source_type:
+        type: string
+      source_type_label:
         type: string
       testee_id:
         type: string
@@ -1091,6 +1215,9 @@ definitions:
         type: array
       risk_level:
         description: 风险等级
+        type: string
+      risk_level_label:
+        description: 风险等级中文
         type: string
       scale_code:
         description: 量表编码
@@ -1161,6 +1288,9 @@ definitions:
         type: number
       risk_level:
         description: 风险等级：normal/medium/high
+        type: string
+      risk_level_label:
+        description: 风险等级中文
         type: string
       t_score:
         description: T分
@@ -1244,6 +1374,9 @@ definitions:
       risk_level:
         description: 风险等级：normal/medium/high
         type: string
+      risk_level_label:
+        description: 风险等级中文
+        type: string
       test_date:
         description: 测评日期
         type: string
@@ -1280,6 +1413,9 @@ definitions:
         type: array
       risk_level:
         description: 整体风险等级
+        type: string
+      risk_level_label:
+        description: 整体风险等级中文
         type: string
       total_score:
         description: 总分
@@ -1418,11 +1554,17 @@ definitions:
       scale_code:
         description: 量表编码（如 "3adyDE"）
         type: string
+      scale_title:
+        description: 量表标题
+        type: string
       seq:
         description: 序号（计划内的第N次测评）
         type: integer
       status:
         description: 状态：pending/opened/completed/expired/canceled
+        type: string
+      status_label:
+        description: 状态中文
         type: string
       testee_id:
         description: 受试者ID
@@ -1489,6 +1631,9 @@ definitions:
       gender:
         description: 性别
         type: string
+      gender_label:
+        description: 性别中文
+        type: string
       guardians:
         description: 监护人信息列表
         items:
@@ -1503,6 +1648,9 @@ definitions:
       is_key_focus:
         description: 是否重点关注
         type: boolean
+      is_key_focus_label:
+        description: 是否重点关注中文
+        type: string
       name:
         description: 姓名
         type: string
@@ -1515,14 +1663,44 @@ definitions:
       source:
         description: 来源
         type: string
+      source_label:
+        description: 来源中文
+        type: string
       tags:
         description: 标签
+        items:
+          type: string
+        type: array
+      tags_label:
+        description: 标签中文
         items:
           type: string
         type: array
       updated_at:
         description: 更新时间
         type: string
+    type: object
+  response.TesteeStatisticsResponse:
+    properties:
+      completed_assessments:
+        type: integer
+      first_assessment_date:
+        type: string
+      last_assessment_date:
+        type: string
+      org_id:
+        type: integer
+      pending_assessments:
+        type: integer
+      risk_distribution:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+      testee_id:
+        type: integer
+      total_assessments:
+        type: integer
     type: object
   response.TrendDataPoint:
     properties:
@@ -1534,6 +1712,9 @@ definitions:
         type: number
       risk_level:
         description: 风险等级
+        type: string
+      risk_level_label:
+        description: 风险等级中文
         type: string
     type: object
   statistics.DailyCount:
@@ -1642,34 +1823,6 @@ definitions:
         type: integer
       today_new_testees:
         description: 今日新增受试者
-        type: integer
-    type: object
-  statistics.TesteeStatistics:
-    properties:
-      completed_assessments:
-        description: 已完成测评数
-        type: integer
-      first_assessment_date:
-        description: 首次测评日期
-        type: string
-      last_assessment_date:
-        description: 时间维度
-        type: string
-      org_id:
-        type: integer
-      pending_assessments:
-        description: 待完成测评数
-        type: integer
-      risk_distribution:
-        additionalProperties:
-          format: int64
-          type: integer
-        description: 风险分布
-        type: object
-      testee_id:
-        type: integer
-      total_assessments:
-        description: 测评统计
         type: integer
     type: object
   viewmodel.AnswerDTO:
@@ -4649,7 +4802,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statistics.TesteeStatistics'
+                  $ref: '#/definitions/response.TesteeStatisticsResponse'
               type: object
         "429":
           description: Too Many Requests
@@ -4682,6 +4835,14 @@ paths:
       - description: 按 Clinician 过滤受试者
         in: query
         name: clinician_id
+        type: string
+      - description: 报到开始日期（格式：YYYY-MM-DD，按 created_at 过滤）
+        in: query
+        name: created_start_date
+        type: string
+      - description: 报到结束日期（格式：YYYY-MM-DD，按 created_at 过滤）
+        in: query
+        name: created_end_date
         type: string
       - default: 1
         description: 页码
@@ -4963,6 +5124,46 @@ paths:
       summary: 健康检查
       tags:
       - 系统
+  /internal/v1/cache/governance/warmup-targets:
+    post:
+      consumes:
+      - application/json
+      description: operating 后台通过 BFF 代理调用，按 target 列表同步触发缓存预热并返回逐项结果；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 预热目标列表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/cachegovernance.ManualWarmupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/cachegovernance.ManualWarmupResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 手工触发缓存预热
+      tags:
+      - Statistics-Sync
   /internal/v1/plans/tasks/{id}/complete:
     post:
       description: 系统动作：用户完成测评后回写任务状态，仅内部路由暴露
@@ -5108,7 +5309,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 将Redis中的累计统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
+      description: 从 MySQL 原始表与每日统计表重建累计统计；仅 qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌（或内部调用token）
         in: header
@@ -5133,12 +5334,20 @@ paths:
     post:
       consumes:
       - application/json
-      description: 将Redis中的每日统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问
+      description: 从 MySQL 原始表重建每日统计；仅 qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌（或内部调用token）
         in: header
         name: Authorization
         required: true
+        type: string
+      - description: 补算开始日期（格式：YYYY-MM-DD）
+        in: query
+        name: start_date
+        type: string
+      - description: 补算结束日期（格式：YYYY-MM-DD，包含当天）
+        in: query
+        name: end_date
         type: string
       produces:
       - application/json
@@ -5158,7 +5367,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 同步计划统计数据到MySQL（定时任务调用）；仅 qs:admin 可访问
+      description: 从 assessment_task 重建计划统计数据到 MySQL；仅 qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌（或内部调用token）
         in: header
@@ -5177,31 +5386,6 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 同步计划统计
-      tags:
-      - Statistics-Sync
-  /internal/v1/statistics/validate:
-    post:
-      consumes:
-      - application/json
-      description: 校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌（或内部调用token）
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 校验数据一致性
       tags:
       - Statistics-Sync
   /ping:

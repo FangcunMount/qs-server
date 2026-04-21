@@ -8,6 +8,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/internal/worker/application"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
@@ -22,6 +24,8 @@ type Container struct {
 	opts        *options.Options
 	logger      *slog.Logger
 	lockRedis   redis.UniversalClient
+	lockHandle  *redisplane.Handle
+	lockManager *redislock.Manager
 	lockBuilder *rediskey.Builder
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
@@ -34,20 +38,20 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, lockRedis redis.UniversalClient) *Container {
-	lockNamespace := ""
-	if opts != nil && opts.Cache != nil {
-		suffix := ""
-		if opts.Cache.Lock != nil {
-			suffix = opts.Cache.Lock.NamespaceSuffix
-		}
-		lockNamespace = rediskey.ComposeNamespace(opts.Cache.Namespace, suffix)
+func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *redisplane.Handle, lockManager *redislock.Manager) *Container {
+	var lockRedis redis.UniversalClient
+	lockBuilder := rediskey.NewBuilder()
+	if lockHandle != nil {
+		lockRedis = lockHandle.Client
+		lockBuilder = lockHandle.Builder
 	}
 	return &Container{
 		opts:        opts,
 		logger:      logger,
 		lockRedis:   lockRedis,
-		lockBuilder: rediskey.NewBuilderWithNamespace(lockNamespace),
+		lockHandle:  lockHandle,
+		lockManager: lockManager,
+		lockBuilder: lockBuilder,
 		initialized: false,
 	}
 }
@@ -82,6 +86,7 @@ func (c *Container) initEventDispatcher() error {
 		EvaluationClient:  c.evaluationClient,
 		InternalClient:    c.internalClient,
 		LockRedis:         c.lockRedis,
+		LockManager:       c.lockManager,
 		LockKeyBuilder:    c.lockBuilder,
 		Notifier:          c.buildNotifier(),
 	}

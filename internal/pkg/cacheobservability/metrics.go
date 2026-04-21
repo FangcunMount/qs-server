@@ -52,6 +52,13 @@ var (
 		},
 		[]string{"component", "family", "profile", "reason"},
 	)
+	runtimeComponentReady = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "qs_runtime_component_ready",
+			Help: "Current Redis runtime readiness grouped by component.",
+		},
+		[]string{"component"},
+	)
 	cacheWarmupDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "qs_cache_warmup_duration_seconds",
@@ -126,6 +133,14 @@ func SetCacheFamilyAvailable(component, family, profile string, available bool) 
 
 func IncCacheFamilyDegraded(component, family, profile, reason string) {
 	cacheFamilyDegradedTotal.WithLabelValues(component, family, profile, reason).Inc()
+}
+
+func SetRuntimeComponentReady(component string, ready bool) {
+	value := 0.0
+	if ready {
+		value = 1
+	}
+	runtimeComponentReady.WithLabelValues(component).Set(value)
 }
 
 func ObserveWarmupDuration(trigger, result string, d time.Duration) {

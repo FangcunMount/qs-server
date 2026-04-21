@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -49,10 +50,10 @@ func NewScaleModule() *ScaleModule {
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: questionnaire.Repository (可选，用于自动获取问卷版本)
 // params[3]: redis.UniversalClient (可选，用于量表缓存装饰器与列表缓存)
-// params[4]: string (可选，用于静态缓存 namespace)
+// params[4]: *rediskey.Builder (可选，用于静态缓存 key builder)
 // params[5]: *iam.IdentityService (可选，用于姓名补全)
-// params[6]: scaleCache.CachePolicy (可选，用于量表详情缓存策略)
-// params[7]: scaleCache.CachePolicy (可选，用于量表列表缓存策略)
+// params[6]: cachepolicy.CachePolicy (可选，用于量表详情缓存策略)
+// params[7]: cachepolicy.CachePolicy (可选，用于量表列表缓存策略)
 // params[8]: scaleCache.HotsetRecorder (可选，用于热点治理)
 func (m *ScaleModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
@@ -89,10 +90,10 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
-	var cacheNamespace string
+	var cacheBuilder *rediskey.Builder
 	if len(params) > 4 {
-		if ns, ok := params[4].(string); ok {
-			cacheNamespace = ns
+		if builder, ok := params[4].(*rediskey.Builder); ok {
+			cacheBuilder = builder
 		}
 	}
 	// 获取 IAM IdentityService（可选参数，用于姓名补全）
@@ -102,15 +103,15 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 			identitySvc = svc
 		}
 	}
-	var scalePolicy scaleCache.CachePolicy
+	var scalePolicy cachepolicy.CachePolicy
 	if len(params) > 6 {
-		if policy, ok := params[6].(scaleCache.CachePolicy); ok {
+		if policy, ok := params[6].(cachepolicy.CachePolicy); ok {
 			scalePolicy = policy
 		}
 	}
-	var scaleListPolicy scaleCache.CachePolicy
+	var scaleListPolicy cachepolicy.CachePolicy
 	if len(params) > 7 {
-		if policy, ok := params[7].(scaleCache.CachePolicy); ok {
+		if policy, ok := params[7].(cachepolicy.CachePolicy); ok {
 			scaleListPolicy = policy
 		}
 	}
@@ -123,8 +124,6 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := scaleInfra.NewRepository(mongoDB)
-	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
-
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		m.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderAndPolicy(baseRepo, redisClient, cacheBuilder, scalePolicy)
@@ -139,7 +138,7 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 			redisClient,
 			m.Repo,
 			identitySvc,
-			scaleCache.NewCacheKeyBuilderWithNamespace(cacheNamespace),
+			cacheBuilder,
 			scaleListPolicy,
 		)
 	}

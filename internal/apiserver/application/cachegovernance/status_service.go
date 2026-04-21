@@ -2,36 +2,26 @@ package cachegovernance
 
 import (
 	"context"
-	"sort"
 	"time"
 
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 type StatusService interface {
+	GetRuntime(context.Context) (*cacheobservability.RuntimeSnapshot, error)
 	GetStatus(context.Context) (*StatusSnapshot, error)
 	GetHotset(context.Context, cacheinfra.WarmupKind, int64) (*HotsetSnapshot, error)
 }
 
 type StatusSnapshot struct {
-	GeneratedAt time.Time                         `json:"generated_at"`
-	Summary     StatusSummary                     `json:"summary"`
-	Families    []cacheobservability.FamilyStatus `json:"families"`
-	Warmup      WarmupStatusSnapshot              `json:"warmup"`
-}
-
-type StatusSummary struct {
-	FamilyTotal      int  `json:"family_total"`
-	AvailableCount   int  `json:"available_count"`
-	DegradedCount    int  `json:"degraded_count"`
-	UnavailableCount int  `json:"unavailable_count"`
-	WarmupEnabled    bool `json:"warmup_enabled"`
-	HotsetEnabled    bool `json:"hotset_enabled"`
+	cacheobservability.RuntimeSnapshot
+	Warmup WarmupStatusSnapshot `json:"warmup"`
 }
 
 type HotsetSnapshot struct {
-	Family    cacheinfra.CacheFamily  `json:"family"`
+	Family    redisplane.Family       `json:"family"`
 	Kind      cacheinfra.WarmupKind   `json:"kind"`
 	Limit     int64                   `json:"limit"`
 	Available bool                    `json:"available"`
@@ -56,36 +46,36 @@ func NewStatusService(component string, status *cacheobservability.FamilyStatusR
 	}
 }
 
-func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapshot, error) {
+func (s *governanceStatusService) GetRuntime(ctx context.Context) (*cacheobservability.RuntimeSnapshot, error) {
 	_ = ctx
-	result := &StatusSnapshot{
+	component := ""
+	if s != nil {
+		component = s.component
+	}
+	result := cacheobservability.RuntimeSnapshot{
 		GeneratedAt: time.Now(),
+		Component:   component,
+		Families:    []cacheobservability.FamilyStatus{},
+		Summary: cacheobservability.RuntimeSummary{
+			Ready: true,
+		},
 	}
 	if s == nil {
-		return result, nil
+		return &result, nil
 	}
-	if s.status != nil {
-		all := s.status.Snapshot()
-		result.Families = make([]cacheobservability.FamilyStatus, 0, len(all))
-		for _, item := range all {
-			if s.component != "" && item.Component != s.component {
-				continue
-			}
-			result.Families = append(result.Families, item)
-		}
-		sort.SliceStable(result.Families, func(i, j int) bool {
-			left := familyDisplayOrder(result.Families[i].Family)
-			right := familyDisplayOrder(result.Families[j].Family)
-			if left == right {
-				return result.Families[i].Family < result.Families[j].Family
-			}
-			return left < right
-		})
+	snapshot := cacheobservability.SnapshotForComponent(s.component, s.status)
+	return &snapshot, nil
+}
+
+func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapshot, error) {
+	runtimeSnapshot, err := s.GetRuntime(ctx)
+	if err != nil {
+		return nil, err
 	}
+	result := &StatusSnapshot{RuntimeSnapshot: *runtimeSnapshot}
 	if s.coord != nil {
 		result.Warmup = s.coord.Snapshot()
 	}
-	result.Summary = summarizeStatus(result.Families, result.Warmup)
 	return result, nil
 }
 
@@ -126,7 +116,7 @@ func (s *governanceStatusService) GetHotset(ctx context.Context, kind cacheinfra
 	return result, nil
 }
 
-func (s *governanceStatusService) familyStatus(family cacheinfra.CacheFamily) *cacheobservability.FamilyStatus {
+func (s *governanceStatusService) familyStatus(family redisplane.Family) *cacheobservability.FamilyStatus {
 	if s == nil || s.status == nil {
 		return nil
 	}
@@ -139,52 +129,13 @@ func (s *governanceStatusService) familyStatus(family cacheinfra.CacheFamily) *c
 	return nil
 }
 
-func warmupKindFamily(kind cacheinfra.WarmupKind) cacheinfra.CacheFamily {
+func warmupKindFamily(kind cacheinfra.WarmupKind) redisplane.Family {
 	switch kind {
 	case cacheinfra.WarmupKindStaticScale, cacheinfra.WarmupKindStaticQuestionnaire, cacheinfra.WarmupKindStaticScaleList:
-		return cacheinfra.CacheFamilyStatic
+		return redisplane.FamilyStatic
 	case cacheinfra.WarmupKindQueryStatsSystem, cacheinfra.WarmupKindQueryStatsQuestionnaire, cacheinfra.WarmupKindQueryStatsPlan:
-		return cacheinfra.CacheFamilyQuery
+		return redisplane.FamilyQuery
 	default:
-		return cacheinfra.CacheFamilyDefault
-	}
-}
-
-func summarizeStatus(families []cacheobservability.FamilyStatus, warmup WarmupStatusSnapshot) StatusSummary {
-	summary := StatusSummary{
-		FamilyTotal:   len(families),
-		WarmupEnabled: warmup.Enabled,
-		HotsetEnabled: warmup.Hotset.Enable,
-	}
-	for _, family := range families {
-		if family.Available && !family.Degraded {
-			summary.AvailableCount++
-		}
-		if family.Degraded {
-			summary.DegradedCount++
-		}
-		if !family.Available {
-			summary.UnavailableCount++
-		}
-	}
-	return summary
-}
-
-func familyDisplayOrder(family string) int {
-	switch family {
-	case string(cacheinfra.CacheFamilyStatic):
-		return 0
-	case string(cacheinfra.CacheFamilyObject):
-		return 1
-	case string(cacheinfra.CacheFamilyQuery):
-		return 2
-	case string(cacheinfra.CacheFamilyMeta):
-		return 3
-	case string(cacheinfra.CacheFamilySDK):
-		return 4
-	case string(cacheinfra.CacheFamilyLock):
-		return 5
-	default:
-		return 99
+		return redisplane.FamilyDefault
 	}
 }

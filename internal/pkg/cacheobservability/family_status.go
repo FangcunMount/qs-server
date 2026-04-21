@@ -91,6 +91,7 @@ func (r *FamilyStatusRegistry) Update(status FamilyStatus) {
 			IncCacheFamilyDegraded(status.Component, status.Family, status.Profile, reason)
 		}
 	}
+	SetRuntimeComponentReady(status.Component, SnapshotForComponent(status.Component, r).Summary.Ready)
 }
 
 func (r *FamilyStatusRegistry) RecordSuccess(family string) {
@@ -119,6 +120,7 @@ func (r *FamilyStatusRegistry) RecordSuccess(family string) {
 	r.mu.Unlock()
 
 	SetCacheFamilyAvailable(status.Component, status.Family, status.Profile, true)
+	SetRuntimeComponentReady(status.Component, SnapshotForComponent(status.Component, r).Summary.Ready)
 }
 
 func (r *FamilyStatusRegistry) RecordFailure(family string, err error) {
@@ -149,6 +151,7 @@ func (r *FamilyStatusRegistry) RecordFailure(family string, err error) {
 	if !prev.Degraded || prev.LastError != status.LastError {
 		IncCacheFamilyDegraded(status.Component, status.Family, status.Profile, status.LastError)
 	}
+	SetRuntimeComponentReady(status.Component, SnapshotForComponent(status.Component, r).Summary.Ready)
 }
 
 func (r *FamilyStatusRegistry) Snapshot() []FamilyStatus {

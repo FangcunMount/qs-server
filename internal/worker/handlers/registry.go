@@ -22,6 +22,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 	redis "github.com/redis/go-redis/v9"
@@ -73,6 +74,7 @@ type Dependencies struct {
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    InternalClient
 	LockRedis         redis.UniversalClient
+	LockManager       *redislock.Manager
 	LockKeyBuilder    *rediskey.Builder
 	Notifier          port.TaskNotifier
 }

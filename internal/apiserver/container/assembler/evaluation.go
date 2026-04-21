@@ -22,6 +22,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
@@ -94,11 +95,11 @@ func NewEvaluationModule() *EvaluationModule {
 // params[4]: questionnaire.Repository (可选，用于 EvaluationService 的 cnt 计分规则)
 // params[5]: event.EventPublisher (可选，用于事件发布)
 // params[6]: redis.UniversalClient (可选，用于对象缓存装饰器)
-// params[7]: string (可选，用于对象缓存 namespace)
-// params[8]: assessmentCache.CachePolicy (可选，用于测评详情缓存策略)
+// params[7]: *rediskey.Builder (可选，用于对象缓存 key builder)
+// params[8]: cachepolicy.CachePolicy (可选，用于测评详情缓存策略)
 // params[9]: redis.UniversalClient (可选，用于 query cache，如我的测评列表)
-// params[10]: string (可选，用于 query cache namespace)
-// params[11]: assessmentCache.CachePolicy (可选，用于我的测评列表缓存策略)
+// params[10]: *rediskey.Builder (可选，用于 query cache key builder)
+// params[11]: cachepolicy.CachePolicy (可选，用于我的测评列表缓存策略)
 // params[12]: assessmentCache.VersionTokenStore (可选，用于 versioned query invalidation)
 func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	if len(params) < 2 {
@@ -157,15 +158,15 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
-	var cacheNamespace string
+	var cacheBuilder *rediskey.Builder
 	if len(params) > 7 {
-		if ns, ok := params[7].(string); ok {
-			cacheNamespace = ns
+		if builder, ok := params[7].(*rediskey.Builder); ok {
+			cacheBuilder = builder
 		}
 	}
-	var assessmentPolicy assessmentCache.CachePolicy
+	var assessmentPolicy cachepolicy.CachePolicy
 	if len(params) > 8 {
-		if policy, ok := params[8].(assessmentCache.CachePolicy); ok {
+		if policy, ok := params[8].(cachepolicy.CachePolicy); ok {
 			assessmentPolicy = policy
 		}
 	}
@@ -175,15 +176,15 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			queryRedisClient = rc
 		}
 	}
-	var queryCacheNamespace string
+	var queryCacheBuilder *rediskey.Builder
 	if len(params) > 10 {
-		if ns, ok := params[10].(string); ok {
-			queryCacheNamespace = ns
+		if builder, ok := params[10].(*rediskey.Builder); ok {
+			queryCacheBuilder = builder
 		}
 	}
-	var assessmentListPolicy assessmentCache.CachePolicy
+	var assessmentListPolicy cachepolicy.CachePolicy
 	if len(params) > 11 {
-		if policy, ok := params[11].(assessmentCache.CachePolicy); ok {
+		if policy, ok := params[11].(cachepolicy.CachePolicy); ok {
 			assessmentListPolicy = policy
 		}
 	}
@@ -197,7 +198,6 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(mysqlDB)
-	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderAndPolicy(baseAssessmentRepo, redisClient, cacheBuilder, assessmentPolicy)
@@ -280,7 +280,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderAndPolicy(
 			assessmentCache.NewRedisCache(queryRedisClient),
 			versionStore,
-			assessmentCache.NewCacheKeyBuilderWithNamespace(queryCacheNamespace),
+			queryCacheBuilder,
 			assessmentListPolicy,
 		)
 		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(

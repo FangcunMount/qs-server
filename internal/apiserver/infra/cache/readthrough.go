@@ -4,14 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 )
 
 // ReadThroughOptions 描述一次统一的缓存读穿透流程。
 type ReadThroughOptions[T any] struct {
-	PolicyKey         CachePolicyKey
+	PolicyKey         cachepolicy.CachePolicyKey
 	CacheKey          string
-	Policy            CachePolicy
+	Policy            cachepolicy.CachePolicy
 	GetCached         func(context.Context) (*T, error)
 	Load              func(context.Context) (*T, error)
 	SetCached         func(context.Context, *T) error
@@ -25,7 +26,7 @@ type ReadThroughOptions[T any] struct {
 // 2. miss 后按对象级 singleflight 回源
 // 3. 回源成功后写回正向缓存或 negative sentinel
 func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, error) {
-	family := string(PolicyFamily(opts.PolicyKey))
+	family := string(cachepolicy.FamilyFor(opts.PolicyKey))
 	policy := string(opts.PolicyKey)
 
 	if opts.GetCached != nil {

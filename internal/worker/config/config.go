@@ -33,6 +33,8 @@ type Config struct {
 	Redis *genericoptions.RedisOptions
 	// 可选 Redis profiles 配置
 	RedisProfiles map[string]*genericoptions.RedisOptions
+	// Redis runtime family 路由
+	RedisRuntime *genericoptions.RedisRuntimeOptions
 }
 
 // LogConfig 日志配置
@@ -169,5 +171,6 @@ func CreateConfigFromOptions(opts *options.Options) (*Config, error) {
 		},
 		Redis:         opts.Redis,
 		RedisProfiles: opts.RedisProfiles,
+		RedisRuntime:  opts.RedisRuntime,
 	}, nil
 }

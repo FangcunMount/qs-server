@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -15,17 +14,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -42,6 +39,8 @@ type apiServer struct {
 	dbManager *DatabaseManager
 	// Redis 客户端（供内建调度器等后台任务复用）
 	redisCache redis.UniversalClient
+	// 共享 Redis family runtime
+	redisRuntime *redisplane.Runtime
 	// Container 主容器
 	container *container.Container
 	// Redis family 状态注册表
@@ -144,42 +143,29 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		)
 	}
 	s.redisCache = redisCache
-	if s.config.Cache.Static == nil {
-		s.config.Cache.Static = &apiserveroptions.CacheRouteOptions{RedisProfile: "static_cache", NamespaceSuffix: "cache:static"}
-	}
-	if s.config.Cache.Object == nil {
-		s.config.Cache.Object = &apiserveroptions.CacheRouteOptions{RedisProfile: "object_cache", NamespaceSuffix: "cache:object"}
-	}
-	if s.config.Cache.Query == nil {
-		s.config.Cache.Query = &apiserveroptions.CacheRouteOptions{RedisProfile: "query_cache", NamespaceSuffix: "cache:query"}
-	}
-	if s.config.Cache.Meta == nil {
-		s.config.Cache.Meta = &apiserveroptions.CacheRouteOptions{RedisProfile: "meta_cache", NamespaceSuffix: "cache:meta"}
-	}
-	if s.config.Cache.SDK == nil {
-		s.config.Cache.SDK = &apiserveroptions.CacheRouteOptions{RedisProfile: "sdk_cache", NamespaceSuffix: "cache:sdk"}
-	}
-	if s.config.Cache.Lock == nil {
-		s.config.Cache.Lock = &apiserveroptions.CacheRouteOptions{RedisProfile: "lock_cache", NamespaceSuffix: "cache:lock"}
-	}
-	staticRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyStatic, *s.config.Cache.Static)
-	queryRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyQuery, *s.config.Cache.Query)
-	objectRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyObject, *s.config.Cache.Object)
-	metaRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyMeta, *s.config.Cache.Meta)
-	sdkRedisCache := s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilySDK, *s.config.Cache.SDK)
-	_ = s.resolveRedisFamilyClient(context.Background(), scaleCache.CacheFamilyLock, *s.config.Cache.Lock)
+	runtimeCatalog := redisplane.CatalogFromOptions(s.config.RedisRuntime, nil)
+	s.redisRuntime = redisplane.NewRuntime("apiserver", s.dbManager, runtimeCatalog, s.familyStatus)
+	handles := s.redisRuntime.ResolveAll(context.Background())
+	staticHandle := handles[redisplane.FamilyStatic]
+	objectHandle := handles[redisplane.FamilyObject]
+	queryHandle := handles[redisplane.FamilyQuery]
+	metaHandle := handles[redisplane.FamilyMeta]
+	sdkHandle := handles[redisplane.FamilySDK]
+	lockHandle := handles[redisplane.FamilyLock]
+	metaRedisCache := redisHandleClient(metaHandle)
+	_ = redisHandleClient(lockHandle)
 	if s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Hotset != nil && s.config.Cache.Warmup.Hotset.Enable && metaRedisCache == nil {
 		logger.L(context.Background()).Warnw("meta_cache unavailable while hotset governance is enabled; hotset recording and hot-target warmup will degrade",
 			"component", "apiserver",
-			"family", string(scaleCache.CacheFamilyMeta),
-			"profile", s.config.Cache.Meta.RedisProfile,
+			"family", string(redisplane.FamilyMeta),
+			"profile", metaHandleProfile(metaHandle),
 		)
 	}
 	if metaRedisCache == nil {
 		logger.L(context.Background()).Warnw("meta_cache unavailable; version-token query caches will run uncached where required",
 			"component", "apiserver",
-			"family", string(scaleCache.CacheFamilyMeta),
-			"profile", s.config.Cache.Meta.RedisProfile,
+			"family", string(redisplane.FamilyMeta),
+			"profile", metaHandleProfile(metaHandle),
 		)
 	}
 
@@ -220,9 +206,9 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		}
 		cacheTTLJitter = s.config.Cache.TTLJitterRatio
 	}
-	var statsWarmupCfg *scaleCache.StatisticsWarmupConfig
+	var statsWarmupCfg *cachegov.StatisticsWarmupConfig
 	if s.config.Cache != nil && s.config.Cache.StatisticsWarmup != nil && s.config.Cache.StatisticsWarmup.Enable {
-		statsWarmupCfg = &scaleCache.StatisticsWarmupConfig{
+		statsWarmupCfg = &cachegov.StatisticsWarmupConfig{
 			OrgIDs:             s.config.Cache.StatisticsWarmup.OrgIDs,
 			QuestionnaireCodes: s.config.Cache.StatisticsWarmup.QuestionnaireCodes,
 			PlanIDs:            s.config.Cache.StatisticsWarmup.PlanIDs,
@@ -257,64 +243,51 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 						return s.config.Cache.Warmup.Hotset.MaxItemsPerKind
 					}(),
 				},
-				Namespace:       s.config.Cache.Namespace,
 				CompressPayload: s.config.Cache.CompressPayload,
-				Static: container.ContainerCacheRouteOptions{
-					RedisProfile:    s.config.Cache.Static.RedisProfile,
-					NamespaceSuffix: s.config.Cache.Static.NamespaceSuffix,
-					NegativeTTL:     s.config.Cache.Static.NegativeTTL,
-					TTLJitterRatio:  s.config.Cache.Static.TTLJitterRatio,
-					Compress:        s.config.Cache.Static.Compress,
-					Singleflight:    s.config.Cache.Static.Singleflight,
-					Negative:        s.config.Cache.Static.Negative,
+				Static: container.ContainerCacheFamilyOptions{
+					NegativeTTL:    s.config.Cache.Static.NegativeTTL,
+					TTLJitterRatio: s.config.Cache.Static.TTLJitterRatio,
+					Compress:       s.config.Cache.Static.Compress,
+					Singleflight:   s.config.Cache.Static.Singleflight,
+					Negative:       s.config.Cache.Static.Negative,
 				},
-				Object: container.ContainerCacheRouteOptions{
-					RedisProfile:    s.config.Cache.Object.RedisProfile,
-					NamespaceSuffix: s.config.Cache.Object.NamespaceSuffix,
-					NegativeTTL:     s.config.Cache.Object.NegativeTTL,
-					TTLJitterRatio:  s.config.Cache.Object.TTLJitterRatio,
-					Compress:        s.config.Cache.Object.Compress,
-					Singleflight:    s.config.Cache.Object.Singleflight,
-					Negative:        s.config.Cache.Object.Negative,
+				Object: container.ContainerCacheFamilyOptions{
+					NegativeTTL:    s.config.Cache.Object.NegativeTTL,
+					TTLJitterRatio: s.config.Cache.Object.TTLJitterRatio,
+					Compress:       s.config.Cache.Object.Compress,
+					Singleflight:   s.config.Cache.Object.Singleflight,
+					Negative:       s.config.Cache.Object.Negative,
 				},
-				Query: container.ContainerCacheRouteOptions{
-					RedisProfile:    s.config.Cache.Query.RedisProfile,
-					NamespaceSuffix: s.config.Cache.Query.NamespaceSuffix,
-					TTL:             s.config.Cache.Query.TTL,
-					NegativeTTL:     s.config.Cache.Query.NegativeTTL,
-					TTLJitterRatio:  s.config.Cache.Query.TTLJitterRatio,
-					Compress:        s.config.Cache.Query.Compress,
-					Singleflight:    s.config.Cache.Query.Singleflight,
-					Negative:        s.config.Cache.Query.Negative,
+				Query: container.ContainerCacheFamilyOptions{
+					TTL:            s.config.Cache.Query.TTL,
+					NegativeTTL:    s.config.Cache.Query.NegativeTTL,
+					TTLJitterRatio: s.config.Cache.Query.TTLJitterRatio,
+					Compress:       s.config.Cache.Query.Compress,
+					Singleflight:   s.config.Cache.Query.Singleflight,
+					Negative:       s.config.Cache.Query.Negative,
 				},
-				Meta: container.ContainerCacheRouteOptions{
-					RedisProfile:    s.config.Cache.Meta.RedisProfile,
-					NamespaceSuffix: s.config.Cache.Meta.NamespaceSuffix,
+				Meta: container.ContainerCacheFamilyOptions{},
+				SDK: container.ContainerCacheFamilyOptions{
+					NegativeTTL:    s.config.Cache.SDK.NegativeTTL,
+					TTLJitterRatio: s.config.Cache.SDK.TTLJitterRatio,
+					Compress:       s.config.Cache.SDK.Compress,
+					Singleflight:   s.config.Cache.SDK.Singleflight,
+					Negative:       s.config.Cache.SDK.Negative,
 				},
-				SDK: container.ContainerCacheRouteOptions{
-					RedisProfile:    s.config.Cache.SDK.RedisProfile,
-					NamespaceSuffix: s.config.Cache.SDK.NamespaceSuffix,
-					NegativeTTL:     s.config.Cache.SDK.NegativeTTL,
-					TTLJitterRatio:  s.config.Cache.SDK.TTLJitterRatio,
-					Compress:        s.config.Cache.SDK.Compress,
-					Singleflight:    s.config.Cache.SDK.Singleflight,
-					Negative:        s.config.Cache.SDK.Negative,
-				},
-				Lock: container.ContainerCacheRouteOptions{
-					RedisProfile:    s.config.Cache.Lock.RedisProfile,
-					NamespaceSuffix: s.config.Cache.Lock.NamespaceSuffix,
-					NegativeTTL:     s.config.Cache.Lock.NegativeTTL,
-					TTLJitterRatio:  s.config.Cache.Lock.TTLJitterRatio,
-					Compress:        s.config.Cache.Lock.Compress,
-					Singleflight:    s.config.Cache.Lock.Singleflight,
-					Negative:        s.config.Cache.Lock.Negative,
+				Lock: container.ContainerCacheFamilyOptions{
+					NegativeTTL:    s.config.Cache.Lock.NegativeTTL,
+					TTLJitterRatio: s.config.Cache.Lock.TTLJitterRatio,
+					Compress:       s.config.Cache.Lock.Compress,
+					Singleflight:   s.config.Cache.Lock.Singleflight,
+					Negative:       s.config.Cache.Lock.Negative,
 				},
 			},
-			StaticRedisClient: staticRedisCache,
-			ObjectRedisClient: objectRedisCache,
-			QueryRedisClient:  queryRedisCache,
-			MetaRedisClient:   metaRedisCache,
-			SDKRedisClient:    sdkRedisCache,
+			StaticRedisHandle: staticHandle,
+			ObjectRedisHandle: objectHandle,
+			QueryRedisHandle:  queryHandle,
+			MetaRedisHandle:   metaHandle,
+			SDKRedisHandle:    sdkHandle,
+			LockRedisHandle:   lockHandle,
 			PlanEntryBaseURL:  s.config.Plan.EntryBaseURL,
 			StatisticsRepairWindowDays: func() int {
 				if s.config.StatisticsSync == nil {
@@ -450,116 +423,18 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	return preparedAPIServer{s}
 }
 
-func (s *apiServer) resolveRedisFamilyClient(ctx context.Context, family scaleCache.CacheFamily, route apiserveroptions.CacheRouteOptions) redis.UniversalClient {
-	if s == nil || s.dbManager == nil {
-		return nil
-	}
-	profile := route.RedisProfile
-	namespace := rediskey.ComposeNamespace(s.config.Cache.Namespace, route.NamespaceSuffix)
-	allowWarmup := family == scaleCache.CacheFamilyStatic || family == scaleCache.CacheFamilyQuery
-
-	updateStatus := func(mode string, configured, available, degraded bool, err error) {
-		if s.familyStatus == nil {
-			return
-		}
-		s.familyStatus.Update(cacheobservability.FamilyStatus{
-			Component:   "apiserver",
-			Family:      string(family),
-			Profile:     profile,
-			Namespace:   namespace,
-			AllowWarmup: allowWarmup,
-			Configured:  configured,
-			Available:   available,
-			Degraded:    degraded,
-			Mode:        mode,
-			LastError:   errorString(err),
-		})
-	}
-
-	if profile == "" {
-		client, err := s.dbManager.GetRedisClient()
-		if err != nil {
-			logger.L(ctx).Warnw("Redis family unavailable",
-				"component", "apiserver",
-				"family", string(family),
-				"profile", profile,
-				"mode", "default",
-				"error", err.Error(),
-			)
-			updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, err)
-			return nil
-		}
-		logger.L(ctx).Infow("Redis family using default Redis",
-			"component", "apiserver",
-			"family", string(family),
-			"mode", "default",
-		)
-		updateStatus(cacheobservability.FamilyModeDefault, true, true, false, nil)
-		return client
-	}
-
-	status := s.dbManager.GetRedisProfileStatus(profile)
-	switch status.State {
-	case cbdatabase.RedisProfileStateMissing:
-		client, err := s.dbManager.GetRedisClient()
-		if err != nil {
-			logger.L(ctx).Warnw("Redis family default fallback unavailable",
-				"component", "apiserver",
-				"family", string(family),
-				"profile", profile,
-				"mode", "fallback_default",
-				"error", err.Error(),
-			)
-			updateStatus(cacheobservability.FamilyModeDegraded, false, false, true, err)
-			return nil
-		}
-		logger.L(ctx).Infow("Redis family profile missing, falling back to default",
-			"component", "apiserver",
-			"family", string(family),
-			"profile", profile,
-			"mode", "fallback_default",
-		)
-		updateStatus(cacheobservability.FamilyModeFallbackDefault, false, true, false, nil)
-		return client
-	case cbdatabase.RedisProfileStateUnavailable:
-		logger.L(ctx).Warnw("Redis family degraded because profile is unavailable",
-			"component", "apiserver",
-			"family", string(family),
-			"profile", profile,
-			"mode", "degraded",
-			"error", errorString(status.Err),
-		)
-		updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, status.Err)
-		return nil
-	default:
-		client, err := s.dbManager.GetRedisClientByProfile(profile)
-		if err != nil {
-			logger.L(ctx).Warnw("Redis family degraded because profile is unavailable",
-				"component", "apiserver",
-				"family", string(family),
-				"profile", profile,
-				"mode", "degraded",
-				"error", err.Error(),
-			)
-			updateStatus(cacheobservability.FamilyModeDegraded, true, false, true, err)
-			return nil
-		}
-		logger.L(ctx).Infow("Redis family using named profile",
-			"component", "apiserver",
-			"family", string(family),
-			"profile", profile,
-			"mode", "named_profile",
-		)
-		updateStatus(cacheobservability.FamilyModeNamedProfile, true, true, false, nil)
-		return client
-	}
-}
-
 func errorString(err error) string {
 	if err == nil {
 		return ""
 	}
 	return err.Error()
+}
+
+func redisHandleClient(handle *redisplane.Handle) redis.UniversalClient {
+	if handle == nil {
+		return nil
+	}
+	return handle.Client
 }
 
 func (s *apiServer) startAuthzVersionSync() {
@@ -968,4 +843,11 @@ func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcpkg.Config) error {
 	grpcConfig.EnableHealthCheck = opts.EnableHealthCheck
 
 	return nil
+}
+
+func metaHandleProfile(handle *redisplane.Handle) string {
+	if handle == nil {
+		return ""
+	}
+	return handle.Profile
 }

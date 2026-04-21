@@ -3,6 +3,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
@@ -10,6 +11,7 @@ import (
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -56,7 +58,9 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	// 健康检查和基础路由
 	engine.GET("/health", r.healthCheck)
+	engine.GET("/readyz", r.readyCheck)
 	engine.GET("/ping", r.ping)
+	engine.GET("/governance/redis", r.redisGovernance)
 
 	// 认证相关的公开路由 已迁移至 IAM / API 网关，不在此维护
 
@@ -1209,6 +1213,14 @@ func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGro
 		r.rateCfg.SubmitUserBurst,
 		statisticsModule.Handler.RepairComplete,
 	)...)
+	governance.POST("/warmup-targets", r.rateLimitedHandlers(
+		r.rateCfg,
+		r.rateCfg.SubmitGlobalQPS,
+		r.rateCfg.SubmitGlobalBurst,
+		r.rateCfg.SubmitUserQPS,
+		r.rateCfg.SubmitUserBurst,
+		statisticsModule.Handler.WarmupTargets,
+	)...)
 	governance.GET("/status", r.rateLimitedHandlers(
 		r.rateCfg,
 		r.rateCfg.QueryGlobalQPS,
@@ -1310,4 +1322,40 @@ func (r *Router) ping(c *gin.Context) {
 		"router":  "centralized",
 		"auth":    "enabled",
 	})
+}
+
+func (r *Router) readyCheck(c *gin.Context) {
+	snapshot := r.runtimeSnapshot(c)
+	statusCode := http.StatusOK
+	statusText := "ready"
+	if !snapshot.Summary.Ready {
+		statusCode = http.StatusServiceUnavailable
+		statusText = "degraded"
+	}
+	c.JSON(statusCode, gin.H{
+		"status":    statusText,
+		"component": "apiserver",
+		"redis":     snapshot,
+	})
+}
+
+func (r *Router) redisGovernance(c *gin.Context) {
+	c.JSON(http.StatusOK, r.runtimeSnapshot(c))
+}
+
+func (r *Router) runtimeSnapshot(c *gin.Context) cacheobservability.RuntimeSnapshot {
+	if r != nil && r.container != nil && r.container.CacheGovernanceStatusService != nil {
+		snapshot, err := r.container.CacheGovernanceStatusService.GetRuntime(c.Request.Context())
+		if err == nil && snapshot != nil {
+			return *snapshot
+		}
+	}
+	return cacheobservability.RuntimeSnapshot{
+		GeneratedAt: time.Now(),
+		Component:   "apiserver",
+		Families:    []cacheobservability.FamilyStatus{},
+		Summary: cacheobservability.RuntimeSummary{
+			Ready: true,
+		},
+	}
 }

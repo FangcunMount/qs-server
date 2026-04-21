@@ -123,16 +123,16 @@ redis:
   use-ssl: false
 
 redis_profiles:
-  static_cache:
-    database: 2
-  object_cache:
-    database: 3
-  query_cache:
-    database: 4
-  sdk_cache:
-    database: 5
   lock_cache:
     database: 6
+
+redis_runtime:
+  namespace: ""
+  families:
+    lock_lease:
+      redis_profile: "lock_cache"
+      namespace_suffix: "cache:lock"
+      allow_fallback_default: true
 
 # ============================================================
 # 5. 缓存控制
@@ -140,9 +140,6 @@ redis_profiles:
 cache:
   disable_statistics_cache: false  # 生产环境默认为 false，设置为 true 以跳过统计缓存
   disable_evaluation_cache: false  # 生产环境默认为 false，设置为 true 以跳过测评结果缓存
-  lock:
-    redis_profile: "lock_cache"
-    namespace_suffix: "cache:lock"
 
 # ============================================================
 # 5. 系统配置

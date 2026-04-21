@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
 func TestCachedTesteeRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedTesteeRepositoryWithBuilderAndPolicy(nil, nil, rediskey.NewBuilderWithNamespace("prod:cache:object"), CachePolicy{})
+	repo := NewCachedTesteeRepositoryWithBuilderAndPolicy(nil, nil, rediskey.NewBuilderWithNamespace("prod:cache:object"), cachepolicy.CachePolicy{})
 	cached, ok := repo.(*CachedTesteeRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)

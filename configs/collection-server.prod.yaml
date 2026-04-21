@@ -79,7 +79,23 @@ redis:
   enable-cluster: false
   use-ssl: false
 
-# 3.2 Redis 说明：当前仅保留单实例，不再区分 cache/store
+redis_profiles:
+  ops_runtime:
+    database: 1
+  lock_cache:
+    database: 6
+
+redis_runtime:
+  namespace: ""
+  families:
+    ops_runtime:
+      redis_profile: "ops_runtime"
+      namespace_suffix: "ops:runtime"
+      allow_fallback_default: true
+    lock_lease:
+      redis_profile: "lock_cache"
+      namespace_suffix: "cache:lock"
+      allow_fallback_default: true
 
 # -------------------------------------------------------
 # 3.3 限流配置

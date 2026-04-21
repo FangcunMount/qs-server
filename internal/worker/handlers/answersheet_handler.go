@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
@@ -29,8 +28,8 @@ const (
 )
 
 type answerSheetProcessingGateHooks struct {
-	acquire func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (string, bool, error)
-	release func(ctx context.Context, deps *Dependencies, answerSheetID uint64, token string) error
+	acquire func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*redislock.Lease, bool, error)
+	release func(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error
 }
 
 var defaultAnswerSheetProcessingGateHooks = answerSheetProcessingGateHooks{
@@ -126,7 +125,7 @@ func withAnswerSheetProcessingGate(
 	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
 	lockKey := answerSheetProcessingLockKey(deps, answerSheetID)
 
-	if deps.LockRedis == nil {
+	if deps.LockManager == nil {
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "redis_unavailable")
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
@@ -138,11 +137,9 @@ func withAnswerSheetProcessingGate(
 		return fn(ctx)
 	}
 
-	token, acquired, err := hooks.acquire(ctx, deps, answerSheetID)
+	lease, acquired, err := hooks.acquire(ctx, deps, answerSheetID)
 	if err != nil {
-		cacheobservability.ObserveLockAcquire("answersheet_processing", "error")
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
-		cacheobservability.ObserveFamilyFailure("worker", "lock_lease", err)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -154,8 +151,6 @@ func withAnswerSheetProcessingGate(
 		return fn(ctx)
 	}
 	if !acquired {
-		cacheobservability.ObserveLockAcquire("answersheet_processing", "contention")
-		cacheobservability.ObserveFamilySuccess("worker", "lock_lease")
 		deps.Logger.Info("answersheet processing skipped as duplicate",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -164,8 +159,6 @@ func withAnswerSheetProcessingGate(
 		)
 		return nil
 	}
-	cacheobservability.ObserveLockAcquire("answersheet_processing", "ok")
-	cacheobservability.ObserveFamilySuccess("worker", "lock_lease")
 
 	deps.Logger.Debug("answersheet processing gate acquired",
 		slog.String("event_id", eventID),
@@ -175,9 +168,7 @@ func withAnswerSheetProcessingGate(
 	)
 
 	defer func() {
-		if err := hooks.release(ctx, deps, answerSheetID, token); err != nil {
-			cacheobservability.ObserveLockRelease("answersheet_processing", "error")
-			cacheobservability.ObserveFamilyFailure("worker", "lock_lease", err)
+		if err := hooks.release(ctx, deps, answerSheetID, lease); err != nil {
 			deps.Logger.Warn("failed to release answersheet processing gate",
 				slog.String("event_id", eventID),
 				slog.String("answersheet_id", answerSheetIDStr),
@@ -185,9 +176,6 @@ func withAnswerSheetProcessingGate(
 				slog.String("lock_mode", string(answerSheetProcessingGateModeLocked)),
 				slog.String("error", err.Error()),
 			)
-		} else {
-			cacheobservability.ObserveLockRelease("answersheet_processing", "ok")
-			cacheobservability.ObserveFamilySuccess("worker", "lock_lease")
 		}
 	}()
 
@@ -195,37 +183,37 @@ func withAnswerSheetProcessingGate(
 }
 
 // acquireProcessingLock 获取答卷处理的 best-effort Redis lease lock。
-func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64) (string, bool, error) {
-	if deps.LockRedis == nil {
-		return "", false, nil
+func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*redislock.Lease, bool, error) {
+	if deps.LockManager == nil {
+		return nil, false, fmt.Errorf("lock manager is unavailable")
 	}
-	lockKey := answerSheetProcessingLockKey(deps, answerSheetID)
-	lockTTL := 5 * time.Minute
-
-	token, acquired, err := redislock.Acquire(ctx, deps.LockRedis, lockKey, lockTTL)
+	lease, acquired, err := deps.LockManager.AcquireSpec(ctx, redislock.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID))
 	if err != nil {
-		return "", false, fmt.Errorf("failed to acquire processing lock: %w", err)
+		return nil, false, fmt.Errorf("failed to acquire processing lock: %w", err)
 	}
-	return token, acquired, nil
+	return lease, acquired, nil
 }
 
 // releaseProcessingLock 释放答卷处理的 Redis lease lock。
-func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64, token string) error {
-	if deps.LockRedis == nil {
+func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error {
+	if deps.LockManager == nil {
 		return nil
 	}
-	lockKey := answerSheetProcessingLockKey(deps, answerSheetID)
-	if err := redislock.Release(ctx, deps.LockRedis, lockKey, token); err != nil {
+	if err := deps.LockManager.ReleaseSpec(ctx, redislock.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID), lease); err != nil {
 		return fmt.Errorf("failed to release processing lock: %w", err)
 	}
 	return nil
+}
+
+func answerSheetProcessingLockKeyBase(answerSheetID uint64) string {
+	return "answersheet:processing:" + strconv.FormatUint(answerSheetID, 10)
 }
 
 func answerSheetProcessingLockKey(deps *Dependencies, answerSheetID uint64) string {
 	if deps != nil && deps.LockKeyBuilder != nil {
 		return deps.LockKeyBuilder.BuildAnswerSheetProcessingLockKey(answerSheetID)
 	}
-	return "answersheet:processing:" + strconv.FormatUint(answerSheetID, 10)
+	return answerSheetProcessingLockKeyBase(answerSheetID)
 }
 
 // 计算答卷分数

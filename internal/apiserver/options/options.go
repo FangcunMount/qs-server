@@ -21,6 +21,7 @@ type Options struct {
 	MigrationOptions        *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
 	RedisOptions            *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
 	RedisProfiles           map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	RedisRuntime            *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
 	MongoDBOptions          *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
 	MessagingOptions        *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
@@ -45,6 +46,7 @@ func NewOptions() *Options {
 		MigrationOptions:        genericoptions.NewMigrationOptions(),
 		RedisOptions:            genericoptions.NewRedisOptions(),
 		RedisProfiles:           map[string]*genericoptions.RedisOptions{},
+		RedisRuntime:            defaultRedisRuntimeOptions(),
 		MongoDBOptions:          genericoptions.NewMongoDBOptions(),
 		MessagingOptions:        genericoptions.NewMessagingOptions(),
 		IAMOptions:              genericoptions.NewIAMOptions(),
@@ -56,6 +58,47 @@ func NewOptions() *Options {
 		Cache:                   NewCacheOptions(),
 		StatisticsSync:          NewStatisticsSyncOptions(),
 	}
+}
+
+func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
+	opts := genericoptions.NewRedisRuntimeOptions()
+	opts.Families["static_meta"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "static_cache",
+		NamespaceSuffix:      "cache:static",
+		AllowFallbackDefault: boolPtr(true),
+		AllowWarmup:          boolPtr(true),
+	}
+	opts.Families["object_view"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "object_cache",
+		NamespaceSuffix:      "cache:object",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	opts.Families["query_result"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "query_cache",
+		NamespaceSuffix:      "cache:query",
+		AllowFallbackDefault: boolPtr(true),
+		AllowWarmup:          boolPtr(true),
+	}
+	opts.Families["meta_hotset"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "meta_cache",
+		NamespaceSuffix:      "cache:meta",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	opts.Families["sdk_token"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "sdk_cache",
+		NamespaceSuffix:      "cache:sdk",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	opts.Families["lock_lease"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "lock_cache",
+		NamespaceSuffix:      "cache:lock",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	return opts
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 // BackpressureOptions 下游背压配置
@@ -202,6 +245,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.MySQLOptions.AddFlags(fss.FlagSet("mysql"))
 	o.MigrationOptions.AddFlags(fss.FlagSet("migration"))
 	o.RedisOptions.AddFlags(fss.FlagSet("redis"))
+	o.RedisRuntime.AddFlags(fss.FlagSet("redis_runtime"))
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
 	o.MessagingOptions.AddFlags(fss.FlagSet("messaging"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
@@ -269,14 +313,13 @@ type CacheOptions struct {
 	TTLJitterRatio         float64                  `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
 	StatisticsWarmup       *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
 	Warmup                 *WarmupOptions           `json:"warmup" mapstructure:"warmup"`
-	Namespace              string                   `json:"namespace" mapstructure:"namespace"`
 	CompressPayload        bool                     `json:"compress_payload" mapstructure:"compress_payload"`
-	Static                 *CacheRouteOptions       `json:"static" mapstructure:"static"`
-	Object                 *CacheRouteOptions       `json:"object" mapstructure:"object"`
-	Query                  *CacheRouteOptions       `json:"query" mapstructure:"query"`
-	Meta                   *CacheRouteOptions       `json:"meta" mapstructure:"meta"`
-	SDK                    *CacheRouteOptions       `json:"sdk" mapstructure:"sdk"`
-	Lock                   *CacheRouteOptions       `json:"lock" mapstructure:"lock"`
+	Static                 *CacheFamilyOptions      `json:"static" mapstructure:"static"`
+	Object                 *CacheFamilyOptions      `json:"object" mapstructure:"object"`
+	Query                  *CacheFamilyOptions      `json:"query" mapstructure:"query"`
+	Meta                   *CacheFamilyOptions      `json:"meta" mapstructure:"meta"`
+	SDK                    *CacheFamilyOptions      `json:"sdk" mapstructure:"sdk"`
+	Lock                   *CacheFamilyOptions      `json:"lock" mapstructure:"lock"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -295,33 +338,15 @@ func NewCacheOptions() *CacheOptions {
 			Negative:         5 * time.Minute,
 		},
 		TTLJitterRatio:  0.1,
-		Namespace:       "",
 		CompressPayload: false,
-		Static: &CacheRouteOptions{
-			RedisProfile:    "static_cache",
-			NamespaceSuffix: "cache:static",
+		Static:          &CacheFamilyOptions{},
+		Object:          &CacheFamilyOptions{},
+		Query: &CacheFamilyOptions{
+			TTL: 5 * time.Minute,
 		},
-		Object: &CacheRouteOptions{
-			RedisProfile:    "object_cache",
-			NamespaceSuffix: "cache:object",
-		},
-		Query: &CacheRouteOptions{
-			RedisProfile:    "query_cache",
-			NamespaceSuffix: "cache:query",
-			TTL:             5 * time.Minute,
-		},
-		Meta: &CacheRouteOptions{
-			RedisProfile:    "meta_cache",
-			NamespaceSuffix: "cache:meta",
-		},
-		SDK: &CacheRouteOptions{
-			RedisProfile:    "sdk_cache",
-			NamespaceSuffix: "cache:sdk",
-		},
-		Lock: &CacheRouteOptions{
-			RedisProfile:    "lock_cache",
-			NamespaceSuffix: "cache:lock",
-		},
+		Meta: &CacheFamilyOptions{},
+		SDK:  &CacheFamilyOptions{},
+		Lock: &CacheFamilyOptions{},
 		StatisticsWarmup: &StatisticsWarmupOptions{
 			Enable:             false,
 			OrgIDs:             []int64{1},
@@ -374,59 +399,28 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.TTL.Plan, "cache.ttl.plan", c.TTL.Plan, "TTL for plan cache entries.")
 	fs.DurationVar(&c.TTL.Negative, "cache.ttl.negative", c.TTL.Negative, "TTL for negative cache entries (cache penetration protection).")
 	fs.Float64Var(&c.TTLJitterRatio, "cache.ttl-jitter-ratio", c.TTLJitterRatio, "Jitter ratio (0-1) to spread cache expirations.")
-	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace, "Optional Redis key namespace prefix (e.g., env name).")
 	fs.BoolVar(&c.CompressPayload, "cache.compress-payload", c.CompressPayload, "Compress cache payloads (gzip) to save memory/bandwidth.")
 	if c.Static == nil {
-		c.Static = &CacheRouteOptions{
-			RedisProfile:    "static_cache",
-			NamespaceSuffix: "cache:static",
-		}
+		c.Static = &CacheFamilyOptions{}
 	}
 	if c.Query == nil {
-		c.Query = &CacheRouteOptions{
-			RedisProfile:    "query_cache",
-			NamespaceSuffix: "cache:query",
-		}
+		c.Query = &CacheFamilyOptions{}
 	}
 	if c.Object == nil {
-		c.Object = &CacheRouteOptions{
-			RedisProfile:    "object_cache",
-			NamespaceSuffix: "cache:object",
-		}
+		c.Object = &CacheFamilyOptions{}
 	}
 	if c.SDK == nil {
-		c.SDK = &CacheRouteOptions{
-			RedisProfile:    "sdk_cache",
-			NamespaceSuffix: "cache:sdk",
-		}
+		c.SDK = &CacheFamilyOptions{}
 	}
 	if c.Meta == nil {
-		c.Meta = &CacheRouteOptions{
-			RedisProfile:    "meta_cache",
-			NamespaceSuffix: "cache:meta",
-		}
+		c.Meta = &CacheFamilyOptions{}
 	}
 	if c.Lock == nil {
-		c.Lock = &CacheRouteOptions{
-			RedisProfile:    "lock_cache",
-			NamespaceSuffix: "cache:lock",
-		}
+		c.Lock = &CacheFamilyOptions{}
 	}
-	fs.StringVar(&c.Static.RedisProfile, "cache.static.redis-profile", c.Static.RedisProfile, "Redis profile used by static scale/questionnaire caches.")
-	fs.StringVar(&c.Static.NamespaceSuffix, "cache.static.namespace-suffix", c.Static.NamespaceSuffix, "Namespace suffix used by static scale/questionnaire caches.")
-	fs.StringVar(&c.Object.RedisProfile, "cache.object.redis-profile", c.Object.RedisProfile, "Redis profile used by object-view caches.")
-	fs.StringVar(&c.Object.NamespaceSuffix, "cache.object.namespace-suffix", c.Object.NamespaceSuffix, "Namespace suffix used by object-view caches.")
-	fs.StringVar(&c.Query.RedisProfile, "cache.query.redis-profile", c.Query.RedisProfile, "Redis profile used by query-result caches.")
-	fs.StringVar(&c.Query.NamespaceSuffix, "cache.query.namespace-suffix", c.Query.NamespaceSuffix, "Namespace suffix used by query-result caches.")
 	fs.DurationVar(&c.Query.TTL, "cache.query.ttl", c.Query.TTL, "Default TTL used by query-result cache entries.")
 	fs.DurationVar(&c.Query.NegativeTTL, "cache.query.negative-ttl", c.Query.NegativeTTL, "Default negative-cache TTL used by query-result caches.")
 	fs.Float64Var(&c.Query.TTLJitterRatio, "cache.query.ttl-jitter-ratio", c.Query.TTLJitterRatio, "TTL jitter ratio override for query-result caches (0 uses the global cache.ttl-jitter-ratio).")
-	fs.StringVar(&c.Meta.RedisProfile, "cache.meta.redis-profile", c.Meta.RedisProfile, "Redis profile used by cache metadata such as query version tokens.")
-	fs.StringVar(&c.Meta.NamespaceSuffix, "cache.meta.namespace-suffix", c.Meta.NamespaceSuffix, "Namespace suffix used by cache metadata such as query version tokens.")
-	fs.StringVar(&c.SDK.RedisProfile, "cache.sdk.redis-profile", c.SDK.RedisProfile, "Redis profile used by SDK token caches.")
-	fs.StringVar(&c.SDK.NamespaceSuffix, "cache.sdk.namespace-suffix", c.SDK.NamespaceSuffix, "Namespace suffix used by SDK token caches.")
-	fs.StringVar(&c.Lock.RedisProfile, "cache.lock.redis-profile", c.Lock.RedisProfile, "Redis profile used by lock/lease keys.")
-	fs.StringVar(&c.Lock.NamespaceSuffix, "cache.lock.namespace-suffix", c.Lock.NamespaceSuffix, "Namespace suffix used by lock/lease keys.")
 	if c.StatisticsWarmup == nil {
 		c.StatisticsWarmup = &StatisticsWarmupOptions{
 			Enable:             false,
@@ -463,16 +457,15 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64Var(&c.Warmup.Hotset.MaxItemsPerKind, "cache.warmup.hotset-max-items-per-kind", c.Warmup.Hotset.MaxItemsPerKind, "Maximum hotset members retained per warmup kind.")
 }
 
-// CacheRouteOptions 分类缓存路由配置。
-type CacheRouteOptions struct {
-	RedisProfile    string        `json:"redis_profile" mapstructure:"redis_profile"`
-	NamespaceSuffix string        `json:"namespace_suffix" mapstructure:"namespace_suffix"`
-	TTL             time.Duration `json:"ttl" mapstructure:"ttl"`
-	NegativeTTL     time.Duration `json:"negative_ttl" mapstructure:"negative_ttl"`
-	TTLJitterRatio  float64       `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
-	Compress        *bool         `json:"compress,omitempty" mapstructure:"compress"`
-	Singleflight    *bool         `json:"singleflight,omitempty" mapstructure:"singleflight"`
-	Negative        *bool         `json:"negative,omitempty" mapstructure:"negative"`
+// CacheFamilyOptions 定义单个缓存 family 的对象级策略。
+// Redis profile 与 namespace 统一由 redis_runtime 管理，这里只保留 TTL、negative、压缩与 singleflight 语义。
+type CacheFamilyOptions struct {
+	TTL            time.Duration `json:"ttl" mapstructure:"ttl"`
+	NegativeTTL    time.Duration `json:"negative_ttl" mapstructure:"negative_ttl"`
+	TTLJitterRatio float64       `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	Compress       *bool         `json:"compress,omitempty" mapstructure:"compress"`
+	Singleflight   *bool         `json:"singleflight,omitempty" mapstructure:"singleflight"`
+	Negative       *bool         `json:"negative,omitempty" mapstructure:"negative"`
 }
 
 // CacheTTLOptions 缓存 TTL 配置

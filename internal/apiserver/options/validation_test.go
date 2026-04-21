@@ -82,9 +82,10 @@ func TestOptionsValidateCacheRoutes(t *testing.T) {
 			name: "rejects missing named profile when profiles declared",
 			mutate: func(opts *Options) {
 				opts.RedisProfiles["static_cache"] = opts.RedisOptions
-				opts.Cache.Query.RedisProfile = "query_cache"
+				opts.RedisRuntime.Families["query_result"].AllowFallbackDefault = boolPtr(false)
+				opts.RedisRuntime.Families["query_result"].RedisProfile = "query_cache"
 			},
-			wantErr: "cache.query.redis_profile references missing redis_profiles entry",
+			wantErr: "redis_runtime.families.query_result.redis_profile references missing redis_profiles entry",
 		},
 		{
 			name: "rejects invalid hotset size",

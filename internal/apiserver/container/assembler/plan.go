@@ -13,6 +13,7 @@ import (
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	planCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -50,8 +51,8 @@ func NewPlanModule() *PlanModule {
 // params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
 // params[2]: scale.Repository (可选，用于通过 code 查找 scale)
 // params[3]: redis.UniversalClient (可选，用于缓存装饰器)
-// params[4]: string (可选，用于对象缓存 namespace)
-// params[5]: planCache.CachePolicy (可选，用于计划详情缓存策略)
+// params[4]: *rediskey.Builder (可选，用于对象缓存 key builder)
+// params[5]: cachepolicy.CachePolicy (可选，用于计划详情缓存策略)
 // params[6]: string (可选，用于入口基础地址)
 func (m *PlanModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
@@ -84,19 +85,18 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
-	var cacheNamespace string
+	var cacheBuilder *rediskey.Builder
 	if len(params) > 4 {
-		if ns, ok := params[4].(string); ok {
-			cacheNamespace = ns
+		if builder, ok := params[4].(*rediskey.Builder); ok {
+			cacheBuilder = builder
 		}
 	}
-	var planPolicy planCache.CachePolicy
+	var planPolicy cachepolicy.CachePolicy
 	if len(params) > 5 {
-		if policy, ok := params[5].(planCache.CachePolicy); ok {
+		if policy, ok := params[5].(cachepolicy.CachePolicy); ok {
 			planPolicy = policy
 		}
 	}
-	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {

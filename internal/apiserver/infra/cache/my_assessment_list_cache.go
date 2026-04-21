@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
-// MyAssessmentListCacheTTL 默认 TTL（兼容旧构造路径保留）。
-//
-// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
-var MyAssessmentListCacheTTL = 10 * time.Minute
+const defaultAssessmentListCacheTTL = 10 * time.Minute
 
 const defaultAssessmentListLocalMaxEntries = 512
 
@@ -19,11 +19,11 @@ const defaultAssessmentListLocalMaxEntries = 512
 // 采用 version token + versioned key 失效，避免主路径使用 DeletePattern。
 type MyAssessmentListCache struct {
 	query      *VersionedQueryCache
-	keyBuilder *CacheKeyBuilder
+	keyBuilder *rediskey.Builder
 }
 
 // NewMyAssessmentListCacheWithBuilderAndPolicy 创建带显式 builder/policy 的“我的测评列表”缓存。
-func NewMyAssessmentListCacheWithBuilderAndPolicy(c Cache, versionStore VersionTokenStore, keyBuilder *CacheKeyBuilder, policy CachePolicy) *MyAssessmentListCache {
+func NewMyAssessmentListCacheWithBuilderAndPolicy(c Cache, versionStore VersionTokenStore, keyBuilder *rediskey.Builder, policy cachepolicy.CachePolicy) *MyAssessmentListCache {
 	if c == nil {
 		return nil
 	}
@@ -37,9 +37,9 @@ func NewMyAssessmentListCacheWithBuilderAndPolicy(c Cache, versionStore VersionT
 		query: NewVersionedQueryCache(
 			c,
 			versionStore,
-			PolicyAssessmentList,
+			cachepolicy.PolicyAssessmentList,
 			policy,
-			policy.TTLOr(MyAssessmentListCacheTTL),
+			policy.TTLOr(defaultAssessmentListCacheTTL),
 			NewLocalHotCache[[]byte](30*time.Second, defaultAssessmentListLocalMaxEntries),
 		),
 		keyBuilder: keyBuilder,

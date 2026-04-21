@@ -2,28 +2,31 @@ package statistics
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"gorm.io/gorm"
 )
 
 const defaultStatisticsRepairWindowDays = 7
+const statisticsSyncLockTTL = 30 * time.Minute
 
 // syncService 统计同步服务实现。
 // 写侧只依赖 MySQL，把统计表视为可重建的物化视图。
 type syncService struct {
 	db               *gorm.DB
 	repairWindowDays int
+	lockManager      *redislock.Manager
 }
 
 // NewSyncService 创建统计同步服务。
 func NewSyncService(
 	db *gorm.DB,
 	repairWindowDays int,
+	lockManager *redislock.Manager,
 ) StatisticsSyncService {
 	if repairWindowDays <= 0 {
 		repairWindowDays = defaultStatisticsRepairWindowDays
@@ -31,6 +34,7 @@ func NewSyncService(
 	return &syncService{
 		db:               db,
 		repairWindowDays: repairWindowDays,
+		lockManager:      lockManager,
 	}
 }
 
@@ -54,7 +58,7 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64, opts
 	}
 
 	lockName := fmt.Sprintf("statistics:daily:%d:%s:%s", orgID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	if err := s.withMySQLLock(ctx, lockName, func(lockCtx context.Context) error {
+	if err := s.withRedisLock(ctx, lockName, func(lockCtx context.Context) error {
 		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec(
 				`DELETE FROM statistics_daily
@@ -163,7 +167,7 @@ func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64
 
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
 	lockName := fmt.Sprintf("statistics:accumulated:%d:%s", orgID, todayStart.Format("2006-01-02"))
-	if err := s.withMySQLLock(ctx, lockName, func(lockCtx context.Context) error {
+	if err := s.withRedisLock(ctx, lockName, func(lockCtx context.Context) error {
 		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec(
 				`DELETE FROM statistics_accumulated
@@ -212,7 +216,7 @@ func (s *syncService) SyncPlanStatistics(ctx context.Context, orgID int64) error
 
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
 	lockName := fmt.Sprintf("statistics:plan:%d:%s", orgID, todayStart.Format("2006-01-02"))
-	if err := s.withMySQLLock(ctx, lockName, func(lockCtx context.Context) error {
+	if err := s.withRedisLock(ctx, lockName, func(lockCtx context.Context) error {
 		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec("DELETE FROM statistics_plan WHERE org_id = ?", orgID).Error; err != nil {
 				return err
@@ -454,27 +458,20 @@ func (s *syncService) buildSystemAccumulatedRow(
 	}, nil
 }
 
-func (s *syncService) withMySQLLock(ctx context.Context, lockName string, fn func(context.Context) error) error {
-	sqlDB, err := s.db.WithContext(ctx).DB()
-	if err != nil {
-		return err
+func (s *syncService) withRedisLock(ctx context.Context, lockName string, fn func(context.Context) error) error {
+	if s.lockManager == nil {
+		return fmt.Errorf("statistics sync redis lock manager is unavailable")
 	}
-	conn, err := sqlDB.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
 
-	var locked int
-	if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 0)", lockName).Scan(&locked); err != nil {
+	lease, acquired, err := s.lockManager.AcquireSpec(ctx, redislock.Specs.StatisticsSync, lockName, statisticsSyncLockTTL)
+	if err != nil {
 		return err
 	}
-	if locked != 1 {
+	if !acquired {
 		return fmt.Errorf("statistics sync lock busy: %s", lockName)
 	}
 	defer func() {
-		var released sql.NullInt64
-		_ = conn.QueryRowContext(context.Background(), "SELECT RELEASE_LOCK(?)", lockName).Scan(&released)
+		_ = s.lockManager.ReleaseSpec(context.Background(), redislock.Specs.StatisticsSync, lockName, lease)
 	}()
 
 	return fn(ctx)

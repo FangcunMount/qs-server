@@ -4527,7 +4527,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statistics.TesteeStatistics"
+                                            "$ref": "#/definitions/response.TesteeStatisticsResponse"
                                         }
                                     }
                                 }
@@ -4582,6 +4582,18 @@ const docTemplate = `{
                         "type": "string",
                         "description": "按 Clinician 过滤受试者",
                         "name": "clinician_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "报到开始日期（格式：YYYY-MM-DD，按 created_at 过滤）",
+                        "name": "created_start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "报到结束日期（格式：YYYY-MM-DD，按 created_at 过滤）",
+                        "name": "created_end_date",
                         "in": "query"
                     },
                     {
@@ -5036,6 +5048,71 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/cache/governance/warmup-targets": {
+            "post": {
+                "description": "operating 后台通过 BFF 代理调用，按 target 列表同步触发缓存预热并返回逐项结果；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics-Sync"
+                ],
+                "summary": "手工触发缓存预热",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "预热目标列表",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/cachegovernance.ManualWarmupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/cachegovernance.ManualWarmupResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/plans/tasks/schedule": {
             "post": {
                 "description": "定时任务调用，扫描待推送任务，生成入口并开放；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
@@ -5265,7 +5342,7 @@ const docTemplate = `{
         },
         "/internal/v1/statistics/sync/accumulated": {
             "post": {
-                "description": "将Redis中的累计统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问",
+                "description": "从 MySQL 原始表与每日统计表重建累计统计；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -5303,7 +5380,7 @@ const docTemplate = `{
         },
         "/internal/v1/statistics/sync/daily": {
             "post": {
-                "description": "将Redis中的每日统计数据同步到MySQL（定时任务调用）；仅 qs:admin 可访问",
+                "description": "从 MySQL 原始表重建每日统计；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -5321,6 +5398,18 @@ const docTemplate = `{
                         "name": "Authorization",
                         "in": "header",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "补算开始日期（格式：YYYY-MM-DD）",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "补算结束日期（格式：YYYY-MM-DD，包含当天）",
+                        "name": "end_date",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5341,7 +5430,7 @@ const docTemplate = `{
         },
         "/internal/v1/statistics/sync/plan": {
             "post": {
-                "description": "同步计划统计数据到MySQL（定时任务调用）；仅 qs:admin 可访问",
+                "description": "从 assessment_task 重建计划统计数据到 MySQL；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -5352,44 +5441,6 @@ const docTemplate = `{
                     "Statistics-Sync"
                 ],
                 "summary": "同步计划统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/statistics/validate": {
-            "post": {
-                "description": "校验Redis和MySQL统计数据的一致性，修复不一致（定时任务调用）；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "校验数据一致性",
                 "parameters": [
                     {
                         "type": "string",
@@ -5438,6 +5489,123 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "cache.WarmupKind": {
+            "type": "string",
+            "enum": [
+                "static.scale",
+                "static.questionnaire",
+                "static.scale_list",
+                "query.stats_system",
+                "query.stats_questionnaire",
+                "query.stats_plan"
+            ],
+            "x-enum-varnames": [
+                "WarmupKindStaticScale",
+                "WarmupKindStaticQuestionnaire",
+                "WarmupKindStaticScaleList",
+                "WarmupKindQueryStatsSystem",
+                "WarmupKindQueryStatsQuestionnaire",
+                "WarmupKindQueryStatsPlan"
+            ]
+        },
+        "cachegovernance.ManualWarmupItemResult": {
+            "type": "object",
+            "properties": {
+                "family": {
+                    "type": "string"
+                },
+                "kind": {
+                    "$ref": "#/definitions/cache.WarmupKind"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/cachegovernance.ManualWarmupItemStatus"
+                }
+            }
+        },
+        "cachegovernance.ManualWarmupItemStatus": {
+            "type": "string",
+            "enum": [
+                "ok",
+                "skipped",
+                "error"
+            ],
+            "x-enum-varnames": [
+                "ManualWarmupItemStatusOK",
+                "ManualWarmupItemStatusSkipped",
+                "ManualWarmupItemStatusError"
+            ]
+        },
+        "cachegovernance.ManualWarmupRequest": {
+            "type": "object",
+            "properties": {
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachegovernance.ManualWarmupTarget"
+                    }
+                }
+            }
+        },
+        "cachegovernance.ManualWarmupResult": {
+            "type": "object",
+            "properties": {
+                "finished_at": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachegovernance.ManualWarmupItemResult"
+                    }
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/cachegovernance.ManualWarmupSummary"
+                },
+                "trigger": {
+                    "type": "string"
+                }
+            }
+        },
+        "cachegovernance.ManualWarmupSummary": {
+            "type": "object",
+            "properties": {
+                "error_count": {
+                    "type": "integer"
+                },
+                "ok_count": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "skipped_count": {
+                    "type": "integer"
+                },
+                "target_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachegovernance.ManualWarmupTarget": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "$ref": "#/definitions/cache.WarmupKind"
+                },
+                "scope": {
+                    "type": "string"
+                }
+            }
+        },
         "core.ErrResponse": {
             "type": "object",
             "properties": {
@@ -6344,6 +6512,9 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
+                "is_active_label": {
+                    "type": "string"
+                },
                 "org_id": {
                     "type": "string"
                 },
@@ -6354,6 +6525,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "target_type": {
+                    "type": "string"
+                },
+                "target_type_label": {
                     "type": "string"
                 },
                 "target_version": {
@@ -6436,6 +6610,10 @@ const docTemplate = `{
                     "description": "来源类型",
                     "type": "string"
                 },
+                "origin_type_label": {
+                    "description": "来源类型中文",
+                    "type": "string"
+                },
                 "questionnaire_code": {
                     "description": "问卷编码（唯一标识）",
                     "type": "string"
@@ -6448,8 +6626,16 @@ const docTemplate = `{
                     "description": "风险等级",
                     "type": "string"
                 },
+                "risk_level_label": {
+                    "description": "风险等级中文",
+                    "type": "string"
+                },
                 "status": {
                     "description": "状态",
+                    "type": "string"
+                },
+                "status_label": {
+                    "description": "状态中文",
                     "type": "string"
                 },
                 "submitted_at": {
@@ -6475,6 +6661,10 @@ const docTemplate = `{
                 },
                 "last_risk_level": {
                     "description": "最后风险等级",
+                    "type": "string"
+                },
+                "last_risk_level_label": {
+                    "description": "最后风险等级中文",
                     "type": "string"
                 },
                 "total_count": {
@@ -6553,6 +6743,9 @@ const docTemplate = `{
                 "clinician_type": {
                     "type": "string"
                 },
+                "clinician_type_label": {
+                    "type": "string"
+                },
                 "department": {
                     "type": "string"
                 },
@@ -6564,6 +6757,9 @@ const docTemplate = `{
                 },
                 "is_active": {
                     "type": "boolean"
+                },
+                "is_active_label": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -6583,6 +6779,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "clinician_type": {
+                    "type": "string"
+                },
+                "clinician_type_label": {
                     "type": "string"
                 },
                 "department": {
@@ -6627,6 +6826,10 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "description": "风险等级",
+                    "type": "string"
+                },
+                "risk_level_label": {
+                    "description": "风险等级中文",
                     "type": "string"
                 },
                 "suggestion": {
@@ -6737,6 +6940,10 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "description": "风险等级",
+                    "type": "string"
+                },
+                "risk_level_label": {
+                    "description": "风险等级中文",
                     "type": "string"
                 },
                 "suggestion": {
@@ -6880,12 +7087,24 @@ const docTemplate = `{
                     "description": "量表编码（如 \"3adyDE\"）",
                     "type": "string"
                 },
+                "scale_title": {
+                    "description": "量表标题",
+                    "type": "string"
+                },
                 "schedule_type": {
                     "description": "周期类型：by_week/by_day/fixed_date/custom",
                     "type": "string"
                 },
+                "schedule_type_label": {
+                    "description": "周期类型中文",
+                    "type": "string"
+                },
                 "status": {
                     "description": "状态：active/paused/finished/canceled",
+                    "type": "string"
+                },
+                "status_label": {
+                    "description": "状态中文",
                     "type": "string"
                 },
                 "total_times": {
@@ -6974,16 +7193,25 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
+                "is_active_label": {
+                    "type": "string"
+                },
                 "org_id": {
                     "type": "string"
                 },
                 "relation_type": {
                     "type": "string"
                 },
+                "relation_type_label": {
+                    "type": "string"
+                },
                 "source_id": {
                     "type": "string"
                 },
                 "source_type": {
+                    "type": "string"
+                },
+                "source_type_label": {
                     "type": "string"
                 },
                 "testee_id": {
@@ -7046,6 +7274,10 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "description": "风险等级",
+                    "type": "string"
+                },
+                "risk_level_label": {
+                    "description": "风险等级中文",
                     "type": "string"
                 },
                 "scale_code": {
@@ -7148,6 +7380,10 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "description": "风险等级：normal/medium/high",
+                    "type": "string"
+                },
+                "risk_level_label": {
+                    "description": "风险等级中文",
                     "type": "string"
                 },
                 "t_score": {
@@ -7270,6 +7506,10 @@ const docTemplate = `{
                     "description": "风险等级：normal/medium/high",
                     "type": "string"
                 },
+                "risk_level_label": {
+                    "description": "风险等级中文",
+                    "type": "string"
+                },
                 "test_date": {
                     "description": "测评日期",
                     "type": "string"
@@ -7320,6 +7560,10 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "description": "整体风险等级",
+                    "type": "string"
+                },
+                "risk_level_label": {
+                    "description": "整体风险等级中文",
                     "type": "string"
                 },
                 "total_score": {
@@ -7516,12 +7760,20 @@ const docTemplate = `{
                     "description": "量表编码（如 \"3adyDE\"）",
                     "type": "string"
                 },
+                "scale_title": {
+                    "description": "量表标题",
+                    "type": "string"
+                },
                 "seq": {
                     "description": "序号（计划内的第N次测评）",
                     "type": "integer"
                 },
                 "status": {
                     "description": "状态：pending/opened/completed/expired/canceled",
+                    "type": "string"
+                },
+                "status_label": {
+                    "description": "状态中文",
                     "type": "string"
                 },
                 "testee_id": {
@@ -7621,6 +7873,10 @@ const docTemplate = `{
                     "description": "性别",
                     "type": "string"
                 },
+                "gender_label": {
+                    "description": "性别中文",
+                    "type": "string"
+                },
                 "guardians": {
                     "description": "监护人信息列表",
                     "type": "array",
@@ -7640,6 +7896,10 @@ const docTemplate = `{
                     "description": "是否重点关注",
                     "type": "boolean"
                 },
+                "is_key_focus_label": {
+                    "description": "是否重点关注中文",
+                    "type": "string"
+                },
                 "name": {
                     "description": "姓名",
                     "type": "string"
@@ -7656,8 +7916,19 @@ const docTemplate = `{
                     "description": "来源",
                     "type": "string"
                 },
+                "source_label": {
+                    "description": "来源中文",
+                    "type": "string"
+                },
                 "tags": {
                     "description": "标签",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tags_label": {
+                    "description": "标签中文",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -7666,6 +7937,39 @@ const docTemplate = `{
                 "updated_at": {
                     "description": "更新时间",
                     "type": "string"
+                }
+            }
+        },
+        "response.TesteeStatisticsResponse": {
+            "type": "object",
+            "properties": {
+                "completed_assessments": {
+                    "type": "integer"
+                },
+                "first_assessment_date": {
+                    "type": "string"
+                },
+                "last_assessment_date": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "pending_assessments": {
+                    "type": "integer"
+                },
+                "risk_distribution": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "testee_id": {
+                    "type": "integer"
+                },
+                "total_assessments": {
+                    "type": "integer"
                 }
             }
         },
@@ -7682,6 +7986,10 @@ const docTemplate = `{
                 },
                 "risk_level": {
                     "description": "风险等级",
+                    "type": "string"
+                },
+                "risk_level_label": {
+                    "description": "风险等级中文",
                     "type": "string"
                 }
             }
@@ -7833,45 +8141,6 @@ const docTemplate = `{
                 },
                 "today_new_testees": {
                     "description": "今日新增受试者",
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.TesteeStatistics": {
-            "type": "object",
-            "properties": {
-                "completed_assessments": {
-                    "description": "已完成测评数",
-                    "type": "integer"
-                },
-                "first_assessment_date": {
-                    "description": "首次测评日期",
-                    "type": "string"
-                },
-                "last_assessment_date": {
-                    "description": "时间维度",
-                    "type": "string"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "pending_assessments": {
-                    "description": "待完成测评数",
-                    "type": "integer"
-                },
-                "risk_distribution": {
-                    "description": "风险分布",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer",
-                        "format": "int64"
-                    }
-                },
-                "testee_id": {
-                    "type": "integer"
-                },
-                "total_assessments": {
-                    "description": "测评统计",
                     "type": "integer"
                 }
             }

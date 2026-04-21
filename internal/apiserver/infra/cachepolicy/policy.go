@@ -9,7 +9,7 @@ import (
 	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
 
-// EnableCompression 控制 legacy fallback 的默认压缩开关。
+// EnableCompression 控制默认压缩开关。
 var EnableCompression bool
 
 // PolicySwitch 表示缓存策略开关的三态值：

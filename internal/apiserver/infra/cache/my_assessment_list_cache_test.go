@@ -6,19 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
-
-type spyCache struct {
-	Cache
-	deletePatternCalls int
-}
-
-func (c *spyCache) DeletePattern(ctx context.Context, pattern string) error {
-	c.deletePatternCalls++
-	return c.Cache.DeletePattern(ctx, pattern)
-}
 
 type assessmentListPayload struct {
 	Total int `json:"total"`
@@ -33,10 +25,10 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 		_ = metaClient.Close()
 	})
 
-	queryCache := &spyCache{Cache: NewRedisCache(queryClient)}
+	queryCache := NewRedisCache(queryClient)
 	versionStore := NewRedisVersionTokenStore(metaClient)
-	keyBuilder := NewCacheKeyBuilderWithNamespace("cache:query")
-	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, versionStore, keyBuilder, CachePolicy{
+	keyBuilder := rediskey.NewBuilderWithNamespace("cache:query")
+	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, versionStore, keyBuilder, cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
 	})
@@ -62,8 +54,8 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 	if err := listCache.Invalidate(ctx, 42); err != nil {
 		t.Fatalf("Invalidate() error = %v", err)
 	}
-	if queryCache.deletePatternCalls != 0 {
-		t.Fatalf("DeletePattern() called %d times, want 0", queryCache.deletePatternCalls)
+	if exists, err := queryClient.Exists(ctx, version0Key).Result(); err != nil || exists != 1 {
+		t.Fatalf("expected old versioned key %q to remain until TTL, exists=%d err=%v", version0Key, exists, err)
 	}
 
 	gotVersion, err := metaClient.Get(ctx, listCache.buildVersionKey(42)).Result()
@@ -110,9 +102,9 @@ func TestMyAssessmentListCacheDegradesVersionReadFailureToMiss(t *testing.T) {
 		_ = queryClient.Close()
 	})
 
-	queryCache := &spyCache{Cache: NewRedisCache(queryClient)}
-	keyBuilder := NewCacheKeyBuilderWithNamespace("cache:query")
-	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, failingVersionStore{}, keyBuilder, CachePolicy{
+	queryCache := NewRedisCache(queryClient)
+	keyBuilder := rediskey.NewBuilderWithNamespace("cache:query")
+	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, failingVersionStore{}, keyBuilder, cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
 	})

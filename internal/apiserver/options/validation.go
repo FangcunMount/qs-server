@@ -1,6 +1,10 @@
 package options
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+)
 
 // Validate 验证命令行参数
 func (o *Options) Validate() []error {
@@ -78,7 +82,7 @@ func (o *Options) Validate() []error {
 		if o.Cache.TTLJitterRatio < 0 || o.Cache.TTLJitterRatio > 1 {
 			errs = append(errs, fmt.Errorf("cache.ttl_jitter_ratio must be between 0 and 1"))
 		}
-		validateCacheRoute := func(name string, route *CacheRouteOptions) {
+		validateCacheFamilyPolicy := func(name string, route *CacheFamilyOptions) {
 			if route == nil {
 				return
 			}
@@ -91,18 +95,13 @@ func (o *Options) Validate() []error {
 			if route.TTLJitterRatio < 0 || route.TTLJitterRatio > 1 {
 				errs = append(errs, fmt.Errorf("cache.%s.ttl_jitter_ratio must be between 0 and 1", name))
 			}
-			if route.RedisProfile != "" && len(o.RedisProfiles) > 0 {
-				if _, ok := o.RedisProfiles[route.RedisProfile]; !ok {
-					errs = append(errs, fmt.Errorf("cache.%s.redis_profile references missing redis_profiles entry %q", name, route.RedisProfile))
-				}
-			}
 		}
-		validateCacheRoute("static", o.Cache.Static)
-		validateCacheRoute("object", o.Cache.Object)
-		validateCacheRoute("query", o.Cache.Query)
-		validateCacheRoute("meta", o.Cache.Meta)
-		validateCacheRoute("sdk", o.Cache.SDK)
-		validateCacheRoute("lock", o.Cache.Lock)
+		validateCacheFamilyPolicy("static", o.Cache.Static)
+		validateCacheFamilyPolicy("object", o.Cache.Object)
+		validateCacheFamilyPolicy("query", o.Cache.Query)
+		validateCacheFamilyPolicy("meta", o.Cache.Meta)
+		validateCacheFamilyPolicy("sdk", o.Cache.SDK)
+		validateCacheFamilyPolicy("lock", o.Cache.Lock)
 
 		if o.Cache.Warmup != nil && o.Cache.Warmup.Hotset != nil && o.Cache.Warmup.Hotset.Enable {
 			if o.Cache.Warmup.Hotset.TopN <= 0 {
@@ -112,14 +111,21 @@ func (o *Options) Validate() []error {
 				errs = append(errs, fmt.Errorf("cache.warmup.hotset.max_items_per_kind must be greater than 0 when enabled"))
 			}
 		}
-		if o.Cache.Meta != nil && o.Cache.Meta.RedisProfile != "" && o.Cache.Warmup != nil && o.Cache.Warmup.Hotset != nil && o.Cache.Warmup.Hotset.Enable {
-			if len(o.RedisProfiles) > 0 {
-				if _, ok := o.RedisProfiles[o.Cache.Meta.RedisProfile]; !ok {
-					errs = append(errs, fmt.Errorf("cache.meta.redis_profile %q is required when hotset governance is enabled", o.Cache.Meta.RedisProfile))
-				}
-			}
-		}
 	}
+
+	errs = append(errs, redisplane.ValidateRuntimeOptions(
+		o.RedisRuntime,
+		[]redisplane.Family{
+			redisplane.FamilyStatic,
+			redisplane.FamilyObject,
+			redisplane.FamilyQuery,
+			redisplane.FamilyMeta,
+			redisplane.FamilySDK,
+			redisplane.FamilyLock,
+		},
+		o.RedisProfiles,
+		"redis_runtime",
+	)...)
 
 	return errs
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
@@ -11,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/gin-gonic/gin"
 )
 
@@ -70,6 +72,8 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 
 	// 健康检查路由
 	engine.GET("/health", healthHandler.Health)
+	engine.GET("/readyz", healthHandler.Ready)
+	engine.GET("/governance/redis", healthHandler.RedisFamilies)
 	engine.GET("/ping", healthHandler.Ping)
 
 	// 公开的API路由
@@ -185,6 +189,8 @@ func requestLimitKey(c *gin.Context) string {
 }
 
 func rateLimitedHandlers(
+	opsHandle *redisplane.Handle,
+	scope string,
 	rateCfg *options.RateLimitOptions,
 	globalQPS float64,
 	globalBurst int,
@@ -195,11 +201,57 @@ func rateLimitedHandlers(
 	if rateCfg == nil || !rateCfg.Enabled {
 		return []gin.HandlerFunc{handler}
 	}
+	if opsHandle != nil && opsHandle.Client != nil {
+		globalLimiter := redisplane.NewDistributedLimiter(opsHandle)
+		userLimiter := redisplane.NewDistributedLimiter(opsHandle)
+		return []gin.HandlerFunc{
+			distributedLimit(globalLimiter, "limit:"+scope+":global", globalQPS, globalBurst, nil),
+			distributedLimit(userLimiter, "limit:"+scope+":user", userQPS, userBurst, requestLimitKey),
+			handler,
+		}
+	}
 
 	return []gin.HandlerFunc{
 		pkgmiddleware.Limit(globalQPS, globalBurst),
 		pkgmiddleware.LimitByKey(userQPS, userBurst, requestLimitKey),
 		handler,
+	}
+}
+
+func distributedLimit(
+	limiter *redisplane.DistributedLimiter,
+	scope string,
+	qps float64,
+	burst int,
+	keyFn func(*gin.Context) string,
+) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if limiter == nil {
+			c.Next()
+			return
+		}
+		key := scope
+		if keyFn != nil {
+			suffix := keyFn(c)
+			if suffix != "" {
+				key += ":" + suffix
+			}
+		}
+		allowed, retryAfter, err := limiter.Allow(c.Request.Context(), key, qps, burst)
+		if err != nil {
+			c.Next()
+			return
+		}
+		if allowed {
+			c.Next()
+			return
+		}
+		seconds := int(retryAfter.Seconds()) + 1
+		if seconds < 1 {
+			seconds = 1
+		}
+		c.Header("Retry-After", strconv.Itoa(seconds))
+		c.AbortWithStatus(http.StatusTooManyRequests)
 	}
 }
 
@@ -230,6 +282,8 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 	answersheets := api.Group("/answersheets")
 	{
 		answersheets.POST("", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"submit",
 			rateCfg,
 			rateCfg.SubmitGlobalQPS,
 			rateCfg.SubmitGlobalBurst,
@@ -238,6 +292,8 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			answerSheetHandler.Submit,
 		)...)
 		answersheets.GET("/submit-status", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -246,6 +302,8 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			answerSheetHandler.SubmitStatus,
 		)...)
 		answersheets.GET("/:id", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -255,6 +313,8 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 		)...)
 		// 通过答卷ID获取测评详情
 		answersheets.GET("/:id/assessment", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -274,6 +334,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 	{
 		// 测评列表
 		assessments.GET("", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -283,6 +345,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 因子趋势（放在 :id 前面避免路由冲突）
 		assessments.GET("/trend", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -292,6 +356,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 高风险因子
 		assessments.GET("/high-risk", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -301,6 +367,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 测评详情
 		assessments.GET("/:id", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -310,6 +378,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 测评得分
 		assessments.GET("/:id/scores", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -319,6 +389,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 测评报告
 		assessments.GET("/:id/report", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -328,6 +400,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 测评趋势摘要
 		assessments.GET("/:id/trend-summary", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"query",
 			rateCfg,
 			rateCfg.QueryGlobalQPS,
 			rateCfg.QueryGlobalBurst,
@@ -337,6 +411,8 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 		)...)
 		// 长轮询等待报告生成
 		assessments.GET("/:id/wait-report", rateLimitedHandlers(
+			r.container.OpsHandle(),
+			"wait-report",
 			rateCfg,
 			rateCfg.WaitReportGlobalQPS,
 			rateCfg.WaitReportGlobalBurst,

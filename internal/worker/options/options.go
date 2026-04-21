@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -34,6 +35,8 @@ type Options struct {
 	Redis *genericoptions.RedisOptions `json:"redis" mapstructure:"redis"`
 	// 可选 Redis profiles（默认按同实例分 DB 配置）
 	RedisProfiles map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	// 共享 Redis family runtime 路由
+	RedisRuntime *genericoptions.RedisRuntimeOptions `json:"redis_runtime" mapstructure:"redis_runtime"`
 	// Cache 控制缓存输出
 	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
 }
@@ -170,8 +173,23 @@ func NewOptions() *Options {
 		PlanScheduler: NewPlanSchedulerOptions(),
 		Redis:         genericoptions.NewRedisOptions(),
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
+		RedisRuntime:  defaultRedisRuntimeOptions(),
 		Cache:         NewCacheOptions(),
 	}
+}
+
+func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
+	opts := genericoptions.NewRedisRuntimeOptions()
+	opts.Families["lock_lease"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "lock_cache",
+		NamespaceSuffix:      "cache:lock",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	return opts
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 // Flags 返回命令行参数
@@ -259,6 +277,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 
 	// Redis flags
 	o.Redis.AddFlags(fss.FlagSet("redis"))
+	o.RedisRuntime.AddFlags(fss.FlagSet("redis_runtime"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))
 
 	return fss
@@ -288,11 +307,12 @@ func (o *Options) Validate() []error {
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
-	if o.Cache != nil && o.Cache.Lock != nil && o.Cache.Lock.RedisProfile != "" && len(o.RedisProfiles) > 0 {
-		if _, ok := o.RedisProfiles[o.Cache.Lock.RedisProfile]; !ok {
-			errs = append(errs, fmt.Errorf("cache.lock.redis_profile references missing redis_profiles entry %q", o.Cache.Lock.RedisProfile))
-		}
-	}
+	errs = append(errs, redisplane.ValidateRuntimeOptions(
+		o.RedisRuntime,
+		[]redisplane.Family{redisplane.FamilyLock},
+		o.RedisProfiles,
+		"redis_runtime",
+	)...)
 	if o.PlanScheduler != nil && o.PlanScheduler.Enable {
 		if len(o.PlanScheduler.OrgIDs) == 0 {
 			errs = append(errs, fmt.Errorf("plan_scheduler.org_ids cannot be empty when enabled"))
@@ -334,16 +354,10 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.BoolVar(&c.DisableStatisticsCache, "cache.disable-statistics-cache", c.DisableStatisticsCache,
 		"Disable Redis-based statistics caching in worker event handlers")
-	fs.StringVar(&c.Namespace, "cache.namespace", c.Namespace,
-		"Optional Redis key namespace prefix shared by cache, statistics, lock, and SDK keys.")
 	if c.Lock == nil {
 		c.Lock = &CacheRouteOptions{
 			RedisProfile:    "lock_cache",
 			NamespaceSuffix: "cache:lock",
 		}
 	}
-	fs.StringVar(&c.Lock.RedisProfile, "cache.lock.redis-profile", c.Lock.RedisProfile,
-		"Redis profile used by worker lock/lease keys.")
-	fs.StringVar(&c.Lock.NamespaceSuffix, "cache.lock.namespace-suffix", c.Lock.NamespaceSuffix,
-		"Nested Redis namespace suffix used for worker lease/lock keys.")
 }

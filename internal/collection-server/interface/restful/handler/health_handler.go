@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"net/http"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
@@ -9,13 +12,15 @@ import (
 type HealthHandler struct {
 	serviceName string
 	version     string
+	status      *cacheobservability.FamilyStatusRegistry
 }
 
 // NewHealthHandler 创建健康检查处理器
-func NewHealthHandler(serviceName, version string) *HealthHandler {
+func NewHealthHandler(serviceName, version string, status *cacheobservability.FamilyStatusRegistry) *HealthHandler {
 	return &HealthHandler{
 		serviceName: serviceName,
 		version:     version,
+		status:      status,
 	}
 }
 
@@ -31,7 +36,34 @@ func (h *HealthHandler) Health(c *gin.Context) {
 		"status":  "healthy",
 		"service": h.serviceName,
 		"version": h.version,
+		"redis":   cacheobservability.SnapshotForComponent(h.serviceName, h.status),
 	})
+}
+
+// Ready 就绪检查
+func (h *HealthHandler) Ready(c *gin.Context) {
+	snapshot := cacheobservability.SnapshotForComponent(h.serviceName, h.status)
+	statusCode := http.StatusOK
+	statusText := "ready"
+	if !snapshot.Summary.Ready {
+		statusCode = http.StatusServiceUnavailable
+		statusText = "degraded"
+	}
+	c.JSON(statusCode, core.Response{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"status":  statusText,
+			"service": h.serviceName,
+			"version": h.version,
+			"redis":   snapshot,
+		},
+	})
+}
+
+// RedisFamilies 返回 Redis family 治理快照
+func (h *HealthHandler) RedisFamilies(c *gin.Context) {
+	core.WriteResponse(c, nil, cacheobservability.SnapshotForComponent(h.serviceName, h.status))
 }
 
 // Ping 简单连通性测试
@@ -61,5 +93,6 @@ func (h *HealthHandler) Info(c *gin.Context) {
 		"version":     h.version,
 		"description": "问卷收集服务 - BFF 层",
 		"status":      "ready",
+		"redis":       cacheobservability.SnapshotForComponent(h.serviceName, h.status),
 	})
 }

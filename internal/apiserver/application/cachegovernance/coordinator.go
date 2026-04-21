@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -21,6 +22,7 @@ type Coordinator interface {
 	HandleQuestionnairePublished(ctx context.Context, code, version string) error
 	HandleStatisticsSync(ctx context.Context, orgID int64) error
 	HandleRepairComplete(ctx context.Context, req RepairCompleteRequest) error
+	HandleManualWarmup(ctx context.Context, req ManualWarmupRequest) (*ManualWarmupResult, error)
 	Snapshot() WarmupStatusSnapshot
 }
 
@@ -69,8 +71,8 @@ type Config struct {
 }
 
 type Dependencies struct {
-	Catalog                         *cacheinfra.CacheCatalog
-	StatisticsSeeds                 *cacheinfra.StatisticsWarmupConfig
+	Runtime                         FamilyRuntime
+	StatisticsSeeds                 *StatisticsWarmupConfig
 	Hotset                          cacheinfra.HotsetRecorder
 	ListPublishedScaleCodes         func(context.Context) ([]string, error)
 	ListPublishedQuestionnaireCodes func(context.Context) ([]string, error)
@@ -194,7 +196,8 @@ func (c *coordinator) WarmStartup(ctx context.Context) error {
 	if c.cfg.StartupQuery {
 		targets = append(targets, c.mergeQueryTargets(ctx, nil, nil)...)
 	}
-	return c.execute(ctx, "startup", targets)
+	_, err := c.executeTargets(ctx, "startup", targets)
+	return err
 }
 
 func (c *coordinator) HandleScalePublished(ctx context.Context, code string) error {
@@ -215,16 +218,18 @@ func (c *coordinator) HandleScalePublished(ctx context.Context, code string) err
 			targets = append(targets, cacheinfra.NewStaticQuestionnaireWarmupTarget(questionnaireCode))
 		}
 	}
-	return c.execute(ctx, "publish", targets)
+	_, err := c.executeTargets(ctx, "publish", targets)
+	return err
 }
 
 func (c *coordinator) HandleQuestionnairePublished(ctx context.Context, code, _ string) error {
 	if c == nil || !c.cfg.Enable {
 		return nil
 	}
-	return c.execute(ctx, "publish", []cacheinfra.WarmupTarget{
+	_, err := c.executeTargets(ctx, "publish", []cacheinfra.WarmupTarget{
 		cacheinfra.NewStaticQuestionnaireWarmupTarget(code),
 	})
+	return err
 }
 
 func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) error {
@@ -232,7 +237,8 @@ func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) err
 		return nil
 	}
 	targets := []cacheinfra.WarmupTarget{cacheinfra.NewQueryStatsSystemWarmupTarget(orgID)}
-	return c.execute(ctx, "statistics_sync", append(targets, c.mergeQueryTargets(ctx, []int64{orgID}, nil)...))
+	_, err := c.executeTargets(ctx, "statistics_sync", append(targets, c.mergeQueryTargets(ctx, []int64{orgID}, nil)...))
+	return err
 }
 
 func (c *coordinator) HandleRepairComplete(ctx context.Context, req RepairCompleteRequest) error {
@@ -250,7 +256,35 @@ func (c *coordinator) HandleRepairComplete(ctx context.Context, req RepairComple
 	default:
 		targets = append(targets, c.repairQueryTargets(req)...)
 	}
-	return c.execute(ctx, "repair", targets)
+	_, err := c.executeTargets(ctx, "repair", targets)
+	return err
+}
+
+func (c *coordinator) HandleManualWarmup(ctx context.Context, req ManualWarmupRequest) (*ManualWarmupResult, error) {
+	if c == nil || !c.cfg.Enable {
+		return &ManualWarmupResult{
+			Trigger:    manualWarmupTrigger,
+			StartedAt:  time.Now(),
+			FinishedAt: time.Now(),
+			Summary: ManualWarmupSummary{
+				Result: "skipped",
+			},
+			Items: []ManualWarmupItemResult{},
+		}, nil
+	}
+	if len(req.Targets) == 0 {
+		return nil, fmt.Errorf("warmup targets cannot be empty")
+	}
+
+	targets := make([]cacheinfra.WarmupTarget, 0, len(req.Targets))
+	for _, item := range req.Targets {
+		target, err := ParseManualWarmupTarget(item)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, target)
+	}
+	return c.executeTargets(ctx, manualWarmupTrigger, targets)
 }
 
 func (c *coordinator) registerExecutors() {
@@ -389,9 +423,9 @@ func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, re
 		cacheinfra.WarmupKindQueryStatsQuestionnaire,
 		cacheinfra.WarmupKindQueryStatsPlan,
 	} {
-		items, err := c.deps.Hotset.Top(ctx, cacheinfra.CacheFamilyQuery, kind, c.cfg.HotsetTopN)
+		items, err := c.deps.Hotset.Top(ctx, redisplane.FamilyQuery, kind, c.cfg.HotsetTopN)
 		if err != nil {
-			logger.L(ctx).Warnw("failed to load warmup hotset", "family", cacheinfra.CacheFamilyQuery, "kind", kind, "error", err)
+			logger.L(ctx).Warnw("failed to load warmup hotset", "family", redisplane.FamilyQuery, "kind", kind, "error", err)
 			continue
 		}
 		for _, item := range items {
@@ -426,24 +460,42 @@ func (c *coordinator) repairQueryTargets(req RepairCompleteRequest) []cacheinfra
 	return dedupeTargets(targets)
 }
 
-func (c *coordinator) execute(ctx context.Context, trigger string, targets []cacheinfra.WarmupTarget) error {
+func (c *coordinator) executeTargets(ctx context.Context, trigger string, targets []cacheinfra.WarmupTarget) (*ManualWarmupResult, error) {
 	if c == nil || !c.cfg.Enable {
-		return nil
+		return &ManualWarmupResult{
+			Trigger:    trigger,
+			StartedAt:  time.Now(),
+			FinishedAt: time.Now(),
+			Summary: ManualWarmupSummary{
+				Result: "skipped",
+			},
+			Items: []ManualWarmupItemResult{},
+		}, nil
 	}
 	startedAt := time.Now()
 	targets = dedupeTargets(targets)
 	if len(targets) == 0 {
 		warmupRunTotal.WithLabelValues(trigger, "skipped").Inc()
-		cacheobservability.ObserveWarmupDuration(trigger, "skipped", time.Since(startedAt))
-		c.recordRun(WarmupRunSnapshot{
+		finishedAt := time.Now()
+		cacheobservability.ObserveWarmupDuration(trigger, "skipped", finishedAt.Sub(startedAt))
+		run := WarmupRunSnapshot{
 			Trigger:      trigger,
 			StartedAt:    startedAt,
-			FinishedAt:   time.Now(),
+			FinishedAt:   finishedAt,
 			Result:       "skipped",
 			TargetCount:  0,
 			SkippedCount: 0,
-		})
-		return nil
+		}
+		c.recordRun(run)
+		return &ManualWarmupResult{
+			Trigger:    trigger,
+			StartedAt:  startedAt,
+			FinishedAt: finishedAt,
+			Summary: ManualWarmupSummary{
+				Result: "skipped",
+			},
+			Items: []ManualWarmupItemResult{},
+		}, nil
 	}
 
 	runCtx := cacheinfra.SuppressHotsetRecording(ctx)
@@ -451,14 +503,29 @@ func (c *coordinator) execute(ctx context.Context, trigger string, targets []cac
 	okCount := 0
 	errorCount := 0
 	skippedCount := 0
+	items := make([]ManualWarmupItemResult, 0, len(targets))
 	for _, target := range targets {
-		if c.deps.Catalog != nil && !c.deps.Catalog.AllowsWarmup(target.Family) {
+		if c.deps.Runtime != nil && !c.deps.Runtime.AllowWarmup(target.Family) {
 			skippedCount++
+			items = append(items, ManualWarmupItemResult{
+				Family:  string(target.Family),
+				Kind:    target.Kind,
+				Scope:   target.Scope,
+				Status:  ManualWarmupItemStatusSkipped,
+				Message: "该缓存族未开启预热",
+			})
 			continue
 		}
 		if err := c.registry.Execute(runCtx, target); err != nil {
 			warmupItemTotal.WithLabelValues(trigger, string(target.Family), string(target.Kind), "error").Inc()
 			errorCount++
+			items = append(items, ManualWarmupItemResult{
+				Family:  string(target.Family),
+				Kind:    target.Kind,
+				Scope:   target.Scope,
+				Status:  ManualWarmupItemStatusError,
+				Message: err.Error(),
+			})
 			logger.L(ctx).Warnw("cache governance warmup target failed",
 				"trigger", trigger,
 				"family", target.Family,
@@ -470,6 +537,12 @@ func (c *coordinator) execute(ctx context.Context, trigger string, targets []cac
 		}
 		warmupItemTotal.WithLabelValues(trigger, string(target.Family), string(target.Kind), "ok").Inc()
 		okCount++
+		items = append(items, ManualWarmupItemResult{
+			Family: string(target.Family),
+			Kind:   target.Kind,
+			Scope:  target.Scope,
+			Status: ManualWarmupItemStatusOK,
+		})
 	}
 	result := "ok"
 	switch {
@@ -480,19 +553,32 @@ func (c *coordinator) execute(ctx context.Context, trigger string, targets []cac
 	case okCount == 0 && skippedCount > 0:
 		result = "skipped"
 	}
+	finishedAt := time.Now()
 	warmupRunTotal.WithLabelValues(trigger, result).Inc()
-	cacheobservability.ObserveWarmupDuration(trigger, result, time.Since(startedAt))
+	cacheobservability.ObserveWarmupDuration(trigger, result, finishedAt.Sub(startedAt))
 	c.recordRun(WarmupRunSnapshot{
 		Trigger:      trigger,
 		StartedAt:    startedAt,
-		FinishedAt:   time.Now(),
+		FinishedAt:   finishedAt,
 		Result:       result,
 		TargetCount:  len(targets),
 		OkCount:      okCount,
 		ErrorCount:   errorCount,
 		SkippedCount: skippedCount,
 	})
-	return nil
+	return &ManualWarmupResult{
+		Trigger:    trigger,
+		StartedAt:  startedAt,
+		FinishedAt: finishedAt,
+		Summary: ManualWarmupSummary{
+			TargetCount:  len(targets),
+			OkCount:      okCount,
+			SkippedCount: skippedCount,
+			ErrorCount:   errorCount,
+			Result:       result,
+		},
+		Items: items,
+	}, nil
 }
 
 func (c *coordinator) recordRun(run WarmupRunSnapshot) {

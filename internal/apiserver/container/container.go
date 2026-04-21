@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/silenceper/wechat/v2/cache"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,11 +18,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
@@ -44,19 +48,20 @@ type Container struct {
 	queryRedisCache              redis.UniversalClient
 	metaRedisCache               redis.UniversalClient
 	sdkRedisCache                redis.UniversalClient
+	staticRedisHandle            *redisplane.Handle
+	objectRedisHandle            *redisplane.Handle
+	queryRedisHandle             *redisplane.Handle
+	metaRedisHandle              *redisplane.Handle
+	sdkRedisHandle               *redisplane.Handle
+	lockRedisHandle              *redisplane.Handle
 	cacheOptions                 ContainerCacheOptions
-	cacheCatalog                 *scaleCache.CacheCatalog
+	policyCatalog                *cachepolicy.PolicyCatalog
 	hotsetRecorder               scaleCache.HotsetRecorder
 	hotsetInspector              scaleCache.HotsetInspector
 	WarmupCoordinator            cachegov.Coordinator
 	CacheGovernanceStatusService cachegov.StatusService
 	planEntryURL                 string
 	statisticsRepairWindowDays   int
-	staticCacheNamespace         string
-	objectCacheNamespace         string
-	queryCacheNamespace          string
-	metaCacheNamespace           string
-	sdkCacheNamespace            string
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -106,16 +111,6 @@ func firstPositiveFloat(values ...float64) float64 {
 	return 0
 }
 
-func ensureContainerCacheRoute(route ContainerCacheRouteOptions, defaultProfile, defaultNamespace string) ContainerCacheRouteOptions {
-	if route.RedisProfile == "" {
-		route.RedisProfile = defaultProfile
-	}
-	if route.NamespaceSuffix == "" {
-		route.NamespaceSuffix = defaultNamespace
-	}
-	return route
-}
-
 // NewContainer 创建容器
 func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
 	return &Container{
@@ -138,16 +133,18 @@ type ContainerOptions struct {
 	Env string
 	// Cache 缓存控制选项
 	Cache ContainerCacheOptions
-	// StaticRedisClient 静态/半静态对象缓存 Redis client。
-	StaticRedisClient redis.UniversalClient
-	// QueryRedisClient 查询结果缓存 Redis client。
-	QueryRedisClient redis.UniversalClient
-	// ObjectRedisClient 对象视图缓存 Redis client。
-	ObjectRedisClient redis.UniversalClient
-	// SDKRedisClient SDK token/cache Redis client。
-	SDKRedisClient redis.UniversalClient
-	// MetaRedisClient query version token 等缓存元数据 Redis client。
-	MetaRedisClient redis.UniversalClient
+	// StaticRedisHandle 静态/半静态对象缓存 family handle。
+	StaticRedisHandle *redisplane.Handle
+	// QueryRedisHandle 查询结果缓存 family handle。
+	QueryRedisHandle *redisplane.Handle
+	// ObjectRedisHandle 对象视图缓存 family handle。
+	ObjectRedisHandle *redisplane.Handle
+	// SDKRedisHandle SDK token/cache family handle。
+	SDKRedisHandle *redisplane.Handle
+	// MetaRedisHandle query version token 与 hotset 等元数据缓存 family handle。
+	MetaRedisHandle *redisplane.Handle
+	// LockRedisHandle lock/lease Redis runtime handle.
+	LockRedisHandle *redisplane.Handle
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
@@ -162,16 +159,15 @@ type ContainerCacheOptions struct {
 	DisableStatisticsCache bool
 	TTL                    ContainerCacheTTLOptions
 	TTLJitterRatio         float64
-	StatisticsWarmup       *scaleCache.StatisticsWarmupConfig
+	StatisticsWarmup       *cachegov.StatisticsWarmupConfig
 	Warmup                 ContainerWarmupOptions
-	Namespace              string
 	CompressPayload        bool
-	Static                 ContainerCacheRouteOptions
-	Object                 ContainerCacheRouteOptions
-	Query                  ContainerCacheRouteOptions
-	Meta                   ContainerCacheRouteOptions
-	SDK                    ContainerCacheRouteOptions
-	Lock                   ContainerCacheRouteOptions
+	Static                 ContainerCacheFamilyOptions
+	Object                 ContainerCacheFamilyOptions
+	Query                  ContainerCacheFamilyOptions
+	Meta                   ContainerCacheFamilyOptions
+	SDK                    ContainerCacheFamilyOptions
+	Lock                   ContainerCacheFamilyOptions
 }
 
 type ContainerWarmupOptions struct {
@@ -183,23 +179,36 @@ type ContainerWarmupOptions struct {
 	MaxItemsPerKind int64
 }
 
-// ContainerCacheRouteOptions 分类缓存路由配置。
-type ContainerCacheRouteOptions struct {
-	RedisProfile    string
-	NamespaceSuffix string
-	TTL             time.Duration
-	NegativeTTL     time.Duration
-	TTLJitterRatio  float64
-	Compress        *bool
-	Singleflight    *bool
-	Negative        *bool
+// ContainerCacheFamilyOptions 定义单个缓存 family 的对象级策略。
+// Redis 路由由 redisplane 统一提供，这里只保留 TTL、negative、压缩与 singleflight 语义。
+type ContainerCacheFamilyOptions struct {
+	TTL            time.Duration
+	NegativeTTL    time.Duration
+	TTLJitterRatio float64
+	Compress       *bool
+	Singleflight   *bool
+	Negative       *bool
 }
 
-func resolvePolicySwitch(explicit *bool, defaultValue bool) scaleCache.PolicySwitch {
+func resolvePolicySwitch(explicit *bool, defaultValue bool) cachepolicy.PolicySwitch {
 	if explicit != nil {
-		return scaleCache.PolicySwitchFromBool(*explicit)
+		return cachepolicy.PolicySwitchFromBool(*explicit)
 	}
-	return scaleCache.PolicySwitchFromBool(defaultValue)
+	return cachepolicy.PolicySwitchFromBool(defaultValue)
+}
+
+func redisHandleClient(handle *redisplane.Handle) redis.UniversalClient {
+	if handle == nil {
+		return nil
+	}
+	return handle.Client
+}
+
+func redisHandleBuilder(handle *redisplane.Handle) *rediskey.Builder {
+	if handle == nil {
+		return nil
+	}
+	return handle.Builder
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
@@ -230,67 +239,34 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.silent = opts.Silent
-	c.staticRedisCache = opts.StaticRedisClient
-	c.queryRedisCache = opts.QueryRedisClient
-	c.objectRedisCache = opts.ObjectRedisClient
-	c.metaRedisCache = opts.MetaRedisClient
-	c.sdkRedisCache = opts.SDKRedisClient
+	c.staticRedisHandle = opts.StaticRedisHandle
+	c.queryRedisHandle = opts.QueryRedisHandle
+	c.objectRedisHandle = opts.ObjectRedisHandle
+	c.metaRedisHandle = opts.MetaRedisHandle
+	c.sdkRedisHandle = opts.SDKRedisHandle
+	c.lockRedisHandle = opts.LockRedisHandle
+	c.staticRedisCache = redisHandleClient(c.staticRedisHandle)
+	c.queryRedisCache = redisHandleClient(c.queryRedisHandle)
+	c.objectRedisCache = redisHandleClient(c.objectRedisHandle)
+	c.metaRedisCache = redisHandleClient(c.metaRedisHandle)
+	c.sdkRedisCache = redisHandleClient(c.sdkRedisHandle)
 
-	opts.Cache.Static = ensureContainerCacheRoute(opts.Cache.Static, "static_cache", "cache:static")
-	opts.Cache.Object = ensureContainerCacheRoute(opts.Cache.Object, "object_cache", "cache:object")
-	opts.Cache.Query = ensureContainerCacheRoute(opts.Cache.Query, "query_cache", "cache:query")
-	opts.Cache.Meta = ensureContainerCacheRoute(opts.Cache.Meta, "meta_cache", "cache:meta")
-	opts.Cache.SDK = ensureContainerCacheRoute(opts.Cache.SDK, "sdk_cache", "cache:sdk")
-	opts.Cache.Lock = ensureContainerCacheRoute(opts.Cache.Lock, "lock_cache", "cache:lock")
-
-	c.cacheCatalog = scaleCache.NewCacheCatalogWithPolicies(opts.Cache.Namespace, map[scaleCache.CacheFamily]scaleCache.CatalogRoute{
-		scaleCache.CacheFamilyDefault: {
-			RedisProfile:    "",
-			NamespaceSuffix: "",
-			AllowWarmup:     false,
-		},
-		scaleCache.CacheFamilyStatic: {
-			RedisProfile:    opts.Cache.Static.RedisProfile,
-			NamespaceSuffix: opts.Cache.Static.NamespaceSuffix,
-			AllowWarmup:     true,
-		},
-		scaleCache.CacheFamilyObject: {
-			RedisProfile:    opts.Cache.Object.RedisProfile,
-			NamespaceSuffix: opts.Cache.Object.NamespaceSuffix,
-		},
-		scaleCache.CacheFamilyQuery: {
-			RedisProfile:    opts.Cache.Query.RedisProfile,
-			NamespaceSuffix: opts.Cache.Query.NamespaceSuffix,
-			AllowWarmup:     true,
-		},
-		scaleCache.CacheFamilyMeta: {
-			RedisProfile:    opts.Cache.Meta.RedisProfile,
-			NamespaceSuffix: opts.Cache.Meta.NamespaceSuffix,
-		},
-		scaleCache.CacheFamilySDK: {
-			RedisProfile:    opts.Cache.SDK.RedisProfile,
-			NamespaceSuffix: opts.Cache.SDK.NamespaceSuffix,
-		},
-		scaleCache.CacheFamilyLock: {
-			RedisProfile:    opts.Cache.Lock.RedisProfile,
-			NamespaceSuffix: opts.Cache.Lock.NamespaceSuffix,
-		},
-	}, map[scaleCache.CacheFamily]scaleCache.CachePolicy{
-		scaleCache.CacheFamilyStatic: {
+	c.policyCatalog = cachepolicy.NewPolicyCatalog(map[redisplane.Family]cachepolicy.CachePolicy{
+		redisplane.FamilyStatic: {
 			Compress:     resolvePolicySwitch(opts.Cache.Static.Compress, opts.Cache.CompressPayload),
 			Singleflight: resolvePolicySwitch(opts.Cache.Static.Singleflight, true),
 			Negative:     resolvePolicySwitch(opts.Cache.Static.Negative, false),
-			NegativeTTL:  opts.Cache.Static.NegativeTTL,
+			NegativeTTL:  firstPositiveDuration(opts.Cache.Static.NegativeTTL, opts.Cache.TTL.Negative),
 			JitterRatio:  firstPositiveFloat(opts.Cache.Static.TTLJitterRatio, opts.Cache.TTLJitterRatio),
 		},
-		scaleCache.CacheFamilyObject: {
+		redisplane.FamilyObject: {
 			Compress:     resolvePolicySwitch(opts.Cache.Object.Compress, opts.Cache.CompressPayload),
 			Singleflight: resolvePolicySwitch(opts.Cache.Object.Singleflight, true),
 			Negative:     resolvePolicySwitch(opts.Cache.Object.Negative, false),
 			NegativeTTL:  firstPositiveDuration(opts.Cache.Object.NegativeTTL, opts.Cache.TTL.Negative),
 			JitterRatio:  firstPositiveFloat(opts.Cache.Object.TTLJitterRatio, opts.Cache.TTLJitterRatio),
 		},
-		scaleCache.CacheFamilyQuery: {
+		redisplane.FamilyQuery: {
 			TTL:          opts.Cache.Query.TTL,
 			NegativeTTL:  firstPositiveDuration(opts.Cache.Query.NegativeTTL, opts.Cache.TTL.Negative),
 			Compress:     resolvePolicySwitch(opts.Cache.Query.Compress, opts.Cache.CompressPayload),
@@ -298,60 +274,55 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 			Negative:     resolvePolicySwitch(opts.Cache.Query.Negative, false),
 			JitterRatio:  firstPositiveFloat(opts.Cache.Query.TTLJitterRatio, opts.Cache.TTLJitterRatio),
 		},
-		scaleCache.CacheFamilySDK: {
+		redisplane.FamilySDK: {
 			Compress:     resolvePolicySwitch(opts.Cache.SDK.Compress, false),
 			Singleflight: resolvePolicySwitch(opts.Cache.SDK.Singleflight, false),
 			Negative:     resolvePolicySwitch(opts.Cache.SDK.Negative, false),
 			NegativeTTL:  opts.Cache.SDK.NegativeTTL,
 			JitterRatio:  firstPositiveFloat(opts.Cache.SDK.TTLJitterRatio, opts.Cache.TTLJitterRatio),
 		},
-		scaleCache.CacheFamilyLock: {
+		redisplane.FamilyLock: {
 			Compress:     resolvePolicySwitch(opts.Cache.Lock.Compress, false),
 			Singleflight: resolvePolicySwitch(opts.Cache.Lock.Singleflight, false),
 			Negative:     resolvePolicySwitch(opts.Cache.Lock.Negative, false),
 			NegativeTTL:  opts.Cache.Lock.NegativeTTL,
 			JitterRatio:  firstPositiveFloat(opts.Cache.Lock.TTLJitterRatio, opts.Cache.TTLJitterRatio),
 		},
-	}, map[scaleCache.CachePolicyKey]scaleCache.CachePolicy{
-		scaleCache.PolicyScale: {
+	}, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
+		cachepolicy.PolicyScale: {
 			TTL: opts.Cache.TTL.Scale,
 		},
-		scaleCache.PolicyScaleList: {
+		cachepolicy.PolicyScaleList: {
 			TTL:          opts.Cache.TTL.ScaleList,
-			Singleflight: scaleCache.PolicySwitchDisabled,
+			Singleflight: cachepolicy.PolicySwitchDisabled,
 		},
-		scaleCache.PolicyQuestionnaire: {
+		cachepolicy.PolicyQuestionnaire: {
 			TTL:         opts.Cache.TTL.Questionnaire,
 			NegativeTTL: opts.Cache.TTL.Negative,
-			Negative:    scaleCache.PolicySwitchEnabled,
+			Negative:    cachepolicy.PolicySwitchEnabled,
 		},
-		scaleCache.PolicyAssessmentDetail: {
+		cachepolicy.PolicyAssessmentDetail: {
 			TTL:          opts.Cache.TTL.AssessmentDetail,
-			Singleflight: scaleCache.PolicySwitchEnabled,
+			Singleflight: cachepolicy.PolicySwitchEnabled,
 		},
-		scaleCache.PolicyAssessmentList: {
+		cachepolicy.PolicyAssessmentList: {
 			TTL:          opts.Cache.TTL.AssessmentList,
-			Singleflight: scaleCache.PolicySwitchDisabled,
+			Singleflight: cachepolicy.PolicySwitchDisabled,
 		},
-		scaleCache.PolicyTestee: {
+		cachepolicy.PolicyTestee: {
 			TTL:         opts.Cache.TTL.Testee,
 			NegativeTTL: opts.Cache.TTL.Negative,
-			Negative:    scaleCache.PolicySwitchEnabled,
+			Negative:    cachepolicy.PolicySwitchEnabled,
 		},
-		scaleCache.PolicyPlan: {
+		cachepolicy.PolicyPlan: {
 			TTL:          opts.Cache.TTL.Plan,
-			Singleflight: scaleCache.PolicySwitchEnabled,
+			Singleflight: cachepolicy.PolicySwitchEnabled,
 		},
-		scaleCache.PolicyStatsQuery: {
-			Singleflight: scaleCache.PolicySwitchDisabled,
+		cachepolicy.PolicyStatsQuery: {
+			Singleflight: cachepolicy.PolicySwitchDisabled,
 		},
 	})
-	c.staticCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyStatic)
-	c.objectCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyObject)
-	c.queryCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyQuery)
-	c.metaCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilyMeta)
-	c.sdkCacheNamespace = c.cacheCatalog.Namespace(scaleCache.CacheFamilySDK)
-	c.hotsetRecorder = scaleCache.NewRedisHotsetStore(c.metaRedisCache, c.cacheCatalog.Builder(scaleCache.CacheFamilyMeta), scaleCache.HotsetOptions{
+	c.hotsetRecorder = scaleCache.NewRedisHotsetStore(c.metaRedisCache, redisHandleBuilder(c.metaRedisHandle), scaleCache.HotsetOptions{
 		Enable:          opts.Cache.Warmup.HotsetEnable,
 		TopN:            opts.Cache.Warmup.HotsetTopN,
 		MaxItemsPerKind: opts.Cache.Warmup.MaxItemsPerKind,
@@ -469,49 +440,7 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 		}
 		return nil
 	}
-
-	// 预热量表缓存
-	if c.ScaleModule != nil && c.ScaleModule.Repo != nil {
-		var warmupSvc *scaleCache.WarmupService
-		// 如果问卷 Repository 可用，创建包含问卷的预热服务
-		if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil && c.SurveyModule.Questionnaire.Repo != nil {
-			warmupSvc = scaleCache.NewWarmupServiceWithQuestionnaire(
-				c.ScaleModule.Repo,
-				c.SurveyModule.Questionnaire.Repo,
-			)
-		} else {
-			warmupSvc = scaleCache.NewWarmupService(c.ScaleModule.Repo)
-		}
-
-		if err := warmupSvc.WarmupAllPublished(ctx); err != nil {
-			// 预热失败不影响服务启动，仅记录日志
-			return fmt.Errorf("scale cache warmup failed: %w", err)
-		}
-	}
-
-	// 统计查询结果缓存预热
-	// 注意：统计查询结果缓存 TTL 较短（5分钟），预热主要用于减少首次查询延迟
-	// 建议：只在有明确需求时使用（如已知活跃组织、常用问卷等）
-	// 可以通过配置或环境变量控制是否启用
-	if c.StatisticsModule != nil && c.cacheOptions.StatisticsWarmup != nil && len(c.cacheOptions.StatisticsWarmup.OrgIDs) > 0 {
-		for _, orgID := range c.cacheOptions.StatisticsWarmup.OrgIDs {
-			if _, err := c.StatisticsModule.SystemStatisticsService.GetSystemStatistics(ctx, orgID); err != nil {
-				return fmt.Errorf("statistics cache warmup failed: %w", err)
-			}
-			for _, code := range c.cacheOptions.StatisticsWarmup.QuestionnaireCodes {
-				if _, err := c.StatisticsModule.QuestionnaireStatisticsService.GetQuestionnaireStatistics(ctx, orgID, code); err != nil {
-					return fmt.Errorf("statistics cache warmup failed: %w", err)
-				}
-			}
-			for _, planID := range c.cacheOptions.StatisticsWarmup.PlanIDs {
-				if _, err := c.StatisticsModule.PlanStatisticsService.GetPlanStatistics(ctx, orgID, planID); err != nil {
-					return fmt.Errorf("statistics cache warmup failed: %w", err)
-				}
-			}
-		}
-	}
-
-	return nil
+	return fmt.Errorf("cache governance warmup coordinator is unavailable")
 }
 
 // initEventPublisher 初始化事件发布器
@@ -544,9 +473,9 @@ func (c *Container) initSurveyModule() error {
 		c.mongoDB,
 		c.eventPublisher,
 		c.staticRedisCache,
-		c.staticCacheNamespace,
+		redisHandleBuilder(c.staticRedisHandle),
 		identitySvc,
-		c.cacheCatalog.Policy(scaleCache.PolicyQuestionnaire),
+		c.policyCatalog.Policy(cachepolicy.PolicyQuestionnaire),
 		c.hotsetRecorder,
 	); err != nil {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
@@ -577,10 +506,10 @@ func (c *Container) initScaleModule() error {
 		c.eventPublisher,
 		questionnaireRepo,
 		c.staticRedisCache,
-		c.staticCacheNamespace,
+		redisHandleBuilder(c.staticRedisHandle),
 		identitySvc,
-		c.cacheCatalog.Policy(scaleCache.PolicyScale),
-		c.cacheCatalog.Policy(scaleCache.PolicyScaleList),
+		c.policyCatalog.Policy(cachepolicy.PolicyScale),
+		c.policyCatalog.Policy(cachepolicy.PolicyScaleList),
 		c.hotsetRecorder,
 	); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
@@ -617,8 +546,8 @@ func (c *Container) initActorModule() error {
 		guardianshipSvc,
 		identitySvc,
 		c.objectRedisCache,
-		c.objectCacheNamespace,
-		c.cacheCatalog.Policy(scaleCache.PolicyTestee),
+		redisHandleBuilder(c.objectRedisHandle),
+		c.policyCatalog.Policy(cachepolicy.PolicyTestee),
 		opAuthz,
 		operationAccountSvc,
 	); err != nil {
@@ -648,7 +577,7 @@ func (c *Container) initEvaluationModule() error {
 	}
 	var versionStore scaleCache.VersionTokenStore
 	if queryRedisClient != nil && c.metaRedisCache != nil {
-		versionStore = scaleCache.NewRedisVersionTokenStoreWithKind(c.metaRedisCache, string(scaleCache.PolicyAssessmentList))
+		versionStore = scaleCache.NewRedisVersionTokenStoreWithKind(c.metaRedisCache, string(cachepolicy.PolicyAssessmentList))
 	}
 	if err := evaluationModule.Initialize(
 		c.mysqlDB,
@@ -658,11 +587,11 @@ func (c *Container) initEvaluationModule() error {
 		c.SurveyModule.Questionnaire.Repo, // params[4]: QuestionnaireRepo
 		c.eventPublisher,                  // params[5]: EventPublisher
 		redisClient,                       // params[6]: Redis 客户端（用于缓存）
-		c.objectCacheNamespace,            // params[7]: Object cache namespace
-		c.cacheCatalog.Policy(scaleCache.PolicyAssessmentDetail),
+		redisHandleBuilder(c.objectRedisHandle),
+		c.policyCatalog.Policy(cachepolicy.PolicyAssessmentDetail),
 		queryRedisClient,
-		c.queryCacheNamespace,
-		c.cacheCatalog.Policy(scaleCache.PolicyAssessmentList),
+		redisHandleBuilder(c.queryRedisHandle),
+		c.policyCatalog.Policy(cachepolicy.PolicyAssessmentList),
 		versionStore,
 	); err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
@@ -688,8 +617,8 @@ func (c *Container) initPlanModule() error {
 		c.eventPublisher,
 		scaleRepo,
 		c.objectRedisCache,
-		c.objectCacheNamespace,
-		c.cacheCatalog.Policy(scaleCache.PolicyPlan),
+		redisHandleBuilder(c.objectRedisHandle),
+		c.policyCatalog.Policy(cachepolicy.PolicyPlan),
 		c.planEntryURL,
 	); err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
@@ -720,11 +649,12 @@ func (c *Container) initStatisticsModule() error {
 	if err := statisticsModule.Initialize(
 		c.mysqlDB,
 		redisClient,
-		c.queryCacheNamespace,
+		redisHandleBuilder(c.queryRedisHandle),
 		answerSheetRepo,
 		c.statisticsRepairWindowDays,
-		c.cacheCatalog.Policy(scaleCache.PolicyStatsQuery),
+		c.policyCatalog.Policy(cachepolicy.PolicyStatsQuery),
 		c.hotsetRecorder,
+		redislock.NewManager("apiserver", "statistics_sync", c.lockRedisHandle),
 	); err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
@@ -764,7 +694,7 @@ func (c *Container) initWarmupCoordinator() error {
 		HotsetTopN:      c.cacheOptions.Warmup.HotsetTopN,
 		MaxItemsPerKind: c.cacheOptions.Warmup.MaxItemsPerKind,
 	}, cachegov.Dependencies{
-		Catalog:                         c.cacheCatalog,
+		Runtime:                         cachegov.NewFamilyRuntime(c.staticRedisHandle, c.queryRedisHandle),
 		StatisticsSeeds:                 c.cacheOptions.StatisticsWarmup,
 		Hotset:                          c.hotsetRecorder,
 		ListPublishedScaleCodes:         c.listPublishedScaleCodes,
@@ -926,7 +856,7 @@ func (c *Container) initQRCodeGenerator() {
 	var wechatCache cache.Cache
 	if c.sdkRedisCache != nil {
 		// 使用 Redis 缓存适配器
-		wechatCache = wechatapi.NewRedisCacheAdapterWithBuilder(c.sdkRedisCache, c.cacheCatalog.Builder(scaleCache.CacheFamilySDK))
+		wechatCache = wechatapi.NewRedisCacheAdapterWithBuilder(c.sdkRedisCache, redisHandleBuilder(c.sdkRedisHandle))
 	} else {
 		// 降级使用内存缓存
 		wechatCache = cache.NewMemory()

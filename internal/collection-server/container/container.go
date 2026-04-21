@@ -9,14 +9,21 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
+	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
 	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 // Container 主容器，负责管理所有组件
 type Container struct {
-	initialized bool
-	opts        *options.Options
+	initialized  bool
+	opts         *options.Options
+	opsHandle    *redisplane.Handle
+	lockManager  *redislock.Manager
+	familyStatus *cacheobservability.FamilyStatusRegistry
 
 	// IAM 模块
 	IAMModule *IAMModule
@@ -45,10 +52,13 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options) *Container {
+func NewContainer(opts *options.Options, opsHandle *redisplane.Handle, lockManager *redislock.Manager, familyStatus *cacheobservability.FamilyStatusRegistry) *Container {
 	return &Container{
-		opts:        opts,
-		initialized: false,
+		opts:         opts,
+		opsHandle:    opsHandle,
+		lockManager:  lockManager,
+		familyStatus: familyStatus,
+		initialized:  false,
 	}
 }
 
@@ -81,12 +91,14 @@ func (c *Container) initApplicationServices() {
 	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
 		guardianshipService = c.IAMModule.GuardianshipService()
 	}
+	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
 
 	c.submissionService = answersheet.NewSubmissionService(
 		c.answerSheetClient,
 		c.actorClient,
 		guardianshipService,
 		c.opts.SubmitQueue,
+		submitGuard,
 	)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
@@ -111,7 +123,7 @@ func (c *Container) initHandlers() {
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, guardianshipService)
-	c.healthHandler = handler.NewHealthHandler("collection-server", "2.0.0")
+	c.healthHandler = handler.NewHealthHandler("collection-server", "2.0.0", c.familyStatus)
 
 	log.Info("✅ REST handlers initialized")
 }
@@ -164,6 +176,11 @@ func (c *Container) ScaleHandler() *handler.ScaleHandler {
 // RateLimitOptions 获取限流配置
 func (c *Container) RateLimitOptions() *options.RateLimitOptions {
 	return c.opts.RateLimit
+}
+
+// OpsHandle returns the collection-server operational Redis handle.
+func (c *Container) OpsHandle() *redisplane.Handle {
+	return c.opsHandle
 }
 
 // ==================== Setters (用于 GRPCClientRegistry 注入) ====================

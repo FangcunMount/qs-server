@@ -10,7 +10,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/credentials"
@@ -24,6 +27,14 @@ type collectionServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
 	// 配置
 	config *config.Config
+	// 数据库/Redis manager
+	dbManager *DatabaseManager
+	// 共享 Redis runtime / family status
+	familyStatus *cacheobservability.FamilyStatusRegistry
+	redisRuntime *redisplane.Runtime
+	opsHandle    *redisplane.Handle
+	lockHandle   *redisplane.Handle
+	lockManager  *redislock.Manager
 	// Container 主容器
 	container *container.Container
 	// gRPC 客户端管理器
@@ -59,6 +70,7 @@ func createCollectionServer(cfg *config.Config) (*collectionServer, error) {
 		gs:               gs,
 		genericAPIServer: genericServer,
 		config:           cfg,
+		familyStatus:     cacheobservability.NewFamilyStatusRegistry("collection-server"),
 	}
 
 	return server, nil
@@ -66,10 +78,38 @@ func createCollectionServer(cfg *config.Config) (*collectionServer, error) {
 
 // PrepareRun 准备运行 Collection 服务器
 func (s *collectionServer) PrepareRun() preparedCollectionServer {
-	// 1. 创建容器
-	s.container = container.NewContainer(s.config.Options)
+	var err error
 
-	// 2. 初始化 IAM 模块（须在 gRPC 连 apiserver 之前，以便挂载 ServiceAuth PerRPC）
+	// 1. 初始化 Redis runtime
+	s.dbManager = NewDatabaseManager(s.config)
+	if err = s.dbManager.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize collection-server database manager: %v", err)
+	}
+	s.redisRuntime = redisplane.NewRuntime(
+		"collection-server",
+		s.dbManager,
+		redisplane.CatalogFromOptions(s.config.RedisRuntime, map[redisplane.Family]redisplane.Route{
+			redisplane.FamilyOps: {
+				RedisProfile:         "ops_runtime",
+				NamespaceSuffix:      "ops:runtime",
+				AllowFallbackDefault: true,
+			},
+			redisplane.FamilyLock: {
+				RedisProfile:         "lock_cache",
+				NamespaceSuffix:      "cache:lock",
+				AllowFallbackDefault: true,
+			},
+		}),
+		s.familyStatus,
+	)
+	s.opsHandle = s.redisRuntime.Handle(context.Background(), redisplane.FamilyOps)
+	s.lockHandle = s.redisRuntime.Handle(context.Background(), redisplane.FamilyLock)
+	s.lockManager = redislock.NewManager("collection-server", "lock_lease", s.lockHandle)
+
+	// 2. 创建容器
+	s.container = container.NewContainer(s.config.Options, s.opsHandle, s.lockManager, s.familyStatus)
+
+	// 3. 初始化 IAM 模块（须在 gRPC 连 apiserver 之前，以便挂载 ServiceAuth PerRPC）
 	ctx := context.Background()
 	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
 	if err != nil {
@@ -83,7 +123,7 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 		perRPC = h
 	}
 
-	// 3. 创建 gRPC 客户端管理器（可选 PerRPC 服务 JWT）
+	// 4. 创建 gRPC 客户端管理器（可选 PerRPC 服务 JWT）
 	s.grpcManager, err = CreateGRPCClientManager(
 		s.config.GRPCClient.Endpoint,
 		s.config.GRPCClient.Timeout,
@@ -100,26 +140,26 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	}
 	log.Infof("✅ gRPC client manager initialized (endpoint: %s)", s.config.GRPCClient.Endpoint)
 
-	// 4. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
+	// 5. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
 	grpcRegistry := NewGRPCClientRegistry(s.grpcManager, s.container)
 	if err := grpcRegistry.RegisterClients(); err != nil {
 		log.Fatalf("Failed to register gRPC clients: %v", err)
 	}
 
-	// 5. 初始化容器中的所有组件
+	// 6. 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
 	s.startAuthzVersionSync()
 	log.Infof("Router registering with middlewares: %v", s.config.GenericServerRunOptions.Middlewares)
 
-	// 6. 安装全局并发限制中间件（避免过载）
+	// 7. 安装全局并发限制中间件（避免过载）
 	if s.config.Concurrency != nil && s.config.Concurrency.MaxConcurrency > 0 {
 		s.genericAPIServer.Engine.Use(concurrencyLimitMiddleware(s.config.Concurrency.MaxConcurrency))
 		log.Infof("Installed concurrency limiter: max=%d", s.config.Concurrency.MaxConcurrency)
 	}
 
-	// 7. 创建并初始化路由器
+	// 8. 创建并初始化路由器
 	NewRouter(s.container).RegisterRoutes(s.genericAPIServer.Engine)
 
 	log.Info("🏗️  Collection Server initialized successfully!")
@@ -128,6 +168,9 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 		if s.grpcManager != nil {
 			_ = s.grpcManager.Close()
+		}
+		if s.dbManager != nil {
+			_ = s.dbManager.Close()
 		}
 		if s.authzVersionSubscriber != nil {
 			s.authzVersionSubscriber.Stop()

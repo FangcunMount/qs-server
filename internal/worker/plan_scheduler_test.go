@@ -9,8 +9,8 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
-	redis "github.com/redis/go-redis/v9"
 )
 
 type fakePlanSchedulerClient struct {
@@ -71,18 +71,18 @@ type fakeWorkerLockManager struct {
 	releaseCount int
 }
 
-func (m *fakeWorkerLockManager) acquire(context.Context, string, time.Duration) (string, bool, error) {
+func (m *fakeWorkerLockManager) acquire(context.Context, redislock.Identity, time.Duration) (*redislock.Lease, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.locked {
-		return "", false, nil
+		return nil, false, nil
 	}
 	m.locked = true
-	return "token", true, nil
+	return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
 }
 
-func (m *fakeWorkerLockManager) release(context.Context, string, string) error {
+func (m *fakeWorkerLockManager) release(context.Context, redislock.Identity, *redislock.Lease) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -99,21 +99,27 @@ func (m *fakeWorkerLockManager) releases() int {
 	return m.releaseCount
 }
 
-func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
-	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"})
-	defer client.Close()
+func (m *fakeWorkerLockManager) acquireSpec(_ context.Context, _ redislock.Spec, _ string, _ time.Duration) (*redislock.Lease, bool, error) {
+	return m.acquire(context.Background(), redislock.Identity{}, 0)
+}
 
+func (m *fakeWorkerLockManager) releaseSpec(_ context.Context, _ redislock.Spec, _ string, lease *redislock.Lease) error {
+	return m.release(context.Background(), redislock.Identity{}, lease)
+}
+
+func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
 	opts := newTestWorkerPlanSchedulerConfig()
 	planClient := &fakePlanSchedulerClient{}
 
 	if runner := newWorkerPlanSchedulerRunnerWithHooks(
 		&workerconfig.PlanSchedulerConfig{Enable: false},
-		client,
+		&redislock.Manager{},
 		planClient,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
-		func(context.Context, string, string) error { return nil },
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected disabled scheduler to return nil runner")
 	}
@@ -123,35 +129,25 @@ func TestNewWorkerPlanSchedulerRunner(t *testing.T) {
 		nil,
 		planClient,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
-		func(context.Context, string, string) error { return nil },
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
 	); runner != nil {
-		t.Fatalf("expected nil redis client to return nil runner")
+		t.Fatalf("expected nil lock manager to return nil runner")
 	}
 
 	if runner := newWorkerPlanSchedulerRunnerWithHooks(
 		opts,
-		client,
+		&redislock.Manager{},
 		nil,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
-		func(context.Context, string, string) error { return nil },
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil plan client to return nil runner")
-	}
-
-	if runner := newWorkerPlanSchedulerRunnerWithHooks(
-		opts,
-		client,
-		planClient,
-		newTestWorkerLockBuilder(),
-		func(context.Context) error { return errors.New("ping failed") },
-		func(context.Context, string, time.Duration) (string, bool, error) { return "token", true, nil },
-		func(context.Context, string, string) error { return nil },
-	); runner != nil {
-		t.Fatalf("expected ping failure to return nil runner")
 	}
 }
 
@@ -168,12 +164,11 @@ func TestWorkerPlanSchedulerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 
 	runner := newWorkerPlanSchedulerRunnerWithHooks(
 		newTestWorkerPlanSchedulerConfig(11, 22, 33),
-		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
+		&redislock.Manager{},
 		client,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		lock.acquire,
-		lock.release,
+		lock.acquireSpec,
+		lock.releaseSpec,
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
@@ -209,12 +204,11 @@ func TestWorkerPlanSchedulerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 
 	runner := newWorkerPlanSchedulerRunnerWithHooks(
 		newTestWorkerPlanSchedulerConfig(1, 2, 3),
-		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
+		&redislock.Manager{},
 		client,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		lock.acquire,
-		lock.release,
+		lock.acquireSpec,
+		lock.releaseSpec,
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
@@ -232,12 +226,13 @@ func TestWorkerPlanSchedulerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 	client := &fakePlanSchedulerClient{}
 	runner := newWorkerPlanSchedulerRunnerWithHooks(
 		newTestWorkerPlanSchedulerConfig(1, 2),
-		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
+		&redislock.Manager{},
 		client,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		func(context.Context, string, time.Duration) (string, bool, error) { return "", false, nil },
-		func(context.Context, string, string) error { return nil },
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return nil, false, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
@@ -258,6 +253,43 @@ func TestWorkerPlanSchedulerLockKeyUsesLockNamespace(t *testing.T) {
 	}
 }
 
+func TestWorkerPlanSchedulerRunOnceUsesConfiguredLockOverride(t *testing.T) {
+	client := &fakePlanSchedulerClient{}
+	opts := newTestWorkerPlanSchedulerConfig(1)
+	opts.LockKey = "qs:plan-scheduler:custom"
+	opts.LockTTL = 90 * time.Second
+
+	var gotSpec redislock.Spec
+	var gotKey string
+	var gotTTL time.Duration
+	runner := newWorkerPlanSchedulerRunnerWithHooks(
+		opts,
+		&redislock.Manager{},
+		client,
+		newTestWorkerLockBuilder(),
+		func(_ context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+			gotSpec = spec
+			gotKey = key
+			gotTTL = ttl
+			return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+	)
+
+	if err := runner.runOnce(context.Background()); err != nil {
+		t.Fatalf("runOnce returned error: %v", err)
+	}
+	if gotSpec.Name != redislock.Specs.PlanSchedulerLeader.Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redislock.Specs.PlanSchedulerLeader.Name)
+	}
+	if gotKey != opts.LockKey {
+		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)
+	}
+	if gotTTL != opts.LockTTL {
+		t.Fatalf("ttl = %s, want %s", gotTTL, opts.LockTTL)
+	}
+}
+
 func TestWorkerPlanSchedulerStartStopsOnContextCancel(t *testing.T) {
 	started := make(chan int64, 1)
 	client := &fakePlanSchedulerClient{
@@ -274,12 +306,11 @@ func TestWorkerPlanSchedulerStartStopsOnContextCancel(t *testing.T) {
 
 	runner := newWorkerPlanSchedulerRunnerWithHooks(
 		opts,
-		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
+		&redislock.Manager{},
 		client,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		lock.acquire,
-		lock.release,
+		lock.acquireSpec,
+		lock.releaseSpec,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -373,21 +404,19 @@ func TestWorkerPlanSchedulerMultiInstanceOnlyOneExecutes(t *testing.T) {
 	opts := newTestWorkerPlanSchedulerConfig(1)
 	runner1 := newWorkerPlanSchedulerRunnerWithHooks(
 		opts,
-		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
+		&redislock.Manager{},
 		client1,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		lock.acquire,
-		lock.release,
+		lock.acquireSpec,
+		lock.releaseSpec,
 	)
 	runner2 := newWorkerPlanSchedulerRunnerWithHooks(
 		opts,
-		redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379"}),
+		&redislock.Manager{},
 		client2,
 		newTestWorkerLockBuilder(),
-		func(context.Context) error { return nil },
-		lock.acquire,
-		lock.release,
+		lock.acquireSpec,
+		lock.releaseSpec,
 	)
 
 	errCh := make(chan error, 1)

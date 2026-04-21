@@ -6,25 +6,16 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	testeeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
 const (
-	// TesteeCachePrefix 受试者缓存键前缀
-	TesteeCachePrefix = "testee:info:"
+	defaultTesteeCacheTTL         = 30 * time.Minute
+	defaultNegativeTesteeCacheTTL = 5 * time.Minute
 )
-
-// DefaultTesteeCacheTTL 默认受试者缓存 TTL（兼容旧构造路径保留）。
-//
-// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
-var DefaultTesteeCacheTTL = 30 * time.Minute
-
-// NegativeCacheTTL 空值缓存 TTL（兼容旧构造路径保留）。
-//
-// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 NegativeTTL。
-var NegativeCacheTTL = 5 * time.Minute
 
 // CachedTesteeRepository 带缓存的受试者 Repository 装饰器
 // 实现 testee.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
@@ -34,18 +25,18 @@ type CachedTesteeRepository struct {
 	ttl    time.Duration
 	mapper *testeeInfra.TesteeMapper
 	keys   *rediskey.Builder
-	policy CachePolicy
+	policy cachepolicy.CachePolicy
 }
 
 // NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
-func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy CachePolicy) testee.Repository {
+func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) testee.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedTesteeRepository{
 		repo:   repo,
 		client: client,
-		ttl:    policy.TTLOr(DefaultTesteeCacheTTL),
+		ttl:    policy.TTLOr(defaultTesteeCacheTTL),
 		mapper: testeeInfra.NewTesteeMapper(),
 		keys:   builder,
 		policy: policy,
@@ -61,7 +52,7 @@ func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
 func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.Testee, error) {
 	key := r.buildCacheKey(id)
 	domain, err := ReadThrough(ctx, ReadThroughOptions[testee.Testee]{
-		PolicyKey: PolicyTestee,
+		PolicyKey: cachepolicy.PolicyTestee,
 		CacheKey:  key,
 		Policy:    r.policy,
 		GetCached: func(ctx context.Context) (*testee.Testee, error) { return r.getCache(ctx, id) },
@@ -130,7 +121,7 @@ func (r *CachedTesteeRepository) getCache(ctx context.Context, id testee.ID) (*t
 	}
 
 	data := r.policy.DecompressValue(cachedData)
-	observePayload(PolicyTestee, len(data), len(cachedData))
+	observePayload(cachepolicy.PolicyTestee, len(data), len(cachedData))
 	var po testeeInfra.TesteePO
 	if err := json.Unmarshal(data, &po); err != nil {
 		return nil, err
@@ -153,7 +144,7 @@ func (r *CachedTesteeRepository) setCache(ctx context.Context, id testee.ID, dom
 	}
 
 	payload := r.policy.CompressValue(data)
-	observePayload(PolicyTestee, len(data), len(payload))
+	observePayload(cachepolicy.PolicyTestee, len(data), len(payload))
 	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
 }
 
@@ -162,7 +153,7 @@ func (r *CachedTesteeRepository) setNegativeCache(ctx context.Context, id testee
 		return nil
 	}
 	key := r.buildCacheKey(id)
-	ttl := r.policy.NegativeTTLOr(NegativeCacheTTL)
+	ttl := r.policy.NegativeTTLOr(defaultNegativeTesteeCacheTTL)
 	return r.client.Set(ctx, key, []byte{}, r.policy.JitterTTL(ttl)).Err()
 }
 
@@ -175,10 +166,10 @@ func (r *CachedTesteeRepository) deleteCache(ctx context.Context, id testee.ID) 
 	key := r.buildCacheKey(id)
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
-		observeInvalidate(PolicyTestee, "error")
+		observeInvalidate(cachepolicy.PolicyTestee, "error")
 		return err
 	}
-	observeInvalidate(PolicyTestee, "ok")
+	observeInvalidate(cachepolicy.PolicyTestee, "ok")
 	return nil
 }
 

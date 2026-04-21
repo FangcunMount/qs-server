@@ -3,6 +3,7 @@ package cache
 import (
 	"sync"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -10,16 +11,16 @@ import (
 // 避免所有缓存共享同一个全局 bucket。
 type SingleflightCoordinator struct {
 	mu     sync.Mutex
-	groups map[CachePolicyKey]*singleflight.Group
+	groups map[cachepolicy.CachePolicyKey]*singleflight.Group
 }
 
 func NewSingleflightCoordinator() *SingleflightCoordinator {
 	return &SingleflightCoordinator{
-		groups: make(map[CachePolicyKey]*singleflight.Group),
+		groups: make(map[cachepolicy.CachePolicyKey]*singleflight.Group),
 	}
 }
 
-func (c *SingleflightCoordinator) group(policyKey CachePolicyKey) *singleflight.Group {
+func (c *SingleflightCoordinator) group(policyKey cachepolicy.CachePolicyKey) *singleflight.Group {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -31,7 +32,7 @@ func (c *SingleflightCoordinator) group(policyKey CachePolicyKey) *singleflight.
 	return group
 }
 
-func (c *SingleflightCoordinator) Do(policyKey CachePolicyKey, key string, fn func() (interface{}, error)) (interface{}, error, bool) {
+func (c *SingleflightCoordinator) Do(policyKey cachepolicy.CachePolicyKey, key string, fn func() (interface{}, error)) (interface{}, error, bool) {
 	return c.group(policyKey).Do(key, fn)
 }
 

@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 )
 
 type readThroughValue struct {
@@ -21,13 +23,13 @@ func TestReadThroughUsesPolicyScopedSingleflight(t *testing.T) {
 	release := make(chan struct{})
 	started := make(chan struct{}, 1)
 
-	policy := CachePolicy{
-		Singleflight: PolicySwitchEnabled,
+	policy := cachepolicy.CachePolicy{
+		Singleflight: cachepolicy.PolicySwitchEnabled,
 	}
 
 	run := func() (*readThroughValue, error) {
 		return ReadThrough(context.Background(), ReadThroughOptions[readThroughValue]{
-			PolicyKey: PolicyAssessmentDetail,
+			PolicyKey: cachepolicy.PolicyAssessmentDetail,
 			CacheKey:  "assessment:detail:42",
 			Policy:    policy,
 			GetCached: func(context.Context) (*readThroughValue, error) {
@@ -100,11 +102,11 @@ func TestReadThroughSingleflightIsScopedByPolicyKey(t *testing.T) {
 	release := make(chan struct{})
 	started := make(chan struct{}, 2)
 
-	policy := CachePolicy{
-		Singleflight: PolicySwitchEnabled,
+	policy := cachepolicy.CachePolicy{
+		Singleflight: cachepolicy.PolicySwitchEnabled,
 	}
 
-	run := func(policyKey CachePolicyKey) {
+	run := func(policyKey cachepolicy.CachePolicyKey) {
 		t.Helper()
 		_, err := ReadThrough(context.Background(), ReadThroughOptions[readThroughValue]{
 			PolicyKey: policyKey,
@@ -127,9 +129,9 @@ func TestReadThroughSingleflightIsScopedByPolicyKey(t *testing.T) {
 
 	var wg sync.WaitGroup
 	begin := make(chan struct{})
-	for _, policyKey := range []CachePolicyKey{PolicyAssessmentDetail, PolicyPlan} {
+	for _, policyKey := range []cachepolicy.CachePolicyKey{cachepolicy.PolicyAssessmentDetail, cachepolicy.PolicyPlan} {
 		wg.Add(1)
-		go func(policyKey CachePolicyKey) {
+		go func(policyKey cachepolicy.CachePolicyKey) {
 			defer wg.Done()
 			<-begin
 			run(policyKey)
@@ -157,9 +159,9 @@ func TestReadThroughDegradesCacheReadErrorToMiss(t *testing.T) {
 
 	var loadCount atomic.Int32
 	value, err := ReadThrough(context.Background(), ReadThroughOptions[readThroughValue]{
-		PolicyKey: PolicyAssessmentDetail,
+		PolicyKey: cachepolicy.PolicyAssessmentDetail,
 		CacheKey:  "assessment:detail:42",
-		Policy:    CachePolicy{},
+		Policy:    cachepolicy.CachePolicy{},
 		GetCached: func(context.Context) (*readThroughValue, error) {
 			return nil, errors.New("redis unavailable")
 		},

@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,6 +19,12 @@ import (
 type actorLookupClient interface {
 	GetTestee(ctx context.Context, testeeID uint64) (*grpcclient.TesteeResponse, error)
 	TesteeExists(ctx context.Context, orgID, iamChildID uint64) (exists bool, testeeID uint64, err error)
+}
+
+type submitGuard interface {
+	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *redislock.Lease, acquired bool, err error)
+	Complete(ctx context.Context, key string, lease *redislock.Lease, answerSheetID string) error
+	Abort(ctx context.Context, key string, lease *redislock.Lease) error
 }
 
 // SubmissionService 答卷提交服务
@@ -30,6 +37,7 @@ type SubmissionService struct {
 	actorClient         actorLookupClient
 	guardianshipService *iam.GuardianshipService
 	queue               *SubmitQueue
+	submitGuard         submitGuard
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -38,11 +46,13 @@ func NewSubmissionService(
 	actorClient *grpcclient.ActorClient,
 	guardianshipService *iam.GuardianshipService,
 	queueOptions *options.SubmitQueueOptions,
+	submitGuard submitGuard,
 ) *SubmissionService {
 	service := &SubmissionService{
 		answerSheetClient:   answerSheetClient,
 		actorClient:         actorClient,
 		guardianshipService: guardianshipService,
+		submitGuard:         submitGuard,
 	}
 
 	if queueOptions != nil && queueOptions.Enabled {
@@ -50,7 +60,7 @@ func NewSubmissionService(
 			queueOptions.WorkerCount,
 			queueOptions.QueueSize,
 			time.Duration(queueOptions.WaitTimeoutMs)*time.Millisecond,
-			service.submitSync,
+			service.submitWithGuard,
 		)
 	}
 
@@ -60,7 +70,7 @@ func NewSubmissionService(
 // Submit 提交答卷
 // writerID 来自认证中间件解析的当前用户
 func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
-	return s.submitSync(ctx, writerID, req)
+	return s.submitWithGuard(ctx, requestKey("", req), writerID, req)
 }
 
 // SubmitQueued 提交答卷（带排队）
@@ -71,6 +81,46 @@ func (s *SubmissionService) SubmitQueued(ctx context.Context, requestID string, 
 	}
 
 	return s.queue.Enqueue(ctx, requestID, writerID, req)
+}
+
+func requestKey(requestID string, req *SubmitAnswerSheetRequest) string {
+	if req != nil && req.IdempotencyKey != "" {
+		return req.IdempotencyKey
+	}
+	return requestID
+}
+
+func (s *SubmissionService) submitWithGuard(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+	key := requestKey(requestID, req)
+	if key == "" || s.submitGuard == nil {
+		return s.submitSync(ctx, writerID, req)
+	}
+
+	doneID, lease, acquired, err := s.submitGuard.Begin(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if doneID != "" {
+		return &SubmitAnswerSheetResponse{
+			ID:      doneID,
+			Message: "already submitted",
+		}, nil
+	}
+	if !acquired {
+		return nil, status.Error(codes.ResourceExhausted, "submit already in progress")
+	}
+
+	resp, submitErr := s.submitSync(ctx, writerID, req)
+	if submitErr != nil {
+		_ = s.submitGuard.Abort(context.Background(), key, lease)
+		return nil, submitErr
+	}
+	if resp != nil {
+		if err := s.submitGuard.Complete(context.Background(), key, lease, resp.ID); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
 }
 
 // GetSubmitStatus 获取提交状态

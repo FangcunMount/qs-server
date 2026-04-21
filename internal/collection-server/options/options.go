@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -18,6 +19,8 @@ type Options struct {
 	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"   mapstructure:"secure"`
 	GRPCClient              *GRPCClientOptions                     `json:"grpc_client" mapstructure:"grpc_client"`
 	RedisOptions            *genericoptions.RedisOptions           `json:"redis"     mapstructure:"redis"`
+	RedisProfiles           map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	RedisRuntime            *genericoptions.RedisRuntimeOptions    `json:"redis_runtime" mapstructure:"redis_runtime"`
 	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
 	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
 	SubmitQueue             *SubmitQueueOptions                    `json:"submit_queue" mapstructure:"submit_queue"`
@@ -124,7 +127,9 @@ func NewOptions() *Options {
 			Insecure:    true,
 			MaxInflight: 200,
 		},
-		RedisOptions: genericoptions.NewRedisOptions(),
+		RedisOptions:  genericoptions.NewRedisOptions(),
+		RedisProfiles: map[string]*genericoptions.RedisOptions{},
+		RedisRuntime:  defaultRedisRuntimeOptions(),
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
@@ -137,6 +142,25 @@ func NewOptions() *Options {
 		IAMOptions: genericoptions.NewIAMOptions(),
 		Runtime:    NewRuntimeOptions(),
 	}
+}
+
+func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
+	opts := genericoptions.NewRedisRuntimeOptions()
+	opts.Families["ops_runtime"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "ops_runtime",
+		NamespaceSuffix:      "ops:runtime",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	opts.Families["lock_lease"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "lock_cache",
+		NamespaceSuffix:      "cache:lock",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	return opts
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 // NewRuntimeOptions 创建默认运行时调优选项
@@ -185,6 +209,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
 	o.GRPCClient.AddFlags(fss.FlagSet("grpc_client"))
 	o.RedisOptions.AddFlags(fss.FlagSet("redis"))
+	o.RedisRuntime.AddFlags(fss.FlagSet("redis_runtime"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
@@ -288,6 +313,12 @@ func (o *Options) Validate() []error {
 	if len(o.RedisOptions.Addrs) == 0 && o.RedisOptions.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
+	errs = append(errs, redisplane.ValidateRuntimeOptions(
+		o.RedisRuntime,
+		[]redisplane.Family{redisplane.FamilyOps, redisplane.FamilyLock},
+		o.RedisProfiles,
+		"redis_runtime",
+	)...)
 
 	// 验证并发配置
 	if o.Concurrency.MaxConcurrency <= 0 {

@@ -2,12 +2,14 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -17,12 +19,35 @@ type metricsServer struct {
 }
 
 func newMetricsServer(bindAddress string, bindPort int) *metricsServer {
+	return newMetricsServerWithGovernance(bindAddress, bindPort, "worker", nil)
+}
+
+func newMetricsServerWithGovernance(bindAddress string, bindPort int, component string, registry *cacheobservability.FamilyStatusRegistry) *metricsServer {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
+		writeGovernanceJSON(w, http.StatusOK, map[string]interface{}{
+			"status":    "healthy",
+			"component": component,
+			"redis":     cacheobservability.SnapshotForComponent(component, registry),
+		})
+	})
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		snapshot := cacheobservability.SnapshotForComponent(component, registry)
+		statusCode := http.StatusOK
+		statusText := "ready"
+		if !snapshot.Summary.Ready {
+			statusCode = http.StatusServiceUnavailable
+			statusText = "degraded"
+		}
+		writeGovernanceJSON(w, statusCode, map[string]interface{}{
+			"status":    statusText,
+			"component": component,
+			"redis":     snapshot,
+		})
+	})
+	mux.HandleFunc("/governance/redis", func(w http.ResponseWriter, _ *http.Request) {
+		writeGovernanceJSON(w, http.StatusOK, cacheobservability.SnapshotForComponent(component, registry))
 	})
 
 	return &metricsServer{
@@ -32,6 +57,12 @@ func newMetricsServer(bindAddress string, bindPort int) *metricsServer {
 			ReadHeaderTimeout: 5 * time.Second,
 		},
 	}
+}
+
+func writeGovernanceJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(payload)
 }
 
 func (s *metricsServer) Start() error {

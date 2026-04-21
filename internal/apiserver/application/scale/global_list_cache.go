@@ -8,15 +8,16 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	cacheimpl "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
 
 const (
 	defaultScaleListPageSize = 200
-	// Deprecated: runtime 已统一通过 CacheCatalog / CachePolicy 注入 TTL。
 	defaultScaleListCacheTTL = 10 * time.Minute
 )
 
@@ -26,11 +27,11 @@ type ScaleListCache struct {
 	repo        domainScale.Repository
 	redis       redis.UniversalClient
 	identitySvc *iam.IdentityService
-	keyBuilder  *cache.CacheKeyBuilder
-	policy      cache.CachePolicy
+	keyBuilder  *rediskey.Builder
+	policy      cachepolicy.CachePolicy
 	pageSize    int
 	// 节点内短 TTL 内存缓存，减少 Redis GET/JSON 解码成本
-	memory *cache.LocalHotCache[*ScaleSummaryListResult]
+	memory *cacheimpl.LocalHotCache[*ScaleSummaryListResult]
 }
 
 const defaultScaleListLocalMaxEntries = 64
@@ -40,8 +41,8 @@ func NewScaleListCacheWithPolicyAndKeyBuilder(
 	redisClient redis.UniversalClient,
 	repo domainScale.Repository,
 	identitySvc *iam.IdentityService,
-	keyBuilder *cache.CacheKeyBuilder,
-	policy cache.CachePolicy,
+	keyBuilder *rediskey.Builder,
+	policy cachepolicy.CachePolicy,
 ) *ScaleListCache {
 	if redisClient == nil || repo == nil {
 		return nil
@@ -57,7 +58,7 @@ func NewScaleListCacheWithPolicyAndKeyBuilder(
 		keyBuilder:  keyBuilder,
 		policy:      policy,
 		pageSize:    defaultScaleListPageSize,
-		memory:      cache.NewLocalHotCache[*ScaleSummaryListResult](30*time.Second, defaultScaleListLocalMaxEntries),
+		memory:      cacheimpl.NewLocalHotCache[*ScaleSummaryListResult](30*time.Second, defaultScaleListLocalMaxEntries),
 	}
 }
 

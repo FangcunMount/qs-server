@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	redis "github.com/redis/go-redis/v9"
@@ -41,7 +42,7 @@ const (
 
 // WarmupTarget 描述一个稳定的预热目标。
 type WarmupTarget struct {
-	Family CacheFamily
+	Family redisplane.Family
 	Kind   WarmupKind
 	Scope  string
 }
@@ -62,7 +63,7 @@ func normalizeCodeScope(prefix, code string) string {
 // NewStaticScaleWarmupTarget 创建量表静态缓存预热目标。
 func NewStaticScaleWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
-		Family: CacheFamilyStatic,
+		Family: redisplane.FamilyStatic,
 		Kind:   WarmupKindStaticScale,
 		Scope:  normalizeCodeScope("scale", code),
 	}
@@ -71,7 +72,7 @@ func NewStaticScaleWarmupTarget(code string) WarmupTarget {
 // NewStaticQuestionnaireWarmupTarget 创建问卷静态缓存预热目标。
 func NewStaticQuestionnaireWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
-		Family: CacheFamilyStatic,
+		Family: redisplane.FamilyStatic,
 		Kind:   WarmupKindStaticQuestionnaire,
 		Scope:  normalizeCodeScope("questionnaire", code),
 	}
@@ -80,7 +81,7 @@ func NewStaticQuestionnaireWarmupTarget(code string) WarmupTarget {
 // NewStaticScaleListWarmupTarget 创建量表列表预热目标。
 func NewStaticScaleListWarmupTarget() WarmupTarget {
 	return WarmupTarget{
-		Family: CacheFamilyStatic,
+		Family: redisplane.FamilyStatic,
 		Kind:   WarmupKindStaticScaleList,
 		Scope:  scaleListWarmupScope,
 	}
@@ -89,7 +90,7 @@ func NewStaticScaleListWarmupTarget() WarmupTarget {
 // NewQueryStatsSystemWarmupTarget 创建系统统计查询预热目标。
 func NewQueryStatsSystemWarmupTarget(orgID int64) WarmupTarget {
 	return WarmupTarget{
-		Family: CacheFamilyQuery,
+		Family: redisplane.FamilyQuery,
 		Kind:   WarmupKindQueryStatsSystem,
 		Scope:  fmt.Sprintf("org:%d", orgID),
 	}
@@ -98,7 +99,7 @@ func NewQueryStatsSystemWarmupTarget(orgID int64) WarmupTarget {
 // NewQueryStatsQuestionnaireWarmupTarget 创建问卷统计查询预热目标。
 func NewQueryStatsQuestionnaireWarmupTarget(orgID int64, code string) WarmupTarget {
 	return WarmupTarget{
-		Family: CacheFamilyQuery,
+		Family: redisplane.FamilyQuery,
 		Kind:   WarmupKindQueryStatsQuestionnaire,
 		Scope:  fmt.Sprintf("org:%d:questionnaire:%s", orgID, strings.ToLower(strings.TrimSpace(code))),
 	}
@@ -107,7 +108,7 @@ func NewQueryStatsQuestionnaireWarmupTarget(orgID int64, code string) WarmupTarg
 // NewQueryStatsPlanWarmupTarget 创建计划统计查询预热目标。
 func NewQueryStatsPlanWarmupTarget(orgID int64, planID uint64) WarmupTarget {
 	return WarmupTarget{
-		Family: CacheFamilyQuery,
+		Family: redisplane.FamilyQuery,
 		Kind:   WarmupKindQueryStatsPlan,
 		Scope:  fmt.Sprintf("org:%d:plan:%d", orgID, planID),
 	}
@@ -192,11 +193,11 @@ func hotsetRecordingSuppressed(ctx context.Context) bool {
 // HotsetRecorder 记录和读取内部热点排行榜。
 type HotsetRecorder interface {
 	Record(context.Context, WarmupTarget) error
-	Top(context.Context, CacheFamily, WarmupKind, int64) ([]WarmupTarget, error)
+	Top(context.Context, redisplane.Family, WarmupKind, int64) ([]WarmupTarget, error)
 }
 
 type HotsetInspector interface {
-	TopWithScores(context.Context, CacheFamily, WarmupKind, int64) ([]HotsetItem, error)
+	TopWithScores(context.Context, redisplane.Family, WarmupKind, int64) ([]HotsetItem, error)
 }
 
 // HotsetOptions 定义热榜治理策略。
@@ -265,18 +266,18 @@ func (s *RedisHotsetStore) Record(ctx context.Context, target WarmupTarget) erro
 	key := s.keys.BuildWarmupHotsetKey(string(target.Family), string(target.Kind))
 	if err := s.client.ZIncrBy(ctx, key, 1, target.Scope).Err(); err != nil {
 		hotsetRecordTotal.WithLabelValues(string(target.Family), string(target.Kind), "error").Inc()
-		cacheobservability.ObserveFamilyFailure("apiserver", string(CacheFamilyMeta), err)
+		cacheobservability.ObserveFamilyFailure("apiserver", string(redisplane.FamilyMeta), err)
 		return err
 	}
 	hotsetRecordTotal.WithLabelValues(string(target.Family), string(target.Kind), "ok").Inc()
-	cacheobservability.ObserveFamilySuccess("apiserver", string(CacheFamilyMeta))
+	cacheobservability.ObserveFamilySuccess("apiserver", string(redisplane.FamilyMeta))
 	if s.shouldMaintain(key) {
 		s.observeAndTrim(ctx, key, target.Family, target.Kind)
 	}
 	return nil
 }
 
-func (s *RedisHotsetStore) Top(ctx context.Context, family CacheFamily, kind WarmupKind, limit int64) ([]WarmupTarget, error) {
+func (s *RedisHotsetStore) Top(ctx context.Context, family redisplane.Family, kind WarmupKind, limit int64) ([]WarmupTarget, error) {
 	items, err := s.TopWithScores(ctx, family, kind, limit)
 	if err != nil {
 		return nil, err
@@ -288,7 +289,7 @@ func (s *RedisHotsetStore) Top(ctx context.Context, family CacheFamily, kind War
 	return targets, nil
 }
 
-func (s *RedisHotsetStore) TopWithScores(ctx context.Context, family CacheFamily, kind WarmupKind, limit int64) ([]HotsetItem, error) {
+func (s *RedisHotsetStore) TopWithScores(ctx context.Context, family redisplane.Family, kind WarmupKind, limit int64) ([]HotsetItem, error) {
 	if s == nil || s.client == nil {
 		return nil, nil
 	}
@@ -299,11 +300,11 @@ func (s *RedisHotsetStore) TopWithScores(ctx context.Context, family CacheFamily
 	values, err := s.client.ZRevRangeWithScores(ctx, key, 0, limit-1).Result()
 	if err != nil {
 		warmupHotReadTotal.WithLabelValues(string(family), string(kind), "error").Inc()
-		cacheobservability.ObserveFamilyFailure("apiserver", string(CacheFamilyMeta), err)
+		cacheobservability.ObserveFamilyFailure("apiserver", string(redisplane.FamilyMeta), err)
 		return nil, err
 	}
 	warmupHotReadTotal.WithLabelValues(string(family), string(kind), "ok").Inc()
-	cacheobservability.ObserveFamilySuccess("apiserver", string(CacheFamilyMeta))
+	cacheobservability.ObserveFamilySuccess("apiserver", string(redisplane.FamilyMeta))
 	s.observeSize(ctx, key, family, kind)
 	items := make([]HotsetItem, 0, len(values))
 	for _, value := range values {
@@ -323,16 +324,16 @@ func (s *RedisHotsetStore) TopWithScores(ctx context.Context, family CacheFamily
 	return items, nil
 }
 
-func (s *RedisHotsetStore) observeSize(ctx context.Context, key string, family CacheFamily, kind WarmupKind) {
+func (s *RedisHotsetStore) observeSize(ctx context.Context, key string, family redisplane.Family, kind WarmupKind) {
 	if s == nil || s.client == nil {
 		return
 	}
 	card, err := s.client.ZCard(ctx, key).Result()
 	if err != nil {
-		cacheobservability.ObserveFamilyFailure("apiserver", string(CacheFamilyMeta), err)
+		cacheobservability.ObserveFamilyFailure("apiserver", string(redisplane.FamilyMeta), err)
 		return
 	}
-	cacheobservability.ObserveFamilySuccess("apiserver", string(CacheFamilyMeta))
+	cacheobservability.ObserveFamilySuccess("apiserver", string(redisplane.FamilyMeta))
 	cacheobservability.SetHotsetSize(string(family), string(kind), card)
 }
 
@@ -346,13 +347,13 @@ func (s *RedisHotsetStore) shouldMaintain(key string) bool {
 	return s.hits[key]%hotsetTrimEvery == 0
 }
 
-func (s *RedisHotsetStore) observeAndTrim(ctx context.Context, key string, family CacheFamily, kind WarmupKind) {
+func (s *RedisHotsetStore) observeAndTrim(ctx context.Context, key string, family redisplane.Family, kind WarmupKind) {
 	if s == nil || s.client == nil {
 		return
 	}
 	card, err := s.client.ZCard(ctx, key).Result()
 	if err != nil {
-		cacheobservability.ObserveFamilyFailure("apiserver", string(CacheFamilyMeta), err)
+		cacheobservability.ObserveFamilyFailure("apiserver", string(redisplane.FamilyMeta), err)
 		logger.L(ctx).Warnw("failed to inspect warmup hotset size",
 			"family", family,
 			"kind", kind,
@@ -360,14 +361,14 @@ func (s *RedisHotsetStore) observeAndTrim(ctx context.Context, key string, famil
 		)
 		return
 	}
-	cacheobservability.ObserveFamilySuccess("apiserver", string(CacheFamilyMeta))
+	cacheobservability.ObserveFamilySuccess("apiserver", string(redisplane.FamilyMeta))
 	cacheobservability.SetHotsetSize(string(family), string(kind), card)
 	if s.opts.MaxItemsPerKind <= 0 || card <= s.opts.MaxItemsPerKind {
 		return
 	}
 	removeUntil := card - s.opts.MaxItemsPerKind - 1
 	if err := s.client.ZRemRangeByRank(ctx, key, 0, removeUntil).Err(); err != nil {
-		cacheobservability.ObserveFamilyFailure("apiserver", string(CacheFamilyMeta), err)
+		cacheobservability.ObserveFamilyFailure("apiserver", string(redisplane.FamilyMeta), err)
 		logger.L(ctx).Warnw("failed to trim warmup hotset",
 			"family", family,
 			"kind", kind,
@@ -375,7 +376,7 @@ func (s *RedisHotsetStore) observeAndTrim(ctx context.Context, key string, famil
 		)
 		return
 	}
-	cacheobservability.ObserveFamilySuccess("apiserver", string(CacheFamilyMeta))
+	cacheobservability.ObserveFamilySuccess("apiserver", string(redisplane.FamilyMeta))
 	s.observeSize(ctx, key, family, kind)
 }
 

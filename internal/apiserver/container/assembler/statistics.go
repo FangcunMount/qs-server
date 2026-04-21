@@ -6,12 +6,14 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	redis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -48,11 +50,12 @@ func NewStatisticsModule() *StatisticsModule {
 // Initialize 初始化统计模块
 // params[0]: *gorm.DB
 // params[1]: redis.UniversalClient (Redis缓存客户端)
-// params[2]: string cache namespace（可选）
+// params[2]: *rediskey.Builder（可选）
 // params[3]: answersheet.Repository (问卷答卷仓储，可选)
 // params[4]: int repair window days（统计批处理默认回补窗口，可选）
-// params[5]: cache.CachePolicy 查询缓存策略（可选）
-// params[6]: cache.HotsetRecorder（可选）
+// params[5]: cachepolicy.CachePolicy 查询缓存策略（可选）
+// params[6]: scaleCache.HotsetRecorder（可选）
+// params[7]: *redislock.Manager（统计同步锁，可选）
 func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	if len(params) < 1 {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
@@ -70,10 +73,10 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 			redisClient = rc
 		}
 	}
-	cacheNamespace := ""
+	var cacheBuilder *rediskey.Builder
 	if len(params) > 2 {
-		if ns, ok := params[2].(string); ok {
-			cacheNamespace = ns
+		if builder, ok := params[2].(*rediskey.Builder); ok {
+			cacheBuilder = builder
 		}
 	}
 	var answerSheetRepo surveyAnswerSheet.Repository
@@ -94,10 +97,16 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 			queryPolicy = value
 		}
 	}
-	var hotset cachepolicy.HotsetRecorder
+	var hotset scaleCache.HotsetRecorder
 	if len(params) > 6 {
-		if value, ok := params[6].(cachepolicy.HotsetRecorder); ok {
+		if value, ok := params[6].(scaleCache.HotsetRecorder); ok {
 			hotset = value
+		}
+	}
+	var lockManager *redislock.Manager
+	if len(params) > 7 {
+		if value, ok := params[7].(*redislock.Manager); ok {
+			lockManager = value
 		}
 	}
 
@@ -106,7 +115,7 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 
 	// 初始化 cache 层
 	if redisClient != nil {
-		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(redisClient, rediskey.NewBuilderWithNamespace(cacheNamespace), queryPolicy)
+		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(redisClient, cacheBuilder, queryPolicy)
 	} else {
 		// Redis不可用时，创建空实现（查询时会降级到MySQL）
 		m.Cache = nil
@@ -120,7 +129,7 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	m.ReadService = statisticsApp.NewReadService(mysqlDB, answerSheetRepo)
 	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(mysqlDB)
 	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(mysqlDB, m.Repo)
-	m.SyncService = statisticsApp.NewSyncService(mysqlDB, repairWindowDays)
+	m.SyncService = statisticsApp.NewSyncService(mysqlDB, repairWindowDays, lockManager)
 
 	// 初始化 handler 层
 	m.Handler = handler.NewStatisticsHandler(

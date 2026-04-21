@@ -20,6 +20,7 @@ import (
 	relationDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
@@ -79,15 +80,15 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		}
 	}
 
-	var cacheNamespace string
+	var cacheBuilder *rediskey.Builder
 	if len(params) > 4 {
-		if ns, ok := params[4].(string); ok {
-			cacheNamespace = ns
+		if builder, ok := params[4].(*rediskey.Builder); ok {
+			cacheBuilder = builder
 		}
 	}
-	var testeePolicy testeeCache.CachePolicy
+	var testeePolicy cachepolicy.CachePolicy
 	if len(params) > 5 {
-		if policy, ok := params[5].(testeeCache.CachePolicy); ok {
+		if policy, ok := params[5].(cachepolicy.CachePolicy); ok {
 			testeePolicy = policy
 		}
 	}
@@ -117,7 +118,6 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	// 初始化 repository 层
 	// 初始化基础 Repository
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB)
-	cacheBuilder := rediskey.NewBuilderWithNamespace(cacheNamespace)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if len(params) > 3 {

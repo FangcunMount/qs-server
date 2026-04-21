@@ -13,6 +13,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
@@ -140,6 +141,22 @@ type repairCompleteRequest struct {
 	OrgIDs             []int64  `json:"org_ids"`
 	QuestionnaireCodes []string `json:"questionnaire_codes"`
 	PlanIDs            []uint64 `json:"plan_ids"`
+}
+
+func validateManualWarmupTargets(protectedOrgID int64, targets []cachegov.ManualWarmupTarget) error {
+	if len(targets) == 0 {
+		return errors.WithCode(code.ErrInvalidArgument, "targets cannot be empty")
+	}
+	for _, item := range targets {
+		target, err := cachegov.ParseManualWarmupTarget(item)
+		if err != nil {
+			return errors.WithCode(code.ErrInvalidArgument, "%s", err.Error())
+		}
+		if orgID, ok := cachegov.WarmupTargetOrgID(target); ok && orgID != protectedOrgID {
+			return errors.WithCode(code.ErrInvalidArgument, "query warmup target org must stay within the protected org scope")
+		}
+	}
+	return nil
 }
 
 func (h *StatisticsHandler) GetOverview(c *gin.Context) {
@@ -668,9 +685,60 @@ func (h *StatisticsHandler) RepairComplete(c *gin.Context) {
 	h.Success(c, gin.H{"message": "repair complete hook accepted"})
 }
 
+// WarmupTargets 手工触发缓存预热目标（内部治理动作）
+// @Summary 手工触发缓存预热
+// @Description operating 后台通过 BFF 代理调用，按 target 列表同步触发缓存预热并返回逐项结果；仅 qs:admin 可访问
+// @Tags Statistics-Sync
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
+// @Param request body cachegovernance.ManualWarmupRequest true "预热目标列表"
+// @Success 200 {object} core.Response{data=cachegovernance.ManualWarmupResult}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 429 {object} core.ErrResponse
+// @Router /internal/v1/cache/governance/warmup-targets [post]
+func (h *StatisticsHandler) WarmupTargets(c *gin.Context) {
+	ctx := c.Request.Context()
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if h.warmupCoordinator == nil {
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "warmup coordinator is unavailable"))
+		return
+	}
+
+	var req cachegov.ManualWarmupRequest
+	if !h.bindJSON(c, &req) {
+		return
+	}
+	if err := validateManualWarmupTargets(orgID, req.Targets); err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.warmupCoordinator.HandleManualWarmup(ctx, req)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "%s", err.Error()))
+		return
+	}
+	h.Success(c, result)
+}
+
 func (h *StatisticsHandler) CacheGovernanceStatus(c *gin.Context) {
 	if h.cacheGovernanceStatusService == nil {
-		h.Success(c, gin.H{"families": []interface{}{}, "warmup": gin.H{}})
+		h.Success(c, &cachegov.StatusSnapshot{
+			RuntimeSnapshot: cacheobservability.RuntimeSnapshot{
+				GeneratedAt: time.Now(),
+				Component:   "apiserver",
+				Families:    []cacheobservability.FamilyStatus{},
+				Summary: cacheobservability.RuntimeSummary{
+					Ready: true,
+				},
+			},
+			Warmup: cachegov.WarmupStatusSnapshot{},
+		})
 		return
 	}
 	result, err := h.cacheGovernanceStatusService.GetStatus(c.Request.Context())
