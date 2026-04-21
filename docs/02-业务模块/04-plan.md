@@ -239,16 +239,14 @@ flowchart TB
 
 **与 `configs/events.yaml` 对照（Verify）**：
 
-| 事件类型 | Topic（yaml 字段 `topic`） | handler（yaml） | consumers（摘录） |
-| -------- | -------------------------- | ----------------- | ------------------- |
-| `task.opened` | `task-lifecycle` | `task_opened_handler` | `qs-worker` |
-| `task.completed` | `task-lifecycle` | `task_completed_handler` | `qs-worker`、`alert-service` |
-| `task.expired` | `task-lifecycle` | `task_expired_handler` | `qs-worker` |
-| `task.canceled` | `task-lifecycle` | `task_canceled_handler` | `qs-worker` |
+- 事件：`task.opened`、`task.completed`、`task.expired`、`task.canceled`
+- Topic key：`task-lifecycle`，对应运行时 topic `qs.plan.task`
+- handler：`task_opened_handler`、`task_completed_handler`、`task_expired_handler`、`task_canceled_handler`
+- 运行时消费链路：当前仓库内通用业务消费者是 `qs-worker`；完整上下游见 [03-基础设施/01-事件系统.md](../03-基础设施/01-事件系统.md)
 
 **载荷边界（与代码一致）**：事件为轻量信号；`task.opened` 含 `task_id` / `plan_id` / `testee_id` / `entry_url` / `open_at`；`task.completed` 含 `assessment_id`；`task.expired` / `task.canceled` 只携带任务、计划、受试者和时间。更多字段需回查仓储。
 
-改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker 侧注册（如 [registry.go](../../internal/worker/handlers/registry.go)）。
+改事件名、topic 绑定或 handler 名时须同步 **yaml**、领域 `events.go`、发布点与 worker 侧注册（如 [registry.go](../../internal/worker/handlers/registry.go)）。
 
 ### 核心链路：模板 → 入组 → 调度 → 测评闭环
 

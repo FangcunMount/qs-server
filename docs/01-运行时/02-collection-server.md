@@ -13,7 +13,7 @@
 | 提交答卷的关键认识 | `SubmitQueued` 是统一入口；`request_id` 只负责队列状态查询，业务幂等以可选 `idempotency_key` 透传给 apiserver 的 durable 提交链为准 |
 | 与主服务的边界 | 它不直连 MySQL / Mongo 主库，不在本进程内完成问卷、测评等主业务持久化 |
 | 本地状态 | Redis 主要服务于排队、会话类辅助和部分缓存，不改变“主状态在 apiserver”的边界 |
-| MQ 边界 | 本进程**不**消费 QS 业务事件总线；只会通过 `iam.authz-sync.*` 订阅 IAM 的授权版本通知 |
+| MQ 边界 | 本进程**不**消费 QS 业务事件总线；只会通过 `iam.authz-sync.*` 订阅 IAM 的授权版本通知；业务事件拓扑见 [03-基础设施/01-事件系统](../03-基础设施/01-事件系统.md) |
 | 排障入口 | 先看中间件链与 Handler，再看 `SubmissionService` / `SubmitQueue` 与 gRPC client |
 
 ## 重点速查（继续往下读前先记这几条）

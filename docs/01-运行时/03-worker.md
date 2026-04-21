@@ -12,6 +12,7 @@
 | 上下游关系 | 上游是 MQ；核心下游是 `qs-apiserver` 的 AnswerSheet / Evaluation / Internal gRPC |
 | 最重要的运行时认识 | worker 不装配完整领域容器，也不持有业务写真值；它只是把事件驱动回主服务 |
 | 事件真值 | `event_type`、topic 和 handler 绑定最终以 `configs/events.yaml` 为准，代码注册必须与之对齐 |
+| 当前实际订阅 | 运行时当前有 4 个业务 topic，其中包括 `qs.analytics.behavior` |
 | 本地依赖 | Redis 只用于锁、统计辅助等 handler 侧能力，不改变业务状态归属 |
 | 排障入口 | 先看 `events.yaml`，再看 `server.go` 分发链、handler 注册和对应 gRPC client |
 
@@ -21,7 +22,7 @@
 2. **`event_type` 是主索引**：排障时先确认消息上的 `event_type`，再对照 yaml 的 handler 键和代码注册。  
 3. **Ack/Nack 取决于 Dispatch 结果**：理解投递语义时，要从 `createDispatchHandler` 这一层看成功、失败和重试。  
 4. **并发和 backlog 共享只看 worker 配置**：当前真正影响 NSQ in-flight 的是 `worker.concurrency`；多实例共享同一 backlog 取决于相同的 `worker.service-name`。  
-4. **Redis 是侧载能力**：锁、统计和幂等辅助可能用到 Redis，但这不等于 worker 成了独立业务服务。  
+5. **Redis 是侧载能力**：锁、统计和幂等辅助可能用到 Redis，但这不等于 worker 成了独立业务服务。
 
 **组件定位**：**MQ 消费进程**；根据 [`configs/events.yaml`](../../configs/events.yaml) 订阅 Topic；将消息按 **event_type** 分发给 handler；通过 **gRPC** 回调 **apiserver** 完成业务写。**不**暴露业务 HTTP；**不**装配完整领域容器。  
 事件拓扑见 [03-事件系统](../03-基础设施/01-事件系统.md)；gRPC 客户端表见 [04-gRPC](../04-接口与运维/02-gRPC契约.md)。
@@ -35,7 +36,7 @@
 | 维度 | 说明 |
 | ---- | ---- |
 | **角色** | 异步执行器：把「已发布事件」转成「对 apiserver 的 RPC」 |
-| **上游** | **MQ**（apiserver 发布的 Topic） |
+| **上游** | **MQ**（apiserver 发布的 4 个业务 Topic） |
 | **下游（兄弟组件）** | **apiserver gRPC**（AnswerSheet / Evaluation / Internal） |
 | **本地依赖** | **Redis**（锁、统计辅助等，视 handler） |
 
@@ -94,7 +95,7 @@ sequenceDiagram
 
 ## 常见事件怎样映射到 handler 和 gRPC
 
-下表仅列 **主链路上常用事件**与**主要 RPC**，便于从消息追到代码；**完整映射与 handler 键名**以 [`configs/events.yaml`](../../configs/events.yaml) 为准。未写明的分支（如仅打日志、仅 Redis 统计）见各 `*_handler.go`。
+下表仅列 **常见事件摘要**与**主要 RPC**，便于从消息追到代码；**完整 topic / event 清单**统一见 [03-基础设施/01-事件系统](../03-基础设施/01-事件系统.md)。未写明的分支见各 `*_handler.go`。
 
 | event_type（节选） | `events.yaml` 中 handler 键 | 主要 gRPC / 侧载（摘要） |
 | ------------------ | ----------------------------- | ------------------------- |
@@ -103,10 +104,13 @@ sequenceDiagram
 | `assessment.interpreted` | `assessment_interpreted_handler` | 内联 **statistics**；无固定必选 Internal |
 | `assessment.failed` | `assessment_failed_handler` | 记录失败日志；当前未接更强告警动作 |
 | `report.generated` | `report_generated_handler` | **Evaluation**：`GetAssessmentReport`；**Internal**：`TagTestee` |
+| `footprint.*` | `behavior_projector_handler` | **Internal**：`ProjectBehaviorEvent`，驱动行为投影与补偿 |
 | `questionnaire.changed` | `questionnaire_changed_handler` | `action=published` 时 **Internal**：`GenerateQuestionnaireQRCode`；其他 action 仅日志 |
 | `scale.changed` | `scale_changed_handler` | `action=published` 时 **Internal**：`GenerateScaleQRCode`；其他 action 仅日志 |
 | `task.opened` | `task_opened_handler` | **Internal**：`SendTaskOpenedMiniProgramNotification` |
 | `task.completed` / `task.expired` / `task.canceled` | 各 `task_*_handler` | 通过 `Notifier` 发送完成/过期/取消通知 |
+
+**当前实际订阅 topic**：`qs.survey.lifecycle`、`qs.evaluation.lifecycle`、`qs.analytics.behavior`、`qs.plan.task`。
 
 **当前没有计划级生命周期事件**：计划生命周期本身已回归同步业务逻辑，异步副作用统一沉到 `task.*`。
 

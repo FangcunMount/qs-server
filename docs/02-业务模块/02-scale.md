@@ -42,7 +42,7 @@
 - **量表生命周期**：创建、编辑基本信息、绑定问卷（编码 + 版本）、发布、下架（回草稿）、归档、删除（仅草稿可删）。
 - **因子与解读**：因子增删改、批量替换、解读规则维护；发布前校验「至少一因子、总分因子唯一、非总分因子须挂题、解读规则非空」等（见 [validator.go](../../internal/apiserver/domain/scale/validator.go)）。
 - **规则消费契约**：向 `evaluation` 提供可加载的 `MedicalScale` + `Factor`；领域层 `ScoringService.CalculateFactorScore` 在运行时用 **答卷 + 问卷** 计算因子分（见 [scoring_service.go](../../internal/apiserver/domain/scale/scoring_service.go)）。
-- **事件与外围协同**：统一发布 `scale.changed`，由 `action=published | unpublished | updated | archived` 区分；`worker` / `collection-server` 等消费者见 [configs/events.yaml](../../configs/events.yaml)。
+- **事件与外围协同**：统一发布 `scale.changed`，由 `action=published | unpublished | updated | archived` 区分；Topic、handler 与运行时消费链路统一见 [03-基础设施/01-事件系统.md](../03-基础设施/01-事件系统.md)。
 - **查询与列表**：后台 REST + C 端 gRPC；已发布量表列表可经应用层缓存刷新（见 [global_list_cache.go](../../internal/apiserver/application/scale/global_list_cache.go)）。
 
 #### 不负责什么（细项）
@@ -55,7 +55,7 @@
 
 - **REST**：量表路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler 见 [scale.go](../../internal/apiserver/interface/restful/handler/scale.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
 - **C 端 gRPC**：`GetScale` / `ListScales` / `GetScaleCategories` 等以 [scale.proto](../../internal/apiserver/interface/grpc/proto/scale/scale.proto) 与 [scale.go](../../internal/apiserver/interface/grpc/service/scale.go) 为准。
-- **领域事件**：事件类型、Topic、handler 须与 [configs/events.yaml](../../configs/events.yaml) 一致；下文「核心契约」中有对照表便于 **Verify**。
+- **领域事件**：事件类型、Topic、handler 须与 [configs/events.yaml](../../configs/events.yaml) 一致；完整运行时事件清单与消费链路见 [03-基础设施/01-事件系统.md](../03-基础设施/01-事件系统.md)。
 
 ### 运行时示意图
 
@@ -263,11 +263,12 @@ flowchart TB
 
 **与 `configs/events.yaml` 对照（Verify）**：
 
-| 事件类型 | Topic（yaml 字段 `topic`） | handler（yaml） | consumers（摘录） |
-| -------- | -------------------------- | ----------------- | ------------------- |
-| `scale.changed` | `questionnaire-lifecycle` | `scale_changed_handler` | `collection-server`、`qs-worker` |
+- 事件类型：`scale.changed`
+- Topic：`questionnaire-lifecycle`，对应运行时 topic `qs.survey.lifecycle`
+- handler：`scale_changed_handler`
+- 运行时消费链路：当前仓库内通用业务消费者是 `qs-worker`；完整上下游见 [03-基础设施/01-事件系统.md](../03-基础设施/01-事件系统.md)
 
-改事件名或 consumer 时须同步 **yaml**、领域 `events.go`、发布点与 worker 侧注册。
+改事件名、topic 绑定或 handler 名时须同步 **yaml**、领域 `events.go`、发布点与 worker 侧注册。
 
 #### `scale.changed`：当前语义与发布点
 
