@@ -136,6 +136,85 @@ func TestOptionsValidateBehaviorPendingReconcile(t *testing.T) {
 	}
 }
 
+func TestOptionsValidateStatisticsSync(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Options)
+		wantErr string
+	}{
+		{
+			name: "disabled statistics sync skips validation",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.Enable = false
+				opts.StatisticsSync.OrgIDs = nil
+				opts.StatisticsSync.RunAt = "bad"
+				opts.StatisticsSync.RepairWindowDays = 0
+				opts.StatisticsSync.LockKey = ""
+				opts.StatisticsSync.LockTTL = 0
+			},
+		},
+		{
+			name: "enabled statistics sync requires org ids",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.OrgIDs = nil
+			},
+			wantErr: "statistics_sync.org_ids cannot be empty when enabled",
+		},
+		{
+			name: "enabled statistics sync requires valid run_at",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.RunAt = "bad"
+			},
+			wantErr: "statistics_sync.run_at must be in HH:MM format",
+		},
+		{
+			name: "enabled statistics sync requires positive repair window",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.RepairWindowDays = 0
+			},
+			wantErr: "statistics_sync.repair_window_days must be greater than 0",
+		},
+		{
+			name: "enabled statistics sync requires lock key",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.LockKey = ""
+			},
+			wantErr: "statistics_sync.lock_key cannot be empty when enabled",
+		},
+		{
+			name: "enabled statistics sync requires positive lock ttl",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.LockTTL = 0
+			},
+			wantErr: "statistics_sync.lock_ttl must be greater than 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewOptions()
+			tt.mutate(opts)
+
+			errs := opts.Validate()
+			if tt.wantErr == "" {
+				for _, err := range errs {
+					if strings.Contains(err.Error(), "statistics_sync.") {
+						t.Fatalf("unexpected statistics sync validation error: %v", err)
+					}
+				}
+				return
+			}
+
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tt.wantErr) {
+					return
+				}
+			}
+			t.Fatalf("expected validation error containing %q, got %v", tt.wantErr, errs)
+		})
+	}
+}
+
 func TestOptionsValidateCacheRoutes(t *testing.T) {
 	tests := []struct {
 		name    string

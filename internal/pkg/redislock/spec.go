@@ -21,6 +21,7 @@ func (s Spec) Identity(key string) Identity {
 var Specs = struct {
 	AnswersheetProcessing    Spec
 	PlanSchedulerLeader      Spec
+	StatisticsSyncLeader     Spec
 	StatisticsSync           Spec
 	BehaviorPendingReconcile Spec
 	CollectionSubmit         Spec
@@ -34,6 +35,11 @@ var Specs = struct {
 		Name:        "plan_scheduler_leader",
 		Description: "用于 worker 计划调度器多实例抢占 leader 的分布式锁。",
 		DefaultTTL:  50 * time.Second,
+	},
+	StatisticsSyncLeader: Spec{
+		Name:        "statistics_sync_leader",
+		Description: "用于 apiserver 统计同步调度器多实例抢占 leader 的分布式锁。",
+		DefaultTTL:  30 * time.Minute,
 	},
 	StatisticsSync: Spec{
 		Name:        "statistics_sync",

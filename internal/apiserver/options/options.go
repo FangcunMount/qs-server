@@ -138,6 +138,8 @@ func NewBackpressureOptions() *BackpressureOptions {
 	}
 }
 
+const DefaultPlanEntryBaseURL = "https://collect.fangcunmount.cn/entry"
+
 // PlanOptions 测评计划相关配置。
 type PlanOptions struct {
 	EntryBaseURL string `json:"entry_base_url" mapstructure:"entry_base_url"`
@@ -146,7 +148,7 @@ type PlanOptions struct {
 // NewPlanOptions 创建默认 plan 配置。
 func NewPlanOptions() *PlanOptions {
 	return &PlanOptions{
-		EntryBaseURL: "https://collect.fangcunmount.cn/entry",
+		EntryBaseURL: DefaultPlanEntryBaseURL,
 	}
 }
 
@@ -542,10 +544,12 @@ type WarmupHotsetOptions struct {
 
 // StatisticsSyncOptions 统计同步定时任务配置
 type StatisticsSyncOptions struct {
-	Enable           bool    `json:"enable" mapstructure:"enable"`
-	OrgIDs           []int64 `json:"org_ids" mapstructure:"org_ids"`
-	RunAt            string  `json:"run_at" mapstructure:"run_at"`
-	RepairWindowDays int     `json:"repair_window_days" mapstructure:"repair_window_days"`
+	Enable           bool          `json:"enable" mapstructure:"enable"`
+	OrgIDs           []int64       `json:"org_ids" mapstructure:"org_ids"`
+	RunAt            string        `json:"run_at" mapstructure:"run_at"`
+	RepairWindowDays int           `json:"repair_window_days" mapstructure:"repair_window_days"`
+	LockKey          string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL          time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
 }
 
 // NewStatisticsSyncOptions 默认开启，每日凌晨 00:30 同步一次。
@@ -555,6 +559,8 @@ func NewStatisticsSyncOptions() *StatisticsSyncOptions {
 		OrgIDs:           []int64{1},
 		RunAt:            "00:30",
 		RepairWindowDays: 7,
+		LockKey:          "qs:statistics-sync:leader",
+		LockTTL:          30 * time.Minute,
 	}
 }
 
@@ -567,6 +573,8 @@ func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64SliceVar(&s.OrgIDs, "statistics_sync.org-ids", s.OrgIDs, "Organization IDs included in scheduled statistics sync.")
 	fs.StringVar(&s.RunAt, "statistics_sync.run-at", s.RunAt, "Daily wall-clock time for statistics sync, in HH:MM format.")
 	fs.IntVar(&s.RepairWindowDays, "statistics_sync.repair-window-days", s.RepairWindowDays, "Number of completed days to rebuild when running scheduled daily statistics sync.")
+	fs.StringVar(&s.LockKey, "statistics_sync.lock-key", s.LockKey, "Redis distributed lock key used by the scheduled statistics sync.")
+	fs.DurationVar(&s.LockTTL, "statistics_sync.lock-ttl", s.LockTTL, "Redis distributed lock TTL used by the scheduled statistics sync.")
 }
 
 // Complete 完成配置选项

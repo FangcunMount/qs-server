@@ -17,6 +17,7 @@ import (
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -107,7 +108,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 
 	m.TaskRepo = planInfra.NewTaskRepository(mysqlDB)
 
-	entryBaseURL := "https://collect.fangcunmount.cn/entry"
+	entryBaseURL := apiserveroptions.DefaultPlanEntryBaseURL
 	if len(params) > 6 {
 		if baseURL, ok := params[6].(string); ok && strings.TrimSpace(baseURL) != "" {
 			entryBaseURL = strings.TrimSpace(baseURL)

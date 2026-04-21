@@ -2,6 +2,7 @@ package options
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
@@ -89,6 +90,23 @@ func (o *Options) Validate() []error {
 		}
 		if o.BehaviorPendingReconcile.LockTTL <= 0 {
 			errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_ttl must be greater than 0"))
+		}
+	}
+	if o.StatisticsSync != nil && o.StatisticsSync.Enable {
+		if len(o.StatisticsSync.OrgIDs) == 0 {
+			errs = append(errs, fmt.Errorf("statistics_sync.org_ids cannot be empty when enabled"))
+		}
+		if _, err := time.ParseInLocation("15:04", o.StatisticsSync.RunAt, time.Local); err != nil {
+			errs = append(errs, fmt.Errorf("statistics_sync.run_at must be in HH:MM format"))
+		}
+		if o.StatisticsSync.RepairWindowDays <= 0 {
+			errs = append(errs, fmt.Errorf("statistics_sync.repair_window_days must be greater than 0"))
+		}
+		if o.StatisticsSync.LockKey == "" {
+			errs = append(errs, fmt.Errorf("statistics_sync.lock_key cannot be empty when enabled"))
+		}
+		if o.StatisticsSync.LockTTL <= 0 {
+			errs = append(errs, fmt.Errorf("statistics_sync.lock_ttl must be greater than 0"))
 		}
 	}
 

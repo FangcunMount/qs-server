@@ -217,11 +217,18 @@ redis_runtime:
       allow_fallback_default: true
 
 # -------------------------------------------------------
-# 3.5 缓存控制
+# 3.5 Plan 业务配置
+# -------------------------------------------------------
+plan:
+  entry_base_url: "https://collect.fangcunmount.cn/entry"
+
+# -------------------------------------------------------
+# 3.6 缓存控制
 # -------------------------------------------------------
 cache:
   disable_evaluation_cache: false  # 是否暂停测评结果的 Redis 缓存
   disable_statistics_cache: false  # 是否暂停统计的 Redis 缓存
+  compress_payload: false          # 是否压缩缓存 payload
   static:
     compress: false
     singleflight: true
@@ -252,6 +259,7 @@ cache:
     assessment_list: "10m"
     testee: "30m"
     plan: "1h"
+    negative: "5m"
   ttl_jitter_ratio: 0.1
   statistics_warmup:
     enable: false
@@ -269,7 +277,33 @@ cache:
       max_items_per_kind: 200
 
 # -------------------------------------------------------
-# 3.5 限流配置
+# 3.7 内建调度器配置
+# -------------------------------------------------------
+plan_scheduler:
+  enable: false
+  org_ids: [1]
+  initial_delay: "1m"
+  interval: "1m"
+  lock_key: "qs:plan-scheduler:leader"
+  lock_ttl: "50s"
+
+behavior_pending_reconcile:
+  enable: true
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:behavior-pending-reconcile:leader"
+  lock_ttl: "30s"
+
+statistics_sync:
+  enable: true
+  org_ids: [1]
+  run_at: "00:30"
+  repair_window_days: 7
+  lock_key: "qs:statistics-sync:leader"
+  lock_ttl: "30m"
+
+# -------------------------------------------------------
+# 3.8 限流配置
 # -------------------------------------------------------
 rate_limit:
   enabled: true
@@ -291,7 +325,7 @@ rate_limit:
   wait_report_user_burst: 5
 
 # -------------------------------------------------------
-# 3.6 下游背压配置
+# 3.9 下游背压配置
 # -------------------------------------------------------
 backpressure:
   mysql:
@@ -308,7 +342,7 @@ backpressure:
     timeout_ms: 2000
 
 # -------------------------------------------------------
-# 3.7 MongoDB 数据库
+# 3.10 MongoDB 数据库
 # -------------------------------------------------------
 # 支持两种方式：分离参数（推荐）或直接 URL
 mongodb:
@@ -464,13 +498,3 @@ log:
     error:
       - stderr
       - /data/logs/qs/qs-apiserver-error.log
-
-# -------------------------------------------------------
-# 6.2 JWT 配置（本地认证降级方案）
-# -------------------------------------------------------
-# 说明：当 IAM 不可用时的降级认证方式
-jwt:
-  realm: "qs jwt"
-  key: "questionnaire-scale-jwt-secret-key-2024"
-  timeout: "24h"
-  max-refresh: "168h"

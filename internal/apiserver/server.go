@@ -548,6 +548,8 @@ func (s *apiServer) startSchedulers() {
 			s.config.StatisticsSync,
 			statisticsSyncSvc,
 			s.container.WarmupCoordinator,
+			s.lockManager,
+			lockBuilder,
 		),
 		runtimescheduler.NewBehaviorPendingReconcileRunner(
 			s.config.BehaviorPendingReconcile,
