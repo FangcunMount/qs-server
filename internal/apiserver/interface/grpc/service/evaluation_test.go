@@ -20,6 +20,15 @@ func TestToAssessmentQueryGRPCError(t *testing.T) {
 		}
 	})
 
+	t.Run("maps wrapped assessment not found to grpc not found", func(t *testing.T) {
+		err := pkgerrors.WrapC(errors.New("repo miss"), errorCode.ErrAssessmentNotFound, "assessment not found")
+
+		got := toAssessmentQueryGRPCError(err)
+		if status.Code(got) != codes.NotFound {
+			t.Fatalf("expected NotFound, got %s", status.Code(got))
+		}
+	})
+
 	t.Run("maps unknown error to grpc internal", func(t *testing.T) {
 		got := toAssessmentQueryGRPCError(errors.New("boom"))
 		if status.Code(got) != codes.Internal {

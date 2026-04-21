@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
@@ -14,17 +15,34 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type evaluationQueryService interface {
+	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
+	GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*evaluation.AssessmentDetailResponse, error)
+	ListMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error)
+	GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
+	GetAssessmentReport(ctx context.Context, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
+	GetFactorTrend(ctx context.Context, testeeID uint64, req *evaluation.GetFactorTrendRequest) ([]evaluation.TrendPointResponse, error)
+	GetAssessmentTrendSummary(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentTrendSummaryResponse, error)
+	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
+}
+
+type answerSheetLookupService interface {
+	Get(ctx context.Context, id uint64) (*answersheetapp.AnswerSheetResponse, error)
+}
+
 // EvaluationHandler 测评处理器
 type EvaluationHandler struct {
 	*BaseHandler
-	queryService *evaluation.QueryService
+	queryService       evaluationQueryService
+	answerSheetService answerSheetLookupService
 }
 
 // NewEvaluationHandler 创建测评处理器
-func NewEvaluationHandler(queryService *evaluation.QueryService) *EvaluationHandler {
+func NewEvaluationHandler(queryService evaluationQueryService, answerSheetService answerSheetLookupService) *EvaluationHandler {
 	return &EvaluationHandler{
-		BaseHandler:  NewBaseHandler(),
-		queryService: queryService,
+		BaseHandler:        NewBaseHandler(),
+		queryService:       queryService,
+		answerSheetService: answerSheetService,
 	}
 }
 
@@ -467,7 +485,7 @@ func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
 	result, err := h.queryService.GetMyAssessmentByAnswerSheetID(c.Request.Context(), answerSheetID)
 	if err != nil {
 		if isGRPCNotFound(err) {
-			h.NotFoundResponse(c, "assessment not found", nil)
+			h.respondPendingAssessmentByAnswerSheet(c, answerSheetID)
 			return
 		}
 		h.InternalErrorResponse(c, "get assessment by answer sheet failed", err)
@@ -475,11 +493,44 @@ func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
 	}
 
 	if result == nil {
-		h.NotFoundResponse(c, "assessment not found", nil)
+		h.respondPendingAssessmentByAnswerSheet(c, answerSheetID)
 		return
 	}
 
 	h.Success(c, result)
+}
+
+func (h *EvaluationHandler) respondPendingAssessmentByAnswerSheet(c *gin.Context, answerSheetID uint64) {
+	exists, err := h.answerSheetExists(c.Request.Context(), answerSheetID)
+	if err != nil {
+		h.InternalErrorResponse(c, "check answer sheet before assessment lookup failed", err)
+		return
+	}
+	if !exists {
+		h.NotFoundResponse(c, "answer sheet not found", nil)
+		return
+	}
+
+	h.Success(c, &evaluation.AssessmentStatusResponse{
+		Status:    "pending",
+		UpdatedAt: time.Now().Unix(),
+	})
+}
+
+func (h *EvaluationHandler) answerSheetExists(ctx context.Context, answerSheetID uint64) (bool, error) {
+	if h.answerSheetService == nil {
+		return true, nil
+	}
+
+	result, err := h.answerSheetService.Get(ctx, answerSheetID)
+	if err != nil {
+		if isGRPCNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return result != nil, nil
 }
 
 func isGRPCNotFound(err error) bool {

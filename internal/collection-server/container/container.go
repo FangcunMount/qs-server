@@ -120,7 +120,7 @@ func (c *Container) initHandlers() {
 
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
-	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService)
+	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, guardianshipService)
 	c.healthHandler = handler.NewHealthHandler("collection-server", "2.0.0", c.familyStatus)
