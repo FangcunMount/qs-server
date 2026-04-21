@@ -182,19 +182,6 @@ func (s *GuardianshipService) RevokeGuardian(ctx context.Context, req *identityv
 	return s.client.RevokeGuardian(ctx, req)
 }
 
-// UpdateGuardianRelation 更新监护关系（SDK v0.0.5 新增）
-func (s *GuardianshipService) UpdateGuardianRelation(ctx context.Context, req *identityv1.UpdateGuardianRelationRequest) (*identityv1.UpdateGuardianRelationResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("guardianship service not enabled")
-	}
-	ctx, release, err := acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.UpdateGuardianRelation(ctx, req)
-}
-
 // BatchRevokeGuardians 批量撤销监护关系（SDK v0.0.5 新增）
 func (s *GuardianshipService) BatchRevokeGuardians(ctx context.Context, req *identityv1.BatchRevokeGuardiansRequest) (*identityv1.BatchRevokeGuardiansResponse, error) {
 	if !s.enabled {

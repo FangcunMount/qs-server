@@ -87,20 +87,6 @@ func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv1.Searc
 	return s.client.SearchUsers(ctx, req)
 }
 
-// LinkExternalIdentity 关联外部身份（SDK v0.0.5 新增）
-// 用于将用户与第三方身份提供商关联
-func (s *IdentityService) LinkExternalIdentity(ctx context.Context, req *identityv1.LinkExternalIdentityRequest) (*identityv1.LinkExternalIdentityResponse, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("identity service not enabled")
-	}
-	ctx, release, err := acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return s.client.LinkExternalIdentity(ctx, req)
-}
-
 // Raw 返回原始 SDK 客户端（用于高级用法）
 func (s *IdentityService) Raw() *identity.Client {
 	return s.client
