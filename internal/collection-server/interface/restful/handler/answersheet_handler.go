@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -14,14 +15,20 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
+type answerSheetSubmissionService interface {
+	SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *answersheet.SubmitAnswerSheetRequest) error
+	GetSubmitStatus(requestID string) (*answersheet.SubmitStatusResponse, bool)
+	Get(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error)
+}
+
 // AnswerSheetHandler 答卷处理器
 type AnswerSheetHandler struct {
 	*BaseHandler
-	submissionService *answersheet.SubmissionService
+	submissionService answerSheetSubmissionService
 }
 
 // NewAnswerSheetHandler 创建答卷处理器
-func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *AnswerSheetHandler {
+func NewAnswerSheetHandler(submissionService answerSheetSubmissionService) *AnswerSheetHandler {
 	return &AnswerSheetHandler{
 		BaseHandler:       NewBaseHandler(),
 		submissionService: submissionService,
@@ -35,7 +42,7 @@ func NewAnswerSheetHandler(submissionService *answersheet.SubmissionService) *An
 // @Accept json
 // @Produce json
 // @Param request body answersheet.SubmitAnswerSheetRequest true "答卷数据"
-// @Success 200 {object} core.Response{data=answersheet.SubmitAnswerSheetResponse}
+// @Success 202 {object} core.Response{data=answersheet.SubmitAcceptedResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
@@ -66,8 +73,7 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		requestID = uuid.Must(uuid.NewV4(), nil).String()
 	}
 
-	result, queued, err := h.submissionService.SubmitQueued(c.Request.Context(), requestID, writerID, &req)
-	if err != nil {
+	if err := h.submissionService.SubmitQueued(c.Request.Context(), requestID, writerID, &req); err != nil {
 		if errors.Is(err, answersheet.ErrQueueFull) {
 			c.JSON(http.StatusTooManyRequests, core.ErrResponse{
 				Code:    http.StatusTooManyRequests,
@@ -79,19 +85,14 @@ func (h *AnswerSheetHandler) Submit(c *gin.Context) {
 		return
 	}
 
-	if queued {
-		c.JSON(http.StatusAccepted, core.Response{
-			Code:    0,
-			Message: "accepted",
-			Data: gin.H{
-				"status":     "queued",
-				"request_id": requestID,
-			},
-		})
-		return
-	}
-
-	h.Success(c, result)
+	c.JSON(http.StatusAccepted, core.Response{
+		Code:    0,
+		Message: "accepted",
+		Data: answersheet.SubmitAcceptedResponse{
+			Status:    answersheet.SubmitStatusQueued,
+			RequestID: requestID,
+		},
+	})
 }
 
 func (h *AnswerSheetHandler) respondSubmitError(c *gin.Context, err error) {

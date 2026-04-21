@@ -64,6 +64,12 @@ type SubmitAnswerSheetResponse struct {
 	Message string `json:"message"`
 }
 
+// SubmitAcceptedResponse 提交受理响应
+type SubmitAcceptedResponse struct {
+	Status    string `json:"status"`
+	RequestID string `json:"request_id"`
+}
+
 // SubmitStatusResponse 提交状态响应
 type SubmitStatusResponse struct {
 	Status        string `json:"status"`

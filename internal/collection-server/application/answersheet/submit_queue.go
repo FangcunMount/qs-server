@@ -10,17 +10,11 @@ import (
 // ErrQueueFull indicates the submit queue is full.
 var ErrQueueFull = errors.New("submit queue full")
 
-type submitResult struct {
-	resp *SubmitAnswerSheetResponse
-	err  error
-}
-
 type submitJob struct {
 	ctx       context.Context
 	requestID string
 	writerID  uint64
 	req       *SubmitAnswerSheetRequest
-	respCh    chan submitResult
 }
 
 type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error)
@@ -28,7 +22,6 @@ type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest)
 // SubmitQueue queues submit requests for asynchronous processing.
 type SubmitQueue struct {
 	jobs        chan submitJob
-	waitTimeout time.Duration
 	submit      submitFunc
 	statusTTL   time.Duration
 	mu          sync.Mutex
@@ -37,17 +30,16 @@ type SubmitQueue struct {
 }
 
 // NewSubmitQueue creates a submit queue with worker goroutines.
-func NewSubmitQueue(workerCount, queueSize int, waitTimeout time.Duration, submit submitFunc) *SubmitQueue {
+func NewSubmitQueue(workerCount, queueSize int, submit submitFunc) *SubmitQueue {
 	if workerCount <= 0 || queueSize <= 0 || submit == nil {
 		return nil
 	}
 
 	q := &SubmitQueue{
-		jobs:        make(chan submitJob, queueSize),
-		waitTimeout: waitTimeout,
-		submit:      submit,
-		statusTTL:   10 * time.Minute,
-		statuses:    make(map[string]SubmitStatusResponse),
+		jobs:      make(chan submitJob, queueSize),
+		submit:    submit,
+		statusTTL: 10 * time.Minute,
+		statuses:  make(map[string]SubmitStatusResponse),
 	}
 
 	for i := 0; i < workerCount; i++ {
@@ -57,68 +49,51 @@ func NewSubmitQueue(workerCount, queueSize int, waitTimeout time.Duration, submi
 	return q
 }
 
-// Enqueue submits a job and waits for a short time for the result.
-// It returns queued=true when the job is accepted but not finished in time.
-func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, bool, error) {
+// Enqueue accepts a submit request for asynchronous processing.
+func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) error {
 	if q == nil {
-		return nil, false, errors.New("submit queue disabled")
+		return errors.New("submit queue disabled")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if requestID == "" {
-		return nil, false, errors.New("request id is required")
+		return errors.New("request id is required")
 	}
 
-	// 幂等：若已有状态，直接返回或告知排队中
+	// 幂等：若已有状态，直接复用现有状态。
 	if status, ok := q.getStatus(requestID); ok {
 		switch status.Status {
 		case SubmitStatusDone:
-			// 已完成，直接返回结果
-			return &SubmitAnswerSheetResponse{
-				ID:      status.AnswerSheetID,
-				Message: "already submitted",
-			}, false, nil
+			return nil
 		case SubmitStatusQueued, SubmitStatusProcessing:
-			// 还在队列/处理中，提示客户端等待
-			return nil, true, nil
+			return nil
 		case SubmitStatusFailed:
-			// 已失败，不重复入队，由客户端决定是否换 request_id 重试
-			return nil, false, errors.New("previous request failed, please retry with a new request_id")
+			return errors.New("previous request failed, please retry with a new request_id")
 		}
 	}
 
-	respCh := make(chan submitResult, 1)
 	job := submitJob{
 		ctx:       context.WithoutCancel(ctx),
 		requestID: requestID,
 		writerID:  writerID,
 		req:       req,
-		respCh:    respCh,
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	select {
 	case q.jobs <- job:
 		q.setStatus(requestID, SubmitStatusQueued, "")
 	default:
-		return nil, false, ErrQueueFull
+		return ErrQueueFull
 	}
 
-	if q.waitTimeout <= 0 {
-		return nil, true, nil
-	}
-
-	timer := time.NewTimer(q.waitTimeout)
-	defer timer.Stop()
-
-	select {
-	case result := <-respCh:
-		return result.resp, false, result.err
-	case <-timer.C:
-		return nil, true, nil
-	case <-ctx.Done():
-		return nil, false, ctx.Err()
-	}
+	return nil
 }
 
 func (q *SubmitQueue) worker() {
@@ -130,7 +105,6 @@ func (q *SubmitQueue) worker() {
 		} else if resp != nil {
 			q.setStatus(job.requestID, SubmitStatusDone, resp.ID)
 		}
-		job.respCh <- submitResult{resp: resp, err: err}
 	}
 }
 

@@ -55,14 +55,14 @@ func NewSubmissionService(
 		submitGuard:         submitGuard,
 	}
 
-	if queueOptions != nil && queueOptions.Enabled {
-		service.queue = NewSubmitQueue(
-			queueOptions.WorkerCount,
-			queueOptions.QueueSize,
-			time.Duration(queueOptions.WaitTimeoutMs)*time.Millisecond,
-			service.submitWithGuard,
-		)
+	if queueOptions == nil {
+		queueOptions = options.NewSubmitQueueOptions()
 	}
+	service.queue = NewSubmitQueue(
+		queueOptions.WorkerCount,
+		queueOptions.QueueSize,
+		service.submitWithGuard,
+	)
 
 	return service
 }
@@ -73,11 +73,10 @@ func (s *SubmissionService) Submit(ctx context.Context, writerID uint64, req *Su
 	return s.submitWithGuard(ctx, requestKey("", req), writerID, req)
 }
 
-// SubmitQueued 提交答卷（带排队）
-func (s *SubmissionService) SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, bool, error) {
+// SubmitQueued 提交答卷（固定走排队受理）
+func (s *SubmissionService) SubmitQueued(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) error {
 	if s.queue == nil {
-		resp, err := s.submitSync(ctx, writerID, req)
-		return resp, false, err
+		return fmt.Errorf("submit queue not initialized")
 	}
 
 	return s.queue.Enqueue(ctx, requestID, writerID, req)

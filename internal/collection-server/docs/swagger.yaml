@@ -60,6 +60,13 @@ definitions:
       message:
         type: string
     type: object
+  answersheet.SubmitAcceptedResponse:
+    properties:
+      request_id:
+        type: string
+      status:
+        type: string
+    type: object
   answersheet.SubmitStatusResponse:
     properties:
       answersheet_id:
@@ -858,14 +865,14 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
             allOf:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/answersheet.SubmitAnswerSheetResponse'
+                  $ref: '#/definitions/answersheet.SubmitAcceptedResponse'
               type: object
         "400":
           description: Bad Request

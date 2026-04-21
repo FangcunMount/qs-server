@@ -40,8 +40,8 @@ paths:
             schema:
               $ref: '#/components/schemas/answersheet.SubmitAnswerSheetRequest'
       responses:
-        '200':
-          description: OK
+        '202':
+          description: Accepted
           content:
             application/json:
               schema:
@@ -50,7 +50,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/answersheet.SubmitAnswerSheetResponse'
+                      $ref: '#/components/schemas/answersheet.SubmitAcceptedResponse'
         '400':
           description: Bad Request
           content:
@@ -1308,6 +1308,13 @@ components:
         id:
           type: string
         message:
+          type: string
+    answersheet.SubmitAcceptedResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+        status:
           type: string
     answersheet.SubmitStatusResponse:
       type: object

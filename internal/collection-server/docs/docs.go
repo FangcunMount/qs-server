@@ -45,8 +45,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
                             "allOf": [
                                 {
@@ -56,7 +56,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/answersheet.SubmitAnswerSheetResponse"
+                                            "$ref": "#/definitions/answersheet.SubmitAcceptedResponse"
                                         }
                                     }
                                 }
@@ -1815,6 +1815,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "answersheet.SubmitAcceptedResponse": {
+            "type": "object",
+            "properties": {
+                "request_id": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 }
             }

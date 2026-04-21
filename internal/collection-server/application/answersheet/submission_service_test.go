@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -91,5 +92,17 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 	}
 	if testee == nil || testee.ID != canonicalTesteeID {
 		t.Fatalf("unexpected canonical testee: %+v", testee)
+	}
+}
+
+func TestNewSubmissionServiceAlwaysInitializesQueue(t *testing.T) {
+	service := NewSubmissionService(nil, nil, nil, &options.SubmitQueueOptions{
+		Enabled:     false,
+		QueueSize:   8,
+		WorkerCount: 1,
+	}, nil)
+
+	if service.queue == nil {
+		t.Fatal("expected submit queue to be initialized even when enabled=false")
 	}
 }

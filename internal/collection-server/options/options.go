@@ -13,20 +13,20 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                     *log.Options                           `json:"log"      mapstructure:"log"`
-	GenericServerRunOptions *genericoptions.ServerRunOptions       `json:"server"   mapstructure:"server"`
-	InsecureServing         *genericoptions.InsecureServingOptions `json:"insecure" mapstructure:"insecure"`
-	SecureServing           *genericoptions.SecureServingOptions   `json:"secure"   mapstructure:"secure"`
-	GRPCClient              *GRPCClientOptions                     `json:"grpc_client" mapstructure:"grpc_client"`
-	RedisOptions            *genericoptions.RedisOptions           `json:"redis"     mapstructure:"redis"`
+	Log                     *log.Options                            `json:"log"      mapstructure:"log"`
+	GenericServerRunOptions *genericoptions.ServerRunOptions        `json:"server"   mapstructure:"server"`
+	InsecureServing         *genericoptions.InsecureServingOptions  `json:"insecure" mapstructure:"insecure"`
+	SecureServing           *genericoptions.SecureServingOptions    `json:"secure"   mapstructure:"secure"`
+	GRPCClient              *GRPCClientOptions                      `json:"grpc_client" mapstructure:"grpc_client"`
+	RedisOptions            *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
 	RedisProfiles           map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
-	RedisRuntime            *genericoptions.RedisRuntimeOptions    `json:"redis_runtime" mapstructure:"redis_runtime"`
-	Concurrency             *ConcurrencyOptions                    `json:"concurrency" mapstructure:"concurrency"`
-	RateLimit               *RateLimitOptions                      `json:"rate_limit" mapstructure:"rate_limit"`
-	SubmitQueue             *SubmitQueueOptions                    `json:"submit_queue" mapstructure:"submit_queue"`
-	JWT                     *JWTOptions                            `json:"jwt" mapstructure:"jwt"`
-	IAMOptions              *genericoptions.IAMOptions             `json:"iam" mapstructure:"iam"`
-	Runtime                 *RuntimeOptions                        `json:"runtime" mapstructure:"runtime"`
+	RedisRuntime            *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	Concurrency             *ConcurrencyOptions                     `json:"concurrency" mapstructure:"concurrency"`
+	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
+	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
+	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
+	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -50,10 +50,10 @@ type ConcurrencyOptions struct {
 
 // SubmitQueueOptions 提交排队配置
 type SubmitQueueOptions struct {
-	Enabled       bool `json:"enabled" mapstructure:"enabled"`
+	Enabled       bool `json:"enabled" mapstructure:"enabled"` // Deprecated: submit queue is always enabled.
 	QueueSize     int  `json:"queue_size" mapstructure:"queue_size"`
 	WorkerCount   int  `json:"worker_count" mapstructure:"worker_count"`
-	WaitTimeoutMs int  `json:"wait_timeout_ms" mapstructure:"wait_timeout_ms"`
+	WaitTimeoutMs int  `json:"wait_timeout_ms" mapstructure:"wait_timeout_ms"` // Deprecated: submit no longer waits synchronously for queue results.
 }
 
 // RateLimitOptions 限流配置
@@ -177,7 +177,7 @@ func NewSubmitQueueOptions() *SubmitQueueOptions {
 		Enabled:       true,
 		QueueSize:     1000,
 		WorkerCount:   8,
-		WaitTimeoutMs: 200,
+		WaitTimeoutMs: 0,
 	}
 }
 
@@ -239,10 +239,10 @@ func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 
 // AddFlags 添加提交排队相关的命令行参数
 func (s *SubmitQueueOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&s.Enabled, "submit_queue.enabled", s.Enabled, "Enable submit queue.")
+	fs.BoolVar(&s.Enabled, "submit_queue.enabled", s.Enabled, "Deprecated: submit queue is always enabled.")
 	fs.IntVar(&s.QueueSize, "submit_queue.queue-size", s.QueueSize, "Submit queue size.")
 	fs.IntVar(&s.WorkerCount, "submit_queue.worker-count", s.WorkerCount, "Submit queue worker count.")
-	fs.IntVar(&s.WaitTimeoutMs, "submit_queue.wait-timeout-ms", s.WaitTimeoutMs, "Submit queue wait timeout in milliseconds.")
+	fs.IntVar(&s.WaitTimeoutMs, "submit_queue.wait-timeout-ms", s.WaitTimeoutMs, "Deprecated: submit no longer waits synchronously for queue results.")
 }
 
 // AddFlags 添加限流相关的命令行参数
@@ -328,7 +328,7 @@ func (o *Options) Validate() []error {
 		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
 	}
 
-	if o.SubmitQueue != nil && o.SubmitQueue.Enabled {
+	if o.SubmitQueue != nil {
 		if o.SubmitQueue.QueueSize <= 0 {
 			errs = append(errs, fmt.Errorf("submit_queue.queue_size must be greater than 0"))
 		}
