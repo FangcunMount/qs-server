@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
 
@@ -58,26 +59,26 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 	)
 
 	var httpStatus int
-	var errorCode int
+	var businessCode int
 	var message string
 	var reference string
 
 	// 尝试解析为内部错误码
 	if coder := errors.ParseCoder(err); coder != nil {
 		httpStatus = coder.HTTPStatus()
-		errorCode = coder.Code()
+		businessCode = coder.Code()
 		message = coder.String()
 		reference = coder.Reference()
 	} else {
 		// 处理未知错误
 		httpStatus = http.StatusInternalServerError
-		errorCode = 100101 // ErrDatabase 默认值
+		businessCode = errorCode.ErrDatabase
 		message = "内部服务器错误"
 	}
 
 	// 发送响应
 	c.JSON(httpStatus, Response{
-		Code:      errorCode,
+		Code:      businessCode,
 		Message:   message,
 		Reference: reference,
 	})
@@ -94,7 +95,7 @@ func (h *BaseHandler) BadRequestResponse(c *gin.Context, message string, err err
 	if err != nil {
 		h.Error(c, errors.Wrap(err, message))
 	} else {
-		h.ErrorResponseWithCode(c, 100003, "%s", message) // ErrBind
+		h.ErrorResponseWithCode(c, errorCode.ErrBind, "%s", message)
 	}
 }
 
@@ -103,7 +104,7 @@ func (h *BaseHandler) NotFoundResponse(c *gin.Context, message string, err error
 	if err != nil {
 		h.Error(c, errors.Wrap(err, message))
 	} else {
-		h.ErrorResponseWithCode(c, 100102, "%s", message) // ErrPageNotFound
+		h.ErrorResponseWithCode(c, errorCode.ErrPageNotFound, "%s", message)
 	}
 }
 
@@ -112,23 +113,23 @@ func (h *BaseHandler) InternalErrorResponse(c *gin.Context, message string, err 
 	if err != nil {
 		h.Error(c, errors.Wrap(err, message))
 	} else {
-		h.ErrorResponseWithCode(c, 100101, "%s", message) // ErrDatabase
+		h.ErrorResponseWithCode(c, errorCode.ErrDatabase, "%s", message)
 	}
 }
 
 // ValidationErrorResponse 参数验证错误响应
 func (h *BaseHandler) ValidationErrorResponse(c *gin.Context, field, message string) {
-	h.ErrorResponseWithCode(c, 100003, "参数验证失败: %s %s", field, message) // ErrValidation
+	h.ErrorResponseWithCode(c, errorCode.ErrValidation, "参数验证失败: %s %s", field, message)
 }
 
 // UnauthorizedResponse 401错误响应
 func (h *BaseHandler) UnauthorizedResponse(c *gin.Context, message string) {
-	h.ErrorResponseWithCode(c, 100004, "%s", message) // ErrTokenInvalid
+	h.ErrorResponseWithCode(c, errorCode.ErrTokenInvalid, "%s", message)
 }
 
 // ForbiddenResponse 403错误响应
 func (h *BaseHandler) ForbiddenResponse(c *gin.Context, message string) {
-	h.ErrorResponseWithCode(c, 100010, "%s", message) // ErrPermissionDenied
+	h.ErrorResponseWithCode(c, errorCode.ErrPermissionDenied, "%s", message)
 }
 
 // ConflictResponse 409错误响应
@@ -136,7 +137,7 @@ func (h *BaseHandler) ConflictResponse(c *gin.Context, message string, err error
 	if err != nil {
 		h.Error(c, errors.Wrap(err, message))
 	} else {
-		h.ErrorResponseWithCode(c, 100201, "%s", message) // ErrUserAlreadyExists
+		h.ErrorResponseWithCode(c, errorCode.ErrConflict, "%s", message)
 	}
 }
 
