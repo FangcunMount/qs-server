@@ -667,8 +667,12 @@ security-govulncheck-ci: ## 运行依赖漏洞扫描并导出 JSON 报告（CI a
 	if [ $$status -ne 0 ] && [ $$status -ne 3 ]; then \
 		exit $$status; \
 	fi; \
+	env -u GOVERSION GOSUMDB=sum.golang.org $(GO) run ./scripts/security/govulncheck_summary.go \
+		-input "$(SECURITY_DIR)/govulncheck.json" \
+		-output "$(SECURITY_DIR)/govulncheck-summary.md"; \
 	if grep -q '"osv": {' "$(SECURITY_DIR)/govulncheck.json"; then \
 		echo "$(COLOR_YELLOW)⚠️ govulncheck 发现已知漏洞，报告已写入 $(SECURITY_DIR)/govulncheck.json$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)⚠️ 分组摘要已写入 $(SECURITY_DIR)/govulncheck-summary.md$(COLOR_RESET)"; \
 	else \
 		echo "$(COLOR_GREEN)✅ govulncheck 未发现已知漏洞$(COLOR_RESET)"; \
 	fi
