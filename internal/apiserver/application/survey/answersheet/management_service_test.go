@@ -2,10 +2,15 @@ package answersheet
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	questionnairedomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -144,5 +149,106 @@ func TestManagementServiceListUsesBuiltConditions(t *testing.T) {
 	}
 	if captured["questionnaire_code"] != "QNR-009" || captured["filler_id"] != fillerID || captured["kind"] != "manual" {
 		t.Fatalf("captured conditions = %#v", captured)
+	}
+}
+
+func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
+	t.Parallel()
+
+	answer1, _ := domainanswersheet.NewAnswer(meta.NewCode("q1"), questionnairedomain.TypeRadio, domainanswersheet.NewOptionValue("A"), 1.5)
+	answer2, _ := domainanswersheet.NewAnswer(meta.NewCode("q2"), questionnairedomain.TypeNumber, domainanswersheet.NewNumberValue(7), 2.5)
+	sheet, err := domainanswersheet.NewAnswerSheet(
+		domainanswersheet.NewQuestionnaireRef("QNR-001", "v1", "PHQ-9"),
+		actor.NewFillerRef(7, actor.FillerTypeGuardian),
+		[]domainanswersheet.Answer{answer1, answer2},
+		time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("NewAnswerSheet() error = %v", err)
+	}
+	sheet.AssignID(meta.FromUint64(12))
+
+	service := &managementService{
+		repo: &managementRepoStub{
+			findByIDFunc: func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error) {
+				return sheet, nil
+			},
+		},
+	}
+
+	result, err := service.GetByID(context.Background(), 12)
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+	if result.ID != 12 || result.QuestionnaireCode != "QNR-001" || result.QuestionnaireVer != "v1" {
+		t.Fatalf("unexpected identity fields: %+v", result)
+	}
+	if result.FillerID != 7 || len(result.Answers) != 2 {
+		t.Fatalf("unexpected filler/answers: %+v", result)
+	}
+	if result.Answers[0].QuestionCode != "q1" || result.Answers[1].QuestionCode != "q2" {
+		t.Fatalf("unexpected answers: %+v", result.Answers)
+	}
+}
+
+func TestManagementServiceDeleteDelegatesToRepository(t *testing.T) {
+	t.Parallel()
+
+	var deletedID meta.ID
+	service := &managementService{
+		repo: &managementRepoStub{
+			findByIDFunc: func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error) {
+				return &domainanswersheet.AnswerSheet{}, nil
+			},
+			deleteFunc: func(_ context.Context, id meta.ID) error {
+				deletedID = id
+				return nil
+			},
+		},
+	}
+
+	if err := service.Delete(context.Background(), 9); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if deletedID != meta.FromUint64(9) {
+		t.Fatalf("deletedID = %d, want 9", deletedID)
+	}
+}
+
+func TestAnswerSheetIDConvertersRejectOverflow(t *testing.T) {
+	t.Parallel()
+
+	if _, err := answerSheetIDFromUint64("answersheet_id", math.MaxUint64); err == nil {
+		t.Fatal("answerSheetIDFromUint64 expected overflow error")
+	}
+	if _, err := fillerUserIDFromUint64("filler_id", math.MaxUint64); err == nil {
+		t.Fatal("fillerUserIDFromUint64 expected overflow error")
+	}
+
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("mustUint64FromInt64 expected panic on negative input")
+		}
+	}()
+	_ = mustUint64FromInt64("filler_id", -1)
+}
+
+func TestManagementServiceDeleteWrapsMissingAnswerSheet(t *testing.T) {
+	t.Parallel()
+
+	service := &managementService{
+		repo: &managementRepoStub{
+			findByIDFunc: func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error) {
+				return nil, errors.WithCode(errorCode.ErrAnswerSheetNotFound, "missing")
+			},
+		},
+	}
+
+	err := service.Delete(context.Background(), 7)
+	if err == nil {
+		t.Fatal("Delete expected error")
+	}
+	if code := errors.ParseCoder(err).Code(); code != errorCode.ErrAnswerSheetNotFound {
+		t.Fatalf("error code = %d, want %d", code, errorCode.ErrAnswerSheetNotFound)
 	}
 }
