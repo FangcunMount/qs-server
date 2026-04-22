@@ -20,6 +20,8 @@ import (
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/aliyunoss"
+	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
@@ -81,8 +83,10 @@ type Container struct {
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 
 	// 基础设施服务
-	QRCodeGenerator wechatPort.QRCodeGenerator            // 小程序码生成器（可选）
-	SubscribeSender wechatPort.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
+	QRCodeGenerator       wechatPort.QRCodeGenerator            // 小程序码生成器（可选）
+	SubscribeSender       wechatPort.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
+	QRCodeObjectStore     objectstorageport.PublicObjectStore   // 二维码对象存储（可选）
+	QRCodeObjectKeyPrefix string                                // 二维码对象 key 前缀
 
 	// 应用层服务
 	QRCodeService                      qrcodeApp.QRCodeService                            // 小程序码生成服务（可选）
@@ -867,30 +871,54 @@ func (c *Container) initQRCodeGenerator() {
 	c.printf("📱 QRCode generator initialized (infrastructure layer)\n")
 }
 
+func (c *Container) initQRCodeObjectStore(ossOptions *options.OSSOptions) error {
+	if ossOptions == nil || !ossOptions.Enabled {
+		c.QRCodeObjectStore = nil
+		c.QRCodeObjectKeyPrefix = ""
+		return nil
+	}
+	if c.QRCodeObjectStore != nil {
+		return nil
+	}
+
+	store, err := aliyunoss.NewPublicObjectStore(ossOptions)
+	if err != nil {
+		return fmt.Errorf("initialize qrcode object store: %w", err)
+	}
+	c.QRCodeObjectStore = store
+	c.QRCodeObjectKeyPrefix = ossOptions.ObjectKeyPrefix
+	c.printf("🪣 QRCode object store initialized (bucket: %s)\n", ossOptions.Bucket)
+	return nil
+}
+
 // InitQRCodeService 初始化小程序码生成服务（应用层）
 // 从配置中读取 wechat_app_id，然后从 IAM 查询微信应用信息
-func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
+func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions, ossOptions *options.OSSOptions) error {
 	// 如果基础设施层未初始化，则应用层服务也不初始化
 	if c.QRCodeGenerator == nil {
 		c.printf("⚠️  QRCode service not initialized (generator not available)\n")
-		return
+		return nil
 	}
 
 	// 如果未提供配置，则不初始化
 	if wechatOptions == nil {
 		c.printf("⚠️  QRCode service not initialized (wechat options not provided)\n")
-		return
+		return nil
 	}
 
 	// 检查是否有配置
 	if wechatOptions.WeChatAppID == "" && (wechatOptions.AppID == "" || wechatOptions.AppSecret == "") {
 		c.printf("⚠️  QRCode service not initialized (missing config: wechat-app-id or app-id/app-secret)\n")
-		return
+		return nil
 	}
 
 	if wechatOptions.PagePath == "" {
 		c.printf("⚠️  QRCode service not initialized (missing page-path)\n")
-		return
+		return nil
+	}
+
+	if err := c.initQRCodeObjectStore(ossOptions); err != nil {
+		return err
 	}
 
 	// 获取 WeChatAppService（如果 IAM 模块已初始化）
@@ -901,7 +929,15 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
 
 	// 创建应用层服务配置
 	config := &qrcodeApp.Config{
-		PagePath: wechatOptions.PagePath,
+		PagePath:        wechatOptions.PagePath,
+		ObjectKeyPrefix: "qrcode",
+		PublicURLPrefix: qrcodeApp.QRCodeURLPrefix,
+	}
+	if ossOptions != nil && ossOptions.ObjectKeyPrefix != "" {
+		config.ObjectKeyPrefix = ossOptions.ObjectKeyPrefix
+	}
+	if ossOptions != nil && strings.TrimSpace(ossOptions.PublicBaseURL) != "" {
+		config.PublicURLPrefix = strings.TrimRight(strings.TrimSpace(ossOptions.PublicBaseURL), "/")
 	}
 
 	// 优先使用 IAM 查询（通过 WeChatAppID）
@@ -920,8 +956,10 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions) {
 		c.QRCodeGenerator,
 		config,
 		wechatAppService,
+		c.QRCodeObjectStore,
 	)
 	c.printf("📱 QRCode service initialized (application layer, page_path: %s)\n", wechatOptions.PagePath)
+	return nil
 }
 
 // InitMiniProgramTaskNotificationService 初始化 task.opened 小程序消息服务。

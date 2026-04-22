@@ -454,6 +454,28 @@ wechat:
   # app-id: ""      # 小程序 AppID（直接配置）
   # app-secret: ""  # 小程序 AppSecret（直接配置）
 
+# ----------------------------------------------------------------------------
+# 4.3 阿里云 OSS（二维码对象存储）
+# ----------------------------------------------------------------------------
+oss:
+  enabled: true         # 是否启用 OSS 存储二维码图片
+  region: "cn-beijing"  # OSS 存储区域（生产环境建议使用与服务器同地域的存储区域）
+  # 生产建议优先使用同地域内网 endpoint
+  endpoint: "oss-cn-beijing-internal.aliyuncs.com"  # OSS 内网 Endpoint（生产环境建议使用同地域内网地址）
+  bucket: "fangcunmount"
+  # 私有 Bucket 代理模式：对外仍返回 apiserver 的二维码路由，由服务端从 OSS 读取后转发
+  public-base-url: "https://qs.fangcunmount.cn/api/v1/qrcodes"
+  object-key-prefix: "qrcode"
+  cache-control: "public, max-age=604800"
+  use-internal-endpoint: true
+  use-cname: false
+  connect-timeout: 3s
+  read-write-timeout: 10s
+  retry-max-attempts: 2
+  # 推荐通过 env_file 注入 AK/SK，而不是直接写在配置文件里
+  # access-key-id: ""
+  # access-key-secret: ""
+
 # ============================================================================
 # 5. 系统运行配置
 # ============================================================================

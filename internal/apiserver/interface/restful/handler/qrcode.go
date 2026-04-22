@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"bytes"
+	goerrors "errors"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,6 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
@@ -16,13 +20,17 @@ import (
 // QRCodeHandler 二维码图片处理器
 type QRCodeHandler struct {
 	BaseHandler
-	storageDir string
+	storageDir      string
+	objectStore     objectstorageport.PublicObjectStore
+	objectKeyPrefix string
 }
 
 // NewQRCodeHandler 创建二维码图片处理器
-func NewQRCodeHandler() *QRCodeHandler {
+func NewQRCodeHandler(objectStore objectstorageport.PublicObjectStore, objectKeyPrefix string) *QRCodeHandler {
 	return &QRCodeHandler{
-		storageDir: qrcode.QRCodeStorageDir,
+		storageDir:      qrcode.QRCodeStorageDir,
+		objectStore:     objectStore,
+		objectKeyPrefix: strings.Trim(objectKeyPrefix, "/"),
 	}
 }
 
@@ -52,16 +60,11 @@ func (h *QRCodeHandler) GetQRCodeImage(c *gin.Context) {
 	// 构建完整文件路径
 	filePath := filepath.Join(h.storageDir, filename)
 
-	// 检查文件是否存在
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		h.NotFoundResponse(c, "二维码文件不存在", errors.New("qrcode file not found"))
+	if fileData, err := h.readLocalQRCode(filePath); err == nil {
+		h.writePNG(c, filename, int64(len(fileData)), bytes.NewReader(fileData), "public, max-age=3600")
 		return
-	}
-
-	// #nosec G304 -- filename is validated and constrained under the QR code storage directory.
-	fileData, err := os.ReadFile(filePath)
-	if err != nil {
-		logger.L(c.Request.Context()).Errorw("读取二维码文件失败",
+	} else if !goerrors.Is(err, os.ErrNotExist) {
+		logger.L(c.Request.Context()).Errorw("读取本地二维码文件失败",
 			"action", "get_qrcode_image",
 			"filename", filename,
 			"error", err.Error(),
@@ -70,13 +73,68 @@ func (h *QRCodeHandler) GetQRCodeImage(c *gin.Context) {
 		return
 	}
 
-	// 设置响应头
-	c.Header("Content-Type", "image/png")
-	c.Header("Content-Disposition", `inline; filename="`+filename+`"`)
-	c.Header("Cache-Control", "public, max-age=3600") // 缓存1小时
+	if h.objectStore == nil {
+		h.NotFoundResponse(c, "二维码文件不存在", errors.New("qrcode file not found"))
+		return
+	}
 
-	// 返回图片数据
-	c.Data(http.StatusOK, "image/png", fileData)
+	reader, err := h.objectStore.Get(c.Request.Context(), h.objectKey(filename))
+	if err != nil {
+		if goerrors.Is(err, objectstorageport.ErrObjectNotFound) {
+			h.NotFoundResponse(c, "二维码文件不存在", errors.New("qrcode object not found"))
+			return
+		}
+		logger.L(c.Request.Context()).Errorw("读取 OSS 二维码对象失败",
+			"action", "get_qrcode_image",
+			"filename", filename,
+			"object_key", h.objectKey(filename),
+			"error", err.Error(),
+		)
+		h.Error(c, errors.WithCode(code.ErrInternalServerError, "读取二维码文件失败"))
+		return
+	}
+	defer func() {
+		if closeErr := reader.Body.Close(); closeErr != nil {
+			logger.L(c.Request.Context()).Warnw("关闭二维码对象流失败",
+				"action", "close_qrcode_stream",
+				"filename", filename,
+				"error", closeErr.Error(),
+			)
+		}
+	}()
+
+	cacheControl := reader.CacheControl
+	if cacheControl == "" {
+		cacheControl = "public, max-age=3600"
+	}
+	contentType := reader.ContentType
+	if contentType == "" {
+		contentType = "image/png"
+	}
+	h.writeImage(c, filename, reader.ContentLength, contentType, reader.Body, cacheControl)
+}
+
+func (h *QRCodeHandler) objectKey(filename string) string {
+	if h.objectKeyPrefix == "" {
+		return filename
+	}
+	return h.objectKeyPrefix + "/" + filename
+}
+
+func (h *QRCodeHandler) readLocalQRCode(filePath string) ([]byte, error) {
+	// #nosec G304 -- filename is validated and constrained under the QR code storage directory.
+	return os.ReadFile(filePath)
+}
+
+func (h *QRCodeHandler) writePNG(c *gin.Context, filename string, contentLength int64, body io.Reader, cacheControl string) {
+	h.writeImage(c, filename, contentLength, "image/png", body, cacheControl)
+}
+
+func (h *QRCodeHandler) writeImage(c *gin.Context, filename string, contentLength int64, contentType string, body io.Reader, cacheControl string) {
+	// 设置响应头
+	c.Header("Content-Disposition", `inline; filename="`+filename+`"`)
+	c.Header("Cache-Control", cacheControl)
+	c.DataFromReader(http.StatusOK, contentLength, contentType, body, nil)
 }
 
 // isValidQRCodeFilename 验证文件名格式

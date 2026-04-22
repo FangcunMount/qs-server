@@ -25,6 +25,7 @@ type Options struct {
 	MongoDBOptions           *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
 	MessagingOptions         *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
 	IAMOptions               *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
+	OSSOptions               *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
 	WeChatOptions            *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
 	Plan                     *PlanOptions                            `json:"plan"      mapstructure:"plan"`
 	PlanScheduler            *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
@@ -51,6 +52,7 @@ func NewOptions() *Options {
 		MongoDBOptions:           genericoptions.NewMongoDBOptions(),
 		MessagingOptions:         genericoptions.NewMessagingOptions(),
 		IAMOptions:               genericoptions.NewIAMOptions(),
+		OSSOptions:               genericoptions.NewOSSOptions(),
 		WeChatOptions:            genericoptions.NewWeChatOptions(),
 		Plan:                     NewPlanOptions(),
 		PlanScheduler:            NewPlanSchedulerOptions(),
@@ -285,6 +287,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.MongoDBOptions.AddFlags(fss.FlagSet("mongodb"))
 	o.MessagingOptions.AddFlags(fss.FlagSet("messaging"))
 	o.IAMOptions.AddFlags(fss.FlagSet("iam"))
+	o.OSSOptions.AddFlags(fss.FlagSet("oss"))
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))

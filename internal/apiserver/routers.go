@@ -88,7 +88,16 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	}
 
 	// 二维码图片访问路由（公开，不需要认证）
-	qrcodeHandler := codesHandler.NewQRCodeHandler()
+	objectKeyPrefix := "qrcode"
+	var qrcodeHandler *codesHandler.QRCodeHandler
+	if r.container != nil && r.container.QRCodeObjectKeyPrefix != "" {
+		objectKeyPrefix = r.container.QRCodeObjectKeyPrefix
+	}
+	if r.container != nil {
+		qrcodeHandler = codesHandler.NewQRCodeHandler(r.container.QRCodeObjectStore, objectKeyPrefix)
+	} else {
+		qrcodeHandler = codesHandler.NewQRCodeHandler(nil, objectKeyPrefix)
+	}
 	engine.GET("/api/v1/qrcodes/:filename", qrcodeHandler.GetQRCodeImage)
 }
 

@@ -404,7 +404,9 @@ func (s *apiServer) initializeWeChatServices() error {
 	if s.config.WeChatOptions == nil || s.container == nil {
 		return nil
 	}
-	s.container.InitQRCodeService(s.config.WeChatOptions)
+	if err := s.container.InitQRCodeService(s.config.WeChatOptions, s.config.OSSOptions); err != nil {
+		return err
+	}
 	s.container.InitMiniProgramTaskNotificationService(s.config.WeChatOptions)
 	if s.container.QRCodeService == nil {
 		return nil

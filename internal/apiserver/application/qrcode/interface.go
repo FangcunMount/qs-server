@@ -12,7 +12,7 @@ type QRCodeService interface {
 	// 流程：
 	//   1. 构建 scene 参数（包含问卷编码和版本）
 	//   2. 调用基础设施层生成小程序码
-	//   3. 保存二维码图片（当前为占位符，后续接入对象存储）
+	//   3. 保存二维码图片（对象存储或本地文件回退）
 	//   4. 返回二维码 URL
 	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
 
@@ -21,7 +21,7 @@ type QRCodeService interface {
 	// 流程：
 	//   1. 构建 scene 参数（包含量表编码）
 	//   2. 调用基础设施层生成小程序码
-	//   3. 保存二维码图片（当前为占位符，后续接入对象存储）
+	//   3. 保存二维码图片（对象存储或本地文件回退）
 	//   4. 返回二维码 URL
 	GenerateScaleQRCode(ctx context.Context, code string) (string, error)
 

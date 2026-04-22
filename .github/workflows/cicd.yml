@@ -17,6 +17,7 @@ name: CI/CD Pipeline
 #   MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DATABASE (Worker 使用)
 #   REDIS_PORT/DB/USERNAME/PASSWORD
 #   JWT_SECRET
+#   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_SESSION_TOKEN（可选，apiserver 二维码 OSS）
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
 #   部署拉 ghcr：与 iam-contracts 一致保留 GITHUB_TOKEN 方案，但 runner/远端统一用 github.actor 登录；
@@ -93,6 +94,9 @@ jobs:
           WWW_UID: ${{ secrets.WWW_UID }}
           WWW_GID: ${{ secrets.WWW_GID }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          OSS_SESSION_TOKEN: ${{ secrets.OSS_SESSION_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
@@ -107,8 +111,8 @@ jobs:
             echo "ℹ️ Not on main branch – required secrets reported for awareness only."
           fi
 
-          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_HOST JWT_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
-          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID)
+          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_HOST JWT_SECRET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
+          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID OSS_SESSION_TOKEN)
 
           for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
             VALUE=${!SECRET_NAME}
@@ -546,6 +550,9 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          OSS_SESSION_TOKEN: ${{ secrets.OSS_SESSION_TOKEN }}
         run: |
           require_env() {
             local missing=0
@@ -565,7 +572,8 @@ jobs:
             MONGODB_HOST MONGODB_PORT MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME \
             MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
             REDIS_HOST REDIS_PORT \
-            JWT_SECRET NSQ_NSQD_HOST NSQ_NSQD_PORT
+            JWT_SECRET NSQ_NSQD_HOST NSQ_NSQD_PORT \
+            OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET
 
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
@@ -595,6 +603,10 @@ jobs:
 
           QS_APISERVER_NSQ_NSQD_HOST=__NSQ_NSQD_HOST__
           QS_APISERVER_NSQ_NSQD_PORT=__NSQ_NSQD_PORT__
+
+          QS_APISERVER_OSS_ACCESS_KEY_ID=__OSS_ACCESS_KEY_ID__
+          QS_APISERVER_OSS_ACCESS_KEY_SECRET=__OSS_ACCESS_KEY_SECRET__
+          QS_APISERVER_OSS_SESSION_TOKEN=__OSS_SESSION_TOKEN__
           ENVEOF
 
           # 去除前导空格并替换占位符为实际值
@@ -616,11 +628,18 @@ jobs:
           sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_NSQD_HOST__|${NSQ_NSQD_HOST}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_NSQD_PORT__|${NSQ_NSQD_PORT}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__OSS_ACCESS_KEY_ID__|${OSS_ACCESS_KEY_ID}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__OSS_ACCESS_KEY_SECRET__|${OSS_ACCESS_KEY_SECRET}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__OSS_SESSION_TOKEN__|${OSS_SESSION_TOKEN}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
           echo "📋 Generated config.prod.env for API Server"
           echo "=========================================="
-          cat deploy-package/configs/env/config.prod.env | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g' | sed 's/SECRET=.*/SECRET=***REDACTED***/g'
+          cat deploy-package/configs/env/config.prod.env \
+            | sed 's/PASSWORD=.*/PASSWORD=***REDACTED***/g' \
+            | sed 's/SECRET=.*/SECRET=***REDACTED***/g' \
+            | sed 's/ACCESS_KEY_ID=.*/ACCESS_KEY_ID=***REDACTED***/g' \
+            | sed 's/SESSION_TOKEN=.*/SESSION_TOKEN=***REDACTED***/g'
           echo "=========================================="
 
           # 以目录形式上传，避免双重 tar 丢失文件

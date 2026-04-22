@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 )
 
@@ -27,6 +30,11 @@ type Config struct {
 	// 可选：直接配置（如果 IAM 未启用时使用）
 	AppID     string // 小程序 AppID（直接配置，优先级低于 IAM）
 	AppSecret string // 小程序 AppSecret（直接配置，优先级低于 IAM）
+
+	// OSS 对象 key 前缀；为空时直接使用文件名。
+	ObjectKeyPrefix string
+	// 对外返回的二维码访问前缀；为空时回退默认路由前缀。
+	PublicURLPrefix string
 }
 
 // service 小程序码生成服务实现
@@ -34,14 +42,21 @@ type service struct {
 	qrCodeGen        wechatPort.QRCodeGenerator
 	config           *Config
 	wechatAppService *iam.WeChatAppService
+	objectStore      objectstorageport.PublicObjectStore
 }
 
 // NewService 创建小程序码生成服务
-func NewService(qrCodeGen wechatPort.QRCodeGenerator, config *Config, wechatAppService *iam.WeChatAppService) QRCodeService {
+func NewService(
+	qrCodeGen wechatPort.QRCodeGenerator,
+	config *Config,
+	wechatAppService *iam.WeChatAppService,
+	objectStore objectstorageport.PublicObjectStore,
+) QRCodeService {
 	return &service{
 		qrCodeGen:        qrCodeGen,
 		config:           config,
 		wechatAppService: wechatAppService,
+		objectStore:      objectStore,
 	}
 }
 
@@ -169,28 +184,27 @@ func (s *service) GenerateQuestionnaireQRCode(ctx context.Context, code, version
 		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
 	}
 
-	// 保存二维码到文件系统
 	fileName := fmt.Sprintf("questionnaire_%s_%s.png", code, version)
-	filePath, err := s.saveQRCodeFile(ctx, fileName, qrCodeData)
+	qrCodeURL, err := s.persistQRCode(ctx, fileName, qrCodeData)
 	if err != nil {
-		l.Errorw("保存小程序码文件失败",
+		l.Errorw("持久化小程序码失败",
 			"action", "generate_questionnaire_qrcode",
 			"code", code,
 			"version", version,
 			"error", err.Error(),
 		)
-		return "", fmt.Errorf("保存小程序码文件失败: %w", err)
+		return "", fmt.Errorf("持久化小程序码失败: %w", err)
 	}
 
 	l.Infow("问卷小程序码生成成功",
 		"action", "generate_questionnaire_qrcode",
 		"code", code,
 		"version", version,
-		"file_path", filePath,
+		"qrcode_url", qrCodeURL,
 		"size", len(qrCodeData),
 	)
 
-	return s.getQRCodeURL(ctx, filePath)
+	return qrCodeURL, nil
 }
 
 // GenerateScaleQRCode 生成量表小程序码
@@ -262,26 +276,25 @@ func (s *service) GenerateScaleQRCode(ctx context.Context, code string) (string,
 		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
 	}
 
-	// 保存二维码到文件系统
 	fileName := fmt.Sprintf("scale_%s.png", code)
-	filePath, err := s.saveQRCodeFile(ctx, fileName, qrCodeData)
+	qrCodeURL, err := s.persistQRCode(ctx, fileName, qrCodeData)
 	if err != nil {
-		l.Errorw("保存小程序码文件失败",
+		l.Errorw("持久化小程序码失败",
 			"action", "generate_scale_qrcode",
 			"code", code,
 			"error", err.Error(),
 		)
-		return "", fmt.Errorf("保存小程序码文件失败: %w", err)
+		return "", fmt.Errorf("持久化小程序码失败: %w", err)
 	}
 
 	l.Infow("量表小程序码生成成功",
 		"action", "generate_scale_qrcode",
 		"code", code,
-		"file_path", filePath,
+		"qrcode_url", qrCodeURL,
 		"size", len(qrCodeData),
 	)
 
-	return s.getQRCodeURL(ctx, filePath)
+	return qrCodeURL, nil
 }
 
 // GenerateAssessmentEntryQRCode 生成测评入口小程序码
@@ -330,12 +343,54 @@ func (s *service) GenerateAssessmentEntryQRCode(ctx context.Context, token strin
 		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
 	}
 
-	filePath, err := s.saveQRCodeFile(ctx, fmt.Sprintf("assessment_entry_%s.png", token), qrCodeData)
+	qrCodeURL, err := s.persistQRCode(ctx, fmt.Sprintf("assessment_entry_%s.png", token), qrCodeData)
 	if err != nil {
-		return "", fmt.Errorf("保存小程序码文件失败: %w", err)
+		return "", fmt.Errorf("持久化小程序码失败: %w", err)
 	}
 
+	return qrCodeURL, nil
+}
+
+func (s *service) persistQRCode(ctx context.Context, fileName string, data []byte) (string, error) {
+	if s.objectStore != nil {
+		objectKey := s.buildObjectKey(fileName)
+		if err := s.objectStore.Put(ctx, objectKey, "image/png", data); err != nil {
+			return "", err
+		}
+		qrCodeURL := s.buildQRCodeURL(fileName)
+		logger.L(ctx).Infow("二维码对象上传成功",
+			"action", "put_qrcode_object",
+			"object_key", objectKey,
+			"size", len(data),
+			"qrcode_url", qrCodeURL,
+		)
+		return qrCodeURL, nil
+	}
+
+	filePath, err := s.saveQRCodeFile(ctx, fileName, data)
+	if err != nil {
+		return "", err
+	}
 	return s.getQRCodeURL(ctx, filePath)
+}
+
+func (s *service) buildQRCodeURL(fileName string) string {
+	prefix := QRCodeURLPrefix
+	if s.config != nil && strings.TrimSpace(s.config.PublicURLPrefix) != "" {
+		prefix = strings.TrimRight(strings.TrimSpace(s.config.PublicURLPrefix), "/")
+	}
+	return fmt.Sprintf("%s/%s", prefix, fileName)
+}
+
+func (s *service) buildObjectKey(fileName string) string {
+	if s.config == nil {
+		return fileName
+	}
+	prefix := strings.Trim(s.config.ObjectKeyPrefix, "/")
+	if prefix == "" {
+		return fileName
+	}
+	return path.Join(prefix, fileName)
 }
 
 // saveQRCodeFile 保存二维码文件到指定目录
@@ -375,7 +430,7 @@ func (s *service) getQRCodeURL(ctx context.Context, filePath string) (string, er
 	}
 
 	fileName := filepath.Base(filePath)
-	qrCodeURL := fmt.Sprintf("%s/%s", QRCodeURLPrefix, fileName)
+	qrCodeURL := s.buildQRCodeURL(fileName)
 	logger.L(ctx).Infow("获取二维码URL成功", "action", "get_qrcode_url", "file_path", filePath, "qrcode_url", qrCodeURL)
 	return qrCodeURL, nil
 }
