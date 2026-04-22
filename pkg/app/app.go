@@ -319,6 +319,8 @@ func printViperConfig(envPrefix string) {
 		"NSQ_NSQD_PORT",
 		"NSQ_LOOKUPD_HOST",
 		"NSQ_LOOKUPD_PORT",
+		"OSS_ACCESS_KEY_ID",
+		"OSS_ACCESS_KEY_SECRET"
 	}
 	for _, key := range keys {
 		envKey := envPrefix + "_" + key
