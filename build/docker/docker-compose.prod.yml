@@ -46,6 +46,12 @@ services:
     networks:
       - qs-network
       - infra-network
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.job=qs-collection-server"
+      - "prometheus.component=qs-collection-server"
+      - "prometheus.metrics_port=8080"
+      - "prometheus.metrics_path=/metrics"
     ports:
       - "8082:8080"
       - "9446:8443"
