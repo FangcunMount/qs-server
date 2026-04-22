@@ -9,18 +9,24 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
+
+type assessmentListCache interface {
+	Get(ctx context.Context, userID uint64, page, pageSize int, status, scaleCode, riskLevel, dateFrom, dateTo string, dest interface{}) error
+	Set(ctx context.Context, userID uint64, page, pageSize int, status, scaleCode, riskLevel, dateFrom, dateTo string, value interface{})
+	Invalidate(ctx context.Context, userID uint64) error
+}
 
 // submissionService 测评提交服务实现
 // 行为者：答题者 (Testee)
 type submissionService struct {
 	repo      assessment.Repository
 	creator   assessment.AssessmentCreator
-	listCache *cache.MyAssessmentListCache
+	listCache assessmentListCache
 }
 
 // NewSubmissionService 创建测评提交服务
@@ -41,7 +47,7 @@ func NewSubmissionServiceWithListCache(
 	repo assessment.Repository,
 	creator assessment.AssessmentCreator,
 	_ event.EventPublisher,
-	listCache *cache.MyAssessmentListCache,
+	listCache assessmentListCache,
 ) AssessmentSubmissionService {
 	return &submissionService{
 		repo:      repo,
@@ -123,7 +129,7 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 	)
 	occurredAt := time.Now()
 	additionalEvents := []event.DomainEvent{
-		domainStatistics.NewFootprintAssessmentCreatedEvent(int64(dto.OrgID), dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
+		domainStatistics.NewFootprintAssessmentCreatedEvent(req.OrgID, dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
 	}
 	if err := s.repo.SaveWithAdditionalEvents(ctx, a, additionalEvents); err != nil {
 		l.Errorw("保存测评失败",
@@ -146,7 +152,12 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 
 	s.invalidateMyListCache(ctx, dto.TesteeID)
 
-	return toAssessmentResult(a), nil
+	result, convErr := toAssessmentResult(a)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return result, nil
 }
 
 // Submit 提交测评
@@ -217,7 +228,12 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 
 	s.invalidateMyListCache(ctx, a.TesteeID().Uint64())
 
-	return toAssessmentResult(a), nil
+	result, convErr := toAssessmentResult(a)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return result, nil
 }
 
 // GetMyAssessment 获取我的测评详情
@@ -270,7 +286,12 @@ func (s *submissionService) GetMyAssessment(ctx context.Context, testeeID, asses
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return toAssessmentResult(a), nil
+	result, convErr := toAssessmentResult(a)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return result, nil
 }
 
 // GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
@@ -308,7 +329,12 @@ func (s *submissionService) GetMyAssessmentByAnswerSheetID(ctx context.Context, 
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return toAssessmentResult(a), nil
+	result, convErr := toAssessmentResult(a)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return result, nil
 }
 
 // ListMyAssessments 查询我的测评列表
@@ -400,10 +426,17 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 	// 5. 转换结果
 	items := make([]*AssessmentResult, len(list))
 	for i, a := range list {
-		items[i] = toAssessmentResult(a)
+		item, convErr := toAssessmentResult(a)
+		if convErr != nil {
+			return nil, convErr
+		}
+		items[i] = item
 	}
 
-	totalInt := int(total)
+	totalInt, err := safeconv.Int64ToInt(total)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrDatabase, "测评总数超出安全范围")
+	}
 	duration := time.Since(startTime)
 	l.Debugw("查询我的测评列表成功",
 		"action", "list_my_assessments",
@@ -449,8 +482,13 @@ func formatAssessmentListDateKey(value *time.Time) string {
 
 // buildCreateRequest 构造创建请求
 func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) (assessment.CreateAssessmentRequest, error) {
+	orgID, err := safeconv.Uint64ToInt64(dto.OrgID)
+	if err != nil {
+		return assessment.CreateAssessmentRequest{}, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID超出 int64 范围")
+	}
+
 	req := assessment.CreateAssessmentRequest{
-		OrgID:    int64(dto.OrgID),
+		OrgID:    orgID,
 		TesteeID: meta.FromUint64(dto.TesteeID),
 		QuestionnaireRef: assessment.NewQuestionnaireRefByCode(
 			meta.NewCode(dto.QuestionnaireCode),

@@ -119,7 +119,7 @@ func (v *validator) ValidatePhone(phone string) error {
 
 	// 检查是否只包含数字、空格、+、-、()
 	for _, c := range phone {
-		if !(c >= '0' && c <= '9') && c != '+' && c != '-' && c != ' ' && c != '(' && c != ')' {
+		if (c < '0' || c > '9') && c != '+' && c != '-' && c != ' ' && c != '(' && c != ')' {
 			return errors.WithCode(code.ErrValidation, "phone contains invalid characters")
 		}
 	}

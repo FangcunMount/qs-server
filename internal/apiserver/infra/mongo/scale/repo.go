@@ -113,7 +113,9 @@ func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, co
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var poList []ScalePO
 	if err := cursor.All(ctx, &poList); err != nil {

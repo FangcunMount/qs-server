@@ -172,7 +172,7 @@ func (c *DefaultAssessmentCreator) Create(
 		return nil, err
 	}
 
-// 3. 创建 pending 测评
+	// 3. 创建 pending 测评
 	opts := make([]AssessmentOption, 0)
 	if req.MedicalScaleRef != nil {
 		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))

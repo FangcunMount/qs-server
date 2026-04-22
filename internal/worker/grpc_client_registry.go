@@ -105,7 +105,9 @@ func CreateGRPCClientManager(cfg *config.GRPCConfig, timeout int) (*grpcclient.M
 
 	// 注册所有客户端
 	if err := manager.RegisterClients(); err != nil {
-		manager.Close()
+		if closeErr := manager.Close(); closeErr != nil {
+			log.Warnf("Failed to close gRPC client manager after register error: %v", closeErr)
+		}
 		return nil, err
 	}
 

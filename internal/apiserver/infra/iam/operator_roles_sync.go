@@ -5,9 +5,12 @@ import (
 	"sort"
 	"strconv"
 
-	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 )
+
+type operatorRoleSnapshot interface {
+	RoleNames() []string
+}
 
 // SyncOperatorRolesFromSnapshot 用 GetAuthorizationSnapshot 的 roles 列表覆盖 Operator 本地投影。
 func SyncOperatorRolesFromSnapshot(ctx context.Context, loader *AuthzSnapshotLoader, orgID int64, op *domain.Operator) error {
@@ -24,12 +27,13 @@ func SyncOperatorRolesFromSnapshot(ctx context.Context, loader *AuthzSnapshotLoa
 }
 
 // ReplaceOperatorRolesProjectionFromSnapshot 用授权快照角色替换本地投影；返回是否发生变更。
-func ReplaceOperatorRolesProjectionFromSnapshot(op *domain.Operator, snap *authzapp.Snapshot) bool {
+func ReplaceOperatorRolesProjectionFromSnapshot(op *domain.Operator, snap operatorRoleSnapshot) bool {
 	if op == nil || snap == nil {
 		return false
 	}
-	out := make([]domain.Role, 0, len(snap.Roles))
-	for _, r := range snap.Roles {
+	roleNames := snap.RoleNames()
+	out := make([]domain.Role, 0, len(roleNames))
+	for _, r := range roleNames {
 		out = append(out, domain.Role(r))
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -47,7 +51,7 @@ func PersistOperatorRolesProjectionFromSnapshot(
 	ctx context.Context,
 	repo domain.Repository,
 	op *domain.Operator,
-	snap *authzapp.Snapshot,
+	snap operatorRoleSnapshot,
 ) (bool, error) {
 	if repo == nil || op == nil || snap == nil {
 		return false, nil

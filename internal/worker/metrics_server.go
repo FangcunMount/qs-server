@@ -18,10 +18,6 @@ type metricsServer struct {
 	listener net.Listener
 }
 
-func newMetricsServer(bindAddress string, bindPort int) *metricsServer {
-	return newMetricsServerWithGovernance(bindAddress, bindPort, "worker", nil)
-}
-
 func newMetricsServerWithGovernance(bindAddress string, bindPort int, component string, registry *cacheobservability.FamilyStatusRegistry) *metricsServer {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())

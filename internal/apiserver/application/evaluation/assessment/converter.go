@@ -1,22 +1,30 @@
 package assessment
 
 import (
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // ============= 领域模型到 DTO 的转换器 =============
 
 // toAssessmentResult 将领域模型转换为 AssessmentResult
-func toAssessmentResult(a *assessment.Assessment) *AssessmentResult {
+func toAssessmentResult(a *assessment.Assessment) (*AssessmentResult, error) {
 	if a == nil {
-		return nil
+		return nil, nil
+	}
+
+	orgID, err := safeconv.Int64ToUint64(a.OrgID())
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrDatabase, "测评机构ID超出安全范围")
 	}
 
 	result := &AssessmentResult{
 		ID:                   a.ID().Uint64(),
-		OrgID:                uint64(a.OrgID()),
+		OrgID:                orgID,
 		TesteeID:             a.TesteeID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),
@@ -65,7 +73,7 @@ func toAssessmentResult(a *assessment.Assessment) *AssessmentResult {
 		result.FailureReason = failureReason
 	}
 
-	return result
+	return result, nil
 }
 
 // toReportResult 将领域模型转换为 ReportResult

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -100,7 +100,7 @@ func (s *Store) buildRows(events []event.DomainEvent) ([]*OutboxPO, error) {
 	return rows, nil
 }
 
-func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
 	if s == nil || s.db == nil || limit <= 0 {
 		return nil, nil
 	}
@@ -139,14 +139,14 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 		return nil, err
 	}
 
-	claimed := make([]appEventing.PendingOutboxEvent, 0, len(rows))
+	claimed := make([]outboxport.PendingEvent, 0, len(rows))
 	for _, row := range rows {
 		evt, err := outboxcodec.Decode(row.PayloadJSON)
 		if err != nil {
 			_ = s.MarkEventFailed(ctx, row.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
 			continue
 		}
-		claimed = append(claimed, appEventing.PendingOutboxEvent{
+		claimed = append(claimed, outboxport.PendingEvent{
 			EventID: row.EventID,
 			Event:   evt,
 		})

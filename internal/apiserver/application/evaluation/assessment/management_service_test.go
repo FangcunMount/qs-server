@@ -17,6 +17,18 @@ type managementRepoStub struct {
 	saved           *domain.Assessment
 	savedWithEvents *domain.Assessment
 	savedEventTypes []string
+
+	findByTesteeIDAssessments []*domain.Assessment
+	findByTesteeIDTotal       int64
+
+	findByOrgIDAssessments []*domain.Assessment
+	findByOrgIDTotal       int64
+
+	findByScopeAssessments []*domain.Assessment
+	findByScopeTotal       int64
+	findByScopeOrgID       int64
+	findByScopeTesteeIDs   []testee.ID
+	findByScopeStatus      *domain.Status
 }
 
 func (r *managementRepoStub) Save(_ context.Context, a *domain.Assessment) error {
@@ -62,7 +74,7 @@ func (r *managementRepoStub) FindByAnswerSheetID(context.Context, domain.AnswerS
 	return nil, fmt.Errorf("assessment not found")
 }
 func (r *managementRepoStub) FindByTesteeID(context.Context, testee.ID, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
+	return r.findByTesteeIDAssessments, r.findByTesteeIDTotal, nil
 }
 func (r *managementRepoStub) FindByTesteeIDWithFilters(context.Context, testee.ID, string, string, string, *time.Time, *time.Time, domain.Pagination) ([]*domain.Assessment, int64, error) {
 	return nil, 0, nil
@@ -89,10 +101,13 @@ func (r *managementRepoStub) FindPendingSubmission(context.Context, domain.Pagin
 	return nil, 0, nil
 }
 func (r *managementRepoStub) FindByOrgID(context.Context, int64, *domain.Status, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
+	return r.findByOrgIDAssessments, r.findByOrgIDTotal, nil
 }
-func (r *managementRepoStub) FindByOrgIDAndTesteeIDs(context.Context, int64, []testee.ID, *domain.Status, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
+func (r *managementRepoStub) FindByOrgIDAndTesteeIDs(_ context.Context, orgID int64, testeeIDs []testee.ID, status *domain.Status, _ domain.Pagination) ([]*domain.Assessment, int64, error) {
+	r.findByScopeOrgID = orgID
+	r.findByScopeTesteeIDs = append([]testee.ID(nil), testeeIDs...)
+	r.findByScopeStatus = status
+	return r.findByScopeAssessments, r.findByScopeTotal, nil
 }
 
 func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
@@ -142,4 +157,95 @@ func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
 	if repo.savedEventTypes[0] != domain.EventTypeSubmitted {
 		t.Fatalf("expected assessment.submitted event, got %s", repo.savedEventTypes[0])
 	}
+}
+
+func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.T) {
+	submitted := domain.StatusSubmitted
+	repo := &managementRepoStub{
+		findByTesteeIDAssessments: []*domain.Assessment{
+			managementAssessmentForList(9001, 9, 3001, domain.StatusSubmitted),
+			managementAssessmentForList(9002, 10, 3001, domain.StatusSubmitted),
+			managementAssessmentForList(9003, 9, 3001, domain.StatusFailed),
+		},
+		findByTesteeIDTotal: 3,
+	}
+	svc := NewManagementService(repo, nil)
+
+	result, err := svc.List(context.Background(), ListAssessmentsDTO{
+		OrgID:    9,
+		Page:     0,
+		PageSize: 0,
+		Conditions: map[string]string{
+			"testee_id": "3001",
+			"status":    submitted.String(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 filtered assessment, got %d", len(result.Items))
+	}
+	if result.Items[0].ID != 9001 {
+		t.Fatalf("expected assessment 9001, got %d", result.Items[0].ID)
+	}
+	if result.Page != 1 || result.PageSize != 10 {
+		t.Fatalf("expected normalized pagination 1/10, got %d/%d", result.Page, result.PageSize)
+	}
+	if result.Total != 3 {
+		t.Fatalf("expected total to keep repository count 3, got %d", result.Total)
+	}
+}
+
+func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
+	submitted := domain.StatusSubmitted
+	repo := &managementRepoStub{
+		findByScopeAssessments: []*domain.Assessment{
+			managementAssessmentForList(9001, 9, 3001, submitted),
+		},
+		findByScopeTotal: 1,
+	}
+	svc := NewManagementService(repo, nil)
+
+	_, err := svc.List(context.Background(), ListAssessmentsDTO{
+		OrgID:                 9,
+		Page:                  1,
+		PageSize:              20,
+		AccessibleTesteeIDs:   []uint64{3001, 3002},
+		RestrictToAccessScope: true,
+		Conditions: map[string]string{
+			"status": submitted.String(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if repo.findByScopeOrgID != 9 {
+		t.Fatalf("expected scope org id 9, got %d", repo.findByScopeOrgID)
+	}
+	if len(repo.findByScopeTesteeIDs) != 2 {
+		t.Fatalf("expected 2 scoped testee IDs, got %d", len(repo.findByScopeTesteeIDs))
+	}
+	if repo.findByScopeStatus == nil || *repo.findByScopeStatus != submitted {
+		t.Fatalf("expected submitted status filter, got %#v", repo.findByScopeStatus)
+	}
+}
+
+func managementAssessmentForList(id uint64, orgID int64, testeeID uint64, status domain.Status) *domain.Assessment {
+	return domain.Reconstruct(
+		domain.NewID(id),
+		orgID,
+		testee.NewID(testeeID),
+		domain.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		domain.NewAnswerSheetRef(meta.FromUint64(id+1000)),
+		nil,
+		domain.NewAdhocOrigin(),
+		status,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 }

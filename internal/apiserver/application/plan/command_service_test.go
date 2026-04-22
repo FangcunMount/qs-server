@@ -230,7 +230,7 @@ func TestCommandServiceCancelPlanCountsAffectedTasks(t *testing.T) {
 	called := false
 	service := NewCommandService(
 		&fakeLifecycleService{
-			cancelPlanFn: func(ctx context.Context, orgID int64, planID string) error {
+			cancelPlanFn: func(_ context.Context, orgID int64, planID string) error {
 				called = true
 				if orgID != 7 || planID != planAggregate.GetID().String() {
 					t.Fatalf("unexpected cancel inputs: org=%d plan=%s", orgID, planID)
@@ -267,7 +267,7 @@ func TestCommandServiceCancelPlanCountsAffectedTasks(t *testing.T) {
 func TestCommandServiceFinishPlanDelegatesToLifecycle(t *testing.T) {
 	service := NewCommandService(
 		&fakeLifecycleService{
-			finishPlanFn: func(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
+			finishPlanFn: func(_ context.Context, orgID int64, planID string) (*PlanResult, error) {
 				if orgID != 7 {
 					t.Fatalf("unexpected org id: %d", orgID)
 				}

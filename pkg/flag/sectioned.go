@@ -55,15 +55,15 @@ func PrintSections(w io.Writer, fss NamedFlagSets, cols int) {
 		}
 
 		var buf bytes.Buffer
-		fmt.Fprintf(&buf, "\n%s flags:\n\n%s", strings.ToUpper(name[:1])+name[1:], wideFS.FlagUsagesWrapped(cols))
+		_, _ = fmt.Fprintf(&buf, "\n%s flags:\n\n%s", strings.ToUpper(name[:1])+name[1:], wideFS.FlagUsagesWrapped(cols))
 
 		if cols > 24 {
 			i := strings.Index(buf.String(), zzz)
 			lines := strings.Split(buf.String()[:i], "\n")
-			fmt.Fprint(w, strings.Join(lines[:len(lines)-1], "\n"))
-			fmt.Fprintln(w)
+			_, _ = fmt.Fprint(w, strings.Join(lines[:len(lines)-1], "\n"))
+			_, _ = fmt.Fprintln(w)
 		} else {
-			fmt.Fprint(w, buf.String())
+			_, _ = fmt.Fprint(w, buf.String())
 		}
 	}
 }

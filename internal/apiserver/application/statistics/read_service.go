@@ -819,14 +819,15 @@ func parseFlexibleTime(raw string, end bool) (time.Time, error) {
 	}
 	var lastErr error
 	for _, layout := range layouts {
-		if t, err := time.ParseInLocation(layout, value, time.Local); err == nil {
-			if layout == "2006-01-02" && end {
-				return t.AddDate(0, 0, 1), nil
-			}
-			return t, nil
-		} else {
+		t, err := time.ParseInLocation(layout, value, time.Local)
+		if err != nil {
 			lastErr = err
+			continue
 		}
+		if layout == "2006-01-02" && end {
+			return t.AddDate(0, 0, 1), nil
+		}
+		return t, nil
 	}
 	return time.Time{}, lastErr
 }

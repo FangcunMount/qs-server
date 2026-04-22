@@ -42,13 +42,6 @@ func (o *WeChatOptions) Validate() []error {
 		errs = append(errs, fmt.Errorf("wechat.page-path is required when wechat.wechat-app-id is set"))
 	}
 
-	// 如果未配置 WeChatAppID，则必须配置 AppID 和 AppSecret（降级模式）
-	if o.WeChatAppID == "" {
-		if o.AppID == "" || o.AppSecret == "" {
-			// 不强制要求，允许完全禁用微信功能
-		}
-	}
-
 	return errs
 }
 

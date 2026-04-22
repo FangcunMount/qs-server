@@ -17,6 +17,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+type waiterNotifier interface {
+	Notify(ctx context.Context, assessmentID uint64, summary waiter.StatusSummary)
+	GetWaiterCount(assessmentID uint64) int
+}
+
 // service 评估引擎服务实现
 type service struct {
 	// 仓储依赖
@@ -31,7 +36,7 @@ type service struct {
 	reportBuilder report.ReportBuilder
 
 	// 等待队列注册表（可选，用于长轮询）
-	waiterRegistry *waiter.WaiterRegistry
+	waiterRegistry waiterNotifier
 
 	// 处理器链
 	pipeline *pipeline.Chain
@@ -41,7 +46,7 @@ type service struct {
 type ServiceOption func(*service)
 
 // WithWaiterRegistry 设置等待队列注册表
-func WithWaiterRegistry(waiterRegistry *waiter.WaiterRegistry) ServiceOption {
+func WithWaiterRegistry(waiterRegistry waiterNotifier) ServiceOption {
 	return func(s *service) {
 		s.waiterRegistry = waiterRegistry
 	}

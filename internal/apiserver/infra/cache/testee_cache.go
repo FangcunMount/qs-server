@@ -78,7 +78,7 @@ func (r *CachedTesteeRepository) FindByIDs(ctx context.Context, ids []testee.ID)
 func (r *CachedTesteeRepository) Save(ctx context.Context, domain *testee.Testee) error {
 	err := r.repo.Save(ctx, domain)
 	if err == nil && domain != nil {
-		r.deleteCache(ctx, domain.ID())
+		_ = r.deleteCache(ctx, domain.ID())
 	}
 	return err
 }
@@ -87,7 +87,7 @@ func (r *CachedTesteeRepository) Save(ctx context.Context, domain *testee.Testee
 func (r *CachedTesteeRepository) Update(ctx context.Context, domain *testee.Testee) error {
 	err := r.repo.Update(ctx, domain)
 	if err == nil && domain != nil {
-		r.deleteCache(ctx, domain.ID())
+		_ = r.deleteCache(ctx, domain.ID())
 	}
 	return err
 }
@@ -96,7 +96,7 @@ func (r *CachedTesteeRepository) Update(ctx context.Context, domain *testee.Test
 func (r *CachedTesteeRepository) Delete(ctx context.Context, id testee.ID) error {
 	err := r.repo.Delete(ctx, id)
 	if err == nil {
-		r.deleteCache(ctx, id)
+		_ = r.deleteCache(ctx, id)
 	}
 	return err
 }

@@ -50,7 +50,11 @@ func (s *PlanCommandService) CreatePlan(ctx context.Context, req *pb.CreatePlanR
 		return nil, toPlanCommandGRPCError(err)
 	}
 
-	return &pb.CreatePlanResponse{Plan: toPBPlanResult(result)}, nil
+	plan, convErr := toPBPlanResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.CreatePlanResponse{Plan: plan}, nil
 }
 
 func (s *PlanCommandService) PausePlan(ctx context.Context, req *pb.PausePlanRequest) (*pb.PausePlanResponse, error) {
@@ -65,7 +69,11 @@ func (s *PlanCommandService) PausePlan(ctx context.Context, req *pb.PausePlanReq
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.PausePlanResponse{Plan: toPBPlanResult(result)}, nil
+	plan, convErr := toPBPlanResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.PausePlanResponse{Plan: plan}, nil
 }
 
 func (s *PlanCommandService) ResumePlan(ctx context.Context, req *pb.ResumePlanRequest) (*pb.ResumePlanResponse, error) {
@@ -80,7 +88,11 @@ func (s *PlanCommandService) ResumePlan(ctx context.Context, req *pb.ResumePlanR
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.ResumePlanResponse{Plan: toPBPlanResult(result)}, nil
+	plan, convErr := toPBPlanResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.ResumePlanResponse{Plan: plan}, nil
 }
 
 func (s *PlanCommandService) FinishPlan(ctx context.Context, req *pb.FinishPlanRequest) (*pb.FinishPlanResponse, error) {
@@ -95,7 +107,11 @@ func (s *PlanCommandService) FinishPlan(ctx context.Context, req *pb.FinishPlanR
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.FinishPlanResponse{Plan: toPBPlanResult(result)}, nil
+	plan, convErr := toPBPlanResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.FinishPlanResponse{Plan: plan}, nil
 }
 
 func (s *PlanCommandService) CancelPlan(ctx context.Context, req *pb.CancelPlanRequest) (*pb.CancelPlanResponse, error) {
@@ -110,9 +126,13 @@ func (s *PlanCommandService) CancelPlan(ctx context.Context, req *pb.CancelPlanR
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
+	affectedTaskCount, convErr := protoInt32FromInt("affected_task_count", result.AffectedTaskCount)
+	if convErr != nil {
+		return nil, convErr
+	}
 	return &pb.CancelPlanResponse{
 		PlanId:            result.PlanID,
-		AffectedTaskCount: int32(result.AffectedTaskCount),
+		AffectedTaskCount: affectedTaskCount,
 	}, nil
 }
 
@@ -139,7 +159,11 @@ func (s *PlanCommandService) EnrollTestee(ctx context.Context, req *pb.EnrollTes
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.EnrollTesteeResponse{Enrollment: toPBEnrollmentResult(result)}, nil
+	enrollment, convErr := toPBEnrollmentResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.EnrollTesteeResponse{Enrollment: enrollment}, nil
 }
 
 func (s *PlanCommandService) TerminateEnrollment(ctx context.Context, req *pb.TerminateEnrollmentRequest) (*pb.TerminateEnrollmentResponse, error) {
@@ -157,10 +181,14 @@ func (s *PlanCommandService) TerminateEnrollment(ctx context.Context, req *pb.Te
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
+	affectedTaskCount, convErr := protoInt32FromInt("affected_task_count", result.AffectedTaskCount)
+	if convErr != nil {
+		return nil, convErr
+	}
 	return &pb.TerminateEnrollmentResponse{
 		PlanId:            result.PlanID,
 		TesteeId:          result.TesteeID,
-		AffectedTaskCount: int32(result.AffectedTaskCount),
+		AffectedTaskCount: affectedTaskCount,
 	}, nil
 }
 
@@ -173,15 +201,17 @@ func (s *PlanCommandService) SchedulePendingTasks(ctx context.Context, req *pb.S
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
+	tasks, convErr := toPBTaskResults(result.Tasks)
+	if convErr != nil {
+		return nil, convErr
+	}
+	stats, convErr := toPBTaskScheduleStats(result.Stats)
+	if convErr != nil {
+		return nil, convErr
+	}
 	return &pb.SchedulePendingTasksResponse{
-		Tasks: toPBTaskResults(result.Tasks),
-		Stats: &pb.TaskScheduleStatsMessage{
-			PendingCount:      int32(result.Stats.PendingCount),
-			OpenedCount:       int32(result.Stats.OpenedCount),
-			FailedCount:       int32(result.Stats.FailedCount),
-			ExpiredCount:      int32(result.Stats.ExpiredCount),
-			ExpireFailedCount: int32(result.Stats.ExpireFailedCount),
-		},
+		Tasks: tasks,
+		Stats: stats,
 	}, nil
 }
 
@@ -201,7 +231,11 @@ func (s *PlanCommandService) OpenTask(ctx context.Context, req *pb.OpenTaskReque
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.OpenTaskResponse{Task: toPBTaskResult(result)}, nil
+	task, convErr := toPBTaskResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.OpenTaskResponse{Task: task}, nil
 }
 
 func (s *PlanCommandService) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*pb.CompleteTaskResponse, error) {
@@ -219,7 +253,11 @@ func (s *PlanCommandService) CompleteTask(ctx context.Context, req *pb.CompleteT
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.CompleteTaskResponse{Task: toPBTaskResult(result)}, nil
+	task, convErr := toPBTaskResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.CompleteTaskResponse{Task: task}, nil
 }
 
 func (s *PlanCommandService) ExpireTask(ctx context.Context, req *pb.ExpireTaskRequest) (*pb.ExpireTaskResponse, error) {
@@ -234,7 +272,11 @@ func (s *PlanCommandService) ExpireTask(ctx context.Context, req *pb.ExpireTaskR
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
-	return &pb.ExpireTaskResponse{Task: toPBTaskResult(result)}, nil
+	task, convErr := toPBTaskResult(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+	return &pb.ExpireTaskResponse{Task: task}, nil
 }
 
 func (s *PlanCommandService) CancelTask(ctx context.Context, req *pb.CancelTaskRequest) (*pb.CancelTaskResponse, error) {
@@ -249,10 +291,14 @@ func (s *PlanCommandService) CancelTask(ctx context.Context, req *pb.CancelTaskR
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
+	affectedTaskCount, convErr := protoInt32FromInt("affected_task_count", result.AffectedTaskCount)
+	if convErr != nil {
+		return nil, convErr
+	}
 	return &pb.CancelTaskResponse{
 		TaskId:            result.TaskID,
 		PlanId:            result.PlanID,
-		AffectedTaskCount: int32(result.AffectedTaskCount),
+		AffectedTaskCount: affectedTaskCount,
 	}, nil
 }
 
@@ -274,9 +320,21 @@ func toPlanCommandGRPCError(err error) error {
 	}
 }
 
-func toPBPlanResult(result *planApp.PlanResult) *pb.PlanResultMessage {
+func toPBPlanResult(result *planApp.PlanResult) (*pb.PlanResultMessage, error) {
 	if result == nil {
-		return nil
+		return nil, nil
+	}
+	interval, err := protoInt32FromInt("interval", result.Interval)
+	if err != nil {
+		return nil, err
+	}
+	totalTimes, err := protoInt32FromInt("total_times", result.TotalTimes)
+	if err != nil {
+		return nil, err
+	}
+	relativeWeeks, err := protoInt32Slice("relative_weeks", result.RelativeWeeks)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.PlanResultMessage{
@@ -285,23 +343,27 @@ func toPBPlanResult(result *planApp.PlanResult) *pb.PlanResultMessage {
 		ScaleCode:     result.ScaleCode,
 		ScheduleType:  result.ScheduleType,
 		TriggerTime:   result.TriggerTime,
-		Interval:      int32(result.Interval),
-		TotalTimes:    int32(result.TotalTimes),
+		Interval:      interval,
+		TotalTimes:    totalTimes,
 		FixedDates:    result.FixedDates,
-		RelativeWeeks: toInt32Slice(result.RelativeWeeks),
+		RelativeWeeks: relativeWeeks,
 		Status:        result.Status,
-	}
+	}, nil
 }
 
-func toPBTaskResult(result *planApp.TaskResult) *pb.TaskResultMessage {
+func toPBTaskResult(result *planApp.TaskResult) (*pb.TaskResultMessage, error) {
 	if result == nil {
-		return nil
+		return nil, nil
+	}
+	seq, err := protoInt32FromInt("seq", result.Seq)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.TaskResultMessage{
 		Id:           result.ID,
 		PlanId:       result.PlanID,
-		Seq:          int32(result.Seq),
+		Seq:          seq,
 		OrgId:        result.OrgID,
 		TesteeId:     result.TesteeID,
 		ScaleCode:    result.ScaleCode,
@@ -313,31 +375,43 @@ func toPBTaskResult(result *planApp.TaskResult) *pb.TaskResultMessage {
 		AssessmentId: cloneOptionalString(result.AssessmentID),
 		EntryToken:   result.EntryToken,
 		EntryUrl:     result.EntryURL,
-	}
+	}, nil
 }
 
-func toPBTaskResults(results []*planApp.TaskResult) []*pb.TaskResultMessage {
+func toPBTaskResults(results []*planApp.TaskResult) ([]*pb.TaskResultMessage, error) {
 	if len(results) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	items := make([]*pb.TaskResultMessage, 0, len(results))
 	for _, result := range results {
-		items = append(items, toPBTaskResult(result))
+		item, err := toPBTaskResult(result)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
 	}
-	return items
+	return items, nil
 }
 
-func toPBEnrollmentResult(result *planApp.EnrollmentResult) *pb.EnrollmentResultMessage {
+func toPBEnrollmentResult(result *planApp.EnrollmentResult) (*pb.EnrollmentResultMessage, error) {
 	if result == nil {
-		return nil
+		return nil, nil
+	}
+	tasks, err := toPBTaskResults(result.Tasks)
+	if err != nil {
+		return nil, err
+	}
+	createdTaskCount, err := protoInt32FromInt("created_task_count", result.CreatedTaskCount)
+	if err != nil {
+		return nil, err
 	}
 	return &pb.EnrollmentResultMessage{
 		PlanId:           result.PlanID,
-		Tasks:            toPBTaskResults(result.Tasks),
+		Tasks:            tasks,
 		Idempotent:       result.Idempotent,
-		CreatedTaskCount: int32(result.CreatedTaskCount),
-	}
+		CreatedTaskCount: createdTaskCount,
+	}, nil
 }
 
 func toIntSlice(values []int32) []int {
@@ -351,15 +425,35 @@ func toIntSlice(values []int32) []int {
 	return items
 }
 
-func toInt32Slice(values []int) []int32 {
-	if len(values) == 0 {
-		return nil
+func toPBTaskScheduleStats(stats planApp.TaskScheduleStats) (*pb.TaskScheduleStatsMessage, error) {
+	pendingCount, err := protoInt32FromInt("pending_count", stats.PendingCount)
+	if err != nil {
+		return nil, err
 	}
-	items := make([]int32, 0, len(values))
-	for _, value := range values {
-		items = append(items, int32(value))
+	openedCount, err := protoInt32FromInt("opened_count", stats.OpenedCount)
+	if err != nil {
+		return nil, err
 	}
-	return items
+	failedCount, err := protoInt32FromInt("failed_count", stats.FailedCount)
+	if err != nil {
+		return nil, err
+	}
+	expiredCount, err := protoInt32FromInt("expired_count", stats.ExpiredCount)
+	if err != nil {
+		return nil, err
+	}
+	expireFailedCount, err := protoInt32FromInt("expire_failed_count", stats.ExpireFailedCount)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.TaskScheduleStatsMessage{
+		PendingCount:      pendingCount,
+		OpenedCount:       openedCount,
+		FailedCount:       failedCount,
+		ExpiredCount:      expiredCount,
+		ExpireFailedCount: expireFailedCount,
+	}, nil
 }
 
 func cloneOptionalString(value *string) *string {

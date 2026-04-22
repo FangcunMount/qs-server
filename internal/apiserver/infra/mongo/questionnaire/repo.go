@@ -235,7 +235,9 @@ func (r *Repository) CountPublishedWithConditions(ctx context.Context, condition
 	if err != nil {
 		return 0, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	if !cursor.Next(ctx) {
 		if err := cursor.Err(); err != nil {
@@ -394,7 +396,9 @@ func (r *Repository) aggregateList(ctx context.Context, pipeline []bson.M) ([]*d
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var questionnaires []*domainQuestionnaire.Questionnaire
 	for cursor.Next(ctx) {
@@ -420,7 +424,9 @@ func (r *Repository) aggregateOne(ctx context.Context, pipeline []bson.M) (*Ques
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	if !cursor.Next(ctx) {
 		if err := cursor.Err(); err != nil {

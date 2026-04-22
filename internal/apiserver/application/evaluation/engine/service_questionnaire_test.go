@@ -11,6 +11,7 @@ import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -308,4 +309,42 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+type waiterNotifierStub struct{}
+
+func (w *waiterNotifierStub) Notify(context.Context, uint64, waiter.StatusSummary) {}
+
+func (w *waiterNotifierStub) GetWaiterCount(uint64) int { return 0 }
+
+type noopReportBuilder struct{}
+
+func (b *noopReportBuilder) Build(*domainAssessment.Assessment, *domainScale.MedicalScale, *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
+	return nil, nil
+}
+
+func TestNewServiceAcceptsWaiterPort(t *testing.T) {
+	waiterRegistry := &waiterNotifierStub{}
+
+	svc := NewService(
+		&fakeAssessmentRepo{},
+		&noopScoreRepo{},
+		&noopReportRepo{},
+		&fakeScaleRepo{},
+		&fakeAnswerSheetRepo{},
+		&fakeQuestionnaireRepo{},
+		&noopReportBuilder{},
+		WithWaiterRegistry(waiterRegistry),
+	)
+
+	impl, ok := svc.(*service)
+	if !ok {
+		t.Fatalf("expected *service, got %T", svc)
+	}
+	if impl.waiterRegistry != waiterRegistry {
+		t.Fatal("expected waiter registry port to be stored on service")
+	}
+	if impl.pipeline == nil {
+		t.Fatal("expected pipeline to be initialized")
+	}
 }

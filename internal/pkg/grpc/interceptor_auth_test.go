@@ -35,25 +35,25 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 
 	ctx := interceptor.injectUserContext(context.Background(), result)
 
-	if got := ctx.Value("user_id"); got != "1001" {
+	if got := UserIDFromContext(ctx); got != "1001" {
 		t.Fatalf("unexpected user_id: %v", got)
 	}
-	if got := ctx.Value("account_id"); got != "2001" {
+	if got := AccountIDFromContext(ctx); got != "2001" {
 		t.Fatalf("unexpected account_id: %v", got)
 	}
-	if got := ctx.Value("tenant_id"); got != "3001" {
+	if got := TenantIDFromContext(ctx); got != "3001" {
 		t.Fatalf("unexpected tenant_id: %v", got)
 	}
-	if got := ctx.Value("session_id"); got != "session-1" {
+	if got := SessionIDFromContext(ctx); got != "session-1" {
 		t.Fatalf("unexpected session_id: %v", got)
 	}
-	if got := ctx.Value("token_id"); got != "token-1" {
+	if got := TokenIDFromContext(ctx); got != "token-1" {
 		t.Fatalf("unexpected token_id: %v", got)
 	}
-	if got := ctx.Value("username"); got != "alice" {
+	if got := UsernameFromContext(ctx); got != "alice" {
 		t.Fatalf("unexpected username: %v", got)
 	}
-	if got := ctx.Value("token_metadata"); got == nil {
+	if got := TokenMetadataFromContext(ctx); got == nil {
 		t.Fatal("expected token_metadata")
 	}
 }

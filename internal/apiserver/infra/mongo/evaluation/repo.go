@@ -155,7 +155,9 @@ func (r *ReportRepository) findByFilter(ctx context.Context, filter bson.M, pagi
 	if err != nil {
 		return nil, 0, fmt.Errorf("查询报告列表失败: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var pos []*InterpretReportPO
 	for cursor.Next(ctx) {

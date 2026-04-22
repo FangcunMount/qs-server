@@ -66,7 +66,7 @@ func (r *CachedPlanRepository) FindByID(ctx context.Context, id plan.AssessmentP
 func (r *CachedPlanRepository) Save(ctx context.Context, domain *plan.AssessmentPlan) error {
 	err := r.repo.Save(ctx, domain)
 	if err == nil && domain != nil {
-		r.deleteCache(ctx, domain.GetID())
+		_ = r.deleteCache(ctx, domain.GetID())
 	}
 	return err
 }

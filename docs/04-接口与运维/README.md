@@ -49,5 +49,7 @@
 4. [04-调度与后台任务.md](./04-调度与后台任务.md) — Crontab、统计同步 ticker、与 [01-事件系统](../03-基础设施/01-事件系统.md) 的异步链  
 5. [05-事故复盘：2026-04-16 qs.evaluation.lifecycle 积压与 30 秒尾延迟.md](./05-事故复盘：2026-04-16%20qs.evaluation.lifecycle%20积压与%2030%20秒尾延迟.md) — 一次真实生产排障如何从“数据库疑似瓶颈”收敛到“应用层同步缓存失效”
 6. [06-operating 缓存治理页接入.md](./06-operating%20缓存治理页接入.md) — 自研 operating 后台如何复用 internal 缓存治理接口与 Grafana 深链接
+7. [07-代码质量基线报告：2026-04-22.md](./07-代码质量基线报告：2026-04-22.md) — 当前质量门禁、覆盖率、安全扫描和下一阶段治理优先级
+8. [08-架构边界审计与Tier1测试策略：2026-04-22.md](./08-架构边界审计与Tier1测试策略：2026-04-22.md) — 分层边界现状、允许例外、Tier 1 测试策略与第一阶段深度治理落点
 
 **机器可读契约**：[api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[api/rest/collection.yaml](../../api/rest/collection.yaml)、[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/)；各进程配置见 [configs/](../../configs/)。

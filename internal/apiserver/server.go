@@ -401,7 +401,9 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 		// 清理容器资源
 		if s.container != nil {
-			s.container.Cleanup()
+			if err := s.container.Cleanup(); err != nil {
+				log.Errorf("Failed to cleanup container resources: %v", err)
+			}
 		}
 
 		if s.authzVersionSubscriber != nil {
@@ -429,13 +431,6 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 	}))
 
 	return preparedAPIServer{s}
-}
-
-func errorString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }
 
 func redisHandleClient(handle *redisplane.Handle) redis.UniversalClient {

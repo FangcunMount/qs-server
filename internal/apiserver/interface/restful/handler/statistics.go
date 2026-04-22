@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -11,9 +10,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +28,7 @@ type StatisticsHandler struct {
 	testeeAccessService            actorAccessApp.TesteeAccessService
 	warmupCoordinator              cachegov.Coordinator
 	cacheGovernanceStatusService   cachegov.StatusService
+	governanceFacade               statisticsApp.GovernanceFacade
 }
 
 // NewStatisticsHandler 创建统计处理器
@@ -61,10 +59,16 @@ func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService actorAcce
 
 func (h *StatisticsHandler) SetWarmupCoordinator(coordinator cachegov.Coordinator) {
 	h.warmupCoordinator = coordinator
+	h.governanceFacade = nil
 }
 
 func (h *StatisticsHandler) SetCacheGovernanceStatusService(service cachegov.StatusService) {
 	h.cacheGovernanceStatusService = service
+	h.governanceFacade = nil
+}
+
+func (h *StatisticsHandler) SetGovernanceFacade(facade statisticsApp.GovernanceFacade) {
+	h.governanceFacade = facade
 }
 
 func (h *StatisticsHandler) bindJSON(c *gin.Context, req interface{}) bool {
@@ -134,29 +138,6 @@ func parseStatisticsSyncDateRange(c *gin.Context) (statisticsApp.SyncDailyOption
 
 type questionnaireBatchRequest struct {
 	Codes []string `json:"codes"`
-}
-
-type repairCompleteRequest struct {
-	RepairKind         string   `json:"repair_kind"`
-	OrgIDs             []int64  `json:"org_ids"`
-	QuestionnaireCodes []string `json:"questionnaire_codes"`
-	PlanIDs            []uint64 `json:"plan_ids"`
-}
-
-func validateManualWarmupTargets(protectedOrgID int64, targets []cachegov.ManualWarmupTarget) error {
-	if len(targets) == 0 {
-		return errors.WithCode(code.ErrInvalidArgument, "targets cannot be empty")
-	}
-	for _, item := range targets {
-		target, err := cachegov.ParseManualWarmupTarget(item)
-		if err != nil {
-			return errors.WithCode(code.ErrInvalidArgument, "%s", err.Error())
-		}
-		if orgID, ok := cachegov.WarmupTargetOrgID(target); ok && orgID != protectedOrgID {
-			return errors.WithCode(code.ErrInvalidArgument, "query warmup target org must stay within the protected org scope")
-		}
-	}
-	return nil
 }
 
 func (h *StatisticsHandler) GetOverview(c *gin.Context) {
@@ -575,7 +556,7 @@ func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	h.triggerStatisticsWarmup(ctx, orgID, "sync_daily_statistics")
+	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_daily_statistics")
 
 	h.Success(c, gin.H{"message": "每日统计同步完成"})
 }
@@ -608,7 +589,7 @@ func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	h.triggerStatisticsWarmup(ctx, orgID, "sync_accumulated_statistics")
+	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_accumulated_statistics")
 
 	h.Success(c, gin.H{"message": "累计统计同步完成"})
 }
@@ -641,7 +622,7 @@ func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	h.triggerStatisticsWarmup(ctx, orgID, "sync_plan_statistics")
+	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_plan_statistics")
 
 	h.Success(c, gin.H{"message": "计划统计同步完成"})
 }
@@ -654,32 +635,13 @@ func (h *StatisticsHandler) RepairComplete(c *gin.Context) {
 		return
 	}
 
-	var req repairCompleteRequest
+	var req statisticsApp.RepairCompleteRequest
 	if !h.bindJSON(c, &req) {
 		return
 	}
-	if len(req.OrgIDs) == 0 {
-		req.OrgIDs = []int64{orgID}
-	}
-	for _, candidate := range req.OrgIDs {
-		if candidate != orgID {
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "org_ids must stay within the protected org scope"))
-			return
-		}
-	}
-	if h.warmupCoordinator != nil {
-		if err := h.warmupCoordinator.HandleRepairComplete(ctx, cachegov.RepairCompleteRequest{
-			RepairKind:         req.RepairKind,
-			OrgIDs:             req.OrgIDs,
-			QuestionnaireCodes: req.QuestionnaireCodes,
-			PlanIDs:            req.PlanIDs,
-		}); err != nil {
-			logger.L(ctx).Warnw("repair-complete cache governance hook failed",
-				"repair_kind", req.RepairKind,
-				"org_ids", req.OrgIDs,
-				"error", err,
-			)
-		}
+	if err := h.governance().HandleRepairComplete(ctx, orgID, req); err != nil {
+		h.Error(c, err)
+		return
 	}
 
 	h.Success(c, gin.H{"message": "repair complete hook accepted"})
@@ -704,44 +666,21 @@ func (h *StatisticsHandler) WarmupTargets(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	if h.warmupCoordinator == nil {
-		h.Error(c, errors.WithCode(code.ErrInternalServerError, "warmup coordinator is unavailable"))
-		return
-	}
-
-	var req cachegov.ManualWarmupRequest
+	var req statisticsApp.ManualWarmupRequest
 	if !h.bindJSON(c, &req) {
 		return
 	}
-	if err := validateManualWarmupTargets(orgID, req.Targets); err != nil {
-		h.Error(c, err)
-		return
-	}
 
-	result, err := h.warmupCoordinator.HandleManualWarmup(ctx, req)
+	result, err := h.governance().HandleManualWarmup(ctx, orgID, req)
 	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "%s", err.Error()))
+		h.Error(c, err)
 		return
 	}
 	h.Success(c, result)
 }
 
 func (h *StatisticsHandler) CacheGovernanceStatus(c *gin.Context) {
-	if h.cacheGovernanceStatusService == nil {
-		h.Success(c, &cachegov.StatusSnapshot{
-			RuntimeSnapshot: cacheobservability.RuntimeSnapshot{
-				GeneratedAt: time.Now(),
-				Component:   "apiserver",
-				Families:    []cacheobservability.FamilyStatus{},
-				Summary: cacheobservability.RuntimeSummary{
-					Ready: true,
-				},
-			},
-			Warmup: cachegov.WarmupStatusSnapshot{},
-		})
-		return
-	}
-	result, err := h.cacheGovernanceStatusService.GetStatus(c.Request.Context())
+	result, err := h.governance().GetStatus(c.Request.Context())
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -750,32 +689,7 @@ func (h *StatisticsHandler) CacheGovernanceStatus(c *gin.Context) {
 }
 
 func (h *StatisticsHandler) CacheGovernanceHotset(c *gin.Context) {
-	if h.cacheGovernanceStatusService == nil {
-		h.Success(c, gin.H{"items": []interface{}{}, "available": false, "degraded": true, "message": "cache governance status service unavailable"})
-		return
-	}
-
-	kindRaw := strings.TrimSpace(c.Query("kind"))
-	kind, ok := cacheinfra.ParseWarmupKind(kindRaw)
-	if !ok {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid kind"))
-		return
-	}
-
-	limit := int64(20)
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid limit"))
-			return
-		}
-		if value > 100 {
-			value = 100
-		}
-		limit = value
-	}
-
-	result, err := h.cacheGovernanceStatusService.GetHotset(c.Request.Context(), kind, limit)
+	result, err := h.governance().GetHotset(c.Request.Context(), c.Query("kind"), c.Query("limit"))
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -783,15 +697,12 @@ func (h *StatisticsHandler) CacheGovernanceHotset(c *gin.Context) {
 	h.Success(c, result)
 }
 
-func (h *StatisticsHandler) triggerStatisticsWarmup(ctx context.Context, orgID int64, action string) {
-	if h == nil || h.warmupCoordinator == nil {
-		return
+func (h *StatisticsHandler) governance() statisticsApp.GovernanceFacade {
+	if h == nil {
+		return statisticsApp.NewGovernanceFacade("apiserver", nil, nil)
 	}
-	if err := h.warmupCoordinator.HandleStatisticsSync(ctx, orgID); err != nil {
-		logger.L(ctx).Warnw("statistics sync cache governance hook failed",
-			"action", action,
-			"org_id", orgID,
-			"error", err,
-		)
+	if h.governanceFacade == nil {
+		h.governanceFacade = statisticsApp.NewGovernanceFacade("apiserver", h.warmupCoordinator, h.cacheGovernanceStatusService)
 	}
+	return h.governanceFacade
 }

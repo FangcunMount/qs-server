@@ -201,60 +201,60 @@ type relationshipServiceRelationRepo struct {
 	historyByClinician    []*domainRelation.ClinicianTesteeRelation
 }
 
-func (s *relationshipServiceRelationRepo) Save(ctx context.Context, item *domainRelation.ClinicianTesteeRelation) error {
+func (s *relationshipServiceRelationRepo) Save(_ context.Context, item *domainRelation.ClinicianTesteeRelation) error {
 	s.saved = item
 	return nil
 }
 
-func (s *relationshipServiceRelationRepo) Update(ctx context.Context, item *domainRelation.ClinicianTesteeRelation) error {
+func (s *relationshipServiceRelationRepo) Update(_ context.Context, item *domainRelation.ClinicianTesteeRelation) error {
 	s.updated = item
 	return nil
 }
 
-func (s *relationshipServiceRelationRepo) FindByID(ctx context.Context, id domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) FindByID(context.Context, domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "relation not found")
 }
 
-func (s *relationshipServiceRelationRepo) FindActive(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationType domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) FindActive(context.Context, int64, domainClinician.ID, domainTestee.ID, domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "relation not found")
 }
 
-func (s *relationshipServiceRelationRepo) FindActivePrimaryByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) FindActivePrimaryByTestee(context.Context, int64, domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
 	if s.activePrimaryByTestee == nil {
 		return nil, cbErrors.WithCode(code.ErrUserNotFound, "primary relation not found")
 	}
 	return s.activePrimaryByTestee, nil
 }
 
-func (s *relationshipServiceRelationRepo) FindActiveByTypes(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) FindActiveByTypes(context.Context, int64, domainClinician.ID, domainTestee.ID, []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "relation not found")
 }
 
-func (s *relationshipServiceRelationRepo) ListActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType, offset, limit int) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) ListActiveByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType, int, int) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	return s.activeByClinician, nil
 }
 
-func (s *relationshipServiceRelationRepo) ListHistoryByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) ListHistoryByClinician(context.Context, int64, domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	return s.historyByClinician, nil
 }
 
-func (s *relationshipServiceRelationRepo) CountActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType) (int64, error) {
+func (s *relationshipServiceRelationRepo) CountActiveByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType) (int64, error) {
 	return int64(len(s.activeByClinician)), nil
 }
 
-func (s *relationshipServiceRelationRepo) ListActiveByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) ListActiveByTestee(context.Context, int64, domainTestee.ID, []domainRelation.RelationType) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceRelationRepo) ListHistoryByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *relationshipServiceRelationRepo) ListHistoryByTestee(context.Context, int64, domainTestee.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceRelationRepo) HasActiveRelationForTestee(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) (bool, error) {
+func (s *relationshipServiceRelationRepo) HasActiveRelationForTestee(context.Context, int64, domainClinician.ID, domainTestee.ID, []domainRelation.RelationType) (bool, error) {
 	return false, nil
 }
 
-func (s *relationshipServiceRelationRepo) ListActiveTesteeIDsByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType) ([]domainTestee.ID, error) {
+func (s *relationshipServiceRelationRepo) ListActiveTesteeIDsByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType) ([]domainTestee.ID, error) {
 	return nil, nil
 }
 
@@ -262,31 +262,31 @@ type relationshipServiceClinicianRepo struct {
 	item *domainClinician.Clinician
 }
 
-func (s *relationshipServiceClinicianRepo) Save(ctx context.Context, item *domainClinician.Clinician) error {
+func (s *relationshipServiceClinicianRepo) Save(context.Context, *domainClinician.Clinician) error {
 	return nil
 }
 
-func (s *relationshipServiceClinicianRepo) Update(ctx context.Context, item *domainClinician.Clinician) error {
+func (s *relationshipServiceClinicianRepo) Update(context.Context, *domainClinician.Clinician) error {
 	return nil
 }
 
-func (s *relationshipServiceClinicianRepo) FindByID(ctx context.Context, id domainClinician.ID) (*domainClinician.Clinician, error) {
+func (s *relationshipServiceClinicianRepo) FindByID(context.Context, domainClinician.ID) (*domainClinician.Clinician, error) {
 	return s.item, nil
 }
 
-func (s *relationshipServiceClinicianRepo) FindByOperator(ctx context.Context, orgID int64, operatorID uint64) (*domainClinician.Clinician, error) {
+func (s *relationshipServiceClinicianRepo) FindByOperator(context.Context, int64, uint64) (*domainClinician.Clinician, error) {
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "clinician not found")
 }
 
-func (s *relationshipServiceClinicianRepo) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domainClinician.Clinician, error) {
+func (s *relationshipServiceClinicianRepo) ListByOrg(context.Context, int64, int, int) ([]*domainClinician.Clinician, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceClinicianRepo) Count(ctx context.Context, orgID int64) (int64, error) {
+func (s *relationshipServiceClinicianRepo) Count(context.Context, int64) (int64, error) {
 	return 0, nil
 }
 
-func (s *relationshipServiceClinicianRepo) Delete(ctx context.Context, id domainClinician.ID) error {
+func (s *relationshipServiceClinicianRepo) Delete(context.Context, domainClinician.ID) error {
 	return nil
 }
 
@@ -297,15 +297,15 @@ type relationshipServiceTesteeRepo struct {
 	findByIDsCalls int
 }
 
-func (s *relationshipServiceTesteeRepo) Save(ctx context.Context, testee *domainTestee.Testee) error {
+func (s *relationshipServiceTesteeRepo) Save(context.Context, *domainTestee.Testee) error {
 	return nil
 }
 
-func (s *relationshipServiceTesteeRepo) Update(ctx context.Context, testee *domainTestee.Testee) error {
+func (s *relationshipServiceTesteeRepo) Update(context.Context, *domainTestee.Testee) error {
 	return nil
 }
 
-func (s *relationshipServiceTesteeRepo) FindByID(ctx context.Context, id domainTestee.ID) (*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) FindByID(_ context.Context, id domainTestee.ID) (*domainTestee.Testee, error) {
 	s.findByIDCalls++
 	if s.byID != nil {
 		item := s.byID[id]
@@ -317,7 +317,7 @@ func (s *relationshipServiceTesteeRepo) FindByID(ctx context.Context, id domainT
 	return s.item, nil
 }
 
-func (s *relationshipServiceTesteeRepo) FindByIDs(ctx context.Context, ids []domainTestee.ID) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) FindByIDs(_ context.Context, ids []domainTestee.ID) ([]*domainTestee.Testee, error) {
 	s.findByIDsCalls++
 	if s.byID == nil {
 		if s.item == nil {
@@ -335,42 +335,42 @@ func (s *relationshipServiceTesteeRepo) FindByIDs(ctx context.Context, ids []dom
 	return items, nil
 }
 
-func (s *relationshipServiceTesteeRepo) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) FindByProfile(context.Context, int64, uint64) (*domainTestee.Testee, error) {
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "testee not found")
 }
 
-func (s *relationshipServiceTesteeRepo) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) FindByOrgAndName(context.Context, int64, string) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) ListByOrg(ctx context.Context, orgID int64, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) ListByOrg(context.Context, int64, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) ListByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) ListByTags(context.Context, int64, []string, int, int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) ListKeyFocus(context.Context, int64, int, int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *relationshipServiceTesteeRepo) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domainTestee.Testee, error) {
 	return nil, nil
 }
 
-func (s *relationshipServiceTesteeRepo) Delete(ctx context.Context, id domainTestee.ID) error {
+func (s *relationshipServiceTesteeRepo) Delete(context.Context, domainTestee.ID) error {
 	return nil
 }
 
-func (s *relationshipServiceTesteeRepo) Count(ctx context.Context, orgID int64, filter domainTestee.ListFilter) (int64, error) {
+func (s *relationshipServiceTesteeRepo) Count(context.Context, int64, domainTestee.ListFilter) (int64, error) {
 	return 0, nil
 }
 
-func (s *relationshipServiceTesteeRepo) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter) (int64, error) {
+func (s *relationshipServiceTesteeRepo) CountByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter) (int64, error) {
 	return 0, nil
 }

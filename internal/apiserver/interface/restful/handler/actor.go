@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,15 @@ type ActorHandler struct {
 	// Evaluation 服务（用于查询测评记录）
 	assessmentManagementService assessmentApp.AssessmentManagementService
 	scoreQueryService           assessmentApp.ScoreQueryService
+}
+
+type testeeListQuery struct {
+	Request        request.ListTesteeRequest
+	OrgID          int64
+	Page           int
+	PageSize       int
+	CreatedAtStart *time.Time
+	CreatedAtEnd   *time.Time
 }
 
 // NewActorHandler 创建 Actor Handler
@@ -213,14 +223,8 @@ func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
 // @Failure 404 {object} core.Response
 // @Router /api/v1/testees/{id}/scale-analysis [get]
 func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
+	id, err := h.parseTesteeIDParam(c, "get_scale_analysis")
 	if err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
-			"action", "get_scale_analysis",
-			"testee_id", idStr,
-			"error", err.Error(),
-		)
 		h.Error(c, err)
 		return
 	}
@@ -229,133 +233,16 @@ func (h *ActorHandler) GetScaleAnalysis(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-
-	// 验证受试者是否存在
-	_, err = h.testeeQueryService.GetByID(c.Request.Context(), id)
-	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get testee",
-			"action", "get_scale_analysis",
-			"testee_id", id,
-			"error", err.Error(),
-		)
+	if err := h.ensureTesteeExists(c, "get_scale_analysis", id); err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	// 查询该受试者的所有测评记录
-	listDTO := assessmentApp.ListAssessmentsDTO{
-		OrgID:    uint64(orgID),
-		Page:     1,
-		PageSize: 1000, // 获取所有记录
-		Conditions: map[string]string{
-			"testee_id": strconv.FormatUint(id, 10),
-		},
-	}
-
-	assessmentList, err := h.assessmentManagementService.List(c.Request.Context(), listDTO)
+	assessments, err := h.listTesteeAssessments(c, orgID, id)
 	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to list assessments",
-			"action", "get_scale_analysis",
-			"testee_id", id,
-			"error", err.Error(),
-		)
 		h.Error(c, err)
 		return
 	}
-
-	// 按量表分组
-	scaleMap := make(map[string]*response.ScaleTrendResponse)
-	for _, assessment := range assessmentList.Items {
-		// 只处理已解读的测评
-		if assessment.Status != "interpreted" || assessment.MedicalScaleCode == nil {
-			continue
-		}
-
-		scaleCode := *assessment.MedicalScaleCode
-		scaleName := ""
-		if assessment.MedicalScaleName != nil {
-			scaleName = *assessment.MedicalScaleName
-		}
-
-		// 获取或创建量表趋势
-		scaleTrend, exists := scaleMap[scaleCode]
-		if !exists {
-			scaleTrend = &response.ScaleTrendResponse{
-				ScaleID:   "",
-				ScaleCode: scaleCode,
-				ScaleName: scaleName,
-				Tests:     []response.ScaleTestResponse{},
-			}
-			if assessment.MedicalScaleID != nil {
-				scaleTrend.ScaleID = strconv.FormatUint(*assessment.MedicalScaleID, 10)
-			}
-			scaleMap[scaleCode] = scaleTrend
-		}
-
-		// 获取测评得分
-		var totalScore float64
-		var riskLevel string
-		var testDate time.Time
-		if assessment.TotalScore != nil {
-			totalScore = *assessment.TotalScore
-		}
-		if assessment.RiskLevel != nil {
-			riskLevel = *assessment.RiskLevel
-		}
-		if assessment.InterpretedAt != nil {
-			testDate = *assessment.InterpretedAt
-		} else if assessment.SubmittedAt != nil {
-			testDate = *assessment.SubmittedAt
-		}
-
-		// 查询因子得分
-		factors := []response.ScaleFactorResponse{}
-		scoreResult, err := h.scoreQueryService.GetByAssessmentID(c.Request.Context(), assessment.ID)
-		if err == nil && scoreResult != nil {
-			for _, factorScore := range scoreResult.FactorScores {
-				factors = append(factors, response.ScaleFactorResponse{
-					FactorCode:     factorScore.FactorCode,
-					FactorName:     factorScore.FactorName,
-					RawScore:       factorScore.RawScore,
-					RiskLevel:      factorScore.RiskLevel,
-					RiskLevelLabel: response.LabelForRiskLevel(factorScore.RiskLevel),
-				})
-			}
-		}
-
-		// 构建测评记录
-		testRecord := response.ScaleTestResponse{
-			AssessmentID:   strconv.FormatUint(assessment.ID, 10),
-			TestDate:       response.FormatDateTimeValue(testDate),
-			TotalScore:     totalScore,
-			RiskLevel:      riskLevel,
-			RiskLevelLabel: response.LabelForRiskLevel(riskLevel),
-			Result:         "", // TODO: 从报告中获取结果描述
-			Factors:        factors,
-		}
-
-		scaleTrend.Tests = append(scaleTrend.Tests, testRecord)
-	}
-
-	// 转换为列表并按时间排序
-	scales := make([]response.ScaleTrendResponse, 0, len(scaleMap))
-	for _, scaleTrend := range scaleMap {
-		// 按测试日期升序排序
-		for i := 0; i < len(scaleTrend.Tests)-1; i++ {
-			for j := i + 1; j < len(scaleTrend.Tests); j++ {
-				if scaleTrend.Tests[i].TestDate > scaleTrend.Tests[j].TestDate {
-					scaleTrend.Tests[i], scaleTrend.Tests[j] = scaleTrend.Tests[j], scaleTrend.Tests[i]
-				}
-			}
-		}
-		scales = append(scales, *scaleTrend)
-	}
-
-	resp := &response.ScaleAnalysisResponse{
-		Scales: scales,
-	}
-
-	h.Success(c, resp)
+	h.Success(c, h.buildScaleAnalysisResponse(c, assessments))
 }
 
 // GetPeriodicStats 获取受试者周期统计。
@@ -518,113 +405,25 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-
-	var req request.ListTesteeRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid list testees request",
-			"action", "list_testees",
-			"resource", "testee",
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	query, err := h.parseTesteeListQuery(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	createdAtStart, createdAtEnd, err := parseInclusiveLocalDateRange(req.CreatedStartDate, req.CreatedEndDate)
+	if query.Request.ProfileID != "" {
+		result, err := h.listTesteesByProfile(c, operatorUserID, query)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		h.Success(c, result)
+		return
+	}
+
+	dto, err := h.buildTesteeListDTO(c, operatorUserID, query)
 	if err != nil {
 		h.Error(c, err)
 		return
-	}
-
-	// 设置默认值
-	if req.Page == 0 {
-		req.Page = 1
-	}
-	if req.PageSize == 0 {
-		req.PageSize = 20
-	}
-
-	// 按 profile_id 精确查询（等同于 IAM child_id）
-	if req.ProfileID != "" {
-		result, err := h.fetchTesteeByProfile(c, orgID, req.ProfileID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, result.ID); err != nil {
-			h.Error(c, err)
-			return
-		}
-		if req.ClinicianID != nil {
-			if _, err := h.requireClinicianInOrg(c, orgID, *req.ClinicianID); err != nil {
-				h.Error(c, err)
-				return
-			}
-			clinicianTesteeIDs, err := h.clinicianRelationshipService.ListAssignedTesteeIDs(c.Request.Context(), orgID, *req.ClinicianID)
-			if err != nil {
-				h.Error(c, err)
-				return
-			}
-			if !containsUint64(clinicianTesteeIDs, result.ID) {
-				h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, req.Page, req.PageSize))
-				return
-			}
-		}
-		if !testeeMatchesListFilter(result, req, createdAtStart, createdAtEnd) {
-			h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, req.Page, req.PageSize))
-			return
-		}
-
-		h.Success(c, toTesteeListResponse([]*testeeApp.TesteeResult{result}, 1, req.Page, req.PageSize))
-		return
-	}
-
-	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	// 使用查询服务 - 统一通过 ListTestees 方法处理所有查询
-	dto := testeeApp.ListTesteeDTO{
-		OrgID:          orgID,
-		Name:           req.Name,
-		Tags:           req.Tags,
-		KeyFocus:       req.IsKeyFocus,
-		CreatedAtStart: createdAtStart,
-		CreatedAtEnd:   createdAtEnd,
-		Offset:         (req.Page - 1) * req.PageSize,
-		Limit:          req.PageSize,
-	}
-	if req.ClinicianID != nil {
-		if _, err := h.requireClinicianInOrg(c, orgID, *req.ClinicianID); err != nil {
-			h.Error(c, err)
-			return
-		}
-		clinicianTesteeIDs, err := h.clinicianRelationshipService.ListAssignedTesteeIDs(c.Request.Context(), orgID, *req.ClinicianID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		dto.AccessibleTesteeIDs = clinicianTesteeIDs
-		dto.RestrictToAccessScope = true
-	}
-	if !scope.IsAdmin {
-		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		if dto.RestrictToAccessScope {
-			dto.AccessibleTesteeIDs = intersectUint64Slices(dto.AccessibleTesteeIDs, allowedTesteeIDs)
-		} else {
-			dto.AccessibleTesteeIDs = allowedTesteeIDs
-		}
-		dto.RestrictToAccessScope = true
 	}
 
 	listResult, err := h.testeeQueryService.ListTestees(c.Request.Context(), dto)
@@ -639,7 +438,7 @@ func (h *ActorHandler) ListTestees(c *gin.Context) {
 		return
 	}
 
-	h.Success(c, toTesteeListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
+	h.Success(c, toTesteeListResponse(listResult.Items, listResult.TotalCount, query.Page, query.PageSize))
 }
 
 func parseInclusiveLocalDateRange(startRaw, endRaw string) (*time.Time, *time.Time, error) {
@@ -825,14 +624,9 @@ func (h *ActorHandler) UpdateStaff(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-
-	current, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	current, err := h.loadProtectedStaff(c, orgID, id)
 	if err != nil {
 		h.Error(c, err)
-		return
-	}
-	if current.OrgID != orgID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
 		return
 	}
 
@@ -847,67 +641,13 @@ func (h *ActorHandler) UpdateStaff(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-
-	if _, err := h.operatorLifecycleService.UpdateProfile(c.Request.Context(), operatorApp.UpdateOperatorProfileDTO{
-		OperatorID: id,
-		Name:       req.Name,
-		Email:      req.Email,
-		Phone:      req.Phone,
-	}); err != nil {
+	if err := h.updateStaffProfile(c, id, req); err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	targetActive := current.IsActive
-	if req.IsActive != nil {
-		targetActive = *req.IsActive
-	}
-
-	if !targetActive {
-		if current.IsActive {
-			if err := h.operatorAuthorizationService.Deactivate(c.Request.Context(), id); err != nil {
-				h.Error(c, err)
-				return
-			}
-		}
-	} else {
-		if !current.IsActive {
-			if err := h.operatorAuthorizationService.Activate(c.Request.Context(), id); err != nil {
-				h.Error(c, err)
-				return
-			}
-		}
-
-		latest, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-
-		if req.Roles != nil {
-			currentRoles := make(map[string]struct{}, len(latest.Roles))
-			for _, role := range latest.Roles {
-				currentRoles[role] = struct{}{}
-			}
-			targetRoles := make(map[string]struct{}, len(req.Roles))
-			for _, role := range req.Roles {
-				targetRoles[role] = struct{}{}
-				if _, exists := currentRoles[role]; !exists {
-					if err := h.operatorAuthorizationService.AssignRole(c.Request.Context(), id, role); err != nil {
-						h.Error(c, err)
-						return
-					}
-				}
-			}
-			for _, role := range latest.Roles {
-				if _, exists := targetRoles[role]; !exists {
-					if err := h.operatorAuthorizationService.RemoveRole(c.Request.Context(), id, role); err != nil {
-						h.Error(c, err)
-						return
-					}
-				}
-			}
-		}
+	if err := h.syncStaffAuthorization(c, id, current, req); err != nil {
+		h.Error(c, err)
+		return
 	}
 
 	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
@@ -1073,6 +813,391 @@ func (h *ActorHandler) fetchTesteeByProfile(c *gin.Context, orgID int64, profile
 	}
 
 	return result, nil
+}
+
+func (h *ActorHandler) parseTesteeIDParam(c *gin.Context, action string) (uint64, error) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
+			"action", action,
+			"testee_id", idStr,
+			"error", err.Error(),
+		)
+		return 0, err
+	}
+	return id, nil
+}
+
+func (h *ActorHandler) ensureTesteeExists(c *gin.Context, action string, testeeID uint64) error {
+	if _, err := h.testeeQueryService.GetByID(c.Request.Context(), testeeID); err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to get testee",
+			"action", action,
+			"testee_id", testeeID,
+			"error", err.Error(),
+		)
+		return err
+	}
+	return nil
+}
+
+func (h *ActorHandler) listTesteeAssessments(c *gin.Context, orgID int64, testeeID uint64) ([]*assessmentApp.AssessmentResult, error) {
+	listDTO := assessmentApp.ListAssessmentsDTO{
+		OrgID:    uint64(orgID),
+		Page:     1,
+		PageSize: 1000,
+		Conditions: map[string]string{
+			"testee_id": strconv.FormatUint(testeeID, 10),
+		},
+	}
+
+	assessmentList, err := h.assessmentManagementService.List(c.Request.Context(), listDTO)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to list assessments",
+			"action", "get_scale_analysis",
+			"testee_id", testeeID,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+	return assessmentList.Items, nil
+}
+
+func (h *ActorHandler) buildScaleAnalysisResponse(c *gin.Context, assessments []*assessmentApp.AssessmentResult) *response.ScaleAnalysisResponse {
+	scaleMap := make(map[string]*response.ScaleTrendResponse)
+	for _, assessment := range assessments {
+		if !isInterpretedScaleAssessment(assessment) {
+			continue
+		}
+		h.appendScaleTrendRecord(c, scaleMap, assessment)
+	}
+	return &response.ScaleAnalysisResponse{Scales: flattenScaleTrendMap(scaleMap)}
+}
+
+func (h *ActorHandler) appendScaleTrendRecord(c *gin.Context, scaleMap map[string]*response.ScaleTrendResponse, assessment *assessmentApp.AssessmentResult) {
+	scaleTrend := ensureScaleTrend(scaleMap, assessment)
+	scaleTrend.Tests = append(scaleTrend.Tests, buildScaleTestRecord(assessment, h.loadScaleFactors(c, assessment.ID)))
+}
+
+func (h *ActorHandler) loadScaleFactors(c *gin.Context, assessmentID uint64) []response.ScaleFactorResponse {
+	if h == nil || h.scoreQueryService == nil {
+		return []response.ScaleFactorResponse{}
+	}
+	scoreResult, err := h.scoreQueryService.GetByAssessmentID(c.Request.Context(), assessmentID)
+	if err != nil || scoreResult == nil {
+		return []response.ScaleFactorResponse{}
+	}
+
+	factors := make([]response.ScaleFactorResponse, 0, len(scoreResult.FactorScores))
+	for _, factorScore := range scoreResult.FactorScores {
+		factors = append(factors, response.ScaleFactorResponse{
+			FactorCode:     factorScore.FactorCode,
+			FactorName:     factorScore.FactorName,
+			RawScore:       factorScore.RawScore,
+			RiskLevel:      factorScore.RiskLevel,
+			RiskLevelLabel: response.LabelForRiskLevel(factorScore.RiskLevel),
+		})
+	}
+	return factors
+}
+
+func ensureScaleTrend(scaleMap map[string]*response.ScaleTrendResponse, assessment *assessmentApp.AssessmentResult) *response.ScaleTrendResponse {
+	scaleCode := *assessment.MedicalScaleCode
+	if scaleTrend, exists := scaleMap[scaleCode]; exists {
+		return scaleTrend
+	}
+
+	scaleTrend := &response.ScaleTrendResponse{
+		ScaleID:   scaleIDForAssessment(assessment),
+		ScaleCode: scaleCode,
+		ScaleName: scaleNameForAssessment(assessment),
+		Tests:     []response.ScaleTestResponse{},
+	}
+	scaleMap[scaleCode] = scaleTrend
+	return scaleTrend
+}
+
+func buildScaleTestRecord(assessment *assessmentApp.AssessmentResult, factors []response.ScaleFactorResponse) response.ScaleTestResponse {
+	totalScore := 0.0
+	if assessment.TotalScore != nil {
+		totalScore = *assessment.TotalScore
+	}
+	riskLevel := ""
+	if assessment.RiskLevel != nil {
+		riskLevel = *assessment.RiskLevel
+	}
+
+	return response.ScaleTestResponse{
+		AssessmentID:   strconv.FormatUint(assessment.ID, 10),
+		TestDate:       response.FormatDateTimeValue(scaleTestDate(assessment)),
+		TotalScore:     totalScore,
+		RiskLevel:      riskLevel,
+		RiskLevelLabel: response.LabelForRiskLevel(riskLevel),
+		Result:         "",
+		Factors:        factors,
+	}
+}
+
+func isInterpretedScaleAssessment(assessment *assessmentApp.AssessmentResult) bool {
+	return assessment != nil && assessment.Status == "interpreted" && assessment.MedicalScaleCode != nil
+}
+
+func scaleIDForAssessment(assessment *assessmentApp.AssessmentResult) string {
+	if assessment.MedicalScaleID == nil {
+		return ""
+	}
+	return strconv.FormatUint(*assessment.MedicalScaleID, 10)
+}
+
+func scaleNameForAssessment(assessment *assessmentApp.AssessmentResult) string {
+	if assessment.MedicalScaleName == nil {
+		return ""
+	}
+	return *assessment.MedicalScaleName
+}
+
+func scaleTestDate(assessment *assessmentApp.AssessmentResult) time.Time {
+	if assessment.InterpretedAt != nil {
+		return *assessment.InterpretedAt
+	}
+	if assessment.SubmittedAt != nil {
+		return *assessment.SubmittedAt
+	}
+	return time.Time{}
+}
+
+func flattenScaleTrendMap(scaleMap map[string]*response.ScaleTrendResponse) []response.ScaleTrendResponse {
+	scales := make([]response.ScaleTrendResponse, 0, len(scaleMap))
+	for _, scaleTrend := range scaleMap {
+		sortScaleTrendTests(scaleTrend.Tests)
+		scales = append(scales, *scaleTrend)
+	}
+	sort.Slice(scales, func(i, j int) bool {
+		return scales[i].ScaleCode < scales[j].ScaleCode
+	})
+	return scales
+}
+
+func sortScaleTrendTests(tests []response.ScaleTestResponse) {
+	sort.Slice(tests, func(i, j int) bool {
+		return tests[i].TestDate < tests[j].TestDate
+	})
+}
+
+func (h *ActorHandler) parseTesteeListQuery(c *gin.Context) (*testeeListQuery, error) {
+	var req request.ListTesteeRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid list testees request",
+			"action", "list_testees",
+			"resource", "testee",
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	createdAtStart, createdAtEnd, err := parseInclusiveLocalDateRange(req.CreatedStartDate, req.CreatedEndDate)
+	if err != nil {
+		return nil, err
+	}
+	page, pageSize := normalizePageRequest(req.Page, req.PageSize, 1, 20)
+
+	return &testeeListQuery{
+		Request:        req,
+		OrgID:          orgID,
+		Page:           page,
+		PageSize:       pageSize,
+		CreatedAtStart: createdAtStart,
+		CreatedAtEnd:   createdAtEnd,
+	}, nil
+}
+
+func normalizePageRequest(page, pageSize, defaultPage, defaultPageSize int) (int, int) {
+	if page == 0 {
+		page = defaultPage
+	}
+	if pageSize == 0 {
+		pageSize = defaultPageSize
+	}
+	return page, pageSize
+}
+
+func (h *ActorHandler) listTesteesByProfile(c *gin.Context, operatorUserID int64, query *testeeListQuery) (*response.TesteeListResponse, error) {
+	result, err := h.fetchTesteeByProfile(c, query.OrgID, query.Request.ProfileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), query.OrgID, operatorUserID, result.ID); err != nil {
+		return nil, err
+	}
+
+	clinicianTesteeIDs, restrictToClinicianScope, err := h.resolveClinicianScopedTesteeIDs(c, query.OrgID, query.Request.ClinicianID)
+	if err != nil {
+		return nil, err
+	}
+	if restrictToClinicianScope && !containsUint64(clinicianTesteeIDs, result.ID) {
+		return toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, query.Page, query.PageSize), nil
+	}
+	if !testeeMatchesListFilter(result, query.Request, query.CreatedAtStart, query.CreatedAtEnd) {
+		return toTesteeListResponse([]*testeeApp.TesteeResult{}, 0, query.Page, query.PageSize), nil
+	}
+
+	return toTesteeListResponse([]*testeeApp.TesteeResult{result}, 1, query.Page, query.PageSize), nil
+}
+
+func (h *ActorHandler) buildTesteeListDTO(c *gin.Context, operatorUserID int64, query *testeeListQuery) (testeeApp.ListTesteeDTO, error) {
+	dto := testeeApp.ListTesteeDTO{
+		OrgID:          query.OrgID,
+		Name:           query.Request.Name,
+		Tags:           query.Request.Tags,
+		KeyFocus:       query.Request.IsKeyFocus,
+		CreatedAtStart: query.CreatedAtStart,
+		CreatedAtEnd:   query.CreatedAtEnd,
+		Offset:         (query.Page - 1) * query.PageSize,
+		Limit:          query.PageSize,
+	}
+
+	clinicianTesteeIDs, restrictToClinicianScope, err := h.resolveClinicianScopedTesteeIDs(c, query.OrgID, query.Request.ClinicianID)
+	if err != nil {
+		return testeeApp.ListTesteeDTO{}, err
+	}
+	dto.AccessibleTesteeIDs = clinicianTesteeIDs
+	dto.RestrictToAccessScope = restrictToClinicianScope
+
+	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), query.OrgID, operatorUserID)
+	if err != nil {
+		return testeeApp.ListTesteeDTO{}, err
+	}
+	if scope.IsAdmin {
+		return dto, nil
+	}
+
+	allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), query.OrgID, operatorUserID)
+	if err != nil {
+		return testeeApp.ListTesteeDTO{}, err
+	}
+	dto.AccessibleTesteeIDs, dto.RestrictToAccessScope = mergeAccessibleTesteeIDs(dto.AccessibleTesteeIDs, dto.RestrictToAccessScope, allowedTesteeIDs)
+	return dto, nil
+}
+
+func (h *ActorHandler) resolveClinicianScopedTesteeIDs(c *gin.Context, orgID int64, clinicianID *uint64) ([]uint64, bool, error) {
+	if clinicianID == nil {
+		return nil, false, nil
+	}
+	if _, err := h.requireClinicianInOrg(c, orgID, *clinicianID); err != nil {
+		return nil, false, err
+	}
+	clinicianTesteeIDs, err := h.clinicianRelationshipService.ListAssignedTesteeIDs(c.Request.Context(), orgID, *clinicianID)
+	if err != nil {
+		return nil, false, err
+	}
+	return clinicianTesteeIDs, true, nil
+}
+
+func mergeAccessibleTesteeIDs(existing []uint64, restrictExisting bool, allowed []uint64) ([]uint64, bool) {
+	if restrictExisting {
+		return intersectUint64Slices(existing, allowed), true
+	}
+	return allowed, true
+}
+
+func (h *ActorHandler) loadProtectedStaff(c *gin.Context, orgID int64, staffID uint64) (*operatorApp.OperatorResult, error) {
+	current, err := h.operatorQueryService.GetByID(c.Request.Context(), staffID)
+	if err != nil {
+		return nil, err
+	}
+	if current.OrgID != orgID {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization")
+	}
+	return current, nil
+}
+
+func (h *ActorHandler) updateStaffProfile(c *gin.Context, staffID uint64, req request.UpdateStaffRequest) error {
+	_, err := h.operatorLifecycleService.UpdateProfile(c.Request.Context(), operatorApp.UpdateOperatorProfileDTO{
+		OperatorID: staffID,
+		Name:       req.Name,
+		Email:      req.Email,
+		Phone:      req.Phone,
+	})
+	return err
+}
+
+func resolveTargetStaffActive(currentActive bool, requested *bool) bool {
+	if requested == nil {
+		return currentActive
+	}
+	return *requested
+}
+
+func (h *ActorHandler) syncStaffAuthorization(c *gin.Context, staffID uint64, current *operatorApp.OperatorResult, req request.UpdateStaffRequest) error {
+	targetActive := resolveTargetStaffActive(current.IsActive, req.IsActive)
+	if err := h.syncStaffActiveState(c, staffID, current.IsActive, targetActive); err != nil {
+		return err
+	}
+	if !targetActive || req.Roles == nil {
+		return nil
+	}
+
+	latest, err := h.operatorQueryService.GetByID(c.Request.Context(), staffID)
+	if err != nil {
+		return err
+	}
+	return h.syncStaffRoles(c, staffID, latest.Roles, req.Roles)
+}
+
+func (h *ActorHandler) syncStaffActiveState(c *gin.Context, staffID uint64, currentActive, targetActive bool) error {
+	switch {
+	case currentActive && !targetActive:
+		return h.operatorAuthorizationService.Deactivate(c.Request.Context(), staffID)
+	case !currentActive && targetActive:
+		return h.operatorAuthorizationService.Activate(c.Request.Context(), staffID)
+	default:
+		return nil
+	}
+}
+
+func (h *ActorHandler) syncStaffRoles(c *gin.Context, staffID uint64, currentRoles, targetRoles []string) error {
+	rolesToAssign, rolesToRemove := diffStringSet(currentRoles, targetRoles)
+	for _, role := range rolesToAssign {
+		if err := h.operatorAuthorizationService.AssignRole(c.Request.Context(), staffID, role); err != nil {
+			return err
+		}
+	}
+	for _, role := range rolesToRemove {
+		if err := h.operatorAuthorizationService.RemoveRole(c.Request.Context(), staffID, role); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func diffStringSet(current, target []string) ([]string, []string) {
+	currentSet := make(map[string]struct{}, len(current))
+	targetSet := make(map[string]struct{}, len(target))
+	for _, role := range current {
+		currentSet[role] = struct{}{}
+	}
+	for _, role := range target {
+		targetSet[role] = struct{}{}
+	}
+
+	toAssign := make([]string, 0, len(target))
+	for _, role := range target {
+		if _, exists := currentSet[role]; !exists {
+			toAssign = append(toAssign, role)
+		}
+	}
+
+	toRemove := make([]string, 0, len(current))
+	for _, role := range current {
+		if _, exists := targetSet[role]; !exists {
+			toRemove = append(toRemove, role)
+		}
+	}
+	return toAssign, toRemove
 }
 
 func (h *ActorHandler) validateProtectedTesteeAccess(c *gin.Context, testeeID uint64) (int64, int64, error) {

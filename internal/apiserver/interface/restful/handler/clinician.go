@@ -28,7 +28,7 @@ func metaIDPtrToUint64(id *meta.ID) *uint64 {
 }
 
 func flexibleTimePtrToTimePtr(v *request.FlexibleTime) *time.Time {
-	if v == nil || v.Time.IsZero() {
+	if v == nil || v.IsZero() {
 		return nil
 	}
 
@@ -129,62 +129,20 @@ func (h *ActorHandler) UpdateClinician(c *gin.Context) {
 }
 
 func (h *ActorHandler) ActivateClinician(c *gin.Context) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	result, err := h.changeClinicianState(c, "activate_clinician", "Clinician activated", h.clinicianLifecycleService.Activate)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if _, err := h.requireClinicianInOrg(c, orgID, id); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.clinicianLifecycleService.Activate(c.Request.Context(), id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	logger.L(c.Request.Context()).Infow("Clinician activated",
-		"action", "activate_clinician",
-		"org_id", orgID,
-		"clinician_id", id,
-		"operator_user_id", operatorUserID,
-	)
 	h.SuccessResponseWithMessage(c, "从业者已激活", toClinicianResponse(result))
 }
 
 func (h *ActorHandler) DeactivateClinician(c *gin.Context) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	result, err := h.changeClinicianState(c, "deactivate_clinician", "Clinician deactivated", h.clinicianLifecycleService.Deactivate)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if _, err := h.requireClinicianInOrg(c, orgID, id); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.clinicianLifecycleService.Deactivate(c.Request.Context(), id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	logger.L(c.Request.Context()).Infow("Clinician deactivated",
-		"action", "deactivate_clinician",
-		"org_id", orgID,
-		"clinician_id", id,
-		"operator_user_id", operatorUserID,
-	)
 	h.SuccessResponseWithMessage(c, "从业者已停用", toClinicianResponse(result))
 }
 
@@ -1025,28 +983,18 @@ func toRelationResponse(item *assessmentEntryApp.RelationSummaryResult) *respons
 	if item == nil {
 		return nil
 	}
-
-	var sourceID *string
-	if item.SourceID != nil {
-		value := strconv.FormatUint(*item.SourceID, 10)
-		sourceID = &value
-	}
-
-	return &response.RelationResponse{
-		ID:                strconv.FormatUint(item.ID, 10),
-		OrgID:             strconv.FormatInt(item.OrgID, 10),
-		ClinicianID:       strconv.FormatUint(item.ClinicianID, 10),
-		TesteeID:          strconv.FormatUint(item.TesteeID, 10),
-		RelationType:      item.RelationType,
-		RelationTypeLabel: response.LabelForRelationType(item.RelationType),
-		SourceType:        item.SourceType,
-		SourceTypeLabel:   response.LabelForRelationSource(item.SourceType),
-		SourceID:          sourceID,
-		IsActive:          item.IsActive,
-		IsActiveLabel:     map[bool]string{true: "有效", false: "失效"}[item.IsActive],
-		BoundAt:           response.FormatDateTimeValue(item.BoundAt),
-		UnboundAt:         response.FormatDateTimePtr(item.UnboundAt),
-	}
+	return buildRelationResponse(
+		item.ID,
+		item.OrgID,
+		item.ClinicianID,
+		item.TesteeID,
+		item.RelationType,
+		item.SourceType,
+		item.SourceID,
+		item.IsActive,
+		item.BoundAt,
+		item.UnboundAt,
+	)
 }
 
 func toAssessmentEntryIntakeResponse(item *assessmentEntryApp.AssessmentEntryIntakeResult) *response.AssessmentEntryIntakeResponse {
@@ -1067,90 +1015,52 @@ func toTesteeSummaryResponse(item *assessmentEntryApp.TesteeSummaryResult) *resp
 	if item == nil {
 		return nil
 	}
-
-	gender := response.GenderCodeFromValue(item.Gender)
-
-	var profileID *string
-	if item.ProfileID != nil {
-		value := strconv.FormatUint(*item.ProfileID, 10)
-		profileID = &value
-	}
-
-	return &response.TesteeResponse{
-		ID:              strconv.FormatUint(item.ID, 10),
-		OrgID:           strconv.FormatInt(item.OrgID, 10),
-		ProfileID:       profileID,
-		IAMChildID:      response.LegacyIAMChildIDAlias(profileID),
-		Name:            item.Name,
-		Gender:          gender,
-		GenderLabel:     response.LabelForGender(gender),
-		Birthday:        response.FormatDatePtr(item.Birthday),
-		Tags:            item.Tags,
-		TagsLabel:       response.LabelTags(item.Tags),
-		Source:          item.Source,
-		SourceLabel:     response.LabelForTesteeSource(item.Source),
-		IsKeyFocus:      item.IsKeyFocus,
-		IsKeyFocusLabel: response.LabelForKeyFocus(item.IsKeyFocus),
-	}
+	return buildTesteeSummaryResponse(
+		item.ID,
+		item.OrgID,
+		item.ProfileID,
+		item.Name,
+		item.Gender,
+		item.Birthday,
+		item.Tags,
+		item.Source,
+		item.IsKeyFocus,
+	)
 }
 
 func toRelationResponseFromClinicianResult(item *clinicianApp.RelationResult) *response.RelationResponse {
 	if item == nil {
 		return nil
 	}
-
-	var sourceID *string
-	if item.SourceID != nil {
-		value := strconv.FormatUint(*item.SourceID, 10)
-		sourceID = &value
-	}
-
-	return &response.RelationResponse{
-		ID:                strconv.FormatUint(item.ID, 10),
-		OrgID:             strconv.FormatInt(item.OrgID, 10),
-		ClinicianID:       strconv.FormatUint(item.ClinicianID, 10),
-		TesteeID:          strconv.FormatUint(item.TesteeID, 10),
-		RelationType:      item.RelationType,
-		RelationTypeLabel: response.LabelForRelationType(item.RelationType),
-		SourceType:        item.SourceType,
-		SourceTypeLabel:   response.LabelForRelationSource(item.SourceType),
-		SourceID:          sourceID,
-		IsActive:          item.IsActive,
-		IsActiveLabel:     map[bool]string{true: "有效", false: "失效"}[item.IsActive],
-		BoundAt:           response.FormatDateTimeValue(item.BoundAt),
-		UnboundAt:         response.FormatDateTimePtr(item.UnboundAt),
-	}
+	return buildRelationResponse(
+		item.ID,
+		item.OrgID,
+		item.ClinicianID,
+		item.TesteeID,
+		item.RelationType,
+		item.SourceType,
+		item.SourceID,
+		item.IsActive,
+		item.BoundAt,
+		item.UnboundAt,
+	)
 }
 
 func toAssignedTesteeResponse(item *clinicianApp.AssignedTesteeResult) *response.TesteeResponse {
 	if item == nil {
 		return nil
 	}
-
-	gender := response.GenderCodeFromValue(item.Gender)
-
-	var profileID *string
-	if item.ProfileID != nil {
-		value := strconv.FormatUint(*item.ProfileID, 10)
-		profileID = &value
-	}
-
-	return &response.TesteeResponse{
-		ID:              strconv.FormatUint(item.ID, 10),
-		OrgID:           strconv.FormatInt(item.OrgID, 10),
-		ProfileID:       profileID,
-		IAMChildID:      response.LegacyIAMChildIDAlias(profileID),
-		Name:            item.Name,
-		Gender:          gender,
-		GenderLabel:     response.LabelForGender(gender),
-		Birthday:        response.FormatDatePtr(item.Birthday),
-		Tags:            item.Tags,
-		TagsLabel:       response.LabelTags(item.Tags),
-		Source:          item.Source,
-		SourceLabel:     response.LabelForTesteeSource(item.Source),
-		IsKeyFocus:      item.IsKeyFocus,
-		IsKeyFocusLabel: response.LabelForKeyFocus(item.IsKeyFocus),
-	}
+	return buildTesteeSummaryResponse(
+		item.ID,
+		item.OrgID,
+		item.ProfileID,
+		item.Name,
+		item.Gender,
+		item.Birthday,
+		item.Tags,
+		item.Source,
+		item.IsKeyFocus,
+	)
 }
 
 func toTesteeClinicianRelationResponse(item *clinicianApp.TesteeRelationResult) *response.TesteeClinicianRelationResponse {
@@ -1171,6 +1081,113 @@ func toClinicianRelationResponse(item *clinicianApp.ClinicianRelationResult) *re
 		Testee:   toAssignedTesteeResponse(item.Testee),
 		Relation: toRelationResponseFromClinicianResult(item.Relation),
 	}
+}
+
+func (h *ActorHandler) changeClinicianState(
+	c *gin.Context,
+	action string,
+	logMessage string,
+	change func(context.Context, uint64) (*clinicianApp.ClinicianResult, error),
+) (*clinicianApp.ClinicianResult, error) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		return nil, err
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := h.requireClinicianInOrg(c, orgID, id); err != nil {
+		return nil, err
+	}
+
+	result, err := change(c.Request.Context(), id)
+	if err != nil {
+		return nil, err
+	}
+	logger.L(c.Request.Context()).Infow(logMessage,
+		"action", action,
+		"org_id", orgID,
+		"clinician_id", id,
+		"operator_user_id", operatorUserID,
+	)
+	return result, nil
+}
+
+func buildRelationResponse(
+	id uint64,
+	orgID int64,
+	clinicianID uint64,
+	testeeID uint64,
+	relationType string,
+	sourceType string,
+	sourceID *uint64,
+	isActive bool,
+	boundAt time.Time,
+	unboundAt *time.Time,
+) *response.RelationResponse {
+	return &response.RelationResponse{
+		ID:                strconv.FormatUint(id, 10),
+		OrgID:             strconv.FormatInt(orgID, 10),
+		ClinicianID:       strconv.FormatUint(clinicianID, 10),
+		TesteeID:          strconv.FormatUint(testeeID, 10),
+		RelationType:      relationType,
+		RelationTypeLabel: response.LabelForRelationType(relationType),
+		SourceType:        sourceType,
+		SourceTypeLabel:   response.LabelForRelationSource(sourceType),
+		SourceID:          uint64StringPtr(sourceID),
+		IsActive:          isActive,
+		IsActiveLabel:     boolLabel(isActive, "有效", "失效"),
+		BoundAt:           response.FormatDateTimeValue(boundAt),
+		UnboundAt:         response.FormatDateTimePtr(unboundAt),
+	}
+}
+
+func buildTesteeSummaryResponse(
+	id uint64,
+	orgID int64,
+	profileID *uint64,
+	name string,
+	genderValue int8,
+	birthday *time.Time,
+	tags []string,
+	source string,
+	isKeyFocus bool,
+) *response.TesteeResponse {
+	gender := response.GenderCodeFromValue(genderValue)
+	profileIDStr := uint64StringPtr(profileID)
+
+	return &response.TesteeResponse{
+		ID:              strconv.FormatUint(id, 10),
+		OrgID:           strconv.FormatInt(orgID, 10),
+		ProfileID:       profileIDStr,
+		IAMChildID:      response.LegacyIAMChildIDAlias(profileIDStr),
+		Name:            name,
+		Gender:          gender,
+		GenderLabel:     response.LabelForGender(gender),
+		Birthday:        response.FormatDatePtr(birthday),
+		Tags:            tags,
+		TagsLabel:       response.LabelTags(tags),
+		Source:          source,
+		SourceLabel:     response.LabelForTesteeSource(source),
+		IsKeyFocus:      isKeyFocus,
+		IsKeyFocusLabel: response.LabelForKeyFocus(isKeyFocus),
+	}
+}
+
+func uint64StringPtr(value *uint64) *string {
+	if value == nil {
+		return nil
+	}
+	text := strconv.FormatUint(*value, 10)
+	return &text
+}
+
+func boolLabel(value bool, trueLabel, falseLabel string) string {
+	if value {
+		return trueLabel
+	}
+	return falseLabel
 }
 
 func (h *ActorHandler) requireClinicianInOrg(c *gin.Context, orgID int64, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {

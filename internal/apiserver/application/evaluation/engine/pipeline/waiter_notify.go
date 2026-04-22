@@ -11,11 +11,17 @@ import (
 // WaiterNotifyHandler 只负责长轮询 waiter 的本地通知，不承担事件投递。
 type WaiterNotifyHandler struct {
 	*BaseHandler
-	waiterRegistry *waiter.WaiterRegistry
+	waiterRegistry interface {
+		Notify(ctx context.Context, assessmentID uint64, summary waiter.StatusSummary)
+		GetWaiterCount(assessmentID uint64) int
+	}
 }
 
 // NewWaiterNotifyHandler 创建 waiter 通知处理器。
-func NewWaiterNotifyHandler(waiterRegistry *waiter.WaiterRegistry) *WaiterNotifyHandler {
+func NewWaiterNotifyHandler(waiterRegistry interface {
+	Notify(ctx context.Context, assessmentID uint64, summary waiter.StatusSummary)
+	GetWaiterCount(assessmentID uint64) int
+}) *WaiterNotifyHandler {
 	return &WaiterNotifyHandler{
 		BaseHandler:    NewBaseHandler("WaiterNotifyHandler"),
 		waiterRegistry: waiterRegistry,

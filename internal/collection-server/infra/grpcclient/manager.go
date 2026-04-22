@@ -184,7 +184,8 @@ func (m *Manager) loadTLSCredentials() (credentials.TransportCredentials, error)
 	}
 
 	tlsConfig := &tls.Config{
-		RootCAs: certPool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    certPool,
 	}
 
 	// 如果提供了服务端名称，用于验证

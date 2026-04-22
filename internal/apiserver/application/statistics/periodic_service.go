@@ -26,16 +26,38 @@ func NewPeriodicStatsService(db *gorm.DB) PeriodicStatsService {
 }
 
 func (s *periodicStatsService) GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*domainStatistics.TesteePeriodicStatisticsResponse, error) {
+	if err := s.ensureTesteeExists(ctx, orgID, testeeID); err != nil {
+		return nil, err
+	}
+
+	tasks, err := s.loadPeriodicTasks(ctx, orgID, testeeID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectMap, assessmentIDs := groupPeriodicTasksByPlan(tasks)
+	assessmentNames, err := s.loadAssessmentNames(ctx, orgID, assessmentIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildPeriodicStatsResponse(projectMap, assessmentNames), nil
+}
+
+func (s *periodicStatsService) ensureTesteeExists(ctx context.Context, orgID int64, testeeID uint64) error {
 	var testee actorInfra.TesteePO
 	if err := s.db.WithContext(ctx).
 		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, testeeID).
 		First(&testee).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
+			return errors.WithCode(code.ErrUserNotFound, "testee not found")
 		}
-		return nil, err
+		return err
 	}
+	return nil
+}
 
+func (s *periodicStatsService) loadPeriodicTasks(ctx context.Context, orgID int64, testeeID uint64) ([]planInfra.AssessmentTaskPO, error) {
 	var tasks []planInfra.AssessmentTaskPO
 	if err := s.db.WithContext(ctx).
 		Table("assessment_task t").
@@ -45,7 +67,10 @@ func (s *periodicStatsService) GetPeriodicStats(ctx context.Context, orgID int64
 		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
+	return tasks, nil
+}
 
+func groupPeriodicTasksByPlan(tasks []planInfra.AssessmentTaskPO) (map[string][]planInfra.AssessmentTaskPO, []uint64) {
 	projectMap := make(map[string][]planInfra.AssessmentTaskPO)
 	assessmentIDs := make([]uint64, 0)
 	for _, item := range tasks {
@@ -55,116 +80,42 @@ func (s *periodicStatsService) GetPeriodicStats(ctx context.Context, orgID int64
 			assessmentIDs = append(assessmentIDs, *item.AssessmentID)
 		}
 	}
+	return projectMap, assessmentIDs
+}
 
+func (s *periodicStatsService) loadAssessmentNames(ctx context.Context, orgID int64, assessmentIDs []uint64) (map[uint64]string, error) {
 	assessmentNames := make(map[uint64]string, len(assessmentIDs))
-	if len(assessmentIDs) > 0 {
-		var assessments []evaluationInfra.AssessmentPO
-		if err := s.db.WithContext(ctx).
-			Select("id, medical_scale_name").
-			Where("org_id = ? AND id IN ? AND deleted_at IS NULL", orgID, assessmentIDs).
-			Find(&assessments).Error; err != nil {
-			return nil, err
-		}
-		for _, item := range assessments {
-			if item.MedicalScaleName != nil && strings.TrimSpace(*item.MedicalScaleName) != "" {
-				assessmentNames[item.ID.Uint64()] = strings.TrimSpace(*item.MedicalScaleName)
-			}
-		}
+	if len(assessmentIDs) == 0 {
+		return assessmentNames, nil
 	}
 
+	var assessments []evaluationInfra.AssessmentPO
+	if err := s.db.WithContext(ctx).
+		Select("id, medical_scale_name").
+		Where("org_id = ? AND id IN ? AND deleted_at IS NULL", orgID, assessmentIDs).
+		Find(&assessments).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range assessments {
+		if item.MedicalScaleName != nil && strings.TrimSpace(*item.MedicalScaleName) != "" {
+			assessmentNames[item.ID.Uint64()] = strings.TrimSpace(*item.MedicalScaleName)
+		}
+	}
+	return assessmentNames, nil
+}
+
+func buildPeriodicStatsResponse(
+	projectMap map[string][]planInfra.AssessmentTaskPO,
+	assessmentNames map[uint64]string,
+) *domainStatistics.TesteePeriodicStatisticsResponse {
 	projects := make([]domainStatistics.TesteePeriodicProjectStatistics, 0, len(projectMap))
 	activeProjects := 0
 	for planID, items := range projectMap {
-		sort.Slice(items, func(i, j int) bool {
-			if items[i].Seq == items[j].Seq {
-				if items[i].PlannedAt.Equal(items[j].PlannedAt) {
-					return items[i].ID < items[j].ID
-				}
-				return items[i].PlannedAt.Before(items[j].PlannedAt)
-			}
-			return items[i].Seq < items[j].Seq
-		})
-
-		completed := 0
-		tasks := make([]domainStatistics.TesteePeriodicTaskStatistics, 0, len(items))
-		var startDate *time.Time
-		var endDate *time.Time
-		currentWeek := 0
-		hasActiveTask := false
-		scaleName := ""
-		for _, item := range items {
-			task := domainStatistics.TesteePeriodicTaskStatistics{
-				Week:      item.Seq,
-				Status:    periodicTaskStatus(item.Status),
-				PlannedAt: cloneTime(item.PlannedAt),
-				DueDate:   cloneTimePtr(item.ExpireAt),
-			}
-			if item.CompletedAt != nil {
-				task.CompletedAt = cloneTimePtr(item.CompletedAt)
-			}
-			if item.AssessmentID != nil {
-				assessmentID := strconv.FormatUint(*item.AssessmentID, 10)
-				task.AssessmentID = &assessmentID
-			}
-
-			if task.Status == "completed" {
-				completed++
-			} else if currentWeek == 0 {
-				currentWeek = item.Seq
-			}
-			if item.Status == "pending" || item.Status == "opened" {
-				hasActiveTask = true
-			}
-			if scaleName == "" {
-				if item.AssessmentID != nil {
-					scaleName = assessmentNames[*item.AssessmentID]
-				}
-				if scaleName == "" {
-					scaleName = strings.TrimSpace(item.ScaleCode)
-				}
-			}
-			if startDate == nil || item.PlannedAt.Before(*startDate) {
-				startDate = cloneTime(item.PlannedAt)
-			}
-			if item.ExpireAt != nil {
-				if endDate == nil || item.ExpireAt.After(*endDate) {
-					endDate = cloneTimePtr(item.ExpireAt)
-				}
-			} else if endDate == nil || item.PlannedAt.After(*endDate) {
-				endDate = cloneTime(item.PlannedAt)
-			}
-			tasks = append(tasks, task)
-		}
-
-		totalWeeks := len(items)
-		completionRate := 0.0
-		if totalWeeks > 0 {
-			completionRate = float64(completed) / float64(totalWeeks) * 100
-		}
-		if totalWeeks == 0 {
-			currentWeek = 0
-		} else if currentWeek == 0 {
-			currentWeek = totalWeeks
-		}
+		project, hasActiveTask := buildPeriodicProjectStatistics(planID, items, assessmentNames)
 		if hasActiveTask {
 			activeProjects++
 		}
-		if scaleName == "" {
-			scaleName = "未命名量表"
-		}
-
-		projects = append(projects, domainStatistics.TesteePeriodicProjectStatistics{
-			ProjectID:      planID,
-			ProjectName:    scaleName,
-			ScaleName:      scaleName,
-			TotalWeeks:     totalWeeks,
-			CompletedWeeks: completed,
-			CompletionRate: completionRate,
-			CurrentWeek:    currentWeek,
-			Tasks:          tasks,
-			StartDate:      startDate,
-			EndDate:        endDate,
-		})
+		projects = append(projects, project)
 	}
 
 	sort.Slice(projects, func(i, j int) bool {
@@ -175,7 +126,120 @@ func (s *periodicStatsService) GetPeriodicStats(ctx context.Context, orgID int64
 		Projects:       projects,
 		TotalProjects:  len(projects),
 		ActiveProjects: activeProjects,
-	}, nil
+	}
+}
+
+func buildPeriodicProjectStatistics(
+	planID string,
+	items []planInfra.AssessmentTaskPO,
+	assessmentNames map[uint64]string,
+) (domainStatistics.TesteePeriodicProjectStatistics, bool) {
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Seq == items[j].Seq {
+			if items[i].PlannedAt.Equal(items[j].PlannedAt) {
+				return items[i].ID < items[j].ID
+			}
+			return items[i].PlannedAt.Before(items[j].PlannedAt)
+		}
+		return items[i].Seq < items[j].Seq
+	})
+
+	completed := 0
+	currentWeek := 0
+	hasActiveTask := false
+	scaleName := ""
+	tasks := make([]domainStatistics.TesteePeriodicTaskStatistics, 0, len(items))
+	var startDate *time.Time
+	var endDate *time.Time
+
+	for _, item := range items {
+		task := buildPeriodicTaskStatistics(item)
+		tasks = append(tasks, task)
+
+		if task.Status == "completed" {
+			completed++
+		} else if currentWeek == 0 {
+			currentWeek = item.Seq
+		}
+		if item.Status == "pending" || item.Status == "opened" {
+			hasActiveTask = true
+		}
+		scaleName = pickPeriodicScaleName(scaleName, item, assessmentNames)
+		startDate, endDate = expandPeriodicWindow(startDate, endDate, item)
+	}
+
+	totalWeeks := len(items)
+	if totalWeeks == 0 {
+		currentWeek = 0
+	} else if currentWeek == 0 {
+		currentWeek = totalWeeks
+	}
+	if scaleName == "" {
+		scaleName = "未命名量表"
+	}
+
+	return domainStatistics.TesteePeriodicProjectStatistics{
+		ProjectID:      planID,
+		ProjectName:    scaleName,
+		ScaleName:      scaleName,
+		TotalWeeks:     totalWeeks,
+		CompletedWeeks: completed,
+		CompletionRate: calculatePeriodicCompletionRate(completed, totalWeeks),
+		CurrentWeek:    currentWeek,
+		Tasks:          tasks,
+		StartDate:      startDate,
+		EndDate:        endDate,
+	}, hasActiveTask
+}
+
+func buildPeriodicTaskStatistics(item planInfra.AssessmentTaskPO) domainStatistics.TesteePeriodicTaskStatistics {
+	task := domainStatistics.TesteePeriodicTaskStatistics{
+		Week:      item.Seq,
+		Status:    periodicTaskStatus(item.Status),
+		PlannedAt: cloneTime(item.PlannedAt),
+		DueDate:   cloneTimePtr(item.ExpireAt),
+	}
+	if item.CompletedAt != nil {
+		task.CompletedAt = cloneTimePtr(item.CompletedAt)
+	}
+	if item.AssessmentID != nil {
+		assessmentID := strconv.FormatUint(*item.AssessmentID, 10)
+		task.AssessmentID = &assessmentID
+	}
+	return task
+}
+
+func pickPeriodicScaleName(current string, item planInfra.AssessmentTaskPO, assessmentNames map[uint64]string) string {
+	if current != "" {
+		return current
+	}
+	if item.AssessmentID != nil && assessmentNames[*item.AssessmentID] != "" {
+		return assessmentNames[*item.AssessmentID]
+	}
+	return strings.TrimSpace(item.ScaleCode)
+}
+
+func expandPeriodicWindow(startDate, endDate *time.Time, item planInfra.AssessmentTaskPO) (*time.Time, *time.Time) {
+	if startDate == nil || item.PlannedAt.Before(*startDate) {
+		startDate = cloneTime(item.PlannedAt)
+	}
+	if item.ExpireAt != nil {
+		if endDate == nil || item.ExpireAt.After(*endDate) {
+			endDate = cloneTimePtr(item.ExpireAt)
+		}
+		return startDate, endDate
+	}
+	if endDate == nil || item.PlannedAt.After(*endDate) {
+		endDate = cloneTime(item.PlannedAt)
+	}
+	return startDate, endDate
+}
+
+func calculatePeriodicCompletionRate(completed, total int) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(completed) / float64(total) * 100
 }
 
 func periodicTaskStatus(status string) string {

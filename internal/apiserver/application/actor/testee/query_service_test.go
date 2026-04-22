@@ -122,47 +122,47 @@ type queryServiceRepoStub struct {
 	lastRestrictedIDs     []domain.ID
 }
 
-func (s *queryServiceRepoStub) Save(ctx context.Context, testee *domain.Testee) error   { return nil }
-func (s *queryServiceRepoStub) Update(ctx context.Context, testee *domain.Testee) error { return nil }
-func (s *queryServiceRepoStub) FindByID(ctx context.Context, id domain.ID) (*domain.Testee, error) {
+func (s *queryServiceRepoStub) Save(context.Context, *domain.Testee) error   { return nil }
+func (s *queryServiceRepoStub) Update(context.Context, *domain.Testee) error { return nil }
+func (s *queryServiceRepoStub) FindByID(context.Context, domain.ID) (*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) FindByIDs(ctx context.Context, ids []domain.ID) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) FindByIDs(context.Context, []domain.ID) ([]*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*domain.Testee, error) {
+func (s *queryServiceRepoStub) FindByProfile(context.Context, int64, uint64) (*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) FindByOrgAndName(context.Context, int64, string) ([]*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) ListByOrg(ctx context.Context, orgID int64, filter domain.ListFilter, offset, limit int) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) ListByOrg(_ context.Context, _ int64, filter domain.ListFilter, _ int, _ int) ([]*domain.Testee, error) {
 	s.listByOrgCalls++
 	s.lastFilter = filter
 	return s.listByOrgItems, nil
 }
-func (s *queryServiceRepoStub) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []domain.ID, filter domain.ListFilter, offset, limit int) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) ListByOrgAndIDs(_ context.Context, _ int64, ids []domain.ID, filter domain.ListFilter, _ int, _ int) ([]*domain.Testee, error) {
 	s.listByOrgAndIDsCalls++
 	s.lastFilter = filter
 	s.lastRestrictedIDs = append([]domain.ID(nil), ids...)
 	return s.listByOrgAndIDsItems, nil
 }
-func (s *queryServiceRepoStub) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) ListByTags(context.Context, int64, []string, int, int) ([]*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) ListKeyFocus(context.Context, int64, int, int) ([]*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*domain.Testee, error) {
+func (s *queryServiceRepoStub) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domain.Testee, error) {
 	return nil, nil
 }
-func (s *queryServiceRepoStub) Delete(ctx context.Context, id domain.ID) error { return nil }
-func (s *queryServiceRepoStub) Count(ctx context.Context, orgID int64, filter domain.ListFilter) (int64, error) {
+func (s *queryServiceRepoStub) Delete(context.Context, domain.ID) error { return nil }
+func (s *queryServiceRepoStub) Count(_ context.Context, _ int64, filter domain.ListFilter) (int64, error) {
 	s.countCalls++
 	s.lastFilter = filter
 	return s.countValue, nil
 }
-func (s *queryServiceRepoStub) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []domain.ID, filter domain.ListFilter) (int64, error) {
+func (s *queryServiceRepoStub) CountByOrgAndIDs(_ context.Context, _ int64, ids []domain.ID, filter domain.ListFilter) (int64, error) {
 	s.countByOrgAndIDsCalls++
 	s.lastFilter = filter
 	s.lastRestrictedIDs = append([]domain.ID(nil), ids...)

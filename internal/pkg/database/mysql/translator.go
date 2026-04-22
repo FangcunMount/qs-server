@@ -6,7 +6,6 @@ import (
 
 	gosql "database/sql"
 
-	perrors "github.com/FangcunMount/component-base/pkg/errors"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	pq "github.com/lib/pq"
 )
@@ -20,11 +19,6 @@ var ErrDuplicate = errors.New("duplicate record")
 func IsDuplicateError(err error) bool {
 	if err == nil {
 		return false
-	}
-
-	// Unwrap perrors if wrapped
-	if perrors.IsCode(err, 0) {
-		// perrors doesn't provide a direct unwrap; fallthrough to string check
 	}
 
 	switch e := err.(type) {

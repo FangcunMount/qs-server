@@ -68,7 +68,7 @@ func (r *CachedAssessmentRepository) Save(ctx context.Context, domain *assessmen
 	err := r.repo.Save(ctx, domain)
 	if err == nil && domain != nil {
 		// 保存成功后失效缓存，确保下次读取最新数据
-		r.deleteCache(ctx, domain.ID())
+		_ = r.deleteCache(ctx, domain.ID())
 	}
 	return err
 }
@@ -77,7 +77,7 @@ func (r *CachedAssessmentRepository) Save(ctx context.Context, domain *assessmen
 func (r *CachedAssessmentRepository) SaveWithEvents(ctx context.Context, domain *assessment.Assessment) error {
 	err := r.repo.SaveWithEvents(ctx, domain)
 	if err == nil && domain != nil {
-		r.deleteCache(ctx, domain.ID())
+		_ = r.deleteCache(ctx, domain.ID())
 	}
 	return err
 }
@@ -85,7 +85,7 @@ func (r *CachedAssessmentRepository) SaveWithEvents(ctx context.Context, domain 
 func (r *CachedAssessmentRepository) SaveWithAdditionalEvents(ctx context.Context, domain *assessment.Assessment, additional []event.DomainEvent) error {
 	err := r.repo.SaveWithAdditionalEvents(ctx, domain, additional)
 	if err == nil && domain != nil {
-		r.deleteCache(ctx, domain.ID())
+		_ = r.deleteCache(ctx, domain.ID())
 	}
 	return err
 }
@@ -94,7 +94,7 @@ func (r *CachedAssessmentRepository) SaveWithAdditionalEvents(ctx context.Contex
 func (r *CachedAssessmentRepository) Delete(ctx context.Context, id assessment.ID) error {
 	err := r.repo.Delete(ctx, id)
 	if err == nil {
-		r.deleteCache(ctx, id)
+		_ = r.deleteCache(ctx, id)
 	}
 	return err
 }

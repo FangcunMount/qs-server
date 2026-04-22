@@ -1,22 +1,26 @@
 package collection
 
 import (
+	"errors"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/pkg/app"
-	"runtime/debug"
 )
 
 // commandDesc 命令描述
 const commandDesc = `The Questionnaire Collection Server provides REST API for questionnaire collection system (mini-program).
 It validates questionnaire submissions and communicates with apiserver via gRPC for data operations.`
+
+const collectionPprofAddress = "127.0.0.1:6060"
 
 // NewApp 创建 App
 func NewApp(basename string) *app.App {
@@ -39,11 +43,7 @@ func run(opts *options.Options) app.RunFunc {
 		defer log.Flush()
 
 		applyRuntimeTuning(opts.Runtime)
-
-		// 启动 pprof 以便线上诊断（仅内网端口）
-		go func() {
-			_ = http.ListenAndServe(":6060", nil)
-		}()
+		startPprofServer(opts.GenericServerRunOptions.Profiling)
 
 		log.Infof("Starting collection-server ... (mode=%s, healthz=%v)", opts.GenericServerRunOptions.Mode, opts.GenericServerRunOptions.Healthz)
 		log.Infof("HTTP bind: %s:%d, HTTPS bind: %s:%d, gRPC endpoint: %s",
@@ -64,6 +64,38 @@ func run(opts *options.Options) app.RunFunc {
 		// 运行 app
 		return Run(cfg)
 	}
+}
+
+func startPprofServer(enabled bool) {
+	if !enabled {
+		return
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+
+	srv := &http.Server{
+		Addr:              collectionPprofAddress,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		log.Infof("pprof server listening on %s", collectionPprofAddress)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Warnf("pprof server stopped unexpectedly: %v", err)
+		}
+	}()
 }
 
 // applyRuntimeTuning 应用 GC/内存调优

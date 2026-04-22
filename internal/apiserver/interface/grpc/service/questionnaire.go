@@ -59,7 +59,11 @@ func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.L
 	// 转换响应（使用摘要类型，不包含 questions）
 	protoQuestionnaires := make([]*pb.QuestionnaireSummary, 0, len(result.Items))
 	for _, item := range result.Items {
-		protoQuestionnaires = append(protoQuestionnaires, s.toProtoQuestionnaireSummary(item))
+		summary, convErr := s.toProtoQuestionnaireSummary(item)
+		if convErr != nil {
+			return nil, convErr
+		}
+		protoQuestionnaires = append(protoQuestionnaires, summary)
 	}
 
 	return &pb.ListQuestionnairesResponse{
@@ -87,26 +91,35 @@ func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.Get
 	}
 
 	// 转换响应
+	protoQuestionnaire, convErr := s.toProtoQuestionnaire(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+
 	return &pb.GetQuestionnaireResponse{
-		Questionnaire: s.toProtoQuestionnaire(result),
+		Questionnaire: protoQuestionnaire,
 	}, nil
 }
 
 // toProtoQuestionnaire 转换为 protobuf 问卷
-func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.QuestionnaireResult) *pb.Questionnaire {
+func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.QuestionnaireResult) (*pb.Questionnaire, error) {
 	if result == nil {
-		return nil
+		return nil, nil
 	}
 
 	// 转换问题列表
 	protoQuestions := make([]*pb.Question, 0, len(result.Questions))
 	for _, q := range result.Questions {
+		options, err := s.toProtoOptions(q.Options)
+		if err != nil {
+			return nil, err
+		}
 		protoQuestions = append(protoQuestions, &pb.Question{
 			Code:            q.Code,
 			Title:           q.Stem,
 			Type:            q.Type,
 			Tips:            q.Description,
-			Options:         s.toProtoOptions(q.Options),
+			Options:         options,
 			ValidationRules: s.toProtoValidationRules(q.ValidationRules),
 		})
 	}
@@ -120,20 +133,24 @@ func (s *QuestionnaireService) toProtoQuestionnaire(result *questionnaire.Questi
 		Status:      result.Status,
 		Type:        result.Type,
 		Questions:   protoQuestions,
-	}
+	}, nil
 }
 
 // toProtoOptions 转换选项列表
-func (s *QuestionnaireService) toProtoOptions(options []questionnaire.OptionResult) []*pb.Option {
+func (s *QuestionnaireService) toProtoOptions(options []questionnaire.OptionResult) ([]*pb.Option, error) {
 	protoOptions := make([]*pb.Option, 0, len(options))
 	for _, opt := range options {
+		score, err := protoInt32FromInt("option.score", opt.Score)
+		if err != nil {
+			return nil, err
+		}
 		protoOptions = append(protoOptions, &pb.Option{
 			Code:    opt.Value,
 			Content: opt.Label,
-			Score:   int32(opt.Score),
+			Score:   score,
 		})
 	}
-	return protoOptions
+	return protoOptions, nil
 }
 
 // toProtoValidationRules 转换校验规则
@@ -149,9 +166,13 @@ func (s *QuestionnaireService) toProtoValidationRules(rules []questionnaire.Vali
 }
 
 // toProtoQuestionnaireSummary 转换为 protobuf 问卷摘要（不包含问题详情）
-func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire.QuestionnaireSummaryResult) *pb.QuestionnaireSummary {
+func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire.QuestionnaireSummaryResult) (*pb.QuestionnaireSummary, error) {
 	if result == nil {
-		return nil
+		return nil, nil
+	}
+	questionCount, err := protoInt32FromInt("question_count", result.QuestionCount)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.QuestionnaireSummary{
@@ -162,6 +183,6 @@ func (s *QuestionnaireService) toProtoQuestionnaireSummary(result *questionnaire
 		ImgUrl:        result.ImgUrl,
 		Status:        result.Status,
 		Type:          result.Type,
-		QuestionCount: int32(result.QuestionCount),
-	}
+		QuestionCount: questionCount,
+	}, nil
 }

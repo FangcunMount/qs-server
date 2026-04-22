@@ -12,9 +12,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
 	relationDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
-	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor"
 )
 
@@ -73,12 +73,20 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 	if req.IamChildId > 0 {
 		profileID = &req.IamChildId
 	}
+	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
+	if err != nil {
+		return nil, err
+	}
+	gender, err := requestInt8FromInt32("gender", req.Gender)
+	if err != nil {
+		return nil, err
+	}
 
 	dto := testeeApp.RegisterTesteeDTO{
-		OrgID:     int64(req.OrgId),
+		OrgID:     orgID,
 		ProfileID: profileID,
 		Name:      req.Name,
-		Gender:    int8(req.Gender),
+		Gender:    gender,
 		Birthday:  birthday,
 		Source:    req.Source,
 	}
@@ -133,7 +141,12 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 		}
 	}
 
-	return s.toProtoTesteeResponse(result), nil
+	resp, err := s.toProtoTesteeResponse(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 // GetTestee 获取受试者详情
@@ -153,7 +166,12 @@ func (s *ActorService) GetTestee(ctx context.Context, req *pb.GetTesteeRequest) 
 		return nil, status.Error(codes.NotFound, "受试者不存在")
 	}
 
-	return s.toProtoTesteeResponse(result), nil
+	resp, convErr := s.toProtoTesteeResponse(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return resp, nil
 }
 
 // UpdateTestee 更新受试者信息
@@ -169,11 +187,15 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 		t := req.Birthday.AsTime()
 		birthday = &t
 	}
+	gender, err := requestInt8FromInt32("gender", req.Gender)
+	if err != nil {
+		return nil, err
+	}
 
 	dto := testeeApp.UpdateTesteeProfileDTO{
 		TesteeID: req.Id,
 		Name:     req.Name,
-		Gender:   int8(req.Gender),
+		Gender:   gender,
 		Birthday: birthday,
 	}
 
@@ -223,7 +245,12 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 		return nil, status.Error(codes.Internal, "获取更新后的受试者信息失败")
 	}
 
-	return s.toProtoTesteeResponse(result), nil
+	resp, convErr := s.toProtoTesteeResponse(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return resp, nil
 }
 
 // TesteeExists 检查受试者是否存在
@@ -236,7 +263,12 @@ func (s *ActorService) TesteeExists(ctx context.Context, req *pb.TesteeExistsReq
 		return nil, status.Error(codes.InvalidArgument, "用户档案ID不能为空")
 	}
 
-	result, err := s.queryService.FindByProfile(ctx, int64(req.OrgId), req.IamChildId)
+	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.queryService.FindByProfile(ctx, orgID, req.IamChildId)
 	if err != nil || result == nil {
 		return &pb.TesteeExistsResponse{
 			Exists:   false,
@@ -257,8 +289,13 @@ func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTestees
 		return nil, status.Error(codes.InvalidArgument, "机构ID不能为空")
 	}
 
+	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
+	if err != nil {
+		return nil, err
+	}
+
 	dto := testeeApp.ListTesteeDTO{
-		OrgID:  int64(req.OrgId),
+		OrgID:  orgID,
 		Offset: int(req.Offset),
 		Limit:  int(req.Limit),
 	}
@@ -278,7 +315,12 @@ func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTestees
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return s.toProtoTesteeListResponse(result), nil
+	resp, convErr := s.toProtoTesteeListResponse(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return resp, nil
 }
 
 // ListTesteesByUser 根据用户（监护人）查询受试者列表
@@ -309,7 +351,12 @@ func (s *ActorService) ListTesteesByUser(ctx context.Context, req *pb.ListTestee
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return s.toProtoTesteeListResponse(result), nil
+	resp, convErr := s.toProtoTesteeListResponse(result)
+	if convErr != nil {
+		return nil, convErr
+	}
+
+	return resp, nil
 }
 
 // GetTesteeCareContext 获取受试者当前照护上下文摘要
@@ -371,14 +418,18 @@ func (s *ActorService) GetTesteeCareContext(ctx context.Context, req *pb.GetTest
 }
 
 // toProtoTesteeResponse 转换为 proto TesteeResponse
-func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) *pb.TesteeResponse {
+func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) (*pb.TesteeResponse, error) {
 	if result == nil {
-		return nil
+		return nil, nil
+	}
+	orgID, err := protoUint64FromInt64("org_id", result.OrgID)
+	if err != nil {
+		return nil, err
 	}
 
 	resp := &pb.TesteeResponse{
 		Id:         result.ID,
-		OrgId:      uint64(result.OrgID),
+		OrgId:      orgID,
 		Name:       result.Name,
 		Gender:     int32(result.Gender),
 		Tags:       result.Tags,
@@ -398,8 +449,12 @@ func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) *pb
 
 	// 设置测评统计信息
 	if result.TotalAssessments > 0 || result.LastAssessmentAt != nil {
+		totalCount, convErr := protoInt32FromInt("assessment_stats.total_count", result.TotalAssessments)
+		if convErr != nil {
+			return nil, convErr
+		}
 		stats := &pb.AssessmentStats{
-			TotalCount:    int32(result.TotalAssessments),
+			TotalCount:    totalCount,
 			LastRiskLevel: result.LastRiskLevel,
 		}
 		if result.LastAssessmentAt != nil {
@@ -408,27 +463,31 @@ func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) *pb
 		resp.AssessmentStats = stats
 	}
 
-	return resp
+	return resp, nil
 }
 
 // toProtoTesteeListResponse 转换为 proto TesteeListResponse
-func (s *ActorService) toProtoTesteeListResponse(result *testeeApp.TesteeListResult) *pb.TesteeListResponse {
+func (s *ActorService) toProtoTesteeListResponse(result *testeeApp.TesteeListResult) (*pb.TesteeListResponse, error) {
 	if result == nil {
 		return &pb.TesteeListResponse{
 			Items: []*pb.TesteeResponse{},
 			Total: 0,
-		}
+		}, nil
 	}
 
 	items := make([]*pb.TesteeResponse, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, s.toProtoTesteeResponse(item))
+		resp, err := s.toProtoTesteeResponse(item)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, resp)
 	}
 
 	return &pb.TesteeListResponse{
 		Items: items,
 		Total: result.TotalCount,
-	}
+	}, nil
 }
 
 func pickPreferredCareContext(result *clinicianApp.TesteeRelationListResult) *clinicianApp.TesteeRelationResult {

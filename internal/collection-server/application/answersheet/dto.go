@@ -22,7 +22,7 @@ func (r *SubmitAnswerSheetRequest) UnmarshalJSON(data []byte) error {
 	// 使用临时结构体避免递归调用
 	type Alias SubmitAnswerSheetRequest
 	aux := &struct {
-		TesteeID interface{} `json:"testee_id"`
+		TesteeID json.RawMessage `json:"testee_id"`
 		*Alias
 	}{
 		Alias: (*Alias)(r),
@@ -33,19 +33,32 @@ func (r *SubmitAnswerSheetRequest) UnmarshalJSON(data []byte) error {
 	}
 
 	// 处理 TesteeID，支持字符串或数字
-	switch v := aux.TesteeID.(type) {
-	case string:
-		// 字符串转数字
-		testeeID, err := strconv.ParseUint(v, 10, 64)
+	if len(aux.TesteeID) == 0 {
+		return fmt.Errorf("testee_id must be a string or number")
+	}
+
+	if aux.TesteeID[0] == '"' {
+		var text string
+		if err := json.Unmarshal(aux.TesteeID, &text); err != nil {
+			return fmt.Errorf("invalid testee_id format: %w", err)
+		}
+		testeeID, err := strconv.ParseUint(text, 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid testee_id format: %w", err)
 		}
 		r.TesteeID = testeeID
-	case float64:
-		r.TesteeID = uint64(v)
-	default:
+		return nil
+	}
+
+	var number json.Number
+	if err := json.Unmarshal(aux.TesteeID, &number); err != nil {
 		return fmt.Errorf("testee_id must be a string or number")
 	}
+	testeeID, err := strconv.ParseUint(number.String(), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid testee_id format: %w", err)
+	}
+	r.TesteeID = testeeID
 
 	return nil
 }

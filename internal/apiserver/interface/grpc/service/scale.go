@@ -116,7 +116,7 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 }
 
 // GetScaleCategories 获取量表分类列表
-func (s *ScaleService) GetScaleCategories(ctx context.Context, req *pb.GetScaleCategoriesRequest) (*pb.GetScaleCategoriesResponse, error) {
+func (s *ScaleService) GetScaleCategories(ctx context.Context, _ *pb.GetScaleCategoriesRequest) (*pb.GetScaleCategoriesResponse, error) {
 	// 调用应用层类别服务
 	result, err := s.categoryService.GetOpenCategories(ctx)
 	if err != nil {
@@ -128,7 +128,7 @@ func (s *ScaleService) GetScaleCategories(ctx context.Context, req *pb.GetScaleC
 }
 
 // toProtoScale 转换为 protobuf 量表
-func (s *ScaleService) toProtoScale(ctx context.Context, result *appScale.ScaleResult) *pb.Scale {
+func (s *ScaleService) toProtoScale(_ context.Context, result *appScale.ScaleResult) *pb.Scale {
 	if result == nil {
 		return nil
 	}
@@ -224,7 +224,7 @@ func (s *ScaleService) toProtoScaleCategories(result *appScale.ScaleCategoriesRe
 }
 
 // toProtoScaleSummary 转换为 protobuf 量表摘要（不包含因子详情）
-func (s *ScaleService) toProtoScaleSummary(ctx context.Context, result *appScale.ScaleSummaryResult) *pb.ScaleSummary {
+func (s *ScaleService) toProtoScaleSummary(_ context.Context, result *appScale.ScaleSummaryResult) *pb.ScaleSummary {
 	if result == nil {
 		return nil
 	}

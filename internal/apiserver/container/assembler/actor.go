@@ -23,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -137,7 +138,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
-	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlDB)
+	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStore(mysqlDB))
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(m.TesteeRepo)

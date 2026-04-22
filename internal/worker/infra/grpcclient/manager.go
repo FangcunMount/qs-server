@@ -131,7 +131,8 @@ func (m *Manager) loadTLSCredentials() (credentials.TransportCredentials, error)
 	}
 
 	tlsCfg := &tls.Config{
-		RootCAs: certPool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    certPool,
 	}
 	if m.config.TLS.ServerName != "" {
 		tlsCfg.ServerName = m.config.TLS.ServerName

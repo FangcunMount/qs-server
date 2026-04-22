@@ -33,7 +33,7 @@ func addConfigFlag(basename string, fs *pflag.FlagSet) {
 	// 自动设置环境变量
 	viper.AutomaticEnv()
 	// 设置环境变量前缀
-	viper.SetEnvPrefix(strings.Replace(strings.ToUpper(basename), "-", "_", -1))
+	viper.SetEnvPrefix(buildEnvPrefix(basename))
 	// 设置环境变量键替换
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 

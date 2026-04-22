@@ -105,7 +105,9 @@ func (n *WebhookNotifier) notify(ctx context.Context, meta port.NotificationMeta
 	if err != nil {
 		return fmt.Errorf("post webhook notification: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("webhook returned status %d", resp.StatusCode)

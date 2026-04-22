@@ -343,7 +343,7 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 		}
 	}
 
-		// 转换维度，只保留可见因子（如果量表信息可用）
+	// 转换维度，只保留可见因子（如果量表信息可用）
 	dimensions := make([]DimensionInterpretResponse, 0, len(result.Dimensions))
 	for _, dim := range result.Dimensions {
 		if visibleFactorCodes == nil || visibleFactorCodes[dim.FactorCode] {

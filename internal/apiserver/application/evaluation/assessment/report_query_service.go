@@ -76,6 +76,6 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 }
 
 // ExportPDF 导出PDF报告
-func (s *reportQueryService) ExportPDF(ctx context.Context, assessmentID uint64) ([]byte, error) {
+func (s *reportQueryService) ExportPDF(_ context.Context, _ uint64) ([]byte, error) {
 	return nil, errors.WithCode(errorCode.ErrUnsupportedOperation, "PDF导出当前不支持")
 }

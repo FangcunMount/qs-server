@@ -20,6 +20,16 @@ type relationshipService struct {
 	uow            *mysql.UnitOfWork
 }
 
+type relationAssignmentInput struct {
+	orgID        int64
+	clinicianID  domainClinician.ID
+	testeeID     domainTestee.ID
+	relationType domainRelation.RelationType
+	sourceType   domainRelation.SourceType
+	sourceID     *uint64
+	now          time.Time
+}
+
 // NewRelationshipService 创建从业者关系服务。
 func NewRelationshipService(
 	relationRepo domainRelation.Repository,
@@ -118,88 +128,21 @@ func (s *relationshipService) assignRelation(ctx context.Context, dto AssignTest
 }
 
 func (s *relationshipService) assignRelationTx(ctx context.Context, dto AssignTesteeDTO) (*domainRelation.ClinicianTesteeRelation, error) {
-	relationshipType, err := normalizeAssignmentRelationType(dto.RelationType)
+	input, err := s.prepareRelationAssignment(ctx, dto)
 	if err != nil {
 		return nil, err
 	}
 
-	sourceType := domainRelation.SourceType(dto.SourceType)
-	if sourceType == "" {
-		sourceType = domainRelation.SourceTypeManual
+	existingPrimaryRelation, err := s.handlePrimaryAssignment(ctx, input)
+	if err != nil || existingPrimaryRelation != nil {
+		return existingPrimaryRelation, err
 	}
 
-	clinicianItem, err := s.clinicianRepo.FindByID(ctx, domainClinician.ID(dto.ClinicianID))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find clinician")
+	existingRelation, err := s.handleExistingAccessRelation(ctx, input)
+	if err != nil || existingRelation != nil {
+		return existingRelation, err
 	}
-	if clinicianItem.OrgID() != dto.OrgID {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "clinician does not belong to the requested organization")
-	}
-
-	testeeItem, err := s.testeeRepo.FindByID(ctx, domainTestee.ID(dto.TesteeID))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find testee")
-	}
-	if testeeItem.OrgID() != dto.OrgID {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "testee does not belong to the requested organization")
-	}
-
-	now := time.Now()
-	if relationshipType == domainRelation.RelationTypePrimary {
-		existingPrimaryRelation, err := s.relationRepo.FindActivePrimaryByTestee(
-			ctx,
-			dto.OrgID,
-			domainTestee.ID(dto.TesteeID),
-		)
-		if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
-			return nil, errors.Wrap(err, "failed to find active primary relation")
-		}
-		if err == nil && existingPrimaryRelation != nil {
-			if existingPrimaryRelation.ClinicianID() == domainClinician.ID(dto.ClinicianID) {
-				return existingPrimaryRelation, nil
-			}
-			existingPrimaryRelation.Unbind(now)
-			if err := s.relationRepo.Update(ctx, existingPrimaryRelation); err != nil {
-				return nil, errors.Wrap(err, "failed to unbind existing primary relation")
-			}
-		}
-	}
-
-	existingRelation, err := s.relationRepo.FindActiveByTypes(
-		ctx,
-		dto.OrgID,
-		domainClinician.ID(dto.ClinicianID),
-		domainTestee.ID(dto.TesteeID),
-		domainRelation.AccessGrantRelationTypes(),
-	)
-	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
-		return nil, errors.Wrap(err, "failed to find existing access relation")
-	}
-	if err == nil && existingRelation != nil {
-		if existingRelation.RelationType() == relationshipType {
-			return existingRelation, nil
-		}
-		existingRelation.Unbind(now)
-		if err := s.relationRepo.Update(ctx, existingRelation); err != nil {
-			return nil, errors.Wrap(err, "failed to replace existing access relation")
-		}
-	}
-
-	result := domainRelation.NewClinicianTesteeRelation(
-		dto.OrgID,
-		domainClinician.ID(dto.ClinicianID),
-		domainTestee.ID(dto.TesteeID),
-		relationshipType,
-		sourceType,
-		dto.SourceID,
-		true,
-		now,
-		nil,
-	)
-	if err := s.relationRepo.Save(ctx, result); err != nil {
-		return nil, errors.Wrap(err, "failed to save relation")
-	}
-	return result, nil
+	return s.createRelation(ctx, input)
 }
 
 func (s *relationshipService) UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error) {
@@ -391,6 +334,132 @@ func normalizeAssignmentRelationType(raw string) (domainRelation.RelationType, e
 		return "", errors.WithCode(code.ErrInvalidArgument, "unsupported clinician relation type")
 	}
 	return relationType, nil
+}
+
+func (s *relationshipService) prepareRelationAssignment(ctx context.Context, dto AssignTesteeDTO) (*relationAssignmentInput, error) {
+	relationType, err := normalizeAssignmentRelationType(dto.RelationType)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceType := domainRelation.SourceType(dto.SourceType)
+	if sourceType == "" {
+		sourceType = domainRelation.SourceTypeManual
+	}
+
+	if err := s.ensureAssignmentActorsInOrg(ctx, dto.OrgID, domainClinician.ID(dto.ClinicianID), domainTestee.ID(dto.TesteeID)); err != nil {
+		return nil, err
+	}
+
+	return &relationAssignmentInput{
+		orgID:        dto.OrgID,
+		clinicianID:  domainClinician.ID(dto.ClinicianID),
+		testeeID:     domainTestee.ID(dto.TesteeID),
+		relationType: relationType,
+		sourceType:   sourceType,
+		sourceID:     dto.SourceID,
+		now:          time.Now(),
+	}, nil
+}
+
+func (s *relationshipService) ensureAssignmentActorsInOrg(
+	ctx context.Context,
+	orgID int64,
+	clinicianID domainClinician.ID,
+	testeeID domainTestee.ID,
+) error {
+	clinicianItem, err := s.clinicianRepo.FindByID(ctx, clinicianID)
+	if err != nil {
+		return errors.Wrap(err, "failed to find clinician")
+	}
+	if clinicianItem.OrgID() != orgID {
+		return errors.WithCode(code.ErrInvalidArgument, "clinician does not belong to the requested organization")
+	}
+
+	testeeItem, err := s.testeeRepo.FindByID(ctx, testeeID)
+	if err != nil {
+		return errors.Wrap(err, "failed to find testee")
+	}
+	if testeeItem.OrgID() != orgID {
+		return errors.WithCode(code.ErrInvalidArgument, "testee does not belong to the requested organization")
+	}
+
+	return nil
+}
+
+func (s *relationshipService) handlePrimaryAssignment(
+	ctx context.Context,
+	input *relationAssignmentInput,
+) (*domainRelation.ClinicianTesteeRelation, error) {
+	if input.relationType != domainRelation.RelationTypePrimary {
+		return nil, nil
+	}
+
+	existingPrimaryRelation, err := s.relationRepo.FindActivePrimaryByTestee(ctx, input.orgID, input.testeeID)
+	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+		return nil, errors.Wrap(err, "failed to find active primary relation")
+	}
+	if err != nil || existingPrimaryRelation == nil {
+		return nil, nil
+	}
+	if existingPrimaryRelation.ClinicianID() == input.clinicianID {
+		return existingPrimaryRelation, nil
+	}
+
+	existingPrimaryRelation.Unbind(input.now)
+	if err := s.relationRepo.Update(ctx, existingPrimaryRelation); err != nil {
+		return nil, errors.Wrap(err, "failed to unbind existing primary relation")
+	}
+	return nil, nil
+}
+
+func (s *relationshipService) handleExistingAccessRelation(
+	ctx context.Context,
+	input *relationAssignmentInput,
+) (*domainRelation.ClinicianTesteeRelation, error) {
+	existingRelation, err := s.relationRepo.FindActiveByTypes(
+		ctx,
+		input.orgID,
+		input.clinicianID,
+		input.testeeID,
+		domainRelation.AccessGrantRelationTypes(),
+	)
+	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+		return nil, errors.Wrap(err, "failed to find existing access relation")
+	}
+	if err != nil || existingRelation == nil {
+		return nil, nil
+	}
+	if existingRelation.RelationType() == input.relationType {
+		return existingRelation, nil
+	}
+
+	existingRelation.Unbind(input.now)
+	if err := s.relationRepo.Update(ctx, existingRelation); err != nil {
+		return nil, errors.Wrap(err, "failed to replace existing access relation")
+	}
+	return nil, nil
+}
+
+func (s *relationshipService) createRelation(
+	ctx context.Context,
+	input *relationAssignmentInput,
+) (*domainRelation.ClinicianTesteeRelation, error) {
+	result := domainRelation.NewClinicianTesteeRelation(
+		input.orgID,
+		input.clinicianID,
+		input.testeeID,
+		input.relationType,
+		input.sourceType,
+		input.sourceID,
+		true,
+		input.now,
+		nil,
+	)
+	if err := s.relationRepo.Save(ctx, result); err != nil {
+		return nil, errors.Wrap(err, "failed to save relation")
+	}
+	return result, nil
 }
 
 func extractRelationTesteeIDs(relations []*domainRelation.ClinicianTesteeRelation) []domainTestee.ID {

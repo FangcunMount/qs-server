@@ -1,9 +1,6 @@
 package main
 
 import (
-	"math/rand"
-	"time"
-
 	collection "github.com/FangcunMount/qs-server/internal/collection-server"
 	_ "github.com/FangcunMount/qs-server/internal/collection-server/docs"
 )
@@ -15,8 +12,5 @@ import (
 // @schemes http https
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	command := collection.NewApp("collection-server")
-	command.Run()
+	collection.NewApp("collection-server").Run()
 }

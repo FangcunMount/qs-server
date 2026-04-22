@@ -10,6 +10,7 @@ import (
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // reportQueryService 报告查询服务实现
@@ -136,7 +137,10 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 		items[i] = ToReportResult(r)
 	}
 
-	totalInt := int(total)
+	totalInt, err := safeconv.Int64ToInt(total)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrDatabase, "报告总数超出安全范围")
+	}
 	duration := time.Since(startTime)
 	l.Debugw("查询受试者报告列表成功",
 		"action", "list_reports",
@@ -215,7 +219,10 @@ func (s *reportQueryService) ListHighRiskReports(ctx context.Context, dto ListHi
 		total = int64(len(items))
 	}
 
-	totalInt := int(total)
+	totalInt, err := safeconv.Int64ToInt(total)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrDatabase, "高风险报告总数超出安全范围")
+	}
 	duration := time.Since(startTime)
 	l.Debugw("查询高风险报告列表成功",
 		"action", "list_high_risk_reports",

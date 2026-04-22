@@ -233,7 +233,13 @@ func (s *workerServer) createDispatchHandler(topicName string) messaging.Handler
 					slog.String("msg_id", msg.UUID),
 					slog.String("error", err.Error()),
 				)
-				msg.Ack() // 无法处理，直接确认避免堆积
+				if ackErr := msg.Ack(); ackErr != nil {
+					s.logger.Warn("failed to ack invalid message",
+						slog.String("topic", topicName),
+						slog.String("msg_id", msg.UUID),
+						slog.String("error", ackErr.Error()),
+					)
+				}
 				return nil
 			}
 			eventType = env.EventType
@@ -255,20 +261,26 @@ func (s *workerServer) createDispatchHandler(topicName string) messaging.Handler
 				slog.String("msg_id", msg.UUID),
 				slog.String("error", err.Error()),
 			)
-			msg.Nack()
+			if nackErr := msg.Nack(); nackErr != nil {
+				s.logger.Warn("failed to nack message",
+					slog.String("topic", topicName),
+					slog.String("msg_id", msg.UUID),
+					slog.String("error", nackErr.Error()),
+				)
+			}
 			return err
 		}
 
-		msg.Ack()
+		if ackErr := msg.Ack(); ackErr != nil {
+			s.logger.Warn("failed to ack message",
+				slog.String("topic", topicName),
+				slog.String("msg_id", msg.UUID),
+				slog.String("error", ackErr.Error()),
+			)
+			return ackErr
+		}
 		return nil
 	}
-}
-
-func errorString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }
 
 // createTopics 在 NSQ 中预创建 Topics

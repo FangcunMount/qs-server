@@ -14,7 +14,7 @@ func init() {
 }
 
 func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[domainQuestionnaire.QuestionnaireChangedData]{
 			parseErrorLabel: "questionnaire changed event",
 			action: func(data *domainQuestionnaire.QuestionnaireChangedData) string {

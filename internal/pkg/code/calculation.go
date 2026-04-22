@@ -2,17 +2,17 @@ package code
 
 // calculation errors (113xxx).
 const (
-// ErrOperandsEmpty - 400: Operands is empty.
-ErrOperandsEmpty int = iota + 113001
+	// ErrOperandsEmpty - 400: Operands is empty.
+	ErrOperandsEmpty int = iota + 113001
 
-// ErrOperandsOverside - 400: Operands is overside.
-ErrOperandsOverside
+	// ErrOperandsOverside - 400: Operands is overside.
+	ErrOperandsOverside
 
-// ErrInvalidCalculaterType - 400: Invalid calculater type.
-ErrInvalidCalculaterType
+	// ErrInvalidCalculaterType - 400: Invalid calculater type.
+	ErrInvalidCalculaterType
 
-// ErrCalculaterNotFound - 400: Calculater not found.
-ErrCalculaterNotFound
+	// ErrCalculaterNotFound - 400: Calculater not found.
+	ErrCalculaterNotFound
 )
 
 func init() {

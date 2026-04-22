@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
 	"github.com/google/uuid"
 )
 
@@ -18,7 +18,7 @@ type entryGenerator struct {
 }
 
 // NewEntryGenerator 创建入口生成器
-func NewEntryGenerator(baseURL string) plan.EntryGenerator {
+func NewEntryGenerator(baseURL string) planentryport.Generator {
 	return &entryGenerator{
 		baseURL: baseURL,
 	}

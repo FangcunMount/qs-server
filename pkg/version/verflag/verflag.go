@@ -87,10 +87,11 @@ func AddFlags(fs *flag.FlagSet) {
 
 // PrintAndExitIfRequested 检查 -version 标志是否被传递，如果传递，则打印版本并退出
 func PrintAndExitIfRequested() {
-	if *versionFlag == VersionRaw {
+	switch *versionFlag {
+	case VersionRaw:
 		fmt.Printf("%#v\n", version.Get())
 		os.Exit(0)
-	} else if *versionFlag == VersionTrue {
+	case VersionTrue:
 		fmt.Printf("%s\n", version.Get())
 		os.Exit(0)
 	}

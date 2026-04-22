@@ -100,14 +100,16 @@ func (s *GenericAPIServer) InstallMiddlewares() {
 func (s *GenericAPIServer) Run() error {
 	// 创建 HTTP 服务器
 	s.insecureServer = &http.Server{
-		Addr:    s.InsecureServingInfo.Address,
-		Handler: s,
+		Addr:              s.InsecureServingInfo.Address,
+		Handler:           s,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	// 创建 HTTPS 服务器
 	s.secureServer = &http.Server{
-		Addr:    s.SecureServingInfo.Address(),
-		Handler: s,
+		Addr:              s.SecureServingInfo.Address(),
+		Handler:           s,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	var eg errgroup.Group
@@ -202,12 +204,12 @@ func (s *GenericAPIServer) ping(ctx context.Context) error {
 		if err == nil && resp.StatusCode == http.StatusOK {
 			log.Info("The router has been deployed successfully.")
 
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			return nil
 		}
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		// 等待 1 秒后继续下一个 ping

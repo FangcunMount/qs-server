@@ -55,7 +55,7 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 2. 查询并校验任务
-	task, err := s.loadTaskInOrg(ctx, orgID, taskID, "open_task")
+	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "open_task")
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	}
 
 	// 2. 查询并校验任务
-	task, err := s.loadTaskInOrg(ctx, orgID, taskID, "complete_task")
+	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "complete_task")
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (s *taskManagementService) ExpireTask(ctx context.Context, orgID int64, tas
 	)
 
 	// 1. 查询并校验任务
-	task, err := s.loadTaskInOrg(ctx, orgID, taskID, "expire_task")
+	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "expire_task")
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (s *taskManagementService) CancelTask(ctx context.Context, orgID int64, tas
 	)
 
 	// 1. 查询并校验任务
-	task, err := s.loadTaskInOrg(ctx, orgID, taskID, "cancel_task")
+	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "cancel_task")
 	if err != nil {
 		return err
 	}
@@ -266,38 +266,4 @@ func (s *taskManagementService) CancelTask(ctx context.Context, orgID int64, tas
 	)
 
 	return nil
-}
-
-func (s *taskManagementService) loadTaskInOrg(ctx context.Context, orgID int64, taskID string, action string) (*plan.AssessmentTask, error) {
-	id, err := toTaskID(taskID)
-	if err != nil {
-		logger.L(ctx).Errorw("Invalid task ID",
-			"action", action,
-			"task_id", taskID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务ID: %v", err)
-	}
-
-	task, err := s.taskRepo.FindByID(ctx, id)
-	if err != nil {
-		logger.L(ctx).Errorw("Task not found",
-			"action", action,
-			"task_id", taskID,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrPageNotFound, "任务不存在")
-	}
-
-	if task.GetOrgID() != orgID {
-		logger.L(ctx).Warnw("Task access denied due to org scope mismatch",
-			"action", action,
-			"task_id", taskID,
-			"request_org_id", orgID,
-			"resource_org_id", task.GetOrgID(),
-		)
-		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "任务不属于当前机构")
-	}
-
-	return task, nil
 }

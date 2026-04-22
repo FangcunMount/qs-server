@@ -152,7 +152,9 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 
 	answerSheetID := uint64(456)
-	mr.Set(answerSheetProcessingLockKey(newAnswerSheetHandlerTestDeps(client, redisClient), answerSheetID), "busy")
+	if err := mr.Set(answerSheetProcessingLockKey(newAnswerSheetHandlerTestDeps(client, redisClient), answerSheetID), "busy"); err != nil {
+		t.Fatalf("set lock: %v", err)
+	}
 
 	deps := newAnswerSheetHandlerTestDeps(client, redisClient)
 	handler := handleAnswerSheetSubmitted(deps)

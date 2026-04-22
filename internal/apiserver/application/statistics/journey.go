@@ -10,7 +10,6 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -55,17 +54,21 @@ type BehaviorProjectorService interface {
 }
 
 type behaviorEventStager struct {
-	outboxStore *mysqlEventOutbox.Store
+	outboxStore behaviorEventOutboxStore
 }
 
-func NewBehaviorEventStager(db *gorm.DB) interface {
+type behaviorEventOutboxStore interface {
+	StageEventsTx(tx *gorm.DB, events []event.DomainEvent) error
+}
+
+func NewBehaviorEventStager(outboxStore behaviorEventOutboxStore) interface {
 	assessmentEntryApp.BehaviorEventStager
 	clinicianApp.BehaviorEventStager
 } {
-	if db == nil {
+	if outboxStore == nil {
 		return nil
 	}
-	return &behaviorEventStager{outboxStore: mysqlEventOutbox.NewStore(db)}
+	return &behaviorEventStager{outboxStore: outboxStore}
 }
 
 func (s *behaviorEventStager) stage(ctx context.Context, evt event.DomainEvent) error {

@@ -69,7 +69,7 @@ func (f *fakePlanCommandService) CancelTask(context.Context, int64, string) (*pl
 
 func TestPlanCommandServiceCreatePlanMapsRequestAndResponse(t *testing.T) {
 	svc := NewPlanCommandService(&fakePlanCommandService{
-		createPlanFn: func(ctx context.Context, dto planApp.CreatePlanDTO) (*planApp.PlanResult, error) {
+		createPlanFn: func(_ context.Context, dto planApp.CreatePlanDTO) (*planApp.PlanResult, error) {
 			if dto.OrgID != 9 {
 				t.Fatalf("unexpected org id: %d", dto.OrgID)
 			}
@@ -129,7 +129,7 @@ func TestPlanCommandServiceCancelPlanMapsPermissionDenied(t *testing.T) {
 		finishPlanFn: func(context.Context, int64, string) (*planApp.PlanResult, error) {
 			panic("unexpected call")
 		},
-		cancelPlanFn: func(ctx context.Context, orgID int64, planID string) (*planApp.PlanMutationResult, error) {
+		cancelPlanFn: func(_ context.Context, _ int64, _ string) (*planApp.PlanMutationResult, error) {
 			return nil, pkgerrors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
 		},
 		schedulePendingTasksFn: func(context.Context, int64, string) (*planApp.TaskScheduleResult, error) {
@@ -158,7 +158,7 @@ func TestPlanCommandServiceFinishPlanMapsRequestAndResponse(t *testing.T) {
 		createPlanFn: func(context.Context, planApp.CreatePlanDTO) (*planApp.PlanResult, error) {
 			panic("unexpected call")
 		},
-		finishPlanFn: func(ctx context.Context, orgID int64, planID string) (*planApp.PlanResult, error) {
+		finishPlanFn: func(_ context.Context, orgID int64, planID string) (*planApp.PlanResult, error) {
 			if orgID != 3 {
 				t.Fatalf("unexpected org id: %d", orgID)
 			}

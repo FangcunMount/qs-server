@@ -47,57 +47,94 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 ) (*statistics.QuestionnaireStatistics, error) {
 	l := logger.L(ctx)
 	l.Infow("获取问卷统计", "org_id", orgID, "questionnaire_code", questionnaireCode)
+	cacheKey := questionnaireStatsCacheKey(orgID, questionnaireCode)
 
-	// 1. 优先从Redis缓存查询（查询结果缓存）
-	if s.cache != nil {
-		cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-		cached, err := s.cache.GetQueryCache(ctx, cacheKey)
-		if err == nil && cached != "" {
-			var stats statistics.QuestionnaireStatistics
-			if err := json.Unmarshal([]byte(cached), &stats); err == nil {
-				l.Debugw("从Redis缓存获取问卷统计", "cache_key", cacheKey)
-				s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
-				return &stats, nil
-			}
-		}
+	if stats, ok := s.loadCachedQuestionnaireStatistics(ctx, cacheKey); ok {
+		s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
+		return stats, nil
 	}
 
-	// 2. 其次从MySQL统计表查询
-	if s.repo != nil {
-		po, err := s.repo.GetAccumulatedStatistics(ctx, orgID, statistics.StatisticTypeQuestionnaire, questionnaireCode)
-		if err == nil && po != nil {
-			// 转换为领域对象
-			stats := s.convertAccumulatedPOToQuestionnaireStatistics(po, orgID, questionnaireCode)
-			stats.DailyTrend = s.getDailyTrend(ctx, orgID, questionnaireCode)
-			if len(stats.OriginDistribution) == 0 {
-				originDistribution, originErr := s.getOriginDistribution(ctx, orgID, questionnaireCode)
-				if originErr != nil {
-					l.Warnw("查询问卷来源分布失败", "questionnaire_code", questionnaireCode, "error", originErr)
-				} else {
-					stats.OriginDistribution = originDistribution
-				}
-			}
-
-			// 缓存结果（TTL 由 query family policy 控制）
-			if s.cache != nil {
-				if data, err := json.Marshal(stats); err == nil {
-					cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-					if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
-						l.Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
-					}
-				} else {
-					l.Warnw("序列化问卷统计结果失败", "error", err)
-				}
-			}
-
-			l.Debugw("从MySQL统计表获取问卷统计")
-			s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
-			return stats, nil
-		}
+	stats, found, err := s.loadAccumulatedQuestionnaireStatistics(ctx, orgID, questionnaireCode)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		s.cacheQuestionnaireStatistics(ctx, cacheKey, stats)
+		l.Debugw("从MySQL统计表获取问卷统计")
+		s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
+		return stats, nil
 	}
 
-	// 3. 最后从原始表实时聚合
 	l.Debugw("从原始表实时聚合问卷统计")
+	realtimeStats, err := s.buildRealtimeQuestionnaireStatistics(ctx, orgID, questionnaireCode)
+	if err != nil {
+		return nil, err
+	}
+
+	s.cacheQuestionnaireStatistics(ctx, cacheKey, realtimeStats)
+	s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
+	return realtimeStats, nil
+}
+
+func questionnaireStatsCacheKey(orgID int64, questionnaireCode string) string {
+	return fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
+}
+
+func (s *questionnaireStatisticsService) loadCachedQuestionnaireStatistics(
+	ctx context.Context,
+	cacheKey string,
+) (*statistics.QuestionnaireStatistics, bool) {
+	if s.cache == nil {
+		return nil, false
+	}
+
+	cached, err := s.cache.GetQueryCache(ctx, cacheKey)
+	if err != nil || cached == "" {
+		return nil, false
+	}
+
+	var stats statistics.QuestionnaireStatistics
+	if err := json.Unmarshal([]byte(cached), &stats); err != nil {
+		return nil, false
+	}
+
+	logger.L(ctx).Debugw("从Redis缓存获取问卷统计", "cache_key", cacheKey)
+	return &stats, true
+}
+
+func (s *questionnaireStatisticsService) loadAccumulatedQuestionnaireStatistics(
+	ctx context.Context,
+	orgID int64,
+	questionnaireCode string,
+) (*statistics.QuestionnaireStatistics, bool, error) {
+	if s.repo == nil {
+		return nil, false, nil
+	}
+
+	po, err := s.repo.GetAccumulatedStatistics(ctx, orgID, statistics.StatisticTypeQuestionnaire, questionnaireCode)
+	if err != nil || po == nil {
+		return nil, false, err
+	}
+
+	stats := s.convertAccumulatedPOToQuestionnaireStatistics(po, orgID, questionnaireCode)
+	stats.DailyTrend = s.getDailyTrend(ctx, orgID, questionnaireCode)
+	if len(stats.OriginDistribution) == 0 {
+		originDistribution, originErr := s.getOriginDistribution(ctx, orgID, questionnaireCode)
+		if originErr != nil {
+			logger.L(ctx).Warnw("查询问卷来源分布失败", "questionnaire_code", questionnaireCode, "error", originErr)
+		} else {
+			stats.OriginDistribution = originDistribution
+		}
+	}
+
+	return stats, true, nil
+}
+
+func (s *questionnaireStatisticsService) buildRealtimeQuestionnaireStatistics(
+	ctx context.Context,
+	orgID int64,
+	questionnaireCode string,
+) (*statistics.QuestionnaireStatistics, error) {
 	result := &statistics.QuestionnaireStatistics{
 		OrgID:              orgID,
 		QuestionnaireCode:  questionnaireCode,
@@ -105,88 +142,90 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 		DailyTrend:         []statistics.DailyCount{},
 	}
 
-	// 从 assessments 表聚合
-	var totalSubmissions int64
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Where("org_id = ? AND questionnaire_code = ? AND deleted_at IS NULL", orgID, questionnaireCode).
-		Count(&totalSubmissions).Error; err != nil {
+	totalSubmissions, err := s.countQuestionnaireAssessments(ctx, orgID, questionnaireCode, nil, "")
+	if err != nil {
+		return nil, err
+	}
+	totalCompletions, err := s.countQuestionnaireAssessments(ctx, orgID, questionnaireCode, nil, "interpreted")
+	if err != nil {
 		return nil, err
 	}
 	result.TotalSubmissions = totalSubmissions
-
-	// 总完成数（已解读）
-	var totalCompletions int64
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Where("org_id = ? AND questionnaire_code = ? AND status = 'interpreted' AND deleted_at IS NULL",
-			orgID, questionnaireCode).
-		Count(&totalCompletions).Error; err != nil {
-		return nil, err
-	}
 	result.TotalCompletions = totalCompletions
 	result.CompletionRate = s.aggregator.CalculateCompletionRate(totalSubmissions, totalCompletions)
 
-	// 近7/15/30天提交数
-	now := time.Now()
-	last7d := now.AddDate(0, 0, -7)
-	last15d := now.AddDate(0, 0, -15)
-	last30d := now.AddDate(0, 0, -30)
-
-	var last7dCount int64
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Where("org_id = ? AND questionnaire_code = ? AND created_at >= ? AND deleted_at IS NULL",
-			orgID, questionnaireCode, last7d).
-		Count(&last7dCount).Error; err != nil {
+	last7dCount, err := s.countQuestionnaireAssessments(ctx, orgID, questionnaireCode, daysAgo(7), "")
+	if err != nil {
+		return nil, err
+	}
+	last15dCount, err := s.countQuestionnaireAssessments(ctx, orgID, questionnaireCode, daysAgo(15), "")
+	if err != nil {
+		return nil, err
+	}
+	last30dCount, err := s.countQuestionnaireAssessments(ctx, orgID, questionnaireCode, daysAgo(30), "")
+	if err != nil {
 		return nil, err
 	}
 	result.Last7DaysCount = last7dCount
-
-	var last15dCount int64
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Where("org_id = ? AND questionnaire_code = ? AND created_at >= ? AND deleted_at IS NULL",
-			orgID, questionnaireCode, last15d).
-		Count(&last15dCount).Error; err != nil {
-		return nil, err
-	}
 	result.Last15DaysCount = last15dCount
-
-	var last30dCount int64
-	if err := s.db.WithContext(ctx).
-		Table("assessment").
-		Where("org_id = ? AND questionnaire_code = ? AND created_at >= ? AND deleted_at IS NULL",
-			orgID, questionnaireCode, last30d).
-		Count(&last30dCount).Error; err != nil {
-		return nil, err
-	}
 	result.Last30DaysCount = last30dCount
 
-	// 来源分布
 	originDistribution, err := s.getOriginDistribution(ctx, orgID, questionnaireCode)
 	if err != nil {
 		return nil, err
 	}
 	result.OriginDistribution = originDistribution
-
-	// 趋势数据（从 statistics_daily 表查询）
 	result.DailyTrend = s.getDailyTrend(ctx, orgID, questionnaireCode)
 
-	// 缓存结果（TTL 由 query family policy 控制）
-	if s.cache != nil {
-		if data, err := json.Marshal(result); err == nil {
-			cacheKey := fmt.Sprintf("questionnaire:%d:%s", orgID, questionnaireCode)
-			if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
-				l.Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
-			}
-		} else {
-			l.Warnw("序列化问卷统计结果失败", "error", err)
-		}
+	return result, nil
+}
+
+func (s *questionnaireStatisticsService) countQuestionnaireAssessments(
+	ctx context.Context,
+	orgID int64,
+	questionnaireCode string,
+	createdAfter *time.Time,
+	status string,
+) (int64, error) {
+	query := s.db.WithContext(ctx).
+		Table("assessment").
+		Where("org_id = ? AND questionnaire_code = ? AND deleted_at IS NULL", orgID, questionnaireCode)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if createdAfter != nil {
+		query = query.Where("created_at >= ?", *createdAfter)
 	}
 
-	s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
-	return result, nil
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (s *questionnaireStatisticsService) cacheQuestionnaireStatistics(
+	ctx context.Context,
+	cacheKey string,
+	stats *statistics.QuestionnaireStatistics,
+) {
+	if s.cache == nil || stats == nil {
+		return
+	}
+
+	data, err := json.Marshal(stats)
+	if err != nil {
+		logger.L(ctx).Warnw("序列化问卷统计结果失败", "error", err)
+		return
+	}
+	if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
+		logger.L(ctx).Warnw("写入问卷统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
+	}
+}
+
+func daysAgo(days int) *time.Time {
+	t := time.Now().AddDate(0, 0, -days)
+	return &t
 }
 
 // convertAccumulatedPOToQuestionnaireStatistics 转换累计统计PO为问卷统计领域对象

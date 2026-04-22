@@ -118,7 +118,9 @@ func (n *GatewayNotifier) notify(ctx context.Context, payload gatewayEnvelope) e
 	if err != nil {
 		return fmt.Errorf("post gateway notification: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("gateway returned status %d", resp.StatusCode)

@@ -2,7 +2,7 @@ package cache
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -116,7 +116,7 @@ func (c *MyAssessmentListCache) buildDataKey(
 		page,
 		pageSize,
 	)
-	hash := sha1.Sum([]byte(raw))
+	hash := sha256.Sum256([]byte(raw))
 	return c.keyBuilder.BuildAssessmentListVersionedKey(userID, version, hex.EncodeToString(hash[:])[:8])
 }
 

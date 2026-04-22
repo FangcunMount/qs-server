@@ -202,7 +202,7 @@ func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.AssessmentS
 
 	// 计算总分和风险等级（从总分因子获取）
 	var totalScore float64
-	var riskLevel assessment.RiskLevel = assessment.RiskLevelNone
+	riskLevel := assessment.RiskLevelNone
 
 	// 构建因子得分列表
 	factorScores := make([]assessment.FactorScore, 0, len(pos))

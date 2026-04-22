@@ -25,7 +25,9 @@ func TestWebhookNotifierPostsTaskNotifications(t *testing.T) {
 	var bodies []requestBody
 	var headers []http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() {
+			_ = r.Body.Close()
+		}()
 
 		var body requestBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

@@ -343,7 +343,7 @@ func (s *service) saveQRCodeFile(ctx context.Context, fileName string, data []by
 	l := logger.L(ctx)
 
 	// 确保存储目录存在
-	if err := os.MkdirAll(QRCodeStorageDir, 0755); err != nil {
+	if err := os.MkdirAll(QRCodeStorageDir, 0750); err != nil {
 		return "", fmt.Errorf("创建二维码存储目录失败: %w", err)
 	}
 
@@ -351,7 +351,7 @@ func (s *service) saveQRCodeFile(ctx context.Context, fileName string, data []by
 	filePath := filepath.Join(QRCodeStorageDir, fileName)
 
 	// 写入文件
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
 		return "", fmt.Errorf("写入二维码文件失败: %w", err)
 	}
 

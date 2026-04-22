@@ -26,7 +26,9 @@ func TestGatewayNotifierPostsTaskNotifications(t *testing.T) {
 	var body requestBody
 	var header http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() {
+			_ = r.Body.Close()
+		}()
 		header = r.Header.Clone()
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode request body: %v", err)

@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // EvaluationService 测评 gRPC 服务 - C端接口
@@ -135,13 +136,29 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 	for _, item := range result.Items {
 		items = append(items, toProtoAssessmentSummary(item))
 	}
+	total, err := protoInt32FromInt("total", result.Total)
+	if err != nil {
+		return nil, err
+	}
+	pageOut, err := protoInt32FromInt("page", result.Page)
+	if err != nil {
+		return nil, err
+	}
+	pageSizeOut, err := protoInt32FromInt("page_size", result.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	totalPages, err := protoInt32FromInt("total_pages", result.TotalPages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.ListMyAssessmentsResponse{
 		Items:      items,
-		Total:      int32(result.Total),
-		Page:       int32(result.Page),
-		PageSize:   int32(result.PageSize),
-		TotalPages: int32(result.TotalPages),
+		Total:      total,
+		Page:       pageOut,
+		PageSize:   pageSizeOut,
+		TotalPages: totalPages,
 	}, nil
 }
 
@@ -353,13 +370,29 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 	for _, item := range result.Items {
 		items = append(items, toProtoReport(item))
 	}
+	total, err := protoInt32FromInt("total", result.Total)
+	if err != nil {
+		return nil, err
+	}
+	pageOut, err := protoInt32FromInt("page", result.Page)
+	if err != nil {
+		return nil, err
+	}
+	pageSizeOut, err := protoInt32FromInt("page_size", result.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	totalPages, err := protoInt32FromInt("total_pages", result.TotalPages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.ListMyReportsResponse{
 		Items:      items,
-		Total:      int32(result.Total),
-		Page:       int32(result.Page),
-		PageSize:   int32(result.PageSize),
-		TotalPages: int32(result.TotalPages),
+		Total:      total,
+		Page:       pageOut,
+		PageSize:   pageSizeOut,
+		TotalPages: totalPages,
 	}, nil
 }
 
@@ -368,13 +401,13 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 // validateTesteeAssessmentAccess 验证受试者是否有权访问指定测评
 func (s *EvaluationService) validateTesteeAssessmentAccess(ctx context.Context, testeeID uint64, assessmentID uint64) error {
 	// 1. 查询测评记录
-	assessmentEntity, err := s.assessmentRepo.FindByID(ctx, assessment.ID(assessmentID))
+	assessmentEntity, err := s.assessmentRepo.FindByID(ctx, assessment.ID(meta.FromUint64(assessmentID)))
 	if err != nil {
 		return status.Error(codes.NotFound, "测评不存在")
 	}
 
 	// 2. 验证测评是否属于该受试者
-	if uint64(assessmentEntity.TesteeID()) != testeeID {
+	if assessmentEntity.TesteeID().Uint64() != testeeID {
 		return status.Error(codes.PermissionDenied, "无权访问该测评")
 	}
 

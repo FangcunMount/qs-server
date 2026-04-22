@@ -2,23 +2,23 @@ package code
 
 // 解读报告错误码 (115xxx).
 const (
-// ErrInterpretReportNotFound - 404: Interpret report not found.
-ErrInterpretReportNotFound int = iota + 115001
+	// ErrInterpretReportNotFound - 404: Interpret report not found.
+	ErrInterpretReportNotFound int = iota + 115001
 
-// ErrInterpretReportAlreadyExists - 400: Interpret report already exists.
-ErrInterpretReportAlreadyExists
+	// ErrInterpretReportAlreadyExists - 400: Interpret report already exists.
+	ErrInterpretReportAlreadyExists
 
-// ErrInterpretReportInvalid - 400: Interpret report is invalid.
-ErrInterpretReportInvalid
+	// ErrInterpretReportInvalid - 400: Interpret report is invalid.
+	ErrInterpretReportInvalid
 
-// ErrInterpretReportGenerationFailed - 500: Interpret report generation failed.
-ErrInterpretReportGenerationFailed
+	// ErrInterpretReportGenerationFailed - 500: Interpret report generation failed.
+	ErrInterpretReportGenerationFailed
 
-// ErrInterpretItemNotFound - 404: Interpret item not found.
-ErrInterpretItemNotFound
+	// ErrInterpretItemNotFound - 404: Interpret item not found.
+	ErrInterpretItemNotFound
 
-// ErrInterpretItemInvalid - 400: Interpret item is invalid.
-ErrInterpretItemInvalid
+	// ErrInterpretItemInvalid - 400: Interpret item is invalid.
+	ErrInterpretItemInvalid
 )
 
 func init() {

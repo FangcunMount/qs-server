@@ -27,6 +27,12 @@ type EvaluationHandler struct {
 	waiterRegistry      *waiter.WaiterRegistry
 }
 
+type accessibleAssessmentContext struct {
+	ctx          context.Context
+	assessmentID uint64
+	assessment   *assessmentApp.AssessmentResult
+}
+
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
 	managementService assessmentApp.AssessmentManagementService,
@@ -180,30 +186,13 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetScores(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "无效的测评ID", err)
-		return
-	}
-
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	assessmentCtx, err := h.loadAccessibleAssessmentContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	ctx := c.Request.Context()
-	assessmentResult, err := h.managementService.GetByID(ctx, id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.scoreQueryService.GetByAssessmentID(ctx, id)
+	result, err := h.scoreQueryService.GetByAssessmentID(assessmentCtx.ctx, assessmentCtx.assessmentID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -270,30 +259,13 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/high-risk-factors [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "无效的测评ID", err)
-		return
-	}
-
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	assessmentCtx, err := h.loadAccessibleAssessmentContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	ctx := c.Request.Context()
-	assessmentResult, err := h.managementService.GetByID(ctx, id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.scoreQueryService.GetHighRiskFactors(ctx, id)
+	result, err := h.scoreQueryService.GetHighRiskFactors(assessmentCtx.ctx, assessmentCtx.assessmentID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -316,30 +288,13 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetReport(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "无效的测评ID", err)
-		return
-	}
-
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	assessmentCtx, err := h.loadAccessibleAssessmentContext(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	ctx := c.Request.Context()
-	assessmentResult, err := h.managementService.GetByID(ctx, id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.reportQueryService.GetByAssessmentID(ctx, id)
+	result, err := h.reportQueryService.GetByAssessmentID(assessmentCtx.ctx, assessmentCtx.assessmentID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -496,7 +451,7 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/assessments/{id}/wait-report [get]
 func (h *EvaluationHandler) WaitReport(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := h.parseAssessmentID(c)
 	if err != nil {
 		h.BadRequestResponse(c, "无效的测评ID", err)
 		return
@@ -507,146 +462,151 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 		return
 	}
 
-	// 解析超时参数
-	timeoutStr := c.DefaultQuery("timeout", "15")
-	timeoutSeconds, err := strconv.Atoi(timeoutStr)
-	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
-		timeoutSeconds = 15
-	}
-	timeout := time.Duration(timeoutSeconds) * time.Second
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), parseWaitReportTimeout(c.DefaultQuery("timeout", "15")))
 	defer cancel()
 
-	// 1. 先确认 assessment 存在且当前操作者有权访问对应 testee
-	result, err := h.managementService.GetByID(ctx, id)
+	assessmentCtx, err := h.loadAccessibleAssessment(ctx, id, orgID, operatorUserID)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, result.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-	if result.Status == "interpreted" || result.Status == "failed" {
-		var totalScore *float64
-		var riskLevel *string
-		if result.TotalScore != nil {
-			ts := *result.TotalScore
-			totalScore = &ts
-		}
-		if result.RiskLevel != nil {
-			rl := string(*result.RiskLevel)
-			riskLevel = &rl
-		}
-		summary := waiter.StatusSummary{
-			Status:     result.Status,
-			TotalScore: totalScore,
-			RiskLevel:  riskLevel,
-			UpdatedAt:  time.Now().Unix(),
-		}
+	if summary, done := assessmentStatusSummary(assessmentCtx.assessment); done {
 		h.Success(c, summary)
 		return
 	}
 
-	// 2. 如果没有等待队列注册表，降级为短轮询
-	if h.waiterRegistry == nil {
-		// 降级为短轮询：每1秒检查一次
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
+	h.Success(c, h.waitForReportSummary(ctx, id))
+}
 
-		for {
-			select {
-			case <-ctx.Done():
-				// 超时或客户端断开
-				summary := waiter.StatusSummary{
-					Status:    "pending",
-					UpdatedAt: time.Now().Unix(),
-				}
-				h.Success(c, summary)
-				return
+// ============= 辅助方法 =============
 
-			case <-ticker.C:
-				// 定期轮询缓存或数据库
-				result, err := h.managementService.GetByID(ctx, id)
-				if err == nil && result != nil {
-					var totalScore *float64
-					var riskLevel *string
-					if result.TotalScore != nil {
-						ts := *result.TotalScore
-						totalScore = &ts
-					}
-					if result.RiskLevel != nil {
-						rl := string(*result.RiskLevel)
-						riskLevel = &rl
-					}
-					summary := waiter.StatusSummary{
-						Status:     result.Status,
-						TotalScore: totalScore,
-						RiskLevel:  riskLevel,
-						UpdatedAt:  time.Now().Unix(),
-					}
-					if result.Status == "interpreted" || result.Status == "failed" {
-						h.Success(c, summary)
-						return
-					}
-				}
-			}
-		}
+func (h *EvaluationHandler) parseAssessmentID(c *gin.Context) (uint64, error) {
+	return strconv.ParseUint(c.Param("id"), 10, 64)
+}
+
+func (h *EvaluationHandler) loadAccessibleAssessmentContext(c *gin.Context) (*accessibleAssessmentContext, error) {
+	id, err := h.parseAssessmentID(c)
+	if err != nil {
+		return nil, err
+	}
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		return nil, err
+	}
+	return h.loadAccessibleAssessment(c.Request.Context(), id, orgID, operatorUserID)
+}
+
+func (h *EvaluationHandler) loadAccessibleAssessment(ctx context.Context, assessmentID uint64, orgID, operatorUserID int64) (*accessibleAssessmentContext, error) {
+	assessmentResult, err := h.managementService.GetByID(ctx, assessmentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
+		return nil, err
+	}
+	return &accessibleAssessmentContext{
+		ctx:          ctx,
+		assessmentID: assessmentID,
+		assessment:   assessmentResult,
+	}, nil
+}
+
+func parseWaitReportTimeout(raw string) time.Duration {
+	timeoutSeconds, err := strconv.Atoi(raw)
+	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
+		timeoutSeconds = 15
+	}
+	return time.Duration(timeoutSeconds) * time.Second
+}
+
+func assessmentStatusSummary(result *assessmentApp.AssessmentResult) (waiter.StatusSummary, bool) {
+	if result == nil || !isTerminalAssessmentStatus(result.Status) {
+		return waiter.StatusSummary{}, false
+	}
+	return buildAssessmentStatusSummary(result), true
+}
+
+func isTerminalAssessmentStatus(status string) bool {
+	return status == "interpreted" || status == "failed"
+}
+
+func buildAssessmentStatusSummary(result *assessmentApp.AssessmentResult) waiter.StatusSummary {
+	var totalScore *float64
+	if result.TotalScore != nil {
+		value := *result.TotalScore
+		totalScore = &value
 	}
 
-	// 3. 注册到等待队列
-	ch := make(chan waiter.StatusSummary, 1)
-	h.waiterRegistry.Add(id, ch)
-	defer h.waiterRegistry.Remove(id, ch)
+	var riskLevel *string
+	if result.RiskLevel != nil {
+		value := *result.RiskLevel
+		riskLevel = &value
+	}
 
-	// 4. 等待三种情况
-	ticker := time.NewTicker(1 * time.Second)
+	return waiter.StatusSummary{
+		Status:     result.Status,
+		TotalScore: totalScore,
+		RiskLevel:  riskLevel,
+		UpdatedAt:  time.Now().Unix(),
+	}
+}
+
+func pendingAssessmentStatusSummary() waiter.StatusSummary {
+	return waiter.StatusSummary{
+		Status:    "pending",
+		UpdatedAt: time.Now().Unix(),
+	}
+}
+
+func (h *EvaluationHandler) waitForReportSummary(ctx context.Context, assessmentID uint64) waiter.StatusSummary {
+	if h.waiterRegistry == nil {
+		return h.waitForReportByPolling(ctx, assessmentID)
+	}
+	return h.waitForReportWithRegistry(ctx, assessmentID)
+}
+
+func (h *EvaluationHandler) waitForReportByPolling(ctx context.Context, assessmentID uint64) waiter.StatusSummary {
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			// 超时或客户端断开
-			summary := waiter.StatusSummary{
-				Status:    "pending",
-				UpdatedAt: time.Now().Unix(),
-			}
-			h.Success(c, summary)
-			return
-
-		case summary := <-ch:
-			// 收到解读完成通知（由 worker 推送）
-			h.Success(c, summary)
-			return
-
+			return pendingAssessmentStatusSummary()
 		case <-ticker.C:
-			// 定期轮询缓存（兜底，防止通知丢失）
-			result, err := h.managementService.GetByID(ctx, id)
-			if err == nil && result != nil {
-				var totalScore *float64
-				var riskLevel *string
-				if result.TotalScore != nil {
-					ts := *result.TotalScore
-					totalScore = &ts
-				}
-				if result.RiskLevel != nil {
-					rl := string(*result.RiskLevel)
-					riskLevel = &rl
-				}
-				summary := waiter.StatusSummary{
-					Status:     result.Status,
-					TotalScore: totalScore,
-					RiskLevel:  riskLevel,
-					UpdatedAt:  time.Now().Unix(),
-				}
-				if result.Status == "interpreted" || result.Status == "failed" {
-					h.Success(c, summary)
-					return
-				}
+			if summary, done := h.loadTerminalAssessmentSummary(ctx, assessmentID); done {
+				return summary
 			}
 		}
 	}
 }
 
-// ============= 辅助方法 =============
+func (h *EvaluationHandler) waitForReportWithRegistry(ctx context.Context, assessmentID uint64) waiter.StatusSummary {
+	ch := make(chan waiter.StatusSummary, 1)
+	h.waiterRegistry.Add(assessmentID, ch)
+	defer h.waiterRegistry.Remove(assessmentID, ch)
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return pendingAssessmentStatusSummary()
+		case summary := <-ch:
+			return summary
+		case <-ticker.C:
+			if summary, done := h.loadTerminalAssessmentSummary(ctx, assessmentID); done {
+				return summary
+			}
+		}
+	}
+}
+
+func (h *EvaluationHandler) loadTerminalAssessmentSummary(ctx context.Context, assessmentID uint64) (waiter.StatusSummary, bool) {
+	result, err := h.managementService.GetByID(ctx, assessmentID)
+	if err != nil || result == nil {
+		return waiter.StatusSummary{}, false
+	}
+	return assessmentStatusSummary(result)
+}

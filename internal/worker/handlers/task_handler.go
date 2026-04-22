@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
@@ -23,6 +24,15 @@ func notificationMetaFromEnvelope(env *EventEnvelope) port.NotificationMeta {
 	}
 }
 
+type taskNotificationCallbacks[T any] struct {
+	parseErrorLabel     string
+	logMessage          string
+	logFields           func(env *EventEnvelope, data *T) []any
+	notify              func(ctx context.Context, notifier port.TaskNotifier, meta port.NotificationMeta, data *T) error
+	notifyFailureLog    string
+	notifyFailureFields func(data *T) []any
+}
+
 func init() {
 	Register("task_opened_handler", func(deps *Dependencies) HandlerFunc {
 		return handleTaskOpened(deps)
@@ -39,7 +49,7 @@ func init() {
 }
 
 func handleTaskOpened(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		var data domainPlan.TaskOpenedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
@@ -95,107 +105,169 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 }
 
 func handleTaskCompleted(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data domainPlan.TaskCompletedData
-		env, err := ParseEventData(payload, &data)
-		if err != nil {
-			return fmt.Errorf("failed to parse task completed event: %w", err)
-		}
-
-		deps.Logger.Info("processing task completed",
-			slog.String("event_id", env.ID),
-			slog.String("task_id", data.TaskID),
-			slog.String("plan_id", data.PlanID),
-			slog.String("testee_id", data.TesteeID),
-			slog.String("assessment_id", data.AssessmentID),
-			slog.Time("completed_at", data.CompletedAt),
-		)
-
-		if deps.Notifier != nil {
-			if err := deps.Notifier.NotifyTaskCompleted(ctx, notificationMetaFromEnvelope(env), port.TaskCompletedNotification{
-				TaskID:       data.TaskID,
-				PlanID:       data.PlanID,
-				TesteeID:     data.TesteeID,
-				AssessmentID: data.AssessmentID,
-				CompletedAt:  data.CompletedAt,
-			}); err != nil {
-				deps.Logger.Warn("failed to notify task completed",
+	return func(ctx context.Context, _ string, payload []byte) error {
+		return handleTaskNotificationEvent(ctx, deps, payload, taskNotificationCallbacks[domainPlan.TaskCompletedData]{
+			parseErrorLabel: "task completed event",
+			logMessage:      "processing task completed",
+			logFields: func(env *EventEnvelope, data *domainPlan.TaskCompletedData) []any {
+				return []any{
+					slog.String("event_id", env.ID),
+					slog.String("task_id", data.TaskID),
+					slog.String("plan_id", data.PlanID),
+					slog.String("testee_id", data.TesteeID),
+					slog.String("assessment_id", data.AssessmentID),
+					slog.Time("completed_at", data.CompletedAt),
+				}
+			},
+			notify: func(ctx context.Context, notifier port.TaskNotifier, meta port.NotificationMeta, data *domainPlan.TaskCompletedData) error {
+				return notifier.NotifyTaskCompleted(ctx, meta, port.TaskCompletedNotification{
+					TaskID:       data.TaskID,
+					PlanID:       data.PlanID,
+					TesteeID:     data.TesteeID,
+					AssessmentID: data.AssessmentID,
+					CompletedAt:  data.CompletedAt,
+				})
+			},
+			notifyFailureLog: "failed to notify task completed",
+			notifyFailureFields: func(data *domainPlan.TaskCompletedData) []any {
+				return []any{
 					slog.String("task_id", data.TaskID),
 					slog.String("testee_id", data.TesteeID),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
-
-		return nil
+				}
+			},
+		})
 	}
 }
 
 func handleTaskExpired(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data domainPlan.TaskExpiredData
-		env, err := ParseEventData(payload, &data)
-		if err != nil {
-			return fmt.Errorf("failed to parse task expired event: %w", err)
-		}
-
-		deps.Logger.Info("processing task expired",
-			slog.String("event_id", env.ID),
-			slog.String("task_id", data.TaskID),
-			slog.String("plan_id", data.PlanID),
-			slog.String("testee_id", data.TesteeID),
-			slog.Time("expired_at", data.ExpiredAt),
-		)
-
-		if deps.Notifier != nil {
-			if err := deps.Notifier.NotifyTaskExpired(ctx, notificationMetaFromEnvelope(env), port.TaskExpiredNotification{
-				TaskID:    data.TaskID,
-				PlanID:    data.PlanID,
-				TesteeID:  data.TesteeID,
-				ExpiredAt: data.ExpiredAt,
-			}); err != nil {
-				deps.Logger.Warn("failed to notify task expired",
-					slog.String("task_id", data.TaskID),
-					slog.String("testee_id", data.TesteeID),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
-
-		return nil
-	}
+	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[domainPlan.TaskExpiredData]{
+		parseErrorLabel:  "task expired event",
+		logMessage:       "processing task expired",
+		timeFieldName:    "expired_at",
+		taskID:           taskExpiredID,
+		planID:           taskExpiredPlanID,
+		testeeID:         taskExpiredTesteeID,
+		timestamp:        taskExpiredAt,
+		notify:           notifyTaskExpired,
+		notifyFailureLog: "failed to notify task expired",
+	})
 }
 
 func handleTaskCanceled(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data domainPlan.TaskCanceledData
-		env, err := ParseEventData(payload, &data)
-		if err != nil {
-			return fmt.Errorf("failed to parse task canceled event: %w", err)
-		}
+	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[domainPlan.TaskCanceledData]{
+		parseErrorLabel:  "task canceled event",
+		logMessage:       "processing task canceled",
+		timeFieldName:    "canceled_at",
+		taskID:           taskCanceledID,
+		planID:           taskCanceledPlanID,
+		testeeID:         taskCanceledTesteeID,
+		timestamp:        taskCanceledAt,
+		notify:           notifyTaskCanceled,
+		notifyFailureLog: "failed to notify task canceled",
+	})
+}
 
-		deps.Logger.Info("processing task canceled",
-			slog.String("event_id", env.ID),
-			slog.String("task_id", data.TaskID),
-			slog.String("plan_id", data.PlanID),
-			slog.String("testee_id", data.TesteeID),
-			slog.Time("canceled_at", data.CanceledAt),
-		)
+func taskExpiredID(data *domainPlan.TaskExpiredData) string       { return data.TaskID }
+func taskExpiredPlanID(data *domainPlan.TaskExpiredData) string   { return data.PlanID }
+func taskExpiredTesteeID(data *domainPlan.TaskExpiredData) string { return data.TesteeID }
+func taskExpiredAt(data *domainPlan.TaskExpiredData) time.Time    { return data.ExpiredAt }
 
-		if deps.Notifier != nil {
-			if err := deps.Notifier.NotifyTaskCanceled(ctx, notificationMetaFromEnvelope(env), port.TaskCanceledNotification{
-				TaskID:     data.TaskID,
-				PlanID:     data.PlanID,
-				TesteeID:   data.TesteeID,
-				CanceledAt: data.CanceledAt,
-			}); err != nil {
-				deps.Logger.Warn("failed to notify task canceled",
-					slog.String("task_id", data.TaskID),
-					slog.String("testee_id", data.TesteeID),
-					slog.String("error", err.Error()),
-				)
-			}
-		}
+func notifyTaskExpired(
+	ctx context.Context,
+	notifier port.TaskNotifier,
+	meta port.NotificationMeta,
+	data *domainPlan.TaskExpiredData,
+) error {
+	return notifier.NotifyTaskExpired(ctx, meta, port.TaskExpiredNotification{
+		TaskID:    data.TaskID,
+		PlanID:    data.PlanID,
+		TesteeID:  data.TesteeID,
+		ExpiredAt: data.ExpiredAt,
+	})
+}
+
+func taskCanceledID(data *domainPlan.TaskCanceledData) string       { return data.TaskID }
+func taskCanceledPlanID(data *domainPlan.TaskCanceledData) string   { return data.PlanID }
+func taskCanceledTesteeID(data *domainPlan.TaskCanceledData) string { return data.TesteeID }
+func taskCanceledAt(data *domainPlan.TaskCanceledData) time.Time    { return data.CanceledAt }
+
+func notifyTaskCanceled(
+	ctx context.Context,
+	notifier port.TaskNotifier,
+	meta port.NotificationMeta,
+	data *domainPlan.TaskCanceledData,
+) error {
+	return notifier.NotifyTaskCanceled(ctx, meta, port.TaskCanceledNotification{
+		TaskID:     data.TaskID,
+		PlanID:     data.PlanID,
+		TesteeID:   data.TesteeID,
+		CanceledAt: data.CanceledAt,
+	})
+}
+
+func handleTaskNotificationEvent[T any](
+	ctx context.Context,
+	deps *Dependencies,
+	payload []byte,
+	callbacks taskNotificationCallbacks[T],
+) error {
+	data := new(T)
+	env, err := ParseEventData(payload, data)
+	if err != nil {
+		return fmt.Errorf("failed to parse %s: %w", callbacks.parseErrorLabel, err)
+	}
+
+	deps.Logger.Info(callbacks.logMessage, callbacks.logFields(env, data)...)
+	if deps.Notifier == nil {
 		return nil
+	}
+
+	if err := callbacks.notify(ctx, deps.Notifier, notificationMetaFromEnvelope(env), data); err != nil {
+		fields := callbacks.notifyFailureFields(data)
+		fields = append(fields, slog.String("error", err.Error()))
+		deps.Logger.Warn(callbacks.notifyFailureLog, fields...)
+	}
+
+	return nil
+}
+
+type taskTimedNotificationCallbacks[T any] struct {
+	parseErrorLabel  string
+	logMessage       string
+	timeFieldName    string
+	taskID           func(data *T) string
+	planID           func(data *T) string
+	testeeID         func(data *T) string
+	timestamp        func(data *T) time.Time
+	notify           func(ctx context.Context, notifier port.TaskNotifier, meta port.NotificationMeta, data *T) error
+	notifyFailureLog string
+}
+
+func handleTimedTaskNotificationHandler[T any](
+	deps *Dependencies,
+	callbacks taskTimedNotificationCallbacks[T],
+) HandlerFunc {
+	return func(ctx context.Context, _ string, payload []byte) error {
+		return handleTaskNotificationEvent(ctx, deps, payload, taskNotificationCallbacks[T]{
+			parseErrorLabel: callbacks.parseErrorLabel,
+			logMessage:      callbacks.logMessage,
+			logFields: func(env *EventEnvelope, data *T) []any {
+				return []any{
+					slog.String("event_id", env.ID),
+					slog.String("task_id", callbacks.taskID(data)),
+					slog.String("plan_id", callbacks.planID(data)),
+					slog.String("testee_id", callbacks.testeeID(data)),
+					slog.Time(callbacks.timeFieldName, callbacks.timestamp(data)),
+				}
+			},
+			notify:           callbacks.notify,
+			notifyFailureLog: callbacks.notifyFailureLog,
+			notifyFailureFields: func(data *T) []any {
+				return []any{
+					slog.String("task_id", callbacks.taskID(data)),
+					slog.String("testee_id", callbacks.testeeID(data)),
+				}
+			},
+		})
 	}
 }

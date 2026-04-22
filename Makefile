@@ -23,6 +23,10 @@ GO := go
 GO_BUILD := $(GO) build
 GO_TEST := $(GO) test
 GO_LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
+GOLANGCI_LINT_VERSION := v2.1.6
+GOVULNCHECK_VERSION := v1.1.4
+GOSEC_VERSION := v2.22.3
+GO_VERSION := 1.24.13
 
 # 目录结构
 BIN_DIR := bin
@@ -30,6 +34,16 @@ TMP_DIR := tmp
 PID_DIR := $(TMP_DIR)/pids
 LOG_DIR := logs
 COVERAGE_DIR := coverage
+SECURITY_DIR := $(TMP_DIR)/security
+MAINTAINABILITY_DIR := $(TMP_DIR)/maintainability
+QUALITY_DIR := scripts/quality
+
+GOSEC_BASE_ARGS := -exclude-generated \
+	-exclude-dir=internal/apiserver/docs \
+	-exclude-dir=internal/collection-server/docs \
+	-exclude-dir=internal/apiserver/interface/grpc/proto \
+	-severity=medium \
+	-confidence=medium
 
 # 服务配置
 APISERVER_BIN := $(BIN_DIR)/qs-apiserver
@@ -80,9 +94,10 @@ COLOR_RED := \033[31m
 .PHONY: dev dev-apiserver dev-collection dev-worker dev-stop dev-status dev-logs
 .PHONY: test test-unit test-coverage test-race test-bench test-all
 .PHONY: test-submit test-message-queue
-.PHONY: lint fmt fmt-check
+.PHONY: lint fmt fmt-check maintainability-lint maintainability-lint-ci tier1-test-policy
+.PHONY: security security-govulncheck security-govulncheck-ci security-gosec security-gosec-ci
 .PHONY: deps deps-download deps-tidy deps-verify deps-check
-.PHONY: install-tools install-air create-dirs
+.PHONY: install-tools install-air install-golangci-lint install-security-tools install-govulncheck install-gosec create-dirs
 .PHONY: up down re st log
 .PHONY: quick-start
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
@@ -112,7 +127,7 @@ help: ## 显示帮助信息
 	@grep -E '^check.*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(COLOR_BOLD)🛠️  开发工具:$(COLOR_RESET)"
-	@grep -E '^(dev|test|lint|fmt).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
+	@grep -E '^(dev|test|lint|fmt|security).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(COLOR_BOLD)📚 其他命令:$(COLOR_RESET)"
 	@grep -E '^(deps|install|clean|version|debug|up|down|quick|docs).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
@@ -574,12 +589,39 @@ test-submit: ## 测试答卷提交
 
 lint: ## 运行代码检查
 	@echo "$(COLOR_CYAN)🔍 运行代码检查...$(COLOR_RESET)"
-	@if command -v golangci-lint > /dev/null 2>&1; then \
-		golangci-lint run --timeout=5m ./...; \
-	else \
-		echo "$(COLOR_YELLOW)⚠️  golangci-lint 未安装，使用 go vet$(COLOR_RESET)"; \
-		$(GO) vet ./...; \
+	@if ! command -v golangci-lint > /dev/null 2>&1; then \
+		echo "$(COLOR_RED)❌ golangci-lint 未安装，请先运行 'make install-golangci-lint' 或 'make install-tools'$(COLOR_RESET)"; \
+		exit 1; \
 	fi
+	@golangci-lint run --timeout=5m
+
+maintainability-lint: ## 运行 maintainability advisory 检查
+	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查...$(COLOR_RESET)"
+	@if ! command -v golangci-lint > /dev/null 2>&1; then \
+		echo "$(COLOR_RED)❌ golangci-lint 未安装，请先运行 'make install-golangci-lint' 或 'make install-tools'$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@mkdir -p "$(MAINTAINABILITY_DIR)"
+	@golangci-lint run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
+		--output.text.path "$(MAINTAINABILITY_DIR)/maintainability.txt" \
+		--output.json.path "$(MAINTAINABILITY_DIR)/maintainability.json"
+	@cat "$(MAINTAINABILITY_DIR)/maintainability.txt"
+
+maintainability-lint-ci: ## 运行 maintainability advisory 检查并导出报告
+	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查（CI）...$(COLOR_RESET)"
+	@if ! command -v golangci-lint > /dev/null 2>&1; then \
+		echo "$(COLOR_RED)❌ golangci-lint 未安装，请先运行 'make install-golangci-lint' 或 'make install-tools'$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@mkdir -p "$(MAINTAINABILITY_DIR)"
+	@golangci-lint run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
+		--output.text.path "$(MAINTAINABILITY_DIR)/maintainability.txt" \
+		--output.json.path "$(MAINTAINABILITY_DIR)/maintainability.json"
+	@echo "$(COLOR_GREEN)✅ maintainability 报告已写入 $(MAINTAINABILITY_DIR)$(COLOR_RESET)"
+
+tier1-test-policy: ## 校验 Tier 1 包修改必须伴随同包测试变更
+	@echo "$(COLOR_CYAN)🧪 校验 Tier 1 包测试策略...$(COLOR_RESET)"
+	@"$(CURDIR)/$(QUALITY_DIR)/check_tier1_tests.sh"
 
 fmt: ## 格式化代码
 	@echo "$(COLOR_CYAN)✨ 格式化代码...$(COLOR_RESET)"
@@ -596,6 +638,64 @@ fmt-check: ## 检查代码格式
 	else \
 		echo "$(COLOR_GREEN)✅ 代码格式正确$(COLOR_RESET)"; \
 	fi
+
+security: security-govulncheck security-gosec ## 运行安全扫描
+
+security-govulncheck: ## 运行依赖漏洞扫描
+	@echo "$(COLOR_CYAN)🔐 运行 govulncheck...$(COLOR_RESET)"
+	@mkdir -p "$(SECURITY_DIR)"
+	@tool="$$(command -v govulncheck 2>/dev/null || printf '%s\n' '$(CURDIR)/$(BIN_DIR)/govulncheck')"; \
+	if [ ! -x "$$tool" ]; then \
+		echo "$(COLOR_RED)❌ govulncheck 未安装，请先运行 'make install-security-tools'$(COLOR_RESET)"; \
+		exit 1; \
+	fi; \
+	status=0; \
+	(cd "$(CURDIR)/cmd/collection-server" && "$$tool" -scan=module > "$(CURDIR)/$(SECURITY_DIR)/govulncheck.txt" 2>&1) || status=$$?; \
+	cat "$(SECURITY_DIR)/govulncheck.txt"; \
+	exit $$status
+
+security-govulncheck-ci: ## 运行依赖漏洞扫描并导出 JSON 报告（CI advisory）
+	@echo "$(COLOR_CYAN)🔐 运行 govulncheck（CI advisory）...$(COLOR_RESET)"
+	@mkdir -p "$(SECURITY_DIR)"
+	@tool="$$(command -v govulncheck 2>/dev/null || printf '%s\n' '$(CURDIR)/$(BIN_DIR)/govulncheck')"; \
+	if [ ! -x "$$tool" ]; then \
+		echo "$(COLOR_RED)❌ govulncheck 未安装，请先运行 'make install-security-tools'$(COLOR_RESET)"; \
+		exit 1; \
+	fi; \
+	status=0; \
+	(cd "$(CURDIR)/cmd/collection-server" && "$$tool" -format json -scan=module > "$(CURDIR)/$(SECURITY_DIR)/govulncheck.json") || status=$$?; \
+	if [ $$status -ne 0 ] && [ $$status -ne 3 ]; then \
+		exit $$status; \
+	fi; \
+	if grep -q '"osv": {' "$(SECURITY_DIR)/govulncheck.json"; then \
+		echo "$(COLOR_YELLOW)⚠️ govulncheck 发现已知漏洞，报告已写入 $(SECURITY_DIR)/govulncheck.json$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_GREEN)✅ govulncheck 未发现已知漏洞$(COLOR_RESET)"; \
+	fi
+
+security-gosec: ## 运行 gosec 静态安全扫描
+	@echo "$(COLOR_CYAN)🔐 运行 gosec...$(COLOR_RESET)"
+	@mkdir -p "$(SECURITY_DIR)"
+	@tool="$$(command -v gosec 2>/dev/null || printf '%s\n' '$(CURDIR)/$(BIN_DIR)/gosec')"; \
+	if [ ! -x "$$tool" ]; then \
+		echo "$(COLOR_RED)❌ gosec 未安装，请先运行 'make install-security-tools'$(COLOR_RESET)"; \
+		exit 1; \
+	fi; \
+	status=0; \
+	"$$tool" $(GOSEC_BASE_ARGS) ./... > "$(SECURITY_DIR)/gosec.txt" 2>&1 || status=$$?; \
+	cat "$(SECURITY_DIR)/gosec.txt"; \
+	exit $$status
+
+security-gosec-ci: ## 运行 gosec 并导出 SARIF 报告（CI advisory）
+	@echo "$(COLOR_CYAN)🔐 运行 gosec（CI advisory）...$(COLOR_RESET)"
+	@mkdir -p "$(SECURITY_DIR)"
+	@tool="$$(command -v gosec 2>/dev/null || printf '%s\n' '$(CURDIR)/$(BIN_DIR)/gosec')"; \
+	if [ ! -x "$$tool" ]; then \
+		echo "$(COLOR_RED)❌ gosec 未安装，请先运行 'make install-security-tools'$(COLOR_RESET)"; \
+		exit 1; \
+	fi; \
+	"$$tool" $(GOSEC_BASE_ARGS) -quiet -no-fail -fmt sarif -out "$(SECURITY_DIR)/gosec.sarif" ./...
+	@echo "$(COLOR_GREEN)✅ gosec 报告已写入 $(SECURITY_DIR)/gosec.sarif$(COLOR_RESET)"
 
 # ============================================================================
 # 依赖管理
@@ -632,11 +732,30 @@ install-tools: ## 安装开发工具
 	@echo "$(COLOR_CYAN)📦 安装开发工具...$(COLOR_RESET)"
 	@echo "安装 Air (热更新)..."
 	@$(GO) install github.com/air-verse/air@latest
+	@echo "安装 golangci-lint ($(GOLANGCI_LINT_VERSION))..."
+	@$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "$(COLOR_GREEN)✅ 工具安装完成$(COLOR_RESET)"
 
 install-air: ## 安装 Air 热更新工具
 	@echo "📦 安装 Air..."
 	@$(GO) install github.com/air-verse/air@latest
+
+install-golangci-lint: ## 安装 golangci-lint
+	@echo "📦 安装 golangci-lint ($(GOLANGCI_LINT_VERSION))..."
+	@$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+install-security-tools: install-govulncheck install-gosec ## 安装安全扫描工具
+	@echo "$(COLOR_GREEN)✅ 安全扫描工具安装完成$(COLOR_RESET)"
+
+install-govulncheck: ## 安装 govulncheck
+	@echo "📦 安装 govulncheck ($(GOVULNCHECK_VERSION))..."
+	@$(MAKE) create-dirs
+	@GOBIN="$(CURDIR)/$(BIN_DIR)" $(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+
+install-gosec: ## 安装 gosec
+	@echo "📦 安装 gosec ($(GOSEC_VERSION))..."
+	@$(MAKE) create-dirs
+	@GOBIN="$(CURDIR)/$(BIN_DIR)" $(GO) install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
 # ============================================================================
 # 清理和维护

@@ -4,7 +4,10 @@ import (
 	"context"
 	"time"
 
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 // ==================== 应用服务接口 ====================
@@ -49,6 +52,37 @@ type ReadService interface {
 // PeriodicStatsService 受试者周期性统计服务。
 type PeriodicStatsService interface {
 	GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*statistics.TesteePeriodicStatisticsResponse, error)
+}
+
+// GovernanceFacade 统计治理入口 facade。
+type GovernanceFacade interface {
+	TriggerStatisticsWarmup(ctx context.Context, orgID int64, action string)
+	HandleRepairComplete(ctx context.Context, protectedOrgID int64, req RepairCompleteRequest) error
+	HandleManualWarmup(ctx context.Context, protectedOrgID int64, req ManualWarmupRequest) (*cachegov.ManualWarmupResult, error)
+	GetStatus(ctx context.Context) (*cachegov.StatusSnapshot, error)
+	GetHotset(ctx context.Context, kindRaw, limitRaw string) (*GovernanceHotsetResponse, error)
+}
+
+// RepairCompleteRequest 描述 repair complete 治理请求。
+type RepairCompleteRequest struct {
+	RepairKind         string   `json:"repair_kind"`
+	OrgIDs             []int64  `json:"org_ids"`
+	QuestionnaireCodes []string `json:"questionnaire_codes"`
+	PlanIDs            []uint64 `json:"plan_ids"`
+}
+
+// ManualWarmupRequest 描述手工治理预热请求。
+type ManualWarmupRequest = cachegov.ManualWarmupRequest
+
+// GovernanceHotsetResponse 描述治理热集响应。
+type GovernanceHotsetResponse struct {
+	Family    redisplane.Family       `json:"family,omitempty"`
+	Kind      cacheinfra.WarmupKind   `json:"kind,omitempty"`
+	Limit     int64                   `json:"limit,omitempty"`
+	Available bool                    `json:"available"`
+	Degraded  bool                    `json:"degraded"`
+	Message   string                  `json:"message,omitempty"`
+	Items     []cacheinfra.HotsetItem `json:"items"`
 }
 
 // SyncDailyOptions 每日统计同步窗口。

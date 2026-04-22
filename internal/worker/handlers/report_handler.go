@@ -17,7 +17,7 @@ func init() {
 }
 
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		var data domainReport.ReportGeneratedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {

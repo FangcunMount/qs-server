@@ -1,0 +1,37 @@
+version: "2"
+
+run:
+  timeout: 8m
+
+linters:
+  default: none
+  enable:
+    - dupl
+    - gocyclo
+    - revive
+  settings:
+    dupl:
+      threshold: 150
+    gocyclo:
+      min-complexity: 20
+    revive:
+      rules:
+        - name: duplicated-imports
+        - name: empty-block
+        - name: error-return
+        - name: error-strings
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unused-parameter
+        - name: var-declaration
+  exclusions:
+    paths:
+      - internal/apiserver/docs
+      - internal/collection-server/docs
+      - internal/apiserver/interface/grpc/proto
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

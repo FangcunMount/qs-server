@@ -14,7 +14,7 @@ func init() {
 }
 
 func handleScaleChanged(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[domainScale.ScaleChangedData]{
 			parseErrorLabel: "scale changed event",
 			action: func(data *domainScale.ScaleChangedData) string {

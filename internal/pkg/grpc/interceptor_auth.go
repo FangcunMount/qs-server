@@ -187,33 +187,33 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 	claims := result.Claims
 
 	// 注入用户信息到 context，供后续业务逻辑使用
-	ctx = context.WithValue(ctx, "user_id", claims.UserID)
-	ctx = context.WithValue(ctx, "account_id", claims.AccountID)
-	ctx = context.WithValue(ctx, "tenant_id", claims.TenantID)
-	ctx = context.WithValue(ctx, "session_id", claims.SessionID)
-	ctx = context.WithValue(ctx, "token_id", claims.TokenID)
+	ctx = context.WithValue(ctx, authContextKeyUserID, claims.UserID)
+	ctx = context.WithValue(ctx, authContextKeyAccountID, claims.AccountID)
+	ctx = context.WithValue(ctx, authContextKeyTenantID, claims.TenantID)
+	ctx = context.WithValue(ctx, authContextKeySessionID, claims.SessionID)
+	ctx = context.WithValue(ctx, authContextKeyTokenID, claims.TokenID)
 
 	// 注入角色
 	if len(claims.Roles) > 0 {
-		ctx = context.WithValue(ctx, "roles", claims.Roles)
+		ctx = context.WithValue(ctx, authContextKeyRoles, claims.Roles)
 	}
 
 	// 注入认证方式
 	if len(claims.AMR) > 0 {
-		ctx = context.WithValue(ctx, "amr", claims.AMR)
+		ctx = context.WithValue(ctx, authContextKeyAMR, claims.AMR)
 	}
 
 	// 注入自定义声明（Extra）
 	if claims.Extra != nil {
-		ctx = context.WithValue(ctx, "custom_claims", claims.Extra)
+		ctx = context.WithValue(ctx, authContextKeyCustomClaims, claims.Extra)
 		// 从 Extra 中提取 username（如果存在）
 		if username, ok := claims.Extra["username"].(string); ok {
-			ctx = context.WithValue(ctx, "username", username)
+			ctx = context.WithValue(ctx, authContextKeyUsername, username)
 		}
 	}
 
 	if result.Metadata != nil {
-		ctx = context.WithValue(ctx, "token_metadata", result.Metadata)
+		ctx = context.WithValue(ctx, authContextKeyTokenMeta, result.Metadata)
 	}
 
 	return ctx

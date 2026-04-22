@@ -281,13 +281,13 @@ func addCmdTemplate(cmd *cobra.Command, namedFlagSets cliflag.NamedFlagSets) {
 	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
+		_, _ = fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
 
 		return nil
 	})
 	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
 }
@@ -328,7 +328,7 @@ func printViperConfig(envPrefix string) {
 
 // buildEnvPrefix 根据 basename 生成环境变量前缀
 func buildEnvPrefix(basename string) string {
-	return strings.Replace(strings.ToUpper(basename), "-", "_", -1)
+	return strings.ReplaceAll(strings.ToUpper(basename), "-", "_")
 }
 
 // applyLegacyNSQEnvOverrides 兼容 CICD 使用的 NSQ 主机/端口环境变量，自动拼接为 nsq-addr/nsq-lookupd-addr

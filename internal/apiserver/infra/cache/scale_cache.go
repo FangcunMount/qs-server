@@ -63,7 +63,10 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 	if r.client != nil {
 		if err := r.setCache(ctx, domain.GetCode().String(), domain); err != nil {
 			// 缓存写入失败不影响创建，仅记录日志
-			// 这里不返回错误，因为业务已成功
+			logger.L(ctx).Warnw("failed to populate scale cache after create",
+				"code", domain.GetCode().String(),
+				"error", err,
+			)
 		}
 	}
 
@@ -112,7 +115,10 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 	// 更新成功后失效缓存
 	if r.client != nil {
 		if err := r.deleteCache(ctx, oldCode); err != nil {
-			// 缓存删除失败不影响更新
+			logger.L(ctx).Warnw("failed to invalidate scale cache after update",
+				"code", oldCode,
+				"error", err,
+			)
 		}
 	}
 
@@ -128,7 +134,10 @@ func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
 	// 删除成功后失效缓存
 	if r.client != nil {
 		if err := r.deleteCache(ctx, code); err != nil {
-			// 缓存删除失败不影响删除
+			logger.L(ctx).Warnw("failed to invalidate scale cache after remove",
+				"code", code,
+				"error", err,
+			)
 		}
 	}
 

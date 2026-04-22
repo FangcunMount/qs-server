@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -22,21 +23,15 @@ type taskSchedulerService struct {
 	taskRepo       plan.AssessmentTaskRepository
 	planRepo       plan.AssessmentPlanRepository
 	taskLifecycle  *plan.TaskLifecycle
-	entryGenerator EntryGenerator // 入口生成器（由基础设施层实现）
+	entryGenerator planentryport.Generator // 入口生成器（由基础设施层实现）
 	eventPublisher event.EventPublisher
-}
-
-// EntryGenerator 入口生成器接口
-// 由基础设施层实现，负责生成测评入口（token、URL）
-type EntryGenerator interface {
-	GenerateEntry(ctx context.Context, task *plan.AssessmentTask) (token string, url string, expireAt time.Time, err error)
 }
 
 // NewTaskSchedulerService 创建任务调度服务
 func NewTaskSchedulerService(
 	taskRepo plan.AssessmentTaskRepository,
 	planRepo plan.AssessmentPlanRepository,
-	entryGenerator EntryGenerator,
+	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
 ) TaskSchedulerService {
 	taskLifecycle := plan.NewTaskLifecycle()

@@ -172,7 +172,9 @@ func DecompressData(data []byte) []byte {
 	if err != nil {
 		return data
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 	out, err := io.ReadAll(r)
 	if err != nil {
 		return data

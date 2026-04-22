@@ -166,147 +166,17 @@ func (s *statisticsService) GetScaleAnalysis(ctx context.Context, testeeID uint6
 // 场景：查看受试者在周期性干预项目中的完成进度
 // 用于监控长期干预计划的执行情况
 func (s *statisticsService) GetPeriodicStats(ctx context.Context, testeeID uint64) (*PeriodicStatsResult, error) {
-	// 1. 验证受试者是否存在
-	testee, err := s.testeeRepo.FindByID(ctx, domain.ID(testeeID))
+	testeeItem, err := s.loadTestee(ctx, testeeID)
 	if err != nil {
-		if errors.IsCode(err, code.ErrUserNotFound) {
-			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
-		}
-		return nil, errors.Wrap(err, "failed to find testee")
+		return nil, err
 	}
 
-	// 2. 查询受试者的所有测评记录
-	pagination := assessment.NewPagination(1, 1000)
-	assessments, _, err := s.assessmentRepo.FindByTesteeID(ctx, testee.ID(), pagination)
+	assessments, err := s.loadAssessments(ctx, testeeItem.ID())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find assessments")
+		return nil, err
 	}
 
-	// 3. 按来源为 plan 的测评进行分组
-	// key: planID, value: 测评列表
-	planMap := make(map[string][]*assessment.Assessment)
-
-	for _, a := range assessments {
-		// 只处理来源为计划的测评
-		if a.Origin().Type() == assessment.OriginPlan {
-			planID := a.Origin().ID()
-			if planID != nil {
-				planMap[*planID] = append(planMap[*planID], a)
-			}
-		}
-	}
-
-	// 4. 构建周期性项目统计
-	projects := make([]PeriodicProjectStats, 0, len(planMap))
-	activeCount := 0
-
-	for planID, planAssessments := range planMap {
-		// 按时间排序
-		sort.Slice(planAssessments, func(i, j int) bool {
-			if planAssessments[i].SubmittedAt() == nil {
-				return false
-			}
-			if planAssessments[j].SubmittedAt() == nil {
-				return true
-			}
-			return planAssessments[i].SubmittedAt().Before(*planAssessments[j].SubmittedAt())
-		})
-
-		// 统计完成情况
-		completedCount := 0
-		for _, a := range planAssessments {
-			if a.Status() == assessment.StatusInterpreted {
-				completedCount++
-			}
-		}
-
-		totalWeeks := len(planAssessments)
-		completionRate := 0.0
-		if totalWeeks > 0 {
-			completionRate = float64(completedCount) / float64(totalWeeks) * 100
-		}
-
-		// 判断是否活跃（有未完成的任务）
-		isActive := completedCount < totalWeeks
-		if isActive {
-			activeCount++
-		}
-
-		// 获取项目信息（从第一个测评中获取）
-		var scaleName string
-		if len(planAssessments) > 0 && planAssessments[0].HasMedicalScale() {
-			scaleName = planAssessments[0].MedicalScaleRef().Name()
-		}
-
-		// 构建任务列表
-		tasks := make([]PeriodicTask, 0, len(planAssessments))
-		var startDate, endDate *time.Time
-
-		for i, a := range planAssessments {
-			task := PeriodicTask{
-				Week: i + 1, // 周次从1开始
-			}
-
-			// 设置状态
-			if a.Status() == assessment.StatusInterpreted {
-				task.Status = "completed"
-				task.CompletedAt = a.InterpretedAt()
-			} else if a.Status() == assessment.StatusFailed {
-				task.Status = "overdue" // 失败的视为超时
-			} else {
-				task.Status = "pending"
-			}
-
-			// 设置测评ID
-			if a.Status() == assessment.StatusInterpreted {
-				assessmentID := uint64(a.ID())
-				task.AssessmentID = &assessmentID
-			}
-
-			// 设置提交时间作为截止时间参考
-			if a.SubmittedAt() != nil {
-				task.DueDate = a.SubmittedAt()
-			}
-
-			// 记录开始和结束日期
-			if a.SubmittedAt() != nil {
-				if startDate == nil || a.SubmittedAt().Before(*startDate) {
-					startDate = a.SubmittedAt()
-				}
-				if endDate == nil || a.SubmittedAt().After(*endDate) {
-					endDate = a.SubmittedAt()
-				}
-			}
-
-			tasks = append(tasks, task)
-		}
-
-		// 计算当前应完成的周次（基于时间推算）
-		currentWeek := completedCount + 1
-		if currentWeek > totalWeeks {
-			currentWeek = totalWeeks
-		}
-
-		project := PeriodicProjectStats{
-			ProjectID:      0, // TODO: 需要从 plan 领域获取真实的项目ID
-			ProjectName:    planID,
-			ScaleName:      scaleName,
-			TotalWeeks:     totalWeeks,
-			CompletedWeeks: completedCount,
-			CompletionRate: completionRate,
-			CurrentWeek:    currentWeek,
-			Tasks:          tasks,
-			StartDate:      startDate,
-			EndDate:        endDate,
-		}
-
-		projects = append(projects, project)
-	}
-
-	// 按项目名称排序
-	sort.Slice(projects, func(i, j int) bool {
-		return projects[i].ProjectName < projects[j].ProjectName
-	})
+	projects, activeCount := buildPeriodicProjects(groupAssessmentsByPlan(assessments))
 
 	return &PeriodicStatsResult{
 		TesteeID:       testeeID,
@@ -314,4 +184,174 @@ func (s *statisticsService) GetPeriodicStats(ctx context.Context, testeeID uint6
 		TotalProjects:  len(projects),
 		ActiveProjects: activeCount,
 	}, nil
+}
+
+func (s *statisticsService) loadTestee(ctx context.Context, testeeID uint64) (*domain.Testee, error) {
+	testeeItem, err := s.testeeRepo.FindByID(ctx, domain.ID(testeeID))
+	if err != nil {
+		if errors.IsCode(err, code.ErrUserNotFound) {
+			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
+		}
+		return nil, errors.Wrap(err, "failed to find testee")
+	}
+	return testeeItem, nil
+}
+
+func (s *statisticsService) loadAssessments(ctx context.Context, testeeID domain.ID) ([]*assessment.Assessment, error) {
+	pagination := assessment.NewPagination(1, 1000)
+	assessments, _, err := s.assessmentRepo.FindByTesteeID(ctx, testeeID, pagination)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find assessments")
+	}
+	return assessments, nil
+}
+
+func groupAssessmentsByPlan(items []*assessment.Assessment) map[string][]*assessment.Assessment {
+	planMap := make(map[string][]*assessment.Assessment)
+	for _, item := range items {
+		if item == nil || item.Origin().Type() != assessment.OriginPlan {
+			continue
+		}
+		planID := item.Origin().ID()
+		if planID == nil || *planID == "" {
+			continue
+		}
+		planMap[*planID] = append(planMap[*planID], item)
+	}
+	return planMap
+}
+
+func buildPeriodicProjects(planMap map[string][]*assessment.Assessment) ([]PeriodicProjectStats, int) {
+	projects := make([]PeriodicProjectStats, 0, len(planMap))
+	activeCount := 0
+
+	for planID, planAssessments := range planMap {
+		project, isActive := buildPeriodicProject(planID, planAssessments)
+		if isActive {
+			activeCount++
+		}
+		projects = append(projects, project)
+	}
+
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].ProjectName < projects[j].ProjectName
+	})
+	return projects, activeCount
+}
+
+func buildPeriodicProject(planID string, planAssessments []*assessment.Assessment) (PeriodicProjectStats, bool) {
+	sortAssessmentsBySubmittedAt(planAssessments)
+
+	completedCount := countCompletedAssessments(planAssessments)
+	tasks, startDate, endDate := buildPeriodicTasks(planAssessments)
+	totalWeeks := len(planAssessments)
+
+	return PeriodicProjectStats{
+		ProjectID:      0, // TODO: 需要从 plan 领域获取真实的项目ID
+		ProjectName:    planID,
+		ScaleName:      periodicScaleName(planAssessments),
+		TotalWeeks:     totalWeeks,
+		CompletedWeeks: completedCount,
+		CompletionRate: calculateCompletionRate(completedCount, totalWeeks),
+		CurrentWeek:    calculateCurrentWeek(completedCount, totalWeeks),
+		Tasks:          tasks,
+		StartDate:      startDate,
+		EndDate:        endDate,
+	}, completedCount < totalWeeks
+}
+
+func sortAssessmentsBySubmittedAt(items []*assessment.Assessment) {
+	sort.Slice(items, func(i, j int) bool {
+		left := items[i].SubmittedAt()
+		right := items[j].SubmittedAt()
+		if left == nil {
+			return false
+		}
+		if right == nil {
+			return true
+		}
+		return left.Before(*right)
+	})
+}
+
+func countCompletedAssessments(items []*assessment.Assessment) int {
+	count := 0
+	for _, item := range items {
+		if item.Status() == assessment.StatusInterpreted {
+			count++
+		}
+	}
+	return count
+}
+
+func buildPeriodicTasks(items []*assessment.Assessment) ([]PeriodicTask, *time.Time, *time.Time) {
+	tasks := make([]PeriodicTask, 0, len(items))
+	var startDate *time.Time
+	var endDate *time.Time
+
+	for index, item := range items {
+		task := buildPeriodicTask(index+1, item)
+		startDate, endDate = expandPeriodicWindow(startDate, endDate, item.SubmittedAt())
+		tasks = append(tasks, task)
+	}
+
+	return tasks, startDate, endDate
+}
+
+func buildPeriodicTask(week int, item *assessment.Assessment) PeriodicTask {
+	task := PeriodicTask{
+		Week:    week,
+		DueDate: item.SubmittedAt(),
+	}
+
+	switch item.Status() {
+	case assessment.StatusInterpreted:
+		task.Status = "completed"
+		task.CompletedAt = item.InterpretedAt()
+		assessmentID := uint64(item.ID())
+		task.AssessmentID = &assessmentID
+	case assessment.StatusFailed:
+		task.Status = "overdue"
+	default:
+		task.Status = "pending"
+	}
+
+	return task
+}
+
+func expandPeriodicWindow(startDate, endDate, submittedAt *time.Time) (*time.Time, *time.Time) {
+	if submittedAt == nil {
+		return startDate, endDate
+	}
+	if startDate == nil || submittedAt.Before(*startDate) {
+		startDate = submittedAt
+	}
+	if endDate == nil || submittedAt.After(*endDate) {
+		endDate = submittedAt
+	}
+	return startDate, endDate
+}
+
+func periodicScaleName(items []*assessment.Assessment) string {
+	for _, item := range items {
+		if item != nil && item.HasMedicalScale() {
+			return item.MedicalScaleRef().Name()
+		}
+	}
+	return ""
+}
+
+func calculateCompletionRate(completedCount, totalWeeks int) float64 {
+	if totalWeeks == 0 {
+		return 0
+	}
+	return float64(completedCount) / float64(totalWeeks) * 100
+}
+
+func calculateCurrentWeek(completedCount, totalWeeks int) int {
+	currentWeek := completedCount + 1
+	if currentWeek > totalWeeks {
+		return totalWeeks
+	}
+	return currentWeek
 }

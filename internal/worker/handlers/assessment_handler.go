@@ -7,6 +7,7 @@ import (
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -28,7 +29,7 @@ func init() {
 // 2. 检查是否需要评估（有关联量表）
 // 3. 调用 InternalClient 执行评估
 func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		var data domainAssessment.AssessmentSubmittedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
@@ -62,8 +63,13 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 
+		assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
+		if err != nil {
+			return fmt.Errorf("invalid assessment id in submitted event: %w", err)
+		}
+
 		// 调用 InternalClient 执行评估
-		resp, err := deps.InternalClient.EvaluateAssessment(ctx, uint64(data.AssessmentID))
+		resp, err := deps.InternalClient.EvaluateAssessment(ctx, assessmentID)
 		if err != nil {
 			deps.Logger.Error("failed to evaluate assessment",
 				slog.Int64("assessment_id", data.AssessmentID),
@@ -90,7 +96,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 // 1. 检查是否高风险
 // 2. 发送预警通知（如有必要）
 func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(_ context.Context, _ string, payload []byte) error {
 		var data domainAssessment.AssessmentInterpretedData
 		_, err := ParseEventData(payload, &data)
 		if err != nil {
@@ -137,12 +143,16 @@ func handleAssessmentFailed(deps *Dependencies) HandlerFunc {
 		)
 
 		if deps.InternalClient != nil {
+			assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
+			if err != nil {
+				return fmt.Errorf("invalid assessment id in failed event: %w", err)
+			}
 			if _, err := deps.InternalClient.ProjectBehaviorEvent(ctx, &pb.ProjectBehaviorEventRequest{
 				EventId:       env.ID,
 				EventType:     eventType,
 				OrgId:         data.OrgID,
 				TesteeId:      data.TesteeID,
-				AssessmentId:  uint64(data.AssessmentID),
+				AssessmentId:  assessmentID,
 				FailureReason: data.Reason,
 				OccurredAt:    timestamppb.New(data.FailedAt),
 			}); err != nil {

@@ -309,7 +309,9 @@ func TestAssessmentPlanRestoreFromRepositoryClearsEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
-	p.pause()
+	if err := p.pause(); err != nil {
+		t.Fatalf("pause returned error: %v", err)
+	}
 
 	p.RestoreFromRepository(p.GetID(), PlanStatusActive)
 

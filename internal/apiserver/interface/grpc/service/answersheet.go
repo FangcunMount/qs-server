@@ -156,13 +156,17 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 	// 转换响应（使用摘要类型，不含 answers）
 	protoAnswerSheets := make([]*pb.AnswerSheetSummary, 0, len(result.Items))
 	for _, item := range result.Items {
+		answerCount, convErr := protoInt32FromInt("answer_count", item.AnswerCount)
+		if convErr != nil {
+			return nil, convErr
+		}
 		protoAnswerSheets = append(protoAnswerSheets, &pb.AnswerSheetSummary{
 			Id:                item.ID,
 			QuestionnaireCode: item.QuestionnaireCode,
 			Title:             item.QuestionnaireTitle,
 			Score:             item.Score,
 			WriterId:          item.FillerID,
-			AnswerCount:       int32(item.AnswerCount),
+			AnswerCount:       answerCount,
 		})
 	}
 
@@ -174,7 +178,7 @@ func (s *AnswerSheetService) ListAnswerSheets(ctx context.Context, req *pb.ListA
 
 // SaveAnswerSheetScores 保存答卷分数（内部接口）
 // @Description 当前不支持通过 gRPC 回写答卷分数；计分流程由内部计分链直接持久化
-func (s *AnswerSheetService) SaveAnswerSheetScores(ctx context.Context, req *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
+func (s *AnswerSheetService) SaveAnswerSheetScores(_ context.Context, _ *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "答卷分数回写接口当前不支持")
 }
 

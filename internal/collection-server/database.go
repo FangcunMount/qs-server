@@ -7,8 +7,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	redis "github.com/redis/go-redis/v9"
 )
 

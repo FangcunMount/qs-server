@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -13,18 +14,11 @@ const (
 	defaultOutboxRelayRetryDelay = 10 * time.Second
 )
 
-// PendingOutboxEvent represents a claimed outbox row that is ready to publish.
-type PendingOutboxEvent struct {
-	EventID string
-	Event   event.DomainEvent
-}
+// PendingOutboxEvent keeps the application-facing alias for the shared outbox contract.
+type PendingOutboxEvent = outboxport.PendingEvent
 
-// OutboxStore manages due outbox rows.
-type OutboxStore interface {
-	ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]PendingOutboxEvent, error)
-	MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error
-	MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error
-}
+// OutboxStore keeps the application-facing alias for the shared outbox contract.
+type OutboxStore = outboxport.Store
 
 // OutboxRelay dispatches due outbox events.
 type OutboxRelay interface {

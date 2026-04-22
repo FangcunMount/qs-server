@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"google.golang.org/grpc/codes"
@@ -27,24 +26,35 @@ type submitGuard interface {
 	Abort(ctx context.Context, key string, lease *redislock.Lease) error
 }
 
+type answerSheetGateway interface {
+	SaveAnswerSheet(ctx context.Context, input *grpcclient.SaveAnswerSheetInput) (*grpcclient.SaveAnswerSheetOutput, error)
+	GetAnswerSheet(ctx context.Context, id uint64) (*grpcclient.AnswerSheetOutput, error)
+}
+
+type guardianshipChecker interface {
+	IsEnabled() bool
+	GetDefaultOrgID() uint64
+	IsGuardian(ctx context.Context, userID, iamChildID string) (bool, error)
+}
+
 // SubmissionService 答卷提交服务
 // 作为 BFF 层的薄服务，主要职责：
 // 1. 转换 REST DTO 到 gRPC 请求
 // 2. 调用 apiserver 的 gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
-	answerSheetClient   *grpcclient.AnswerSheetClient
+	answerSheetClient   answerSheetGateway
 	actorClient         actorLookupClient
-	guardianshipService *iam.GuardianshipService
+	guardianshipService guardianshipChecker
 	queue               *SubmitQueue
 	submitGuard         submitGuard
 }
 
 // NewSubmissionService 创建答卷提交服务
 func NewSubmissionService(
-	answerSheetClient *grpcclient.AnswerSheetClient,
-	actorClient *grpcclient.ActorClient,
-	guardianshipService *iam.GuardianshipService,
+	answerSheetClient answerSheetGateway,
+	actorClient actorLookupClient,
+	guardianshipService guardianshipChecker,
 	queueOptions *options.SubmitQueueOptions,
 	submitGuard submitGuard,
 ) *SubmissionService {

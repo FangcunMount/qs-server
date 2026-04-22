@@ -2,20 +2,20 @@ package code
 
 // 医学量表错误码 (114xxx).
 const (
-// ErrMedicalScaleInvalidInput 无效的输入参数
-ErrMedicalScaleInvalidInput int = iota + 114001
+	// ErrMedicalScaleInvalidInput 无效的输入参数
+	ErrMedicalScaleInvalidInput int = iota + 114001
 
-// ErrMedicalScaleNotFound 医学量表不存在
-ErrMedicalScaleNotFound
+	// ErrMedicalScaleNotFound 医学量表不存在
+	ErrMedicalScaleNotFound
 
-// ErrMedicalScaleAlreadyExists 医学量表已存在
-ErrMedicalScaleAlreadyExists
+	// ErrMedicalScaleAlreadyExists 医学量表已存在
+	ErrMedicalScaleAlreadyExists
 
-// ErrMedicalScaleFactorNotFound 因子不存在
-ErrMedicalScaleFactorNotFound
+	// ErrMedicalScaleFactorNotFound 因子不存在
+	ErrMedicalScaleFactorNotFound
 
-// ErrMedicalScaleInvalid 医学量表无效
-ErrMedicalScaleInvalid
+	// ErrMedicalScaleInvalid 医学量表无效
+	ErrMedicalScaleInvalid
 )
 
 func init() {

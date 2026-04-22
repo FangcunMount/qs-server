@@ -407,7 +407,7 @@ func (h *InterpretationHandler) buildSuccessEvents(evalCtx *Context, rpt *domain
 
 	assessmentID := evalCtx.Assessment.ID().Uint64()
 	reportID := rpt.ID().Uint64()
-	testeeID := uint64(evalCtx.Assessment.TesteeID())
+	testeeID := evalCtx.Assessment.TesteeID().Uint64()
 
 	return []event.DomainEvent{
 		assessment.NewAssessmentInterpretedEvent(

@@ -254,49 +254,66 @@ func TestLifecycle_Publish_WithMajorVersionIncrement(t *testing.T) {
 func TestVersionWorkflow(t *testing.T) {
 	t.Run("完整工作流:创建-存草稿-发布-编辑-存草稿-再发布", func(t *testing.T) {
 		// 1. 创建问卷，初始版本0.0.1
-		q, _ := NewQuestionnaire(
+		q, err := NewQuestionnaire(
 			meta.NewCode("TEST001"),
 			"测试问卷",
 		)
+		if err != nil {
+			t.Fatalf("NewQuestionnaire returned error: %v", err)
+		}
 		versioning := Versioning{}
-		versioning.InitializeVersion(q)
+		if err := versioning.InitializeVersion(q); err != nil {
+			t.Fatalf("InitializeVersion returned error: %v", err)
+		}
 
 		if q.GetVersion().Value() != "0.0.1" {
 			t.Errorf("Step 1: 初始化版本 = %v, want 0.0.1", q.GetVersion().Value())
 		}
 
 		// 2. 存草稿，版本递增到0.0.2
-		versioning.IncrementMinorVersion(q)
+		if err := versioning.IncrementMinorVersion(q); err != nil {
+			t.Fatalf("IncrementMinorVersion returned error: %v", err)
+		}
 		if q.GetVersion().Value() != "0.0.2" {
 			t.Errorf("Step 2: 第一次存草稿 = %v, want 0.0.2", q.GetVersion().Value())
 		}
 
 		// 3. 再次存草稿，版本递增到0.0.3
-		versioning.IncrementMinorVersion(q)
+		if err := versioning.IncrementMinorVersion(q); err != nil {
+			t.Fatalf("IncrementMinorVersion returned error: %v", err)
+		}
 		if q.GetVersion().Value() != "0.0.3" {
 			t.Errorf("Step 3: 第二次存草稿 = %v, want 0.0.3", q.GetVersion().Value())
 		}
 
 		// 4. 发布，大版本递增到1.0.1
-		versioning.IncrementMajorVersion(q)
+		if err := versioning.IncrementMajorVersion(q); err != nil {
+			t.Fatalf("IncrementMajorVersion returned error: %v", err)
+		}
 		if q.GetVersion().Value() != "1.0.1" {
 			t.Errorf("Step 4: 首次发布 = %v, want 1.0.1", q.GetVersion().Value())
 		}
 
 		// 5. 编辑并存草稿，小版本递增到1.0.2
-		versioning.IncrementMinorVersion(q)
+		if err := versioning.IncrementMinorVersion(q); err != nil {
+			t.Fatalf("IncrementMinorVersion returned error: %v", err)
+		}
 		if q.GetVersion().Value() != "1.0.2" {
 			t.Errorf("Step 5: 发布后编辑存草稿 = %v, want 1.0.2", q.GetVersion().Value())
 		}
 
 		// 6. 再次存草稿，版本递增到1.0.3
-		versioning.IncrementMinorVersion(q)
+		if err := versioning.IncrementMinorVersion(q); err != nil {
+			t.Fatalf("IncrementMinorVersion returned error: %v", err)
+		}
 		if q.GetVersion().Value() != "1.0.3" {
 			t.Errorf("Step 6: 再次存草稿 = %v, want 1.0.3", q.GetVersion().Value())
 		}
 
 		// 7. 再次发布，大版本递增到2.0.1
-		versioning.IncrementMajorVersion(q)
+		if err := versioning.IncrementMajorVersion(q); err != nil {
+			t.Fatalf("IncrementMajorVersion returned error: %v", err)
+		}
 		if q.GetVersion().Value() != "2.0.1" {
 			t.Errorf("Step 7: 再次发布 = %v, want 2.0.1", q.GetVersion().Value())
 		}

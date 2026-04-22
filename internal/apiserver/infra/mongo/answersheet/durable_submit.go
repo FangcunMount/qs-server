@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	appAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
@@ -130,7 +130,7 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 	return sheet, false, nil
 }
 
-func (r *Repository) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+func (r *Repository) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
 	return r.outboxStore.ClaimDueEvents(ctx, limit, now)
 }
 

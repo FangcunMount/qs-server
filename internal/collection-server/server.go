@@ -155,7 +155,7 @@ func (s *collectionServer) PrepareRun() preparedCollectionServer {
 
 	// 7. 安装全局并发限制中间件（避免过载）
 	if s.config.Concurrency != nil && s.config.Concurrency.MaxConcurrency > 0 {
-		s.genericAPIServer.Engine.Use(concurrencyLimitMiddleware(s.config.Concurrency.MaxConcurrency))
+		s.genericAPIServer.Use(concurrencyLimitMiddleware(s.config.Concurrency.MaxConcurrency))
 		log.Infof("Installed concurrency limiter: max=%d", s.config.Concurrency.MaxConcurrency)
 	}
 

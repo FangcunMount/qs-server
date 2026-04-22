@@ -160,7 +160,9 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var summaries []*answersheet.AnswerSheetSummary
 	for cursor.Next(ctx) {
@@ -228,7 +230,9 @@ func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questio
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var summaries []*answersheet.AnswerSheetSummary
 	for cursor.Next(ctx) {

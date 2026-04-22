@@ -30,6 +30,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // InternalService 内部 gRPC 服务 - 供 Worker 调用
@@ -55,6 +56,12 @@ type InternalService struct {
 	qrCodeService qrcodeApp.QRCodeService
 	// 小程序 task 消息服务（可选）
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
+}
+
+type assessmentScaleContext struct {
+	medicalScaleID   *uint64
+	medicalScaleCode *string
+	medicalScaleName *string
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -203,119 +210,159 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		"task_id", req.TaskId,
 	)
 
-	// 验证参数
-	if req.AnswersheetId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "answersheet_id 不能为空")
-	}
-	if req.QuestionnaireCode == "" {
-		return nil, status.Error(codes.InvalidArgument, "questionnaire_code 不能为空")
-	}
-	if req.QuestionnaireVersion == "" {
-		return nil, status.Error(codes.InvalidArgument, "questionnaire_version 不能为空")
-	}
-	if req.TesteeId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
-	}
-	if req.FillerId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "filler_id 不能为空")
+	if err := validateCreateAssessmentFromAnswerSheetRequest(req); err != nil {
+		return nil, err
 	}
 
-	// 查找问卷关联的量表（可能没有）
-	var medicalScaleID *uint64
-	var medicalScaleCode *string
-	var medicalScaleName *string
+	scaleCtx := s.resolveAssessmentScaleContext(ctx, req.QuestionnaireCode)
+	dto := buildCreateAssessmentDTO(req, scaleCtx)
+	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, scaleCtx.medicalScaleCode, &dto)
 
-	medicalScale, err := s.scaleRepo.FindByQuestionnaireCode(ctx, req.QuestionnaireCode)
-	if err == nil && medicalScale != nil {
-		// 找到关联的量表
-		scaleID := medicalScale.GetID().Uint64()
-		scaleCode := medicalScale.GetCode().Value()
-		scaleName := medicalScale.GetTitle()
+	if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
+		return response, nil
+	}
 
-		medicalScaleID = &scaleID
-		medicalScaleCode = &scaleCode
-		medicalScaleName = &scaleName
+	return s.createAssessmentFromAnswerSheet(ctx, l, req, dto, matchedTask, scaleCtx.medicalScaleID != nil)
+}
 
-		l.Infow("找到关联量表",
-			"scale_id", scaleID,
-			"scale_code", scaleCode,
-			"scale_name", scaleName,
-		)
-	} else {
+func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFromAnswerSheetRequest) error {
+	switch {
+	case req == nil:
+		return status.Error(codes.InvalidArgument, "request 不能为空")
+	case req.AnswersheetId == 0:
+		return status.Error(codes.InvalidArgument, "answersheet_id 不能为空")
+	case req.QuestionnaireCode == "":
+		return status.Error(codes.InvalidArgument, "questionnaire_code 不能为空")
+	case req.QuestionnaireVersion == "":
+		return status.Error(codes.InvalidArgument, "questionnaire_version 不能为空")
+	case req.TesteeId == 0:
+		return status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	case req.FillerId == 0:
+		return status.Error(codes.InvalidArgument, "filler_id 不能为空")
+	default:
+		return nil
+	}
+}
+
+func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) assessmentScaleContext {
+	l := logger.L(ctx)
+	if s.scaleRepo == nil || questionnaireCode == "" {
+		return assessmentScaleContext{}
+	}
+
+	medicalScale, err := s.scaleRepo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	if err != nil || medicalScale == nil {
 		l.Infow("问卷未关联量表，将创建纯问卷模式的测评",
-			"questionnaire_code", req.QuestionnaireCode,
+			"questionnaire_code", questionnaireCode,
 		)
+		return assessmentScaleContext{}
 	}
 
-	// 构建创建 DTO（使用 QuestionnaireCode 作为唯一标识）
+	scaleID := medicalScale.GetID().Uint64()
+	scaleCode := medicalScale.GetCode().Value()
+	scaleName := medicalScale.GetTitle()
+	l.Infow("找到关联量表",
+		"scale_id", scaleID,
+		"scale_code", scaleCode,
+		"scale_name", scaleName,
+	)
+
+	return assessmentScaleContext{
+		medicalScaleID:   &scaleID,
+		medicalScaleCode: &scaleCode,
+		medicalScaleName: &scaleName,
+	}
+}
+
+func buildCreateAssessmentDTO(
+	req *pb.CreateAssessmentFromAnswerSheetRequest,
+	scaleCtx assessmentScaleContext,
+) assessmentApp.CreateAssessmentDTO {
 	dto := assessmentApp.CreateAssessmentDTO{
 		OrgID:                req.OrgId,
 		TesteeID:             req.TesteeId,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		AnswerSheetID:        req.AnswersheetId,
-		MedicalScaleID:       medicalScaleID,
-		MedicalScaleCode:     medicalScaleCode,
-		MedicalScaleName:     medicalScaleName,
+		MedicalScaleID:       scaleCtx.medicalScaleID,
+		MedicalScaleCode:     scaleCtx.medicalScaleCode,
+		MedicalScaleName:     scaleCtx.medicalScaleName,
 		OriginType:           req.OriginType,
 	}
-
 	if dto.OriginType == "" {
 		dto.OriginType = "adhoc"
 	}
 	if req.OriginId != "" {
 		dto.OriginID = &req.OriginId
 	}
+	return dto
+}
 
+func (s *InternalService) applyMatchedTaskOrigin(
+	ctx context.Context,
+	l *logger.RequestLogger,
+	req *pb.CreateAssessmentFromAnswerSheetRequest,
+	medicalScaleCode *string,
+	dto *assessmentApp.CreateAssessmentDTO,
+) *planDomain.AssessmentTask {
 	var matchedTask *planDomain.AssessmentTask
-	if req.TaskId != "" {
+	switch {
+	case req.TaskId != "":
 		matchedTask = s.resolvePlanTaskByID(ctx, req, medicalScaleCode)
-	} else if medicalScaleCode != nil {
+	case medicalScaleCode != nil:
 		matchedTask = s.resolveOpenedPlanTask(ctx, req.OrgId, req.TesteeId, *medicalScaleCode)
 	}
-	if matchedTask != nil {
-		planID := matchedTask.GetPlanID().String()
-		dto.OriginType = "plan"
-		dto.OriginID = &planID
-		l.Infow("识别到计划任务上下文",
-			"task_id", matchedTask.GetID().String(),
-			"plan_id", planID,
-			"testee_id", req.TesteeId,
-		)
+	if matchedTask == nil {
+		return nil
 	}
 
-	// 幂等：先查是否已存在
-	if existing, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswersheetId); err == nil && existing != nil {
-		l.Infow("检测到答卷已创建测评，直接返回",
-			"answersheet_id", req.AnswersheetId,
-			"assessment_id", existing.ID,
-		)
-		s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, existing.ID)
-		return &pb.CreateAssessmentFromAnswerSheetResponse{
-			AssessmentId:  existing.ID,
-			Created:       false,
-			AutoSubmitted: false,
-			Message:       "测评已存在",
-		}, nil
+	planID := matchedTask.GetPlanID().String()
+	dto.OriginType = "plan"
+	dto.OriginID = &planID
+	l.Infow("识别到计划任务上下文",
+		"task_id", matchedTask.GetID().String(),
+		"plan_id", planID,
+		"testee_id", req.TesteeId,
+	)
+	return matchedTask
+}
+
+func (s *InternalService) loadExistingAssessmentResponse(
+	ctx context.Context,
+	l *logger.RequestLogger,
+	answerSheetID uint64,
+	orgID uint64,
+	matchedTask *planDomain.AssessmentTask,
+) (*pb.CreateAssessmentFromAnswerSheetResponse, bool) {
+	existing, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, answerSheetID)
+	if err != nil || existing == nil {
+		return nil, false
 	}
 
-	// 调用应用服务创建测评
+	l.Infow("检测到答卷已创建测评，直接返回",
+		"answersheet_id", answerSheetID,
+		"assessment_id", existing.ID,
+	)
+	s.completeMatchedTask(ctx, l, orgID, matchedTask, existing.ID)
+	return existingAssessmentResponse(existing.ID), true
+}
+
+func (s *InternalService) createAssessmentFromAnswerSheet(
+	ctx context.Context,
+	l *logger.RequestLogger,
+	req *pb.CreateAssessmentFromAnswerSheetRequest,
+	dto assessmentApp.CreateAssessmentDTO,
+	matchedTask *planDomain.AssessmentTask,
+	shouldAutoSubmit bool,
+) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
 	result, err := s.submissionService.Create(ctx, dto)
 	if err != nil {
-		// 如果是唯一约束冲突，查出已有测评并返回
 		if errors.IsCode(err, errorCode.ErrAssessmentDuplicate) {
-			if existing, findErr := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswersheetId); findErr == nil && existing != nil {
+			if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
 				l.Infow("测评已存在，返回已有结果",
 					"answersheet_id", req.AnswersheetId,
-					"assessment_id", existing.ID,
 				)
-				s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, existing.ID)
-				return &pb.CreateAssessmentFromAnswerSheetResponse{
-					AssessmentId:  existing.ID,
-					Created:       false,
-					AutoSubmitted: false,
-					Message:       "测评已存在",
-				}, nil
+				return response, nil
 			}
 		}
 
@@ -333,31 +380,46 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 		"result", "success",
 	)
 
-	// 如果有关联量表，自动提交测评
 	autoSubmitted := false
-	if medicalScaleID != nil {
-		_, err := s.submissionService.Submit(ctx, result.ID)
-		if err != nil {
-			l.Warnw("自动提交测评失败",
-				"assessment_id", result.ID,
-				"error", err.Error(),
-			)
-		} else {
-			autoSubmitted = true
-			l.Infow("自动提交测评成功",
-				"assessment_id", result.ID,
-			)
-		}
+	if shouldAutoSubmit {
+		autoSubmitted = s.autoSubmitAssessment(ctx, l, result.ID)
 	}
 
 	s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, result.ID)
+	return createdAssessmentResponse(result.ID, autoSubmitted), nil
+}
 
+func (s *InternalService) autoSubmitAssessment(ctx context.Context, l *logger.RequestLogger, assessmentID uint64) bool {
+	if _, err := s.submissionService.Submit(ctx, assessmentID); err != nil {
+		l.Warnw("自动提交测评失败",
+			"assessment_id", assessmentID,
+			"error", err.Error(),
+		)
+		return false
+	}
+
+	l.Infow("自动提交测评成功",
+		"assessment_id", assessmentID,
+	)
+	return true
+}
+
+func existingAssessmentResponse(assessmentID uint64) *pb.CreateAssessmentFromAnswerSheetResponse {
 	return &pb.CreateAssessmentFromAnswerSheetResponse{
-		AssessmentId:  result.ID,
+		AssessmentId:  assessmentID,
+		Created:       false,
+		AutoSubmitted: false,
+		Message:       "测评已存在",
+	}
+}
+
+func createdAssessmentResponse(assessmentID uint64, autoSubmitted bool) *pb.CreateAssessmentFromAnswerSheetResponse {
+	return &pb.CreateAssessmentFromAnswerSheetResponse{
+		AssessmentId:  assessmentID,
 		Created:       true,
 		AutoSubmitted: autoSubmitted,
 		Message:       "测评创建成功",
-	}, nil
+	}
 }
 
 func (s *InternalService) resolvePlanTaskByID(
@@ -387,7 +449,15 @@ func (s *InternalService) resolvePlanTaskByID(
 		return nil
 	}
 
-	if task.GetOrgID() != int64(req.OrgId) {
+	requestOrgID, convErr := safeconv.Uint64ToInt64(req.OrgId)
+	if convErr != nil {
+		logger.L(ctx).Warnw("请求机构ID超出 int64 范围，跳过显式任务识别",
+			"org_id", req.OrgId,
+			"error", convErr.Error(),
+		)
+		return nil
+	}
+	if task.GetOrgID() != requestOrgID {
 		logger.L(ctx).Warnw("计划任务机构不匹配，跳过显式任务识别",
 			"task_id", req.TaskId,
 			"request_org_id", req.OrgId,
@@ -450,11 +520,19 @@ func (s *InternalService) resolveOpenedPlanTask(
 	}
 
 	var matched *planDomain.AssessmentTask
+	targetOrgID, convErr := safeconv.Uint64ToInt64(orgID)
+	if convErr != nil {
+		logger.L(ctx).Warnw("机构ID超出 int64 范围，跳过自动 plan 识别",
+			"org_id", orgID,
+			"error", convErr.Error(),
+		)
+		return nil
+	}
 	for _, task := range tasks {
 		if task == nil {
 			continue
 		}
-		if task.GetOrgID() != int64(orgID) || task.GetScaleCode() != scaleCode || !task.IsOpened() {
+		if task.GetOrgID() != targetOrgID || task.GetScaleCode() != scaleCode || !task.IsOpened() {
 			continue
 		}
 		if matched != nil {
@@ -486,10 +564,19 @@ func (s *InternalService) completeMatchedTask(
 	if task.IsCompleted() {
 		return
 	}
+	targetOrgID, err := safeconv.Uint64ToInt64(orgID)
+	if err != nil {
+		l.Warnw("机构ID超出 int64 范围，跳过计划任务完成回写",
+			"org_id", orgID,
+			"assessment_id", assessmentID,
+			"error", err.Error(),
+		)
+		return
+	}
 
 	if _, err := s.planCommandService.CompleteTask(
 		ctx,
-		int64(orgID),
+		targetOrgID,
 		task.GetID().String(),
 		meta.FromUint64(assessmentID).String(),
 	); err != nil {
@@ -879,9 +966,13 @@ func (s *InternalService) SendTaskOpenedMiniProgramNotification(
 		"message", result.Message,
 	)
 
+	sentCount, err := protoInt32FromInt("sent_count", result.SentCount)
+	if err != nil {
+		return nil, err
+	}
 	return &pb.SendTaskOpenedMiniProgramNotificationResponse{
 		Success:          result.SentCount > 0,
-		SentCount:        int32(result.SentCount),
+		SentCount:        sentCount,
 		RecipientOpenIds: result.RecipientOpenIDs,
 		RecipientSource:  result.RecipientSource,
 		Skipped:          result.Skipped,
@@ -901,26 +992,13 @@ func (s *InternalService) BootstrapOperator(
 		"user_id", req.UserId,
 	)
 
-	if s.operatorLifecycleService == nil || s.operatorQueryService == nil {
-		return nil, status.Error(codes.FailedPrecondition, "operator services not configured")
-	}
-	if req.OrgId <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
-	}
-	if req.UserId <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "user_id 不能为空")
-	}
-	if req.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "name 不能为空")
+	if err := validateBootstrapOperatorRequest(s, req); err != nil {
+		return nil, err
 	}
 
-	created := false
-	if _, err := s.operatorQueryService.GetByUser(ctx, req.OrgId, req.UserId); err != nil {
-		if errors.IsCode(err, errorCode.ErrUserNotFound) {
-			created = true
-		} else {
-			return nil, status.Errorf(codes.Internal, "query existing operator failed: %v", err)
-		}
+	created, err := s.bootstrapOperatorCreated(ctx, req.OrgId, req.UserId)
+	if err != nil {
+		return nil, err
 	}
 
 	result, err := s.operatorLifecycleService.EnsureByUser(ctx, req.OrgId, req.UserId, req.Name)
@@ -928,32 +1006,14 @@ func (s *InternalService) BootstrapOperator(
 		return nil, status.Errorf(codes.Internal, "ensure operator failed: %v", err)
 	}
 
-	if req.Name != "" || req.Email != "" || req.Phone != "" {
-		if err := s.operatorLifecycleService.UpdateFromExternalSource(ctx, result.ID, req.Name, req.Email, req.Phone); err != nil {
-			return nil, status.Errorf(codes.Internal, "sync operator profile failed: %v", err)
-		}
+	if err := s.syncBootstrapOperatorProfile(ctx, req, result.ID); err != nil {
+		return nil, err
 	}
-
-	if s.operatorAuthService != nil {
-		if req.IsActive {
-			if err := s.operatorAuthService.Activate(ctx, result.ID); err != nil {
-				return nil, status.Errorf(codes.Internal, "activate operator failed: %v", err)
-			}
-		} else {
-			if err := s.operatorAuthService.Deactivate(ctx, result.ID); err != nil {
-				return nil, status.Errorf(codes.Internal, "deactivate operator failed: %v", err)
-			}
-		}
+	if err := s.syncBootstrapOperatorActivation(ctx, req, result.ID); err != nil {
+		return nil, err
 	}
-
-	if req.IsActive && s.authzSnapshot != nil && s.operatorRepo != nil {
-		op, err := s.operatorRepo.FindByID(ctx, domainoperator.ID(result.ID))
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "load operator aggregate failed: %v", err)
-		}
-		if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.authzSnapshot, s.operatorRepo, req.OrgId, op); err != nil {
-			return nil, status.Errorf(codes.Internal, "sync operator roles from snapshot failed: %v", err)
-		}
+	if err := s.syncBootstrapOperatorRoles(ctx, req, result.ID); err != nil {
+		return nil, err
 	}
 
 	finalResult, err := s.operatorQueryService.GetByUser(ctx, req.OrgId, req.UserId)
@@ -961,10 +1021,6 @@ func (s *InternalService) BootstrapOperator(
 		return nil, status.Errorf(codes.Internal, "query operator after bootstrap failed: %v", err)
 	}
 
-	message := "operator already exists"
-	if created {
-		message = "operator bootstrapped"
-	}
 	l.Infow("operator bootstrap 完成",
 		"action", "bootstrap_operator",
 		"org_id", req.OrgId,
@@ -977,7 +1033,99 @@ func (s *InternalService) BootstrapOperator(
 	return &pb.BootstrapOperatorResponse{
 		OperatorId: finalResult.ID,
 		Created:    created,
-		Message:    message,
+		Message:    bootstrapOperatorMessage(created),
 		Roles:      append([]string(nil), finalResult.Roles...),
 	}, nil
+}
+
+func validateBootstrapOperatorRequest(s *InternalService, req *pb.BootstrapOperatorRequest) error {
+	switch {
+	case s.operatorLifecycleService == nil || s.operatorQueryService == nil:
+		return status.Error(codes.FailedPrecondition, "operator services not configured")
+	case req == nil:
+		return status.Error(codes.InvalidArgument, "request 不能为空")
+	case req.OrgId <= 0:
+		return status.Error(codes.InvalidArgument, "org_id 不能为空")
+	case req.UserId <= 0:
+		return status.Error(codes.InvalidArgument, "user_id 不能为空")
+	case req.Name == "":
+		return status.Error(codes.InvalidArgument, "name 不能为空")
+	default:
+		return nil
+	}
+}
+
+func (s *InternalService) bootstrapOperatorCreated(ctx context.Context, orgID, userID int64) (bool, error) {
+	if _, err := s.operatorQueryService.GetByUser(ctx, orgID, userID); err != nil {
+		if errors.IsCode(err, errorCode.ErrUserNotFound) {
+			return true, nil
+		}
+		return false, status.Errorf(codes.Internal, "query existing operator failed: %v", err)
+	}
+	return false, nil
+}
+
+func (s *InternalService) syncBootstrapOperatorProfile(
+	ctx context.Context,
+	req *pb.BootstrapOperatorRequest,
+	operatorID uint64,
+) error {
+	if req.Name == "" && req.Email == "" && req.Phone == "" {
+		return nil
+	}
+	if err := s.operatorLifecycleService.UpdateFromExternalSource(ctx, operatorID, req.Name, req.Email, req.Phone); err != nil {
+		return status.Errorf(codes.Internal, "sync operator profile failed: %v", err)
+	}
+	return nil
+}
+
+func (s *InternalService) syncBootstrapOperatorActivation(
+	ctx context.Context,
+	req *pb.BootstrapOperatorRequest,
+	operatorID uint64,
+) error {
+	if s.operatorAuthService == nil {
+		return nil
+	}
+
+	var err error
+	if req.IsActive {
+		err = s.operatorAuthService.Activate(ctx, operatorID)
+		if err != nil {
+			return status.Errorf(codes.Internal, "activate operator failed: %v", err)
+		}
+		return nil
+	}
+
+	err = s.operatorAuthService.Deactivate(ctx, operatorID)
+	if err != nil {
+		return status.Errorf(codes.Internal, "deactivate operator failed: %v", err)
+	}
+	return nil
+}
+
+func (s *InternalService) syncBootstrapOperatorRoles(
+	ctx context.Context,
+	req *pb.BootstrapOperatorRequest,
+	operatorID uint64,
+) error {
+	if !req.IsActive || s.authzSnapshot == nil || s.operatorRepo == nil {
+		return nil
+	}
+
+	op, err := s.operatorRepo.FindByID(ctx, domainoperator.ID(meta.FromUint64(operatorID)))
+	if err != nil {
+		return status.Errorf(codes.Internal, "load operator aggregate failed: %v", err)
+	}
+	if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.authzSnapshot, s.operatorRepo, req.OrgId, op); err != nil {
+		return status.Errorf(codes.Internal, "sync operator roles from snapshot failed: %v", err)
+	}
+	return nil
+}
+
+func bootstrapOperatorMessage(created bool) string {
+	if created {
+		return "operator bootstrapped"
+	}
+	return "operator already exists"
 }

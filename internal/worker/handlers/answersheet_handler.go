@@ -50,7 +50,7 @@ func handleAnswerSheetSubmittedWithHooks(
 	deps *Dependencies,
 	hooks answerSheetProcessingGateHooks,
 ) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
+	return func(ctx context.Context, _ string, payload []byte) error {
 		env, answerSheetID, data, err := parseAnswerSheetData(deps, payload)
 		if err != nil {
 			return fmt.Errorf("failed to parse answersheet submitted event: %w", err)

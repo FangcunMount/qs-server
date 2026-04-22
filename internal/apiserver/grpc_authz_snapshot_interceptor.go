@@ -2,7 +2,6 @@ package apiserver
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -11,15 +10,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"google.golang.org/grpc"
+	grpcctx "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	grpcapi "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-)
-
-// gRPC IAM 认证拦截器写入的 context 键（见 internal/pkg/grpc/interceptor_auth.go injectUserContext）。
-const (
-	grpcCtxUserIDKey   = "user_id"
-	grpcCtxTenantIDKey = "tenant_id"
 )
 
 // NewAuthzSnapshotUnaryInterceptor 在 IAM JWT 之后加载授权快照并写入 context，
@@ -27,18 +21,18 @@ const (
 func NewAuthzSnapshotUnaryInterceptor(
 	loader *iam.AuthzSnapshotLoader,
 	repo domainoperator.Repository,
-) grpc.UnaryServerInterceptor {
+) grpcapi.UnaryServerInterceptor {
 	if loader == nil {
-		return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		return func(ctx context.Context, req interface{}, _ *grpcapi.UnaryServerInfo, handler grpcapi.UnaryHandler) (interface{}, error) {
 			return handler(ctx, req)
 		}
 	}
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, info *grpcapi.UnaryServerInfo, handler grpcapi.UnaryHandler) (interface{}, error) {
 		if grpcAuthzSnapshotSkipMethod(info.FullMethod) {
 			return handler(ctx, req)
 		}
-		tenantID := grpcCtxString(ctx, grpcCtxTenantIDKey)
-		userIDStr := grpcCtxString(ctx, grpcCtxUserIDKey)
+		tenantID := grpcctx.TenantIDFromContext(ctx)
+		userIDStr := grpcctx.UserIDFromContext(ctx)
 		if tenantID == "" || userIDStr == "" {
 			// 未走 IAM（如健康检查、内部免鉴权 RPC）或无租户/用户声明：不注入快照。
 			return handler(ctx, req)
@@ -88,22 +82,4 @@ func grpcAuthzSnapshotSkipMethod(fullMethod string) bool {
 		}
 	}
 	return false
-}
-
-func grpcCtxString(ctx context.Context, key string) string {
-	if ctx == nil {
-		return ""
-	}
-	v := ctx.Value(key)
-	if v == nil {
-		return ""
-	}
-	switch x := v.(type) {
-	case string:
-		return x
-	case []byte:
-		return string(x)
-	default:
-		return fmt.Sprint(x)
-	}
 }

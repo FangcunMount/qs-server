@@ -3,10 +3,8 @@ package plan
 import (
 	"context"
 
-	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type commandService struct {
@@ -112,7 +110,7 @@ func (s *commandService) ExpireTask(ctx context.Context, orgID int64, taskID str
 }
 
 func (s *commandService) CancelTask(ctx context.Context, orgID int64, taskID string) (*TaskMutationResult, error) {
-	task, err := s.loadTaskInOrg(ctx, orgID, taskID, "cancel_task")
+	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "cancel_task")
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +125,7 @@ func (s *commandService) CancelTask(ctx context.Context, orgID int64, taskID str
 }
 
 func (s *commandService) countCancelableTasksByPlan(ctx context.Context, orgID int64, planID string) (int, error) {
-	planAggregate, err := s.loadPlanInOrg(ctx, orgID, planID, "cancel_plan")
+	planAggregate, err := loadPlanInOrg(ctx, s.planRepo, orgID, planID, "cancel_plan")
 	if err != nil {
 		return 0, err
 	}
@@ -139,7 +137,7 @@ func (s *commandService) countCancelableTasksByPlan(ctx context.Context, orgID i
 			"plan_id", planID,
 			"error", err.Error(),
 		)
-		return 0, pkgerrors.WrapC(err, errorCode.ErrDatabase, "查询计划任务失败")
+		return 0, wrapDatabaseErr(err, "查询计划任务失败")
 	}
 
 	count := 0
@@ -155,7 +153,7 @@ func (s *commandService) countCancelableTasksByPlan(ctx context.Context, orgID i
 }
 
 func (s *commandService) countCancelableTasksByEnrollment(ctx context.Context, orgID int64, planID string, testeeID string) (int, error) {
-	planAggregate, err := s.loadPlanInOrg(ctx, orgID, planID, "terminate_enrollment")
+	planAggregate, err := loadPlanInOrg(ctx, s.planRepo, orgID, planID, "terminate_enrollment")
 	if err != nil {
 		return 0, err
 	}
@@ -167,7 +165,7 @@ func (s *commandService) countCancelableTasksByEnrollment(ctx context.Context, o
 			"testee_id", testeeID,
 			"error", err.Error(),
 		)
-		return 0, pkgerrors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+		return 0, invalidArgumentErr("无效的受试者ID: %v", err)
 	}
 
 	tasks, err := s.taskRepo.FindByTesteeIDAndPlanID(ctx, testeeDomainID, planAggregate.GetID())
@@ -178,7 +176,7 @@ func (s *commandService) countCancelableTasksByEnrollment(ctx context.Context, o
 			"testee_id", testeeID,
 			"error", err.Error(),
 		)
-		return 0, pkgerrors.WrapC(err, errorCode.ErrDatabase, "查询受试者计划任务失败")
+		return 0, wrapDatabaseErr(err, "查询受试者计划任务失败")
 	}
 
 	count := 0
@@ -191,72 +189,4 @@ func (s *commandService) countCancelableTasksByEnrollment(ctx context.Context, o
 		}
 	}
 	return count, nil
-}
-
-func (s *commandService) loadPlanInOrg(ctx context.Context, orgID int64, planID string, action string) (*domainplan.AssessmentPlan, error) {
-	id, err := toPlanID(planID)
-	if err != nil {
-		logger.L(ctx).Errorw("Invalid plan ID",
-			"action", action,
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, pkgerrors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
-	}
-
-	planAggregate, err := s.planRepo.FindByID(ctx, id)
-	if err != nil {
-		logger.L(ctx).Errorw("Plan not found",
-			"action", action,
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, pkgerrors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
-	}
-
-	if planAggregate.GetOrgID() != orgID {
-		logger.L(ctx).Warnw("Plan access denied due to org scope mismatch",
-			"action", action,
-			"plan_id", planID,
-			"request_org_id", orgID,
-			"resource_org_id", planAggregate.GetOrgID(),
-		)
-		return nil, pkgerrors.WithCode(errorCode.ErrPermissionDenied, "计划不属于当前机构")
-	}
-
-	return planAggregate, nil
-}
-
-func (s *commandService) loadTaskInOrg(ctx context.Context, orgID int64, taskID string, action string) (*domainplan.AssessmentTask, error) {
-	id, err := toTaskID(taskID)
-	if err != nil {
-		logger.L(ctx).Errorw("Invalid task ID",
-			"action", action,
-			"task_id", taskID,
-			"error", err.Error(),
-		)
-		return nil, pkgerrors.WithCode(errorCode.ErrInvalidArgument, "无效的任务ID: %v", err)
-	}
-
-	task, err := s.taskRepo.FindByID(ctx, id)
-	if err != nil {
-		logger.L(ctx).Errorw("Task not found",
-			"action", action,
-			"task_id", taskID,
-			"error", err.Error(),
-		)
-		return nil, pkgerrors.WithCode(errorCode.ErrPageNotFound, "任务不存在")
-	}
-
-	if task.GetOrgID() != orgID {
-		logger.L(ctx).Warnw("Task access denied due to org scope mismatch",
-			"action", action,
-			"task_id", taskID,
-			"request_org_id", orgID,
-			"resource_org_id", task.GetOrgID(),
-		)
-		return nil, pkgerrors.WithCode(errorCode.ErrPermissionDenied, "任务不属于当前机构")
-	}
-
-	return task, nil
 }

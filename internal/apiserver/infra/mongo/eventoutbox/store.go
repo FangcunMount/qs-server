@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
@@ -159,12 +159,12 @@ func (s *Store) buildDocuments(events []event.DomainEvent) ([]*OutboxPO, error) 
 	return docs, nil
 }
 
-func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 
-	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	claimed := make([]outboxport.PendingEvent, 0, limit)
 	staleBefore := now.Add(-s.publishingStaleFor)
 
 	// Recover a small amount of failed/stale work first so these rows do not
@@ -219,12 +219,12 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 	return claimed, nil
 }
 
-func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 
-	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	claimed := make([]outboxport.PendingEvent, 0, limit)
 	for len(claimed) < limit {
 		item, found, err := s.claimOne(ctx, bson.M{
 			"status":          statusPending,
@@ -242,12 +242,12 @@ func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]a
 	return claimed, nil
 }
 
-func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit int, now time.Time) ([]appEventing.PendingOutboxEvent, error) {
+func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 
-	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	claimed := make([]outboxport.PendingEvent, 0, limit)
 	for len(claimed) < limit {
 		item, found, err := s.claimOne(ctx, bson.M{
 			"status":          status,
@@ -265,12 +265,12 @@ func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit 
 	return claimed, nil
 }
 
-func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleBefore time.Time) ([]appEventing.PendingOutboxEvent, error) {
+func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleBefore time.Time) ([]outboxport.PendingEvent, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 
-	claimed := make([]appEventing.PendingOutboxEvent, 0, limit)
+	claimed := make([]outboxport.PendingEvent, 0, limit)
 	for len(claimed) < limit {
 		item, found, err := s.claimOne(ctx, bson.M{
 			"status":     statusPublishing,
@@ -288,7 +288,7 @@ func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleB
 	return claimed, nil
 }
 
-func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, now time.Time) (appEventing.PendingOutboxEvent, bool, error) {
+func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, now time.Time) (outboxport.PendingEvent, bool, error) {
 	update := bson.M{
 		"$set": bson.M{
 			"status":     statusPublishing,
@@ -302,18 +302,18 @@ func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, n
 	var po OutboxPO
 	if err := s.coll.FindOneAndUpdate(ctx, filter, update, opts).Decode(&po); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return appEventing.PendingOutboxEvent{}, false, nil
+			return outboxport.PendingEvent{}, false, nil
 		}
-		return appEventing.PendingOutboxEvent{}, false, err
+		return outboxport.PendingEvent{}, false, err
 	}
 
 	evt, err := outboxcodec.Decode(po.PayloadJSON)
 	if err != nil {
 		_ = s.MarkEventFailed(ctx, po.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
-		return appEventing.PendingOutboxEvent{}, false, nil
+		return outboxport.PendingEvent{}, false, nil
 	}
 
-	return appEventing.PendingOutboxEvent{
+	return outboxport.PendingEvent{
 		EventID: po.EventID,
 		Event:   evt,
 	}, true, nil

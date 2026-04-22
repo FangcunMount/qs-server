@@ -130,7 +130,7 @@ func (r *taskWindowRepoStub) FindListByTesteeIDs(context.Context, int64, *domain
 	return nil, 0, nil
 }
 
-func (r *taskWindowRepoStub) FindWindow(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID, status *domainPlan.TaskStatus, plannedBefore *time.Time, page, pageSize int) ([]*domainPlan.AssessmentTask, bool, error) {
+func (r *taskWindowRepoStub) FindWindow(_ context.Context, orgID int64, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID, status *domainPlan.TaskStatus, plannedBefore *time.Time, page, pageSize int) ([]*domainPlan.AssessmentTask, bool, error) {
 	r.lastWindowOrgID = orgID
 	r.lastWindowPlanID = planID
 	r.lastWindowTesteeIDs = append([]testee.ID(nil), testeeIDs...)

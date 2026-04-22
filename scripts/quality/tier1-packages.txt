@@ -1,0 +1,7 @@
+internal/collection-server/application/answersheet
+internal/apiserver/application/survey/answersheet
+internal/apiserver/application/evaluation/assessment
+internal/apiserver/application/evaluation/engine
+internal/apiserver/application/evaluation/report
+internal/worker/handlers
+internal/apiserver/interface/grpc/service

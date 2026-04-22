@@ -50,28 +50,28 @@ type stubOperatorRepository struct {
 	item *domainOperator.Operator
 }
 
-func (s *stubOperatorRepository) Save(ctx context.Context, staff *domainOperator.Operator) error {
+func (s *stubOperatorRepository) Save(context.Context, *domainOperator.Operator) error {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) Update(ctx context.Context, staff *domainOperator.Operator) error {
+func (s *stubOperatorRepository) Update(context.Context, *domainOperator.Operator) error {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) FindByID(ctx context.Context, id domainOperator.ID) (*domainOperator.Operator, error) {
+func (s *stubOperatorRepository) FindByID(context.Context, domainOperator.ID) (*domainOperator.Operator, error) {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) FindByUser(ctx context.Context, orgID int64, userID int64) (*domainOperator.Operator, error) {
+func (s *stubOperatorRepository) FindByUser(context.Context, int64, int64) (*domainOperator.Operator, error) {
 	return s.item, nil
 }
-func (s *stubOperatorRepository) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domainOperator.Operator, error) {
+func (s *stubOperatorRepository) ListByOrg(context.Context, int64, int, int) ([]*domainOperator.Operator, error) {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) ListByRole(ctx context.Context, orgID int64, role domainOperator.Role, offset, limit int) ([]*domainOperator.Operator, error) {
+func (s *stubOperatorRepository) ListByRole(context.Context, int64, domainOperator.Role, int, int) ([]*domainOperator.Operator, error) {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) Delete(ctx context.Context, id domainOperator.ID) error {
+func (s *stubOperatorRepository) Delete(context.Context, domainOperator.ID) error {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) Count(ctx context.Context, orgID int64) (int64, error) {
+func (s *stubOperatorRepository) Count(context.Context, int64) (int64, error) {
 	panic("unexpected call")
 }
 
@@ -79,25 +79,25 @@ type stubClinicianRepository struct {
 	item *domainClinician.Clinician
 }
 
-func (s *stubClinicianRepository) Save(ctx context.Context, item *domainClinician.Clinician) error {
+func (s *stubClinicianRepository) Save(context.Context, *domainClinician.Clinician) error {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) Update(ctx context.Context, item *domainClinician.Clinician) error {
+func (s *stubClinicianRepository) Update(context.Context, *domainClinician.Clinician) error {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) FindByID(ctx context.Context, id domainClinician.ID) (*domainClinician.Clinician, error) {
+func (s *stubClinicianRepository) FindByID(context.Context, domainClinician.ID) (*domainClinician.Clinician, error) {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) FindByOperator(ctx context.Context, orgID int64, operatorID uint64) (*domainClinician.Clinician, error) {
+func (s *stubClinicianRepository) FindByOperator(context.Context, int64, uint64) (*domainClinician.Clinician, error) {
 	return s.item, nil
 }
-func (s *stubClinicianRepository) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domainClinician.Clinician, error) {
+func (s *stubClinicianRepository) ListByOrg(context.Context, int64, int, int) ([]*domainClinician.Clinician, error) {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) Count(ctx context.Context, orgID int64) (int64, error) {
+func (s *stubClinicianRepository) Count(context.Context, int64) (int64, error) {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) Delete(ctx context.Context, id domainClinician.ID) error {
+func (s *stubClinicianRepository) Delete(context.Context, domainClinician.ID) error {
 	panic("unexpected call")
 }
 
@@ -106,44 +106,44 @@ type stubRelationRepository struct {
 	activeAllowed     bool
 }
 
-func (s *stubRelationRepository) Save(ctx context.Context, item *domainRelation.ClinicianTesteeRelation) error {
+func (s *stubRelationRepository) Save(context.Context, *domainRelation.ClinicianTesteeRelation) error {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) Update(ctx context.Context, item *domainRelation.ClinicianTesteeRelation) error {
+func (s *stubRelationRepository) Update(context.Context, *domainRelation.ClinicianTesteeRelation) error {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) FindByID(ctx context.Context, id domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) FindByID(context.Context, domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) FindActive(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationType domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) FindActive(context.Context, int64, domainClinician.ID, domainTestee.ID, domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) FindActivePrimaryByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) FindActivePrimaryByTestee(context.Context, int64, domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) FindActiveByTypes(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) FindActiveByTypes(context.Context, int64, domainClinician.ID, domainTestee.ID, []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) ListActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType, offset, limit int) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) ListActiveByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType, int, int) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) ListHistoryByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) ListHistoryByClinician(context.Context, int64, domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) CountActiveByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType) (int64, error) {
+func (s *stubRelationRepository) CountActiveByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType) (int64, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) ListActiveByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) ListActiveByTestee(context.Context, int64, domainTestee.ID, []domainRelation.RelationType) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) ListHistoryByTestee(ctx context.Context, orgID int64, testeeID domainTestee.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationRepository) ListHistoryByTestee(context.Context, int64, domainTestee.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) HasActiveRelationForTestee(ctx context.Context, orgID int64, clinicianID domainClinician.ID, testeeID domainTestee.ID, relationTypes []domainRelation.RelationType) (bool, error) {
+func (s *stubRelationRepository) HasActiveRelationForTestee(_ context.Context, _ int64, _ domainClinician.ID, _ domainTestee.ID, relationTypes []domainRelation.RelationType) (bool, error) {
 	s.lastRelationTypes = append([]domainRelation.RelationType(nil), relationTypes...)
 	return s.activeAllowed, nil
 }
-func (s *stubRelationRepository) ListActiveTesteeIDsByClinician(ctx context.Context, orgID int64, clinicianID domainClinician.ID, relationTypes []domainRelation.RelationType) ([]domainTestee.ID, error) {
+func (s *stubRelationRepository) ListActiveTesteeIDsByClinician(_ context.Context, _ int64, _ domainClinician.ID, relationTypes []domainRelation.RelationType) ([]domainTestee.ID, error) {
 	s.lastRelationTypes = append([]domainRelation.RelationType(nil), relationTypes...)
 	return []domainTestee.ID{domainTestee.ID(401)}, nil
 }
@@ -152,48 +152,48 @@ type stubTesteeRepository struct {
 	item *domainTestee.Testee
 }
 
-func (s *stubTesteeRepository) Save(ctx context.Context, testee *domainTestee.Testee) error {
+func (s *stubTesteeRepository) Save(context.Context, *domainTestee.Testee) error {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) Update(ctx context.Context, testee *domainTestee.Testee) error {
+func (s *stubTesteeRepository) Update(context.Context, *domainTestee.Testee) error {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) FindByID(ctx context.Context, id domainTestee.ID) (*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) FindByID(context.Context, domainTestee.ID) (*domainTestee.Testee, error) {
 	return s.item, nil
 }
-func (s *stubTesteeRepository) FindByIDs(ctx context.Context, ids []domainTestee.ID) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) FindByIDs(context.Context, []domainTestee.ID) ([]*domainTestee.Testee, error) {
 	if s.item == nil {
 		return []*domainTestee.Testee{}, nil
 	}
 	return []*domainTestee.Testee{s.item}, nil
 }
-func (s *stubTesteeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) FindByProfile(context.Context, int64, uint64) (*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) FindByOrgAndName(context.Context, int64, string) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListByOrg(ctx context.Context, orgID int64, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) ListByOrg(context.Context, int64, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) ListByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) ListByTags(context.Context, int64, []string, int, int) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) ListKeyFocus(context.Context, int64, int, int) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeRepository) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domainTestee.Testee, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) Delete(ctx context.Context, id domainTestee.ID) error {
+func (s *stubTesteeRepository) Delete(context.Context, domainTestee.ID) error {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) Count(ctx context.Context, orgID int64, filter domainTestee.ListFilter) (int64, error) {
+func (s *stubTesteeRepository) Count(context.Context, int64, domainTestee.ListFilter) (int64, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []domainTestee.ID, filter domainTestee.ListFilter) (int64, error) {
+func (s *stubTesteeRepository) CountByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter) (int64, error) {
 	panic("unexpected call")
 }
