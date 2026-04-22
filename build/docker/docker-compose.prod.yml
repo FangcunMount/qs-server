@@ -86,8 +86,8 @@ services:
       - "prometheus.component=qs-worker"
       - "prometheus.metrics_port=9092"
       - "prometheus.metrics_path=/metrics"
-    expose:
-      - "9092"
+    ports:
+      - "19092:9092"
     env_file:
       - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:
