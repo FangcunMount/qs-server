@@ -41,125 +41,118 @@ func NewStatisticsService(
 // 场景：查看受试者在各个量表上的历史得分变化
 // 用于绘制趋势图表，分析干预效果
 func (s *statisticsService) GetScaleAnalysis(ctx context.Context, testeeID uint64) (*ScaleAnalysisResult, error) {
-	// 1. 验证受试者是否存在
-	testee, err := s.testeeRepo.FindByID(ctx, domain.ID(testeeID))
+	testeeItem, err := s.loadTestee(ctx, testeeID)
 	if err != nil {
-		if errors.IsCode(err, code.ErrUserNotFound) {
-			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
-		}
-		return nil, errors.Wrap(err, "failed to find testee")
+		return nil, err
 	}
 
-	// 2. 查询受试者的所有测评记录（不分页，全量查询）
-	// 使用一个大的分页参数来获取所有记录
-	pagination := assessment.NewPagination(1, 1000)
-	assessments, _, err := s.assessmentRepo.FindByTesteeID(ctx, testee.ID(), pagination)
+	assessments, err := s.loadAssessments(ctx, testeeItem.ID())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find assessments")
+		return nil, err
 	}
 
-	// 3. 过滤出已完成的测评（只有完成的测评才有有效结果）
-	completedAssessments := make([]*assessment.Assessment, 0)
-	for _, a := range assessments {
-		if a.Status() == assessment.StatusInterpreted {
-			completedAssessments = append(completedAssessments, a)
-		}
-	}
-
-	// 4. 按量表分组
-	scaleMap := make(map[uint64]*ScaleTrendAnalysis) // key: scaleID
-
-	for _, a := range completedAssessments {
-		// 只处理有量表的测评
-		if !a.HasMedicalScale() {
-			continue
-		}
-
-		scaleRef := a.MedicalScaleRef()
-		scaleID := uint64(scaleRef.ID())
-
-		// 初始化量表分析结构
-		if _, exists := scaleMap[scaleID]; !exists {
-			scaleMap[scaleID] = &ScaleTrendAnalysis{
-				ScaleID:   scaleID,
-				ScaleCode: string(scaleRef.Code()),
-				ScaleName: scaleRef.Name(),
-				Tests:     make([]TestRecordData, 0),
-			}
-		}
-
-		// 构建测评记录数据
-		testRecord := TestRecordData{
-			AssessmentID: uint64(a.ID()),
-			TestDate:     *a.SubmittedAt(), // 使用提交时间
-		}
-
-		// 获取总分和风险等级
-		if a.TotalScore() != nil {
-			testRecord.TotalScore = *a.TotalScore()
-		}
-		if a.RiskLevel() != nil {
-			testRecord.RiskLevel = string(*a.RiskLevel())
-		}
-
-		// 获取解读报告（获取结果描述）
-		rep, err := s.reportRepo.FindByAssessmentID(ctx, a.ID())
-		if err == nil && rep != nil {
-			testRecord.Result = rep.Conclusion()
-		}
-
-		// 获取因子得分
-		scores, err := s.scoreRepo.FindByAssessmentID(ctx, a.ID())
-		if err == nil && len(scores) > 0 {
-			// 获取因子得分列表
-			for _, score := range scores {
-				for _, factorScore := range score.FactorScores() {
-					// 跳过总分因子（总分已经在上面记录）
-					if factorScore.IsTotalScore() {
-						continue
-					}
-
-					factorData := FactorScoreData{
-						FactorCode: string(factorScore.FactorCode()),
-						FactorName: factorScore.FactorName(),
-						RawScore:   factorScore.RawScore(),
-						RiskLevel:  string(factorScore.RiskLevel()),
-					}
-
-					// T分和百分位（如果有）
-					// 注意：当前设计中 FactorScore 只有 RawScore，T分和百分位可能在未来扩展
-					// 这里预留字段，当前为 nil
-
-					testRecord.Factors = append(testRecord.Factors, factorData)
-				}
-			}
-		}
-
-		scaleMap[scaleID].Tests = append(scaleMap[scaleID].Tests, testRecord)
-	}
-
-	// 5. 对每个量表的测评记录按时间排序（升序）
-	for _, scaleTrend := range scaleMap {
-		sort.Slice(scaleTrend.Tests, func(i, j int) bool {
-			return scaleTrend.Tests[i].TestDate.Before(scaleTrend.Tests[j].TestDate)
-		})
-	}
-
-	// 6. 转换为结果列表（按量表ID排序）
-	scales := make([]ScaleTrendAnalysis, 0, len(scaleMap))
-	for _, scaleTrend := range scaleMap {
-		scales = append(scales, *scaleTrend)
-	}
-
-	// 按量表ID排序
-	sort.Slice(scales, func(i, j int) bool {
-		return scales[i].ScaleID < scales[j].ScaleID
-	})
+	scales := s.buildScaleAnalyses(ctx, filterScaleAnalysisAssessments(assessments))
 
 	return &ScaleAnalysisResult{
 		TesteeID: testeeID,
 		Scales:   scales,
 	}, nil
+}
+
+func filterScaleAnalysisAssessments(items []*assessment.Assessment) []*assessment.Assessment {
+	filtered := make([]*assessment.Assessment, 0, len(items))
+	for _, item := range items {
+		if item == nil || item.Status() != assessment.StatusInterpreted || !item.HasMedicalScale() {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
+}
+
+func (s *statisticsService) buildScaleAnalyses(ctx context.Context, items []*assessment.Assessment) []ScaleTrendAnalysis {
+	scaleMap := make(map[uint64]*ScaleTrendAnalysis)
+	for _, item := range items {
+		scaleTrend := ensureScaleTrendAnalysis(scaleMap, item)
+		scaleTrend.Tests = append(scaleTrend.Tests, s.buildScaleTestRecord(ctx, item))
+	}
+	return finalizeScaleTrendAnalyses(scaleMap)
+}
+
+func ensureScaleTrendAnalysis(scaleMap map[uint64]*ScaleTrendAnalysis, item *assessment.Assessment) *ScaleTrendAnalysis {
+	scaleRef := item.MedicalScaleRef()
+	scaleID := scaleRef.ID().Uint64()
+	if existing, ok := scaleMap[scaleID]; ok {
+		return existing
+	}
+
+	scaleTrend := &ScaleTrendAnalysis{
+		ScaleID:   scaleID,
+		ScaleCode: string(scaleRef.Code()),
+		ScaleName: scaleRef.Name(),
+		Tests:     make([]TestRecordData, 0),
+	}
+	scaleMap[scaleID] = scaleTrend
+	return scaleTrend
+}
+
+func (s *statisticsService) buildScaleTestRecord(ctx context.Context, item *assessment.Assessment) TestRecordData {
+	record := TestRecordData{
+		AssessmentID: item.ID().Uint64(),
+		TestDate:     *item.SubmittedAt(),
+	}
+	if item.TotalScore() != nil {
+		record.TotalScore = *item.TotalScore()
+	}
+	if item.RiskLevel() != nil {
+		record.RiskLevel = string(*item.RiskLevel())
+	}
+
+	s.applyScaleReport(ctx, item, &record)
+	s.appendScaleFactorScores(ctx, item, &record)
+	return record
+}
+
+func (s *statisticsService) applyScaleReport(ctx context.Context, item *assessment.Assessment, record *TestRecordData) {
+	reportItem, err := s.reportRepo.FindByAssessmentID(ctx, item.ID())
+	if err == nil && reportItem != nil {
+		record.Result = reportItem.Conclusion()
+	}
+}
+
+func (s *statisticsService) appendScaleFactorScores(ctx context.Context, item *assessment.Assessment, record *TestRecordData) {
+	scores, err := s.scoreRepo.FindByAssessmentID(ctx, item.ID())
+	if err != nil {
+		return
+	}
+
+	for _, score := range scores {
+		for _, factorScore := range score.FactorScores() {
+			if factorScore.IsTotalScore() {
+				continue
+			}
+			record.Factors = append(record.Factors, FactorScoreData{
+				FactorCode: string(factorScore.FactorCode()),
+				FactorName: factorScore.FactorName(),
+				RawScore:   factorScore.RawScore(),
+				RiskLevel:  string(factorScore.RiskLevel()),
+			})
+		}
+	}
+}
+
+func finalizeScaleTrendAnalyses(scaleMap map[uint64]*ScaleTrendAnalysis) []ScaleTrendAnalysis {
+	scales := make([]ScaleTrendAnalysis, 0, len(scaleMap))
+	for _, scaleTrend := range scaleMap {
+		sort.Slice(scaleTrend.Tests, func(i, j int) bool {
+			return scaleTrend.Tests[i].TestDate.Before(scaleTrend.Tests[j].TestDate)
+		})
+		scales = append(scales, *scaleTrend)
+	}
+	sort.Slice(scales, func(i, j int) bool {
+		return scales[i].ScaleID < scales[j].ScaleID
+	})
+	return scales
 }
 
 // GetPeriodicStats 获取受试者参与的周期性测评项目统计
@@ -187,7 +180,11 @@ func (s *statisticsService) GetPeriodicStats(ctx context.Context, testeeID uint6
 }
 
 func (s *statisticsService) loadTestee(ctx context.Context, testeeID uint64) (*domain.Testee, error) {
-	testeeItem, err := s.testeeRepo.FindByID(ctx, domain.ID(testeeID))
+	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return nil, err
+	}
+	testeeItem, err := s.testeeRepo.FindByID(ctx, targetTesteeID)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
@@ -308,7 +305,7 @@ func buildPeriodicTask(week int, item *assessment.Assessment) PeriodicTask {
 	case assessment.StatusInterpreted:
 		task.Status = "completed"
 		task.CompletedAt = item.InterpretedAt()
-		assessmentID := uint64(item.ID())
+		assessmentID := item.ID().Uint64()
 		task.AssessmentID = &assessmentID
 	case assessment.StatusFailed:
 		task.Status = "overdue"

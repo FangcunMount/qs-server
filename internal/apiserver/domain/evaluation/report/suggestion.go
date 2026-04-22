@@ -144,7 +144,7 @@ func (s *FactorInterpretationSuggestionStrategy) Name() string {
 }
 
 // CanHandle 是否可以处理
-func (s *FactorInterpretationSuggestionStrategy) CanHandle(report *InterpretReport) bool {
+func (s *FactorInterpretationSuggestionStrategy) CanHandle(_ *InterpretReport) bool {
 	// 只要有评估结果就可以处理
 	return s.evaluationResult != nil && len(s.evaluationResult.FactorScores) > 0
 }

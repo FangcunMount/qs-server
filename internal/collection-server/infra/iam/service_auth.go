@@ -35,7 +35,7 @@ type ServiceAuthConfig struct {
 
 // NewServiceAuthHelper 创建服务间认证助手
 // 需要传入已初始化的 IAM Client
-func NewServiceAuthHelper(ctx context.Context, client *Client, config *ServiceAuthConfig) (*ServiceAuthHelper, error) {
+func NewServiceAuthHelper(_ context.Context, client *Client, config *ServiceAuthConfig) (*ServiceAuthHelper, error) {
 	if client == nil || !client.enabled {
 		return nil, fmt.Errorf("IAM client not enabled")
 	}
@@ -102,8 +102,8 @@ func (h *ServiceAuthHelper) CallWithAuth(ctx context.Context, fn func(ctx contex
 
 // GetRequestMetadata 实现 credentials.PerRPCCredentials 接口
 // 用于 gRPC WithPerRPCCredentials
-func (h *ServiceAuthHelper) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	token, err := h.GetToken(ctx)
+func (h *ServiceAuthHelper) GetRequestMetadata(_ context.Context, _ ...string) (map[string]string, error) {
+	token, err := h.GetToken(context.Background())
 	if err != nil {
 		return nil, err
 	}

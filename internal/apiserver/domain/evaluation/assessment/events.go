@@ -99,7 +99,7 @@ func NewAssessmentSubmittedEvent(
 	data := AssessmentSubmittedData{
 		OrgID:             orgID,
 		AssessmentID:      int64(assessmentID),
-		TesteeID:          uint64(testeeID),
+		TesteeID:          testeeID.Uint64(),
 		QuestionnaireCode: string(questionnaireRef.Code()),
 		QuestionnaireVer:  questionnaireRef.Version(),
 		AnswerSheetID:     strconv.FormatInt(int64(answerSheetRef.ID()), 10),
@@ -127,7 +127,7 @@ func NewAssessmentInterpretedEvent(
 		AssessmentInterpretedData{
 			OrgID:         orgID,
 			AssessmentID:  int64(assessmentID),
-			TesteeID:      uint64(testeeID),
+			TesteeID:      testeeID.Uint64(),
 			ScaleCode:     string(medicalScaleRef.Code()),
 			ScaleVersion:  medicalScaleRef.Name(),
 			TotalScore:    totalScore,
@@ -149,7 +149,7 @@ func NewAssessmentFailedEvent(
 		AssessmentFailedData{
 			OrgID:        orgID,
 			AssessmentID: int64(assessmentID),
-			TesteeID:     uint64(testeeID),
+			TesteeID:     testeeID.Uint64(),
 			Reason:       reason,
 			FailedAt:     failedAt,
 		},

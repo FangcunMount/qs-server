@@ -19,17 +19,17 @@ type fakeQRCodeGenerator struct {
 
 var _ wechatPort.QRCodeGenerator = (*fakeQRCodeGenerator)(nil)
 
-func (f *fakeQRCodeGenerator) GenerateQRCode(ctx context.Context, appID, appSecret, path string, width int) (io.Reader, error) {
+func (f *fakeQRCodeGenerator) GenerateQRCode(_ context.Context, _, _, _ string, _ int) (io.Reader, error) {
 	return nil, errFakeGenerate
 }
 
 func (f *fakeQRCodeGenerator) GenerateUnlimitedQRCode(
-	ctx context.Context,
-	appID, appSecret, scene, page string,
-	width int,
-	autoColor bool,
-	lineColor map[string]int,
-	isHyaline bool,
+	_ context.Context,
+	_, _, scene, page string,
+	_ int,
+	_ bool,
+	_ map[string]int,
+	_ bool,
 ) (io.Reader, error) {
 	f.scene = scene
 	f.page = page

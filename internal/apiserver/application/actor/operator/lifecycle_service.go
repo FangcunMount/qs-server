@@ -128,8 +128,12 @@ func (s *lifecycleService) EnsureByUser(ctx context.Context, orgID int64, userID
 
 // Delete 删除操作者
 func (s *lifecycleService) Delete(ctx context.Context, operatorID uint64) error {
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.repo.Delete(txCtx, domain.ID(operatorID)); err != nil {
+		if err := s.repo.Delete(txCtx, targetOperatorID); err != nil {
 			return errors.Wrap(err, "failed to delete operator")
 		}
 		return nil
@@ -139,9 +143,13 @@ func (s *lifecycleService) Delete(ctx context.Context, operatorID uint64) error 
 // UpdateProfile 更新本地员工投影资料。
 func (s *lifecycleService) UpdateProfile(ctx context.Context, dto UpdateOperatorProfileDTO) (*OperatorResult, error) {
 	var result *domain.Operator
+	targetOperatorID, err := operatorIDFromUint64("operator_id", dto.OperatorID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		st, err := s.repo.FindByID(txCtx, domain.ID(dto.OperatorID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		st, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
@@ -168,10 +176,14 @@ func (s *lifecycleService) UpdateProfile(ctx context.Context, dto UpdateOperator
 
 // UpdateContactInfo 更新联系方式
 func (s *lifecycleService) UpdateContactInfo(ctx context.Context, dto UpdateOperatorContactDTO) error {
+	targetOperatorID, err := operatorIDFromUint64("operator_id", dto.OperatorID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 
 		// 1. 查找操作者
-		st, err := s.repo.FindByID(txCtx, domain.ID(dto.OperatorID))
+		st, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
@@ -194,9 +206,13 @@ func (s *lifecycleService) UpdateContactInfo(ctx context.Context, dto UpdateOper
 
 // UpdateFromExternalSource 从外部源更新操作者信息
 func (s *lifecycleService) UpdateFromExternalSource(ctx context.Context, operatorID uint64, name, email, phone string) error {
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找操作者
-		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}

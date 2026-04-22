@@ -55,7 +55,7 @@ func NewCategoryService() ScaleCategoryService {
 }
 
 // GetCategories 获取量表分类列表
-func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesResult, error) {
+func (s *categoryService) GetCategories(_ context.Context) (*ScaleCategoriesResult, error) {
 	// 构建类别列表
 	// 根据 Category.isOpen() 判断
 	categories := []CategoryOption{}
@@ -105,7 +105,7 @@ func (s *categoryService) GetCategories(ctx context.Context) (*ScaleCategoriesRe
 }
 
 // GetOpenCategories 获取开放的量表分类列表
-func (s *categoryService) GetOpenCategories(ctx context.Context) (*ScaleCategoriesResult, error) {
+func (s *categoryService) GetOpenCategories(_ context.Context) (*ScaleCategoriesResult, error) {
 	// 构建类别列表
 	// 根据 Category.isOpen() 判断
 	categories := []CategoryOption{}

@@ -116,7 +116,7 @@ func (r *ReportRepository) FindByAssessmentID(ctx context.Context, assessmentID 
 // FindByTesteeID 查询受试者的报告列表
 func (r *ReportRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination report.Pagination) ([]*report.InterpretReport, int64, error) {
 	filter := bson.M{
-		"testee_id":  uint64(testeeID),
+		"testee_id":  testeeID.Uint64(),
 		"deleted_at": nil,
 	}
 	return r.findByFilter(ctx, filter, pagination)
@@ -130,7 +130,7 @@ func (r *ReportRepository) FindByTesteeIDs(ctx context.Context, testeeIDs []test
 
 	rawIDs := make([]uint64, 0, len(testeeIDs))
 	for _, id := range testeeIDs {
-		rawIDs = append(rawIDs, uint64(id))
+		rawIDs = append(rawIDs, id.Uint64())
 	}
 
 	filter := bson.M{
@@ -226,7 +226,7 @@ func (r *ReportRepository) nowTime() interface{} {
 }
 
 func (r *ReportRepository) insertTx(ctx mongo.SessionContext, auditCtx context.Context, rpt *report.InterpretReport, testeeID testee.ID) error {
-	po := r.mapper.ToPO(rpt, uint64(testeeID))
+	po := r.mapper.ToPO(rpt, testeeID.Uint64())
 	base.ApplyAuditCreate(auditCtx, po)
 	po.BeforeInsert()
 	po.DomainID = rpt.ID()

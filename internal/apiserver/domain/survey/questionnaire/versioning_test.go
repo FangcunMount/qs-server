@@ -53,7 +53,7 @@ func TestVersioning_InitializeVersion(t *testing.T) {
 
 // TestVersioning_IncrementMinorVersion 测试小版本递增
 func TestVersioning_IncrementMinorVersion(t *testing.T) {
-	tests := []struct {
+	runVersionIncrementTests(t, []struct {
 		name            string
 		initialVersion  string
 		expectedVersion string
@@ -89,34 +89,14 @@ func TestVersioning_IncrementMinorVersion(t *testing.T) {
 			expectedVersion: "0.0.1",
 			wantErr:         false,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			q, _ := NewQuestionnaire(
-				meta.NewCode("TEST001"),
-				"测试问卷",
-				WithVersion(NewVersion(tt.initialVersion)),
-			)
-
-			versioning := Versioning{}
-			err := versioning.IncrementMinorVersion(q)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("IncrementMinorVersion() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr && q.GetVersion().Value() != tt.expectedVersion {
-				t.Errorf("IncrementMinorVersion() version = %v, want %v", q.GetVersion().Value(), tt.expectedVersion)
-			}
-		})
-	}
+	}, func(versioning Versioning, q *Questionnaire) error {
+		return versioning.IncrementMinorVersion(q)
+	})
 }
 
 // TestVersioning_IncrementMajorVersion 测试大版本递增
 func TestVersioning_IncrementMajorVersion(t *testing.T) {
-	tests := []struct {
+	runVersionIncrementTests(t, []struct {
 		name            string
 		initialVersion  string
 		expectedVersion string
@@ -152,7 +132,22 @@ func TestVersioning_IncrementMajorVersion(t *testing.T) {
 			expectedVersion: "1.0.1",
 			wantErr:         false,
 		},
-	}
+	}, func(versioning Versioning, q *Questionnaire) error {
+		return versioning.IncrementMajorVersion(q)
+	})
+}
+
+func runVersionIncrementTests(
+	t *testing.T,
+	tests []struct {
+		name            string
+		initialVersion  string
+		expectedVersion string
+		wantErr         bool
+	},
+	increment func(Versioning, *Questionnaire) error,
+) {
+	t.Helper()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,15 +158,15 @@ func TestVersioning_IncrementMajorVersion(t *testing.T) {
 			)
 
 			versioning := Versioning{}
-			err := versioning.IncrementMajorVersion(q)
+			err := increment(versioning, q)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("IncrementMajorVersion() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("increment() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr && q.GetVersion().Value() != tt.expectedVersion {
-				t.Errorf("IncrementMajorVersion() version = %v, want %v", q.GetVersion().Value(), tt.expectedVersion)
+				t.Errorf("increment() version = %v, want %v", q.GetVersion().Value(), tt.expectedVersion)
 			}
 		})
 	}

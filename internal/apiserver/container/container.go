@@ -1027,7 +1027,7 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 }
 
 // checkModulesHealth 检查模块健康状态
-func (c *Container) checkModulesHealth(ctx context.Context) error {
+func (c *Container) checkModulesHealth(_ context.Context) error {
 	for _, module := range modulePool {
 		if err := module.CheckHealth(); err != nil {
 			return fmt.Errorf("module health check failed: %w", err)

@@ -42,6 +42,17 @@ type StatisticsModule struct {
 	warmupCoordinator              cachegov.Coordinator
 }
 
+type statisticsModuleDeps struct {
+	mysqlDB          *gorm.DB
+	redisClient      redis.UniversalClient
+	cacheBuilder     *rediskey.Builder
+	answerSheetRepo  surveyAnswerSheet.Repository
+	repairWindowDays int
+	queryPolicy      cachepolicy.CachePolicy
+	hotsetRecorder   scaleCache.HotsetRecorder
+	lockManager      *redislock.Manager
+}
+
 // NewStatisticsModule 创建统计模块
 func NewStatisticsModule() *StatisticsModule {
 	return &StatisticsModule{}
@@ -57,79 +68,31 @@ func NewStatisticsModule() *StatisticsModule {
 // params[6]: scaleCache.HotsetRecorder（可选）
 // params[7]: *redislock.Manager（统计同步锁，可选）
 func (m *StatisticsModule) Initialize(params ...interface{}) error {
-	if len(params) < 1 {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
-	}
-
-	mysqlDB, ok := params[0].(*gorm.DB)
-	if !ok || mysqlDB == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
-	}
-
-	// 获取Redis客户端（可选参数）
-	var redisClient redis.UniversalClient
-	if len(params) > 1 {
-		if rc, ok := params[1].(redis.UniversalClient); ok && rc != nil {
-			redisClient = rc
-		}
-	}
-	var cacheBuilder *rediskey.Builder
-	if len(params) > 2 {
-		if builder, ok := params[2].(*rediskey.Builder); ok {
-			cacheBuilder = builder
-		}
-	}
-	var answerSheetRepo surveyAnswerSheet.Repository
-	if len(params) > 3 {
-		if repo, ok := params[3].(surveyAnswerSheet.Repository); ok && repo != nil {
-			answerSheetRepo = repo
-		}
-	}
-	repairWindowDays := 0
-	if len(params) > 4 {
-		if value, ok := params[4].(int); ok {
-			repairWindowDays = value
-		}
-	}
-	queryPolicy := cachepolicy.CachePolicy{}
-	if len(params) > 5 {
-		if value, ok := params[5].(cachepolicy.CachePolicy); ok {
-			queryPolicy = value
-		}
-	}
-	var hotset scaleCache.HotsetRecorder
-	if len(params) > 6 {
-		if value, ok := params[6].(scaleCache.HotsetRecorder); ok {
-			hotset = value
-		}
-	}
-	var lockManager *redislock.Manager
-	if len(params) > 7 {
-		if value, ok := params[7].(*redislock.Manager); ok {
-			lockManager = value
-		}
+	deps, err := parseStatisticsModuleDeps(params)
+	if err != nil {
+		return err
 	}
 
 	// 初始化 repository 层
-	m.Repo = statisticsInfra.NewStatisticsRepository(mysqlDB)
+	m.Repo = statisticsInfra.NewStatisticsRepository(deps.mysqlDB)
 
 	// 初始化 cache 层
-	if redisClient != nil {
-		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(redisClient, cacheBuilder, queryPolicy)
+	if deps.redisClient != nil {
+		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(deps.redisClient, deps.cacheBuilder, deps.queryPolicy)
 	} else {
 		// Redis不可用时，创建空实现（查询时会降级到MySQL）
 		m.Cache = nil
 	}
 
 	// 初始化 service 层
-	m.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(mysqlDB, m.Repo, m.Cache, hotset)
-	m.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(mysqlDB, m.Repo, m.Cache, hotset)
-	m.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(mysqlDB, m.Repo, m.Cache)
-	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(mysqlDB, m.Repo, m.Cache, hotset)
-	m.ReadService = statisticsApp.NewReadService(mysqlDB, answerSheetRepo)
-	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(mysqlDB)
-	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(mysqlDB, m.Repo)
-	m.SyncService = statisticsApp.NewSyncService(mysqlDB, repairWindowDays, lockManager)
+	m.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
+	m.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
+	m.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(deps.mysqlDB, m.Repo, m.Cache)
+	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
+	m.ReadService = statisticsApp.NewReadService(deps.mysqlDB, deps.answerSheetRepo)
+	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(deps.mysqlDB)
+	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(deps.mysqlDB, m.Repo)
+	m.SyncService = statisticsApp.NewSyncService(deps.mysqlDB, deps.repairWindowDays, deps.lockManager)
 
 	// 初始化 handler 层
 	m.Handler = handler.NewStatisticsHandler(
@@ -149,6 +112,45 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	}
 
 	return nil
+}
+
+func parseStatisticsModuleDeps(params []interface{}) (*statisticsModuleDeps, error) {
+	if len(params) < 1 {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	}
+
+	mysqlDB, ok := params[0].(*gorm.DB)
+	if !ok || mysqlDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+
+	deps := &statisticsModuleDeps{mysqlDB: mysqlDB}
+	applyOptionalParam(params, 1, func(client redis.UniversalClient) {
+		if client != nil {
+			deps.redisClient = client
+		}
+	})
+	applyOptionalParam(params, 2, func(builder *rediskey.Builder) {
+		deps.cacheBuilder = builder
+	})
+	applyOptionalParam(params, 3, func(repo surveyAnswerSheet.Repository) {
+		if repo != nil {
+			deps.answerSheetRepo = repo
+		}
+	})
+	applyOptionalParam(params, 4, func(value int) {
+		deps.repairWindowDays = value
+	})
+	applyOptionalParam(params, 5, func(value cachepolicy.CachePolicy) {
+		deps.queryPolicy = value
+	})
+	applyOptionalParam(params, 6, func(value scaleCache.HotsetRecorder) {
+		deps.hotsetRecorder = value
+	})
+	applyOptionalParam(params, 7, func(value *redislock.Manager) {
+		deps.lockManager = value
+	})
+	return deps, nil
 }
 
 // SetTesteeAccessService 设置 testee 访问控制服务。

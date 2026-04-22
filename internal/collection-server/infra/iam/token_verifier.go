@@ -38,7 +38,7 @@ func mergeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 // 2. gRPC 远程验证（降级）
 // 3. 缓存管理和自动刷新
 // 4. 熔断保护
-func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, error) {
+func NewTokenVerifier(_ context.Context, client *Client) (*TokenVerifier, error) {
 	if client == nil || !client.enabled {
 		return nil, fmt.Errorf("IAM client not enabled")
 	}

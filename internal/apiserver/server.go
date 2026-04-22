@@ -17,6 +17,7 @@ import (
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	runtimescheduler "github.com/FangcunMount/qs-server/internal/apiserver/runtime/scheduler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
@@ -29,6 +30,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // apiServer 定义了 API 服务器的基本结构（六边形架构版本）
@@ -62,6 +65,24 @@ type apiServer struct {
 // preparedAPIServer 定义了准备运行的 API 服务器
 type preparedAPIServer struct {
 	*apiServer
+}
+
+type prepareRedisHandles struct {
+	static *redisplane.Handle
+	object *redisplane.Handle
+	query  *redisplane.Handle
+	meta   *redisplane.Handle
+	sdk    *redisplane.Handle
+	lock   *redisplane.Handle
+}
+
+type prepareResources struct {
+	mysqlDB      *gorm.DB
+	mongoDB      *mongo.Database
+	redisCache   redis.UniversalClient
+	redisHandles prepareRedisHandles
+	mqPublisher  messaging.Publisher
+	publishMode  eventconfig.PublishMode
 }
 
 // createAPIServer 创建 API 服务器实例（六边形架构版本）
@@ -100,49 +121,85 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 
 // PrepareRun 准备运行 API 服务器（六边形架构版本）
 func (s *apiServer) PrepareRun() preparedAPIServer {
-	// 初始化数据库连接
-	if err := s.dbManager.Initialize(); err != nil {
-		logger.L(context.Background()).Errorw("Failed to initialize database",
-			"component", "apiserver",
-			"error", err.Error(),
-		)
-		log.Fatalf("Failed to initialize database: %v", err)
+	resources, err := s.prepareResources()
+	if err != nil {
+		s.fatalPrepareRun("prepare resources", err)
 	}
 
-	// 获取 MySQL 数据库连接
+	s.container = container.NewContainerWithOptions(
+		resources.mysqlDB,
+		resources.mongoDB,
+		resources.redisCache,
+		s.buildContainerOptions(resources),
+	)
+	if err := s.initializeContainer(); err != nil {
+		s.fatalPrepareRun("initialize container", err)
+	}
+	if err := s.initializeWeChatServices(); err != nil {
+		s.fatalPrepareRun("initialize wechat services", err)
+	}
+	if err := s.initializeTransports(); err != nil {
+		s.fatalPrepareRun("initialize transports", err)
+	}
+	s.logInitialization(resources.mongoDB != nil)
+	s.startWarmup()
+	s.startSchedulers()
+	s.startMongoOutboxRelay()
+	s.startAssessmentOutboxRelay()
+	s.registerShutdownCallback()
+
+	return preparedAPIServer{s}
+}
+
+func (s *apiServer) prepareResources() (*prepareResources, error) {
+	mysqlDB, mongoDB, err := s.initializeDatabaseConnections()
+	if err != nil {
+		return nil, err
+	}
+	s.configureBackpressure()
+	redisCache, handles := s.initializeRedisRuntime()
+	mqPublisher, publishMode := s.createMQPublisher()
+	return &prepareResources{
+		mysqlDB:      mysqlDB,
+		mongoDB:      mongoDB,
+		redisCache:   redisCache,
+		redisHandles: handles,
+		mqPublisher:  mqPublisher,
+		publishMode:  publishMode,
+	}, nil
+}
+
+func (s *apiServer) initializeDatabaseConnections() (*gorm.DB, *mongo.Database, error) {
+	if err := s.dbManager.Initialize(); err != nil {
+		return nil, nil, err
+	}
 	mysqlDB, err := s.dbManager.GetMySQLDB()
 	if err != nil {
-		logger.L(context.Background()).Errorw("Failed to get MySQL connection",
-			"component", "apiserver",
-			"error", err.Error(),
-		)
-		log.Fatalf("Failed to get MySQL connection: %v", err)
+		return nil, nil, err
 	}
-
-	// 获取 MongoDB 数据库链接
 	mongoDB, err := s.dbManager.GetMongoDB()
 	if err != nil {
-		logger.L(context.Background()).Errorw("Failed to get MongoDB connection",
-			"component", "apiserver",
-			"error", err.Error(),
-		)
-		log.Fatalf("Failed to get MongoDB connection: %v", err)
+		return nil, nil, err
 	}
+	return mysqlDB, mongoDB, nil
+}
 
-	// 初始化下游背压（MySQL/Mongo/IAM）
-	if s.config.Backpressure != nil {
-		if bp := s.config.Backpressure.MySQL; bp != nil && bp.Enabled {
-			mysqlbp.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
-		}
-		if bp := s.config.Backpressure.Mongo; bp != nil && bp.Enabled {
-			infraMongo.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
-		}
-		if bp := s.config.Backpressure.IAM; bp != nil && bp.Enabled {
-			infraIAM.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
-		}
+func (s *apiServer) configureBackpressure() {
+	if s.config.Backpressure == nil {
+		return
 	}
+	if bp := s.config.Backpressure.MySQL; bp != nil && bp.Enabled {
+		mysqlbp.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+	}
+	if bp := s.config.Backpressure.Mongo; bp != nil && bp.Enabled {
+		infraMongo.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+	}
+	if bp := s.config.Backpressure.IAM; bp != nil && bp.Enabled {
+		infraIAM.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+	}
+}
 
-	// 获取 Redis 客户端（cache/store）
+func (s *apiServer) initializeRedisRuntime() (redis.UniversalClient, prepareRedisHandles) {
 	redisCache, err := s.dbManager.GetRedisClient()
 	if err != nil {
 		logger.L(context.Background()).Warnw("Cache Redis not available",
@@ -151,20 +208,31 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 		)
 	}
 	s.redisCache = redisCache
+
 	runtimeCatalog := redisplane.CatalogFromOptions(s.config.RedisRuntime, nil)
 	s.redisRuntime = redisplane.NewRuntime("apiserver", s.dbManager, runtimeCatalog, s.familyStatus)
-	handles := s.redisRuntime.ResolveAll(context.Background())
-	staticHandle := handles[redisplane.FamilyStatic]
-	objectHandle := handles[redisplane.FamilyObject]
-	queryHandle := handles[redisplane.FamilyQuery]
-	metaHandle := handles[redisplane.FamilyMeta]
-	sdkHandle := handles[redisplane.FamilySDK]
-	lockHandle := handles[redisplane.FamilyLock]
-	s.lockHandle = lockHandle
-	s.lockManager = redislock.NewManager("apiserver", "lock_lease", lockHandle)
+	resolved := s.redisRuntime.ResolveAll(context.Background())
+	handles := prepareRedisHandles{
+		static: resolved[redisplane.FamilyStatic],
+		object: resolved[redisplane.FamilyObject],
+		query:  resolved[redisplane.FamilyQuery],
+		meta:   resolved[redisplane.FamilyMeta],
+		sdk:    resolved[redisplane.FamilySDK],
+		lock:   resolved[redisplane.FamilyLock],
+	}
+	s.lockHandle = handles.lock
+	s.lockManager = redislock.NewManager("apiserver", "lock_lease", handles.lock)
+	s.warnMetaCacheAvailability(handles.meta)
+	return redisCache, handles
+}
+
+func (s *apiServer) warnMetaCacheAvailability(metaHandle *redisplane.Handle) {
 	metaRedisCache := redisHandleClient(metaHandle)
-	_ = redisHandleClient(lockHandle)
-	if s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Hotset != nil && s.config.Cache.Warmup.Hotset.Enable && metaRedisCache == nil {
+	if s.config.Cache != nil &&
+		s.config.Cache.Warmup != nil &&
+		s.config.Cache.Warmup.Hotset != nil &&
+		s.config.Cache.Warmup.Hotset.Enable &&
+		metaRedisCache == nil {
 		logger.L(context.Background()).Warnw("meta_cache unavailable while hotset governance is enabled; hotset recording and hot-target warmup will degrade",
 			"component", "apiserver",
 			"family", string(redisplane.FamilyMeta),
@@ -178,150 +246,149 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			"profile", metaHandleProfile(metaHandle),
 		)
 	}
+}
 
-	// 创建消息队列 publisher（用于事件发布）
-	var mqPublisher messaging.Publisher
+func (s *apiServer) createMQPublisher() (messaging.Publisher, eventconfig.PublishMode) {
 	publishMode := eventconfig.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode)
-	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
-		mqPublisher, err = s.config.MessagingOptions.NewPublisher()
-		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create MQ publisher, falling back to logging mode",
-				"component", "apiserver",
-				"error", err.Error(),
-			)
-			mqPublisher = nil
-		} else {
-			logger.L(context.Background()).Infow("MQ publisher created successfully",
-				"component", "apiserver",
-				"provider", s.config.MessagingOptions.Provider,
-			)
-			// 明确开启 MQ 发布模式（避免因 server.mode=release 被误判为 logging）
-			publishMode = eventconfig.PublishModeMQ
-		}
+	if s.config.MessagingOptions == nil || !s.config.MessagingOptions.Enabled {
+		return nil, publishMode
 	}
 
-	// 创建六边形架构容器（使用 MQ 模式）
-	var cacheTTLOpts container.ContainerCacheTTLOptions
-	var cacheTTLJitter float64
-	if s.config.Cache != nil && s.config.Cache.TTL != nil {
-		cacheTTLOpts = container.ContainerCacheTTLOptions{
-			Scale:            s.config.Cache.TTL.Scale,
-			ScaleList:        s.config.Cache.TTL.ScaleList,
-			Questionnaire:    s.config.Cache.TTL.Questionnaire,
-			AssessmentDetail: s.config.Cache.TTL.AssessmentDetail,
-			AssessmentList:   s.config.Cache.TTL.AssessmentList,
-			Testee:           s.config.Cache.TTL.Testee,
-			Plan:             s.config.Cache.TTL.Plan,
-			Negative:         s.config.Cache.TTL.Negative,
-		}
-		cacheTTLJitter = s.config.Cache.TTLJitterRatio
-	}
-	var statsWarmupCfg *cachegov.StatisticsWarmupConfig
-	if s.config.Cache != nil && s.config.Cache.StatisticsWarmup != nil && s.config.Cache.StatisticsWarmup.Enable {
-		statsWarmupCfg = &cachegov.StatisticsWarmupConfig{
-			OrgIDs:             s.config.Cache.StatisticsWarmup.OrgIDs,
-			QuestionnaireCodes: s.config.Cache.StatisticsWarmup.QuestionnaireCodes,
-			PlanIDs:            s.config.Cache.StatisticsWarmup.PlanIDs,
-		}
-	}
-	s.container = container.NewContainerWithOptions(
-		mysqlDB, mongoDB, redisCache,
-		container.ContainerOptions{
-			MQPublisher:   mqPublisher,
-			PublisherMode: publishMode,
-			Cache: container.ContainerCacheOptions{
-				DisableEvaluationCache: s.config.Cache != nil && s.config.Cache.DisableEvaluationCache,
-				DisableStatisticsCache: s.config.Cache != nil && s.config.Cache.DisableStatisticsCache,
-				TTL:                    cacheTTLOpts,
-				TTLJitterRatio:         cacheTTLJitter,
-				StatisticsWarmup:       statsWarmupCfg,
-				Warmup: container.ContainerWarmupOptions{
-					Enable:        s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Enable,
-					StartupStatic: s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Startup != nil && s.config.Cache.Warmup.Startup.Static,
-					StartupQuery:  s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Startup != nil && s.config.Cache.Warmup.Startup.Query,
-					HotsetEnable:  s.config.Cache != nil && s.config.Cache.Warmup != nil && s.config.Cache.Warmup.Hotset != nil && s.config.Cache.Warmup.Hotset.Enable,
-					HotsetTopN: func() int64 {
-						if s.config.Cache == nil || s.config.Cache.Warmup == nil || s.config.Cache.Warmup.Hotset == nil {
-							return 0
-						}
-						return s.config.Cache.Warmup.Hotset.TopN
-					}(),
-					MaxItemsPerKind: func() int64 {
-						if s.config.Cache == nil || s.config.Cache.Warmup == nil || s.config.Cache.Warmup.Hotset == nil {
-							return 0
-						}
-						return s.config.Cache.Warmup.Hotset.MaxItemsPerKind
-					}(),
-				},
-				CompressPayload: s.config.Cache.CompressPayload,
-				Static: container.ContainerCacheFamilyOptions{
-					NegativeTTL:    s.config.Cache.Static.NegativeTTL,
-					TTLJitterRatio: s.config.Cache.Static.TTLJitterRatio,
-					Compress:       s.config.Cache.Static.Compress,
-					Singleflight:   s.config.Cache.Static.Singleflight,
-					Negative:       s.config.Cache.Static.Negative,
-				},
-				Object: container.ContainerCacheFamilyOptions{
-					NegativeTTL:    s.config.Cache.Object.NegativeTTL,
-					TTLJitterRatio: s.config.Cache.Object.TTLJitterRatio,
-					Compress:       s.config.Cache.Object.Compress,
-					Singleflight:   s.config.Cache.Object.Singleflight,
-					Negative:       s.config.Cache.Object.Negative,
-				},
-				Query: container.ContainerCacheFamilyOptions{
-					TTL:            s.config.Cache.Query.TTL,
-					NegativeTTL:    s.config.Cache.Query.NegativeTTL,
-					TTLJitterRatio: s.config.Cache.Query.TTLJitterRatio,
-					Compress:       s.config.Cache.Query.Compress,
-					Singleflight:   s.config.Cache.Query.Singleflight,
-					Negative:       s.config.Cache.Query.Negative,
-				},
-				Meta: container.ContainerCacheFamilyOptions{},
-				SDK: container.ContainerCacheFamilyOptions{
-					NegativeTTL:    s.config.Cache.SDK.NegativeTTL,
-					TTLJitterRatio: s.config.Cache.SDK.TTLJitterRatio,
-					Compress:       s.config.Cache.SDK.Compress,
-					Singleflight:   s.config.Cache.SDK.Singleflight,
-					Negative:       s.config.Cache.SDK.Negative,
-				},
-				Lock: container.ContainerCacheFamilyOptions{
-					NegativeTTL:    s.config.Cache.Lock.NegativeTTL,
-					TTLJitterRatio: s.config.Cache.Lock.TTLJitterRatio,
-					Compress:       s.config.Cache.Lock.Compress,
-					Singleflight:   s.config.Cache.Lock.Singleflight,
-					Negative:       s.config.Cache.Lock.Negative,
-				},
-			},
-			StaticRedisHandle: staticHandle,
-			ObjectRedisHandle: objectHandle,
-			QueryRedisHandle:  queryHandle,
-			MetaRedisHandle:   metaHandle,
-			SDKRedisHandle:    sdkHandle,
-			LockRedisHandle:   lockHandle,
-			PlanEntryBaseURL:  s.config.Plan.EntryBaseURL,
-			StatisticsRepairWindowDays: func() int {
-				if s.config.StatisticsSync == nil {
-					return 0
-				}
-				return s.config.StatisticsSync.RepairWindowDays
-			}(),
-		},
-	)
-	// 初始化 IAM 模块（优先）
-	ctx := context.Background()
-	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
+	publisher, err := s.config.MessagingOptions.NewPublisher()
 	if err != nil {
-		logger.L(context.Background()).Errorw("Failed to initialize IAM module",
+		logger.L(context.Background()).Warnw("Failed to create MQ publisher, falling back to logging mode",
 			"component", "apiserver",
 			"error", err.Error(),
 		)
-		log.Fatalf("Failed to initialize IAM module: %v", err)
+		return nil, publishMode
+	}
+	logger.L(context.Background()).Infow("MQ publisher created successfully",
+		"component", "apiserver",
+		"provider", s.config.MessagingOptions.Provider,
+	)
+	return publisher, eventconfig.PublishModeMQ
+}
+
+func (s *apiServer) buildContainerOptions(resources *prepareResources) container.ContainerOptions {
+	return container.ContainerOptions{
+		MQPublisher:                resources.mqPublisher,
+		PublisherMode:              resources.publishMode,
+		Cache:                      s.buildContainerCacheOptions(),
+		StaticRedisHandle:          resources.redisHandles.static,
+		ObjectRedisHandle:          resources.redisHandles.object,
+		QueryRedisHandle:           resources.redisHandles.query,
+		MetaRedisHandle:            resources.redisHandles.meta,
+		SDKRedisHandle:             resources.redisHandles.sdk,
+		LockRedisHandle:            resources.redisHandles.lock,
+		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
+		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
+	}
+}
+
+func (s *apiServer) buildContainerCacheOptions() container.ContainerCacheOptions {
+	cacheCfg := s.config.Cache
+	if cacheCfg == nil {
+		return container.ContainerCacheOptions{}
+	}
+
+	var ttl container.ContainerCacheTTLOptions
+	if cacheCfg.TTL != nil {
+		ttl = container.ContainerCacheTTLOptions{
+			Scale:            cacheCfg.TTL.Scale,
+			ScaleList:        cacheCfg.TTL.ScaleList,
+			Questionnaire:    cacheCfg.TTL.Questionnaire,
+			AssessmentDetail: cacheCfg.TTL.AssessmentDetail,
+			AssessmentList:   cacheCfg.TTL.AssessmentList,
+			Testee:           cacheCfg.TTL.Testee,
+			Plan:             cacheCfg.TTL.Plan,
+			Negative:         cacheCfg.TTL.Negative,
+		}
+	}
+
+	return container.ContainerCacheOptions{
+		DisableEvaluationCache: cacheCfg.DisableEvaluationCache,
+		DisableStatisticsCache: cacheCfg.DisableStatisticsCache,
+		TTL:                    ttl,
+		TTLJitterRatio:         cacheCfg.TTLJitterRatio,
+		StatisticsWarmup:       buildStatisticsWarmupConfig(cacheCfg),
+		Warmup:                 buildWarmupOptions(cacheCfg),
+		CompressPayload:        cacheCfg.CompressPayload,
+		Static:                 buildCacheFamilyOptions(cacheCfg.Static),
+		Object:                 buildCacheFamilyOptions(cacheCfg.Object),
+		Query:                  buildQueryFamilyOptions(cacheCfg.Query),
+		Meta:                   container.ContainerCacheFamilyOptions{},
+		SDK:                    buildCacheFamilyOptions(cacheCfg.SDK),
+		Lock:                   buildCacheFamilyOptions(cacheCfg.Lock),
+	}
+}
+
+func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cachegov.StatisticsWarmupConfig {
+	if cacheCfg == nil || cacheCfg.StatisticsWarmup == nil || !cacheCfg.StatisticsWarmup.Enable {
+		return nil
+	}
+	return &cachegov.StatisticsWarmupConfig{
+		OrgIDs:             cacheCfg.StatisticsWarmup.OrgIDs,
+		QuestionnaireCodes: cacheCfg.StatisticsWarmup.QuestionnaireCodes,
+		PlanIDs:            cacheCfg.StatisticsWarmup.PlanIDs,
+	}
+}
+
+func buildWarmupOptions(cacheCfg *apiserveroptions.CacheOptions) container.ContainerWarmupOptions {
+	if cacheCfg == nil || cacheCfg.Warmup == nil {
+		return container.ContainerWarmupOptions{}
+	}
+	options := container.ContainerWarmupOptions{
+		Enable: cacheCfg.Warmup.Enable,
+	}
+	if cacheCfg.Warmup.Startup != nil {
+		options.StartupStatic = cacheCfg.Warmup.Startup.Static
+		options.StartupQuery = cacheCfg.Warmup.Startup.Query
+	}
+	if cacheCfg.Warmup.Hotset != nil {
+		options.HotsetEnable = cacheCfg.Warmup.Hotset.Enable
+		options.HotsetTopN = cacheCfg.Warmup.Hotset.TopN
+		options.MaxItemsPerKind = cacheCfg.Warmup.Hotset.MaxItemsPerKind
+	}
+	return options
+}
+
+func buildCacheFamilyOptions(family *apiserveroptions.CacheFamilyOptions) container.ContainerCacheFamilyOptions {
+	if family == nil {
+		return container.ContainerCacheFamilyOptions{}
+	}
+	return container.ContainerCacheFamilyOptions{
+		NegativeTTL:    family.NegativeTTL,
+		TTLJitterRatio: family.TTLJitterRatio,
+		Compress:       family.Compress,
+		Singleflight:   family.Singleflight,
+		Negative:       family.Negative,
+	}
+}
+
+func buildQueryFamilyOptions(family *apiserveroptions.CacheFamilyOptions) container.ContainerCacheFamilyOptions {
+	options := buildCacheFamilyOptions(family)
+	if family != nil {
+		options.TTL = family.TTL
+	}
+	return options
+}
+
+func statisticsRepairWindowDays(cfg *config.Config) int {
+	if cfg.StatisticsSync == nil {
+		return 0
+	}
+	return cfg.StatisticsSync.RepairWindowDays
+}
+
+func (s *apiServer) initializeContainer() error {
+	ctx := context.Background()
+	iamModule, err := container.NewIAMModule(ctx, s.config.IAMOptions)
+	if err != nil {
+		return err
 	}
 	s.container.IAMModule = iamModule
-
-	// 初始化容器中的所有组件
 	if err := s.container.Initialize(); err != nil {
-		log.Fatalf("Failed to initialize hexagonal architecture container: %v", err)
+		return err
 	}
 	if s.container != nil {
 		s.container.CacheGovernanceStatusService = cachegov.NewStatusService("apiserver", s.familyStatus, s.container.HotsetInspector(), s.container.WarmupCoordinator)
@@ -329,61 +396,58 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			s.container.StatisticsModule.Handler.SetCacheGovernanceStatusService(s.container.CacheGovernanceStatusService)
 		}
 	}
-
 	s.startAuthzVersionSync()
+	return nil
+}
 
-	// 初始化小程序码生成服务（从配置读取 wechat_app_id，然后从 IAM 查询）
-	if s.config.WeChatOptions != nil {
-		s.container.InitQRCodeService(s.config.WeChatOptions)
-		s.container.InitMiniProgramTaskNotificationService(s.config.WeChatOptions)
-		// 将 QRCodeService 注入到各个模块
-		if s.container.QRCodeService != nil {
-			// 注入到 EvaluationModule
-			if s.container.EvaluationModule != nil {
-				s.container.EvaluationModule.SetQRCodeService(s.container.QRCodeService)
-			}
-			// 注入到 SurveyModule（问卷）
-			if s.container.SurveyModule != nil {
-				s.container.SurveyModule.SetQRCodeService(s.container.QRCodeService)
-			}
-			// 注入到 ScaleModule（量表）
-			if s.container.ScaleModule != nil {
-				s.container.ScaleModule.SetQRCodeService(s.container.QRCodeService)
-			}
-			// 注入到 ActorModule（测评入口二维码）
-			if s.container.ActorModule != nil {
-				s.container.ActorModule.SetQRCodeService(s.container.QRCodeService)
-			}
-		}
+func (s *apiServer) initializeWeChatServices() error {
+	if s.config.WeChatOptions == nil || s.container == nil {
+		return nil
 	}
+	s.container.InitQRCodeService(s.config.WeChatOptions)
+	s.container.InitMiniProgramTaskNotificationService(s.config.WeChatOptions)
+	if s.container.QRCodeService == nil {
+		return nil
+	}
+	if s.container.EvaluationModule != nil {
+		s.container.EvaluationModule.SetQRCodeService(s.container.QRCodeService)
+	}
+	if s.container.SurveyModule != nil {
+		s.container.SurveyModule.SetQRCodeService(s.container.QRCodeService)
+	}
+	if s.container.ScaleModule != nil {
+		s.container.ScaleModule.SetQRCodeService(s.container.QRCodeService)
+	}
+	if s.container.ActorModule != nil {
+		s.container.ActorModule.SetQRCodeService(s.container.QRCodeService)
+	}
+	return nil
+}
 
-	// 现在创建 GRPC 服务器（IAM Module 已初始化）
+func (s *apiServer) initializeTransports() error {
+	var err error
 	s.grpcServer, err = buildGRPCServer(s.config, s.container)
 	if err != nil {
-		log.Fatalf("Failed to build GRPC server: %v", err)
+		return err
 	}
-
-	// 创建并初始化路由器
 	NewRouter(s.container, s.config.RateLimit).RegisterRoutes(s.genericAPIServer.Engine)
+	return NewGRPCRegistry(s.grpcServer, s.container).RegisterServices()
+}
 
-	// 注册 GRPC 服务
-	if err := NewGRPCRegistry(s.grpcServer, s.container).RegisterServices(); err != nil {
-		log.Fatalf("Failed to register GRPC services: %v", err)
-	}
-
+func (s *apiServer) logInitialization(hasMongo bool) {
 	log.Info("🏗️  Hexagonal Architecture initialized successfully!")
 	log.Info("   📦 Domain: questionnaire, user")
 	log.Info("   🔌 Ports: storage, document")
 	log.Info("   🔧 Adapters: mysql, mongodb, http, grpc")
 	log.Info("   📋 Application Services: questionnaire_service, user_service")
-
-	if mongoDB != nil {
+	if hasMongo {
 		log.Info("   🗄️  Storage Mode: MySQL + MongoDB (Hybrid)")
-	} else {
-		log.Info("   🗄️  Storage Mode: MySQL Only")
+		return
 	}
+	log.Info("   🗄️  Storage Mode: MySQL Only")
+}
 
-	// 异步预热缓存（不阻塞服务启动）
+func (s *apiServer) startWarmup() {
 	go func() {
 		ctx := context.Background()
 		if err := s.container.WarmupCache(ctx); err != nil {
@@ -392,45 +456,40 @@ func (s *apiServer) PrepareRun() preparedAPIServer {
 			logger.L(ctx).Infow("Cache warmup completed")
 		}
 	}()
+}
 
-	s.startSchedulers()
-	s.startMongoOutboxRelay()
-	s.startAssessmentOutboxRelay()
-
-	// 添加关闭回调
+func (s *apiServer) registerShutdownCallback() {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
-		// 清理容器资源
 		if s.container != nil {
 			if err := s.container.Cleanup(); err != nil {
 				log.Errorf("Failed to cleanup container resources: %v", err)
 			}
 		}
-
 		if s.authzVersionSubscriber != nil {
 			s.authzVersionSubscriber.Stop()
 			if err := s.authzVersionSubscriber.Close(); err != nil {
 				log.Errorf("Failed to close IAM authz version subscriber: %v", err)
 			}
 		}
-
-		// 关闭数据库连接
 		if s.dbManager != nil {
 			if err := s.dbManager.Close(); err != nil {
 				log.Errorf("Failed to close database connections: %v", err)
 			}
 		}
-
-		// 关闭 HTTP 服务器
 		s.genericAPIServer.Close()
-
-		// 关闭 GRPC 服务器
 		s.grpcServer.Close()
-
 		log.Info("🏗️  Hexagonal Architecture server shutdown complete")
 		return nil
 	}))
+}
 
-	return preparedAPIServer{s}
+func (s *apiServer) fatalPrepareRun(action string, err error) {
+	logger.L(context.Background()).Errorw("Failed to prepare api server",
+		"component", "apiserver",
+		"action", action,
+		"error", err.Error(),
+	)
+	log.Fatalf("Failed to %s: %v", action, err)
 }
 
 func redisHandleClient(handle *redisplane.Handle) redis.UniversalClient {

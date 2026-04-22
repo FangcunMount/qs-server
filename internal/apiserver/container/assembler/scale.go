@@ -40,6 +40,18 @@ type ScaleModule struct {
 	eventPublisher event.EventPublisher
 }
 
+type scaleModuleDeps struct {
+	mongoDB           *mongo.Database
+	eventPublisher    event.EventPublisher
+	questionnaireRepo domainQuestionnaire.Repository
+	redisClient       redis.UniversalClient
+	cacheBuilder      *rediskey.Builder
+	identityService   *iam.IdentityService
+	scalePolicy       cachepolicy.CachePolicy
+	scaleListPolicy   cachepolicy.CachePolicy
+	hotsetRecorder    scaleCache.HotsetRecorder
+}
+
 // NewScaleModule 创建 Scale 模块
 func NewScaleModule() *ScaleModule {
 	return &ScaleModule{}
@@ -56,98 +68,38 @@ func NewScaleModule() *ScaleModule {
 // params[7]: cachepolicy.CachePolicy (可选，用于量表列表缓存策略)
 // params[8]: scaleCache.HotsetRecorder (可选，用于热点治理)
 func (m *ScaleModule) Initialize(params ...interface{}) error {
-	if len(params) < 1 {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	deps, err := parseScaleModuleDeps(params)
+	if err != nil {
+		return err
 	}
-
-	mongoDB, ok := params[0].(*mongo.Database)
-	if !ok || mongoDB == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
-	}
-
-	// 获取事件发布器（可选参数）
-	if len(params) > 1 {
-		if ep, ok := params[1].(event.EventPublisher); ok && ep != nil {
-			m.eventPublisher = ep
-		}
-	}
-	if m.eventPublisher == nil {
-		m.eventPublisher = event.NewNopEventPublisher()
-	}
-
-	// 获取问卷仓库（可选参数）
-	var questionnaireRepo domainQuestionnaire.Repository
-	if len(params) > 2 {
-		if qr, ok := params[2].(domainQuestionnaire.Repository); ok && qr != nil {
-			questionnaireRepo = qr
-		}
-	}
-
-	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
-	var redisClient redis.UniversalClient
-	if len(params) > 3 {
-		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
-			redisClient = rc
-		}
-	}
-	var cacheBuilder *rediskey.Builder
-	if len(params) > 4 {
-		if builder, ok := params[4].(*rediskey.Builder); ok {
-			cacheBuilder = builder
-		}
-	}
-	// 获取 IAM IdentityService（可选参数，用于姓名补全）
-	var identitySvc *iam.IdentityService
-	if len(params) > 5 {
-		if svc, ok := params[5].(*iam.IdentityService); ok {
-			identitySvc = svc
-		}
-	}
-	var scalePolicy cachepolicy.CachePolicy
-	if len(params) > 6 {
-		if policy, ok := params[6].(cachepolicy.CachePolicy); ok {
-			scalePolicy = policy
-		}
-	}
-	var scaleListPolicy cachepolicy.CachePolicy
-	if len(params) > 7 {
-		if policy, ok := params[7].(cachepolicy.CachePolicy); ok {
-			scaleListPolicy = policy
-		}
-	}
-	var hotset scaleCache.HotsetRecorder
-	if len(params) > 8 {
-		if recorder, ok := params[8].(scaleCache.HotsetRecorder); ok {
-			hotset = recorder
-		}
-	}
+	m.eventPublisher = deps.eventPublisher
 
 	// 初始化 repository 层（基础实现）
-	baseRepo := scaleInfra.NewRepository(mongoDB)
+	baseRepo := scaleInfra.NewRepository(deps.mongoDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
-	if redisClient != nil {
-		m.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderAndPolicy(baseRepo, redisClient, cacheBuilder, scalePolicy)
+	if deps.redisClient != nil {
+		m.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderAndPolicy(baseRepo, deps.redisClient, deps.cacheBuilder, deps.scalePolicy)
 	} else {
 		m.Repo = baseRepo
 	}
 
 	// 初始化量表全局列表缓存
 	var listCache *scaleApp.ScaleListCache
-	if redisClient != nil {
+	if deps.redisClient != nil {
 		listCache = scaleApp.NewScaleListCacheWithPolicyAndKeyBuilder(
-			redisClient,
+			deps.redisClient,
 			m.Repo,
-			identitySvc,
-			cacheBuilder,
-			scaleListPolicy,
+			deps.identityService,
+			deps.cacheBuilder,
+			deps.scaleListPolicy,
 		)
 	}
 	m.ListCache = listCache
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, questionnaireRepo, m.eventPublisher, listCache)
+	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, deps.questionnaireRepo, m.eventPublisher, listCache)
 	m.FactorService = scaleApp.NewFactorService(m.Repo, listCache, m.eventPublisher)
-	m.QueryService = scaleApp.NewQueryService(m.Repo, identitySvc, listCache, hotset)
+	m.QueryService = scaleApp.NewQueryService(m.Repo, deps.identityService, listCache, deps.hotsetRecorder)
 	m.CategoryService = scaleApp.NewCategoryService()
 
 	// 初始化 handler 层
@@ -161,6 +113,53 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 	)
 
 	return nil
+}
+
+func parseScaleModuleDeps(params []interface{}) (*scaleModuleDeps, error) {
+	if len(params) < 1 {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	}
+
+	mongoDB, ok := params[0].(*mongo.Database)
+	if !ok || mongoDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+
+	deps := &scaleModuleDeps{
+		mongoDB:        mongoDB,
+		eventPublisher: event.NewNopEventPublisher(),
+	}
+	applyOptionalParam(params, 1, func(publisher event.EventPublisher) {
+		if publisher != nil {
+			deps.eventPublisher = publisher
+		}
+	})
+	applyOptionalParam(params, 2, func(repo domainQuestionnaire.Repository) {
+		if repo != nil {
+			deps.questionnaireRepo = repo
+		}
+	})
+	applyOptionalParam(params, 3, func(client redis.UniversalClient) {
+		if client != nil {
+			deps.redisClient = client
+		}
+	})
+	applyOptionalParam(params, 4, func(builder *rediskey.Builder) {
+		deps.cacheBuilder = builder
+	})
+	applyOptionalParam(params, 5, func(svc *iam.IdentityService) {
+		deps.identityService = svc
+	})
+	applyOptionalParam(params, 6, func(policy cachepolicy.CachePolicy) {
+		deps.scalePolicy = policy
+	})
+	applyOptionalParam(params, 7, func(policy cachepolicy.CachePolicy) {
+		deps.scaleListPolicy = policy
+	})
+	applyOptionalParam(params, 8, func(recorder scaleCache.HotsetRecorder) {
+		deps.hotsetRecorder = recorder
+	})
+	return deps, nil
 }
 
 // Cleanup 清理模块资源

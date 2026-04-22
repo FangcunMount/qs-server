@@ -32,7 +32,7 @@ func TestIsDuplicateError_DriverAndMessageCases(t *testing.T) {
 }
 
 func TestNewDuplicateToTranslator_MapsOnlyDuplicates(t *testing.T) {
-	mapper := func(err error) error {
+	mapper := func(_ error) error {
 		return perrors.WithCode(102200, "mapped duplicate")
 	}
 

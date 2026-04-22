@@ -120,7 +120,7 @@ func StreamClientLoggingInterceptor() grpc.StreamClientInterceptor {
 }
 
 // StreamClientLoggingInterceptorWithConfig 带配置的gRPC流式客户端日志拦截器
-func StreamClientLoggingInterceptorWithConfig(config GRPCLoggerConfig) grpc.StreamClientInterceptor {
+func StreamClientLoggingInterceptorWithConfig(_ GRPCLoggerConfig) grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		grpcInfo(ctx, "gRPC stream started",
 			log.String("method", method),

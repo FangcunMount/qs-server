@@ -82,6 +82,22 @@ type EvaluationModule struct {
 	testeeAccessService actorAccessApp.TesteeAccessService
 }
 
+type evaluationModuleDeps struct {
+	mysqlDB              *gorm.DB
+	mongoDB              *mongo.Database
+	scaleRepo            scale.Repository
+	answerSheetRepo      answersheet.Repository
+	questionnaireRepo    questionnaire.Repository
+	eventPublisher       event.EventPublisher
+	redisClient          redis.UniversalClient
+	cacheBuilder         *rediskey.Builder
+	assessmentPolicy     cachepolicy.CachePolicy
+	queryRedisClient     redis.UniversalClient
+	queryCacheBuilder    *rediskey.Builder
+	assessmentListPolicy cachepolicy.CachePolicy
+	versionStore         assessmentCache.VersionTokenStore
+}
+
 // NewEvaluationModule 创建评估模块
 func NewEvaluationModule() *EvaluationModule {
 	return &EvaluationModule{}
@@ -102,116 +118,30 @@ func NewEvaluationModule() *EvaluationModule {
 // params[11]: cachepolicy.CachePolicy (可选，用于我的测评列表缓存策略)
 // params[12]: assessmentCache.VersionTokenStore (可选，用于 versioned query invalidation)
 func (m *EvaluationModule) Initialize(params ...interface{}) error {
-	if len(params) < 2 {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
+	deps, err := parseEvaluationModuleDeps(params)
+	if err != nil {
+		return err
 	}
-
-	mysqlDB, ok := params[0].(*gorm.DB)
-	if !ok || mysqlDB == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
-	}
-	m.mysqlDB = mysqlDB
-
-	mongoDB, ok := params[1].(*mongo.Database)
-	if !ok || mongoDB == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
-	}
-
-	// 可选的 ScaleRepo（用于 EvaluationService）
-	var scaleRepo scale.Repository
-	if len(params) > 2 {
-		if sr, ok := params[2].(scale.Repository); ok {
-			scaleRepo = sr
-		}
-	}
-
-	// 可选的 AnswerSheetRepo（用于 EvaluationService）
-	var answerSheetRepo answersheet.Repository
-	if len(params) > 3 {
-		if asr, ok := params[3].(answersheet.Repository); ok {
-			answerSheetRepo = asr
-		}
-	}
-
-	// 可选的 QuestionnaireRepo（用于 EvaluationService 的 cnt 计分规则）
-	var questionnaireRepo questionnaire.Repository
-	if len(params) > 4 {
-		if qr, ok := params[4].(questionnaire.Repository); ok {
-			questionnaireRepo = qr
-		}
-	}
-
-	// 获取事件发布器（可选参数）
-	if len(params) > 5 {
-		if ep, ok := params[5].(event.EventPublisher); ok && ep != nil {
-			m.eventPublisher = ep
-		}
-	}
-	if m.eventPublisher == nil {
-		m.eventPublisher = event.NewNopEventPublisher()
-	}
-
-	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
-	var redisClient redis.UniversalClient
-	if len(params) > 6 {
-		if rc, ok := params[6].(redis.UniversalClient); ok && rc != nil {
-			redisClient = rc
-		}
-	}
-	var cacheBuilder *rediskey.Builder
-	if len(params) > 7 {
-		if builder, ok := params[7].(*rediskey.Builder); ok {
-			cacheBuilder = builder
-		}
-	}
-	var assessmentPolicy cachepolicy.CachePolicy
-	if len(params) > 8 {
-		if policy, ok := params[8].(cachepolicy.CachePolicy); ok {
-			assessmentPolicy = policy
-		}
-	}
-	var queryRedisClient redis.UniversalClient
-	if len(params) > 9 {
-		if rc, ok := params[9].(redis.UniversalClient); ok && rc != nil {
-			queryRedisClient = rc
-		}
-	}
-	var queryCacheBuilder *rediskey.Builder
-	if len(params) > 10 {
-		if builder, ok := params[10].(*rediskey.Builder); ok {
-			queryCacheBuilder = builder
-		}
-	}
-	var assessmentListPolicy cachepolicy.CachePolicy
-	if len(params) > 11 {
-		if policy, ok := params[11].(cachepolicy.CachePolicy); ok {
-			assessmentListPolicy = policy
-		}
-	}
-	var versionStore assessmentCache.VersionTokenStore
-	if len(params) > 12 {
-		if store, ok := params[12].(assessmentCache.VersionTokenStore); ok {
-			versionStore = store
-		}
-	}
+	m.mysqlDB = deps.mysqlDB
+	m.eventPublisher = deps.eventPublisher
 
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
-	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(mysqlDB)
+	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(deps.mysqlDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
-	if redisClient != nil {
-		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderAndPolicy(baseAssessmentRepo, redisClient, cacheBuilder, assessmentPolicy)
+	if deps.redisClient != nil {
+		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderAndPolicy(baseAssessmentRepo, deps.redisClient, deps.cacheBuilder, deps.assessmentPolicy)
 	} else {
 		m.AssessmentRepo = baseAssessmentRepo
 	}
 
-	m.ScoreRepo = mysqlEval.NewScoreRepository(mysqlDB)
-	reportRepo, err := mongoEval.NewReportRepository(mongoDB)
+	m.ScoreRepo = mysqlEval.NewScoreRepository(deps.mysqlDB)
+	reportRepo, err := mongoEval.NewReportRepository(deps.mongoDB)
 	if err != nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
 	m.ReportRepo = reportRepo
-	m.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStore(mysqlDB), m.eventPublisher)
+	m.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStore(deps.mysqlDB), m.eventPublisher)
 
 	// ==================== 初始化领域服务 ====================
 
@@ -222,7 +152,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// 注意：因子解读配置中的建议已通过 FactorInterpretationSuggestionStrategy 收集
 	// 如果需要额外的建议生成策略，可以在这里注册
 	// 当前不注册任何策略，完全依赖因子解读配置中的建议
-	var suggestionGenerator report.SuggestionGenerator = nil
+	var suggestionGenerator report.SuggestionGenerator
 
 	// 当前导出能力保留入口，但显式收口为 unsupported，避免主路径继续装配空实现。
 	reportExporter := reportApp.NewUnsupportedReportExporter()
@@ -230,12 +160,12 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ====================  初始化评估引擎 ====================
 	// 创建等待队列注册表（用于长轮询，在创建 EvaluationService 和 Handler 时使用）
 	var waiterRegistry *waiter.WaiterRegistry
-	if scaleRepo != nil && answerSheetRepo != nil && questionnaireRepo != nil {
+	if deps.scaleRepo != nil && deps.answerSheetRepo != nil && deps.questionnaireRepo != nil {
 		waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
 	}
 
 	// 注意：如果有 scaleRepo、answerSheetRepo 和 questionnaireRepo，则初始化 EvaluationService
-	if scaleRepo != nil && answerSheetRepo != nil && questionnaireRepo != nil {
+	if deps.scaleRepo != nil && deps.answerSheetRepo != nil && deps.questionnaireRepo != nil {
 		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
@@ -248,9 +178,9 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			m.AssessmentRepo,
 			m.ScoreRepo,
 			m.ReportRepo,
-			scaleRepo,
-			answerSheetRepo,
-			questionnaireRepo,
+			deps.scaleRepo,
+			deps.answerSheetRepo,
+			deps.questionnaireRepo,
 			reportBuilder,
 			serviceOpts...,
 		)
@@ -276,12 +206,12 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ==================== 初始化 Assessment 应用服务 ====================
 
 	// 提交服务 - 服务于答题者 (Testee)
-	if queryRedisClient != nil && versionStore != nil {
+	if deps.queryRedisClient != nil && deps.versionStore != nil {
 		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderAndPolicy(
-			assessmentCache.NewRedisCache(queryRedisClient),
-			versionStore,
-			queryCacheBuilder,
-			assessmentListPolicy,
+			assessmentCache.NewRedisCache(deps.queryRedisClient),
+			deps.versionStore,
+			deps.queryCacheBuilder,
+			deps.assessmentListPolicy,
 		)
 		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
 			m.AssessmentRepo,
@@ -307,7 +237,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		m.ScoreRepo,
 		m.AssessmentRepo,
-		scaleRepo, // 传入 scaleRepo（可能为 nil，但会在 SetScaleRepository 中更新）
+		deps.scaleRepo, // 传入 scaleRepo（可能为 nil，但会在 SetScaleRepository 中更新）
 	)
 
 	// ==================== 初始化 Interface 层 ====================
@@ -330,6 +260,67 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	return nil
 }
 
+func parseEvaluationModuleDeps(params []interface{}) (*evaluationModuleDeps, error) {
+	if len(params) < 2 {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
+	}
+
+	mysqlDB, ok := params[0].(*gorm.DB)
+	if !ok || mysqlDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
+	}
+	mongoDB, ok := params[1].(*mongo.Database)
+	if !ok || mongoDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
+	}
+
+	deps := &evaluationModuleDeps{
+		mysqlDB:        mysqlDB,
+		mongoDB:        mongoDB,
+		eventPublisher: event.NewNopEventPublisher(),
+	}
+	applyOptionalParam(params, 2, func(repo scale.Repository) {
+		deps.scaleRepo = repo
+	})
+	applyOptionalParam(params, 3, func(repo answersheet.Repository) {
+		deps.answerSheetRepo = repo
+	})
+	applyOptionalParam(params, 4, func(repo questionnaire.Repository) {
+		deps.questionnaireRepo = repo
+	})
+	applyOptionalParam(params, 5, func(publisher event.EventPublisher) {
+		if publisher != nil {
+			deps.eventPublisher = publisher
+		}
+	})
+	applyOptionalParam(params, 6, func(client redis.UniversalClient) {
+		if client != nil {
+			deps.redisClient = client
+		}
+	})
+	applyOptionalParam(params, 7, func(builder *rediskey.Builder) {
+		deps.cacheBuilder = builder
+	})
+	applyOptionalParam(params, 8, func(policy cachepolicy.CachePolicy) {
+		deps.assessmentPolicy = policy
+	})
+	applyOptionalParam(params, 9, func(client redis.UniversalClient) {
+		if client != nil {
+			deps.queryRedisClient = client
+		}
+	})
+	applyOptionalParam(params, 10, func(builder *rediskey.Builder) {
+		deps.queryCacheBuilder = builder
+	})
+	applyOptionalParam(params, 11, func(policy cachepolicy.CachePolicy) {
+		deps.assessmentListPolicy = policy
+	})
+	applyOptionalParam(params, 12, func(store assessmentCache.VersionTokenStore) {
+		deps.versionStore = store
+	})
+	return deps, nil
+}
+
 // SetScaleRepository 设置量表仓储（用于跨模块依赖注入）
 // 注意：需要同时有 answerSheetRepo 和 questionnaireRepo 才能创建 EvaluationService
 func (m *EvaluationModule) SetScaleRepository(
@@ -344,7 +335,7 @@ func (m *EvaluationModule) SetScaleRepository(
 	// 使用默认策略创建 SuggestionGenerator
 	// 注意：因子解读配置中的建议已通过 FactorInterpretationSuggestionStrategy 收集
 	// 当前不注册任何策略，完全依赖因子解读配置中的建议
-	var suggestionGenerator report.SuggestionGenerator = nil
+	var suggestionGenerator report.SuggestionGenerator
 	reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 	if m.mysqlDB == nil {
 		return
@@ -391,7 +382,7 @@ func (m *EvaluationModule) SetTesteeAccessService(testeeAccessService actorAcces
 
 // SetQRCodeService 设置二维码服务（用于跨模块依赖注入）
 // 注意：EvaluationHandler 不再需要 QRCodeService，此方法保留以保持接口一致性
-func (m *EvaluationModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
+func (m *EvaluationModule) SetQRCodeService(_ qrcodeApp.QRCodeService) {
 	// EvaluationHandler 不再需要 QRCodeService，因为二维码查询已移至问卷和量表 Handler
 }
 

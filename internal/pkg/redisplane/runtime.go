@@ -91,7 +91,7 @@ func (r *Runtime) ResolveAll(ctx context.Context) map[Family]*Handle {
 	return results
 }
 
-func (r *Runtime) resolve(ctx context.Context, family Family) *Handle {
+func (r *Runtime) resolve(_ context.Context, family Family) *Handle {
 	route := Route{}
 	namespace := ""
 	builder := rediskey.NewBuilder()

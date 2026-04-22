@@ -6,7 +6,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // managementService 答卷管理服务实现
@@ -30,9 +29,13 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerShee
 	if id == 0 {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答卷ID不能为空")
 	}
+	sheetID, err := answerSheetIDFromUint64("answersheet_id", id)
+	if err != nil {
+		return nil, err
+	}
 
 	// 2. 获取答卷
-	sheet, err := s.repo.FindByID(ctx, meta.ID(id))
+	sheet, err := s.repo.FindByID(ctx, sheetID)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "获取答卷失败")
 	}
@@ -42,35 +45,10 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerShee
 
 // List 查询答卷列表
 func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error) {
-	// 1. 验证分页参数
-	if dto.Page <= 0 {
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "页码必须大于0")
+	if err := validateManagementListDTO(dto); err != nil {
+		return nil, err
 	}
-	if dto.PageSize <= 0 {
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量必须大于0")
-	}
-	if dto.PageSize > 100 {
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量不能超过100")
-	}
-
-	// 构建查询条件
-	conditions := make(map[string]interface{})
-	if dto.QuestionnaireCode != "" {
-		conditions["questionnaire_code"] = dto.QuestionnaireCode
-	}
-	if dto.FillerID != nil && *dto.FillerID > 0 {
-		conditions["filler_id"] = *dto.FillerID
-	}
-	if dto.StartTime != nil {
-		conditions["start_time"] = dto.StartTime
-	}
-	if dto.EndTime != nil {
-		conditions["end_time"] = dto.EndTime
-	}
-	// 合并其他条件
-	for k, v := range dto.Conditions {
-		conditions[k] = v
-	}
+	conditions := buildListConditions(dto)
 
 	// 3. 查询答卷摘要列表
 	sheets, err := s.repo.FindSummaryListByQuestionnaire(ctx, dto.QuestionnaireCode, dto.Page, dto.PageSize)
@@ -87,21 +65,58 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 	return toSummaryListResult(sheets, total), nil
 }
 
+func validateManagementListDTO(dto ListAnswerSheetsDTO) error {
+	if dto.Page <= 0 {
+		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "页码必须大于0")
+	}
+	if dto.PageSize <= 0 {
+		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量必须大于0")
+	}
+	if dto.PageSize > 100 {
+		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量不能超过100")
+	}
+	return nil
+}
+
+func buildListConditions(dto ListAnswerSheetsDTO) map[string]interface{} {
+	conditions := make(map[string]interface{})
+	if dto.QuestionnaireCode != "" {
+		conditions["questionnaire_code"] = dto.QuestionnaireCode
+	}
+	if dto.FillerID != nil && *dto.FillerID > 0 {
+		conditions["filler_id"] = *dto.FillerID
+	}
+	if dto.StartTime != nil {
+		conditions["start_time"] = dto.StartTime
+	}
+	if dto.EndTime != nil {
+		conditions["end_time"] = dto.EndTime
+	}
+	for k, v := range dto.Conditions {
+		conditions[k] = v
+	}
+	return conditions
+}
+
 // Delete 删除答卷
 func (s *managementService) Delete(ctx context.Context, id uint64) error {
 	// 1. 验证输入参数
 	if id == 0 {
 		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答卷ID不能为空")
 	}
+	sheetID, err := answerSheetIDFromUint64("answersheet_id", id)
+	if err != nil {
+		return err
+	}
 
 	// 2. 检查答卷是否存在
-	_, err := s.repo.FindByID(ctx, meta.ID(id))
+	_, err = s.repo.FindByID(ctx, sheetID)
 	if err != nil {
 		return errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "答卷不存在")
 	}
 
 	// 3. 删除答卷
-	if err := s.repo.Delete(ctx, meta.ID(id)); err != nil {
+	if err := s.repo.Delete(ctx, sheetID); err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "删除答卷失败")
 	}
 

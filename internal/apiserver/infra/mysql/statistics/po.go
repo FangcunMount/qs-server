@@ -109,7 +109,7 @@ func (AssessmentEntryResolveLogPO) TableName() string {
 // BeforeCreate GORM hook。
 func (p *AssessmentEntryResolveLogPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
-		p.ID = uint64(meta.New())
+		p.ID = meta.New().Uint64()
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func (AssessmentEntryIntakeLogPO) TableName() string {
 // BeforeCreate GORM hook。
 func (p *AssessmentEntryIntakeLogPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
-		p.ID = uint64(meta.New())
+		p.ID = meta.New().Uint64()
 	}
 	return nil
 }

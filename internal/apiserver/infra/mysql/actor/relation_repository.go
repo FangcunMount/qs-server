@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"gorm.io/gorm"
 )
 
@@ -58,7 +59,7 @@ func (r *relationRepository) Update(ctx context.Context, item *domain.ClinicianT
 }
 
 func (r *relationRepository) FindByID(ctx context.Context, id domain.ID) (*domain.ClinicianTesteeRelation, error) {
-	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
+	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "relation not found")
@@ -267,7 +268,11 @@ func (r *relationRepository) ListActiveTesteeIDsByClinician(
 
 	ids := make([]testee.ID, 0, len(rawIDs))
 	for _, rawID := range rawIDs {
-		ids = append(ids, testee.ID(rawID))
+		convertedID, err := safeconv.Uint64ToMetaID(rawID)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, testee.ID(convertedID))
 	}
 	return ids, nil
 }

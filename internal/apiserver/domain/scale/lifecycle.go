@@ -65,7 +65,7 @@ func (l *lifecycle) Publish(ctx context.Context, scale *MedicalScale) error {
 }
 
 // Unpublish 下线量表
-func (l *lifecycle) Unpublish(ctx context.Context, scale *MedicalScale) error {
+func (l *lifecycle) Unpublish(_ context.Context, scale *MedicalScale) error {
 	// 1. 前置状态检查
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be unpublished")
@@ -79,7 +79,7 @@ func (l *lifecycle) Unpublish(ctx context.Context, scale *MedicalScale) error {
 }
 
 // Archive 归档量表
-func (l *lifecycle) Archive(ctx context.Context, scale *MedicalScale) error {
+func (l *lifecycle) Archive(_ context.Context, scale *MedicalScale) error {
 	// 1. 前置状态检查
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "scale is already archived")

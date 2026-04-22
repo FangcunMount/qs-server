@@ -6,6 +6,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+func mustMetaIDFromUint64(value uint64) meta.ID {
+	return meta.FromUint64(value)
+}
+
 // ============= Response 结构 =============
 
 // AnswerSheetResponse 答卷响应
@@ -57,12 +61,12 @@ func NewAnswerSheetResponse(result *answersheet.AnswerSheetResult) *AnswerSheetR
 	}
 
 	return &AnswerSheetResponse{
-		ID:                meta.ID(result.ID),
+		ID:                mustMetaIDFromUint64(result.ID),
 		QuestionnaireCode: result.QuestionnaireCode,
 		QuestionnaireVer:  result.QuestionnaireVer,
 		Title:             result.QuestionnaireTitle,
 		Score:             result.Score,
-		FillerID:          meta.ID(result.FillerID),
+		FillerID:          mustMetaIDFromUint64(result.FillerID),
 		FillerName:        result.FillerName,
 		Answers:           answers,
 		FilledAt:          result.FilledAt.Format("2006-01-02 15:04:05"),
@@ -81,12 +85,12 @@ func NewAnswerSheetListResponse(result *answersheet.AnswerSheetListResult) *Answ
 	items := make([]AnswerSheetSummaryItem, 0, len(result.Items))
 	for _, item := range result.Items {
 		items = append(items, AnswerSheetSummaryItem{
-			ID:                meta.ID(item.ID),
+			ID:                mustMetaIDFromUint64(item.ID),
 			QuestionnaireCode: item.QuestionnaireCode,
 			QuestionnaireVer:  item.QuestionnaireVer,
 			Title:             item.QuestionnaireTitle,
 			Score:             item.Score,
-			FillerID:          meta.ID(item.FillerID),
+			FillerID:          mustMetaIDFromUint64(item.FillerID),
 			FilledAt:          item.FilledAt.Format("2006-01-02 15:04:05"),
 		})
 	}
@@ -109,11 +113,11 @@ func NewAnswerSheetSummaryListResponse(result *answersheet.AnswerSheetSummaryLis
 	items := make([]AnswerSheetSummaryItem, 0, len(result.Items))
 	for _, item := range result.Items {
 		items = append(items, AnswerSheetSummaryItem{
-			ID:                meta.ID(item.ID),
+			ID:                mustMetaIDFromUint64(item.ID),
 			QuestionnaireCode: item.QuestionnaireCode,
 			Title:             item.QuestionnaireTitle,
 			Score:             item.Score,
-			FillerID:          meta.ID(item.FillerID),
+			FillerID:          mustMetaIDFromUint64(item.FillerID),
 			FilledAt:          item.FilledAt.Format("2006-01-02 15:04:05"),
 		})
 	}

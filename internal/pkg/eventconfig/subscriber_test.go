@@ -18,7 +18,7 @@ func TestSubscriberGetTopicsToSubscribe(t *testing.T) {
 
 	sub := NewSubscriber(SubscriberOptions{
 		Registry: registry,
-		HandlerFactory: func(handlerName string) (HandlerFunc, error) {
+		HandlerFactory: func(_ string) (HandlerFunc, error) {
 			return func(context.Context, string, []byte) error { return nil }, nil
 		},
 	})

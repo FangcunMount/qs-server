@@ -17,7 +17,7 @@ func InitFlags(flags *pflag.FlagSet) {
 }
 
 // WordSepNormalizeFunc 单词分隔符规范化函数
-func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+func WordSepNormalizeFunc(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 	if strings.Contains(name, "_") {
 		return pflag.NormalizedName(strings.ReplaceAll(name, "_", "-"))
 	}
@@ -26,7 +26,7 @@ func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 
 // WarnWordSepNormalizeFunc 警告包含 "_" 分隔符的标志
 // 当命令行参数中带有 "_" 时输出警告，并自动转换为 "-"
-func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+func WarnWordSepNormalizeFunc(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 	if strings.Contains(name, "_") {
 		nname := strings.ReplaceAll(name, "_", "-")
 		log.Warnf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", name, nname)

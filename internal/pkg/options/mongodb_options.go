@@ -72,55 +72,58 @@ func (o *MongoDBOptions) Validate() []error {
 
 // AddFlags adds flags related to mongodb storage for a specific APIServer to the specified FlagSet.
 func (o *MongoDBOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.URL, "mongodb.url", o.URL, ""+
-		"Full MongoDB connection URI. If set, it takes precedence over separated host/credential fields.")
+	addMongoDBConnectionFlags(fs, o)
+	addMongoDBTLSFlags(fs, o)
+	addMongoDBLoggingFlags(fs, o)
+}
 
-	fs.StringVar(&o.Host, "mongodb.host", o.Host, ""+
-		"MongoDB service host address (format: host:port).")
-
-	fs.StringVar(&o.Username, "mongodb.username", o.Username, ""+
-		"Username for access to MongoDB service.")
-
-	fs.StringVar(&o.Password, "mongodb.password", o.Password, ""+
-		"Password for access to MongoDB service.")
-
-	fs.StringVar(&o.Database, "mongodb.database", o.Database, ""+
-		"Database name for the server to use.")
-
-	fs.StringVar(&o.ReplicaSet, "mongodb.replica-set", o.ReplicaSet, ""+
-		"Replica set name for MongoDB transactions (for example: rs0).")
-
-	fs.BoolVar(&o.DirectConnection, "mongodb.direct-connection", o.DirectConnection, ""+
+func addMongoDBConnectionFlags(fs *pflag.FlagSet, o *MongoDBOptions) {
+	addStringFlags(fs, []stringFlagSpec{
+		{target: &o.URL, name: "mongodb.url", value: o.URL, usage: "" +
+			"Full MongoDB connection URI. If set, it takes precedence over separated host/credential fields."},
+		{target: &o.Host, name: "mongodb.host", value: o.Host, usage: "" +
+			"MongoDB service host address (format: host:port)."},
+		{target: &o.Username, name: "mongodb.username", value: o.Username, usage: "" +
+			"Username for access to MongoDB service."},
+		{target: &o.Password, name: "mongodb.password", value: o.Password, usage: "" +
+			"Password for access to MongoDB service."},
+		{target: &o.Database, name: "mongodb.database", value: o.Database, usage: "" +
+			"Database name for the server to use."},
+		{target: &o.ReplicaSet, name: "mongodb.replica-set", value: o.ReplicaSet, usage: "" +
+			"Replica set name for MongoDB transactions (for example: rs0)."},
+	})
+	addBoolFlag(fs, &o.DirectConnection, "mongodb.direct-connection", o.DirectConnection, ""+
 		"Force directConnection=true for single-node replica set deployments.")
+}
 
-	fs.BoolVar(&o.UseSSL, "mongodb.use-ssl", o.UseSSL, ""+
-		"Enable SSL for mongodb connection.")
+func addMongoDBTLSFlags(fs *pflag.FlagSet, o *MongoDBOptions) {
+	addBoolFlags(fs, []boolFlagSpec{
+		{target: &o.UseSSL, name: "mongodb.use-ssl", value: o.UseSSL, usage: "" +
+			"Enable SSL for mongodb connection."},
+		{target: &o.SSLInsecureSkipVerify, name: "mongodb.ssl-insecure-skip-verify", value: o.SSLInsecureSkipVerify, usage: "" +
+			"Skip SSL certificate verification for mongodb."},
+		{target: &o.SSLAllowInvalidHostnames, name: "mongodb.ssl-allow-invalid-hostnames", value: o.SSLAllowInvalidHostnames, usage: "" +
+			"Allow invalid hostnames in SSL certificates for mongodb."},
+	})
+	addStringFlags(fs, []stringFlagSpec{
+		{target: &o.SSLCAFile, name: "mongodb.ssl-ca-file", value: o.SSLCAFile, usage: "" +
+			"Path to SSL CA certificate file for mongodb."},
+		{target: &o.SSLPEMKeyfile, name: "mongodb.ssl-pem-keyfile", value: o.SSLPEMKeyfile, usage: "" +
+			"Path to SSL PEM key file for mongodb."},
+	})
+}
 
-	fs.BoolVar(&o.SSLInsecureSkipVerify, "mongodb.ssl-insecure-skip-verify", o.SSLInsecureSkipVerify, ""+
-		"Skip SSL certificate verification for mongodb.")
-
-	fs.BoolVar(&o.SSLAllowInvalidHostnames, "mongodb.ssl-allow-invalid-hostnames", o.SSLAllowInvalidHostnames, ""+
-		"Allow invalid hostnames in SSL certificates for mongodb.")
-
-	fs.StringVar(&o.SSLCAFile, "mongodb.ssl-ca-file", o.SSLCAFile, ""+
-		"Path to SSL CA certificate file for mongodb.")
-
-	fs.StringVar(&o.SSLPEMKeyfile, "mongodb.ssl-pem-keyfile", o.SSLPEMKeyfile, ""+
-		"Path to SSL PEM key file for mongodb.")
-
-	fs.BoolVar(&o.EnableLogger, "mongodb.enable-logger", o.EnableLogger, ""+
-		"Enable MongoDB command logging.")
-
-	fs.DurationVar(&o.SlowThreshold, "mongodb.slow-threshold", o.SlowThreshold, ""+
+func addMongoDBLoggingFlags(fs *pflag.FlagSet, o *MongoDBOptions) {
+	addBoolFlags(fs, []boolFlagSpec{
+		{target: &o.EnableLogger, name: "mongodb.enable-logger", value: o.EnableLogger, usage: "" +
+			"Enable MongoDB command logging."},
+		{target: &o.LogCommandDetail, name: "mongodb.log-command-detail", value: o.LogCommandDetail, usage: "" +
+			"Enable detailed command logging (includes query statements, sensitive data will be sanitized)."},
+		{target: &o.LogReplyDetail, name: "mongodb.log-reply-detail", value: o.LogReplyDetail, usage: "" +
+			"Enable detailed reply logging (may increase log size significantly)."},
+		{target: &o.LogStarted, name: "mongodb.log-started", value: o.LogStarted, usage: "" +
+			"Enable logging of command start events (increases log volume, use for debugging only)."},
+	})
+	addDurationFlag(fs, &o.SlowThreshold, "mongodb.slow-threshold", o.SlowThreshold, ""+
 		"Slow query threshold for mongodb (e.g., 200ms).")
-
-	// 详细日志配置（component-base v0.4.1+ 已支持）
-	fs.BoolVar(&o.LogCommandDetail, "mongodb.log-command-detail", o.LogCommandDetail, ""+
-		"Enable detailed command logging (includes query statements, sensitive data will be sanitized).")
-
-	fs.BoolVar(&o.LogReplyDetail, "mongodb.log-reply-detail", o.LogReplyDetail, ""+
-		"Enable detailed reply logging (may increase log size significantly).")
-
-	fs.BoolVar(&o.LogStarted, "mongodb.log-started", o.LogStarted, ""+
-		"Enable logging of command start events (increases log volume, use for debugging only).")
 }

@@ -282,39 +282,26 @@ func (r *taskRepository) FindWindow(
 // Save 保存任务（新增或更新）
 func (r *taskRepository) Save(ctx context.Context, task *domainPlan.AssessmentTask) error {
 	po := r.mapper.ToPO(task)
+	return saveMappedEntity(
+		ctx,
+		task,
+		po,
+		func() error { return po.BeforeCreate(nil) },
+		r.ExistsByID,
+		r.createAndSyncTask,
+		r.updateAndSyncTask,
+	)
+}
 
-	// 判断是新增还是更新
-	if task.GetID().IsZero() {
-		// ID 为零，确保 BeforeCreate 被调用以生成 ID
-		if err := po.BeforeCreate(nil); err != nil {
-			return err
-		}
-		// 直接创建
-		return r.CreateAndSync(ctx, po, func(po *AssessmentTaskPO) {
-			r.mapper.SyncID(po, task)
-		})
-	}
+func (r *taskRepository) createAndSyncTask(ctx context.Context, po *AssessmentTaskPO, task *domainPlan.AssessmentTask) error {
+	return r.CreateAndSync(ctx, po, func(saved *AssessmentTaskPO) {
+		syncTaskPO(saved, task, r.mapper)
+	})
+}
 
-	// ID 不为零，先检查记录是否存在
-	exists, err := r.ExistsByID(ctx, task.GetID().Uint64())
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		// 记录不存在，确保 BeforeCreate 被调用（虽然已有 ID，但需要设置版本号）
-		if err := po.BeforeCreate(nil); err != nil {
-			return err
-		}
-		// 执行 INSERT（使用指定的 ID）
-		return r.CreateAndSync(ctx, po, func(po *AssessmentTaskPO) {
-			r.mapper.SyncID(po, task)
-		})
-	}
-
-	// 记录存在，执行 UPDATE
-	return r.UpdateAndSync(ctx, po, func(po *AssessmentTaskPO) {
-		r.mapper.SyncID(po, task)
+func (r *taskRepository) updateAndSyncTask(ctx context.Context, po *AssessmentTaskPO, task *domainPlan.AssessmentTask) error {
+	return r.UpdateAndSync(ctx, po, func(saved *AssessmentTaskPO) {
+		syncTaskPO(saved, task, r.mapper)
 	})
 }
 

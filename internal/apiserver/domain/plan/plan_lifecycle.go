@@ -21,6 +21,12 @@ type PlanLifecycle struct {
 	taskLifecycle *TaskLifecycle
 }
 
+type resumeTaskState struct {
+	maxCompletedSeq map[testee.ID]int
+	firstTask       map[testee.ID]*AssessmentTask
+	tasksByTestee   map[testee.ID][]*AssessmentTask
+}
+
 // NewPlanLifecycle 创建计划生命周期管理器
 func NewPlanLifecycle(
 	taskRepo AssessmentTaskRepository,
@@ -36,7 +42,7 @@ func NewPlanLifecycle(
 
 // Activate 开启计划（将计划设置为活跃状态）
 // 适用于：从暂停状态恢复，或新创建的计划
-func (l *PlanLifecycle) Activate(ctx context.Context, plan *AssessmentPlan) error {
+func (l *PlanLifecycle) Activate(_ context.Context, plan *AssessmentPlan) error {
 	// 1. 前置状态检查
 	if plan.IsFinished() {
 		return errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能开启")
@@ -111,18 +117,45 @@ func (l *PlanLifecycle) Resume(
 		"testee_count", len(testeeStartDates),
 	)
 
-	// 1. 前置状态检查
-	if plan.IsFinished() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能恢复")
-	}
-	if plan.IsCanceled() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "已取消的计划不能恢复")
-	}
-	if !plan.IsPaused() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "计划未处于暂停状态，无法恢复")
+	if err := validatePlanResume(plan); err != nil {
+		return nil, err
 	}
 
-	// 2. 查询该计划的所有任务
+	allTasks, err := l.findResumeTasks(ctx, planID, plan)
+	if err != nil {
+		return nil, err
+	}
+
+	state := buildResumeTaskState(allTasks)
+	startDateMap := resolveResumeStartDates(plan, state.firstTask, testeeStartDates)
+	result, err := l.prepareResumeTasks(ctx, planID, plan, state, startDateMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. 调用聚合根的包内方法（状态变更）
+	if err := plan.resume(); err != nil {
+		return result, err
+	}
+
+	// 注意：领域层不负责持久化，返回待保存的任务供应用层保存
+	return result, nil
+}
+
+func validatePlanResume(plan *AssessmentPlan) error {
+	if plan.IsFinished() {
+		return errors.WithCode(code.ErrInvalidArgument, "已完成的计划不能恢复")
+	}
+	if plan.IsCanceled() {
+		return errors.WithCode(code.ErrInvalidArgument, "已取消的计划不能恢复")
+	}
+	if !plan.IsPaused() {
+		return errors.WithCode(code.ErrInvalidArgument, "计划未处于暂停状态，无法恢复")
+	}
+	return nil
+}
+
+func (l *PlanLifecycle) findResumeTasks(ctx context.Context, planID string, plan *AssessmentPlan) ([]*AssessmentTask, error) {
 	allTasks, err := l.taskRepo.FindByPlanID(ctx, plan.GetID())
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to find tasks for plan",
@@ -138,112 +171,130 @@ func (l *PlanLifecycle) Resume(
 		"plan_id", planID,
 		"total_tasks", len(allTasks),
 	)
+	return allTasks, nil
+}
 
-	// 3. 按受试者分组，找出每个受试者已完成的最大序号和开始日期
-	testeeMaxSeq := make(map[testee.ID]int)
-	testeeStartDateMap := make(map[testee.ID]time.Time)
-	testeeFirstTask := make(map[testee.ID]*AssessmentTask)
-	testeeTasks := make(map[testee.ID][]*AssessmentTask)
+func buildResumeTaskState(allTasks []*AssessmentTask) *resumeTaskState {
+	state := &resumeTaskState{
+		maxCompletedSeq: make(map[testee.ID]int),
+		firstTask:       make(map[testee.ID]*AssessmentTask),
+		tasksByTestee:   make(map[testee.ID][]*AssessmentTask),
+	}
 
-	// 找出每个受试者的第一个任务（用于推断 startDate）
 	for _, task := range allTasks {
 		testeeID := task.GetTesteeID()
-		testeeTasks[testeeID] = append(testeeTasks[testeeID], task)
-		if firstTask, exists := testeeFirstTask[testeeID]; !exists || task.GetSeq() < firstTask.GetSeq() {
-			testeeFirstTask[testeeID] = task
+		state.tasksByTestee[testeeID] = append(state.tasksByTestee[testeeID], task)
+		if firstTask, exists := state.firstTask[testeeID]; !exists || task.GetSeq() < firstTask.GetSeq() {
+			state.firstTask[testeeID] = task
 		}
-
-		// 找出已完成任务的最大序号
-		if task.IsCompleted() {
-			if seq := task.GetSeq(); seq > testeeMaxSeq[testeeID] {
-				testeeMaxSeq[testeeID] = seq
-			}
+		if task.IsCompleted() && task.GetSeq() > state.maxCompletedSeq[testeeID] {
+			state.maxCompletedSeq[testeeID] = task.GetSeq()
 		}
 	}
 
-	// 为每个受试者确定 startDate
-	for testeeID, firstTask := range testeeFirstTask {
-		// 如果提供了 startDate，使用提供的
-		if startDate, ok := testeeStartDates[testeeID]; ok && !startDate.IsZero() {
-			testeeStartDateMap[testeeID] = startDate
-		} else {
-			// 从第一个任务推断 startDate
-			startDate := inferStartDateFromTask(plan, firstTask)
-			if !startDate.IsZero() {
-				testeeStartDateMap[testeeID] = startDate
-			}
-		}
-	}
+	return state
+}
 
-	// 4. 为每个受试者重新生成或复用未完成的任务
-	result := &ResumeTasksResult{
-		TasksToSave: make([]*AssessmentTask, 0),
-	}
-	for testeeID, startDate := range testeeStartDateMap {
-		if startDate.IsZero() {
-			logger.L(ctx).Warnw("Skipping testee with zero start date",
-				"domain_action", "resume_plan",
-				"plan_id", planID,
-				"testee_id", testeeID.String(),
-			)
+func resolveResumeStartDates(
+	plan *AssessmentPlan,
+	firstTasks map[testee.ID]*AssessmentTask,
+	provided map[testee.ID]time.Time,
+) map[testee.ID]time.Time {
+	startDates := make(map[testee.ID]time.Time, len(firstTasks))
+	for testeeID, firstTask := range firstTasks {
+		if startDate, ok := provided[testeeID]; ok && !startDate.IsZero() {
+			startDates[testeeID] = startDate
 			continue
 		}
 
-		// 生成所有任务
-		allGeneratedTasks := l.taskGenerator.GenerateTasks(plan, testeeID, startDate)
-		existingBySeq := groupTasksBySeq(testeeTasks[testeeID])
-
-		// 找出需要重新生成或复用的任务（序号大于已完成的最大序号）
-		maxCompletedSeq := testeeMaxSeq[testeeID]
-		for _, task := range allGeneratedTasks {
-			if task.GetSeq() <= maxCompletedSeq {
-				continue
-			}
-
-			reusable := preferredReusableTask(existingBySeq[task.GetSeq()])
-			if reusable == nil {
-				result.TasksToSave = append(result.TasksToSave, task)
-				continue
-			}
-
-			if err := l.taskLifecycle.Reschedule(ctx, reusable, task.GetPlannedAt()); err != nil {
-				logger.L(ctx).Errorw("Failed to reschedule existing task for resumed plan",
-					"domain_action", "resume_plan",
-					"plan_id", planID,
-					"testee_id", testeeID.String(),
-					"task_id", reusable.GetID().String(),
-					"seq", reusable.GetSeq(),
-					"error", err.Error(),
-				)
-				return nil, errors.WithCode(code.ErrInternalServerError, "重置任务失败: %v", err)
-			}
-			result.TasksToSave = append(result.TasksToSave, reusable)
+		startDate := inferStartDateFromTask(plan, firstTask)
+		if !startDate.IsZero() {
+			startDates[testeeID] = startDate
 		}
+	}
+	return startDates
+}
 
-		logger.L(ctx).Infow("Generated tasks for testee",
-			"domain_action", "resume_plan",
-			"plan_id", planID,
-			"testee_id", testeeID.String(),
-			"max_completed_seq", maxCompletedSeq,
-			"tasks_to_save_count", len(allGeneratedTasks)-maxCompletedSeq,
-		)
+func (l *PlanLifecycle) prepareResumeTasks(
+	ctx context.Context,
+	planID string,
+	plan *AssessmentPlan,
+	state *resumeTaskState,
+	startDates map[testee.ID]time.Time,
+) (*ResumeTasksResult, error) {
+	result := &ResumeTasksResult{TasksToSave: make([]*AssessmentTask, 0)}
+	for testeeID, startDate := range startDates {
+		tasks, err := l.prepareResumeTasksForTestee(ctx, planID, plan, state, testeeID, startDate)
+		if err != nil {
+			return nil, err
+		}
+		result.TasksToSave = append(result.TasksToSave, tasks...)
 	}
 
 	sortTasksBySeq(result.TasksToSave)
-
 	logger.L(ctx).Infow("Tasks prepared for resumed plan",
 		"domain_action", "resume_plan",
 		"plan_id", planID,
 		"tasks_to_save_count", len(result.TasksToSave),
 	)
+	return result, nil
+}
 
-	// 5. 调用聚合根的包内方法（状态变更）
-	if err := plan.resume(); err != nil {
-		return result, err
+func (l *PlanLifecycle) prepareResumeTasksForTestee(
+	ctx context.Context,
+	planID string,
+	plan *AssessmentPlan,
+	state *resumeTaskState,
+	testeeID testee.ID,
+	startDate time.Time,
+) ([]*AssessmentTask, error) {
+	if startDate.IsZero() {
+		logger.L(ctx).Warnw("Skipping testee with zero start date",
+			"domain_action", "resume_plan",
+			"plan_id", planID,
+			"testee_id", testeeID.String(),
+		)
+		return nil, nil
 	}
 
-	// 注意：领域层不负责持久化，返回待保存的任务供应用层保存
-	return result, nil
+	allGeneratedTasks := l.taskGenerator.GenerateTasks(plan, testeeID, startDate)
+	existingBySeq := groupTasksBySeq(state.tasksByTestee[testeeID])
+	maxCompletedSeq := state.maxCompletedSeq[testeeID]
+	tasksToSave := make([]*AssessmentTask, 0, len(allGeneratedTasks))
+
+	for _, task := range allGeneratedTasks {
+		if task.GetSeq() <= maxCompletedSeq {
+			continue
+		}
+
+		reusable := preferredReusableTask(existingBySeq[task.GetSeq()])
+		if reusable == nil {
+			tasksToSave = append(tasksToSave, task)
+			continue
+		}
+
+		if err := l.taskLifecycle.Reschedule(ctx, reusable, task.GetPlannedAt()); err != nil {
+			logger.L(ctx).Errorw("Failed to reschedule existing task for resumed plan",
+				"domain_action", "resume_plan",
+				"plan_id", planID,
+				"testee_id", testeeID.String(),
+				"task_id", reusable.GetID().String(),
+				"seq", reusable.GetSeq(),
+				"error", err.Error(),
+			)
+			return nil, errors.WithCode(code.ErrInternalServerError, "重置任务失败: %v", err)
+		}
+		tasksToSave = append(tasksToSave, reusable)
+	}
+
+	logger.L(ctx).Infow("Generated tasks for testee",
+		"domain_action", "resume_plan",
+		"plan_id", planID,
+		"testee_id", testeeID.String(),
+		"max_completed_seq", maxCompletedSeq,
+		"tasks_to_save_count", len(tasksToSave),
+	)
+	return tasksToSave, nil
 }
 
 // inferStartDateFromTask 从任务推断开始日期

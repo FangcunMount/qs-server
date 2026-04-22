@@ -107,7 +107,7 @@ func (h *ServiceAuthHelper) CallWithAuth(ctx context.Context, fn func(ctx contex
 
 // GetRequestMetadata 实现 credentials.PerRPCCredentials 接口
 // 用于 gRPC WithPerRPCCredentials
-func (h *ServiceAuthHelper) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+func (h *ServiceAuthHelper) GetRequestMetadata(ctx context.Context, _ ...string) (map[string]string, error) {
 	token, err := h.GetToken(ctx)
 	if err != nil {
 		return nil, err

@@ -9,7 +9,7 @@ import "math"
 type MaxStrategy struct{}
 
 // Calculate 执行最大值计分
-func (s *MaxStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
+func (s *MaxStrategy) Calculate(values []float64, _ map[string]string) (float64, error) {
 	if len(values) == 0 {
 		return 0, nil
 	}
@@ -35,7 +35,7 @@ func (s *MaxStrategy) StrategyType() StrategyType {
 type MinStrategy struct{}
 
 // Calculate 执行最小值计分
-func (s *MinStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
+func (s *MinStrategy) Calculate(values []float64, _ map[string]string) (float64, error) {
 	if len(values) == 0 {
 		return 0, nil
 	}

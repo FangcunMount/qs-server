@@ -131,7 +131,7 @@ func (r *assessmentRepository) FindByTesteeID(ctx context.Context, testeeID test
 	var total int64
 
 	query := r.WithContext(ctx).
-		Where("testee_id = ? AND deleted_at IS NULL", uint64(testeeID))
+		Where("testee_id = ? AND deleted_at IS NULL", testeeID.Uint64())
 
 	// 统计总数
 	if err := query.Model(&AssessmentPO{}).Count(&total).Error; err != nil {
@@ -167,7 +167,7 @@ func (r *assessmentRepository) FindByTesteeIDWithFilters(
 	var total int64
 
 	query := r.WithContext(ctx).
-		Where("testee_id = ? AND deleted_at IS NULL", uint64(testeeID))
+		Where("testee_id = ? AND deleted_at IS NULL", testeeID.Uint64())
 
 	query = applyAssessmentStatusFilter(query, status)
 	if scaleCode != "" {
@@ -206,7 +206,7 @@ func (r *assessmentRepository) FindByTesteeIDAndScaleID(ctx context.Context, tes
 
 	query := r.WithContext(ctx).
 		Where("testee_id = ? AND medical_scale_id = ? AND deleted_at IS NULL",
-			uint64(testeeID), scaleRef.ID().Uint64())
+			testeeID.Uint64(), scaleRef.ID().Uint64())
 
 	// 统计总数
 	if err := query.Model(&AssessmentPO{}).Count(&total).Error; err != nil {
@@ -292,7 +292,7 @@ func (r *assessmentRepository) CountByTesteeIDAndStatus(ctx context.Context, tes
 	err := r.WithContext(ctx).
 		Model(&AssessmentPO{}).
 		Where("testee_id = ? AND status = ? AND deleted_at IS NULL",
-			uint64(testeeID), status.String()).
+			testeeID.Uint64(), status.String()).
 		Count(&count).Error
 
 	return count, err
@@ -320,7 +320,11 @@ func (r *assessmentRepository) FindByIDs(ctx context.Context, ids []assessment.I
 	// 转换ID列表
 	idList := make([]uint64, len(ids))
 	for i, id := range ids {
-		idList[i] = id.Uint64()
+		convertedID, err := metaIDToUint64(id)
+		if err != nil {
+			return nil, err
+		}
+		idList[i] = convertedID
 	}
 
 	var pos []*AssessmentPO
@@ -411,7 +415,11 @@ func (r *assessmentRepository) FindByOrgIDAndTesteeIDs(
 	var total int64
 	rawIDs := make([]uint64, 0, len(testeeIDs))
 	for _, id := range testeeIDs {
-		rawIDs = append(rawIDs, uint64(id))
+		convertedID, err := metaIDToUint64(id)
+		if err != nil {
+			return nil, 0, err
+		}
+		rawIDs = append(rawIDs, convertedID)
 	}
 
 	query := r.WithContext(ctx).

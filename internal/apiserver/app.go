@@ -30,7 +30,7 @@ func NewApp(basename string) *app.App {
 }
 
 func run(opts *options.Options) app.RunFunc {
-	return func(basename string) error {
+	return func(_ string) error {
 		// 初始化日志（使用从配置文件加载的配置）
 		log.Init(opts.Log)
 		defer log.Flush()

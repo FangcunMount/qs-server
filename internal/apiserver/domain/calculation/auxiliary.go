@@ -7,7 +7,7 @@ package calculation
 type CountStrategy struct{}
 
 // Calculate 执行计数计分
-func (s *CountStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
+func (s *CountStrategy) Calculate(values []float64, _ map[string]string) (float64, error) {
 	return float64(len(values)), nil
 }
 
@@ -23,7 +23,7 @@ func (s *CountStrategy) StrategyType() StrategyType {
 type FirstStrategy struct{}
 
 // Calculate 执行首值计分
-func (s *FirstStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
+func (s *FirstStrategy) Calculate(values []float64, _ map[string]string) (float64, error) {
 	if len(values) == 0 {
 		return 0, nil
 	}
@@ -42,7 +42,7 @@ func (s *FirstStrategy) StrategyType() StrategyType {
 type LastStrategy struct{}
 
 // Calculate 执行末值计分
-func (s *LastStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
+func (s *LastStrategy) Calculate(values []float64, _ map[string]string) (float64, error) {
 	if len(values) == 0 {
 		return 0, nil
 	}

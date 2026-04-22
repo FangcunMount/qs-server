@@ -66,7 +66,7 @@ func (b *binder) Bind(ctx context.Context, testee *Testee, profileID uint64) err
 }
 
 // Unbind 解除绑定
-func (b *binder) Unbind(ctx context.Context, testee *Testee) error {
+func (b *binder) Unbind(_ context.Context, testee *Testee) error {
 	if !testee.IsBoundToProfile() {
 		// 幂等操作：未绑定时不报错
 		return nil

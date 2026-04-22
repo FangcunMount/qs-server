@@ -11,6 +11,7 @@ import (
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // Repository 答卷MongoDB存储库
@@ -86,9 +87,13 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 
 	// 使用 $set 操作符包装更新数据
 	update := bson.M{"$set": updateData}
+	domainID, err := safeconv.MetaIDToUint64(sheet.ID())
+	if err != nil {
+		return err
+	}
 
 	filter := bson.M{
-		"domain_id": uint64(sheet.ID()),
+		"domain_id": domainID,
 	}
 
 	result, err := r.Collection().UpdateOne(ctx, filter, update)
@@ -105,13 +110,17 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 
 // FindByID 根据 ID 查询答卷
 func (r *Repository) FindByID(ctx context.Context, id meta.ID) (*answersheet.AnswerSheet, error) {
+	domainID, err := safeconv.MetaIDToUint64(id)
+	if err != nil {
+		return nil, err
+	}
 	filter := bson.M{
-		"domain_id":  uint64(id),
+		"domain_id":  domainID,
 		"deleted_at": nil,
 	}
 
 	var po AnswerSheetPO
-	err := r.Collection().FindOne(ctx, filter).Decode(&po)
+	err = r.Collection().FindOne(ctx, filter).Decode(&po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -128,9 +137,13 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 	if pageSize <= 0 {
 		return []*answersheet.AnswerSheetSummary{}, nil
 	}
+	fillerInt64, err := safeconv.Uint64ToInt64(fillerID)
+	if err != nil {
+		return nil, err
+	}
 
 	filter := bson.M{
-		"filler_id":  int64(fillerID),
+		"filler_id":  fillerInt64,
 		"deleted_at": nil,
 	}
 
@@ -164,32 +177,7 @@ func (r *Repository) FindSummaryListByFiller(ctx context.Context, fillerID uint6
 		_ = cursor.Close(ctx)
 	}()
 
-	var summaries []*answersheet.AnswerSheetSummary
-	for cursor.Next(ctx) {
-		var po AnswerSheetSummaryPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		summary := &answersheet.AnswerSheetSummary{
-			ID:                 meta.ID(po.DomainID),
-			QuestionnaireCode:  po.QuestionnaireCode,
-			QuestionnaireTitle: po.QuestionnaireTitle,
-			FillerID:           uint64(po.FillerID),
-			FillerType:         po.FillerType,
-			TotalScore:         po.TotalScore,
-			AnswerCount:        po.AnswerCount,
-		}
-		if po.FilledAt != nil {
-			summary.FilledAt = *po.FilledAt
-		}
-		summaries = append(summaries, summary)
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-
-	return summaries, nil
+	return decodeSummaryCursor(ctx, cursor)
 }
 
 // FindSummaryListByQuestionnaire 查询问卷的答卷摘要列表（使用聚合管道计算 answer_count）
@@ -234,32 +222,7 @@ func (r *Repository) FindSummaryListByQuestionnaire(ctx context.Context, questio
 		_ = cursor.Close(ctx)
 	}()
 
-	var summaries []*answersheet.AnswerSheetSummary
-	for cursor.Next(ctx) {
-		var po AnswerSheetSummaryPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		summary := &answersheet.AnswerSheetSummary{
-			ID:                 meta.ID(po.DomainID),
-			QuestionnaireCode:  po.QuestionnaireCode,
-			QuestionnaireTitle: po.QuestionnaireTitle,
-			FillerID:           uint64(po.FillerID),
-			FillerType:         po.FillerType,
-			TotalScore:         po.TotalScore,
-			AnswerCount:        po.AnswerCount,
-		}
-		if po.FilledAt != nil {
-			summary.FilledAt = *po.FilledAt
-		}
-		summaries = append(summaries, summary)
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-
-	return summaries, nil
+	return decodeSummaryCursor(ctx, cursor)
 }
 
 // CountWithConditions 根据条件统计数量
@@ -274,8 +237,12 @@ func (r *Repository) CountWithConditions(ctx context.Context, conditions map[str
 
 // CountByFiller 统计填写者的答卷数量
 func (r *Repository) CountByFiller(ctx context.Context, fillerID uint64) (int64, error) {
+	fillerInt64, err := safeconv.Uint64ToInt64(fillerID)
+	if err != nil {
+		return 0, err
+	}
 	filter := bson.M{
-		"filler_id":  int64(fillerID),
+		"filler_id":  fillerInt64,
 		"deleted_at": nil,
 	}
 	return r.CountDocuments(ctx, filter)
@@ -299,9 +266,13 @@ func (r *Repository) Delete(ctx context.Context, id meta.ID) error {
 			"updated_at": now,
 		},
 	}
+	domainID, err := safeconv.MetaIDToUint64(id)
+	if err != nil {
+		return err
+	}
 
 	filter := bson.M{
-		"domain_id": uint64(id),
+		"domain_id": domainID,
 	}
 
 	result, err := r.Collection().UpdateOne(ctx, filter, update)
@@ -314,4 +285,54 @@ func (r *Repository) Delete(ctx context.Context, id meta.ID) error {
 	}
 
 	return nil
+}
+
+func decodeSummaryCursor(ctx context.Context, cursor *mongo.Cursor) ([]*answersheet.AnswerSheetSummary, error) {
+	var summaries []*answersheet.AnswerSheetSummary
+	for cursor.Next(ctx) {
+		var po AnswerSheetSummaryPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		summary, err := answerSheetSummaryFromPO(&po)
+		if err != nil {
+			return nil, err
+		}
+		summaries = append(summaries, summary)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return summaries, nil
+}
+
+func answerSheetSummaryFromPO(po *AnswerSheetSummaryPO) (*answersheet.AnswerSheetSummary, error) {
+	if po == nil {
+		return nil, nil
+	}
+
+	id, err := safeconv.Uint64ToMetaID(po.DomainID)
+	if err != nil {
+		return nil, err
+	}
+	fillerID, err := safeconv.Int64ToUint64(po.FillerID)
+	if err != nil {
+		return nil, err
+	}
+
+	summary := &answersheet.AnswerSheetSummary{
+		ID:                 id,
+		QuestionnaireCode:  po.QuestionnaireCode,
+		QuestionnaireTitle: po.QuestionnaireTitle,
+		FillerID:           fillerID,
+		FillerType:         po.FillerType,
+		TotalScore:         po.TotalScore,
+		AnswerCount:        po.AnswerCount,
+	}
+	if po.FilledAt != nil {
+		summary.FilledAt = *po.FilledAt
+	}
+	return summary, nil
 }

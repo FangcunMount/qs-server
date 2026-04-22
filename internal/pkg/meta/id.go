@@ -25,7 +25,7 @@ type ID int64
 
 // New 内部生成（使用 idutil 的 ID 生成器）
 func New() ID {
-	return ID(idutil.GetIntID())
+	return FromUint64(idutil.GetIntID())
 }
 
 // FromUint64 内部可信数据来源（若越界就 panic —— 逻辑错误尽早暴露）
@@ -33,7 +33,7 @@ func FromUint64(v uint64) ID {
 	if v > math.MaxInt64 {
 		panic(fmt.Errorf("meta.FromUint64: %d exceeds int64", v))
 	}
-	return ID(v)
+	return ID(int64(v))
 }
 
 // MustFromUint64 显式 Must 版本（更清晰）
@@ -73,7 +73,14 @@ func ParseID(s string) (ID, error) {
 func (id ID) Int64() int64 { return int64(id) }
 func (id ID) Uint64() uint64 {
 	// 非负保证：我们的构造路径不允许负数
-	return uint64(id)
+	if id < 0 {
+		panic(fmt.Errorf("meta.ID.Uint64: negative %d", id))
+	}
+	value, err := strconv.ParseUint(id.String(), 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("meta.ID.Uint64: %w", err))
+	}
+	return value
 }
 func (id ID) String() string { return strconv.FormatInt(int64(id), 10) }
 func (id ID) IsZero() bool   { return id == 0 }
@@ -106,7 +113,7 @@ func (id *ID) Scan(src any) error {
 		if v > math.MaxInt64 {
 			return fmt.Errorf("meta.ID.Scan: %d exceeds int64", v)
 		}
-		*id = ID(v)
+		*id = ID(int64(v))
 		return nil
 	case []byte:
 		parsed, err := ParseID(string(v))
@@ -166,6 +173,6 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	if u > math.MaxInt64 {
 		return fmt.Errorf("id %d exceeds int64", u)
 	}
-	*id = ID(u)
+	*id = ID(int64(u))
 	return nil
 }

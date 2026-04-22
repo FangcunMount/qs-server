@@ -22,7 +22,7 @@ type fakePlanCommandService struct {
 	block      <-chan struct{}
 }
 
-func (f *fakePlanCommandService) SchedulePendingTasks(ctx context.Context, orgID int64, before string) (*planApp.TaskScheduleResult, error) {
+func (f *fakePlanCommandService) SchedulePendingTasks(ctx context.Context, orgID int64, _ string) (*planApp.TaskScheduleResult, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, orgID)
 	stats := f.statsByOrg[orgID]

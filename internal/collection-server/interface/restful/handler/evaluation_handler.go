@@ -234,101 +234,110 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/wait-report [get]
 func (h *EvaluationHandler) WaitReport(c *gin.Context) {
-	// 从 query 参数获取 testee_id
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
+	testeeID, assessmentID, timeout, ok := h.parseWaitReportRequest(c)
+	if !ok {
 		return
 	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return
-	}
-
-	idStr := h.GetPathParam(c, "id")
-	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
-		return
-	}
-
-	// 解析超时参数
-	timeoutStr := c.DefaultQuery("timeout", "15")
-	timeoutSeconds, err := strconv.Atoi(timeoutStr)
-	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
-		timeoutSeconds = 15
-	}
-	timeout := time.Duration(timeoutSeconds) * time.Second
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()
 
-	// 1. 快速检查一次状态
-	result, err := h.queryService.GetMyAssessment(ctx, testeeID, assessmentID)
-	if err == nil && result != nil {
-		// 如果已经完成，立即返回
-		if result.Status == "interpreted" || result.Status == "failed" {
-			var totalScore *float64
-			var riskLevel *string
-			if result.TotalScore != 0 {
-				ts := result.TotalScore
-				totalScore = &ts
-			}
-			if result.RiskLevel != "" {
-				rl := result.RiskLevel
-				riskLevel = &rl
-			}
-			h.Success(c, &evaluation.AssessmentStatusResponse{
-				Status:     result.Status,
-				TotalScore: totalScore,
-				RiskLevel:  riskLevel,
-				UpdatedAt:  time.Now().Unix(),
-			})
-			return
-		}
+	if statusResponse, ok := h.lookupAssessmentStatus(ctx, testeeID, assessmentID); ok {
+		h.Success(c, statusResponse)
+		return
 	}
 
-	// 2. 短轮询：每1秒检查一次状态
+	h.Success(c, h.pollWaitReport(ctx, testeeID, assessmentID))
+}
+
+func (h *EvaluationHandler) parseWaitReportRequest(c *gin.Context) (uint64, uint64, time.Duration, bool) {
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
+	if testeeIDStr == "" {
+		h.BadRequestResponse(c, "testee_id is required", nil)
+		return 0, 0, 0, false
+	}
+
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid testee_id format", err)
+		return 0, 0, 0, false
+	}
+
+	assessmentID, err := strconv.ParseUint(h.GetPathParam(c, "id"), 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid assessment id", err)
+		return 0, 0, 0, false
+	}
+
+	return testeeID, assessmentID, normalizeWaitReportTimeout(c.DefaultQuery("timeout", "15")), true
+}
+
+func normalizeWaitReportTimeout(timeout string) time.Duration {
+	timeoutSeconds, err := strconv.Atoi(timeout)
+	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
+		timeoutSeconds = 15
+	}
+	return time.Duration(timeoutSeconds) * time.Second
+}
+
+func (h *EvaluationHandler) lookupAssessmentStatus(
+	ctx context.Context,
+	testeeID uint64,
+	assessmentID uint64,
+) (*evaluation.AssessmentStatusResponse, bool) {
+	result, err := h.queryService.GetMyAssessment(ctx, testeeID, assessmentID)
+	if err != nil || result == nil || !isTerminalAssessmentStatus(result.Status) {
+		return nil, false
+	}
+	return buildAssessmentStatusResponse(result), true
+}
+
+func (h *EvaluationHandler) pollWaitReport(
+	ctx context.Context,
+	testeeID uint64,
+	assessmentID uint64,
+) *evaluation.AssessmentStatusResponse {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			// 超时或客户端断开
-			h.Success(c, &evaluation.AssessmentStatusResponse{
-				Status:    "pending",
-				UpdatedAt: time.Now().Unix(),
-			})
-			return
+			return pendingAssessmentStatusResponse()
 
 		case <-ticker.C:
-			// 定期轮询状态
-			result, err := h.queryService.GetMyAssessment(ctx, testeeID, assessmentID)
-			if err == nil && result != nil {
-				if result.Status == "interpreted" || result.Status == "failed" {
-					var totalScore *float64
-					var riskLevel *string
-					if result.TotalScore != 0 {
-						ts := result.TotalScore
-						totalScore = &ts
-					}
-					if result.RiskLevel != "" {
-						rl := result.RiskLevel
-						riskLevel = &rl
-					}
-					h.Success(c, &evaluation.AssessmentStatusResponse{
-						Status:     result.Status,
-						TotalScore: totalScore,
-						RiskLevel:  riskLevel,
-						UpdatedAt:  time.Now().Unix(),
-					})
-					return
-				}
+			if statusResponse, ok := h.lookupAssessmentStatus(ctx, testeeID, assessmentID); ok {
+				return statusResponse
 			}
 		}
 	}
+}
+
+func isTerminalAssessmentStatus(status string) bool {
+	return status == "interpreted" || status == "failed"
+}
+
+func pendingAssessmentStatusResponse() *evaluation.AssessmentStatusResponse {
+	return &evaluation.AssessmentStatusResponse{
+		Status:    "pending",
+		UpdatedAt: time.Now().Unix(),
+	}
+}
+
+func buildAssessmentStatusResponse(result *evaluation.AssessmentDetailResponse) *evaluation.AssessmentStatusResponse {
+	response := &evaluation.AssessmentStatusResponse{
+		Status:    result.Status,
+		UpdatedAt: time.Now().Unix(),
+	}
+	if result.TotalScore != 0 {
+		totalScore := result.TotalScore
+		response.TotalScore = &totalScore
+	}
+	if result.RiskLevel != "" {
+		riskLevel := result.RiskLevel
+		response.RiskLevel = &riskLevel
+	}
+	return response
 }
 
 // GetFactorTrend 获取因子得分趋势

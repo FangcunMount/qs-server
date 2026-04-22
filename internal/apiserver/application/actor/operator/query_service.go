@@ -23,7 +23,11 @@ func NewQueryService(repo domain.Repository) OperatorQueryService {
 
 // GetByID 根据ID查询操作者
 func (s *queryService) GetByID(ctx context.Context, operatorID uint64) (*OperatorResult, error) {
-	st, err := s.repo.FindByID(ctx, domain.ID(operatorID))
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return nil, err
+	}
+	st, err := s.repo.FindByID(ctx, targetOperatorID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find operator")
 	}

@@ -58,7 +58,7 @@ func (h *QRCodeHandler) GetQRCodeImage(c *gin.Context) {
 		return
 	}
 
-	// 读取文件
+	// #nosec G304 -- filename is validated and constrained under the QR code storage directory.
 	fileData, err := os.ReadFile(filePath)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("读取二维码文件失败",

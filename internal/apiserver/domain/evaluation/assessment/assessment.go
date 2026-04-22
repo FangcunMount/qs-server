@@ -463,5 +463,5 @@ func (a *Assessment) setID(id ID) {
 
 // SyncIDFromRepository 从仓储层同步ID（供仓储层使用）
 func SyncIDFromRepository(a *Assessment, id uint64) {
-	a.setID(ID(id))
+	a.setID(NewID(id))
 }

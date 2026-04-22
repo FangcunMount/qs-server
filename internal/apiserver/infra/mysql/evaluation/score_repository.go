@@ -34,7 +34,7 @@ func NewScoreRepository(db *gorm.DB) assessment.ScoreRepository {
 
 // SaveScores 批量保存得分
 // 注意：需要传入辅助信息来扁平化存储
-func (r *scoreRepository) SaveScores(ctx context.Context, scores []*assessment.AssessmentScore) error {
+func (r *scoreRepository) SaveScores(_ context.Context, scores []*assessment.AssessmentScore) error {
 	if len(scores) == 0 {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (r *scoreRepository) FindByTesteeIDAndFactorCode(ctx context.Context, teste
 	var pos []*AssessmentScorePO
 	query := r.WithContext(ctx).
 		Where("testee_id = ? AND factor_code = ? AND deleted_at IS NULL",
-			uint64(testeeID), factorCode.String()).
+			testeeID.Uint64(), factorCode.String()).
 		Order("id DESC")
 
 	if limit > 0 {
@@ -140,7 +140,7 @@ func (r *scoreRepository) FindLatestByTesteeIDAndScaleID(ctx context.Context, te
 		Model(&AssessmentScorePO{}).
 		Select("assessment_id").
 		Where("testee_id = ? AND medical_scale_id = ? AND deleted_at IS NULL",
-			uint64(testeeID), scaleRef.ID().Uint64()).
+			testeeID.Uint64(), scaleRef.ID().Uint64()).
 		Order("id DESC").
 		Limit(1).
 		Scan(&latestAssessmentID).Error
@@ -201,7 +201,7 @@ func (r *scoreRepository) toSingleFactorDomainList(pos []*AssessmentScorePO) []*
 
 		// 创建只包含单个因子的 AssessmentScore
 		score := assessment.ReconstructAssessmentScore(
-			assessment.ID(po.AssessmentID),
+			mustAssessmentIDFromUint64("assessment_score.assessment_id", po.AssessmentID),
 			po.RawScore,
 			assessment.RiskLevel(po.RiskLevel),
 			[]assessment.FactorScore{factorScore},

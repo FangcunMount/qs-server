@@ -49,14 +49,15 @@ func (r *CachedAssessmentRepository) buildCacheKey(id assessment.ID) string {
 
 // FindByID 根据ID查询测评（优先从缓存读取）
 func (r *CachedAssessmentRepository) FindByID(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
-	domain, err := ReadThrough(ctx, ReadThroughOptions[assessment.Assessment]{
-		PolicyKey: cachepolicy.PolicyAssessmentDetail,
-		CacheKey:  r.buildCacheKey(id),
-		Policy:    r.policy,
-		GetCached: func(ctx context.Context) (*assessment.Assessment, error) { return r.getCache(ctx, id) },
-		Load:      func(ctx context.Context) (*assessment.Assessment, error) { return r.repo.FindByID(ctx, id) },
-		SetCached: func(ctx context.Context, value *assessment.Assessment) error { return r.setCache(ctx, id, value) },
-	})
+	domain, err := readByIDWithCache(
+		ctx,
+		cachepolicy.PolicyAssessmentDetail,
+		r.buildCacheKey(id),
+		r.policy,
+		func(ctx context.Context) (*assessment.Assessment, error) { return r.getCache(ctx, id) },
+		func(ctx context.Context) (*assessment.Assessment, error) { return r.repo.FindByID(ctx, id) },
+		func(ctx context.Context, value *assessment.Assessment) error { return r.setCache(ctx, id, value) },
+	)
 	if err != nil {
 		return nil, err
 	}

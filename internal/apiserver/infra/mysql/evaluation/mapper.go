@@ -1,7 +1,6 @@
 package evaluation
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -81,7 +80,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 	)
 
 	// 构建答卷引用
-	answerSheetRef := assessment.NewAnswerSheetRef(meta.ID(po.AnswerSheetID))
+	answerSheetRef := assessment.NewAnswerSheetRef(mustMetaIDFromUint64("assessment.answer_sheet_id", po.AnswerSheetID))
 
 	// 构建来源信息
 	origin := assessment.ReconstructOrigin(assessment.OriginType(po.OriginType), po.OriginID)
@@ -94,7 +93,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 			name = *po.MedicalScaleName
 		}
 		ref := assessment.NewMedicalScaleRef(
-			meta.ID(*po.MedicalScaleID),
+			mustMetaIDFromUint64("assessment.medical_scale_id", *po.MedicalScaleID),
 			meta.NewCode(*po.MedicalScaleCode),
 			name,
 		)
@@ -112,7 +111,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 	return assessment.Reconstruct(
 		po.ID,
 		po.OrgID,
-		testee.ID(po.TesteeID),
+		mustTesteeIDFromUint64("assessment.testee_id", po.TesteeID),
 		questionnaireRef,
 		answerSheetRef,
 		scaleRef,
@@ -129,7 +128,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 
 // SyncID 同步ID
 func (m *AssessmentMapper) SyncID(po *AssessmentPO, domain *assessment.Assessment) {
-	assessment.SyncIDFromRepository(domain, uint64(po.ID))
+	assessment.SyncIDFromRepository(domain, mustUint64FromMetaID("assessment.id", po.ID))
 }
 
 // ToDomainList 批量转换持久化对象为领域对象
@@ -198,7 +197,7 @@ func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.AssessmentS
 
 	// 取第一个 PO 作为参考（假设同一 Assessment 的 PO 共享这些字段）
 	firstPO := pos[0]
-	assessmentID := meta.ID(firstPO.AssessmentID)
+	assessmentID := mustAssessmentIDFromUint64("assessment_score.assessment_id", firstPO.AssessmentID)
 
 	// 计算总分和风险等级（从总分因子获取）
 	var totalScore float64

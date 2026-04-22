@@ -37,7 +37,7 @@ func NewApp(basename string) *app.App {
 }
 
 func run(opts *options.Options) app.RunFunc {
-	return func(basename string) error {
+	return func(_ string) error {
 		// 初始化日志
 		log.Init(opts.Log)
 		defer log.Flush()

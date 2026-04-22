@@ -16,7 +16,7 @@ func toOperatorResult(s *domain.Operator) *OperatorResult {
 	}
 
 	return &OperatorResult{
-		ID:       uint64(s.ID()),
+		ID:       s.ID().Uint64(),
 		OrgID:    s.OrgID(),
 		UserID:   s.UserID(),
 		Roles:    roles,

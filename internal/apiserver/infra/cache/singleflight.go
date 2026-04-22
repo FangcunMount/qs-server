@@ -32,8 +32,9 @@ func (c *SingleflightCoordinator) group(policyKey cachepolicy.CachePolicyKey) *s
 	return group
 }
 
-func (c *SingleflightCoordinator) Do(policyKey cachepolicy.CachePolicyKey, key string, fn func() (interface{}, error)) (interface{}, error, bool) {
-	return c.group(policyKey).Do(key, fn)
+func (c *SingleflightCoordinator) Do(policyKey cachepolicy.CachePolicyKey, key string, fn func() (interface{}, error)) (interface{}, bool, error) {
+	value, err, shared := c.group(policyKey).Do(key, fn)
+	return value, shared, err
 }
 
 var defaultSingleflightCoordinator = NewSingleflightCoordinator()

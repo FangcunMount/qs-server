@@ -31,7 +31,7 @@ func NewTokenProvider(sdkCache cache.Cache) *TokenProvider {
 }
 
 // FetchMiniProgramToken 获取小程序访问令牌
-func (p *TokenProvider) FetchMiniProgramToken(ctx context.Context, appID, appSecret string) (*AccessTokenResult, error) {
+func (p *TokenProvider) FetchMiniProgramToken(_ context.Context, appID, appSecret string) (*AccessTokenResult, error) {
 	if appID == "" || appSecret == "" {
 		return nil, errors.New("appID and appSecret cannot be empty")
 	}
@@ -48,7 +48,7 @@ func (p *TokenProvider) FetchMiniProgramToken(ctx context.Context, appID, appSec
 }
 
 // FetchOfficialAccountToken 获取公众号访问令牌
-func (p *TokenProvider) FetchOfficialAccountToken(ctx context.Context, appID, appSecret string) (*AccessTokenResult, error) {
+func (p *TokenProvider) FetchOfficialAccountToken(_ context.Context, appID, appSecret string) (*AccessTokenResult, error) {
 	if appID == "" || appSecret == "" {
 		return nil, errors.New("appID and appSecret cannot be empty")
 	}

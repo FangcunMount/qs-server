@@ -1,9 +1,11 @@
 package answersheet
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -44,6 +46,10 @@ type AnswerSheetSubmittedEvent = event.Event[AnswerSheetSubmittedData]
 func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, taskID string) AnswerSheetSubmittedEvent {
 	code, ver, _ := sheet.QuestionnaireInfo()
 	filler := sheet.Filler()
+	fillerID, err := safeconv.Int64ToUint64(filler.UserID())
+	if err != nil {
+		panic(fmt.Errorf("answersheet filler id: %w", err))
+	}
 
 	return event.New(EventTypeSubmitted, AggregateType, sheet.ID().String(),
 		AnswerSheetSubmittedData{
@@ -52,7 +58,7 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, ta
 			QuestionnaireVersion: ver,
 			TesteeID:             testeeID,
 			OrgID:                orgID,
-			FillerID:             uint64(filler.UserID()),
+			FillerID:             fillerID,
 			FillerType:           filler.FillerType().String(),
 			TaskID:               taskID,
 			SubmittedAt:          sheet.FilledAt(),

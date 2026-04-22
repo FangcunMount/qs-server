@@ -22,7 +22,7 @@ func NewSubscribeSender(sdkCache cache.Cache) *SubscribeSender {
 	return &SubscribeSender{cache: sdkCache}
 }
 
-func (s *SubscribeSender) SendSubscribeMessage(ctx context.Context, appID, appSecret string, msg wechatPort.SubscribeMessage) error {
+func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatPort.SubscribeMessage) error {
 	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func (s *SubscribeSender) SendSubscribeMessage(ctx context.Context, appID, appSe
 	return nil
 }
 
-func (s *SubscribeSender) ListTemplates(ctx context.Context, appID, appSecret string) ([]wechatPort.SubscribeTemplate, error) {
+func (s *SubscribeSender) ListTemplates(_ context.Context, appID, appSecret string) ([]wechatPort.SubscribeTemplate, error) {
 	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
 	if err != nil {
 		return nil, err

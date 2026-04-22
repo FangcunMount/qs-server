@@ -107,7 +107,7 @@ func (AssessmentEpisodePO) TableName() string { return "assessment_episode" }
 
 func (p *AssessmentEpisodePO) BeforeCreate(_ *gorm.DB) error {
 	if p.EpisodeID == 0 {
-		p.EpisodeID = uint64(meta.New())
+		p.EpisodeID = meta.New().Uint64()
 	}
 	return nil
 }
@@ -212,7 +212,7 @@ func (AnalyticsProjectionOrgDailyPO) TableName() string { return "analytics_proj
 
 func (p *AnalyticsProjectionOrgDailyPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
-		p.ID = uint64(meta.New())
+		p.ID = meta.New().Uint64()
 	}
 	return nil
 }
@@ -243,7 +243,7 @@ func (AnalyticsProjectionClinicianDailyPO) TableName() string {
 
 func (p *AnalyticsProjectionClinicianDailyPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
-		p.ID = uint64(meta.New())
+		p.ID = meta.New().Uint64()
 	}
 	return nil
 }
@@ -273,7 +273,7 @@ func (AnalyticsProjectionEntryDailyPO) TableName() string { return "analytics_pr
 
 func (p *AnalyticsProjectionEntryDailyPO) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == 0 {
-		p.ID = uint64(meta.New())
+		p.ID = meta.New().Uint64()
 	}
 	return nil
 }

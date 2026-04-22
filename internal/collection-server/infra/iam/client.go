@@ -157,7 +157,7 @@ func (c *Client) Close() error {
 
 // HealthCheck 健康检查
 // 通过尝试调用 IAM 服务来验证连接是否正常
-func (c *Client) HealthCheck(ctx context.Context) error {
+func (c *Client) HealthCheck(_ context.Context) error {
 	if !c.enabled {
 		return nil
 	}

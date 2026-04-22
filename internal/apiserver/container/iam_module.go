@@ -42,101 +42,15 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}
 
-	// 创建 Token 验证器（使用 SDK 的 JWKS 本地验签 + 远程降级）
-	var tokenVerifier *iam.TokenVerifier
-	if client.IsEnabled() {
-		tokenVerifier, err = iam.NewTokenVerifier(ctx, client)
-		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create token verifier, will use remote verification only",
-				"component", "iam_module",
-				"error", err.Error(),
-			)
-			// 不返回错误，允许降级到远程验证
-		}
-	}
-
-	// 创建服务间认证助手（如果配置了 ServiceAuth）
-	var serviceAuthHelper *iam.ServiceAuthHelper
-	if client.IsEnabled() && opts.ServiceAuth != nil && opts.ServiceAuth.ServiceID != "" {
-		serviceAuthConfig := &iam.ServiceAuthConfig{
-			ServiceID:      opts.ServiceAuth.ServiceID,
-			TargetAudience: opts.ServiceAuth.TargetAudience,
-			TokenTTL:       int64(opts.ServiceAuth.TokenTTL.Seconds()),
-			RefreshBefore:  int64(opts.ServiceAuth.RefreshBefore.Seconds()),
-		}
-		serviceAuthHelper, err = iam.NewServiceAuthHelper(ctx, client, serviceAuthConfig)
-		if err != nil {
-			if errors.Is(err, iam.ErrServiceTokenNotSupported) {
-				logger.L(context.Background()).Infow("IAM server does not support IssueServiceToken, service-to-service auth disabled",
-					"component", "iam_module",
-					"service_id", serviceAuthConfig.ServiceID,
-					"target_audience", serviceAuthConfig.TargetAudience,
-				)
-			} else {
-				logger.L(context.Background()).Warnw("Failed to create service auth helper, service-to-service auth will not be available",
-					"component", "iam_module",
-					"error", err.Error(),
-				)
-				// 不返回错误，允许继续运行
-			}
-		}
-	}
-
-	// 创建 Identity 服务
-	var identityService *iam.IdentityService
-	if client.IsEnabled() {
-		identityService, err = iam.NewIdentityService(client)
-		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create identity service",
-				"component", "iam_module",
-				"error", err.Error(),
-			)
-		}
-	}
-
-	var operationAccountSvc *iam.OperationAccountService
-	if client.IsEnabled() {
-		operationAccountSvc, err = iam.NewOperationAccountService(client)
-		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create operation account service",
-				"component", "iam_module",
-				"error", err.Error(),
-			)
-		}
-	}
-
-	// 创建 Guardianship 服务
-	var guardianshipSvc *iam.GuardianshipService
-	if client.IsEnabled() {
-		guardianshipSvc, err = iam.NewGuardianshipService(client)
-		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create guardianship service",
-				"component", "iam_module",
-				"error", err.Error(),
-			)
-		}
-	}
-
-	// 创建 WeChatApp 服务
-	var wechatAppService *iam.WeChatAppService
-	if client.IsEnabled() {
-		wechatAppService, err = iam.NewWeChatAppService(client)
-		if err != nil {
-			logger.L(context.Background()).Warnw("Failed to create wechat app service",
-				"component", "iam_module",
-				"error", err.Error(),
-			)
-		}
-	}
-
-	var authzSnapshotLoader *iam.AuthzSnapshotLoader
-	if client.IsEnabled() && opts.GRPCEnabled {
-		iamOpts := convertIAMOptions(opts)
-		authzSnapshotLoader = iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
-			AppName:              iamOpts.AuthzAppName,
-			CacheTTL:             iamOpts.AuthzCacheTTL,
-			CasbinDomainOverride: iamOpts.AuthzCasbinDomainOverride,
-		})
+	module := &IAMModule{
+		client:              client,
+		tokenVerifier:       newIAMTokenVerifier(ctx, client),
+		serviceAuthHelper:   newIAMServiceAuthHelper(ctx, client, opts),
+		identityService:     newIAMIdentityService(client),
+		operationAccountSvc: newIAMOperationAccountService(client),
+		guardianshipSvc:     newIAMGuardianshipService(client),
+		wechatAppService:    newIAMWeChatAppService(client),
+		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
 	}
 
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
@@ -144,16 +58,127 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		"result", "success",
 	)
 
-	return &IAMModule{
-		client:              client,
-		tokenVerifier:       tokenVerifier,
-		serviceAuthHelper:   serviceAuthHelper,
-		identityService:     identityService,
-		operationAccountSvc: operationAccountSvc,
-		guardianshipSvc:     guardianshipSvc,
-		wechatAppService:    wechatAppService,
-		authzSnapshotLoader: authzSnapshotLoader,
-	}, nil
+	return module, nil
+}
+
+func newIAMTokenVerifier(ctx context.Context, client *iam.Client) *iam.TokenVerifier {
+	if client == nil || !client.IsEnabled() {
+		return nil
+	}
+
+	tokenVerifier, err := iam.NewTokenVerifier(ctx, client)
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to create token verifier, will use remote verification only",
+			"component", "iam_module",
+			"error", err.Error(),
+		)
+		return nil
+	}
+	return tokenVerifier
+}
+
+func newIAMServiceAuthHelper(ctx context.Context, client *iam.Client, opts *options.IAMOptions) *iam.ServiceAuthHelper {
+	if client == nil || !client.IsEnabled() || opts == nil || opts.ServiceAuth == nil || opts.ServiceAuth.ServiceID == "" {
+		return nil
+	}
+
+	serviceAuthConfig := &iam.ServiceAuthConfig{
+		ServiceID:      opts.ServiceAuth.ServiceID,
+		TargetAudience: opts.ServiceAuth.TargetAudience,
+		TokenTTL:       int64(opts.ServiceAuth.TokenTTL.Seconds()),
+		RefreshBefore:  int64(opts.ServiceAuth.RefreshBefore.Seconds()),
+	}
+
+	serviceAuthHelper, err := iam.NewServiceAuthHelper(ctx, client, serviceAuthConfig)
+	if err == nil {
+		return serviceAuthHelper
+	}
+	if errors.Is(err, iam.ErrServiceTokenNotSupported) {
+		logger.L(context.Background()).Infow("IAM server does not support IssueServiceToken, service-to-service auth disabled",
+			"component", "iam_module",
+			"service_id", serviceAuthConfig.ServiceID,
+			"target_audience", serviceAuthConfig.TargetAudience,
+		)
+		return nil
+	}
+
+	logger.L(context.Background()).Warnw("Failed to create service auth helper, service-to-service auth will not be available",
+		"component", "iam_module",
+		"error", err.Error(),
+	)
+	return nil
+}
+
+func newIAMIdentityService(client *iam.Client) *iam.IdentityService {
+	if client == nil || !client.IsEnabled() {
+		return nil
+	}
+	identityService, err := iam.NewIdentityService(client)
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to create identity service",
+			"component", "iam_module",
+			"error", err.Error(),
+		)
+		return nil
+	}
+	return identityService
+}
+
+func newIAMOperationAccountService(client *iam.Client) *iam.OperationAccountService {
+	if client == nil || !client.IsEnabled() {
+		return nil
+	}
+	service, err := iam.NewOperationAccountService(client)
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to create operation account service",
+			"component", "iam_module",
+			"error", err.Error(),
+		)
+		return nil
+	}
+	return service
+}
+
+func newIAMGuardianshipService(client *iam.Client) *iam.GuardianshipService {
+	if client == nil || !client.IsEnabled() {
+		return nil
+	}
+	service, err := iam.NewGuardianshipService(client)
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to create guardianship service",
+			"component", "iam_module",
+			"error", err.Error(),
+		)
+		return nil
+	}
+	return service
+}
+
+func newIAMWeChatAppService(client *iam.Client) *iam.WeChatAppService {
+	if client == nil || !client.IsEnabled() {
+		return nil
+	}
+	service, err := iam.NewWeChatAppService(client)
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to create wechat app service",
+			"component", "iam_module",
+			"error", err.Error(),
+		)
+		return nil
+	}
+	return service
+}
+
+func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions) *iam.AuthzSnapshotLoader {
+	if client == nil || !client.IsEnabled() || opts == nil || !opts.GRPCEnabled {
+		return nil
+	}
+	iamOpts := convertIAMOptions(opts)
+	return iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
+		AppName:              iamOpts.AuthzAppName,
+		CacheTTL:             iamOpts.AuthzCacheTTL,
+		CasbinDomainOverride: iamOpts.AuthzCasbinDomainOverride,
+	})
 }
 
 // Client 返回 IAM 客户端

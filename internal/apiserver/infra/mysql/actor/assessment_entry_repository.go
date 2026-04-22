@@ -46,7 +46,7 @@ func (r *assessmentEntryRepository) Update(ctx context.Context, item *domain.Ass
 }
 
 func (r *assessmentEntryRepository) FindByID(ctx context.Context, id domain.ID) (*domain.AssessmentEntry, error) {
-	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
+	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "assessment entry not found")

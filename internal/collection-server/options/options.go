@@ -294,80 +294,130 @@ func (o *Options) Validate() []error {
 
 	errs = append(errs, o.GenericServerRunOptions.Validate()...)
 	errs = append(errs, o.Log.Validate()...)
+	errs = append(errs, validateCollectionGRPCClient(o.GRPCClient)...)
+	errs = append(errs, validateCollectionRedis(o.RedisOptions, o.RedisRuntime, o.RedisProfiles)...)
+	errs = append(errs, validateCollectionConcurrency(o.Concurrency)...)
+	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
+	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
+	errs = append(errs, validateCollectionJWT(o.JWT)...)
 
-	// 验证 GRPC 客户端配置
-	if o.GRPCClient.Endpoint == "" {
+	return errs
+}
+
+func validateCollectionGRPCClient(opts *GRPCClientOptions) []error {
+	if opts == nil {
+		return []error{fmt.Errorf("grpc_client cannot be nil")}
+	}
+
+	var errs []error
+	if opts.Endpoint == "" {
 		errs = append(errs, fmt.Errorf("grpc_client.endpoint cannot be empty"))
 	}
-	if o.GRPCClient.Timeout <= 0 {
+	if opts.Timeout <= 0 {
 		errs = append(errs, fmt.Errorf("grpc_client.timeout must be greater than 0"))
 	}
-	if o.GRPCClient.MaxInflight <= 0 {
+	if opts.MaxInflight <= 0 {
 		errs = append(errs, fmt.Errorf("grpc_client.max_inflight must be greater than 0"))
 	}
+	return errs
+}
 
-	// 验证 Redis 配置（至少需要配置主机和端口）
-	if o.RedisOptions.Host == "" && len(o.RedisOptions.Addrs) == 0 {
+func validateCollectionRedis(
+	redisOpts *genericoptions.RedisOptions,
+	runtimeOpts *genericoptions.RedisRuntimeOptions,
+	profiles map[string]*genericoptions.RedisOptions,
+) []error {
+	if redisOpts == nil {
+		return []error{fmt.Errorf("redis cannot be nil")}
+	}
+
+	var errs []error
+	if redisOpts.Host == "" && len(redisOpts.Addrs) == 0 {
 		errs = append(errs, fmt.Errorf("redis.host cannot be empty"))
 	}
-	if len(o.RedisOptions.Addrs) == 0 && o.RedisOptions.Port <= 0 {
+	if len(redisOpts.Addrs) == 0 && redisOpts.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
 	errs = append(errs, redisplane.ValidateRuntimeOptions(
-		o.RedisRuntime,
+		runtimeOpts,
 		[]redisplane.Family{redisplane.FamilyOps, redisplane.FamilyLock},
-		o.RedisProfiles,
+		profiles,
 		"redis_runtime",
 	)...)
+	return errs
+}
 
-	// 验证并发配置
-	if o.Concurrency.MaxConcurrency <= 0 {
+func validateCollectionConcurrency(opts *ConcurrencyOptions) []error {
+	if opts == nil {
+		return []error{fmt.Errorf("concurrency cannot be nil")}
+	}
+
+	var errs []error
+	if opts.MaxConcurrency <= 0 {
 		errs = append(errs, fmt.Errorf("concurrency.max-concurrency must be greater than 0"))
 	}
-	if o.Concurrency.MaxConcurrency > 100 {
+	if opts.MaxConcurrency > 100 {
 		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
 	}
+	return errs
+}
 
-	if o.SubmitQueue != nil {
-		if o.SubmitQueue.QueueSize <= 0 {
-			errs = append(errs, fmt.Errorf("submit_queue.queue_size must be greater than 0"))
-		}
-		if o.SubmitQueue.WorkerCount <= 0 {
-			errs = append(errs, fmt.Errorf("submit_queue.worker_count must be greater than 0"))
-		}
-		if o.SubmitQueue.WaitTimeoutMs < 0 {
-			errs = append(errs, fmt.Errorf("submit_queue.wait_timeout_ms cannot be negative"))
-		}
+func validateCollectionSubmitQueue(opts *SubmitQueueOptions) []error {
+	if opts == nil {
+		return nil
 	}
 
-	if o.RateLimit != nil && o.RateLimit.Enabled {
-		if o.RateLimit.SubmitGlobalQPS <= 0 || o.RateLimit.SubmitGlobalBurst <= 0 {
-			errs = append(errs, fmt.Errorf("rate_limit.submit_* must be greater than 0"))
-		}
-		if o.RateLimit.SubmitUserQPS <= 0 || o.RateLimit.SubmitUserBurst <= 0 {
-			errs = append(errs, fmt.Errorf("rate_limit.submit_user_* must be greater than 0"))
-		}
-		if o.RateLimit.QueryGlobalQPS <= 0 || o.RateLimit.QueryGlobalBurst <= 0 {
-			errs = append(errs, fmt.Errorf("rate_limit.query_* must be greater than 0"))
-		}
-		if o.RateLimit.QueryUserQPS <= 0 || o.RateLimit.QueryUserBurst <= 0 {
-			errs = append(errs, fmt.Errorf("rate_limit.query_user_* must be greater than 0"))
-		}
-		if o.RateLimit.WaitReportGlobalQPS <= 0 || o.RateLimit.WaitReportGlobalBurst <= 0 {
-			errs = append(errs, fmt.Errorf("rate_limit.wait_report_* must be greater than 0"))
-		}
-		if o.RateLimit.WaitReportUserQPS <= 0 || o.RateLimit.WaitReportUserBurst <= 0 {
-			errs = append(errs, fmt.Errorf("rate_limit.wait_report_user_* must be greater than 0"))
-		}
+	var errs []error
+	if opts.QueueSize <= 0 {
+		errs = append(errs, fmt.Errorf("submit_queue.queue_size must be greater than 0"))
+	}
+	if opts.WorkerCount <= 0 {
+		errs = append(errs, fmt.Errorf("submit_queue.worker_count must be greater than 0"))
+	}
+	if opts.WaitTimeoutMs < 0 {
+		errs = append(errs, fmt.Errorf("submit_queue.wait_timeout_ms cannot be negative"))
+	}
+	return errs
+}
+
+func validateCollectionRateLimit(opts *RateLimitOptions) []error {
+	if opts == nil || !opts.Enabled {
+		return nil
 	}
 
-	// 验证 JWT 配置
-	if o.JWT.SecretKey == "" {
+	var errs []error
+	if opts.SubmitGlobalQPS <= 0 || opts.SubmitGlobalBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.submit_* must be greater than 0"))
+	}
+	if opts.SubmitUserQPS <= 0 || opts.SubmitUserBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.submit_user_* must be greater than 0"))
+	}
+	if opts.QueryGlobalQPS <= 0 || opts.QueryGlobalBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.query_* must be greater than 0"))
+	}
+	if opts.QueryUserQPS <= 0 || opts.QueryUserBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.query_user_* must be greater than 0"))
+	}
+	if opts.WaitReportGlobalQPS <= 0 || opts.WaitReportGlobalBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.wait_report_* must be greater than 0"))
+	}
+	if opts.WaitReportUserQPS <= 0 || opts.WaitReportUserBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.wait_report_user_* must be greater than 0"))
+	}
+	return errs
+}
+
+func validateCollectionJWT(opts *JWTOptions) []error {
+	if opts == nil {
+		return []error{fmt.Errorf("jwt cannot be nil")}
+	}
+
+	var errs []error
+	if opts.SecretKey == "" {
 		errs = append(errs, fmt.Errorf("jwt.secret-key cannot be empty"))
 	}
-	if o.JWT.TokenDuration <= 0 {
+	if opts.TokenDuration <= 0 {
 		errs = append(errs, fmt.Errorf("jwt.token-duration must be greater than 0"))
 	}
-
 	return errs
 }

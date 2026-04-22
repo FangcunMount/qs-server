@@ -55,18 +55,13 @@ func (f *Tristate) Type() string {
 
 // boolFromTri 将 Tristate 转换为 bool
 func boolFromTri(t Tristate) bool {
-	if t == True {
-		return true
-	} else {
-		return false
-	}
+	return t == True
 }
 
 // triFromBool 将 bool 转换为 Tristate
 func triFromBool(b bool) Tristate {
 	if b {
 		return True
-	} else {
-		return False
 	}
+	return False
 }

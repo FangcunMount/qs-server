@@ -38,6 +38,16 @@ type SurveyModule struct {
 	eventPublisher event.EventPublisher
 }
 
+type surveyModuleDeps struct {
+	mongoDB             *mongo.Database
+	eventPublisher      event.EventPublisher
+	redisClient         redis.UniversalClient
+	cacheBuilder        *rediskey.Builder
+	identityService     *iam.IdentityService
+	questionnairePolicy cachepolicy.CachePolicy
+	hotsetRecorder      questionnaireCache.HotsetRecorder
+}
+
 // QuestionnaireSubModule 问卷子模块
 type QuestionnaireSubModule struct {
 	// repository 层
@@ -84,69 +94,62 @@ func NewSurveyModule() *SurveyModule {
 // params[5]: cachepolicy.CachePolicy (可选，用于问卷缓存策略)
 // params[6]: questionnaireCache.HotsetRecorder (可选，用于热点治理)
 func (m *SurveyModule) Initialize(params ...interface{}) error {
-	if len(params) < 1 {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	deps, err := parseSurveyModuleDeps(params)
+	if err != nil {
+		return err
 	}
-
-	mongoDB, ok := params[0].(*mongo.Database)
-	if !ok || mongoDB == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
-	}
-
-	// 获取事件发布器（可选参数）
-	if len(params) > 1 {
-		if ep, ok := params[1].(event.EventPublisher); ok && ep != nil {
-			m.eventPublisher = ep
-		}
-	}
-	if m.eventPublisher == nil {
-		m.eventPublisher = event.NewNopEventPublisher()
-	}
-
-	// 获取 Redis 客户端（可选参数，用于缓存装饰器）
-	var redisClient redis.UniversalClient
-	if len(params) > 2 {
-		if rc, ok := params[2].(redis.UniversalClient); ok && rc != nil {
-			redisClient = rc
-		}
-	}
-	var cacheBuilder *rediskey.Builder
-	if len(params) > 3 {
-		if builder, ok := params[3].(*rediskey.Builder); ok {
-			cacheBuilder = builder
-		}
-	}
-	// 获取 IAM IdentityService（可选参数，用于姓名补全）
-	var identitySvc *iam.IdentityService
-	if len(params) > 4 {
-		if svc, ok := params[4].(*iam.IdentityService); ok {
-			identitySvc = svc
-		}
-	}
-	var questionnairePolicy cachepolicy.CachePolicy
-	if len(params) > 5 {
-		if policy, ok := params[5].(cachepolicy.CachePolicy); ok {
-			questionnairePolicy = policy
-		}
-	}
-	var hotset questionnaireCache.HotsetRecorder
-	if len(params) > 6 {
-		if recorder, ok := params[6].(questionnaireCache.HotsetRecorder); ok {
-			hotset = recorder
-		}
-	}
+	m.eventPublisher = deps.eventPublisher
 
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(mongoDB, redisClient, cacheBuilder, identitySvc, questionnairePolicy, hotset); err != nil {
+	if err := m.initQuestionnaireSubModule(deps.mongoDB, deps.redisClient, deps.cacheBuilder, deps.identityService, deps.questionnairePolicy, deps.hotsetRecorder); err != nil {
 		return err
 	}
 
 	// 初始化答卷子模块
-	if err := m.initAnswerSheetSubModule(mongoDB); err != nil {
+	if err := m.initAnswerSheetSubModule(deps.mongoDB); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func parseSurveyModuleDeps(params []interface{}) (*surveyModuleDeps, error) {
+	if len(params) < 1 {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+	}
+
+	mongoDB, ok := params[0].(*mongo.Database)
+	if !ok || mongoDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+
+	deps := &surveyModuleDeps{
+		mongoDB:        mongoDB,
+		eventPublisher: event.NewNopEventPublisher(),
+	}
+	applyOptionalParam(params, 1, func(publisher event.EventPublisher) {
+		if publisher != nil {
+			deps.eventPublisher = publisher
+		}
+	})
+	applyOptionalParam(params, 2, func(client redis.UniversalClient) {
+		if client != nil {
+			deps.redisClient = client
+		}
+	})
+	applyOptionalParam(params, 3, func(builder *rediskey.Builder) {
+		deps.cacheBuilder = builder
+	})
+	applyOptionalParam(params, 4, func(svc *iam.IdentityService) {
+		deps.identityService = svc
+	})
+	applyOptionalParam(params, 5, func(policy cachepolicy.CachePolicy) {
+		deps.questionnairePolicy = policy
+	})
+	applyOptionalParam(params, 6, func(recorder questionnaireCache.HotsetRecorder) {
+		deps.hotsetRecorder = recorder
+	})
+	return deps, nil
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块

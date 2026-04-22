@@ -69,8 +69,8 @@ func VersionVar(p *versionValue, name string, value versionValue, usage string) 
 	flag.Lookup(name).NoOptDefVal = "true"
 }
 
-// Version 包装 VersionVar 函数
-func Version(name string, value versionValue, usage string) *versionValue {
+// newVersionFlag 包装 VersionVar 函数。
+func newVersionFlag(name string, value versionValue, usage string) *versionValue {
 	p := new(versionValue)
 	VersionVar(p, name, value, usage)
 	return p
@@ -78,7 +78,7 @@ func Version(name string, value versionValue, usage string) *versionValue {
 
 const versionFlagName = "version"
 
-var versionFlag = Version(versionFlagName, VersionFalse, "Print version information and quit.")
+var versionFlag = newVersionFlag(versionFlagName, VersionFalse, "Print version information and quit.")
 
 // AddFlags 注册此包的标志到任意 FlagSets，使得它们指向全局标志
 func AddFlags(fs *flag.FlagSet) {

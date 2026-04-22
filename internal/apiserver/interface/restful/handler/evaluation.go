@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/gin-gonic/gin"
 
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
@@ -13,6 +14,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // EvaluationHandler 评估模块 Handler
@@ -141,9 +144,14 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		}
 		conditions["testee_id"] = strconv.FormatUint(req.TesteeID, 10)
 	}
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64"))
+		return
+	}
 
 	dto := assessmentApp.ListAssessmentsDTO{
-		OrgID:      uint64(orgID),
+		OrgID:      orgScope,
 		Page:       req.Page,
 		PageSize:   req.PageSize,
 		Conditions: conditions,

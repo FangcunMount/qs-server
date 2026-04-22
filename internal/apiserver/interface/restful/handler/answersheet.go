@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/gin-gonic/gin"
 )
 
@@ -81,47 +82,10 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/answersheets [get]
 func (h *AnswerSheetHandler) List(c *gin.Context) {
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if err != nil || page <= 0 {
-		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "页码必须为正整数"))
+	dto, err := buildAnswerSheetListDTO(c)
+	if err != nil {
+		h.Error(c, err)
 		return
-	}
-
-	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	if err != nil || pageSize <= 0 || pageSize > 100 {
-		h.Error(c, errors.WithCode(code.ErrAnswerSheetInvalid, "每页数量必须为1-100的整数"))
-		return
-	}
-
-	var fillerID *uint64
-	if fillerIDStr := c.Query("filler_id"); fillerIDStr != "" {
-		parsed, err := strconv.ParseUint(fillerIDStr, 10, 64)
-		if err == nil {
-			fillerID = &parsed
-		}
-	}
-
-	var startTime *time.Time
-	if startTimeStr := c.Query("start_time"); startTimeStr != "" {
-		if t, err := time.Parse("2006-01-02", startTimeStr); err == nil {
-			startTime = &t
-		}
-	}
-
-	var endTime *time.Time
-	if endTimeStr := c.Query("end_time"); endTimeStr != "" {
-		if t, err := time.Parse("2006-01-02", endTimeStr); err == nil {
-			endTime = &t
-		}
-	}
-
-	dto := answersheet.ListAnswerSheetsDTO{
-		Page:              page,
-		PageSize:          pageSize,
-		QuestionnaireCode: c.Query("questionnaire_code"),
-		FillerID:          fillerID,
-		StartTime:         startTime,
-		EndTime:           endTime,
 	}
 
 	result, err := h.managementService.List(c.Request.Context(), dto)
@@ -154,42 +118,22 @@ func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 		return
 	}
 
-	fillerID := req.FillerID
-	if fillerID == 0 {
-		fillerID = req.WriterID
-	}
-	if fillerID == 0 {
-		userID, ok := h.GetUserIDUint64(c)
-		if !ok || userID == 0 {
-			h.UnauthorizedResponse(c, "user not authenticated")
-			return
-		}
-		fillerID = userID
-	}
-
-	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
-	for _, a := range req.Answers {
-		answers = append(answers, answersheet.AnswerDTO{
-			QuestionCode: a.QuestionCode,
-			QuestionType: a.QuestionType,
-			Value:        a.Value,
-		})
-	}
-
-	dto := answersheet.SubmitAnswerSheetDTO{
-		QuestionnaireCode: req.QuestionnaireCode,
-		QuestionnaireVer:  req.QuestionnaireVersion,
-		TesteeID:          req.TesteeID,
-		FillerID:          fillerID,
-		TaskID:            req.TaskID,
-		Answers:           answers,
+	fillerID, ok := h.resolveAdminSubmitFillerID(c, req)
+	if !ok {
+		h.UnauthorizedResponse(c, "user not authenticated")
+		return
 	}
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	dto.OrgID = uint64(orgID)
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64"))
+		return
+	}
+	dto := buildAdminSubmitDTO(req, fillerID, orgScope)
 
 	result, err := h.submissionService.Submit(c.Request.Context(), dto)
 	if err != nil {
@@ -198,4 +142,79 @@ func (h *AnswerSheetHandler) AdminSubmit(c *gin.Context) {
 	}
 
 	h.Success(c, response.NewAnswerSheetResponse(result))
+}
+
+func buildAnswerSheetListDTO(c *gin.Context) (answersheet.ListAnswerSheetsDTO, error) {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page <= 0 {
+		return answersheet.ListAnswerSheetsDTO{}, errors.WithCode(code.ErrAnswerSheetInvalid, "页码必须为正整数")
+	}
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if err != nil || pageSize <= 0 || pageSize > 100 {
+		return answersheet.ListAnswerSheetsDTO{}, errors.WithCode(code.ErrAnswerSheetInvalid, "每页数量必须为1-100的整数")
+	}
+
+	return answersheet.ListAnswerSheetsDTO{
+		Page:              page,
+		PageSize:          pageSize,
+		QuestionnaireCode: c.Query("questionnaire_code"),
+		FillerID:          optionalUint64Query(c.Query("filler_id")),
+		StartTime:         optionalDateQuery(c.Query("start_time")),
+		EndTime:           optionalDateQuery(c.Query("end_time")),
+	}, nil
+}
+
+func optionalUint64Query(raw string) *uint64 {
+	if raw == "" {
+		return nil
+	}
+	value, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &value
+}
+
+func optionalDateQuery(raw string) *time.Time {
+	if raw == "" {
+		return nil
+	}
+	value, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return nil
+	}
+	return &value
+}
+
+func (h *AnswerSheetHandler) resolveAdminSubmitFillerID(c *gin.Context, req request.AdminSubmitAnswerSheetRequest) (uint64, bool) {
+	switch {
+	case req.FillerID != 0:
+		return req.FillerID, true
+	case req.WriterID != 0:
+		return req.WriterID, true
+	default:
+		userID, ok := h.GetUserIDUint64(c)
+		return userID, ok && userID != 0
+	}
+}
+
+func buildAdminSubmitDTO(req request.AdminSubmitAnswerSheetRequest, fillerID, orgID uint64) answersheet.SubmitAnswerSheetDTO {
+	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
+	for _, answer := range req.Answers {
+		answers = append(answers, answersheet.AnswerDTO{
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
+			Value:        answer.Value,
+		})
+	}
+
+	return answersheet.SubmitAnswerSheetDTO{
+		QuestionnaireCode: req.QuestionnaireCode,
+		QuestionnaireVer:  req.QuestionnaireVersion,
+		TesteeID:          req.TesteeID,
+		FillerID:          fillerID,
+		OrgID:             orgID,
+		TaskID:            req.TaskID,
+		Answers:           answers,
+	}
 }

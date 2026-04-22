@@ -22,6 +22,12 @@ type Router struct {
 	rateCfg   *options.RateLimitOptions
 }
 
+type routeSpec struct {
+	method   string
+	path     string
+	handlers []gin.HandlerFunc
+}
+
 // NewRouter 创建路由管理器
 func NewRouter(c *container.Container, rateCfg *options.RateLimitOptions) *Router {
 	if rateCfg == nil {
@@ -188,7 +194,7 @@ func (r *Router) iamVerificationMode() string {
 
 // registerUserProtectedRoutes 注册用户相关的受保护路由
 // 用户管理已迁移到 IAM 服务，此方法保留以便未来扩展
-func (r *Router) registerUserProtectedRoutes(apiV1 *gin.RouterGroup) {
+func (r *Router) registerUserProtectedRoutes(_ *gin.RouterGroup) {
 	// 用户相关功能已迁移到 iam-contracts 项目
 }
 
@@ -218,29 +224,8 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 	{
 		manage := questionnaires.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageQuestionnaires))
 		read := questionnaires.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadQuestionnaires))
-
-		// 生命周期管理
-		manage.POST("", quesHandler.Create)                          // 创建问卷
-		manage.PUT("/:code/basic-info", quesHandler.UpdateBasicInfo) // 更新基本信息
-		manage.POST("/:code/draft", quesHandler.SaveDraft)           // 保存草稿
-		manage.POST("/:code/publish", quesHandler.Publish)           // 发布问卷
-		manage.POST("/:code/unpublish", quesHandler.Unpublish)       // 取消发布
-		manage.POST("/:code/archive", quesHandler.Archive)           // 归档问卷
-		manage.DELETE("/:code", quesHandler.Delete)                  // 删除问卷
-
-		// 问题内容管理
-		manage.POST("/:code/questions", quesHandler.AddQuestion)               // 添加问题
-		manage.PUT("/:code/questions/:qcode", quesHandler.UpdateQuestion)      // 更新问题
-		manage.DELETE("/:code/questions/:qcode", quesHandler.RemoveQuestion)   // 删除问题
-		manage.POST("/:code/questions/reorder", quesHandler.ReorderQuestions)  // 重排问题
-		manage.PUT("/:code/questions/batch", quesHandler.BatchUpdateQuestions) // 批量更新
-
-		// 查询接口
-		read.GET("", quesHandler.List)                               // 获取问卷列表
-		read.GET("/:code", quesHandler.GetByCode)                    // 获取问卷详情
-		read.GET("/published/:code", quesHandler.GetPublishedByCode) // 获取已发布问卷
-		read.GET("/published", quesHandler.ListPublished)            // 获取已发布列表
-		read.GET("/:code/qrcode", quesHandler.GetQRCode)             // 获取问卷小程序码
+		registerRouteSpecs(manage, questionnaireManageRoutes(quesHandler))
+		registerRouteSpecs(read, questionnaireReadRoutes(quesHandler))
 	}
 }
 
@@ -296,29 +281,77 @@ func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
 	{
 		manage := scales.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageScales))
 		read := scales.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadScales))
+		registerRouteSpecs(manage, scaleManageRoutes(scaleHandler))
+		registerRouteSpecs(read, scaleReadRoutes(scaleHandler))
+	}
+}
 
-		// 生命周期管理
-		manage.POST("", scaleHandler.Create)                                 // 创建量表
-		manage.PUT("/:code/basic-info", scaleHandler.UpdateBasicInfo)        // 更新基本信息
-		manage.PUT("/:code/questionnaire", scaleHandler.UpdateQuestionnaire) // 更新关联问卷
-		manage.POST("/:code/publish", scaleHandler.Publish)                  // 发布量表
-		manage.POST("/:code/unpublish", scaleHandler.Unpublish)              // 下架量表
-		manage.POST("/:code/archive", scaleHandler.Archive)                  // 归档量表
-		manage.DELETE("/:code", scaleHandler.Delete)                         // 删除量表
+func registerRouteSpecs(group *gin.RouterGroup, routes []routeSpec) {
+	for _, route := range routes {
+		switch route.method {
+		case http.MethodGet:
+			group.GET(route.path, route.handlers...)
+		case http.MethodPost:
+			group.POST(route.path, route.handlers...)
+		case http.MethodPut:
+			group.PUT(route.path, route.handlers...)
+		case http.MethodDelete:
+			group.DELETE(route.path, route.handlers...)
+		}
+	}
+}
 
-		// 因子管理（仅提供批量操作）
-		manage.PUT("/:code/factors/batch", scaleHandler.BatchUpdateFactors)      // 批量更新因子
-		manage.PUT("/:code/interpret-rules", scaleHandler.ReplaceInterpretRules) // 批量设置解读规则
+func questionnaireManageRoutes(handler *codesHandler.QuestionnaireHandler) []routeSpec {
+	return []routeSpec{
+		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
+		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
+		{method: http.MethodPost, path: "/:code/draft", handlers: []gin.HandlerFunc{handler.SaveDraft}},
+		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
+		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
+		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
+		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
+		{method: http.MethodPost, path: "/:code/questions", handlers: []gin.HandlerFunc{handler.AddQuestion}},
+		{method: http.MethodPut, path: "/:code/questions/:qcode", handlers: []gin.HandlerFunc{handler.UpdateQuestion}},
+		{method: http.MethodDelete, path: "/:code/questions/:qcode", handlers: []gin.HandlerFunc{handler.RemoveQuestion}},
+		{method: http.MethodPost, path: "/:code/questions/reorder", handlers: []gin.HandlerFunc{handler.ReorderQuestions}},
+		{method: http.MethodPut, path: "/:code/questions/batch", handlers: []gin.HandlerFunc{handler.BatchUpdateQuestions}},
+	}
+}
 
-		// 查询接口（注意：具体路径要放在参数路径之前，避免路由冲突）
-		read.GET("/categories", scaleHandler.GetCategories)                // 获取量表分类列表
-		read.GET("/by-questionnaire", scaleHandler.GetByQuestionnaireCode) // 根据问卷获取量表
-		read.GET("/published/:code", scaleHandler.GetPublishedByCode)      // 获取已发布量表
-		read.GET("/published", scaleHandler.ListPublished)                 // 获取已发布列表
-		read.GET("/:code/factors", scaleHandler.GetFactors)                // 获取因子列表
-		read.GET("/:code/qrcode", scaleHandler.GetQRCode)                  // 获取量表小程序码
-		read.GET("/:code", scaleHandler.GetByCode)                         // 获取量表详情
-		read.GET("", scaleHandler.List)                                    // 获取量表列表
+func questionnaireReadRoutes(handler *codesHandler.QuestionnaireHandler) []routeSpec {
+	return []routeSpec{
+		{method: http.MethodGet, path: "", handlers: []gin.HandlerFunc{handler.List}},
+		{method: http.MethodGet, path: "/:code", handlers: []gin.HandlerFunc{handler.GetByCode}},
+		{method: http.MethodGet, path: "/published/:code", handlers: []gin.HandlerFunc{handler.GetPublishedByCode}},
+		{method: http.MethodGet, path: "/published", handlers: []gin.HandlerFunc{handler.ListPublished}},
+		{method: http.MethodGet, path: "/:code/qrcode", handlers: []gin.HandlerFunc{handler.GetQRCode}},
+	}
+}
+
+func scaleManageRoutes(handler *codesHandler.ScaleHandler) []routeSpec {
+	return []routeSpec{
+		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
+		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
+		{method: http.MethodPut, path: "/:code/questionnaire", handlers: []gin.HandlerFunc{handler.UpdateQuestionnaire}},
+		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
+		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
+		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
+		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
+		{method: http.MethodPut, path: "/:code/factors/batch", handlers: []gin.HandlerFunc{handler.BatchUpdateFactors}},
+		{method: http.MethodPut, path: "/:code/interpret-rules", handlers: []gin.HandlerFunc{handler.ReplaceInterpretRules}},
+	}
+}
+
+func scaleReadRoutes(handler *codesHandler.ScaleHandler) []routeSpec {
+	return []routeSpec{
+		{method: http.MethodGet, path: "/categories", handlers: []gin.HandlerFunc{handler.GetCategories}},
+		{method: http.MethodGet, path: "/by-questionnaire", handlers: []gin.HandlerFunc{handler.GetByQuestionnaireCode}},
+		{method: http.MethodGet, path: "/published/:code", handlers: []gin.HandlerFunc{handler.GetPublishedByCode}},
+		{method: http.MethodGet, path: "/published", handlers: []gin.HandlerFunc{handler.ListPublished}},
+		{method: http.MethodGet, path: "/:code/factors", handlers: []gin.HandlerFunc{handler.GetFactors}},
+		{method: http.MethodGet, path: "/:code/qrcode", handlers: []gin.HandlerFunc{handler.GetQRCode}},
+		{method: http.MethodGet, path: "/:code", handlers: []gin.HandlerFunc{handler.GetByCode}},
+		{method: http.MethodGet, path: "", handlers: []gin.HandlerFunc{handler.List}},
 	}
 }
 

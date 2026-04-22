@@ -50,7 +50,7 @@ func (lc *lifecycler) Activate(staff *Operator) error {
 }
 
 // Deactivate 停用员工
-func (lc *lifecycler) Deactivate(staff *Operator, reason string) error {
+func (lc *lifecycler) Deactivate(staff *Operator, _ string) error {
 	// 1. 检查是否已停用（幂等）
 	if !staff.IsActive() {
 		return nil

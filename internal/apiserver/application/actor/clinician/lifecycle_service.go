@@ -49,7 +49,11 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterClinicianDT
 		}
 
 		if dto.OperatorID != nil {
-			if _, err := s.operatorRepo.FindByID(txCtx, domainOperator.ID(*dto.OperatorID)); err != nil {
+			operatorID, err := operatorIDFromUint64("operator_id", *dto.OperatorID)
+			if err != nil {
+				return err
+			}
+			if _, err := s.operatorRepo.FindByID(txCtx, operatorID); err != nil {
 				return errors.Wrap(err, "failed to find operator")
 			}
 
@@ -86,9 +90,13 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterClinicianDT
 
 func (s *lifecycleService) Update(ctx context.Context, dto UpdateClinicianDTO) (*ClinicianResult, error) {
 	var result *domainClinician.Clinician
+	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, domainClinician.ID(dto.ClinicianID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.repo.FindByID(txCtx, clinicianID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find clinician")
 		}
@@ -139,13 +147,21 @@ func (s *lifecycleService) Deactivate(ctx context.Context, clinicianID uint64) (
 
 func (s *lifecycleService) BindOperator(ctx context.Context, dto BindClinicianOperatorDTO) (*ClinicianResult, error) {
 	var result *domainClinician.Clinician
+	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
+	if err != nil {
+		return nil, err
+	}
+	operatorID, err := operatorIDFromUint64("operator_id", dto.OperatorID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, domainClinician.ID(dto.ClinicianID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.repo.FindByID(txCtx, clinicianID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find clinician")
 		}
-		operatorItem, err := s.operatorRepo.FindByID(txCtx, domainOperator.ID(dto.OperatorID))
+		operatorItem, err := s.operatorRepo.FindByID(txCtx, operatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
@@ -176,9 +192,13 @@ func (s *lifecycleService) BindOperator(ctx context.Context, dto BindClinicianOp
 
 func (s *lifecycleService) UnbindOperator(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
 	var result *domainClinician.Clinician
+	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, domainClinician.ID(clinicianID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.repo.FindByID(txCtx, targetClinicianID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find clinician")
 		}
@@ -197,8 +217,12 @@ func (s *lifecycleService) UnbindOperator(ctx context.Context, clinicianID uint6
 }
 
 func (s *lifecycleService) Delete(ctx context.Context, clinicianID uint64) error {
+	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.repo.Delete(txCtx, domainClinician.ID(clinicianID)); err != nil {
+		if err := s.repo.Delete(txCtx, targetClinicianID); err != nil {
 			return errors.Wrap(err, "failed to delete clinician")
 		}
 		return nil
@@ -207,9 +231,13 @@ func (s *lifecycleService) Delete(ctx context.Context, clinicianID uint64) error
 
 func (s *lifecycleService) setActive(ctx context.Context, clinicianID uint64, active bool) (*ClinicianResult, error) {
 	var result *domainClinician.Clinician
+	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, domainClinician.ID(clinicianID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.repo.FindByID(txCtx, targetClinicianID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find clinician")
 		}

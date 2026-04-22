@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // AnswerSheetScoringService 答卷计分应用服务
@@ -54,7 +53,11 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 	}
 
 	// 1. 加载答卷
-	sheet, err := s.answerSheetRepo.FindByID(ctx, meta.ID(answerSheetID))
+	sheetID, err := answerSheetIDFromUint64("answersheet_id", answerSheetID)
+	if err != nil {
+		return err
+	}
+	sheet, err := s.answerSheetRepo.FindByID(ctx, sheetID)
 	if err != nil {
 		l.Errorw("加载答卷失败", "answersheet_id", answerSheetID, "error", err.Error())
 		return errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "答卷不存在")

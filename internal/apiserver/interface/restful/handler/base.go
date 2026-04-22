@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
@@ -51,7 +52,11 @@ func (h *BaseHandler) RequireProtectedOrgID(c *gin.Context) (int64, error) {
 	if orgID == 0 {
 		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route requires org scope from JWT")
 	}
-	return int64(orgID), nil
+	resolvedID, err := safeconv.Uint64ToInt64(orgID)
+	if err != nil {
+		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route org scope exceeds int64")
+	}
+	return resolvedID, nil
 }
 
 // RequireProtectedUserID 获取受保护路由的用户身份。
@@ -60,7 +65,11 @@ func (h *BaseHandler) RequireProtectedUserID(c *gin.Context) (int64, error) {
 	if !ok || userID == 0 {
 		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route requires user identity from JWT")
 	}
-	return int64(userID), nil
+	resolvedID, err := safeconv.Uint64ToInt64(userID)
+	if err != nil {
+		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route user identity exceeds int64")
+	}
+	return resolvedID, nil
 }
 
 // RequireProtectedScope 获取受保护路由的组织和用户信息。

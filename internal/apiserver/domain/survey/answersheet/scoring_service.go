@@ -128,7 +128,7 @@ func (s *scoringService) CalculateAnswerScore(value calculation.ScorableValue, o
 
 // CalculateAnswerSheetScore 计算整个答卷的得分
 // 设计：领域层负责组装任务，委托给 pkg/calculation 批量计算
-func (s *scoringService) CalculateAnswerSheetScore(ctx context.Context, sheet *AnswerSheet, qnr *questionnaire.Questionnaire) (*ScoredAnswerSheet, error) {
+func (s *scoringService) CalculateAnswerSheetScore(_ context.Context, sheet *AnswerSheet, qnr *questionnaire.Questionnaire) (*ScoredAnswerSheet, error) {
 	// 1. 构建问题映射（领域层职责：数据准备）
 	questionMap := buildQuestionMap(qnr.GetQuestions())
 
@@ -169,7 +169,7 @@ func (s *scoringService) buildScoredAnswerSheet(
 	sheetID meta.ID,
 	answers []Answer,
 	resultMap map[string]calculation.ScoreResult,
-	questionMap map[string]questionnaire.Question,
+	_ map[string]questionnaire.Question,
 ) *ScoredAnswerSheet {
 	scoredAnswers := make([]ScoredAnswer, 0, len(answers))
 	var totalScore float64
@@ -190,7 +190,7 @@ func (s *scoringService) buildScoredAnswerSheet(
 	}
 
 	return &ScoredAnswerSheet{
-		AnswerSheetID: uint64(sheetID),
+		AnswerSheetID: sheetID.Uint64(),
 		TotalScore:    totalScore,
 		ScoredAnswers: scoredAnswers,
 	}

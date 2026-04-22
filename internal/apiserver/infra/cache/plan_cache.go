@@ -48,14 +48,15 @@ func (r *CachedPlanRepository) buildCacheKey(id plan.AssessmentPlanID) string {
 
 // FindByID 根据ID查询计划（优先从缓存读取）
 func (r *CachedPlanRepository) FindByID(ctx context.Context, id plan.AssessmentPlanID) (*plan.AssessmentPlan, error) {
-	domain, err := ReadThrough(ctx, ReadThroughOptions[plan.AssessmentPlan]{
-		PolicyKey: cachepolicy.PolicyPlan,
-		CacheKey:  r.buildCacheKey(id),
-		Policy:    r.policy,
-		GetCached: func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.getCache(ctx, id) },
-		Load:      func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.repo.FindByID(ctx, id) },
-		SetCached: func(ctx context.Context, value *plan.AssessmentPlan) error { return r.setCache(ctx, id, value) },
-	})
+	domain, err := readByIDWithCache(
+		ctx,
+		cachepolicy.PolicyPlan,
+		r.buildCacheKey(id),
+		r.policy,
+		func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.getCache(ctx, id) },
+		func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.repo.FindByID(ctx, id) },
+		func(ctx context.Context, value *plan.AssessmentPlan) error { return r.setCache(ctx, id, value) },
+	)
 	if err != nil {
 		return nil, err
 	}

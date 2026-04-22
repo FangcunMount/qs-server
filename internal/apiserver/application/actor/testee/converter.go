@@ -7,7 +7,7 @@ import (
 // toTesteeResult 将领域对象转换为应用层 DTO
 func toTesteeResult(testee *domain.Testee) *TesteeResult {
 	result := &TesteeResult{
-		ID:         uint64(testee.ID()),
+		ID:         testee.ID().Uint64(),
 		OrgID:      testee.OrgID(),
 		Name:       testee.Name(),
 		Gender:     int8(testee.Gender()),
@@ -21,7 +21,7 @@ func toTesteeResult(testee *domain.Testee) *TesteeResult {
 
 	// 可选字段
 	if testee.ProfileID() != nil {
-		profileID := uint64(*testee.ProfileID())
+		profileID := *testee.ProfileID()
 		result.ProfileID = &profileID
 	}
 

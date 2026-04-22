@@ -37,6 +37,7 @@ type EventConfig struct {
 
 // Load 从文件加载事件配置
 func Load(path string) (*Config, error) {
+	// #nosec G304 -- config path is provided by trusted service startup options.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)

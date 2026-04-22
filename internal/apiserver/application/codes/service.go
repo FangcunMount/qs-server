@@ -15,7 +15,7 @@ func NewService() CodesService {
 }
 
 // Apply 实现 CodesService.Apply
-func (s *codesService) Apply(ctx context.Context, kind string, count int, prefix string, metadata map[string]interface{}) ([]string, error) {
+func (s *codesService) Apply(_ context.Context, kind string, count int, prefix string, _ map[string]interface{}) ([]string, error) {
 	if count <= 0 {
 		count = 1
 	}

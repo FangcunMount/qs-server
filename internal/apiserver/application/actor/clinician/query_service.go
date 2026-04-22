@@ -29,7 +29,11 @@ func NewQueryService(
 }
 
 func (s *queryService) GetByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
-	item, err := s.repo.FindByID(ctx, domainClinician.ID(clinicianID))
+	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.repo.FindByID(ctx, targetClinicianID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find clinician")
 	}
@@ -77,10 +81,14 @@ func (s *queryService) enrichCounts(ctx context.Context, item *ClinicianResult) 
 		return nil, nil
 	}
 	if s.relationRepo != nil {
+		clinicianID, err := clinicianIDFromUint64("clinician_id", item.ID)
+		if err != nil {
+			return nil, err
+		}
 		ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
 			ctx,
 			item.OrgID,
-			domainClinician.ID(item.ID),
+			clinicianID,
 			domainRelation.AccessGrantRelationTypes(),
 		)
 		if err != nil {
@@ -93,7 +101,11 @@ func (s *queryService) enrichCounts(ctx context.Context, item *ClinicianResult) 
 		item.AssignedTesteeCount = int64(len(seen))
 	}
 	if s.assessmentEntryRepo != nil {
-		count, err := s.assessmentEntryRepo.CountByClinician(ctx, item.OrgID, domainClinician.ID(item.ID))
+		clinicianID, err := clinicianIDFromUint64("clinician_id", item.ID)
+		if err != nil {
+			return nil, err
+		}
+		count, err := s.assessmentEntryRepo.CountByClinician(ctx, item.OrgID, clinicianID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to count assessment entries")
 		}

@@ -12,6 +12,7 @@ import (
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 type service struct {
@@ -65,7 +66,7 @@ func (s *service) ResolveAccessScope(ctx context.Context, orgID int64, operatorU
 		return &TesteeAccessScope{IsAdmin: true}, nil
 	}
 
-	clinicianItem, err := s.clinicianRepo.FindByOperator(ctx, orgID, uint64(operatorItem.ID()))
+	clinicianItem, err := s.clinicianRepo.FindByOperator(ctx, orgID, operatorItem.ID().Uint64())
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrPermissionDenied, "operator is not bound to clinician")
@@ -88,8 +89,12 @@ func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operato
 	if err != nil {
 		return err
 	}
+	targetTesteeID, err := accessTesteeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return err
+	}
 
-	testeeItem, err := s.testeeRepo.FindByID(ctx, domainTestee.ID(testeeID))
+	testeeItem, err := s.testeeRepo.FindByID(ctx, targetTesteeID)
 	if err != nil {
 		return errors.Wrap(err, "failed to find testee")
 	}
@@ -102,12 +107,16 @@ func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operato
 	if scope.ClinicianID == nil {
 		return errors.WithCode(code.ErrPermissionDenied, "clinician scope is required")
 	}
+	clinicianID, err := accessClinicianIDFromUint64("clinician_id", *scope.ClinicianID)
+	if err != nil {
+		return err
+	}
 
 	allowed, err := s.relationRepo.HasActiveRelationForTestee(
 		ctx,
 		orgID,
-		domainClinician.ID(*scope.ClinicianID),
-		domainTestee.ID(testeeID),
+		clinicianID,
+		targetTesteeID,
 		domainRelation.AccessGrantRelationTypes(),
 	)
 	if err != nil {
@@ -130,11 +139,15 @@ func (s *service) ListAccessibleTesteeIDs(ctx context.Context, orgID int64, oper
 	if scope.ClinicianID == nil {
 		return []uint64{}, nil
 	}
+	clinicianID, err := accessClinicianIDFromUint64("clinician_id", *scope.ClinicianID)
+	if err != nil {
+		return nil, err
+	}
 
 	ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
 		ctx,
 		orgID,
-		domainClinician.ID(*scope.ClinicianID),
+		clinicianID,
 		domainRelation.AccessGrantRelationTypes(),
 	)
 	if err != nil {
@@ -152,6 +165,30 @@ func (s *service) ListAccessibleTesteeIDs(ctx context.Context, orgID int64, oper
 		result = append(result, rawID)
 	}
 	return result, nil
+}
+
+func accessClinicianIDFromUint64(field string, value uint64) (domainClinician.ID, error) {
+	id, err := domainTesteeIDFromUint64(field, value)
+	if err != nil {
+		return 0, err
+	}
+	return domainClinician.ID(id), nil
+}
+
+func accessTesteeIDFromUint64(field string, value uint64) (domainTestee.ID, error) {
+	id, err := domainTesteeIDFromUint64(field, value)
+	if err != nil {
+		return 0, err
+	}
+	return domainTestee.ID(id), nil
+}
+
+func domainTesteeIDFromUint64(field string, value uint64) (domainTestee.ID, error) {
+	id, err := safeconv.Uint64ToMetaID(value)
+	if err != nil {
+		return 0, errors.WithCode(code.ErrInvalidArgument, "%s exceeds int64", field)
+	}
+	return domainTestee.ID(id), nil
 }
 
 func (s *service) resolveAuthzSnapshot(ctx context.Context, orgID int64, operatorUserID int64) (*authzapp.Snapshot, error) {

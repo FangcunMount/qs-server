@@ -81,13 +81,28 @@ func createWorkerServer(cfg *config.Config) (*workerServer, error) {
 
 // PrepareRun 准备运行 Worker 服务器
 func (s *workerServer) PrepareRun() preparedWorkerServer {
-	var err error
+	s.mustInitializeStorageRuntime()
+	s.mustInitializeGRPC()
+	s.mustInitializeContainer()
+	s.startMetricsIfEnabled()
+	s.createTopicsIfNeeded()
+	s.mustInitializeSubscriber()
 
-	// 1. 初始化数据库管理器（Redis）
+	if err := s.subscribeHandlers(); err != nil {
+		log.Fatalf("Failed to subscribe handlers: %v", err)
+	}
+
+	log.Info("🏗️  Worker Server initialized successfully!")
+	s.registerShutdown()
+	return preparedWorkerServer{s}
+}
+
+func (s *workerServer) mustInitializeStorageRuntime() {
 	s.dbManager = NewDatabaseManager(s.config)
-	if err = s.dbManager.Initialize(); err != nil {
+	if err := s.dbManager.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize database manager: %v", err)
 	}
+
 	s.redisRuntime = redisplane.NewRuntime(
 		"worker",
 		s.dbManager,
@@ -102,18 +117,21 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 	)
 	s.lockHandle = s.redisRuntime.Handle(context.Background(), redisplane.FamilyLock)
 	s.lockManager = redislock.NewManager("worker", "lock_lease", s.lockHandle)
+}
 
-	// 2. 创建 gRPC 客户端管理器
-	s.grpcManager, err = CreateGRPCClientManager(
+func (s *workerServer) mustInitializeGRPC() {
+	grpcManager, err := CreateGRPCClientManager(
 		s.config.GRPC,
-		30, // 默认超时 30 秒
+		30,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create gRPC client manager: %v", err)
 	}
+	s.grpcManager = grpcManager
 	log.Infof("✅ gRPC client manager initialized (endpoint: %s)", s.config.GRPC.ApiserverAddr)
+}
 
-	// 3. 创建容器
+func (s *workerServer) mustInitializeContainer() {
 	s.container = container.NewContainer(
 		s.config.Options,
 		s.logger,
@@ -121,51 +139,52 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		s.lockManager,
 	)
 
-	// 4. 通过 GRPCClientRegistry 注入 gRPC 客户端到容器
 	grpcRegistry := NewGRPCClientRegistry(s.grpcManager, s.container)
-	if err = grpcRegistry.RegisterClients(); err != nil {
+	if err := grpcRegistry.RegisterClients(); err != nil {
 		log.Fatalf("Failed to register gRPC clients: %v", err)
 	}
-
-	// 5. 初始化容器中的所有组件
-	if err = s.container.Initialize(); err != nil {
+	if err := s.container.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize container: %v", err)
 	}
+}
 
-	if s.config != nil && s.config.Metrics != nil && s.config.Metrics.Enable {
-		s.metricsServer = newMetricsServerWithGovernance(s.config.Metrics.BindAddress, s.config.Metrics.BindPort, "worker", s.familyStatus)
-		if err = s.metricsServer.Start(); err != nil {
-			log.Fatalf("Failed to start worker metrics server: %v", err)
-		}
+func (s *workerServer) startMetricsIfEnabled() {
+	if s.config == nil || s.config.Metrics == nil || !s.config.Metrics.Enable {
+		return
 	}
 
-	// 6. 预创建 NSQ Topics（可选，避免 TOPIC_NOT_FOUND 日志）
-	if s.config.Messaging.Provider == "nsq" {
-		if err = s.createTopics(); err != nil {
-			// Topic 创建失败不是致命错误，只记录警告
-			log.Warnf("⚠️  Topic creation failed (non-fatal): %v", err)
-		}
+	s.metricsServer = newMetricsServerWithGovernance(s.config.Metrics.BindAddress, s.config.Metrics.BindPort, "worker", s.familyStatus)
+	if err := s.metricsServer.Start(); err != nil {
+		log.Fatalf("Failed to start worker metrics server: %v", err)
 	}
+}
 
-	// 7. 创建消息订阅者
-	maxInFlight := 1
-	if s.config != nil && s.config.Worker != nil && s.config.Worker.Concurrency > 0 {
-		maxInFlight = s.config.Worker.Concurrency
+func (s *workerServer) createTopicsIfNeeded() {
+	if s.config.Messaging.Provider != "nsq" {
+		return
 	}
-	s.subscriber, err = createSubscriber(s.config.Messaging, s.logger, maxInFlight)
+	if err := s.createTopics(); err != nil {
+		log.Warnf("⚠️  Topic creation failed (non-fatal): %v", err)
+	}
+}
+
+func (s *workerServer) mustInitializeSubscriber() {
+	subscriber, err := createSubscriber(s.config.Messaging, s.logger, s.workerMaxInFlight())
 	if err != nil {
 		log.Fatalf("Failed to create subscriber: %v", err)
 	}
+	s.subscriber = subscriber
 	log.Infof("✅ Message subscriber created (provider: %s)", s.config.Messaging.Provider)
+}
 
-	// 8. 订阅所有处理器
-	if err = s.subscribeHandlers(); err != nil {
-		log.Fatalf("Failed to subscribe handlers: %v", err)
+func (s *workerServer) workerMaxInFlight() int {
+	if s.config != nil && s.config.Worker != nil && s.config.Worker.Concurrency > 0 {
+		return s.config.Worker.Concurrency
 	}
+	return 1
+}
 
-	log.Info("🏗️  Worker Server initialized successfully!")
-
-	// 添加关闭回调
+func (s *workerServer) registerShutdown() {
 	s.gs.AddShutdownCallback(shutdown.ShutdownFunc(func(string) error {
 		if s.subscriber != nil {
 			s.subscriber.Stop()
@@ -184,8 +203,6 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 				log.Warnf("shutdown worker metrics server failed: %v", err)
 			}
 		}
-
-		// 清理容器资源
 		if s.container != nil {
 			s.container.Cleanup()
 		}
@@ -193,8 +210,6 @@ func (s *workerServer) PrepareRun() preparedWorkerServer {
 		log.Info("🏗️  Worker Server shutdown complete")
 		return nil
 	}))
-
-	return preparedWorkerServer{s}
 }
 
 // subscribeHandlers 订阅所有 Topic 处理器

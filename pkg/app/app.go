@@ -182,7 +182,7 @@ func (a *App) Run() {
 }
 
 // runCommand 运行命令
-func (a *App) runCommand(cmd *cobra.Command, args []string) error {
+func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 	// 打印工作目录
 	printWorkingDir()
 	// 打印命令行参数
@@ -286,7 +286,7 @@ func addCmdTemplate(cmd *cobra.Command, namedFlagSets cliflag.NamedFlagSets) {
 
 		return nil
 	})
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+	cmd.SetHelpFunc(func(cmd *cobra.Command, _ []string) {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})

@@ -83,11 +83,11 @@ func NewNopEventPublisher() *NopEventPublisher {
 }
 
 // Publish 空实现
-func (p *NopEventPublisher) Publish(ctx context.Context, event DomainEvent) error {
+func (p *NopEventPublisher) Publish(_ context.Context, _ DomainEvent) error {
 	return nil
 }
 
 // PublishAll 空实现
-func (p *NopEventPublisher) PublishAll(ctx context.Context, events []DomainEvent) error {
+func (p *NopEventPublisher) PublishAll(_ context.Context, _ []DomainEvent) error {
 	return nil
 }

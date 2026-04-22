@@ -66,7 +66,7 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 	qCode, qVersion, qTitle := as.QuestionnaireInfo()
 
 	result := &AnswerSheetResult{
-		ID:                 uint64(as.ID()),
+		ID:                 as.ID().Uint64(),
 		QuestionnaireCode:  qCode,
 		QuestionnaireVer:   qVersion,
 		QuestionnaireTitle: qTitle,
@@ -77,7 +77,7 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 
 	// 填写人信息
 	if filler := as.Filler(); filler != nil {
-		result.FillerID = uint64(filler.UserID())
+		result.FillerID = mustUint64FromInt64("answersheet.filler_id", filler.UserID())
 		// FillerRef 没有 Name 方法，需要从其他地方获取或省略
 		// TODO: 如果需要显示姓名，需要根据 UserID 查询
 		result.FillerName = "" // 暂时留空
@@ -105,7 +105,7 @@ func toSummaryListResult(items []*answersheet.AnswerSheetSummary, total int64) *
 
 	for _, item := range items {
 		result.Items = append(result.Items, &AnswerSheetSummaryResult{
-			ID:                 uint64(item.ID),
+			ID:                 item.ID.Uint64(),
 			QuestionnaireCode:  item.QuestionnaireCode,
 			QuestionnaireTitle: item.QuestionnaireTitle,
 			FillerID:           item.FillerID,

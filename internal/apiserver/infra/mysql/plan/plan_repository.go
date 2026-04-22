@@ -134,39 +134,26 @@ func (r *planRepository) FindList(ctx context.Context, orgID int64, scaleCode st
 // Save 保存计划（新增或更新）
 func (r *planRepository) Save(ctx context.Context, plan *domainPlan.AssessmentPlan) error {
 	po := r.mapper.ToPO(plan)
+	return saveMappedEntity(
+		ctx,
+		plan,
+		po,
+		func() error { return po.BeforeCreate(nil) },
+		r.ExistsByID,
+		r.createAndSyncPlan,
+		r.updateAndSyncPlan,
+	)
+}
 
-	// 判断是新增还是更新
-	if plan.GetID().IsZero() {
-		// ID 为零，确保 BeforeCreate 被调用以生成 ID
-		if err := po.BeforeCreate(nil); err != nil {
-			return err
-		}
-		// 直接创建
-		return r.CreateAndSync(ctx, po, func(po *AssessmentPlanPO) {
-			r.mapper.SyncID(po, plan)
-		})
-	}
+func (r *planRepository) createAndSyncPlan(ctx context.Context, po *AssessmentPlanPO, plan *domainPlan.AssessmentPlan) error {
+	return r.CreateAndSync(ctx, po, func(saved *AssessmentPlanPO) {
+		syncPlanPO(saved, plan, r.mapper)
+	})
+}
 
-	// ID 不为零，先检查记录是否存在
-	exists, err := r.ExistsByID(ctx, plan.GetID().Uint64())
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		// 记录不存在，确保 BeforeCreate 被调用（虽然已有 ID，但需要设置版本号）
-		if err := po.BeforeCreate(nil); err != nil {
-			return err
-		}
-		// 执行 INSERT（使用指定的 ID）
-		return r.CreateAndSync(ctx, po, func(po *AssessmentPlanPO) {
-			r.mapper.SyncID(po, plan)
-		})
-	}
-
-	// 记录存在，执行 UPDATE
-	return r.UpdateAndSync(ctx, po, func(po *AssessmentPlanPO) {
-		r.mapper.SyncID(po, plan)
+func (r *planRepository) updateAndSyncPlan(ctx context.Context, po *AssessmentPlanPO, plan *domainPlan.AssessmentPlan) error {
+	return r.UpdateAndSync(ctx, po, func(saved *AssessmentPlanPO) {
+		syncPlanPO(saved, plan, r.mapper)
 	})
 }
 

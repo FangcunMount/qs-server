@@ -10,6 +10,7 @@ import (
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // queryService 问卷查询服务实现
@@ -176,7 +177,11 @@ func (s *queryService) GetQuestionCount(ctx context.Context, code string) (int32
 		return 0, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
 	}
 
-	return int32(q.GetQuestionCnt()), nil
+	count, err := safeconv.IntToInt32(q.GetQuestionCnt())
+	if err != nil {
+		return 0, errors.WrapC(err, errorCode.ErrDatabase, "问卷题目数量溢出")
+	}
+	return count, nil
 }
 
 // ListPublished 查询已发布问卷摘要列表（轻量级）

@@ -37,9 +37,13 @@ func NewManagementService(
 
 // UpdateBasicInfo 更新基本信息
 func (s *managementService) UpdateBasicInfo(ctx context.Context, dto UpdateTesteeProfileDTO) error {
+	testeeID, err := testeeIDFromUint64("testee_id", dto.TesteeID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, domain.ID(dto.TesteeID))
+		testee, err := s.repo.FindByID(txCtx, testeeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find testee")
 		}
@@ -61,9 +65,13 @@ func (s *managementService) UpdateBasicInfo(ctx context.Context, dto UpdateTeste
 
 // BindProfile 绑定用户档案
 func (s *managementService) BindProfile(ctx context.Context, testeeID uint64, profileID uint64) error {
+	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
+		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find testee")
 		}
@@ -82,9 +90,13 @@ func (s *managementService) BindProfile(ctx context.Context, testeeID uint64, pr
 
 // AddTag 添加业务标签
 func (s *managementService) AddTag(ctx context.Context, testeeID uint64, tag string) error {
+	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
+		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find testee")
 		}
@@ -103,9 +115,13 @@ func (s *managementService) AddTag(ctx context.Context, testeeID uint64, tag str
 
 // RemoveTag 移除业务标签
 func (s *managementService) RemoveTag(ctx context.Context, testeeID uint64, tag string) error {
+	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
+		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find testee")
 		}
@@ -124,9 +140,13 @@ func (s *managementService) RemoveTag(ctx context.Context, testeeID uint64, tag 
 
 // MarkAsKeyFocus 标记为重点关注
 func (s *managementService) MarkAsKeyFocus(ctx context.Context, testeeID uint64) error {
+	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
+		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find testee")
 		}
@@ -145,9 +165,13 @@ func (s *managementService) MarkAsKeyFocus(ctx context.Context, testeeID uint64)
 
 // UnmarkKeyFocus 取消重点关注
 func (s *managementService) UnmarkKeyFocus(ctx context.Context, testeeID uint64) error {
+	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, domain.ID(testeeID))
+		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find testee")
 		}

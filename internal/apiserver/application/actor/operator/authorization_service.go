@@ -50,8 +50,12 @@ func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64
 	if err := s.validator.ValidateRole(role); err != nil {
 		return err
 	}
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
 
-	st, err := s.repo.FindByID(ctx, domain.ID(operatorID))
+	st, err := s.repo.FindByID(ctx, targetOperatorID)
 	if err != nil {
 		return errors.Wrap(err, "failed to find operator")
 	}
@@ -68,7 +72,7 @@ func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64
 	}
 
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		st2, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st2, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
@@ -85,8 +89,12 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 	if err := s.validator.ValidateRole(role); err != nil {
 		return err
 	}
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
 
-	st, err := s.repo.FindByID(ctx, domain.ID(operatorID))
+	st, err := s.repo.FindByID(ctx, targetOperatorID)
 	if err != nil {
 		return errors.Wrap(err, "failed to find operator")
 	}
@@ -103,7 +111,7 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 	}
 
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		st2, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st2, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
@@ -116,8 +124,12 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 
 // Activate 激活操作者
 func (s *authorizationService) Activate(ctx context.Context, operatorID uint64) error {
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
@@ -130,8 +142,12 @@ func (s *authorizationService) Activate(ctx context.Context, operatorID uint64) 
 
 // Deactivate 停用操作者
 func (s *authorizationService) Deactivate(ctx context.Context, operatorID uint64) error {
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		st, err := s.repo.FindByID(txCtx, domain.ID(operatorID))
+		st, err := s.repo.FindByID(txCtx, targetOperatorID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}

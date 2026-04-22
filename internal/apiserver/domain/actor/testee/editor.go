@@ -70,7 +70,7 @@ func (e *editor) UpdateBasicInfo(ctx context.Context, testee *Testee, name *stri
 }
 
 // MarkAsKeyFocus 标记为重点关注
-func (e *editor) MarkAsKeyFocus(ctx context.Context, testee *Testee) error {
+func (e *editor) MarkAsKeyFocus(_ context.Context, testee *Testee) error {
 	if testee == nil {
 		return errors.WithCode(code.ErrInvalidArgument, "testee cannot be nil")
 	}
@@ -86,7 +86,7 @@ func (e *editor) MarkAsKeyFocus(ctx context.Context, testee *Testee) error {
 }
 
 // UnmarkAsKeyFocus 取消重点关注
-func (e *editor) UnmarkAsKeyFocus(ctx context.Context, testee *Testee) error {
+func (e *editor) UnmarkAsKeyFocus(_ context.Context, testee *Testee) error {
 	if testee == nil {
 		return errors.WithCode(code.ErrInvalidArgument, "testee cannot be nil")
 	}

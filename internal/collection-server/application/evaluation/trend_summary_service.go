@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 const (
@@ -102,6 +104,10 @@ func (s *QueryService) GetAssessmentTrendSummary(ctx context.Context, testeeID, 
 	if err != nil {
 		return nil, err
 	}
+	comparableCount, err := safeconv.IntToInt32(len(comparableItems))
+	if err != nil {
+		return nil, err
+	}
 
 	return &AssessmentTrendSummaryResponse{
 		Current:       currentSnapshot,
@@ -110,7 +116,7 @@ func (s *QueryService) GetAssessmentTrendSummary(ctx context.Context, testeeID, 
 		FactorChanges: toFactorChangeResponses(selectedFactors),
 		FactorTrends:  factorTrends,
 		Meta: AssessmentTrendMetaResponse{
-			ComparableCount:    int32(len(comparableItems)),
+			ComparableCount:    comparableCount,
 			HasMultipleFillers: false,
 			DisplayMode:        "same_scale_same_version",
 			Note:               buildTrendNote(len(comparableItems), previousItem != nil),

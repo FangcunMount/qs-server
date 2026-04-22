@@ -126,7 +126,7 @@ func (l *TaskLifecycle) Complete(ctx context.Context, task *AssessmentTask, asse
 
 // Expire 过期任务
 // 将已推送状态的任务变更为已过期状态
-func (l *TaskLifecycle) Expire(ctx context.Context, task *AssessmentTask) error {
+func (l *TaskLifecycle) Expire(_ context.Context, task *AssessmentTask) error {
 	// 1. 前置状态检查
 	if !task.IsOpened() {
 		return errors.WithCode(code.ErrInvalidArgument, "任务未处于已推送状态，无法过期")
@@ -138,7 +138,7 @@ func (l *TaskLifecycle) Expire(ctx context.Context, task *AssessmentTask) error 
 
 // Cancel 取消任务
 // 将任务变更为已取消状态（适用于任何非终态任务）
-func (l *TaskLifecycle) Cancel(ctx context.Context, task *AssessmentTask) error {
+func (l *TaskLifecycle) Cancel(_ context.Context, task *AssessmentTask) error {
 	// 1. 前置状态检查
 	if task.IsTerminal() {
 		return nil // 幂等操作

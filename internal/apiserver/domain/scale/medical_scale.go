@@ -438,7 +438,7 @@ func (m *MedicalScale) publish() error {
 
 	// 触发领域事件
 	m.addEvent(NewScaleChangedEvent(
-		uint64(m.id),
+		m.id.Uint64(),
 		string(m.scaleCode),
 		"", // version 暂无
 		m.title,
@@ -458,7 +458,7 @@ func (m *MedicalScale) unpublish() error {
 
 	// 触发领域事件
 	m.addEvent(NewScaleChangedEvent(
-		uint64(m.id),
+		m.id.Uint64(),
 		string(m.scaleCode),
 		"",
 		m.title,
@@ -478,7 +478,7 @@ func (m *MedicalScale) archive() error {
 
 	// 触发领域事件
 	m.addEvent(NewScaleChangedEvent(
-		uint64(m.id),
+		m.id.Uint64(),
 		string(m.scaleCode),
 		"",
 		m.title,

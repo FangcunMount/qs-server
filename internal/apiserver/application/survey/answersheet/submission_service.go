@@ -302,7 +302,11 @@ func (s *submissionService) createAndSaveAnswerSheet(
 	)
 
 	// 构建填写人引用
-	fillerRef := actor.NewFillerRef(int64(dto.FillerID), actor.FillerTypeSelf)
+	fillerUserID, err := fillerUserIDFromUint64("filler_id", dto.FillerID)
+	if err != nil {
+		return nil, err
+	}
+	fillerRef := actor.NewFillerRef(fillerUserID, actor.FillerTypeSelf)
 
 	l.Debugw("开始创建答卷领域对象", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "answer_count", len(answers))
 
@@ -365,7 +369,11 @@ func (s *submissionService) GetMyAnswerSheet(ctx context.Context, fillerID uint6
 
 	// 2. 获取答卷
 	l.Debugw("加载答卷数据", "answersheet_id", answerSheetID)
-	sheet, err := s.repo.FindByID(ctx, meta.ID(answerSheetID))
+	sheetID, err := answerSheetIDFromUint64("answersheet_id", answerSheetID)
+	if err != nil {
+		return nil, err
+	}
+	sheet, err := s.repo.FindByID(ctx, sheetID)
 	if err != nil {
 		l.Errorw("加载答卷失败",
 			"action", "get_my_answersheet",
@@ -378,7 +386,11 @@ func (s *submissionService) GetMyAnswerSheet(ctx context.Context, fillerID uint6
 
 	// 3. 验证是否是本人的答卷
 	l.Debugw("验证答卷权限", "filler_id", fillerID, "answersheet_filler_id", sheet.Filler().UserID())
-	fillerRef := actor.NewFillerRef(int64(fillerID), actor.FillerTypeSelf)
+	fillerUserID, err := fillerUserIDFromUint64("filler_id", fillerID)
+	if err != nil {
+		return nil, err
+	}
+	fillerRef := actor.NewFillerRef(fillerUserID, actor.FillerTypeSelf)
 	if !sheet.IsFilledBy(fillerRef) {
 		l.Warnw("无权查看答卷",
 			"action", "get_my_answersheet",

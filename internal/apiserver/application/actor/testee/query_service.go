@@ -23,7 +23,12 @@ func NewQueryService(repo domain.Repository) TesteeQueryService {
 
 // GetByID 根据ID查询受试者
 func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeResult, error) {
-	testee, err := s.repo.FindByID(ctx, domain.ID(testeeID))
+	resolvedID, err := testeeIDFromUint64("testee_id", testeeID)
+	if err != nil {
+		return nil, err
+	}
+
+	testee, err := s.repo.FindByID(ctx, resolvedID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find testee")
 	}
@@ -61,7 +66,11 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 	if dto.RestrictToAccessScope {
 		testeeIDs := make([]domain.ID, 0, len(dto.AccessibleTesteeIDs))
 		for _, id := range dto.AccessibleTesteeIDs {
-			testeeIDs = append(testeeIDs, domain.ID(id))
+			resolvedID, err := testeeIDFromUint64("accessible_testee_id", id)
+			if err != nil {
+				return nil, err
+			}
+			testeeIDs = append(testeeIDs, resolvedID)
 		}
 
 		testees, err = s.repo.ListByOrgAndIDs(ctx, dto.OrgID, testeeIDs, filter, dto.Offset, dto.Limit)

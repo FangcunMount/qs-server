@@ -57,54 +57,49 @@ func (o *RedisOptions) Validate() []error {
 
 // AddFlags adds flags related to redis storage for a specific APIServer to the specified FlagSet.
 func (o *RedisOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.Host, "redis.host", o.Host, ""+
-		"Redis service host address. If left blank, the following related redis options will be ignored.")
+	addStringFlags(fs, []stringFlagSpec{
+		{target: &o.Host, name: "redis.host", value: o.Host, usage: "" +
+			"Redis service host address. If left blank, the following related redis options will be ignored."},
+		{target: &o.Username, name: "redis.username", value: o.Username, usage: "" +
+			"Redis username (Redis 6.0+ ACL)."},
+		{target: &o.Password, name: "redis.password", value: o.Password, usage: "" +
+			"Password for access to redis service."},
+	})
 
-	fs.IntVar(&o.Port, "redis.port", o.Port, ""+
-		"Redis service port.")
+	addStringSliceFlags(fs, []stringSliceFlagSpec{
+		{target: &o.Addrs, name: "redis.addrs", value: o.Addrs, usage: "" +
+			"Redis cluster addresses. If set, host and port will be ignored."},
+	})
 
-	fs.StringSliceVar(&o.Addrs, "redis.addrs", o.Addrs, ""+
-		"Redis cluster addresses. If set, host and port will be ignored.")
+	addIntFlags(fs, []intFlagSpec{
+		{target: &o.Port, name: "redis.port", value: o.Port, usage: "" +
+			"Redis service port."},
+		{target: &o.Database, name: "redis.database", value: o.Database, usage: "" +
+			"Redis database number."},
+		{target: &o.MaxIdle, name: "redis.max-idle", value: o.MaxIdle, usage: "" +
+			"Maximum idle connections allowed to connect to redis."},
+		{target: &o.MaxActive, name: "redis.max-active", value: o.MaxActive, usage: "" +
+			"Maximum active connections allowed to connect to redis."},
+		{target: &o.Timeout, name: "redis.timeout", value: o.Timeout, usage: "" +
+			"Redis connection max idle time in seconds."},
+		{target: &o.MinIdleConns, name: "redis.min-idle-conns", value: o.MinIdleConns, usage: "" +
+			"Minimum number of idle connections to maintain."},
+		{target: &o.PoolTimeout, name: "redis.pool-timeout", value: o.PoolTimeout, usage: "" +
+			"Time in seconds to wait for a connection if the pool is exhausted."},
+		{target: &o.DialTimeout, name: "redis.dial-timeout", value: o.DialTimeout, usage: "" +
+			"Dial timeout in seconds."},
+		{target: &o.ReadTimeout, name: "redis.read-timeout", value: o.ReadTimeout, usage: "" +
+			"Read timeout in seconds."},
+		{target: &o.WriteTimeout, name: "redis.write-timeout", value: o.WriteTimeout, usage: "" +
+			"Write timeout in seconds."},
+	})
 
-	fs.StringVar(&o.Username, "redis.username", o.Username, ""+
-		"Redis username (Redis 6.0+ ACL).")
-
-	fs.StringVar(&o.Password, "redis.password", o.Password, ""+
-		"Password for access to redis service.")
-
-	fs.IntVar(&o.Database, "redis.database", o.Database, ""+
-		"Redis database number.")
-
-	fs.IntVar(&o.MaxIdle, "redis.max-idle", o.MaxIdle, ""+
-		"Maximum idle connections allowed to connect to redis.")
-
-	fs.IntVar(&o.MaxActive, "redis.max-active", o.MaxActive, ""+
-		"Maximum active connections allowed to connect to redis.")
-
-	fs.IntVar(&o.Timeout, "redis.timeout", o.Timeout, ""+
-		"Redis connection max idle time in seconds.")
-
-	fs.IntVar(&o.MinIdleConns, "redis.min-idle-conns", o.MinIdleConns, ""+
-		"Minimum number of idle connections to maintain.")
-
-	fs.IntVar(&o.PoolTimeout, "redis.pool-timeout", o.PoolTimeout, ""+
-		"Time in seconds to wait for a connection if the pool is exhausted.")
-
-	fs.IntVar(&o.DialTimeout, "redis.dial-timeout", o.DialTimeout, ""+
-		"Dial timeout in seconds.")
-
-	fs.IntVar(&o.ReadTimeout, "redis.read-timeout", o.ReadTimeout, ""+
-		"Read timeout in seconds.")
-
-	fs.IntVar(&o.WriteTimeout, "redis.write-timeout", o.WriteTimeout, ""+
-		"Write timeout in seconds.")
-
-	fs.BoolVar(&o.EnableCluster, "redis.enable-cluster", o.EnableCluster, ""+
-		"Enable redis cluster mode.")
-
-	fs.BoolVar(&o.UseSSL, "redis.use-ssl", o.UseSSL, ""+
-		"Enable SSL for redis connection.")
-
-	fs.BoolVar(&o.SSLInsecureSkipVerify, "redis.ssl-insecure-skip-verify", o.SSLInsecureSkipVerify, ""+
-		"Skip SSL certificate verification.")
+	addBoolFlags(fs, []boolFlagSpec{
+		{target: &o.EnableCluster, name: "redis.enable-cluster", value: o.EnableCluster, usage: "" +
+			"Enable redis cluster mode."},
+		{target: &o.UseSSL, name: "redis.use-ssl", value: o.UseSSL, usage: "" +
+			"Enable SSL for redis connection."},
+		{target: &o.SSLInsecureSkipVerify, name: "redis.ssl-insecure-skip-verify", value: o.SSLInsecureSkipVerify, usage: "" +
+			"Skip SSL certificate verification."},
+	})
 }

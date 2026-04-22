@@ -45,7 +45,7 @@ func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, clien
 
 // buildCacheKey 构建缓存键
 func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
-	return r.keys.BuildTesteeInfoKey(uint64(id))
+	return r.keys.BuildTesteeInfoKey(id.Uint64())
 }
 
 // FindByID 根据ID查询受试者（优先从缓存读取）

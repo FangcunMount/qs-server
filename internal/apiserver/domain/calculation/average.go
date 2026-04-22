@@ -7,7 +7,7 @@ package calculation
 type AverageStrategy struct{}
 
 // Calculate 执行平均分计分
-func (s *AverageStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
+func (s *AverageStrategy) Calculate(values []float64, _ map[string]string) (float64, error) {
 	if len(values) == 0 {
 		return 0, nil
 	}

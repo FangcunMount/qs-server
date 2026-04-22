@@ -82,7 +82,7 @@ func (c *Command) cobraCommand() *cobra.Command {
 }
 
 // runCommand 运行命令
-func (c *Command) runCommand(cmd *cobra.Command, args []string) {
+func (c *Command) runCommand(_ *cobra.Command, args []string) {
 	if c.runFunc != nil {
 		if err := c.runFunc(args); err != nil {
 			fmt.Printf("%v %v\n", color.RedString("Error:"), err)

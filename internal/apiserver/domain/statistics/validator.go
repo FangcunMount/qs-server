@@ -19,7 +19,7 @@ type ConsistencyDiff struct {
 }
 
 // ValidateConsistency 校验一致性
-func (v *Validator) ValidateConsistency(redisStats, mysqlStats interface{}) []ConsistencyDiff {
+func (v *Validator) ValidateConsistency(_ interface{}, _ interface{}) []ConsistencyDiff {
 	// 这里需要根据具体的统计类型进行比较
 	// 暂时返回空，后续根据实际需求实现
 	return []ConsistencyDiff{}

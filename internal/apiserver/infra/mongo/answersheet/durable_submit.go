@@ -12,6 +12,7 @@ import (
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -103,8 +104,12 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 		}
 
 		events := append([]event.DomainEvent{}, sheet.Events()...)
+		orgID, err := safeconv.Uint64ToInt64(metaInfo.OrgID)
+		if err != nil {
+			return err
+		}
 		events = append(events, domainStatistics.NewFootprintAnswerSheetSubmittedEvent(
-			int64(metaInfo.OrgID),
+			orgID,
 			metaInfo.TesteeID,
 			sheet.ID().Uint64(),
 			sheet.FilledAt(),

@@ -33,7 +33,7 @@ func NewTagger(validator Validator) Tagger {
 }
 
 // Tag 给受试者打标签
-func (t *tagger) Tag(ctx context.Context, testee *Testee, tag Tag) error {
+func (t *tagger) Tag(_ context.Context, testee *Testee, tag Tag) error {
 	if testee == nil {
 		return errors.WithCode(code.ErrInvalidArgument, "testee cannot be nil")
 	}
@@ -55,7 +55,7 @@ func (t *tagger) Tag(ctx context.Context, testee *Testee, tag Tag) error {
 }
 
 // UnTag 移除受试者的标签
-func (t *tagger) UnTag(ctx context.Context, testee *Testee, tag Tag) error {
+func (t *tagger) UnTag(_ context.Context, testee *Testee, tag Tag) error {
 	if testee == nil {
 		return errors.WithCode(code.ErrInvalidArgument, "testee cannot be nil")
 	}
@@ -67,7 +67,7 @@ func (t *tagger) UnTag(ctx context.Context, testee *Testee, tag Tag) error {
 }
 
 // CleanTag 清空受试者的所有标签
-func (t *tagger) CleanTag(ctx context.Context, testee *Testee) error {
+func (t *tagger) CleanTag(_ context.Context, testee *Testee) error {
 	if testee == nil {
 		return errors.WithCode(code.ErrInvalidArgument, "testee cannot be nil")
 	}

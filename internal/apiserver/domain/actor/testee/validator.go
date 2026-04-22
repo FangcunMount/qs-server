@@ -51,7 +51,7 @@ func NewValidator(repo Repository) Validator {
 }
 
 // ValidateForCreation 验证创建受试者的数据
-func (v *validator) ValidateForCreation(ctx context.Context, orgID int64, name string, gender Gender) error {
+func (v *validator) ValidateForCreation(_ context.Context, orgID int64, name string, gender Gender) error {
 	// 验证机构ID
 	if orgID <= 0 {
 		return errors.WithCode(code.ErrInvalidArgument, "org_id must be positive")
@@ -72,7 +72,7 @@ func (v *validator) ValidateForCreation(ctx context.Context, orgID int64, name s
 }
 
 // ValidateForUpdate 验证更新受试者的数据
-func (v *validator) ValidateForUpdate(ctx context.Context, testee *Testee, name *string, gender *Gender) error {
+func (v *validator) ValidateForUpdate(_ context.Context, testee *Testee, name *string, gender *Gender) error {
 	if testee == nil {
 		return errors.WithCode(code.ErrInvalidArgument, "testee cannot be nil")
 	}

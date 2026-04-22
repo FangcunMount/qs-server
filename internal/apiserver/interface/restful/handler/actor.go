@@ -20,6 +20,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/gin-gonic/gin"
 )
 
@@ -842,8 +843,12 @@ func (h *ActorHandler) ensureTesteeExists(c *gin.Context, action string, testeeI
 }
 
 func (h *ActorHandler) listTesteeAssessments(c *gin.Context, orgID int64, testeeID uint64) ([]*assessmentApp.AssessmentResult, error) {
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64")
+	}
 	listDTO := assessmentApp.ListAssessmentsDTO{
-		OrgID:    uint64(orgID),
+		OrgID:    orgScope,
 		Page:     1,
 		PageSize: 1000,
 		Conditions: map[string]string{

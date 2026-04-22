@@ -76,7 +76,7 @@ func TestCoordinatorHandleRepairCompleteStillUsesStructuredExecutor(t *testing.T
 		Runtime: NewFamilyRuntime(
 			&redisplane.Handle{Family: redisplane.FamilyQuery, AllowWarmup: true},
 		),
-		WarmStatsQuestionnaire: func(_ context.Context, orgID int64, code string) error {
+		WarmStatsQuestionnaire: func(_ context.Context, _ int64, code string) error {
 			questionnaireCalls = append(questionnaireCalls, code)
 			return nil
 		},

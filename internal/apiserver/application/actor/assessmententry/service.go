@@ -30,6 +30,17 @@ type service struct {
 	uow             *mysql.UnitOfWork
 }
 
+type intakeState struct {
+	entry             *domainAssessmentEntry.AssessmentEntry
+	clinician         *domainClinician.Clinician
+	testee            *domainTestee.Testee
+	relation          *domainRelation.ClinicianTesteeRelation
+	assignment        *RelationSummaryResult
+	testeeCreated     bool
+	assignmentCreated bool
+	intakeAt          time.Time
+}
+
 // NewService 创建测评入口服务。
 func NewService(
 	repo domainAssessmentEntry.Repository,
@@ -61,9 +72,13 @@ func NewService(
 
 func (s *service) Create(ctx context.Context, dto CreateAssessmentEntryDTO) (*AssessmentEntryResult, error) {
 	var result *domainAssessmentEntry.AssessmentEntry
+	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		clinicianItem, err := s.clinicianRepo.FindByID(txCtx, domainClinician.ID(dto.ClinicianID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		clinicianItem, err := s.clinicianRepo.FindByID(txCtx, clinicianID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find clinician")
 		}
@@ -92,7 +107,7 @@ func (s *service) Create(ctx context.Context, dto CreateAssessmentEntryDTO) (*As
 
 		result = domainAssessmentEntry.NewAssessmentEntry(
 			dto.OrgID,
-			domainClinician.ID(dto.ClinicianID),
+			clinicianID,
 			tokenCode.String(),
 			domainAssessmentEntry.TargetType(dto.TargetType),
 			dto.TargetCode,
@@ -114,7 +129,11 @@ func (s *service) Create(ctx context.Context, dto CreateAssessmentEntryDTO) (*As
 }
 
 func (s *service) GetByID(ctx context.Context, entryID uint64) (*AssessmentEntryResult, error) {
-	item, err := s.repo.FindByID(ctx, domainAssessmentEntry.ID(entryID))
+	targetEntryID, err := assessmentEntryIDFromUint64("entry_id", entryID)
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.repo.FindByID(ctx, targetEntryID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find assessment entry")
 	}
@@ -130,10 +149,14 @@ func (s *service) Reactivate(ctx context.Context, entryID uint64) (*AssessmentEn
 }
 
 func (s *service) ListByClinician(ctx context.Context, dto ListAssessmentEntryDTO) (*AssessmentEntryListResult, error) {
+	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
+	if err != nil {
+		return nil, err
+	}
 	items, err := s.repo.ListByClinician(
 		ctx,
 		dto.OrgID,
-		domainClinician.ID(dto.ClinicianID),
+		clinicianID,
 		dto.Offset,
 		dto.Limit,
 	)
@@ -141,7 +164,7 @@ func (s *service) ListByClinician(ctx context.Context, dto ListAssessmentEntryDT
 		return nil, errors.Wrap(err, "failed to list assessment entries")
 	}
 
-	totalCount, err := s.repo.CountByClinician(ctx, dto.OrgID, domainClinician.ID(dto.ClinicianID))
+	totalCount, err := s.repo.CountByClinician(ctx, dto.OrgID, clinicianID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count assessment entries")
 	}
@@ -172,7 +195,7 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 			return err
 		}
 		if s.behaviorEvents != nil {
-			if err := s.behaviorEvents.StageEntryOpened(txCtx, entry.OrgID(), uint64(entry.ClinicianID()), entry.ID().Uint64(), resolvedAt); err != nil {
+			if err := s.behaviorEvents.StageEntryOpened(txCtx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt); err != nil {
 				return errors.Wrap(err, "failed to stage assessment entry opened behavior event")
 			}
 		}
@@ -189,161 +212,206 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 }
 
 func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error) {
-	var (
-		entry             *domainAssessmentEntry.AssessmentEntry
-		clinicianItem     *domainClinician.Clinician
-		testeeItem        *domainTestee.Testee
-		relationItem      *domainRelation.ClinicianTesteeRelation
-		assignment        *RelationSummaryResult
-		testeeCreated     bool
-		assignmentCreated bool
-		intakeAt          = time.Now()
-	)
+	state := &intakeState{intakeAt: time.Now()}
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
-		entry, clinicianItem, err = s.resolveEntry(txCtx, token)
+		state.entry, state.clinician, err = s.resolveEntry(txCtx, token)
 		if err != nil {
 			return err
 		}
 
-		if dto.ProfileID != nil && *dto.ProfileID > 0 && s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
-			if err := s.guardianshipSvc.ValidateChildExists(txCtx, strconv.FormatUint(*dto.ProfileID, 10)); err != nil {
-				return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
-			}
+		if err := s.validateIntakeProfile(txCtx, dto); err != nil {
+			return err
 		}
 
-		if dto.ProfileID != nil && *dto.ProfileID > 0 {
-			_, existingErr := s.testeeRepo.FindByProfile(txCtx, entry.OrgID(), *dto.ProfileID)
-			switch {
-			case existingErr == nil:
-				testeeCreated = false
-			case errors.IsCode(existingErr, code.ErrUserNotFound):
-				testeeCreated = true
-			default:
-				return errors.Wrap(existingErr, "failed to check existing testee by profile")
-			}
-
-			testeeItem, err = s.testeeFactory.GetOrCreateByProfile(
-				txCtx,
-				entry.OrgID(),
-				*dto.ProfileID,
-				dto.Name,
-				dto.Gender,
-				dto.Birthday,
-			)
-			if err != nil {
-				return errors.Wrap(err, "failed to get or create testee by profile")
-			}
-		} else {
-			testeeCreated = true
-			testeeItem, err = s.testeeFactory.CreateTemporary(
-				txCtx,
-				entry.OrgID(),
-				dto.Name,
-				dto.Gender,
-				dto.Birthday,
-				string(domainRelation.SourceTypeAssessmentEntry),
-			)
-			if err != nil {
-				return errors.Wrap(err, "failed to create temporary testee")
-			}
-		}
-
-		entryID := entry.ID().Uint64()
-		relationItem, err = s.relationRepo.FindActive(
-			txCtx,
-			entry.OrgID(),
-			entry.ClinicianID(),
-			testeeItem.ID(),
-			domainRelation.RelationTypeCreator,
-		)
+		state.testee, state.testeeCreated, err = s.resolveIntakeTestee(txCtx, state.entry, dto)
 		if err != nil {
-			if !errors.IsCode(err, code.ErrUserNotFound) {
-				return errors.Wrap(err, "failed to find relation")
-			}
-
-			relationItem = domainRelation.NewClinicianTesteeRelation(
-				entry.OrgID(),
-				entry.ClinicianID(),
-				testeeItem.ID(),
-				domainRelation.RelationTypeCreator,
-				domainRelation.SourceTypeAssessmentEntry,
-				&entryID,
-				true,
-				time.Now(),
-				nil,
-			)
-			if err := s.relationRepo.Save(txCtx, relationItem); err != nil {
-				return errors.Wrap(err, "failed to save relation")
-			}
+			return err
 		}
 
-		assignedRelation, err := s.relationRepo.FindActiveByTypes(
-			txCtx,
-			entry.OrgID(),
-			entry.ClinicianID(),
-			testeeItem.ID(),
-			domainRelation.AccessGrantRelationTypes(),
-		)
+		state.relation, err = s.ensureCreatorRelation(txCtx, state.entry, state.testee)
 		if err != nil {
-			if !errors.IsCode(err, code.ErrUserNotFound) {
-				return errors.Wrap(err, "failed to find access relation")
-			}
-
-			assignmentCreated = true
-			assignedRelation = domainRelation.NewClinicianTesteeRelation(
-				entry.OrgID(),
-				entry.ClinicianID(),
-				testeeItem.ID(),
-				domainRelation.RelationTypeAttending,
-				domainRelation.SourceTypeAssessmentEntry,
-				&entryID,
-				true,
-				time.Now(),
-				nil,
-			)
-			if err := s.relationRepo.Save(txCtx, assignedRelation); err != nil {
-				return errors.Wrap(err, "failed to save attending relation")
-			}
+			return err
 		}
 
-		assignment = toRelationSummaryResult(assignedRelation)
-
-		if s.behaviorEvents != nil {
-			orgID := entry.OrgID()
-			clinicianID := uint64(entry.ClinicianID())
-			entryID := entry.ID().Uint64()
-			testeeID := testeeItem.ID().Uint64()
-
-			if err := s.behaviorEvents.StageIntakeConfirmed(txCtx, orgID, clinicianID, entryID, testeeID, intakeAt); err != nil {
-				return errors.Wrap(err, "failed to stage intake confirmed behavior event")
-			}
-			if testeeCreated {
-				if err := s.behaviorEvents.StageTesteeProfileCreated(txCtx, orgID, clinicianID, entryID, testeeID, intakeAt); err != nil {
-					return errors.Wrap(err, "failed to stage testee profile created behavior event")
-				}
-			}
-			if assignmentCreated {
-				if err := s.behaviorEvents.StageCareRelationshipEstablished(txCtx, orgID, clinicianID, entryID, testeeID, intakeAt); err != nil {
-					return errors.Wrap(err, "failed to stage care relationship established behavior event")
-				}
-			}
+		assignedRelation, assignmentCreated, err := s.ensureAssignmentRelation(txCtx, state.entry, state.testee)
+		if err != nil {
+			return err
 		}
-
-		return nil
+		state.assignmentCreated = assignmentCreated
+		state.assignment = toRelationSummaryResult(assignedRelation)
+		return s.stageIntakeBehaviorEvents(txCtx, state)
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &AssessmentEntryIntakeResult{
-		Entry:      toAssessmentEntryResult(entry),
-		Clinician:  toClinicianSummaryResult(clinicianItem),
-		Testee:     toTesteeSummaryResult(testeeItem),
-		Relation:   toRelationSummaryResult(relationItem),
-		Assignment: assignment,
+		Entry:      toAssessmentEntryResult(state.entry),
+		Clinician:  toClinicianSummaryResult(state.clinician),
+		Testee:     toTesteeSummaryResult(state.testee),
+		Relation:   toRelationSummaryResult(state.relation),
+		Assignment: state.assignment,
 	}, nil
+}
+
+func (s *service) validateIntakeProfile(ctx context.Context, dto IntakeByAssessmentEntryDTO) error {
+	if dto.ProfileID == nil || *dto.ProfileID == 0 || s.guardianshipSvc == nil || !s.guardianshipSvc.IsEnabled() {
+		return nil
+	}
+	if err := s.guardianshipSvc.ValidateChildExists(ctx, strconv.FormatUint(*dto.ProfileID, 10)); err != nil {
+		return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
+	}
+	return nil
+}
+
+func (s *service) resolveIntakeTestee(
+	ctx context.Context,
+	entry *domainAssessmentEntry.AssessmentEntry,
+	dto IntakeByAssessmentEntryDTO,
+) (*domainTestee.Testee, bool, error) {
+	if dto.ProfileID == nil || *dto.ProfileID == 0 {
+		testeeItem, err := s.testeeFactory.CreateTemporary(
+			ctx,
+			entry.OrgID(),
+			dto.Name,
+			dto.Gender,
+			dto.Birthday,
+			string(domainRelation.SourceTypeAssessmentEntry),
+		)
+		if err != nil {
+			return nil, false, errors.Wrap(err, "failed to create temporary testee")
+		}
+		return testeeItem, true, nil
+	}
+
+	testeeCreated, err := s.isNewProfileTestee(ctx, entry.OrgID(), *dto.ProfileID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	testeeItem, err := s.testeeFactory.GetOrCreateByProfile(
+		ctx,
+		entry.OrgID(),
+		*dto.ProfileID,
+		dto.Name,
+		dto.Gender,
+		dto.Birthday,
+	)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "failed to get or create testee by profile")
+	}
+	return testeeItem, testeeCreated, nil
+}
+
+func (s *service) isNewProfileTestee(ctx context.Context, orgID int64, profileID uint64) (bool, error) {
+	_, err := s.testeeRepo.FindByProfile(ctx, orgID, profileID)
+	switch {
+	case err == nil:
+		return false, nil
+	case errors.IsCode(err, code.ErrUserNotFound):
+		return true, nil
+	default:
+		return false, errors.Wrap(err, "failed to check existing testee by profile")
+	}
+}
+
+func (s *service) ensureCreatorRelation(
+	ctx context.Context,
+	entry *domainAssessmentEntry.AssessmentEntry,
+	testeeItem *domainTestee.Testee,
+) (*domainRelation.ClinicianTesteeRelation, error) {
+	relationItem, err := s.relationRepo.FindActive(
+		ctx,
+		entry.OrgID(),
+		entry.ClinicianID(),
+		testeeItem.ID(),
+		domainRelation.RelationTypeCreator,
+	)
+	if err == nil {
+		return relationItem, nil
+	}
+	if !errors.IsCode(err, code.ErrUserNotFound) {
+		return nil, errors.Wrap(err, "failed to find relation")
+	}
+
+	relationItem = newAssessmentEntryRelation(entry, testeeItem, domainRelation.RelationTypeCreator)
+	if err := s.relationRepo.Save(ctx, relationItem); err != nil {
+		return nil, errors.Wrap(err, "failed to save relation")
+	}
+	return relationItem, nil
+}
+
+func (s *service) ensureAssignmentRelation(
+	ctx context.Context,
+	entry *domainAssessmentEntry.AssessmentEntry,
+	testeeItem *domainTestee.Testee,
+) (*domainRelation.ClinicianTesteeRelation, bool, error) {
+	relationItem, err := s.relationRepo.FindActiveByTypes(
+		ctx,
+		entry.OrgID(),
+		entry.ClinicianID(),
+		testeeItem.ID(),
+		domainRelation.AccessGrantRelationTypes(),
+	)
+	if err == nil {
+		return relationItem, false, nil
+	}
+	if !errors.IsCode(err, code.ErrUserNotFound) {
+		return nil, false, errors.Wrap(err, "failed to find access relation")
+	}
+
+	relationItem = newAssessmentEntryRelation(entry, testeeItem, domainRelation.RelationTypeAttending)
+	if err := s.relationRepo.Save(ctx, relationItem); err != nil {
+		return nil, false, errors.Wrap(err, "failed to save attending relation")
+	}
+	return relationItem, true, nil
+}
+
+func newAssessmentEntryRelation(
+	entry *domainAssessmentEntry.AssessmentEntry,
+	testeeItem *domainTestee.Testee,
+	relationType domainRelation.RelationType,
+) *domainRelation.ClinicianTesteeRelation {
+	entryID := entry.ID().Uint64()
+	return domainRelation.NewClinicianTesteeRelation(
+		entry.OrgID(),
+		entry.ClinicianID(),
+		testeeItem.ID(),
+		relationType,
+		domainRelation.SourceTypeAssessmentEntry,
+		&entryID,
+		true,
+		time.Now(),
+		nil,
+	)
+}
+
+func (s *service) stageIntakeBehaviorEvents(ctx context.Context, state *intakeState) error {
+	if s.behaviorEvents == nil {
+		return nil
+	}
+
+	orgID := state.entry.OrgID()
+	clinicianID := state.entry.ClinicianID().Uint64()
+	entryID := state.entry.ID().Uint64()
+	testeeID := state.testee.ID().Uint64()
+
+	if err := s.behaviorEvents.StageIntakeConfirmed(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt); err != nil {
+		return errors.Wrap(err, "failed to stage intake confirmed behavior event")
+	}
+	if state.testeeCreated {
+		if err := s.behaviorEvents.StageTesteeProfileCreated(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt); err != nil {
+			return errors.Wrap(err, "failed to stage testee profile created behavior event")
+		}
+	}
+	if state.assignmentCreated {
+		if err := s.behaviorEvents.StageCareRelationshipEstablished(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt); err != nil {
+			return errors.Wrap(err, "failed to stage care relationship established behavior event")
+		}
+	}
+	return nil
 }
 
 func (s *service) resolveEntry(
@@ -374,9 +442,13 @@ func (s *service) resolveEntry(
 
 func (s *service) setActive(ctx context.Context, entryID uint64, active bool) (*AssessmentEntryResult, error) {
 	var result *domainAssessmentEntry.AssessmentEntry
+	targetEntryID, err := assessmentEntryIDFromUint64("entry_id", entryID)
+	if err != nil {
+		return nil, err
+	}
 
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		item, err := s.repo.FindByID(txCtx, domainAssessmentEntry.ID(entryID))
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		item, err := s.repo.FindByID(txCtx, targetEntryID)
 		if err != nil {
 			return errors.Wrap(err, "failed to find assessment entry")
 		}

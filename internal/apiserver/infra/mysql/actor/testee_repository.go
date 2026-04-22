@@ -56,7 +56,7 @@ func (r *testeeRepository) Update(ctx context.Context, t *testee.Testee) error {
 
 // FindByID 根据ID查找受试者
 func (r *testeeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.Testee, error) {
-	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
+	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
@@ -74,7 +74,7 @@ func (r *testeeRepository) FindByIDs(ctx context.Context, ids []testee.ID) ([]*t
 
 	rawIDs := make([]uint64, 0, len(ids))
 	for _, id := range ids {
-		rawIDs = append(rawIDs, uint64(id))
+		rawIDs = append(rawIDs, id.Uint64())
 	}
 
 	var pos []*TesteePO
@@ -207,7 +207,7 @@ func (r *testeeRepository) ListByProfileIDs(ctx context.Context, profileIDs []ui
 
 // Delete 删除受试者（软删除）
 func (r *testeeRepository) Delete(ctx context.Context, id testee.ID) error {
-	return r.DeleteByID(ctx, uint64(id))
+	return r.DeleteByID(ctx, id.Uint64())
 }
 
 // Count 统计机构下的受试者数量
@@ -252,7 +252,7 @@ func (r *testeeRepository) filteredByOrgAndIDs(
 ) *gorm.DB {
 	rawIDs := make([]uint64, 0, len(ids))
 	for _, id := range ids {
-		rawIDs = append(rawIDs, uint64(id))
+		rawIDs = append(rawIDs, id.Uint64())
 	}
 
 	query := r.WithContext(ctx).

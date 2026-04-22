@@ -89,7 +89,7 @@ func (b *DefaultReportBuilder) Build(
 }
 
 // buildConclusion 构建总体结论
-func (b *DefaultReportBuilder) buildConclusion(medicalScale *scale.MedicalScale, result *assessment.EvaluationResult) string {
+func (b *DefaultReportBuilder) buildConclusion(_ *scale.MedicalScale, result *assessment.EvaluationResult) string {
 	// 优先使用总分因子的解读作为总体结论
 	for _, fs := range result.FactorScores {
 		if fs.IsTotalScore && fs.Conclusion != "" {

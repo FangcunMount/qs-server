@@ -2,8 +2,9 @@ package cache
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -384,5 +385,9 @@ func shouldSampleHotset(target WarmupTarget) bool {
 	if target.Kind == WarmupKindStaticScaleList {
 		return true
 	}
-	return rand.Float64() < defaultHotsetSampleRate
+	draw, err := cryptorand.Int(cryptorand.Reader, big.NewInt(10000))
+	if err != nil {
+		return false
+	}
+	return draw.Int64() < int64(defaultHotsetSampleRate*10000)
 }

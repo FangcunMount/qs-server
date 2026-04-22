@@ -113,80 +113,69 @@ func (r *scaleRepoSyncStub) ExistsByCode(_ context.Context, _ string) (bool, err
 	return false, nil
 }
 
-func TestSyncScaleQuestionnaireVersionUpdatesSingleMedicalScaleBinding(t *testing.T) {
-	ctx := context.Background()
-	q, err := domainQuestionnaire.NewQuestionnaire(
-		meta.NewCode("Q-MS"),
-		"Medical",
-		domainQuestionnaire.WithType(domainQuestionnaire.TypeMedicalScale),
-	)
-	if err != nil {
-		t.Fatalf("NewQuestionnaire() error = %v", err)
-	}
-	scaleItem, err := domainScale.NewMedicalScale(
-		meta.NewCode("S-001"),
-		"Scale",
-		domainScale.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	scaleRepo := &scaleRepoSyncStub{item: scaleItem}
-	svc := &lifecycleService{
-		repo: &questionnaireRepoSyncStub{
-			byCode: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-MS": q,
-			},
+func TestSyncScaleQuestionnaireVersion(t *testing.T) {
+	tests := []struct {
+		name             string
+		code             string
+		questionnaireTyp domainQuestionnaire.QuestionnaireType
+		wantUpdateCalls  int
+		wantVersion      string
+	}{
+		{
+			name:             "updates single medical scale binding",
+			code:             "Q-MS",
+			questionnaireTyp: domainQuestionnaire.TypeMedicalScale,
+			wantUpdateCalls:  1,
+			wantVersion:      "2.0",
 		},
-		scaleRepo: scaleRepo,
-	}
-
-	if err := svc.syncScaleQuestionnaireVersion(ctx, "Q-MS", "2.0"); err != nil {
-		t.Fatalf("syncScaleQuestionnaireVersion() error = %v", err)
-	}
-	if scaleRepo.updateCalls != 1 {
-		t.Fatalf("syncScaleQuestionnaireVersion() updateCalls = %d, want 1", scaleRepo.updateCalls)
-	}
-	if got := scaleRepo.item.GetQuestionnaireVersion(); got != "2.0" {
-		t.Fatalf("syncScaleQuestionnaireVersion() questionnaire version = %q, want %q", got, "2.0")
-	}
-}
-
-func TestSyncScaleQuestionnaireVersionSkipsSurveyQuestionnaire(t *testing.T) {
-	ctx := context.Background()
-	q, err := domainQuestionnaire.NewQuestionnaire(
-		meta.NewCode("Q-SURVEY"),
-		"Survey",
-		domainQuestionnaire.WithType(domainQuestionnaire.TypeSurvey),
-	)
-	if err != nil {
-		t.Fatalf("NewQuestionnaire() error = %v", err)
-	}
-	scaleItem, err := domainScale.NewMedicalScale(
-		meta.NewCode("S-001"),
-		"Scale",
-		domainScale.WithQuestionnaire(meta.NewCode("Q-SURVEY"), "1.0"),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-	scaleRepo := &scaleRepoSyncStub{item: scaleItem}
-	svc := &lifecycleService{
-		repo: &questionnaireRepoSyncStub{
-			byCode: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-SURVEY": q,
-			},
+		{
+			name:             "skips survey questionnaire",
+			code:             "Q-SURVEY",
+			questionnaireTyp: domainQuestionnaire.TypeSurvey,
+			wantUpdateCalls:  0,
+			wantVersion:      "1.0",
 		},
-		scaleRepo: scaleRepo,
 	}
 
-	if err := svc.syncScaleQuestionnaireVersion(ctx, "Q-SURVEY", "2.0"); err != nil {
-		t.Fatalf("syncScaleQuestionnaireVersion() error = %v", err)
-	}
-	if scaleRepo.updateCalls != 0 {
-		t.Fatalf("syncScaleQuestionnaireVersion() updateCalls = %d, want 0", scaleRepo.updateCalls)
-	}
-	if got := scaleRepo.item.GetQuestionnaireVersion(); got != "1.0" {
-		t.Fatalf("syncScaleQuestionnaireVersion() questionnaire version = %q, want %q", got, "1.0")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			q, err := domainQuestionnaire.NewQuestionnaire(
+				meta.NewCode(tt.code),
+				"Questionnaire",
+				domainQuestionnaire.WithType(tt.questionnaireTyp),
+			)
+			if err != nil {
+				t.Fatalf("NewQuestionnaire() error = %v", err)
+			}
+			scaleItem, err := domainScale.NewMedicalScale(
+				meta.NewCode("S-001"),
+				"Scale",
+				domainScale.WithQuestionnaire(meta.NewCode(tt.code), "1.0"),
+			)
+			if err != nil {
+				t.Fatalf("NewMedicalScale() error = %v", err)
+			}
+
+			scaleRepo := &scaleRepoSyncStub{item: scaleItem}
+			svc := &lifecycleService{
+				repo: &questionnaireRepoSyncStub{
+					byCode: map[string]*domainQuestionnaire.Questionnaire{
+						tt.code: q,
+					},
+				},
+				scaleRepo: scaleRepo,
+			}
+
+			if err := svc.syncScaleQuestionnaireVersion(ctx, tt.code, "2.0"); err != nil {
+				t.Fatalf("syncScaleQuestionnaireVersion() error = %v", err)
+			}
+			if scaleRepo.updateCalls != tt.wantUpdateCalls {
+				t.Fatalf("syncScaleQuestionnaireVersion() updateCalls = %d, want %d", scaleRepo.updateCalls, tt.wantUpdateCalls)
+			}
+			if got := scaleRepo.item.GetQuestionnaireVersion(); got != tt.wantVersion {
+				t.Fatalf("syncScaleQuestionnaireVersion() questionnaire version = %q, want %q", got, tt.wantVersion)
+			}
+		})
 	}
 }

@@ -65,7 +65,7 @@ func (p *InterpretReportPO) BeforeInsert() {
 		p.ID = primitive.NewObjectID()
 	}
 	if p.DomainID.IsZero() {
-		p.DomainID = report.ID(idutil.GetIntID())
+		p.DomainID = report.NewID(idutil.GetIntID())
 	}
 	now := time.Now()
 	p.CreatedAt = now

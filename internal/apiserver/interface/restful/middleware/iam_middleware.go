@@ -12,6 +12,7 @@ import (
 	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // Context 键常量
@@ -115,14 +116,25 @@ func RequireActiveOperatorMiddleware(repo domainOperator.Repository) gin.Handler
 			c.Abort()
 			return
 		}
-		orgID := int64(GetOrgID(c))
+		orgID, err := safeconv.Uint64ToInt64(GetOrgID(c))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "organization scope exceeds int64"})
+			c.Abort()
+			return
+		}
 		uid := GetUserID(c)
 		if orgID <= 0 || uid == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid organization or user scope"})
 			c.Abort()
 			return
 		}
-		op, err := repo.FindByUser(c.Request.Context(), orgID, int64(uid))
+		userID, err := safeconv.Uint64ToInt64(uid)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "user scope exceeds int64"})
+			c.Abort()
+			return
+		}
+		op, err := repo.FindByUser(c.Request.Context(), orgID, userID)
 		if err != nil {
 			if errors.IsCode(err, code.ErrUserNotFound) {
 				c.JSON(http.StatusForbidden, gin.H{"error": "operator not found in current organization"})

@@ -33,7 +33,7 @@ func NewLifecycle() Lifecycle {
 var _ Lifecycle = (*lifecycle)(nil)
 
 // Publish 发布问卷，将草稿状态的问卷变更为已发布状态
-func (l *lifecycle) Publish(ctx context.Context, q *Questionnaire) error {
+func (l *lifecycle) Publish(_ context.Context, q *Questionnaire) error {
 	// 1. 前置状态检查
 	if q.IsArchived() {
 		return errors.WithCode(code.ErrQuestionnaireArchived, "archived questionnaire cannot be published")
@@ -60,7 +60,7 @@ func (l *lifecycle) Publish(ctx context.Context, q *Questionnaire) error {
 }
 
 // Unpublish 下线问卷，将已发布的问卷变更为草稿状态
-func (l *lifecycle) Unpublish(ctx context.Context, q *Questionnaire) error {
+func (l *lifecycle) Unpublish(_ context.Context, q *Questionnaire) error {
 	// 1. 前置状态检查
 	if q.IsArchived() {
 		return errors.WithCode(code.ErrQuestionnaireArchived, "questionnaire is already archived")
@@ -74,7 +74,7 @@ func (l *lifecycle) Unpublish(ctx context.Context, q *Questionnaire) error {
 }
 
 // Archive 归档问卷，将问卷变更为已归档状态
-func (l *lifecycle) Archive(ctx context.Context, q *Questionnaire) error {
+func (l *lifecycle) Archive(_ context.Context, q *Questionnaire) error {
 	// 1. 前置状态检查
 	if q.IsArchived() {
 		return errors.WithCode(code.ErrQuestionnaireArchived, "questionnaire is already archived")

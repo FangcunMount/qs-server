@@ -45,7 +45,7 @@ func (r *clinicianRepository) Update(ctx context.Context, item *domain.Clinician
 }
 
 func (r *clinicianRepository) FindByID(ctx context.Context, id domain.ID) (*domain.Clinician, error) {
-	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
+	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "clinician not found")
@@ -94,5 +94,5 @@ func (r *clinicianRepository) Count(ctx context.Context, orgID int64) (int64, er
 }
 
 func (r *clinicianRepository) Delete(ctx context.Context, id domain.ID) error {
-	return r.DeleteByID(ctx, uint64(id))
+	return r.DeleteByID(ctx, id.Uint64())
 }

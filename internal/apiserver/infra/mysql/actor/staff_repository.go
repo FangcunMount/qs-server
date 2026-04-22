@@ -57,7 +57,7 @@ func (r *operatorRepository) Update(ctx context.Context, item *domain.Operator) 
 
 // FindByID 根据ID查找操作者
 func (r *operatorRepository) FindByID(ctx context.Context, id domain.ID) (*domain.Operator, error) {
-	po, err := r.BaseRepository.FindByID(ctx, uint64(id))
+	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "operator not found")
@@ -124,7 +124,7 @@ func (r *operatorRepository) ListByRole(ctx context.Context, orgID int64, role d
 
 // Delete 删除操作者
 func (r *operatorRepository) Delete(ctx context.Context, id domain.ID) error {
-	return r.DeleteByID(ctx, uint64(id))
+	return r.DeleteByID(ctx, id.Uint64())
 }
 
 // Count 统计机构下的操作者数量

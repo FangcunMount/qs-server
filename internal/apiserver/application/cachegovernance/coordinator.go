@@ -308,7 +308,7 @@ func (c *coordinator) registerExecutors() {
 		}
 		return c.deps.WarmQuestionnaire(ctx, code)
 	})
-	c.registry.Register(cacheinfra.WarmupKindStaticScaleList, func(ctx context.Context, target cacheinfra.WarmupTarget) error {
+	c.registry.Register(cacheinfra.WarmupKindStaticScaleList, func(ctx context.Context, _ cacheinfra.WarmupTarget) error {
 		if c.deps.WarmScaleList == nil {
 			return nil
 		}

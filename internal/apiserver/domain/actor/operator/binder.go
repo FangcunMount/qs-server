@@ -65,7 +65,7 @@ func (b *binder) Bind(ctx context.Context, staff *Operator, userID int64) error 
 }
 
 // Unbind 解绑用户
-func (b *binder) Unbind(ctx context.Context, staff *Operator) error {
+func (b *binder) Unbind(_ context.Context, staff *Operator) error {
 	// 1. 检查是否已绑定
 	if staff.UserID() <= 0 {
 		return errors.WithCode(code.ErrValidation, "staff not bound to any user")
@@ -88,7 +88,7 @@ func (b *binder) Unbind(ctx context.Context, staff *Operator) error {
 }
 
 // ValidateBinding 验证绑定关系
-func (b *binder) ValidateBinding(ctx context.Context, staff *Operator) error {
+func (b *binder) ValidateBinding(_ context.Context, staff *Operator) error {
 	// 检查是否有绑定
 	if staff.UserID() <= 0 {
 		return errors.WithCode(code.ErrValidation, "staff not bound to any user")
