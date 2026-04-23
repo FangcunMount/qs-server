@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
@@ -164,19 +165,23 @@ func TestBuildProcessLifecycleDepsUsesStageOutputs(t *testing.T) {
 func TestRunPreparedServerStartsShutdownBeforeServing(t *testing.T) {
 	t.Parallel()
 
-	var order []string
+	order := make(chan string, 3)
+	httpDone := make(chan struct{})
+	grpcDone := make(chan struct{})
 	got := runPreparedServer(preparedServerRunDeps{
 		startShutdown: func() error {
-			order = append(order, "shutdown")
+			order <- "shutdown"
 			return nil
 		},
 		transports: preparedServerTransports{
 			runHTTP: func() error {
-				order = append(order, "http")
+				defer close(httpDone)
+				order <- "http"
 				return errors.New("http boom")
 			},
 			runGRPC: func() error {
-				order = append(order, "grpc")
+				defer close(grpcDone)
+				order <- "grpc"
 				return nil
 			},
 		},
@@ -186,8 +191,21 @@ func TestRunPreparedServerStartsShutdownBeforeServing(t *testing.T) {
 		t.Fatalf("runPreparedServer() error = %v, want http boom", got)
 	}
 
-	if len(order) == 0 || order[0] != "shutdown" {
-		t.Fatalf("order = %#v, want shutdown first", order)
+	waitDone := func(name string, done <-chan struct{}) {
+		t.Helper()
+		select {
+		case <-done:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("%s service did not finish", name)
+		}
+	}
+
+	waitDone("http", httpDone)
+	waitDone("grpc", grpcDone)
+
+	first := <-order
+	if first != "shutdown" {
+		t.Fatalf("first event = %q, want shutdown", first)
 	}
 }
 
