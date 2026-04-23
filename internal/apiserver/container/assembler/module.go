@@ -2,7 +2,6 @@ package assembler
 
 // Module 模块接口
 type Module interface {
-	Initialize(params ...interface{}) error
 	CheckHealth() error
 	Cleanup() error
 	ModuleInfo() ModuleInfo

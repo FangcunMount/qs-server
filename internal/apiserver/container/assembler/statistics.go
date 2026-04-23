@@ -43,128 +43,79 @@ type StatisticsModule struct {
 	warmupCoordinator              cachegov.Coordinator
 }
 
-type statisticsModuleDeps struct {
-	mysqlDB          *gorm.DB
-	redisClient      redis.UniversalClient
-	cacheBuilder     *rediskey.Builder
-	answerSheetRepo  surveyAnswerSheet.Repository
-	repairWindowDays int
-	queryPolicy      cachepolicy.CachePolicy
-	hotsetRecorder   scaleCache.HotsetRecorder
-	lockManager      *redislock.Manager
-	versionStore     scaleCache.VersionTokenStore
-	observer         *scaleCache.Observer
+// StatisticsModuleDeps 定义 Statistics 模块的显式构造依赖。
+type StatisticsModuleDeps struct {
+	MySQLDB          *gorm.DB
+	RedisClient      redis.UniversalClient
+	CacheBuilder     *rediskey.Builder
+	AnswerSheetRepo  surveyAnswerSheet.Repository
+	RepairWindowDays int
+	QueryPolicy      cachepolicy.CachePolicy
+	HotsetRecorder   scaleCache.HotsetRecorder
+	LockManager      *redislock.Manager
+	VersionStore     scaleCache.VersionTokenStore
+	Observer         *scaleCache.Observer
 }
 
-// NewStatisticsModule 创建统计模块
-func NewStatisticsModule() *StatisticsModule {
-	return &StatisticsModule{}
-}
-
-// Initialize 初始化统计模块
-// params[0]: *gorm.DB
-// params[1]: redis.UniversalClient (Redis缓存客户端)
-// params[2]: *rediskey.Builder（可选）
-// params[3]: answersheet.Repository (问卷答卷仓储，可选)
-// params[4]: int repair window days（统计批处理默认回补窗口，可选）
-// params[5]: cachepolicy.CachePolicy 查询缓存策略（可选）
-// params[6]: scaleCache.HotsetRecorder（可选）
-// params[7]: *redislock.Manager（统计同步锁，可选）
-func (m *StatisticsModule) Initialize(params ...interface{}) error {
-	deps, err := parseStatisticsModuleDeps(params)
+// NewStatisticsModule 创建统计模块。
+func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
+	normalized, err := normalizeStatisticsModuleDeps(deps)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	module := &StatisticsModule{}
 
 	// 初始化 repository 层
-	m.Repo = statisticsInfra.NewStatisticsRepository(deps.mysqlDB)
+	module.Repo = statisticsInfra.NewStatisticsRepository(normalized.MySQLDB)
 
 	// 初始化 cache 层
-	if deps.redisClient != nil {
-		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
-			deps.redisClient,
-			deps.cacheBuilder,
-			deps.queryPolicy,
-			deps.versionStore,
-			deps.observer,
+	if normalized.RedisClient != nil {
+		module.Cache = statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+			normalized.RedisClient,
+			normalized.CacheBuilder,
+			normalized.QueryPolicy,
+			normalized.VersionStore,
+			normalized.Observer,
 		)
 	} else {
 		// Redis不可用时，创建空实现（查询时会降级到MySQL）
-		m.Cache = nil
+		module.Cache = nil
 	}
 
 	// 初始化 service 层
-	m.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
-	m.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
-	m.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(deps.mysqlDB, m.Repo, m.Cache)
-	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
-	m.ReadService = statisticsApp.NewReadService(statisticsReadModelInfra.NewReadModel(deps.mysqlDB), deps.answerSheetRepo)
-	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(deps.mysqlDB)
-	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(deps.mysqlDB, m.Repo)
-	m.SyncService = statisticsApp.NewSyncService(deps.mysqlDB, deps.repairWindowDays, deps.lockManager)
+	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(normalized.MySQLDB, module.Repo, module.Cache)
+	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.ReadService = statisticsApp.NewReadService(statisticsReadModelInfra.NewReadModel(normalized.MySQLDB), normalized.AnswerSheetRepo)
+	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(normalized.MySQLDB)
+	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(normalized.MySQLDB, module.Repo)
+	module.SyncService = statisticsApp.NewSyncService(normalized.MySQLDB, normalized.RepairWindowDays, normalized.LockManager)
 
 	// 初始化 handler 层
-	m.Handler = handler.NewStatisticsHandler(
-		m.SystemStatisticsService,
-		m.QuestionnaireStatisticsService,
-		m.TesteeStatisticsService,
-		m.PlanStatisticsService,
-		m.ReadService,
-		m.PeriodicStatsService,
-		m.SyncService,
+	module.Handler = handler.NewStatisticsHandler(
+		module.SystemStatisticsService,
+		module.QuestionnaireStatisticsService,
+		module.TesteeStatisticsService,
+		module.PlanStatisticsService,
+		module.ReadService,
+		module.PeriodicStatsService,
+		module.SyncService,
 	)
-	if m.testeeAccessService != nil {
-		m.Handler.SetTesteeAccessService(m.testeeAccessService)
+	if module.testeeAccessService != nil {
+		module.Handler.SetTesteeAccessService(module.testeeAccessService)
 	}
-	if m.warmupCoordinator != nil {
-		m.Handler.SetWarmupCoordinator(m.warmupCoordinator)
+	if module.warmupCoordinator != nil {
+		module.Handler.SetWarmupCoordinator(module.warmupCoordinator)
 	}
 
-	return nil
+	return module, nil
 }
 
-func parseStatisticsModuleDeps(params []interface{}) (*statisticsModuleDeps, error) {
-	if len(params) < 1 {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+func normalizeStatisticsModuleDeps(deps StatisticsModuleDeps) (StatisticsModuleDeps, error) {
+	if deps.MySQLDB == nil {
+		return StatisticsModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
-
-	mysqlDB, ok := params[0].(*gorm.DB)
-	if !ok || mysqlDB == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
-	}
-
-	deps := &statisticsModuleDeps{mysqlDB: mysqlDB}
-	applyOptionalParam(params, 1, func(client redis.UniversalClient) {
-		if client != nil {
-			deps.redisClient = client
-		}
-	})
-	applyOptionalParam(params, 2, func(builder *rediskey.Builder) {
-		deps.cacheBuilder = builder
-	})
-	applyOptionalParam(params, 3, func(repo surveyAnswerSheet.Repository) {
-		if repo != nil {
-			deps.answerSheetRepo = repo
-		}
-	})
-	applyOptionalParam(params, 4, func(value int) {
-		deps.repairWindowDays = value
-	})
-	applyOptionalParam(params, 5, func(value cachepolicy.CachePolicy) {
-		deps.queryPolicy = value
-	})
-	applyOptionalParam(params, 6, func(value scaleCache.HotsetRecorder) {
-		deps.hotsetRecorder = value
-	})
-	applyOptionalParam(params, 7, func(value *redislock.Manager) {
-		deps.lockManager = value
-	})
-	applyOptionalParam(params, 8, func(value scaleCache.VersionTokenStore) {
-		deps.versionStore = value
-	})
-	applyOptionalParam(params, 9, func(value *scaleCache.Observer) {
-		deps.observer = value
-	})
 	return deps, nil
 }
 

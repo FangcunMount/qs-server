@@ -42,124 +42,84 @@ type PlanModule struct {
 	testeeAccessService actorAccessApp.TesteeAccessService
 }
 
-type planModuleDeps struct {
-	mysqlDB        *gorm.DB
-	eventPublisher event.EventPublisher
-	scaleRepo      scale.Repository
-	redisClient    redis.UniversalClient
-	cacheBuilder   *rediskey.Builder
-	planPolicy     cachepolicy.CachePolicy
-	entryBaseURL   string
-	observer       *planCache.Observer
+// PlanModuleDeps 定义 Plan 模块的显式构造依赖。
+type PlanModuleDeps struct {
+	MySQLDB        *gorm.DB
+	EventPublisher event.EventPublisher
+	ScaleRepo      scale.Repository
+	RedisClient    redis.UniversalClient
+	CacheBuilder   *rediskey.Builder
+	PlanPolicy     cachepolicy.CachePolicy
+	EntryBaseURL   string
+	Observer       *planCache.Observer
 }
 
-// NewPlanModule 创建 Plan 模块
-func NewPlanModule() *PlanModule {
-	return &PlanModule{}
-}
-
-// Initialize 初始化 Plan 模块
-// params[0]: *gorm.DB
-// params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
-// params[2]: scale.Repository (可选，用于通过 code 查找 scale)
-// params[3]: redis.UniversalClient (可选，用于缓存装饰器)
-// params[4]: *rediskey.Builder (可选，用于对象缓存 key builder)
-// params[5]: cachepolicy.CachePolicy (可选，用于计划详情缓存策略)
-// params[6]: string (可选，用于入口基础地址)
-func (m *PlanModule) Initialize(params ...interface{}) error {
-	deps, err := parsePlanModuleDeps(params)
+// NewPlanModule 创建 Plan 模块。
+func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
+	normalized, err := normalizePlanModuleDeps(deps)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m.eventPublisher = deps.eventPublisher
+
+	module := &PlanModule{}
+	module.eventPublisher = normalized.EventPublisher
 
 	// 初始化 repository 层
 	// 初始化基础 Repository
-	basePlanRepo := planInfra.NewPlanRepository(deps.mysqlDB)
+	basePlanRepo := planInfra.NewPlanRepository(normalized.MySQLDB)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
-	if deps.redisClient != nil {
-		m.PlanRepo = planCache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, deps.redisClient, deps.cacheBuilder, deps.planPolicy, deps.observer)
+	if normalized.RedisClient != nil {
+		module.PlanRepo = planCache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.PlanPolicy, normalized.Observer)
 	} else {
-		m.PlanRepo = basePlanRepo
+		module.PlanRepo = basePlanRepo
 	}
 
-	m.TaskRepo = planInfra.NewTaskRepository(deps.mysqlDB)
+	module.TaskRepo = planInfra.NewTaskRepository(normalized.MySQLDB)
 
 	// 初始化基础设施层（入口生成器）
-	entryGenerator := planEntryInfra.NewEntryGenerator(deps.entryBaseURL)
+	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	lifecycleService := planApp.NewLifecycleService(m.PlanRepo, m.TaskRepo, deps.scaleRepo, m.eventPublisher)
-	enrollmentService := planApp.NewEnrollmentService(m.PlanRepo, m.TaskRepo, m.eventPublisher)
-	taskSchedulerService := planApp.NewTaskSchedulerService(m.TaskRepo, m.PlanRepo, entryGenerator, m.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementService(m.TaskRepo, m.eventPublisher)
-	m.CommandService = planApp.NewCommandService(
+	lifecycleService := planApp.NewLifecycleService(module.PlanRepo, module.TaskRepo, normalized.ScaleRepo, module.eventPublisher)
+	enrollmentService := planApp.NewEnrollmentService(module.PlanRepo, module.TaskRepo, module.eventPublisher)
+	taskSchedulerService := planApp.NewTaskSchedulerService(module.TaskRepo, module.PlanRepo, entryGenerator, module.eventPublisher)
+	taskManagementService := planApp.NewTaskManagementService(module.TaskRepo, module.eventPublisher)
+	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,
 		taskSchedulerService,
 		taskManagementService,
-		m.PlanRepo,
-		m.TaskRepo,
+		module.PlanRepo,
+		module.TaskRepo,
 	)
-	m.QueryService = planApp.NewQueryService(m.PlanRepo, m.TaskRepo, deps.scaleRepo)
+	module.QueryService = planApp.NewQueryService(module.PlanRepo, module.TaskRepo, normalized.ScaleRepo)
 
 	// 初始化 handler 层
-	m.Handler = handler.NewPlanHandler(
-		m.CommandService,
-		m.QueryService,
+	module.Handler = handler.NewPlanHandler(
+		module.CommandService,
+		module.QueryService,
 	)
-	if m.testeeAccessService != nil {
-		m.Handler.SetTesteeAccessService(m.testeeAccessService)
+	if module.testeeAccessService != nil {
+		module.Handler.SetTesteeAccessService(module.testeeAccessService)
 	}
 
-	return nil
+	return module, nil
 }
 
-func parsePlanModuleDeps(params []interface{}) (*planModuleDeps, error) {
-	if len(params) < 1 {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+func normalizePlanModuleDeps(deps PlanModuleDeps) (PlanModuleDeps, error) {
+	if deps.MySQLDB == nil {
+		return PlanModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
-	mysqlDB, ok := params[0].(*gorm.DB)
-	if !ok || mysqlDB == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	if deps.EventPublisher == nil {
+		deps.EventPublisher = event.NewNopEventPublisher()
 	}
-
-	deps := &planModuleDeps{
-		mysqlDB:        mysqlDB,
-		eventPublisher: event.NewNopEventPublisher(),
-		entryBaseURL:   apiserveroptions.DefaultPlanEntryBaseURL,
+	if strings.TrimSpace(deps.EntryBaseURL) == "" {
+		deps.EntryBaseURL = apiserveroptions.DefaultPlanEntryBaseURL
+	} else {
+		deps.EntryBaseURL = strings.TrimSpace(deps.EntryBaseURL)
 	}
-	applyOptionalParam(params, 1, func(publisher event.EventPublisher) {
-		if publisher != nil {
-			deps.eventPublisher = publisher
-		}
-	})
-	applyOptionalParam(params, 2, func(repo scale.Repository) {
-		if repo != nil {
-			deps.scaleRepo = repo
-		}
-	})
-	applyOptionalParam(params, 3, func(client redis.UniversalClient) {
-		if client != nil {
-			deps.redisClient = client
-		}
-	})
-	applyOptionalParam(params, 4, func(builder *rediskey.Builder) {
-		deps.cacheBuilder = builder
-	})
-	applyOptionalParam(params, 5, func(policy cachepolicy.CachePolicy) {
-		deps.planPolicy = policy
-	})
-	applyOptionalParam(params, 6, func(baseURL string) {
-		if strings.TrimSpace(baseURL) != "" {
-			deps.entryBaseURL = strings.TrimSpace(baseURL)
-		}
-	})
-	applyOptionalParam(params, 7, func(observer *planCache.Observer) {
-		deps.observer = observer
-	})
 	return deps, nil
 }
 

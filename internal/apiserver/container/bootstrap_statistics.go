@@ -6,12 +6,13 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
-func (c *Container) buildStatisticsModuleInitializeParams() []interface{} {
+func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 	redisClient := c.redisCache
 	if !c.cacheOptions.DisableStatisticsCache {
 		redisClient = c.CacheClient(redisplane.FamilyQuery)
@@ -20,7 +21,7 @@ func (c *Container) buildStatisticsModuleInitializeParams() []interface{} {
 		redisClient = nil
 	}
 
-	var answerSheetRepo interface{}
+	var answerSheetRepo surveyAnswerSheet.Repository
 	if c != nil && c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
 		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
 	}
@@ -36,24 +37,28 @@ func (c *Container) buildStatisticsModuleInitializeParams() []interface{} {
 		}
 	}
 
-	return []interface{}{
-		c.mysqlDB,
-		redisClient,
-		c.CacheBuilder(redisplane.FamilyQuery),
-		answerSheetRepo,
-		c.statisticsRepairWindowDays,
-		c.CachePolicy(cachepolicy.PolicyStatsQuery),
-		c.hotsetRecorder(),
-		c.CacheLockManager(),
-		versionStore,
-		c.cacheObserver(),
+	return assembler.StatisticsModuleDeps{
+		MySQLDB:          c.mysqlDB,
+		RedisClient:      redisClient,
+		CacheBuilder:     c.CacheBuilder(redisplane.FamilyQuery),
+		AnswerSheetRepo:  answerSheetRepo,
+		RepairWindowDays: c.statisticsRepairWindowDays,
+		QueryPolicy:      c.CachePolicy(cachepolicy.PolicyStatsQuery),
+		HotsetRecorder:   c.hotsetRecorder(),
+		LockManager:      c.CacheLockManager(),
+		VersionStore:     versionStore,
+		Observer:         c.cacheObserver(),
 	}
+}
+
+func (c *Container) buildStatisticsModule() (*assembler.StatisticsModule, error) {
+	return assembler.NewStatisticsModule(c.buildStatisticsModuleDeps())
 }
 
 // initStatisticsModule 初始化 Statistics 模块。
 func (c *Container) initStatisticsModule() error {
-	statisticsModule := assembler.NewStatisticsModule()
-	if err := statisticsModule.Initialize(c.buildStatisticsModuleInitializeParams()...); err != nil {
+	statisticsModule, err := c.buildStatisticsModule()
+	if err != nil {
 		return fmt.Errorf("failed to initialize statistics module: %w", err)
 	}
 

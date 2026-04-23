@@ -64,157 +64,105 @@ type ActorModule struct {
 	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater // 将 IAM 角色快照投影回本地 operator
 }
 
-// NewActorModule 创建 Actor 模块
-func NewActorModule() *ActorModule {
-	return &ActorModule{}
+// ActorModuleDeps 定义 Actor 模块的显式构造依赖。
+type ActorModuleDeps struct {
+	MySQLDB             *gorm.DB
+	GuardianshipService *iam.GuardianshipService
+	IdentityService     *iam.IdentityService
+	RedisClient         redis.UniversalClient
+	CacheBuilder        *rediskey.Builder
+	TesteePolicy        cachepolicy.CachePolicy
+	OperatorAuthz       *iam.OperatorAuthzBundle
+	OperationAccountSvc *iam.OperationAccountService
+	Observer            *testeeCache.Observer
 }
 
-// Initialize 初始化模块
-func (m *ActorModule) Initialize(params ...interface{}) error {
-	mysqlDB := params[0].(*gorm.DB)
-	if mysqlDB == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+// NewActorModule 创建 Actor 模块。
+func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
+	if deps.MySQLDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 
-	// 提取可选的 guardianshipSvc 参数
-	var guardianshipSvc *iam.GuardianshipService
-	if len(params) > 1 {
-		if svc, ok := params[1].(*iam.GuardianshipService); ok {
-			guardianshipSvc = svc
-		}
-	}
-
-	var cacheBuilder *rediskey.Builder
-	if len(params) > 4 {
-		if builder, ok := params[4].(*rediskey.Builder); ok {
-			cacheBuilder = builder
-		}
-	}
-	var testeePolicy cachepolicy.CachePolicy
-	if len(params) > 5 {
-		if policy, ok := params[5].(cachepolicy.CachePolicy); ok {
-			testeePolicy = policy
-		}
-	}
-
-	var opAuthz *iam.OperatorAuthzBundle
-	if len(params) > 6 {
-		if b, ok := params[6].(*iam.OperatorAuthzBundle); ok {
-			opAuthz = b
-		}
-	}
-	var operationAccountSvc *iam.OperationAccountService
-	if len(params) > 7 {
-		if svc, ok := params[7].(*iam.OperationAccountService); ok {
-			operationAccountSvc = svc
-		}
-	}
-	var observer *testeeCache.Observer
-	if len(params) > 8 {
-		if value, ok := params[8].(*testeeCache.Observer); ok {
-			observer = value
-		}
-	}
+	module := &ActorModule{}
+	mysqlDB := deps.MySQLDB
+	guardianshipSvc := deps.GuardianshipService
+	identitySvc := deps.IdentityService
+	operationAccountSvc := deps.OperationAccountSvc
 	var authzAssign *iam.AuthzAssignmentClient
 	var authzSnap *iam.AuthzSnapshotLoader
-	if opAuthz != nil {
-		authzAssign = opAuthz.Assignment
-		authzSnap = opAuthz.Snapshot
+	if deps.OperatorAuthz != nil {
+		authzAssign = deps.OperatorAuthz.Assignment
+		authzSnap = deps.OperatorAuthz.Snapshot
 	}
 
 	// 初始化 UnitOfWork
 	uow := mysql.NewUnitOfWork(mysqlDB)
 
 	// 初始化 repository 层
-	// 初始化基础 Repository
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB)
 
-	// 如果提供了 Redis 客户端，使用缓存装饰器
-	if len(params) > 3 {
-		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
-			m.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, rc, cacheBuilder, testeePolicy, observer)
-		} else {
-			m.TesteeRepo = baseTesteeRepo
-		}
+	if deps.RedisClient != nil {
+		module.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
 	} else {
-		m.TesteeRepo = baseTesteeRepo
+		module.TesteeRepo = baseTesteeRepo
 	}
 
-	m.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB)
-	m.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB)
-	m.RelationRepo = actorInfra.NewRelationRepository(mysqlDB)
-	m.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB)
+	module.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB)
+	module.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB)
+	module.RelationRepo = actorInfra.NewRelationRepository(mysqlDB)
+	module.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB)
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
 	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStore(mysqlDB))
 
 	// 初始化 testee domain services
-	testeeValidator := testee.NewValidator(m.TesteeRepo)
-	testeeFactory := testee.NewFactory(m.TesteeRepo, testeeValidator)
+	testeeValidator := testee.NewValidator(module.TesteeRepo)
+	testeeFactory := testee.NewFactory(module.TesteeRepo, testeeValidator)
 	testeeEditor := testee.NewEditor(testeeValidator)
-	testeeBinder := testee.NewBinder(m.TesteeRepo)
+	testeeBinder := testee.NewBinder(module.TesteeRepo)
 	testeeTagger := testee.NewTagger(testeeValidator)
 
 	// 初始化 operator domain services
 	operatorValidator := operator.NewValidator()
-	operatorFactory := operator.NewFactory(m.OperatorRepo, operatorValidator)
+	operatorFactory := operator.NewFactory(module.OperatorRepo, operatorValidator)
 	operatorEditor := operator.NewEditor(operatorValidator)
-	operatorBinder := operator.NewBinder(m.OperatorRepo, operatorValidator)
+	operatorBinder := operator.NewBinder(module.OperatorRepo, operatorValidator)
 	operatorRoleAllocator := operator.NewRoleAllocator(operatorValidator)
 	operatorLifecycler := operator.NewLifecycler(operatorRoleAllocator)
 	clinicianValidator := clinicianDomain.NewValidator()
 	assessmentEntryValidator := assessmentEntryDomain.NewValidator()
 
-	// 初始化 testee service 层（按行为者组织）
-	// 注册服务 - 服务于C端用户（患者/家长）
-	m.TesteeRegistrationService = testeeApp.NewRegistrationService(
-		m.TesteeRepo,
+	module.TesteeRegistrationService = testeeApp.NewRegistrationService(
+		module.TesteeRepo,
 		testeeFactory,
 		testeeValidator,
 		testeeBinder,
 		uow,
 		guardianshipSvc,
 	)
-	// 管理服务 - 服务于B端操作者
-	m.TesteeManagementService = testeeApp.NewManagementService(
-		m.TesteeRepo,
+	module.TesteeManagementService = testeeApp.NewManagementService(
+		module.TesteeRepo,
 		testeeEditor,
 		testeeBinder,
 		testeeTagger,
 		uow,
 	)
-	// 查询服务 - 服务于所有需要查询的用户（小程序、C端）
-	m.TesteeQueryService = testeeApp.NewQueryService(m.TesteeRepo)
-
-	// 标签服务 - 服务于系统自动（事件驱动）
-	m.TesteeTaggingService = testeeApp.NewTaggingService(
-		m.TesteeRepo,
-		m.TesteeManagementService,
-		m.TesteeQueryService,
+	module.TesteeQueryService = testeeApp.NewQueryService(module.TesteeRepo)
+	module.TesteeTaggingService = testeeApp.NewTaggingService(
+		module.TesteeRepo,
+		module.TesteeManagementService,
+		module.TesteeQueryService,
 		uow,
 	)
 
-	// 初始化 operator service 层（按行为者组织）
-	// 生命周期服务 - 服务于人事/行政部门
-	// 初始化 Operator Lifecycle Service，注入 IAM IdentityService 如果可用
-	var identitySvc *iam.IdentityService
-	// 尝试从外部容器的 IAMModule 提取（在 Initialize 时 container 会传入该参数为 params[2]）
-	if len(params) > 2 {
-		if svc, ok := params[2].(*iam.IdentityService); ok {
-			identitySvc = svc
-		}
-	}
-
-	// 后台查询服务 - 服务于B端员工（包含家长信息）
-	// 需要 IdentityService 来查询用户详细信息（当 ListGuardians 只返回 guardianship 时）
-	m.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
-		m.TesteeQueryService,
+	module.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
+		module.TesteeQueryService,
 		guardianshipSvc,
 		identitySvc,
 	)
-	m.OperatorLifecycleService = operatorApp.NewLifecycleService(
-		m.OperatorRepo,
+	module.OperatorLifecycleService = operatorApp.NewLifecycleService(
+		module.OperatorRepo,
 		operatorFactory,
 		operatorValidator,
 		operatorEditor,
@@ -227,9 +175,8 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		authzAssign,
 		authzSnap,
 	)
-	// 权限管理服务 - 服务于IT管理员
-	m.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
-		m.OperatorRepo,
+	module.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
+		module.OperatorRepo,
 		operatorValidator,
 		operatorRoleAllocator,
 		operatorLifecycler,
@@ -237,35 +184,34 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		authzAssign,
 		authzSnap,
 	)
-	// 查询服务 - 服务于所有需要查询的用户
-	m.OperatorQueryService = operatorApp.NewQueryService(m.OperatorRepo)
-	m.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(m.OperatorRepo)
-	m.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
-		m.ClinicianRepo,
-		m.OperatorRepo,
+	module.OperatorQueryService = operatorApp.NewQueryService(module.OperatorRepo)
+	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(module.OperatorRepo)
+	module.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
+		module.ClinicianRepo,
+		module.OperatorRepo,
 		clinicianValidator,
 		uow,
 	)
-	m.ClinicianQueryService = clinicianApp.NewQueryService(m.ClinicianRepo, m.RelationRepo, m.AssessmentEntryRepo)
-	m.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
-		m.RelationRepo,
-		m.ClinicianRepo,
-		m.TesteeRepo,
+	module.ClinicianQueryService = clinicianApp.NewQueryService(module.ClinicianRepo, module.RelationRepo, module.AssessmentEntryRepo)
+	module.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
+		module.RelationRepo,
+		module.ClinicianRepo,
+		module.TesteeRepo,
 		behaviorEvents,
 		uow,
 	)
-	m.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
-		m.OperatorRepo,
-		m.ClinicianRepo,
-		m.RelationRepo,
-		m.TesteeRepo,
+	module.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
+		module.OperatorRepo,
+		module.ClinicianRepo,
+		module.RelationRepo,
+		module.TesteeRepo,
 		authzSnap,
 	)
-	m.AssessmentEntryService = assessmentEntryApp.NewService(
-		m.AssessmentEntryRepo,
-		m.ClinicianRepo,
-		m.RelationRepo,
-		m.TesteeRepo,
+	module.AssessmentEntryService = assessmentEntryApp.NewService(
+		module.AssessmentEntryRepo,
+		module.ClinicianRepo,
+		module.RelationRepo,
+		module.TesteeRepo,
 		testeeFactory,
 		assessmentEntryValidator,
 		guardianshipSvc,
@@ -275,34 +221,34 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		uow,
 	)
 
-	m.TesteeHandler = handler.NewTesteeHandler(
-		m.TesteeManagementService,
-		m.TesteeQueryService,
-		m.TesteeBackendQueryService,
-		m.ClinicianQueryService,
-		m.ClinicianRelationshipService,
-		m.TesteeAccessService,
-		nil, // assessmentManagementService - 稍后注入
-		nil, // scoreQueryService - 稍后注入
+	module.TesteeHandler = handler.NewTesteeHandler(
+		module.TesteeManagementService,
+		module.TesteeQueryService,
+		module.TesteeBackendQueryService,
+		module.ClinicianQueryService,
+		module.ClinicianRelationshipService,
+		module.TesteeAccessService,
+		nil,
+		nil,
 	)
-	m.OperatorClinicianHandler = handler.NewOperatorClinicianHandler(
-		m.OperatorLifecycleService,
-		m.OperatorAuthorizationService,
-		m.OperatorQueryService,
-		m.ClinicianLifecycleService,
-		m.ClinicianQueryService,
-		m.ClinicianRelationshipService,
-		m.TesteeQueryService,
-		m.TesteeAccessService,
+	module.OperatorClinicianHandler = handler.NewOperatorClinicianHandler(
+		module.OperatorLifecycleService,
+		module.OperatorAuthorizationService,
+		module.OperatorQueryService,
+		module.ClinicianLifecycleService,
+		module.ClinicianQueryService,
+		module.ClinicianRelationshipService,
+		module.TesteeQueryService,
+		module.TesteeAccessService,
 	)
-	m.AssessmentEntryHandler = handler.NewAssessmentEntryHandler(
-		m.OperatorQueryService,
-		m.ClinicianQueryService,
-		m.AssessmentEntryService,
-		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
+	module.AssessmentEntryHandler = handler.NewAssessmentEntryHandler(
+		module.OperatorQueryService,
+		module.ClinicianQueryService,
+		module.AssessmentEntryService,
+		nil,
 	)
 
-	return nil
+	return module, nil
 }
 
 // SetEvaluationServices 设置评估服务（用于延迟注入）

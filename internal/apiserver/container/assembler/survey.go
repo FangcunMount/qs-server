@@ -38,15 +38,16 @@ type SurveyModule struct {
 	eventPublisher event.EventPublisher
 }
 
-type surveyModuleDeps struct {
-	mongoDB             *mongo.Database
-	eventPublisher      event.EventPublisher
-	redisClient         redis.UniversalClient
-	cacheBuilder        *rediskey.Builder
-	identityService     *iam.IdentityService
-	questionnairePolicy cachepolicy.CachePolicy
-	hotsetRecorder      questionnaireCache.HotsetRecorder
-	observer            *questionnaireCache.Observer
+// SurveyModuleDeps 定义 Survey 模块的显式构造依赖。
+type SurveyModuleDeps struct {
+	MongoDB             *mongo.Database
+	EventPublisher      event.EventPublisher
+	RedisClient         redis.UniversalClient
+	CacheBuilder        *rediskey.Builder
+	IdentityService     *iam.IdentityService
+	QuestionnairePolicy cachepolicy.CachePolicy
+	HotsetRecorder      questionnaireCache.HotsetRecorder
+	Observer            *questionnaireCache.Observer
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -78,81 +79,48 @@ type AnswerSheetSubModule struct {
 	SubmittedEventRelay asApp.SubmittedEventRelay
 }
 
-// NewSurveyModule 创建 Survey 模块
-func NewSurveyModule() *SurveyModule {
-	return &SurveyModule{
+// NewSurveyModule 创建 Survey 模块。
+func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
+	normalized, err := normalizeSurveyModuleDeps(deps)
+	if err != nil {
+		return nil, err
+	}
+
+	module := &SurveyModule{
 		Questionnaire: &QuestionnaireSubModule{},
 		AnswerSheet:   &AnswerSheetSubModule{},
 	}
-}
 
-// Initialize 初始化 Survey 模块
-// params[0]: *mongo.Database
-// params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
-// params[2]: redis.UniversalClient (可选，用于问卷缓存装饰器)
-// params[3]: *rediskey.Builder (可选，用于问卷缓存 key builder)
-// params[4]: *iam.IdentityService (可选，用于姓名补全)
-// params[5]: cachepolicy.CachePolicy (可选，用于问卷缓存策略)
-// params[6]: questionnaireCache.HotsetRecorder (可选，用于热点治理)
-func (m *SurveyModule) Initialize(params ...interface{}) error {
-	deps, err := parseSurveyModuleDeps(params)
-	if err != nil {
-		return err
-	}
-	m.eventPublisher = deps.eventPublisher
+	module.eventPublisher = normalized.EventPublisher
 
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(deps.mongoDB, deps.redisClient, deps.cacheBuilder, deps.identityService, deps.questionnairePolicy, deps.hotsetRecorder, deps.observer); err != nil {
-		return err
+	if err := module.initQuestionnaireSubModule(
+		normalized.MongoDB,
+		normalized.RedisClient,
+		normalized.CacheBuilder,
+		normalized.IdentityService,
+		normalized.QuestionnairePolicy,
+		normalized.HotsetRecorder,
+		normalized.Observer,
+	); err != nil {
+		return nil, err
 	}
 
 	// 初始化答卷子模块
-	if err := m.initAnswerSheetSubModule(deps.mongoDB); err != nil {
-		return err
+	if err := module.initAnswerSheetSubModule(normalized.MongoDB); err != nil {
+		return nil, err
 	}
 
-	return nil
+	return module, nil
 }
 
-func parseSurveyModuleDeps(params []interface{}) (*surveyModuleDeps, error) {
-	if len(params) < 1 {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) {
+	if deps.MongoDB == nil {
+		return SurveyModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
-
-	mongoDB, ok := params[0].(*mongo.Database)
-	if !ok || mongoDB == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	if deps.EventPublisher == nil {
+		deps.EventPublisher = event.NewNopEventPublisher()
 	}
-
-	deps := &surveyModuleDeps{
-		mongoDB:        mongoDB,
-		eventPublisher: event.NewNopEventPublisher(),
-	}
-	applyOptionalParam(params, 1, func(publisher event.EventPublisher) {
-		if publisher != nil {
-			deps.eventPublisher = publisher
-		}
-	})
-	applyOptionalParam(params, 2, func(client redis.UniversalClient) {
-		if client != nil {
-			deps.redisClient = client
-		}
-	})
-	applyOptionalParam(params, 3, func(builder *rediskey.Builder) {
-		deps.cacheBuilder = builder
-	})
-	applyOptionalParam(params, 4, func(svc *iam.IdentityService) {
-		deps.identityService = svc
-	})
-	applyOptionalParam(params, 5, func(policy cachepolicy.CachePolicy) {
-		deps.questionnairePolicy = policy
-	})
-	applyOptionalParam(params, 6, func(recorder questionnaireCache.HotsetRecorder) {
-		deps.hotsetRecorder = recorder
-	})
-	applyOptionalParam(params, 7, func(observer *questionnaireCache.Observer) {
-		deps.observer = observer
-	})
 	return deps, nil
 }
 

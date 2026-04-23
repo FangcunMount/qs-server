@@ -16,23 +16,27 @@ func (c *Container) resolveIdentityService() *iam.IdentityService {
 	return c.IAMModule.IdentityService()
 }
 
-func (c *Container) buildSurveyModuleInitializeParams() []interface{} {
-	return []interface{}{
-		c.mongoDB,
-		c.eventPublisher,
-		c.CacheClient(redisplane.FamilyStatic),
-		c.CacheBuilder(redisplane.FamilyStatic),
-		c.resolveIdentityService(),
-		c.CachePolicy(cachepolicy.PolicyQuestionnaire),
-		c.hotsetRecorder(),
-		c.cacheObserver(),
+func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
+	return assembler.SurveyModuleDeps{
+		MongoDB:             c.mongoDB,
+		EventPublisher:      c.eventPublisher,
+		RedisClient:         c.CacheClient(redisplane.FamilyStatic),
+		CacheBuilder:        c.CacheBuilder(redisplane.FamilyStatic),
+		IdentityService:     c.resolveIdentityService(),
+		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
+		HotsetRecorder:      c.hotsetRecorder(),
+		Observer:            c.cacheObserver(),
 	}
+}
+
+func (c *Container) buildSurveyModule() (*assembler.SurveyModule, error) {
+	return assembler.NewSurveyModule(c.buildSurveyModuleDeps())
 }
 
 // initSurveyModule 初始化 Survey 模块（包含问卷和答卷子模块）。
 func (c *Container) initSurveyModule() error {
-	surveyModule := assembler.NewSurveyModule()
-	if err := surveyModule.Initialize(c.buildSurveyModuleInitializeParams()...); err != nil {
+	surveyModule, err := c.buildSurveyModule()
+	if err != nil {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 

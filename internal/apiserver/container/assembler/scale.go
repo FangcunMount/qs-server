@@ -40,129 +40,78 @@ type ScaleModule struct {
 	eventPublisher event.EventPublisher
 }
 
-type scaleModuleDeps struct {
-	mongoDB           *mongo.Database
-	eventPublisher    event.EventPublisher
-	questionnaireRepo domainQuestionnaire.Repository
-	redisClient       redis.UniversalClient
-	cacheBuilder      *rediskey.Builder
-	identityService   *iam.IdentityService
-	scalePolicy       cachepolicy.CachePolicy
-	scaleListPolicy   cachepolicy.CachePolicy
-	hotsetRecorder    scaleCache.HotsetRecorder
-	observer          *scaleCache.Observer
+// ScaleModuleDeps 定义 Scale 模块的显式构造依赖。
+type ScaleModuleDeps struct {
+	MongoDB           *mongo.Database
+	EventPublisher    event.EventPublisher
+	QuestionnaireRepo domainQuestionnaire.Repository
+	RedisClient       redis.UniversalClient
+	CacheBuilder      *rediskey.Builder
+	IdentityService   *iam.IdentityService
+	ScalePolicy       cachepolicy.CachePolicy
+	ScaleListPolicy   cachepolicy.CachePolicy
+	HotsetRecorder    scaleCache.HotsetRecorder
+	Observer          *scaleCache.Observer
 }
 
-// NewScaleModule 创建 Scale 模块
-func NewScaleModule() *ScaleModule {
-	return &ScaleModule{}
-}
-
-// Initialize 初始化 Scale 模块
-// params[0]: *mongo.Database
-// params[1]: event.EventPublisher (可选，默认使用 NopEventPublisher)
-// params[2]: questionnaire.Repository (可选，用于自动获取问卷版本)
-// params[3]: redis.UniversalClient (可选，用于量表缓存装饰器与列表缓存)
-// params[4]: *rediskey.Builder (可选，用于静态缓存 key builder)
-// params[5]: *iam.IdentityService (可选，用于姓名补全)
-// params[6]: cachepolicy.CachePolicy (可选，用于量表详情缓存策略)
-// params[7]: cachepolicy.CachePolicy (可选，用于量表列表缓存策略)
-// params[8]: scaleCache.HotsetRecorder (可选，用于热点治理)
-func (m *ScaleModule) Initialize(params ...interface{}) error {
-	deps, err := parseScaleModuleDeps(params)
+// NewScaleModule 创建 Scale 模块。
+func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
+	normalized, err := normalizeScaleModuleDeps(deps)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m.eventPublisher = deps.eventPublisher
+
+	module := &ScaleModule{}
+	module.eventPublisher = normalized.EventPublisher
 
 	// 初始化 repository 层（基础实现）
-	baseRepo := scaleInfra.NewRepository(deps.mongoDB)
+	baseRepo := scaleInfra.NewRepository(normalized.MongoDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
-	if deps.redisClient != nil {
-		m.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(baseRepo, deps.redisClient, deps.cacheBuilder, deps.scalePolicy, deps.observer)
+	if normalized.RedisClient != nil {
+		module.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(baseRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.ScalePolicy, normalized.Observer)
 	} else {
-		m.Repo = baseRepo
+		module.Repo = baseRepo
 	}
 
 	// 初始化量表全局列表缓存
 	var listCache *scaleApp.ScaleListCache
-	if deps.redisClient != nil {
+	if normalized.RedisClient != nil {
 		listCache = scaleApp.NewScaleListCacheWithPolicyAndKeyBuilder(
-			deps.redisClient,
-			m.Repo,
-			deps.identityService,
-			deps.cacheBuilder,
-			deps.scaleListPolicy,
+			normalized.RedisClient,
+			module.Repo,
+			normalized.IdentityService,
+			normalized.CacheBuilder,
+			normalized.ScaleListPolicy,
 		)
 	}
-	m.ListCache = listCache
+	module.ListCache = listCache
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	m.LifecycleService = scaleApp.NewLifecycleService(m.Repo, deps.questionnaireRepo, m.eventPublisher, listCache)
-	m.FactorService = scaleApp.NewFactorService(m.Repo, listCache, m.eventPublisher)
-	m.QueryService = scaleApp.NewQueryService(m.Repo, deps.identityService, listCache, deps.hotsetRecorder)
-	m.CategoryService = scaleApp.NewCategoryService()
+	module.LifecycleService = scaleApp.NewLifecycleService(module.Repo, normalized.QuestionnaireRepo, module.eventPublisher, listCache)
+	module.FactorService = scaleApp.NewFactorService(module.Repo, listCache, module.eventPublisher)
+	module.QueryService = scaleApp.NewQueryService(module.Repo, normalized.IdentityService, listCache, normalized.HotsetRecorder)
+	module.CategoryService = scaleApp.NewCategoryService()
 
 	// 初始化 handler 层
 	// 注意：QRCodeService 在容器初始化后才创建，需要通过 SetQRCodeService 方法单独设置
-	m.Handler = handler.NewScaleHandler(
-		m.LifecycleService,
-		m.FactorService,
-		m.QueryService,
-		m.CategoryService,
+	module.Handler = handler.NewScaleHandler(
+		module.LifecycleService,
+		module.FactorService,
+		module.QueryService,
+		module.CategoryService,
 		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
 	)
 
-	return nil
+	return module, nil
 }
 
-func parseScaleModuleDeps(params []interface{}) (*scaleModuleDeps, error) {
-	if len(params) < 1 {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is required")
+func normalizeScaleModuleDeps(deps ScaleModuleDeps) (ScaleModuleDeps, error) {
+	if deps.MongoDB == nil {
+		return ScaleModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
-
-	mongoDB, ok := params[0].(*mongo.Database)
-	if !ok || mongoDB == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	if deps.EventPublisher == nil {
+		deps.EventPublisher = event.NewNopEventPublisher()
 	}
-
-	deps := &scaleModuleDeps{
-		mongoDB:        mongoDB,
-		eventPublisher: event.NewNopEventPublisher(),
-	}
-	applyOptionalParam(params, 1, func(publisher event.EventPublisher) {
-		if publisher != nil {
-			deps.eventPublisher = publisher
-		}
-	})
-	applyOptionalParam(params, 2, func(repo domainQuestionnaire.Repository) {
-		if repo != nil {
-			deps.questionnaireRepo = repo
-		}
-	})
-	applyOptionalParam(params, 3, func(client redis.UniversalClient) {
-		if client != nil {
-			deps.redisClient = client
-		}
-	})
-	applyOptionalParam(params, 4, func(builder *rediskey.Builder) {
-		deps.cacheBuilder = builder
-	})
-	applyOptionalParam(params, 5, func(svc *iam.IdentityService) {
-		deps.identityService = svc
-	})
-	applyOptionalParam(params, 6, func(policy cachepolicy.CachePolicy) {
-		deps.scalePolicy = policy
-	})
-	applyOptionalParam(params, 7, func(policy cachepolicy.CachePolicy) {
-		deps.scaleListPolicy = policy
-	})
-	applyOptionalParam(params, 8, func(recorder scaleCache.HotsetRecorder) {
-		deps.hotsetRecorder = recorder
-	})
-	applyOptionalParam(params, 9, func(observer *scaleCache.Observer) {
-		deps.observer = observer
-	})
 	return deps, nil
 }
 

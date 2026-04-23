@@ -32,25 +32,29 @@ func (c *Container) resolveActorModuleInitDeps() actorModuleInitDeps {
 	return deps
 }
 
-func (c *Container) buildActorModuleInitializeParams() []interface{} {
+func (c *Container) buildActorModuleDeps() assembler.ActorModuleDeps {
 	deps := c.resolveActorModuleInitDeps()
-	return []interface{}{
-		c.mysqlDB,
-		deps.guardianshipSvc,
-		deps.identitySvc,
-		c.CacheClient(redisplane.FamilyObject),
-		c.CacheBuilder(redisplane.FamilyObject),
-		c.CachePolicy(cachepolicy.PolicyTestee),
-		deps.opAuthz,
-		deps.operationAccountSvc,
-		c.cacheObserver(),
+	return assembler.ActorModuleDeps{
+		MySQLDB:             c.mysqlDB,
+		GuardianshipService: deps.guardianshipSvc,
+		IdentityService:     deps.identitySvc,
+		RedisClient:         c.CacheClient(redisplane.FamilyObject),
+		CacheBuilder:        c.CacheBuilder(redisplane.FamilyObject),
+		TesteePolicy:        c.CachePolicy(cachepolicy.PolicyTestee),
+		OperatorAuthz:       deps.opAuthz,
+		OperationAccountSvc: deps.operationAccountSvc,
+		Observer:            c.cacheObserver(),
 	}
+}
+
+func (c *Container) buildActorModule() (*assembler.ActorModule, error) {
+	return assembler.NewActorModule(c.buildActorModuleDeps())
 }
 
 // initActorModule 初始化 Actor 模块。
 func (c *Container) initActorModule() error {
-	actorModule := assembler.NewActorModule()
-	if err := actorModule.Initialize(c.buildActorModuleInitializeParams()...); err != nil {
+	actorModule, err := c.buildActorModule()
+	if err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
 	}
 

@@ -4,19 +4,22 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
-func (c *Container) buildEvaluationModuleInitializeParams() []interface{} {
-	var scaleRepo interface{}
+func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
+	var scaleRepo scale.Repository
 	if c != nil && c.ScaleModule != nil {
 		scaleRepo = c.ScaleModule.Repo
 	}
 
-	var answerSheetRepo interface{}
-	var questionnaireRepo interface{}
+	var answerSheetRepo answersheet.Repository
+	var questionnaireRepo questionnaire.Repository
 	if c != nil && c.SurveyModule != nil {
 		if c.SurveyModule.AnswerSheet != nil {
 			answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
@@ -42,28 +45,32 @@ func (c *Container) buildEvaluationModuleInitializeParams() []interface{} {
 		)
 	}
 
-	return []interface{}{
-		c.mysqlDB,
-		c.mongoDB,
-		scaleRepo,
-		answerSheetRepo,
-		questionnaireRepo,
-		c.eventPublisher,
-		redisClient,
-		c.CacheBuilder(redisplane.FamilyObject),
-		c.CachePolicy(cachepolicy.PolicyAssessmentDetail),
-		queryRedisClient,
-		c.CacheBuilder(redisplane.FamilyQuery),
-		c.CachePolicy(cachepolicy.PolicyAssessmentList),
-		versionStore,
-		c.cacheObserver(),
+	return assembler.EvaluationModuleDeps{
+		MySQLDB:              c.mysqlDB,
+		MongoDB:              c.mongoDB,
+		ScaleRepo:            scaleRepo,
+		AnswerSheetRepo:      answerSheetRepo,
+		QuestionnaireRepo:    questionnaireRepo,
+		EventPublisher:       c.eventPublisher,
+		RedisClient:          redisClient,
+		CacheBuilder:         c.CacheBuilder(redisplane.FamilyObject),
+		AssessmentPolicy:     c.CachePolicy(cachepolicy.PolicyAssessmentDetail),
+		QueryRedisClient:     queryRedisClient,
+		QueryCacheBuilder:    c.CacheBuilder(redisplane.FamilyQuery),
+		AssessmentListPolicy: c.CachePolicy(cachepolicy.PolicyAssessmentList),
+		VersionStore:         versionStore,
+		Observer:             c.cacheObserver(),
 	}
+}
+
+func (c *Container) buildEvaluationModule() (*assembler.EvaluationModule, error) {
+	return assembler.NewEvaluationModule(c.buildEvaluationModuleDeps())
 }
 
 // initEvaluationModule 初始化 Evaluation 模块。
 func (c *Container) initEvaluationModule() error {
-	evaluationModule := assembler.NewEvaluationModule()
-	if err := evaluationModule.Initialize(c.buildEvaluationModuleInitializeParams()...); err != nil {
+	evaluationModule, err := c.buildEvaluationModule()
+	if err != nil {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
 

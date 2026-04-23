@@ -103,13 +103,20 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 
 func newRouterTestContainer() *container.Container {
 	clinicianQuery := &routerClinicianQueryStub{}
-	surveyModule := assembler.NewSurveyModule()
-	surveyModule.Questionnaire.Handler = handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil)
-	surveyModule.AnswerSheet.Handler = handlerpkg.NewAnswerSheetHandler(nil, nil)
-	scaleModule := assembler.NewScaleModule()
-	scaleModule.Handler = handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil)
-	evaluationModule := assembler.NewEvaluationModule()
-	evaluationModule.Handler = handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
+	surveyModule := &assembler.SurveyModule{
+		Questionnaire: &assembler.QuestionnaireSubModule{
+			Handler: handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil),
+		},
+		AnswerSheet: &assembler.AnswerSheetSubModule{
+			Handler: handlerpkg.NewAnswerSheetHandler(nil, nil),
+		},
+	}
+	scaleModule := &assembler.ScaleModule{
+		Handler: handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil),
+	}
+	evaluationModule := &assembler.EvaluationModule{
+		Handler: handlerpkg.NewEvaluationHandler(nil, nil, nil, nil),
+	}
 	testeeHandler := handlerpkg.NewTesteeHandler(nil, nil, nil, nil, nil, nil, nil, nil)
 	operatorClinicianHandler := handlerpkg.NewOperatorClinicianHandler(nil, nil, nil, nil, clinicianQuery, nil, nil, nil)
 	assessmentEntryHandler := handlerpkg.NewAssessmentEntryHandler(nil, clinicianQuery, nil, nil)

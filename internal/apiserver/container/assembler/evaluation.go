@@ -82,67 +82,51 @@ type EvaluationModule struct {
 	testeeAccessService actorAccessApp.TesteeAccessService
 }
 
-type evaluationModuleDeps struct {
-	mysqlDB              *gorm.DB
-	mongoDB              *mongo.Database
-	scaleRepo            scale.Repository
-	answerSheetRepo      answersheet.Repository
-	questionnaireRepo    questionnaire.Repository
-	eventPublisher       event.EventPublisher
-	redisClient          redis.UniversalClient
-	cacheBuilder         *rediskey.Builder
-	assessmentPolicy     cachepolicy.CachePolicy
-	queryRedisClient     redis.UniversalClient
-	queryCacheBuilder    *rediskey.Builder
-	assessmentListPolicy cachepolicy.CachePolicy
-	versionStore         assessmentCache.VersionTokenStore
-	observer             *assessmentCache.Observer
+// EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
+type EvaluationModuleDeps struct {
+	MySQLDB              *gorm.DB
+	MongoDB              *mongo.Database
+	ScaleRepo            scale.Repository
+	AnswerSheetRepo      answersheet.Repository
+	QuestionnaireRepo    questionnaire.Repository
+	EventPublisher       event.EventPublisher
+	RedisClient          redis.UniversalClient
+	CacheBuilder         *rediskey.Builder
+	AssessmentPolicy     cachepolicy.CachePolicy
+	QueryRedisClient     redis.UniversalClient
+	QueryCacheBuilder    *rediskey.Builder
+	AssessmentListPolicy cachepolicy.CachePolicy
+	VersionStore         assessmentCache.VersionTokenStore
+	Observer             *assessmentCache.Observer
 }
 
-// NewEvaluationModule 创建评估模块
-func NewEvaluationModule() *EvaluationModule {
-	return &EvaluationModule{}
-}
-
-// Initialize 初始化模块
-// params[0]: *gorm.DB (MySQL)
-// params[1]: *mongo.Database (MongoDB)
-// params[2]: scale.Repository (可选，用于 EvaluationService)
-// params[3]: answersheet.Repository (可选，用于 EvaluationService)
-// params[4]: questionnaire.Repository (可选，用于 EvaluationService 的 cnt 计分规则)
-// params[5]: event.EventPublisher (可选，用于事件发布)
-// params[6]: redis.UniversalClient (可选，用于对象缓存装饰器)
-// params[7]: *rediskey.Builder (可选，用于对象缓存 key builder)
-// params[8]: cachepolicy.CachePolicy (可选，用于测评详情缓存策略)
-// params[9]: redis.UniversalClient (可选，用于 query cache，如我的测评列表)
-// params[10]: *rediskey.Builder (可选，用于 query cache key builder)
-// params[11]: cachepolicy.CachePolicy (可选，用于我的测评列表缓存策略)
-// params[12]: assessmentCache.VersionTokenStore (可选，用于 versioned query invalidation)
-func (m *EvaluationModule) Initialize(params ...interface{}) error {
-	deps, err := parseEvaluationModuleDeps(params)
+// NewEvaluationModule 创建评估模块。
+func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
+	normalized, err := normalizeEvaluationModuleDeps(deps)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m.mysqlDB = deps.mysqlDB
-	m.eventPublisher = deps.eventPublisher
+	module := &EvaluationModule{}
+	module.mysqlDB = normalized.MySQLDB
+	module.eventPublisher = normalized.EventPublisher
 
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
-	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(deps.mysqlDB)
+	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(normalized.MySQLDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
-	if deps.redisClient != nil {
-		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, deps.redisClient, deps.cacheBuilder, deps.assessmentPolicy, deps.observer)
+	if normalized.RedisClient != nil {
+		module.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
 	} else {
-		m.AssessmentRepo = baseAssessmentRepo
+		module.AssessmentRepo = baseAssessmentRepo
 	}
 
-	m.ScoreRepo = mysqlEval.NewScoreRepository(deps.mysqlDB)
-	reportRepo, err := mongoEval.NewReportRepository(deps.mongoDB)
+	module.ScoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB)
+	reportRepo, err := mongoEval.NewReportRepository(normalized.MongoDB)
 	if err != nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
-	m.ReportRepo = reportRepo
-	m.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStore(deps.mysqlDB), m.eventPublisher)
+	module.ReportRepo = reportRepo
+	module.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStore(normalized.MySQLDB), module.eventPublisher)
 
 	// ==================== 初始化领域服务 ====================
 
@@ -161,12 +145,12 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ====================  初始化评估引擎 ====================
 	// 创建等待队列注册表（用于长轮询，在创建 EvaluationService 和 Handler 时使用）
 	var waiterRegistry *waiter.WaiterRegistry
-	if deps.scaleRepo != nil && deps.answerSheetRepo != nil && deps.questionnaireRepo != nil {
+	if normalized.ScaleRepo != nil && normalized.AnswerSheetRepo != nil && normalized.QuestionnaireRepo != nil {
 		waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
 	}
 
 	// 注意：如果有 scaleRepo、answerSheetRepo 和 questionnaireRepo，则初始化 EvaluationService
-	if deps.scaleRepo != nil && deps.answerSheetRepo != nil && deps.questionnaireRepo != nil {
+	if normalized.ScaleRepo != nil && normalized.AnswerSheetRepo != nil && normalized.QuestionnaireRepo != nil {
 		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
@@ -175,13 +159,13 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 			serviceOpts = append(serviceOpts, engine.WithWaiterRegistry(waiterRegistry))
 		}
 
-		m.EvaluationService = engine.NewService(
-			m.AssessmentRepo,
-			m.ScoreRepo,
-			m.ReportRepo,
-			deps.scaleRepo,
-			deps.answerSheetRepo,
-			deps.questionnaireRepo,
+		module.EvaluationService = engine.NewService(
+			module.AssessmentRepo,
+			module.ScoreRepo,
+			module.ReportRepo,
+			normalized.ScaleRepo,
+			normalized.AnswerSheetRepo,
+			normalized.QuestionnaireRepo,
 			reportBuilder,
 			serviceOpts...,
 		)
@@ -190,139 +174,88 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	// ==================== 初始化 Report 应用服务 ====================
 
 	// 建议服务
-	m.SuggestionService = reportApp.NewSuggestionService(
-		m.ReportRepo,
+	module.SuggestionService = reportApp.NewSuggestionService(
+		module.ReportRepo,
 		suggestionGenerator,
 	)
 
 	// 报告生成服务
-	m.ReportGenerationService = reportApp.NewReportGenerationService(m.ReportRepo)
+	module.ReportGenerationService = reportApp.NewReportGenerationService(module.ReportRepo)
 
 	// 报告导出服务
-	m.ReportExportService = reportApp.NewReportExportService(
-		m.ReportRepo,
+	module.ReportExportService = reportApp.NewReportExportService(
+		module.ReportRepo,
 		reportExporter,
 	)
 
 	// ==================== 初始化 Assessment 应用服务 ====================
 
 	// 提交服务 - 服务于答题者 (Testee)
-	if deps.queryRedisClient != nil && deps.versionStore != nil {
+	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
 		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
-			assessmentCache.NewRedisCache(deps.queryRedisClient),
-			deps.versionStore,
-			deps.queryCacheBuilder,
-			deps.assessmentListPolicy,
-			deps.observer,
+			assessmentCache.NewRedisCache(normalized.QueryRedisClient),
+			normalized.VersionStore,
+			normalized.QueryCacheBuilder,
+			normalized.AssessmentListPolicy,
+			normalized.Observer,
 		)
-		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
-			m.AssessmentRepo,
+		module.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
+			module.AssessmentRepo,
 			assessmentCreator,
-			m.eventPublisher,
+			module.eventPublisher,
 			listCache,
 		)
 	} else {
-		m.SubmissionService = assessmentApp.NewSubmissionService(
-			m.AssessmentRepo,
+		module.SubmissionService = assessmentApp.NewSubmissionService(
+			module.AssessmentRepo,
 			assessmentCreator,
-			m.eventPublisher,
+			module.eventPublisher,
 		)
 	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
-	m.ManagementService = assessmentApp.NewManagementService(m.AssessmentRepo, m.eventPublisher)
+	module.ManagementService = assessmentApp.NewManagementService(module.AssessmentRepo, module.eventPublisher)
 
 	// 报告查询服务 - 服务于报告查询者
-	m.ReportQueryService = assessmentApp.NewReportQueryService(m.ReportRepo)
+	module.ReportQueryService = assessmentApp.NewReportQueryService(module.ReportRepo)
 
 	// 得分查询服务 - 服务于数据分析
-	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
-		m.ScoreRepo,
-		m.AssessmentRepo,
-		deps.scaleRepo, // 传入 scaleRepo（可能为 nil，但会在 SetScaleRepository 中更新）
+	module.ScoreQueryService = assessmentApp.NewScoreQueryService(
+		module.ScoreRepo,
+		module.AssessmentRepo,
+		normalized.ScaleRepo, // 传入 scaleRepo（可能为 nil，但会在 SetScaleRepository 中更新）
 	)
 
 	// ==================== 初始化 Interface 层 ====================
-	m.Handler = handler.NewEvaluationHandler(
-		m.ManagementService,
-		m.ReportQueryService,
-		m.ScoreQueryService,
-		m.EvaluationService,
+	module.Handler = handler.NewEvaluationHandler(
+		module.ManagementService,
+		module.ReportQueryService,
+		module.ScoreQueryService,
+		module.EvaluationService,
 	)
 
-	if m.testeeAccessService != nil {
-		m.Handler.SetTesteeAccessService(m.testeeAccessService)
+	if module.testeeAccessService != nil {
+		module.Handler.SetTesteeAccessService(module.testeeAccessService)
 	}
 
 	// 注入等待队列注册表（如果可用，用于长轮询接口）
 	if waiterRegistry != nil {
-		m.Handler.SetWaiterRegistry(waiterRegistry)
+		module.Handler.SetWaiterRegistry(waiterRegistry)
 	}
 
-	return nil
+	return module, nil
 }
 
-func parseEvaluationModuleDeps(params []interface{}) (*evaluationModuleDeps, error) {
-	if len(params) < 2 {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation module requires both MySQL and MongoDB connections")
+func normalizeEvaluationModuleDeps(deps EvaluationModuleDeps) (EvaluationModuleDeps, error) {
+	if deps.MySQLDB == nil {
+		return EvaluationModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
 	}
-
-	mysqlDB, ok := params[0].(*gorm.DB)
-	if !ok || mysqlDB == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
+	if deps.MongoDB == nil {
+		return EvaluationModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
 	}
-	mongoDB, ok := params[1].(*mongo.Database)
-	if !ok || mongoDB == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
+	if deps.EventPublisher == nil {
+		deps.EventPublisher = event.NewNopEventPublisher()
 	}
-
-	deps := &evaluationModuleDeps{
-		mysqlDB:        mysqlDB,
-		mongoDB:        mongoDB,
-		eventPublisher: event.NewNopEventPublisher(),
-	}
-	applyOptionalParam(params, 2, func(repo scale.Repository) {
-		deps.scaleRepo = repo
-	})
-	applyOptionalParam(params, 3, func(repo answersheet.Repository) {
-		deps.answerSheetRepo = repo
-	})
-	applyOptionalParam(params, 4, func(repo questionnaire.Repository) {
-		deps.questionnaireRepo = repo
-	})
-	applyOptionalParam(params, 5, func(publisher event.EventPublisher) {
-		if publisher != nil {
-			deps.eventPublisher = publisher
-		}
-	})
-	applyOptionalParam(params, 6, func(client redis.UniversalClient) {
-		if client != nil {
-			deps.redisClient = client
-		}
-	})
-	applyOptionalParam(params, 7, func(builder *rediskey.Builder) {
-		deps.cacheBuilder = builder
-	})
-	applyOptionalParam(params, 8, func(policy cachepolicy.CachePolicy) {
-		deps.assessmentPolicy = policy
-	})
-	applyOptionalParam(params, 9, func(client redis.UniversalClient) {
-		if client != nil {
-			deps.queryRedisClient = client
-		}
-	})
-	applyOptionalParam(params, 10, func(builder *rediskey.Builder) {
-		deps.queryCacheBuilder = builder
-	})
-	applyOptionalParam(params, 11, func(policy cachepolicy.CachePolicy) {
-		deps.assessmentListPolicy = policy
-	})
-	applyOptionalParam(params, 12, func(store assessmentCache.VersionTokenStore) {
-		deps.versionStore = store
-	})
-	applyOptionalParam(params, 13, func(observer *assessmentCache.Observer) {
-		deps.observer = observer
-	})
 	return deps, nil
 }
 

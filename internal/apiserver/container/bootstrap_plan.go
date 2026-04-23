@@ -9,28 +9,32 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
-func (c *Container) buildPlanModuleInitializeParams() []interface{} {
+func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
 	var scaleRepo scale.Repository
 	if c != nil && c.ScaleModule != nil {
 		scaleRepo = c.ScaleModule.Repo
 	}
 
-	return []interface{}{
-		c.mysqlDB,
-		c.eventPublisher,
-		scaleRepo,
-		c.CacheClient(redisplane.FamilyObject),
-		c.CacheBuilder(redisplane.FamilyObject),
-		c.CachePolicy(cachepolicy.PolicyPlan),
-		c.planEntryURL,
-		c.cacheObserver(),
+	return assembler.PlanModuleDeps{
+		MySQLDB:        c.mysqlDB,
+		EventPublisher: c.eventPublisher,
+		ScaleRepo:      scaleRepo,
+		RedisClient:    c.CacheClient(redisplane.FamilyObject),
+		CacheBuilder:   c.CacheBuilder(redisplane.FamilyObject),
+		PlanPolicy:     c.CachePolicy(cachepolicy.PolicyPlan),
+		EntryBaseURL:   c.planEntryURL,
+		Observer:       c.cacheObserver(),
 	}
+}
+
+func (c *Container) buildPlanModule() (*assembler.PlanModule, error) {
+	return assembler.NewPlanModule(c.buildPlanModuleDeps())
 }
 
 // initPlanModule 初始化 Plan 模块。
 func (c *Container) initPlanModule() error {
-	planModule := assembler.NewPlanModule()
-	if err := planModule.Initialize(c.buildPlanModuleInitializeParams()...); err != nil {
+	planModule, err := c.buildPlanModule()
+	if err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)
 	}
 
