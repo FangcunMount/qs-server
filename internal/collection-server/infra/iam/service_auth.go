@@ -8,7 +8,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/serviceauth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -59,7 +59,7 @@ func NewServiceAuthHelper(_ context.Context, client *Client, config *ServiceAuth
 	}
 
 	// 使用 SDK 创建 ServiceAuthHelper
-	helper, err := sdk.NewServiceAuthHelper(sdkConfig, client.sdk)
+	helper, err := auth.NewServiceAuthHelper(sdkConfig, client.sdk.Auth())
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.Unimplemented {
 			return nil, ErrServiceTokenNotSupported

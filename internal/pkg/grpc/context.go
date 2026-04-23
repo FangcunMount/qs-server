@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 )
 
 type authContextKey string

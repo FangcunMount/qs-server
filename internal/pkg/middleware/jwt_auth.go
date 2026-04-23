@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/gin-gonic/gin"
 
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 )
 
 // UserClaimsContextKey 用户声明上下文键

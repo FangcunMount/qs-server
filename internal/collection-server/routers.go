@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"

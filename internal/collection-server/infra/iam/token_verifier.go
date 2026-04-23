@@ -6,14 +6,15 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	authjwks "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/jwks"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 )
 
 // TokenVerifier Token 验证器封装
 // 使用 IAM SDK 的 auth.TokenVerifier，支持本地 JWKS 验签 + 远程降级
 type TokenVerifier struct {
 	verifier    *auth.TokenVerifier
-	jwksManager *auth.JWKSManager
+	jwksManager *authjwks.JWKSManager
 }
 
 func defaultVerifyOptions() *auth.VerifyOptions {
@@ -75,9 +76,26 @@ func NewTokenVerifier(_ context.Context, client *Client) (*TokenVerifier, error)
 		log.Warn("JWKS disabled, will use remote verification only")
 	}
 
-	// 使用 SDK 的 NewTokenVerifier（自动创建 JWKSManager 和选择验证策略）
-	verifier, err := sdk.NewTokenVerifier(verifyCfg, jwksCfg, client.sdk)
+	var (
+		jwksManager *authjwks.JWKSManager
+		err         error
+	)
+	if jwksCfg != nil {
+		jwksManager, err = authjwks.NewJWKSManager(
+			jwksCfg,
+			authjwks.WithAuthClient(client.sdk.Auth()),
+			authjwks.WithCacheEnabled(true),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create JWKS manager: %w", err)
+		}
+	}
+
+	verifier, err := auth.NewTokenVerifier(verifyCfg, jwksManager, client.sdk.Auth())
 	if err != nil {
+		if jwksManager != nil {
+			jwksManager.Stop()
+		}
 		return nil, fmt.Errorf("failed to create token verifier: %w", err)
 	}
 
@@ -85,7 +103,8 @@ func NewTokenVerifier(_ context.Context, client *Client) (*TokenVerifier, error)
 	log.Infof("  Strategy: %s", verifier.Strategy().Name())
 
 	return &TokenVerifier{
-		verifier: verifier,
+		verifier:    verifier,
+		jwksManager: jwksManager,
 	}, nil
 }
 

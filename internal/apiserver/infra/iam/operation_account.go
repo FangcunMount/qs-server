@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/client"
 )
 
 type RegisterOperationAccountInput struct {

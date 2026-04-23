@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"

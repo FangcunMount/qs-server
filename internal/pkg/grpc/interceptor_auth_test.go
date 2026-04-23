@@ -6,7 +6,7 @@ import (
 	"time"
 
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 )
 
 func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {

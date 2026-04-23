@@ -4,7 +4,7 @@ import (
 	"time"
 
 	basemtls "github.com/FangcunMount/component-base/pkg/grpc/mtls"
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/auth"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 	"google.golang.org/grpc"
 )
 

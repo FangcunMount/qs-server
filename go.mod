@@ -4,8 +4,9 @@ go 1.25.9
 
 require (
 	github.com/FangcunMount/component-base v0.5.3
-	github.com/FangcunMount/iam-contracts v0.1.11
+	github.com/FangcunMount/iam-contracts v1.0.1
 	github.com/alicebob/miniredis/v2 v2.30.0
+	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
@@ -15,6 +16,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/crypto v0.47.0
+	golang.org/x/mod v0.31.0
 	gorm.io/gorm v1.30.0
 )
 
@@ -29,7 +31,6 @@ require (
 
 require (
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
-	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1 // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20220106215444-fb4bf637b56d // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
@@ -61,7 +62,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/mod v0.31.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260120221211-b8f7ae30c516 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	k8s.io/klog v1.0.0 // indirect
