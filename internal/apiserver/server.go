@@ -408,21 +408,6 @@ func (s *apiServer) initializeWeChatServices() error {
 		return err
 	}
 	s.container.InitMiniProgramTaskNotificationService(s.config.WeChatOptions)
-	if s.container.QRCodeService == nil {
-		return nil
-	}
-	if s.container.EvaluationModule != nil {
-		s.container.EvaluationModule.SetQRCodeService(s.container.QRCodeService)
-	}
-	if s.container.SurveyModule != nil {
-		s.container.SurveyModule.SetQRCodeService(s.container.QRCodeService)
-	}
-	if s.container.ScaleModule != nil {
-		s.container.ScaleModule.SetQRCodeService(s.container.QRCodeService)
-	}
-	if s.container.ActorModule != nil {
-		s.container.ActorModule.SetQRCodeService(s.container.QRCodeService)
-	}
 	return nil
 }
 
