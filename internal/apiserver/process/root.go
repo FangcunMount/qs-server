@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -45,6 +46,7 @@ type messagingOutput struct {
 }
 
 type cacheRuntimeOutput struct {
+	redisRuntime   *redisbootstrap.RuntimeBundle
 	cacheSubsystem *cachebootstrap.Subsystem
 }
 

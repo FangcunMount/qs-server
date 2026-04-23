@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -36,7 +37,8 @@ type databaseResourceDeps struct {
 
 type redisRuntimeStageDeps struct {
 	getClient      func() (redis.UniversalClient, error)
-	buildSubsystem func() *cachebootstrap.Subsystem
+	buildRuntime   func() *redisbootstrap.RuntimeBundle
+	buildSubsystem func(*redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem
 }
 
 type mqPublisherStageDeps struct {
@@ -89,8 +91,16 @@ func (s *server) buildRedisRuntimeDeps(dbManager *bootstrap.DatabaseManager) red
 
 	return redisRuntimeStageDeps{
 		getClient: dbManager.GetRedisClient,
-		buildSubsystem: func() *cachebootstrap.Subsystem {
-			return cachebootstrap.NewSubsystem("apiserver", dbManager, s.config.RedisRuntime, s.buildContainerCacheOptions())
+		buildRuntime: func() *redisbootstrap.RuntimeBundle {
+			return redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+				Component:      "apiserver",
+				RuntimeOptions: s.config.RedisRuntime,
+				Resolver:       dbManager,
+				LockName:       "lock_lease",
+			})
+		},
+		buildSubsystem: func(runtimeBundle *redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
+			return cachebootstrap.NewSubsystemFromRuntime(runtimeBundle, s.buildContainerCacheOptions())
 		},
 	}
 }
@@ -133,7 +143,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	if deps.applyBackpressure != nil {
 		deps.applyBackpressure()
 	}
-	redisCache, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
+	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
 	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
 
 	output := resourceOutput{
@@ -148,6 +158,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 			publishMode: publishMode,
 		},
 		cacheRuntime: cacheRuntimeOutput{
+			redisRuntime:   redisRuntime,
 			cacheSubsystem: cacheSubsystem,
 		},
 	}
@@ -194,7 +205,7 @@ func (s *server) configureBackpressure() {
 	}
 }
 
-func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, *cachebootstrap.Subsystem) {
+func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, *redisbootstrap.RuntimeBundle, *cachebootstrap.Subsystem) {
 	var redisCache redis.UniversalClient
 	if deps.getClient != nil {
 		client, err := deps.getClient()
@@ -206,10 +217,14 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 		}
 		redisCache = client
 	}
-	if deps.buildSubsystem == nil {
-		return redisCache, nil
+	var redisRuntime *redisbootstrap.RuntimeBundle
+	if deps.buildRuntime != nil {
+		redisRuntime = deps.buildRuntime()
 	}
-	return redisCache, deps.buildSubsystem()
+	if deps.buildSubsystem == nil {
+		return redisCache, redisRuntime, nil
+	}
+	return redisCache, redisRuntime, deps.buildSubsystem(redisRuntime)
 }
 
 func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventconfig.PublishMode) {

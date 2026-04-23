@@ -6,6 +6,7 @@ import (
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -96,5 +97,37 @@ func TestSubsystemReturnsFamilyScopedBuilders(t *testing.T) {
 	}
 	if got := queryBuilder.BuildQueryVersionKey("stats:query", "system:1"); got != "prod:cache:query:query:version:stats:query:system:1" {
 		t.Fatalf("query builder key = %q, want prod:cache:query:query:version:stats:query:system:1", got)
+	}
+}
+
+func TestSubsystemUsesSharedRedisRuntimeBundle(t *testing.T) {
+	runtimeBundle := redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+		Component: "apiserver",
+		RuntimeOptions: &genericoptions.RedisRuntimeOptions{
+			Namespace: "prod:cache",
+			Families: map[string]*genericoptions.RedisRuntimeFamilyRoute{
+				string(redisplane.FamilyMeta): {NamespaceSuffix: "meta"},
+				string(redisplane.FamilyLock): {NamespaceSuffix: "lock"},
+			},
+		},
+		Resolver: fakeResolver{},
+		LockName: "lock_lease",
+	})
+
+	subsystem := NewSubsystemFromRuntime(runtimeBundle, CacheOptions{})
+	if subsystem == nil {
+		t.Fatal("subsystem = nil, want non-nil")
+	}
+	if subsystem.Runtime() != runtimeBundle.Runtime {
+		t.Fatal("subsystem runtime did not use shared runtime bundle")
+	}
+	if subsystem.StatusRegistry() != runtimeBundle.StatusRegistry {
+		t.Fatal("subsystem status registry did not use shared runtime bundle")
+	}
+	if subsystem.LockManager() != runtimeBundle.LockManager {
+		t.Fatal("subsystem lock manager did not use shared runtime bundle")
+	}
+	if got := subsystem.Builder(redisplane.FamilyMeta).BuildQueryVersionKey("stats", "system"); got != "prod:cache:meta:query:version:stats:system" {
+		t.Fatalf("meta builder key = %q, want prod:cache:meta:query:version:stats:system", got)
 	}
 }

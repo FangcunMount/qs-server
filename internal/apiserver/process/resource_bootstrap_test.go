@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -30,6 +31,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	var mysqlDB gorm.DB
 	var mongoDB mongo.Database
 	var redisClient redis.UniversalClient
+	runtimeBundle := &redisbootstrap.RuntimeBundle{Component: "apiserver"}
 	subsystem := &cachebootstrap.Subsystem{}
 	publisher := &fakePublisher{}
 
@@ -44,8 +46,14 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			getMongo:   func() (*mongo.Database, error) { return &mongoDB, nil },
 		},
 		redisRuntime: redisRuntimeStageDeps{
-			getClient:      func() (redis.UniversalClient, error) { return redisClient, nil },
-			buildSubsystem: func() *cachebootstrap.Subsystem { return subsystem },
+			getClient:    func() (redis.UniversalClient, error) { return redisClient, nil },
+			buildRuntime: func() *redisbootstrap.RuntimeBundle { return runtimeBundle },
+			buildSubsystem: func(got *redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
+				if got != runtimeBundle {
+					t.Fatalf("runtime bundle = %#v, want %#v", got, runtimeBundle)
+				}
+				return subsystem
+			},
 		},
 		mqPublisher: mqPublisherStageDeps{
 			fallbackMode: eventconfig.PublishModeLogging,
@@ -75,6 +83,9 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if got.cacheRuntime.cacheSubsystem != subsystem {
 		t.Fatalf("cacheSubsystem = %#v, want %#v", got.cacheRuntime.cacheSubsystem, subsystem)
 	}
+	if got.cacheRuntime.redisRuntime != runtimeBundle {
+		t.Fatalf("redis runtime = %#v, want %#v", got.cacheRuntime.redisRuntime, runtimeBundle)
+	}
 	if got.messaging.mqPublisher != publisher {
 		t.Fatalf("mqPublisher = %#v, want %#v", got.messaging.mqPublisher, publisher)
 	}
@@ -92,12 +103,24 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T) {
 	subsystem := &cachebootstrap.Subsystem{}
 
-	client, gotSubsystem := initializeRedisRuntime(redisRuntimeStageDeps{
-		getClient:      func() (redis.UniversalClient, error) { return nil, errors.New("redis unavailable") },
-		buildSubsystem: func() *cachebootstrap.Subsystem { return subsystem },
+	runtimeBundle := &redisbootstrap.RuntimeBundle{Component: "apiserver"}
+	client, gotRuntime, gotSubsystem := initializeRedisRuntime(redisRuntimeStageDeps{
+		getClient: func() (redis.UniversalClient, error) { return nil, errors.New("redis unavailable") },
+		buildRuntime: func() *redisbootstrap.RuntimeBundle {
+			return runtimeBundle
+		},
+		buildSubsystem: func(got *redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
+			if got != runtimeBundle {
+				t.Fatalf("runtime bundle = %#v, want %#v", got, runtimeBundle)
+			}
+			return subsystem
+		},
 	})
 	if client != nil {
 		t.Fatalf("redis client = %#v, want nil when redis is unavailable", client)
+	}
+	if gotRuntime != runtimeBundle {
+		t.Fatalf("redis runtime = %#v, want %#v", gotRuntime, runtimeBundle)
 	}
 	if gotSubsystem != subsystem {
 		t.Fatalf("cache subsystem = %#v, want %#v", gotSubsystem, subsystem)

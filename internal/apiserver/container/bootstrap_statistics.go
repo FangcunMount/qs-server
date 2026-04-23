@@ -1,10 +1,8 @@
 package container
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -80,34 +78,8 @@ func (c *Container) initWarmupCoordinator() error {
 	if c == nil {
 		return nil
 	}
-	var warmScale func(context.Context, string) error
-	var warmQuestionnaire func(context.Context, string) error
-	var warmScaleList func(context.Context) error
-	if c.CacheClient(redisplane.FamilyStatic) != nil {
-		warmScale = c.warmScaleCacheTarget
-		warmQuestionnaire = c.warmQuestionnaireCacheTarget
-		warmScaleList = c.warmScaleListTarget
-	}
-	var warmStatsSystem func(context.Context, int64) error
-	var warmStatsQuestionnaire func(context.Context, int64, string) error
-	var warmStatsPlan func(context.Context, int64, uint64) error
-	if c.CacheClient(redisplane.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
-		warmStatsSystem = c.warmSystemStatsTarget
-		warmStatsQuestionnaire = c.warmQuestionnaireStatsTarget
-		warmStatsPlan = c.warmPlanStatsTarget
-	}
 	if c.cache != nil {
-		c.cache.BindGovernance(cachebootstrap.GovernanceBindings{
-			ListPublishedScaleCodes:         c.listPublishedScaleCodes,
-			ListPublishedQuestionnaireCodes: c.listPublishedQuestionnaireCodes,
-			LookupScaleQuestionnaireCode:    c.lookupScaleQuestionnaireCode,
-			WarmScale:                       warmScale,
-			WarmQuestionnaire:               warmQuestionnaire,
-			WarmScaleList:                   warmScaleList,
-			WarmStatsSystem:                 warmStatsSystem,
-			WarmStatsQuestionnaire:          warmStatsQuestionnaire,
-			WarmStatsPlan:                   warmStatsPlan,
-		})
+		c.cache.BindGovernance(newCacheGovernanceAdapter(c).bindings())
 	}
 	if c.StatisticsModule != nil {
 		c.StatisticsModule.SetWarmupCoordinator(c.WarmupCoordinator())

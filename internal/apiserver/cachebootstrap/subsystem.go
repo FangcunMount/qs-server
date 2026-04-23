@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
@@ -53,11 +54,33 @@ func NewSubsystem(component string, resolver redisplane.Resolver, runtimeOptions
 	if component == "" {
 		component = "apiserver"
 	}
+	return NewSubsystemFromRuntime(redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+		Component:      component,
+		RuntimeOptions: runtimeOptions,
+		Resolver:       resolver,
+		LockName:       "lock_lease",
+	}), cacheConfig)
+}
 
-	statusRegistry := cacheobservability.NewFamilyStatusRegistry(component)
-	runtimeCatalog := redisplane.CatalogFromOptions(runtimeOptions, nil)
-	runtime := redisplane.NewRuntime(component, resolver, runtimeCatalog, statusRegistry)
-	handles := runtime.ResolveAll(context.Background())
+// NewSubsystemFromRuntime creates cache governance and policy wiring from a shared Redis runtime bundle.
+func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheConfig CacheOptions) *Subsystem {
+	component := "apiserver"
+	var statusRegistry *cacheobservability.FamilyStatusRegistry
+	var runtime *redisplane.Runtime
+	var handles map[redisplane.Family]*redisplane.Handle
+	var lockManager *redislock.Manager
+	if runtimeBundle != nil {
+		if runtimeBundle.Component != "" {
+			component = runtimeBundle.Component
+		}
+		statusRegistry = runtimeBundle.StatusRegistry
+		runtime = runtimeBundle.Runtime
+		handles = runtimeBundle.Handles
+		lockManager = runtimeBundle.LockManager
+	}
+	if statusRegistry == nil {
+		statusRegistry = cacheobservability.NewFamilyStatusRegistry(component)
+	}
 
 	s := &Subsystem{
 		component:      component,
@@ -81,7 +104,10 @@ func NewSubsystem(component string, resolver redisplane.Resolver, runtimeOptions
 	if inspector, ok := s.hotsetRecorder.(cacheinfra.HotsetInspector); ok {
 		s.hotsetInspector = inspector
 	}
-	s.lockManager = redislock.NewManager(component, "lock_lease", s.Handle(redisplane.FamilyLock))
+	s.lockManager = lockManager
+	if s.lockManager == nil {
+		s.lockManager = redislock.NewManager(component, "lock_lease", s.Handle(redisplane.FamilyLock))
+	}
 	s.warnMetaCacheAvailability()
 	return s
 }

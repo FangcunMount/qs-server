@@ -4,8 +4,7 @@ import (
 	"context"
 
 	bootstrap "github.com/FangcunMount/qs-server/internal/collection-server/bootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
@@ -15,11 +14,11 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		return resourceOutput{}, err
 	}
 
-	familyStatus := cacheobservability.NewFamilyStatusRegistry("collection-server")
-	redisRuntime := redisplane.NewRuntime(
-		"collection-server",
-		dbManager,
-		redisplane.CatalogFromOptions(s.config.RedisRuntime, map[redisplane.Family]redisplane.Route{
+	redisRuntime := redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+		Component:      "collection-server",
+		RuntimeOptions: s.config.RedisRuntime,
+		Resolver:       dbManager,
+		Defaults: map[redisplane.Family]redisplane.Route{
 			redisplane.FamilyOps: {
 				RedisProfile:         "ops_runtime",
 				NamespaceSuffix:      "ops:runtime",
@@ -30,20 +29,19 @@ func (s *server) prepareResources() (resourceOutput, error) {
 				NamespaceSuffix:      "cache:lock",
 				AllowFallbackDefault: true,
 			},
-		}),
-		familyStatus,
-	)
-	lockHandle := redisRuntime.Handle(context.Background(), redisplane.FamilyLock)
+		},
+		LockName: "lock_lease",
+	})
 	return resourceOutput{
 		handles: resourceHandles{
 			dbManager: dbManager,
 		},
 		redisRuntime: redisRuntimeOutput{
-			familyStatus: familyStatus,
-			redisRuntime: redisRuntime,
-			opsHandle:    redisRuntime.Handle(context.Background(), redisplane.FamilyOps),
-			lockHandle:   lockHandle,
-			lockManager:  redislock.NewManager("collection-server", "lock_lease", lockHandle),
+			familyStatus: redisRuntime.StatusRegistry,
+			redisRuntime: redisRuntime.Runtime,
+			opsHandle:    redisRuntime.Handle(redisplane.FamilyOps),
+			lockHandle:   redisRuntime.Handle(redisplane.FamilyLock),
+			lockManager:  redisRuntime.LockManager,
 		},
 	}, nil
 }
