@@ -10,25 +10,28 @@ import (
 func TestRunGroupStartsShutdownBeforeServices(t *testing.T) {
 	t.Parallel()
 
-	var order []string
+	order := make(chan string, 3)
+	httpDone := make(chan struct{})
+	grpcDone := make(chan struct{})
 	err := RunGroup{
 		StartShutdown: func() error {
-			order = append(order, "shutdown")
+			order <- "shutdown"
 			return nil
 		},
 		Services: []ServiceRunner{
 			{
 				Name: "http",
 				Run: func() error {
-					order = append(order, "http")
+					defer close(httpDone)
+					order <- "http"
 					return errors.New("http boom")
 				},
 			},
 			{
 				Name: "grpc",
 				Run: func() error {
-					order = append(order, "grpc")
-					time.Sleep(10 * time.Millisecond)
+					defer close(grpcDone)
+					order <- "grpc"
 					return nil
 				},
 			},
@@ -37,8 +40,22 @@ func TestRunGroupStartsShutdownBeforeServices(t *testing.T) {
 	if err == nil || err.Error() != "http boom" {
 		t.Fatalf("Run() error = %v, want http boom", err)
 	}
-	if len(order) == 0 || order[0] != "shutdown" {
-		t.Fatalf("order = %#v, want shutdown first", order)
+
+	waitDone := func(name string, done <-chan struct{}) {
+		t.Helper()
+		select {
+		case <-done:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("%s service did not finish", name)
+		}
+	}
+
+	waitDone("http", httpDone)
+	waitDone("grpc", grpcDone)
+
+	first := <-order
+	if first != "shutdown" {
+		t.Fatalf("first event = %q, want shutdown", first)
 	}
 }
 
