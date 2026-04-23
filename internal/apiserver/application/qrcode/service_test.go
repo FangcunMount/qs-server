@@ -32,7 +32,7 @@ func TestServiceGetWechatAppConfigUsesProvider(t *testing.T) {
 		},
 	}
 	svc := &service{
-		config: &Config{WeChatAppID: "wechat-app-1"},
+		config:           &Config{WeChatAppID: "wechat-app-1"},
 		wechatAppService: provider,
 	}
 

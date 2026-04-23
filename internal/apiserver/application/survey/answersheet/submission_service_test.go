@@ -12,8 +12,8 @@ import (
 )
 
 type durableStoreCaptureStub struct {
-	lastMeta    DurableSubmitMeta
-	existing    bool
+	lastMeta      DurableSubmitMeta
+	existing      bool
 	returnedSheet *domainAnswerSheet.AnswerSheet
 }
 
@@ -45,13 +45,13 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *tes
 
 	ctx := context.Background()
 	result, err := svc.createAndSaveAnswerSheet(ctx, logger.L(ctx), SubmitAnswerSheetDTO{
-		IdempotencyKey:   "idem-1",
-		FillerID:         301,
-		TesteeID:         401,
-		OrgID:            501,
-		TaskID:           "task-1",
-		QuestionnaireCode:"QNR-1",
-		QuestionnaireVer: "1.0.0",
+		IdempotencyKey:    "idem-1",
+		FillerID:          301,
+		TesteeID:          401,
+		OrgID:             501,
+		TaskID:            "task-1",
+		QuestionnaireCode: "QNR-1",
+		QuestionnaireVer:  "1.0.0",
 	}, qnr, []domainAnswerSheet.Answer{answer})
 	if err != nil {
 		t.Fatalf("createAndSaveAnswerSheet() error = %v", err)
@@ -77,11 +77,11 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testin
 	svc := &submissionService{durableStore: store}
 	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
 	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
-		FillerID:         301,
-		TesteeID:         401,
-		OrgID:            501,
-		QuestionnaireCode:"QNR-1",
-		QuestionnaireVer: "1.0.0",
+		FillerID:          301,
+		TesteeID:          401,
+		OrgID:             501,
+		QuestionnaireCode: "QNR-1",
+		QuestionnaireVer:  "1.0.0",
 	}, qnr, mustAnswersForSubmissionTest(t))
 	if err != nil {
 		t.Fatalf("createAndSaveAnswerSheet() error = %v", err)

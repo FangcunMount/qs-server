@@ -9,9 +9,9 @@ import (
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestValidateCreateAssessmentFromAnswerSheetRequest(t *testing.T) {

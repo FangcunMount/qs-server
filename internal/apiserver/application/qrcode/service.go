@@ -11,8 +11,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
-	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 )
 
 const (
