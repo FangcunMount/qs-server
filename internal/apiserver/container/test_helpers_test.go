@@ -5,10 +5,8 @@ import (
 	"io"
 	"reflect"
 	"testing"
-	"time"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
@@ -141,33 +139,6 @@ func (*miniProgramTaskNotificationServiceStub) SendTaskOpened(context.Context, n
 		Skipped:   true,
 		Message:   "stub",
 	}, nil
-}
-
-type warmupCoordinatorStub struct{}
-
-func (*warmupCoordinatorStub) WarmStartup(context.Context) error { return nil }
-func (*warmupCoordinatorStub) HandleScalePublished(context.Context, string) error {
-	return nil
-}
-func (*warmupCoordinatorStub) HandleQuestionnairePublished(context.Context, string, string) error {
-	return nil
-}
-func (*warmupCoordinatorStub) HandleStatisticsSync(context.Context, int64) error {
-	return nil
-}
-func (*warmupCoordinatorStub) HandleRepairComplete(context.Context, cachegov.RepairCompleteRequest) error {
-	return nil
-}
-func (*warmupCoordinatorStub) HandleManualWarmup(context.Context, cachegov.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
-	return &cachegov.ManualWarmupResult{}, nil
-}
-func (*warmupCoordinatorStub) Snapshot() cachegov.WarmupStatusSnapshot {
-	return cachegov.WarmupStatusSnapshot{
-		Enabled: true,
-		LatestRuns: []cachegov.WarmupRunSnapshot{
-			{Trigger: "stub", StartedAt: time.Now(), FinishedAt: time.Now(), Result: "ok"},
-		},
-	}
 }
 
 var _ assembler.Module = (*fakeModule)(nil)
