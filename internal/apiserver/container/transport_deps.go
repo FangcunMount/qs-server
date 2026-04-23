@@ -1,0 +1,117 @@
+package container
+
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
+	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+)
+
+func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttransport.Deps {
+	deps := resttransport.Deps{RateLimit: rateCfg}
+	if c == nil {
+		return deps
+	}
+	deps.CodesService = c.CodesService
+	deps.QRCodeObjectStore = c.QRCodeObjectStore
+	deps.QRCodeObjectKeyPrefix = c.QRCodeObjectKeyPrefix
+	deps.GovernanceStatusService = c.CacheGovernanceStatusService()
+
+	if c.SurveyModule != nil {
+		if c.SurveyModule.Questionnaire != nil {
+			deps.Survey.QuestionnaireHandler = c.SurveyModule.Questionnaire.Handler
+		}
+		if c.SurveyModule.AnswerSheet != nil {
+			deps.Survey.AnswerSheetHandler = c.SurveyModule.AnswerSheet.Handler
+		}
+	}
+	if c.ScaleModule != nil {
+		deps.Scale.Handler = c.ScaleModule.Handler
+	}
+	if c.ActorModule != nil {
+		deps.Actor.TesteeHandler = c.ActorModule.TesteeHandler
+		deps.Actor.OperatorClinicianHandler = c.ActorModule.OperatorClinicianHandler
+		deps.Actor.AssessmentEntryHandler = c.ActorModule.AssessmentEntryHandler
+		deps.Actor.ActiveOperatorRepo = c.ActorModule.OperatorRepo
+		deps.Actor.OperatorRoleProjectionUpdater = c.ActorModule.OperatorRoleProjectionUpdater
+	}
+	if c.EvaluationModule != nil {
+		deps.Evaluation.Handler = c.EvaluationModule.Handler
+	}
+	if c.PlanModule != nil {
+		deps.Plan.Handler = c.PlanModule.Handler
+	}
+	if c.StatisticsModule != nil {
+		deps.Statistics.Handler = c.StatisticsModule.Handler
+	}
+	if c.IAMModule != nil {
+		deps.IAM.Enabled = c.IAMModule.IsEnabled()
+		deps.IAM.TokenVerifier = c.IAMModule.SDKTokenVerifier()
+		deps.IAM.SnapshotLoader = c.IAMModule.AuthzSnapshotLoader()
+		if client := c.IAMModule.Client(); client != nil && client.Config() != nil && client.Config().JWT != nil {
+			deps.IAM.ForceRemoteVerification = client.Config().JWT.ForceRemoteVerification
+		}
+	}
+
+	return deps
+}
+
+func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
+	deps := grpctransport.Deps{Server: server}
+	if c == nil {
+		return deps
+	}
+	deps.WarmupCoordinator = c.WarmupCoordinator()
+	deps.QRCodeService = c.QRCodeService
+	deps.MiniProgramTaskNotificationService = c.MiniProgramTaskNotificationService
+
+	if c.SurveyModule != nil {
+		if c.SurveyModule.AnswerSheet != nil {
+			deps.Survey.AnswerSheetSubmissionService = c.SurveyModule.AnswerSheet.SubmissionService
+			deps.Survey.AnswerSheetManagementService = c.SurveyModule.AnswerSheet.ManagementService
+			deps.Survey.AnswerSheetScoringService = c.SurveyModule.AnswerSheet.ScoringService
+		}
+		if c.SurveyModule.Questionnaire != nil {
+			deps.Survey.QuestionnaireQueryService = c.SurveyModule.Questionnaire.QueryService
+			deps.Scale.QuestionnaireQueryService = c.SurveyModule.Questionnaire.QueryService
+		}
+	}
+	if c.ActorModule != nil {
+		deps.Actor.TesteeRegistrationService = c.ActorModule.TesteeRegistrationService
+		deps.Actor.TesteeManagementService = c.ActorModule.TesteeManagementService
+		deps.Actor.TesteeQueryService = c.ActorModule.TesteeQueryService
+		deps.Actor.ClinicianRelationshipService = c.ActorModule.ClinicianRelationshipService
+		deps.Actor.AssessmentEntryRepo = c.ActorModule.AssessmentEntryRepo
+		deps.Actor.TesteeRepo = c.ActorModule.TesteeRepo
+		deps.Actor.TesteeTaggingService = c.ActorModule.TesteeTaggingService
+		deps.Actor.OperatorLifecycleService = c.ActorModule.OperatorLifecycleService
+		deps.Actor.OperatorAuthorizationService = c.ActorModule.OperatorAuthorizationService
+		deps.Actor.OperatorQueryService = c.ActorModule.OperatorQueryService
+		deps.Actor.OperatorRepo = c.ActorModule.OperatorRepo
+	}
+	if c.EvaluationModule != nil {
+		deps.Evaluation.SubmissionService = c.EvaluationModule.SubmissionService
+		deps.Evaluation.ManagementService = c.EvaluationModule.ManagementService
+		deps.Evaluation.ReportQueryService = c.EvaluationModule.ReportQueryService
+		deps.Evaluation.ScoreQueryService = c.EvaluationModule.ScoreQueryService
+		deps.Evaluation.EvaluationService = c.EvaluationModule.EvaluationService
+		deps.Evaluation.AssessmentRepo = c.EvaluationModule.AssessmentRepo
+	}
+	if c.ScaleModule != nil {
+		deps.Scale.QueryService = c.ScaleModule.QueryService
+		deps.Scale.CategoryService = c.ScaleModule.CategoryService
+		deps.Scale.Repo = c.ScaleModule.Repo
+	}
+	if c.PlanModule != nil {
+		deps.Plan.CommandService = c.PlanModule.CommandService
+		deps.Plan.TaskRepo = c.PlanModule.TaskRepo
+	}
+	if c.StatisticsModule != nil {
+		deps.Statistics.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService
+	}
+	if c.IAMModule != nil {
+		deps.IAM.AuthzSnapshotLoader = c.IAMModule.AuthzSnapshotLoader()
+	}
+
+	return deps
+}

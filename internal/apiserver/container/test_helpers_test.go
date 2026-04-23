@@ -5,9 +5,13 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"time"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
@@ -115,7 +119,60 @@ func (*subscribeSenderStub) ListTemplates(context.Context, string, string) ([]we
 	return nil, nil
 }
 
+type qrCodeServiceStub struct{}
+
+func (*qrCodeServiceStub) GenerateQuestionnaireQRCode(context.Context, string, string) (string, error) {
+	return "", nil
+}
+
+func (*qrCodeServiceStub) GenerateScaleQRCode(context.Context, string) (string, error) {
+	return "", nil
+}
+
+func (*qrCodeServiceStub) GenerateAssessmentEntryQRCode(context.Context, string) (string, error) {
+	return "", nil
+}
+
+type miniProgramTaskNotificationServiceStub struct{}
+
+func (*miniProgramTaskNotificationServiceStub) SendTaskOpened(context.Context, notificationApp.TaskOpenedDTO) (*notificationApp.TaskOpenedResult, error) {
+	return &notificationApp.TaskOpenedResult{
+		SentCount: 0,
+		Skipped:   true,
+		Message:   "stub",
+	}, nil
+}
+
+type warmupCoordinatorStub struct{}
+
+func (*warmupCoordinatorStub) WarmStartup(context.Context) error { return nil }
+func (*warmupCoordinatorStub) HandleScalePublished(context.Context, string) error {
+	return nil
+}
+func (*warmupCoordinatorStub) HandleQuestionnairePublished(context.Context, string, string) error {
+	return nil
+}
+func (*warmupCoordinatorStub) HandleStatisticsSync(context.Context, int64) error {
+	return nil
+}
+func (*warmupCoordinatorStub) HandleRepairComplete(context.Context, cachegov.RepairCompleteRequest) error {
+	return nil
+}
+func (*warmupCoordinatorStub) HandleManualWarmup(context.Context, cachegov.ManualWarmupRequest) (*cachegov.ManualWarmupResult, error) {
+	return &cachegov.ManualWarmupResult{}, nil
+}
+func (*warmupCoordinatorStub) Snapshot() cachegov.WarmupStatusSnapshot {
+	return cachegov.WarmupStatusSnapshot{
+		Enabled: true,
+		LatestRuns: []cachegov.WarmupRunSnapshot{
+			{Trigger: "stub", StartedAt: time.Now(), FinishedAt: time.Now(), Result: "ok"},
+		},
+	}
+}
+
 var _ assembler.Module = (*fakeModule)(nil)
 var _ codesapp.CodesService = (*codesServiceStub)(nil)
 var _ wechatPort.QRCodeGenerator = (*qrCodeGeneratorStub)(nil)
 var _ wechatPort.MiniProgramSubscribeSender = (*subscribeSenderStub)(nil)
+var _ qrcodeApp.QRCodeService = (*qrCodeServiceStub)(nil)
+var _ notificationApp.MiniProgramTaskNotificationService = (*miniProgramTaskNotificationServiceStub)(nil)

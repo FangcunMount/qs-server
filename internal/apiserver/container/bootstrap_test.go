@@ -4,7 +4,13 @@ import (
 	"context"
 	"testing"
 
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -206,5 +212,108 @@ func TestContainerInitMiniProgramTaskNotificationServiceSkipsWithoutTemplateID(t
 
 	if c.MiniProgramTaskNotificationService != nil {
 		t.Fatalf("MiniProgramTaskNotificationService = %#v, want nil when template id is missing", c.MiniProgramTaskNotificationService)
+	}
+}
+
+func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
+	t.Parallel()
+
+	c := NewContainer(nil, nil, nil)
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
+	c.cache.BindGovernance(cachebootstrap.GovernanceBindings{})
+	c.CodesService = &codesServiceStub{}
+	c.QRCodeObjectKeyPrefix = "rest-prefix"
+
+	questionnaireHandler := handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil)
+	answerSheetHandler := handlerpkg.NewAnswerSheetHandler(nil, nil)
+	scaleHandler := handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil)
+	testeeHandler := handlerpkg.NewTesteeHandler(nil, nil, nil, nil, nil, nil, nil, nil)
+	operatorClinicianHandler := handlerpkg.NewOperatorClinicianHandler(nil, nil, nil, nil, nil, nil, nil, nil)
+	assessmentEntryHandler := handlerpkg.NewAssessmentEntryHandler(nil, nil, nil, nil)
+	evaluationHandler := handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
+	planHandler := handlerpkg.NewPlanHandler(nil, nil)
+	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
+
+	c.SurveyModule = &assembler.SurveyModule{
+		Questionnaire: &assembler.QuestionnaireSubModule{Handler: questionnaireHandler},
+		AnswerSheet:   &assembler.AnswerSheetSubModule{Handler: answerSheetHandler},
+	}
+	c.ScaleModule = &assembler.ScaleModule{Handler: scaleHandler}
+	c.ActorModule = &assembler.ActorModule{
+		TesteeHandler:            testeeHandler,
+		OperatorClinicianHandler: operatorClinicianHandler,
+		AssessmentEntryHandler:   assessmentEntryHandler,
+	}
+	c.EvaluationModule = &assembler.EvaluationModule{Handler: evaluationHandler}
+	c.PlanModule = &assembler.PlanModule{Handler: planHandler}
+	c.StatisticsModule = &assembler.StatisticsModule{Handler: statisticsHandler}
+
+	deps := c.BuildRESTDeps(nil)
+	if deps.RateLimit != nil {
+		t.Fatalf("RateLimit = %#v, want nil passthrough before router defaulting", deps.RateLimit)
+	}
+	if deps.Survey.QuestionnaireHandler != questionnaireHandler || deps.Survey.AnswerSheetHandler != answerSheetHandler {
+		t.Fatalf("survey handlers not extracted correctly: %#v", deps.Survey)
+	}
+	if deps.Scale.Handler != scaleHandler || deps.Actor.TesteeHandler != testeeHandler || deps.Actor.OperatorClinicianHandler != operatorClinicianHandler || deps.Actor.AssessmentEntryHandler != assessmentEntryHandler {
+		t.Fatalf("actor/scale handlers not extracted correctly: %#v %#v", deps.Scale, deps.Actor)
+	}
+	if deps.Evaluation.Handler != evaluationHandler || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
+		t.Fatalf("evaluation/plan/statistics handlers not extracted correctly")
+	}
+	if deps.CodesService != c.CodesService {
+		t.Fatalf("CodesService = %#v, want %#v", deps.CodesService, c.CodesService)
+	}
+	if deps.GovernanceStatusService != c.CacheGovernanceStatusService() {
+		t.Fatalf("GovernanceStatusService = %#v, want %#v", deps.GovernanceStatusService, c.CacheGovernanceStatusService())
+	}
+	if deps.QRCodeObjectKeyPrefix != "rest-prefix" {
+		t.Fatalf("QRCodeObjectKeyPrefix = %q, want rest-prefix", deps.QRCodeObjectKeyPrefix)
+	}
+}
+
+func TestContainerBuildGRPCDepsExposesTransportSpecificDependencies(t *testing.T) {
+	t.Parallel()
+
+	c := NewContainer(nil, nil, nil)
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, nil)
+	c.cache.BindGovernance(cachebootstrap.GovernanceBindings{})
+	c.QRCodeService = &qrCodeServiceStub{}
+	c.MiniProgramTaskNotificationService = &miniProgramTaskNotificationServiceStub{}
+	authzSnapshot := &iaminfra.AuthzSnapshotLoader{}
+	c.IAMModule = &IAMModule{authzSnapshotLoader: authzSnapshot}
+
+	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil)
+	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil)
+	categoryService := scaleApp.NewCategoryService()
+	c.SurveyModule = &assembler.SurveyModule{
+		Questionnaire: &assembler.QuestionnaireSubModule{QueryService: questionnaireQuery},
+	}
+	c.ScaleModule = &assembler.ScaleModule{
+		QueryService:    scaleQuery,
+		CategoryService: categoryService,
+	}
+
+	deps := c.BuildGRPCDeps(nil)
+	if deps.Server != nil {
+		t.Fatalf("Server = %#v, want nil passthrough", deps.Server)
+	}
+	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
+		t.Fatalf("Survey.QuestionnaireQueryService = %#v, want %#v", deps.Survey.QuestionnaireQueryService, questionnaireQuery)
+	}
+	if deps.Scale.QuestionnaireQueryService != questionnaireQuery {
+		t.Fatalf("Scale.QuestionnaireQueryService = %#v, want %#v", deps.Scale.QuestionnaireQueryService, questionnaireQuery)
+	}
+	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
+		t.Fatalf("scale deps not extracted correctly: %#v", deps.Scale)
+	}
+	if deps.WarmupCoordinator != c.WarmupCoordinator() {
+		t.Fatalf("WarmupCoordinator = %#v, want %#v", deps.WarmupCoordinator, c.WarmupCoordinator())
+	}
+	if deps.QRCodeService != c.QRCodeService || deps.MiniProgramTaskNotificationService != c.MiniProgramTaskNotificationService {
+		t.Fatalf("shared app services not extracted correctly")
+	}
+	if deps.IAM.AuthzSnapshotLoader != authzSnapshot {
+		t.Fatalf("AuthzSnapshotLoader = %#v, want %#v", deps.IAM.AuthzSnapshotLoader, authzSnapshot)
 	}
 }

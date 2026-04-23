@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由。
 func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
-	quesHandler := r.container.SurveyModule.Questionnaire.Handler
+	quesHandler := r.deps.Survey.QuestionnaireHandler
 	if quesHandler == nil {
 		return
 	}
@@ -26,7 +26,7 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 // registerAnswersheetProtectedRoutes 注册答卷相关的受保护路由。
 func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
-	answersheetHandler := r.container.SurveyModule.AnswerSheet.Handler
+	answersheetHandler := r.deps.Survey.AnswerSheetHandler
 	if answersheetHandler == nil {
 		return
 	}

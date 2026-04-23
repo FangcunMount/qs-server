@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,7 +36,7 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(newRouterTestContainer(), nil)
+	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 
 	routes := engine.Routes()
@@ -62,7 +63,7 @@ func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(newRouterTestContainer(), nil)
+	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clinicians", nil)
@@ -89,7 +90,7 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 		})
 		c.Next()
 	})
-	router := NewRouter(newRouterTestContainer(), nil)
+	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clinicians", nil)

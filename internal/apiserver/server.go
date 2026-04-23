@@ -20,6 +20,8 @@ import (
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	runtimescheduler "github.com/FangcunMount/qs-server/internal/apiserver/runtime/scheduler"
+	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
+	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
@@ -351,8 +353,8 @@ func (s *apiServer) initializeTransports() error {
 	if err != nil {
 		return err
 	}
-	NewRouter(s.container, s.config.RateLimit).RegisterRoutes(s.genericAPIServer.Engine)
-	return NewGRPCRegistry(s.grpcServer, s.container).RegisterServices()
+	resttransport.NewRouter(s.container.BuildRESTDeps(s.config.RateLimit)).RegisterRoutes(s.genericAPIServer.Engine)
+	return grpctransport.NewRegistry(s.container.BuildGRPCDeps(s.grpcServer)).RegisterServices()
 }
 
 func (s *apiServer) logInitialization(hasMongo bool) {

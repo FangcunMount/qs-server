@@ -1,21 +1,28 @@
-package apiserver
+package rest
 
 import (
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
-// Router 集中的路由管理器
+// Router 集中的路由管理器。
 type Router struct {
-	container *container.Container
-	rateCfg   *options.RateLimitOptions
+	deps    Deps
+	rateCfg *options.RateLimitOptions
 }
 
 type routeSpec struct {
@@ -24,19 +31,73 @@ type routeSpec struct {
 	handlers []gin.HandlerFunc
 }
 
-// NewRouter 创建路由管理器
-func NewRouter(c *container.Container, rateCfg *options.RateLimitOptions) *Router {
+type Deps struct {
+	RateLimit *options.RateLimitOptions
+
+	Survey     SurveyDeps
+	Scale      ScaleDeps
+	Actor      ActorDeps
+	Evaluation EvaluationDeps
+	Plan       PlanDeps
+	Statistics StatisticsDeps
+
+	CodesService            codesapp.CodesService
+	QRCodeObjectStore       objectstorageport.PublicObjectStore
+	QRCodeObjectKeyPrefix   string
+	GovernanceStatusService cachegov.StatusService
+	IAM                     IAMDeps
+}
+
+type SurveyDeps struct {
+	QuestionnaireHandler *handler.QuestionnaireHandler
+	AnswerSheetHandler   *handler.AnswerSheetHandler
+}
+
+type ScaleDeps struct {
+	Handler *handler.ScaleHandler
+}
+
+type ActorDeps struct {
+	TesteeHandler                 *handler.TesteeHandler
+	OperatorClinicianHandler      *handler.OperatorClinicianHandler
+	AssessmentEntryHandler        *handler.AssessmentEntryHandler
+	ActiveOperatorRepo            domainoperator.Repository
+	OperatorRoleProjectionUpdater operatorapp.OperatorRoleProjectionUpdater
+}
+
+type EvaluationDeps struct {
+	Handler *handler.EvaluationHandler
+}
+
+type PlanDeps struct {
+	Handler *handler.PlanHandler
+}
+
+type StatisticsDeps struct {
+	Handler *handler.StatisticsHandler
+}
+
+type IAMDeps struct {
+	Enabled                 bool
+	TokenVerifier           *auth.TokenVerifier
+	ForceRemoteVerification bool
+	SnapshotLoader          *iaminfra.AuthzSnapshotLoader
+}
+
+// NewRouter 创建路由管理器。
+func NewRouter(deps Deps) *Router {
+	rateCfg := deps.RateLimit
 	if rateCfg == nil {
 		rateCfg = options.NewRateLimitOptions()
 	}
 
 	return &Router{
-		container: c,
-		rateCfg:   rateCfg,
+		deps:    deps,
+		rateCfg: rateCfg,
 	}
 }
 
-// RegisterRoutes 注册所有路由
+// RegisterRoutes 注册所有路由。
 func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	engine.Static("/api/rest", "./api/rest")
 	engine.Static("/swagger-ui", "./web/swagger-ui/swagger-ui-dist")
@@ -103,7 +164,7 @@ func (r *Router) unsupportedFeature(c *gin.Context) {
 	})
 }
 
-// healthCheck 健康检查处理函数
+// healthCheck 健康检查处理函数。
 func (r *Router) healthCheck(c *gin.Context) {
 	response := gin.H{
 		"status":       "healthy",
@@ -123,7 +184,7 @@ func (r *Router) healthCheck(c *gin.Context) {
 	c.JSON(200, response)
 }
 
-// ping 简单的连通性测试
+// ping 简单的连通性测试。
 func (r *Router) ping(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
@@ -153,8 +214,8 @@ func (r *Router) redisGovernance(c *gin.Context) {
 }
 
 func (r *Router) runtimeSnapshot(c *gin.Context) cacheobservability.RuntimeSnapshot {
-	if r != nil && r.container != nil && r.container.CacheGovernanceStatusService() != nil {
-		snapshot, err := r.container.CacheGovernanceStatusService().GetRuntime(c.Request.Context())
+	if r != nil && r.deps.GovernanceStatusService != nil {
+		snapshot, err := r.deps.GovernanceStatusService.GetRuntime(c.Request.Context())
 		if err == nil && snapshot != nil {
 			return *snapshot
 		}

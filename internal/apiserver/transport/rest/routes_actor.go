@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
@@ -6,23 +6,19 @@ import (
 )
 
 func (r *Router) registerActorPublicRoutes(publicAPI *gin.RouterGroup) {
-	if r.container == nil || r.container.ActorModule == nil || r.container.ActorModule.AssessmentEntryHandler == nil {
+	if r.deps.Actor.AssessmentEntryHandler == nil {
 		return
 	}
 
-	publicAPI.GET("/assessment-entries/:token", r.container.ActorModule.AssessmentEntryHandler.ResolveAssessmentEntry)
-	publicAPI.POST("/assessment-entries/:token/intake", r.container.ActorModule.AssessmentEntryHandler.IntakeAssessmentEntry)
+	publicAPI.GET("/assessment-entries/:token", r.deps.Actor.AssessmentEntryHandler.ResolveAssessmentEntry)
+	publicAPI.POST("/assessment-entries/:token/intake", r.deps.Actor.AssessmentEntryHandler.IntakeAssessmentEntry)
 }
 
 // registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由。
 func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
-	module := r.container.ActorModule
-	if module == nil {
-		return
-	}
-	testeeHandler := module.TesteeHandler
-	operatorClinicianHandler := module.OperatorClinicianHandler
-	assessmentEntryHandler := module.AssessmentEntryHandler
+	testeeHandler := r.deps.Actor.TesteeHandler
+	operatorClinicianHandler := r.deps.Actor.OperatorClinicianHandler
+	assessmentEntryHandler := r.deps.Actor.AssessmentEntryHandler
 	if testeeHandler == nil && operatorClinicianHandler == nil && assessmentEntryHandler == nil {
 		return
 	}
@@ -248,7 +244,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			operatorClinicianHandler.ListClinicianRelations,
 		)...)
-		if assessmentEntryHandler := module.AssessmentEntryHandler; assessmentEntryHandler != nil {
+		if assessmentEntryHandler := r.deps.Actor.AssessmentEntryHandler; assessmentEntryHandler != nil {
 			me.POST("/assessment-entries", r.rateLimitedHandlers(
 				r.rateCfg,
 				r.rateCfg.SubmitGlobalQPS,
@@ -368,7 +364,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 		}
 	}
 
-	if assessmentEntryHandler := module.AssessmentEntryHandler; assessmentEntryHandler != nil {
+	if assessmentEntryHandler := r.deps.Actor.AssessmentEntryHandler; assessmentEntryHandler != nil {
 		assessmentEntries := apiV1.Group("/assessment-entries", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		{
 			assessmentEntries.GET("/:id", r.rateLimitedHandlers(

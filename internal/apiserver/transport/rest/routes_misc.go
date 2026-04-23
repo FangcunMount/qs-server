@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -14,11 +14,11 @@ func (r *Router) registerUserProtectedRoutes(_ *gin.RouterGroup) {
 
 // registerCodesRoutes 注册 codes 申请路由。
 func (r *Router) registerCodesRoutes(apiV1 *gin.RouterGroup) {
-	if r.container == nil || r.container.CodesService == nil {
+	if r.deps.CodesService == nil {
 		return
 	}
 
-	handler := codesHandler.NewCodesHandler(r.container.CodesService)
+	handler := codesHandler.NewCodesHandler(r.deps.CodesService)
 	codes := apiV1.Group("/codes", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	codes.POST("/apply", handler.Apply)
 }

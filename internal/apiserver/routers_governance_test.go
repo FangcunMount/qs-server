@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/gin-gonic/gin"
@@ -33,11 +34,11 @@ func TestRouterReadyzReturnsServiceUnavailableWhenRuntimeNotReady(t *testing.T) 
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(newGovernanceTestContainer(
+	router := resttransport.NewRouter(newGovernanceTestContainer(
 		cacheobservability.FamilyStatus{Component: "apiserver", Family: "query_result", Available: true},
 		cacheobservability.FamilyStatus{Component: "apiserver", Family: "static_meta", Available: false, Degraded: true},
-	), nil)
-	router.registerPublicRoutes(engine)
+	).BuildRESTDeps(nil))
+	router.RegisterRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
@@ -74,10 +75,10 @@ func TestRouterGovernanceEndpointReturnsRuntimeSnapshotOnly(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(newGovernanceTestContainer(
+	router := resttransport.NewRouter(newGovernanceTestContainer(
 		cacheobservability.FamilyStatus{Component: "apiserver", Family: "query_result", Profile: "query_cache", Available: true},
-	), nil)
-	router.registerPublicRoutes(engine)
+	).BuildRESTDeps(nil))
+	router.RegisterRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/governance/redis", nil)
 	rec := httptest.NewRecorder()
@@ -107,8 +108,8 @@ func TestRouterGovernanceEndpointsRemainPublicWhenGovernanceServiceUnavailable(t
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(&container.Container{}, nil)
-	router.registerPublicRoutes(engine)
+	router := resttransport.NewRouter((&container.Container{}).BuildRESTDeps(nil))
+	router.RegisterRoutes(engine)
 
 	for _, path := range []string{"/readyz", "/governance/redis"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)

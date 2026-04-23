@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
@@ -7,7 +7,7 @@ import (
 
 // registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由。
 func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
-	evalHandler := r.container.EvaluationModule.Handler
+	evalHandler := r.deps.Evaluation.Handler
 	if evalHandler == nil {
 		return
 	}

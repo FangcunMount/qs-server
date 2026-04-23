@@ -1,11 +1,10 @@
-package apiserver
+package rest
 
 import (
 	"fmt"
 	"net/http"
 
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
-	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
@@ -64,15 +63,10 @@ func (registrar publicRouteRegistrar) register(engine *gin.Engine) {
 	}
 
 	objectKeyPrefix := "qrcode"
-	var qrcodeHandler *codesHandler.QRCodeHandler
-	if r.container != nil && r.container.QRCodeObjectKeyPrefix != "" {
-		objectKeyPrefix = r.container.QRCodeObjectKeyPrefix
+	if r.deps.QRCodeObjectKeyPrefix != "" {
+		objectKeyPrefix = r.deps.QRCodeObjectKeyPrefix
 	}
-	if r.container != nil {
-		qrcodeHandler = codesHandler.NewQRCodeHandler(r.container.QRCodeObjectStore, objectKeyPrefix)
-	} else {
-		qrcodeHandler = codesHandler.NewQRCodeHandler(nil, objectKeyPrefix)
-	}
+	qrcodeHandler := codesHandler.NewQRCodeHandler(r.deps.QRCodeObjectStore, objectKeyPrefix)
 	engine.GET("/api/v1/qrcodes/:filename", qrcodeHandler.GetQRCodeImage)
 }
 
@@ -105,23 +99,19 @@ func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
 
 func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, routePrefix string) {
 	r := composer.router
-	if r.container.IAMModule != nil && r.container.IAMModule.IsEnabled() {
-		tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
+	if r.deps.IAM.Enabled {
+		tokenVerifier := r.deps.IAM.TokenVerifier
 		if tokenVerifier != nil {
 			verifyOpts := r.iamVerifyOptions()
 			group.Use(middleware.JWTAuthMiddlewareWithOptions(tokenVerifier, verifyOpts))
 			group.Use(restmiddleware.UserIdentityMiddleware())
 			group.Use(restmiddleware.RequireTenantIDMiddleware())
 			group.Use(restmiddleware.RequireNumericOrgScopeMiddleware())
-			if r.container.ActorModule != nil && r.container.ActorModule.OperatorRepo != nil {
-				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.container.ActorModule.OperatorRepo))
+			if r.deps.Actor.ActiveOperatorRepo != nil {
+				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.deps.Actor.ActiveOperatorRepo))
 			}
-			if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
-				var updater operatorapp.OperatorRoleProjectionUpdater
-				if r.container.ActorModule != nil {
-					updater = r.container.ActorModule.OperatorRoleProjectionUpdater
-				}
-				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, updater))
+			if loader := r.deps.IAM.SnapshotLoader; loader != nil {
+				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, r.deps.Actor.OperatorRoleProjectionUpdater))
 			} else {
 				fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable (need gRPC); authorization snapshot disabled for %s\n", routePrefix)
 			}
@@ -152,15 +142,8 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 }
 
 func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
-	if r == nil || r.container == nil || r.container.IAMModule == nil || r.container.IAMModule.Client() == nil {
-		return &auth.VerifyOptions{IncludeMetadata: true}
-	}
-	cfg := r.container.IAMModule.Client().Config()
-	if cfg == nil || cfg.JWT == nil {
-		return &auth.VerifyOptions{IncludeMetadata: true}
-	}
 	return &auth.VerifyOptions{
-		ForceRemote:     cfg.JWT.ForceRemoteVerification,
+		ForceRemote:     r != nil && r.deps.IAM.ForceRemoteVerification,
 		IncludeMetadata: true,
 	}
 }

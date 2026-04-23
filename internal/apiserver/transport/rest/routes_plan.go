@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
@@ -7,7 +7,7 @@ import (
 
 // registerPlanProtectedRoutes 注册 Plan 模块相关的受保护路由。
 func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
-	planHandler := r.container.PlanModule.Handler
+	planHandler := r.deps.Plan.Handler
 	if planHandler == nil {
 		return
 	}
@@ -166,7 +166,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 }
 
 func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
-	planHandler := r.container.PlanModule.Handler
+	planHandler := r.deps.Plan.Handler
 	if planHandler == nil {
 		return
 	}

@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 
 // registerScaleProtectedRoutes 注册量表相关的受保护路由。
 func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
-	scaleHandler := r.container.ScaleModule.Handler
+	scaleHandler := r.deps.Scale.Handler
 	if scaleHandler == nil {
 		return
 	}

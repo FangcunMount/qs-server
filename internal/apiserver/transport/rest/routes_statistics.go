@@ -1,4 +1,4 @@
-package apiserver
+package rest
 
 import (
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
@@ -7,8 +7,8 @@ import (
 
 // registerStatisticsProtectedRoutes 注册 Statistics 模块相关的受保护路由。
 func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
-	statisticsModule := r.container.StatisticsModule
-	if statisticsModule == nil || statisticsModule.Handler == nil {
+	statisticsHandler := r.deps.Statistics.Handler
+	if statisticsHandler == nil {
 		return
 	}
 
@@ -21,7 +21,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetOverview,
+			statisticsHandler.GetOverview,
 		)...)
 		adminStatistics.GET("/clinicians", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -29,7 +29,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.ListClinicianStatistics,
+			statisticsHandler.ListClinicianStatistics,
 		)...)
 		adminStatistics.GET("/clinicians/:id", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -37,7 +37,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetClinicianStatistics,
+			statisticsHandler.GetClinicianStatistics,
 		)...)
 		adminStatistics.GET("/entries", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -45,7 +45,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.ListAssessmentEntryStatistics,
+			statisticsHandler.ListAssessmentEntryStatistics,
 		)...)
 		adminStatistics.GET("/entries/:id", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -53,7 +53,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetAssessmentEntryStatistics,
+			statisticsHandler.GetAssessmentEntryStatistics,
 		)...)
 		adminStatistics.GET("/system", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -61,7 +61,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetSystemStatistics,
+			statisticsHandler.GetSystemStatistics,
 		)...)
 		adminStatistics.GET("/questionnaires/:code", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -69,7 +69,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetQuestionnaireStatistics,
+			statisticsHandler.GetQuestionnaireStatistics,
 		)...)
 		statistics.GET("/testees/:testee_id", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -77,7 +77,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetTesteeStatistics,
+			statisticsHandler.GetTesteeStatistics,
 		)...)
 		statistics.GET("/testees/:testee_id/periodic", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -85,7 +85,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetTesteePeriodicStatistics,
+			statisticsHandler.GetTesteePeriodicStatistics,
 		)...)
 		adminStatistics.GET("/plans/:plan_id", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -93,7 +93,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetPlanStatistics,
+			statisticsHandler.GetPlanStatistics,
 		)...)
 		clinicianStatistics := statistics.Group("/clinicians/me")
 		clinicianStatistics.GET("/overview", r.rateLimitedHandlers(
@@ -102,7 +102,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetCurrentClinicianOverview,
+			statisticsHandler.GetCurrentClinicianOverview,
 		)...)
 		clinicianStatistics.GET("/entries", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -110,7 +110,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.ListCurrentClinicianEntryStatistics,
+			statisticsHandler.ListCurrentClinicianEntryStatistics,
 		)...)
 		clinicianStatistics.GET("/testees-summary", r.rateLimitedHandlers(
 			r.rateCfg,
@@ -118,7 +118,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryGlobalBurst,
 			r.rateCfg.QueryUserQPS,
 			r.rateCfg.QueryUserBurst,
-			statisticsModule.Handler.GetCurrentClinicianTesteeSummary,
+			statisticsHandler.GetCurrentClinicianTesteeSummary,
 		)...)
 		contentStatistics := statistics.Group("", restmiddleware.RequireAnyCapabilityMiddleware(
 			restmiddleware.CapabilityManageQuestionnaires,
@@ -130,14 +130,14 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.SubmitGlobalBurst,
 			r.rateCfg.SubmitUserQPS,
 			r.rateCfg.SubmitUserBurst,
-			statisticsModule.Handler.BatchQuestionnaireStatistics,
+			statisticsHandler.BatchQuestionnaireStatistics,
 		)...)
 	}
 }
 
 func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
-	statisticsModule := r.container.StatisticsModule
-	if statisticsModule == nil || statisticsModule.Handler == nil {
+	statisticsHandler := r.deps.Statistics.Handler
+	if statisticsHandler == nil {
 		return
 	}
 
@@ -149,7 +149,7 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitGlobalBurst,
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
-		statisticsModule.Handler.SyncDailyStatistics,
+		statisticsHandler.SyncDailyStatistics,
 	)...)
 	sync.POST("/accumulated", r.rateLimitedHandlers(
 		r.rateCfg,
@@ -157,7 +157,7 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitGlobalBurst,
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
-		statisticsModule.Handler.SyncAccumulatedStatistics,
+		statisticsHandler.SyncAccumulatedStatistics,
 	)...)
 	sync.POST("/plan", r.rateLimitedHandlers(
 		r.rateCfg,
@@ -165,13 +165,13 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitGlobalBurst,
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
-		statisticsModule.Handler.SyncPlanStatistics,
+		statisticsHandler.SyncPlanStatistics,
 	)...)
 }
 
 func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGroup) {
-	statisticsModule := r.container.StatisticsModule
-	if statisticsModule == nil || statisticsModule.Handler == nil {
+	statisticsHandler := r.deps.Statistics.Handler
+	if statisticsHandler == nil {
 		return
 	}
 
@@ -182,7 +182,7 @@ func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGro
 		r.rateCfg.SubmitGlobalBurst,
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
-		statisticsModule.Handler.RepairComplete,
+		statisticsHandler.RepairComplete,
 	)...)
 	governance.POST("/warmup-targets", r.rateLimitedHandlers(
 		r.rateCfg,
@@ -190,7 +190,7 @@ func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGro
 		r.rateCfg.SubmitGlobalBurst,
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
-		statisticsModule.Handler.WarmupTargets,
+		statisticsHandler.WarmupTargets,
 	)...)
 	governance.GET("/status", r.rateLimitedHandlers(
 		r.rateCfg,
@@ -198,7 +198,7 @@ func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGro
 		r.rateCfg.QueryGlobalBurst,
 		r.rateCfg.QueryUserQPS,
 		r.rateCfg.QueryUserBurst,
-		statisticsModule.Handler.CacheGovernanceStatus,
+		statisticsHandler.CacheGovernanceStatus,
 	)...)
 	governance.GET("/hotset", r.rateLimitedHandlers(
 		r.rateCfg,
@@ -206,6 +206,6 @@ func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGro
 		r.rateCfg.QueryGlobalBurst,
 		r.rateCfg.QueryUserQPS,
 		r.rateCfg.QueryUserBurst,
-		statisticsModule.Handler.CacheGovernanceHotset,
+		statisticsHandler.CacheGovernanceHotset,
 	)...)
 }
