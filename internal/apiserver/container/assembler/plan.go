@@ -50,6 +50,7 @@ type planModuleDeps struct {
 	cacheBuilder   *rediskey.Builder
 	planPolicy     cachepolicy.CachePolicy
 	entryBaseURL   string
+	observer       *planCache.Observer
 }
 
 // NewPlanModule 创建 Plan 模块
@@ -78,7 +79,7 @@ func (m *PlanModule) Initialize(params ...interface{}) error {
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if deps.redisClient != nil {
-		m.PlanRepo = planCache.NewCachedPlanRepositoryWithBuilderAndPolicy(basePlanRepo, deps.redisClient, deps.cacheBuilder, deps.planPolicy)
+		m.PlanRepo = planCache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, deps.redisClient, deps.cacheBuilder, deps.planPolicy, deps.observer)
 	} else {
 		m.PlanRepo = basePlanRepo
 	}
@@ -155,6 +156,9 @@ func parsePlanModuleDeps(params []interface{}) (*planModuleDeps, error) {
 		if strings.TrimSpace(baseURL) != "" {
 			deps.entryBaseURL = strings.TrimSpace(baseURL)
 		}
+	})
+	applyOptionalParam(params, 7, func(observer *planCache.Observer) {
+		deps.observer = observer
 	})
 	return deps, nil
 }

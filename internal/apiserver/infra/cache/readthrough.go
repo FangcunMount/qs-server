@@ -13,6 +13,7 @@ type ReadThroughOptions[T any] struct {
 	PolicyKey         cachepolicy.CachePolicyKey
 	CacheKey          string
 	Policy            cachepolicy.CachePolicy
+	Observer          *Observer
 	GetCached         func(context.Context) (*T, error)
 	Load              func(context.Context) (*T, error)
 	SetCached         func(context.Context, *T) error
@@ -26,6 +27,7 @@ func readByIDWithCache[T any](
 	policyKey cachepolicy.CachePolicyKey,
 	cacheKey string,
 	policy cachepolicy.CachePolicy,
+	observer *Observer,
 	getCached func(context.Context) (*T, error),
 	load func(context.Context) (*T, error),
 	setCached func(context.Context, *T) error,
@@ -34,6 +36,7 @@ func readByIDWithCache[T any](
 		PolicyKey: policyKey,
 		CacheKey:  cacheKey,
 		Policy:    policy,
+		Observer:  observer,
 		GetCached: getCached,
 		Load:      load,
 		SetCached: setCached,
@@ -54,14 +57,14 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 		cacheobservability.ObserveCacheOperationDuration(family, policy, "get", time.Since(start))
 		if err == nil {
 			cacheobservability.ObserveCacheGet(family, policy, "hit")
-			cacheobservability.ObserveFamilySuccess("apiserver", family)
+			opts.Observer.ObserveFamilySuccess(family)
 			return cached, nil
 		}
 		if err != ErrCacheNotFound {
 			cacheobservability.ObserveCacheGet(family, policy, "error")
-			cacheobservability.ObserveFamilyFailure("apiserver", family, err)
+			opts.Observer.ObserveFamilyFailure(family, err)
 		} else {
-			cacheobservability.ObserveFamilySuccess("apiserver", family)
+			opts.Observer.ObserveFamilySuccess(family)
 		}
 		cacheobservability.ObserveCacheGet(family, policy, "miss")
 	}
@@ -105,10 +108,10 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 				cacheobservability.ObserveCacheOperationDuration(family, policy, "set", time.Since(start))
 				if err != nil {
 					cacheobservability.ObserveCacheWrite(family, policy, "set", "error")
-					cacheobservability.ObserveFamilyFailure("apiserver", family, err)
+					opts.Observer.ObserveFamilyFailure(family, err)
 					return
 				}
-				cacheobservability.ObserveFamilySuccess("apiserver", family)
+				opts.Observer.ObserveFamilySuccess(family)
 				cacheobservability.ObserveCacheWrite(family, policy, "set", "ok")
 			}
 			if opts.AsyncSetNegative {
@@ -127,10 +130,10 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 			cacheobservability.ObserveCacheOperationDuration(family, policy, "set", time.Since(start))
 			if err != nil {
 				cacheobservability.ObserveCacheWrite(family, policy, "set", "error")
-				cacheobservability.ObserveFamilyFailure("apiserver", family, err)
+				opts.Observer.ObserveFamilyFailure(family, err)
 				return
 			}
-			cacheobservability.ObserveFamilySuccess("apiserver", family)
+			opts.Observer.ObserveFamilySuccess(family)
 			cacheobservability.ObserveCacheWrite(family, policy, "set", "ok")
 		}
 		if opts.AsyncSetCached {

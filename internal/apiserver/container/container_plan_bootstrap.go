@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 func (c *Container) buildPlanModuleInitializeParams() []interface{} {
@@ -18,10 +19,11 @@ func (c *Container) buildPlanModuleInitializeParams() []interface{} {
 		c.mysqlDB,
 		c.eventPublisher,
 		scaleRepo,
-		c.objectRedisCache,
-		redisHandleBuilder(c.objectRedisHandle),
-		c.policyCatalog.Policy(cachepolicy.PolicyPlan),
+		c.CacheClient(redisplane.FamilyObject),
+		c.CacheBuilder(redisplane.FamilyObject),
+		c.CachePolicy(cachepolicy.PolicyPlan),
 		c.planEntryURL,
+		c.cacheObserver(),
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
@@ -20,13 +21,11 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	runtimescheduler "github.com/FangcunMount/qs-server/internal/apiserver/runtime/scheduler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
@@ -46,16 +45,10 @@ type apiServer struct {
 	dbManager *DatabaseManager
 	// Redis 客户端（供内建调度器等后台任务复用）
 	redisCache redis.UniversalClient
-	// 共享 Redis family runtime
-	redisRuntime *redisplane.Runtime
-	// lock/lease Redis runtime handle
-	lockHandle *redisplane.Handle
-	// apiserver 内建 scheduler 共享锁管理器
-	lockManager *redislock.Manager
+	// cache 子系统组合根
+	cacheSubsystem *cachebootstrap.Subsystem
 	// Container 主容器
 	container *container.Container
-	// Redis family 状态注册表
-	familyStatus *cacheobservability.FamilyStatusRegistry
 	// IAM authz_version 同步订阅者
 	authzVersionSubscriber messaging.Subscriber
 	// 配置
@@ -67,22 +60,12 @@ type preparedAPIServer struct {
 	*apiServer
 }
 
-type prepareRedisHandles struct {
-	static *redisplane.Handle
-	object *redisplane.Handle
-	query  *redisplane.Handle
-	meta   *redisplane.Handle
-	sdk    *redisplane.Handle
-	lock   *redisplane.Handle
-}
-
 type prepareResources struct {
-	mysqlDB      *gorm.DB
-	mongoDB      *mongo.Database
-	redisCache   redis.UniversalClient
-	redisHandles prepareRedisHandles
-	mqPublisher  messaging.Publisher
-	publishMode  eventconfig.PublishMode
+	mysqlDB     *gorm.DB
+	mongoDB     *mongo.Database
+	redisCache  redis.UniversalClient
+	mqPublisher messaging.Publisher
+	publishMode eventconfig.PublishMode
 }
 
 // createAPIServer 创建 API 服务器实例（六边形架构版本）
@@ -113,7 +96,6 @@ func createAPIServer(cfg *config.Config) (*apiServer, error) {
 		redisCache:       nil,
 		grpcServer:       nil, // 延迟初始化
 		config:           cfg,
-		familyStatus:     cacheobservability.NewFamilyStatusRegistry("apiserver"),
 	}
 
 	return server, nil
@@ -157,15 +139,14 @@ func (s *apiServer) prepareResources() (*prepareResources, error) {
 		return nil, err
 	}
 	s.configureBackpressure()
-	redisCache, handles := s.initializeRedisRuntime()
+	redisCache := s.initializeRedisRuntime()
 	mqPublisher, publishMode := s.createMQPublisher()
 	return &prepareResources{
-		mysqlDB:      mysqlDB,
-		mongoDB:      mongoDB,
-		redisCache:   redisCache,
-		redisHandles: handles,
-		mqPublisher:  mqPublisher,
-		publishMode:  publishMode,
+		mysqlDB:     mysqlDB,
+		mongoDB:     mongoDB,
+		redisCache:  redisCache,
+		mqPublisher: mqPublisher,
+		publishMode: publishMode,
 	}, nil
 }
 
@@ -199,7 +180,7 @@ func (s *apiServer) configureBackpressure() {
 	}
 }
 
-func (s *apiServer) initializeRedisRuntime() (redis.UniversalClient, prepareRedisHandles) {
+func (s *apiServer) initializeRedisRuntime() redis.UniversalClient {
 	redisCache, err := s.dbManager.GetRedisClient()
 	if err != nil {
 		logger.L(context.Background()).Warnw("Cache Redis not available",
@@ -208,44 +189,8 @@ func (s *apiServer) initializeRedisRuntime() (redis.UniversalClient, prepareRedi
 		)
 	}
 	s.redisCache = redisCache
-
-	runtimeCatalog := redisplane.CatalogFromOptions(s.config.RedisRuntime, nil)
-	s.redisRuntime = redisplane.NewRuntime("apiserver", s.dbManager, runtimeCatalog, s.familyStatus)
-	resolved := s.redisRuntime.ResolveAll(context.Background())
-	handles := prepareRedisHandles{
-		static: resolved[redisplane.FamilyStatic],
-		object: resolved[redisplane.FamilyObject],
-		query:  resolved[redisplane.FamilyQuery],
-		meta:   resolved[redisplane.FamilyMeta],
-		sdk:    resolved[redisplane.FamilySDK],
-		lock:   resolved[redisplane.FamilyLock],
-	}
-	s.lockHandle = handles.lock
-	s.lockManager = redislock.NewManager("apiserver", "lock_lease", handles.lock)
-	s.warnMetaCacheAvailability(handles.meta)
-	return redisCache, handles
-}
-
-func (s *apiServer) warnMetaCacheAvailability(metaHandle *redisplane.Handle) {
-	metaRedisCache := redisHandleClient(metaHandle)
-	if s.config.Cache != nil &&
-		s.config.Cache.Warmup != nil &&
-		s.config.Cache.Warmup.Hotset != nil &&
-		s.config.Cache.Warmup.Hotset.Enable &&
-		metaRedisCache == nil {
-		logger.L(context.Background()).Warnw("meta_cache unavailable while hotset governance is enabled; hotset recording and hot-target warmup will degrade",
-			"component", "apiserver",
-			"family", string(redisplane.FamilyMeta),
-			"profile", metaHandleProfile(metaHandle),
-		)
-	}
-	if metaRedisCache == nil {
-		logger.L(context.Background()).Warnw("meta_cache unavailable; version-token query caches will run uncached where required",
-			"component", "apiserver",
-			"family", string(redisplane.FamilyMeta),
-			"profile", metaHandleProfile(metaHandle),
-		)
-	}
+	s.cacheSubsystem = cachebootstrap.NewSubsystem("apiserver", s.dbManager, s.config.RedisRuntime, s.buildContainerCacheOptions())
+	return redisCache
 }
 
 func (s *apiServer) createMQPublisher() (messaging.Publisher, eventconfig.PublishMode) {
@@ -274,12 +219,7 @@ func (s *apiServer) buildContainerOptions(resources *prepareResources) container
 		MQPublisher:                resources.mqPublisher,
 		PublisherMode:              resources.publishMode,
 		Cache:                      s.buildContainerCacheOptions(),
-		StaticRedisHandle:          resources.redisHandles.static,
-		ObjectRedisHandle:          resources.redisHandles.object,
-		QueryRedisHandle:           resources.redisHandles.query,
-		MetaRedisHandle:            resources.redisHandles.meta,
-		SDKRedisHandle:             resources.redisHandles.sdk,
-		LockRedisHandle:            resources.redisHandles.lock,
+		CacheSubsystem:             s.cacheSubsystem,
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
 	}
@@ -390,12 +330,6 @@ func (s *apiServer) initializeContainer() error {
 	if err := s.container.Initialize(); err != nil {
 		return err
 	}
-	if s.container != nil {
-		s.container.CacheGovernanceStatusService = cachegov.NewStatusService("apiserver", s.familyStatus, s.container.HotsetInspector(), s.container.WarmupCoordinator)
-		if s.container.StatisticsModule != nil && s.container.StatisticsModule.Handler != nil {
-			s.container.StatisticsModule.Handler.SetCacheGovernanceStatusService(s.container.CacheGovernanceStatusService)
-		}
-	}
 	s.startAuthzVersionSync()
 	return nil
 }
@@ -479,13 +413,6 @@ func (s *apiServer) fatalPrepareRun(action string, err error) {
 	log.Fatalf("Failed to %s: %v", action, err)
 }
 
-func redisHandleClient(handle *redisplane.Handle) redis.UniversalClient {
-	if handle == nil {
-		return nil
-	}
-	return handle.Client
-}
-
 func (s *apiServer) startAuthzVersionSync() {
 	if s == nil || s.container == nil || s.container.IAMModule == nil {
 		return
@@ -567,8 +494,8 @@ func (s *apiServer) startSchedulers() {
 		statisticsSyncSvc statisticsApp.StatisticsSyncService
 		behaviorProjector statisticsApp.BehaviorProjectorService
 	)
-	if s.lockHandle != nil {
-		lockBuilder = s.lockHandle.Builder
+	if s.container != nil {
+		lockBuilder = s.container.CacheBuilder(redisplane.FamilyLock)
 	}
 	if s.container.PlanModule != nil {
 		planCommand = s.container.PlanModule.CommandService
@@ -581,21 +508,21 @@ func (s *apiServer) startSchedulers() {
 	manager := runtimescheduler.NewManager(
 		runtimescheduler.NewPlanRunner(
 			s.config.PlanScheduler,
-			s.lockManager,
+			s.container.CacheLockManager(),
 			planCommand,
 			lockBuilder,
 		),
 		runtimescheduler.NewStatisticsSyncRunner(
 			s.config.StatisticsSync,
 			statisticsSyncSvc,
-			s.container.WarmupCoordinator,
-			s.lockManager,
+			s.container.WarmupCoordinator(),
+			s.container.CacheLockManager(),
 			lockBuilder,
 		),
 		runtimescheduler.NewBehaviorPendingReconcileRunner(
 			s.config.BehaviorPendingReconcile,
 			behaviorProjector,
-			s.lockManager,
+			s.container.CacheLockManager(),
 			lockBuilder,
 		),
 	)
@@ -814,11 +741,4 @@ func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcpkg.Config) error {
 	grpcConfig.EnableHealthCheck = opts.EnableHealthCheck
 
 	return nil
-}
-
-func metaHandleProfile(handle *redisplane.Handle) string {
-	if handle == nil {
-		return ""
-	}
-	return handle.Profile
 }

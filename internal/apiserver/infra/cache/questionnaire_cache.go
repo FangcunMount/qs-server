@@ -20,25 +20,31 @@ const (
 )
 
 type CachedQuestionnaireRepository struct {
-	repo   domainQuestionnaire.Repository
-	client redis.UniversalClient
-	ttl    time.Duration
-	mapper *questionnaireInfra.QuestionnaireMapper
-	keys   *rediskey.Builder
-	policy cachepolicy.CachePolicy
+	repo     domainQuestionnaire.Repository
+	client   redis.UniversalClient
+	ttl      time.Duration
+	mapper   *questionnaireInfra.QuestionnaireMapper
+	keys     *rediskey.Builder
+	policy   cachepolicy.CachePolicy
+	observer *Observer
 }
 
 func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
+	return NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+}
+
+func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) domainQuestionnaire.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedQuestionnaireRepository{
-		repo:   repo,
-		client: client,
-		ttl:    policy.TTLOr(defaultQuestionnaireCacheTTL),
-		mapper: questionnaireInfra.NewQuestionnaireMapper(),
-		keys:   builder,
-		policy: policy,
+		repo:     repo,
+		client:   client,
+		ttl:      policy.TTLOr(defaultQuestionnaireCacheTTL),
+		mapper:   questionnaireInfra.NewQuestionnaireMapper(),
+		keys:     builder,
+		policy:   policy,
+		observer: observer,
 	}
 }
 
@@ -261,6 +267,7 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 		PolicyKey: cachepolicy.PolicyQuestionnaire,
 		CacheKey:  key,
 		Policy:    r.policy,
+		Observer:  r.observer,
 		GetCached: func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
 			return r.getCache(ctx, key)
 		},

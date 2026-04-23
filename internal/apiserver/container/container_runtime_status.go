@@ -3,8 +3,6 @@ package container
 import (
 	"context"
 	"fmt"
-
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 )
 
 // HealthCheck 健康检查
@@ -119,13 +117,6 @@ func (c *Container) GetLoadedModules() []string {
 	}
 
 	return modules
-}
-
-func (c *Container) HotsetInspector() scaleCache.HotsetInspector {
-	if c == nil {
-		return nil
-	}
-	return c.hotsetInspector
 }
 
 // PrintContainerInfo 打印容器信息

@@ -1,70 +1,42 @@
 package apiserver
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/gin-gonic/gin"
 )
 
-type fakeGovernanceStatusService struct {
-	runtime *cacheobservability.RuntimeSnapshot
-	status  *cachegov.StatusSnapshot
-}
-
-func (f fakeGovernanceStatusService) GetRuntime(context.Context) (*cacheobservability.RuntimeSnapshot, error) {
-	if f.runtime == nil {
-		return &cacheobservability.RuntimeSnapshot{
-			GeneratedAt: time.Now(),
-			Component:   "apiserver",
-			Families:    []cacheobservability.FamilyStatus{},
-			Summary:     cacheobservability.RuntimeSummary{Ready: true},
-		}, nil
+func newGovernanceTestContainer(statuses ...cacheobservability.FamilyStatus) *container.Container {
+	subsystem := cachebootstrap.NewSubsystem(
+		"apiserver",
+		nil,
+		&genericoptions.RedisRuntimeOptions{},
+		cachebootstrap.CacheOptions{},
+	)
+	subsystem.BindGovernance(cachebootstrap.GovernanceBindings{})
+	for _, status := range statuses {
+		subsystem.StatusRegistry().Update(status)
 	}
-	return f.runtime, nil
-}
-
-func (f fakeGovernanceStatusService) GetStatus(context.Context) (*cachegov.StatusSnapshot, error) {
-	if f.status == nil {
-		return &cachegov.StatusSnapshot{}, nil
-	}
-	return f.status, nil
-}
-
-func (f fakeGovernanceStatusService) GetHotset(context.Context, cacheinfra.WarmupKind, int64) (*cachegov.HotsetSnapshot, error) {
-	return &cachegov.HotsetSnapshot{}, nil
+	return container.NewContainerWithOptions(nil, nil, nil, container.ContainerOptions{
+		CacheSubsystem: subsystem,
+	})
 }
 
 func TestRouterReadyzReturnsServiceUnavailableWhenRuntimeNotReady(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(&container.Container{
-		CacheGovernanceStatusService: fakeGovernanceStatusService{
-			runtime: &cacheobservability.RuntimeSnapshot{
-				GeneratedAt: time.Now(),
-				Component:   "apiserver",
-				Summary: cacheobservability.RuntimeSummary{
-					FamilyTotal:      2,
-					AvailableCount:   1,
-					DegradedCount:    1,
-					UnavailableCount: 1,
-					Ready:            false,
-				},
-				Families: []cacheobservability.FamilyStatus{
-					{Component: "apiserver", Family: "static_meta", Available: false, Degraded: true},
-				},
-			},
-		},
-	}, nil)
+	router := NewRouter(newGovernanceTestContainer(
+		cacheobservability.FamilyStatus{Component: "apiserver", Family: "query_result", Available: true},
+		cacheobservability.FamilyStatus{Component: "apiserver", Family: "static_meta", Available: false, Degraded: true},
+	), nil)
 	router.registerPublicRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
@@ -102,22 +74,9 @@ func TestRouterGovernanceEndpointReturnsRuntimeSnapshotOnly(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := NewRouter(&container.Container{
-		CacheGovernanceStatusService: fakeGovernanceStatusService{
-			runtime: &cacheobservability.RuntimeSnapshot{
-				GeneratedAt: time.Now(),
-				Component:   "apiserver",
-				Summary: cacheobservability.RuntimeSummary{
-					FamilyTotal:    1,
-					AvailableCount: 1,
-					Ready:          true,
-				},
-				Families: []cacheobservability.FamilyStatus{
-					{Component: "apiserver", Family: "query_result", Profile: "query_cache", Available: true},
-				},
-			},
-		},
-	}, nil)
+	router := NewRouter(newGovernanceTestContainer(
+		cacheobservability.FamilyStatus{Component: "apiserver", Family: "query_result", Profile: "query_cache", Available: true},
+	), nil)
 	router.registerPublicRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/governance/redis", nil)

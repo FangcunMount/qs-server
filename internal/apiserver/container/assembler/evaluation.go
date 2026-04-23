@@ -96,6 +96,7 @@ type evaluationModuleDeps struct {
 	queryCacheBuilder    *rediskey.Builder
 	assessmentListPolicy cachepolicy.CachePolicy
 	versionStore         assessmentCache.VersionTokenStore
+	observer             *assessmentCache.Observer
 }
 
 // NewEvaluationModule 创建评估模块
@@ -130,7 +131,7 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(deps.mysqlDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if deps.redisClient != nil {
-		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderAndPolicy(baseAssessmentRepo, deps.redisClient, deps.cacheBuilder, deps.assessmentPolicy)
+		m.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, deps.redisClient, deps.cacheBuilder, deps.assessmentPolicy, deps.observer)
 	} else {
 		m.AssessmentRepo = baseAssessmentRepo
 	}
@@ -207,11 +208,12 @@ func (m *EvaluationModule) Initialize(params ...interface{}) error {
 
 	// 提交服务 - 服务于答题者 (Testee)
 	if deps.queryRedisClient != nil && deps.versionStore != nil {
-		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderAndPolicy(
+		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
 			assessmentCache.NewRedisCache(deps.queryRedisClient),
 			deps.versionStore,
 			deps.queryCacheBuilder,
 			deps.assessmentListPolicy,
+			deps.observer,
 		)
 		m.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
 			m.AssessmentRepo,
@@ -317,6 +319,9 @@ func parseEvaluationModuleDeps(params []interface{}) (*evaluationModuleDeps, err
 	})
 	applyOptionalParam(params, 12, func(store assessmentCache.VersionTokenStore) {
 		deps.versionStore = store
+	})
+	applyOptionalParam(params, 13, func(observer *assessmentCache.Observer) {
+		deps.observer = observer
 	})
 	return deps, nil
 }

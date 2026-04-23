@@ -1,0 +1,342 @@
+package cachebootstrap
+
+import (
+	"context"
+	"time"
+
+	"github.com/FangcunMount/component-base/pkg/logger"
+	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	redis "github.com/redis/go-redis/v9"
+)
+
+// GovernanceBindings 描述 warmup/governance 最终装配所需的业务回调。
+type GovernanceBindings struct {
+	ListPublishedScaleCodes         func(context.Context) ([]string, error)
+	ListPublishedQuestionnaireCodes func(context.Context) ([]string, error)
+	LookupScaleQuestionnaireCode    func(context.Context, string) (string, error)
+	WarmScale                       func(context.Context, string) error
+	WarmQuestionnaire               func(context.Context, string) error
+	WarmScaleList                   func(context.Context) error
+	WarmStatsSystem                 func(context.Context, int64) error
+	WarmStatsQuestionnaire          func(context.Context, int64, string) error
+	WarmStatsPlan                   func(context.Context, int64, uint64) error
+}
+
+// Subsystem 收口 apiserver cache 子系统运行时与治理装配。
+type Subsystem struct {
+	component   string
+	cacheConfig CacheOptions
+
+	statusRegistry *cacheobservability.FamilyStatusRegistry
+	runtime        *redisplane.Runtime
+	handles        map[redisplane.Family]*redisplane.Handle
+	policyCatalog  *cachepolicy.PolicyCatalog
+	observer       *cacheinfra.Observer
+
+	hotsetRecorder  cacheinfra.HotsetRecorder
+	hotsetInspector cacheinfra.HotsetInspector
+	lockManager     *redislock.Manager
+
+	warmupCoordinator cachegov.Coordinator
+	statusService     cachegov.StatusService
+}
+
+// NewSubsystem 创建 cache 子系统组合根，并完成 runtime/policy/hotset/lock 的基础装配。
+func NewSubsystem(component string, resolver redisplane.Resolver, runtimeOptions *genericoptions.RedisRuntimeOptions, cacheConfig CacheOptions) *Subsystem {
+	if component == "" {
+		component = "apiserver"
+	}
+
+	statusRegistry := cacheobservability.NewFamilyStatusRegistry(component)
+	runtimeCatalog := redisplane.CatalogFromOptions(runtimeOptions, nil)
+	runtime := redisplane.NewRuntime(component, resolver, runtimeCatalog, statusRegistry)
+	handles := runtime.ResolveAll(context.Background())
+
+	s := &Subsystem{
+		component:      component,
+		cacheConfig:    cacheConfig,
+		statusRegistry: statusRegistry,
+		runtime:        runtime,
+		handles:        handles,
+		observer:       cacheinfra.NewObserver(component),
+	}
+	s.policyCatalog = newPolicyCatalog(cacheConfig)
+	s.hotsetRecorder = cacheinfra.NewRedisHotsetStoreWithObserver(
+		s.Client(redisplane.FamilyMeta),
+		s.Builder(redisplane.FamilyMeta),
+		cacheinfra.HotsetOptions{
+			Enable:          cacheConfig.Warmup.HotsetEnable,
+			TopN:            cacheConfig.Warmup.HotsetTopN,
+			MaxItemsPerKind: cacheConfig.Warmup.MaxItemsPerKind,
+		},
+		s.observer,
+	)
+	if inspector, ok := s.hotsetRecorder.(cacheinfra.HotsetInspector); ok {
+		s.hotsetInspector = inspector
+	}
+	s.lockManager = redislock.NewManager(component, "lock_lease", s.Handle(redisplane.FamilyLock))
+	s.warnMetaCacheAvailability()
+	return s
+}
+
+// BindGovernance 在 warmup callbacks 就绪后完成 governance/status 的最终装配。
+func (s *Subsystem) BindGovernance(bindings GovernanceBindings) {
+	if s == nil {
+		return
+	}
+	s.warmupCoordinator = cachegov.NewCoordinator(cachegov.Config{
+		Enable:          s.cacheConfig.Warmup.Enable,
+		StartupStatic:   s.cacheConfig.Warmup.StartupStatic,
+		StartupQuery:    s.cacheConfig.Warmup.StartupQuery,
+		HotsetEnable:    s.cacheConfig.Warmup.HotsetEnable,
+		HotsetTopN:      s.cacheConfig.Warmup.HotsetTopN,
+		MaxItemsPerKind: s.cacheConfig.Warmup.MaxItemsPerKind,
+	}, cachegov.Dependencies{
+		Runtime:                         cachegov.NewFamilyRuntime(s.Handle(redisplane.FamilyStatic), s.Handle(redisplane.FamilyQuery)),
+		StatisticsSeeds:                 s.cacheConfig.StatisticsWarmup,
+		Hotset:                          s.hotsetRecorder,
+		ListPublishedScaleCodes:         bindings.ListPublishedScaleCodes,
+		ListPublishedQuestionnaireCodes: bindings.ListPublishedQuestionnaireCodes,
+		LookupScaleQuestionnaireCode:    bindings.LookupScaleQuestionnaireCode,
+		WarmScale:                       bindings.WarmScale,
+		WarmQuestionnaire:               bindings.WarmQuestionnaire,
+		WarmScaleList:                   bindings.WarmScaleList,
+		WarmStatsSystem:                 bindings.WarmStatsSystem,
+		WarmStatsQuestionnaire:          bindings.WarmStatsQuestionnaire,
+		WarmStatsPlan:                   bindings.WarmStatsPlan,
+	})
+	s.statusService = cachegov.NewStatusService(s.component, s.statusRegistry, s.hotsetInspector, s.warmupCoordinator)
+}
+
+func (s *Subsystem) Component() string {
+	if s == nil {
+		return ""
+	}
+	return s.component
+}
+
+func (s *Subsystem) StatusRegistry() *cacheobservability.FamilyStatusRegistry {
+	if s == nil {
+		return nil
+	}
+	return s.statusRegistry
+}
+
+func (s *Subsystem) Runtime() *redisplane.Runtime {
+	if s == nil {
+		return nil
+	}
+	return s.runtime
+}
+
+func (s *Subsystem) Handle(family redisplane.Family) *redisplane.Handle {
+	if s == nil {
+		return nil
+	}
+	if s.handles != nil {
+		if handle, ok := s.handles[family]; ok {
+			return handle
+		}
+	}
+	if s.runtime == nil {
+		return nil
+	}
+	return s.runtime.Handle(context.Background(), family)
+}
+
+func (s *Subsystem) Client(family redisplane.Family) redis.UniversalClient {
+	handle := s.Handle(family)
+	if handle == nil {
+		return nil
+	}
+	return handle.Client
+}
+
+func (s *Subsystem) Builder(family redisplane.Family) *rediskey.Builder {
+	handle := s.Handle(family)
+	if handle == nil {
+		return nil
+	}
+	return handle.Builder
+}
+
+func (s *Subsystem) Policy(key cachepolicy.CachePolicyKey) cachepolicy.CachePolicy {
+	if s == nil || s.policyCatalog == nil {
+		return cachepolicy.CachePolicy{}
+	}
+	return s.policyCatalog.Policy(key)
+}
+
+func (s *Subsystem) Observer() *cacheinfra.Observer {
+	if s == nil {
+		return nil
+	}
+	return s.observer
+}
+
+func (s *Subsystem) HotsetRecorder() cacheinfra.HotsetRecorder {
+	if s == nil {
+		return nil
+	}
+	return s.hotsetRecorder
+}
+
+func (s *Subsystem) HotsetInspector() cacheinfra.HotsetInspector {
+	if s == nil {
+		return nil
+	}
+	return s.hotsetInspector
+}
+
+func (s *Subsystem) LockManager() *redislock.Manager {
+	if s == nil {
+		return nil
+	}
+	return s.lockManager
+}
+
+func (s *Subsystem) WarmupCoordinator() cachegov.Coordinator {
+	if s == nil {
+		return nil
+	}
+	return s.warmupCoordinator
+}
+
+func (s *Subsystem) StatusService() cachegov.StatusService {
+	if s == nil {
+		return nil
+	}
+	return s.statusService
+}
+
+func (s *Subsystem) warnMetaCacheAvailability() {
+	metaHandle := s.Handle(redisplane.FamilyMeta)
+	metaRedisCache := s.Client(redisplane.FamilyMeta)
+	if s.cacheConfig.Warmup.HotsetEnable && metaRedisCache == nil {
+		logger.L(context.Background()).Warnw("meta_cache unavailable while hotset governance is enabled; hotset recording and hot-target warmup will degrade",
+			"component", s.component,
+			"family", string(redisplane.FamilyMeta),
+			"profile", handleProfile(metaHandle),
+		)
+	}
+	if metaRedisCache == nil {
+		logger.L(context.Background()).Warnw("meta_cache unavailable; version-token query caches will run uncached where required",
+			"component", s.component,
+			"family", string(redisplane.FamilyMeta),
+			"profile", handleProfile(metaHandle),
+		)
+	}
+}
+
+func handleProfile(handle *redisplane.Handle) string {
+	if handle == nil {
+		return ""
+	}
+	return handle.Profile
+}
+
+func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
+	return cachepolicy.NewPolicyCatalog(map[redisplane.Family]cachepolicy.CachePolicy{
+		redisplane.FamilyStatic: {
+			Compress:     resolvePolicySwitch(cacheConfig.Static.Compress, cacheConfig.CompressPayload),
+			Singleflight: resolvePolicySwitch(cacheConfig.Static.Singleflight, true),
+			Negative:     resolvePolicySwitch(cacheConfig.Static.Negative, false),
+			NegativeTTL:  firstPositiveDuration(cacheConfig.Static.NegativeTTL, cacheConfig.TTL.Negative),
+			JitterRatio:  firstPositiveFloat(cacheConfig.Static.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+		},
+		redisplane.FamilyObject: {
+			Compress:     resolvePolicySwitch(cacheConfig.Object.Compress, cacheConfig.CompressPayload),
+			Singleflight: resolvePolicySwitch(cacheConfig.Object.Singleflight, true),
+			Negative:     resolvePolicySwitch(cacheConfig.Object.Negative, false),
+			NegativeTTL:  firstPositiveDuration(cacheConfig.Object.NegativeTTL, cacheConfig.TTL.Negative),
+			JitterRatio:  firstPositiveFloat(cacheConfig.Object.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+		},
+		redisplane.FamilyQuery: {
+			TTL:          cacheConfig.Query.TTL,
+			NegativeTTL:  firstPositiveDuration(cacheConfig.Query.NegativeTTL, cacheConfig.TTL.Negative),
+			Compress:     resolvePolicySwitch(cacheConfig.Query.Compress, cacheConfig.CompressPayload),
+			Singleflight: resolvePolicySwitch(cacheConfig.Query.Singleflight, false),
+			Negative:     resolvePolicySwitch(cacheConfig.Query.Negative, false),
+			JitterRatio:  firstPositiveFloat(cacheConfig.Query.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+		},
+		redisplane.FamilySDK: {
+			Compress:     resolvePolicySwitch(cacheConfig.SDK.Compress, false),
+			Singleflight: resolvePolicySwitch(cacheConfig.SDK.Singleflight, false),
+			Negative:     resolvePolicySwitch(cacheConfig.SDK.Negative, false),
+			NegativeTTL:  cacheConfig.SDK.NegativeTTL,
+			JitterRatio:  firstPositiveFloat(cacheConfig.SDK.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+		},
+		redisplane.FamilyLock: {
+			Compress:     resolvePolicySwitch(cacheConfig.Lock.Compress, false),
+			Singleflight: resolvePolicySwitch(cacheConfig.Lock.Singleflight, false),
+			Negative:     resolvePolicySwitch(cacheConfig.Lock.Negative, false),
+			NegativeTTL:  cacheConfig.Lock.NegativeTTL,
+			JitterRatio:  firstPositiveFloat(cacheConfig.Lock.TTLJitterRatio, cacheConfig.TTLJitterRatio),
+		},
+	}, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
+		cachepolicy.PolicyScale: {
+			TTL: cacheConfig.TTL.Scale,
+		},
+		cachepolicy.PolicyScaleList: {
+			TTL:          cacheConfig.TTL.ScaleList,
+			Singleflight: cachepolicy.PolicySwitchDisabled,
+		},
+		cachepolicy.PolicyQuestionnaire: {
+			TTL:         cacheConfig.TTL.Questionnaire,
+			NegativeTTL: cacheConfig.TTL.Negative,
+			Negative:    cachepolicy.PolicySwitchEnabled,
+		},
+		cachepolicy.PolicyAssessmentDetail: {
+			TTL:          cacheConfig.TTL.AssessmentDetail,
+			Singleflight: cachepolicy.PolicySwitchEnabled,
+		},
+		cachepolicy.PolicyAssessmentList: {
+			TTL:          cacheConfig.TTL.AssessmentList,
+			Singleflight: cachepolicy.PolicySwitchDisabled,
+		},
+		cachepolicy.PolicyTestee: {
+			TTL:         cacheConfig.TTL.Testee,
+			NegativeTTL: cacheConfig.TTL.Negative,
+			Negative:    cachepolicy.PolicySwitchEnabled,
+		},
+		cachepolicy.PolicyPlan: {
+			TTL:          cacheConfig.TTL.Plan,
+			Singleflight: cachepolicy.PolicySwitchEnabled,
+		},
+		cachepolicy.PolicyStatsQuery: {
+			Singleflight: cachepolicy.PolicySwitchDisabled,
+		},
+	})
+}
+
+func firstPositiveDuration(values ...time.Duration) time.Duration {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func firstPositiveFloat(values ...float64) float64 {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func resolvePolicySwitch(explicit *bool, defaultValue bool) cachepolicy.PolicySwitch {
+	if explicit != nil {
+		return cachepolicy.PolicySwitchFromBool(*explicit)
+	}
+	return cachepolicy.PolicySwitchFromBool(defaultValue)
+}

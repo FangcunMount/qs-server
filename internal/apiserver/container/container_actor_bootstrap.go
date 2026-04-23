@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 type actorModuleInitDeps struct {
@@ -37,11 +38,12 @@ func (c *Container) buildActorModuleInitializeParams() []interface{} {
 		c.mysqlDB,
 		deps.guardianshipSvc,
 		deps.identitySvc,
-		c.objectRedisCache,
-		redisHandleBuilder(c.objectRedisHandle),
-		c.policyCatalog.Policy(cachepolicy.PolicyTestee),
+		c.CacheClient(redisplane.FamilyObject),
+		c.CacheBuilder(redisplane.FamilyObject),
+		c.CachePolicy(cachepolicy.PolicyTestee),
 		deps.opAuthz,
 		deps.operationAccountSvc,
+		c.cacheObserver(),
 	}
 }
 

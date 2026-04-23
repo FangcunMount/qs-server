@@ -2,22 +2,17 @@ package container
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 
-	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
@@ -29,28 +24,13 @@ import (
 // 组合所有业务模块和基础设施组件
 type Container struct {
 	// 基础设施
-	mysqlDB                      *gorm.DB
-	mongoDB                      *mongo.Database
-	redisCache                   redis.UniversalClient
-	staticRedisCache             redis.UniversalClient
-	objectRedisCache             redis.UniversalClient
-	queryRedisCache              redis.UniversalClient
-	metaRedisCache               redis.UniversalClient
-	sdkRedisCache                redis.UniversalClient
-	staticRedisHandle            *redisplane.Handle
-	objectRedisHandle            *redisplane.Handle
-	queryRedisHandle             *redisplane.Handle
-	metaRedisHandle              *redisplane.Handle
-	sdkRedisHandle               *redisplane.Handle
-	lockRedisHandle              *redisplane.Handle
-	cacheOptions                 ContainerCacheOptions
-	policyCatalog                *cachepolicy.PolicyCatalog
-	hotsetRecorder               scaleCache.HotsetRecorder
-	hotsetInspector              scaleCache.HotsetInspector
-	WarmupCoordinator            cachegov.Coordinator
-	CacheGovernanceStatusService cachegov.StatusService
-	planEntryURL                 string
-	statisticsRepairWindowDays   int
+	mysqlDB                    *gorm.DB
+	mongoDB                    *mongo.Database
+	redisCache                 redis.UniversalClient
+	cacheOptions               ContainerCacheOptions
+	cache                      *cachebootstrap.Subsystem
+	planEntryURL               string
+	statisticsRepairWindowDays int
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -86,24 +66,6 @@ type Container struct {
 	moduleOrder []string
 }
 
-func firstPositiveDuration(values ...time.Duration) time.Duration {
-	for _, value := range values {
-		if value > 0 {
-			return value
-		}
-	}
-	return 0
-}
-
-func firstPositiveFloat(values ...float64) float64 {
-	for _, value := range values {
-		if value > 0 {
-			return value
-		}
-	}
-	return 0
-}
-
 // NewContainer 创建容器
 func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
 	return &Container{
@@ -127,18 +89,8 @@ type ContainerOptions struct {
 	Env string
 	// Cache 缓存控制选项
 	Cache ContainerCacheOptions
-	// StaticRedisHandle 静态/半静态对象缓存 family handle。
-	StaticRedisHandle *redisplane.Handle
-	// QueryRedisHandle 查询结果缓存 family handle。
-	QueryRedisHandle *redisplane.Handle
-	// ObjectRedisHandle 对象视图缓存 family handle。
-	ObjectRedisHandle *redisplane.Handle
-	// SDKRedisHandle SDK token/cache family handle。
-	SDKRedisHandle *redisplane.Handle
-	// MetaRedisHandle query version token 与 hotset 等元数据缓存 family handle。
-	MetaRedisHandle *redisplane.Handle
-	// LockRedisHandle lock/lease Redis runtime handle.
-	LockRedisHandle *redisplane.Handle
+	// CacheSubsystem cache 子系统组合根。
+	CacheSubsystem *cachebootstrap.Subsystem
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
@@ -147,63 +99,12 @@ type ContainerOptions struct {
 	Silent bool
 }
 
-// ContainerCacheOptions 缓存控制配置
-type ContainerCacheOptions struct {
-	DisableEvaluationCache bool
-	DisableStatisticsCache bool
-	TTL                    ContainerCacheTTLOptions
-	TTLJitterRatio         float64
-	StatisticsWarmup       *cachegov.StatisticsWarmupConfig
-	Warmup                 ContainerWarmupOptions
-	CompressPayload        bool
-	Static                 ContainerCacheFamilyOptions
-	Object                 ContainerCacheFamilyOptions
-	Query                  ContainerCacheFamilyOptions
-	Meta                   ContainerCacheFamilyOptions
-	SDK                    ContainerCacheFamilyOptions
-	Lock                   ContainerCacheFamilyOptions
-}
+type ContainerCacheOptions = cachebootstrap.CacheOptions
 
-type ContainerWarmupOptions struct {
-	Enable          bool
-	StartupStatic   bool
-	StartupQuery    bool
-	HotsetEnable    bool
-	HotsetTopN      int64
-	MaxItemsPerKind int64
-}
+type ContainerWarmupOptions = cachebootstrap.WarmupOptions
 
 // ContainerCacheFamilyOptions 定义单个缓存 family 的对象级策略。
-// Redis 路由由 redisplane 统一提供，这里只保留 TTL、negative、压缩与 singleflight 语义。
-type ContainerCacheFamilyOptions struct {
-	TTL            time.Duration
-	NegativeTTL    time.Duration
-	TTLJitterRatio float64
-	Compress       *bool
-	Singleflight   *bool
-	Negative       *bool
-}
-
-func resolvePolicySwitch(explicit *bool, defaultValue bool) cachepolicy.PolicySwitch {
-	if explicit != nil {
-		return cachepolicy.PolicySwitchFromBool(*explicit)
-	}
-	return cachepolicy.PolicySwitchFromBool(defaultValue)
-}
-
-func redisHandleClient(handle *redisplane.Handle) redis.UniversalClient {
-	if handle == nil {
-		return nil
-	}
-	return handle.Client
-}
-
-func redisHandleBuilder(handle *redisplane.Handle) *rediskey.Builder {
-	if handle == nil {
-		return nil
-	}
-	return handle.Builder
-}
+type ContainerCacheFamilyOptions = cachebootstrap.CacheFamilyOptions
 
 func (c *Container) registerModule(name string, module assembler.Module) {
 	if c == nil || name == "" || module == nil {
@@ -232,16 +133,7 @@ func (c *Container) loadedModules() []assembler.Module {
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
-type ContainerCacheTTLOptions struct {
-	Scale            time.Duration
-	ScaleList        time.Duration
-	Questionnaire    time.Duration
-	AssessmentDetail time.Duration
-	AssessmentList   time.Duration
-	Testee           time.Duration
-	Plan             time.Duration
-	Negative         time.Duration
-}
+type ContainerCacheTTLOptions = cachebootstrap.CacheTTLOptions
 
 // NewContainerWithOptions 创建带配置的容器
 func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, opts ContainerOptions) *Container {
@@ -256,100 +148,10 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	}
 
 	c.cacheOptions = opts.Cache
+	c.cache = opts.CacheSubsystem
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.silent = opts.Silent
-	c.staticRedisHandle = opts.StaticRedisHandle
-	c.queryRedisHandle = opts.QueryRedisHandle
-	c.objectRedisHandle = opts.ObjectRedisHandle
-	c.metaRedisHandle = opts.MetaRedisHandle
-	c.sdkRedisHandle = opts.SDKRedisHandle
-	c.lockRedisHandle = opts.LockRedisHandle
-	c.staticRedisCache = redisHandleClient(c.staticRedisHandle)
-	c.queryRedisCache = redisHandleClient(c.queryRedisHandle)
-	c.objectRedisCache = redisHandleClient(c.objectRedisHandle)
-	c.metaRedisCache = redisHandleClient(c.metaRedisHandle)
-	c.sdkRedisCache = redisHandleClient(c.sdkRedisHandle)
-
-	c.policyCatalog = cachepolicy.NewPolicyCatalog(map[redisplane.Family]cachepolicy.CachePolicy{
-		redisplane.FamilyStatic: {
-			Compress:     resolvePolicySwitch(opts.Cache.Static.Compress, opts.Cache.CompressPayload),
-			Singleflight: resolvePolicySwitch(opts.Cache.Static.Singleflight, true),
-			Negative:     resolvePolicySwitch(opts.Cache.Static.Negative, false),
-			NegativeTTL:  firstPositiveDuration(opts.Cache.Static.NegativeTTL, opts.Cache.TTL.Negative),
-			JitterRatio:  firstPositiveFloat(opts.Cache.Static.TTLJitterRatio, opts.Cache.TTLJitterRatio),
-		},
-		redisplane.FamilyObject: {
-			Compress:     resolvePolicySwitch(opts.Cache.Object.Compress, opts.Cache.CompressPayload),
-			Singleflight: resolvePolicySwitch(opts.Cache.Object.Singleflight, true),
-			Negative:     resolvePolicySwitch(opts.Cache.Object.Negative, false),
-			NegativeTTL:  firstPositiveDuration(opts.Cache.Object.NegativeTTL, opts.Cache.TTL.Negative),
-			JitterRatio:  firstPositiveFloat(opts.Cache.Object.TTLJitterRatio, opts.Cache.TTLJitterRatio),
-		},
-		redisplane.FamilyQuery: {
-			TTL:          opts.Cache.Query.TTL,
-			NegativeTTL:  firstPositiveDuration(opts.Cache.Query.NegativeTTL, opts.Cache.TTL.Negative),
-			Compress:     resolvePolicySwitch(opts.Cache.Query.Compress, opts.Cache.CompressPayload),
-			Singleflight: resolvePolicySwitch(opts.Cache.Query.Singleflight, false),
-			Negative:     resolvePolicySwitch(opts.Cache.Query.Negative, false),
-			JitterRatio:  firstPositiveFloat(opts.Cache.Query.TTLJitterRatio, opts.Cache.TTLJitterRatio),
-		},
-		redisplane.FamilySDK: {
-			Compress:     resolvePolicySwitch(opts.Cache.SDK.Compress, false),
-			Singleflight: resolvePolicySwitch(opts.Cache.SDK.Singleflight, false),
-			Negative:     resolvePolicySwitch(opts.Cache.SDK.Negative, false),
-			NegativeTTL:  opts.Cache.SDK.NegativeTTL,
-			JitterRatio:  firstPositiveFloat(opts.Cache.SDK.TTLJitterRatio, opts.Cache.TTLJitterRatio),
-		},
-		redisplane.FamilyLock: {
-			Compress:     resolvePolicySwitch(opts.Cache.Lock.Compress, false),
-			Singleflight: resolvePolicySwitch(opts.Cache.Lock.Singleflight, false),
-			Negative:     resolvePolicySwitch(opts.Cache.Lock.Negative, false),
-			NegativeTTL:  opts.Cache.Lock.NegativeTTL,
-			JitterRatio:  firstPositiveFloat(opts.Cache.Lock.TTLJitterRatio, opts.Cache.TTLJitterRatio),
-		},
-	}, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
-		cachepolicy.PolicyScale: {
-			TTL: opts.Cache.TTL.Scale,
-		},
-		cachepolicy.PolicyScaleList: {
-			TTL:          opts.Cache.TTL.ScaleList,
-			Singleflight: cachepolicy.PolicySwitchDisabled,
-		},
-		cachepolicy.PolicyQuestionnaire: {
-			TTL:         opts.Cache.TTL.Questionnaire,
-			NegativeTTL: opts.Cache.TTL.Negative,
-			Negative:    cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyAssessmentDetail: {
-			TTL:          opts.Cache.TTL.AssessmentDetail,
-			Singleflight: cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyAssessmentList: {
-			TTL:          opts.Cache.TTL.AssessmentList,
-			Singleflight: cachepolicy.PolicySwitchDisabled,
-		},
-		cachepolicy.PolicyTestee: {
-			TTL:         opts.Cache.TTL.Testee,
-			NegativeTTL: opts.Cache.TTL.Negative,
-			Negative:    cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyPlan: {
-			TTL:          opts.Cache.TTL.Plan,
-			Singleflight: cachepolicy.PolicySwitchEnabled,
-		},
-		cachepolicy.PolicyStatsQuery: {
-			Singleflight: cachepolicy.PolicySwitchDisabled,
-		},
-	})
-	c.hotsetRecorder = scaleCache.NewRedisHotsetStore(c.metaRedisCache, redisHandleBuilder(c.metaRedisHandle), scaleCache.HotsetOptions{
-		Enable:          opts.Cache.Warmup.HotsetEnable,
-		TopN:            opts.Cache.Warmup.HotsetTopN,
-		MaxItemsPerKind: opts.Cache.Warmup.MaxItemsPerKind,
-	})
-	if inspector, ok := c.hotsetRecorder.(scaleCache.HotsetInspector); ok {
-		c.hotsetInspector = inspector
-	}
 
 	return c
 }

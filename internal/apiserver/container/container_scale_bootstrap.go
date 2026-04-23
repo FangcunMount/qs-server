@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 func (c *Container) buildScaleModuleInitializeParams() []interface{} {
@@ -17,12 +18,13 @@ func (c *Container) buildScaleModuleInitializeParams() []interface{} {
 		c.mongoDB,
 		c.eventPublisher,
 		questionnaireRepo,
-		c.staticRedisCache,
-		redisHandleBuilder(c.staticRedisHandle),
+		c.CacheClient(redisplane.FamilyStatic),
+		c.CacheBuilder(redisplane.FamilyStatic),
 		c.resolveIdentityService(),
-		c.policyCatalog.Policy(cachepolicy.PolicyScale),
-		c.policyCatalog.Policy(cachepolicy.PolicyScaleList),
-		c.hotsetRecorder,
+		c.CachePolicy(cachepolicy.PolicyScale),
+		c.CachePolicy(cachepolicy.PolicyScaleList),
+		c.hotsetRecorder(),
+		c.cacheObserver(),
 	}
 }
 

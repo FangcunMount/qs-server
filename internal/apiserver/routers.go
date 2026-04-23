@@ -153,8 +153,8 @@ func (r *Router) redisGovernance(c *gin.Context) {
 }
 
 func (r *Router) runtimeSnapshot(c *gin.Context) cacheobservability.RuntimeSnapshot {
-	if r != nil && r.container != nil && r.container.CacheGovernanceStatusService != nil {
-		snapshot, err := r.container.CacheGovernanceStatusService.GetRuntime(c.Request.Context())
+	if r != nil && r.container != nil && r.container.CacheGovernanceStatusService() != nil {
+		snapshot, err := r.container.CacheGovernanceStatusService().GetRuntime(c.Request.Context())
 		if err == nil && snapshot != nil {
 			return *snapshot
 		}

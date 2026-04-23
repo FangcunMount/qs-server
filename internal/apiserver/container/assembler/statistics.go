@@ -52,6 +52,8 @@ type statisticsModuleDeps struct {
 	queryPolicy      cachepolicy.CachePolicy
 	hotsetRecorder   scaleCache.HotsetRecorder
 	lockManager      *redislock.Manager
+	versionStore     scaleCache.VersionTokenStore
+	observer         *scaleCache.Observer
 }
 
 // NewStatisticsModule 创建统计模块
@@ -79,7 +81,13 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 
 	// 初始化 cache 层
 	if deps.redisClient != nil {
-		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(deps.redisClient, deps.cacheBuilder, deps.queryPolicy)
+		m.Cache = statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+			deps.redisClient,
+			deps.cacheBuilder,
+			deps.queryPolicy,
+			deps.versionStore,
+			deps.observer,
+		)
 	} else {
 		// Redis不可用时，创建空实现（查询时会降级到MySQL）
 		m.Cache = nil
@@ -150,6 +158,12 @@ func parseStatisticsModuleDeps(params []interface{}) (*statisticsModuleDeps, err
 	})
 	applyOptionalParam(params, 7, func(value *redislock.Manager) {
 		deps.lockManager = value
+	})
+	applyOptionalParam(params, 8, func(value scaleCache.VersionTokenStore) {
+		deps.versionStore = value
+	})
+	applyOptionalParam(params, 9, func(value *scaleCache.Observer) {
+		deps.observer = value
 	})
 	return deps, nil
 }

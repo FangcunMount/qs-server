@@ -225,7 +225,7 @@ func (r *GRPCRegistry) registerInternalService() error {
 		r.container.ActorModule.OperatorRepo,
 		authzSnapshot,
 		r.container.StatisticsModule.BehaviorProjectorService,
-		r.container.WarmupCoordinator,
+		r.container.WarmupCoordinator(),
 		r.container.QRCodeService, // 可能为 nil
 		r.container.MiniProgramTaskNotificationService,
 	)

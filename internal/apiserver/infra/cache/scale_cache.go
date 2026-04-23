@@ -19,26 +19,32 @@ const defaultScaleCacheTTL = 24 * time.Hour
 // CachedScaleRepository 带缓存的量表 Repository 装饰器
 // 实现 scale.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedScaleRepository struct {
-	repo   scale.Repository
-	client redis.UniversalClient
-	ttl    time.Duration
-	mapper *scaleInfra.ScaleMapper
-	keys   *rediskey.Builder
-	policy cachepolicy.CachePolicy
+	repo     scale.Repository
+	client   redis.UniversalClient
+	ttl      time.Duration
+	mapper   *scaleInfra.ScaleMapper
+	keys     *rediskey.Builder
+	policy   cachepolicy.CachePolicy
+	observer *Observer
 }
 
 // NewCachedScaleRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的量表缓存 Repository。
 func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) scale.Repository {
+	return NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+}
+
+func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) scale.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedScaleRepository{
-		repo:   repo,
-		client: client,
-		ttl:    policy.TTLOr(defaultScaleCacheTTL),
-		mapper: scaleInfra.NewScaleMapper(),
-		keys:   builder,
-		policy: policy,
+		repo:     repo,
+		client:   client,
+		ttl:      policy.TTLOr(defaultScaleCacheTTL),
+		mapper:   scaleInfra.NewScaleMapper(),
+		keys:     builder,
+		policy:   policy,
+		observer: observer,
 	}
 }
 
@@ -80,6 +86,7 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 		PolicyKey:      cachepolicy.PolicyScale,
 		CacheKey:       key,
 		Policy:         r.policy,
+		Observer:       r.observer,
 		GetCached:      func(ctx context.Context) (*scale.MedicalScale, error) { return r.getCache(ctx, code) },
 		Load:           func(ctx context.Context) (*scale.MedicalScale, error) { return r.repo.FindByCode(ctx, code) },
 		SetCached:      func(ctx context.Context, value *scale.MedicalScale) error { return r.setCache(ctx, code, value) },

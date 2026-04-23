@@ -50,6 +50,7 @@ type scaleModuleDeps struct {
 	scalePolicy       cachepolicy.CachePolicy
 	scaleListPolicy   cachepolicy.CachePolicy
 	hotsetRecorder    scaleCache.HotsetRecorder
+	observer          *scaleCache.Observer
 }
 
 // NewScaleModule 创建 Scale 模块
@@ -78,7 +79,7 @@ func (m *ScaleModule) Initialize(params ...interface{}) error {
 	baseRepo := scaleInfra.NewRepository(deps.mongoDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if deps.redisClient != nil {
-		m.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderAndPolicy(baseRepo, deps.redisClient, deps.cacheBuilder, deps.scalePolicy)
+		m.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(baseRepo, deps.redisClient, deps.cacheBuilder, deps.scalePolicy, deps.observer)
 	} else {
 		m.Repo = baseRepo
 	}
@@ -158,6 +159,9 @@ func parseScaleModuleDeps(params []interface{}) (*scaleModuleDeps, error) {
 	})
 	applyOptionalParam(params, 8, func(recorder scaleCache.HotsetRecorder) {
 		deps.hotsetRecorder = recorder
+	})
+	applyOptionalParam(params, 9, func(observer *scaleCache.Observer) {
+		deps.observer = observer
 	})
 	return deps, nil
 }

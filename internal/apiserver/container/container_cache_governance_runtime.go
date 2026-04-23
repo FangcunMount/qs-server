@@ -14,8 +14,8 @@ func (c *Container) WarmupCache(ctx context.Context) error {
 	if !c.initialized {
 		return fmt.Errorf("container not initialized")
 	}
-	if c.WarmupCoordinator != nil {
-		if err := c.WarmupCoordinator.WarmStartup(ctx); err != nil {
+	if coordinator := c.WarmupCoordinator(); coordinator != nil {
+		if err := coordinator.WarmStartup(ctx); err != nil {
 			return fmt.Errorf("cache governance startup warmup failed: %w", err)
 		}
 		return nil

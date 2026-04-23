@@ -46,6 +46,7 @@ type surveyModuleDeps struct {
 	identityService     *iam.IdentityService
 	questionnairePolicy cachepolicy.CachePolicy
 	hotsetRecorder      questionnaireCache.HotsetRecorder
+	observer            *questionnaireCache.Observer
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -101,7 +102,7 @@ func (m *SurveyModule) Initialize(params ...interface{}) error {
 	m.eventPublisher = deps.eventPublisher
 
 	// 初始化问卷子模块
-	if err := m.initQuestionnaireSubModule(deps.mongoDB, deps.redisClient, deps.cacheBuilder, deps.identityService, deps.questionnairePolicy, deps.hotsetRecorder); err != nil {
+	if err := m.initQuestionnaireSubModule(deps.mongoDB, deps.redisClient, deps.cacheBuilder, deps.identityService, deps.questionnairePolicy, deps.hotsetRecorder, deps.observer); err != nil {
 		return err
 	}
 
@@ -149,18 +150,21 @@ func parseSurveyModuleDeps(params []interface{}) (*surveyModuleDeps, error) {
 	applyOptionalParam(params, 6, func(recorder questionnaireCache.HotsetRecorder) {
 		deps.hotsetRecorder = recorder
 	})
+	applyOptionalParam(params, 7, func(observer *questionnaireCache.Observer) {
+		deps.observer = observer
+	})
 	return deps, nil
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset questionnaireCache.HotsetRecorder) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset questionnaireCache.HotsetRecorder, observer *questionnaireCache.Observer) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := quesMongoInfra.NewRepository(mongoDB)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
-		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(baseRepo, redisClient, cacheBuilder, policy)
+		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(baseRepo, redisClient, cacheBuilder, policy, observer)
 	} else {
 		sub.Repo = baseRepo
 	}

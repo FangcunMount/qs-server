@@ -31,8 +31,11 @@ func TestStatisticsCacheUsesNamespacedQueryKeys(t *testing.T) {
 	if value != "{\"ok\":true}" {
 		t.Fatalf("unexpected cache value: %s", value)
 	}
-	if !mr.Exists("stats-test:stats:query:system:1") {
-		t.Fatalf("expected namespaced stats query key")
+	if !mr.Exists("stats-test:query:stats:query:system:1:v0") {
+		t.Fatalf("expected versioned namespaced stats query key")
+	}
+	if mr.Exists("stats-test:query:version:stats:query:system:1") {
+		t.Fatalf("unexpected version token key for static fallback store")
 	}
 }
 
@@ -49,8 +52,8 @@ func TestStatisticsCacheUsesExplicitBuilderNamespace(t *testing.T) {
 	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
 		t.Fatalf("set query cache failed: %v", err)
 	}
-	if !mr.Exists("prod:cache:query:stats:query:system:1") {
-		t.Fatalf("expected explicit namespaced stats query key")
+	if !mr.Exists("prod:cache:query:query:stats:query:system:1:v0") {
+		t.Fatalf("expected explicit namespaced versioned stats query key")
 	}
 }
 
@@ -75,7 +78,7 @@ func TestStatisticsCacheAppliesPolicyTTLAndCompression(t *testing.T) {
 		t.Fatalf("set query cache failed: %v", err)
 	}
 
-	ttl := mr.TTL("prod:cache:query:stats:query:system:1")
+	ttl := mr.TTL("prod:cache:query:query:stats:query:system:1:v0")
 	if ttl <= 0 || ttl > 3*time.Minute {
 		t.Fatalf("expected policy ttl to be applied, got %v", ttl)
 	}
@@ -102,5 +105,33 @@ func TestStatisticsCacheDegradesRedisReadErrorToMiss(t *testing.T) {
 	}
 	if value != "" {
 		t.Fatalf("GetQueryCache() value = %q, want empty miss", value)
+	}
+}
+
+func TestStatisticsCacheSupportsMissingVersionTokenStoreKey(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	cache := NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+		client,
+		rediskey.NewBuilderWithNamespace("prod:cache:query"),
+		cachepolicy.CachePolicy{TTL: time.Minute},
+		nil,
+		nil,
+	)
+	ctx := context.Background()
+
+	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
+		t.Fatalf("SetQueryCache() error = %v", err)
+	}
+	got, err := cache.GetQueryCache(ctx, "system:1")
+	if err != nil {
+		t.Fatalf("GetQueryCache() error = %v", err)
+	}
+	if got != "{\"ok\":true}" {
+		t.Fatalf("GetQueryCache() = %q, want original payload", got)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 func (c *Container) buildEvaluationModuleInitializeParams() []interface{} {
@@ -25,16 +26,20 @@ func (c *Container) buildEvaluationModuleInitializeParams() []interface{} {
 		}
 	}
 
-	redisClient := c.objectRedisCache
-	queryRedisClient := c.queryRedisCache
+	redisClient := c.CacheClient(redisplane.FamilyObject)
+	queryRedisClient := c.CacheClient(redisplane.FamilyQuery)
 	if c.cacheOptions.DisableEvaluationCache {
 		redisClient = nil
 		queryRedisClient = nil
 	}
 
 	var versionStore scaleCache.VersionTokenStore
-	if queryRedisClient != nil && c.metaRedisCache != nil {
-		versionStore = scaleCache.NewRedisVersionTokenStoreWithKind(c.metaRedisCache, string(cachepolicy.PolicyAssessmentList))
+	if queryRedisClient != nil {
+		versionStore = scaleCache.NewRedisVersionTokenStoreWithKindAndObserver(
+			c.CacheClient(redisplane.FamilyMeta),
+			string(cachepolicy.PolicyAssessmentList),
+			c.cacheObserver(),
+		)
 	}
 
 	return []interface{}{
@@ -45,12 +50,13 @@ func (c *Container) buildEvaluationModuleInitializeParams() []interface{} {
 		questionnaireRepo,
 		c.eventPublisher,
 		redisClient,
-		redisHandleBuilder(c.objectRedisHandle),
-		c.policyCatalog.Policy(cachepolicy.PolicyAssessmentDetail),
+		c.CacheBuilder(redisplane.FamilyObject),
+		c.CachePolicy(cachepolicy.PolicyAssessmentDetail),
 		queryRedisClient,
-		redisHandleBuilder(c.queryRedisHandle),
-		c.policyCatalog.Policy(cachepolicy.PolicyAssessmentList),
+		c.CacheBuilder(redisplane.FamilyQuery),
+		c.CachePolicy(cachepolicy.PolicyAssessmentList),
 		versionStore,
+		c.cacheObserver(),
 	}
 }
 

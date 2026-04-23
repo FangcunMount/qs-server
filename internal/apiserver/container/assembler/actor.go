@@ -109,6 +109,12 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 			operationAccountSvc = svc
 		}
 	}
+	var observer *testeeCache.Observer
+	if len(params) > 8 {
+		if value, ok := params[8].(*testeeCache.Observer); ok {
+			observer = value
+		}
+	}
 	var authzAssign *iam.AuthzAssignmentClient
 	var authzSnap *iam.AuthzSnapshotLoader
 	if opAuthz != nil {
@@ -126,7 +132,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if len(params) > 3 {
 		if rc, ok := params[3].(redis.UniversalClient); ok && rc != nil {
-			m.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderAndPolicy(baseTesteeRepo, rc, cacheBuilder, testeePolicy)
+			m.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, rc, cacheBuilder, testeePolicy, observer)
 		} else {
 			m.TesteeRepo = baseTesteeRepo
 		}

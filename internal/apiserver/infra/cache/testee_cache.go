@@ -20,26 +20,32 @@ const (
 // CachedTesteeRepository 带缓存的受试者 Repository 装饰器
 // 实现 testee.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedTesteeRepository struct {
-	repo   testee.Repository
-	client redis.UniversalClient
-	ttl    time.Duration
-	mapper *testeeInfra.TesteeMapper
-	keys   *rediskey.Builder
-	policy cachepolicy.CachePolicy
+	repo     testee.Repository
+	client   redis.UniversalClient
+	ttl      time.Duration
+	mapper   *testeeInfra.TesteeMapper
+	keys     *rediskey.Builder
+	policy   cachepolicy.CachePolicy
+	observer *Observer
 }
 
 // NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
 func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) testee.Repository {
+	return NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+}
+
+func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) testee.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedTesteeRepository{
-		repo:   repo,
-		client: client,
-		ttl:    policy.TTLOr(defaultTesteeCacheTTL),
-		mapper: testeeInfra.NewTesteeMapper(),
-		keys:   builder,
-		policy: policy,
+		repo:     repo,
+		client:   client,
+		ttl:      policy.TTLOr(defaultTesteeCacheTTL),
+		mapper:   testeeInfra.NewTesteeMapper(),
+		keys:     builder,
+		policy:   policy,
+		observer: observer,
 	}
 }
 
@@ -55,6 +61,7 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 		PolicyKey: cachepolicy.PolicyTestee,
 		CacheKey:  key,
 		Policy:    r.policy,
+		Observer:  r.observer,
 		GetCached: func(ctx context.Context) (*testee.Testee, error) { return r.getCache(ctx, id) },
 		Load:      func(ctx context.Context) (*testee.Testee, error) { return r.repo.FindByID(ctx, id) },
 		SetCached: func(ctx context.Context, value *testee.Testee) error { return r.setCache(ctx, id, value) },

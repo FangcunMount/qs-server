@@ -18,26 +18,32 @@ const defaultPlanCacheTTL = 2 * time.Hour
 // CachedPlanRepository 带缓存的计划 Repository 装饰器
 // 实现 plan.AssessmentPlanRepository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedPlanRepository struct {
-	repo   plan.AssessmentPlanRepository
-	client redis.UniversalClient
-	ttl    time.Duration
-	mapper *planInfra.PlanMapper
-	keys   *rediskey.Builder
-	policy cachepolicy.CachePolicy
+	repo     plan.AssessmentPlanRepository
+	client   redis.UniversalClient
+	ttl      time.Duration
+	mapper   *planInfra.PlanMapper
+	keys     *rediskey.Builder
+	policy   cachepolicy.CachePolicy
+	observer *Observer
 }
 
 // NewCachedPlanRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的计划缓存 Repository。
 func NewCachedPlanRepositoryWithBuilderAndPolicy(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) plan.AssessmentPlanRepository {
+	return NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+}
+
+func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) plan.AssessmentPlanRepository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedPlanRepository{
-		repo:   repo,
-		client: client,
-		ttl:    policy.TTLOr(defaultPlanCacheTTL),
-		mapper: planInfra.NewPlanMapper(),
-		keys:   builder,
-		policy: policy,
+		repo:     repo,
+		client:   client,
+		ttl:      policy.TTLOr(defaultPlanCacheTTL),
+		mapper:   planInfra.NewPlanMapper(),
+		keys:     builder,
+		policy:   policy,
+		observer: observer,
 	}
 }
 
@@ -53,6 +59,7 @@ func (r *CachedPlanRepository) FindByID(ctx context.Context, id plan.AssessmentP
 		cachepolicy.PolicyPlan,
 		r.buildCacheKey(id),
 		r.policy,
+		r.observer,
 		func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.getCache(ctx, id) },
 		func(ctx context.Context) (*plan.AssessmentPlan, error) { return r.repo.FindByID(ctx, id) },
 		func(ctx context.Context, value *plan.AssessmentPlan) error { return r.setCache(ctx, id, value) },

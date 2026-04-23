@@ -19,26 +19,32 @@ const defaultAssessmentDetailCacheTTL = 2 * time.Hour
 // CachedAssessmentRepository 带缓存的测评 Repository 装饰器
 // 实现 assessment.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedAssessmentRepository struct {
-	repo   assessment.Repository
-	client redis.UniversalClient
-	ttl    time.Duration
-	mapper *assessmentInfra.AssessmentMapper
-	keys   *rediskey.Builder
-	policy cachepolicy.CachePolicy
+	repo     assessment.Repository
+	client   redis.UniversalClient
+	ttl      time.Duration
+	mapper   *assessmentInfra.AssessmentMapper
+	keys     *rediskey.Builder
+	policy   cachepolicy.CachePolicy
+	observer *Observer
 }
 
 // NewCachedAssessmentRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的测评缓存 Repository。
 func NewCachedAssessmentRepositoryWithBuilderAndPolicy(repo assessment.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) assessment.Repository {
+	return NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
+}
+
+func NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo assessment.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) assessment.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	return &CachedAssessmentRepository{
-		repo:   repo,
-		client: client,
-		ttl:    policy.TTLOr(defaultAssessmentDetailCacheTTL),
-		mapper: assessmentInfra.NewAssessmentMapper(),
-		keys:   builder,
-		policy: policy,
+		repo:     repo,
+		client:   client,
+		ttl:      policy.TTLOr(defaultAssessmentDetailCacheTTL),
+		mapper:   assessmentInfra.NewAssessmentMapper(),
+		keys:     builder,
+		policy:   policy,
+		observer: observer,
 	}
 }
 
@@ -54,6 +60,7 @@ func (r *CachedAssessmentRepository) FindByID(ctx context.Context, id assessment
 		cachepolicy.PolicyAssessmentDetail,
 		r.buildCacheKey(id),
 		r.policy,
+		r.observer,
 		func(ctx context.Context) (*assessment.Assessment, error) { return r.getCache(ctx, id) },
 		func(ctx context.Context) (*assessment.Assessment, error) { return r.repo.FindByID(ctx, id) },
 		func(ctx context.Context, value *assessment.Assessment) error { return r.setCache(ctx, id, value) },

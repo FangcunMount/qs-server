@@ -24,6 +24,10 @@ type MyAssessmentListCache struct {
 
 // NewMyAssessmentListCacheWithBuilderAndPolicy 创建带显式 builder/policy 的“我的测评列表”缓存。
 func NewMyAssessmentListCacheWithBuilderAndPolicy(c Cache, versionStore VersionTokenStore, keyBuilder *rediskey.Builder, policy cachepolicy.CachePolicy) *MyAssessmentListCache {
+	return NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c, versionStore, keyBuilder, policy, nil)
+}
+
+func NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c Cache, versionStore VersionTokenStore, keyBuilder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) *MyAssessmentListCache {
 	if c == nil {
 		return nil
 	}
@@ -34,13 +38,14 @@ func NewMyAssessmentListCacheWithBuilderAndPolicy(c Cache, versionStore VersionT
 		panic("cache key builder is required")
 	}
 	return &MyAssessmentListCache{
-		query: NewVersionedQueryCache(
+		query: NewVersionedQueryCacheWithObserver(
 			c,
 			versionStore,
 			cachepolicy.PolicyAssessmentList,
 			policy,
 			policy.TTLOr(defaultAssessmentListCacheTTL),
 			NewLocalHotCache[[]byte](30*time.Second, defaultAssessmentListLocalMaxEntries),
+			observer,
 		),
 		keyBuilder: keyBuilder,
 	}

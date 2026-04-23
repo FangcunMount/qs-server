@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/aliyunoss"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/silenceper/wechat/v2/cache"
 )
 
@@ -21,8 +22,8 @@ func (c *Container) initQRCodeGenerator() {
 }
 
 func (c *Container) buildWeChatSDKCache() cache.Cache {
-	if c != nil && c.sdkRedisCache != nil {
-		return wechatapi.NewRedisCacheAdapterWithBuilder(c.sdkRedisCache, redisHandleBuilder(c.sdkRedisHandle))
+	if client := c.CacheClient(redisplane.FamilySDK); client != nil {
+		return wechatapi.NewRedisCacheAdapterWithBuilder(client, c.CacheBuilder(redisplane.FamilySDK))
 	}
 	return cache.NewMemory()
 }

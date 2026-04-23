@@ -7,12 +7,14 @@ import (
 	"reflect"
 	"testing"
 
+	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -27,6 +29,47 @@ type fakeModule struct {
 	cleanup      error
 	checkCalls   int
 	cleanupCalls int
+}
+
+type fakeRedisResolver struct {
+	defaultClient redis.UniversalClient
+	profiles      map[string]redis.UniversalClient
+}
+
+func (r fakeRedisResolver) GetRedisClient() (redis.UniversalClient, error) {
+	return r.defaultClient, nil
+}
+
+func (r fakeRedisResolver) GetRedisClientByProfile(profile string) (redis.UniversalClient, error) {
+	if client, ok := r.profiles[profile]; ok {
+		return client, nil
+	}
+	return nil, nil
+}
+
+func (r fakeRedisResolver) GetRedisProfileStatus(profile string) cbdatabase.RedisProfileStatus {
+	if _, ok := r.profiles[profile]; ok {
+		return cbdatabase.RedisProfileStatus{State: cbdatabase.RedisProfileStateAvailable}
+	}
+	return cbdatabase.RedisProfileStatus{State: cbdatabase.RedisProfileStateMissing}
+}
+
+func newTestCacheSubsystem(t *testing.T, opts ContainerCacheOptions, profileClients map[string]redis.UniversalClient) *cachebootstrap.Subsystem {
+	t.Helper()
+
+	runtimeOpts := &genericoptions.RedisRuntimeOptions{
+		Namespace: "test",
+		Families: map[string]*genericoptions.RedisRuntimeFamilyRoute{
+			string(redisplane.FamilyStatic): {RedisProfile: "static", NamespaceSuffix: "static"},
+			string(redisplane.FamilyObject): {RedisProfile: "object", NamespaceSuffix: "object"},
+			string(redisplane.FamilyQuery):  {RedisProfile: "query", NamespaceSuffix: "query"},
+			string(redisplane.FamilyMeta):   {RedisProfile: "meta", NamespaceSuffix: "meta"},
+			string(redisplane.FamilySDK):    {RedisProfile: "sdk", NamespaceSuffix: "sdk"},
+			string(redisplane.FamilyLock):   {RedisProfile: "lock", NamespaceSuffix: "lock"},
+		},
+	}
+
+	return cachebootstrap.NewSubsystem("apiserver", fakeRedisResolver{profiles: profileClients}, runtimeOpts, opts)
 }
 
 func (*fakeModule) Initialize(...interface{}) error { return nil }
@@ -114,29 +157,29 @@ func TestContainerBuildActorModuleInitializeParamsUsesObjectCacheBuilderAndPolic
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
-	builder := rediskey.NewBuilderWithNamespace("actor")
-	policy := cachepolicy.CachePolicy{TTL: 5}
-	c.objectRedisHandle = &redisplane.Handle{Builder: builder}
-	c.policyCatalog = cachepolicy.NewPolicyCatalog(nil, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
-		cachepolicy.PolicyTestee: policy,
-	})
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
+		TTL: ContainerCacheTTLOptions{Testee: 5},
+	}, nil)
 
 	params := c.buildActorModuleInitializeParams()
-	if len(params) != 8 {
-		t.Fatalf("len(params) = %d, want 8", len(params))
+	if len(params) != 9 {
+		t.Fatalf("len(params) = %d, want 9", len(params))
 	}
-	if params[4] != builder {
-		t.Fatalf("cache builder = %#v, want %#v", params[4], builder)
+	if params[4] != c.CacheBuilder(redisplane.FamilyObject) {
+		t.Fatalf("cache builder = %#v, want %#v", params[4], c.CacheBuilder(redisplane.FamilyObject))
 	}
 	gotPolicy, ok := params[5].(cachepolicy.CachePolicy)
 	if !ok {
 		t.Fatalf("policy arg type = %T, want cachepolicy.CachePolicy", params[5])
 	}
-	if gotPolicy != policy {
-		t.Fatalf("policy = %#v, want %#v", gotPolicy, policy)
+	if gotPolicy != c.CachePolicy(cachepolicy.PolicyTestee) {
+		t.Fatalf("policy = %#v, want %#v", gotPolicy, c.CachePolicy(cachepolicy.PolicyTestee))
 	}
 	if !isNilInterfaceValue(params[1]) || !isNilInterfaceValue(params[2]) || !isNilInterfaceValue(params[6]) || !isNilInterfaceValue(params[7]) {
 		t.Fatalf("unexpected IAM deps in params: %#v", params)
+	}
+	if params[8] != c.cacheObserver() {
+		t.Fatalf("observer = %#v, want %#v", params[8], c.cacheObserver())
 	}
 }
 
@@ -144,33 +187,33 @@ func TestContainerBuildSurveyModuleInitializeParamsUsesStaticCacheBuilderAndPoli
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
-	builder := rediskey.NewBuilderWithNamespace("survey")
-	policy := cachepolicy.CachePolicy{TTL: 7}
 	c.eventPublisher = event.NewNopEventPublisher()
-	c.staticRedisHandle = &redisplane.Handle{Builder: builder}
-	c.policyCatalog = cachepolicy.NewPolicyCatalog(nil, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
-		cachepolicy.PolicyQuestionnaire: policy,
-	})
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
+		TTL: ContainerCacheTTLOptions{Questionnaire: 7},
+	}, nil)
 
 	params := c.buildSurveyModuleInitializeParams()
-	if len(params) != 7 {
-		t.Fatalf("len(params) = %d, want 7", len(params))
+	if len(params) != 8 {
+		t.Fatalf("len(params) = %d, want 8", len(params))
 	}
 	if params[1] != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", params[1], c.eventPublisher)
 	}
-	if params[3] != builder {
-		t.Fatalf("cache builder = %#v, want %#v", params[3], builder)
+	if params[3] != c.CacheBuilder(redisplane.FamilyStatic) {
+		t.Fatalf("cache builder = %#v, want %#v", params[3], c.CacheBuilder(redisplane.FamilyStatic))
 	}
 	gotPolicy, ok := params[5].(cachepolicy.CachePolicy)
 	if !ok {
 		t.Fatalf("policy arg type = %T, want cachepolicy.CachePolicy", params[5])
 	}
-	if gotPolicy != policy {
-		t.Fatalf("policy = %#v, want %#v", gotPolicy, policy)
+	if gotPolicy != c.CachePolicy(cachepolicy.PolicyQuestionnaire) {
+		t.Fatalf("policy = %#v, want %#v", gotPolicy, c.CachePolicy(cachepolicy.PolicyQuestionnaire))
 	}
 	if !isNilInterfaceValue(params[4]) {
 		t.Fatalf("identity service = %#v, want nil without IAM", params[4])
+	}
+	if params[7] != c.cacheObserver() {
+		t.Fatalf("observer = %#v, want %#v", params[7], c.cacheObserver())
 	}
 }
 
@@ -180,38 +223,39 @@ func TestContainerBuildStatisticsModuleInitializeParamsSelectsQueryCacheAndLockM
 	queryClient := redis.NewClient(&redis.Options{Addr: "127.0.0.1:0"})
 	t.Cleanup(func() { _ = queryClient.Close() })
 
-	lockBuilder := rediskey.NewBuilderWithNamespace("lock")
-	queryBuilder := rediskey.NewBuilderWithNamespace("query")
-	policy := cachepolicy.CachePolicy{TTL: 11}
-
 	c := NewContainer(nil, nil, nil)
-	c.queryRedisCache = queryClient
-	c.queryRedisHandle = &redisplane.Handle{Builder: queryBuilder}
-	c.lockRedisHandle = &redisplane.Handle{Builder: lockBuilder}
-	c.policyCatalog = cachepolicy.NewPolicyCatalog(nil, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
-		cachepolicy.PolicyStatsQuery: policy,
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, map[string]redis.UniversalClient{
+		"query": queryClient,
 	})
 
 	params := c.buildStatisticsModuleInitializeParams()
-	if len(params) != 8 {
-		t.Fatalf("len(params) = %d, want 8", len(params))
+	if len(params) != 10 {
+		t.Fatalf("len(params) = %d, want 10", len(params))
 	}
 	if params[1] != queryClient {
 		t.Fatalf("redis client = %#v, want query cache %#v", params[1], queryClient)
 	}
-	if params[2] != queryBuilder {
-		t.Fatalf("cache builder = %#v, want %#v", params[2], queryBuilder)
+	if params[2] != c.CacheBuilder(redisplane.FamilyQuery) {
+		t.Fatalf("cache builder = %#v, want %#v", params[2], c.CacheBuilder(redisplane.FamilyQuery))
 	}
 	gotPolicy, ok := params[5].(cachepolicy.CachePolicy)
 	if !ok {
 		t.Fatalf("policy arg type = %T, want cachepolicy.CachePolicy", params[5])
 	}
-	if gotPolicy != policy {
-		t.Fatalf("policy = %#v, want %#v", gotPolicy, policy)
+	if gotPolicy != c.CachePolicy(cachepolicy.PolicyStatsQuery) {
+		t.Fatalf("policy = %#v, want %#v", gotPolicy, c.CachePolicy(cachepolicy.PolicyStatsQuery))
 	}
 	lockManager, ok := params[7].(*redislock.Manager)
 	if !ok || lockManager == nil {
 		t.Fatalf("lock manager = %#v, want *redislock.Manager", params[7])
+	}
+	if _, ok := params[8].(interface {
+		Current(context.Context, string) (uint64, error)
+	}); !ok {
+		t.Fatalf("version store = %#v, want VersionTokenStore", params[8])
+	}
+	if params[9] != c.cacheObserver() {
+		t.Fatalf("observer = %#v, want %#v", params[9], c.cacheObserver())
 	}
 
 	c.cacheOptions.DisableStatisticsCache = true
