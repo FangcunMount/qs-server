@@ -1,6 +1,6 @@
 module github.com/FangcunMount/qs-server
 
-go 1.24.13
+go 1.25.9
 
 require (
 	github.com/FangcunMount/component-base v0.5.3

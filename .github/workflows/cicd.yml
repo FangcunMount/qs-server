@@ -54,7 +54,7 @@ on:
 env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_REPOSITORY: fangcunmount
-  GO_VERSION: '1.24.13'
+  GO_VERSION: '1.25.9'
   GOTOOLCHAIN: auto
   DOCS_VERIFY: 'false' # 需要文档校验时设为 'true'（例如 workflow_dispatch 手动触发）
 

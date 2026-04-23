@@ -26,7 +26,9 @@ GO_LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIM
 GOLANGCI_LINT_VERSION := v2.1.6
 GOVULNCHECK_VERSION := v1.1.4
 GOSEC_VERSION := v2.22.3
-GO_VERSION := 1.24.13
+GO_VERSION := 1.25.9
+GO_TOOLCHAIN := go$(GO_VERSION)
+GOLANGCI_LINT_BIN = $(CURDIR)/$(BIN_DIR)/golangci-lint
 
 # 目录结构
 BIN_DIR := bin
@@ -94,7 +96,7 @@ COLOR_RED := \033[31m
 .PHONY: dev dev-apiserver dev-collection dev-worker dev-stop dev-status dev-logs
 .PHONY: test test-unit test-coverage test-race test-bench test-all
 .PHONY: test-submit test-message-queue
-.PHONY: lint fmt fmt-check maintainability-lint maintainability-lint-ci tier1-test-policy
+.PHONY: lint fmt fmt-check maintainability-lint maintainability-lint-ci tier1-test-policy ensure-golangci-lint
 .PHONY: security security-govulncheck security-govulncheck-ci security-gosec security-gosec-ci
 .PHONY: deps deps-download deps-tidy deps-verify deps-check
 .PHONY: install-tools install-air install-golangci-lint install-security-tools install-govulncheck install-gosec create-dirs
@@ -587,34 +589,32 @@ test-submit: ## 测试答卷提交
 # 代码质量
 # ============================================================================
 
-lint: ## 运行代码检查
-	@echo "$(COLOR_CYAN)🔍 运行代码检查...$(COLOR_RESET)"
-	@if ! command -v golangci-lint > /dev/null 2>&1; then \
-		echo "$(COLOR_RED)❌ golangci-lint 未安装，请先运行 'make install-golangci-lint' 或 'make install-tools'$(COLOR_RESET)"; \
-		exit 1; \
+ensure-golangci-lint:
+	@mkdir -p "$(BIN_DIR)"
+	@tool="$(GOLANGCI_LINT_BIN)"; \
+	target_go="$(GO_TOOLCHAIN)"; \
+	built_go="$$( "$$tool" version 2>/dev/null | sed -n 's/.*built with \(go[^ ]*\).*/\1/p')"; \
+	if [ ! -x "$$tool" ] || [ "$$built_go" != "$$target_go" ]; then \
+		echo "$(COLOR_CYAN)📦 安装 golangci-lint ($(GOLANGCI_LINT_VERSION)) 到仓库本地 bin/...$(COLOR_RESET)"; \
+		env -u GOVERSION GOSUMDB=sum.golang.org GOTOOLCHAIN="$(GO_TOOLCHAIN)" GOBIN="$(CURDIR)/$(BIN_DIR)" $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
 	fi
-	@golangci-lint run --timeout=5m
 
-maintainability-lint: ## 运行 maintainability advisory 检查
+lint: ensure-golangci-lint ## 运行代码检查
+	@echo "$(COLOR_CYAN)🔍 运行代码检查...$(COLOR_RESET)"
+	@"$(GOLANGCI_LINT_BIN)" run --timeout=5m
+
+maintainability-lint: ensure-golangci-lint ## 运行 maintainability advisory 检查
 	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查...$(COLOR_RESET)"
-	@if ! command -v golangci-lint > /dev/null 2>&1; then \
-		echo "$(COLOR_RED)❌ golangci-lint 未安装，请先运行 'make install-golangci-lint' 或 'make install-tools'$(COLOR_RESET)"; \
-		exit 1; \
-	fi
 	@mkdir -p "$(MAINTAINABILITY_DIR)"
-	@golangci-lint run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
+	@"$(GOLANGCI_LINT_BIN)" run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
 		--output.text.path "$(MAINTAINABILITY_DIR)/maintainability.txt" \
 		--output.json.path "$(MAINTAINABILITY_DIR)/maintainability.json"
 	@cat "$(MAINTAINABILITY_DIR)/maintainability.txt"
 
-maintainability-lint-ci: ## 运行 maintainability advisory 检查并导出报告
+maintainability-lint-ci: ensure-golangci-lint ## 运行 maintainability advisory 检查并导出报告
 	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查（CI）...$(COLOR_RESET)"
-	@if ! command -v golangci-lint > /dev/null 2>&1; then \
-		echo "$(COLOR_RED)❌ golangci-lint 未安装，请先运行 'make install-golangci-lint' 或 'make install-tools'$(COLOR_RESET)"; \
-		exit 1; \
-	fi
 	@mkdir -p "$(MAINTAINABILITY_DIR)"
-	@golangci-lint run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
+	@"$(GOLANGCI_LINT_BIN)" run -c .golangci-maintainability.yml --timeout=8m --issues-exit-code=0 \
 		--output.text.path "$(MAINTAINABILITY_DIR)/maintainability.txt" \
 		--output.json.path "$(MAINTAINABILITY_DIR)/maintainability.json"
 	@echo "$(COLOR_GREEN)✅ maintainability 报告已写入 $(MAINTAINABILITY_DIR)$(COLOR_RESET)"
@@ -741,7 +741,8 @@ install-tools: ## 安装开发工具
 	@echo "安装 Air (热更新)..."
 	@$(GO) install github.com/air-verse/air@latest
 	@echo "安装 golangci-lint ($(GOLANGCI_LINT_VERSION))..."
-	@$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@$(MAKE) create-dirs
+	@env -u GOVERSION GOSUMDB=sum.golang.org GOTOOLCHAIN="$(GO_TOOLCHAIN)" GOBIN="$(CURDIR)/$(BIN_DIR)" $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "$(COLOR_GREEN)✅ 工具安装完成$(COLOR_RESET)"
 
 install-air: ## 安装 Air 热更新工具
@@ -750,7 +751,8 @@ install-air: ## 安装 Air 热更新工具
 
 install-golangci-lint: ## 安装 golangci-lint
 	@echo "📦 安装 golangci-lint ($(GOLANGCI_LINT_VERSION))..."
-	@$(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@$(MAKE) create-dirs
+	@env -u GOVERSION GOSUMDB=sum.golang.org GOTOOLCHAIN="$(GO_TOOLCHAIN)" GOBIN="$(CURDIR)/$(BIN_DIR)" $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 install-security-tools: install-govulncheck install-gosec ## 安装安全扫描工具
 	@echo "$(COLOR_GREEN)✅ 安全扫描工具安装完成$(COLOR_RESET)"

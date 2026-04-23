@@ -384,7 +384,7 @@ func renderMarkdown(report reportData) string {
 	} else {
 		for _, item := range report.ActiveStdlib {
 			fmt.Fprintf(&b, "- `%s` %s  \n", item.ID, item.Summary)
-			fmt.Fprintf(&b, "  当前：`%s`；修复于：`%s`；处置：需要升级 Go toolchain，当前 `1.24.x` 无法单靠依赖升级消掉。", item.CurrentVersion, item.FixedVersion)
+			fmt.Fprintf(&b, "  当前：`%s`；修复于：`%s`；处置：需要升级 Go toolchain，无法单靠依赖升级消掉。", item.CurrentVersion, item.FixedVersion)
 			if item.URL != "" {
 				fmt.Fprintf(&b, "  参考：%s", item.URL)
 			}
