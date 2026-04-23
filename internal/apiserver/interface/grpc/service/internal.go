@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -48,8 +46,7 @@ type InternalService struct {
 	operatorLifecycleService  operatorApp.OperatorLifecycleService
 	operatorAuthService       operatorApp.OperatorAuthorizationService
 	operatorQueryService      operatorApp.OperatorQueryService
-	operatorRepo              domainoperator.Repository
-	authzSnapshot             *iaminfra.AuthzSnapshotLoader
+	operatorRoleSyncer        operatorBootstrapRoleSyncer
 	behaviorProjectorService  statisticsApp.BehaviorProjectorService
 	warmupCoordinator         cachegov.Coordinator
 	// 小程序码生成服务（可选）
@@ -62,6 +59,30 @@ type assessmentScaleContext struct {
 	medicalScaleID   *uint64
 	medicalScaleCode *string
 	medicalScaleName *string
+}
+
+type operatorBootstrapRoleSyncer interface {
+	SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error
+}
+
+type authzSnapshotOperatorRoleSyncer struct {
+	operatorRepo  domainoperator.Repository
+	authzSnapshot *iaminfra.AuthzSnapshotLoader
+}
+
+func (s authzSnapshotOperatorRoleSyncer) SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error {
+	if s.operatorRepo == nil || s.authzSnapshot == nil {
+		return nil
+	}
+
+	op, err := s.operatorRepo.FindByID(ctx, domainoperator.ID(meta.FromUint64(operatorID)))
+	if err != nil {
+		return fmt.Errorf("load operator aggregate failed: %w", err)
+	}
+	if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.authzSnapshot, s.operatorRepo, orgID, op); err != nil {
+		return fmt.Errorf("sync operator roles from snapshot failed: %w", err)
+	}
+	return nil
 }
 
 // NewInternalService 创建内部 gRPC 服务
@@ -88,6 +109,13 @@ func NewInternalService(
 	if q, ok := qrCodeService.(qrcodeApp.QRCodeService); ok {
 		qrService = q
 	}
+	var roleSyncer operatorBootstrapRoleSyncer
+	if operatorRepo != nil || authzSnapshot != nil {
+		roleSyncer = authzSnapshotOperatorRoleSyncer{
+			operatorRepo:  operatorRepo,
+			authzSnapshot: authzSnapshot,
+		}
+	}
 
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
@@ -101,8 +129,7 @@ func NewInternalService(
 		operatorLifecycleService:           operatorLifecycleService,
 		operatorAuthService:                operatorAuthService,
 		operatorQueryService:               operatorQueryService,
-		operatorRepo:                       operatorRepo,
-		authzSnapshot:                      authzSnapshot,
+		operatorRoleSyncer:                 roleSyncer,
 		behaviorProjectorService:           behaviorProjectorService,
 		warmupCoordinator:                  warmupCoordinator,
 		qrCodeService:                      qrService,
@@ -119,35 +146,7 @@ func (s *InternalService) ProjectBehaviorEvent(
 	ctx context.Context,
 	req *pb.ProjectBehaviorEventRequest,
 ) (*pb.ProjectBehaviorEventResponse, error) {
-	if s.behaviorProjectorService == nil {
-		return nil, status.Error(codes.FailedPrecondition, "behavior projector service is not available")
-	}
-	if req == nil || req.EventId == "" || req.EventType == "" || req.OrgId == 0 || req.OccurredAt == nil {
-		return nil, status.Error(codes.InvalidArgument, "event_id, event_type, org_id and occurred_at are required")
-	}
-
-	result, err := s.behaviorProjectorService.ProjectBehaviorEvent(ctx, statisticsApp.BehaviorProjectEventInput{
-		EventID:           req.EventId,
-		EventType:         req.EventType,
-		OrgID:             req.OrgId,
-		ClinicianID:       req.ClinicianId,
-		SourceClinicianID: req.SourceClinicianId,
-		EntryID:           req.EntryId,
-		TesteeID:          req.TesteeId,
-		AnswerSheetID:     req.AnswersheetId,
-		AssessmentID:      req.AssessmentId,
-		ReportID:          req.ReportId,
-		FailureReason:     req.FailureReason,
-		OccurredAt:        req.OccurredAt.AsTime(),
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &pb.ProjectBehaviorEventResponse{
-		Status:  string(result.Status),
-		Message: "ok",
-	}, nil
+	return newBehaviorProjectionFlow(s).ProjectBehaviorEvent(ctx, req)
 }
 
 // CalculateAnswerSheetScore 计算答卷分数
@@ -156,42 +155,7 @@ func (s *InternalService) CalculateAnswerSheetScore(
 	ctx context.Context,
 	req *pb.CalculateAnswerSheetScoreRequest,
 ) (*pb.CalculateAnswerSheetScoreResponse, error) {
-	l := logger.L(ctx)
-
-	l.Infow("gRPC: 收到答卷计分请求",
-		"action", "calculate_answersheet_score",
-		"answersheet_id", req.AnswersheetId,
-	)
-
-	// 验证参数
-	if req.AnswersheetId == 0 {
-		return &pb.CalculateAnswerSheetScoreResponse{
-			Success: false,
-			Message: "answersheet_id 不能为空",
-		}, nil
-	}
-
-	// 调用应用服务计算分数
-	err := s.answerSheetScoringService.CalculateAndSave(ctx, req.AnswersheetId)
-	if err != nil {
-		l.Errorw("答卷计分失败",
-			"answersheet_id", req.AnswersheetId,
-			"error", err.Error(),
-		)
-		return &pb.CalculateAnswerSheetScoreResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	l.Infow("答卷计分成功",
-		"answersheet_id", req.AnswersheetId,
-	)
-
-	return &pb.CalculateAnswerSheetScoreResponse{
-		Success: true,
-		Message: "计分成功",
-	}, nil
+	return newAssessmentFlow(s).CalculateAnswerSheetScore(ctx, req)
 }
 
 // CreateAssessmentFromAnswerSheet 从答卷创建测评
@@ -200,29 +164,7 @@ func (s *InternalService) CreateAssessmentFromAnswerSheet(
 	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
-	l := logger.L(ctx)
-
-	l.Infow("gRPC: 收到从答卷创建测评请求",
-		"action", "create_assessment_from_answersheet",
-		"answersheet_id", req.AnswersheetId,
-		"questionnaire_code", req.QuestionnaireCode,
-		"filler_id", req.FillerId,
-		"task_id", req.TaskId,
-	)
-
-	if err := validateCreateAssessmentFromAnswerSheetRequest(req); err != nil {
-		return nil, err
-	}
-
-	scaleCtx := s.resolveAssessmentScaleContext(ctx, req.QuestionnaireCode)
-	dto := buildCreateAssessmentDTO(req, scaleCtx)
-	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, scaleCtx.medicalScaleCode, &dto)
-
-	if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
-		return response, nil
-	}
-
-	return s.createAssessmentFromAnswerSheet(ctx, l, req, dto, matchedTask, scaleCtx.medicalScaleID != nil)
+	return newAssessmentFlow(s).CreateAssessmentFromAnswerSheet(ctx, req)
 }
 
 func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFromAnswerSheetRequest) error {
@@ -601,72 +543,7 @@ func (s *InternalService) EvaluateAssessment(
 	ctx context.Context,
 	req *pb.EvaluateAssessmentRequest,
 ) (*pb.EvaluateAssessmentResponse, error) {
-	l := logger.L(ctx)
-
-	l.Infow("gRPC: 收到执行评估请求",
-		"action", "evaluate_assessment",
-		"assessment_id", req.AssessmentId,
-	)
-
-	// 验证参数
-	if req.AssessmentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
-	}
-
-	// 调用评估引擎
-	err := s.engineService.Evaluate(ctx, req.AssessmentId)
-	if err != nil {
-		l.Errorw("执行评估失败",
-			"action", "evaluate_assessment",
-			"assessment_id", req.AssessmentId,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return &pb.EvaluateAssessmentResponse{
-			Success: false,
-			Status:  "failed",
-			Message: err.Error(),
-		}, nil
-	}
-
-	// 获取评估后的测评信息
-	result, err := s.managementService.GetByID(ctx, req.AssessmentId)
-	if err != nil {
-		l.Warnw("获取评估结果失败",
-			"assessment_id", req.AssessmentId,
-			"error", err.Error(),
-		)
-		return &pb.EvaluateAssessmentResponse{
-			Success: true,
-			Status:  "interpreted",
-			Message: "评估完成，但获取结果失败",
-		}, nil
-	}
-
-	var totalScore float64
-	var riskLevel string
-	if result.TotalScore != nil {
-		totalScore = *result.TotalScore
-	}
-	if result.RiskLevel != nil {
-		riskLevel = *result.RiskLevel
-	}
-
-	l.Infow("执行评估成功",
-		"action", "evaluate_assessment",
-		"assessment_id", req.AssessmentId,
-		"total_score", totalScore,
-		"risk_level", riskLevel,
-		"result", "success",
-	)
-
-	return &pb.EvaluateAssessmentResponse{
-		Success:    true,
-		Status:     "interpreted",
-		Message:    "评估完成",
-		TotalScore: totalScore,
-		RiskLevel:  riskLevel,
-	}, nil
+	return newAssessmentFlow(s).EvaluateAssessment(ctx, req)
 }
 
 // TagTestee 给受试者打标签
@@ -677,56 +554,7 @@ func (s *InternalService) TagTestee(
 	ctx context.Context,
 	req *pb.TagTesteeRequest,
 ) (*pb.TagTesteeResponse, error) {
-	l := logger.L(ctx)
-
-	l.Infow("gRPC: 收到给受试者打标签请求",
-		"action", "tag_testee",
-		"testee_id", req.TesteeId,
-		"risk_level", req.RiskLevel,
-		"scale_code", req.ScaleCode,
-		"high_risk_factors_count", len(req.HighRiskFactors),
-		"mark_key_focus", req.MarkKeyFocus,
-	)
-
-	// 参数验证
-	if req.TesteeId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
-	}
-
-	// 调用应用服务层处理业务逻辑
-	// 所有标签更新策略、风险等级判断等业务规则都在应用服务层
-	result, err := s.testeeTaggingService.TagByAssessmentResult(
-		ctx,
-		req.TesteeId,
-		req.RiskLevel,
-		req.ScaleCode,
-		req.HighRiskFactors,
-		req.MarkKeyFocus,
-	)
-	if err != nil {
-		l.Errorw("给受试者打标签失败",
-			"testee_id", req.TesteeId,
-			"risk_level", req.RiskLevel,
-			"scale_code", req.ScaleCode,
-			"error", err.Error(),
-		)
-		return nil, status.Errorf(codes.Internal, "给受试者打标签失败: %v", err)
-	}
-
-	l.Infow("给受试者打标签成功",
-		"action", "tag_testee",
-		"testee_id", req.TesteeId,
-		"tags_added_count", len(result.TagsAdded),
-		"tags_removed_count", len(result.TagsRemoved),
-		"key_focus_marked", result.KeyFocusMarked,
-	)
-
-	return &pb.TagTesteeResponse{
-		Success:        true,
-		TagsAdded:      result.TagsAdded,
-		KeyFocusMarked: result.KeyFocusMarked,
-		Message:        fmt.Sprintf("标签更新成功：添加 %d 个，移除 %d 个", len(result.TagsAdded), len(result.TagsRemoved)),
-	}, nil
+	return newAssessmentFlow(s).TagTestee(ctx, req)
 }
 
 // ==================== 小程序码生成操作 ====================
@@ -737,27 +565,14 @@ func (s *InternalService) GenerateQuestionnaireQRCode(
 	ctx context.Context,
 	req *pb.GenerateQuestionnaireQRCodeRequest,
 ) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
-	return s.generateQuestionnaireQRCode(ctx, req)
+	return newNotificationFlow(s).GenerateQuestionnaireQRCode(ctx, req)
 }
 
 func (s *InternalService) HandleQuestionnairePublishedPostActions(
 	ctx context.Context,
 	req *pb.GenerateQuestionnaireQRCodeRequest,
 ) (*pb.GenerateQuestionnaireQRCodeResponse, error) {
-	resp, err := s.generateQuestionnaireQRCode(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	if s.warmupCoordinator != nil {
-		if warmErr := s.warmupCoordinator.HandleQuestionnairePublished(ctx, req.GetCode(), req.GetVersion()); warmErr != nil {
-			logger.L(ctx).Warnw("questionnaire publish post-actions warmup failed",
-				"code", req.GetCode(),
-				"version", req.GetVersion(),
-				"error", warmErr,
-			)
-		}
-	}
-	return resp, nil
+	return newNotificationFlow(s).HandleQuestionnairePublishedPostActions(ctx, req)
 }
 
 func (s *InternalService) generateQuestionnaireQRCode(
@@ -826,26 +641,14 @@ func (s *InternalService) GenerateScaleQRCode(
 	ctx context.Context,
 	req *pb.GenerateScaleQRCodeRequest,
 ) (*pb.GenerateScaleQRCodeResponse, error) {
-	return s.generateScaleQRCode(ctx, req)
+	return newNotificationFlow(s).GenerateScaleQRCode(ctx, req)
 }
 
 func (s *InternalService) HandleScalePublishedPostActions(
 	ctx context.Context,
 	req *pb.GenerateScaleQRCodeRequest,
 ) (*pb.GenerateScaleQRCodeResponse, error) {
-	resp, err := s.generateScaleQRCode(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	if s.warmupCoordinator != nil {
-		if warmErr := s.warmupCoordinator.HandleScalePublished(ctx, req.GetCode()); warmErr != nil {
-			logger.L(ctx).Warnw("scale publish post-actions warmup failed",
-				"code", req.GetCode(),
-				"error", warmErr,
-			)
-		}
-	}
-	return resp, nil
+	return newNotificationFlow(s).HandleScalePublishedPostActions(ctx, req)
 }
 
 func (s *InternalService) generateScaleQRCode(
@@ -907,77 +710,7 @@ func (s *InternalService) SendTaskOpenedMiniProgramNotification(
 	ctx context.Context,
 	req *pb.SendTaskOpenedMiniProgramNotificationRequest,
 ) (*pb.SendTaskOpenedMiniProgramNotificationResponse, error) {
-	l := logger.L(ctx)
-
-	l.Infow("gRPC: 收到 task.opened 小程序通知请求",
-		"action", "send_task_opened_mini_program_notification",
-		"task_id", req.GetTaskId(),
-		"testee_id", req.GetTesteeId(),
-	)
-
-	if s.miniProgramTaskNotificationService == nil {
-		l.Warnw("小程序 task 通知服务未配置",
-			"action", "send_task_opened_mini_program_notification",
-			"task_id", req.GetTaskId(),
-		)
-		return &pb.SendTaskOpenedMiniProgramNotificationResponse{
-			Success: false,
-			Skipped: true,
-			Message: "小程序 task 通知服务未配置",
-		}, nil
-	}
-	if req.GetTaskId() == "" || req.GetTesteeId() == 0 {
-		return nil, status.Error(codes.InvalidArgument, "task_id 和 testee_id 不能为空")
-	}
-
-	openAt := time.Time{}
-	if req.GetOpenAt() != nil {
-		openAt = req.GetOpenAt().AsTime()
-	}
-
-	result, err := s.miniProgramTaskNotificationService.SendTaskOpened(ctx, notificationApp.TaskOpenedDTO{
-		OrgID:    req.GetOrgId(),
-		TaskID:   req.GetTaskId(),
-		TesteeID: req.GetTesteeId(),
-		EntryURL: req.GetEntryUrl(),
-		OpenAt:   openAt,
-	})
-	if err != nil {
-		l.Errorw("发送 task.opened 小程序通知失败",
-			"action", "send_task_opened_mini_program_notification",
-			"task_id", req.GetTaskId(),
-			"testee_id", req.GetTesteeId(),
-			"error", err.Error(),
-		)
-		return &pb.SendTaskOpenedMiniProgramNotificationResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	l.Infow("发送 task.opened 小程序通知完成",
-		"action", "send_task_opened_mini_program_notification",
-		"task_id", req.GetTaskId(),
-		"testee_id", req.GetTesteeId(),
-		"sent_count", result.SentCount,
-		"skipped", result.Skipped,
-		"recipient_source", result.RecipientSource,
-		"recipient_open_ids", strings.Join(result.RecipientOpenIDs, ","),
-		"message", result.Message,
-	)
-
-	sentCount, err := protoInt32FromInt("sent_count", result.SentCount)
-	if err != nil {
-		return nil, err
-	}
-	return &pb.SendTaskOpenedMiniProgramNotificationResponse{
-		Success:          result.SentCount > 0,
-		SentCount:        sentCount,
-		RecipientOpenIds: result.RecipientOpenIDs,
-		RecipientSource:  result.RecipientSource,
-		Skipped:          result.Skipped,
-		Message:          result.Message,
-	}, nil
+	return newNotificationFlow(s).SendTaskOpenedMiniProgramNotification(ctx, req)
 }
 
 // BootstrapOperator 自举首个操作者。
@@ -985,147 +718,5 @@ func (s *InternalService) BootstrapOperator(
 	ctx context.Context,
 	req *pb.BootstrapOperatorRequest,
 ) (*pb.BootstrapOperatorResponse, error) {
-	l := logger.L(ctx)
-	l.Infow("gRPC: 收到 operator bootstrap 请求",
-		"action", "bootstrap_operator",
-		"org_id", req.OrgId,
-		"user_id", req.UserId,
-	)
-
-	if err := validateBootstrapOperatorRequest(s, req); err != nil {
-		return nil, err
-	}
-
-	created, err := s.bootstrapOperatorCreated(ctx, req.OrgId, req.UserId)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := s.operatorLifecycleService.EnsureByUser(ctx, req.OrgId, req.UserId, req.Name)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "ensure operator failed: %v", err)
-	}
-
-	if err := s.syncBootstrapOperatorProfile(ctx, req, result.ID); err != nil {
-		return nil, err
-	}
-	if err := s.syncBootstrapOperatorActivation(ctx, req, result.ID); err != nil {
-		return nil, err
-	}
-	if err := s.syncBootstrapOperatorRoles(ctx, req, result.ID); err != nil {
-		return nil, err
-	}
-
-	finalResult, err := s.operatorQueryService.GetByUser(ctx, req.OrgId, req.UserId)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "query operator after bootstrap failed: %v", err)
-	}
-
-	l.Infow("operator bootstrap 完成",
-		"action", "bootstrap_operator",
-		"org_id", req.OrgId,
-		"user_id", req.UserId,
-		"operator_id", finalResult.ID,
-		"created", created,
-		"roles", finalResult.Roles,
-	)
-
-	return &pb.BootstrapOperatorResponse{
-		OperatorId: finalResult.ID,
-		Created:    created,
-		Message:    bootstrapOperatorMessage(created),
-		Roles:      append([]string(nil), finalResult.Roles...),
-	}, nil
-}
-
-func validateBootstrapOperatorRequest(s *InternalService, req *pb.BootstrapOperatorRequest) error {
-	switch {
-	case s.operatorLifecycleService == nil || s.operatorQueryService == nil:
-		return status.Error(codes.FailedPrecondition, "operator services not configured")
-	case req == nil:
-		return status.Error(codes.InvalidArgument, "request 不能为空")
-	case req.OrgId <= 0:
-		return status.Error(codes.InvalidArgument, "org_id 不能为空")
-	case req.UserId <= 0:
-		return status.Error(codes.InvalidArgument, "user_id 不能为空")
-	case req.Name == "":
-		return status.Error(codes.InvalidArgument, "name 不能为空")
-	default:
-		return nil
-	}
-}
-
-func (s *InternalService) bootstrapOperatorCreated(ctx context.Context, orgID, userID int64) (bool, error) {
-	if _, err := s.operatorQueryService.GetByUser(ctx, orgID, userID); err != nil {
-		if errors.IsCode(err, errorCode.ErrUserNotFound) {
-			return true, nil
-		}
-		return false, status.Errorf(codes.Internal, "query existing operator failed: %v", err)
-	}
-	return false, nil
-}
-
-func (s *InternalService) syncBootstrapOperatorProfile(
-	ctx context.Context,
-	req *pb.BootstrapOperatorRequest,
-	operatorID uint64,
-) error {
-	if req.Name == "" && req.Email == "" && req.Phone == "" {
-		return nil
-	}
-	if err := s.operatorLifecycleService.UpdateFromExternalSource(ctx, operatorID, req.Name, req.Email, req.Phone); err != nil {
-		return status.Errorf(codes.Internal, "sync operator profile failed: %v", err)
-	}
-	return nil
-}
-
-func (s *InternalService) syncBootstrapOperatorActivation(
-	ctx context.Context,
-	req *pb.BootstrapOperatorRequest,
-	operatorID uint64,
-) error {
-	if s.operatorAuthService == nil {
-		return nil
-	}
-
-	var err error
-	if req.IsActive {
-		err = s.operatorAuthService.Activate(ctx, operatorID)
-		if err != nil {
-			return status.Errorf(codes.Internal, "activate operator failed: %v", err)
-		}
-		return nil
-	}
-
-	err = s.operatorAuthService.Deactivate(ctx, operatorID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "deactivate operator failed: %v", err)
-	}
-	return nil
-}
-
-func (s *InternalService) syncBootstrapOperatorRoles(
-	ctx context.Context,
-	req *pb.BootstrapOperatorRequest,
-	operatorID uint64,
-) error {
-	if !req.IsActive || s.authzSnapshot == nil || s.operatorRepo == nil {
-		return nil
-	}
-
-	op, err := s.operatorRepo.FindByID(ctx, domainoperator.ID(meta.FromUint64(operatorID)))
-	if err != nil {
-		return status.Errorf(codes.Internal, "load operator aggregate failed: %v", err)
-	}
-	if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.authzSnapshot, s.operatorRepo, req.OrgId, op); err != nil {
-		return status.Errorf(codes.Internal, "sync operator roles from snapshot failed: %v", err)
-	}
-	return nil
-}
-
-func bootstrapOperatorMessage(created bool) string {
-	if created {
-		return "operator bootstrapped"
-	}
-	return "operator already exists"
+	return newOperatorBootstrapFlow(s).BootstrapOperator(ctx, req)
 }

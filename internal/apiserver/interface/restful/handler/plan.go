@@ -1,8 +1,7 @@
 package handler
 
 import (
-	"bytes"
-	"io"
+	"context"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -23,6 +22,11 @@ type PlanHandler struct {
 	commandService      planApp.PlanCommandService
 	queryService        planApp.PlanQueryService
 	testeeAccessService actorAccessApp.TesteeAccessService
+}
+
+type createPlanInput struct {
+	orgID int64
+	req   request.CreatePlanRequest
 }
 
 // NewPlanHandler 创建计划处理器
@@ -67,91 +71,18 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 		"content_length", c.Request.ContentLength,
 	)
 
-	// 记录原始请求体（用于调试）
-	if c.Request.Body != nil {
-		rawBody, _ := io.ReadAll(c.Request.Body)
-		if len(rawBody) > 0 {
-			logger.L(ctx).Infow("CreatePlan raw request body",
-				"action", "create_plan",
-				"raw_body", string(rawBody),
-			)
-			// 重新设置 Body，因为 ReadAll 会消费掉
-			c.Request.Body = io.NopCloser(bytes.NewReader(rawBody))
-		}
-	}
-
-	var req request.CreatePlanRequest
-	logger.L(ctx).Infow("CreatePlan binding JSON",
-		"action", "create_plan",
-	)
-	if err := h.BindJSON(c, &req); err != nil {
-		logger.L(ctx).Errorw("CreatePlan BindJSON failed",
-			"action", "create_plan",
-			"error", err.Error(),
-		)
-		h.Error(c, err)
+	input, ok := h.parseCreatePlanInput(c)
+	if !ok {
 		return
 	}
 
-	logger.L(ctx).Infow("CreatePlan request parsed",
-		"action", "create_plan",
-		"scale_code", req.ScaleCode,
-		"schedule_type", req.ScheduleType,
-		"trigger_time", req.TriggerTime,
-		"interval", req.Interval,
-		"total_times", req.TotalTimes,
-		"fixed_dates", req.FixedDates,
-		"relative_weeks", req.RelativeWeeks,
-	)
-
-	logger.L(ctx).Infow("CreatePlan validating struct",
-		"action", "create_plan",
-	)
-	if ok, err := govalidator.ValidateStruct(req); !ok {
-		logger.L(ctx).Errorw("CreatePlan validation failed",
-			"action", "create_plan",
-			"validation_error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	logger.L(ctx).Infow("CreatePlan validation passed",
-		"action", "create_plan",
-	)
-
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	logger.L(ctx).Infow("CreatePlan got orgID",
-		"action", "create_plan",
-		"org_id_int64", orgID,
-	)
-
-	dto := planApp.CreatePlanDTO{
-		OrgID:         orgID,
-		ScaleCode:     req.ScaleCode,
-		ScheduleType:  req.ScheduleType,
-		TriggerTime:   req.TriggerTime,
-		Interval:      req.Interval,
-		TotalTimes:    req.TotalTimes,
-		FixedDates:    req.FixedDates,
-		RelativeWeeks: req.RelativeWeeks,
-	}
-
-	logger.L(ctx).Infow("CreatePlan calling command service",
-		"action", "create_plan",
-		"dto", dto,
-	)
-
-	result, err := h.commandService.CreatePlan(ctx, dto)
+	dto := buildCreatePlanDTO(input)
+	result, err := h.executeCreatePlan(ctx, dto)
 	if err != nil {
 		logger.L(ctx).Errorw("CreatePlan command service failed",
 			"action", "create_plan",
 			"resource", "plan",
-			"org_id", orgID,
+			"org_id", input.orgID,
 			"dto", dto,
 			"error", err.Error(),
 		)
@@ -162,10 +93,82 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 	logger.L(ctx).Infow("CreatePlan success",
 		"action", "create_plan",
 		"plan_id", result.ID,
-		"org_id", orgID,
+		"org_id", input.orgID,
 	)
 
 	h.Success(c, response.NewPlanResponse(result))
+}
+
+func (h *PlanHandler) parseCreatePlanInput(c *gin.Context) (createPlanInput, bool) {
+	ctx := c.Request.Context()
+	var req request.CreatePlanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.L(ctx).Errorw("CreatePlan BindJSON failed",
+			"action", "create_plan",
+			"error", err.Error(),
+		)
+		h.BadRequestResponse(c, "JSON参数绑定失败", nil)
+		return createPlanInput{}, false
+	}
+	if err := validateCreatePlanRequest(req); err != nil {
+		logger.L(ctx).Errorw("CreatePlan validation failed",
+			"action", "create_plan",
+			"validation_error", err.Error(),
+		)
+		h.Error(c, err)
+		return createPlanInput{}, false
+	}
+
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return createPlanInput{}, false
+	}
+
+	logger.L(ctx).Infow("CreatePlan request parsed",
+		"action", "create_plan",
+		"org_id", orgID,
+		"scale_code", req.ScaleCode,
+		"schedule_type", req.ScheduleType,
+		"trigger_time", req.TriggerTime,
+		"interval", req.Interval,
+		"total_times", req.TotalTimes,
+		"fixed_dates", req.FixedDates,
+		"relative_weeks", req.RelativeWeeks,
+	)
+
+	return createPlanInput{
+		orgID: orgID,
+		req:   req,
+	}, true
+}
+
+func validateCreatePlanRequest(req request.CreatePlanRequest) error {
+	if ok, err := govalidator.ValidateStruct(req); !ok {
+		return err
+	}
+	return nil
+}
+
+func buildCreatePlanDTO(input createPlanInput) planApp.CreatePlanDTO {
+	return planApp.CreatePlanDTO{
+		OrgID:         input.orgID,
+		ScaleCode:     input.req.ScaleCode,
+		ScheduleType:  input.req.ScheduleType,
+		TriggerTime:   input.req.TriggerTime,
+		Interval:      input.req.Interval,
+		TotalTimes:    input.req.TotalTimes,
+		FixedDates:    input.req.FixedDates,
+		RelativeWeeks: input.req.RelativeWeeks,
+	}
+}
+
+func (h *PlanHandler) executeCreatePlan(ctx context.Context, dto planApp.CreatePlanDTO) (*planApp.PlanResult, error) {
+	logger.L(ctx).Infow("CreatePlan calling command service",
+		"action", "create_plan",
+		"dto", dto,
+	)
+	return h.commandService.CreatePlan(ctx, dto)
 }
 
 // PausePlan 暂停计划

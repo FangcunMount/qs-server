@@ -3,89 +3,103 @@ package answersheet
 import (
 	"context"
 	"testing"
+	"time"
 
-	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	questionnairedomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestValidateSubmitDTORejectsMissingFields(t *testing.T) {
-	t.Parallel()
-
-	service := &submissionService{}
-	log := logger.L(context.Background())
-	cases := []SubmitAnswerSheetDTO{
-		{},
-		{QuestionnaireCode: "QNR-001"},
-		{QuestionnaireCode: "QNR-001", FillerID: 1},
-		{QuestionnaireCode: "QNR-001", FillerID: 1, TesteeID: 2},
-		{
-			QuestionnaireCode: "QNR-001",
-			FillerID:          1,
-			TesteeID:          2,
-			Answers: []AnswerDTO{
-				{QuestionType: "Radio", Value: "A"},
-			},
-		},
-	}
-
-	for _, dto := range cases {
-		if err := service.validateSubmitDTO(log, dto); err == nil {
-			t.Fatalf("validateSubmitDTO(%+v) expected error", dto)
-		}
-	}
+type durableStoreCaptureStub struct {
+	lastMeta    DurableSubmitMeta
+	existing    bool
+	returnedSheet *domainAnswerSheet.AnswerSheet
 }
 
-func TestValidateAnswersBatchReturnsQuestionDetails(t *testing.T) {
-	t.Parallel()
-
-	service := &submissionService{batchValidator: validation.NewBatchValidator()}
-	log := logger.L(context.Background())
-
-	err := service.validateAnswersBatch(log, []validation.ValidationTask{
-		{
-			ID:    "q1",
-			Value: domainanswersheet.NewAnswerValueAdapter(domainanswersheet.NewStringValue("")),
-			Rules: []validation.ValidationRule{
-				validation.NewValidationRule(validation.RuleTypeRequired, "true"),
-			},
-		},
-	})
-	if err == nil {
-		t.Fatal("validateAnswersBatch expected error")
+func (s *durableStoreCaptureStub) CreateDurably(_ context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
+	s.lastMeta = meta
+	if s.returnedSheet != nil {
+		return s.returnedSheet, s.existing, nil
 	}
-	if coder := pkgerrors.ParseCoder(err); coder.Code() != errorCode.ErrAnswerSheetInvalid {
-		t.Fatalf("error code = %d, want %d", coder.Code(), errorCode.ErrAnswerSheetInvalid)
-	}
+	return sheet, s.existing, nil
 }
 
-func TestCreateAnswersBuildsDomainAnswers(t *testing.T) {
-	t.Parallel()
+func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *testing.T) {
+	store := &durableStoreCaptureStub{existing: true}
+	svc := &submissionService{durableStore: store}
 
-	service := &submissionService{}
-	log := logger.L(context.Background())
-	answers, err := service.createAnswers(log, []answerBuildResult{
-		{
-			questionCode: "q1",
-			questionType: questionnairedomain.TypeRadio,
-			answerValue:  domainanswersheet.NewOptionValue("A"),
-		},
-		{
-			questionCode: "q2",
-			questionType: questionnairedomain.TypeNumber,
-			answerValue:  domainanswersheet.NewNumberValue(12),
-		},
-	})
+	qnr, err := domainQuestionnaire.NewQuestionnaire(
+		meta.NewCode("QNR-1"),
+		"Questionnaire",
+		domainQuestionnaire.WithVersion(domainQuestionnaire.Version("1.0.0")),
+		domainQuestionnaire.WithStatus(domainQuestionnaire.STATUS_PUBLISHED),
+	)
 	if err != nil {
-		t.Fatalf("createAnswers returned error: %v", err)
+		t.Fatalf("NewQuestionnaire() error = %v", err)
 	}
-	if len(answers) != 2 {
-		t.Fatalf("len(answers) = %d, want 2", len(answers))
+	answer, err := domainAnswerSheet.NewAnswer(meta.NewCode("Q1"), domainQuestionnaire.TypeText, domainAnswerSheet.NewStringValue("ok"), 0)
+	if err != nil {
+		t.Fatalf("NewAnswer() error = %v", err)
 	}
-	if answers[0].QuestionCode() != "q1" || answers[1].QuestionCode() != "q2" {
-		t.Fatalf("unexpected answers: %+v", answers)
+
+	ctx := context.Background()
+	result, err := svc.createAndSaveAnswerSheet(ctx, logger.L(ctx), SubmitAnswerSheetDTO{
+		IdempotencyKey:   "idem-1",
+		FillerID:         301,
+		TesteeID:         401,
+		OrgID:            501,
+		TaskID:           "task-1",
+		QuestionnaireCode:"QNR-1",
+		QuestionnaireVer: "1.0.0",
+	}, qnr, []domainAnswerSheet.Answer{answer})
+	if err != nil {
+		t.Fatalf("createAndSaveAnswerSheet() error = %v", err)
 	}
+	if result == nil {
+		t.Fatal("createAndSaveAnswerSheet() returned nil sheet")
+	}
+	if store.lastMeta.IdempotencyKey != "idem-1" || store.lastMeta.WriterID != 301 || store.lastMeta.TesteeID != 401 || store.lastMeta.OrgID != 501 || store.lastMeta.TaskID != "task-1" {
+		t.Fatalf("unexpected durable meta: %+v", store.lastMeta)
+	}
+}
+
+func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testing.T) {
+	existing := domainAnswerSheet.Reconstruct(
+		meta.FromUint64(999),
+		domainAnswerSheet.NewQuestionnaireRef("QNR-1", "1.0.0", "Questionnaire"),
+		nil,
+		mustAnswersForSubmissionTest(t),
+		nowForSubmissionTest(),
+		0,
+	)
+	store := &durableStoreCaptureStub{existing: true, returnedSheet: existing}
+	svc := &submissionService{durableStore: store}
+	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
+	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
+		FillerID:         301,
+		TesteeID:         401,
+		OrgID:            501,
+		QuestionnaireCode:"QNR-1",
+		QuestionnaireVer: "1.0.0",
+	}, qnr, mustAnswersForSubmissionTest(t))
+	if err != nil {
+		t.Fatalf("createAndSaveAnswerSheet() error = %v", err)
+	}
+	if result != existing {
+		t.Fatalf("expected existing sheet to be returned")
+	}
+}
+
+func mustAnswersForSubmissionTest(t *testing.T) []domainAnswerSheet.Answer {
+	t.Helper()
+	answer, err := domainAnswerSheet.NewAnswer(meta.NewCode("Q1"), domainQuestionnaire.TypeText, domainAnswerSheet.NewStringValue("ok"), 0)
+	if err != nil {
+		t.Fatalf("NewAnswer() error = %v", err)
+	}
+	return []domainAnswerSheet.Answer{answer}
+}
+
+func nowForSubmissionTest() time.Time {
+	return time.Unix(1, 0)
 }

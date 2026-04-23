@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -15,13 +15,13 @@ import (
 // 行为者：所有用户
 type queryService struct {
 	repo        scale.Repository
-	identitySvc *iam.IdentityService
+	identitySvc iambridge.IdentityResolver
 	listCache   *ScaleListCache
 	hotset      cacheinfra.HotsetRecorder
 }
 
 // NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository, identitySvc *iam.IdentityService, listCache *ScaleListCache, hotset cacheinfra.HotsetRecorder) ScaleQueryService {
+func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache *ScaleListCache, hotset cacheinfra.HotsetRecorder) ScaleQueryService {
 	return &queryService{
 		repo:        repo,
 		identitySvc: identitySvc,

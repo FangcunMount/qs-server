@@ -110,44 +110,7 @@ func NewActorHandler(
 // @Router /api/v1/testees/{id} [get]
 // GetTestee 获取受试者详情（后台管理接口，包含家长信息）
 func (h *ActorHandler) GetTestee(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid testee ID",
-			"action", "get_testee",
-			"testee_id", idStr,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-
-	orgID, _, err := h.validateProtectedTesteeAccess(c, id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	// 使用后台查询服务（包含家长信息）
-	backendResult, err := h.testeeBackendQueryService.GetByIDWithGuardians(c.Request.Context(), id)
-	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to get testee with guardians",
-			"action", "get_testee",
-			"testee_id", id,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-	if backendResult.OrgID != orgID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "testee does not belong to current organization"))
-		return
-	}
-
-	// 转换为响应对象（包含家长信息）
-	resp := toTesteeBackendResponse(backendResult)
-
-	h.Success(c, resp)
+	h.testeeHTTP().GetTestee(c)
 }
 
 // GetTesteeByProfileID 根据 profile_id 获取受试者详情
@@ -162,55 +125,7 @@ func (h *ActorHandler) GetTestee(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/testees/by-profile-id [get]
 func (h *ActorHandler) GetTesteeByProfileID(c *gin.Context) {
-	_, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var req request.GetTesteeByProfileIDRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		logger.L(c.Request.Context()).Warnw("Invalid get testee by profile_id request",
-			"action", "get_testee_by_profile_id",
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	profileIDStr := req.CanonicalProfileID()
-	if profileIDStr == "" {
-		h.BadRequestResponse(c, "profile_id is required", nil)
-		return
-	}
-
-	testeeResult, err := h.fetchTesteeByProfile(c, orgID, profileIDStr)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeResult.ID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	// 使用后台查询服务获取包含监护人的完整信息
-	if h.testeeBackendQueryService != nil {
-		backendResult, backendErr := h.testeeBackendQueryService.GetByIDWithGuardians(c.Request.Context(), testeeResult.ID)
-		if backendErr != nil {
-			h.Error(c, backendErr)
-			return
-		}
-		h.Success(c, toTesteeBackendResponse(backendResult))
-		return
-	}
-
-	h.Success(c, toTesteeResponse(testeeResult))
+	h.testeeHTTP().GetTesteeByProfileID(c)
 }
 
 // GetScaleAnalysis

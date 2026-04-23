@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -149,15 +149,15 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 	return result
 }
 
-func toScaleResultWithUsers(ctx context.Context, m *scale.MedicalScale, identitySvc *iam.IdentityService) *ScaleResult {
+func toScaleResultWithUsers(ctx context.Context, m *scale.MedicalScale, identitySvc iambridge.IdentityResolver) *ScaleResult {
 	if m == nil {
 		return nil
 	}
 
-	userNames := iam.ResolveUserNames(ctx, identitySvc, []meta.ID{m.GetCreatedBy(), m.GetUpdatedBy()})
+	userNames := resolveIdentityNames(ctx, identitySvc, []meta.ID{m.GetCreatedBy(), m.GetUpdatedBy()})
 	result := toScaleResult(m)
-	result.CreatedBy = iam.DisplayName(m.GetCreatedBy(), userNames)
-	result.UpdatedBy = iam.DisplayName(m.GetUpdatedBy(), userNames)
+	result.CreatedBy = displayIdentityName(m.GetCreatedBy(), userNames)
+	result.UpdatedBy = displayIdentityName(m.GetUpdatedBy(), userNames)
 	return result
 }
 
@@ -211,7 +211,7 @@ func toFactorResult(f *scale.Factor) FactorResult {
 }
 
 // toSummaryListResult 将量表摘要列表转换为结果对象
-func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total int64, identitySvc *iam.IdentityService) *ScaleSummaryListResult {
+func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total int64, identitySvc iambridge.IdentityResolver) *ScaleSummaryListResult {
 	userNames := resolveSummaryUserNames(ctx, items, identitySvc)
 	result := &ScaleSummaryListResult{
 		Items: make([]*ScaleSummaryResult, 0, len(items)),
@@ -254,9 +254,9 @@ func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total
 			Tags:              tags,
 			QuestionnaireCode: item.GetQuestionnaireCode().String(),
 			Status:            item.GetStatus().String(),
-			CreatedBy:         iam.DisplayName(item.GetCreatedBy(), userNames),
+			CreatedBy:         displayIdentityName(item.GetCreatedBy(), userNames),
 			CreatedAt:         item.GetCreatedAt(),
-			UpdatedBy:         iam.DisplayName(item.GetUpdatedBy(), userNames),
+			UpdatedBy:         displayIdentityName(item.GetUpdatedBy(), userNames),
 			UpdatedAt:         item.GetUpdatedAt(),
 		})
 	}
@@ -264,7 +264,7 @@ func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total
 	return result
 }
 
-func resolveSummaryUserNames(ctx context.Context, items []*scale.MedicalScale, identitySvc *iam.IdentityService) map[string]string {
+func resolveSummaryUserNames(ctx context.Context, items []*scale.MedicalScale, identitySvc iambridge.IdentityResolver) map[string]string {
 	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
 		if item == nil {
@@ -272,5 +272,24 @@ func resolveSummaryUserNames(ctx context.Context, items []*scale.MedicalScale, i
 		}
 		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
 	}
-	return iam.ResolveUserNames(ctx, identitySvc, userIDs)
+	return resolveIdentityNames(ctx, identitySvc, userIDs)
+}
+
+func resolveIdentityNames(ctx context.Context, identitySvc iambridge.IdentityResolver, ids []meta.ID) map[string]string {
+	if identitySvc == nil || !identitySvc.IsEnabled() {
+		return nil
+	}
+	return identitySvc.ResolveUserNames(ctx, ids)
+}
+
+func displayIdentityName(id meta.ID, userNames map[string]string) string {
+	if id.IsZero() {
+		return ""
+	}
+	if userNames != nil {
+		if name, ok := userNames[id.String()]; ok && name != "" {
+			return name
+		}
+	}
+	return id.String()
 }

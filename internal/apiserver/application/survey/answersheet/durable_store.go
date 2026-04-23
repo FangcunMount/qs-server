@@ -5,16 +5,11 @@ import (
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 )
 
 // DurableSubmitMeta carries submission metadata that must survive durable writes.
-type DurableSubmitMeta struct {
-	IdempotencyKey string
-	WriterID       uint64
-	TesteeID       uint64
-	OrgID          uint64
-	TaskID         string
-}
+type DurableSubmitMeta = submitport.DurableSubmitMeta
 
 // SubmissionDurableStore persists answersheets together with inbound idempotency
 // metadata and the answersheet.submitted outbox entry.

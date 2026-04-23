@@ -261,35 +261,7 @@ func (h *ActorHandler) GetClinician(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/clinicians [get]
 func (h *ActorHandler) ListClinicians(c *gin.Context) {
-	var req request.ListClinicianRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		h.Error(c, err)
-		return
-	}
-	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	if req.Page == 0 {
-		req.Page = 1
-	}
-	if req.PageSize == 0 {
-		req.PageSize = 20
-	}
-
-	result, err := h.clinicianQueryService.ListClinicians(c.Request.Context(), clinicianApp.ListClinicianDTO{
-		OrgID:  orgID,
-		Offset: (req.Page - 1) * req.PageSize,
-		Limit:  req.PageSize,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, toClinicianListResponse(result, req.Page, req.PageSize))
+	h.clinicianHTTP().ListClinicians(c)
 }
 
 func (h *ActorHandler) ListClinicianTestees(c *gin.Context) {
@@ -760,13 +732,7 @@ func (h *ActorHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/public/assessment-entries/{token} [get]
 func (h *ActorHandler) ResolveAssessmentEntry(c *gin.Context) {
-	result, err := h.assessmentEntryService.Resolve(c.Request.Context(), c.Param("token"))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, toAssessmentEntryResolvedResponse(result))
+	h.assessmentEntryHTTP().ResolveAssessmentEntry(c)
 }
 
 // IntakeAssessmentEntry 公开扫码 intake。
@@ -781,24 +747,7 @@ func (h *ActorHandler) ResolveAssessmentEntry(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/public/assessment-entries/{token}/intake [post]
 func (h *ActorHandler) IntakeAssessmentEntry(c *gin.Context) {
-	var req request.IntakeByAssessmentEntryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.assessmentEntryService.Intake(c.Request.Context(), c.Param("token"), assessmentEntryApp.IntakeByAssessmentEntryDTO{
-		ProfileID: req.ProfileID,
-		Name:      req.Name,
-		Gender:    parseGender(req.Gender),
-		Birthday:  req.Birthday,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.SuccessResponseWithMessage(c, "扫码建档成功", toAssessmentEntryIntakeResponse(result))
+	h.assessmentEntryHTTP().IntakeAssessmentEntry(c)
 }
 
 func (h *ActorHandler) currentClinician(c *gin.Context) (*clinicianApp.ClinicianResult, error) {

@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 )
 
@@ -41,7 +41,7 @@ type Config struct {
 type service struct {
 	qrCodeGen        wechatPort.QRCodeGenerator
 	config           *Config
-	wechatAppService *iam.WeChatAppService
+	wechatAppService iambridge.WeChatAppConfigProvider
 	objectStore      objectstorageport.PublicObjectStore
 }
 
@@ -49,7 +49,7 @@ type service struct {
 func NewService(
 	qrCodeGen wechatPort.QRCodeGenerator,
 	config *Config,
-	wechatAppService *iam.WeChatAppService,
+	wechatAppService iambridge.WeChatAppConfigProvider,
 	objectStore objectstorageport.PublicObjectStore,
 ) QRCodeService {
 	return &service{
@@ -70,7 +70,7 @@ func (s *service) getWechatAppConfig(ctx context.Context) (appID, appSecret stri
 			"wechat_app_id", s.config.WeChatAppID,
 		)
 
-		resp, err := s.wechatAppService.GetWechatApp(ctx, s.config.WeChatAppID)
+		resp, err := s.wechatAppService.ResolveWeChatAppConfig(ctx, s.config.WeChatAppID)
 		if err != nil {
 			l.Errorw("从 IAM 查询微信应用配置失败",
 				"action", "get_wechat_app_config",
@@ -80,13 +80,12 @@ func (s *service) getWechatAppConfig(ctx context.Context) (appID, appSecret stri
 			return "", "", fmt.Errorf("从 IAM 查询微信应用配置失败: %w", err)
 		}
 
-		if resp == nil || resp.App == nil {
+		if resp == nil {
 			return "", "", fmt.Errorf("IAM 返回的微信应用信息为空")
 		}
 
-		// 从响应中提取 AppID 和 AppSecret
-		appID = resp.App.GetAppId()
-		appSecret = resp.App.GetAppSecret()
+		appID = resp.AppID
+		appSecret = resp.AppSecret
 
 		if appID == "" || appSecret == "" {
 			return "", "", fmt.Errorf("IAM 返回的微信应用信息不完整: app_id=%s, app_secret=%s", appID, appSecret)

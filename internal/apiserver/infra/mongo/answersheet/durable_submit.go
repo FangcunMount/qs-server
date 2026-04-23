@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	appAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -45,7 +45,7 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
-func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo appAnswerSheet.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
+func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
 	if sheet == nil {
 		return nil, false, nil
 	}

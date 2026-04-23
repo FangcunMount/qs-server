@@ -10,7 +10,7 @@ import (
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -23,7 +23,7 @@ type service struct {
 	testeeRepo      domainTestee.Repository
 	testeeFactory   domainTestee.Factory
 	validator       domainAssessmentEntry.Validator
-	guardianshipSvc *iam.GuardianshipService
+	guardianshipSvc iambridge.GuardianshipReader
 	resolveLog      ResolveLogWriter
 	intakeLog       IntakeLogWriter
 	behaviorEvents  BehaviorEventStager
@@ -49,7 +49,7 @@ func NewService(
 	testeeRepo domainTestee.Repository,
 	testeeFactory domainTestee.Factory,
 	validator domainAssessmentEntry.Validator,
-	guardianshipSvc *iam.GuardianshipService,
+	guardianshipSvc iambridge.GuardianshipReader,
 	resolveLog ResolveLogWriter,
 	intakeLog IntakeLogWriter,
 	behaviorEvents BehaviorEventStager,

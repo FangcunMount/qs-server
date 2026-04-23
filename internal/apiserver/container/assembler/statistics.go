@@ -9,6 +9,7 @@ import (
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
+	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -89,7 +90,7 @@ func (m *StatisticsModule) Initialize(params ...interface{}) error {
 	m.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
 	m.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(deps.mysqlDB, m.Repo, m.Cache)
 	m.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(deps.mysqlDB, m.Repo, m.Cache, deps.hotsetRecorder)
-	m.ReadService = statisticsApp.NewReadService(deps.mysqlDB, deps.answerSheetRepo)
+	m.ReadService = statisticsApp.NewReadService(statisticsReadModelInfra.NewReadModel(deps.mysqlDB), deps.answerSheetRepo)
 	m.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(deps.mysqlDB)
 	m.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(deps.mysqlDB, m.Repo)
 	m.SyncService = statisticsApp.NewSyncService(deps.mysqlDB, deps.repairWindowDays, deps.lockManager)

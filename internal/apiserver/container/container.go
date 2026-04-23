@@ -35,9 +35,6 @@ import (
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 )
 
-// modulePool 模块池
-var modulePool = make(map[string]assembler.Module)
-
 // Container 主容器
 // 组合所有业务模块和基础设施组件
 type Container struct {
@@ -95,6 +92,8 @@ type Container struct {
 	// 容器状态
 	initialized bool
 	silent      bool
+	modules     map[string]assembler.Module
+	moduleOrder []string
 }
 
 func firstPositiveDuration(values ...time.Duration) time.Duration {
@@ -124,6 +123,7 @@ func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.Un
 		publisherMode: eventconfig.PublishModeLogging, // 默认使用日志模式
 		cacheOptions:  ContainerCacheOptions{},
 		initialized:   false,
+		modules:       make(map[string]assembler.Module),
 	}
 }
 
@@ -213,6 +213,32 @@ func redisHandleBuilder(handle *redisplane.Handle) *rediskey.Builder {
 		return nil
 	}
 	return handle.Builder
+}
+
+func (c *Container) registerModule(name string, module assembler.Module) {
+	if c == nil || name == "" || module == nil {
+		return
+	}
+	if c.modules == nil {
+		c.modules = make(map[string]assembler.Module)
+	}
+	if _, exists := c.modules[name]; !exists {
+		c.moduleOrder = append(c.moduleOrder, name)
+	}
+	c.modules[name] = module
+}
+
+func (c *Container) loadedModules() []assembler.Module {
+	if c == nil || len(c.moduleOrder) == 0 {
+		return nil
+	}
+	modules := make([]assembler.Module, 0, len(c.moduleOrder))
+	for _, name := range c.moduleOrder {
+		if module := c.modules[name]; module != nil {
+			modules = append(modules, module)
+		}
+	}
+	return modules
 }
 
 // ContainerCacheTTLOptions 缓存 TTL 配置（0 表示使用默认值）
@@ -486,7 +512,7 @@ func (c *Container) initSurveyModule() error {
 	}
 
 	c.SurveyModule = surveyModule
-	modulePool["survey"] = surveyModule
+	c.registerModule("survey", surveyModule)
 
 	c.printf("📦 Survey module initialized (questionnaire + answersheet)\n")
 	return nil
@@ -520,7 +546,7 @@ func (c *Container) initScaleModule() error {
 	}
 
 	c.ScaleModule = scaleModule
-	modulePool["scale"] = scaleModule
+	c.registerModule("scale", scaleModule)
 
 	c.printf("📦 Scale module initialized\n")
 	return nil
@@ -559,7 +585,7 @@ func (c *Container) initActorModule() error {
 	}
 
 	c.ActorModule = actorModule
-	modulePool["actor"] = actorModule
+	c.registerModule("actor", actorModule)
 
 	c.printf("📦 Actor module initialized\n")
 	return nil
@@ -602,7 +628,7 @@ func (c *Container) initEvaluationModule() error {
 	}
 
 	c.EvaluationModule = evaluationModule
-	modulePool["evaluation"] = evaluationModule
+	c.registerModule("evaluation", evaluationModule)
 
 	c.printf("📦 Evaluation module initialized\n")
 	return nil
@@ -629,7 +655,7 @@ func (c *Container) initPlanModule() error {
 	}
 
 	c.PlanModule = planModule
-	modulePool["plan"] = planModule
+	c.registerModule("plan", planModule)
 
 	c.printf("📦 Plan module initialized\n")
 	return nil
@@ -664,7 +690,7 @@ func (c *Container) initStatisticsModule() error {
 	}
 
 	c.StatisticsModule = statisticsModule
-	modulePool["statistics"] = statisticsModule
+	c.registerModule("statistics", statisticsModule)
 
 	c.printf("📦 Statistics module initialized\n")
 	return nil
@@ -1066,7 +1092,7 @@ func (c *Container) HealthCheck(ctx context.Context) error {
 
 // checkModulesHealth 检查模块健康状态
 func (c *Container) checkModulesHealth(_ context.Context) error {
-	for _, module := range modulePool {
+	for _, module := range c.loadedModules() {
 		if err := module.CheckHealth(); err != nil {
 			return fmt.Errorf("module health check failed: %w", err)
 		}
@@ -1086,7 +1112,7 @@ func (c *Container) Cleanup() error {
 		c.printf("   ✅ IAM module cleaned up\n")
 	}
 
-	for _, module := range modulePool {
+	for _, module := range c.loadedModules() {
 		if err := module.Cleanup(); err != nil {
 			return fmt.Errorf("failed to cleanup module: %w", err)
 		}
@@ -1102,7 +1128,7 @@ func (c *Container) Cleanup() error {
 // GetContainerInfo 获取容器信息
 func (c *Container) GetContainerInfo() map[string]interface{} {
 	modules := make(map[string]interface{})
-	for _, module := range modulePool {
+	for _, module := range c.loadedModules() {
 		modules[module.ModuleInfo().Name] = module.ModuleInfo()
 	}
 
@@ -1129,7 +1155,7 @@ func (c *Container) IsInitialized() bool {
 func (c *Container) GetLoadedModules() []string {
 	modules := make([]string, 0)
 
-	for _, module := range modulePool {
+	for _, module := range c.loadedModules() {
 		modules = append(modules, module.ModuleInfo().Name)
 	}
 
