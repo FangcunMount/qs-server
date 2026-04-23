@@ -8,9 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
@@ -275,14 +273,4 @@ func (flow assessmentFlow) TagTestee(
 		KeyFocusMarked: result.KeyFocusMarked,
 		Message:        fmt.Sprintf("标签更新成功：添加 %d 个，移除 %d 个", len(result.TagsAdded), len(result.TagsRemoved)),
 	}, nil
-}
-
-func (flow assessmentFlow) applyMatchedTaskOrigin(
-	ctx context.Context,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	medicalScaleCode *string,
-	dto *assessmentApp.CreateAssessmentDTO,
-) *planDomain.AssessmentTask {
-	l := logger.L(ctx)
-	return flow.service.applyMatchedTaskOrigin(ctx, l, req, medicalScaleCode, dto)
 }

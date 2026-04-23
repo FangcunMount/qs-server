@@ -13,20 +13,27 @@ import (
 )
 
 func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
+	versionStore := scaleCache.NewStaticVersionTokenStore(0)
+	if c == nil {
+		return assembler.StatisticsModuleDeps{
+			VersionStore: versionStore,
+		}
+	}
+
+	disableStatisticsCache := c.cacheOptions.DisableStatisticsCache
 	redisClient := c.redisCache
-	if !c.cacheOptions.DisableStatisticsCache {
+	if !disableStatisticsCache {
 		redisClient = c.CacheClient(redisplane.FamilyQuery)
 	}
-	if c.cacheOptions.DisableStatisticsCache {
+	if disableStatisticsCache {
 		redisClient = nil
 	}
 
 	var answerSheetRepo surveyAnswerSheet.Repository
-	if c != nil && c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
+	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
 		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
 	}
-	versionStore := scaleCache.NewStaticVersionTokenStore(0)
-	if !c.cacheOptions.DisableStatisticsCache {
+	if !disableStatisticsCache {
 		versionStore = scaleCache.NewRedisVersionTokenStoreWithKindAndObserver(
 			c.CacheClient(redisplane.FamilyMeta),
 			string(cachepolicy.PolicyStatsQuery),

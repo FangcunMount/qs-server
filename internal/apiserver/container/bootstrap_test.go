@@ -101,6 +101,19 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	}
 }
 
+func TestContainerBuildStatisticsModuleDepsHandlesNilContainer(t *testing.T) {
+	t.Parallel()
+
+	var c *Container
+	deps := c.buildStatisticsModuleDeps()
+	if deps.VersionStore == nil {
+		t.Fatal("version store = nil, want fallback static store")
+	}
+	if !isNilInterfaceValue(deps.RedisClient) {
+		t.Fatalf("redis client = %#v, want nil for nil container", deps.RedisClient)
+	}
+}
+
 func TestContainerInitCodesServiceDoesNotOverwriteExistingImplementation(t *testing.T) {
 	t.Parallel()
 
