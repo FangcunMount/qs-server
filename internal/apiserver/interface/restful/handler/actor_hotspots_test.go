@@ -26,7 +26,7 @@ func TestBuildScaleAnalysisResponseFiltersAndSorts(t *testing.T) {
 	riskLevel := "low"
 	totalScore := 10.0
 
-	handler := &ActorHandler{}
+	handler := &TesteeHandler{}
 	result := handler.buildScaleAnalysisResponse(c, []*assessmentApp.AssessmentResult{
 		{
 			ID:               2,

@@ -41,7 +41,9 @@ type ActorModule struct {
 	AssessmentEntryRepo assessmentEntryDomain.Repository
 
 	// handler 层
-	ActorHandler *handler.ActorHandler
+	TesteeHandler            *handler.TesteeHandler
+	OperatorClinicianHandler *handler.OperatorClinicianHandler
+	AssessmentEntryHandler   *handler.AssessmentEntryHandler
 
 	// testee service 层（按行为者组织）
 	TesteeRegistrationService testeeApp.TesteeRegistrationService // 注册服务 - C端用户
@@ -51,14 +53,15 @@ type ActorModule struct {
 	TesteeTaggingService      testeeApp.TesteeTaggingService      // 标签服务 - 系统自动（事件驱动）
 
 	// operator service 层（按行为者组织）
-	OperatorLifecycleService     operatorApp.OperatorLifecycleService      // 生命周期服务 - 人事/行政
-	OperatorAuthorizationService operatorApp.OperatorAuthorizationService  // 权限管理服务 - IT管理员
-	OperatorQueryService         operatorApp.OperatorQueryService          // 查询服务 - 通用
-	ClinicianLifecycleService    clinicianApp.ClinicianLifecycleService    // 生命周期服务 - 人事/行政部门
-	ClinicianQueryService        clinicianApp.ClinicianQueryService        // 查询服务 - 通用
-	ClinicianRelationshipService clinicianApp.ClinicianRelationshipService // 关系服务 - 建立从业者-受试者关系、查询名下受试者
-	AssessmentEntryService       assessmentEntryApp.AssessmentEntryService // 创建测评入口、解析 token、扫码 intake
-	TesteeAccessService          actorAccessApp.TesteeAccessService        // 解析后台访问范围：admin bypass / ClinicianTesteeRelation
+	OperatorLifecycleService      operatorApp.OperatorLifecycleService      // 生命周期服务 - 人事/行政
+	OperatorAuthorizationService  operatorApp.OperatorAuthorizationService  // 权限管理服务 - IT管理员
+	OperatorQueryService          operatorApp.OperatorQueryService          // 查询服务 - 通用
+	ClinicianLifecycleService     clinicianApp.ClinicianLifecycleService    // 生命周期服务 - 人事/行政部门
+	ClinicianQueryService         clinicianApp.ClinicianQueryService        // 查询服务 - 通用
+	ClinicianRelationshipService  clinicianApp.ClinicianRelationshipService // 关系服务 - 建立从业者-受试者关系、查询名下受试者
+	AssessmentEntryService        assessmentEntryApp.AssessmentEntryService // 创建测评入口、解析 token、扫码 intake
+	TesteeAccessService           actorAccessApp.TesteeAccessService        // 解析后台访问范围：admin bypass / ClinicianTesteeRelation
+	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater // 将 IAM 角色快照投影回本地 operator
 }
 
 // NewActorModule 创建 Actor 模块
@@ -230,6 +233,7 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 	)
 	// 查询服务 - 服务于所有需要查询的用户
 	m.OperatorQueryService = operatorApp.NewQueryService(m.OperatorRepo)
+	m.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(m.OperatorRepo)
 	m.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
 		m.ClinicianRepo,
 		m.OperatorRepo,
@@ -265,25 +269,31 @@ func (m *ActorModule) Initialize(params ...interface{}) error {
 		uow,
 	)
 
-	// 初始化 handler 层 - 先不注入评估服务（评估模块还未初始化）
-	// 评估服务将在容器初始化完成后通过 SetEvaluationServices 方法注入
-	m.ActorHandler = handler.NewActorHandler(
-		m.TesteeRegistrationService,
+	m.TesteeHandler = handler.NewTesteeHandler(
 		m.TesteeManagementService,
 		m.TesteeQueryService,
 		m.TesteeBackendQueryService,
+		m.ClinicianQueryService,
+		m.ClinicianRelationshipService,
+		m.TesteeAccessService,
+		nil, // assessmentManagementService - 稍后注入
+		nil, // scoreQueryService - 稍后注入
+	)
+	m.OperatorClinicianHandler = handler.NewOperatorClinicianHandler(
 		m.OperatorLifecycleService,
 		m.OperatorAuthorizationService,
 		m.OperatorQueryService,
 		m.ClinicianLifecycleService,
 		m.ClinicianQueryService,
 		m.ClinicianRelationshipService,
+		m.TesteeQueryService,
 		m.TesteeAccessService,
+	)
+	m.AssessmentEntryHandler = handler.NewAssessmentEntryHandler(
+		m.OperatorQueryService,
+		m.ClinicianQueryService,
 		m.AssessmentEntryService,
-		guardianshipSvc,
 		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
-		nil, // assessmentManagementService - 稍后注入
-		nil, // scoreQueryService - 稍后注入
 	)
 
 	return nil
@@ -294,15 +304,15 @@ func (m *ActorModule) SetEvaluationServices(
 	assessmentManagementService assessmentApp.AssessmentManagementService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 ) {
-	if m.ActorHandler != nil {
-		m.ActorHandler.SetEvaluationServices(assessmentManagementService, scoreQueryService)
+	if m.TesteeHandler != nil {
+		m.TesteeHandler.SetEvaluationServices(assessmentManagementService, scoreQueryService)
 	}
 }
 
 // SetQRCodeService 设置二维码服务（用于测评入口二维码生成）。
 func (m *ActorModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
-	if m.ActorHandler != nil {
-		m.ActorHandler.SetQRCodeService(qrCodeService)
+	if m.AssessmentEntryHandler != nil {
+		m.AssessmentEntryHandler.SetQRCodeService(qrCodeService)
 	}
 }
 

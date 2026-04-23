@@ -408,12 +408,7 @@ func (c *Container) Initialize() error {
 	}
 
 	// 将评估服务注入到 Actor 模块（因为 Actor 模块在 Evaluation 模块之前初始化）
-	if c.ActorModule != nil && c.EvaluationModule != nil {
-		c.ActorModule.SetEvaluationServices(
-			c.EvaluationModule.ManagementService,
-			c.EvaluationModule.ScoreQueryService,
-		)
-	}
+	c.wireActorEvaluationDependencies()
 
 	// 初始化 Plan 模块
 	if err := c.initPlanModule(); err != nil {
@@ -428,17 +423,7 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize cache governance warmup coordinator: %w", err)
 	}
 
-	if c.ActorModule != nil && c.ActorModule.TesteeAccessService != nil {
-		if c.EvaluationModule != nil {
-			c.EvaluationModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
-		}
-		if c.PlanModule != nil {
-			c.PlanModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
-		}
-		if c.StatisticsModule != nil {
-			c.StatisticsModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
-		}
-	}
+	c.wireProtectedScopeDependencies()
 
 	// 初始化 CodesService
 	c.initCodesService()
@@ -549,45 +534,6 @@ func (c *Container) initScaleModule() error {
 	c.registerModule("scale", scaleModule)
 
 	c.printf("📦 Scale module initialized\n")
-	return nil
-}
-
-// initActorModule 初始化 Actor 模块
-func (c *Container) initActorModule() error {
-	actorModule := assembler.NewActorModule()
-
-	// 获取 guardianshipSvc（如果 IAM 模块已启用）
-	var guardianshipSvc *iam.GuardianshipService
-	var identitySvc *iam.IdentityService
-	var operationAccountSvc *iam.OperationAccountService
-	var opAuthz *iam.OperatorAuthzBundle
-	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
-		guardianshipSvc = c.IAMModule.GuardianshipService()
-		identitySvc = c.IAMModule.IdentityService()
-		operationAccountSvc = c.IAMModule.OperationAccountService()
-		opAuthz = &iam.OperatorAuthzBundle{
-			Assignment: iam.NewAuthzAssignmentClient(c.IAMModule.Client()),
-			Snapshot:   c.IAMModule.AuthzSnapshotLoader(),
-		}
-	}
-
-	if err := actorModule.Initialize(
-		c.mysqlDB,
-		guardianshipSvc,
-		identitySvc,
-		c.objectRedisCache,
-		redisHandleBuilder(c.objectRedisHandle),
-		c.policyCatalog.Policy(cachepolicy.PolicyTestee),
-		opAuthz,
-		operationAccountSvc,
-	); err != nil {
-		return fmt.Errorf("failed to initialize actor module: %w", err)
-	}
-
-	c.ActorModule = actorModule
-	c.registerModule("actor", actorModule)
-
-	c.printf("📦 Actor module initialized\n")
 	return nil
 }
 

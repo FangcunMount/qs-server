@@ -1,6 +1,11 @@
 package operator
 
-import "context"
+import (
+	"context"
+
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+)
 
 // ============= 按行为者组织的应用服务接口（Driving Ports）=============
 //
@@ -68,6 +73,12 @@ type OperatorQueryService interface {
 
 	// ListOperators 列出机构内操作者
 	ListOperators(ctx context.Context, dto ListOperatorDTO) (*OperatorListResult, error)
+}
+
+// OperatorRoleProjectionUpdater 将授权快照中的角色投影回本地 Operator 聚合。
+// 这是一种请求期副作用：失败时只记录日志，不改变当前请求的认证/鉴权结果。
+type OperatorRoleProjectionUpdater interface {
+	PersistFromSnapshot(ctx context.Context, op *domain.Operator, snap *authzapp.Snapshot) error
 }
 
 // ============= DTOs =============

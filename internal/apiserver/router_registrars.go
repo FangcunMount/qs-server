@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
@@ -60,11 +60,7 @@ func (registrar publicRouteRegistrar) register(engine *gin.Engine) {
 				"description": "问卷量表管理系统",
 			})
 		})
-
-		if r.container != nil && r.container.ActorModule != nil && r.container.ActorModule.ActorHandler != nil {
-			publicAPI.GET("/assessment-entries/:token", r.container.ActorModule.ActorHandler.ResolveAssessmentEntry)
-			publicAPI.POST("/assessment-entries/:token/intake", r.container.ActorModule.ActorHandler.IntakeAssessmentEntry)
-		}
+		r.registerActorPublicRoutes(publicAPI)
 	}
 
 	objectKeyPrefix := "qrcode"
@@ -90,9 +86,9 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	r.registerAnswersheetProtectedRoutes(apiV1)
 	r.registerScaleProtectedRoutes(apiV1)
 	r.registerEvaluationProtectedRoutes(apiV1)
+	r.registerActorProtectedRoutes(apiV1)
 	r.registerPlanProtectedRoutes(apiV1)
 	r.registerStatisticsProtectedRoutes(apiV1)
-	r.registerActorProtectedRoutes(apiV1)
 	r.registerCodesRoutes(apiV1)
 	r.registerAdminRoutes(apiV1)
 }
@@ -121,11 +117,11 @@ func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, r
 				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.container.ActorModule.OperatorRepo))
 			}
 			if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
-				var operatorRepo domainoperator.Repository
+				var updater operatorapp.OperatorRoleProjectionUpdater
 				if r.container.ActorModule != nil {
-					operatorRepo = r.container.ActorModule.OperatorRepo
+					updater = r.container.ActorModule.OperatorRoleProjectionUpdater
 				}
-				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, operatorRepo))
+				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, updater))
 			} else {
 				fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable (need gRPC); authorization snapshot disabled for %s\n", routePrefix)
 			}

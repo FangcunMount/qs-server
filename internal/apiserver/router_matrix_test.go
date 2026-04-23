@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
@@ -41,10 +41,21 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	routes := engine.Routes()
 	assertRoutePresent(t, routes, http.MethodGet, "/health")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/public/assessment-entries/:token")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/questionnaires")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/answersheets")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/scales")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/evaluations/assessments")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id/clinicians")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/staff")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/assessment-entries/:id")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/overview")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id/plans")
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/plans/tasks/window")
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/daily")
+	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
 }
 
 func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
@@ -91,30 +102,26 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 }
 
 func newRouterTestContainer() *container.Container {
-	actorHandlerClinicianQuery := &routerClinicianQueryStub{}
-	actorHandler := handlerpkg.NewActorHandler(
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		actorHandlerClinicianQuery,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
+	clinicianQuery := &routerClinicianQueryStub{}
+	surveyModule := assembler.NewSurveyModule()
+	surveyModule.Questionnaire.Handler = handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil)
+	surveyModule.AnswerSheet.Handler = handlerpkg.NewAnswerSheetHandler(nil, nil)
+	scaleModule := assembler.NewScaleModule()
+	scaleModule.Handler = handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil)
+	evaluationModule := assembler.NewEvaluationModule()
+	evaluationModule.Handler = handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
+	testeeHandler := handlerpkg.NewTesteeHandler(nil, nil, nil, nil, nil, nil, nil, nil)
+	operatorClinicianHandler := handlerpkg.NewOperatorClinicianHandler(nil, nil, nil, nil, clinicianQuery, nil, nil, nil)
+	assessmentEntryHandler := handlerpkg.NewAssessmentEntryHandler(nil, clinicianQuery, nil, nil)
 	return &container.Container{
-		SurveyModule:     assembler.NewSurveyModule(),
-		ScaleModule:      assembler.NewScaleModule(),
-		ActorModule:      &assembler.ActorModule{ActorHandler: actorHandler},
-		EvaluationModule: &assembler.EvaluationModule{},
+		SurveyModule: surveyModule,
+		ScaleModule:  scaleModule,
+		ActorModule: &assembler.ActorModule{
+			TesteeHandler:            testeeHandler,
+			OperatorClinicianHandler: operatorClinicianHandler,
+			AssessmentEntryHandler:   assessmentEntryHandler,
+		},
+		EvaluationModule: evaluationModule,
 		PlanModule: &assembler.PlanModule{
 			Handler: handlerpkg.NewPlanHandler(nil, nil),
 		},

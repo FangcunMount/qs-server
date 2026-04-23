@@ -2,65 +2,283 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/gin-gonic/gin"
 )
 
-func metaIDPtrToUint64(id *meta.ID) *uint64 {
-	if id == nil || id.IsZero() {
-		return nil
-	}
-
-	value := id.Uint64()
-	return &value
+// OperatorClinicianHandler 负责 staff / clinician / relation HTTP 入口。
+type OperatorClinicianHandler struct {
+	*BaseHandler
+	operatorLifecycleService     operatorApp.OperatorLifecycleService
+	operatorAuthorizationService operatorApp.OperatorAuthorizationService
+	operatorQueryService         operatorApp.OperatorQueryService
+	clinicianLifecycleService    clinicianApp.ClinicianLifecycleService
+	clinicianQueryService        clinicianApp.ClinicianQueryService
+	clinicianRelationshipService clinicianApp.ClinicianRelationshipService
+	testeeQueryService           testeeApp.TesteeQueryService
+	testeeAccessService          actorAccessApp.TesteeAccessService
 }
 
-func flexibleTimePtrToTimePtr(v *request.FlexibleTime) *time.Time {
-	if v == nil || v.IsZero() {
-		return nil
+func NewOperatorClinicianHandler(
+	operatorLifecycleService operatorApp.OperatorLifecycleService,
+	operatorAuthorizationService operatorApp.OperatorAuthorizationService,
+	operatorQueryService operatorApp.OperatorQueryService,
+	clinicianLifecycleService clinicianApp.ClinicianLifecycleService,
+	clinicianQueryService clinicianApp.ClinicianQueryService,
+	clinicianRelationshipService clinicianApp.ClinicianRelationshipService,
+	testeeQueryService testeeApp.TesteeQueryService,
+	testeeAccessService actorAccessApp.TesteeAccessService,
+) *OperatorClinicianHandler {
+	return &OperatorClinicianHandler{
+		BaseHandler:                  NewBaseHandler(),
+		operatorLifecycleService:     operatorLifecycleService,
+		operatorAuthorizationService: operatorAuthorizationService,
+		operatorQueryService:         operatorQueryService,
+		clinicianLifecycleService:    clinicianLifecycleService,
+		clinicianQueryService:        clinicianQueryService,
+		clinicianRelationshipService: clinicianRelationshipService,
+		testeeQueryService:           testeeQueryService,
+		testeeAccessService:          testeeAccessService,
 	}
-
-	value := v.Time
-	return &value
 }
 
-func (h *ActorHandler) generateAssessmentEntryQRCodeURL(ctx context.Context, token string) string {
-	if h.qrCodeService == nil {
-		return ""
+func (h *OperatorClinicianHandler) CreateStaff(c *gin.Context) {
+	var req request.CreateStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid create staff request",
+			"action", "create_staff",
+			"resource", "staff",
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
 	}
-
-	generated, err := h.qrCodeService.GenerateAssessmentEntryQRCode(ctx, token)
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
 	if err != nil {
-		return ""
+		h.Error(c, err)
+		return
 	}
 
-	return generated
+	dto := toRegisterStaffDTO(&req, orgID)
+	result, err := h.operatorLifecycleService.Register(c.Request.Context(), dto)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to create staff",
+			"action", "create_staff",
+			"resource", "staff",
+			"org_id", dto.OrgID,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "员工创建成功", toStaffResponse(result))
 }
 
-// CreateClinician 创建从业者。
-// @Summary 创建从业者
-// @Description 创建机构内从业者档案，仅 qs:admin 可访问；请求体中的 org_id 仅作兼容校验，实际以 JWT org_id 为准
-// @Tags Actor-Clinician
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreateClinicianRequest true "创建从业者请求"
-// @Success 200 {object} core.Response{data=response.ClinicianResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians [post]
-func (h *ActorHandler) CreateClinician(c *gin.Context) {
+func (h *OperatorClinicianHandler) GetStaff(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid staff ID",
+			"action", "get_staff",
+			"resource", "staff",
+			"staff_id", idStr,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to get staff",
+			"action", "get_staff",
+			"resource", "staff",
+			"staff_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+	if result.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
+		return
+	}
+
+	h.Success(c, toStaffResponse(result))
+}
+
+func (h *OperatorClinicianHandler) UpdateStaff(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid staff ID",
+			"action", "update_staff",
+			"resource", "staff",
+			"staff_id", idStr,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+	current, err := h.loadProtectedStaff(c, orgID, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	var req request.UpdateStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid update staff request",
+			"action", "update_staff",
+			"resource", "staff",
+			"staff_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+	if err := h.updateStaffProfile(c, id, req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.syncStaffAuthorization(c, id, current, req); err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "员工更新成功", toStaffResponse(result))
+}
+
+func (h *OperatorClinicianHandler) DeleteStaff(c *gin.Context) {
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid staff ID",
+			"action", "delete_staff",
+			"resource", "staff",
+			"staff_id", idStr,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+	result, err := h.operatorQueryService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization"))
+		return
+	}
+
+	if clinicianItem, err := h.clinicianQueryService.GetByOperator(c.Request.Context(), orgID, id); err == nil && clinicianItem != nil {
+		h.Error(c, errors.WithCode(code.ErrValidation, "员工已绑定临床人员，请先解绑"))
+		return
+	} else if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
+		h.Error(c, err)
+		return
+	}
+
+	if err := h.operatorLifecycleService.Delete(c.Request.Context(), id); err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to delete staff",
+			"action", "delete_staff",
+			"resource", "staff",
+			"staff_id", id,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	h.SuccessResponseWithMessage(c, "员工删除成功", nil)
+}
+
+func (h *OperatorClinicianHandler) ListStaff(c *gin.Context) {
+	var req request.ListStaffRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		logger.L(c.Request.Context()).Warnw("Invalid list staff request",
+			"action", "list_staff",
+			"resource", "staff",
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	if req.Page == 0 {
+		req.Page = 1
+	}
+	if req.PageSize == 0 {
+		req.PageSize = 20
+	}
+
+	offset := (req.Page - 1) * req.PageSize
+	listDTO := operatorApp.ListOperatorDTO{
+		OrgID:  orgID,
+		Role:   req.Role,
+		Offset: offset,
+		Limit:  req.PageSize,
+	}
+
+	listResult, err := h.operatorQueryService.ListOperators(c.Request.Context(), listDTO)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("Failed to list staff",
+			"action", "list_staff",
+			"resource", "staff",
+			"org_id", listDTO.OrgID,
+			"error", err.Error(),
+		)
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toStaffListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
+}
+
+func (h *OperatorClinicianHandler) CreateClinician(c *gin.Context) {
 	var req request.CreateClinicianRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.Error(c, err)
@@ -90,7 +308,7 @@ func (h *ActorHandler) CreateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者创建成功", toClinicianResponse(result))
 }
 
-func (h *ActorHandler) UpdateClinician(c *gin.Context) {
+func (h *OperatorClinicianHandler) UpdateClinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -128,7 +346,7 @@ func (h *ActorHandler) UpdateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者更新成功", toClinicianResponse(result))
 }
 
-func (h *ActorHandler) ActivateClinician(c *gin.Context) {
+func (h *OperatorClinicianHandler) ActivateClinician(c *gin.Context) {
 	result, err := h.changeClinicianState(c, "activate_clinician", "Clinician activated", h.clinicianLifecycleService.Activate)
 	if err != nil {
 		h.Error(c, err)
@@ -137,7 +355,7 @@ func (h *ActorHandler) ActivateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者已激活", toClinicianResponse(result))
 }
 
-func (h *ActorHandler) DeactivateClinician(c *gin.Context) {
+func (h *OperatorClinicianHandler) DeactivateClinician(c *gin.Context) {
 	result, err := h.changeClinicianState(c, "deactivate_clinician", "Clinician deactivated", h.clinicianLifecycleService.Deactivate)
 	if err != nil {
 		h.Error(c, err)
@@ -146,7 +364,7 @@ func (h *ActorHandler) DeactivateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者已停用", toClinicianResponse(result))
 }
 
-func (h *ActorHandler) BindClinicianOperator(c *gin.Context) {
+func (h *OperatorClinicianHandler) BindClinicianOperator(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -188,7 +406,7 @@ func (h *ActorHandler) BindClinicianOperator(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者绑定员工成功", toClinicianResponse(result))
 }
 
-func (h *ActorHandler) UnbindClinicianOperator(c *gin.Context) {
+func (h *OperatorClinicianHandler) UnbindClinicianOperator(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -212,17 +430,7 @@ func (h *ActorHandler) UnbindClinicianOperator(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者解绑员工成功", toClinicianResponse(result))
 }
 
-// GetClinician 获取从业者详情。
-// @Summary 获取从业者详情
-// @Description 查询指定从业者详情，仅 qs:admin 可访问
-// @Tags Actor-Clinician
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path string true "从业者ID"
-// @Success 200 {object} core.Response{data=response.ClinicianResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians/{id} [get]
-func (h *ActorHandler) GetClinician(c *gin.Context) {
+func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -248,23 +456,54 @@ func (h *ActorHandler) GetClinician(c *gin.Context) {
 	h.Success(c, toClinicianResponse(result))
 }
 
-// ListClinicians 查询从业者列表。
-// @Summary 查询从业者列表
-// @Description 查询机构内从业者列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验，实际以 JWT org_id 为准
-// @Tags Actor-Clinician
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param org_id query int false "兼容字段：机构ID，若传入必须与 JWT org_id 一致"
-// @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} core.Response{data=response.ClinicianListResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians [get]
-func (h *ActorHandler) ListClinicians(c *gin.Context) {
-	h.clinicianHTTP().ListClinicians(c)
+func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
+	req := request.ListClinicianRequest{Page: 1, PageSize: 20}
+	if orgIDParam := c.Query("org_id"); orgIDParam != "" {
+		if _, err := fmt.Sscan(orgIDParam, &req.OrgID); err != nil {
+			h.Error(c, err)
+			return
+		}
+	}
+	if pageParam := c.Query("page"); pageParam != "" {
+		if _, err := fmt.Sscan(pageParam, &req.Page); err != nil {
+			h.Error(c, err)
+			return
+		}
+	}
+	if pageSizeParam := c.Query("page_size"); pageSizeParam != "" {
+		if _, err := fmt.Sscan(pageSizeParam, &req.PageSize); err != nil {
+			h.Error(c, err)
+			return
+		}
+	}
+	if req.Page <= 0 {
+		h.BadRequestResponse(c, "page must be greater than 0", nil)
+		return
+	}
+	if req.PageSize <= 0 || req.PageSize > 100 {
+		h.BadRequestResponse(c, "page_size must be between 1 and 100", nil)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	result, err := h.clinicianQueryService.ListClinicians(c.Request.Context(), clinicianApp.ListClinicianDTO{
+		OrgID:  orgID,
+		Offset: (req.Page - 1) * req.PageSize,
+		Limit:  req.PageSize,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	h.Success(c, toClinicianListResponse(result, req.Page, req.PageSize))
 }
 
-func (h *ActorHandler) ListClinicianTestees(c *gin.Context) {
+func (h *OperatorClinicianHandler) ListClinicianTestees(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -309,76 +548,7 @@ func (h *ActorHandler) ListClinicianTestees(c *gin.Context) {
 	})
 }
 
-func (h *ActorHandler) CreateClinicianAssessmentEntry(c *gin.Context) {
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	clinicianID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if _, err := h.requireClinicianInOrg(c, orgID, clinicianID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var req request.CreateAssessmentEntryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.assessmentEntryService.Create(c.Request.Context(), assessmentEntryApp.CreateAssessmentEntryDTO{
-		OrgID:         orgID,
-		ClinicianID:   clinicianID,
-		TargetType:    req.TargetType,
-		TargetCode:    req.TargetCode,
-		TargetVersion: req.TargetVersion,
-		ExpiresAt:     flexibleTimePtrToTimePtr(req.ExpiresAt),
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	qrCodeURL := h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)
-	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
-}
-
-func (h *ActorHandler) ListClinicianAssessmentEntries(c *gin.Context) {
-	orgID, err := h.RequireProtectedOrgID(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	clinicianID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if _, err := h.requireClinicianInOrg(c, orgID, clinicianID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	page, pageSize := paginationFromContext(c)
-	result, err := h.assessmentEntryService.ListByClinician(c.Request.Context(), assessmentEntryApp.ListAssessmentEntryDTO{
-		OrgID:       orgID,
-		ClinicianID: clinicianID,
-		Offset:      (page - 1) * pageSize,
-		Limit:       pageSize,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
-}
-
-func (h *ActorHandler) ListClinicianRelations(c *gin.Context) {
+func (h *OperatorClinicianHandler) ListClinicianRelations(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -397,16 +567,7 @@ func (h *ActorHandler) ListClinicianRelations(c *gin.Context) {
 	h.listClinicianRelationsFor(c, orgID, clinicianID)
 }
 
-// GetMyClinician 获取当前操作者对应的从业者。
-// @Summary 获取我的从业者身份
-// @Description 获取当前后台操作者绑定的从业者档案；当前也兼容旧的 /practitioners 路由别名
-// @Tags Actor-Clinician
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Success 200 {object} core.Response{data=response.ClinicianResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians/me [get]
-func (h *ActorHandler) GetMyClinician(c *gin.Context) {
+func (h *OperatorClinicianHandler) GetMyClinician(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
@@ -420,18 +581,7 @@ func (h *ActorHandler) GetMyClinician(c *gin.Context) {
 	h.Success(c, toClinicianResponse(clinicianItem))
 }
 
-// ListMyClinicianTestees 查询当前从业者名下受试者。
-// @Summary 查询我的受试者
-// @Description 查询当前从业者可访问的受试者列表，底层复用与 /api/v1/testees 相同的访问范围收口逻辑
-// @Tags Actor-Clinician
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} core.Response{data=response.TesteeListResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians/me/testees [get]
-func (h *ActorHandler) ListMyClinicianTestees(c *gin.Context) {
+func (h *OperatorClinicianHandler) ListMyClinicianTestees(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
 		h.Error(c, err)
@@ -465,119 +615,7 @@ func (h *ActorHandler) ListMyClinicianTestees(c *gin.Context) {
 	h.Success(c, toTesteeListResponse(result.Items, result.TotalCount, page, pageSize))
 }
 
-// CreateMyAssessmentEntry 创建当前从业者测评入口。
-// @Summary 创建我的测评入口
-// @Description 为当前从业者创建测评入口二维码；当前也兼容旧的 /practitioners 路由别名
-// @Tags Actor-AssessmentEntry
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
-// @Success 200 {object} core.Response{data=response.AssessmentEntryResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians/me/assessment-entries [post]
-func (h *ActorHandler) CreateMyAssessmentEntry(c *gin.Context) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var req request.CreateAssessmentEntryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.assessmentEntryService.Create(c.Request.Context(), assessmentEntryApp.CreateAssessmentEntryDTO{
-		OrgID:         clinicianItem.OrgID,
-		ClinicianID:   clinicianItem.ID,
-		TargetType:    req.TargetType,
-		TargetCode:    req.TargetCode,
-		TargetVersion: req.TargetVersion,
-		ExpiresAt:     flexibleTimePtrToTimePtr(req.ExpiresAt),
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	qrCodeURL := h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)
-
-	resp := toAssessmentEntryResponse(result, qrCodeURL)
-	h.SuccessResponseWithMessage(c, "测评入口创建成功", resp)
-}
-
-// ListMyAssessmentEntries 查询当前从业者测评入口列表。
-// @Summary 查询我的测评入口列表
-// @Description 查询当前从业者创建的测评入口列表；当前也兼容旧的 /practitioners 路由别名
-// @Tags Actor-AssessmentEntry
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(20)
-// @Success 200 {object} core.Response{data=response.AssessmentEntryListResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians/me/assessment-entries [get]
-func (h *ActorHandler) ListMyAssessmentEntries(c *gin.Context) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	page, pageSize := paginationFromContext(c)
-	result, err := h.assessmentEntryService.ListByClinician(c.Request.Context(), assessmentEntryApp.ListAssessmentEntryDTO{
-		OrgID:       clinicianItem.OrgID,
-		ClinicianID: clinicianItem.ID,
-		Offset:      (page - 1) * pageSize,
-		Limit:       pageSize,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
-}
-
-// GetMyAssessmentEntry 查询当前从业者测评入口详情。
-// @Summary 查询我的测评入口详情
-// @Description 查询当前从业者持有的单个测评入口详情
-// @Tags Actor-AssessmentEntry
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path string true "入口ID"
-// @Success 200 {object} core.Response{data=response.AssessmentEntryResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/clinicians/me/assessment-entries/{id} [get]
-func (h *ActorHandler) GetMyAssessmentEntry(c *gin.Context) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	result, err := h.assessmentEntryService.GetByID(c.Request.Context(), entryID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if result.ClinicianID != clinicianItem.ID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current clinician"))
-		return
-	}
-
-	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
-}
-
-func (h *ActorHandler) ListMyClinicianRelations(c *gin.Context) {
+func (h *OperatorClinicianHandler) ListMyClinicianRelations(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
 		h.Error(c, err)
@@ -587,7 +625,7 @@ func (h *ActorHandler) ListMyClinicianRelations(c *gin.Context) {
 	h.listClinicianRelationsFor(c, clinicianItem.OrgID, clinicianItem.ID)
 }
 
-func (h *ActorHandler) AssignClinicianTestee(c *gin.Context) {
+func (h *OperatorClinicianHandler) AssignClinicianTestee(c *gin.Context) {
 	var req request.AssignClinicianTesteeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.Error(c, err)
@@ -614,19 +652,19 @@ func (h *ActorHandler) AssignClinicianTestee(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "分配受试者成功", toRelationResponseFromClinicianResult(result))
 }
 
-func (h *ActorHandler) AssignPrimaryClinicianTestee(c *gin.Context) {
+func (h *OperatorClinicianHandler) AssignPrimaryClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypePrimary), "设置主责从业者成功")
 }
 
-func (h *ActorHandler) AssignAttendingClinicianTestee(c *gin.Context) {
+func (h *OperatorClinicianHandler) AssignAttendingClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeAttending), "设置跟进从业者成功")
 }
 
-func (h *ActorHandler) AssignCollaboratorClinicianTestee(c *gin.Context) {
+func (h *OperatorClinicianHandler) AssignCollaboratorClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeCollaborator), "设置协作从业者成功")
 }
 
-func (h *ActorHandler) TransferPrimaryClinicianTestee(c *gin.Context) {
+func (h *OperatorClinicianHandler) TransferPrimaryClinicianTestee(c *gin.Context) {
 	var req request.TransferPrimaryClinicianRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.Error(c, err)
@@ -652,7 +690,7 @@ func (h *ActorHandler) TransferPrimaryClinicianTestee(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "转移主责从业者成功", toRelationResponseFromClinicianResult(result))
 }
 
-func (h *ActorHandler) UnbindClinicianTesteeRelation(c *gin.Context) {
+func (h *OperatorClinicianHandler) UnbindClinicianTesteeRelation(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
@@ -675,82 +713,78 @@ func (h *ActorHandler) UnbindClinicianTesteeRelation(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "解绑成功", toRelationResponseFromClinicianResult(result))
 }
 
-func (h *ActorHandler) GetTesteeClinicians(c *gin.Context) {
+func (h *OperatorClinicianHandler) GetTesteeClinicians(c *gin.Context) {
 	h.listTesteeClinicianRelations(c, true)
 }
 
-func (h *ActorHandler) ListTesteeClinicianRelations(c *gin.Context) {
+func (h *OperatorClinicianHandler) ListTesteeClinicianRelations(c *gin.Context) {
 	h.listTesteeClinicianRelations(c, false)
 }
 
-func (h *ActorHandler) GetAssessmentEntry(c *gin.Context) {
-	orgID, err := h.RequireProtectedOrgID(c)
+func (h *OperatorClinicianHandler) loadProtectedStaff(c *gin.Context, orgID int64, staffID uint64) (*operatorApp.OperatorResult, error) {
+	current, err := h.operatorQueryService.GetByID(c.Request.Context(), staffID)
 	if err != nil {
-		h.Error(c, err)
-		return
+		return nil, err
 	}
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if current.OrgID != orgID {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "operator does not belong to current organization")
+	}
+	return current, nil
+}
+
+func (h *OperatorClinicianHandler) updateStaffProfile(c *gin.Context, staffID uint64, req request.UpdateStaffRequest) error {
+	_, err := h.operatorLifecycleService.UpdateProfile(c.Request.Context(), operatorApp.UpdateOperatorProfileDTO{
+		OperatorID: staffID,
+		Name:       req.Name,
+		Email:      req.Email,
+		Phone:      req.Phone,
+	})
+	return err
+}
+
+func (h *OperatorClinicianHandler) syncStaffAuthorization(c *gin.Context, staffID uint64, current *operatorApp.OperatorResult, req request.UpdateStaffRequest) error {
+	targetActive := resolveTargetStaffActive(current.IsActive, req.IsActive)
+	if err := h.syncStaffActiveState(c, staffID, current.IsActive, targetActive); err != nil {
+		return err
+	}
+	if !targetActive || req.Roles == nil {
+		return nil
+	}
+
+	latest, err := h.operatorQueryService.GetByID(c.Request.Context(), staffID)
 	if err != nil {
-		h.Error(c, err)
-		return
+		return err
 	}
-	result, err := h.assessmentEntryService.GetByID(c.Request.Context(), entryID)
-	if err != nil {
-		h.Error(c, err)
-		return
+	return h.syncStaffRoles(c, staffID, latest.Roles, req.Roles)
+}
+
+func (h *OperatorClinicianHandler) syncStaffActiveState(c *gin.Context, staffID uint64, currentActive, targetActive bool) error {
+	switch {
+	case currentActive && !targetActive:
+		return h.operatorAuthorizationService.Deactivate(c.Request.Context(), staffID)
+	case !currentActive && targetActive:
+		return h.operatorAuthorizationService.Activate(c.Request.Context(), staffID)
+	default:
+		return nil
 	}
-	if result.OrgID != orgID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current organization"))
-		return
+}
+
+func (h *OperatorClinicianHandler) syncStaffRoles(c *gin.Context, staffID uint64, currentRoles, targetRoles []string) error {
+	rolesToAssign, rolesToRemove := diffStringSet(currentRoles, targetRoles)
+	for _, role := range rolesToAssign {
+		if err := h.operatorAuthorizationService.AssignRole(c.Request.Context(), staffID, role); err != nil {
+			return err
+		}
 	}
-	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
+	for _, role := range rolesToRemove {
+		if err := h.operatorAuthorizationService.RemoveRole(c.Request.Context(), staffID, role); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (h *ActorHandler) DeactivateAssessmentEntry(c *gin.Context) {
-	h.setAssessmentEntryActive(c, false)
-}
-
-func (h *ActorHandler) ReactivateAssessmentEntry(c *gin.Context) {
-	h.setAssessmentEntryActive(c, true)
-}
-
-func (h *ActorHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
-	h.setMyAssessmentEntryActive(c, false)
-}
-
-func (h *ActorHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
-	h.setMyAssessmentEntryActive(c, true)
-}
-
-// ResolveAssessmentEntry 公开解析测评入口。
-// @Summary 公开解析测评入口
-// @Description 公开解析测评入口 token，返回入口配置和所属从业者摘要
-// @Tags Actor-AssessmentEntry
-// @Produce json
-// @Param token path string true "测评入口Token"
-// @Success 200 {object} core.Response{data=response.AssessmentEntryResolvedResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/public/assessment-entries/{token} [get]
-func (h *ActorHandler) ResolveAssessmentEntry(c *gin.Context) {
-	h.assessmentEntryHTTP().ResolveAssessmentEntry(c)
-}
-
-// IntakeAssessmentEntry 公开扫码 intake。
-// @Summary 公开扫码建档
-// @Description 通过测评入口 token 建立受试者并自动绑定从业者关系
-// @Tags Actor-AssessmentEntry
-// @Accept json
-// @Produce json
-// @Param token path string true "测评入口Token"
-// @Param request body request.IntakeByAssessmentEntryRequest true "扫码 intake 请求"
-// @Success 200 {object} core.Response{data=response.AssessmentEntryIntakeResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/public/assessment-entries/{token}/intake [post]
-func (h *ActorHandler) IntakeAssessmentEntry(c *gin.Context) {
-	h.assessmentEntryHTTP().IntakeAssessmentEntry(c)
-}
-
-func (h *ActorHandler) currentClinician(c *gin.Context) (*clinicianApp.ClinicianResult, error) {
+func (h *OperatorClinicianHandler) currentClinician(c *gin.Context) (*clinicianApp.ClinicianResult, error) {
 	orgID, userID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		return nil, err
@@ -780,29 +814,237 @@ func (h *ActorHandler) currentClinician(c *gin.Context) (*clinicianApp.Clinician
 	return clinicianItem, nil
 }
 
-func paginationFromContext(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-	return page, pageSize
+func (h *OperatorClinicianHandler) requireClinicianInOrg(c *gin.Context, orgID int64, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
+	return requireClinicianInOrg(c.Request.Context(), h.clinicianQueryService, orgID, clinicianID)
 }
 
-func parseGender(value string) int8 {
-	switch value {
-	case "male", "男":
-		return 1
-	case "female", "女":
-		return 2
+func requireClinicianInOrg(ctx context.Context, queryService clinicianApp.ClinicianQueryService, orgID int64, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
+	if queryService == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "clinician query service not configured")
+	}
+	result, err := queryService.GetByID(ctx, clinicianID)
+	if err != nil {
+		return nil, err
+	}
+	if result.OrgID != orgID {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "clinician does not belong to current organization")
+	}
+	return result, nil
+}
+
+func (h *OperatorClinicianHandler) changeClinicianState(
+	c *gin.Context,
+	action string,
+	logMessage string,
+	change func(context.Context, uint64) (*clinicianApp.ClinicianResult, error),
+) (*clinicianApp.ClinicianResult, error) {
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		return nil, err
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := h.requireClinicianInOrg(c, orgID, id); err != nil {
+		return nil, err
+	}
+
+	result, err := change(c.Request.Context(), id)
+	if err != nil {
+		return nil, err
+	}
+	logger.L(c.Request.Context()).Infow(logMessage,
+		"action", action,
+		"org_id", orgID,
+		"clinician_id", id,
+		"operator_user_id", operatorUserID,
+	)
+	return result, nil
+}
+
+func (h *OperatorClinicianHandler) listTesteeClinicianRelations(c *gin.Context, activeOnly bool) {
+	testeeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.clinicianRelationshipService.ListTesteeRelations(c.Request.Context(), clinicianApp.ListTesteeRelationDTO{
+		OrgID:      orgID,
+		TesteeID:   testeeID,
+		ActiveOnly: activeOnly,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	items := make([]*response.TesteeClinicianRelationResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toTesteeClinicianRelationResponse(item))
+	}
+	h.Success(c, &response.TesteeClinicianRelationListResponse{Items: items})
+}
+
+func (h *OperatorClinicianHandler) listClinicianRelationsFor(c *gin.Context, orgID int64, clinicianID uint64) {
+	page, pageSize := paginationFromContext(c)
+	result, err := h.clinicianRelationshipService.ListClinicianRelations(c.Request.Context(), clinicianApp.ListClinicianRelationDTO{
+		OrgID:       orgID,
+		ClinicianID: clinicianID,
+		Offset:      (page - 1) * pageSize,
+		Limit:       pageSize,
+		ActiveOnly:  true,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	items := make([]*response.ClinicianRelationResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toClinicianRelationResponse(item))
+	}
+
+	totalPages := 0
+	if pageSize > 0 {
+		totalPages = int((result.TotalCount + int64(pageSize) - 1) / int64(pageSize))
+	}
+	h.Success(c, &response.ClinicianRelationListResponse{
+		Items:      items,
+		Total:      result.TotalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	})
+}
+
+func (h *OperatorClinicianHandler) assignClinicianTesteeWithType(c *gin.Context, relationType string, successMessage string) {
+	var req request.AssignClinicianTesteeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	dto := clinicianApp.AssignTesteeDTO{
+		OrgID:        orgID,
+		ClinicianID:  req.ClinicianID.Uint64(),
+		TesteeID:     req.TesteeID.Uint64(),
+		RelationType: relationType,
+		SourceType:   req.SourceType,
+		SourceID:     metaIDPtrToUint64(req.SourceID),
+	}
+
+	var result *clinicianApp.RelationResult
+	switch relationType {
+	case string(domainRelation.RelationTypePrimary):
+		result, err = h.clinicianRelationshipService.AssignPrimary(c.Request.Context(), dto)
+	case string(domainRelation.RelationTypeCollaborator):
+		result, err = h.clinicianRelationshipService.AssignCollaborator(c.Request.Context(), dto)
 	default:
-		return 0
+		result, err = h.clinicianRelationshipService.AssignAttending(c.Request.Context(), dto)
+	}
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.SuccessResponseWithMessage(c, successMessage, toRelationResponseFromClinicianResult(result))
+}
+
+func resolveTargetStaffActive(currentActive bool, requested *bool) bool {
+	if requested == nil {
+		return currentActive
+	}
+	return *requested
+}
+
+func diffStringSet(current, target []string) ([]string, []string) {
+	currentSet := make(map[string]struct{}, len(current))
+	targetSet := make(map[string]struct{}, len(target))
+	for _, role := range current {
+		currentSet[role] = struct{}{}
+	}
+	for _, role := range target {
+		targetSet[role] = struct{}{}
+	}
+
+	toAssign := make([]string, 0, len(target))
+	for _, role := range target {
+		if _, exists := currentSet[role]; !exists {
+			toAssign = append(toAssign, role)
+		}
+	}
+
+	toRemove := make([]string, 0, len(current))
+	for _, role := range current {
+		if _, exists := targetSet[role]; !exists {
+			toRemove = append(toRemove, role)
+		}
+	}
+	return toAssign, toRemove
+}
+
+func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorApp.RegisterOperatorDTO {
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	return operatorApp.RegisterOperatorDTO{
+		OrgID:    orgID,
+		UserID:   req.UserID.Int64(),
+		Roles:    req.Roles,
+		Name:     req.Name,
+		Email:    req.Email,
+		Phone:    req.Phone,
+		Password: req.Password,
+		IsActive: isActive,
+	}
+}
+
+func toStaffResponse(result *operatorApp.OperatorResult) *response.StaffResponse {
+	return &response.StaffResponse{
+		ID:       fmt.Sprintf("%d", result.ID),
+		OrgID:    fmt.Sprintf("%d", result.OrgID),
+		UserID:   fmt.Sprintf("%d", result.UserID),
+		Roles:    result.Roles,
+		Name:     result.Name,
+		Email:    result.Email,
+		Phone:    result.Phone,
+		IsActive: result.IsActive,
+	}
+}
+
+func toStaffListResponse(results []*operatorApp.OperatorResult, total int64, page, pageSize int) *response.StaffListResponse {
+	items := make([]*response.StaffResponse, 0, len(results))
+	for _, result := range results {
+		items = append(items, toStaffResponse(result))
+	}
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	return &response.StaffListResponse{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
 	}
 }
 
@@ -852,129 +1094,6 @@ func toClinicianListResponse(result *clinicianApp.ClinicianListResult, page, pag
 		PageSize:   pageSize,
 		TotalPages: totalPages,
 	}
-}
-
-func toAssessmentEntryResponse(item *assessmentEntryApp.AssessmentEntryResult, qrCodeURL string) *response.AssessmentEntryResponse {
-	if item == nil {
-		return nil
-	}
-
-	return &response.AssessmentEntryResponse{
-		ID:              strconv.FormatUint(item.ID, 10),
-		OrgID:           strconv.FormatInt(item.OrgID, 10),
-		ClinicianID:     strconv.FormatUint(item.ClinicianID, 10),
-		Token:           item.Token,
-		TargetType:      item.TargetType,
-		TargetTypeLabel: response.LabelForTargetType(item.TargetType),
-		TargetCode:      item.TargetCode,
-		TargetVersion:   item.TargetVersion,
-		IsActive:        item.IsActive,
-		IsActiveLabel:   map[bool]string{true: "启用", false: "停用"}[item.IsActive],
-		ExpiresAt:       response.FormatDateTimePtr(item.ExpiresAt),
-		QRCodeURL:       qrCodeURL,
-	}
-}
-
-func toAssessmentEntryListResponse(result *assessmentEntryApp.AssessmentEntryListResult, page, pageSize int) *response.AssessmentEntryListResponse {
-	items := make([]*response.AssessmentEntryResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, toAssessmentEntryResponse(item, ""))
-	}
-
-	totalPages := 0
-	if pageSize > 0 {
-		totalPages = int((result.TotalCount + int64(pageSize) - 1) / int64(pageSize))
-	}
-
-	return &response.AssessmentEntryListResponse{
-		Items:      items,
-		Total:      result.TotalCount,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPages,
-	}
-}
-
-func toClinicianSummaryResponse(item *assessmentEntryApp.ClinicianSummaryResult) *response.ClinicianSummaryResponse {
-	if item == nil {
-		return nil
-	}
-
-	var operatorID *string
-	if item.OperatorID != nil {
-		value := strconv.FormatUint(*item.OperatorID, 10)
-		operatorID = &value
-	}
-
-	return &response.ClinicianSummaryResponse{
-		ID:                 strconv.FormatUint(item.ID, 10),
-		OperatorID:         operatorID,
-		Name:               item.Name,
-		Department:         item.Department,
-		Title:              item.Title,
-		ClinicianType:      item.ClinicianType,
-		ClinicianTypeLabel: response.LabelForClinicianType(item.ClinicianType),
-	}
-}
-
-func toAssessmentEntryResolvedResponse(item *assessmentEntryApp.ResolvedAssessmentEntryResult) *response.AssessmentEntryResolvedResponse {
-	if item == nil {
-		return nil
-	}
-
-	return &response.AssessmentEntryResolvedResponse{
-		Entry:     toAssessmentEntryResponse(item.Entry, ""),
-		Clinician: toClinicianSummaryResponse(item.Clinician),
-	}
-}
-
-func toRelationResponse(item *assessmentEntryApp.RelationSummaryResult) *response.RelationResponse {
-	if item == nil {
-		return nil
-	}
-	return buildRelationResponse(
-		item.ID,
-		item.OrgID,
-		item.ClinicianID,
-		item.TesteeID,
-		item.RelationType,
-		item.SourceType,
-		item.SourceID,
-		item.IsActive,
-		item.BoundAt,
-		item.UnboundAt,
-	)
-}
-
-func toAssessmentEntryIntakeResponse(item *assessmentEntryApp.AssessmentEntryIntakeResult) *response.AssessmentEntryIntakeResponse {
-	if item == nil {
-		return nil
-	}
-
-	return &response.AssessmentEntryIntakeResponse{
-		Entry:      toAssessmentEntryResponse(item.Entry, ""),
-		Clinician:  toClinicianSummaryResponse(item.Clinician),
-		Testee:     toTesteeSummaryResponse(item.Testee),
-		Relation:   toRelationResponse(item.Relation),
-		Assignment: toRelationResponse(item.Assignment),
-	}
-}
-
-func toTesteeSummaryResponse(item *assessmentEntryApp.TesteeSummaryResult) *response.TesteeResponse {
-	if item == nil {
-		return nil
-	}
-	return buildTesteeSummaryResponse(
-		item.ID,
-		item.OrgID,
-		item.ProfileID,
-		item.Name,
-		item.Gender,
-		item.Birthday,
-		item.Tags,
-		item.Source,
-		item.IsKeyFocus,
-	)
 }
 
 func toRelationResponseFromClinicianResult(item *clinicianApp.RelationResult) *response.RelationResponse {
@@ -1030,306 +1149,4 @@ func toClinicianRelationResponse(item *clinicianApp.ClinicianRelationResult) *re
 		Testee:   toAssignedTesteeResponse(item.Testee),
 		Relation: toRelationResponseFromClinicianResult(item.Relation),
 	}
-}
-
-func (h *ActorHandler) changeClinicianState(
-	c *gin.Context,
-	action string,
-	logMessage string,
-	change func(context.Context, uint64) (*clinicianApp.ClinicianResult, error),
-) (*clinicianApp.ClinicianResult, error) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		return nil, err
-	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := h.requireClinicianInOrg(c, orgID, id); err != nil {
-		return nil, err
-	}
-
-	result, err := change(c.Request.Context(), id)
-	if err != nil {
-		return nil, err
-	}
-	logger.L(c.Request.Context()).Infow(logMessage,
-		"action", action,
-		"org_id", orgID,
-		"clinician_id", id,
-		"operator_user_id", operatorUserID,
-	)
-	return result, nil
-}
-
-func buildRelationResponse(
-	id uint64,
-	orgID int64,
-	clinicianID uint64,
-	testeeID uint64,
-	relationType string,
-	sourceType string,
-	sourceID *uint64,
-	isActive bool,
-	boundAt time.Time,
-	unboundAt *time.Time,
-) *response.RelationResponse {
-	return &response.RelationResponse{
-		ID:                strconv.FormatUint(id, 10),
-		OrgID:             strconv.FormatInt(orgID, 10),
-		ClinicianID:       strconv.FormatUint(clinicianID, 10),
-		TesteeID:          strconv.FormatUint(testeeID, 10),
-		RelationType:      relationType,
-		RelationTypeLabel: response.LabelForRelationType(relationType),
-		SourceType:        sourceType,
-		SourceTypeLabel:   response.LabelForRelationSource(sourceType),
-		SourceID:          uint64StringPtr(sourceID),
-		IsActive:          isActive,
-		IsActiveLabel:     boolLabel(isActive, "有效", "失效"),
-		BoundAt:           response.FormatDateTimeValue(boundAt),
-		UnboundAt:         response.FormatDateTimePtr(unboundAt),
-	}
-}
-
-func buildTesteeSummaryResponse(
-	id uint64,
-	orgID int64,
-	profileID *uint64,
-	name string,
-	genderValue int8,
-	birthday *time.Time,
-	tags []string,
-	source string,
-	isKeyFocus bool,
-) *response.TesteeResponse {
-	gender := response.GenderCodeFromValue(genderValue)
-	profileIDStr := uint64StringPtr(profileID)
-
-	return &response.TesteeResponse{
-		ID:              strconv.FormatUint(id, 10),
-		OrgID:           strconv.FormatInt(orgID, 10),
-		ProfileID:       profileIDStr,
-		IAMChildID:      response.LegacyIAMChildIDAlias(profileIDStr),
-		Name:            name,
-		Gender:          gender,
-		GenderLabel:     response.LabelForGender(gender),
-		Birthday:        response.FormatDatePtr(birthday),
-		Tags:            tags,
-		TagsLabel:       response.LabelTags(tags),
-		Source:          source,
-		SourceLabel:     response.LabelForTesteeSource(source),
-		IsKeyFocus:      isKeyFocus,
-		IsKeyFocusLabel: response.LabelForKeyFocus(isKeyFocus),
-	}
-}
-
-func uint64StringPtr(value *uint64) *string {
-	if value == nil {
-		return nil
-	}
-	text := strconv.FormatUint(*value, 10)
-	return &text
-}
-
-func boolLabel(value bool, trueLabel, falseLabel string) string {
-	if value {
-		return trueLabel
-	}
-	return falseLabel
-}
-
-func (h *ActorHandler) requireClinicianInOrg(c *gin.Context, orgID int64, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
-	result, err := h.clinicianQueryService.GetByID(c.Request.Context(), clinicianID)
-	if err != nil {
-		return nil, err
-	}
-	if result.OrgID != orgID {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "clinician does not belong to current organization")
-	}
-	return result, nil
-}
-
-func (h *ActorHandler) listTesteeClinicianRelations(c *gin.Context, activeOnly bool) {
-	testeeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	orgID, _, err := h.validateProtectedTesteeAccess(c, testeeID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	result, err := h.clinicianRelationshipService.ListTesteeRelations(c.Request.Context(), clinicianApp.ListTesteeRelationDTO{
-		OrgID:      orgID,
-		TesteeID:   testeeID,
-		ActiveOnly: activeOnly,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	items := make([]*response.TesteeClinicianRelationResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, toTesteeClinicianRelationResponse(item))
-	}
-	h.Success(c, &response.TesteeClinicianRelationListResponse{Items: items})
-}
-
-func (h *ActorHandler) listClinicianRelationsFor(c *gin.Context, orgID int64, clinicianID uint64) {
-	page, pageSize := paginationFromContext(c)
-	result, err := h.clinicianRelationshipService.ListClinicianRelations(c.Request.Context(), clinicianApp.ListClinicianRelationDTO{
-		OrgID:       orgID,
-		ClinicianID: clinicianID,
-		Offset:      (page - 1) * pageSize,
-		Limit:       pageSize,
-		ActiveOnly:  true,
-	})
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	items := make([]*response.ClinicianRelationResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, toClinicianRelationResponse(item))
-	}
-
-	totalPages := 0
-	if pageSize > 0 {
-		totalPages = int((result.TotalCount + int64(pageSize) - 1) / int64(pageSize))
-	}
-	h.Success(c, &response.ClinicianRelationListResponse{
-		Items:      items,
-		Total:      result.TotalCount,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPages,
-	})
-}
-
-func (h *ActorHandler) setAssessmentEntryActive(c *gin.Context, active bool) {
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var result *assessmentEntryApp.AssessmentEntryResult
-	if active {
-		result, err = h.assessmentEntryService.Reactivate(c.Request.Context(), entryID)
-	} else {
-		result, err = h.assessmentEntryService.Deactivate(c.Request.Context(), entryID)
-	}
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if result.OrgID != orgID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current organization"))
-		return
-	}
-	logger.L(c.Request.Context()).Infow("Assessment entry lifecycle changed",
-		"action", map[bool]string{true: "reactivate_assessment_entry", false: "deactivate_assessment_entry"}[active],
-		"org_id", orgID,
-		"assessment_entry_id", entryID,
-		"clinician_id", result.ClinicianID,
-		"operator_user_id", operatorUserID,
-		"is_active", result.IsActive,
-	)
-	if active {
-		h.SuccessResponseWithMessage(c, "测评入口已启用", toAssessmentEntryResponse(result, ""))
-		return
-	}
-	h.SuccessResponseWithMessage(c, "测评入口已停用", toAssessmentEntryResponse(result, ""))
-}
-
-func (h *ActorHandler) setMyAssessmentEntryActive(c *gin.Context, active bool) {
-	clinicianItem, err := h.currentClinician(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	_, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	var result *assessmentEntryApp.AssessmentEntryResult
-	if active {
-		result, err = h.assessmentEntryService.Reactivate(c.Request.Context(), entryID)
-	} else {
-		result, err = h.assessmentEntryService.Deactivate(c.Request.Context(), entryID)
-	}
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if result.ClinicianID != clinicianItem.ID {
-		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "assessment entry does not belong to current clinician"))
-		return
-	}
-	logger.L(c.Request.Context()).Infow("Assessment entry lifecycle changed",
-		"action", map[bool]string{true: "reactivate_my_assessment_entry", false: "deactivate_my_assessment_entry"}[active],
-		"org_id", clinicianItem.OrgID,
-		"assessment_entry_id", entryID,
-		"clinician_id", result.ClinicianID,
-		"operator_user_id", operatorUserID,
-		"is_active", result.IsActive,
-	)
-	if active {
-		h.SuccessResponseWithMessage(c, "测评入口已启用", toAssessmentEntryResponse(result, ""))
-		return
-	}
-	h.SuccessResponseWithMessage(c, "测评入口已停用", toAssessmentEntryResponse(result, ""))
-}
-
-func (h *ActorHandler) assignClinicianTesteeWithType(c *gin.Context, relationType string, successMessage string) {
-	var req request.AssignClinicianTesteeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.Error(c, err)
-		return
-	}
-	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	dto := clinicianApp.AssignTesteeDTO{
-		OrgID:        orgID,
-		ClinicianID:  req.ClinicianID.Uint64(),
-		TesteeID:     req.TesteeID.Uint64(),
-		RelationType: relationType,
-		SourceType:   req.SourceType,
-		SourceID:     metaIDPtrToUint64(req.SourceID),
-	}
-
-	var result *clinicianApp.RelationResult
-	switch relationType {
-	case string(domainRelation.RelationTypePrimary):
-		result, err = h.clinicianRelationshipService.AssignPrimary(c.Request.Context(), dto)
-	case string(domainRelation.RelationTypeCollaborator):
-		result, err = h.clinicianRelationshipService.AssignCollaborator(c.Request.Context(), dto)
-	default:
-		result, err = h.clinicianRelationshipService.AssignAttending(c.Request.Context(), dto)
-	}
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.SuccessResponseWithMessage(c, successMessage, toRelationResponseFromClinicianResult(result))
 }

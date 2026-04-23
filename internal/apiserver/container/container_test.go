@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 type fakeModule struct {
@@ -95,5 +98,48 @@ func TestContainerCheckModulesHealthReturnsModuleError(t *testing.T) {
 
 	if err := c.checkModulesHealth(context.Background()); err == nil || !errors.Is(err, want) {
 		t.Fatalf("checkModulesHealth() error = %v, want wrapped %v", err, want)
+	}
+}
+
+func TestContainerBuildActorModuleInitializeParamsUsesObjectCacheBuilderAndPolicy(t *testing.T) {
+	t.Parallel()
+
+	c := NewContainer(nil, nil, nil)
+	builder := rediskey.NewBuilderWithNamespace("actor")
+	policy := cachepolicy.CachePolicy{TTL: 5}
+	c.objectRedisHandle = &redisplane.Handle{Builder: builder}
+	c.policyCatalog = cachepolicy.NewPolicyCatalog(nil, map[cachepolicy.CachePolicyKey]cachepolicy.CachePolicy{
+		cachepolicy.PolicyTestee: policy,
+	})
+
+	params := c.buildActorModuleInitializeParams()
+	if len(params) != 8 {
+		t.Fatalf("len(params) = %d, want 8", len(params))
+	}
+	if params[4] != builder {
+		t.Fatalf("cache builder = %#v, want %#v", params[4], builder)
+	}
+	gotPolicy, ok := params[5].(cachepolicy.CachePolicy)
+	if !ok {
+		t.Fatalf("policy arg type = %T, want cachepolicy.CachePolicy", params[5])
+	}
+	if gotPolicy != policy {
+		t.Fatalf("policy = %#v, want %#v", gotPolicy, policy)
+	}
+	if !isNilInterfaceValue(params[1]) || !isNilInterfaceValue(params[2]) || !isNilInterfaceValue(params[6]) || !isNilInterfaceValue(params[7]) {
+		t.Fatalf("unexpected IAM deps in params: %#v", params)
+	}
+}
+
+func isNilInterfaceValue(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
 	}
 }

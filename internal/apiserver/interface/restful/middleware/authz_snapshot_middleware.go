@@ -1,14 +1,14 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/gin-gonic/gin"
 )
@@ -20,9 +20,27 @@ const (
 
 // AuthzSnapshotMiddleware 加载 IAM GetAuthorizationSnapshot 并写入 gin 与 request context。
 // 若当前请求已解析出 active operator，则顺手将 IAM roles 投影回本地 staff/operator 表。
-func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, repo domainoperator.Repository) gin.HandlerFunc {
+func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, updater operatorapp.OperatorRoleProjectionUpdater) gin.HandlerFunc {
+	if loader == nil {
+		return func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error": "authorization snapshot loader not configured",
+			})
+			c.Abort()
+		}
+	}
+
+	return newAuthzSnapshotMiddleware(func(ctx context.Context, tenantID, userID string) (*authz.Snapshot, error) {
+		return loader.Load(ctx, tenantID, userID)
+	}, updater)
+}
+
+func newAuthzSnapshotMiddleware(
+	load func(ctx context.Context, tenantID, userID string) (*authz.Snapshot, error),
+	updater operatorapp.OperatorRoleProjectionUpdater,
+) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if loader == nil {
+		if load == nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error": "authorization snapshot loader not configured",
 			})
@@ -38,7 +56,7 @@ func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, repo domainoperator
 			c.Abort()
 			return
 		}
-		snap, err := loader.Load(c.Request.Context(), tenantID, userIDStr)
+		snap, err := load(c.Request.Context(), tenantID, userIDStr)
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error": fmt.Sprintf("failed to load authorization snapshot: %v", err),
@@ -50,9 +68,9 @@ func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, repo domainoperator
 		ctx := authz.WithSnapshot(c.Request.Context(), snap)
 		ctx = actorctx.WithGrantingUserID(ctx, GetUserID(c))
 		c.Request = c.Request.WithContext(ctx)
-		if repo != nil {
+		if updater != nil {
 			if op := GetCurrentOperator(c); op != nil {
-				if _, err := iaminfra.PersistOperatorRolesProjectionFromSnapshot(c.Request.Context(), repo, op, snap); err != nil {
+				if err := updater.PersistFromSnapshot(c.Request.Context(), op, snap); err != nil {
 					logger.L(c.Request.Context()).Warnw("failed to persist operator roles projection from IAM snapshot",
 						"org_id", op.OrgID(),
 						"user_id", op.UserID(),
