@@ -14,6 +14,7 @@ type ReadThroughOptions[T any] struct {
 	CacheKey          string
 	Policy            cachepolicy.CachePolicy
 	Observer          *Observer
+	Runner            *ReadThroughRunner[T]
 	GetCached         func(context.Context) (*T, error)
 	Load              func(context.Context) (*T, error)
 	SetCached         func(context.Context, *T) error
@@ -22,11 +23,40 @@ type ReadThroughOptions[T any] struct {
 	AsyncSetNegative  bool
 }
 
+// ReadThroughRunner owns the read-through execution policy for one typed object
+// path. Passing a runner allows tests or future callers to isolate singleflight
+// coordination without changing repository decorator wiring.
+type ReadThroughRunner[T any] struct {
+	coordinator *SingleflightCoordinator
+}
+
+func NewReadThroughRunner[T any](coordinator *SingleflightCoordinator) *ReadThroughRunner[T] {
+	if coordinator == nil {
+		coordinator = NewSingleflightCoordinator()
+	}
+	return &ReadThroughRunner[T]{coordinator: coordinator}
+}
+
 // ReadThrough 执行统一缓存读穿透：
 // 1. 优先读缓存
 // 2. miss 后按对象级 singleflight 回源
 // 3. 回源成功后写回正向缓存或 negative sentinel
 func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, error) {
+	runner := opts.Runner
+	if runner == nil {
+		runner = &ReadThroughRunner[T]{coordinator: sharedSingleflightCoordinator()}
+	}
+	return runner.Read(ctx, opts)
+}
+
+func (r *ReadThroughRunner[T]) coordinatorOrDefault() *SingleflightCoordinator {
+	if r == nil || r.coordinator == nil {
+		return sharedSingleflightCoordinator()
+	}
+	return r.coordinator
+}
+
+func (r *ReadThroughRunner[T]) Read(ctx context.Context, opts ReadThroughOptions[T]) (*T, error) {
 	family := string(cachepolicy.FamilyFor(opts.PolicyKey))
 	policy := string(opts.PolicyKey)
 
@@ -63,7 +93,7 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 		err   error
 	)
 	if opts.Policy.SingleflightEnabled(false) {
-		result, _, doErr := sharedSingleflightCoordinator().Do(opts.PolicyKey, opts.CacheKey, func() (interface{}, error) {
+		result, _, doErr := r.coordinatorOrDefault().Do(opts.PolicyKey, opts.CacheKey, func() (interface{}, error) {
 			return load()
 		})
 		if doErr != nil {

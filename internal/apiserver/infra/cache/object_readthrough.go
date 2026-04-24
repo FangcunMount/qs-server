@@ -12,6 +12,7 @@ type ObjectReadThroughOptions[T any] struct {
 	CacheKey         string
 	Policy           cachepolicy.CachePolicy
 	Observer         *Observer
+	Runner           *ReadThroughRunner[T]
 	Store            *ObjectCacheStore[T]
 	Load             func(context.Context) (*T, error)
 	CacheNegative    bool
@@ -27,6 +28,7 @@ func ReadThroughObject[T any](ctx context.Context, opts ObjectReadThroughOptions
 		CacheKey:  opts.CacheKey,
 		Policy:    opts.Policy,
 		Observer:  opts.Observer,
+		Runner:    opts.Runner,
 		GetCached: func(ctx context.Context) (*T, error) {
 			if opts.Store == nil {
 				return nil, ErrCacheNotFound

@@ -155,6 +155,72 @@ func TestReadThroughSingleflightIsScopedByPolicyKey(t *testing.T) {
 	}
 }
 
+func TestReadThroughInjectedRunnersIsolateSingleflight(t *testing.T) {
+	t.Parallel()
+
+	var loadCount atomic.Int32
+	release := make(chan struct{})
+	started := make(chan struct{}, 2)
+	policy := cachepolicy.CachePolicy{
+		Singleflight: cachepolicy.PolicySwitchEnabled,
+	}
+
+	run := func(runner *ReadThroughRunner[readThroughValue]) error {
+		_, err := ReadThrough(context.Background(), ReadThroughOptions[readThroughValue]{
+			PolicyKey: cachepolicy.PolicyAssessmentDetail,
+			CacheKey:  "same:object:key",
+			Policy:    policy,
+			Runner:    runner,
+			GetCached: func(context.Context) (*readThroughValue, error) {
+				return nil, ErrCacheNotFound
+			},
+			Load: func(context.Context) (*readThroughValue, error) {
+				loadCount.Add(1)
+				started <- struct{}{}
+				<-release
+				return &readThroughValue{Value: "isolated"}, nil
+			},
+		})
+		return err
+	}
+
+	var wg sync.WaitGroup
+	errors := make(chan error, 2)
+	begin := make(chan struct{})
+	for _, runner := range []*ReadThroughRunner[readThroughValue]{
+		NewReadThroughRunner[readThroughValue](NewSingleflightCoordinator()),
+		NewReadThroughRunner[readThroughValue](NewSingleflightCoordinator()),
+	} {
+		wg.Add(1)
+		go func(runner *ReadThroughRunner[readThroughValue]) {
+			defer wg.Done()
+			<-begin
+			errors <- run(runner)
+		}(runner)
+	}
+	close(begin)
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected both injected runner loaders to start")
+		}
+	}
+	close(release)
+	wg.Wait()
+	close(errors)
+
+	if got := loadCount.Load(); got != 2 {
+		t.Fatalf("expected isolated runners to execute both loaders, got %d", got)
+	}
+	for err := range errors {
+		if err != nil {
+			t.Fatalf("unexpected read-through error: %v", err)
+		}
+	}
+}
+
 func TestReadThroughDegradesCacheReadErrorToMiss(t *testing.T) {
 	t.Parallel()
 
