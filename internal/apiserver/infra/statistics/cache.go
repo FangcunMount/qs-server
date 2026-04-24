@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -20,7 +20,7 @@ type StatisticsCache struct {
 	cache        cacheentry.Cache
 	versionStore cachequery.VersionTokenStore
 	policy       cachepolicy.CachePolicy
-	observer     *cacheinfra.Observer
+	observer     *cacheobservability.ComponentObserver
 	keys         *rediskey.Builder
 }
 
@@ -40,7 +40,7 @@ func NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 	builder *rediskey.Builder,
 	policy cachepolicy.CachePolicy,
 	versionStore cachequery.VersionTokenStore,
-	observer *cacheinfra.Observer,
+	observer *cacheobservability.ComponentObserver,
 ) *StatisticsCache {
 	if builder == nil {
 		panic("redis builder is required")

@@ -8,8 +8,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	cacheimpl "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
@@ -25,13 +26,14 @@ const (
 // 用于在数据变更后重建 Redis 中的全局列表键（scale:list:v1）
 type ScaleListCache struct {
 	repo        domainScale.Repository
-	redis       redis.UniversalClient
+	entry       cacheentry.Cache
+	payload     *cacheentry.PayloadStore
 	identitySvc iambridge.IdentityResolver
 	keyBuilder  *rediskey.Builder
 	policy      cachepolicy.CachePolicy
 	pageSize    int
 	// 节点内短 TTL 内存缓存，减少 Redis GET/JSON 解码成本
-	memory *cacheimpl.LocalHotCache[*ScaleSummaryListResult]
+	memory *cachequery.LocalHotCache[*ScaleSummaryListResult]
 }
 
 const defaultScaleListLocalMaxEntries = 64
@@ -50,22 +52,24 @@ func NewScaleListCacheWithPolicyAndKeyBuilder(
 	if keyBuilder == nil {
 		panic("cache key builder is required")
 	}
+	entry := cacheentry.NewRedisCache(redisClient)
 
 	return &ScaleListCache{
 		repo:        repo,
-		redis:       redisClient,
+		entry:       entry,
+		payload:     cacheentry.NewPayloadStore(entry, cachepolicy.PolicyScaleList, policy),
 		identitySvc: identitySvc,
 		keyBuilder:  keyBuilder,
 		policy:      policy,
 		pageSize:    defaultScaleListPageSize,
-		memory:      cacheimpl.NewLocalHotCache[*ScaleSummaryListResult](30*time.Second, defaultScaleListLocalMaxEntries),
+		memory:      cachequery.NewLocalHotCache[*ScaleSummaryListResult](30*time.Second, defaultScaleListLocalMaxEntries),
 	}
 }
 
 // Rebuild 重新拉取已发布量表列表并写入缓存
 // 若列表为空则删除缓存键
 func (c *ScaleListCache) Rebuild(ctx context.Context) error {
-	if c == nil || c.redis == nil || c.repo == nil {
+	if c == nil || c.entry == nil || c.payload == nil || c.repo == nil {
 		return nil
 	}
 
@@ -80,7 +84,7 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 
 	key := c.keyBuilder.BuildScaleListKey()
 	if total == 0 {
-		if err := c.redis.Del(ctx, key).Err(); err != nil {
+		if err := c.entry.Delete(ctx, key); err != nil {
 			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
 			return err
 		}
@@ -108,7 +112,7 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 
 	c.resetMemory()
 
-	if err := c.redis.Set(ctx, key, c.policy.CompressValue(data), c.policy.JitterTTL(c.policy.TTLOr(defaultScaleListCacheTTL))).Err(); err != nil {
+	if err := c.payload.Set(ctx, key, data, c.policy.TTLOr(defaultScaleListCacheTTL)); err != nil {
 		cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
 		return err
 	}
@@ -119,7 +123,7 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 // GetPage 从缓存读取已发布量表列表并按页切片
 // 命中返回 result 和 true，未命中/解析失败返回 nil 和 false
 func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*ScaleSummaryListResult, bool) {
-	if c == nil || c.redis == nil {
+	if c == nil || c.payload == nil {
 		return nil, false
 	}
 
@@ -129,17 +133,16 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 	}
 
 	key := c.keyBuilder.BuildScaleListKey()
-	data, err := c.redis.Get(ctx, key).Bytes()
+	data, err := c.payload.Get(ctx, key)
 	if err != nil {
-		if err != redis.Nil {
-			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
-		} else {
+		if err == cacheentry.ErrCacheNotFound {
 			cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+		} else {
+			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
 		}
 		return nil, false
 	}
 	cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
-	data = c.policy.DecompressValue(data)
 
 	var payload scaleSummaryListCache
 	if err := json.Unmarshal(data, &payload); err != nil {

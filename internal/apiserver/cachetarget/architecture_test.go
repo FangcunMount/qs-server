@@ -27,7 +27,30 @@ func TestApplicationHotsetPathsDoNotImportInfraCache(t *testing.T) {
 			t.Fatalf("glob %s: %v", dir, err)
 		}
 		for _, file := range files {
-			if strings.HasSuffix(file, "_test.go") || strings.HasSuffix(file, filepath.Join("scale", "global_list_cache.go")) {
+			if strings.HasSuffix(file, "_test.go") {
+				continue
+			}
+			checkNoInfraCacheImport(t, file)
+		}
+	}
+}
+
+func TestRuntimeCacheBoundaryCallersDoNotImportInfraCacheFacade(t *testing.T) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("failed to resolve current file")
+	}
+	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", ".."))
+	for _, dir := range []string{
+		filepath.Join(repoRoot, "internal", "apiserver", "cachebootstrap"),
+		filepath.Join(repoRoot, "internal", "apiserver", "infra", "statistics"),
+	} {
+		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+		if err != nil {
+			t.Fatalf("glob %s: %v", dir, err)
+		}
+		for _, file := range files {
+			if strings.HasSuffix(file, "_test.go") {
 				continue
 			}
 			checkNoInfraCacheImport(t, file)

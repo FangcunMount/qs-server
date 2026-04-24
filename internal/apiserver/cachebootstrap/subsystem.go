@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachehotset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
@@ -41,7 +40,7 @@ type Subsystem struct {
 	runtime        *redisplane.Runtime
 	handles        map[redisplane.Family]*redisplane.Handle
 	policyCatalog  *cachepolicy.PolicyCatalog
-	observer       *cacheinfra.Observer
+	observer       *cacheobservability.ComponentObserver
 
 	hotsetRecorder  cachetarget.HotsetRecorder
 	hotsetInspector cachetarget.HotsetInspector
@@ -90,7 +89,7 @@ func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheC
 		statusRegistry: statusRegistry,
 		runtime:        runtime,
 		handles:        handles,
-		observer:       cacheinfra.NewObserver(component),
+		observer:       cacheobservability.NewComponentObserver(component),
 	}
 	s.policyCatalog = newPolicyCatalog(cacheConfig)
 	s.hotsetRecorder = cachehotset.NewRedisStoreWithObserver(
@@ -202,7 +201,7 @@ func (s *Subsystem) Policy(key cachepolicy.CachePolicyKey) cachepolicy.CachePoli
 	return s.policyCatalog.Policy(key)
 }
 
-func (s *Subsystem) Observer() *cacheinfra.Observer {
+func (s *Subsystem) Observer() *cacheobservability.ComponentObserver {
 	if s == nil {
 		return nil
 	}

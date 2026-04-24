@@ -23,10 +23,7 @@ const (
 )
 
 // FamilyObserver is the narrow observability surface required by the hotset store.
-type FamilyObserver interface {
-	ObserveFamilySuccess(family string)
-	ObserveFamilyFailure(family string, err error)
-}
+type FamilyObserver = cacheobservability.FamilyObserver
 
 // Options 定义热榜治理策略。
 type Options struct {
