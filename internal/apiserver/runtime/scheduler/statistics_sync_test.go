@@ -178,10 +178,17 @@ func TestNewStatisticsSyncRunner(t *testing.T) {
 }
 
 func TestStatisticsSyncRunnerLockKeyUsesLockNamespace(t *testing.T) {
-	runner := &StatisticsSyncRunner{
-		opts:        newTestStatisticsSyncOptions(),
-		lockBuilder: newTestStatisticsLockBuilder(),
-	}
+	runner := newStatisticsSyncRunnerWithHooks(
+		newTestStatisticsSyncOptions(),
+		&fakeStatisticsSyncService{},
+		nil,
+		&redislock.Manager{},
+		newTestStatisticsLockBuilder(),
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+	)
 	if got := runner.lockKey(); got != "apiserver-test:cache:lock:qs:statistics-sync:test" {
 		t.Fatalf("unexpected lock key: %s", got)
 	}

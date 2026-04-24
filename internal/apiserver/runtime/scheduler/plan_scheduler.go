@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -19,12 +18,9 @@ type planCommandService interface {
 
 // PlanRunner executes built-in plan scheduling inside apiserver.
 type PlanRunner struct {
-	opts        *apiserveroptions.PlanSchedulerOptions
-	command     planCommandService
-	lockManager *redislock.Manager
-	lockBuilder *rediskey.Builder
-	acquireLock func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error)
-	releaseLock func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error
+	opts    *apiserveroptions.PlanSchedulerOptions
+	command planCommandService
+	leader  *leaderLock
 }
 
 // NewPlanRunner creates the apiserver plan scheduler runner.
@@ -75,12 +71,16 @@ func newPlanRunnerWithHooks(
 	}
 
 	return &PlanRunner{
-		opts:        opts,
-		command:     command,
-		lockManager: lockManager,
-		lockBuilder: lockBuilder,
-		acquireLock: acquireLock,
-		releaseLock: releaseLock,
+		opts:    opts,
+		command: command,
+		leader: newLeaderLock(
+			redislock.Specs.PlanSchedulerLeader,
+			opts.LockKey,
+			opts.LockTTL,
+			lockBuilder,
+			acquireLock,
+			releaseLock,
+		),
 	}
 }
 
@@ -122,57 +122,48 @@ func (r *PlanRunner) executeTick(ctx context.Context) {
 }
 
 func (r *PlanRunner) runOnce(ctx context.Context) error {
-	lockSpec := redislock.Specs.PlanSchedulerLeader
 	lockKey := r.lockKey()
 
-	lease, acquired, err := r.acquireLock(ctx, lockSpec, r.opts.LockKey, r.opts.LockTTL)
-	if err != nil {
-		return fmt.Errorf("failed to acquire apiserver plan scheduler lock: %w", err)
-	}
-	if !acquired {
-		log.Infof("apiserver plan scheduler tick skipped (lock_key=%s, org_ids=%v, reason=lock_not_acquired)",
-			lockKey, r.opts.OrgIDs)
-		return nil
-	}
-
-	defer func() {
-		if err := r.releaseLock(context.Background(), lockSpec, r.opts.LockKey, lease); err != nil {
+	return r.leader.Run(ctx, leaderLockRunOptions{
+		AcquireError: "failed to acquire apiserver plan scheduler lock",
+		OnNotAcquired: func(lockKey string) {
+			log.Infof("apiserver plan scheduler tick skipped (lock_key=%s, org_ids=%v, reason=lock_not_acquired)",
+				lockKey, r.opts.OrgIDs)
+		},
+		OnReleaseError: func(lockKey string, err error) {
 			log.Warnf("failed to release apiserver plan scheduler lock (lock_key=%s): %v", lockKey, err)
+		},
+	}, func(ctx context.Context) error {
+		log.Infof("apiserver plan scheduler tick acquired lock (lock_key=%s, org_ids=%v)", lockKey, r.opts.OrgIDs)
+
+		totalOpened := 0
+		totalExpired := 0
+		failedOrgs := 0
+
+		for _, orgID := range r.opts.OrgIDs {
+			result, err := r.command.SchedulePendingTasks(ctx, orgID, "")
+			if err != nil {
+				failedOrgs++
+				log.Warnf("apiserver plan scheduler tick failed for org (org_id=%d, lock_key=%s): %v", orgID, lockKey, err)
+				continue
+			}
+			if result == nil {
+				continue
+			}
+			totalOpened += result.Stats.OpenedCount
+			totalExpired += result.Stats.ExpiredCount
 		}
-	}()
 
-	log.Infof("apiserver plan scheduler tick acquired lock (lock_key=%s, org_ids=%v)", lockKey, r.opts.OrgIDs)
+		log.Infof("apiserver plan scheduler tick completed (lock_key=%s, org_ids=%v, opened_count=%d, expired_count=%d, failed_org_count=%d)",
+			lockKey, r.opts.OrgIDs, totalOpened, totalExpired, failedOrgs)
 
-	totalOpened := 0
-	totalExpired := 0
-	failedOrgs := 0
-
-	for _, orgID := range r.opts.OrgIDs {
-		result, err := r.command.SchedulePendingTasks(ctx, orgID, "")
-		if err != nil {
-			failedOrgs++
-			log.Warnf("apiserver plan scheduler tick failed for org (org_id=%d, lock_key=%s): %v", orgID, lockKey, err)
-			continue
-		}
-		if result == nil {
-			continue
-		}
-		totalOpened += result.Stats.OpenedCount
-		totalExpired += result.Stats.ExpiredCount
-	}
-
-	log.Infof("apiserver plan scheduler tick completed (lock_key=%s, org_ids=%v, opened_count=%d, expired_count=%d, failed_org_count=%d)",
-		lockKey, r.opts.OrgIDs, totalOpened, totalExpired, failedOrgs)
-
-	return nil
+		return nil
+	})
 }
 
 func (r *PlanRunner) lockKey() string {
 	if r == nil {
 		return ""
 	}
-	if r.lockBuilder == nil {
-		r.lockBuilder = rediskey.NewBuilder()
-	}
-	return r.lockBuilder.BuildLockKey(r.opts.LockKey)
+	return r.leader.DisplayKey()
 }

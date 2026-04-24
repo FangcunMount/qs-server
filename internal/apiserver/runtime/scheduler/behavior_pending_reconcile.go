@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -15,12 +14,9 @@ import (
 
 // BehaviorPendingReconcileRunner periodically retries pending behavior attribution work.
 type BehaviorPendingReconcileRunner struct {
-	opts        *apiserveroptions.BehaviorPendingReconcileOptions
-	projector   statisticsApp.BehaviorProjectorService
-	lockManager *redislock.Manager
-	lockBuilder *rediskey.Builder
-	acquireLock func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error)
-	releaseLock func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error
+	opts      *apiserveroptions.BehaviorPendingReconcileOptions
+	projector statisticsApp.BehaviorProjectorService
+	leader    *leaderLock
 }
 
 // NewBehaviorPendingReconcileRunner creates the reconcile runner when dependencies are available.
@@ -86,12 +82,16 @@ func newBehaviorPendingReconcileRunnerWithHooks(
 	}
 
 	return &BehaviorPendingReconcileRunner{
-		opts:        opts,
-		projector:   projector,
-		lockManager: lockManager,
-		lockBuilder: lockBuilder,
-		acquireLock: acquireLock,
-		releaseLock: releaseLock,
+		opts:      opts,
+		projector: projector,
+		leader: newLeaderLock(
+			redislock.Specs.BehaviorPendingReconcile,
+			opts.LockKey,
+			opts.LockTTL,
+			lockBuilder,
+			acquireLock,
+			releaseLock,
+		),
 	}
 }
 
@@ -134,34 +134,23 @@ func (r *BehaviorPendingReconcileRunner) executeTick(ctx context.Context) {
 }
 
 func (r *BehaviorPendingReconcileRunner) runOnce(ctx context.Context) error {
-	lockSpec := redislock.Specs.BehaviorPendingReconcile
-	lockKey := r.lockKey()
-
-	lease, acquired, err := r.acquireLock(ctx, lockSpec, r.opts.LockKey, r.opts.LockTTL)
-	if err != nil {
-		return fmt.Errorf("failed to acquire behavior pending reconcile lock: %w", err)
-	}
-	if !acquired {
-		log.Debugf("behavior pending reconcile tick skipped (lock_key=%s, reason=lock_not_acquired)", lockKey)
-		return nil
-	}
-
-	defer func() {
-		if err := r.releaseLock(context.Background(), lockSpec, r.opts.LockKey, lease); err != nil {
+	return r.leader.Run(ctx, leaderLockRunOptions{
+		AcquireError: "failed to acquire behavior pending reconcile lock",
+		OnNotAcquired: func(lockKey string) {
+			log.Debugf("behavior pending reconcile tick skipped (lock_key=%s, reason=lock_not_acquired)", lockKey)
+		},
+		OnReleaseError: func(lockKey string, err error) {
 			log.Warnf("failed to release behavior pending reconcile lock (lock_key=%s): %v", lockKey, err)
-		}
-	}()
-
-	_, err = r.projector.ReconcilePendingBehaviorEvents(ctx, r.opts.BatchLimit)
-	return err
+		},
+	}, func(ctx context.Context) error {
+		_, err := r.projector.ReconcilePendingBehaviorEvents(ctx, r.opts.BatchLimit)
+		return err
+	})
 }
 
 func (r *BehaviorPendingReconcileRunner) lockKey() string {
 	if r == nil {
 		return ""
 	}
-	if r.lockBuilder == nil {
-		r.lockBuilder = rediskey.NewBuilder()
-	}
-	return r.lockBuilder.BuildLockKey(r.opts.LockKey)
+	return r.leader.DisplayKey()
 }

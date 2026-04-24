@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -25,12 +24,9 @@ type StatisticsSyncRunner struct {
 	opts              *apiserveroptions.StatisticsSyncOptions
 	syncService       statisticsSyncService
 	warmupCoordinator cachegov.Coordinator
-	lockManager       *redislock.Manager
-	lockBuilder       *rediskey.Builder
+	leader            *leaderLock
 	clock             DailyClock
 	now               func() time.Time
-	acquireLock       func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error)
-	releaseLock       func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error
 }
 
 // NewStatisticsSyncRunner creates the statistics sync scheduler runner.
@@ -107,12 +103,16 @@ func newStatisticsSyncRunnerWithHooks(
 		opts:              opts,
 		syncService:       syncService,
 		warmupCoordinator: warmupCoordinator,
-		lockManager:       lockManager,
-		lockBuilder:       lockBuilder,
-		clock:             clock,
-		now:               time.Now,
-		acquireLock:       acquireLock,
-		releaseLock:       releaseLock,
+		leader: newLeaderLock(
+			redislock.Specs.StatisticsSyncLeader,
+			opts.LockKey,
+			opts.LockTTL,
+			lockBuilder,
+			acquireLock,
+			releaseLock,
+		),
+		clock: clock,
+		now:   time.Now,
 	}
 }
 
@@ -155,57 +155,46 @@ func (r *StatisticsSyncRunner) executeTick(ctx context.Context) {
 }
 
 func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
-	lockSpec := redislock.Specs.StatisticsSyncLeader
-	lockKey := r.lockKey()
-
-	lease, acquired, err := r.acquireLock(ctx, lockSpec, r.opts.LockKey, r.opts.LockTTL)
-	if err != nil {
-		return fmt.Errorf("failed to acquire statistics sync scheduler lock: %w", err)
-	}
-	if !acquired {
-		log.Debugf("statistics sync scheduler tick skipped (lock_key=%s, reason=lock_not_acquired)", lockKey)
-		return nil
-	}
-
-	defer func() {
-		if err := r.releaseLock(context.Background(), lockSpec, r.opts.LockKey, lease); err != nil {
+	return r.leader.Run(ctx, leaderLockRunOptions{
+		AcquireError: "failed to acquire statistics sync scheduler lock",
+		OnNotAcquired: func(lockKey string) {
+			log.Debugf("statistics sync scheduler tick skipped (lock_key=%s, reason=lock_not_acquired)", lockKey)
+		},
+		OnReleaseError: func(lockKey string, err error) {
 			log.Warnf("failed to release statistics sync scheduler lock (lock_key=%s): %v", lockKey, err)
-		}
-	}()
-
-	for _, orgID := range r.opts.OrgIDs {
-		start, end := statisticsSyncRepairWindow(r.now().In(time.Local), r.opts.RepairWindowDays)
-		dailyOpts := statisticsApp.SyncDailyOptions{StartDate: &start, EndDate: &end}
-		if err := r.syncService.SyncDailyStatistics(ctx, orgID, dailyOpts); err != nil {
-			log.Warnf("statistics nightly daily sync failed (org=%d): %v", orgID, err)
-			continue
-		}
-		if err := r.syncService.SyncAccumulatedStatistics(ctx, orgID); err != nil {
-			log.Warnf("statistics nightly accumulated sync failed (org=%d): %v", orgID, err)
-			continue
-		}
-		if err := r.syncService.SyncPlanStatistics(ctx, orgID); err != nil {
-			log.Warnf("statistics nightly plan sync failed (org=%d): %v", orgID, err)
-			continue
-		}
-		if r.warmupCoordinator != nil {
-			if err := r.warmupCoordinator.HandleStatisticsSync(ctx, orgID); err != nil {
-				log.Warnf("statistics nightly cache warmup failed (org=%d): %v", orgID, err)
+		},
+	}, func(ctx context.Context) error {
+		for _, orgID := range r.opts.OrgIDs {
+			start, end := statisticsSyncRepairWindow(r.now().In(time.Local), r.opts.RepairWindowDays)
+			dailyOpts := statisticsApp.SyncDailyOptions{StartDate: &start, EndDate: &end}
+			if err := r.syncService.SyncDailyStatistics(ctx, orgID, dailyOpts); err != nil {
+				log.Warnf("statistics nightly daily sync failed (org=%d): %v", orgID, err)
+				continue
+			}
+			if err := r.syncService.SyncAccumulatedStatistics(ctx, orgID); err != nil {
+				log.Warnf("statistics nightly accumulated sync failed (org=%d): %v", orgID, err)
+				continue
+			}
+			if err := r.syncService.SyncPlanStatistics(ctx, orgID); err != nil {
+				log.Warnf("statistics nightly plan sync failed (org=%d): %v", orgID, err)
+				continue
+			}
+			if r.warmupCoordinator != nil {
+				if err := r.warmupCoordinator.HandleStatisticsSync(ctx, orgID); err != nil {
+					log.Warnf("statistics nightly cache warmup failed (org=%d): %v", orgID, err)
+				}
 			}
 		}
-	}
 
-	return nil
+		return nil
+	})
 }
 
 func (r *StatisticsSyncRunner) lockKey() string {
 	if r == nil {
 		return ""
 	}
-	if r.lockBuilder == nil {
-		r.lockBuilder = rediskey.NewBuilder()
-	}
-	return r.lockBuilder.BuildLockKey(r.opts.LockKey)
+	return r.leader.DisplayKey()
 }
 
 func statisticsSyncRepairWindow(now time.Time, repairWindowDays int) (time.Time, time.Time) {

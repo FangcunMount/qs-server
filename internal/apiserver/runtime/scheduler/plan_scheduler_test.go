@@ -230,10 +230,16 @@ func TestPlanRunnerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 }
 
 func TestPlanRunnerLockKeyUsesLockNamespace(t *testing.T) {
-	runner := &PlanRunner{
-		opts:        newTestPlanSchedulerOptions(1),
-		lockBuilder: newTestPlanLockBuilder(),
-	}
+	runner := newPlanRunnerWithHooks(
+		newTestPlanSchedulerOptions(1),
+		&redislock.Manager{},
+		&fakePlanCommandService{},
+		newTestPlanLockBuilder(),
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+	)
 	if got := runner.lockKey(); got != "apiserver-test:cache:lock:qs:plan-scheduler:test" {
 		t.Fatalf("unexpected lock key: %s", got)
 	}

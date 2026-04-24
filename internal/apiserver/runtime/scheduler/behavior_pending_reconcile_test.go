@@ -121,10 +121,16 @@ func TestNewBehaviorPendingReconcileRunner(t *testing.T) {
 }
 
 func TestBehaviorPendingReconcileLockKeyUsesLockNamespace(t *testing.T) {
-	runner := &BehaviorPendingReconcileRunner{
-		opts:        newTestBehaviorPendingReconcileOptions(),
-		lockBuilder: newTestBehaviorLockBuilder(),
-	}
+	runner := newBehaviorPendingReconcileRunnerWithHooks(
+		newTestBehaviorPendingReconcileOptions(),
+		&fakeBehaviorProjector{},
+		&redislock.Manager{},
+		newTestBehaviorLockBuilder(),
+		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		},
+		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+	)
 	if got := runner.lockKey(); got != "apiserver-test:cache:lock:qs:behavior-pending-reconcile:test" {
 		t.Fatalf("unexpected lock key: %s", got)
 	}
