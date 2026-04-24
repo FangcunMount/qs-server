@@ -10,6 +10,7 @@ import (
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -25,7 +26,7 @@ type CachedQuestionnaireRepository struct {
 	ttl      time.Duration
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
-	observer *Observer
+	observer *cacheobservability.ComponentObserver
 	store    *ObjectCacheStore[domainQuestionnaire.Questionnaire]
 }
 
@@ -33,7 +34,7 @@ func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnai
 	return NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) domainQuestionnaire.Repository {
+func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) domainQuestionnaire.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
@@ -276,11 +277,7 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 
 	iter := r.client.Scan(ctx, 0, patterns[2], 100).Iterator()
 	for iter.Next(ctx) {
-		if err := r.client.Del(ctx, iter.Val()).Err(); err != nil {
-			observeInvalidate(cachepolicy.PolicyQuestionnaire, "error")
-		} else {
-			observeInvalidate(cachepolicy.PolicyQuestionnaire, "ok")
-		}
+		_ = r.store.Delete(ctx, iter.Val())
 	}
 	return iter.Err()
 }

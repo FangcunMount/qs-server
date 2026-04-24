@@ -26,6 +26,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
@@ -74,7 +75,7 @@ type ActorModuleDeps struct {
 	TesteePolicy        cachepolicy.CachePolicy
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	OperationAccountSvc *iam.OperationAccountService
-	Observer            *testeeCache.Observer
+	Observer            *cacheobservability.ComponentObserver
 }
 
 // NewActorModule 创建 Actor 模块。

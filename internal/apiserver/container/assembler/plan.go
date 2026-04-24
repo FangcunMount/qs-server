@@ -18,6 +18,7 @@ import (
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -51,7 +52,7 @@ type PlanModuleDeps struct {
 	CacheBuilder   *rediskey.Builder
 	PlanPolicy     cachepolicy.CachePolicy
 	EntryBaseURL   string
-	Observer       *planCache.Observer
+	Observer       *cacheobservability.ComponentObserver
 }
 
 // NewPlanModule 创建 Plan 模块。

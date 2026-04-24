@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -22,7 +23,7 @@ type CachedScaleRepository struct {
 	repo     scale.Repository
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
-	observer *Observer
+	observer *cacheobservability.ComponentObserver
 	store    *ObjectCacheStore[scale.MedicalScale]
 }
 
@@ -31,7 +32,7 @@ func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client 
 	return NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) scale.Repository {
+func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) scale.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

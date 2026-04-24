@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 )
@@ -13,7 +14,7 @@ type ReadThroughOptions[T any] struct {
 	PolicyKey         cachepolicy.CachePolicyKey
 	CacheKey          string
 	Policy            cachepolicy.CachePolicy
-	Observer          *Observer
+	Observer          *cacheobservability.ComponentObserver
 	Runner            *ReadThroughRunner[T]
 	GetCached         func(context.Context) (*T, error)
 	Load              func(context.Context) (*T, error)
@@ -69,7 +70,7 @@ func (r *ReadThroughRunner[T]) Read(ctx context.Context, opts ReadThroughOptions
 			opts.Observer.ObserveFamilySuccess(family)
 			return cached, nil
 		}
-		if err != ErrCacheNotFound {
+		if err != cacheentry.ErrCacheNotFound {
 			cacheobservability.ObserveCacheGet(family, policy, "error")
 			opts.Observer.ObserveFamilyFailure(family, err)
 		} else {

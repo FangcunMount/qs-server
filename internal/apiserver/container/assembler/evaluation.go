@@ -30,6 +30,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -99,7 +100,7 @@ type EvaluationModuleDeps struct {
 	QueryCacheBuilder    *rediskey.Builder
 	AssessmentListPolicy cachepolicy.CachePolicy
 	VersionStore         cachequery.VersionTokenStore
-	Observer             *assessmentCache.Observer
+	Observer             *cacheobservability.ComponentObserver
 }
 
 // NewEvaluationModule 创建评估模块。

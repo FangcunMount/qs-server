@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	testeeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -23,7 +24,7 @@ type CachedTesteeRepository struct {
 	repo     testee.Repository
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
-	observer *Observer
+	observer *cacheobservability.ComponentObserver
 	store    *ObjectCacheStore[testee.Testee]
 }
 
@@ -32,7 +33,7 @@ func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, clien
 	return NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) testee.Repository {
+func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) testee.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

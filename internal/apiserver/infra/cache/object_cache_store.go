@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	redis "github.com/redis/go-redis/v9"
 )
 
 // ObjectCacheStore owns Redis entry storage details for object repository caches.
@@ -19,7 +20,7 @@ type ObjectCacheStore[T any] struct {
 }
 
 type ObjectCacheStoreOptions[T any] struct {
-	Cache       Cache
+	Cache       cacheentry.Cache
 	PolicyKey   cachepolicy.CachePolicyKey
 	Policy      cachepolicy.CachePolicy
 	TTL         time.Duration
@@ -40,7 +41,7 @@ func NewObjectCacheStore[T any](opts ObjectCacheStoreOptions[T]) *ObjectCacheSto
 
 func (s *ObjectCacheStore[T]) Get(ctx context.Context, key string) (*T, error) {
 	if s == nil || s.payload == nil {
-		return nil, ErrCacheNotFound
+		return nil, cacheentry.ErrCacheNotFound
 	}
 
 	data, err := s.payload.Get(ctx, key)
@@ -98,4 +99,11 @@ func (s *ObjectCacheStore[T]) Exists(ctx context.Context, key string) (bool, err
 
 func (s *ObjectCacheStore[T]) available() bool {
 	return s != nil && s.payload != nil && s.payload.Available()
+}
+
+func newRedisCacheIfAvailable(client redis.UniversalClient) cacheentry.Cache {
+	if client == nil {
+		return nil
+	}
+	return cacheentry.NewRedisCache(client)
 }

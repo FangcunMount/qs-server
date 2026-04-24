@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 )
@@ -35,7 +36,7 @@ func TestReadThroughUsesPolicyScopedSingleflight(t *testing.T) {
 			Policy:    policy,
 			GetCached: func(context.Context) (*readThroughValue, error) {
 				cacheMissCount.Add(1)
-				return nil, ErrCacheNotFound
+				return nil, cacheentry.ErrCacheNotFound
 			},
 			Load: func(context.Context) (*readThroughValue, error) {
 				loadCount.Add(1)
@@ -114,7 +115,7 @@ func TestReadThroughSingleflightIsScopedByPolicyKey(t *testing.T) {
 			CacheKey:  "shared:key",
 			Policy:    policy,
 			GetCached: func(context.Context) (*readThroughValue, error) {
-				return nil, ErrCacheNotFound
+				return nil, cacheentry.ErrCacheNotFound
 			},
 			Load: func(context.Context) (*readThroughValue, error) {
 				loadCount.Add(1)
@@ -172,7 +173,7 @@ func TestReadThroughInjectedRunnersIsolateSingleflight(t *testing.T) {
 			Policy:    policy,
 			Runner:    runner,
 			GetCached: func(context.Context) (*readThroughValue, error) {
-				return nil, ErrCacheNotFound
+				return nil, cacheentry.ErrCacheNotFound
 			},
 			Load: func(context.Context) (*readThroughValue, error) {
 				loadCount.Add(1)
@@ -264,7 +265,7 @@ func TestReadThroughObserverUsesInjectedComponent(t *testing.T) {
 		PolicyKey: cachepolicy.PolicyAssessmentDetail,
 		CacheKey:  "assessment:detail:42",
 		Policy:    cachepolicy.CachePolicy{},
-		Observer:  NewObserver("readthrough-observer"),
+		Observer:  cacheobservability.NewComponentObserver("readthrough-observer"),
 		GetCached: func(context.Context) (*readThroughValue, error) {
 			return &readThroughValue{Value: "cached"}, nil
 		},

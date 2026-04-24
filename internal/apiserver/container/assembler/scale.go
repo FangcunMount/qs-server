@@ -16,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -52,7 +53,7 @@ type ScaleModuleDeps struct {
 	ScalePolicy       cachepolicy.CachePolicy
 	ScaleListPolicy   cachepolicy.CachePolicy
 	HotsetRecorder    cachetarget.HotsetRecorder
-	Observer          *scaleCache.Observer
+	Observer          *cacheobservability.ComponentObserver
 }
 
 // NewScaleModule 创建 Scale 模块。

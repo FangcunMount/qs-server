@@ -21,6 +21,7 @@ import (
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -48,7 +49,7 @@ type SurveyModuleDeps struct {
 	IdentityService     *iam.IdentityService
 	QuestionnairePolicy cachepolicy.CachePolicy
 	HotsetRecorder      cachetarget.HotsetRecorder
-	Observer            *questionnaireCache.Observer
+	Observer            *cacheobservability.ComponentObserver
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -126,7 +127,7 @@ func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) 
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *questionnaireCache.Observer) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *cacheobservability.ComponentObserver) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）

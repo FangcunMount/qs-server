@@ -7,13 +7,13 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
@@ -56,7 +56,7 @@ type StatisticsModuleDeps struct {
 	HotsetRecorder   cachetarget.HotsetRecorder
 	LockManager      *redislock.Manager
 	VersionStore     cachequery.VersionTokenStore
-	Observer         *scaleCache.Observer
+	Observer         *cacheobservability.ComponentObserver
 }
 
 // NewStatisticsModule 创建统计模块。

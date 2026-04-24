@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -21,7 +22,7 @@ type CachedPlanRepository struct {
 	repo     plan.AssessmentPlanRepository
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
-	observer *Observer
+	observer *cacheobservability.ComponentObserver
 	store    *ObjectCacheStore[plan.AssessmentPlan]
 }
 
@@ -30,7 +31,7 @@ func NewCachedPlanRepositoryWithBuilderAndPolicy(repo plan.AssessmentPlanReposit
 	return NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *Observer) plan.AssessmentPlanRepository {
+func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) plan.AssessmentPlanRepository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

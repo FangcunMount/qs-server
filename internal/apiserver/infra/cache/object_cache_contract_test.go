@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -48,7 +49,7 @@ func TestObjectCacheStoreGetDecodesCompressedPositiveHit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encode() error = %v", err)
 	}
-	payload, err := NewRedisCache(client).Get(ctx, "object:42")
+	payload, err := cacheentry.NewRedisCache(client).Get(ctx, "object:42")
 	if err != nil {
 		t.Fatalf("redis Get() error = %v", err)
 	}
@@ -203,7 +204,7 @@ func TestObjectCacheStoreDeleteAndNilCacheNoOp(t *testing.T) {
 		NegativeTTL: time.Minute,
 		Codec:       objectCacheContractCodec,
 	})
-	if _, err := nilStore.Get(ctx, "object:nil"); !errors.Is(err, ErrCacheNotFound) {
+	if _, err := nilStore.Get(ctx, "object:nil"); !errors.Is(err, cacheentry.ErrCacheNotFound) {
 		t.Fatalf("nil cache Get() error = %v, want ErrCacheNotFound", err)
 	}
 	if err := nilStore.Set(ctx, "object:nil", &objectCacheContractValue{}); err != nil {
@@ -302,7 +303,7 @@ func newObjectCacheContractStore(t *testing.T, policy cachepolicy.CachePolicy) (
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	store := NewObjectCacheStore(ObjectCacheStoreOptions[objectCacheContractValue]{
-		Cache:       NewRedisCache(client),
+		Cache:       cacheentry.NewRedisCache(client),
 		PolicyKey:   cachepolicy.PolicyAssessmentDetail,
 		Policy:      policy,
 		TTL:         time.Minute,
