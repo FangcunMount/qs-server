@@ -20,12 +20,10 @@ const defaultScaleCacheTTL = 24 * time.Hour
 // 实现 scale.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedScaleRepository struct {
 	repo     scale.Repository
-	client   redis.UniversalClient
-	ttl      time.Duration
-	mapper   *scaleInfra.ScaleMapper
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
 	observer *Observer
+	store    *ObjectCacheStore[scale.MedicalScale]
 }
 
 // NewCachedScaleRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的量表缓存 Repository。
@@ -37,20 +35,42 @@ func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository,
 	if builder == nil {
 		panic("redis builder is required")
 	}
+	mapper := scaleInfra.NewScaleMapper()
 	return &CachedScaleRepository{
 		repo:     repo,
-		client:   client,
-		ttl:      policy.TTLOr(defaultScaleCacheTTL),
-		mapper:   scaleInfra.NewScaleMapper(),
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
+		store: NewObjectCacheStore(ObjectCacheStoreOptions[scale.MedicalScale]{
+			Cache:     newRedisCacheIfAvailable(client),
+			PolicyKey: cachepolicy.PolicyScale,
+			Policy:    policy,
+			TTL:       policy.TTLOr(defaultScaleCacheTTL),
+			Codec:     newScaleCacheEntryCodec(mapper),
+		}),
+	}
+}
+
+func newScaleCacheEntryCodec(mapper *scaleInfra.ScaleMapper) CacheEntryCodec[scale.MedicalScale] {
+	return CacheEntryCodec[scale.MedicalScale]{
+		EncodeFunc: func(domain *scale.MedicalScale) ([]byte, error) {
+			return json.Marshal(mapper.ToPO(domain))
+		},
+		DecodeFunc: func(data []byte) (*scale.MedicalScale, error) {
+			var po scaleInfra.ScalePO
+			if err := json.Unmarshal(data, &po); err != nil {
+				return nil, err
+			}
+			return mapper.ToDomain(context.Background(), &po), nil
+		},
 	}
 }
 
 // WithTTL 设置缓存 TTL
 func (r *CachedScaleRepository) WithTTL(ttl time.Duration) *CachedScaleRepository {
-	r.ttl = ttl
+	if r.store != nil {
+		r.store.ttl = ttl
+	}
 	return r
 }
 
@@ -66,7 +86,7 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 	}
 
 	// 创建成功后写入缓存
-	if r.client != nil {
+	if r.store != nil && r.store.cache != nil {
 		if err := r.setCache(ctx, domain.GetCode().String(), domain); err != nil {
 			// 缓存写入失败不影响创建，仅记录日志
 			logger.L(ctx).Warnw("failed to populate scale cache after create",
@@ -120,7 +140,7 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 	}
 
 	// 更新成功后失效缓存
-	if r.client != nil {
+	if r.store != nil && r.store.cache != nil {
 		if err := r.deleteCache(ctx, oldCode); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate scale cache after update",
 				"code", oldCode,
@@ -139,7 +159,7 @@ func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
 	}
 
 	// 删除成功后失效缓存
-	if r.client != nil {
+	if r.store != nil && r.store.cache != nil {
 		if err := r.deleteCache(ctx, code); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate scale cache after remove",
 				"code", code,
@@ -160,86 +180,30 @@ func (r *CachedScaleRepository) ExistsByCode(ctx context.Context, code string) (
 
 // getCache 从缓存获取量表
 func (r *CachedScaleRepository) getCache(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	if r.client == nil {
-		return nil, ErrCacheNotFound
-	}
-	// 1. 构建缓存键
-	key := r.buildCacheKey(code)
-	// 2. 获取缓存
-	result := r.client.Get(ctx, key)
-	if result.Err() == redis.Nil {
-		return nil, ErrCacheNotFound // 缓存未命中，返回 ErrCacheNotFound
-	}
-	if result.Err() != nil {
-		return nil, result.Err()
-	}
-
-	// 3. 解压数据
-	dataBytes, err := result.Bytes()
-	if err != nil {
-		return nil, err
-	}
-	if len(dataBytes) == 0 {
-		return nil, nil // 空值缓存，表示不存在
-	}
-	// 4. 反序列化为 PO
-	data := r.policy.DecompressValue(dataBytes)
-	observePayload(cachepolicy.PolicyScale, len(data), len(dataBytes))
-	var po scaleInfra.ScalePO
-	if err := json.Unmarshal(data, &po); err != nil {
-		logger.L(ctx).Warnw("failed to unmarshal cached scale", "code", code, "error", err)
-		return nil, err
-	}
-
-	// 5. 通过 mapper 转换为 domain
-	domain := r.mapper.ToDomain(ctx, &po)
-	return domain, nil
+	return r.store.Get(ctx, r.buildCacheKey(code))
 }
 
 // setCache 写入缓存
 func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domain *scale.MedicalScale) error {
-	if r.client == nil {
-		return nil
-	}
-	key := r.buildCacheKey(code)
-	// 通过 mapper 转换为 PO
-	po := r.mapper.ToPO(domain)
-	// 序列化 PO（PO 有 JSON tag）
-	data, err := json.Marshal(po)
-	if err != nil {
-		return err
-	}
-
-	payload := r.policy.CompressValue(data)
-	observePayload(cachepolicy.PolicyScale, len(data), len(payload))
-	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
+	return r.store.Set(ctx, r.buildCacheKey(code), domain)
 }
 
 // deleteCache 删除缓存
 func (r *CachedScaleRepository) deleteCache(ctx context.Context, code string) error {
-	if r.client == nil {
-		return nil
-	}
-	key := r.buildCacheKey(code)
-	err := r.client.Del(ctx, key).Err()
-	if err != nil {
-		observeInvalidate(cachepolicy.PolicyScale, "error")
-		return err
-	}
-	observeInvalidate(cachepolicy.PolicyScale, "ok")
-	return nil
+	return r.store.Delete(ctx, r.buildCacheKey(code))
 }
 
 // WarmupCache 预热缓存（批量加载量表）
 func (r *CachedScaleRepository) WarmupCache(ctx context.Context, codes []string) error {
-	if r.client == nil {
+	if r.store == nil || r.store.cache == nil {
 		return nil // Redis 不可用时跳过
 	}
 
 	for _, code := range codes {
 		// 检查缓存是否已存在
 		key := r.buildCacheKey(code)
-		if r.client.Exists(ctx, key).Val() > 0 {
+		exists, err := r.store.Exists(ctx, key)
+		if err == nil && exists {
 			continue // 已缓存，跳过
 		}
 

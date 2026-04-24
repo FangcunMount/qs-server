@@ -23,10 +23,10 @@ type CachedQuestionnaireRepository struct {
 	repo     domainQuestionnaire.Repository
 	client   redis.UniversalClient
 	ttl      time.Duration
-	mapper   *questionnaireInfra.QuestionnaireMapper
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
 	observer *Observer
+	store    *ObjectCacheStore[domainQuestionnaire.Questionnaire]
 }
 
 func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
@@ -37,14 +37,37 @@ func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQue
 	if builder == nil {
 		panic("redis builder is required")
 	}
+	mapper := questionnaireInfra.NewQuestionnaireMapper()
 	return &CachedQuestionnaireRepository{
 		repo:     repo,
 		client:   client,
 		ttl:      policy.TTLOr(defaultQuestionnaireCacheTTL),
-		mapper:   questionnaireInfra.NewQuestionnaireMapper(),
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
+		store: NewObjectCacheStore(ObjectCacheStoreOptions[domainQuestionnaire.Questionnaire]{
+			Cache:       newRedisCacheIfAvailable(client),
+			PolicyKey:   cachepolicy.PolicyQuestionnaire,
+			Policy:      policy,
+			TTL:         policy.TTLOr(defaultQuestionnaireCacheTTL),
+			NegativeTTL: policy.NegativeTTLOr(defaultNegativeQuestionnaireCacheTTL),
+			Codec:       newQuestionnaireCacheEntryCodec(mapper),
+		}),
+	}
+}
+
+func newQuestionnaireCacheEntryCodec(mapper *questionnaireInfra.QuestionnaireMapper) CacheEntryCodec[domainQuestionnaire.Questionnaire] {
+	return CacheEntryCodec[domainQuestionnaire.Questionnaire]{
+		EncodeFunc: func(domain *domainQuestionnaire.Questionnaire) ([]byte, error) {
+			return json.Marshal(mapper.ToPO(domain))
+		},
+		DecodeFunc: func(data []byte) (*domainQuestionnaire.Questionnaire, error) {
+			var po questionnaireInfra.QuestionnairePO
+			if err := json.Unmarshal(data, &po); err != nil {
+				return nil, err
+			}
+			return mapper.ToBO(&po), nil
+		},
 	}
 }
 
@@ -215,47 +238,15 @@ func (r *CachedQuestionnaireRepository) versionKey(code, version string) string 
 }
 
 func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string) (*domainQuestionnaire.Questionnaire, error) {
-	if r.client == nil {
-		return nil, ErrCacheNotFound
-	}
-	result := r.client.Get(ctx, key)
-	if result.Err() == redis.Nil {
-		return nil, ErrCacheNotFound
-	}
-	if result.Err() != nil {
-		return nil, result.Err()
-	}
-
-	dataBytes, err := result.Bytes()
+	value, err := r.store.Get(ctx, key)
 	if err != nil {
 		return nil, err
 	}
-	if len(dataBytes) == 0 {
-		return nil, nil
-	}
-
-	data := r.policy.DecompressValue(dataBytes)
-	observePayload(cachepolicy.PolicyQuestionnaire, len(data), len(dataBytes))
-	var po questionnaireInfra.QuestionnairePO
-	if err := json.Unmarshal(data, &po); err != nil {
-		logger.L(ctx).Warnw("failed to unmarshal cached questionnaire", "key", key, "error", err)
-		return nil, err
-	}
-	return r.mapper.ToBO(&po), nil
+	return value, nil
 }
 
 func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string, qDomain *domainQuestionnaire.Questionnaire, ttl time.Duration) error {
-	if r.client == nil {
-		return nil
-	}
-	po := r.mapper.ToPO(qDomain)
-	data, err := json.Marshal(po)
-	if err != nil {
-		return err
-	}
-	payload := r.policy.CompressValue(data)
-	observePayload(cachepolicy.PolicyQuestionnaire, len(data), len(payload))
-	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(ttl)).Err()
+	return r.store.SetWithTTL(ctx, key, qDomain, ttl)
 }
 
 func (r *CachedQuestionnaireRepository) loadWithCache(
@@ -276,10 +267,7 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 			return r.setCache(ctx, key, value, r.ttl)
 		},
 		SetNegativeCached: func(ctx context.Context) error {
-			if r.client == nil {
-				return nil
-			}
-			return r.client.Set(ctx, key, []byte{}, r.policy.JitterTTL(r.policy.NegativeTTLOr(defaultNegativeQuestionnaireCacheTTL))).Err()
+			return r.store.SetNegative(ctx, key)
 		},
 		AsyncSetCached: true,
 	})
@@ -293,11 +281,8 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 	}
 
 	for _, pattern := range patterns[:2] {
-		if err := r.client.Del(ctx, pattern).Err(); err != nil {
-			observeInvalidate(cachepolicy.PolicyQuestionnaire, "error")
+		if err := r.store.Delete(ctx, pattern); err != nil {
 			logger.L(ctx).Warnw("failed to delete questionnaire cache key", "key", pattern, "error", err)
-		} else {
-			observeInvalidate(cachepolicy.PolicyQuestionnaire, "ok")
 		}
 	}
 
@@ -314,17 +299,19 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 
 // WarmupCache 预热工作版本和当前已发布版本缓存
 func (r *CachedQuestionnaireRepository) WarmupCache(ctx context.Context, codes []string) error {
-	if r.client == nil {
+	if r.store == nil || r.store.cache == nil {
 		return nil
 	}
 
 	for _, code := range codes {
-		if r.client.Exists(ctx, r.headKey(code)).Val() == 0 {
+		headExists, _ := r.store.Exists(ctx, r.headKey(code))
+		if !headExists {
 			if qDomain, err := r.repo.FindByCode(ctx, code); err == nil && qDomain != nil {
 				_ = r.setCache(ctx, r.headKey(code), qDomain, r.ttl)
 			}
 		}
-		if r.client.Exists(ctx, r.publishedKey(code)).Val() == 0 {
+		publishedExists, _ := r.store.Exists(ctx, r.publishedKey(code))
+		if !publishedExists {
 			if qDomain, err := r.repo.FindPublishedByCode(ctx, code); err == nil && qDomain != nil {
 				_ = r.setCache(ctx, r.publishedKey(code), qDomain, r.ttl)
 			}

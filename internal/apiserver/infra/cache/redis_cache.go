@@ -21,6 +21,13 @@ func NewRedisCache(client redis.UniversalClient) Cache {
 	}
 }
 
+func newRedisCacheIfAvailable(client redis.UniversalClient) Cache {
+	if client == nil {
+		return nil
+	}
+	return NewRedisCache(client)
+}
+
 // Get 获取缓存值
 func (c *RedisCache) Get(ctx context.Context, key string) ([]byte, error) {
 	if c.client == nil {

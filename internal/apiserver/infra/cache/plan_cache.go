@@ -19,12 +19,10 @@ const defaultPlanCacheTTL = 2 * time.Hour
 // 实现 plan.AssessmentPlanRepository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedPlanRepository struct {
 	repo     plan.AssessmentPlanRepository
-	client   redis.UniversalClient
-	ttl      time.Duration
-	mapper   *planInfra.PlanMapper
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
 	observer *Observer
+	store    *ObjectCacheStore[plan.AssessmentPlan]
 }
 
 // NewCachedPlanRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的计划缓存 Repository。
@@ -36,14 +34,34 @@ func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPla
 	if builder == nil {
 		panic("redis builder is required")
 	}
+	mapper := planInfra.NewPlanMapper()
 	return &CachedPlanRepository{
 		repo:     repo,
-		client:   client,
-		ttl:      policy.TTLOr(defaultPlanCacheTTL),
-		mapper:   planInfra.NewPlanMapper(),
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
+		store: NewObjectCacheStore(ObjectCacheStoreOptions[plan.AssessmentPlan]{
+			Cache:     newRedisCacheIfAvailable(client),
+			PolicyKey: cachepolicy.PolicyPlan,
+			Policy:    policy,
+			TTL:       policy.TTLOr(defaultPlanCacheTTL),
+			Codec:     newPlanCacheEntryCodec(mapper),
+		}),
+	}
+}
+
+func newPlanCacheEntryCodec(mapper *planInfra.PlanMapper) CacheEntryCodec[plan.AssessmentPlan] {
+	return CacheEntryCodec[plan.AssessmentPlan]{
+		EncodeFunc: func(domain *plan.AssessmentPlan) ([]byte, error) {
+			return json.Marshal(mapper.ToPO(domain))
+		},
+		DecodeFunc: func(data []byte) (*plan.AssessmentPlan, error) {
+			var po planInfra.AssessmentPlanPO
+			if err := json.Unmarshal(data, &po); err != nil {
+				return nil, err
+			}
+			return mapper.ToDomain(&po), nil
+		},
 	}
 }
 
@@ -81,61 +99,17 @@ func (r *CachedPlanRepository) Save(ctx context.Context, domain *plan.Assessment
 
 // getCache 从缓存获取
 func (r *CachedPlanRepository) getCache(ctx context.Context, id plan.AssessmentPlanID) (*plan.AssessmentPlan, error) {
-	if r.client == nil {
-		return nil, ErrCacheNotFound
-	}
-
-	key := r.buildCacheKey(id)
-	cachedData, err := r.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
-		return nil, ErrCacheNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	data := r.policy.DecompressValue(cachedData)
-	observePayload(cachepolicy.PolicyPlan, len(data), len(cachedData))
-	var po planInfra.AssessmentPlanPO
-	if err := json.Unmarshal(data, &po); err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomain(&po), nil
+	return r.store.Get(ctx, r.buildCacheKey(id))
 }
 
 // setCache 写入缓存
 func (r *CachedPlanRepository) setCache(ctx context.Context, id plan.AssessmentPlanID, domain *plan.AssessmentPlan) error {
-	if r.client == nil {
-		return nil
-	}
-
-	key := r.buildCacheKey(id)
-	po := r.mapper.ToPO(domain)
-	data, err := json.Marshal(po)
-	if err != nil {
-		return err
-	}
-
-	payload := r.policy.CompressValue(data)
-	observePayload(cachepolicy.PolicyPlan, len(data), len(payload))
-	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
+	return r.store.Set(ctx, r.buildCacheKey(id), domain)
 }
 
 // deleteCache 删除缓存
 func (r *CachedPlanRepository) deleteCache(ctx context.Context, id plan.AssessmentPlanID) error {
-	if r.client == nil {
-		return nil
-	}
-
-	key := r.buildCacheKey(id)
-	err := r.client.Del(ctx, key).Err()
-	if err != nil {
-		observeInvalidate(cachepolicy.PolicyPlan, "error")
-		return err
-	}
-	observeInvalidate(cachepolicy.PolicyPlan, "ok")
-	return nil
+	return r.store.Delete(ctx, r.buildCacheKey(id))
 }
 
 // 实现其他 Repository 方法（透传，不缓存）

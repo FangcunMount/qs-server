@@ -21,12 +21,10 @@ const (
 // 实现 testee.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedTesteeRepository struct {
 	repo     testee.Repository
-	client   redis.UniversalClient
-	ttl      time.Duration
-	mapper   *testeeInfra.TesteeMapper
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
 	observer *Observer
+	store    *ObjectCacheStore[testee.Testee]
 }
 
 // NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
@@ -38,14 +36,35 @@ func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repositor
 	if builder == nil {
 		panic("redis builder is required")
 	}
+	mapper := testeeInfra.NewTesteeMapper()
 	return &CachedTesteeRepository{
 		repo:     repo,
-		client:   client,
-		ttl:      policy.TTLOr(defaultTesteeCacheTTL),
-		mapper:   testeeInfra.NewTesteeMapper(),
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
+		store: NewObjectCacheStore(ObjectCacheStoreOptions[testee.Testee]{
+			Cache:       newRedisCacheIfAvailable(client),
+			PolicyKey:   cachepolicy.PolicyTestee,
+			Policy:      policy,
+			TTL:         policy.TTLOr(defaultTesteeCacheTTL),
+			NegativeTTL: policy.NegativeTTLOr(defaultNegativeTesteeCacheTTL),
+			Codec:       newTesteeCacheEntryCodec(mapper),
+		}),
+	}
+}
+
+func newTesteeCacheEntryCodec(mapper *testeeInfra.TesteeMapper) CacheEntryCodec[testee.Testee] {
+	return CacheEntryCodec[testee.Testee]{
+		EncodeFunc: func(domain *testee.Testee) ([]byte, error) {
+			return json.Marshal(mapper.ToPO(domain))
+		},
+		DecodeFunc: func(data []byte) (*testee.Testee, error) {
+			var po testeeInfra.TesteePO
+			if err := json.Unmarshal(data, &po); err != nil {
+				return nil, err
+			}
+			return mapper.ToDomain(&po), nil
+		},
 	}
 }
 
@@ -110,74 +129,21 @@ func (r *CachedTesteeRepository) Delete(ctx context.Context, id testee.ID) error
 
 // getCache 从缓存获取
 func (r *CachedTesteeRepository) getCache(ctx context.Context, id testee.ID) (*testee.Testee, error) {
-	if r.client == nil {
-		return nil, ErrCacheNotFound
-	}
-
-	key := r.buildCacheKey(id)
-	cachedData, err := r.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
-		return nil, ErrCacheNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if len(cachedData) == 0 {
-		return nil, nil // 空值缓存，表示不存在
-	}
-
-	data := r.policy.DecompressValue(cachedData)
-	observePayload(cachepolicy.PolicyTestee, len(data), len(cachedData))
-	var po testeeInfra.TesteePO
-	if err := json.Unmarshal(data, &po); err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomain(&po), nil
+	return r.store.Get(ctx, r.buildCacheKey(id))
 }
 
 // setCache 写入缓存
 func (r *CachedTesteeRepository) setCache(ctx context.Context, id testee.ID, domain *testee.Testee) error {
-	if r.client == nil {
-		return nil
-	}
-
-	key := r.buildCacheKey(id)
-	po := r.mapper.ToPO(domain)
-	data, err := json.Marshal(po)
-	if err != nil {
-		return err
-	}
-
-	payload := r.policy.CompressValue(data)
-	observePayload(cachepolicy.PolicyTestee, len(data), len(payload))
-	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
+	return r.store.Set(ctx, r.buildCacheKey(id), domain)
 }
 
 func (r *CachedTesteeRepository) setNegativeCache(ctx context.Context, id testee.ID) error {
-	if r.client == nil {
-		return nil
-	}
-	key := r.buildCacheKey(id)
-	ttl := r.policy.NegativeTTLOr(defaultNegativeTesteeCacheTTL)
-	return r.client.Set(ctx, key, []byte{}, r.policy.JitterTTL(ttl)).Err()
+	return r.store.SetNegative(ctx, r.buildCacheKey(id))
 }
 
 // deleteCache 删除缓存
 func (r *CachedTesteeRepository) deleteCache(ctx context.Context, id testee.ID) error {
-	if r.client == nil {
-		return nil
-	}
-
-	key := r.buildCacheKey(id)
-	err := r.client.Del(ctx, key).Err()
-	if err != nil {
-		observeInvalidate(cachepolicy.PolicyTestee, "error")
-		return err
-	}
-	observeInvalidate(cachepolicy.PolicyTestee, "ok")
-	return nil
+	return r.store.Delete(ctx, r.buildCacheKey(id))
 }
 
 // 实现其他 Repository 方法（透传，不缓存）

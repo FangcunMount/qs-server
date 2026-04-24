@@ -20,12 +20,10 @@ const defaultAssessmentDetailCacheTTL = 2 * time.Hour
 // 实现 assessment.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedAssessmentRepository struct {
 	repo     assessment.Repository
-	client   redis.UniversalClient
-	ttl      time.Duration
-	mapper   *assessmentInfra.AssessmentMapper
 	keys     *rediskey.Builder
 	policy   cachepolicy.CachePolicy
 	observer *Observer
+	store    *ObjectCacheStore[assessment.Assessment]
 }
 
 // NewCachedAssessmentRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的测评缓存 Repository。
@@ -37,14 +35,34 @@ func NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo assessment.R
 	if builder == nil {
 		panic("redis builder is required")
 	}
+	mapper := assessmentInfra.NewAssessmentMapper()
 	return &CachedAssessmentRepository{
 		repo:     repo,
-		client:   client,
-		ttl:      policy.TTLOr(defaultAssessmentDetailCacheTTL),
-		mapper:   assessmentInfra.NewAssessmentMapper(),
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
+		store: NewObjectCacheStore(ObjectCacheStoreOptions[assessment.Assessment]{
+			Cache:     newRedisCacheIfAvailable(client),
+			PolicyKey: cachepolicy.PolicyAssessmentDetail,
+			Policy:    policy,
+			TTL:       policy.TTLOr(defaultAssessmentDetailCacheTTL),
+			Codec:     newAssessmentCacheEntryCodec(mapper),
+		}),
+	}
+}
+
+func newAssessmentCacheEntryCodec(mapper *assessmentInfra.AssessmentMapper) CacheEntryCodec[assessment.Assessment] {
+	return CacheEntryCodec[assessment.Assessment]{
+		EncodeFunc: func(domain *assessment.Assessment) ([]byte, error) {
+			return json.Marshal(mapper.ToPO(domain))
+		},
+		DecodeFunc: func(data []byte) (*assessment.Assessment, error) {
+			var po assessmentInfra.AssessmentPO
+			if err := json.Unmarshal(data, &po); err != nil {
+				return nil, err
+			}
+			return mapper.ToDomain(&po), nil
+		},
 	}
 }
 
@@ -109,61 +127,17 @@ func (r *CachedAssessmentRepository) Delete(ctx context.Context, id assessment.I
 
 // getCache 从缓存获取
 func (r *CachedAssessmentRepository) getCache(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
-	if r.client == nil {
-		return nil, ErrCacheNotFound
-	}
-
-	key := r.buildCacheKey(id)
-	cachedData, err := r.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
-		return nil, ErrCacheNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	data := r.policy.DecompressValue(cachedData)
-	observePayload(cachepolicy.PolicyAssessmentDetail, len(data), len(cachedData))
-	var po assessmentInfra.AssessmentPO
-	if err := json.Unmarshal(data, &po); err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomain(&po), nil
+	return r.store.Get(ctx, r.buildCacheKey(id))
 }
 
 // setCache 写入缓存
 func (r *CachedAssessmentRepository) setCache(ctx context.Context, id assessment.ID, domain *assessment.Assessment) error {
-	if r.client == nil {
-		return nil
-	}
-
-	key := r.buildCacheKey(id)
-	po := r.mapper.ToPO(domain)
-	data, err := json.Marshal(po)
-	if err != nil {
-		return err
-	}
-
-	payload := r.policy.CompressValue(data)
-	observePayload(cachepolicy.PolicyAssessmentDetail, len(data), len(payload))
-	return r.client.Set(ctx, key, payload, r.policy.JitterTTL(r.ttl)).Err()
+	return r.store.Set(ctx, r.buildCacheKey(id), domain)
 }
 
 // deleteCache 删除缓存
 func (r *CachedAssessmentRepository) deleteCache(ctx context.Context, id assessment.ID) error {
-	if r.client == nil {
-		return nil
-	}
-
-	key := r.buildCacheKey(id)
-	err := r.client.Del(ctx, key).Err()
-	if err != nil {
-		observeInvalidate(cachepolicy.PolicyAssessmentDetail, "error")
-		return err
-	}
-	observeInvalidate(cachepolicy.PolicyAssessmentDetail, "ok")
-	return nil
+	return r.store.Delete(ctx, r.buildCacheKey(id))
 }
 
 // 实现其他 Repository 方法（透传，不缓存）
