@@ -10,6 +10,7 @@ import (
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -46,7 +47,7 @@ type SurveyModuleDeps struct {
 	CacheBuilder        *rediskey.Builder
 	IdentityService     *iam.IdentityService
 	QuestionnairePolicy cachepolicy.CachePolicy
-	HotsetRecorder      questionnaireCache.HotsetRecorder
+	HotsetRecorder      cachetarget.HotsetRecorder
 	Observer            *questionnaireCache.Observer
 }
 
@@ -125,7 +126,7 @@ func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) 
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset questionnaireCache.HotsetRecorder, observer *questionnaireCache.Observer) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *questionnaireCache.Observer) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）

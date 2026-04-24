@@ -28,16 +28,6 @@ type FamilyObserver interface {
 	ObserveFamilyFailure(family string, err error)
 }
 
-// Recorder 记录和读取内部热点排行榜。
-type Recorder interface {
-	Record(context.Context, cachetarget.WarmupTarget) error
-	Top(context.Context, redisplane.Family, cachetarget.WarmupKind, int64) ([]cachetarget.WarmupTarget, error)
-}
-
-type Inspector interface {
-	TopWithScores(context.Context, redisplane.Family, cachetarget.WarmupKind, int64) ([]cachetarget.HotsetItem, error)
-}
-
 // Options 定义热榜治理策略。
 type Options struct {
 	Enable          bool
@@ -72,11 +62,11 @@ type RedisStore struct {
 	hits     map[string]int64
 }
 
-func NewRedisStore(client redis.UniversalClient, builder *rediskey.Builder, opts Options) Recorder {
+func NewRedisStore(client redis.UniversalClient, builder *rediskey.Builder, opts Options) cachetarget.HotsetRecorder {
 	return NewRedisStoreWithObserver(client, builder, opts, nil)
 }
 
-func NewRedisStoreWithObserver(client redis.UniversalClient, builder *rediskey.Builder, opts Options, observer FamilyObserver) Recorder {
+func NewRedisStoreWithObserver(client redis.UniversalClient, builder *rediskey.Builder, opts Options, observer FamilyObserver) cachetarget.HotsetRecorder {
 	if client == nil || builder == nil || !opts.Enable {
 		return nil
 	}
@@ -94,6 +84,9 @@ func NewRedisStoreWithObserver(client redis.UniversalClient, builder *rediskey.B
 		hits:     make(map[string]int64),
 	}
 }
+
+var _ cachetarget.HotsetRecorder = (*RedisStore)(nil)
+var _ cachetarget.HotsetInspector = (*RedisStore)(nil)
 
 func (s *RedisStore) Record(ctx context.Context, target cachetarget.WarmupTarget) error {
 	if s == nil || s.client == nil || target.Scope == "" {

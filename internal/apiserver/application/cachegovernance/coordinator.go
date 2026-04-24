@@ -10,7 +10,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/prometheus/client_golang/prometheus"
@@ -74,7 +73,7 @@ type Config struct {
 type Dependencies struct {
 	Runtime                         FamilyRuntime
 	StatisticsSeeds                 *StatisticsWarmupConfig
-	Hotset                          cacheinfra.HotsetRecorder
+	Hotset                          cachetarget.HotsetRecorder
 	ListPublishedScaleCodes         func(context.Context) ([]string, error)
 	ListPublishedQuestionnaireCodes func(context.Context) ([]string, error)
 	LookupScaleQuestionnaireCode    func(context.Context, string) (string, error)

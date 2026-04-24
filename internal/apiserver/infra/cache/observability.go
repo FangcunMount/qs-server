@@ -1,21 +1,14 @@
 package cache
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 )
 
 func observePayload(policyKey cachepolicy.CachePolicyKey, rawSize, storedSize int) {
-	family := string(cachepolicy.FamilyFor(policyKey))
-	policy := string(policyKey)
-	if rawSize >= 0 {
-		cacheobservability.ObserveCachePayloadBytes(family, policy, "raw", rawSize)
-	}
-	if storedSize >= 0 {
-		cacheobservability.ObserveCachePayloadBytes(family, policy, "stored", storedSize)
-	}
+	cacheentry.ObservePayload(policyKey, rawSize, storedSize)
 }
 
 func observeInvalidate(policyKey cachepolicy.CachePolicyKey, result string) {
-	cacheobservability.ObserveCacheWrite(string(cachepolicy.FamilyFor(policyKey)), string(policyKey), "invalidate", result)
+	cacheentry.ObserveInvalidate(policyKey, result)
 }

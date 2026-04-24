@@ -5489,7 +5489,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "cache.WarmupKind": {
+        "cachetarget.WarmupKind": {
             "type": "string",
             "enum": [
                 "static.scale",
@@ -5515,7 +5515,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "$ref": "#/definitions/cache.WarmupKind"
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
                 },
                 "message": {
                     "type": "string"
@@ -5599,7 +5599,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "kind": {
-                    "$ref": "#/definitions/cache.WarmupKind"
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
                 },
                 "scope": {
                     "type": "string"

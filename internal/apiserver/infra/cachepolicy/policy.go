@@ -9,7 +9,8 @@ import (
 	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
 
-// EnableCompression 控制默认压缩开关。
+// EnableCompression is kept only for temporary compatibility with old callers.
+// New cache paths must resolve compression into CachePolicy.Compress explicitly.
 var EnableCompression bool
 
 // PolicySwitch 表示缓存策略开关的三态值：
@@ -136,7 +137,7 @@ func (p CachePolicy) JitterTTL(ttl time.Duration) time.Duration {
 
 // CompressValue 根据策略决定是否压缩 payload。
 func (p CachePolicy) CompressValue(data []byte) []byte {
-	return CompressData(data, p.Compress.Enabled(EnableCompression))
+	return CompressData(data, p.Compress.Enabled(false))
 }
 
 // DecompressValue 对缓存值做向后兼容解压。

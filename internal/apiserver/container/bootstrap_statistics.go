@@ -5,13 +5,13 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
-	versionStore := scaleCache.NewStaticVersionTokenStore(0)
+	versionStore := cachequery.NewStaticVersionTokenStore(0)
 	if c == nil {
 		return assembler.StatisticsModuleDeps{
 			VersionStore: versionStore,
@@ -32,13 +32,13 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
 	}
 	if !disableStatisticsCache {
-		versionStore = scaleCache.NewRedisVersionTokenStoreWithKindAndObserver(
+		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(
 			c.CacheClient(redisplane.FamilyMeta),
 			string(cachepolicy.PolicyStatsQuery),
 			c.cacheObserver(),
 		)
 		if versionStore == nil {
-			versionStore = scaleCache.NewStaticVersionTokenStore(0)
+			versionStore = cachequery.NewStaticVersionTokenStore(0)
 		}
 	}
 

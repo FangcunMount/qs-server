@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  cache.WarmupKind:
+  cachetarget.WarmupKind:
     enum:
     - static.scale
     - static.questionnaire
@@ -21,7 +21,7 @@ definitions:
       family:
         type: string
       kind:
-        $ref: '#/definitions/cache.WarmupKind'
+        $ref: '#/definitions/cachetarget.WarmupKind'
       message:
         type: string
       scope:
@@ -77,7 +77,7 @@ definitions:
   cachegovernance.ManualWarmupTarget:
     properties:
       kind:
-        $ref: '#/definitions/cache.WarmupKind'
+        $ref: '#/definitions/cachetarget.WarmupKind'
       scope:
         type: string
     type: object

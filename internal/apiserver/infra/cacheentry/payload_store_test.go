@@ -1,4 +1,4 @@
-package cache
+package cacheentry
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-func TestCachePayloadStoreRoundTripsCompressedPayload(t *testing.T) {
+func TestPayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 	t.Parallel()
 
 	mr := miniredis.RunT(t)
@@ -21,7 +21,7 @@ func TestCachePayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 		mr.Close()
 	})
 
-	store := newCachePayloadStore(NewRedisCache(client), cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{
+	store := NewPayloadStore(NewRedisCache(client), cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{
 		Compress: cachepolicy.PolicySwitchEnabled,
 	})
 	ctx := context.Background()
@@ -46,10 +46,10 @@ func TestCachePayloadStoreRoundTripsCompressedPayload(t *testing.T) {
 	}
 }
 
-func TestCachePayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
+func TestPayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	t.Parallel()
 
-	nilStore := newCachePayloadStore(nil, cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{})
+	nilStore := NewPayloadStore(nil, cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{})
 	ctx := context.Background()
 	if _, err := nilStore.Get(ctx, "payload:nil"); !errors.Is(err, ErrCacheNotFound) {
 		t.Fatalf("nil Get() error = %v, want ErrCacheNotFound", err)
@@ -68,7 +68,7 @@ func TestCachePayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	}
 
 	boom := errors.New("redis unavailable")
-	errorStore := newCachePayloadStore(errorCache{err: boom}, cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{})
+	errorStore := NewPayloadStore(errorCache{err: boom}, cachepolicy.PolicyStatsQuery, cachepolicy.CachePolicy{})
 	if _, err := errorStore.Get(ctx, "payload:error"); !errors.Is(err, boom) {
 		t.Fatalf("error Get() error = %v, want %v", err, boom)
 	}
@@ -81,4 +81,24 @@ func TestCachePayloadStoreNilCacheNoOpsAndPropagatesRedisErrors(t *testing.T) {
 	if _, err := errorStore.Exists(ctx, "payload:error"); !errors.Is(err, boom) {
 		t.Fatalf("error Exists() error = %v, want %v", err, boom)
 	}
+}
+
+type errorCache struct {
+	err error
+}
+
+func (c errorCache) Get(context.Context, string) ([]byte, error) {
+	return nil, c.err
+}
+
+func (c errorCache) Set(context.Context, string, []byte, time.Duration) error {
+	return c.err
+}
+
+func (c errorCache) Delete(context.Context, string) error {
+	return c.err
+}
+
+func (c errorCache) Exists(context.Context, string) (bool, error) {
+	return false, c.err
 }

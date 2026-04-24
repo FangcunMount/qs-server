@@ -5,7 +5,9 @@ import (
 	"time"
 
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -15,8 +17,8 @@ const statsQueryCacheKind = "stats:query"
 // StatisticsCache 统计查询缓存（Redis 操作封装）。
 // 只保留查询结果缓存，不再承担事件去重和日计数写入。
 type StatisticsCache struct {
-	cache        cacheinfra.Cache
-	versionStore cacheinfra.VersionTokenStore
+	cache        cacheentry.Cache
+	versionStore cachequery.VersionTokenStore
 	policy       cachepolicy.CachePolicy
 	observer     *cacheinfra.Observer
 	keys         *rediskey.Builder
@@ -28,7 +30,7 @@ func NewStatisticsCacheWithBuilderAndPolicy(client redis.UniversalClient, builde
 		client,
 		builder,
 		policy,
-		cacheinfra.NewStaticVersionTokenStore(0),
+		cachequery.NewStaticVersionTokenStore(0),
 		nil,
 	)
 }
@@ -37,17 +39,17 @@ func NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 	client redis.UniversalClient,
 	builder *rediskey.Builder,
 	policy cachepolicy.CachePolicy,
-	versionStore cacheinfra.VersionTokenStore,
+	versionStore cachequery.VersionTokenStore,
 	observer *cacheinfra.Observer,
 ) *StatisticsCache {
 	if builder == nil {
 		panic("redis builder is required")
 	}
 	if versionStore == nil {
-		versionStore = cacheinfra.NewStaticVersionTokenStore(0)
+		versionStore = cachequery.NewStaticVersionTokenStore(0)
 	}
 	return &StatisticsCache{
-		cache:        cacheinfra.NewRedisCache(client),
+		cache:        cacheentry.NewRedisCache(client),
 		versionStore: versionStore,
 		policy:       policy,
 		observer:     observer,
@@ -64,7 +66,7 @@ func (c *StatisticsCache) GetQueryCache(ctx context.Context, cacheKey string) (s
 	err := c.queryCache(0).Get(ctx, c.versionKey(cacheKey), func(version uint64) string {
 		return c.dataKey(cacheKey, version)
 	}, &value)
-	if err == cacheinfra.ErrCacheNotFound {
+	if err == cacheentry.ErrCacheNotFound {
 		return "", nil
 	}
 	if err != nil {
@@ -84,11 +86,11 @@ func (c *StatisticsCache) SetQueryCache(ctx context.Context, cacheKey string, va
 	return nil
 }
 
-func (c *StatisticsCache) queryCache(ttl time.Duration) *cacheinfra.VersionedQueryCache {
+func (c *StatisticsCache) queryCache(ttl time.Duration) *cachequery.VersionedQueryCache {
 	if c == nil || c.cache == nil || c.versionStore == nil {
 		return nil
 	}
-	return cacheinfra.NewVersionedQueryCacheWithObserver(
+	return cachequery.NewVersionedQueryCacheWithObserver(
 		c.cache,
 		c.versionStore,
 		cachepolicy.PolicyStatsQuery,

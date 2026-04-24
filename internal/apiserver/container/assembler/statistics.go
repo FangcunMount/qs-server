@@ -5,9 +5,11 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
@@ -51,9 +53,9 @@ type StatisticsModuleDeps struct {
 	AnswerSheetRepo  surveyAnswerSheet.Repository
 	RepairWindowDays int
 	QueryPolicy      cachepolicy.CachePolicy
-	HotsetRecorder   scaleCache.HotsetRecorder
+	HotsetRecorder   cachetarget.HotsetRecorder
 	LockManager      *redislock.Manager
-	VersionStore     scaleCache.VersionTokenStore
+	VersionStore     cachequery.VersionTokenStore
 	Observer         *scaleCache.Observer
 }
 

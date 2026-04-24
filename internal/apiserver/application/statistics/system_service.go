@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"gorm.io/gorm"
@@ -21,7 +20,7 @@ type systemStatisticsService struct {
 	repo       *statisticsInfra.StatisticsRepository
 	cache      *statisticsCache.StatisticsCache
 	aggregator *statistics.Aggregator
-	hotset     cacheinfra.HotsetRecorder
+	hotset     cachetarget.HotsetRecorder
 }
 
 // NewSystemStatisticsService 创建系统整体统计服务
@@ -29,7 +28,7 @@ func NewSystemStatisticsService(
 	db *gorm.DB,
 	repo *statisticsInfra.StatisticsRepository,
 	cache *statisticsCache.StatisticsCache,
-	hotset cacheinfra.HotsetRecorder,
+	hotset cachetarget.HotsetRecorder,
 ) SystemStatisticsService {
 	return &systemStatisticsService{
 		db:         db,

@@ -1,14 +1,12 @@
-package cache
+package cachequery
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/alicebob/miniredis/v2"
@@ -28,7 +26,7 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 		_ = metaClient.Close()
 	})
 
-	queryCache := NewRedisCache(queryClient)
+	queryCache := cacheentry.NewRedisCache(queryClient)
 	versionStore := NewRedisVersionTokenStore(metaClient)
 	keyBuilder := rediskey.NewBuilderWithNamespace("cache:query")
 	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, versionStore, keyBuilder, cachepolicy.CachePolicy{
@@ -41,7 +39,7 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 
 	listCache.Set(ctx, 42, 1, 10, "done", "SDS", "high", "", "", payload)
 
-	version0Key := buildAssessmentListDataKeyForTest(keyBuilder, 42, 0, 1, 10, "done", "SDS", "high", "", "")
+	version0Key := listCache.buildDataKey(42, 0, 1, 10, "done", "SDS", "high", "", "")
 	if exists, err := queryClient.Exists(ctx, version0Key).Result(); err != nil || exists != 1 {
 		t.Fatalf("expected v0 cache key %q to exist, exists=%d err=%v", version0Key, exists, err)
 	}
@@ -61,7 +59,7 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 		t.Fatalf("expected old versioned key %q to remain until TTL, exists=%d err=%v", version0Key, exists, err)
 	}
 
-	gotVersion, err := metaClient.Get(ctx, keyBuilder.BuildAssessmentListVersionKey(42)).Result()
+	gotVersion, err := metaClient.Get(ctx, listCache.buildVersionKey(42)).Result()
 	if err != nil {
 		t.Fatalf("read version token failed: %v", err)
 	}
@@ -70,12 +68,12 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 	}
 
 	var afterInvalidate assessmentListPayload
-	if err := listCache.Get(ctx, 42, 1, 10, "done", "SDS", "high", "", "", &afterInvalidate); err != ErrCacheNotFound {
-		t.Fatalf("Get() after invalidate error = %v, want %v", err, ErrCacheNotFound)
+	if err := listCache.Get(ctx, 42, 1, 10, "done", "SDS", "high", "", "", &afterInvalidate); err != cacheentry.ErrCacheNotFound {
+		t.Fatalf("Get() after invalidate error = %v, want %v", err, cacheentry.ErrCacheNotFound)
 	}
 
 	listCache.Set(ctx, 42, 1, 10, "done", "SDS", "high", "", "", &assessmentListPayload{Total: 2})
-	version1Key := buildAssessmentListDataKeyForTest(keyBuilder, 42, 1, 1, 10, "done", "SDS", "high", "", "")
+	version1Key := listCache.buildDataKey(42, 1, 1, 10, "done", "SDS", "high", "", "")
 	if exists, err := queryClient.Exists(ctx, version1Key).Result(); err != nil || exists != 1 {
 		t.Fatalf("expected v1 cache key %q to exist, exists=%d err=%v", version1Key, exists, err)
 	}
@@ -87,31 +85,6 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 	if refreshed.Total != 2 {
 		t.Fatalf("Get() after rewrite total = %d, want 2", refreshed.Total)
 	}
-}
-
-func buildAssessmentListDataKeyForTest(
-	builder *rediskey.Builder,
-	userID uint64,
-	version uint64,
-	page, pageSize int,
-	status string,
-	scaleCode string,
-	riskLevel string,
-	dateFrom string,
-	dateTo string,
-) string {
-	raw := fmt.Sprintf(
-		"status=%s&scale_code=%s&risk_level=%s&date_from=%s&date_to=%s&page=%d&page_size=%d",
-		status,
-		scaleCode,
-		riskLevel,
-		dateFrom,
-		dateTo,
-		page,
-		pageSize,
-	)
-	hash := sha256.Sum256([]byte(raw))
-	return builder.BuildAssessmentListVersionedKey(userID, version, hex.EncodeToString(hash[:])[:8])
 }
 
 type failingVersionStore struct{}
@@ -130,7 +103,7 @@ func TestMyAssessmentListCacheDegradesVersionReadFailureToMiss(t *testing.T) {
 		_ = queryClient.Close()
 	})
 
-	queryCache := NewRedisCache(queryClient)
+	queryCache := cacheentry.NewRedisCache(queryClient)
 	keyBuilder := rediskey.NewBuilderWithNamespace("cache:query")
 	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, failingVersionStore{}, keyBuilder, cachepolicy.CachePolicy{
 		TTL:         time.Minute,
@@ -138,7 +111,7 @@ func TestMyAssessmentListCacheDegradesVersionReadFailureToMiss(t *testing.T) {
 	})
 
 	var cached assessmentListPayload
-	if err := listCache.Get(context.Background(), 42, 1, 10, "done", "SDS", "high", "", "", &cached); err != ErrCacheNotFound {
-		t.Fatalf("Get() error = %v, want %v", err, ErrCacheNotFound)
+	if err := listCache.Get(context.Background(), 42, 1, 10, "done", "SDS", "high", "", "", &cached); err != cacheentry.ErrCacheNotFound {
+		t.Fatalf("Get() error = %v, want %v", err, cacheentry.ErrCacheNotFound)
 	}
 }

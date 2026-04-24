@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
@@ -34,11 +33,11 @@ type HotsetSnapshot struct {
 type governanceStatusService struct {
 	component string
 	status    *cacheobservability.FamilyStatusRegistry
-	hotset    cacheinfra.HotsetInspector
+	hotset    cachetarget.HotsetInspector
 	coord     Coordinator
 }
 
-func NewStatusService(component string, status *cacheobservability.FamilyStatusRegistry, hotset cacheinfra.HotsetInspector, coord Coordinator) StatusService {
+func NewStatusService(component string, status *cacheobservability.FamilyStatusRegistry, hotset cachetarget.HotsetInspector, coord Coordinator) StatusService {
 	return &governanceStatusService{
 		component: component,
 		status:    status,

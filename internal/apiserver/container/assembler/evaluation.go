@@ -22,7 +22,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
@@ -96,7 +98,7 @@ type EvaluationModuleDeps struct {
 	QueryRedisClient     redis.UniversalClient
 	QueryCacheBuilder    *rediskey.Builder
 	AssessmentListPolicy cachepolicy.CachePolicy
-	VersionStore         assessmentCache.VersionTokenStore
+	VersionStore         cachequery.VersionTokenStore
 	Observer             *assessmentCache.Observer
 }
 
@@ -192,8 +194,8 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 
 	// 提交服务 - 服务于答题者 (Testee)
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
-		listCache := assessmentCache.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
-			assessmentCache.NewRedisCache(normalized.QueryRedisClient),
+		listCache := cachequery.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
+			cacheentry.NewRedisCache(normalized.QueryRedisClient),
 			normalized.VersionStore,
 			normalized.QueryCacheBuilder,
 			normalized.AssessmentListPolicy,

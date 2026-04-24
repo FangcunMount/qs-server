@@ -39,6 +39,17 @@ type HotsetItem struct {
 	Score  float64      `json:"score"`
 }
 
+// HotsetRecorder 记录和读取可治理缓存目标的热点排行。
+type HotsetRecorder interface {
+	Record(context.Context, WarmupTarget) error
+	Top(context.Context, redisplane.Family, WarmupKind, int64) ([]WarmupTarget, error)
+}
+
+// HotsetInspector 读取带分数的热点排行，供治理状态接口使用。
+type HotsetInspector interface {
+	TopWithScores(context.Context, redisplane.Family, WarmupKind, int64) ([]HotsetItem, error)
+}
+
 func (t WarmupTarget) Key() string {
 	return fmt.Sprintf("%s|%s|%s", t.Family, t.Kind, t.Scope)
 }

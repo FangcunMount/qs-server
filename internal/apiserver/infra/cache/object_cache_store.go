@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 )
 
@@ -14,7 +15,7 @@ type ObjectCacheStore[T any] struct {
 	ttl         time.Duration
 	negativeTTL time.Duration
 	codec       CacheEntryCodec[T]
-	payload     *cachePayloadStore
+	payload     *cacheentry.PayloadStore
 }
 
 type ObjectCacheStoreOptions[T any] struct {
@@ -33,7 +34,7 @@ func NewObjectCacheStore[T any](opts ObjectCacheStoreOptions[T]) *ObjectCacheSto
 		ttl:         opts.TTL,
 		negativeTTL: opts.NegativeTTL,
 		codec:       opts.Codec,
-		payload:     newCachePayloadStore(opts.Cache, opts.PolicyKey, opts.Policy),
+		payload:     cacheentry.NewPayloadStore(opts.Cache, opts.PolicyKey, opts.Policy),
 	}
 }
 
@@ -96,5 +97,5 @@ func (s *ObjectCacheStore[T]) Exists(ctx context.Context, key string) (bool, err
 }
 
 func (s *ObjectCacheStore[T]) available() bool {
-	return s != nil && s.payload != nil && s.payload.cache != nil
+	return s != nil && s.payload != nil && s.payload.Available()
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -50,7 +51,7 @@ type ScaleModuleDeps struct {
 	IdentityService   *iam.IdentityService
 	ScalePolicy       cachepolicy.CachePolicy
 	ScaleListPolicy   cachepolicy.CachePolicy
-	HotsetRecorder    scaleCache.HotsetRecorder
+	HotsetRecorder    cachetarget.HotsetRecorder
 	Observer          *scaleCache.Observer
 }
 

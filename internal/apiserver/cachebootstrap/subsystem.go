@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachehotset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -42,8 +43,8 @@ type Subsystem struct {
 	policyCatalog  *cachepolicy.PolicyCatalog
 	observer       *cacheinfra.Observer
 
-	hotsetRecorder  cacheinfra.HotsetRecorder
-	hotsetInspector cacheinfra.HotsetInspector
+	hotsetRecorder  cachetarget.HotsetRecorder
+	hotsetInspector cachetarget.HotsetInspector
 	lockManager     *redislock.Manager
 
 	warmupCoordinator cachegov.Coordinator
@@ -102,7 +103,7 @@ func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheC
 		},
 		s.observer,
 	)
-	if inspector, ok := s.hotsetRecorder.(cacheinfra.HotsetInspector); ok {
+	if inspector, ok := s.hotsetRecorder.(cachetarget.HotsetInspector); ok {
 		s.hotsetInspector = inspector
 	}
 	s.lockManager = lockManager
@@ -208,14 +209,14 @@ func (s *Subsystem) Observer() *cacheinfra.Observer {
 	return s.observer
 }
 
-func (s *Subsystem) HotsetRecorder() cacheinfra.HotsetRecorder {
+func (s *Subsystem) HotsetRecorder() cachetarget.HotsetRecorder {
 	if s == nil {
 		return nil
 	}
 	return s.hotsetRecorder
 }
 
-func (s *Subsystem) HotsetInspector() cacheinfra.HotsetInspector {
+func (s *Subsystem) HotsetInspector() cachetarget.HotsetInspector {
 	if s == nil {
 		return nil
 	}

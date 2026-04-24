@@ -3731,7 +3731,7 @@ paths:
                 additionalProperties: true
 components:
   schemas:
-    cache.WarmupKind:
+    cachetarget.WarmupKind:
       type: string
       enum:
       - static.scale
@@ -3753,7 +3753,7 @@ components:
         family:
           type: string
         kind:
-          $ref: '#/components/schemas/cache.WarmupKind'
+          $ref: '#/components/schemas/cachetarget.WarmupKind'
         message:
           type: string
         scope:
@@ -3809,7 +3809,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/cache.WarmupKind'
+          $ref: '#/components/schemas/cachetarget.WarmupKind'
         scope:
           type: string
     core.ErrResponse:

@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"gorm.io/gorm"
@@ -20,7 +19,7 @@ type planStatisticsService struct {
 	repo       *statisticsInfra.StatisticsRepository
 	cache      *statisticsCache.StatisticsCache
 	aggregator *statistics.Aggregator
-	hotset     cacheinfra.HotsetRecorder
+	hotset     cachetarget.HotsetRecorder
 }
 
 // NewPlanStatisticsService 创建计划统计服务
@@ -28,7 +27,7 @@ func NewPlanStatisticsService(
 	db *gorm.DB,
 	repo *statisticsInfra.StatisticsRepository,
 	cache *statisticsCache.StatisticsCache,
-	hotset cacheinfra.HotsetRecorder,
+	hotset cachetarget.HotsetRecorder,
 ) PlanStatisticsService {
 	return &planStatisticsService{
 		db:         db,

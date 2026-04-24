@@ -7,8 +7,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
@@ -36,9 +36,9 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		queryRedisClient = nil
 	}
 
-	var versionStore scaleCache.VersionTokenStore
+	var versionStore cachequery.VersionTokenStore
 	if queryRedisClient != nil {
-		versionStore = scaleCache.NewRedisVersionTokenStoreWithKindAndObserver(
+		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(
 			c.CacheClient(redisplane.FamilyMeta),
 			string(cachepolicy.PolicyAssessmentList),
 			c.cacheObserver(),

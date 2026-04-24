@@ -5486,7 +5486,7 @@
         }
     },
     "definitions": {
-        "cache.WarmupKind": {
+        "cachetarget.WarmupKind": {
             "type": "string",
             "enum": [
                 "static.scale",
@@ -5512,7 +5512,7 @@
                     "type": "string"
                 },
                 "kind": {
-                    "$ref": "#/definitions/cache.WarmupKind"
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
                 },
                 "message": {
                     "type": "string"
@@ -5596,7 +5596,7 @@
             "type": "object",
             "properties": {
                 "kind": {
-                    "$ref": "#/definitions/cache.WarmupKind"
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
                 },
                 "scope": {
                     "type": "string"

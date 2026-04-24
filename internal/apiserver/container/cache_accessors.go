@@ -2,6 +2,7 @@ package container
 
 import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
@@ -45,14 +46,14 @@ func (c *Container) cacheObserver() *cacheinfra.Observer {
 	return c.cache.Observer()
 }
 
-func (c *Container) hotsetRecorder() cacheinfra.HotsetRecorder {
+func (c *Container) hotsetRecorder() cachetarget.HotsetRecorder {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.HotsetRecorder()
 }
 
-func (c *Container) HotsetInspector() cacheinfra.HotsetInspector {
+func (c *Container) HotsetInspector() cachetarget.HotsetInspector {
 	if c == nil || c.cache == nil {
 		return nil
 	}
