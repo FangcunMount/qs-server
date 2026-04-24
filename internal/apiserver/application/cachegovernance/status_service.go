@@ -80,7 +80,7 @@ func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapsho
 }
 
 func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarget.WarmupKind, limit int64) (*HotsetSnapshot, error) {
-	family := warmupKindFamily(kind)
+	family := cachetarget.FamilyForKind(kind)
 	result := &HotsetSnapshot{
 		Family: family,
 		Kind:   kind,
@@ -127,15 +127,4 @@ func (s *governanceStatusService) familyStatus(family redisplane.Family) *cacheo
 		}
 	}
 	return nil
-}
-
-func warmupKindFamily(kind cachetarget.WarmupKind) redisplane.Family {
-	switch kind {
-	case cachetarget.WarmupKindStaticScale, cachetarget.WarmupKindStaticQuestionnaire, cachetarget.WarmupKindStaticScaleList:
-		return redisplane.FamilyStatic
-	case cachetarget.WarmupKindQueryStatsSystem, cachetarget.WarmupKindQueryStatsQuestionnaire, cachetarget.WarmupKindQueryStatsPlan:
-		return redisplane.FamilyQuery
-	default:
-		return redisplane.FamilyDefault
-	}
 }

@@ -54,6 +54,34 @@ func (t WarmupTarget) Key() string {
 	return fmt.Sprintf("%s|%s|%s", t.Family, t.Kind, t.Scope)
 }
 
+// OrgID returns the owning organization for query warmup targets.
+func (t WarmupTarget) OrgID() (int64, bool) {
+	switch t.Kind {
+	case WarmupKindQueryStatsSystem:
+		return ParseQueryStatsSystemScope(t.Scope)
+	case WarmupKindQueryStatsQuestionnaire:
+		orgID, _, ok := ParseQueryStatsQuestionnaireScope(t.Scope)
+		return orgID, ok
+	case WarmupKindQueryStatsPlan:
+		orgID, _, ok := ParseQueryStatsPlanScope(t.Scope)
+		return orgID, ok
+	default:
+		return 0, false
+	}
+}
+
+// FamilyForKind returns the Redis family used by a governance warmup kind.
+func FamilyForKind(kind WarmupKind) redisplane.Family {
+	switch kind {
+	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticScaleList:
+		return redisplane.FamilyStatic
+	case WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
+		return redisplane.FamilyQuery
+	default:
+		return redisplane.FamilyDefault
+	}
+}
+
 func normalizeCodeScope(prefix, code string) string {
 	return prefix + ":" + strings.ToLower(strings.TrimSpace(code))
 }
@@ -123,6 +151,51 @@ func ParseWarmupKind(raw string) (WarmupKind, bool) {
 		return WarmupKind(strings.TrimSpace(raw)), true
 	default:
 		return "", false
+	}
+}
+
+// ParseWarmupTarget parses a validated governance kind and scope into a canonical warmup target.
+func ParseWarmupTarget(kind WarmupKind, scope string) (WarmupTarget, error) {
+	scope = strings.TrimSpace(scope)
+	switch kind {
+	case WarmupKindStaticScale:
+		code, ok := ParseStaticScaleScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid static scale warmup scope: %s", scope)
+		}
+		return NewStaticScaleWarmupTarget(code), nil
+	case WarmupKindStaticQuestionnaire:
+		code, ok := ParseStaticQuestionnaireScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid static questionnaire warmup scope: %s", scope)
+		}
+		return NewStaticQuestionnaireWarmupTarget(code), nil
+	case WarmupKindStaticScaleList:
+		expected := NewStaticScaleListWarmupTarget()
+		if scope != expected.Scope {
+			return WarmupTarget{}, fmt.Errorf("invalid static scale list warmup scope: %s", scope)
+		}
+		return expected, nil
+	case WarmupKindQueryStatsSystem:
+		orgID, ok := ParseQueryStatsSystemScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid stats system warmup scope: %s", scope)
+		}
+		return NewQueryStatsSystemWarmupTarget(orgID), nil
+	case WarmupKindQueryStatsQuestionnaire:
+		orgID, code, ok := ParseQueryStatsQuestionnaireScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid stats questionnaire warmup scope: %s", scope)
+		}
+		return NewQueryStatsQuestionnaireWarmupTarget(orgID, code), nil
+	case WarmupKindQueryStatsPlan:
+		orgID, planID, ok := ParseQueryStatsPlanScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid stats plan warmup scope: %s", scope)
+		}
+		return NewQueryStatsPlanWarmupTarget(orgID, planID), nil
+	default:
+		return WarmupTarget{}, fmt.Errorf("unsupported warmup kind: %s", kind)
 	}
 }
 
