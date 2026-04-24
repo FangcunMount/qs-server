@@ -124,7 +124,7 @@ func (m *Manager) lockKey(identity Identity) (string, error) {
 
 func (m *Manager) metricName(identity Identity) string {
 	base := strings.TrimSpace(identity.Name)
-	if base == "" {
+	if base == "" && m != nil {
 		base = m.name
 	}
 	if base == "" {

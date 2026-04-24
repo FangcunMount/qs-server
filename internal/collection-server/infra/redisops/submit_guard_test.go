@@ -3,6 +3,7 @@ package redisops
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
@@ -103,5 +104,101 @@ func TestSubmitGuardReleasesInFlightLeaseOnAbort(t *testing.T) {
 	}
 	if doneID != "" || !acquired || lease2 == nil {
 		t.Fatalf("expected lease reacquisition after abort, got doneID=%q acquired=%v lease=%+v", doneID, acquired, lease2)
+	}
+}
+
+func TestSubmitGuardCompleteKeepsInFlightLeaseWhenDoneMarkerWriteFails(t *testing.T) {
+	mr := miniredis.RunT(t)
+	opsClientA := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	opsClientB := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	lockClient := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = opsClientA.Close()
+		_ = opsClientB.Close()
+		_ = lockClient.Close()
+	})
+
+	lockHandle := &redisplane.Handle{
+		Family:  redisplane.FamilyLock,
+		Client:  lockClient,
+		Builder: rediskey.NewBuilderWithNamespace("cache:lock"),
+	}
+	instanceA := NewSubmitGuard(
+		&redisplane.Handle{
+			Family:  redisplane.FamilyOps,
+			Client:  opsClientA,
+			Builder: rediskey.NewBuilderWithNamespace("ops:runtime"),
+		},
+		redislock.NewManager("collection-server-a", "lock_lease", lockHandle),
+	)
+	instanceB := NewSubmitGuard(
+		&redisplane.Handle{
+			Family:  redisplane.FamilyOps,
+			Client:  opsClientB,
+			Builder: rediskey.NewBuilderWithNamespace("ops:runtime"),
+		},
+		redislock.NewManager("collection-server-b", "lock_lease", lockHandle),
+	)
+
+	_, lease, acquired, err := instanceA.Begin(context.Background(), "req-3")
+	if err != nil {
+		t.Fatalf("instance A begin failed: %v", err)
+	}
+	if !acquired || lease == nil {
+		t.Fatalf("expected instance A to acquire lock, got acquired=%v lease=%+v", acquired, lease)
+	}
+
+	if err := opsClientA.Close(); err != nil {
+		t.Fatalf("close ops client A: %v", err)
+	}
+	if err := instanceA.Complete(context.Background(), "req-3", lease, "answersheet-3"); err == nil {
+		t.Fatal("expected complete to fail when done marker write fails")
+	}
+
+	doneID, leaseB, acquired, err := instanceB.Begin(context.Background(), "req-3")
+	if err != nil {
+		t.Fatalf("instance B begin failed: %v", err)
+	}
+	if doneID != "" || acquired || leaseB != nil {
+		t.Fatalf("expected in-flight lease to remain held, got doneID=%q acquired=%v lease=%+v", doneID, acquired, leaseB)
+	}
+
+	mr.FastForward(defaultSubmitInflightTTL + time.Second)
+
+	doneID, leaseB, acquired, err = instanceB.Begin(context.Background(), "req-3")
+	if err != nil {
+		t.Fatalf("instance B begin after ttl failed: %v", err)
+	}
+	if doneID != "" || !acquired || leaseB == nil {
+		t.Fatalf("expected lease acquisition after ttl expiry, got doneID=%q acquired=%v lease=%+v", doneID, acquired, leaseB)
+	}
+}
+
+func TestSubmitGuardAllowsWhenDisabledOrKeyEmpty(t *testing.T) {
+	ctx := context.Background()
+
+	var nilGuard *SubmitGuard
+	if doneID, lease, acquired, err := nilGuard.Begin(ctx, "req-disabled"); err != nil {
+		t.Fatalf("nil guard Begin() error = %v", err)
+	} else if doneID != "" || lease != nil || !acquired {
+		t.Fatalf("nil guard Begin() = doneID=%q lease=%+v acquired=%v, want allow", doneID, lease, acquired)
+	}
+	if err := nilGuard.Complete(ctx, "req-disabled", nil, "answersheet-disabled"); err != nil {
+		t.Fatalf("nil guard Complete() error = %v", err)
+	}
+	if err := nilGuard.Abort(ctx, "req-disabled", nil); err != nil {
+		t.Fatalf("nil guard Abort() error = %v", err)
+	}
+
+	disabledGuard := NewSubmitGuard(nil, nil)
+	if doneID, lease, acquired, err := disabledGuard.Begin(ctx, ""); err != nil {
+		t.Fatalf("empty key Begin() error = %v", err)
+	} else if doneID != "" || lease != nil || !acquired {
+		t.Fatalf("empty key Begin() = doneID=%q lease=%+v acquired=%v, want allow", doneID, lease, acquired)
+	}
+	if doneID, lease, acquired, err := disabledGuard.Begin(ctx, "req-disabled"); err != nil {
+		t.Fatalf("disabled guard Begin() error = %v", err)
+	} else if doneID != "" || lease != nil || !acquired {
+		t.Fatalf("disabled guard Begin() = doneID=%q lease=%+v acquired=%v, want allow", doneID, lease, acquired)
 	}
 }

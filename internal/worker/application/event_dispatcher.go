@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
-	redis "github.com/redis/go-redis/v9"
 )
 
 // EventDispatcher 事件分发器
@@ -37,7 +36,6 @@ type HandlerDependencies struct {
 	AnswerSheetClient *grpcclient.AnswerSheetClient
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    handlers.InternalClient
-	LockRedis         redis.UniversalClient
 	LockManager       *redislock.Manager
 	LockKeyBuilder    *rediskey.Builder
 	Notifier          port.TaskNotifier
@@ -79,7 +77,6 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 		AnswerSheetClient: d.deps.AnswerSheetClient,
 		EvaluationClient:  d.deps.EvaluationClient,
 		InternalClient:    d.deps.InternalClient,
-		LockRedis:         d.deps.LockRedis,
 		LockManager:       d.deps.LockManager,
 		LockKeyBuilder:    d.deps.LockKeyBuilder,
 		Notifier:          d.deps.Notifier,

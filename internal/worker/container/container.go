@@ -15,7 +15,6 @@ import (
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
-	redis "github.com/redis/go-redis/v9"
 )
 
 // Container 主容器，负责管理所有组件
@@ -23,8 +22,6 @@ type Container struct {
 	initialized bool
 	opts        *options.Options
 	logger      *slog.Logger
-	lockRedis   redis.UniversalClient
-	lockHandle  *redisplane.Handle
 	lockManager *redislock.Manager
 	lockBuilder *rediskey.Builder
 
@@ -39,17 +36,13 @@ type Container struct {
 
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *redisplane.Handle, lockManager *redislock.Manager) *Container {
-	var lockRedis redis.UniversalClient
 	lockBuilder := rediskey.NewBuilder()
 	if lockHandle != nil {
-		lockRedis = lockHandle.Client
 		lockBuilder = lockHandle.Builder
 	}
 	return &Container{
 		opts:        opts,
 		logger:      logger,
-		lockRedis:   lockRedis,
-		lockHandle:  lockHandle,
 		lockManager: lockManager,
 		lockBuilder: lockBuilder,
 		initialized: false,
@@ -85,7 +78,6 @@ func (c *Container) initEventDispatcher() error {
 		AnswerSheetClient: c.answerSheetClient,
 		EvaluationClient:  c.evaluationClient,
 		InternalClient:    c.internalClient,
-		LockRedis:         c.lockRedis,
 		LockManager:       c.lockManager,
 		LockKeyBuilder:    c.lockBuilder,
 		Notifier:          c.buildNotifier(),
@@ -193,9 +185,4 @@ func (c *Container) Logger() *slog.Logger {
 // Options 获取配置
 func (c *Container) Options() *options.Options {
 	return c.opts
-}
-
-// LockRedis 获取 worker 锁 Redis 客户端。
-func (c *Container) LockRedis() redis.UniversalClient {
-	return c.lockRedis
 }

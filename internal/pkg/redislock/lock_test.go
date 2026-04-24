@@ -90,6 +90,50 @@ func TestManagerAcquireSpecUsesSpecNameAndDefaultTTL(t *testing.T) {
 	}
 }
 
+func TestManagerAcquireSpecRejectsInvalidSpec(t *testing.T) {
+	manager := NewManager("worker", "lock_lease", &redisplane.Handle{
+		Family:  redisplane.FamilyLock,
+		Builder: rediskey.NewBuilderWithNamespace("cache:lock"),
+	})
+
+	if _, acquired, err := manager.AcquireSpec(context.Background(), Spec{
+		DefaultTTL: time.Second,
+	}, "invalid:name"); err == nil {
+		t.Fatal("expected empty spec name to be rejected")
+	} else if acquired {
+		t.Fatal("expected invalid spec to not acquire lock")
+	}
+
+	if _, acquired, err := manager.AcquireSpec(context.Background(), Spec{
+		Name: "invalid_ttl",
+	}, "invalid:ttl"); err == nil {
+		t.Fatal("expected empty ttl to be rejected")
+	} else if acquired {
+		t.Fatal("expected invalid ttl to not acquire lock")
+	}
+}
+
+func TestManagerReleaseNoOpsWhenUnavailable(t *testing.T) {
+	ctx := context.Background()
+	lease := &Lease{Key: "cache:lock:any", Token: "token"}
+
+	var nilManager *Manager
+	if err := nilManager.Release(ctx, Identity{}, lease); err != nil {
+		t.Fatalf("nil manager Release() error = %v", err)
+	}
+	if err := nilManager.ReleaseSpec(ctx, Specs.AnswersheetProcessing, "answersheet:processing:1", lease); err != nil {
+		t.Fatalf("nil manager ReleaseSpec() error = %v", err)
+	}
+
+	unavailableManager := NewManager("worker", "lock_lease", nil)
+	if err := unavailableManager.Release(ctx, Identity{Name: "answersheet_processing"}, lease); err != nil {
+		t.Fatalf("unavailable manager Release() error = %v", err)
+	}
+	if err := unavailableManager.Release(ctx, Identity{Name: "answersheet_processing"}, nil); err != nil {
+		t.Fatalf("nil lease Release() error = %v", err)
+	}
+}
+
 func TestManagerLockLeaseExpiresAfterTTL(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})

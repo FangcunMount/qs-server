@@ -281,7 +281,6 @@ func newAnswerSheetHandlerTestDeps(client InternalClient, redisClient redis.Univ
 	return &Dependencies{
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		InternalClient: client,
-		LockRedis:      redisClient,
 		LockManager:    lockManager,
 		LockKeyBuilder: lockBuilder,
 	}
