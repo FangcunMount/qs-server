@@ -73,16 +73,14 @@ func (r *CachedAssessmentRepository) buildCacheKey(id assessment.ID) string {
 
 // FindByID 根据ID查询测评（优先从缓存读取）
 func (r *CachedAssessmentRepository) FindByID(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
-	domain, err := readByIDWithCache(
-		ctx,
-		cachepolicy.PolicyAssessmentDetail,
-		r.buildCacheKey(id),
-		r.policy,
-		r.observer,
-		func(ctx context.Context) (*assessment.Assessment, error) { return r.getCache(ctx, id) },
-		func(ctx context.Context) (*assessment.Assessment, error) { return r.repo.FindByID(ctx, id) },
-		func(ctx context.Context, value *assessment.Assessment) error { return r.setCache(ctx, id, value) },
-	)
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[assessment.Assessment]{
+		PolicyKey: cachepolicy.PolicyAssessmentDetail,
+		CacheKey:  r.buildCacheKey(id),
+		Policy:    r.policy,
+		Observer:  r.observer,
+		Store:     r.store,
+		Load:      func(ctx context.Context) (*assessment.Assessment, error) { return r.repo.FindByID(ctx, id) },
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -123,16 +121,6 @@ func (r *CachedAssessmentRepository) Delete(ctx context.Context, id assessment.I
 		_ = r.deleteCache(ctx, id)
 	}
 	return err
-}
-
-// getCache 从缓存获取
-func (r *CachedAssessmentRepository) getCache(ctx context.Context, id assessment.ID) (*assessment.Assessment, error) {
-	return r.store.Get(ctx, r.buildCacheKey(id))
-}
-
-// setCache 写入缓存
-func (r *CachedAssessmentRepository) setCache(ctx context.Context, id assessment.ID, domain *assessment.Assessment) error {
-	return r.store.Set(ctx, r.buildCacheKey(id), domain)
 }
 
 // deleteCache 删除缓存

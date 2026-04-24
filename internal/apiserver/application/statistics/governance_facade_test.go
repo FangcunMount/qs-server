@@ -6,7 +6,7 @@ import (
 	"time"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 )
 
 type stubGovernanceCoordinator struct {
@@ -55,7 +55,7 @@ func (s *stubGovernanceCoordinator) HandleManualWarmup(_ context.Context, req ca
 		Items: []cachegov.ManualWarmupItemResult{
 			{
 				Family: "static_meta",
-				Kind:   cacheinfra.WarmupKindStaticScale,
+				Kind:   cachetarget.WarmupKindStaticScale,
 				Scope:  "scale:S-001",
 				Status: cachegov.ManualWarmupItemStatusOK,
 			},
@@ -105,7 +105,7 @@ func TestGovernanceFacadeHandleManualWarmupRejectsCrossOrgTarget(t *testing.T) {
 
 	_, err := facade.HandleManualWarmup(context.Background(), 1, ManualWarmupRequest{
 		Targets: []cachegov.ManualWarmupTarget{
-			{Kind: cacheinfra.WarmupKindQueryStatsSystem, Scope: "org:2"},
+			{Kind: cachetarget.WarmupKindQueryStatsSystem, Scope: "org:2"},
 		},
 	})
 	if err == nil {

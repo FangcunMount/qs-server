@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -42,7 +43,7 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*ScaleResult
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
-	s.recordHotset(ctx, cacheinfra.NewStaticScaleWarmupTarget(code))
+	s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
 
 	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
@@ -108,7 +109,7 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Sc
 	if !m.IsPublished() {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表未发布")
 	}
-	s.recordHotset(ctx, cacheinfra.NewStaticScaleWarmupTarget(code))
+	s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
 
 	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
 }
@@ -160,7 +161,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 			_ = s.listCache.Rebuild(context.Background())
 		}()
 	}
-	s.recordHotset(ctx, cacheinfra.NewStaticScaleListWarmupTarget())
+	s.recordHotset(ctx, cachetarget.NewStaticScaleListWarmupTarget())
 
 	return result, nil
 }
@@ -191,7 +192,7 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]Fact
 	return result, nil
 }
 
-func (s *queryService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+func (s *queryService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
 	if s == nil || s.hotset == nil {
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachehotset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -91,10 +92,10 @@ func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheC
 		observer:       cacheinfra.NewObserver(component),
 	}
 	s.policyCatalog = newPolicyCatalog(cacheConfig)
-	s.hotsetRecorder = cacheinfra.NewRedisHotsetStoreWithObserver(
+	s.hotsetRecorder = cachehotset.NewRedisStoreWithObserver(
 		s.Client(redisplane.FamilyMeta),
 		s.Builder(redisplane.FamilyMeta),
-		cacheinfra.HotsetOptions{
+		cachehotset.Options{
 			Enable:          cacheConfig.Warmup.HotsetEnable,
 			TopN:            cacheConfig.Warmup.HotsetTopN,
 			MaxItemsPerKind: cacheConfig.Warmup.MaxItemsPerKind,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
@@ -12,7 +13,7 @@ import (
 type StatusService interface {
 	GetRuntime(context.Context) (*cacheobservability.RuntimeSnapshot, error)
 	GetStatus(context.Context) (*StatusSnapshot, error)
-	GetHotset(context.Context, cacheinfra.WarmupKind, int64) (*HotsetSnapshot, error)
+	GetHotset(context.Context, cachetarget.WarmupKind, int64) (*HotsetSnapshot, error)
 }
 
 type StatusSnapshot struct {
@@ -21,13 +22,13 @@ type StatusSnapshot struct {
 }
 
 type HotsetSnapshot struct {
-	Family    redisplane.Family       `json:"family"`
-	Kind      cacheinfra.WarmupKind   `json:"kind"`
-	Limit     int64                   `json:"limit"`
-	Available bool                    `json:"available"`
-	Degraded  bool                    `json:"degraded"`
-	Message   string                  `json:"message,omitempty"`
-	Items     []cacheinfra.HotsetItem `json:"items"`
+	Family    redisplane.Family        `json:"family"`
+	Kind      cachetarget.WarmupKind   `json:"kind"`
+	Limit     int64                    `json:"limit"`
+	Available bool                     `json:"available"`
+	Degraded  bool                     `json:"degraded"`
+	Message   string                   `json:"message,omitempty"`
+	Items     []cachetarget.HotsetItem `json:"items"`
 }
 
 type governanceStatusService struct {
@@ -79,13 +80,13 @@ func (s *governanceStatusService) GetStatus(ctx context.Context) (*StatusSnapsho
 	return result, nil
 }
 
-func (s *governanceStatusService) GetHotset(ctx context.Context, kind cacheinfra.WarmupKind, limit int64) (*HotsetSnapshot, error) {
+func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarget.WarmupKind, limit int64) (*HotsetSnapshot, error) {
 	family := warmupKindFamily(kind)
 	result := &HotsetSnapshot{
 		Family: family,
 		Kind:   kind,
 		Limit:  limit,
-		Items:  []cacheinfra.HotsetItem{},
+		Items:  []cachetarget.HotsetItem{},
 	}
 	if limit <= 0 {
 		result.Limit = 20
@@ -129,11 +130,11 @@ func (s *governanceStatusService) familyStatus(family redisplane.Family) *cacheo
 	return nil
 }
 
-func warmupKindFamily(kind cacheinfra.WarmupKind) redisplane.Family {
+func warmupKindFamily(kind cachetarget.WarmupKind) redisplane.Family {
 	switch kind {
-	case cacheinfra.WarmupKindStaticScale, cacheinfra.WarmupKindStaticQuestionnaire, cacheinfra.WarmupKindStaticScaleList:
+	case cachetarget.WarmupKindStaticScale, cachetarget.WarmupKindStaticQuestionnaire, cachetarget.WarmupKindStaticScaleList:
 		return redisplane.FamilyStatic
-	case cacheinfra.WarmupKindQueryStatsSystem, cacheinfra.WarmupKindQueryStatsQuestionnaire, cacheinfra.WarmupKindQueryStatsPlan:
+	case cachetarget.WarmupKindQueryStatsSystem, cachetarget.WarmupKindQueryStatsQuestionnaire, cachetarget.WarmupKindQueryStatsPlan:
 		return redisplane.FamilyQuery
 	default:
 		return redisplane.FamilyDefault

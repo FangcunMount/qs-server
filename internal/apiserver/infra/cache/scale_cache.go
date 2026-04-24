@@ -86,7 +86,7 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 	}
 
 	// 创建成功后写入缓存
-	if r.store != nil && r.store.cache != nil {
+	if r.store.available() {
 		if err := r.setCache(ctx, domain.GetCode().String(), domain); err != nil {
 			// 缓存写入失败不影响创建，仅记录日志
 			logger.L(ctx).Warnw("failed to populate scale cache after create",
@@ -101,15 +101,13 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 
 // FindByCode 根据编码查询量表（优先从缓存读取）
 func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	key := r.buildCacheKey(code)
-	return ReadThrough(ctx, ReadThroughOptions[scale.MedicalScale]{
+	return ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
 		PolicyKey:      cachepolicy.PolicyScale,
-		CacheKey:       key,
+		CacheKey:       r.buildCacheKey(code),
 		Policy:         r.policy,
 		Observer:       r.observer,
-		GetCached:      func(ctx context.Context) (*scale.MedicalScale, error) { return r.getCache(ctx, code) },
+		Store:          r.store,
 		Load:           func(ctx context.Context) (*scale.MedicalScale, error) { return r.repo.FindByCode(ctx, code) },
-		SetCached:      func(ctx context.Context, value *scale.MedicalScale) error { return r.setCache(ctx, code, value) },
 		AsyncSetCached: true,
 	})
 }
@@ -140,7 +138,7 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 	}
 
 	// 更新成功后失效缓存
-	if r.store != nil && r.store.cache != nil {
+	if r.store.available() {
 		if err := r.deleteCache(ctx, oldCode); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate scale cache after update",
 				"code", oldCode,
@@ -159,7 +157,7 @@ func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
 	}
 
 	// 删除成功后失效缓存
-	if r.store != nil && r.store.cache != nil {
+	if r.store.available() {
 		if err := r.deleteCache(ctx, code); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate scale cache after remove",
 				"code", code,
@@ -178,11 +176,6 @@ func (r *CachedScaleRepository) ExistsByCode(ctx context.Context, code string) (
 
 // ==================== 缓存操作 ====================
 
-// getCache 从缓存获取量表
-func (r *CachedScaleRepository) getCache(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	return r.store.Get(ctx, r.buildCacheKey(code))
-}
-
 // setCache 写入缓存
 func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domain *scale.MedicalScale) error {
 	return r.store.Set(ctx, r.buildCacheKey(code), domain)
@@ -195,7 +188,7 @@ func (r *CachedScaleRepository) deleteCache(ctx context.Context, code string) er
 
 // WarmupCache 预热缓存（批量加载量表）
 func (r *CachedScaleRepository) WarmupCache(ctx context.Context, codes []string) error {
-	if r.store == nil || r.store.cache == nil {
+	if !r.store.available() {
 		return nil // Redis 不可用时跳过
 	}
 

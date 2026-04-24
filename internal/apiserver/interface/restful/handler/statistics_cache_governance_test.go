@@ -10,7 +10,7 @@ import (
 	"time"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -54,9 +54,9 @@ func (f *fakeManualWarmupCoordinator) HandleManualWarmup(_ context.Context, req 
 		},
 		Items: []cachegov.ManualWarmupItemResult{
 			{
-				Family: string(cacheinfra.NewStaticScaleWarmupTarget("S-001").Family),
-				Kind:   cacheinfra.WarmupKindStaticScale,
-				Scope:  cacheinfra.NewStaticScaleWarmupTarget("S-001").Scope,
+				Family: string(cachetarget.NewStaticScaleWarmupTarget("S-001").Family),
+				Kind:   cachetarget.WarmupKindStaticScale,
+				Scope:  cachetarget.NewStaticScaleWarmupTarget("S-001").Scope,
 				Status: cachegov.ManualWarmupItemStatusOK,
 			},
 		},

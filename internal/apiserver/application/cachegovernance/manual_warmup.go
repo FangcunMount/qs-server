@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 )
 
 const manualWarmupTrigger = "manual"
@@ -17,8 +17,8 @@ type ManualWarmupRequest struct {
 
 // ManualWarmupTarget 描述一个由治理接口提交的预热目标。
 type ManualWarmupTarget struct {
-	Kind  cacheinfra.WarmupKind `json:"kind"`
-	Scope string                `json:"scope"`
+	Kind  cachetarget.WarmupKind `json:"kind"`
+	Scope string                 `json:"scope"`
 }
 
 // ManualWarmupItemStatus 表示单个预热目标的执行结果。
@@ -42,7 +42,7 @@ type ManualWarmupSummary struct {
 // ManualWarmupItemResult 描述单个预热目标的执行明细。
 type ManualWarmupItemResult struct {
 	Family  string                 `json:"family"`
-	Kind    cacheinfra.WarmupKind  `json:"kind"`
+	Kind    cachetarget.WarmupKind `json:"kind"`
 	Scope   string                 `json:"scope"`
 	Status  ManualWarmupItemStatus `json:"status"`
 	Message string                 `json:"message,omitempty"`
@@ -58,66 +58,66 @@ type ManualWarmupResult struct {
 }
 
 // ParseManualWarmupTarget 将治理命令中的目标解析成标准预热目标。
-func ParseManualWarmupTarget(target ManualWarmupTarget) (cacheinfra.WarmupTarget, error) {
+func ParseManualWarmupTarget(target ManualWarmupTarget) (cachetarget.WarmupTarget, error) {
 	kindRaw := strings.TrimSpace(string(target.Kind))
-	kind, ok := cacheinfra.ParseWarmupKind(kindRaw)
+	kind, ok := cachetarget.ParseWarmupKind(kindRaw)
 	if !ok {
-		return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid warmup kind: %s", kindRaw)
+		return cachetarget.WarmupTarget{}, fmt.Errorf("invalid warmup kind: %s", kindRaw)
 	}
 
 	scope := strings.TrimSpace(target.Scope)
 	switch kind {
-	case cacheinfra.WarmupKindStaticScale:
-		code, ok := cacheinfra.ParseStaticScaleScope(scope)
+	case cachetarget.WarmupKindStaticScale:
+		code, ok := cachetarget.ParseStaticScaleScope(scope)
 		if !ok {
-			return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid static scale warmup scope: %s", scope)
+			return cachetarget.WarmupTarget{}, fmt.Errorf("invalid static scale warmup scope: %s", scope)
 		}
-		return cacheinfra.NewStaticScaleWarmupTarget(code), nil
-	case cacheinfra.WarmupKindStaticQuestionnaire:
-		code, ok := cacheinfra.ParseStaticQuestionnaireScope(scope)
+		return cachetarget.NewStaticScaleWarmupTarget(code), nil
+	case cachetarget.WarmupKindStaticQuestionnaire:
+		code, ok := cachetarget.ParseStaticQuestionnaireScope(scope)
 		if !ok {
-			return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid static questionnaire warmup scope: %s", scope)
+			return cachetarget.WarmupTarget{}, fmt.Errorf("invalid static questionnaire warmup scope: %s", scope)
 		}
-		return cacheinfra.NewStaticQuestionnaireWarmupTarget(code), nil
-	case cacheinfra.WarmupKindStaticScaleList:
-		expected := cacheinfra.NewStaticScaleListWarmupTarget()
+		return cachetarget.NewStaticQuestionnaireWarmupTarget(code), nil
+	case cachetarget.WarmupKindStaticScaleList:
+		expected := cachetarget.NewStaticScaleListWarmupTarget()
 		if scope != expected.Scope {
-			return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid static scale list warmup scope: %s", scope)
+			return cachetarget.WarmupTarget{}, fmt.Errorf("invalid static scale list warmup scope: %s", scope)
 		}
 		return expected, nil
-	case cacheinfra.WarmupKindQueryStatsSystem:
-		orgID, ok := cacheinfra.ParseQueryStatsSystemScope(scope)
+	case cachetarget.WarmupKindQueryStatsSystem:
+		orgID, ok := cachetarget.ParseQueryStatsSystemScope(scope)
 		if !ok {
-			return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid stats system warmup scope: %s", scope)
+			return cachetarget.WarmupTarget{}, fmt.Errorf("invalid stats system warmup scope: %s", scope)
 		}
-		return cacheinfra.NewQueryStatsSystemWarmupTarget(orgID), nil
-	case cacheinfra.WarmupKindQueryStatsQuestionnaire:
-		orgID, code, ok := cacheinfra.ParseQueryStatsQuestionnaireScope(scope)
+		return cachetarget.NewQueryStatsSystemWarmupTarget(orgID), nil
+	case cachetarget.WarmupKindQueryStatsQuestionnaire:
+		orgID, code, ok := cachetarget.ParseQueryStatsQuestionnaireScope(scope)
 		if !ok {
-			return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid stats questionnaire warmup scope: %s", scope)
+			return cachetarget.WarmupTarget{}, fmt.Errorf("invalid stats questionnaire warmup scope: %s", scope)
 		}
-		return cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, code), nil
-	case cacheinfra.WarmupKindQueryStatsPlan:
-		orgID, planID, ok := cacheinfra.ParseQueryStatsPlanScope(scope)
+		return cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, code), nil
+	case cachetarget.WarmupKindQueryStatsPlan:
+		orgID, planID, ok := cachetarget.ParseQueryStatsPlanScope(scope)
 		if !ok {
-			return cacheinfra.WarmupTarget{}, fmt.Errorf("invalid stats plan warmup scope: %s", scope)
+			return cachetarget.WarmupTarget{}, fmt.Errorf("invalid stats plan warmup scope: %s", scope)
 		}
-		return cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID), nil
+		return cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID), nil
 	default:
-		return cacheinfra.WarmupTarget{}, fmt.Errorf("unsupported warmup kind: %s", kind)
+		return cachetarget.WarmupTarget{}, fmt.Errorf("unsupported warmup kind: %s", kind)
 	}
 }
 
 // WarmupTargetOrgID 返回查询类预热目标所属机构。
-func WarmupTargetOrgID(target cacheinfra.WarmupTarget) (int64, bool) {
+func WarmupTargetOrgID(target cachetarget.WarmupTarget) (int64, bool) {
 	switch target.Kind {
-	case cacheinfra.WarmupKindQueryStatsSystem:
-		return cacheinfra.ParseQueryStatsSystemScope(target.Scope)
-	case cacheinfra.WarmupKindQueryStatsQuestionnaire:
-		orgID, _, ok := cacheinfra.ParseQueryStatsQuestionnaireScope(target.Scope)
+	case cachetarget.WarmupKindQueryStatsSystem:
+		return cachetarget.ParseQueryStatsSystemScope(target.Scope)
+	case cachetarget.WarmupKindQueryStatsQuestionnaire:
+		orgID, _, ok := cachetarget.ParseQueryStatsQuestionnaireScope(target.Scope)
 		return orgID, ok
-	case cacheinfra.WarmupKindQueryStatsPlan:
-		orgID, _, ok := cacheinfra.ParseQueryStatsPlanScope(target.Scope)
+	case cachetarget.WarmupKindQueryStatsPlan:
+		orgID, _, ok := cachetarget.ParseQueryStatsPlanScope(target.Scope)
 		return orgID, ok
 	default:
 		return 0, false

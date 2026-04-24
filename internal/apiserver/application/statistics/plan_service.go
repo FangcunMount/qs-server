@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
@@ -55,7 +56,7 @@ func (s *planStatisticsService) GetPlanStatistics(
 			var stats statistics.PlanStatistics
 			if err := json.Unmarshal([]byte(cached), &stats); err == nil {
 				l.Debugw("从Redis缓存获取计划统计", "cache_key", cacheKey)
-				s.recordHotset(ctx, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
+				s.recordHotset(ctx, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
 				return &stats, nil
 			}
 		}
@@ -80,7 +81,7 @@ func (s *planStatisticsService) GetPlanStatistics(
 			}
 
 			l.Debugw("从MySQL统计表获取计划统计")
-			s.recordHotset(ctx, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
+			s.recordHotset(ctx, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
 			return stats, nil
 		}
 	}
@@ -151,7 +152,7 @@ func (s *planStatisticsService) GetPlanStatistics(
 		}
 	}
 
-	s.recordHotset(ctx, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
+	s.recordHotset(ctx, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
 	return result, nil
 }
 
@@ -175,7 +176,7 @@ func (s *planStatisticsService) convertPlanPOToPlanStatistics(
 	return result
 }
 
-func (s *planStatisticsService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+func (s *planStatisticsService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
 	if s == nil || s.hotset == nil {
 		return
 	}

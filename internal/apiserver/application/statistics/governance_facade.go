@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -95,7 +95,7 @@ func (f *governanceFacade) GetStatus(ctx context.Context) (*cachegov.StatusSnaps
 func (f *governanceFacade) GetHotset(ctx context.Context, kindRaw, limitRaw string) (*GovernanceHotsetResponse, error) {
 	if f == nil || f.statusService == nil {
 		return &GovernanceHotsetResponse{
-			Items:     []cacheinfra.HotsetItem{},
+			Items:     []cachetarget.HotsetItem{},
 			Available: false,
 			Degraded:  true,
 			Message:   "cache governance status service unavailable",
@@ -167,8 +167,8 @@ func validateManualWarmupTargets(protectedOrgID int64, targets []cachegov.Manual
 	return nil
 }
 
-func parseWarmupKind(raw string) (cacheinfra.WarmupKind, error) {
-	kind, ok := cacheinfra.ParseWarmupKind(strings.TrimSpace(raw))
+func parseWarmupKind(raw string) (cachetarget.WarmupKind, error) {
+	kind, ok := cachetarget.ParseWarmupKind(strings.TrimSpace(raw))
 	if !ok {
 		return "", errors.WithCode(code.ErrInvalidArgument, "invalid kind")
 	}

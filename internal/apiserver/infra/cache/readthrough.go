@@ -22,27 +22,6 @@ type ReadThroughOptions[T any] struct {
 	AsyncSetNegative  bool
 }
 
-func readByIDWithCache[T any](
-	ctx context.Context,
-	policyKey cachepolicy.CachePolicyKey,
-	cacheKey string,
-	policy cachepolicy.CachePolicy,
-	observer *Observer,
-	getCached func(context.Context) (*T, error),
-	load func(context.Context) (*T, error),
-	setCached func(context.Context, *T) error,
-) (*T, error) {
-	return ReadThrough(ctx, ReadThroughOptions[T]{
-		PolicyKey: policyKey,
-		CacheKey:  cacheKey,
-		Policy:    policy,
-		Observer:  observer,
-		GetCached: getCached,
-		Load:      load,
-		SetCached: setCached,
-	})
-}
-
 // ReadThrough 执行统一缓存读穿透：
 // 1. 优先读缓存
 // 2. miss 后按对象级 singleflight 回源

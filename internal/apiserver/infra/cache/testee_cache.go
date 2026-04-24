@@ -75,18 +75,14 @@ func (r *CachedTesteeRepository) buildCacheKey(id testee.ID) string {
 
 // FindByID 根据ID查询受试者（优先从缓存读取）
 func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.Testee, error) {
-	key := r.buildCacheKey(id)
-	domain, err := ReadThrough(ctx, ReadThroughOptions[testee.Testee]{
-		PolicyKey: cachepolicy.PolicyTestee,
-		CacheKey:  key,
-		Policy:    r.policy,
-		Observer:  r.observer,
-		GetCached: func(ctx context.Context) (*testee.Testee, error) { return r.getCache(ctx, id) },
-		Load:      func(ctx context.Context) (*testee.Testee, error) { return r.repo.FindByID(ctx, id) },
-		SetCached: func(ctx context.Context, value *testee.Testee) error { return r.setCache(ctx, id, value) },
-		SetNegativeCached: func(ctx context.Context) error {
-			return r.setNegativeCache(ctx, id)
-		},
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[testee.Testee]{
+		PolicyKey:        cachepolicy.PolicyTestee,
+		CacheKey:         r.buildCacheKey(id),
+		Policy:           r.policy,
+		Observer:         r.observer,
+		Store:            r.store,
+		Load:             func(ctx context.Context) (*testee.Testee, error) { return r.repo.FindByID(ctx, id) },
+		CacheNegative:    true,
 		AsyncSetCached:   true,
 		AsyncSetNegative: true,
 	})
@@ -125,20 +121,6 @@ func (r *CachedTesteeRepository) Delete(ctx context.Context, id testee.ID) error
 		_ = r.deleteCache(ctx, id)
 	}
 	return err
-}
-
-// getCache 从缓存获取
-func (r *CachedTesteeRepository) getCache(ctx context.Context, id testee.ID) (*testee.Testee, error) {
-	return r.store.Get(ctx, r.buildCacheKey(id))
-}
-
-// setCache 写入缓存
-func (r *CachedTesteeRepository) setCache(ctx context.Context, id testee.ID, domain *testee.Testee) error {
-	return r.store.Set(ctx, r.buildCacheKey(id), domain)
-}
-
-func (r *CachedTesteeRepository) setNegativeCache(ctx context.Context, id testee.ID) error {
-	return r.store.SetNegative(ctx, r.buildCacheKey(id))
 }
 
 // deleteCache 删除缓存

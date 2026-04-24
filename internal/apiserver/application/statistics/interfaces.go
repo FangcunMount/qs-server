@@ -5,8 +5,8 @@ import (
 	"time"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
@@ -76,13 +76,13 @@ type ManualWarmupRequest = cachegov.ManualWarmupRequest
 
 // GovernanceHotsetResponse 描述治理热集响应。
 type GovernanceHotsetResponse struct {
-	Family    redisplane.Family       `json:"family,omitempty"`
-	Kind      cacheinfra.WarmupKind   `json:"kind,omitempty"`
-	Limit     int64                   `json:"limit,omitempty"`
-	Available bool                    `json:"available"`
-	Degraded  bool                    `json:"degraded"`
-	Message   string                  `json:"message,omitempty"`
-	Items     []cacheinfra.HotsetItem `json:"items"`
+	Family    redisplane.Family        `json:"family,omitempty"`
+	Kind      cachetarget.WarmupKind   `json:"kind,omitempty"`
+	Limit     int64                    `json:"limit,omitempty"`
+	Available bool                     `json:"available"`
+	Degraded  bool                     `json:"degraded"`
+	Message   string                   `json:"message,omitempty"`
+	Items     []cachetarget.HotsetItem `json:"items"`
 }
 
 // SyncDailyOptions 每日统计同步窗口。

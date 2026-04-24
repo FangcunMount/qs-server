@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
@@ -52,7 +53,7 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 			var stats statistics.SystemStatistics
 			if err := json.Unmarshal([]byte(cached), &stats); err == nil {
 				l.Debugw("从Redis缓存获取系统统计", "cache_key", cacheKey)
-				s.recordHotset(ctx, cacheinfra.NewQueryStatsSystemWarmupTarget(orgID))
+				s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 				return &stats, nil
 			}
 		}
@@ -81,7 +82,7 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 			}
 
 			l.Debugw("从MySQL统计表获取系统统计")
-			s.recordHotset(ctx, cacheinfra.NewQueryStatsSystemWarmupTarget(orgID))
+			s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 			return stats, nil
 		}
 	}
@@ -157,7 +158,7 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 		}
 	}
 
-	s.recordHotset(ctx, cacheinfra.NewQueryStatsSystemWarmupTarget(orgID))
+	s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 	return result, nil
 }
 
@@ -263,7 +264,7 @@ func (s *systemStatisticsService) getDailyTrend(ctx context.Context, orgID int64
 	return trend
 }
 
-func (s *systemStatisticsService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+func (s *systemStatisticsService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
 	if s == nil || s.hotset == nil {
 		return
 	}

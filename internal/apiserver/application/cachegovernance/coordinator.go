@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
@@ -33,24 +34,24 @@ type RepairCompleteRequest struct {
 	PlanIDs            []uint64
 }
 
-type WarmFunc func(context.Context, cacheinfra.WarmupTarget) error
+type WarmFunc func(context.Context, cachetarget.WarmupTarget) error
 
 type WarmupRegistry struct {
-	executors map[cacheinfra.WarmupKind]WarmFunc
+	executors map[cachetarget.WarmupKind]WarmFunc
 }
 
 func NewWarmupRegistry() *WarmupRegistry {
-	return &WarmupRegistry{executors: make(map[cacheinfra.WarmupKind]WarmFunc)}
+	return &WarmupRegistry{executors: make(map[cachetarget.WarmupKind]WarmFunc)}
 }
 
-func (r *WarmupRegistry) Register(kind cacheinfra.WarmupKind, fn WarmFunc) {
+func (r *WarmupRegistry) Register(kind cachetarget.WarmupKind, fn WarmFunc) {
 	if r == nil || fn == nil {
 		return
 	}
 	r.executors[kind] = fn
 }
 
-func (r *WarmupRegistry) Execute(ctx context.Context, target cacheinfra.WarmupTarget) error {
+func (r *WarmupRegistry) Execute(ctx context.Context, target cachetarget.WarmupTarget) error {
 	if r == nil {
 		return fmt.Errorf("warmup registry is nil")
 	}
@@ -189,7 +190,7 @@ func (c *coordinator) WarmStartup(ctx context.Context) error {
 	if c == nil || !c.cfg.Enable {
 		return nil
 	}
-	targets := make([]cacheinfra.WarmupTarget, 0)
+	targets := make([]cachetarget.WarmupTarget, 0)
 	if c.cfg.StartupStatic {
 		targets = append(targets, c.startupStaticTargets(ctx)...)
 	}
@@ -204,9 +205,9 @@ func (c *coordinator) HandleScalePublished(ctx context.Context, code string) err
 	if c == nil || !c.cfg.Enable {
 		return nil
 	}
-	targets := []cacheinfra.WarmupTarget{
-		cacheinfra.NewStaticScaleWarmupTarget(code),
-		cacheinfra.NewStaticScaleListWarmupTarget(),
+	targets := []cachetarget.WarmupTarget{
+		cachetarget.NewStaticScaleWarmupTarget(code),
+		cachetarget.NewStaticScaleListWarmupTarget(),
 	}
 	if c.deps.LookupScaleQuestionnaireCode != nil {
 		if questionnaireCode, err := c.deps.LookupScaleQuestionnaireCode(ctx, code); err != nil {
@@ -215,7 +216,7 @@ func (c *coordinator) HandleScalePublished(ctx context.Context, code string) err
 				"error", err,
 			)
 		} else if questionnaireCode != "" {
-			targets = append(targets, cacheinfra.NewStaticQuestionnaireWarmupTarget(questionnaireCode))
+			targets = append(targets, cachetarget.NewStaticQuestionnaireWarmupTarget(questionnaireCode))
 		}
 	}
 	_, err := c.executeTargets(ctx, "publish", targets)
@@ -226,8 +227,8 @@ func (c *coordinator) HandleQuestionnairePublished(ctx context.Context, code, _ 
 	if c == nil || !c.cfg.Enable {
 		return nil
 	}
-	_, err := c.executeTargets(ctx, "publish", []cacheinfra.WarmupTarget{
-		cacheinfra.NewStaticQuestionnaireWarmupTarget(code),
+	_, err := c.executeTargets(ctx, "publish", []cachetarget.WarmupTarget{
+		cachetarget.NewStaticQuestionnaireWarmupTarget(code),
 	})
 	return err
 }
@@ -236,7 +237,7 @@ func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) err
 	if c == nil || !c.cfg.Enable || orgID <= 0 {
 		return nil
 	}
-	targets := []cacheinfra.WarmupTarget{cacheinfra.NewQueryStatsSystemWarmupTarget(orgID)}
+	targets := []cachetarget.WarmupTarget{cachetarget.NewQueryStatsSystemWarmupTarget(orgID)}
 	_, err := c.executeTargets(ctx, "statistics_sync", append(targets, c.mergeQueryTargets(ctx, []int64{orgID}, nil)...))
 	return err
 }
@@ -246,7 +247,7 @@ func (c *coordinator) HandleRepairComplete(ctx context.Context, req RepairComple
 		return nil
 	}
 
-	var targets []cacheinfra.WarmupTarget
+	var targets []cachetarget.WarmupTarget
 	switch strings.TrimSpace(req.RepairKind) {
 	case "statistics_backfill":
 		targets = append(targets, c.repairQueryTargets(req)...)
@@ -276,7 +277,7 @@ func (c *coordinator) HandleManualWarmup(ctx context.Context, req ManualWarmupRe
 		return nil, fmt.Errorf("warmup targets cannot be empty")
 	}
 
-	targets := make([]cacheinfra.WarmupTarget, 0, len(req.Targets))
+	targets := make([]cachetarget.WarmupTarget, 0, len(req.Targets))
 	for _, item := range req.Targets {
 		target, err := ParseManualWarmupTarget(item)
 		if err != nil {
@@ -288,57 +289,57 @@ func (c *coordinator) HandleManualWarmup(ctx context.Context, req ManualWarmupRe
 }
 
 func (c *coordinator) registerExecutors() {
-	c.registry.Register(cacheinfra.WarmupKindStaticScale, func(ctx context.Context, target cacheinfra.WarmupTarget) error {
+	c.registry.Register(cachetarget.WarmupKindStaticScale, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if c.deps.WarmScale == nil {
 			return nil
 		}
-		code, ok := cacheinfra.ParseStaticScaleScope(target.Scope)
+		code, ok := cachetarget.ParseStaticScaleScope(target.Scope)
 		if !ok {
 			return fmt.Errorf("invalid static scale warmup scope: %s", target.Scope)
 		}
 		return c.deps.WarmScale(ctx, code)
 	})
-	c.registry.Register(cacheinfra.WarmupKindStaticQuestionnaire, func(ctx context.Context, target cacheinfra.WarmupTarget) error {
+	c.registry.Register(cachetarget.WarmupKindStaticQuestionnaire, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if c.deps.WarmQuestionnaire == nil {
 			return nil
 		}
-		code, ok := cacheinfra.ParseStaticQuestionnaireScope(target.Scope)
+		code, ok := cachetarget.ParseStaticQuestionnaireScope(target.Scope)
 		if !ok {
 			return fmt.Errorf("invalid static questionnaire warmup scope: %s", target.Scope)
 		}
 		return c.deps.WarmQuestionnaire(ctx, code)
 	})
-	c.registry.Register(cacheinfra.WarmupKindStaticScaleList, func(ctx context.Context, _ cacheinfra.WarmupTarget) error {
+	c.registry.Register(cachetarget.WarmupKindStaticScaleList, func(ctx context.Context, _ cachetarget.WarmupTarget) error {
 		if c.deps.WarmScaleList == nil {
 			return nil
 		}
 		return c.deps.WarmScaleList(ctx)
 	})
-	c.registry.Register(cacheinfra.WarmupKindQueryStatsSystem, func(ctx context.Context, target cacheinfra.WarmupTarget) error {
+	c.registry.Register(cachetarget.WarmupKindQueryStatsSystem, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if c.deps.WarmStatsSystem == nil {
 			return nil
 		}
-		orgID, ok := cacheinfra.ParseQueryStatsSystemScope(target.Scope)
+		orgID, ok := cachetarget.ParseQueryStatsSystemScope(target.Scope)
 		if !ok {
 			return fmt.Errorf("invalid stats system warmup scope: %s", target.Scope)
 		}
 		return c.deps.WarmStatsSystem(ctx, orgID)
 	})
-	c.registry.Register(cacheinfra.WarmupKindQueryStatsQuestionnaire, func(ctx context.Context, target cacheinfra.WarmupTarget) error {
+	c.registry.Register(cachetarget.WarmupKindQueryStatsQuestionnaire, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if c.deps.WarmStatsQuestionnaire == nil {
 			return nil
 		}
-		orgID, code, ok := cacheinfra.ParseQueryStatsQuestionnaireScope(target.Scope)
+		orgID, code, ok := cachetarget.ParseQueryStatsQuestionnaireScope(target.Scope)
 		if !ok {
 			return fmt.Errorf("invalid stats questionnaire warmup scope: %s", target.Scope)
 		}
 		return c.deps.WarmStatsQuestionnaire(ctx, orgID, code)
 	})
-	c.registry.Register(cacheinfra.WarmupKindQueryStatsPlan, func(ctx context.Context, target cacheinfra.WarmupTarget) error {
+	c.registry.Register(cachetarget.WarmupKindQueryStatsPlan, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if c.deps.WarmStatsPlan == nil {
 			return nil
 		}
-		orgID, planID, ok := cacheinfra.ParseQueryStatsPlanScope(target.Scope)
+		orgID, planID, ok := cachetarget.ParseQueryStatsPlanScope(target.Scope)
 		if !ok {
 			return fmt.Errorf("invalid stats plan warmup scope: %s", target.Scope)
 		}
@@ -346,14 +347,14 @@ func (c *coordinator) registerExecutors() {
 	})
 }
 
-func (c *coordinator) startupStaticTargets(ctx context.Context) []cacheinfra.WarmupTarget {
-	targets := make([]cacheinfra.WarmupTarget, 0)
+func (c *coordinator) startupStaticTargets(ctx context.Context) []cachetarget.WarmupTarget {
+	targets := make([]cachetarget.WarmupTarget, 0)
 	if c.deps.ListPublishedScaleCodes != nil {
 		if codes, err := c.deps.ListPublishedScaleCodes(ctx); err != nil {
 			logger.L(ctx).Warnw("failed to load published scales for startup warmup", "error", err)
 		} else {
 			for _, code := range codes {
-				targets = append(targets, cacheinfra.NewStaticScaleWarmupTarget(code))
+				targets = append(targets, cachetarget.NewStaticScaleWarmupTarget(code))
 			}
 		}
 	}
@@ -362,24 +363,24 @@ func (c *coordinator) startupStaticTargets(ctx context.Context) []cacheinfra.War
 			logger.L(ctx).Warnw("failed to load published questionnaires for startup warmup", "error", err)
 		} else {
 			for _, code := range codes {
-				targets = append(targets, cacheinfra.NewStaticQuestionnaireWarmupTarget(code))
+				targets = append(targets, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
 			}
 		}
 	}
 	if c.deps.WarmScaleList != nil {
-		targets = append(targets, cacheinfra.NewStaticScaleListWarmupTarget())
+		targets = append(targets, cachetarget.NewStaticScaleListWarmupTarget())
 	}
 	return dedupeTargets(targets)
 }
 
-func (c *coordinator) mergeQueryTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cacheinfra.WarmupTarget {
-	targets := make([]cacheinfra.WarmupTarget, 0)
+func (c *coordinator) mergeQueryTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
+	targets := make([]cachetarget.WarmupTarget, 0)
 	targets = append(targets, c.querySeedTargets(orgFilter)...)
 	targets = append(targets, c.queryHotTargets(ctx, orgFilter, repair)...)
 	return dedupeTargets(targets)
 }
 
-func (c *coordinator) querySeedTargets(orgFilter []int64) []cacheinfra.WarmupTarget {
+func (c *coordinator) querySeedTargets(orgFilter []int64) []cachetarget.WarmupTarget {
 	if c.deps.StatisticsSeeds == nil {
 		return nil
 	}
@@ -389,25 +390,25 @@ func (c *coordinator) querySeedTargets(orgFilter []int64) []cacheinfra.WarmupTar
 			filter[orgID] = struct{}{}
 		}
 	}
-	targets := make([]cacheinfra.WarmupTarget, 0)
+	targets := make([]cachetarget.WarmupTarget, 0)
 	for _, orgID := range c.deps.StatisticsSeeds.OrgIDs {
 		if len(filter) > 0 {
 			if _, ok := filter[orgID]; !ok {
 				continue
 			}
 		}
-		targets = append(targets, cacheinfra.NewQueryStatsSystemWarmupTarget(orgID))
+		targets = append(targets, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 		for _, code := range c.deps.StatisticsSeeds.QuestionnaireCodes {
-			targets = append(targets, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
+			targets = append(targets, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
 		}
 		for _, planID := range c.deps.StatisticsSeeds.PlanIDs {
-			targets = append(targets, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
+			targets = append(targets, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
 		}
 	}
 	return targets
 }
 
-func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cacheinfra.WarmupTarget {
+func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
 	if !c.cfg.HotsetEnable || c.deps.Hotset == nil {
 		return nil
 	}
@@ -417,11 +418,11 @@ func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, re
 			filter[orgID] = struct{}{}
 		}
 	}
-	targets := make([]cacheinfra.WarmupTarget, 0)
-	for _, kind := range []cacheinfra.WarmupKind{
-		cacheinfra.WarmupKindQueryStatsSystem,
-		cacheinfra.WarmupKindQueryStatsQuestionnaire,
-		cacheinfra.WarmupKindQueryStatsPlan,
+	targets := make([]cachetarget.WarmupTarget, 0)
+	for _, kind := range []cachetarget.WarmupKind{
+		cachetarget.WarmupKindQueryStatsSystem,
+		cachetarget.WarmupKindQueryStatsQuestionnaire,
+		cachetarget.WarmupKindQueryStatsPlan,
 	} {
 		items, err := c.deps.Hotset.Top(ctx, redisplane.FamilyQuery, kind, c.cfg.HotsetTopN)
 		if err != nil {
@@ -438,29 +439,29 @@ func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, re
 	return targets
 }
 
-func (c *coordinator) repairQueryTargets(req RepairCompleteRequest) []cacheinfra.WarmupTarget {
+func (c *coordinator) repairQueryTargets(req RepairCompleteRequest) []cachetarget.WarmupTarget {
 	if len(req.OrgIDs) == 0 {
 		return nil
 	}
-	targets := make([]cacheinfra.WarmupTarget, 0)
+	targets := make([]cachetarget.WarmupTarget, 0)
 	for _, orgID := range req.OrgIDs {
 		if orgID <= 0 {
 			continue
 		}
 		if strings.TrimSpace(req.RepairKind) == "statistics_backfill" {
-			targets = append(targets, cacheinfra.NewQueryStatsSystemWarmupTarget(orgID))
+			targets = append(targets, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 		}
 		for _, code := range req.QuestionnaireCodes {
-			targets = append(targets, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
+			targets = append(targets, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
 		}
 		for _, planID := range req.PlanIDs {
-			targets = append(targets, cacheinfra.NewQueryStatsPlanWarmupTarget(orgID, planID))
+			targets = append(targets, cachetarget.NewQueryStatsPlanWarmupTarget(orgID, planID))
 		}
 	}
 	return dedupeTargets(targets)
 }
 
-func (c *coordinator) executeTargets(ctx context.Context, trigger string, targets []cacheinfra.WarmupTarget) (*ManualWarmupResult, error) {
+func (c *coordinator) executeTargets(ctx context.Context, trigger string, targets []cachetarget.WarmupTarget) (*ManualWarmupResult, error) {
 	if c == nil || !c.cfg.Enable {
 		return &ManualWarmupResult{
 			Trigger:    trigger,
@@ -498,7 +499,7 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 		}, nil
 	}
 
-	runCtx := cacheinfra.SuppressHotsetRecording(ctx)
+	runCtx := cachetarget.SuppressHotsetRecording(ctx)
 	warmupRunTotal.WithLabelValues(trigger, "started").Inc()
 	okCount := 0
 	errorCount := 0
@@ -590,22 +591,22 @@ func (c *coordinator) recordRun(run WarmupRunSnapshot) {
 	c.runs[run.Trigger] = run
 }
 
-func allowQueryTarget(target cacheinfra.WarmupTarget, orgFilter map[int64]struct{}, repair *RepairCompleteRequest) bool {
+func allowQueryTarget(target cachetarget.WarmupTarget, orgFilter map[int64]struct{}, repair *RepairCompleteRequest) bool {
 	if len(orgFilter) == 0 && repair == nil {
 		return true
 	}
 	switch target.Kind {
-	case cacheinfra.WarmupKindQueryStatsSystem:
-		orgID, ok := cacheinfra.ParseQueryStatsSystemScope(target.Scope)
+	case cachetarget.WarmupKindQueryStatsSystem:
+		orgID, ok := cachetarget.ParseQueryStatsSystemScope(target.Scope)
 		return ok && allowOrg(orgFilter, orgID)
-	case cacheinfra.WarmupKindQueryStatsQuestionnaire:
-		orgID, code, ok := cacheinfra.ParseQueryStatsQuestionnaireScope(target.Scope)
+	case cachetarget.WarmupKindQueryStatsQuestionnaire:
+		orgID, code, ok := cachetarget.ParseQueryStatsQuestionnaireScope(target.Scope)
 		if !ok || !allowOrg(orgFilter, orgID) {
 			return false
 		}
 		return repair == nil || len(repair.QuestionnaireCodes) == 0 || containsFold(repair.QuestionnaireCodes, code)
-	case cacheinfra.WarmupKindQueryStatsPlan:
-		orgID, planID, ok := cacheinfra.ParseQueryStatsPlanScope(target.Scope)
+	case cachetarget.WarmupKindQueryStatsPlan:
+		orgID, planID, ok := cachetarget.ParseQueryStatsPlanScope(target.Scope)
 		if !ok || !allowOrg(orgFilter, orgID) {
 			return false
 		}
@@ -623,11 +624,11 @@ func allowOrg(filter map[int64]struct{}, orgID int64) bool {
 	return ok
 }
 
-func dedupeTargets(targets []cacheinfra.WarmupTarget) []cacheinfra.WarmupTarget {
+func dedupeTargets(targets []cachetarget.WarmupTarget) []cachetarget.WarmupTarget {
 	if len(targets) == 0 {
 		return nil
 	}
-	seen := make(map[string]cacheinfra.WarmupTarget, len(targets))
+	seen := make(map[string]cachetarget.WarmupTarget, len(targets))
 	for _, target := range targets {
 		if target.Scope == "" {
 			continue
@@ -639,7 +640,7 @@ func dedupeTargets(targets []cacheinfra.WarmupTarget) []cacheinfra.WarmupTarget 
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	result := make([]cacheinfra.WarmupTarget, 0, len(keys))
+	result := make([]cachetarget.WarmupTarget, 0, len(keys))
 	for _, key := range keys {
 		result = append(result, seen[key])
 	}

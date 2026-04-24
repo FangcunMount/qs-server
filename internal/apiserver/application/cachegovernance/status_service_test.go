@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
@@ -36,15 +36,15 @@ func (s stubCoordinator) HandleManualWarmup(context.Context, ManualWarmupRequest
 func (s stubCoordinator) Snapshot() WarmupStatusSnapshot { return s.snapshot }
 
 type stubHotsetInspector struct {
-	items []cacheinfra.HotsetItem
+	items []cachetarget.HotsetItem
 	err   error
 }
 
-func (s stubHotsetInspector) TopWithScores(_ context.Context, _ redisplane.Family, _ cacheinfra.WarmupKind, _ int64) ([]cacheinfra.HotsetItem, error) {
+func (s stubHotsetInspector) TopWithScores(_ context.Context, _ redisplane.Family, _ cachetarget.WarmupKind, _ int64) ([]cachetarget.HotsetItem, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return append([]cacheinfra.HotsetItem(nil), s.items...), nil
+	return append([]cachetarget.HotsetItem(nil), s.items...), nil
 }
 
 func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *testing.T) {
@@ -223,15 +223,15 @@ func TestStatusServiceGetHotsetReturnsItemsAndFamilyStatus(t *testing.T) {
 		Mode:        cacheobservability.FamilyModeNamedProfile,
 	})
 	service := NewStatusService("apiserver", registry, stubHotsetInspector{
-		items: []cacheinfra.HotsetItem{
+		items: []cachetarget.HotsetItem{
 			{
-				Target: cacheinfra.NewQueryStatsSystemWarmupTarget(1),
+				Target: cachetarget.NewQueryStatsSystemWarmupTarget(1),
 				Score:  12,
 			},
 		},
 	}, nil)
 
-	got, err := service.GetHotset(context.Background(), cacheinfra.WarmupKindQueryStatsSystem, 0)
+	got, err := service.GetHotset(context.Background(), cachetarget.WarmupKindQueryStatsSystem, 0)
 	if err != nil {
 		t.Fatalf("GetHotset() error = %v", err)
 	}
@@ -270,7 +270,7 @@ func TestStatusServiceGetHotsetReturnsDegradedWhenInspectorFails(t *testing.T) {
 		err: errors.New("meta cache unavailable"),
 	}, nil)
 
-	got, err := service.GetHotset(context.Background(), cacheinfra.WarmupKindStaticScale, 5)
+	got, err := service.GetHotset(context.Background(), cachetarget.WarmupKindStaticScale, 5)
 	if err != nil {
 		t.Fatalf("GetHotset() error = %v", err)
 	}

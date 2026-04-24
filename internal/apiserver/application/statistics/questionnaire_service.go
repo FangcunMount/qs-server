@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
@@ -50,7 +51,7 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 	cacheKey := questionnaireStatsCacheKey(orgID, questionnaireCode)
 
 	if stats, ok := s.loadCachedQuestionnaireStatistics(ctx, cacheKey); ok {
-		s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
+		s.recordHotset(ctx, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 		return stats, nil
 	}
 
@@ -61,7 +62,7 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 	if found {
 		s.cacheQuestionnaireStatistics(ctx, cacheKey, stats)
 		l.Debugw("从MySQL统计表获取问卷统计")
-		s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
+		s.recordHotset(ctx, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 		return stats, nil
 	}
 
@@ -72,7 +73,7 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 	}
 
 	s.cacheQuestionnaireStatistics(ctx, cacheKey, realtimeStats)
-	s.recordHotset(ctx, cacheinfra.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
+	s.recordHotset(ctx, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 	return realtimeStats, nil
 }
 
@@ -292,7 +293,7 @@ func (s *questionnaireStatisticsService) getDailyTrend(
 	return trend
 }
 
-func (s *questionnaireStatisticsService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+func (s *questionnaireStatisticsService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
 	if s == nil || s.hotset == nil {
 		return
 	}

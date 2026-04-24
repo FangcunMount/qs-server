@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	cacheinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -60,7 +61,7 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 		"code", code,
 		"status", q.GetStatus().String(),
 	)
-	s.recordHotset(ctx, cacheinfra.NewStaticQuestionnaireWarmupTarget(code))
+	s.recordHotset(ctx, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
 
 	return toQuestionnaireResult(q), nil
 }
@@ -158,7 +159,7 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	s.logSuccess(ctx, "get_published_by_code", startTime,
 		"code", code,
 	)
-	s.recordHotset(ctx, cacheinfra.NewStaticQuestionnaireWarmupTarget(code))
+	s.recordHotset(ctx, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
 
 	return toQuestionnaireResult(q), nil
 }
@@ -242,7 +243,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	return result, nil
 }
 
-func (s *queryService) recordHotset(ctx context.Context, target cacheinfra.WarmupTarget) {
+func (s *queryService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
 	if s == nil || s.hotset == nil {
 		return
 	}

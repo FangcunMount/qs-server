@@ -73,6 +73,9 @@ func newQuestionnaireCacheEntryCodec(mapper *questionnaireInfra.QuestionnaireMap
 
 func (r *CachedQuestionnaireRepository) WithTTL(ttl time.Duration) *CachedQuestionnaireRepository {
 	r.ttl = ttl
+	if r.store != nil {
+		r.store.ttl = ttl
+	}
 	return r
 }
 
@@ -237,14 +240,6 @@ func (r *CachedQuestionnaireRepository) versionKey(code, version string) string 
 	return r.keys.BuildQuestionnaireKey(strings.ToLower(code), version)
 }
 
-func (r *CachedQuestionnaireRepository) getCache(ctx context.Context, key string) (*domainQuestionnaire.Questionnaire, error) {
-	value, err := r.store.Get(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
 func (r *CachedQuestionnaireRepository) setCache(ctx context.Context, key string, qDomain *domainQuestionnaire.Questionnaire, ttl time.Duration) error {
 	return r.store.SetWithTTL(ctx, key, qDomain, ttl)
 }
@@ -254,21 +249,14 @@ func (r *CachedQuestionnaireRepository) loadWithCache(
 	key string,
 	fallback func(context.Context) (*domainQuestionnaire.Questionnaire, error),
 ) (*domainQuestionnaire.Questionnaire, error) {
-	return ReadThrough(ctx, ReadThroughOptions[domainQuestionnaire.Questionnaire]{
-		PolicyKey: cachepolicy.PolicyQuestionnaire,
-		CacheKey:  key,
-		Policy:    r.policy,
-		Observer:  r.observer,
-		GetCached: func(ctx context.Context) (*domainQuestionnaire.Questionnaire, error) {
-			return r.getCache(ctx, key)
-		},
-		Load: fallback,
-		SetCached: func(ctx context.Context, value *domainQuestionnaire.Questionnaire) error {
-			return r.setCache(ctx, key, value, r.ttl)
-		},
-		SetNegativeCached: func(ctx context.Context) error {
-			return r.store.SetNegative(ctx, key)
-		},
+	return ReadThroughObject(ctx, ObjectReadThroughOptions[domainQuestionnaire.Questionnaire]{
+		PolicyKey:      cachepolicy.PolicyQuestionnaire,
+		CacheKey:       key,
+		Policy:         r.policy,
+		Observer:       r.observer,
+		Store:          r.store,
+		Load:           fallback,
+		CacheNegative:  true,
 		AsyncSetCached: true,
 	})
 }
@@ -299,7 +287,7 @@ func (r *CachedQuestionnaireRepository) deleteCacheByCode(ctx context.Context, c
 
 // WarmupCache 预热工作版本和当前已发布版本缓存
 func (r *CachedQuestionnaireRepository) WarmupCache(ctx context.Context, codes []string) error {
-	if r.store == nil || r.store.cache == nil {
+	if !r.store.available() {
 		return nil
 	}
 
