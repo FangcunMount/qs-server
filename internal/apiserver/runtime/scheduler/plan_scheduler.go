@@ -141,7 +141,10 @@ func (r *PlanRunner) runOnce(ctx context.Context) error {
 		failedOrgs := 0
 
 		for _, orgID := range r.opts.OrgIDs {
-			result, err := r.command.SchedulePendingTasks(ctx, orgID, "")
+			before := time.Now()
+			lowerBound := before.Add(-r.opts.PendingLookback)
+			scheduleCtx := planApp.WithTaskSchedulerPlannedAtLowerBound(ctx, lowerBound)
+			result, err := r.command.SchedulePendingTasks(scheduleCtx, orgID, before.Format("2006-01-02 15:04:05"))
 			if err != nil {
 				failedOrgs++
 				log.Warnf("apiserver plan scheduler tick failed for org (org_id=%d, lock_key=%s): %v", orgID, lockKey, err)

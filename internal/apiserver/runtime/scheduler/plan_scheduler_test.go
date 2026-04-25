@@ -14,17 +14,23 @@ import (
 )
 
 type fakePlanCommandService struct {
-	mu         sync.Mutex
-	calls      []int64
-	statsByOrg map[int64]planApp.TaskScheduleStats
-	errByOrg   map[int64]error
-	started    chan int64
-	block      <-chan struct{}
+	mu          sync.Mutex
+	calls       []int64
+	befores     []string
+	lowerBounds []time.Time
+	statsByOrg  map[int64]planApp.TaskScheduleStats
+	errByOrg    map[int64]error
+	started     chan int64
+	block       <-chan struct{}
 }
 
-func (f *fakePlanCommandService) SchedulePendingTasks(ctx context.Context, orgID int64, _ string) (*planApp.TaskScheduleResult, error) {
+func (f *fakePlanCommandService) SchedulePendingTasks(ctx context.Context, orgID int64, before string) (*planApp.TaskScheduleResult, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, orgID)
+	f.befores = append(f.befores, before)
+	if lowerBound, ok := planApp.TaskSchedulerPlannedAtLowerBoundFromContext(ctx); ok {
+		f.lowerBounds = append(f.lowerBounds, lowerBound)
+	}
 	stats := f.statsByOrg[orgID]
 	err := f.errByOrg[orgID]
 	started := f.started
@@ -57,6 +63,15 @@ func (f *fakePlanCommandService) callOrder() []int64 {
 	calls := make([]int64, len(f.calls))
 	copy(calls, f.calls)
 	return calls
+}
+
+func (f *fakePlanCommandService) schedulingWindows() ([]string, []time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	befores := append([]string(nil), f.befores...)
+	lowerBounds := append([]time.Time(nil), f.lowerBounds...)
+	return befores, lowerBounds
 }
 
 type fakeSchedulerLockManager struct {
@@ -173,6 +188,44 @@ func TestPlanRunnerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 	}
 	if lock.releases() != 1 {
 		t.Fatalf("expected lock release once, got %d", lock.releases())
+	}
+}
+
+func TestPlanRunnerRunOncePassesPendingLookbackWindow(t *testing.T) {
+	lock := &fakeSchedulerLockManager{}
+	command := &fakePlanCommandService{
+		statsByOrg: map[int64]planApp.TaskScheduleStats{1: {OpenedCount: 1}},
+		errByOrg:   map[int64]error{},
+	}
+	opts := newTestPlanSchedulerOptions(1)
+	opts.PendingLookback = 6 * time.Hour
+
+	runner := newPlanRunnerWithHooks(
+		opts,
+		&redislock.Manager{},
+		command,
+		newTestPlanLockBuilder(),
+		lock.acquire,
+		lock.release,
+	)
+
+	startedAt := time.Now()
+	if err := runner.runOnce(context.Background()); err != nil {
+		t.Fatalf("runOnce returned error: %v", err)
+	}
+	finishedAt := time.Now()
+
+	befores, lowerBounds := command.schedulingWindows()
+	if len(befores) != 1 || befores[0] == "" {
+		t.Fatalf("expected scheduler to pass explicit before time, got %+v", befores)
+	}
+	if len(lowerBounds) != 1 {
+		t.Fatalf("expected scheduler to pass one lower bound, got %+v", lowerBounds)
+	}
+	earliest := startedAt.Add(-opts.PendingLookback)
+	latest := finishedAt.Add(-opts.PendingLookback)
+	if lowerBounds[0].Before(earliest) || lowerBounds[0].After(latest) {
+		t.Fatalf("lower bound %s outside expected window [%s, %s]", lowerBounds[0], earliest, latest)
 	}
 }
 
@@ -395,12 +448,13 @@ func newTestPlanSchedulerOptions(orgIDs ...int64) *apiserveroptions.PlanSchedule
 		orgIDs = []int64{1}
 	}
 	return &apiserveroptions.PlanSchedulerOptions{
-		Enable:       true,
-		OrgIDs:       orgIDs,
-		InitialDelay: 0,
-		Interval:     time.Minute,
-		LockKey:      "qs:plan-scheduler:test",
-		LockTTL:      30 * time.Second,
+		Enable:          true,
+		OrgIDs:          orgIDs,
+		InitialDelay:    0,
+		Interval:        time.Minute,
+		PendingLookback: 24 * time.Hour,
+		LockKey:         "qs:plan-scheduler:test",
+		LockTTL:         30 * time.Second,
 	}
 }
 

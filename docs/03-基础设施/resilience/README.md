@@ -12,6 +12,7 @@
 | 依赖保护 | apiserver MySQL / Mongo / IAM in-flight backpressure，显式注入到 repo/client |
 | 重复抑制 | Redis lease primitive + caller-owned `leader/idempotency/duplicate` semantics |
 | 降级边界 | collection Redis limiter fail-open；worker duplicate gate degraded-continue |
+| 可视化 | Prometheus/Grafana 看趋势；operating 通过三进程只读 status endpoint 看当前摘要 |
 | 维护模式 | 新增保护点必须按 `模型 -> contract test -> docs -> hygiene` 闭环维护 |
 
 ## 阅读顺序
@@ -24,6 +25,15 @@
 6. [05-观测降级与排障](./05-观测降级与排障.md)：按 outcome 排障。
 7. [06-新增高并发治理能力SOP](./06-新增高并发治理能力SOP.md)：新增能力的测试与文档清单。
 8. [07-能力矩阵](./07-能力矩阵.md)：横向核对每个能力的模型、primitive、outcome 和测试。
+
+## 当前只读入口
+
+| 入口 | 用途 | 行为边界 |
+| ---- | ---- | -------- |
+| `GET /internal/v1/resilience/status` | apiserver 当前限流、背压、scheduler lock capability snapshot | internal admin 只读；不提供调参或 lock release |
+| `GET /governance/resilience` on collection-server | collection rate limit、SubmitQueue、SubmitGuard snapshot | 只读；不提供 queue drain |
+| `GET /governance/resilience` on worker metrics server | worker duplicate suppression 与 Redis lock capability snapshot | 只读；不提供 retry 或 skip 修复 |
+| Grafana `resilience-*` dashboards | `qs_resilience_*` 时序趋势和告警 | 不直接承载治理动作 |
 
 ## 维护模式
 

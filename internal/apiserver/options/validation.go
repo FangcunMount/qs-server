@@ -108,6 +108,9 @@ func validatePlanScheduler(opts *PlanSchedulerOptions) []error {
 	if opts.Interval <= 0 {
 		errs = append(errs, fmt.Errorf("plan_scheduler.interval must be greater than 0"))
 	}
+	if opts.PendingLookback <= 0 {
+		errs = append(errs, fmt.Errorf("plan_scheduler.pending_lookback must be greater than 0"))
+	}
 	if opts.LockKey == "" {
 		errs = append(errs, fmt.Errorf("plan_scheduler.lock_key cannot be empty when enabled"))
 	}
