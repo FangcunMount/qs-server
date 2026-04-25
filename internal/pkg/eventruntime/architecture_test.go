@@ -29,9 +29,16 @@ func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
 		if strings.Contains(text, removedEventConfigImportPath()) {
 			t.Fatalf("%s must use eventcatalog/eventruntime instead of removed eventconfig", rel)
 		}
+		if strings.Contains(text, workerApplicationImportPath()) {
+			t.Fatalf("%s must use worker integration eventing instead of removed worker/application", rel)
+		}
 		if strings.HasPrefix(rel, "internal/worker/integration/messaging/") &&
 			strings.Contains(text, workerContainerImportPath()) {
 			t.Fatalf("%s must depend on narrow messaging interfaces instead of worker/container", rel)
+		}
+		if strings.HasPrefix(rel, "internal/worker/integration/messaging/") &&
+			strings.Contains(text, workerHandlersImportPath()) {
+			t.Fatalf("%s must use eventcodec instead of worker/handlers", rel)
 		}
 		return nil
 	})
@@ -46,6 +53,14 @@ func removedEventConfigImportPath() string {
 
 func workerContainerImportPath() string {
 	return "github.com/FangcunMount/qs-server/internal/worker/" + "container"
+}
+
+func workerApplicationImportPath() string {
+	return "github.com/FangcunMount/qs-server/internal/worker/" + "application"
+}
+
+func workerHandlersImportPath() string {
+	return "github.com/FangcunMount/qs-server/internal/worker/" + "handlers"
 }
 
 func repoRoot(t *testing.T) string {

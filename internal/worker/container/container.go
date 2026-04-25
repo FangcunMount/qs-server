@@ -10,9 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
-	"github.com/FangcunMount/qs-server/internal/worker/application"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
+	workereventing "github.com/FangcunMount/qs-server/internal/worker/integration/eventing"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
@@ -32,7 +32,7 @@ type Container struct {
 	internalClient    *grpcclient.InternalClient
 
 	// 事件分发器
-	eventDispatcher *application.EventDispatcher
+	eventDispatcher *workereventing.Dispatcher
 }
 
 // NewContainer 创建新的容器
@@ -75,7 +75,7 @@ func (c *Container) initEventDispatcher() error {
 	log.Info("🎯 Initializing event dispatcher...")
 
 	// 构建处理器依赖
-	deps := &application.HandlerDependencies{
+	deps := &workereventing.HandlerDependencies{
 		Logger:            c.logger,
 		AnswerSheetClient: c.answerSheetClient,
 		EvaluationClient:  c.evaluationClient,
@@ -86,7 +86,7 @@ func (c *Container) initEventDispatcher() error {
 	}
 
 	// 创建事件分发器
-	c.eventDispatcher = application.NewEventDispatcher(c.logger, deps)
+	c.eventDispatcher = workereventing.NewDispatcher(c.logger, deps)
 
 	if err := c.eventDispatcher.Initialize(c.eventCatalog); err != nil {
 		return err
@@ -169,7 +169,7 @@ func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload
 	if c.eventDispatcher == nil {
 		return nil
 	}
-	return c.eventDispatcher.Dispatch(ctx, eventType, payload)
+	return c.eventDispatcher.DispatchEvent(ctx, eventType, payload)
 }
 
 // Logger 获取日志器

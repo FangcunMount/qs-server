@@ -8,8 +8,8 @@ import (
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
-	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/nsqio/go-nsq"
 )
 
@@ -35,7 +35,7 @@ func (MessageEventExtractor) Extract(msg *basemessaging.Message) (string, error)
 	if eventType, ok := msg.Metadata["event_type"]; ok {
 		return eventType, nil
 	}
-	env, err := handlers.ParseEventEnvelope(msg.Payload)
+	env, err := eventcodec.DecodeEnvelope(msg.Payload)
 	if err != nil {
 		return "", err
 	}
