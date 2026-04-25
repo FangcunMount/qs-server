@@ -284,6 +284,7 @@ plan_scheduler:
   org_ids: [1]
   initial_delay: "1m"
   interval: "1m"
+  pending_lookback: "24h"
   lock_key: "qs:plan-scheduler:leader"
   lock_ttl: "50s"
 

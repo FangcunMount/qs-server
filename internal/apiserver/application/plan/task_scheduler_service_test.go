@@ -216,6 +216,54 @@ func TestTaskSchedulerServiceSchedulesScopedTasksWithoutGlobalPendingScan(t *tes
 	}
 }
 
+func TestTaskSchedulerServiceSkipsPendingTasksBeforeLowerBound(t *testing.T) {
+	p, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
+	if err != nil {
+		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	}
+
+	before := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+	oldTask := domainPlan.NewAssessmentTask(
+		p.GetID(),
+		1,
+		1,
+		testee.NewID(4101),
+		"scale-code",
+		before.Add(-48*time.Hour),
+	)
+	recentTask := domainPlan.NewAssessmentTask(
+		p.GetID(),
+		2,
+		1,
+		testee.NewID(4102),
+		"scale-code",
+		before.Add(-time.Hour),
+	)
+
+	taskRepo := &schedulerTaskRepoStub{
+		pendingTasks: []*domainPlan.AssessmentTask{oldTask, recentTask},
+	}
+	planRepo := &schedulerPlanRepoByIDStub{plan: p}
+	entryGenerator := &entryGeneratorStub{}
+
+	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, event.NewNopEventPublisher())
+	ctx := WithTaskSchedulerPlannedAtLowerBound(context.Background(), before.Add(-24*time.Hour))
+	results, err := service.SchedulePendingTasks(ctx, 1, before.Format("2006-01-02 15:04:05"))
+	if err != nil {
+		t.Fatalf("SchedulePendingTasks returned error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected only one task inside lookback window to open, got %d", len(results))
+	}
+	if results[0].ID != recentTask.GetID().String() {
+		t.Fatalf("expected recent task %s to open, got %s", recentTask.GetID().String(), results[0].ID)
+	}
+	if oldTask.IsOpened() {
+		t.Fatalf("expected old task before lower bound to remain pending")
+	}
+}
+
 func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
 	p, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
 	if err != nil {

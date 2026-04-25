@@ -202,11 +202,19 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 func (s *taskSchedulerService) findPendingTasks(ctx context.Context, orgID int64, before time.Time) ([]*plan.AssessmentTask, error) {
 	scope := taskSchedulerScopeFromContext(ctx)
 	if scope == nil || (strings.TrimSpace(scope.PlanID) == "" && len(scope.TesteeIDs) == 0) {
-		return s.taskRepo.FindPendingTasks(ctx, orgID, before)
+		tasks, err := s.taskRepo.FindPendingTasks(ctx, orgID, before)
+		if err != nil {
+			return nil, err
+		}
+		return filterSchedulablePendingTasks(ctx, tasks, orgID, before), nil
 	}
 	planID := strings.TrimSpace(scope.PlanID)
 	if planID == "" {
-		return s.taskRepo.FindPendingTasks(ctx, orgID, before)
+		tasks, err := s.taskRepo.FindPendingTasks(ctx, orgID, before)
+		if err != nil {
+			return nil, err
+		}
+		return filterSchedulablePendingTasks(ctx, tasks, orgID, before), nil
 	}
 
 	parsedPlanID, err := plan.ParseAssessmentPlanID(planID)
@@ -231,12 +239,20 @@ func (s *taskSchedulerService) findPendingTasks(ctx context.Context, orgID int64
 		}
 	}
 
+	return filterSchedulablePendingTasks(ctx, tasks, orgID, before), nil
+}
+
+func filterSchedulablePendingTasks(ctx context.Context, tasks []*plan.AssessmentTask, orgID int64, before time.Time) []*plan.AssessmentTask {
 	filtered := make([]*plan.AssessmentTask, 0, len(tasks))
+	lowerBound, hasLowerBound := TaskSchedulerPlannedAtLowerBoundFromContext(ctx)
 	for _, task := range tasks {
 		if task == nil {
 			continue
 		}
 		if task.GetOrgID() != orgID || !task.IsPending() {
+			continue
+		}
+		if hasLowerBound && task.GetPlannedAt().Before(lowerBound) {
 			continue
 		}
 		if task.GetPlannedAt().After(before) {
@@ -251,7 +267,7 @@ func (s *taskSchedulerService) findPendingTasks(ctx context.Context, orgID int64
 		}
 		return filtered[i].GetPlannedAt().Before(filtered[j].GetPlannedAt())
 	})
-	return filtered, nil
+	return filtered
 }
 
 func parseScheduleScopeTesteeIDs(rawIDs []string) ([]testee.ID, error) {

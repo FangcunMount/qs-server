@@ -1,9 +1,13 @@
 package plan
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type taskScheduleStatsCollectorKey struct{}
 type taskSchedulerScopeKey struct{}
+type taskSchedulerPlannedAtLowerBoundKey struct{}
 
 // TaskScheduleStats 记录一次任务调度中的统计数据。
 type TaskScheduleStats struct {
@@ -32,6 +36,16 @@ func WithTaskSchedulerScope(ctx context.Context, planID string, testeeIDs []stri
 	return context.WithValue(ctx, taskSchedulerScopeKey{}, scope)
 }
 
+// WithTaskSchedulerPlannedAtLowerBound limits automatic scheduling to tasks at
+// or after lowerBound. It is intended for the built-in scheduler so historical
+// backfilled pending tasks are not opened immediately.
+func WithTaskSchedulerPlannedAtLowerBound(ctx context.Context, lowerBound time.Time) context.Context {
+	if lowerBound.IsZero() {
+		return ctx
+	}
+	return context.WithValue(ctx, taskSchedulerPlannedAtLowerBoundKey{}, lowerBound)
+}
+
 // WithTaskScheduleStatsCollector 为调度上下文附加统计收集器。
 func WithTaskScheduleStatsCollector(ctx context.Context, collector *TaskScheduleStats) context.Context {
 	if collector == nil {
@@ -46,6 +60,19 @@ func taskSchedulerScopeFromContext(ctx context.Context) *TaskSchedulerScope {
 	}
 	scope, _ := ctx.Value(taskSchedulerScopeKey{}).(*TaskSchedulerScope)
 	return scope
+}
+
+// TaskSchedulerPlannedAtLowerBoundFromContext returns the optional lower bound
+// used by automatic scheduling.
+func TaskSchedulerPlannedAtLowerBoundFromContext(ctx context.Context) (time.Time, bool) {
+	if ctx == nil {
+		return time.Time{}, false
+	}
+	lowerBound, ok := ctx.Value(taskSchedulerPlannedAtLowerBoundKey{}).(time.Time)
+	if !ok || lowerBound.IsZero() {
+		return time.Time{}, false
+	}
+	return lowerBound, true
 }
 
 // CollectTaskScheduleStats 将调度统计累加到上下文收集器中。
