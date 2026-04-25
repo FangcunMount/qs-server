@@ -169,7 +169,7 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 	return nil
 }
 
-func (p *RoutingPublisher) publishToLog(ctx context.Context, topicName string, evt event.DomainEvent) error {
+func (p *RoutingPublisher) publishToLog(ctx context.Context, topicName string, evt event.DomainEvent) {
 	logger.L(ctx).Infow("[DomainEvent]",
 		"action", "log_event",
 		"event_type", evt.EventType(),
@@ -179,7 +179,6 @@ func (p *RoutingPublisher) publishToLog(ctx context.Context, topicName string, e
 		"topic", topicName,
 		"source", p.source,
 	)
-	return nil
 }
 
 func (p *RoutingPublisher) observe(ctx context.Context, topicName, eventType string, outcome eventobservability.PublishOutcome) {
