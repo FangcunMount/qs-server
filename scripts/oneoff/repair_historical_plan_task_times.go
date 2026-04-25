@@ -28,6 +28,7 @@ type config struct {
 	plannedStart     string
 	plannedEnd       string
 	backupSuffix     string
+	timeout          time.Duration
 	apply            bool
 	limit            int
 }
@@ -67,7 +68,7 @@ type scopeRow struct {
 
 func main() {
 	cfg := parseFlags()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 	defer cancel()
 
 	db, err := openMySQL(cfg.mysqlDSN)
@@ -150,6 +151,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.plannedStart, "planned-start", "", "optional inclusive planned_at start")
 	flag.StringVar(&cfg.plannedEnd, "planned-end", "", "optional exclusive planned_at end")
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "suffix for backup tables/collections")
+	flag.DurationVar(&cfg.timeout, "timeout", 30*time.Minute, "overall script timeout, e.g. 30m, 1h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply changes; default is dry-run")
 	flag.IntVar(&cfg.limit, "preview-limit", 20, "number of rows to preview")
 	flag.Parse()
@@ -338,7 +340,10 @@ CREATE TEMPORARY TABLE repair_plan_task_time_scope (
   new_submitted_at DATETIME(3) NOT NULL,
   new_assessment_created_at DATETIME(3) NOT NULL,
   new_interpreted_at DATETIME(3) NULL,
-  new_report_generated_at DATETIME(3) NULL
+  new_report_generated_at DATETIME(3) NULL,
+  KEY idx_repair_scope_answer_sheet_id (answer_sheet_id),
+  KEY idx_repair_scope_assessment_id (assessment_id),
+  KEY idx_repair_scope_org_id (org_id)
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 	if err != nil {
 		return err
@@ -379,14 +384,22 @@ func backupMySQL(ctx context.Context, conn *sql.Conn, suffix string) error {
 		fmt.Sprintf("CREATE TABLE repair_bak_assessment_%s AS SELECT a.* FROM assessment a INNER JOIN repair_plan_task_time_scope s ON s.assessment_id = a.id", suffix),
 		fmt.Sprintf("CREATE TABLE repair_bak_assessment_score_%s AS SELECT sc.* FROM assessment_score sc INNER JOIN repair_plan_task_time_scope s ON s.assessment_id = sc.assessment_id WHERE sc.deleted_at IS NULL", suffix),
 		fmt.Sprintf("CREATE TABLE repair_bak_assessment_episode_%s AS SELECT e.* FROM assessment_episode e INNER JOIN repair_plan_task_time_scope s ON s.answer_sheet_id = e.answersheet_id WHERE e.deleted_at IS NULL", suffix),
-		fmt.Sprintf(`CREATE TABLE repair_bak_behavior_footprint_%s AS
+		fmt.Sprintf("CREATE TABLE repair_bak_behavior_footprint_%s LIKE behavior_footprint", suffix),
+		fmt.Sprintf(`INSERT IGNORE INTO repair_bak_behavior_footprint_%s
 SELECT bf.* FROM behavior_footprint bf
-INNER JOIN repair_plan_task_time_scope s ON s.answer_sheet_id = bf.answersheet_id OR s.assessment_id = bf.assessment_id
+INNER JOIN repair_plan_task_time_scope s ON s.answer_sheet_id = bf.answersheet_id
+WHERE bf.org_id = s.org_id
+  AND bf.deleted_at IS NULL
+  AND bf.event_name COLLATE utf8mb4_unicode_ci IN ('answersheet_submitted' COLLATE utf8mb4_unicode_ci, 'assessment_created' COLLATE utf8mb4_unicode_ci, 'report_generated' COLLATE utf8mb4_unicode_ci)`, suffix),
+		fmt.Sprintf(`INSERT IGNORE INTO repair_bak_behavior_footprint_%s
+SELECT bf.* FROM behavior_footprint bf
+INNER JOIN repair_plan_task_time_scope s ON s.assessment_id = bf.assessment_id
 WHERE bf.org_id = s.org_id
   AND bf.deleted_at IS NULL
   AND bf.event_name COLLATE utf8mb4_unicode_ci IN ('answersheet_submitted' COLLATE utf8mb4_unicode_ci, 'assessment_created' COLLATE utf8mb4_unicode_ci, 'report_generated' COLLATE utf8mb4_unicode_ci)`, suffix),
 	}
-	for _, statement := range statements {
+	for i, statement := range statements {
+		log.Printf("backup mysql step %d/%d", i+1, len(statements))
 		if _, err := conn.ExecContext(ctx, statement); err != nil {
 			return err
 		}
