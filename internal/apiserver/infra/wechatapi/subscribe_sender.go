@@ -23,28 +23,27 @@ func NewSubscribeSender(sdkCache cache.Cache) *SubscribeSender {
 }
 
 func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatPort.SubscribeMessage) error {
-	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
-	if err != nil {
-		return err
-	}
+	// subscribeClient, err := s.newSubscribeClient(appID, appSecret)
+	// if err != nil {
+	// 	return err
+	// }
 
-	data := make(map[string]*miniSubscribe.DataItem, len(msg.Data))
-	for key, value := range msg.Data {
-		data[key] = &miniSubscribe.DataItem{Value: value}
-	}
+	// data := make(map[string]*miniSubscribe.DataItem, len(msg.Data))
+	// for key, value := range msg.Data {
+	// 	data[key] = &miniSubscribe.DataItem{Value: value}
+	// }
 
-	req := &miniSubscribe.Message{
-		ToUser:           msg.ToUser,
-		TemplateID:       msg.TemplateID,
-		Page:             msg.Page,
-		Data:             data,
-		MiniprogramState: msg.MiniProgramState,
-		Lang:             msg.Lang,
-	}
-	return nil
-	if err := subscribeClient.Send(req); err != nil {
-		return fmt.Errorf("send subscribe message: %w", err)
-	}
+	// req := &miniSubscribe.Message{
+	// 	ToUser:           msg.ToUser,
+	// 	TemplateID:       msg.TemplateID,
+	// 	Page:             msg.Page,
+	// 	Data:             data,
+	// 	MiniprogramState: msg.MiniProgramState,
+	// 	Lang:             msg.Lang,
+	// }
+	// if err := subscribeClient.Send(req); err != nil {
+	// 	return fmt.Errorf("send subscribe message: %w", err)
+	// }
 	return nil
 }
 
