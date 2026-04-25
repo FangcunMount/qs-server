@@ -54,6 +54,29 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 	})
 }
 
+func TestBackpressureIsNotConfiguredThroughPackageGlobals(t *testing.T) {
+	root := repoRoot(t)
+	paths := []string{
+		"internal/pkg/database/mysql",
+		"internal/apiserver/infra/mongo",
+		"internal/apiserver/infra/iam",
+		"internal/apiserver/process",
+	}
+	for _, rel := range paths {
+		scanGoSourceFiles(t, filepath.Join(root, rel), func(path string, content string) {
+			if strings.Contains(content, "SetLimiter(") {
+				t.Fatalf("%s uses SetLimiter; backpressure must be injected explicitly", path)
+			}
+			if strings.Contains(content, "var limiter *backpressure") {
+				t.Fatalf("%s declares package-level backpressure limiter", path)
+			}
+			if strings.Contains(content, "func acquire(ctx context.Context)") {
+				t.Fatalf("%s declares package-level acquire helper", path)
+			}
+		})
+	}
+}
+
 func TestRedisLockSpecsHaveResilienceSemantics(t *testing.T) {
 	specs := []redislock.Spec{
 		redislock.Specs.AnswersheetProcessing,
@@ -115,6 +138,32 @@ func scanGoFiles(t *testing.T, root string, visit func(path string, file *ast.Fi
 			return err
 		}
 		visit(path, file)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func scanGoSourceFiles(t *testing.T, root string, visit func(path string, content string)) {
+	t.Helper()
+	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		bytes, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		visit(path, string(bytes))
 		return nil
 	}); err != nil {
 		t.Fatal(err)

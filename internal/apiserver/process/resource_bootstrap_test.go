@@ -40,6 +40,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	var backpressureConfigured bool
 	var buildOptionsInput containerOptionsInput
 	wantOptions := container.ContainerOptions{PlanEntryBaseURL: "https://entry.example"}
+	backpressureOptions := container.BackpressureOptions{}
 
 	got, err := prepareResources(resourceStageDeps{
 		database: databaseResourceDeps{
@@ -63,8 +64,11 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			provider:     "stub",
 			newPublisher: func() (messaging.Publisher, error) { return publisher, nil },
 		},
-		loadEventCatalog:  func() (*eventcatalog.Catalog, error) { return catalog, nil },
-		applyBackpressure: func() { backpressureConfigured = true },
+		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return catalog, nil },
+		buildBackpressure: func() container.BackpressureOptions {
+			backpressureConfigured = true
+			return backpressureOptions
+		},
 		buildContainerOptions: func(output containerOptionsInput) container.ContainerOptions {
 			buildOptionsInput = output
 			return wantOptions
@@ -75,7 +79,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	}
 
 	if !backpressureConfigured {
-		t.Fatal("applyBackpressure was not called")
+		t.Fatal("buildBackpressure was not called")
 	}
 	if got.handles.mysqlDB != &mysqlDB || got.handles.mongoDB != &mongoDB {
 		t.Fatalf("database output mismatch: %+v", got)
@@ -98,7 +102,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if got.containerInput.containerOptions != wantOptions {
 		t.Fatalf("containerOptions = %#v, want %#v", got.containerInput.containerOptions, wantOptions)
 	}
-	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.mqPublisher != publisher || buildOptionsInput.eventCatalog != catalog {
+	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.mqPublisher != publisher || buildOptionsInput.eventCatalog != catalog || buildOptionsInput.backpressure != backpressureOptions {
 		t.Fatalf("buildContainerOptions input mismatch: %#v", buildOptionsInput)
 	}
 }
@@ -149,8 +153,8 @@ func TestCreateMQPublisherFallsBackToLoggingModeOnPublisherError(t *testing.T) {
 func TestAPIServerBuildResourceStageDepsWithoutConfigOmitsConfigBoundBuilders(t *testing.T) {
 	deps := (&server{}).buildResourceStageDeps()
 
-	if deps.applyBackpressure != nil {
-		t.Fatal("applyBackpressure != nil, want nil")
+	if deps.buildBackpressure != nil {
+		t.Fatal("buildBackpressure != nil, want nil")
 	}
 	if deps.buildContainerOptions != nil {
 		t.Fatal("buildContainerOptions != nil, want nil")
@@ -165,8 +169,8 @@ func TestAPIServerBuildResourceStageDepsWithConfigIncludesConfigBoundBuilders(t 
 
 	deps := (&server{config: cfg}).buildResourceStageDeps()
 
-	if deps.applyBackpressure == nil {
-		t.Fatal("applyBackpressure = nil, want callback")
+	if deps.buildBackpressure == nil {
+		t.Fatal("buildBackpressure = nil, want callback")
 	}
 	if deps.buildContainerOptions == nil {
 		t.Fatal("buildContainerOptions = nil, want builder")

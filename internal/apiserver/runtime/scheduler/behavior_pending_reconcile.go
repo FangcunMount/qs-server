@@ -16,7 +16,7 @@ import (
 type BehaviorPendingReconcileRunner struct {
 	opts      *apiserveroptions.BehaviorPendingReconcileOptions
 	projector statisticsApp.BehaviorProjectorService
-	leader    *leaderLock
+	leader    leaderLeaseRunner
 }
 
 // NewBehaviorPendingReconcileRunner creates the reconcile runner when dependencies are available.

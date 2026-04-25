@@ -16,6 +16,7 @@ type containerOptionsInput struct {
 	publishMode    eventruntime.PublishMode
 	eventCatalog   *eventcatalog.Catalog
 	cacheSubsystem *cachebootstrap.Subsystem
+	backpressure   container.BackpressureOptions
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
@@ -25,6 +26,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		EventCatalog:               input.eventCatalog,
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
+		Backpressure:               input.backpressure,
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
 	}

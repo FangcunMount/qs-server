@@ -26,6 +26,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -78,6 +79,7 @@ type ActorModuleDeps struct {
 	OperationAccountSvc *iam.OperationAccountService
 	Observer            *cacheobservability.ComponentObserver
 	TopicResolver       eventcatalog.TopicResolver
+	MySQLLimiter        backpressure.Acquirer
 }
 
 // NewActorModule 创建 Actor 模块。
@@ -100,9 +102,10 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 
 	// 初始化 UnitOfWork
 	uow := mysql.NewUnitOfWork(mysqlDB)
+	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
 
 	// 初始化 repository 层
-	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB)
+	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB, mysqlOptions)
 
 	if deps.RedisClient != nil {
 		module.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
@@ -110,11 +113,11 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		module.TesteeRepo = baseTesteeRepo
 	}
 
-	module.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB)
-	module.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB)
-	module.RelationRepo = actorInfra.NewRelationRepository(mysqlDB)
-	module.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB)
-	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB)
+	module.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB, mysqlOptions)
+	module.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB, mysqlOptions)
+	module.RelationRepo = actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
+	module.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
+	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB, mysqlOptions)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
 	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStoreWithTopicResolver(mysqlDB, deps.TopicResolver))

@@ -18,9 +18,11 @@ import (
 	questionnaireCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -53,6 +55,7 @@ type SurveyModuleDeps struct {
 	HotsetRecorder      cachetarget.HotsetRecorder
 	Observer            *cacheobservability.ComponentObserver
 	TopicResolver       eventcatalog.TopicResolver
+	MongoLimiter        backpressure.Acquirer
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -108,12 +111,13 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 		normalized.QuestionnairePolicy,
 		normalized.HotsetRecorder,
 		normalized.Observer,
+		normalized.MongoLimiter,
 	); err != nil {
 		return nil, err
 	}
 
 	// 初始化答卷子模块
-	if err := module.initAnswerSheetSubModule(normalized.MongoDB); err != nil {
+	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.MongoLimiter); err != nil {
 		return nil, err
 	}
 
@@ -131,11 +135,11 @@ func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) 
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *cacheobservability.ComponentObserver) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *cacheobservability.ComponentObserver, limiter backpressure.Acquirer) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）
-	baseRepo := quesMongoInfra.NewRepository(mongoDB)
+	baseRepo := quesMongoInfra.NewRepository(mongoDB, mongoBase.BaseRepositoryOptions{Limiter: limiter})
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(baseRepo, redisClient, cacheBuilder, policy, observer)
@@ -205,11 +209,11 @@ func (m *SurveyModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
-func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
+func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, limiter backpressure.Acquirer) error {
 	sub := m.AnswerSheet
 
 	// 初始化 repository 层
-	baseRepo, err := asMongoInfra.NewRepositoryWithTopicResolver(mongoDB, m.topicResolver)
+	baseRepo, err := asMongoInfra.NewRepositoryWithTopicResolver(mongoDB, m.topicResolver, mongoBase.BaseRepositoryOptions{Limiter: limiter})
 	if err != nil {
 		return err
 	}

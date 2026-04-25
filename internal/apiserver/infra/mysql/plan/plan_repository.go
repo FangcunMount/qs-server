@@ -18,9 +18,9 @@ type planRepository struct {
 }
 
 // NewPlanRepository 创建计划仓储
-func NewPlanRepository(db *gorm.DB) domainPlan.AssessmentPlanRepository {
+func NewPlanRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domainPlan.AssessmentPlanRepository {
 	repo := &planRepository{
-		BaseRepository: mysql.NewBaseRepository[*AssessmentPlanPO](db),
+		BaseRepository: mysql.NewBaseRepository[*AssessmentPlanPO](db, opts...),
 		mapper:         NewPlanMapper(),
 	}
 	// 设置错误转换器

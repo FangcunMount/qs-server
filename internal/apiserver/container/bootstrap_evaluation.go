@@ -61,6 +61,8 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		VersionStore:         versionStore,
 		Observer:             c.cacheObserver(),
 		TopicResolver:        c.eventCatalog,
+		MySQLLimiter:         c.backpressure.MySQL,
+		MongoLimiter:         c.backpressure.Mongo,
 	}
 }
 

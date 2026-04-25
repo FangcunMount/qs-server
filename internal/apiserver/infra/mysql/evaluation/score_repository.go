@@ -20,9 +20,9 @@ type scoreRepository struct {
 }
 
 // NewScoreRepository 创建得分仓储
-func NewScoreRepository(db *gorm.DB) assessment.ScoreRepository {
+func NewScoreRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) assessment.ScoreRepository {
 	repo := &scoreRepository{
-		BaseRepository: mysql.NewBaseRepository[*AssessmentScorePO](db),
+		BaseRepository: mysql.NewBaseRepository[*AssessmentScorePO](db, opts...),
 		mapper:         NewScoreMapper(),
 	}
 	// 设置错误转换器

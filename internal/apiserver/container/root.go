@@ -30,6 +30,7 @@ type Container struct {
 	redisCache                 redis.UniversalClient
 	cacheOptions               ContainerCacheOptions
 	cache                      *cachebootstrap.Subsystem
+	backpressure               BackpressureOptions
 	planEntryURL               string
 	statisticsRepairWindowDays int
 
@@ -122,6 +123,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.eventCatalog = opts.EventCatalog
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
+	c.backpressure = opts.Backpressure
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.silent = opts.Silent

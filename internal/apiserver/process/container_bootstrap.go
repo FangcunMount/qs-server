@@ -43,7 +43,9 @@ func (s *server) buildContainerStageDeps(resources resourceOutput) containerStag
 	}
 	if s.config != nil {
 		deps.newIAMModule = func(ctx context.Context) (*container.IAMModule, error) {
-			return container.NewIAMModule(ctx, s.config.IAMOptions)
+			return container.NewIAMModuleWithRuntimeOptions(ctx, s.config.IAMOptions, container.IAMModuleRuntimeOptions{
+				Limiter: resources.containerInput.containerOptions.Backpressure.IAM,
+			})
 		}
 	}
 	return deps

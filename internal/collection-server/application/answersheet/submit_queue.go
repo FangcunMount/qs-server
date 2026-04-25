@@ -23,11 +23,11 @@ type submitFunc func(context.Context, string, uint64, *SubmitAnswerSheetRequest)
 
 // SubmitQueue queues submit requests for asynchronous processing.
 type SubmitQueue struct {
-	jobs     chan submitJob
-	submit   submitFunc
-	statuses *submitQueueStatusStore
-	observer resilienceplane.Observer
-	subject  resilienceplane.Subject
+	jobs       chan submitJob
+	statuses   *submitQueueStatusStore
+	workerPool *submitQueueWorkerPool
+	observer   resilienceplane.Observer
+	subject    resilienceplane.Subject
 }
 
 type SubmitQueueRuntimeOptions struct {
@@ -51,7 +51,6 @@ func NewSubmitQueueWithOptions(workerCount, queueSize int, submit submitFunc, op
 
 	q := &SubmitQueue{
 		jobs:     make(chan submitJob, queueSize),
-		submit:   submit,
 		statuses: newSubmitQueueStatusStore(10 * time.Minute),
 		observer: defaultSubmitQueueObserver(opts.Observer),
 		subject: resilienceplane.Subject{
@@ -61,10 +60,8 @@ func NewSubmitQueueWithOptions(workerCount, queueSize int, submit submitFunc, op
 			Strategy:  "memory_channel",
 		},
 	}
-
-	for i := 0; i < workerCount; i++ {
-		go q.worker()
-	}
+	q.workerPool = newSubmitQueueWorkerPool(workerCount, q.jobs, submit, q.setStatus)
+	q.workerPool.Start()
 
 	return q
 }
@@ -119,18 +116,6 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 	}
 
 	return nil
-}
-
-func (q *SubmitQueue) worker() {
-	for job := range q.jobs {
-		q.setStatus(job.requestID, SubmitStatusProcessing, "")
-		resp, err := q.submit(job.ctx, job.requestID, job.writerID, job.req)
-		if err != nil {
-			q.setStatus(job.requestID, SubmitStatusFailed, "")
-		} else if resp != nil {
-			q.setStatus(job.requestID, SubmitStatusDone, resp.ID)
-		}
-	}
 }
 
 // GetStatus returns submit status for a request ID.

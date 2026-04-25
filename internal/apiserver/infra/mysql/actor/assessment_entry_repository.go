@@ -17,9 +17,9 @@ type assessmentEntryRepository struct {
 }
 
 // NewAssessmentEntryRepository 创建测评入口仓储。
-func NewAssessmentEntryRepository(db *gorm.DB) domain.Repository {
+func NewAssessmentEntryRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domain.Repository {
 	repo := &assessmentEntryRepository{
-		BaseRepository: mysql.NewBaseRepository[*AssessmentEntryPO](db),
+		BaseRepository: mysql.NewBaseRepository[*AssessmentEntryPO](db, opts...),
 		mapper:         NewAssessmentEntryMapper(),
 	}
 	repo.SetErrorTranslator(translateError)

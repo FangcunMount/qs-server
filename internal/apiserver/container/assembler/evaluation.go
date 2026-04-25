@@ -25,13 +25,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -103,6 +106,8 @@ type EvaluationModuleDeps struct {
 	VersionStore         cachequery.VersionTokenStore
 	Observer             *cacheobservability.ComponentObserver
 	TopicResolver        eventcatalog.TopicResolver
+	MySQLLimiter         backpressure.Acquirer
+	MongoLimiter         backpressure.Acquirer
 }
 
 // NewEvaluationModule 创建评估模块。
@@ -117,7 +122,9 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
-	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
+	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
+	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: normalized.MongoLimiter}
+	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlOptions)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if normalized.RedisClient != nil {
 		module.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
@@ -125,8 +132,8 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		module.AssessmentRepo = baseAssessmentRepo
 	}
 
-	module.ScoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB)
-	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(normalized.MongoDB, normalized.TopicResolver)
+	module.ScoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
+	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(normalized.MongoDB, normalized.TopicResolver, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}

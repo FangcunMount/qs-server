@@ -24,7 +24,7 @@ type StatisticsSyncRunner struct {
 	opts              *apiserveroptions.StatisticsSyncOptions
 	syncService       statisticsSyncService
 	warmupCoordinator cachegov.Coordinator
-	leader            *leaderLock
+	leader            leaderLeaseRunner
 	clock             DailyClock
 	now               func() time.Time
 }

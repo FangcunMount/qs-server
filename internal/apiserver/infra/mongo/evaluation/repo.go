@@ -24,18 +24,18 @@ type ReportRepository struct {
 }
 
 // NewReportRepository 创建报告仓储
-func NewReportRepository(db *mongo.Database) (*ReportRepository, error) {
-	return NewReportRepositoryWithTopicResolver(db, nil)
+func NewReportRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*ReportRepository, error) {
+	return NewReportRepositoryWithTopicResolver(db, nil, opts...)
 }
 
-func NewReportRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver) (*ReportRepository, error) {
+func NewReportRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver, opts ...base.BaseRepositoryOptions) (*ReportRepository, error) {
 	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(db, resolver)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ReportRepository{
-		BaseRepository: base.NewBaseRepository(db, (&InterpretReportPO{}).CollectionName()),
+		BaseRepository: base.NewBaseRepository(db, (&InterpretReportPO{}).CollectionName(), opts...),
 		mapper:         NewReportMapper(),
 		outboxStore:    outboxStore,
 	}, nil

@@ -45,6 +45,7 @@ func (c *Container) buildActorModuleDeps() assembler.ActorModuleDeps {
 		OperationAccountSvc: deps.operationAccountSvc,
 		Observer:            c.cacheObserver(),
 		TopicResolver:       c.eventCatalog,
+		MySQLLimiter:        c.backpressure.MySQL,
 	}
 }
 

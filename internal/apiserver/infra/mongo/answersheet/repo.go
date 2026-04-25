@@ -24,14 +24,14 @@ type Repository struct {
 }
 
 // NewRepository 创建答卷MongoDB存储库
-func NewRepository(db *mongo.Database) (*Repository, error) {
-	return NewRepositoryWithTopicResolver(db, nil)
+func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) (*Repository, error) {
+	return NewRepositoryWithTopicResolver(db, nil, opts...)
 }
 
-func NewRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver) (*Repository, error) {
+func NewRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver, opts ...mongoBase.BaseRepositoryOptions) (*Repository, error) {
 	po := &AnswerSheetPO{}
 	repo := &Repository{
-		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName()),
+		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),
 		mapper:          NewAnswerSheetMapper(),
 		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
 	}

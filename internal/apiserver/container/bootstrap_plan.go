@@ -24,6 +24,7 @@ func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
 		PlanPolicy:     c.CachePolicy(cachepolicy.PolicyPlan),
 		EntryBaseURL:   c.planEntryURL,
 		Observer:       c.cacheObserver(),
+		MySQLLimiter:   c.backpressure.MySQL,
 	}
 }
 

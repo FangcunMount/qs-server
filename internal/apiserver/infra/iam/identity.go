@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/identity"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 // IdentityService 身份服务封装
@@ -15,6 +16,7 @@ import (
 type IdentityService struct {
 	client  *identity.Client
 	enabled bool
+	limiter backpressure.Acquirer
 }
 
 // NewIdentityService 创建身份服务
@@ -40,6 +42,7 @@ func NewIdentityService(client *Client) (*IdentityService, error) {
 	return &IdentityService{
 		client:  identityClient,
 		enabled: true,
+		limiter: client.Limiter(),
 	}, nil
 }
 
@@ -53,7 +56,7 @@ func (s *IdentityService) GetUser(ctx context.Context, userID string) (*identity
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +69,7 @@ func (s *IdentityService) BatchGetUsers(ctx context.Context, userIDs []string) (
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv1.Searc
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +101,7 @@ func (s *IdentityService) CreateUser(ctx context.Context, name, email, phone str
 	if !s.enabled {
 		return 0, fmt.Errorf("identity service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -129,4 +132,11 @@ func (s *IdentityService) CreateUser(ctx context.Context, name, email, phone str
 		return 0, fmt.Errorf("failed to parse user id from IAM: %w", err)
 	}
 	return uid, nil
+}
+
+func (s *IdentityService) acquire(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || s.limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return s.limiter.Acquire(ctx)
 }

@@ -18,8 +18,10 @@ import (
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -53,6 +55,7 @@ type PlanModuleDeps struct {
 	PlanPolicy     cachepolicy.CachePolicy
 	EntryBaseURL   string
 	Observer       *cacheobservability.ComponentObserver
+	MySQLLimiter   backpressure.Acquirer
 }
 
 // NewPlanModule 创建 Plan 模块。
@@ -67,7 +70,8 @@ func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
 
 	// 初始化 repository 层
 	// 初始化基础 Repository
-	basePlanRepo := planInfra.NewPlanRepository(normalized.MySQLDB)
+	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
+	basePlanRepo := planInfra.NewPlanRepository(normalized.MySQLDB, mysqlOptions)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if normalized.RedisClient != nil {
@@ -76,7 +80,7 @@ func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
 		module.PlanRepo = basePlanRepo
 	}
 
-	module.TaskRepo = planInfra.NewTaskRepository(normalized.MySQLDB)
+	module.TaskRepo = planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)
 
 	// 初始化基础设施层（入口生成器）
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)

@@ -14,8 +14,10 @@ import (
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
@@ -54,6 +56,7 @@ type ScaleModuleDeps struct {
 	ScaleListPolicy   cachepolicy.CachePolicy
 	HotsetRecorder    cachetarget.HotsetRecorder
 	Observer          *cacheobservability.ComponentObserver
+	MongoLimiter      backpressure.Acquirer
 }
 
 // NewScaleModule 创建 Scale 模块。
@@ -67,7 +70,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	module.eventPublisher = normalized.EventPublisher
 
 	// 初始化 repository 层（基础实现）
-	baseRepo := scaleInfra.NewRepository(normalized.MongoDB)
+	baseRepo := scaleInfra.NewRepository(normalized.MongoDB, mongoBase.BaseRepositoryOptions{Limiter: normalized.MongoLimiter})
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if normalized.RedisClient != nil {
 		module.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(baseRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.ScalePolicy, normalized.Observer)

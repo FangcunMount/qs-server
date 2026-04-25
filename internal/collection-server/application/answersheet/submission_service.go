@@ -20,7 +20,8 @@ type actorLookupClient interface {
 	TesteeExists(ctx context.Context, orgID, iamChildID uint64) (exists bool, testeeID uint64, err error)
 }
 
-type submitGuard interface {
+// IdempotencyGuard protects cross-instance submit idempotency for the same request key.
+type IdempotencyGuard interface {
 	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *redislock.Lease, acquired bool, err error)
 	Complete(ctx context.Context, key string, lease *redislock.Lease, answerSheetID string) error
 	Abort(ctx context.Context, key string, lease *redislock.Lease) error
@@ -47,7 +48,7 @@ type SubmissionService struct {
 	actorClient         actorLookupClient
 	guardianshipService guardianshipChecker
 	queue               *SubmitQueue
-	submitGuard         submitGuard
+	submitGuard         IdempotencyGuard
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -56,7 +57,7 @@ func NewSubmissionService(
 	actorClient actorLookupClient,
 	guardianshipService guardianshipChecker,
 	queueOptions *options.SubmitQueueOptions,
-	submitGuard submitGuard,
+	submitGuard IdempotencyGuard,
 ) *SubmissionService {
 	service := &SubmissionService{
 		answerSheetClient:   answerSheetClient,

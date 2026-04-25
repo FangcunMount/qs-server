@@ -19,9 +19,9 @@ type taskRepository struct {
 }
 
 // NewTaskRepository 创建任务仓储
-func NewTaskRepository(db *gorm.DB) domainPlan.AssessmentTaskRepository {
+func NewTaskRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domainPlan.AssessmentTaskRepository {
 	repo := &taskRepository{
-		BaseRepository: mysql.NewBaseRepository[*AssessmentTaskPO](db),
+		BaseRepository: mysql.NewBaseRepository[*AssessmentTaskPO](db, opts...),
 		mapper:         NewTaskMapper(),
 	}
 	// 设置错误转换器

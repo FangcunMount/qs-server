@@ -26,6 +26,7 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 		ScaleListPolicy:   c.CachePolicy(cachepolicy.PolicyScaleList),
 		HotsetRecorder:    c.hotsetRecorder(),
 		Observer:          c.cacheObserver(),
+		MongoLimiter:      c.backpressure.Mongo,
 	}
 }
 

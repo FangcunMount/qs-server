@@ -19,9 +19,9 @@ type relationRepository struct {
 }
 
 // NewRelationRepository 创建关系仓储。
-func NewRelationRepository(db *gorm.DB) domain.Repository {
+func NewRelationRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domain.Repository {
 	repo := &relationRepository{
-		BaseRepository: mysql.NewBaseRepository[*ClinicianRelationPO](db),
+		BaseRepository: mysql.NewBaseRepository[*ClinicianRelationPO](db, opts...),
 		mapper:         NewRelationMapper(),
 	}
 	repo.SetErrorTranslator(translateError)

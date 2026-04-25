@@ -13,8 +13,10 @@ import (
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	redis "github.com/redis/go-redis/v9"
@@ -57,6 +59,7 @@ type StatisticsModuleDeps struct {
 	LockManager      *redislock.Manager
 	VersionStore     cachequery.VersionTokenStore
 	Observer         *cacheobservability.ComponentObserver
+	MySQLLimiter     backpressure.Acquirer
 }
 
 // NewStatisticsModule 创建统计模块。
@@ -68,7 +71,9 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 	module := &StatisticsModule{}
 
 	// 初始化 repository 层
-	module.Repo = statisticsInfra.NewStatisticsRepository(normalized.MySQLDB)
+	module.Repo = statisticsInfra.NewStatisticsRepository(normalized.MySQLDB, mysql.BaseRepositoryOptions{
+		Limiter: normalized.MySQLLimiter,
+	})
 
 	// 初始化 cache 层
 	if normalized.RedisClient != nil {

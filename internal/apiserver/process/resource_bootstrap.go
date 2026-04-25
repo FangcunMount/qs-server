@@ -9,10 +9,7 @@ import (
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	infraIAM "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
@@ -27,7 +24,7 @@ type resourceStageDeps struct {
 	redisRuntime          redisRuntimeStageDeps
 	mqPublisher           mqPublisherStageDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
-	applyBackpressure     func()
+	buildBackpressure     func() container.BackpressureOptions
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
 
@@ -62,7 +59,7 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 		redisRuntime:          s.buildRedisRuntimeDeps(dbManager),
 		mqPublisher:           s.buildMQPublisherDeps(),
 		loadEventCatalog:      loadDefaultEventCatalog,
-		applyBackpressure:     s.buildBackpressureDeps(),
+		buildBackpressure:     s.buildBackpressureDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
 	return deps
@@ -124,11 +121,11 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 	return deps
 }
 
-func (s *server) buildBackpressureDeps() func() {
+func (s *server) buildBackpressureDeps() func() container.BackpressureOptions {
 	if s == nil || s.config == nil {
 		return nil
 	}
-	return s.configureBackpressure
+	return s.buildBackpressureOptions
 }
 
 func (s *server) buildContainerOptionsBuilder() func(containerOptionsInput) container.ContainerOptions {
@@ -143,8 +140,9 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	if err != nil {
 		return resourceOutput{}, err
 	}
-	if deps.applyBackpressure != nil {
-		deps.applyBackpressure()
+	var backpressureOptions container.BackpressureOptions
+	if deps.buildBackpressure != nil {
+		backpressureOptions = deps.buildBackpressure()
 	}
 	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
 	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
@@ -175,6 +173,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 			publishMode:    publishMode,
 			eventCatalog:   eventCatalog,
 			cacheSubsystem: cacheSubsystem,
+			backpressure:   backpressureOptions,
 		})}
 	}
 	return output, nil
@@ -198,19 +197,21 @@ func initializeDatabaseConnections(deps databaseResourceDeps) (*gorm.DB, *mongo.
 	return mysqlDB, mongoDB, nil
 }
 
-func (s *server) configureBackpressure() {
+func (s *server) buildBackpressureOptions() container.BackpressureOptions {
 	if s == nil || s.config == nil || s.config.Backpressure == nil {
-		return
+		return container.BackpressureOptions{}
 	}
+	options := container.BackpressureOptions{}
 	if bp := s.config.Backpressure.MySQL; bp != nil && bp.Enabled {
-		mysqlbp.SetLimiter(newDependencyBackpressureLimiter("mysql", bp.MaxInflight, bp.TimeoutMs))
+		options.MySQL = newDependencyBackpressureLimiter("mysql", bp.MaxInflight, bp.TimeoutMs)
 	}
 	if bp := s.config.Backpressure.Mongo; bp != nil && bp.Enabled {
-		infraMongo.SetLimiter(newDependencyBackpressureLimiter("mongo", bp.MaxInflight, bp.TimeoutMs))
+		options.Mongo = newDependencyBackpressureLimiter("mongo", bp.MaxInflight, bp.TimeoutMs)
 	}
 	if bp := s.config.Backpressure.IAM; bp != nil && bp.Enabled {
-		infraIAM.SetLimiter(newDependencyBackpressureLimiter("iam", bp.MaxInflight, bp.TimeoutMs))
+		options.IAM = newDependencyBackpressureLimiter("iam", bp.MaxInflight, bp.TimeoutMs)
 	}
+	return options
 }
 
 func newDependencyBackpressureLimiter(dependency string, maxInflight int, timeoutMs int) *backpressure.Limiter {

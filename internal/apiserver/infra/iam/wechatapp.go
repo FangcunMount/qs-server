@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	idpv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/idp/v1"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/idp"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 // WeChatAppService 微信应用服务封装
@@ -14,6 +15,7 @@ import (
 type WeChatAppService struct {
 	client  *idp.Client
 	enabled bool
+	limiter backpressure.Acquirer
 }
 
 // NewWeChatAppService 创建微信应用服务
@@ -39,6 +41,7 @@ func NewWeChatAppService(client *Client) (*WeChatAppService, error) {
 	return &WeChatAppService{
 		client:  idpClient,
 		enabled: true,
+		limiter: client.Limiter(),
 	}, nil
 }
 
@@ -53,7 +56,7 @@ func (s *WeChatAppService) GetWechatApp(ctx context.Context, appID string) (*idp
 	if !s.enabled {
 		return nil, fmt.Errorf("wechat app service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -64,4 +67,11 @@ func (s *WeChatAppService) GetWechatApp(ctx context.Context, appID string) (*idp
 // Raw 返回原始 SDK 客户端（用于高级用法）
 func (s *WeChatAppService) Raw() *idp.Client {
 	return s.client
+}
+
+func (s *WeChatAppService) acquire(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || s.limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return s.limiter.Acquire(ctx)
 }

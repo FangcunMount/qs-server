@@ -16,9 +16,9 @@ type clinicianRepository struct {
 }
 
 // NewClinicianRepository 创建从业者仓储。
-func NewClinicianRepository(db *gorm.DB) domain.Repository {
+func NewClinicianRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domain.Repository {
 	repo := &clinicianRepository{
-		BaseRepository: mysql.NewBaseRepository[*ClinicianPO](db),
+		BaseRepository: mysql.NewBaseRepository[*ClinicianPO](db, opts...),
 		mapper:         NewClinicianMapper(),
 	}
 	repo.SetErrorTranslator(translateError)

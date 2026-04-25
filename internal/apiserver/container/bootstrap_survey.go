@@ -27,6 +27,7 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 		HotsetRecorder:      c.hotsetRecorder(),
 		Observer:            c.cacheObserver(),
 		TopicResolver:       c.eventCatalog,
+		MongoLimiter:        c.backpressure.Mongo,
 	}
 }
 

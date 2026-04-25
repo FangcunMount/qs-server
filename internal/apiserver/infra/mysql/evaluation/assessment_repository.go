@@ -24,13 +24,13 @@ type assessmentRepository struct {
 }
 
 // NewAssessmentRepository 创建测评仓储
-func NewAssessmentRepository(db *gorm.DB) assessment.Repository {
-	return NewAssessmentRepositoryWithTopicResolver(db, nil)
+func NewAssessmentRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) assessment.Repository {
+	return NewAssessmentRepositoryWithTopicResolver(db, nil, opts...)
 }
 
-func NewAssessmentRepositoryWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver) assessment.Repository {
+func NewAssessmentRepositoryWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver, opts ...mysql.BaseRepositoryOptions) assessment.Repository {
 	repo := &assessmentRepository{
-		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db),
+		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db, opts...),
 		mapper:         NewAssessmentMapper(),
 		outboxStore:    mysqlEventOutbox.NewStoreWithTopicResolver(db, resolver),
 	}

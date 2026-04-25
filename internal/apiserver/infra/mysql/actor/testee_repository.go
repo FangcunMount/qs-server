@@ -17,9 +17,9 @@ type testeeRepository struct {
 }
 
 // NewTesteeRepository 创建受试者仓储
-func NewTesteeRepository(db *gorm.DB) testee.Repository {
+func NewTesteeRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) testee.Repository {
 	repo := &testeeRepository{
-		BaseRepository: mysql.NewBaseRepository[*TesteePO](db),
+		BaseRepository: mysql.NewBaseRepository[*TesteePO](db, opts...),
 		mapper:         NewTesteeMapper(),
 	}
 	// 设置错误转换器

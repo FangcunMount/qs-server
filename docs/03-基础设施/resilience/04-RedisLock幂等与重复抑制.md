@@ -6,9 +6,9 @@
 
 | 场景 | 语义 | 代码 |
 | ---- | ---- | ---- |
-| Scheduler leader | 抢不到锁就跳过本轮 | [`runtime/scheduler`](../../../internal/apiserver/runtime/scheduler/) |
-| Collection submit | in-flight lock + done marker | [`SubmitGuard`](../../../internal/collection-server/infra/redisops/submit_guard.go) |
-| Worker answersheet | best-effort duplicate suppression，降级继续 | [`answersheet_handler.go`](../../../internal/worker/handlers/answersheet_handler.go) |
+| Scheduler leader | 抢不到锁就跳过本轮，runner 依赖 `leaderLeaseRunner` | [`runtime/scheduler`](../../../internal/apiserver/runtime/scheduler/) |
+| Collection submit | application-facing `IdempotencyGuard`，Redis adapter 是 `SubmitGuard` | [`SubmissionService`](../../../internal/collection-server/application/answersheet/submission_service.go)、[`SubmitGuard`](../../../internal/collection-server/infra/redisops/submit_guard.go) |
+| Worker answersheet | package-local `DuplicateSuppressionGate`，降级继续 | [`answersheet_handler.go`](../../../internal/worker/handlers/answersheet_handler.go) |
 | Redis primitive | token-based lease，无自动续租，无 fencing token | [`redislock`](../../../internal/pkg/redislock/) |
 
 ## 模型图
@@ -17,10 +17,11 @@
 flowchart TD
     redislock["redislock.Manager<br/>lease primitive"]
     leader["Leader Lock<br/>skip on contention"]
-    submit["SubmitGuard<br/>done marker + in-flight lock"]
-    duplicate["Worker Gate<br/>best-effort duplicate skip"]
+    leaderPort["leaderLeaseRunner"]
+    submit["IdempotencyGuard<br/>done marker + in-flight lock"]
+    duplicate["DuplicateSuppressionGate<br/>best-effort duplicate skip"]
 
-    redislock --> leader
+    redislock --> leader --> leaderPort
     redislock --> submit
     redislock --> duplicate
 ```
@@ -56,6 +57,7 @@ sequenceDiagram
 - wrong-token release 不能释放其他 owner 的锁。
 - `SubmitGuard.Complete` 写 done marker 失败时保留 in-flight lock，等待 TTL 过期。
 - worker gate 失败时继续处理，正确性依赖下游幂等和唯一约束。
+- 三类 lock 语义接口只存在于消费方边界，不上移到 `redislock` primitive。
 
 ## Verify
 

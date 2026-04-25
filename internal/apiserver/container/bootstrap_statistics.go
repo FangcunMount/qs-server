@@ -53,6 +53,7 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 		LockManager:      c.CacheLockManager(),
 		VersionStore:     versionStore,
 		Observer:         c.cacheObserver(),
+		MySQLLimiter:     c.backpressure.MySQL,
 	}
 }
 

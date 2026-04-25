@@ -16,9 +16,9 @@ type StatisticsRepository struct {
 }
 
 // NewStatisticsRepository 创建统计仓储
-func NewStatisticsRepository(db *gorm.DB) *StatisticsRepository {
+func NewStatisticsRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) *StatisticsRepository {
 	return &StatisticsRepository{
-		BaseRepository: mysql.NewBaseRepository[*StatisticsAccumulatedPO](db),
+		BaseRepository: mysql.NewBaseRepository[*StatisticsAccumulatedPO](db, opts...),
 		db:             db,
 	}
 }

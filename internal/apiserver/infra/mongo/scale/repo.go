@@ -20,10 +20,10 @@ type Repository struct {
 }
 
 // NewRepository 创建 Scale MongoDB 存储库
-func NewRepository(db *mongo.Database) scale.Repository {
+func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) scale.Repository {
 	po := &ScalePO{}
 	return &Repository{
-		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName()),
+		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),
 		mapper:         NewScaleMapper(),
 	}
 }

@@ -17,9 +17,9 @@ type operatorRepository struct {
 }
 
 // NewOperatorRepository 创建操作者仓储
-func NewOperatorRepository(db *gorm.DB) domain.Repository {
+func NewOperatorRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domain.Repository {
 	repo := &operatorRepository{
-		BaseRepository: mysql.NewBaseRepository[*OperatorPO](db),
+		BaseRepository: mysql.NewBaseRepository[*OperatorPO](db, opts...),
 		mapper:         NewOperatorMapper(),
 	}
 	// 设置错误转换器
@@ -28,8 +28,8 @@ func NewOperatorRepository(db *gorm.DB) domain.Repository {
 }
 
 // NewStaffRepository 兼容旧构造函数，内部委托到 NewOperatorRepository。
-func NewStaffRepository(db *gorm.DB) domain.Repository {
-	return NewOperatorRepository(db)
+func NewStaffRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domain.Repository {
+	return NewOperatorRepository(db, opts...)
 }
 
 // Save 保存操作者

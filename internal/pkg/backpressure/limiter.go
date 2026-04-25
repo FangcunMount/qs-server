@@ -15,6 +15,10 @@ type Limiter struct {
 	observer resilienceplane.Observer
 }
 
+type Acquirer interface {
+	Acquire(context.Context) (context.Context, func(), error)
+}
+
 type Options struct {
 	Component  string
 	Dependency string

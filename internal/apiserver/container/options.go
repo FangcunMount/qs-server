@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 )
@@ -22,12 +23,20 @@ type ContainerOptions struct {
 	Cache ContainerCacheOptions
 	// CacheSubsystem cache 子系统组合根。
 	CacheSubsystem *cachebootstrap.Subsystem
+	// Backpressure 下游依赖背压 limiter，显式传入各 infra adapter。
+	Backpressure BackpressureOptions
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
 	StatisticsRepairWindowDays int
 	// Silent suppresses container stdout bootstrap/cleanup prints.
 	Silent bool
+}
+
+type BackpressureOptions struct {
+	MySQL backpressure.Acquirer
+	Mongo backpressure.Acquirer
+	IAM   backpressure.Acquirer
 }
 
 type ContainerCacheOptions = cachebootstrap.CacheOptions

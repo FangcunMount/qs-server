@@ -18,28 +18,31 @@ import (
 type BaseRepository struct {
 	db         *mongo.Database
 	collection *mongo.Collection
+	limiter    backpressure.Acquirer
 }
 
-var limiter *backpressure.Limiter
-
-// SetLimiter configures a global limiter for Mongo operations.
-func SetLimiter(l *backpressure.Limiter) {
-	limiter = l
-}
-
-func acquire(ctx context.Context) (context.Context, func(), error) {
-	if limiter == nil {
-		return ctx, func() {}, nil
-	}
-	return limiter.Acquire(ctx)
+type BaseRepositoryOptions struct {
+	Limiter backpressure.Acquirer
 }
 
 // NewBaseRepository 创建基础存储库
-func NewBaseRepository(db *mongo.Database, collectionName string) BaseRepository {
+func NewBaseRepository(db *mongo.Database, collectionName string, opts ...BaseRepositoryOptions) BaseRepository {
+	options := BaseRepositoryOptions{}
+	if len(opts) > 0 {
+		options = opts[0]
+	}
 	return BaseRepository{
 		db:         db,
 		collection: db.Collection(collectionName),
+		limiter:    options.Limiter,
 	}
+}
+
+func (r *BaseRepository) acquire(ctx context.Context) (context.Context, func(), error) {
+	if r == nil || r.limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return r.limiter.Acquire(ctx)
 }
 
 // DB 获取数据库连接
@@ -54,7 +57,7 @@ func (r *BaseRepository) Collection() *mongo.Collection {
 
 // InsertOne 插入一条文档
 func (r *BaseRepository) InsertOne(ctx context.Context, document interface{}) (*mongo.InsertOneResult, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +67,7 @@ func (r *BaseRepository) InsertOne(ctx context.Context, document interface{}) (*
 
 // FindOne 查找一条文档
 func (r *BaseRepository) FindOne(ctx context.Context, filter bson.M, result interface{}) error {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return err
 	}
@@ -74,7 +77,7 @@ func (r *BaseRepository) FindOne(ctx context.Context, filter bson.M, result inte
 
 // FindByID 根据ObjectID查找文档
 func (r *BaseRepository) FindByID(ctx context.Context, id primitive.ObjectID, result interface{}) error {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return err
 	}
@@ -85,7 +88,7 @@ func (r *BaseRepository) FindByID(ctx context.Context, id primitive.ObjectID, re
 
 // UpdateOne 更新一条文档
 func (r *BaseRepository) UpdateOne(ctx context.Context, filter bson.M, update bson.M) (*mongo.UpdateResult, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +98,7 @@ func (r *BaseRepository) UpdateOne(ctx context.Context, filter bson.M, update bs
 
 // UpdateByID 根据ObjectID更新文档
 func (r *BaseRepository) UpdateByID(ctx context.Context, id primitive.ObjectID, update bson.M) (*mongo.UpdateResult, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +109,7 @@ func (r *BaseRepository) UpdateByID(ctx context.Context, id primitive.ObjectID, 
 
 // DeleteOne 删除一条文档
 func (r *BaseRepository) DeleteOne(ctx context.Context, filter bson.M) (*mongo.DeleteResult, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +119,7 @@ func (r *BaseRepository) DeleteOne(ctx context.Context, filter bson.M) (*mongo.D
 
 // DeleteByID 根据ObjectID删除文档
 func (r *BaseRepository) DeleteByID(ctx context.Context, id primitive.ObjectID) (*mongo.DeleteResult, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +130,7 @@ func (r *BaseRepository) DeleteByID(ctx context.Context, id primitive.ObjectID) 
 
 // Find 查找多条文档
 func (r *BaseRepository) Find(ctx context.Context, filter bson.M, opts ...*options.FindOptions) (*mongo.Cursor, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +140,7 @@ func (r *BaseRepository) Find(ctx context.Context, filter bson.M, opts ...*optio
 
 // CountDocuments 统计文档数量
 func (r *BaseRepository) CountDocuments(ctx context.Context, filter bson.M) (int64, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -147,7 +150,7 @@ func (r *BaseRepository) CountDocuments(ctx context.Context, filter bson.M) (int
 
 // ExistsByFilter 检查是否存在符合条件的文档
 func (r *BaseRepository) ExistsByFilter(ctx context.Context, filter bson.M) (bool, error) {
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return false, err
 	}

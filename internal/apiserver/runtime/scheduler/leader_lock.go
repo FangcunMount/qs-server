@@ -13,6 +13,11 @@ type leaderLockAcquireFunc func(context.Context, redislock.Spec, string, time.Du
 
 type leaderLockReleaseFunc func(context.Context, redislock.Spec, string, *redislock.Lease) error
 
+type leaderLeaseRunner interface {
+	DisplayKey() string
+	Run(ctx context.Context, opts leaderLockRunOptions, body func(context.Context) error) error
+}
+
 type leaderLock struct {
 	spec       redislock.Spec
 	rawKey     string

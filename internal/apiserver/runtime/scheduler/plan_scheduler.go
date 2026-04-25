@@ -20,7 +20,7 @@ type planCommandService interface {
 type PlanRunner struct {
 	opts    *apiserveroptions.PlanSchedulerOptions
 	command planCommandService
-	leader  *leaderLock
+	leader  leaderLeaseRunner
 }
 
 // NewPlanRunner creates the apiserver plan scheduler runner.

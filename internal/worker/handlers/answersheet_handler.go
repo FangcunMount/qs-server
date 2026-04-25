@@ -26,9 +26,29 @@ type answerSheetProcessingGateHooks struct {
 	release func(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error
 }
 
+type DuplicateSuppressionGate interface {
+	Run(ctx context.Context, deps *Dependencies, eventID string, answerSheetID uint64, fn func(context.Context) error) error
+}
+
+type answerSheetDuplicateSuppressionGate struct {
+	hooks answerSheetProcessingGateHooks
+}
+
+var _ DuplicateSuppressionGate = answerSheetDuplicateSuppressionGate{}
+
 var defaultAnswerSheetProcessingGateHooks = answerSheetProcessingGateHooks{
 	acquire: acquireProcessingLock,
 	release: releaseProcessingLock,
+}
+
+func newAnswerSheetDuplicateSuppressionGate(hooks answerSheetProcessingGateHooks) DuplicateSuppressionGate {
+	if hooks.acquire == nil {
+		hooks.acquire = acquireProcessingLock
+	}
+	if hooks.release == nil {
+		hooks.release = releaseProcessingLock
+	}
+	return answerSheetDuplicateSuppressionGate{hooks: hooks}
 }
 
 // handleAnswerSheetSubmitted 返回答卷提交处理函数
@@ -44,13 +64,14 @@ func handleAnswerSheetSubmittedWithHooks(
 	deps *Dependencies,
 	hooks answerSheetProcessingGateHooks,
 ) HandlerFunc {
+	gate := newAnswerSheetDuplicateSuppressionGate(hooks)
 	return func(ctx context.Context, _ string, payload []byte) error {
 		env, answerSheetID, data, err := parseAnswerSheetData(deps, payload)
 		if err != nil {
 			return fmt.Errorf("failed to parse answersheet submitted event: %w", err)
 		}
 
-		return withAnswerSheetProcessingGate(ctx, deps, env.ID, answerSheetID, hooks, func(runCtx context.Context) error {
+		return gate.Run(ctx, deps, env.ID, answerSheetID, func(runCtx context.Context) error {
 			// Step 1: 计算答卷分数（在 Survey 域完成）
 			if err := calculateAnswerSheetScore(runCtx, deps, answerSheetID); err != nil {
 				deps.Logger.Error("failed to calculate answersheet score",
@@ -109,13 +130,16 @@ func withAnswerSheetProcessingGate(
 	hooks answerSheetProcessingGateHooks,
 	fn func(context.Context) error,
 ) error {
-	if hooks.acquire == nil {
-		hooks.acquire = acquireProcessingLock
-	}
-	if hooks.release == nil {
-		hooks.release = releaseProcessingLock
-	}
+	return newAnswerSheetDuplicateSuppressionGate(hooks).Run(ctx, deps, eventID, answerSheetID, fn)
+}
 
+func (g answerSheetDuplicateSuppressionGate) Run(
+	ctx context.Context,
+	deps *Dependencies,
+	eventID string,
+	answerSheetID uint64,
+	fn func(context.Context) error,
+) error {
 	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
 	lockKey := answerSheetProcessingLockKey(deps, answerSheetID)
 
@@ -132,7 +156,7 @@ func withAnswerSheetProcessingGate(
 		return fn(ctx)
 	}
 
-	lease, acquired, err := hooks.acquire(ctx, deps, answerSheetID)
+	lease, acquired, err := g.hooks.acquire(ctx, deps, answerSheetID)
 	if err != nil {
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
 		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDegradedOpen)
@@ -165,7 +189,7 @@ func withAnswerSheetProcessingGate(
 	)
 
 	defer func() {
-		if err := hooks.release(ctx, deps, answerSheetID, lease); err != nil {
+		if err := g.hooks.release(ctx, deps, answerSheetID, lease); err != nil {
 			deps.Logger.Warn("failed to release answersheet processing gate",
 				slog.String("event_id", eventID),
 				slog.String("answersheet_id", answerSheetIDStr),

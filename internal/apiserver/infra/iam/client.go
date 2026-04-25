@@ -73,24 +73,19 @@ type Client struct {
 	sdk     *sdk.Client
 	config  *IAMOptions
 	enabled bool
+	limiter backpressure.Acquirer
 }
 
-var limiter *backpressure.Limiter
-
-// SetLimiter configures a global limiter for IAM calls.
-func SetLimiter(l *backpressure.Limiter) {
-	limiter = l
-}
-
-func acquire(ctx context.Context) (context.Context, func(), error) {
-	if limiter == nil {
-		return ctx, func() {}, nil
-	}
-	return limiter.Acquire(ctx)
+type ClientRuntimeOptions struct {
+	Limiter backpressure.Acquirer
 }
 
 // NewClient 创建 IAM 客户端
 func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
+	return NewClientWithRuntimeOptions(ctx, opts, ClientRuntimeOptions{})
+}
+
+func NewClientWithRuntimeOptions(ctx context.Context, opts *IAMOptions, runtime ClientRuntimeOptions) (*Client, error) {
 	l := logger.L(ctx)
 
 	if opts == nil || !opts.Enabled {
@@ -100,6 +95,7 @@ func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
 		return &Client{
 			enabled: false,
 			config:  opts,
+			limiter: runtime.Limiter,
 		}, nil
 	}
 
@@ -156,7 +152,15 @@ func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
 		sdk:     client,
 		config:  opts,
 		enabled: true,
+		limiter: runtime.Limiter,
 	}, nil
+}
+
+func (c *Client) Limiter() backpressure.Acquirer {
+	if c == nil {
+		return nil
+	}
+	return c.limiter
 }
 
 // SDK 返回底层的 SDK 客户端

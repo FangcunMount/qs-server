@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
@@ -24,8 +25,16 @@ type IAMModule struct {
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
 }
 
+type IAMModuleRuntimeOptions struct {
+	Limiter backpressure.Acquirer
+}
+
 // NewIAMModule 创建 IAM 模块
 func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, error) {
+	return NewIAMModuleWithRuntimeOptions(ctx, opts, IAMModuleRuntimeOptions{})
+}
+
+func NewIAMModuleWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtime IAMModuleRuntimeOptions) (*IAMModule, error) {
 	if opts == nil || !opts.Enabled {
 		logger.L(context.Background()).Infow("IAM integration is disabled",
 			"component", "iam_module",
@@ -37,7 +46,9 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 	clientOpts := convertIAMOptions(opts)
 
 	// 创建 IAM 客户端
-	client, err := iam.NewClient(ctx, clientOpts)
+	client, err := iam.NewClientWithRuntimeOptions(ctx, clientOpts, iam.ClientRuntimeOptions{
+		Limiter: runtime.Limiter,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}

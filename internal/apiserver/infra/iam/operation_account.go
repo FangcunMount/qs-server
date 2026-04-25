@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/client"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 type RegisterOperationAccountInput struct {
@@ -33,6 +34,7 @@ type RegisterOperationAccountResult struct {
 type OperationAccountService struct {
 	client  *auth.Client
 	enabled bool
+	limiter backpressure.Acquirer
 }
 
 func NewOperationAccountService(client *Client) (*OperationAccountService, error) {
@@ -57,6 +59,7 @@ func NewOperationAccountService(client *Client) (*OperationAccountService, error
 	return &OperationAccountService{
 		client:  authClient,
 		enabled: true,
+		limiter: client.Limiter(),
 	}, nil
 }
 
@@ -68,7 +71,7 @@ func (s *OperationAccountService) RegisterOperationAccount(ctx context.Context, 
 	if !s.enabled {
 		return nil, fmt.Errorf("operation account service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,4 +106,11 @@ func (s *OperationAccountService) RegisterOperationAccount(ctx context.Context, 
 		IsNewUser:    resp.GetIsNewUser(),
 		IsNewAccount: resp.GetIsNewAccount(),
 	}, nil
+}
+
+func (s *OperationAccountService) acquire(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || s.limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return s.limiter.Acquire(ctx)
 }

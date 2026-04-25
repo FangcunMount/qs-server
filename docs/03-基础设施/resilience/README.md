@@ -9,8 +9,8 @@
 | 真值入口 | 代码与配置优先；本文是 Resilience Plane 文档地图 |
 | 核心模型 | [`internal/pkg/resilienceplane`](../../../internal/pkg/resilienceplane/) 只定义 outcome vocabulary 和 observer，不实现业务逻辑 |
 | 入口保护 | HTTP rate limit + collection `SubmitQueue` |
-| 依赖保护 | apiserver MySQL / Mongo / IAM in-flight backpressure |
-| 重复抑制 | Redis lease primitive + caller-owned semantics |
+| 依赖保护 | apiserver MySQL / Mongo / IAM in-flight backpressure，显式注入到 repo/client |
+| 重复抑制 | Redis lease primitive + caller-owned `leader/idempotency/duplicate` semantics |
 | 降级边界 | collection Redis limiter fail-open；worker duplicate gate degraded-continue |
 
 ## 阅读顺序

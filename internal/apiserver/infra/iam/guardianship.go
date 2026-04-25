@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
 	"github.com/FangcunMount/iam-contracts/pkg/sdk/identity"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 // GuardianshipService 监护关系服务封装
@@ -14,6 +15,7 @@ import (
 type GuardianshipService struct {
 	client  *identity.GuardianshipClient
 	enabled bool
+	limiter backpressure.Acquirer
 }
 
 // NewGuardianshipService 创建监护关系服务
@@ -39,6 +41,7 @@ func NewGuardianshipService(client *Client) (*GuardianshipService, error) {
 	return &GuardianshipService{
 		client:  guardianshipClient,
 		enabled: true,
+		limiter: client.Limiter(),
 	}, nil
 }
 
@@ -54,7 +57,7 @@ func (s *GuardianshipService) IsGuardian(ctx context.Context, userID, childID st
 		return false, fmt.Errorf("guardianship service not enabled")
 	}
 
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -73,7 +76,7 @@ func (s *GuardianshipService) IsGuardianWithDetails(ctx context.Context, userID,
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +98,7 @@ func (s *GuardianshipService) ValidateChildExists(ctx context.Context, childID s
 	}
 
 	// 通过查询监护人列表来验证 child 是否存在
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return err
 	}
@@ -131,7 +134,7 @@ func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +149,7 @@ func (s *GuardianshipService) ListGuardians(ctx context.Context, childID string)
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +164,7 @@ func (s *GuardianshipService) AddGuardian(ctx context.Context, req *identityv1.A
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +177,7 @@ func (s *GuardianshipService) RevokeGuardian(ctx context.Context, req *identityv
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +190,7 @@ func (s *GuardianshipService) BatchRevokeGuardians(ctx context.Context, req *ide
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +203,7 @@ func (s *GuardianshipService) ImportGuardians(ctx context.Context, req *identity
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
-	ctx, release, err := acquire(ctx)
+	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -211,4 +214,11 @@ func (s *GuardianshipService) ImportGuardians(ctx context.Context, req *identity
 // Raw 返回原始 SDK 客户端（用于高级用法）
 func (s *GuardianshipService) Raw() *identity.GuardianshipClient {
 	return s.client
+}
+
+func (s *GuardianshipService) acquire(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || s.limiter == nil {
+		return ctx, func() {}, nil
+	}
+	return s.limiter.Acquire(ctx)
 }
