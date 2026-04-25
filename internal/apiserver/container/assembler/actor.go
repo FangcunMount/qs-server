@@ -29,7 +29,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
@@ -77,7 +77,7 @@ type ActorModuleDeps struct {
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	OperationAccountSvc *iam.OperationAccountService
 	Observer            *cacheobservability.ComponentObserver
-	TopicResolver       eventconfig.TopicResolver
+	TopicResolver       eventcatalog.TopicResolver
 }
 
 // NewActorModule 创建 Actor 模块。

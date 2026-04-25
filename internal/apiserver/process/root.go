@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
@@ -42,7 +42,7 @@ type resourceHandles struct {
 
 type messagingOutput struct {
 	mqPublisher messaging.Publisher
-	publishMode eventconfig.PublishMode
+	publishMode eventruntime.PublishMode
 }
 
 type cacheRuntimeOutput struct {

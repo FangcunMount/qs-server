@@ -4,13 +4,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 const (
 	// EventTypeChanged 量表生命周期变化
-	EventTypeChanged = eventconfig.ScaleChanged
+	EventTypeChanged = eventcatalog.ScaleChanged
 )
 
 // AggregateType 聚合根类型

@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -24,13 +25,17 @@ type Repository struct {
 
 // NewRepository 创建答卷MongoDB存储库
 func NewRepository(db *mongo.Database) (*Repository, error) {
+	return NewRepositoryWithTopicResolver(db, nil)
+}
+
+func NewRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver) (*Repository, error) {
 	po := &AnswerSheetPO{}
 	repo := &Repository{
 		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName()),
 		mapper:          NewAnswerSheetMapper(),
 		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
 	}
-	outboxStore, err := mongoEventOutbox.NewStore(db)
+	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(db, resolver)
 	if err != nil {
 		return nil, err
 	}

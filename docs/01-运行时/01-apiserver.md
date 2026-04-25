@@ -115,7 +115,7 @@ sequenceDiagram
 
 **统计同步 ticker**：`startStatisticsSyncScheduler` 内为三轮 `SyncDaily/Accumulated/Plan` **单独注册**一条 `ShutdownCallback`，仅对 ticker 使用的 **context 调用 `cancel()`**，使 goroutine 在 `select` 上退出。**与主回调同属** `GracefulShutdown`；若关心「cancel 与关库的先后」，以 **回调注册顺序** 与 **`github.com/FangcunMount/component-base/pkg/shutdown` 的实际 invocation 顺序**为准（排障时可打日志核对）。
 
-**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 resource stage 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container/bootstrap_notification.go](../../internal/apiserver/container/bootstrap_notification.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。与此同时，runtime stage 还会按配置启动 **Mongo outbox relay** 与 **assessment MySQL outbox relay**；它们并不只补发 `answersheet.submitted` 和 `assessment.* / report.generated`，也会按持久化边界补发已经 staged 的 `footprint.*` 行为事件。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
+**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 resource stage 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventruntime.NewRoutingPublisher`**（[container/root.go](../../internal/apiserver/container/root.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。与此同时，runtime stage 还会按配置启动 **Mongo outbox relay** 与 **assessment MySQL outbox relay**；它们并不只补发 `answersheet.submitted` 和 `assessment.* / report.generated`，也会按持久化边界补发已经 staged 的 `footprint.*` 行为事件。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
 
 **IAM 授权版本同步**：与业务事件总线分离，`apiserver` 通过 **`iam.authz-sync.*`** 创建独立订阅者，消费 **`iam.authz.version`** 控制面主题以推进本地授权快照失效，见 [process/container_bootstrap.go](../../internal/apiserver/process/container_bootstrap.go) 与 [version_sync.go](../../internal/pkg/iamauth/version_sync.go)。
 
@@ -125,7 +125,7 @@ sequenceDiagram
 
 这一节只回答“本进程里谁在发事件、发布点落在哪”；Topic 映射和 worker 消费机制回看 [03-事件系统](../03-基础设施/01-事件系统.md)。
 
-**配置与 Topic 映射**仍以 [`configs/events.yaml`](../../configs/events.yaml) 与 [03-事件系统](../03-基础设施/01-事件系统.md) 为 **Verify**；**本进程内谁在发**集中在 **应用服务 / 流水线**，经 **`Container.GetEventPublisher()`** 注入的 **`event.EventPublisher`**（内部多为 [RoutingPublisher](../../internal/pkg/eventconfig/publisher.go)）调用 **`Publish`**。
+**配置与 Topic 映射**仍以 [`configs/events.yaml`](../../configs/events.yaml) 与 [03-事件系统](../03-基础设施/01-事件系统.md) 为 **Verify**；**本进程内谁在发**集中在 **应用服务 / 流水线**，经 **`Container.GetEventPublisher()`** 注入的 **`event.EventPublisher`**（内部多为 [RoutingPublisher](../../internal/pkg/eventruntime/publisher.go)）调用 **`Publish`**。
 
 | 领域 / 场景 | 典型行为 | 代码锚点（示例） |
 | ----------- | -------- | ---------------- |

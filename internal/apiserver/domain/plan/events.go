@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -20,13 +20,13 @@ const (
 
 const (
 	// EventTypeTaskOpened 任务开放事件
-	EventTypeTaskOpened = eventconfig.TaskOpened
+	EventTypeTaskOpened = eventcatalog.TaskOpened
 	// EventTypeTaskCompleted 任务完成事件
-	EventTypeTaskCompleted = eventconfig.TaskCompleted
+	EventTypeTaskCompleted = eventcatalog.TaskCompleted
 	// EventTypeTaskExpired 任务过期事件
-	EventTypeTaskExpired = eventconfig.TaskExpired
+	EventTypeTaskExpired = eventcatalog.TaskExpired
 	// EventTypeTaskCanceled 任务取消事件
-	EventTypeTaskCanceled = eventconfig.TaskCanceled
+	EventTypeTaskCanceled = eventcatalog.TaskCanceled
 )
 
 // ==================== 事件 Payload 定义 ====================

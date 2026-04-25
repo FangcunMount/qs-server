@@ -4,7 +4,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 )
 
 // ContainerOptions 容器配置选项。
@@ -12,7 +13,9 @@ type ContainerOptions struct {
 	// MQPublisher 消息队列发布器（可选，传入则启用 MQ 模式）
 	MQPublisher messaging.Publisher
 	// PublisherMode 事件发布器模式（mq, logging, nop）
-	PublisherMode eventconfig.PublishMode
+	PublisherMode eventruntime.PublishMode
+	// EventCatalog 事件契约 catalog，发布器和 outbox topic resolver 共享。
+	EventCatalog *eventcatalog.Catalog
 	// Env 环境名称（prod, dev, test），用于自动选择发布器模式
 	Env string
 	// Cache 缓存控制选项

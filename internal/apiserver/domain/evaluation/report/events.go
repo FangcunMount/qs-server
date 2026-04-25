@@ -3,7 +3,7 @@ package report
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -12,7 +12,7 @@ import (
 
 const (
 	// EventTypeGenerated 报告已生成
-	EventTypeGenerated = eventconfig.ReportGenerated
+	EventTypeGenerated = eventcatalog.ReportGenerated
 )
 
 // AggregateType 聚合根类型

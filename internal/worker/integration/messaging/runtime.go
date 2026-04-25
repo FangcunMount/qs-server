@@ -17,6 +17,71 @@ type eventDispatcher interface {
 	DispatchEvent(ctx context.Context, eventType string, payload []byte) error
 }
 
+type MessageEventExtractor struct{}
+
+func (MessageEventExtractor) Extract(msg *basemessaging.Message) (string, error) {
+	if msg.Metadata == nil {
+		msg.Metadata = map[string]string{}
+	}
+	if eventType, ok := msg.Metadata["event_type"]; ok {
+		return eventType, nil
+	}
+	env, err := handlers.ParseEventEnvelope(msg.Payload)
+	if err != nil {
+		return "", err
+	}
+	msg.Metadata["event_type"] = env.EventType
+	return env.EventType, nil
+}
+
+type MessageSettlementPolicy struct {
+	logger *slog.Logger
+	topic  string
+}
+
+func (p MessageSettlementPolicy) AckInvalid(msg *basemessaging.Message, parseErr error) {
+	p.logger.Warn("message missing event_type and payload parse failed",
+		slog.String("topic", p.topic),
+		slog.String("msg_id", msg.UUID),
+		slog.String("error", parseErr.Error()),
+	)
+	if ackErr := msg.Ack(); ackErr != nil {
+		p.logger.Warn("failed to ack invalid message",
+			slog.String("topic", p.topic),
+			slog.String("msg_id", msg.UUID),
+			slog.String("error", ackErr.Error()),
+		)
+	}
+}
+
+func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventType string, dispatchErr error) {
+	p.logger.Error("failed to dispatch event",
+		slog.String("topic", p.topic),
+		slog.String("event_type", eventType),
+		slog.String("msg_id", msg.UUID),
+		slog.String("error", dispatchErr.Error()),
+	)
+	if nackErr := msg.Nack(); nackErr != nil {
+		p.logger.Warn("failed to nack message",
+			slog.String("topic", p.topic),
+			slog.String("msg_id", msg.UUID),
+			slog.String("error", nackErr.Error()),
+		)
+	}
+}
+
+func (p MessageSettlementPolicy) AckSuccess(msg *basemessaging.Message) error {
+	if ackErr := msg.Ack(); ackErr != nil {
+		p.logger.Warn("failed to ack message",
+			slog.String("topic", p.topic),
+			slog.String("msg_id", msg.UUID),
+			slog.String("error", ackErr.Error()),
+		)
+		return ackErr
+	}
+	return nil
+}
+
 func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
 	switch cfg.Provider {
 	case "nsq":
@@ -80,33 +145,13 @@ func SubscribeHandlers(serviceName string, logger *slog.Logger, c *container.Con
 }
 
 func createDispatchHandler(logger *slog.Logger, dispatcher eventDispatcher, topicName string) basemessaging.Handler {
+	extractor := MessageEventExtractor{}
+	settlement := MessageSettlementPolicy{logger: logger, topic: topicName}
 	return func(ctx context.Context, msg *basemessaging.Message) error {
-		if msg.Metadata == nil {
-			msg.Metadata = map[string]string{}
-		}
-		eventType, ok := msg.Metadata["event_type"]
-		if !ok {
-			env, err := handlers.ParseEventEnvelope(msg.Payload)
-			if err != nil {
-				logger.Warn("message missing event_type and payload parse failed",
-					slog.String("topic", topicName),
-					slog.String("msg_id", msg.UUID),
-					slog.String("error", err.Error()),
-				)
-				if ackErr := msg.Ack(); ackErr != nil {
-					logger.Warn("failed to ack invalid message",
-						slog.String("topic", topicName),
-						slog.String("msg_id", msg.UUID),
-						slog.String("error", ackErr.Error()),
-					)
-				}
-				return nil
-			}
-			eventType = env.EventType
-			if msg.Metadata == nil {
-				msg.Metadata = map[string]string{}
-			}
-			msg.Metadata["event_type"] = eventType
+		eventType, err := extractor.Extract(msg)
+		if err != nil {
+			settlement.AckInvalid(msg, err)
+			return nil
 		}
 
 		logger.Debug("received message",
@@ -116,30 +161,10 @@ func createDispatchHandler(logger *slog.Logger, dispatcher eventDispatcher, topi
 		)
 
 		if err := dispatcher.DispatchEvent(ctx, eventType, msg.Payload); err != nil {
-			logger.Error("failed to dispatch event",
-				slog.String("topic", topicName),
-				slog.String("event_type", eventType),
-				slog.String("msg_id", msg.UUID),
-				slog.String("error", err.Error()),
-			)
-			if nackErr := msg.Nack(); nackErr != nil {
-				logger.Warn("failed to nack message",
-					slog.String("topic", topicName),
-					slog.String("msg_id", msg.UUID),
-					slog.String("error", nackErr.Error()),
-				)
-			}
+			settlement.NackFailed(msg, eventType, err)
 			return err
 		}
 
-		if ackErr := msg.Ack(); ackErr != nil {
-			logger.Warn("failed to ack message",
-				slog.String("topic", topicName),
-				slog.String("msg_id", msg.UUID),
-				slog.String("error", ackErr.Error()),
-			)
-			return ackErr
-		}
-		return nil
+		return settlement.AckSuccess(msg)
 	}
 }

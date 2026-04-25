@@ -7,6 +7,11 @@ type Catalog struct {
 	topicToEvents map[string][]string
 }
 
+// TopicResolver resolves an event type to its physical topic name.
+type TopicResolver interface {
+	GetTopicForEvent(eventType string) (string, bool)
+}
+
 // NewCatalog builds a query catalog from a validated config.
 func NewCatalog(cfg *Config) *Catalog {
 	c := &Catalog{

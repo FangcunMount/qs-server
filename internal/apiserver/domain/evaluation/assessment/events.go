@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -14,11 +14,11 @@ import (
 
 const (
 	// EventTypeSubmitted 测评已提交
-	EventTypeSubmitted = eventconfig.AssessmentSubmitted
+	EventTypeSubmitted = eventcatalog.AssessmentSubmitted
 	// EventTypeInterpreted 测评已解读
-	EventTypeInterpreted = eventconfig.AssessmentInterpreted
+	EventTypeInterpreted = eventcatalog.AssessmentInterpreted
 	// EventTypeFailed 测评失败
-	EventTypeFailed = eventconfig.AssessmentFailed
+	EventTypeFailed = eventcatalog.AssessmentFailed
 )
 
 // AggregateType 聚合根类型

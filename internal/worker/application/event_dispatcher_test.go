@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 func TestEventDispatcherInitializesCurrentRuntimeTopics(t *testing.T) {
@@ -23,7 +23,7 @@ func TestEventDispatcherInitializesCurrentRuntimeTopics(t *testing.T) {
 		t.Fatalf("expected 4 topic subscriptions, got %d", len(subs))
 	}
 
-	cfg, err := eventconfig.Load("../../../configs/events.yaml")
+	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}

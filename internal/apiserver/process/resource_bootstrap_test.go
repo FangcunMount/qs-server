@@ -10,7 +10,8 @@ import (
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,6 +35,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	runtimeBundle := &redisbootstrap.RuntimeBundle{Component: "apiserver"}
 	subsystem := &cachebootstrap.Subsystem{}
 	publisher := &fakePublisher{}
+	catalog := eventcatalog.NewCatalog(nil)
 
 	var backpressureConfigured bool
 	var buildOptionsInput containerOptionsInput
@@ -56,11 +58,12 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			},
 		},
 		mqPublisher: mqPublisherStageDeps{
-			fallbackMode: eventconfig.PublishModeLogging,
+			fallbackMode: eventruntime.PublishModeLogging,
 			enabled:      true,
 			provider:     "stub",
 			newPublisher: func() (messaging.Publisher, error) { return publisher, nil },
 		},
+		loadEventCatalog:  func() (*eventcatalog.Catalog, error) { return catalog, nil },
 		applyBackpressure: func() { backpressureConfigured = true },
 		buildContainerOptions: func(output containerOptionsInput) container.ContainerOptions {
 			buildOptionsInput = output
@@ -89,13 +92,13 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if got.messaging.mqPublisher != publisher {
 		t.Fatalf("mqPublisher = %#v, want %#v", got.messaging.mqPublisher, publisher)
 	}
-	if got.messaging.publishMode != eventconfig.PublishModeMQ {
-		t.Fatalf("publishMode = %q, want %q", got.messaging.publishMode, eventconfig.PublishModeMQ)
+	if got.messaging.publishMode != eventruntime.PublishModeMQ {
+		t.Fatalf("publishMode = %q, want %q", got.messaging.publishMode, eventruntime.PublishModeMQ)
 	}
 	if got.containerInput.containerOptions != wantOptions {
 		t.Fatalf("containerOptions = %#v, want %#v", got.containerInput.containerOptions, wantOptions)
 	}
-	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.mqPublisher != publisher {
+	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.mqPublisher != publisher || buildOptionsInput.eventCatalog != catalog {
 		t.Fatalf("buildContainerOptions input mismatch: %#v", buildOptionsInput)
 	}
 }
@@ -129,7 +132,7 @@ func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T
 
 func TestCreateMQPublisherFallsBackToLoggingModeOnPublisherError(t *testing.T) {
 	publisher, mode := createMQPublisher(mqPublisherStageDeps{
-		fallbackMode: eventconfig.PublishModeLogging,
+		fallbackMode: eventruntime.PublishModeLogging,
 		enabled:      true,
 		provider:     "unsupported",
 		newPublisher: func() (messaging.Publisher, error) { return nil, errors.New("boom") },
@@ -138,8 +141,8 @@ func TestCreateMQPublisherFallsBackToLoggingModeOnPublisherError(t *testing.T) {
 	if publisher != nil {
 		t.Fatalf("publisher = %#v, want nil on fallback", publisher)
 	}
-	if mode != eventconfig.PublishModeLogging {
-		t.Fatalf("publish mode = %q, want %q", mode, eventconfig.PublishModeLogging)
+	if mode != eventruntime.PublishModeLogging {
+		t.Fatalf("publish mode = %q, want %q", mode, eventruntime.PublishModeLogging)
 	}
 }
 

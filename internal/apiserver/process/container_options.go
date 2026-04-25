@@ -7,12 +7,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 )
 
 type containerOptionsInput struct {
 	mqPublisher    messaging.Publisher
-	publishMode    eventconfig.PublishMode
+	publishMode    eventruntime.PublishMode
+	eventCatalog   *eventcatalog.Catalog
 	cacheSubsystem *cachebootstrap.Subsystem
 }
 
@@ -20,6 +22,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 	return container.ContainerOptions{
 		MQPublisher:                input.mqPublisher,
 		PublisherMode:              input.publishMode,
+		EventCatalog:               input.eventCatalog,
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,

@@ -311,7 +311,7 @@ sequenceDiagram
 
 #### 领域事件（须与配置一致）
 
-事件类型字符串与 [`configs/events.yaml`](../../configs/events.yaml)、[eventconfig](../../internal/pkg/eventconfig) 对齐。
+事件类型字符串与 [`configs/events.yaml`](../../configs/events.yaml)、[eventcatalog](../../internal/pkg/eventcatalog) 对齐。
 
 | 事件类型 | Topic（name） | handler（yaml） | 当前出站边界 |
 | -------- | -------------- | ----------------- | -------------- |

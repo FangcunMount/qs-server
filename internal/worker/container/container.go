@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
@@ -162,7 +162,7 @@ func (c *Container) SetInternalClient(client *grpcclient.InternalClient) {
 // ==================== Getters ====================
 
 // GetTopicSubscriptions 获取需要订阅的 Topic 列表
-func (c *Container) GetTopicSubscriptions() []eventconfig.TopicSubscription {
+func (c *Container) GetTopicSubscriptions() []eventcatalog.TopicSubscription {
 	if c.eventDispatcher == nil {
 		return nil
 	}

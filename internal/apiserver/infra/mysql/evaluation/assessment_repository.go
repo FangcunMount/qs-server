@@ -11,6 +11,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"gorm.io/gorm"
 )
@@ -24,10 +25,14 @@ type assessmentRepository struct {
 
 // NewAssessmentRepository 创建测评仓储
 func NewAssessmentRepository(db *gorm.DB) assessment.Repository {
+	return NewAssessmentRepositoryWithTopicResolver(db, nil)
+}
+
+func NewAssessmentRepositoryWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver) assessment.Repository {
 	repo := &assessmentRepository{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db),
 		mapper:         NewAssessmentMapper(),
-		outboxStore:    mysqlEventOutbox.NewStore(db),
+		outboxStore:    mysqlEventOutbox.NewStoreWithTopicResolver(db, resolver),
 	}
 	// 设置错误转换器
 	repo.SetErrorTranslator(translateAssessmentError)

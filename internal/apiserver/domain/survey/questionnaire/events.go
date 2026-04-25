@@ -3,13 +3,13 @@ package questionnaire
 import (
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 const (
 	// EventTypeChanged 问卷生命周期变化
-	EventTypeChanged = eventconfig.QuestionnaireChanged
+	EventTypeChanged = eventcatalog.QuestionnaireChanged
 )
 
 // AggregateType 聚合根类型

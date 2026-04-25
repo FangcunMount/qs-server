@@ -65,6 +65,36 @@ func TestDispatchHandlerFallsBackToPayloadEnvelope(t *testing.T) {
 	}
 }
 
+func TestMessageEventExtractorUsesMetadataBeforePayload(t *testing.T) {
+	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
+	msg.Metadata["event_type"] = "metadata.event"
+
+	eventType, err := (MessageEventExtractor{}).Extract(msg)
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	if eventType != "metadata.event" {
+		t.Fatalf("eventType = %q, want metadata.event", eventType)
+	}
+}
+
+func TestMessageSettlementPolicyAckSuccess(t *testing.T) {
+	msg := basemessaging.NewMessage("msg-1", []byte("{}"))
+	ackCount := 0
+	msg.SetAckFunc(func() error {
+		ackCount++
+		return nil
+	})
+
+	policy := MessageSettlementPolicy{logger: testLogger(), topic: "topic"}
+	if err := policy.AckSuccess(msg); err != nil {
+		t.Fatalf("AckSuccess: %v", err)
+	}
+	if ackCount != 1 {
+		t.Fatalf("ackCount = %d, want 1", ackCount)
+	}
+}
+
 func TestDispatchHandlerAcksInvalidPayloadWithoutDispatch(t *testing.T) {
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))

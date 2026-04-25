@@ -4,21 +4,21 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 const BehaviorAggregateType = "BehaviorFootprint"
 
 const (
-	EventTypeFootprintEntryOpened                 = eventconfig.FootprintEntryOpened
-	EventTypeFootprintIntakeConfirmed             = eventconfig.FootprintIntakeConfirmed
-	EventTypeFootprintTesteeProfileCreated        = eventconfig.FootprintTesteeProfileCreated
-	EventTypeFootprintCareRelationshipEstablished = eventconfig.FootprintCareRelationshipEstablished
-	EventTypeFootprintCareRelationshipTransferred = eventconfig.FootprintCareRelationshipTransferred
-	EventTypeFootprintAnswerSheetSubmitted        = eventconfig.FootprintAnswerSheetSubmitted
-	EventTypeFootprintAssessmentCreated           = eventconfig.FootprintAssessmentCreated
-	EventTypeFootprintReportGenerated             = eventconfig.FootprintReportGenerated
+	EventTypeFootprintEntryOpened                 = eventcatalog.FootprintEntryOpened
+	EventTypeFootprintIntakeConfirmed             = eventcatalog.FootprintIntakeConfirmed
+	EventTypeFootprintTesteeProfileCreated        = eventcatalog.FootprintTesteeProfileCreated
+	EventTypeFootprintCareRelationshipEstablished = eventcatalog.FootprintCareRelationshipEstablished
+	EventTypeFootprintCareRelationshipTransferred = eventcatalog.FootprintCareRelationshipTransferred
+	EventTypeFootprintAnswerSheetSubmitted        = eventcatalog.FootprintAnswerSheetSubmitted
+	EventTypeFootprintAssessmentCreated           = eventcatalog.FootprintAssessmentCreated
+	EventTypeFootprintReportGenerated             = eventcatalog.FootprintReportGenerated
 )
 
 type FootprintEntryOpenedData struct {

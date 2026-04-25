@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -47,16 +47,16 @@ func (OutboxPO) TableName() string {
 type Store struct {
 	db                 *gorm.DB
 	publishingStaleFor time.Duration
-	topicResolver      eventconfig.TopicResolver
+	topicResolver      eventcatalog.TopicResolver
 }
 
 func NewStore(db *gorm.DB) *Store {
-	return NewStoreWithTopicResolver(db, eventconfig.Global())
+	return NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
 }
 
-func NewStoreWithTopicResolver(db *gorm.DB, resolver eventconfig.TopicResolver) *Store {
+func NewStoreWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver) *Store {
 	if resolver == nil {
-		resolver = eventconfig.Global()
+		resolver = eventcatalog.NewCatalog(nil)
 	}
 	return &Store{
 		db:                 db,

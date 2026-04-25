@@ -8,7 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -24,7 +24,7 @@ import (
 // 4. 分发事件到对应处理器
 type EventDispatcher struct {
 	logger     *slog.Logger
-	subscriber *eventconfig.Subscriber
+	subscriber *eventruntime.Subscriber
 
 	// 处理器依赖
 	deps *HandlerDependencies
@@ -87,7 +87,7 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 	factory := d.createHandlerFactory(handlerDeps)
 
 	// 5. 创建订阅器
-	d.subscriber = eventconfig.NewSubscriber(eventconfig.SubscriberOptions{
+	d.subscriber = eventruntime.NewSubscriber(eventruntime.SubscriberOptions{
 		Catalog:        catalog,
 		HandlerFactory: factory,
 		Logger:         d.logger,
@@ -107,23 +107,23 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 
 // createHandlerFactory 创建处理器工厂
 // 使用 handlers 包的 init() 自注册机制
-func (d *EventDispatcher) createHandlerFactory(deps *handlers.Dependencies) eventconfig.HandlerFactory {
+func (d *EventDispatcher) createHandlerFactory(deps *handlers.Dependencies) eventruntime.HandlerFactory {
 	// 预先创建所有处理器实例
 	allHandlers := handlers.CreateAll(deps)
 
 	// 返回工厂函数
-	return func(handlerName string) (eventconfig.HandlerFunc, error) {
+	return func(handlerName string) (eventruntime.HandlerFunc, error) {
 		handler, ok := allHandlers[handlerName]
 		if !ok {
 			return nil, fmt.Errorf("handler %q not registered via init()", handlerName)
 		}
-		// 适配 handlers.HandlerFunc -> eventconfig.HandlerFunc
-		return eventconfig.HandlerFunc(handler), nil
+		// 适配 handlers.HandlerFunc -> eventruntime.HandlerFunc
+		return eventruntime.HandlerFunc(handler), nil
 	}
 }
 
 // GetTopicSubscriptions 获取需要订阅的 Topic 列表
-func (d *EventDispatcher) GetTopicSubscriptions() []eventconfig.TopicSubscription {
+func (d *EventDispatcher) GetTopicSubscriptions() []eventcatalog.TopicSubscription {
 	if d.subscriber == nil {
 		return nil
 	}

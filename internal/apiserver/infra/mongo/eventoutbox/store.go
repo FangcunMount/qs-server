@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -47,16 +47,16 @@ func (OutboxPO) CollectionName() string {
 type Store struct {
 	coll               *mongo.Collection
 	publishingStaleFor time.Duration
-	topicResolver      eventconfig.TopicResolver
+	topicResolver      eventcatalog.TopicResolver
 }
 
 func NewStore(db *mongo.Database) (*Store, error) {
-	return NewStoreWithTopicResolver(db, eventconfig.Global())
+	return NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
 }
 
-func NewStoreWithTopicResolver(db *mongo.Database, resolver eventconfig.TopicResolver) (*Store, error) {
+func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver) (*Store, error) {
 	if resolver == nil {
-		resolver = eventconfig.Global()
+		resolver = eventcatalog.NewCatalog(nil)
 	}
 	store := &Store{
 		coll:               db.Collection((&OutboxPO{}).CollectionName()),

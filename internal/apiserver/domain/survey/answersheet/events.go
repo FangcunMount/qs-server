@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -14,7 +14,7 @@ import (
 
 const (
 	// EventTypeSubmitted 答卷已提交
-	EventTypeSubmitted = eventconfig.AnswerSheetSubmitted
+	EventTypeSubmitted = eventcatalog.AnswerSheetSubmitted
 )
 
 // AggregateType 聚合根类型

@@ -7,9 +7,7 @@ import (
 )
 
 // TopicResolver resolves an event type to its physical topic name.
-type TopicResolver interface {
-	GetTopicForEvent(eventType string) (string, bool)
-}
+type TopicResolver = eventcatalog.TopicResolver
 
 // Registry is the legacy mutable global access point for event configuration.
 // New process code should prefer explicit eventcatalog.Catalog dependencies.

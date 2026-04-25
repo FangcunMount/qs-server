@@ -13,7 +13,8 @@ import (
 	infraMongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	mysqlbp "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,6 +26,7 @@ type resourceStageDeps struct {
 	database              databaseResourceDeps
 	redisRuntime          redisRuntimeStageDeps
 	mqPublisher           mqPublisherStageDeps
+	loadEventCatalog      func() (*eventcatalog.Catalog, error)
 	applyBackpressure     func()
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
@@ -42,7 +44,7 @@ type redisRuntimeStageDeps struct {
 }
 
 type mqPublisherStageDeps struct {
-	fallbackMode eventconfig.PublishMode
+	fallbackMode eventruntime.PublishMode
 	enabled      bool
 	provider     string
 	newPublisher func() (messaging.Publisher, error)
@@ -59,6 +61,7 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 		database:              buildDatabaseDeps(dbManager),
 		redisRuntime:          s.buildRedisRuntimeDeps(dbManager),
 		mqPublisher:           s.buildMQPublisherDeps(),
+		loadEventCatalog:      loadDefaultEventCatalog,
 		applyBackpressure:     s.buildBackpressureDeps(),
 		buildContainerOptions: s.buildContainerOptionsBuilder(),
 	}
@@ -111,7 +114,7 @@ func (s *server) buildMQPublisherDeps() mqPublisherStageDeps {
 	}
 
 	deps := mqPublisherStageDeps{
-		fallbackMode: eventconfig.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode),
+		fallbackMode: eventruntime.PublishModeFromEnv(s.config.GenericServerRunOptions.Mode),
 	}
 	if s.config.MessagingOptions != nil {
 		deps.enabled = s.config.MessagingOptions.Enabled
@@ -145,6 +148,10 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	}
 	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
 	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
+	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
+	if err != nil {
+		return resourceOutput{}, err
+	}
 
 	output := resourceOutput{
 		handles: resourceHandles{
@@ -166,6 +173,7 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 		output.containerInput = containerBootstrapInput{containerOptions: deps.buildContainerOptions(containerOptionsInput{
 			mqPublisher:    mqPublisher,
 			publishMode:    publishMode,
+			eventCatalog:   eventCatalog,
 			cacheSubsystem: cacheSubsystem,
 		})}
 	}
@@ -227,7 +235,7 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 	return redisCache, redisRuntime, deps.buildSubsystem(redisRuntime)
 }
 
-func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventconfig.PublishMode) {
+func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventruntime.PublishMode) {
 	if !deps.enabled || deps.newPublisher == nil {
 		return nil, deps.fallbackMode
 	}
@@ -244,5 +252,20 @@ func createMQPublisher(deps mqPublisherStageDeps) (messaging.Publisher, eventcon
 		"component", "apiserver",
 		"provider", deps.provider,
 	)
-	return publisher, eventconfig.PublishModeMQ
+	return publisher, eventruntime.PublishModeMQ
+}
+
+func loadDefaultEventCatalog() (*eventcatalog.Catalog, error) {
+	cfg, err := eventcatalog.Load("configs/events.yaml")
+	if err != nil {
+		return nil, err
+	}
+	return eventcatalog.NewCatalog(cfg), nil
+}
+
+func loadEventCatalog(load func() (*eventcatalog.Catalog, error)) (*eventcatalog.Catalog, error) {
+	if load == nil {
+		return eventcatalog.NewCatalog(nil), nil
+	}
+	return load()
 }

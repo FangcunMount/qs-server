@@ -259,7 +259,7 @@ flowchart TB
 
 - `scale.changed`
 - `action = published | unpublished | updated | archived`
-  - 定义与事件载荷：[events.go](../../internal/apiserver/domain/scale/events.go)；类型常量来自 [eventconfig](../../internal/pkg/eventconfig/types.go)（与 yaml 字符串一致）。
+  - 定义与事件载荷：[events.go](../../internal/apiserver/domain/scale/events.go)；类型常量来自 [eventcatalog](../../internal/pkg/eventcatalog/types.go)（与 yaml 字符串一致）。
 
 **与 `configs/events.yaml` 对照（Verify）**：
 

@@ -23,6 +23,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -38,6 +39,7 @@ type SurveyModule struct {
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher event.EventPublisher
+	topicResolver  eventcatalog.TopicResolver
 }
 
 // SurveyModuleDeps 定义 Survey 模块的显式构造依赖。
@@ -50,6 +52,7 @@ type SurveyModuleDeps struct {
 	QuestionnairePolicy cachepolicy.CachePolicy
 	HotsetRecorder      cachetarget.HotsetRecorder
 	Observer            *cacheobservability.ComponentObserver
+	TopicResolver       eventcatalog.TopicResolver
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -94,6 +97,7 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 	}
 
 	module.eventPublisher = normalized.EventPublisher
+	module.topicResolver = normalized.TopicResolver
 
 	// 初始化问卷子模块
 	if err := module.initQuestionnaireSubModule(
@@ -205,7 +209,7 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database) error {
 	sub := m.AnswerSheet
 
 	// 初始化 repository 层
-	baseRepo, err := asMongoInfra.NewRepository(mongoDB)
+	baseRepo, err := asMongoInfra.NewRepositoryWithTopicResolver(mongoDB, m.topicResolver)
 	if err != nil {
 		return err
 	}

@@ -26,6 +26,7 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
 		HotsetRecorder:      c.hotsetRecorder(),
 		Observer:            c.cacheObserver(),
+		TopicResolver:       c.eventCatalog,
 	}
 }
 

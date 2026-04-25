@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -24,7 +25,11 @@ type ReportRepository struct {
 
 // NewReportRepository 创建报告仓储
 func NewReportRepository(db *mongo.Database) (*ReportRepository, error) {
-	outboxStore, err := mongoEventOutbox.NewStore(db)
+	return NewReportRepositoryWithTopicResolver(db, nil)
+}
+
+func NewReportRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver) (*ReportRepository, error) {
+	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(db, resolver)
 	if err != nil {
 		return nil, err
 	}

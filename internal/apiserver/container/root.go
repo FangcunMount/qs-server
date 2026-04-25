@@ -13,7 +13,7 @@ import (
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
@@ -39,7 +39,7 @@ type Container struct {
 	// 事件发布器（统一管理）
 	eventPublisher event.EventPublisher
 	eventCatalog   *eventcatalog.Catalog
-	publisherMode  eventconfig.PublishMode
+	publisherMode  eventruntime.PublishMode
 
 	// 业务模块
 	SurveyModule     *assembler.SurveyModule     // Survey 模块（包含问卷和答卷子模块）
@@ -74,7 +74,7 @@ func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.Un
 		mysqlDB:       mysqlDB,
 		mongoDB:       mongoDB,
 		redisCache:    redisCache,
-		publisherMode: eventconfig.PublishModeLogging, // 默认使用日志模式
+		publisherMode: eventruntime.PublishModeLogging, // 默认使用日志模式
 		cacheOptions:  ContainerCacheOptions{},
 		initialized:   false,
 		modules:       make(map[string]assembler.Module),
@@ -116,9 +116,10 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	if opts.PublisherMode != "" {
 		c.publisherMode = opts.PublisherMode
 	} else if opts.Env != "" {
-		c.publisherMode = eventconfig.PublishModeFromEnv(opts.Env)
+		c.publisherMode = eventruntime.PublishModeFromEnv(opts.Env)
 	}
 
+	c.eventCatalog = opts.EventCatalog
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.planEntryURL = opts.PlanEntryBaseURL
@@ -133,13 +134,6 @@ func (c *Container) Initialize() error {
 	if c.initialized {
 		return nil
 	}
-
-	// 加载事件配置（发布器依赖此配置进行路由）
-	if err := eventconfig.Initialize("configs/events.yaml"); err != nil {
-		return fmt.Errorf("failed to load event config: %w", err)
-	}
-	c.eventCatalog = eventconfig.Global().Catalog()
-	c.printf("📋 Event config loaded (events.yaml)\n")
 
 	// 初始化事件发布器（所有模块共享）
 	c.initEventPublisher()
@@ -209,7 +203,7 @@ func (c *Container) printf(format string, args ...interface{}) {
 
 // initEventPublisher 初始化事件发布器
 func (c *Container) initEventPublisher() {
-	c.eventPublisher = eventconfig.NewRoutingPublisher(eventconfig.RoutingPublisherOptions{
+	c.eventPublisher = eventruntime.NewRoutingPublisher(eventruntime.RoutingPublisherOptions{
 		Mode:        c.publisherMode,
 		Source:      event.SourceAPIServer,
 		MQPublisher: c.mqPublisher,
