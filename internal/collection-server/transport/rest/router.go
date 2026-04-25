@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
 )
 
@@ -205,15 +206,25 @@ func rateLimitedHandlers(
 		globalLimiter := redisplane.NewDistributedLimiter(opsHandle)
 		userLimiter := redisplane.NewDistributedLimiter(opsHandle)
 		return []gin.HandlerFunc{
-			distributedLimit(globalLimiter, "limit:"+scope+":global", globalQPS, globalBurst, nil),
-			distributedLimit(userLimiter, "limit:"+scope+":user", userQPS, userBurst, requestLimitKey),
+			distributedLimit(globalLimiter, "limit:"+scope+":global", globalQPS, globalBurst, nil, scope, "global"),
+			distributedLimit(userLimiter, "limit:"+scope+":user", userQPS, userBurst, requestLimitKey, scope, "user"),
 			handler,
 		}
 	}
 
 	return []gin.HandlerFunc{
-		pkgmiddleware.Limit(globalQPS, globalBurst),
-		pkgmiddleware.LimitByKey(userQPS, userBurst, requestLimitKey),
+		pkgmiddleware.LimitWithOptions(globalQPS, globalBurst, pkgmiddleware.LimitOptions{
+			Component: "collection-server",
+			Scope:     scope,
+			Resource:  "global",
+			Strategy:  "local",
+		}),
+		pkgmiddleware.LimitByKeyWithOptions(userQPS, userBurst, requestLimitKey, pkgmiddleware.LimitOptions{
+			Component: "collection-server",
+			Scope:     scope,
+			Resource:  "user",
+			Strategy:  "local_key",
+		}),
 		handler,
 	}
 }
@@ -224,9 +235,19 @@ func distributedLimit(
 	qps float64,
 	burst int,
 	keyFn func(*gin.Context) string,
+	limitScope string,
+	resource string,
 ) gin.HandlerFunc {
+	subject := resilienceplane.Subject{
+		Component: "collection-server",
+		Scope:     limitScope,
+		Resource:  resource,
+		Strategy:  "redis",
+	}
+	observer := resilienceplane.DefaultObserver()
 	return func(c *gin.Context) {
 		if limiter == nil {
+			resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeDegradedOpen)
 			c.Next()
 			return
 		}
@@ -239,13 +260,16 @@ func distributedLimit(
 		}
 		allowed, retryAfter, err := limiter.Allow(c.Request.Context(), key, qps, burst)
 		if err != nil {
+			resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeDegradedOpen)
 			c.Next()
 			return
 		}
 		if allowed {
+			resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeAllowed)
 			c.Next()
 			return
 		}
+		resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeRateLimited)
 		seconds := int(retryAfter.Seconds()) + 1
 		if seconds < 1 {
 			seconds = 1

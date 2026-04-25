@@ -14,6 +14,7 @@
 | 阅读原则 | 先总览，再按问题进入运行时 / 业务模块 / 基础设施 / 接口运维 / 专题分析 |
 | 事件入口 | 事件系统统一从 [03-基础设施/01-事件系统.md](./03-基础设施/01-事件系统.md) 和 [03-基础设施/event/README.md](./03-基础设施/event/README.md) 进入 |
 | Redis 入口 | Redis 相关文档统一从 [03-基础设施/12-Redis文档中心.md](./03-基础设施/12-Redis文档中心.md) 进入 |
+| Resilience 入口 | 限流、队列、背压、锁、幂等和降级统一从 [03-基础设施/resilience/README.md](./03-基础设施/resilience/README.md) 进入 |
 
 ---
 
@@ -78,6 +79,13 @@
 2. [03-基础设施/redis/README.md](./03-基础设施/redis/README.md)
 3. [03-基础设施/06-Redis使用情况.md](./03-基础设施/06-Redis使用情况.md)
 4. [03-基础设施/13-Redis缓存业务清单.md](./03-基础设施/13-Redis缓存业务清单.md)
+
+### 需要看高并发治理 / Resilience Plane
+
+1. [03-基础设施/resilience/README.md](./03-基础设施/resilience/README.md)
+2. [03-基础设施/resilience/00-整体架构.md](./03-基础设施/resilience/00-整体架构.md)
+3. [03-基础设施/resilience/05-观测降级与排障.md](./03-基础设施/resilience/05-观测降级与排障.md)
+4. [03-基础设施/resilience/06-新增高并发治理能力SOP.md](./03-基础设施/resilience/06-新增高并发治理能力SOP.md)
 
 ### 需要准备宣讲或对外介绍
 

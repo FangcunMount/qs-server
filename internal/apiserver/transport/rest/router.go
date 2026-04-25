@@ -140,8 +140,18 @@ func (r *Router) rateLimitedHandlers(
 	}
 
 	return []gin.HandlerFunc{
-		middleware.Limit(globalQPS, globalBurst),
-		middleware.LimitByKey(userQPS, userBurst, requestLimitKey),
+		middleware.LimitWithOptions(globalQPS, globalBurst, middleware.LimitOptions{
+			Component: "apiserver",
+			Scope:     "rest",
+			Resource:  "global",
+			Strategy:  "local",
+		}),
+		middleware.LimitByKeyWithOptions(userQPS, userBurst, requestLimitKey, middleware.LimitOptions{
+			Component: "apiserver",
+			Scope:     "rest",
+			Resource:  "user",
+			Strategy:  "local_key",
+		}),
 		handler,
 	}
 }

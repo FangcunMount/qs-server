@@ -203,14 +203,21 @@ func (s *server) configureBackpressure() {
 		return
 	}
 	if bp := s.config.Backpressure.MySQL; bp != nil && bp.Enabled {
-		mysqlbp.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+		mysqlbp.SetLimiter(newDependencyBackpressureLimiter("mysql", bp.MaxInflight, bp.TimeoutMs))
 	}
 	if bp := s.config.Backpressure.Mongo; bp != nil && bp.Enabled {
-		infraMongo.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+		infraMongo.SetLimiter(newDependencyBackpressureLimiter("mongo", bp.MaxInflight, bp.TimeoutMs))
 	}
 	if bp := s.config.Backpressure.IAM; bp != nil && bp.Enabled {
-		infraIAM.SetLimiter(backpressure.NewLimiter(bp.MaxInflight, time.Duration(bp.TimeoutMs)*time.Millisecond))
+		infraIAM.SetLimiter(newDependencyBackpressureLimiter("iam", bp.MaxInflight, bp.TimeoutMs))
 	}
+}
+
+func newDependencyBackpressureLimiter(dependency string, maxInflight int, timeoutMs int) *backpressure.Limiter {
+	return backpressure.NewLimiterWithOptions(maxInflight, time.Duration(timeoutMs)*time.Millisecond, backpressure.Options{
+		Component:  "apiserver",
+		Dependency: dependency,
+	})
 }
 
 func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, *redisbootstrap.RuntimeBundle, *cachebootstrap.Subsystem) {

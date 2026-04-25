@@ -10,6 +10,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 type answerSheetProcessingGateMode string
@@ -120,6 +121,7 @@ func withAnswerSheetProcessingGate(
 
 	if deps.LockManager == nil {
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "redis_unavailable")
+		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -133,6 +135,7 @@ func withAnswerSheetProcessingGate(
 	lease, acquired, err := hooks.acquire(ctx, deps, answerSheetID)
 	if err != nil {
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
+		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -144,6 +147,7 @@ func withAnswerSheetProcessingGate(
 		return fn(ctx)
 	}
 	if !acquired {
+		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDuplicateSkipped)
 		deps.Logger.Info("answersheet processing skipped as duplicate",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -173,6 +177,15 @@ func withAnswerSheetProcessingGate(
 	}()
 
 	return fn(ctx)
+}
+
+func observeAnswerSheetGate(ctx context.Context, outcome resilienceplane.Outcome) {
+	resilienceplane.Observe(ctx, resilienceplane.DefaultObserver(), resilienceplane.ProtectionDuplicateSuppression, resilienceplane.Subject{
+		Component: "worker",
+		Scope:     "answersheet_submitted",
+		Resource:  "answersheet_processing",
+		Strategy:  "redis_lock",
+	}, outcome)
 }
 
 // acquireProcessingLock 获取答卷处理的 best-effort Redis lease lock。

@@ -9,6 +9,7 @@ import (
 	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 // Identity 描述一个具体的锁实例身份。
@@ -45,10 +46,12 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	key, err := m.lockKey(identity)
 	if err != nil {
 		cacheobservability.ObserveLockAcquire(lockName, "error")
+		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		return nil, false, err
 	}
 	if m == nil || m.handle == nil || m.handle.Client == nil {
 		cacheobservability.ObserveLockDegraded(lockName, "redis_unavailable")
+		m.observe(ctx, identity, resilienceplane.OutcomeLockDegraded)
 		err := fmt.Errorf("lock redis handle is unavailable")
 		cacheobservability.ObserveFamilyFailure(m.component, string(redisplane.FamilyLock), err)
 		return nil, false, err
@@ -56,15 +59,18 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	token, acquired, err := rediskit.AcquireLease(ctx, m.handle.Client, key, ttl)
 	if err != nil {
 		cacheobservability.ObserveLockAcquire(lockName, "error")
+		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		cacheobservability.ObserveFamilyFailure(m.component, string(redisplane.FamilyLock), err)
 		return nil, false, err
 	}
 	if !acquired {
 		cacheobservability.ObserveLockAcquire(lockName, "contention")
+		m.observe(ctx, identity, resilienceplane.OutcomeLockContention)
 		cacheobservability.ObserveFamilySuccess(m.component, string(redisplane.FamilyLock))
 		return nil, false, nil
 	}
 	cacheobservability.ObserveLockAcquire(lockName, "ok")
+	m.observe(ctx, identity, resilienceplane.OutcomeLockAcquired)
 	cacheobservability.ObserveFamilySuccess(m.component, string(redisplane.FamilyLock))
 	return &Lease{Key: key, Token: token}, true, nil
 }
@@ -92,10 +98,12 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 	}
 	if err := rediskit.ReleaseLease(ctx, m.handle.Client, lease.Key, lease.Token); err != nil {
 		cacheobservability.ObserveLockRelease(lockName, "error")
+		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		cacheobservability.ObserveFamilyFailure(m.component, string(redisplane.FamilyLock), err)
 		return err
 	}
 	cacheobservability.ObserveLockRelease(lockName, "ok")
+	m.observe(ctx, identity, resilienceplane.OutcomeLockReleased)
 	cacheobservability.ObserveFamilySuccess(m.component, string(redisplane.FamilyLock))
 	return nil
 }
@@ -131,4 +139,17 @@ func (m *Manager) metricName(identity Identity) string {
 		base = "lock"
 	}
 	return base
+}
+
+func (m *Manager) observe(ctx context.Context, identity Identity, outcome resilienceplane.Outcome) {
+	component := ""
+	if m != nil {
+		component = m.component
+	}
+	resilienceplane.Observe(ctx, resilienceplane.DefaultObserver(), resilienceplane.ProtectionLock, resilienceplane.Subject{
+		Component: component,
+		Scope:     m.metricName(identity),
+		Resource:  "redis_lock",
+		Strategy:  "lease",
+	}, outcome)
 }
