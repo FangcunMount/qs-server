@@ -121,7 +121,7 @@ mysql:
   password: ""
   database: "qs"
   max-idle-connections: 10        # 2C4G 临时降配阶段降低热连接占用
-  max-open-connections: 80        # 收紧连接池，和下游背压预算一起控制数据库并发
+  max-open-connections: 100        # 收紧连接池，和下游背压预算一起控制数据库并发
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
@@ -270,7 +270,7 @@ plan_scheduler:
   org_ids: [1]                  # 组织ID列表（从配置读取，默认调度所有组织）
   initial_delay: "1m"           # 启动后首次调度延迟，避免与其他服务启动冲突
   interval: "10m"               # 2C4G 临时降配阶段回到保守扫描频率
-  pending_lookback: "1200d"       # 只自动开放最近 24 小时内到期的 pending 任务，避免历史补录任务被立即开放
+  pending_lookback: "28800h"       # 只自动开放最近 24 小时内到期的 pending 任务，避免历史补录任务被立即开放
   lock_key: "qs:plan-scheduler:leader" # 分布式锁键，确保单实例执行
   lock_ttl: "2m"                # 锁过期时间，略长于调度间隔，避免死锁
 
@@ -317,7 +317,7 @@ rate_limit:
 backpressure:
   mysql:
     enabled: true
-    max_inflight: 80
+    max_inflight: 100
     timeout_ms: 2500
   mongo:
     enabled: true
@@ -325,7 +325,7 @@ backpressure:
     timeout_ms: 2000
   iam:
     enabled: true
-    max_inflight: 40
+    max_inflight: 100
     timeout_ms: 2000
 
 # ----------------------------------------------------------------------------
